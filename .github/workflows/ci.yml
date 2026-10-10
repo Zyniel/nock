@@ -47,9 +47,12 @@ jobs:
       - name: Install the web client
         run: npm --prefix web ci
 
-      - name: Install the browser for browser tests
-        run: uv run playwright install --with-deps chromium
+      - name: Install the browsers for browser tests
+        run: uv run playwright install --with-deps chromium firefox webkit
 
       # The same command you run locally and that the Claude Code hooks run.
+      # CI also runs the browser tests in Firefox (see pyproject.toml).
       - name: Run the quality gate
         run: uv run python scripts/gate.py
+        env:
+          PYTEST_ADDOPTS: --browser firefox

@@ -72,4 +72,15 @@ python-version = "3.13"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    # Browser tests run in Chromium and WebKit here; CI adds Firefox through
+    # PYTEST_ADDOPTS (human decision, 2026-10-10: all three engines). Firefox is
+    # left out locally because Windows blocks its executable on this machine.
+    "--browser",
+    "chromium",
+    "--browser",
+    "webkit",
+]
