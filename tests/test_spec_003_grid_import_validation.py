@@ -293,8 +293,12 @@ def test_ac4_fx01_report_holds_the_parsed_grid(fx01_text: str) -> None:
 
 def test_ac4_report_is_frozen(fx01_text: str) -> None:
     report = import_grid(fx01_text)
+    # The attribute name goes through a variable: a direct assignment is
+    # rejected by the type checker on a frozen model, and setattr with a
+    # constant name is rejected by the linter.
+    attribute_name = "word_count"
     with pytest.raises(ValidationError):
-        report.word_count = 9
+        setattr(report, attribute_name, 9)
 
 
 def test_ac4_empty_cells_are_not_counted() -> None:
