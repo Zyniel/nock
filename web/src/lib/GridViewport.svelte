@@ -11,13 +11,65 @@
     fitCellSize,
   } from './gridLayout'
   import type { GridView } from './roomSession'
+  import { positionKey, wordKey } from './wordSelection'
+  import type { Selection, Word } from './wordSelection'
 
   interface Finger {
     clientX: number
     clientY: number
   }
 
-  let { grid }: { grid: GridView } = $props()
+  let {
+    grid,
+    words,
+    selection,
+    activeWord,
+    onCellTap,
+    onClueTap,
+  }: {
+    grid: GridView
+    words: Word[]
+    selection: Selection | null
+    activeWord: Word | null
+    onCellTap: (row: number, column: number) => void
+    onClueTap: (word: Word) => void
+  } = $props()
+
+  let gridElement: HTMLDivElement | undefined = $state()
+  let activeKey = $derived(activeWord === null ? '' : wordKey(activeWord))
+  let wordPositions = $derived(
+    new Set((activeWord?.cells ?? []).map((cell) => positionKey(cell.row, cell.column))),
+  )
+
+  function isSelected(row: number, column: number): boolean {
+    return selection !== null && selection.row === row && selection.column === column
+  }
+
+  // One handler for the whole grid: find the cell or the clue that was tapped.
+  function onGridClick(event: MouseEvent): void {
+    if (!(event.target instanceof Element)) {
+      return
+    }
+    const clueElement = event.target.closest('[data-testid="clue"]')
+    const cellElement = event.target.closest('[data-testid="cell"]')
+    if (cellElement === null) {
+      return
+    }
+    const row = Number(cellElement.getAttribute('data-row'))
+    const column = Number(cellElement.getAttribute('data-column'))
+    if (clueElement !== null) {
+      const clueIndex = Number(clueElement.getAttribute('data-clue-index'))
+      const key = `${row},${column},${clueIndex}`
+      const word = words.find((candidate) => wordKey(candidate) === key)
+      if (word !== undefined) {
+        onClueTap(word)
+        gridElement?.focus()
+      }
+    } else if (cellElement.getAttribute('data-type') === 'letter') {
+      onCellTap(row, column)
+      gridElement?.focus()
+    }
+  }
 
   let viewport: HTMLDivElement | undefined = $state()
   let areaWidth = $state(0)
@@ -43,6 +95,16 @@
     const observer = new ResizeObserver(measure)
     observer.observe(element)
     return () => observer.disconnect()
+  })
+
+  // Taps and clicks on the grid select a word.
+  $effect(() => {
+    const element = gridElement
+    if (element === undefined) {
+      return
+    }
+    element.addEventListener('click', onGridClick)
+    return () => element.removeEventListener('click', onGridClick)
   })
 
   // Touch gestures, handled here: one finger pans, two fingers pinch (the zoom
@@ -140,6 +202,13 @@
     data-width={String(grid.width)}
     data-height={String(grid.height)}
     aria-label={t('grid.label')}
+    role="grid"
+    tabindex="0"
+    bind:this={gridElement}
+    data-selected-row={selection === null ? '' : String(selection.row)}
+    data-selected-column={selection === null ? '' : String(selection.column)}
+    data-direction={selection === null ? '' : selection.direction}
+    data-word={activeKey}
     style:--cell="{cellSize}px"
     style:grid-template-columns="repeat({grid.width}, var(--cell))"
     style:grid-auto-rows="var(--cell)"
@@ -155,6 +224,10 @@
           data-type="letter"
           data-letter={cell.letter ?? ''}
           data-locked={String(cell.locked)}
+          data-selected={String(isSelected(cell.row, cell.column))}
+          data-in-word={String(wordPositions.has(positionKey(cell.row, cell.column)))}
+          class:selected={isSelected(cell.row, cell.column)}
+          class:in-word={wordPositions.has(positionKey(cell.row, cell.column))}
           style:grid-row={cell.row + 1}
           style:grid-column={cell.column + 1}
         >{cell.letter ?? ''}</div>
@@ -178,6 +251,8 @@
               data-testid="clue"
               data-clue-index={index}
               data-arrow={clue.arrow}
+              data-active={String(activeKey === `${cell.row},${cell.column},${index}`)}
+              class:active={activeKey === `${cell.row},${cell.column},${index}`}
             >
               <span class="clue-text" data-testid="clue-text">{clue.text}</span>
               <span
@@ -246,6 +321,22 @@
 
   .letter.locked {
     background: #dfe3ee;
+  }
+
+  .letter.in-word {
+    background: #cfe3ff;
+  }
+
+  .letter.selected {
+    background: #ffd54a;
+  }
+
+  .clue.active {
+    background: #ffd54a;
+  }
+
+  .grid:focus {
+    outline: none;
   }
 
   .empty {

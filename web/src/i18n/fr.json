@@ -22,5 +22,7 @@
   "room.status.not_found": "Ce salon n'existe pas.",
   "room.status.closed": "Connexion perdue.",
   "grid.label": "Grille",
+  "clue_bar.label": "Définition en cours",
+  "clue_bar.empty": "Touchez une case ou une définition.",
   "not_found.heading": "Page introuvable"
 }
