@@ -762,12 +762,19 @@ def test_ac2_when_every_word_is_finished_tab_changes_nothing_and_keeps_the_focus
     tap(page, 1, 1)
     expect_selection(page, 1, 1, "across", ACROSS_W1)
 
+    grid = page.get_by_test_id("grid")
+
     page.keyboard.press("Tab")
+    expect(grid).to_be_focused()
     page.keyboard.press("Shift+Tab")
+    expect(grid).to_be_focused()
+
+    assert dispatch_key(page, "Tab") is False
+    assert dispatch_key(page, "Tab", shift=True) is False
 
     settle(page)
     expect_selection(page, 1, 1, "across", ACROSS_W1)
-    expect(page.get_by_test_id("grid")).to_be_focused()
+    expect(grid).to_be_focused()
     assert sent_selections(mock) == [across(1, 1)]
     assert len(mock.received) == 2
 
