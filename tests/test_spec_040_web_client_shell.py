@@ -627,6 +627,31 @@ def test_ac28_no_response_of_the_app_is_a_redirect(
         assert "location" not in response.headers, path
 
 
+API_DOCS_PATHS = ["/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"]
+
+
+@pytest.mark.parametrize("path", API_DOCS_PATHS)
+def test_ac29_api_docs_answer_json_404_with_a_built_client(
+    empty_client: TestClient, path: str
+) -> None:
+    response = empty_client.get(path, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+
+
+@pytest.mark.parametrize("path", API_DOCS_PATHS)
+def test_ac29_api_docs_answer_json_404_without_a_built_client(
+    tmp_path: Path, path: str
+) -> None:
+    client = TestClient(create_app(dist_dir=tmp_path / "does-not-exist"))
+
+    response = client.get(path, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+
+
 # ---- AC-7: RoomRegistry -----------------------------------------------------
 
 
