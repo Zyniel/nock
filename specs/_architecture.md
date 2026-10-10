@@ -63,14 +63,15 @@ interface" follows this note. Decided with the human on 2026-10-10.
 | `nock/server.py` | FastAPI app and WebSocket endpoint |
 | `web/` | Svelte client |
 
-## Still to do before the first server or client spec
+## Toolchain (in place since 2026-10-10)
 
-These touch tooling, so the human decides and makes the change:
-
-- Add the dependencies: `pydantic` first (spec 002), then `fastapi`, `uvicorn`;
-  for tests `httpx`, `pytest-playwright`.
-- Add the Node toolchain for `web/` and its checks (`svelte-check`, lint) to the
-  gate.
-- Let the implementer role write `web/` in `scripts/hooks/guard_paths.py` and in
-  the role table of `CLAUDE.md`.
-- Write the room events spec (the message list in `nock/protocol.py`).
+- Python: `pydantic`, `fastapi`, `uvicorn[standard]`; for tests `httpx` and
+  `pytest-playwright` (Chromium installed by `uv run playwright install chromium`).
+- Client: Node.js LTS; `web/` was created from the Vite `svelte-ts` template.
+- The full gate runs `npm --prefix web run check` (svelte-check and tsc) and
+  `npm --prefix web run build` before pytest, so browser tests use the fresh
+  build in `web/dist`. CI installs Node, runs `npm --prefix web ci` and installs
+  Chromium first.
+- The implementer may write `web/`. Its `package.json`, lock file and config
+  files count as tooling: adding an npm dependency is the human's decision.
+- The room events contract is spec 039 (`nock/protocol.py`).

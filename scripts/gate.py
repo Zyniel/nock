@@ -9,7 +9,8 @@ Usage:
 
 Stages:
     tests: ruff + black + spec traceability.
-    full:  everything in "tests", then pyrefly + pytest.
+    full:  everything in "tests", then pyrefly, svelte-check and the vite build
+           of web/, then pytest (browser tests included).
 
 Exit codes:
     0: every check passed.
@@ -42,8 +43,13 @@ STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("ruff (lint)", ["ruff", "check", "."]),
     ("black (format)", ["black", "--check", "--diff", "--quiet", "."]),
 ]
+WEB_DIR = PROJECT_ROOT / "web"
+
+# pytest comes after the web build: browser tests load the built client.
 RUNTIME_STEPS: list[tuple[str, list[str]]] = [
     ("pyrefly (types)", ["pyrefly", "check"]),
+    ("svelte-check (web types)", ["npm", "--prefix", "web", "run", "check"]),
+    ("vite build (web)", ["npm", "--prefix", "web", "run", "build"]),
     ("pytest (tests)", ["pytest", "--quiet"]),
 ]
 
@@ -62,7 +68,14 @@ def run_step(step_name: str, command: list[str]) -> bool:
 
     executable_path = shutil.which(command[0])
     if executable_path is None:
-        print(f"FAIL: '{command[0]}' is not installed. Run: uv sync")
+        print(
+            f"FAIL: '{command[0]}' is not installed. "
+            "Run: uv sync (Python tools), or install Node.js LTS (npm)."
+        )
+        return False
+
+    if command[0] == "npm" and not (WEB_DIR / "node_modules").is_dir():
+        print("FAIL: the web dependencies are not installed. Run: npm --prefix web ci")
         return False
 
     full_command = [executable_path, *command[1:]]

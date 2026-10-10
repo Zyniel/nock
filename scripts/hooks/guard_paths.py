@@ -22,7 +22,7 @@ from pathlib import Path
 ROLE_WRITE_PATHS: dict[str, list[str]] = {
     "spec-writer": ["specs/"],
     "test-writer": ["tests/"],
-    "implementer": ["src/", "docs/", "README.md"],
+    "implementer": ["src/", "web/", "docs/", "README.md"],
     "reviewer": [],
 }
 
