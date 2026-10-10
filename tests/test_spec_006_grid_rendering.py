@@ -1285,3 +1285,144 @@ def test_ac6_the_last_grid_stays_on_screen_after_the_socket_closes(
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")
     expect(cell_at(page, 1, 2)).to_have_attribute("data-locked", "true")
     expect(cell_at(page, 1, 2)).to_have_text("M")
+
+
+# ---- AC-7: the room page fits the window -------------------------------------
+
+CELLS_OUTSIDE_SCRIPT = """() => {
+  const outside = [];
+  for (const e of document.querySelectorAll('[data-testid="cell"]')) {
+    const b = e.getBoundingClientRect();
+    const inside = b.left >= -1 && b.top >= -1
+      && b.right <= window.innerWidth + 1 && b.bottom <= window.innerHeight + 1;
+    if (!inside) outside.push(e.dataset.row + ',' + e.dataset.column);
+  }
+  return outside;
+}"""
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac7_viewport_is_inside_the_window_vertically(
+    page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page.set_viewport_size({"width": width, "height": height})
+    viewport = open_room(page, live_server, room_registry, fx01_grid)
+
+    expect(viewport).to_have_attribute("data-zoom", "1")
+    window_height = page.evaluate("() => window.innerHeight")
+    box = box_of(viewport)
+    assert box["y"] >= -1
+    assert box["y"] + box["height"] <= window_height + 1
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac7_room_page_has_no_vertical_scroll(
+    page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page.set_viewport_size({"width": width, "height": height})
+    open_room(page, live_server, room_registry, fx01_grid)
+
+    sizes = page.evaluate(
+        "() => [document.documentElement.scrollHeight, window.innerHeight]"
+    )
+
+    assert sizes[0] <= sizes[1]
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac7_every_cell_is_inside_the_window(
+    page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page.set_viewport_size({"width": width, "height": height})
+    open_room(page, live_server, room_registry, fx01_grid)
+
+    expect(page.get_by_test_id("cell")).to_have_count(25)
+    assert page.evaluate(CELLS_OUTSIDE_SCRIPT) == []
+
+
+# ---- AC-8: a malformed grid in a snapshot is ignored --------------------------
+
+MALFORMED_KINDS = ["duplicate_position", "out_of_range_row", "out_of_range_column"]
+MALFORMED_KINDS += ["missing_cell", "extra_cell"]
+
+
+def malformed_frame(view: GridView, seq: int, kind: str) -> str:
+    """A snapshot frame whose grid breaks one rule; it also changes cell (1, 1)."""
+    changed = with_letter_cells(view, [(1, 1, {"letter": "Q"})])
+    data = json.loads(snapshot_frame(changed, seq))
+    cells = data["grid"]["cells"]
+    if kind == "duplicate_position":
+        cells[1] = dict(cells[0])
+    elif kind == "out_of_range_row":
+        cells[-1]["row"] = 5
+    elif kind == "out_of_range_column":
+        cells[-1]["column"] = 5
+    elif kind == "missing_cell":
+        cells.pop()
+    elif kind == "extra_cell":
+        cells.append(dict(cells[-1]))
+    else:
+        pytest.fail(f"unknown kind {kind}")
+    return json.dumps(data)
+
+
+@pytest.mark.parametrize("kind", MALFORMED_KINDS)
+def test_ac8_a_malformed_grid_is_ignored_and_the_previous_grid_is_kept(
+    page: Page, live_server: str, fx01_grid: Grid, kind: str
+) -> None:
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    mock = open_mock_room(page, live_server)
+    first_view = with_letter_cells(grid_view(fx01_grid), [(1, 0, {"letter": "T"})])
+    show_snapshot(page, mock, first_view, 0)
+
+    mock.send(malformed_frame(grid_view(fx01_grid), 1, kind))
+    page.wait_for_timeout(SETTLE_MS)
+
+    room = page.get_by_test_id("room-page")
+    expect(room).to_have_attribute("data-seq", "0")
+    expect(room).to_have_attribute("data-status", "joined")
+    expect(page.get_by_test_id("cell")).to_have_count(25)
+    expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")
+    expect(cell_at(page, 1, 1)).to_have_attribute("data-letter", "")
+    expect(page.locator('[data-testid="cell"][data-type="clue"]')).to_have_count(7)
+    expect(page.get_by_test_id("grid")).to_have_attribute("data-width", "5")
+    assert errors == []
+
+
+@pytest.mark.parametrize("kind", MALFORMED_KINDS)
+def test_ac8_a_valid_snapshot_sent_after_a_malformed_one_is_shown(
+    page: Page, live_server: str, fx01_grid: Grid, kind: str
+) -> None:
+    mock = open_mock_room(page, live_server)
+    show_snapshot(page, mock, grid_view(fx01_grid), 0)
+    mock.send(malformed_frame(grid_view(fx01_grid), 1, kind))
+    page.wait_for_timeout(SETTLE_MS)
+    next_view = with_letter_cells(grid_view(fx01_grid), [(1, 2, {"letter": "M"})])
+
+    show_snapshot(page, mock, next_view, 2)
+
+    expect(cell_at(page, 1, 2)).to_have_attribute("data-letter", "M")
+    expect(cell_at(page, 1, 1)).to_have_attribute("data-letter", "")
+    expect(page.get_by_test_id("cell")).to_have_count(25)

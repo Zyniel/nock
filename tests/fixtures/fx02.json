@@ -31,7 +31,7 @@
     {"type": "letter", "row": 2, "column": 0},
     {"type": "letter", "row": 2, "column": 1},
     {"type": "letter", "row": 2, "column": 2},
-    {"type": "clue", "row": 2, "column": 3, "clues": [{"text": "Verbe aller au futur", "arrow": "down", "answer": "IRA"}]},
+    {"type": "clue", "row": 2, "column": 3, "clues": [{"text": "Il ... au futur", "arrow": "down", "answer": "IRA"}]},
     {"type": "letter", "row": 2, "column": 4},
     {"type": "empty", "row": 2, "column": 5},
     {"type": "letter", "row": 2, "column": 6},
