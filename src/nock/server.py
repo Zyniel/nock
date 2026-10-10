@@ -85,16 +85,29 @@ def _index_response(dist_dir: Path) -> Response:
     return FileResponse(index_path)
 
 
+def _is_safe_file_name(name: str) -> bool:
+    """Tell whether `name` is one plain file name that cannot leave a directory."""
+    if name in ("", ".", ".."):
+        return False
+    if "/" in name:
+        return False
+    if "\\" in name:
+        return False
+    # ":" would allow Windows drive letters and alternate data streams.
+    return ":" not in name
+
+
 def _file_in_directory(directory: Path, name: str) -> FileResponse:
     """Answer with the regular file `name` directly inside `directory`.
 
     Raises:
         HTTPException: 404 when there is no such file, or `name` leaves `directory`.
     """
-    is_plain_name = name not in ("", ".", "..") and "/" not in name
-    if not is_plain_name or "\\" in name:
+    if not _is_safe_file_name(name):
         raise _not_found()
-    file_path = directory / name
+    file_path = (directory / name).resolve()
+    if not file_path.is_relative_to(directory.resolve()):
+        raise _not_found()
     if not file_path.is_file():
         raise _not_found()
     return FileResponse(file_path)
