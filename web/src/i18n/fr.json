@@ -21,5 +21,6 @@
   "room.status.joined": "Connecté",
   "room.status.not_found": "Ce salon n'existe pas.",
   "room.status.closed": "Connexion perdue.",
+  "grid.label": "Grille",
   "not_found.heading": "Page introuvable"
 }

@@ -3,16 +3,48 @@
 
 export type RoomStatus = 'connecting' | 'joined' | 'not_found' | 'closed'
 
-export interface GridSize {
-  width: number
-  height: number
+export type Arrow = 'right' | 'down' | 'right_then_down' | 'down_then_right'
+
+export interface ClueView {
+  text: string
+  arrow: Arrow
 }
 
-// Only what the shell reads from a snapshot (later specs read more).
+export interface LetterCellView {
+  type: 'letter'
+  row: number
+  column: number
+  // `null` when the cell is empty.
+  letter: string | null
+  locked: boolean
+}
+
+export interface ClueCellView {
+  type: 'clue'
+  row: number
+  column: number
+  clues: ClueView[]
+}
+
+export interface EmptyCellView {
+  type: 'empty'
+  row: number
+  column: number
+}
+
+export type CellView = LetterCellView | ClueCellView | EmptyCellView
+
+export interface GridView {
+  width: number
+  height: number
+  cells: CellView[]
+}
+
+// Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
   seq: number
-  grid: GridSize
+  grid: GridView
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -54,8 +86,69 @@ function parseFrame(text: string): Record<string, unknown> | null {
   return message
 }
 
-function toSnapshot(message: Record<string, unknown>): Snapshot | null {
-  const grid = message.grid as Record<string, unknown> | null | undefined
+const ARROWS: string[] = ['right', 'down', 'right_then_down', 'down_then_right']
+
+function toClue(value: unknown): ClueView | null {
+  const clue = value as Record<string, unknown> | null
+  if (typeof clue !== 'object' || clue === null) {
+    return null
+  }
+  if (typeof clue.text !== 'string' || typeof clue.arrow !== 'string') {
+    return null
+  }
+  if (!ARROWS.includes(clue.arrow)) {
+    return null
+  }
+  return { text: clue.text, arrow: clue.arrow as Arrow }
+}
+
+function toClues(value: unknown): ClueView[] | null {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 2) {
+    return null
+  }
+  const clues: ClueView[] = []
+  for (const item of value) {
+    const clue = toClue(item)
+    if (clue === null) {
+      return null
+    }
+    clues.push(clue)
+  }
+  return clues
+}
+
+// Returns null for an unknown cell type or a malformed cell.
+function toCell(value: unknown): CellView | null {
+  const cell = value as Record<string, unknown> | null
+  if (typeof cell !== 'object' || cell === null) {
+    return null
+  }
+  const { row, column } = cell
+  if (typeof row !== 'number' || typeof column !== 'number') {
+    return null
+  }
+  if (cell.type === 'empty') {
+    return { type: 'empty', row, column }
+  }
+  if (cell.type === 'clue') {
+    const clues = toClues(cell.clues)
+    return clues === null ? null : { type: 'clue', row, column, clues }
+  }
+  if (cell.type === 'letter') {
+    const { letter, locked } = cell
+    if (letter !== null && typeof letter !== 'string') {
+      return null
+    }
+    if (typeof locked !== 'boolean') {
+      return null
+    }
+    return { type: 'letter', row, column, letter, locked }
+  }
+  return null
+}
+
+function toGrid(value: unknown): GridView | null {
+  const grid = value as Record<string, unknown> | null | undefined
   if (typeof grid !== 'object' || grid === null) {
     return null
   }
@@ -63,10 +156,29 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
   if (typeof width !== 'number' || typeof height !== 'number') {
     return null
   }
+  if (!Array.isArray(grid.cells)) {
+    return null
+  }
+  const cells: CellView[] = []
+  for (const item of grid.cells) {
+    const cell = toCell(item)
+    if (cell === null) {
+      return null
+    }
+    cells.push(cell)
+  }
+  return { width, height, cells }
+}
+
+function toSnapshot(message: Record<string, unknown>): Snapshot | null {
+  const grid = toGrid(message.grid)
+  if (grid === null) {
+    return null
+  }
   if (typeof message.seq !== 'number' || !Number.isInteger(message.seq)) {
     return null
   }
-  return { type: 'snapshot', seq: message.seq, grid: { width, height } }
+  return { type: 'snapshot', seq: message.seq, grid }
 }
 
 function toEvent(message: Record<string, unknown>): RoomEvent | null {

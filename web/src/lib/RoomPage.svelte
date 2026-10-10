@@ -1,4 +1,5 @@
 <script lang="ts">
+  import GridViewport from './GridViewport.svelte'
   import { t } from './i18n'
   import { gridLabel, newSession, receiveFrame, statusAfterClose } from './roomSession'
 
@@ -51,4 +52,7 @@
 >
   <h1>{t('room.heading', { code })}</h1>
   <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+  {#if session.snapshot !== null}
+    <GridViewport grid={session.snapshot.grid} />
+  {/if}
 </main>
