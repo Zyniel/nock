@@ -94,6 +94,7 @@ the specs whose criteria this one mentions.
 | [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 3 | 015 |
 | [037](037-integrity.md) | US-10.3 Integrity | E10 | MVP | 4 | - |
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 4 | 032 |
+| [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 19 | 002 |
 
 ## Open decisions
 
