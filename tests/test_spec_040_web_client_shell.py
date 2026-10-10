@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
@@ -352,12 +353,62 @@ def test_ac5_a_directory_is_not_served_as_a_file(empty_client: TestClient) -> No
     assert response.text != INDEX_HTML
 
 
-@pytest.mark.parametrize("path", ["/..%2Fsecret.txt", "/assets/..%2F..%2Fsecret.txt"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/..%2Fsecret.txt",
+        "/assets/..%2F..%2Fsecret.txt",
+        "/..%5Csecret.txt",
+        "/assets/..%5C..%5Csecret.txt",
+    ],
+)
 def test_ac5_path_traversal_never_leaves_dist_dir(dist_dir: Path, path: str) -> None:
     (dist_dir.parent / "secret.txt").write_text("TOP-SECRET", encoding="utf-8")
     client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
 
     response = client.get(path)
+
+    assert response.status_code == 404
+    assert "TOP-SECRET" not in response.text
+
+
+def test_ac5_alternate_data_stream_of_index_is_not_served(
+    empty_client: TestClient,
+) -> None:
+    response = empty_client.get("/index.html::$DATA")
+
+    assert response.status_code != 200
+    assert response.text != INDEX_HTML
+
+
+@pytest.mark.parametrize("encoded_colon", [False, True])
+@pytest.mark.parametrize("absolute", [False, True])
+def test_ac5_drive_letter_paths_never_leave_dist_dir(
+    dist_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    absolute: bool,
+    encoded_colon: bool,
+) -> None:
+    # The secret sits next to this test file, normally on another drive than
+    # the temporary dist_dir. Joining the request naively onto dist_dir would
+    # reach it on Windows, from the current directory (drive-relative name) or
+    # from the full path (drive-absolute name). Elsewhere a ':' is legal in a
+    # file name, and the spec only requires that nothing outside dist_dir is
+    # returned.
+    drive = Path(__file__).resolve().drive or "C:"
+    with tempfile.TemporaryDirectory(dir=Path(__file__).parent) as outside_name:
+        outside = Path(outside_name).resolve()
+        secret = outside / "secret.txt"
+        secret.write_text("TOP-SECRET", encoding="utf-8")
+        monkeypatch.chdir(outside)
+        client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+        path = "/" + secret.as_posix() if absolute else f"/{drive}secret.txt"
+        if encoded_colon:
+            path = path.replace(":", "%3A")
+
+        response = client.get(path)
+        # Leave the folder: Windows cannot delete the current directory.
+        monkeypatch.undo()
 
     assert response.status_code == 404
     assert "TOP-SECRET" not in response.text
