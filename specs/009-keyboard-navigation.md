@@ -1,7 +1,7 @@
 ---
 id: "009"
 title: Keyboard and navigation
-status: approved
+status: done
 ---
 
 # 009 - Keyboard and navigation

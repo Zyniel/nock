@@ -30,6 +30,16 @@ Not defined yet. To write following `specs/_architecture.md` before approval.
 
 None stated in the backlog. To complete during review.
 
+Known issues carried from earlier specs (recorded by the lead on 2026-10-11, to
+settle when this spec is refined):
+
+- Keyboard trap: spec 009 prevents Tab and Shift+Tab whenever the grid has the
+  focus, so a keyboard-only player cannot leave the grid with Tab (WCAG 2.1.2).
+  This spec must give a way out (for example Escape, then Tab) and test it.
+- The grid has `role="grid"` with no `row` or `gridcell` children (since spec
+  006), which accessibility checkers flag (aria-required-children). Choose the
+  roles here.
+
 ## Out of scope
 
 - Nothing stated in the backlog (epic E10).
