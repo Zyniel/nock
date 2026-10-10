@@ -1,7 +1,7 @@
 ---
 id: "040"
 title: Web client shell
-status: draft
+status: approved
 ---
 
 # 040 - Web client shell
@@ -349,9 +349,11 @@ Applied to the text of one `.svelte` file, in this order:
 
 None.
 
-## Open questions
+## Decisions
 
-Each item names the pick already written into the spec above.
+Approved by the human on 2026-10-10, with the pick of each item kept as written
+(item 14: the human approves the `resolveJsonModule` line in `web/tsconfig.app.json`;
+the lead adds it before the build). Each one is already part of the spec above.
 
 1. Room seam before spec 011. Options: a registry object passed to `create_app`,
    a module-level dict, or an HTTP endpoint that creates rooms. Pick: an in-memory
@@ -406,3 +408,7 @@ Each item names the pick already written into the spec above.
     can never pass as skipped tests.
 16. Live-server fixture. Pick: function-scoped, in `tests/conftest.py` so specs 011
     onwards reuse it.
+
+## Open questions
+
+None.
