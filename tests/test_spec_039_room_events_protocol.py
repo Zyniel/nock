@@ -8,22 +8,34 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from nock.grid import Arrow, Grid
 from nock.protocol import (
     Chat,
+    ChatMessage,
+    Check,
     CheckResult,
+    ClueCellView,
     ClueView,
     EditLetter,
     EmptyCellView,
+    Erase,
+    ErrorMessage,
     Flag,
+    GridSolved,
     GridTarget,
     GridView,
     Join,
     LetterCellView,
+    LetterChanged,
+    PencilEdit,
+    PlayerJoined,
+    RemovePlayer,
     Reveal,
+    RevealResult,
     Snapshot,
+    Vote,
     VoteOpened,
     WordTarget,
     grid_view,
@@ -33,7 +45,7 @@ from nock.protocol import (
 
 # Raw JSON can hold anything, so these values are typed Any.
 JsonData = dict[str, Any]
-Parser = Callable[[str | bytes], object]
+Parser = Callable[[str | bytes], BaseModel]
 
 PLAYER_P2 = (
     '{"player_id": "p2", "nickname": "Bruno", "colour": 1, "state": "active", '
@@ -393,6 +405,7 @@ def test_ac1_base_seq_zero_is_accepted() -> None:
 
     message = parse_client_message(text)
 
+    assert isinstance(message, Erase)
     assert message.base_seq == 0
 
 
@@ -446,6 +459,7 @@ def test_ac2_erased_letter_changed_parses() -> None:
 
     message = parse_server_message(json.dumps(data))
 
+    assert isinstance(message, LetterChanged)
     assert message.letter is None
     assert parse_server_message(message.model_dump_json()) == message
 
@@ -462,7 +476,7 @@ def test_ac2_snapshot_of_fx01_view_round_trips(fx01_text: str) -> None:
         revealed=False,
         wrong=False,
     )
-    cells = []
+    cells: list[ClueCellView | EmptyCellView | LetterCellView] = []
     for cell in view.cells:
         if cell.row == 1 and cell.column == 0:
             cells.append(typed_cell)
@@ -488,6 +502,7 @@ def test_ac2_snapshot_built_in_python_round_trips(fx01_text: str) -> None:
     again = parse_server_message(snapshot.model_dump_json())
 
     assert again == snapshot
+    assert isinstance(again, Snapshot)
     assert again.grid.width == 5
     assert len(again.grid.cells) == 25
 
@@ -499,6 +514,7 @@ def test_ac2_empty_reveal_budget_is_valid() -> None:
 
     message = parse_server_message(json.dumps(data))
 
+    assert isinstance(message, RevealResult)
     assert message.reveal_budget.letters == 0
     assert message.reveal_budget.words == 0
 
@@ -512,6 +528,8 @@ def test_ac2_cross_field_rules_are_not_checked() -> None:
     erased_message = parse_server_message(json.dumps(erased_pencil))
     snapshot = parse_server_message(json.dumps(stranger_snapshot))
 
+    assert isinstance(erased_message, LetterChanged)
+    assert isinstance(snapshot, Snapshot)
     assert erased_message.letter is None
     assert erased_message.pencil is True
     assert snapshot.you == "p99"
@@ -550,12 +568,15 @@ def test_ac3_check_result_target_is_the_grid() -> None:
 def test_ac3_flag_with_null_clue_carries_none() -> None:
     message = parse_client_message('{"type": "flag", "clue": null}')
 
+    assert isinstance(message, Flag)
     assert message.clue is None
 
 
 def test_ac3_flag_example_carries_the_clue() -> None:
     message = parse_client_message(client_text("flag"))
 
+    assert isinstance(message, Flag)
+    assert message.clue is not None
     assert (message.clue.row, message.clue.column) == (0, 0)
     assert message.clue.clue_index == 1
 
@@ -563,12 +584,14 @@ def test_ac3_flag_example_carries_the_clue() -> None:
 def test_ac3_check_example_carries_a_word_target() -> None:
     message = parse_client_message(client_text("check"))
 
+    assert isinstance(message, Check)
     assert message.target == WordTarget(row=0, column=2, clue_index=0)
 
 
 def test_ac3_snapshot_example_carries_its_values() -> None:
     message = parse_server_message(server_text("snapshot"))
 
+    assert isinstance(message, Snapshot)
     assert message.seq == 0
     assert message.you == "p1"
     assert message.resume_token == "r7Kq2mXo9vB4tY1zW8nP"
@@ -591,6 +614,7 @@ def test_ac3_snapshot_example_carries_its_values() -> None:
 def test_ac3_snapshot_grid_cells_are_typed() -> None:
     message = parse_server_message(server_text("snapshot"))
 
+    assert isinstance(message, Snapshot)
     clue_cell, letter_cell = message.grid.cells
     assert clue_cell.type == "clue"
     assert clue_cell.clues == (ClueView(text="Note", arrow=Arrow.RIGHT),)
@@ -612,6 +636,10 @@ def test_ac3_values_of_other_examples() -> None:
     solved = parse_server_message(server_text("grid_solved"))
     error = parse_server_message(server_text("error"))
 
+    assert isinstance(erase, Erase)
+    assert isinstance(chat, ChatMessage)
+    assert isinstance(solved, GridSolved)
+    assert isinstance(error, ErrorMessage)
     assert (erase.row, erase.column, erase.base_seq) == (1, 0, 7)
     assert chat.text == "IDES, je crois"
     assert chat.seq == 16
@@ -752,6 +780,7 @@ def test_ac5_player_colour_out_of_palette_is_rejected(colour: int) -> None:
 def test_ac5_player_colour_at_palette_edges_parses(colour: int) -> None:
     message = parse_server_message(with_player_colour(colour))
 
+    assert isinstance(message, PlayerJoined)
     assert message.player.colour == colour
 
 
@@ -802,6 +831,7 @@ def test_ac5_resume_token_length_edges_parse(length: int) -> None:
 
     message = parse_client_message(json.dumps(data))
 
+    assert isinstance(message, Join)
     assert message.resume_token == token
 
 
@@ -825,6 +855,7 @@ def test_ac5_player_id_of_64_characters_parses_and_65_is_rejected() -> None:
 
     message = parse_client_message(json.dumps(long_id))
 
+    assert isinstance(message, RemovePlayer)
     assert message.player_id == "a" * 64
     with pytest.raises(ValidationError):
         parse_client_message(json.dumps(too_long))
@@ -835,6 +866,7 @@ def test_ac5_player_id_allows_dash_and_underscore() -> None:
 
     message = parse_client_message(json.dumps(data))
 
+    assert isinstance(message, RemovePlayer)
     assert message.player_id == "a_b-C9"
 
 
@@ -843,12 +875,15 @@ def test_ac5_vote_id_one_parses() -> None:
 
     message = parse_client_message(json.dumps(data))
 
+    assert isinstance(message, Vote)
     assert message.vote_id == 1
 
 
 def test_ac5_flag_clue_index_one_parses() -> None:
     message = parse_client_message(with_flag_clue_index(1))
 
+    assert isinstance(message, Flag)
+    assert message.clue is not None
     assert message.clue.clue_index == 1
 
 
@@ -883,6 +918,7 @@ def test_ac5_client_message_cannot_carry_an_event_seq() -> None:
 def test_ac6_edit_letter_accepts_uppercase_letter(letter: str) -> None:
     message = parse_client_message(edit_letter_with(letter))
 
+    assert isinstance(message, EditLetter)
     assert message.letter == letter
 
 
@@ -890,6 +926,7 @@ def test_ac6_edit_letter_accepts_uppercase_letter(letter: str) -> None:
 def test_ac6_pencil_edit_accepts_uppercase_letter(letter: str) -> None:
     message = parse_client_message(pencil_edit_with(letter))
 
+    assert isinstance(message, PencilEdit)
     assert message.letter == letter
 
 
@@ -946,7 +983,10 @@ def test_ac6_letter_cell_view_accepts_uppercase() -> None:
 
     message = parse_server_message(json.dumps(data))
 
-    assert message.grid.cells[1].letter == "T"
+    assert isinstance(message, Snapshot)
+    letter_cell = message.grid.cells[1]
+    assert isinstance(letter_cell, LetterCellView)
+    assert letter_cell.letter == "T"
 
 
 # ---- AC-7 ---------------------------------------------------------------
@@ -967,6 +1007,7 @@ def test_ac6_letter_cell_view_accepts_uppercase() -> None:
 def test_ac7_nickname_is_trimmed_and_accepted(sent: str, expected: str) -> None:
     message = parse_client_message(join_with(sent))
 
+    assert isinstance(message, Join)
     assert message.nickname == expected
 
 
@@ -1011,6 +1052,7 @@ def test_ac7_player_view_nickname_uses_the_same_rule() -> None:
 def test_ac8_chat_text_is_trimmed_and_accepted(sent: str, expected: str) -> None:
     message = parse_client_message(chat_with(sent))
 
+    assert isinstance(message, Chat)
     assert message.text == expected
 
 
@@ -1032,6 +1074,7 @@ def test_ac8_chat_markup_round_trips_unchanged() -> None:
 
     again = parse_client_message(message.model_dump_json())
 
+    assert isinstance(again, Chat)
     assert again.text == "<b>salut</b>"
 
 
@@ -1174,6 +1217,8 @@ def test_ac9_listed_enum_value_parses(
 ) -> None:
     message = parser(text)
 
+    # The field name comes from the parametrized case, so it cannot be a
+    # literal attribute access.
     assert getattr(message, field) == value
     assert parser(message.model_dump_json()) == message
 
@@ -1199,6 +1244,7 @@ def test_ac9_error_code_list_has_sixteen_values() -> None:
 def test_ac9_check_scope_parses(scope: str) -> None:
     message = parse_client_message(check_with_scope(scope))
 
+    assert isinstance(message, Check)
     assert message.target.scope == scope
 
 
@@ -1206,6 +1252,7 @@ def test_ac9_check_scope_parses(scope: str) -> None:
 def test_ac9_reveal_scope_parses(scope: str) -> None:
     message = parse_client_message(reveal_with_scope(scope))
 
+    assert isinstance(message, Reveal)
     assert message.target.scope == scope
 
 
@@ -1242,6 +1289,7 @@ def test_ac10_check_with_grid_scope_parses_to_grid_target() -> None:
 
     message = parse_client_message(text)
 
+    assert isinstance(message, Check)
     assert message.target == GridTarget()
     assert parse_client_message(message.model_dump_json()) == message
 
@@ -1267,10 +1315,15 @@ def test_ac10_vote_opened_with_check_of_grid_parses() -> None:
 
     message = parse_server_message(json.dumps(data))
 
+    assert isinstance(message, VoteOpened)
+    assert isinstance(message.request, Check)
     assert message.request.target == GridTarget()
 
 
 # ---- AC-11 --------------------------------------------------------------
+
+
+SEQ_FIELD = "seq"
 
 
 @pytest.mark.parametrize("type_name", SEQ_TYPES)
@@ -1297,7 +1350,8 @@ def test_ac11_seq_one_parses(type_name: str) -> None:
     message = parse_server_message(json.dumps(data))
 
     assert type(message) is protocol_class(SERVER_CLASSES[type_name])
-    assert message.seq == 1
+    # 16 different classes carry seq, so it is read through a variable name.
+    assert getattr(message, SEQ_FIELD) == 1
 
 
 @pytest.mark.parametrize("type_name", SEQ_TYPES)
@@ -1307,7 +1361,7 @@ def test_ac11_seq_has_no_upper_bound(type_name: str) -> None:
 
     message = parse_server_message(json.dumps(data))
 
-    assert message.seq == big_seq
+    assert getattr(message, SEQ_FIELD) == big_seq
 
 
 @pytest.mark.parametrize("bad_seq", ['"1"', "1.0", "true"])
@@ -1351,6 +1405,7 @@ def test_ac12_message_without_seq_parses_and_has_no_seq_field(
 def test_ac13_snapshot_seq_in_range_parses(seq: int) -> None:
     message = parse_server_message(snapshot_with(seq=seq))
 
+    assert isinstance(message, Snapshot)
     assert message.seq == seq
 
 
@@ -1445,7 +1500,10 @@ def test_ac15_snapshot_with_a_clue_answer_is_rejected() -> None:
 def test_ac15_same_snapshot_without_the_answer_parses() -> None:
     message = parse_server_message(snapshot_with_clue_cell(CLUE_WITHOUT_ANSWER))
 
-    assert message.grid.cells[0].clues[0].text == "Note"
+    assert isinstance(message, Snapshot)
+    clue_cell = message.grid.cells[0]
+    assert isinstance(clue_cell, ClueCellView)
+    assert clue_cell.clues[0].text == "Note"
 
 
 def test_ac15_clue_view_rejects_an_answer() -> None:
@@ -1498,6 +1556,7 @@ def test_ac16_single_clue_cell_keeps_its_clue(fx01_text: str) -> None:
 
     cell = view.cells[2]
 
+    assert isinstance(cell, ClueCellView)
     assert cell.clues == (ClueView(text="Artiste muet", arrow=Arrow.DOWN),)
 
 
@@ -1576,6 +1635,7 @@ def snapshot_with_players(count: int) -> str:
 def test_ac18_snapshot_with_eight_players_parses() -> None:
     message = parse_server_message(snapshot_with_players(8))
 
+    assert isinstance(message, Snapshot)
     assert [player.player_id for player in message.players] == [
         "p1",
         "p2",
@@ -1596,6 +1656,7 @@ def test_ac18_snapshot_with_nine_players_is_rejected() -> None:
 def test_ac18_snapshot_with_no_player_parses() -> None:
     message = parse_server_message(snapshot_with_players(0))
 
+    assert isinstance(message, Snapshot)
     assert message.players == ()
 
 
@@ -1605,9 +1666,13 @@ def test_ac18_snapshot_with_no_player_parses() -> None:
 def test_ac19_assigning_a_field_raises_and_keeps_the_message() -> None:
     message = parse_client_message(client_text("edit_letter"))
 
+    # setattr with a variable name: the type checker rejects a direct
+    # assignment to a frozen field, which is what this test must attempt.
+    field = "row"
     with pytest.raises(ValidationError):
-        message.row = 2
+        setattr(message, field, 2)
 
+    assert isinstance(message, EditLetter)
     assert message.row == 1
     assert message == EditLetter(row=1, column=0, letter="T", base_seq=None)
 
@@ -1617,8 +1682,9 @@ def test_ac19_server_messages_are_frozen(type_name: str) -> None:
     message = parse_server_message(server_text(type_name))
     before = message.model_dump_json()
 
+    field = "type"  # variable name: see test_ac19_assigning_a_field_raises
     with pytest.raises(ValidationError):
-        message.type = "other"
+        setattr(message, field, "other")
 
     assert message.model_dump_json() == before
 
@@ -1626,16 +1692,23 @@ def test_ac19_server_messages_are_frozen(type_name: str) -> None:
 def test_ac19_nested_model_is_frozen() -> None:
     message = parse_server_message(server_text("vote_opened"))
 
+    assert isinstance(message, VoteOpened)
+    assert isinstance(message.request, Reveal)
+    target = message.request.target
+    assert isinstance(target, WordTarget)
+    field = "row"  # variable name: see test_ac19_assigning_a_field_raises
     with pytest.raises(ValidationError):
-        message.request.target.row = 9
+        setattr(target, field, 9)
 
-    assert message.request.target.row == 0
+    assert target.row == 0
 
 
 def test_ac19_snapshot_is_frozen() -> None:
     message = parse_server_message(server_text("snapshot"))
 
+    assert isinstance(message, Snapshot)
+    field = "solved"  # variable name: see test_ac19_assigning_a_field_raises
     with pytest.raises(ValidationError):
-        message.solved = True
+        setattr(message, field, True)
 
     assert message.solved is False
