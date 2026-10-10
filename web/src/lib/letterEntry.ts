@@ -6,6 +6,9 @@ export type KeyAction = { kind: 'letter'; letter: string } | { kind: 'erase' } |
 // The letter A to Z that a typed character stands for, or null. Accents are
 // removed (é gives E); letters that do not fold to one letter (œ, æ, ß) give null.
 export function letterFromKey(key: string): string | null {
+  if ([...key].length !== 1) {
+    return null
+  }
   const withoutMarks = key.normalize('NFD').replace(/\p{Mn}/gu, '')
   const upper = withoutMarks.toUpperCase()
   if (/^[A-Z]$/.test(upper)) {

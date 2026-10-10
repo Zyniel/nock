@@ -78,7 +78,19 @@
   // The selection moved to the cell at `index` of the selected word.
   function selectWordCell(word: Word, current: Selection, index: number): void {
     const target = word.cells[index]
-    select({ row: target.row, column: target.column, direction: current.direction, word: current.word })
+    select({
+      row: target.row,
+      column: target.column,
+      direction: current.direction,
+      word: current.word,
+    })
+  }
+
+  // The place of a cell in a word (-1 when the word does not contain it).
+  function indexInWord(word: Word, cell: LetterCellView): number {
+    return word.cells.findIndex(
+      (position) => position.row === cell.row && position.column === cell.column,
+    )
   }
 
   // Type a letter on the selected cell, then move to the next unlocked cell.
@@ -100,9 +112,7 @@
         base_seq: null,
       })
     }
-    const here = activeWord.cells.findIndex(
-      (position) => position.row === cell.row && position.column === cell.column,
-    )
+    const here = indexInWord(activeWord, cell)
     for (let index = here + 1; index < activeWord.cells.length; index++) {
       const position = activeWord.cells[index]
       const candidate = letterCellAt(position.row, position.column)
@@ -132,9 +142,7 @@
     if (cell === null || eraseCell(cell)) {
       return
     }
-    const here = activeWord.cells.findIndex(
-      (position) => position.row === cell.row && position.column === cell.column,
-    )
+    const here = indexInWord(activeWord, cell)
     if (here <= 0) {
       return
     }

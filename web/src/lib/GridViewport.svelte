@@ -104,9 +104,6 @@
 
   // Letter keys and Backspace (spec 008). Arrows and Tab come with spec 009.
   function onGridKeydown(event: KeyboardEvent): void {
-    if (selection === null) {
-      return
-    }
     const action = actionForKey(
       event.key,
       event.ctrlKey,
@@ -115,6 +112,13 @@
       event.isComposing,
     )
     if (action.kind === 'ignore') {
+      return
+    }
+    if (selection === null) {
+      // Backspace never leaves the page, even with nothing selected.
+      if (action.kind === 'erase') {
+        event.preventDefault()
+      }
       return
     }
     event.preventDefault()
