@@ -244,7 +244,7 @@ gate, CI and the role rules, which you have approved by sending it.
   036 following specs/_architecture.md, with the test type of each criterion.
   Answers:
   - 005: the grid source decision does not block the code. AC-2 is tested by a
-    test that fails when a module under src/ imports an HTTP client (httpx,
+    test that fails when a module under src/ imports an HTTP client (httpx, httpx2,
     requests, urllib.request, aiohttp) or opens an outgoing connection.
   - 036: FX-02 is tests/fixtures/fx02.json. "Mid-range phone over 4G" is a
     Playwright run with 4x CPU throttling and a 4G network profile (9 Mbit/s
