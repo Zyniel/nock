@@ -52,7 +52,7 @@ def _format_position(position: Position) -> str:
 def _format_clue(clue: _PlacedClue) -> str:
     """Name a clue by its clue cell coordinates and its text."""
     cell = _format_position((clue.row, clue.column))
-    return f"{cell} {clue.text!r}"
+    return f'{cell} "{clue.text}"'
 
 
 def _clue_cells_in_order(grid: Grid) -> list[ClueCell]:
@@ -85,13 +85,13 @@ def _check_arrows(grid: Grid) -> None:
                 target_cell = grid.cell_at(target_row, target_column)
                 if isinstance(target_cell, LetterCell):
                     continue
-                reason = f"a {target_cell.type} cell, not a letter cell"
+                reason = f"not a letter cell (its type is {target_cell.type})"
             else:
                 reason = "outside the grid"
             source = _format_position((clue_cell.row, clue_cell.column))
             target = _format_position((target_row, target_column))
             raise GridImportError(
-                f"clue at {source} ({clue.text!r}) has arrow {clue.arrow.value} "
+                f'clue at {source} ("{clue.text}") has arrow {clue.arrow.value} '
                 f"pointing to {target}, which is {reason}"
             )
 
@@ -159,10 +159,15 @@ def _find_runs(grid: Grid, row_step: int, column_step: int) -> list[list[Positio
     Runs come ordered by their first cell: row-major for a horizontal step
     (0, 1), column-major for a vertical step (1, 0).
     """
+    scan_order = []
     if row_step == 0:
-        scan_order = [(r, c) for r in range(grid.height) for c in range(grid.width)]
+        for row in range(grid.height):
+            for column in range(grid.width):
+                scan_order.append((row, column))
     else:
-        scan_order = [(r, c) for c in range(grid.width) for r in range(grid.height)]
+        for column in range(grid.width):
+            for row in range(grid.height):
+                scan_order.append((row, column))
 
     runs = []
     for row, column in scan_order:
