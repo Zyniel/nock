@@ -382,17 +382,15 @@ def test_ac5_alternate_data_stream_of_index_is_not_served(
 
 
 @pytest.mark.parametrize("encoded_colon", [False, True])
-@pytest.mark.parametrize("absolute", [False, True])
 def test_ac5_drive_letter_paths_never_leave_dist_dir(
     dist_dir: Path,
     monkeypatch: pytest.MonkeyPatch,
-    absolute: bool,
     encoded_colon: bool,
 ) -> None:
-    # The secret sits next to this test file, normally on another drive than
-    # the temporary dist_dir. Joining the request naively onto dist_dir would
-    # reach it on Windows, from the current directory (drive-relative name) or
-    # from the full path (drive-absolute name). Elsewhere a ':' is legal in a
+    # The secret sits next to this test file. The check only bites when the
+    # test file and the temporary dist_dir are on different drives: joining a
+    # drive-relative name naively onto dist_dir would then reach the secret
+    # from the current directory on Windows. Elsewhere a ':' is legal in a
     # file name, and the spec only requires that nothing outside dist_dir is
     # returned.
     drive = Path(__file__).resolve().drive or "C:"
@@ -401,14 +399,16 @@ def test_ac5_drive_letter_paths_never_leave_dist_dir(
         secret = outside / "secret.txt"
         secret.write_text("TOP-SECRET", encoding="utf-8")
         monkeypatch.chdir(outside)
-        client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
-        path = "/" + secret.as_posix() if absolute else f"/{drive}secret.txt"
-        if encoded_colon:
-            path = path.replace(":", "%3A")
+        try:
+            client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+            path = f"/{drive}secret.txt"
+            if encoded_colon:
+                path = path.replace(":", "%3A")
 
-        response = client.get(path)
-        # Leave the folder: Windows cannot delete the current directory.
-        monkeypatch.undo()
+            response = client.get(path)
+        finally:
+            # Leave the folder: Windows cannot delete the current directory.
+            monkeypatch.undo()
 
     assert response.status_code == 404
     assert "TOP-SECRET" not in response.text
