@@ -2,8 +2,10 @@
 
 Wired in .claude/settings.json to PreToolUse for the Edit, Write and
 NotebookEdit tools. When the call comes from one of the roles below and the
-target file is outside that role's folders, the call is blocked (exit code 2)
-and the reason is sent back to the agent.
+target file is outside that role's folders, or matches one of the role's
+denied patterns (tooling files inside an allowed folder, such as the web/
+package and config files), the call is blocked (exit code 2) and the reason is
+sent back to the agent.
 
 The main session has no "agent_type", so the lead and you are never limited.
 
@@ -29,12 +31,15 @@ ROLE_WRITE_PATHS: dict[str, list[str]] = {
 
 # Files a role may not write even inside its allowed folders, as fnmatch
 # patterns relative to the project root. The web/ package, lock and config files
-# are tooling (see CLAUDE.md): only the human changes them.
+# are tooling (see CLAUDE.md): only the human changes them. "web/.*" covers dot
+# files and folders such as .npmrc, .gitignore and .vscode/ (fnmatch's "*" also
+# matches "/").
 ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
     "implementer": [
         "web/package*.json",
         "web/*.config.*",
         "web/tsconfig*.json",
+        "web/.*",
     ],
 }
 
@@ -76,6 +81,9 @@ def resolve_denied_patterns(role_name: str) -> list[str]:
 
     Args:
         role_name: Agent type taken from the hook input.
+
+    Returns:
+        The role's denied patterns, or an empty list when it has none.
     """
     for known_role, denied_patterns in ROLE_DENIED_PATTERNS.items():
         if role_name == known_role or role_name.startswith(f"{known_role}-"):
@@ -89,6 +97,9 @@ def find_denied_pattern(relative_path: str, denied_patterns: list[str]) -> str |
     Args:
         relative_path: Path relative to the project root, with "/" separators.
         denied_patterns: fnmatch patterns relative to the project root.
+
+    Returns:
+        The first matching pattern, or None when no pattern matches.
     """
     for pattern in denied_patterns:
         if fnmatch.fnmatchcase(relative_path, pattern):

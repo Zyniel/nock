@@ -1,7 +1,7 @@
 ---
 id: "040"
 title: Web client shell
-status: approved
+status: done
 ---
 
 # 040 - Web client shell

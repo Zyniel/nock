@@ -65,8 +65,9 @@ interface" follows this note. Decided with the human on 2026-10-10.
 
 ## Toolchain (in place since 2026-10-10)
 
-- Python: `pydantic`, `fastapi`, `uvicorn[standard]`; for tests `httpx2` (used by the FastAPI/Starlette test client) and
-  `pytest-playwright` (Chromium installed by `uv run playwright install chromium`).
+- Python: `pydantic`, `fastapi`, `uvicorn[standard]`; for tests `httpx2` (used
+  by the FastAPI/Starlette test client) and `pytest-playwright` (Chromium
+  installed by `uv run playwright install chromium`).
 - Client: Node.js LTS; `web/` was created from the Vite `svelte-ts` template.
 - The full gate runs `npm --prefix web run check` (svelte-check and tsc) and
   `npm --prefix web run build` before pytest, so browser tests use the fresh

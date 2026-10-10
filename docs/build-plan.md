@@ -102,11 +102,11 @@ ones before it.
   ```
 
   ```bash
-  uv add --dev httpx
+  uv add --dev httpx2
   ```
 
   ```bash
-  git commit -am "build: add fastapi, uvicorn and httpx"
+  git commit -am "build: add fastapi, uvicorn and httpx2"
   ```
 
 - [ ] Write the room events contract. Prompt:
