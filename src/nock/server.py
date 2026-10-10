@@ -87,7 +87,10 @@ def _index_response(dist_dir: Path) -> Response:
 
 def _is_safe_file_name(name: str) -> bool:
     """Tell whether `name` is one plain file name that cannot leave a directory."""
-    if name in ("", ".", ".."):
+    if name == "":
+        return False
+    # Dot files are never served; this also rejects "." and "..".
+    if name.startswith("."):
         return False
     if "/" in name:
         return False
@@ -187,7 +190,8 @@ def create_app(
     room_registry = rooms if rooms is not None else RoomRegistry()
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
-    web_app = FastAPI()
+    # No slash redirect: a path ending with "/" matches no route and is a 404.
+    web_app = FastAPI(redirect_slashes=False)
 
     @web_app.get("/", include_in_schema=False)
     def serve_catalogue() -> Response:
