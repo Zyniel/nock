@@ -410,7 +410,12 @@ def test_ac1_typing_the_letter_already_there_sends_nothing_and_moves_on(
     expect_letter(page, 1, 2, "M")
     expect_selection(page, 1, 3, "across", ACROSS_W1)
     expect_edits(page, mock, [put(1, 2, "M")])
-    assert sent_selections(mock) == [across(1, 0), across(1, 1), across(1, 2)]
+    assert sent_selections(mock) == [
+        across(1, 0),
+        across(1, 1),
+        across(1, 2),
+        across(1, 3),
+    ]
 
 
 def test_ac1_the_cursor_stays_when_every_later_cell_is_locked(
@@ -576,7 +581,7 @@ def test_ac2_ligatures_and_other_letters_that_do_not_fold_are_ignored(
     frames_before = len(mock.received)
 
     # oe ligature, ae ligature, sharp s, o with stroke, then named keys
-    press_all(page, ["œ", "æ", "ß", "ø", "Dead"])
+    press_all(page, ["œ", "æ", "ß", "ø"])
     dispatch_key(page, "Dead")
     dispatch_key(page, "F2")
     dispatch_key(page, "Enter")
