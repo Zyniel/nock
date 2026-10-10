@@ -97,6 +97,7 @@ CLIENT_EXAMPLES: dict[str, str] = {
         '"reveal_budget": {"letters": 5, "words": 1}}'
     ),
     "mute_player": ('{"type": "mute_player", "player_id": "p2", "muted": true}'),
+    "ping": '{"type": "ping"}',
 }
 
 # Server examples keep the PLAYER_P2 and SETTINGS placeholders, as in the spec.
@@ -176,6 +177,7 @@ SERVER_EXAMPLES: dict[str, str] = {
     ),
     "grid_solved": '{"type": "grid_solved", "seq": 60, "elapsed_ms": 754000}',
     "grid_full_wrong": '{"type": "grid_full_wrong", "seq": 59}',
+    "pong": '{"type": "pong"}',
     "error": (
         '{"type": "error", "code": "cell_locked", '
         '"message": "cell (1, 0) is locked"}'
@@ -201,6 +203,7 @@ CLIENT_CLASSES: dict[str, str] = {
     "lock_room": "LockRoom",
     "change_settings": "ChangeSettings",
     "mute_player": "MutePlayer",
+    "ping": "Ping",
 }
 SERVER_CLASSES: dict[str, str] = {
     "snapshot": "Snapshot",
@@ -222,6 +225,7 @@ SERVER_CLASSES: dict[str, str] = {
     "player_muted": "PlayerMuted",
     "grid_solved": "GridSolved",
     "grid_full_wrong": "GridFullWrong",
+    "pong": "Pong",
     "error": "ErrorMessage",
 }
 SEQ_TYPES: list[str] = [
@@ -242,7 +246,7 @@ SEQ_TYPES: list[str] = [
     "grid_solved",
     "grid_full_wrong",
 ]
-NO_SEQ_TYPES: list[str] = ["selection_moved", "reaction", "error"]
+NO_SEQ_TYPES: list[str] = ["selection_moved", "reaction", "pong", "error"]
 ERROR_CODES: list[str] = [
     "invalid_message",
     "not_joined",
@@ -260,6 +264,9 @@ ERROR_CODES: list[str] = [
     "rate_limited",
     "nothing_to_undo",
     "grid_solved",
+    "invalid_nickname",
+    "invalid_target",
+    "stale_edit",
 ]
 
 
@@ -375,9 +382,9 @@ def test_ac1_client_example_round_trips(type_name: str) -> None:
     assert type(again) is type(message)
 
 
-def test_ac1_client_example_count_is_seventeen() -> None:
-    assert len(CLIENT_EXAMPLES) == 17
-    assert len(CLIENT_CLASSES) == 17
+def test_ac1_client_example_count_is_eighteen() -> None:
+    assert len(CLIENT_EXAMPLES) == 18
+    assert len(CLIENT_CLASSES) == 18
 
 
 def test_ac1_client_parser_accepts_bytes() -> None:
@@ -455,9 +462,9 @@ def test_ac2_server_example_round_trips(type_name: str) -> None:
     assert type(again) is type(message)
 
 
-def test_ac2_server_example_count_is_twenty() -> None:
-    assert len(SERVER_EXAMPLES) == 20
-    assert len(SERVER_CLASSES) == 20
+def test_ac2_server_example_count_is_twenty_one() -> None:
+    assert len(SERVER_EXAMPLES) == 21
+    assert len(SERVER_CLASSES) == 21
 
 
 def test_ac2_server_parser_accepts_bytes() -> None:
@@ -1679,9 +1686,9 @@ def test_ac9_unlisted_enum_value_is_rejected(
         parser(text)
 
 
-def test_ac9_error_code_list_has_sixteen_values() -> None:
-    assert len(ERROR_CODES) == 16
-    assert len(set(ERROR_CODES)) == 16
+def test_ac9_error_code_list_has_nineteen_values() -> None:
+    assert len(ERROR_CODES) == 19
+    assert len(set(ERROR_CODES)) == 19
 
 
 @pytest.mark.parametrize("scope", ["letter", "word", "grid"])
@@ -2195,3 +2202,89 @@ def test_ac19_snapshot_is_frozen() -> None:
         setattr(message, field, True)
 
     assert message.solved is False
+
+
+# ---- AC-20 --------------------------------------------------------------
+# Ping and Pong are looked up by name so that only these tests fail while
+# the classes do not exist yet.
+
+
+def test_ac20_ping_parses_to_ping() -> None:
+    message = parse_client_message('{"type": "ping"}')
+
+    assert message == protocol_class("Ping")()
+    assert type(message) is protocol_class("Ping")
+
+
+def test_ac20_pong_parses_to_pong() -> None:
+    message = parse_server_message('{"type": "pong"}')
+
+    assert message == protocol_class("Pong")()
+    assert type(message) is protocol_class("Pong")
+
+
+def test_ac20_ping_and_pong_serialise_to_their_type_only() -> None:
+    ping_json = protocol_class("Ping")().model_dump_json()
+    pong_json = protocol_class("Pong")().model_dump_json()
+
+    assert json.loads(ping_json) == {"type": "ping"}
+    assert json.loads(pong_json) == {"type": "pong"}
+
+
+def test_ac20_ping_is_rejected_by_the_server_parser() -> None:
+    with pytest.raises(ValidationError):
+        parse_server_message('{"type": "ping"}')
+
+
+def test_ac20_pong_is_rejected_by_the_client_parser() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message('{"type": "pong"}')
+
+
+@pytest.mark.parametrize("extra_field", ["seq", "id"])
+def test_ac20_ping_with_an_extra_field_is_rejected(extra_field: str) -> None:
+    text = json.dumps({"type": "ping", extra_field: 1})
+
+    with pytest.raises(ValidationError):
+        parse_client_message(text)
+
+
+# ---- AC-21 --------------------------------------------------------------
+
+NEW_ERROR_CODES: dict[str, str] = {
+    "invalid_nickname": "INVALID_NICKNAME",
+    "invalid_target": "INVALID_TARGET",
+    "stale_edit": "STALE_EDIT",
+}
+
+
+def test_ac21_error_code_has_nineteen_members() -> None:
+    assert len(protocol_class("ErrorCode")) == 19
+
+
+def test_ac21_error_code_values_are_the_listed_ones() -> None:
+    members = list(protocol_class("ErrorCode"))
+    values = [member.value for member in members]
+
+    assert sorted(values) == sorted(ERROR_CODES)
+
+
+@pytest.mark.parametrize("value", list(NEW_ERROR_CODES))
+def test_ac21_new_code_maps_to_its_member(value: str) -> None:
+    error_code = protocol_class("ErrorCode")
+
+    member = error_code(value)
+
+    assert member is getattr(error_code, NEW_ERROR_CODES[value])
+
+
+@pytest.mark.parametrize("value", list(NEW_ERROR_CODES))
+def test_ac21_error_message_with_new_code_parses(value: str) -> None:
+    error_code = protocol_class("ErrorCode")
+
+    message = parse_server_message(error_with(value))
+
+    assert isinstance(message, ErrorMessage)
+    assert message.code is getattr(error_code, NEW_ERROR_CODES[value])
+    assert message.message == "cell (1, 0) is locked"
+    assert parse_server_message(message.model_dump_json()) == message
