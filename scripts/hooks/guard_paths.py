@@ -13,6 +13,7 @@ shell commands. The reviewer and the per-phase git commits are the backstop.
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import sys
 from pathlib import Path
@@ -24,6 +25,17 @@ ROLE_WRITE_PATHS: dict[str, list[str]] = {
     "test-writer": ["tests/"],
     "implementer": ["src/", "web/", "docs/", "README.md"],
     "reviewer": [],
+}
+
+# Files a role may not write even inside its allowed folders, as fnmatch
+# patterns relative to the project root. The web/ package, lock and config files
+# are tooling (see CLAUDE.md): only the human changes them.
+ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
+    "implementer": [
+        "web/package*.json",
+        "web/*.config.*",
+        "web/tsconfig*.json",
+    ],
 }
 
 
@@ -54,6 +66,33 @@ def resolve_allowed_paths(role_name: str) -> list[str] | None:
     for known_role, allowed_paths in ROLE_WRITE_PATHS.items():
         if role_name == known_role or role_name.startswith(f"{known_role}-"):
             return allowed_paths
+    return None
+
+
+def resolve_denied_patterns(role_name: str) -> list[str]:
+    """Return the patterns a role may never write, even inside its folders.
+
+    "implementer-2" is treated like "implementer".
+
+    Args:
+        role_name: Agent type taken from the hook input.
+    """
+    for known_role, denied_patterns in ROLE_DENIED_PATTERNS.items():
+        if role_name == known_role or role_name.startswith(f"{known_role}-"):
+            return denied_patterns
+    return []
+
+
+def find_denied_pattern(relative_path: str, denied_patterns: list[str]) -> str | None:
+    """Return the first pattern that matches a path, or None.
+
+    Args:
+        relative_path: Path relative to the project root, with "/" separators.
+        denied_patterns: fnmatch patterns relative to the project root.
+    """
+    for pattern in denied_patterns:
+        if fnmatch.fnmatchcase(relative_path, pattern):
+            return pattern
     return None
 
 
@@ -104,6 +143,20 @@ def main() -> int:
     except ValueError:
         # Outside the project (scratch files, temp folders): not this hook's job.
         return 0
+
+    denied_pattern = find_denied_pattern(
+        relative_path, resolve_denied_patterns(role_name)
+    )
+    if denied_pattern is not None:
+        print(
+            f"Blocked: the {role_name} role may not write '{relative_path}': "
+            f"it matches '{denied_pattern}', which is tooling (see CLAUDE.md). "
+            "Only the human changes tooling. If this file really has to change, "
+            "stop and say so in your report: name the file, the change and the "
+            "reason, so the lead can ask the human.",
+            file=sys.stderr,
+        )
+        return 2
 
     if is_allowed(relative_path, allowed_paths):
         return 0
