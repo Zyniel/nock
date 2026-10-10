@@ -236,6 +236,34 @@ def test_ac2_word_starting_in_the_middle_of_a_run_gives_it_no_clue() -> None:
     assert "(2, 1)" in message
 
 
+def test_ac2_horizontal_runs_are_reported_before_vertical_runs() -> None:
+    # Vertical run (0, 1) to (2, 1) and horizontal run (4, 0) to (4, 2) both
+    # have no clue (each has a word starting in its middle or not at its
+    # start). The vertical run starts earlier, but horizontal runs come first.
+    cells = [
+        _clue_cell(0, 0, ("Un", "right", "A")),
+        _letter(0, 1),
+        _empty(0, 2),
+        _clue_cell(1, 0, ("Deux", "right_then_down", "BC")),
+        _letter(1, 1),
+        _empty(1, 2),
+        _empty(2, 0),
+        _letter(2, 1),
+        _empty(2, 2),
+        _clue_cell(3, 0, ("Trois", "down", "D")),
+        _clue_cell(3, 1, ("Quatre", "down_then_right", "EF")),
+        _empty(3, 2),
+        _letter(4, 0),
+        _letter(4, 1),
+        _letter(4, 2),
+    ]
+    message = _error_message(_small_grid(3, 5, cells))
+    assert "(4, 0)" in message
+    assert "(4, 2)" in message
+    assert "(0, 1)" not in message
+    assert "(2, 1)" not in message
+
+
 def test_ac2_isolated_letters_are_not_runs(fx01_text: str) -> None:
     report = import_grid(fx01_text)
     assert report.word_count == 8
@@ -371,6 +399,8 @@ def test_ac6_letter_cell_in_no_word_is_named(fx01_text: str) -> None:
     del _find_cell(data, 0, 0)["clues"][1]
     message = _error_message(_dump(data))
     assert "(0, 1)" in message
+    # The run error that would come next says "from (0, 1) to (4, 1)".
+    assert "(4, 1)" not in message
 
 
 def test_ac6_clue_cell_replaced_by_letter_is_named_first(fx01_text: str) -> None:
@@ -378,6 +408,8 @@ def test_ac6_clue_cell_replaced_by_letter_is_named_first(fx01_text: str) -> None
     _make_letter(data, 4, 0)
     message = _error_message(_dump(data))
     assert "(4, 0)" in message
+    # The run error that would come next says "from (4, 0) to (4, 4)".
+    assert "(4, 4)" not in message
 
 
 def test_ac6_first_letter_cell_in_row_major_order_is_reported(
@@ -389,6 +421,21 @@ def test_ac6_first_letter_cell_in_row_major_order_is_reported(
     message = _error_message(_dump(data))
     assert "(3, 0)" in message
     assert "(4, 0)" not in message
+    # The run error that would come next says "from (3, 0) to (3, 4)".
+    assert "(3, 4)" not in message
+
+
+def test_ac6_isolated_letter_cell_in_no_word_is_named() -> None:
+    # (0, 4) is no run and no word, so only the AC-6 check can reject it.
+    cells = [
+        _clue_cell(0, 0, ("Deux lettres", "right", "AB")),
+        _letter(0, 1),
+        _letter(0, 2),
+        _empty(0, 3),
+        _letter(0, 4),
+    ]
+    message = _error_message(_small_grid(5, 1, cells))
+    assert "(0, 4)" in message
 
 
 # AC-7: two clues with the same word
