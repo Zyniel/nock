@@ -122,6 +122,7 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-2.2.3) (browser with mocked socket) Tapping a clue selects the first empty cell of its word. In a two-clue cell, each half selects its own word. With a snapshot where (1, 2) holds `M`, tapping the clue `Artiste muet` gives (2, 2), `down`, `data-word="0,2,0"`. Tapping the clue `Passoire fine` gives (1, 0), `across`, `0,0,0`; tapping `De la marine` gives (0, 1), `down`, `0,0,1`. With a snapshot where (1, 3), (2, 3), (3, 3), (4, 3) hold `I`, `D`, `E`, `S`, tapping `Fatales à César` gives (1, 3), `down`, `0,3,0`.
 - **AC-4** (AC-2.2.4) (browser with mocked socket, phone window) The selected word's clue is repeated at 14 px or more in a bar that stays visible above the keyboard. After tapping (3, 1), `clue-bar-text` reads `Fin de prière`, `clue-bar` has `data-word="3,0,0"`, its computed `font-size` is 14 px or more, and its box lies inside the window (top at least 0, bottom at most `window.innerHeight`). It stays inside the window after `window.scrollTo(0, 10000)` and after scrolling `grid-viewport` to its end. Before any tap it reads `fr.json["clue_bar.empty"]`. The in-app keyboard part is spec 009 AC-4.
 - **AC-5** (new) (browser with mocked socket) Each selection change sends one `select_cell`. Tapping (1, 1), then (1, 1) again, then (0, 1) twice makes the page send, after its `join`, exactly `SelectCell(row=1, column=1, direction="across")`, `SelectCell(row=1, column=1, direction="down")`, `SelectCell(row=0, column=1, direction="down")`, in that order, and nothing for the last tap.
+- **AC-6** (new) (browser with mocked socket) The selected word is the word that was chosen, even when it starts inside a longer run. With a hand-built view where a clue's word starts in the middle of a longer word of the same direction (so a cell belongs to two words of one direction), tapping that clue selects its own word: `data-word` names the clue's word and only its cells have `data-in-word`; the clue bar shows that clue. Tapping a cell afterwards applies AC-1 and Decision 6 again (the longest word of the direction), unless the tapped cell is the selected cell. With no clue involved, a cell shared by two words of one direction selects the longest one (Decision 6), and this is tested with a hand-built view. The `clue-bar` has `role="region"` so its `aria-label` is announced.
 
 ## Edge cases and errors
 
@@ -188,6 +189,12 @@ already part of the spec above.
    039) and spec 013 needs it. Pick: send it on every change (AC-5); no throttling.
 6. A cell in two words of the same direction (possible when a word starts in the
    middle of a run, spec 003 edge cases). Pick: the longest one.
+
+Added after the review, decided by the lead on 2026-10-10 under the human's
+instruction to take technical decisions:
+7. A clue tap selects that clue's word even inside a longer run; the selection
+   remembers its word. A cell tap still picks the longest word (AC-6).
+8. The clue bar is a labelled region (`role="region"`) (AC-6).
 
 ## Open questions
 
