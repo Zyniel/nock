@@ -1,7 +1,7 @@
 ---
 id: "039"
 title: Room events protocol
-status: draft
+status: approved
 ---
 
 # 039 - Room events protocol
@@ -764,10 +764,10 @@ Server (with `PLAYER_P2` and `SETTINGS` substituted):
 
 None.
 
-## Open questions
+## Decisions
 
-Each item below is already written into the interface with the pick shown, so
-that the spec is buildable; change the interface if the answer differs.
+Approved by the human on 2026-10-10, with the pick of each item kept as written
+(item 4 confirmed: strict). Each one is already part of the interface above.
 
 1. Messages added beyond the request. Spec 014 AC-3 (host hand-over) and spec 022
    AC-4 (host mutes a player's chat) need messages the request did not list.
@@ -820,3 +820,7 @@ that the spec is buildable; change the interface if the answer differs.
 16. Clearing a flag. Spec 021 says a flag clears when its word is filled and a new
     flag replaces the old one, but not whether a player can remove it by hand.
     Pick: `flag` with `"clue": null` removes the sender's flag.
+
+## Open questions
+
+None.
