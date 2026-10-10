@@ -1,7 +1,7 @@
 ---
 id: "039"
 title: Room events protocol
-status: approved
+status: done
 ---
 
 # 039 - Room events protocol
