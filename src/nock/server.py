@@ -6,11 +6,19 @@ import re
 import secrets
 import string
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Response, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Response, WebSocket
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import ValidationError
 
+from nock.catalogue import (
+    GRIDS_DIR,
+    Catalogue,
+    CatalogueEntry,
+    load_catalogue,
+    summarize,
+)
 from nock.grid import Grid
 from nock.protocol import (
     ErrorCode,
@@ -26,6 +34,7 @@ from nock.protocol import (
 
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
 ROOM_CODE_PATTERN: str = r"^[A-Z0-9]{6}$"
+GRID_NUMBER_PATTERN: str = r"^[1-9][0-9]{0,8}$"
 ROOM_NOT_FOUND_CLOSE_CODE: int = 4404  # WebSocket close code, unknown room
 
 _ROOM_CODE_LENGTH = 6
@@ -83,6 +92,22 @@ def _index_response(dist_dir: Path) -> Response:
     if not index_path.is_file():
         return PlainTextResponse(_MISSING_BUILD_TEXT, status_code=503)
     return FileResponse(index_path)
+
+
+def _published_entry(
+    catalogue: Catalogue, number_regex: re.Pattern[str], number: str
+) -> CatalogueEntry:
+    """Return the published entry written `number` in a URL.
+
+    Raises:
+        HTTPException: 404 when `number` is malformed, unknown or unpublished.
+    """
+    if number_regex.fullmatch(number) is None:
+        raise _not_found()
+    entry = catalogue.find_published(int(number))
+    if entry is None:
+        raise _not_found()
+    return entry
 
 
 def _is_safe_file_name(name: str) -> bool:
@@ -177,19 +202,24 @@ async def _ignore_until_disconnect(websocket: WebSocket) -> None:
 
 
 def create_app(
-    rooms: RoomRegistry | None = None, dist_dir: Path | None = None
+    rooms: RoomRegistry | None = None,
+    dist_dir: Path | None = None,
+    catalogue: Catalogue | None = None,
 ) -> FastAPI:
     """Build the app.
 
     Args:
         rooms: The rooms the WebSocket serves. None: a new empty registry.
         dist_dir: The built client. None: WEB_DIST_DIR.
+        catalogue: The grids served. None: an empty catalogue.
 
     Never raises because `dist_dir` is missing or empty (see AC-6).
     """
     room_registry = rooms if rooms is not None else RoomRegistry()
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
+    grid_catalogue = catalogue if catalogue is not None else Catalogue()
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
+    grid_number_regex = re.compile(GRID_NUMBER_PATTERN)
     # No slash redirect: a path ending with "/" matches no route and is a 404.
     web_app = FastAPI(redirect_slashes=False)
 
@@ -202,6 +232,26 @@ def create_app(
         if room_code_regex.fullmatch(code) is None:
             raise _not_found()
         return _index_response(client_dir)
+
+    @web_app.get("/g/{number}", include_in_schema=False)
+    def serve_grid(number: str) -> Response:
+        _published_entry(grid_catalogue, grid_number_regex, number)
+        return _index_response(client_dir)
+
+    @web_app.get("/api/grids")
+    def list_grids(
+        force: Annotated[int | None, Query(ge=1, le=4)] = None,
+    ) -> list[dict[str, object]]:
+        summaries = grid_catalogue.published_summaries(force)
+        bodies: list[dict[str, object]] = []
+        for summary in summaries:
+            bodies.append(summary.model_dump(mode="json"))
+        return bodies
+
+    @web_app.get("/api/grids/{number}")
+    def get_grid(number: str) -> dict[str, object]:
+        entry = _published_entry(grid_catalogue, grid_number_regex, number)
+        return summarize(entry).model_dump(mode="json")
 
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:
@@ -229,4 +279,4 @@ def create_app(
     return web_app
 
 
-app: FastAPI = create_app()
+app: FastAPI = create_app(catalogue=load_catalogue(GRIDS_DIR))
