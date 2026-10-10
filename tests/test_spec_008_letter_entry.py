@@ -18,6 +18,7 @@ from playwright.sync_api import Locator, Page, WebSocketRoute, expect
 
 from nock.grid import Grid
 from nock.protocol import (
+    CellView,
     EditLetter,
     EmptyCellView,
     Erase,
@@ -122,7 +123,7 @@ def snapshot_frame(view: GridView, seq: int) -> str:
 
 def with_letter_cells(view: GridView, changes: ChangeList) -> GridView:
     """Return `view` with the given letter cells replaced by updated copies."""
-    new_cells = []
+    new_cells: list[CellView] = []
     for cell in view.cells:
         new_cell = cell
         if isinstance(cell, LetterCellView):
@@ -868,7 +869,7 @@ def focus_grid_after_word_removed(
     tap(page, 1, 0)
     expect_selection(page, 1, 0, "across", ACROSS_W1)
     view = grid_view(fx01_grid)
-    new_cells = []
+    new_cells: list[CellView] = []
     for cell in view.cells:
         if cell.row == 1 and cell.column == 0:
             new_cells.append(EmptyCellView(row=1, column=0))
