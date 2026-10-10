@@ -25,6 +25,12 @@ def fx01_text() -> str:
     return (FIXTURES_DIR / "fx01.json").read_text(encoding="utf-8")
 
 
+@pytest.fixture
+def fx02_text() -> str:
+    """Return the JSON text of the FX-02 full-size grid (13 by 17)."""
+    return (FIXTURES_DIR / "fx02.json").read_text(encoding="utf-8")
+
+
 MISSING_BUILD_MESSAGE = "web/dist is missing: run npm --prefix web run build"
 SERVER_START_TIMEOUT_SECONDS = 10.0
 
