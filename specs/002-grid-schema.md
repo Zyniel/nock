@@ -1,7 +1,7 @@
 ---
 id: "002"
 title: Grid schema
-status: approved
+status: done
 ---
 
 # 002 - Grid schema

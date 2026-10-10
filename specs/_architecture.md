@@ -8,7 +8,7 @@ interface" follows this note. Decided with the human on 2026-10-10.
 | Layer | Choice |
 | --- | --- |
 | Game rules | Pure Python modules in `src/nock/`, no network and no database code |
-| Data models | Pydantic v2 `BaseModel` everywhere (rules, messages, storage) |
+| Data models | Pydantic v2 `BaseModel` by default (rules, messages, storage); see the modeling rules |
 | Server | FastAPI with its WebSockets, run by uvicorn |
 | Storage | SQLite: an append-only edit log per room plus snapshots |
 | Client | Svelte + TypeScript, built with Vite into static files served by FastAPI |
@@ -16,8 +16,14 @@ interface" follows this note. Decided with the human on 2026-10-10.
 
 ## Modeling rules
 
-- Every data type is a Pydantic `BaseModel`. No `dataclasses`, no `TypedDict`
-  for data.
+- Pydantic `BaseModel` is the default for data. It is required for every type
+  that is part of a public interface, crosses a boundary (JSON, WebSocket,
+  storage) or holds validated game data (grids, rooms, players, messages).
+- A private value used only inside one module (an intermediate result, a value
+  built in a hot loop) may be a `typing.NamedTuple` when that is lighter or
+  clearer. It must stay private (leading underscore) and never be returned by a
+  public function. Reviewers do not block on this choice. Do not use
+  `dataclasses` or `TypedDict`.
 - Models are immutable by default: `model_config = ConfigDict(frozen=True)`.
   A model that has to change is replaced, not mutated.
 - A family of variants is a discriminated union on a `type` field holding a
