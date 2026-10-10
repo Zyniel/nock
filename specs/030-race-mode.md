@@ -1,7 +1,7 @@
 ---
 id: "030"
 title: Race
-status: draft
+status: approved
 ---
 
 # 030 - Race

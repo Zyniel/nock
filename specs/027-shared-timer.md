@@ -1,7 +1,7 @@
 ---
 id: "027"
 title: Shared timer
-status: draft
+status: approved
 ---
 
 # 027 - Shared timer

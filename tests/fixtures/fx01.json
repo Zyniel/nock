@@ -1,0 +1,31 @@
+{
+  "width": 5,
+  "height": 5,
+  "cells": [
+    {"type": "clue", "row": 0, "column": 0, "clues": [{"text": "Passoire fine", "arrow": "down_then_right", "answer": "TAMIS"},{"text": "De la marine", "arrow": "right_then_down", "answer": "NAVAL"}]},
+    {"type": "letter", "row": 0, "column": 1},
+    {"type": "clue", "row": 0, "column": 2, "clues": [{"text": "Artiste muet", "arrow": "down", "answer": "MIME"}]},
+    {"type": "clue", "row": 0, "column": 3, "clues": [{"text": "Fatales à César", "arrow": "down", "answer": "IDES"}]},
+    {"type": "clue", "row": 0, "column": 4, "clues": [{"text": "Flaire", "arrow": "down", "answer": "SENT"}]},
+    {"type": "letter", "row": 1, "column": 0},
+    {"type": "letter", "row": 1, "column": 1},
+    {"type": "letter", "row": 1, "column": 2},
+    {"type": "letter", "row": 1, "column": 3},
+    {"type": "letter", "row": 1, "column": 4},
+    {"type": "clue", "row": 2, "column": 0, "clues": [{"text": "Sans contenu", "arrow": "right", "answer": "VIDE"}]},
+    {"type": "letter", "row": 2, "column": 1},
+    {"type": "letter", "row": 2, "column": 2},
+    {"type": "letter", "row": 2, "column": 3},
+    {"type": "letter", "row": 2, "column": 4},
+    {"type": "clue", "row": 3, "column": 0, "clues": [{"text": "Fin de prière", "arrow": "right", "answer": "AMEN"}]},
+    {"type": "letter", "row": 3, "column": 1},
+    {"type": "letter", "row": 3, "column": 2},
+    {"type": "letter", "row": 3, "column": 3},
+    {"type": "letter", "row": 3, "column": 4},
+    {"type": "clue", "row": 4, "column": 0, "clues": [{"text": "Alourdit le ballon", "arrow": "right", "answer": "LEST"}]},
+    {"type": "letter", "row": 4, "column": 1},
+    {"type": "letter", "row": 4, "column": 2},
+    {"type": "letter", "row": 4, "column": 3},
+    {"type": "letter", "row": 4, "column": 4}
+  ]
+}

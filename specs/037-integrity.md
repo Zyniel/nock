@@ -1,7 +1,7 @@
 ---
 id: "037"
 title: Integrity
-status: draft
+status: approved
 ---
 
 # 037 - Integrity

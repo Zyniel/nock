@@ -54,9 +54,11 @@ Inside `claude`, in this folder:
    `git push -u origin <branch>` and `gh pr create --fill`; GitHub Actions then
    runs the same gate.
 
-Spec `001-slugify` is a finished example of the three files a feature produces.
-Delete `specs/001-slugify.md`, `tests/test_spec_001_slugify.py` and
-`src/nock/text.py` when you no longer need it.
+Spec `002-grid-schema` shows the three files a feature produces: the spec, its
+tests (`tests/test_spec_002_grid_schema.py`) and its code (`src/nock/grid.py`).
+`specs/_archive/` keeps what is no longer used: the starter example
+`001-slugify` and the original backlog, `complete.md`, that specs 002 to 038 were
+split from. The gate, pytest and pyrefly ignore it.
 
 ## 3. Where things go
 

@@ -1,7 +1,7 @@
 ---
 id: "011"
 title: Room creation and invitation
-status: draft
+status: approved
 ---
 
 # 011 - Room creation and invitation

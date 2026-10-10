@@ -1,7 +1,7 @@
 ---
 id: "028"
 title: End-of-game recap
-status: draft
+status: approved
 ---
 
 # 028 - End-of-game recap

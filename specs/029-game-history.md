@@ -1,7 +1,7 @@
 ---
 id: "029"
 title: Game history
-status: draft
+status: approved
 ---
 
 # 029 - Game history

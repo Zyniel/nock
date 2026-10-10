@@ -1,7 +1,7 @@
 ---
 id: "034"
 title: Catching up after an absence
-status: draft
+status: approved
 ---
 
 # 034 - Catching up after an absence
