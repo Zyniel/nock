@@ -10,6 +10,7 @@
     distanceBetween,
     fitCellSize,
   } from './gridLayout'
+  import { actionForKey } from './letterEntry'
   import type { GridView } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
@@ -26,6 +27,8 @@
     activeWord,
     onCellTap,
     onClueTap,
+    onLetter,
+    onErase,
   }: {
     grid: GridView
     words: Word[]
@@ -33,6 +36,8 @@
     activeWord: Word | null
     onCellTap: (row: number, column: number) => void
     onClueTap: (word: Word) => void
+    onLetter: (letter: string) => void
+    onErase: () => void
   } = $props()
 
   let gridElement: HTMLDivElement | undefined = $state()
@@ -97,15 +102,41 @@
     return () => observer.disconnect()
   })
 
-  // Taps and clicks on the grid select a word. Keyboard handling is deferred to
-  // spec 009, so this listener only deals with pointer clicks.
+  // Letter keys and Backspace (spec 008). Arrows and Tab come with spec 009.
+  function onGridKeydown(event: KeyboardEvent): void {
+    if (selection === null) {
+      return
+    }
+    const action = actionForKey(
+      event.key,
+      event.ctrlKey,
+      event.metaKey,
+      event.altKey,
+      event.isComposing,
+    )
+    if (action.kind === 'ignore') {
+      return
+    }
+    event.preventDefault()
+    if (action.kind === 'letter') {
+      onLetter(action.letter)
+    } else {
+      onErase()
+    }
+  }
+
+  // Taps and clicks on the grid select a word; keys on the focused grid type.
   $effect(() => {
     const element = gridElement
     if (element === undefined) {
       return
     }
     element.addEventListener('click', onGridClick)
-    return () => element.removeEventListener('click', onGridClick)
+    element.addEventListener('keydown', onGridKeydown)
+    return () => {
+      element.removeEventListener('click', onGridClick)
+      element.removeEventListener('keydown', onGridKeydown)
+    }
   })
 
   // Touch gestures, handled here: one finger pans, two fingers pinch (the zoom

@@ -1,6 +1,7 @@
 <script lang="ts">
   import GridViewport from './GridViewport.svelte'
   import { t } from './i18n'
+  import type { LetterCellView } from './roomSession'
   import { gridLabel, newSession, receiveFrame, statusAfterClose } from './roomSession'
   import {
     computeWords,
@@ -32,6 +33,13 @@
     }
   })
 
+  // Send a message when the socket is open; after a close nothing is sent.
+  function send(message: object): void {
+    if (socket !== null && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(message))
+    }
+  }
+
   // Make `next` the selection, and tell the server when it is a change.
   function select(next: Selection | null): void {
     if (next === null || sameSelection(next, selection)) {
@@ -44,14 +52,97 @@
       selection.direction !== next.direction
     rawSelection = next
     // The server only knows the cell and the direction, not the chosen word.
-    if (cellChanged && socket !== null && socket.readyState === WebSocket.OPEN) {
-      const message = {
+    if (cellChanged) {
+      send({
         type: 'select_cell',
         row: next.row,
         column: next.column,
         direction: next.direction,
+      })
+    }
+  }
+
+  // The letter cell at a position of the snapshot, or null.
+  function letterCellAt(row: number, column: number): LetterCellView | null {
+    if (session.snapshot === null) {
+      return null
+    }
+    for (const cell of session.snapshot.grid.cells) {
+      if (cell.type === 'letter' && cell.row === row && cell.column === column) {
+        return cell
       }
-      socket.send(JSON.stringify(message))
+    }
+    return null
+  }
+
+  // The selection moved to the cell at `index` of the selected word.
+  function selectWordCell(word: Word, current: Selection, index: number): void {
+    const target = word.cells[index]
+    select({ row: target.row, column: target.column, direction: current.direction, word: current.word })
+  }
+
+  // Type a letter on the selected cell, then move to the next unlocked cell.
+  function onLetter(letter: string): void {
+    if (selection === null || activeWord === null) {
+      return
+    }
+    const cell = letterCellAt(selection.row, selection.column)
+    if (cell === null || cell.locked) {
+      return
+    }
+    if (cell.letter !== letter) {
+      cell.letter = letter
+      send({
+        type: 'edit_letter',
+        row: cell.row,
+        column: cell.column,
+        letter,
+        base_seq: null,
+      })
+    }
+    const here = activeWord.cells.findIndex(
+      (position) => position.row === cell.row && position.column === cell.column,
+    )
+    for (let index = here + 1; index < activeWord.cells.length; index++) {
+      const position = activeWord.cells[index]
+      const candidate = letterCellAt(position.row, position.column)
+      if (candidate !== null && !candidate.locked) {
+        selectWordCell(activeWord, selection, index)
+        return
+      }
+    }
+  }
+
+  // Clear a cell that is filled and not locked, and tell the server.
+  function eraseCell(cell: LetterCellView): boolean {
+    if (cell.locked || cell.letter === null) {
+      return false
+    }
+    cell.letter = null
+    send({ type: 'erase', row: cell.row, column: cell.column, base_seq: null })
+    return true
+  }
+
+  // Backspace: clear the selected cell, or step back and clear the previous one.
+  function onErase(): void {
+    if (selection === null || activeWord === null) {
+      return
+    }
+    const cell = letterCellAt(selection.row, selection.column)
+    if (cell === null || eraseCell(cell)) {
+      return
+    }
+    const here = activeWord.cells.findIndex(
+      (position) => position.row === cell.row && position.column === cell.column,
+    )
+    if (here <= 0) {
+      return
+    }
+    selectWordCell(activeWord, selection, here - 1)
+    const previous = activeWord.cells[here - 1]
+    const previousCell = letterCellAt(previous.row, previous.column)
+    if (previousCell !== null) {
+      eraseCell(previousCell)
     }
   }
 
@@ -119,6 +210,8 @@
       {activeWord}
       {onCellTap}
       {onClueTap}
+      {onLetter}
+      {onErase}
       {words}
     />
     <div
