@@ -126,6 +126,8 @@ The words in brackets say how each criterion is tested.
 - **AC-4** (AC-2.1.4) (browser with live server) A new game on FX-01 renders 7 clue cells and 18 empty letter cells. A fresh room on FX-01 shows 25 `cell` elements: 7 with `data-type="clue"`, 18 with `data-type="letter"`, all 18 with `data-letter=""`, `data-locked="false"` and no visible text, and none with `data-type="empty"`; the grid has `data-width="5"` and `data-height="5"`.
 - **AC-5** (AC-2.1.5) (browser with live server, viewport emulation in Chromium, Firefox and WebKit) The game is a responsive web app with no native app and no install. Every screen works from 320 px wide up to desktop, in portrait and landscape, on current Chrome, Safari, Firefox and Edge. In each of the three engines (Chromium standing for Chrome and Edge, WebKit for Safari), for each window size 320x568, 568x320, 360x740, 740x360, 768x1024, 1024x768, 1280x800 and 1920x1080, and for each page `/` and `/r/<code>` (a room on FX-02): `document.documentElement.scrollWidth <= window.innerWidth` (no horizontal page scroll); on the room page, the `grid-viewport` box lies inside the window horizontally, is at least 100 px wide and 100 px high, and at least one `cell` is inside the window.
 - **AC-6** (new) (browser with mocked socket) The grid shows the letters and locks of the snapshot. Given a FX-01 snapshot whose cell (1, 0) has `letter="T"` and whose cell (1, 2) has `letter="M"`, `locked=True`, the cell (1, 0) has `data-letter="T"` and the text `T`, the cell (1, 2) has `data-letter="M"`, `data-locked="true"` and the text `M`, and the cell (1, 1) has `data-letter=""`. A second snapshot where (1, 0) is empty makes it `data-letter=""`.
+- **AC-7** (new) (browser with live server) The room page fits the window at every size of AC-5. On a fresh FX-01 room, at each window size of AC-5 and at zoom 1, the `grid-viewport` box lies inside the window (top >= 0, bottom <= window height), the page has no vertical scroll (`document.documentElement.scrollHeight <= window.innerHeight`), and every cell of the grid is inside the window.
+- **AC-8** (new) (browser with mocked socket) A snapshot whose grid is malformed is ignored and the page keeps working. With FX-01's snapshot shown, when the mock sends a second snapshot with a higher `seq` whose `grid.cells` holds a duplicate position, a position outside `width` x `height`, or a number of cells different from `width` x `height`, then the page shows no error, keeps the previous grid (same cells, letters and `data-seq`), and a valid snapshot sent next is shown.
 
 ## Edge cases and errors
 
@@ -207,6 +209,13 @@ Each one is already part of the spec above.
    the clue cell to the near half of the letter cell, on the correct side.
 8. Locked cells are shown (`data-locked`) here because the snapshot already holds
    them; their look is the implementer's choice until spec 016.
+
+Added after the review, decided by the lead on 2026-10-10 under the human's
+instruction to take technical decisions:
+9. The room page fits the window: the grid area is sized from the space really
+   left by the page, with no vertical page scroll (AC-7).
+10. A malformed grid in a snapshot (duplicate or out-of-range position, wrong cell
+    count) is ignored like any other malformed frame (AC-8).
 
 ## Open questions
 

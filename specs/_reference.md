@@ -61,7 +61,7 @@ the specs whose criteria this one mentions.
 | [003](003-grid-import-validation.md) | US-1.2 Grid validation at import | E1 | MVP | 7 | - |
 | [004](004-grid-catalogue.md) | US-1.3 Grid catalogue | E1 | MVP | 7 | - |
 | [005](005-licensed-content.md) | US-1.4 Licensed content only | E1 | MVP | 3 | - |
-| [006](006-grid-rendering.md) | US-2.1 Grid rendering | E2 | MVP | 6 | - |
+| [006](006-grid-rendering.md) | US-2.1 Grid rendering | E2 | MVP | 8 | - |
 | [007](007-word-selection.md) | US-2.2 Word selection and direction | E2 | MVP | 5 | - |
 | [008](008-letter-entry.md) | US-2.3 Letter entry | E2 | MVP | 4 | 016 |
 | [009](009-keyboard-navigation.md) | US-2.4 Keyboard and navigation | E2 | MVP | 4 | - |
