@@ -67,8 +67,11 @@ Spec 009's in-app keyboard calls the same two actions (letter, erase).
 
 "Browser with mocked socket" as in spec 007: a FX-01 snapshot (cells replaced with
 `model_copy` for letters and locks), a tap with `locator.click()` on a cell (which
-selects it and focuses the grid), keys with `page.keyboard.press(...)` (for
-example `page.keyboard.press("é")`), sent frames parsed with
+selects it and focuses the grid), ASCII keys with `page.keyboard.press(...)`,
+accented keys (é, à, ç...) by dispatching a `KeyboardEvent("keydown", {key: "é",
+bubbles: true, cancelable: true})` on the focused grid with `page.evaluate`
+(Playwright's `keyboard.press("é")` raises "Unknown key" and `keyboard.type`
+sends no keydown, in every engine), sent frames parsed with
 `parse_client_message`. The mock never answers edits, so what the cells show comes
 from the client alone. `select_cell` frames are ignored by these tests unless
 stated.
