@@ -510,6 +510,8 @@ def test_ac1_arrow_down_while_across_switches_to_down_and_arrow_left_back(
 def test_ac1_arrows_skip_an_empty_cell(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    # With (1, 1) empty, TAMIS ends before it, so (1, 2) has no across word
+    # (specs 002 and 007); only MIME is left and step 2 of the spec picks it.
     view = with_empty_cell(grid_view(fx01_grid), 1, 1)
     mock = open_view(page, live_server, view)
     tap(page, 1, 0)
@@ -517,8 +519,25 @@ def test_ac1_arrows_skip_an_empty_cell(
 
     page.keyboard.press("ArrowRight")
 
-    expect_cell_selection(page, 1, 2, "across")
-    assert sent_selections(mock)[-1] == across(1, 2)
+    expect_selection(page, 1, 2, "down", DOWN_MIME)
+    assert sent_selections(mock)[-1] == down(1, 2)
+
+
+def test_ac1_arrow_down_skips_an_empty_cell_and_uses_the_only_word_left(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    # With (2, 1) empty, NAVAL ends before it, so (3, 1) has no down word and
+    # the walk lands on its across word AMEN.
+    view = with_empty_cell(grid_view(fx01_grid), 2, 1)
+    mock = open_view(page, live_server, view)
+    tap(page, 1, 1)
+    tap(page, 1, 1)
+    expect_selection(page, 1, 1, "down", DOWN_W2)
+
+    page.keyboard.press("ArrowDown")
+
+    expect_selection(page, 3, 1, "across", ACROSS_AMEN)
+    assert sent_selections(mock)[-1] == across(3, 1)
 
 
 def test_ac1_arrows_do_nothing_without_a_selection(
