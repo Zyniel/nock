@@ -171,7 +171,7 @@ export function selectedWord(words: Word[], selection: Selection | null): Word |
 }
 
 // A selection on a cell, in a direction, with the longest word there.
-function selectionOnCell(
+export function selectionOnCell(
   words: Word[],
   row: number,
   column: number,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import GridViewport from './GridViewport.svelte'
+  import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
   import type { LetterCellView } from './roomSession'
   import { gridLabel, newSession, receiveFrame, statusAfterClose } from './roomSession'
@@ -19,6 +20,9 @@
   let session = $state(newSession())
   let rawSelection: Selection | null = $state(null)
   let socket: WebSocket | null = null
+  let gridViewport: GridViewport | undefined = $state()
+  // The in-app keyboard is for touch screens: the main pointer is coarse.
+  const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
   let words = $derived(session.snapshot === null ? [] : computeWords(session.snapshot.grid))
   // A new snapshot may remove the word of the selection: then nothing is selected.
@@ -213,11 +217,13 @@
   <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
   {#if session.snapshot !== null}
     <GridViewport
+      bind:this={gridViewport}
       grid={session.snapshot.grid}
       {selection}
       {activeWord}
       {onCellTap}
       {onClueTap}
+      onSelect={select}
       {onLetter}
       {onErase}
       {words}
@@ -233,6 +239,13 @@
         >{activeWord === null ? t('clue_bar.empty') : activeWord.text}</span
       >
     </div>
+    {#if isTouchScreen}
+      <InAppKeyboard
+        {onLetter}
+        {onErase}
+        onKeyUsed={() => gridViewport?.focusGrid()}
+      />
+    {/if}
   {/if}
 </main>
 
@@ -261,5 +274,25 @@
     display: block;
     font-size: 1rem;
     line-height: 1.3;
+  }
+
+  /* A low window (a phone on its side) keeps its height for the grid. */
+  @media (max-height: 500px) {
+    main {
+      padding: 0.25rem 0.5rem;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .clue-bar {
+      padding: 0.25rem 0.75rem;
+    }
   }
 </style>

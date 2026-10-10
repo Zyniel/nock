@@ -11,6 +11,7 @@
     fitCellSize,
   } from './gridLayout'
   import { actionForKey } from './letterEntry'
+  import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
   import type { GridView } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
@@ -27,6 +28,7 @@
     activeWord,
     onCellTap,
     onClueTap,
+    onSelect,
     onLetter,
     onErase,
   }: {
@@ -36,6 +38,7 @@
     activeWord: Word | null
     onCellTap: (row: number, column: number) => void
     onClueTap: (word: Word) => void
+    onSelect: (next: Selection) => void
     onLetter: (letter: string) => void
     onErase: () => void
   } = $props()
@@ -102,8 +105,42 @@
     return () => observer.disconnect()
   })
 
-  // Letter keys and Backspace (spec 008). Arrows and Tab come with spec 009.
+  // Put the focus back on the grid (the in-app keyboard uses it).
+  export function focusGrid(): void {
+    gridElement?.focus()
+  }
+
+  // Arrow keys move the selection to the next letter cell (spec 009).
+  function onArrowKey(key: string): void {
+    if (selection === null || !isArrowKey(key)) {
+      return
+    }
+    const next = selectionAfterArrow(grid, words, selection, key)
+    if (next !== null) {
+      onSelect(next)
+    }
+  }
+
+  // Tab and Shift+Tab select the next or previous unfinished word (spec 009).
+  function onTabKey(shiftKey: boolean): void {
+    const next = selectionAfterTab(grid, words, selection, shiftKey ? -1 : 1)
+    if (next !== null) {
+      onSelect(next)
+    }
+  }
+
+  // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
+    const hasModifier = event.ctrlKey || event.metaKey || event.altKey
+    if (!hasModifier && (event.key === 'Tab' || (isArrowKey(event.key) && selection !== null))) {
+      event.preventDefault()
+      if (event.key === 'Tab') {
+        onTabKey(event.shiftKey)
+      } else {
+        onArrowKey(event.key)
+      }
+      return
+    }
     const action = actionForKey(
       event.key,
       event.ctrlKey,
