@@ -167,7 +167,37 @@ function toGrid(value: unknown): GridView | null {
     }
     cells.push(cell)
   }
+  if (!hasEveryPositionOnce(cells, width, height)) {
+    return null
+  }
   return { width, height, cells }
+}
+
+// True when there is one cell per position of the grid: no duplicate, none
+// outside width x height, and so exactly width x height cells.
+function hasEveryPositionOnce(cells: CellView[], width: number, height: number): boolean {
+  if (cells.length !== width * height) {
+    return false
+  }
+  const seen = new Set<number>()
+  for (const cell of cells) {
+    const inside =
+      Number.isInteger(cell.row) &&
+      Number.isInteger(cell.column) &&
+      cell.row >= 0 &&
+      cell.row < height &&
+      cell.column >= 0 &&
+      cell.column < width
+    if (!inside) {
+      return false
+    }
+    const position = cell.row * width + cell.column
+    if (seen.has(position)) {
+      return false
+    }
+    seen.add(position)
+  }
+  return true
 }
 
 function toSnapshot(message: Record<string, unknown>): Snapshot | null {

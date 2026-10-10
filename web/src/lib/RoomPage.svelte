@@ -56,3 +56,14 @@
     <GridViewport grid={session.snapshot.grid} />
   {/if}
 </main>
+
+<style>
+  /* The page fills the window; the grid viewport takes the height left. */
+  main {
+    box-sizing: border-box;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+</style>

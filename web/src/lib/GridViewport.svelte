@@ -209,8 +209,8 @@
 <style>
   .viewport {
     width: 100%;
-    height: max(12rem, calc(100vh - 8rem));
-    height: max(12rem, calc(100dvh - 8rem));
+    flex: 1 1 0;
+    min-height: 0;
     overflow: auto;
     /* The app handles touch pan and pinch itself. */
     touch-action: none;
