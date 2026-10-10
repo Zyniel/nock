@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -20,6 +21,8 @@ from nock.grid_import import import_grid
 
 GridNumber = Annotated[int, Field(ge=1, le=999_999_999, strict=True)]
 Force = Annotated[int, Field(ge=1, le=4, strict=True)]
+
+PUBLISHED_ON_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 GRIDS_DIR: Path = Path(__file__).resolve().parents[2] / "grids"
 
@@ -56,6 +59,14 @@ def _count_clues(grid: Grid) -> int:
         if isinstance(cell, ClueCell):
             clue_count += len(cell.clues)
     return clue_count
+
+
+def _newest_first_key(entry: CatalogueEntry) -> tuple[date, int]:
+    """Sort key putting the latest publication date first, then the highest number.
+
+    Use it with `reverse=True`.
+    """
+    return (entry.published_on, entry.number)
 
 
 def summarize(entry: CatalogueEntry) -> GridSummary:
@@ -111,7 +122,7 @@ class Catalogue(BaseModel):
             if force is not None and entry.force != force:
                 continue
             shown_entries.append(entry)
-        shown_entries.sort(key=lambda e: (e.published_on, e.number), reverse=True)
+        shown_entries.sort(key=_newest_first_key, reverse=True)
         summaries: list[GridSummary] = []
         for entry in shown_entries:
             summaries.append(summarize(entry))
@@ -142,16 +153,37 @@ def _read_entry(path: Path) -> CatalogueEntry:
         raise ValueError("the file must hold a JSON object")
     if "grid" not in payload:
         raise ValueError("the key 'grid' is missing")
+    published_on = payload.get("published_on")
+    is_text = isinstance(published_on, str)
+    if is_text and PUBLISHED_ON_PATTERN.fullmatch(published_on) is None:
+        raise ValueError("'published_on' must be written YYYY-MM-DD")
     report = import_grid(json.dumps(payload["grid"]))
     payload["grid"] = report.grid
     return CatalogueEntry.model_validate(payload)
 
 
+def _catalogue_paths(directory: Path) -> list[Path]:
+    """List the catalogue files of `directory`, sorted by name in code-point order."""
+    names: list[str] = []
+    for path in directory.iterdir():
+        if path.name.startswith("."):
+            continue
+        if not path.name.endswith(".json"):
+            continue
+        names.append(path.name)
+    names.sort()
+    paths: list[Path] = []
+    for name in names:
+        paths.append(directory / name)
+    return paths
+
+
 def load_catalogue(directory: Path) -> Catalogue:
     """Load every `*.json` file directly inside `directory`, in file-name order.
 
-    A missing directory gives an empty catalogue. Sub-directories and files with
-    another extension are ignored.
+    Files are read in code-point order of their names. A missing directory gives
+    an empty catalogue. Sub-directories, dot files and names that do not end in
+    lower-case ".json" are ignored.
 
     Args:
         directory: The directory holding one JSON file per grid.
@@ -165,7 +197,7 @@ def load_catalogue(directory: Path) -> Catalogue:
     """
     if not directory.is_dir():
         return Catalogue()
-    paths = sorted(directory.glob("*.json"))
+    paths = _catalogue_paths(directory)
     entries: list[CatalogueEntry] = []
     numbers_seen: set[int] = set()
     for path in paths:

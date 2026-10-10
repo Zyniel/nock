@@ -35,6 +35,7 @@ from nock.protocol import (
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
 ROOM_CODE_PATTERN: str = r"^[A-Z0-9]{6}$"
 GRID_NUMBER_PATTERN: str = r"^[1-9][0-9]{0,8}$"
+FORCE_PATTERN: str = r"^[1-4]$"
 ROOM_NOT_FOUND_CLOSE_CODE: int = 4404  # WebSocket close code, unknown room
 
 _ROOM_CODE_LENGTH = 6
@@ -221,7 +222,12 @@ def create_app(
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
     grid_number_regex = re.compile(GRID_NUMBER_PATTERN)
     # No slash redirect: a path ending with "/" matches no route and is a 404.
-    web_app = FastAPI(redirect_slashes=False)
+    web_app = FastAPI(
+        redirect_slashes=False,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+    )
 
     @web_app.get("/", include_in_schema=False)
     def serve_catalogue() -> Response:
@@ -240,9 +246,10 @@ def create_app(
 
     @web_app.get("/api/grids")
     def list_grids(
-        force: Annotated[int | None, Query(ge=1, le=4)] = None,
+        force: Annotated[str | None, Query(pattern=FORCE_PATTERN)] = None,
     ) -> list[dict[str, object]]:
-        summaries = grid_catalogue.published_summaries(force)
+        force_number = int(force) if force is not None else None
+        summaries = grid_catalogue.published_summaries(force_number)
         bodies: list[dict[str, object]] = []
         for summary in summaries:
             bodies.append(summary.model_dump(mode="json"))
