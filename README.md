@@ -55,8 +55,9 @@ Inside `claude`, in this folder:
    runs the same gate.
 
 Spec `001-slugify` is a finished example of the three files a feature produces.
-Delete `specs/001-slugify.md`, `tests/test_spec_001_slugify.py` and
-`src/nock/text.py` when you no longer need it.
+It moves to `specs/_archive/001-slugify/` once spec 002 has its own tests (see
+`docs/build-plan.md`). `specs/_archive/` also keeps the original backlog,
+`complete.md`, that specs 002 to 038 were split from.
 
 ## 3. Where things go
 

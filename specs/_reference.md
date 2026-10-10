@@ -1,7 +1,7 @@
 # Shared reference for all specs
 
 Not a spec: the quality gate ignores files starting with "_". Specs 002 to 038
-point here for the reference grid and the vocabulary. Source: `specs/complete.md`.
+point here for the reference grid and the vocabulary. Source: `specs/_archive/complete.md`.
 
 ## Reference grid
 
@@ -52,7 +52,7 @@ Six epics make the MVP: a group can open a link, fill one grid together and see 
 ## Spec index
 
 One spec per user story. Each criterion keeps its backlog id in brackets, for
-example `**AC-1** (AC-4.2.1)`, so it traces back to `complete.md`. "Refers to" lists
+example `**AC-1** (AC-4.2.1)`, so it traces back to `specs/_archive/complete.md`. "Refers to" lists
 the specs whose criteria this one mentions.
 
 | Spec | Story | Epic | Release | Criteria | Refers to |
