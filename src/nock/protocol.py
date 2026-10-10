@@ -57,7 +57,7 @@ class Direction(StrEnum):
 class PlayerState(StrEnum):
     """Presence of a player."""
 
-    ACTIVE = "active"
+    ACTIVE = "active"  # spec 013 AC-1
     IDLE = "idle"
     DISCONNECTED = "disconnected"
 
@@ -65,7 +65,7 @@ class PlayerState(StrEnum):
 class HelpMode(StrEnum):
     """Who may ask for checks and reveals."""
 
-    FREE = "free"
+    FREE = "free"  # spec 025 AC-1
     VOTE = "vote"
     NONE = "none"
 
@@ -73,7 +73,7 @@ class HelpMode(StrEnum):
 class Reaction(StrEnum):
     """The reactions a player can show on a clue."""
 
-    THUMBS_UP = "thumbs_up"
+    THUMBS_UP = "thumbs_up"  # spec 022 AC-2, a set of 5
     CLAP = "clap"
     LAUGH = "laugh"
     WOW = "wow"
@@ -84,14 +84,14 @@ class LeaveReason(StrEnum):
     """Why a player left the room."""
 
     LEFT = "left"  # closed the room on purpose
-    REMOVED = "removed"  # removed by the host
-    TIMED_OUT = "timed_out"  # disconnected for too long
+    REMOVED = "removed"  # removed by the host, spec 014 AC-1
+    TIMED_OUT = "timed_out"  # disconnected past the spec 017 window
 
 
 class VoteOutcome(StrEnum):
     """How a vote ended."""
 
-    PASSED = "passed"
+    PASSED = "passed"  # spec 025 AC-2, AC-3
     REJECTED = "rejected"
     TIMED_OUT = "timed_out"
 
@@ -99,22 +99,22 @@ class VoteOutcome(StrEnum):
 class ErrorCode(StrEnum):
     """Why the server refused a message."""
 
-    INVALID_MESSAGE = "invalid_message"
-    NOT_JOINED = "not_joined"
-    ROOM_FULL = "room_full"
-    ROOM_LOCKED = "room_locked"
-    REMOVED = "removed"
-    NOT_HOST = "not_host"
-    NOT_A_LETTER_CELL = "not_a_letter_cell"
-    CELL_LOCKED = "cell_locked"
-    HELP_DISABLED = "help_disabled"
-    BUDGET_EXHAUSTED = "budget_exhausted"
+    INVALID_MESSAGE = "invalid_message"  # failed parse_client_message
+    NOT_JOINED = "not_joined"  # any message before join
+    ROOM_FULL = "room_full"  # spec 012 AC-4
+    ROOM_LOCKED = "room_locked"  # spec 014 AC-2
+    REMOVED = "removed"  # spec 014 AC-1
+    NOT_HOST = "not_host"  # host action from a non-host
+    NOT_A_LETTER_CELL = "not_a_letter_cell"  # spec 037 AC-2
+    CELL_LOCKED = "cell_locked"  # spec 016 AC-3
+    HELP_DISABLED = "help_disabled"  # help mode none, spec 025 AC-4
+    BUDGET_EXHAUSTED = "budget_exhausted"  # spec 024 AC-3
     VOTE_IN_PROGRESS = "vote_in_progress"
     NO_OPEN_VOTE = "no_open_vote"
-    MUTED = "muted"
-    RATE_LIMITED = "rate_limited"
-    NOTHING_TO_UNDO = "nothing_to_undo"
-    GRID_SOLVED = "grid_solved"
+    MUTED = "muted"  # spec 022 AC-4
+    RATE_LIMITED = "rate_limited"  # spec 037 AC-3
+    NOTHING_TO_UNDO = "nothing_to_undo"  # spec 018 AC-3
+    GRID_SOLVED = "grid_solved"  # input locked, spec 026 AC-1
 
 
 class CellRef(ProtocolModel):
@@ -170,7 +170,10 @@ RevealTarget = Annotated[CellTarget | WordTarget, Field(discriminator="scope")]
 
 
 class RevealBudget(ProtocolModel):
-    """How many letters and words can still be revealed."""
+    """How many letters and words can still be revealed.
+
+    Spec 024 AC-2: the default is 5 letters and 1 word.
+    """
 
     letters: Count
     words: Count
@@ -181,7 +184,7 @@ class RoomSettings(ProtocolModel):
 
     help_mode: HelpMode
     reveal_budget: RevealBudget  # the allowance the host set
-    locked: StrictBool
+    locked: StrictBool  # spec 014 AC-2
 
 
 # ---- Client to server ---------------------------------------------------
@@ -192,7 +195,7 @@ class Join(ProtocolModel):
 
     type: Literal["join"] = "join"
     nickname: Nickname
-    resume_token: ResumeToken | None = None
+    resume_token: ResumeToken | None = None  # from an earlier snapshot
 
 
 class SelectCell(ProtocolModel):
@@ -268,7 +271,7 @@ class Flag(ProtocolModel):
     """Flag a clue as stuck; `clue` of None removes my flag."""
 
     type: Literal["flag"] = "flag"
-    clue: ClueRef | None
+    clue: ClueRef | None  # None removes my flag
 
 
 class Chat(ProtocolModel):
@@ -303,7 +306,7 @@ class LockRoom(ProtocolModel):
     """Host action: lock the room, or unlock it with `locked` False."""
 
     type: Literal["lock_room"] = "lock_room"
-    locked: StrictBool
+    locked: StrictBool  # False unlocks
 
 
 class ChangeSettings(ProtocolModel):
@@ -439,6 +442,8 @@ def grid_view(grid: Grid) -> GridView:
             cell_views.append(_view_of_clue_cell(cell))
         elif isinstance(cell, EmptyCell):
             cell_views.append(EmptyCellView(row=cell.row, column=cell.column))
+        else:
+            raise TypeError(f"Unknown cell kind: {type(cell).__name__}")
     return GridView(width=grid.width, height=grid.height, cells=tuple(cell_views))
 
 
@@ -471,7 +476,7 @@ class LetterChanged(ProtocolModel):
     seq: Seq
     row: Coordinate
     column: Coordinate
-    letter: Letter | None
+    letter: Letter | None  # None: the cell was erased
     pencil: StrictBool
     player_id: PlayerId  # who made the change (the new author)
 
@@ -483,8 +488,8 @@ class CellLocked(ProtocolModel):
     seq: Seq
     row: Coordinate
     column: Coordinate
-    letter: Letter
-    revealed: StrictBool
+    letter: Letter  # the letter now locked in the cell
+    revealed: StrictBool  # True: revealed, no author (spec 024 AC-1)
 
 
 class PlayerJoined(ProtocolModel):
@@ -571,7 +576,7 @@ class FlagChanged(ProtocolModel):
     type: Literal["flag_changed"] = "flag_changed"
     seq: Seq
     player_id: PlayerId
-    clue: ClueRef | None
+    clue: ClueRef | None  # None: the player's flag is cleared
 
 
 class ChatMessage(ProtocolModel):
@@ -628,7 +633,7 @@ class GridSolved(ProtocolModel):
 
 
 class GridFullWrong(ProtocolModel):
-    """The grid is full but wrong. Carries no hint of where."""
+    """The grid is full but wrong. Carries no hint of where, spec 026 AC-2."""
 
     type: Literal["grid_full_wrong"] = "grid_full_wrong"
     seq: Seq
