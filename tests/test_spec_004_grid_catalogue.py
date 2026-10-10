@@ -972,9 +972,22 @@ def loaded_numbers(directory: Path) -> list[int]:
     return numbers
 
 
-@pytest.mark.parametrize("bad_date", ["2026-10-01T00:00:00", "2026-1-1", "01/10/2026"])
+@pytest.mark.parametrize(
+    "bad_date",
+    [
+        pytest.param("2026-10-01T00:00:00", id="datetime"),
+        pytest.param("2026-1-1", id="no-zero-padding"),
+        pytest.param("01/10/2026", id="slashes"),
+        pytest.param("20261001", id="compact-form"),
+        pytest.param(0, id="int-zero"),
+        pytest.param(1790035200, id="int-timestamp"),
+        pytest.param(1790035200.0, id="float-timestamp"),
+        pytest.param(True, id="boolean"),
+        pytest.param(None, id="null"),
+    ],
+)
 def test_ac7_published_on_must_be_exactly_year_month_day(
-    tmp_path: Path, fx01_text: str, bad_date: str
+    tmp_path: Path, fx01_text: str, bad_date: object
 ) -> None:
     write_catalogue_file(tmp_path, "bad.json", fx01_text, published_on=bad_date)
 
