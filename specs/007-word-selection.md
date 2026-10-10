@@ -1,7 +1,7 @@
 ---
 id: "007"
 title: Word selection and direction
-status: approved
+status: done
 ---
 
 # 007 - Word selection and direction
