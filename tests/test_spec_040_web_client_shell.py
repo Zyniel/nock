@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from httpx2 import Response
 from playwright.sync_api import Page, WebSocketRoute, expect
 from starlette.websockets import WebSocketDisconnect
 
@@ -453,6 +454,177 @@ def test_ac6_app_is_served_once_built_without_restart(tmp_path: Path) -> None:
 
 def test_ac6_default_dist_dir_is_the_repository_web_dist() -> None:
     assert WEB_DIST_DIR == PROJECT_ROOT / "web" / "dist"
+
+
+# ---- AC-27 and AC-28: dot files and trailing slashes -------------------------
+
+NOT_FOUND_BODY = {"detail": "Not Found"}
+DOT_FILE_PATHS = [
+    "/.env",
+    "/.htaccess",
+    "/assets/.hidden.js",
+    "/.well-known/security.txt",
+    "/%2Eenv",
+]
+TRAILING_SLASH_PATHS = [
+    "/api/",
+    "/api/rooms/",
+    "/assets/",
+    "/assets/app.js/",
+    "/favicon.svg/",
+    "/r/",
+    "/r/ABC123/",
+    "/catalogue/",
+]
+
+
+@pytest.fixture
+def dot_dist_dir(dist_dir: Path) -> Path:
+    """A built client that also holds dot files and dot directories."""
+    (dist_dir / ".env").write_text("SECRET=1", encoding="utf-8")
+    (dist_dir / ".htaccess").write_text("Deny from all", encoding="utf-8")
+    (dist_dir / "..config").write_text("SECRET=3", encoding="utf-8")
+    (dist_dir / "assets" / ".hidden.js").write_text("console.log(2)", encoding="utf-8")
+    (dist_dir / "assets" / ".cache").mkdir()
+    (dist_dir / "assets" / ".cache" / "inner.js").write_text(
+        "console.log(4)", encoding="utf-8"
+    )
+    (dist_dir / ".well-known").mkdir()
+    (dist_dir / ".well-known" / "security.txt").write_text(
+        "Contact: nobody", encoding="utf-8"
+    )
+    return dist_dir
+
+
+@pytest.fixture
+def dot_client(dot_dist_dir: Path) -> TestClient:
+    return TestClient(create_app(rooms=RoomRegistry(), dist_dir=dot_dist_dir))
+
+
+def assert_plain_not_found(response: Response) -> None:
+    """Check a direct 404 with FastAPI's JSON body and nothing of the app."""
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+    assert "location" not in response.headers
+    assert response.text != INDEX_HTML
+
+
+@pytest.mark.parametrize("path", DOT_FILE_PATHS)
+def test_ac27_dot_files_answer_json_404(dot_client: TestClient, path: str) -> None:
+    response = dot_client.get(path, follow_redirects=False)
+
+    assert_plain_not_found(response)
+    for secret in ("SECRET=1", "console.log(2)", "Contact: nobody", "Deny from all"):
+        assert secret not in response.text
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/..config",
+        "/assets/.cache/inner.js",
+        "/.well-known/security.txt",
+        "/%2Ewell-known/security.txt",
+        "/assets/%2Ehidden.js",
+    ],
+)
+def test_ac27_every_dot_segment_counts_after_decoding(
+    dot_client: TestClient, path: str
+) -> None:
+    response = dot_client.get(path, follow_redirects=False)
+
+    assert_plain_not_found(response)
+    for secret in ("SECRET=3", "console.log(2)", "console.log(4)", "Contact: nobody"):
+        assert secret not in response.text
+
+
+def test_ac27_dot_files_do_not_hide_regular_files(dot_client: TestClient) -> None:
+    script = dot_client.get("/assets/app.js")
+    favicon = dot_client.get("/favicon.svg")
+    root = dot_client.get("/")
+
+    assert script.status_code == 200
+    assert script.text == "console.log(1)"
+    assert favicon.status_code == 200
+    assert favicon.text == "<svg></svg>"
+    assert root.status_code == 200
+    assert root.text == INDEX_HTML
+
+
+@pytest.mark.parametrize("path", DOT_FILE_PATHS)
+def test_ac27_unbuilt_client_answers_404_not_503_for_dot_files(
+    tmp_path: Path, path: str
+) -> None:
+    unbuilt = tmp_path / "unbuilt"
+    unbuilt.mkdir()
+    (unbuilt / ".env").write_text("SECRET=1", encoding="utf-8")
+    client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=unbuilt))
+
+    response = client.get(path, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+
+
+def test_ac27_missing_dist_dir_answers_404_for_dot_files(tmp_path: Path) -> None:
+    client = TestClient(create_app(dist_dir=tmp_path / "does-not-exist"))
+
+    response = client.get("/.env", follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+
+
+@pytest.mark.parametrize("path", TRAILING_SLASH_PATHS)
+def test_ac28_trailing_slash_answers_404_without_redirect(
+    empty_client: TestClient, path: str
+) -> None:
+    response = empty_client.get(path, follow_redirects=False)
+
+    assert_plain_not_found(response)
+    assert not 300 <= response.status_code < 400
+
+
+def test_ac28_root_is_still_served(empty_client: TestClient) -> None:
+    response = empty_client.get("/", follow_redirects=False)
+
+    assert response.status_code == 200
+    assert response.text == INDEX_HTML
+
+
+def test_ac28_registered_room_with_trailing_slash_is_404(
+    room_client: TestClient, room_code: str
+) -> None:
+    served = room_client.get(f"/r/{room_code}", follow_redirects=False)
+    response = room_client.get(f"/r/{room_code}/", follow_redirects=False)
+
+    assert served.status_code == 200
+    assert_plain_not_found(response)
+
+
+@pytest.mark.parametrize("path", ["/r/ABC123/", "/api/", "/favicon.svg/"])
+def test_ac28_unbuilt_client_answers_404_not_503(tmp_path: Path, path: str) -> None:
+    client = TestClient(create_app(dist_dir=tmp_path / "does-not-exist"))
+
+    response = client.get(path, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+    assert "location" not in response.headers
+
+
+def test_ac28_no_response_of_the_app_is_a_redirect(
+    room_client: TestClient, room_code: str
+) -> None:
+    paths = ["/", f"/r/{room_code}", "/assets/app.js", "/favicon.svg"]
+    paths += ["/api", "/api/nope", "/assets", "/catalogue", "/r/abc123"]
+    paths += [*TRAILING_SLASH_PATHS, f"/r/{room_code}/"]
+    paths += [*DOT_FILE_PATHS, socket_url(room_code)]
+
+    for path in paths:
+        response = room_client.get(path, follow_redirects=False)
+        assert not 300 <= response.status_code < 400, path
+        assert "location" not in response.headers, path
 
 
 # ---- AC-7: RoomRegistry -----------------------------------------------------
