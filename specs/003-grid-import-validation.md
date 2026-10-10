@@ -1,7 +1,7 @@
 ---
 id: "003"
 title: Grid validation at import
-status: approved
+status: done
 ---
 
 # 003 - Grid validation at import
