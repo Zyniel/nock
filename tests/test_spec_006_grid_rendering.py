@@ -11,6 +11,7 @@ import pytest
 from playwright.sync_api import (
     Browser,
     ElementHandle,
+    FloatRect,
     Locator,
     Page,
     WebSocketRoute,
@@ -122,7 +123,7 @@ def cell_at(page: Page, row: int, column: int) -> Locator:
     return page.locator(selector)
 
 
-def box_of(locator: Locator) -> dict[str, float]:
+def box_of(locator: Locator) -> FloatRect:
     box = locator.bounding_box()
     assert box is not None, "the element has no box on screen"
     return box
@@ -684,9 +685,7 @@ def test_ac1_a_one_finger_drag_never_changes_the_zoom(
 # ---- AC-2: each arrow is drawn on the side of its word's first letter ---------
 
 
-def assert_arrow_on_side(
-    arrow_box: dict[str, float], cell_box: dict[str, float], side: str
-) -> None:
+def assert_arrow_on_side(arrow_box: FloatRect, cell_box: FloatRect, side: str) -> None:
     arrow_x = arrow_box["x"] + arrow_box["width"] / 2
     arrow_y = arrow_box["y"] + arrow_box["height"] / 2
     cell_left = cell_box["x"]
