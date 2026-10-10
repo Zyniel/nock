@@ -1,7 +1,7 @@
 ---
 id: "040"
 title: Web client shell
-status: done
+status: approved
 ---
 
 # 040 - Web client shell
@@ -85,13 +85,25 @@ directory.
 | --- | --- |
 | `GET /` | `<dist_dir>/index.html`, status 200, `text/html` |
 | `GET /r/{code}`, `code` matching `ROOM_CODE_PATTERN` | the same `index.html`, whether or not the room exists |
-| `GET /assets/{file}` | that file from `<dist_dir>/assets/`, 404 when absent |
-| `GET /{file}` naming a regular file directly inside `<dist_dir>` (for example `/favicon.svg`) | that file |
+| `GET /assets/{file}`, `file` not starting with `.` | that file from `<dist_dir>/assets/`, 404 when absent |
+| `GET /{file}` naming a regular file directly inside `<dist_dir>`, `file` not starting with `.` (for example `/favicon.svg`) | that file |
 | WebSocket `/api/rooms/{code}/ws` | the room socket below |
+| any path with a segment starting with `.` (for example `/.env`, `/assets/.hidden.js`) | 404, FastAPI's JSON body `{"detail": "Not Found"}`, even when the file exists (AC-27) |
+| any path other than `/` ending with `/` (for example `/api/`, `/assets/`, `/r/ABC123/`, `/catalogue/`) | 404, FastAPI's JSON body `{"detail": "Not Found"}`, no redirect (AC-28) |
 | any other path under `/api`, and `/api` itself | 404, FastAPI's JSON body `{"detail": "Not Found"}` |
 | any other path | 404, never `index.html` |
 
 Every server route lives under `/api/`; no path under `/api/` ever returns the app.
+
+No HTTP response of the app has a 3xx status: FastAPI's automatic trailing-slash
+redirect is never applied (for example `FastAPI(redirect_slashes=False)`; the
+means is the implementer's choice, the observable rule is AC-28). The only path
+ending with `/` that is served is `/` itself.
+
+A path segment is a part of the decoded URL path between two `/`. A segment
+starting with `.` (dot files and dot directories, such as `.env`, `.htaccess`,
+`.well-known`) is never served, whatever `dist_dir` holds: Vite copies every file
+of `web/public/` into `dist`, dot files included.
 
 ### Room WebSocket `/api/rooms/{code}/ws`
 
@@ -223,7 +235,10 @@ client.
 
 - HTTP and WebSocket criteria use `fastapi.testclient.TestClient` on
   `create_app(rooms=..., dist_dir=tmp_path)`, where the test writes its own
-  `index.html` (and `assets/app.js`, `favicon.svg` when needed) into `tmp_path`.
+  `index.html` (and `assets/app.js`, `favicon.svg`, dot files when needed) into
+  `tmp_path`.
+- AC-28 requests are made with `client.get(path, follow_redirects=False)`, so a
+  redirect shows as its own 3xx status instead of being followed.
 - The FX-01 grid is `Grid.model_validate_json(fx01_text)` with the existing
   `fx01_text` fixture of `tests/conftest.py`.
 - Browser criteria use pytest-playwright's `page` fixture (Chromium) against a
@@ -275,6 +290,8 @@ The word in brackets says how each criterion is tested.
 - **AC-24** (static) Given every `web/src/**/*.svelte` and `web/src/**/*.ts` file, when every match of `\bt\(\s*["']([^"']+)["']` is collected, then each captured key is a key of `fr.json`, and at least one match exists.
 - **AC-25** (static) Given `web/index.html`, when it is read, then its `<html>` tag has `lang="fr"`, its `<title>` element is empty, and its `<body>` holds no text once tags are removed (whitespace only).
 - **AC-26** (static) Given the repository, when the demo files are looked up, then none of `web/src/lib/Counter.svelte`, `web/src/assets/hero.png`, `web/src/assets/svelte.svg`, `web/src/assets/vite.svg`, `web/public/icons.svg` exists, and no file under `web/src` contains the text `Counter` or `svelte.svg`.
+- **AC-27** (HTTP) Given a `dist_dir` holding `index.html`, `.env` with the text `SECRET=1`, `.htaccess`, `assets/.hidden.js` with the text `console.log(2)` and `.well-known/security.txt`, when `GET /.env`, `GET /.htaccess`, `GET /assets/.hidden.js`, `GET /.well-known/security.txt` or `GET /%2Eenv` is requested, then each answers 404 with the JSON body `{"detail": "Not Found"}` (so neither the file's content nor `index.html`).
+- **AC-28** (HTTP) Given a `dist_dir` holding `index.html`, `assets/app.js` and `favicon.svg`, and an empty registry, when `GET /api/`, `GET /api/rooms/`, `GET /assets/`, `GET /assets/app.js/`, `GET /favicon.svg/`, `GET /r/`, `GET /r/ABC123/` or `GET /catalogue/` is requested without following redirects, then each answers 404 directly (not a 3xx status, no `location` header) with the JSON body `{"detail": "Not Found"}`; `GET /` still answers 200 with the content of `index.html`.
 
 ### Markup scan (AC-23)
 
@@ -296,8 +313,17 @@ Applied to the text of one `.svelte` file, in this order:
 
 - Room code case (AC-4, AC-11): codes are upper case; `/r/abc123` is 404 and no
   lowercase fallback exists.
-- Trailing slash (AC-2): `GET /r/ABC123/` is not covered; FastAPI's default
-  behaviour is acceptable.
+- Trailing slash (AC-28): every path ending with `/` except `/` itself answers 404
+  JSON, with no redirect, whether or not the path without the slash is served
+  (`/r/ABC123/`, `/favicon.svg/`). This holds when the room `ABC123` is registered
+  too, and when the client is not built (`/r/ABC123/` is 404, not 503).
+- No redirect anywhere (AC-28): no HTTP response of the app has a 3xx status.
+- Dot segments (AC-27): the rule applies to every segment, not only the last one,
+  and after percent-decoding (`/%2Eenv` is `/.env`). A name such as `..config`
+  also starts with `.` and is 404. A future spec that needs a dot path (for
+  example `/.well-known/...`) must change AC-27.
+- Unbuilt client, dot files (AC-6, AC-27): `GET /.env` answers 404 JSON, never
+  503.
 - Path traversal (AC-5): a request such as `GET /..%2Fpyproject.toml` or
   `GET /assets/..%2F..%2Fpyproject.toml` never returns a file outside `dist_dir`
   (404).
@@ -408,6 +434,22 @@ the lead adds it before the build). Each one is already part of the spec above.
     can never pass as skipped tests.
 16. Live-server fixture. Pick: function-scoped, in `tests/conftest.py` so specs 011
     onwards reuse it.
+
+Added after the review, approved by the human on 2026-10-10 ("update spec and
+reimplement" for both). Each one is part of the spec above.
+
+17. Dot files. Reviewer finding: `GET /.env` answered 200 when `dist_dir` held a
+    `.env`, and Vite copies everything in `web/public/` into `dist`, dot files
+    included. Decision: dot files are not served. Any path with a segment starting
+    with `.` answers 404 with the JSON not-found body, even when the file exists
+    (AC-27).
+18. Trailing slash. Reviewer finding: `GET /api/` and `GET /assets/` answered 307
+    (FastAPI's slash redirect), and the redirect then ended in a 404 JSON, while
+    the route table said 404 for every other path under `/api`. Decision: such
+    paths are not found. Every path ending with `/` other than `/` answers 404
+    with the JSON not-found body directly; the app never answers 3xx, so FastAPI's
+    slash redirect is off or never reached (AC-28). This replaces the earlier
+    edge case that left `GET /r/ABC123/` to FastAPI's default behaviour.
 
 ## Open questions
 
