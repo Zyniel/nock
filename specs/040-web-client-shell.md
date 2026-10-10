@@ -1,7 +1,7 @@
 ---
 id: "040"
 title: Web client shell
-status: approved
+status: done
 ---
 
 # 040 - Web client shell
@@ -452,8 +452,8 @@ reimplement" for both). Each one is part of the spec above.
     slash redirect is off or never reached (AC-28). This replaces the earlier
     edge case that left `GET /r/ABC123/` to FastAPI's default behaviour.
 
-    Added after the review of spec 004, decided by the lead on 2026-10-10 under the
-    human's instruction to take technical decisions:
+Added after the review of spec 004, decided by the lead on 2026-10-10 under the
+human's instruction to take technical decisions:
 19. No generated API documentation. FastAPI's `/docs`, `/redoc` and `/openapi.json`
     are turned off: they would describe the server's API to anyone, and the route
     table already says every other path is not found (AC-29).
