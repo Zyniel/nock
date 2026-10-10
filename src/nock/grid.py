@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unicodedata
 from enum import StrEnum
-from typing import Annotated, Literal, NamedTuple
+from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
@@ -25,8 +25,10 @@ class Arrow(StrEnum):
     RIGHT_THEN_DOWN = "right_then_down"
 
 
-class _WordStart(NamedTuple):
+class _WordStart(BaseModel):
     """First cell of a word and the step taken from one letter to the next."""
+
+    model_config = ConfigDict(frozen=True)
 
     row: int
     column: int
@@ -213,37 +215,34 @@ class Grid(BaseModel):
 
         arrow = clue_cell.clues[clue_index].arrow
         word_start = self._start_and_step(row, column, arrow)
-        start_row = word_start.row
-        start_column = word_start.column
-        row_step = word_start.row_step
-        column_step = word_start.column_step
 
-        start_position = _format_position(start_row, start_column)
-        if not self._is_inside(start_row, start_column):
+        start_position = _format_position(word_start.row, word_start.column)
+        if not self._is_inside(word_start.row, word_start.column):
             raise ValueError(f"word starts at {start_position}, outside the grid")
-        if not isinstance(self.cell_at(start_row, start_column), LetterCell):
+        start_cell = self.cell_at(word_start.row, word_start.column)
+        if not isinstance(start_cell, LetterCell):
             raise ValueError(f"word starts at {start_position}, not a letter cell")
 
         positions: list[Position] = []
-        current_row = start_row
-        current_column = start_column
+        current_row = word_start.row
+        current_column = word_start.column
         while self._is_inside(current_row, current_column):
             if not isinstance(self.cell_at(current_row, current_column), LetterCell):
                 break
             positions.append((current_row, current_column))
-            current_row += row_step
-            current_column += column_step
+            current_row += word_start.row_step
+            current_column += word_start.column_step
         return positions
 
     @staticmethod
     def _start_and_step(row: int, column: int, arrow: Arrow) -> _WordStart:
         """Return where the word of a clue starts and which way it runs."""
         if arrow == Arrow.RIGHT:
-            return _WordStart(row, column + 1, row_step=0, column_step=1)
+            return _WordStart(row=row, column=column + 1, row_step=0, column_step=1)
         if arrow == Arrow.DOWN:
-            return _WordStart(row + 1, column, row_step=1, column_step=0)
+            return _WordStart(row=row + 1, column=column, row_step=1, column_step=0)
         if arrow == Arrow.DOWN_THEN_RIGHT:
-            return _WordStart(row + 1, column, row_step=0, column_step=1)
+            return _WordStart(row=row + 1, column=column, row_step=0, column_step=1)
         if arrow == Arrow.RIGHT_THEN_DOWN:
-            return _WordStart(row, column + 1, row_step=1, column_step=0)
+            return _WordStart(row=row, column=column + 1, row_step=1, column_step=0)
         raise ValueError(f"unknown arrow {arrow!r}")
