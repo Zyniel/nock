@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from playwright.sync_api import Browser, Locator, Page, Route, expect
+from playwright.sync_api import Browser, Locator, Page, Request, Route, expect
 from pydantic import ValidationError
 
 from nock.catalogue import (
@@ -391,7 +391,7 @@ def test_ac2_published_summaries_are_newest_first_then_highest_number(
 ) -> None:
     summaries = catalogue.published_summaries()
 
-    assert summary_numbers(summaries) == [2, 3, 1]
+    assert summary_numbers(summaries) == [3, 2, 1]
 
 
 def test_ac2_published_summaries_filter_on_force(catalogue: Catalogue) -> None:
@@ -445,7 +445,7 @@ def test_ac2_empty_catalogue_has_no_summary() -> None:
 def test_ac2_http_list_is_newest_first(client: TestClient) -> None:
     body = client.get("/api/grids").json()
 
-    assert json_numbers(body) == [2, 3, 1]
+    assert json_numbers(body) == [3, 2, 1]
 
 
 def test_ac2_http_list_filters_on_force(client: TestClient) -> None:
@@ -476,7 +476,7 @@ def test_ac2_http_unknown_query_parameter_is_ignored(client: TestClient) -> None
     response = client.get("/api/grids?colour=red")
 
     assert response.status_code == 200
-    assert json_numbers(response.json()) == [2, 3, 1]
+    assert json_numbers(response.json()) == [3, 2, 1]
 
 
 def test_ac2_browser_list_is_newest_first_with_all_pressed(
@@ -484,7 +484,7 @@ def test_ac2_browser_list_is_newest_first_with_all_pressed(
 ) -> None:
     page.goto(f"{live_server}/")
 
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     expect(page.get_by_test_id("catalogue-list")).to_be_visible()
     expect(filter_button(page, "all")).to_have_attribute("aria-pressed", "true")
     for force in ["1", "2", "3", "4"]:
@@ -519,7 +519,7 @@ def test_ac2_browser_selecting_force_1_shows_its_grids(
     page: Page, live_server: str
 ) -> None:
     page.goto(f"{live_server}/")
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
 
     filter_button(page, "1").click()
 
@@ -532,7 +532,7 @@ def test_ac2_browser_force_without_grid_shows_the_filtered_empty_text(
     page: Page, live_server: str
 ) -> None:
     page.goto(f"{live_server}/")
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
 
     filter_button(page, "4").click()
 
@@ -552,7 +552,7 @@ def test_ac2_browser_selecting_all_again_restores_the_list(
 
     filter_button(page, "all").click()
 
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     expect(page.get_by_test_id("catalogue-page")).not_to_contain_text(
         load_fr()["catalogue.empty_filtered"]
     )
@@ -568,7 +568,7 @@ def test_ac3_browser_progress_is_read_from_local_storage(
 
     page.goto(f"{live_server}/")
 
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     item_1 = item_by_number(page, 1)
     item_2 = item_by_number(page, 2)
     item_3 = item_by_number(page, 3)
@@ -589,7 +589,7 @@ def test_ac3_browser_without_progress_every_item_is_none(
 ) -> None:
     page.goto(f"{live_server}/")
 
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     for number in [1, 2, 3]:
         item = item_by_number(page, number)
         expect(item).to_have_attribute("data-progress", "none")
@@ -607,7 +607,7 @@ def test_ac3_browser_corrupt_progress_reads_as_none(
     expect(page.get_by_test_id("catalogue-page")).to_have_attribute(
         "data-state", "ready"
     )
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     for number in [1, 2, 3]:
         item = item_by_number(page, number)
         expect(item).to_have_attribute("data-progress", "none")
@@ -621,7 +621,7 @@ def test_ac3_browser_one_bad_value_does_not_hide_the_good_ones(
 
     page.goto(f"{live_server}/")
 
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     expect(item_by_number(page, 1)).to_have_attribute("data-progress", "started")
     expect(item_by_number(page, 2)).to_have_attribute("data-progress", "none")
     expect(item_by_number(page, 3)).to_have_attribute("data-progress", "none")
@@ -782,7 +782,7 @@ def test_ac4_browser_unpublished_grid_is_not_listed(
 ) -> None:
     page.goto(f"{live_server}/")
 
-    expect_item_numbers(page, [2, 3, 1])
+    expect_item_numbers(page, [3, 2, 1])
     expect(item_by_number(page, 4)).to_have_count(0)
 
 
@@ -995,7 +995,7 @@ def test_ac6_browser_grid_page_asks_the_api_for_that_grid(
 ) -> None:
     requested_paths: list[str] = []
 
-    def record_request(request: object) -> None:
+    def record_request(request: Request) -> None:
         url = request.url
         requested_paths.append(url)
 
