@@ -50,6 +50,11 @@ rest, and report the question.
    A test that already passes before the feature exists needs a second look.
 2. Run `uv run python scripts/gate.py --stage tests`. It checks lint, formatting
    and that every criterion has a test. You cannot finish while it fails.
+3. Run `uv run pyrefly check`. The `tests` stage does not type-check, so a type
+   error in a test file would otherwise only appear after the implementation.
+   Errors caused by the missing implementation (an import or attribute that does
+   not exist yet) are expected; fix every other error in your test files, without
+   `# type: ignore` or `cast`.
 
 You only write inside `tests/`.
 
