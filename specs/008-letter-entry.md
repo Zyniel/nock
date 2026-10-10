@@ -84,6 +84,7 @@ The words in brackets say how each criterion is tested.
 - **AC-2** (AC-2.3.2) (browser with mocked socket) Typing é, à or ç enters E, A or C. Digits, spaces and punctuation are ignored. Tapping (1, 0) then pressing `é`, `à`, `ç` fills (1, 0), (1, 1), (1, 2) with `E`, `A`, `C` and sends three `EditLetter` with those letters; then pressing `1`, `Space`, `.`, `-`, `'` and `?` changes no cell, keeps the selection on (1, 3) and sends no frame.
 - **AC-3** (AC-2.3.3) (browser with mocked socket) Backspace clears the current cell. On an empty cell it moves back one cell and clears that one. With a snapshot where (1, 0) holds `T` and (1, 1) holds `A`: tapping (1, 1) (across) and pressing `Backspace` clears (1, 1), keeps the selection there and sends `Erase(row=1, column=1)`; pressing `Backspace` again moves the selection to (1, 0), clears it and sends `Erase(row=1, column=0)`; pressing it a third time (first cell, empty) changes nothing and sends nothing.
 - **AC-4** (AC-2.3.4) (browser with mocked socket) Typing over a filled cell replaces its letter, unless the cell is locked (spec 016 AC-3, backlog AC-4.2.3). With a snapshot where (1, 1) holds `A` (author `p2`) and (1, 2) holds `M` with `locked=True`: tapping (1, 1) and pressing `e` shows `E` at (1, 1) and sends `EditLetter(row=1, column=1, letter="E")`; tapping (1, 2) and pressing `x` leaves `M`, sends no `edit_letter` and keeps the selection on (1, 2).
+- **AC-5** (new) (browser with mocked socket) Backspace never leaves the page. When the `grid` element has the focus and no cell is selected (for example after Tab, or after a snapshot removed the selected word), a Backspace keydown on the grid is prevented (`dispatchEvent` returns false), changes nothing and sends nothing, and the page stays on the room URL.
 
 ## Edge cases and errors
 
@@ -140,8 +141,9 @@ Each one is already part of the spec above.
 4. Typing the letter already in the cell. Options: send it again (it would make me
    the author, spec 019), or send nothing. Pick: send nothing, just move on.
 5. Where keys are read. Pick: `keydown` while the `grid` element has the focus, so
-   other inputs keep their keys; tested with `page.keyboard.press`, which sends
-   `keydown` with `event.key` for characters such as `é`. Not covered: dead-key
+   other inputs keep their keys; tested with `page.keyboard.press` for ASCII keys
+   and a dispatched `keydown` with `event.key` for characters such as `é`, which
+   Playwright cannot press (see the test harness). Not covered: dead-key
    composition and IME input on real keyboards (only the final `event.key` is
    handled).
 6. Build order. The build plan puts 008 after 016 for the lock, and 009 (whose
@@ -149,6 +151,11 @@ Each one is already part of the spec above.
    keep the plan, so 009's implementer writes these rules early; or build 008
    right after 007, testing the lock with snapshot locks only. Pick: build 008
    right after 007, before 009 (the lead updates `docs/build-plan.md`).
+
+Added after the review, decided by the lead on 2026-10-11 under the human's
+instruction to take technical decisions:
+7. Backspace is always prevented on the focused grid, even with no selection, so
+   no browser can treat it as "back" and leave the room (AC-5).
 
 ## Open questions
 
