@@ -436,17 +436,26 @@ These apply to every spec from 011 to 018 and 037.
   `data-status` is `joined` or `nickname`, and when it is `nickname` (spec 012)
   fills `nickname-input` with `nickname`, submits, and waits for `joined`. Tests
   of this spec use it so they keep passing after spec 012.
-- Clipboard: the browser context is created with
+- Clipboard (Chromium only): the browser context is created with
   `permissions=["clipboard-read", "clipboard-write"]`, and the test reads
-  `page.evaluate("navigator.clipboard.readText()")`.
+  `page.evaluate("navigator.clipboard.readText()")`. Granting these permissions
+  and reading the clipboard from a test page are relied on only in Chromium
+  (Playwright's Firefox rejects the `clipboard-read` permission), so the test that
+  clicks `copy-link` and reads the clipboard is marked
+  `@pytest.mark.only_browser("chromium")`. The rest of AC-1's browser part (the
+  `share-link` checks) runs in a separate test in all three engines.
 - Phone: `viewport={"width": 360, "height": 740}`, `has_touch=True`,
-  `is_mobile=True` (as spec 006). Desktop: 1280 by 800.
+  `is_mobile=True` (as spec 006; under Firefox, where Playwright does not support
+  `is_mobile`, the context leaves it out). Desktop: 1280 by 800.
+- Engines: every browser criterion runs in Chromium, Firefox and WebKit
+  (`specs/_architecture.md`). The clipboard check of AC-1 is the only
+  Chromium-only check of this spec.
 
 ## Acceptance criteria
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-3.1.1) (HTTP; browser with live server) Creating a room gives a share link and a 6-character room code. HTTP: with a catalogue holding FX-01 as published entry 2, `POST /api/rooms` with `{"grid_number": 2}` answers 201 with a JSON body that parses to `CreateRoomResponse`, whose `code` matches `^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$` and whose `share_url` is `http://testserver/r/<code>`; then `registry.find_room(code)` equals the FX-01 grid and `registry.room_state(code).grid_number == 2`. Browser: for a room registered on FX-01, after `enter_room`, `share-link` has `href` and text `<base_url>/r/<code>`, and clicking `copy-link` puts that same text in the clipboard and shows `fr.json["room.share.copied"]` on the button.
+- **AC-1** (AC-3.1.1) (HTTP; browser with live server) Creating a room gives a share link and a 6-character room code. HTTP: with a catalogue holding FX-01 as published entry 2, `POST /api/rooms` with `{"grid_number": 2}` answers 201 with a JSON body that parses to `CreateRoomResponse`, whose `code` matches `^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$` and whose `share_url` is `http://testserver/r/<code>`; then `registry.find_room(code)` equals the FX-01 grid and `registry.room_state(code).grid_number == 2`. Browser (all three engines): for a room registered on FX-01, after `enter_room`, `share-link` has `href` and text `<base_url>/r/<code>`. Browser (Chromium only, clipboard, see "Test harness"): clicking `copy-link` puts that same text in the clipboard and shows `fr.json["room.share.copied"]` on the button.
 - **AC-2** (AC-3.1.2) (browser with live server, phone and desktop contexts) The link opens the room on the grid, on phone and desktop, with no install. For a room registered on FX-01, opening its `share_url` path `/r/<code>` with `enter_room` in the phone context and, separately, in the desktop context reaches `data-status="joined"` and `data-grid="5x5"`, and the `grid` element of spec 006 is visible with 25 `cell` elements.
 - **AC-3** (AC-3.1.3) (Python; WebSocket with a fake clock; browser with mocked socket) Room codes are random, not sequential. Ten wrong codes from one address within a minute are throttled. Python: 1,000 calls to `register_room` on one registry give 1,000 distinct codes, all matching the alphabet pattern of AC-1; at each of the 6 positions at least 20 different characters occur; and no code, read as a base-32 number over `ROOM_CODE_ALPHABET`, is exactly 1 more than the code returned just before it. WebSocket: with a registry holding one room `<code>` and a `FakeClock`, ten connections to `/api/rooms/ZZZZZZ/ws` each close with 4404; the eleventh connection, to `/api/rooms/<code>/ws`, closes with 4429 before any message; after `advance(60)` a connection to `<code>` is accepted and its join receives a `Snapshot`. Browser: when the mock closes the socket with 4429, the room page reaches `data-status="throttled"` and `room-status` shows `fr.json["room.status.throttled"]`.
 
@@ -504,9 +513,11 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Item 10 records how the human's choice of three browser engines applies here.
+Each one is already part of the spec above.
 
 1. Where the runtime lives. The architecture names `room.py`, `store.py` and
    `server.py`. Options: put the registry and room tasks in `server.py`, or in a
@@ -532,7 +543,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    `Catalogue.find_published`. Pick: `POST /api/rooms` with `{"grid_number": N}`,
    201 with `code` and an absolute `share_url`; 404 for an unknown or unpublished
    grid. The lead merges `create_app` with spec 004's `catalogue` argument (spec 004
-   open question 9); this spec adds no argument.
+   decision 9); this spec adds no argument.
 6. Who is the host. The creator gets no secret over HTTP. Pick: the first player to
    join a room becomes host (spec 012); the creator is normally first because the
    catalogue sends them to the room at once (spec 010).
@@ -546,3 +557,12 @@ Each pick below is already written into the spec. The lead confirms or changes i
 9. Grid number on the client. The snapshot (spec 039) does not carry
    `grid_number`, which spec 010 may need to write `nock.progress` for invited
    players. Pick: not added here; spec 010 decides (it may need a protocol field).
+10. Browsers (human decision on spec 006, 2026-10-10). Browser criteria run in
+    Chromium, Firefox and WebKit. The clipboard check of AC-1 is Chromium-only
+    (`only_browser("chromium")`), because the clipboard permissions it grants are
+    not supported by Playwright's Firefox; the share link itself is checked in all
+    three. Not covered: copying on a real phone.
+
+## Open questions
+
+None.

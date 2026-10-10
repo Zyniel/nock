@@ -163,9 +163,12 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above. (The `stale_edit` error code named in
+check 4 and in the page's answer matching is part of spec 039 since its
+reopening, decision 20 there.)
 
 1. "300 ms at the 95th percentile on a 4G connection" (AC-1). A real 4G network
    cannot run in CI. Options: emulate 4G in the browser, or split the budget.
@@ -191,3 +194,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
 6. Clearing `wrong`. Spec 023 strikes wrong letters; a new letter in the cell is no
    longer the checked one. Pick: any accepted edit clears `wrong`, on the server and
    on the page.
+
+## Open questions
+
+None.

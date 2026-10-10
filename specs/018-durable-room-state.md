@@ -259,7 +259,7 @@ The words in brackets say how each criterion is tested.
 - Disconnection, reconnection and the resend queue: spec 017.
 - Multi-level undo and redo.
 - Several server processes sharing one database, replication, backups.
-- A real process kill or power cut in CI (see open question 2).
+- A real process kill or power cut in CI (see decision 2).
 - Expiry and deletion of rooms (spec 032), the operator replay tool (spec 038 AC-4,
   which reads `read_log`), catch-up after an absence (spec 034).
 
@@ -267,9 +267,10 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above.
 
 1. Undo stays in this spec (answered by the human).
 2. Testing a restart (AC-1). Options: an in-process simulated restart (a second
@@ -301,3 +302,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    no pending edit, which spec 015's plain FIFO would mismatch. Pick: an own
    `letter_changed` removes the oldest pending edit only when cell and letter match
    it.
+
+## Open questions
+
+None.

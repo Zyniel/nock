@@ -192,9 +192,11 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above. (The `ping` message that item 1 and
+AC-1 refer to is part of spec 039 since its reopening, decision 17 there.)
 
 1. "Input" for idleness. Options: only edits, or any message. Pick: any message of
    the player except `join` and `ping`, so a player moving around without typing is
@@ -219,3 +221,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    so this spec writes the feed lines for lock, settings and host changes that
    spec 014 triggers. The lines for checks, reveals and flags are tested with mocked
    events, since specs 021, 023 and 024 come later.
+
+## Open questions
+
+None.

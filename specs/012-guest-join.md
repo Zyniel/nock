@@ -108,7 +108,7 @@ steps marked with another spec are built by that spec; until then they never app
    - `nickname`: the normalised nickname, made unique (see "Duplicate nicknames");
    - `colour`: the lowest index 0 to 7 that no player of the room has;
    - `is_host`: True when no player of the room is host (the first joiner, spec
-     011 open question 6), else False;
+     011 decision 6), else False;
    - `state = active`, `joined_seq = seq`, `last_input_at = last_seen_at = now`;
    - appended at the end of `state.players`; `state.seq = seq`;
    - one entry `LogEntry(at=now, event=PlayerJoined(seq, player=<its view>),
@@ -153,10 +153,11 @@ frees the seat.)
 - New constant in `nock.server` (re-exported from `nock.hub`):
   `SESSION_REPLACED_CLOSE_CODE: int = 4001`.
 
-### Protocol change (see open question 1)
+### Protocol (spec 039)
 
-`ErrorCode` gains `INVALID_NICKNAME = "invalid_nickname"` (spec 039 decision 14
-lets room specs add values).
+`ErrorCode.INVALID_NICKNAME = "invalid_nickname"` is part of spec 039 (added when
+spec 039 was reopened on 2026-10-10, its decision 18); this spec gives it its
+meaning (join step 5). No other protocol change.
 
 ### Client: `web/`
 
@@ -165,17 +166,34 @@ Stored in `localStorage`:
 | Key | Value |
 | --- | --- |
 | `nock.identity.<CODE>` | JSON `{"player_id": "...", "resume_token": "...", "nickname": "..."}`, written after every snapshot from `snapshot.you`, `snapshot.resume_token` and the player's own `nickname` in `snapshot.players` |
-| `nock.nickname` | the last nickname this browser joined with |
+| `nock.nickname` | the nickname of the last join this browser sent from the nickname form, as sent (normalised, without any duplicate suffix the server added), written when the snapshot answering that join arrives; a join sent at once (step 2, cases a and b) never writes it |
 
-A stored identity that is not JSON or lacks a string field is ignored.
+`nock.identity.<CODE>` is the one identity record of a player in a room, for every
+player, the creator of spec 010 included. Spec 010's `nock.room.<CODE>` holds no
+identity (only the grid number and the selection). A stored identity that is not
+JSON, not an object, or lacks one of its three fields as a non-empty string is
+ignored (as if absent).
 
 Room page flow (replaces spec 040 step 2):
 
 1. On mount, open the socket. `data-status="connecting"`.
-2. When it opens: if `nock.identity.<CODE>` is stored, send
-   `{"type": "join", "nickname": <stored nickname>, "resume_token": <stored token>}`
-   and set `data-status="joining"`; otherwise set `data-status="nickname"` and show
-   the nickname form.
+2. When it opens, the first case that applies:
+   - a. `nock.identity.<CODE>` is stored (valid): send
+     `{"type": "join", "nickname": <stored nickname>, "resume_token": <stored token>}`,
+     no form, and set `data-status="joining"`. This resumes the same player
+     (join step 2), whether the identity came from the form or from case b.
+   - b. No identity, and spec 010's `nock.room.<CODE>` holds a record (a JSON
+     object) whose `grid` is a number, which means the room was created from the
+     catalogue on this device: send
+     `{"type": "join", "nickname": <nickname>, "resume_token": null}`, no form, and
+     set `data-status="joining"`, where `<nickname>` is `nock.nickname` when it is
+     stored and passes the rule of step 4, else `t("room.default_nickname")`.
+   - c. Otherwise (no record, a record whose `grid` is not a number, or a record
+     that is not a JSON object): send nothing, set `data-status="nickname"` and
+     show the nickname form.
+
+   Since every snapshot stores the identity (step 5), a page reload after any
+   successful join takes case a and is the same player.
 3. Nickname form `data-testid="nickname-form"`, with heading `t("join.heading")`,
    an input `data-testid="nickname-input"` labelled `t("join.nickname_label")`,
    placeholder `t("room.default_nickname")`, prefilled with `nock.nickname` when
@@ -188,10 +206,11 @@ Room page flow (replaces spec 040 step 2):
    rules) and sends nothing. Otherwise it sends
    `{"type": "join", "nickname": <normalised>, "resume_token": null}`, sets
    `data-status="joining"` and disables the submit button.
-5. On a snapshot: `data-status="joined"`, the form is removed, the identity and
-   `nock.nickname` are stored.
-6. On `error` with code `invalid_nickname`: back to `data-status="nickname"`, the
-   form shows `t("join.error.characters")`.
+5. On a snapshot: `data-status="joined"`, the form is removed, and
+   `nock.identity.<CODE>` is stored; when the join it answers was sent from the
+   form, `nock.nickname` is stored too (see the table above).
+6. On `error` with code `invalid_nickname` (whichever case sent the join): back
+   to `data-status="nickname"`, the form is shown with `t("join.error.characters")`.
 7. On `error` with code `room_full`: `data-status="full"`, no form. Final.
 8. On close with code 4001: `data-status="replaced"`. Final.
 
@@ -240,7 +259,9 @@ New `fr.json` keys:
 As spec 011. Seeded rooms: `new_room(...)` then `model_copy(update=...)` (or a
 new `RoomState(...)`) with chosen `cells` and `players`, registered with
 `registry.add_room(state)`. Mocked-socket tests seed `localStorage` with
-`context.add_init_script(...)` when they need a stored identity.
+`context.add_init_script(...)` when they need a stored identity, room record or
+nickname. Every browser criterion runs in Chromium, Firefox and WebKit
+(`specs/_architecture.md`); no check of this spec is Chromium-only.
 
 ## Acceptance criteria
 
@@ -251,6 +272,8 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-3.2.3) (WebSocket) I see the current letters, timer and hint budget within 1 second of joining. Given a FX-01 room added with `add_room` whose cell (1, 0) holds `T` (author `p9`) and (1, 1) holds `A` (author `p9`), and whose `reveal_budget` is `RevealBudget(letters=3, words=1)`, when a client sends a join, then a `Snapshot` arrives less than 1.0 second (measured with `time.monotonic()`) after the join was sent, its `grid == grid_state(registry.room_state(code))`, its cell (1, 0) has `letter == "T"` and `author == "p9"`, its `reveal_budget == RevealBudget(letters=3, words=1)`, and its `timer_elapsed_ms == 0` with `timer_running is False`.
 - **AC-4** (AC-3.2.4) (Python; WebSocket; browser with live server) Joining a room that already has 8 players shows "room full" and does not add me. Python: `join_room` on a room with 8 players returns `reply == (ErrorMessage(code="room_full", ...),)` (code compared), `close_sender is True`, no entry, and the same state. WebSocket: 8 clients join a FX-01 room; a ninth join is answered by `ErrorMessage(code="room_full")` and then a close with code 1000; the first client receives no event for it; `room_state` still holds 8 players. Browser: for a room added with 8 players (all `disconnected`), opening `/r/<code>` and submitting `Zoé` reaches `data-status="full"` and `room-status` shows `fr.json["room.status.full"]`.
 - **AC-5** (new) (WebSocket; browser with live server) Reloading the page keeps me the same player. WebSocket: client A joins as `Ana` and client B as `Bob`; when A's socket closes, B receives `PlayerStateChanged(player_id=<A>, state="disconnected")`; a new socket that sends `{"type": "join", "nickname": "Autre", "resume_token": <A's token>}` receives a `Snapshot` with `you == <A>`, A's view still `nickname == "Ana"`, `colour == 0`, `is_host is True`, `state == "active"`, and B receives `PlayerStateChanged(player_id=<A>, state="active")`; the room still has 2 players. Browser: after joining as `Ana` and reloading the page, the room page reaches `data-status="joined"` without showing `nickname-form`, with the same `data-you` as before the reload, and `roster` holds one player.
+- **AC-6** (new) (browser with mocked socket) The room page joins at once only with a stored identity or for a room created from the catalogue on this device. On `/r/ABC123`, `localStorage` seeded before `page.goto`: (a) with `nock.identity.ABC123` = `{"player_id": "p1", "resume_token": "r7Kq2mXo9vB4tY1zW8nP", "nickname": "Ana 2"}`, the first frame the page sends parses to `Join(nickname="Ana 2", resume_token="r7Kq2mXo9vB4tY1zW8nP")`, the page shows `data-status="joining"` and no `nickname-form` exists; the same holds when `nock.room.ABC123` = `{"grid": 1, "selection": null}` is also seeded. (b) With no identity, `nock.room.ABC123` = `{"grid": 1, "selection": null}` and `nock.nickname` = `Zoé`, the first frame parses to `Join(nickname="Zoé", resume_token=None)` and no `nickname-form` exists; with `nock.nickname` absent, or set to `A`, it parses to `Join(nickname=fr.json["room.default_nickname"], resume_token=None)`. (c) With no identity and `nock.room.ABC123` = `{"grid": null, "selection": null}`, or no record, or only `nock.identity.ZZZZZZ` stored (another room), the page sends no frame, reaches `data-status="nickname"` and shows `nickname-form`, whose input holds `Zoé` when `nock.nickname` = `Zoé` is seeded and is empty otherwise.
+- **AC-7** (new) (browser with mocked socket) After a join, the identity is always stored and the remembered nickname only for a join from the form. On `/r/ABC123` with nothing seeded, submitting the form with `Ana` and the mock answering with a FX-01 snapshot (`you` = `p1`, `resume_token` = `r7Kq2mXo9vB4tY1zW8nP`, players `p1` named `Ana 2`) makes `localStorage["nock.identity.ABC123"]` parse to `{"player_id": "p1", "resume_token": "r7Kq2mXo9vB4tY1zW8nP", "nickname": "Ana 2"}` and `localStorage["nock.nickname"]` equal `Ana`. In case (b) of AC-6 with `nock.nickname` absent, after the same snapshot with `p1` named `Invité`, `nock.identity.ABC123` holds `p1`, that token and `Invité`, and `nock.nickname` is still absent.
 
 ## Edge cases and errors
 
@@ -286,6 +309,16 @@ The words in brackets say how each criterion is tested.
   `invalid_nickname` does not.
 - Form (AC-1): the submit button is disabled while `joining`; pressing Enter in the
   input submits. An identity stored for another room code is not used.
+- Corrupt identity (AC-6): `nock.identity.ABC123` set to `not json`, `[]`,
+  `{"player_id": "p1"}` or with an empty `resume_token` is ignored; the page goes
+  on with case b or c.
+- Room record without a number (AC-6): a record whose `grid` is `null`, `"1"` or
+  missing gives case c (the form); only a JSON number gives case b.
+- Creator refused (AC-6): a join sent by case b and answered `invalid_nickname`
+  shows the form (step 6); the form's join then follows the usual rules.
+- Remembered nickname (AC-7): the form's nickname is stored as sent (`Ana`), not
+  as the server made it unique (`Ana 2`); the identity holds the server's
+  nickname.
 - Answers (AC-3): the snapshot is built from `grid_state`, never from `grid`.
 
 ## Out of scope
@@ -305,15 +338,18 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written,
+except: item 1, settled by reopening spec 039; item 7, completed by the human's
+decision on the creator's nickname (one identity record per room, shared with
+spec 010). Each one is already part of the spec above.
 
 1. Protocol: an error code for a refused nickname. Options: reuse
    `invalid_message`, or add `invalid_nickname` to `ErrorCode`. Pick: add
-   `invalid_nickname` (allowed by spec 039 decision 14). If spec 039's AC-9 test
-   checks that `ErrorCode` has exactly 16 values, the lead updates that test's list
-   in the same branch.
+   `invalid_nickname`. Decision (human): spec 039 was reopened to add it (spec
+   039 decision 18, with its AC-9 count of error codes updated there), so it is
+   no longer a change this spec makes.
 2. Spec 040 amendments. This spec changes what spec 040's tests observe: AC-8
    expects `seq == 0` and `players == ()`; AC-16 expects `data-seq="0"` with no
    nickname step; AC-18 expects the first sent message to be
@@ -329,15 +365,27 @@ Each pick below is already written into the spec. The lead confirms or changes i
    allowed; NFC first; at least one letter or digit.
 4. Duplicate suffix. Options: `Ana2`, `Ana 2`, `Ana (2)`. Pick: `Ana 2`, which
    stays a valid nickname; comparison by `casefold()`.
-5. Host. Pick: the first joiner (spec 011 open question 6); if the room has no host
+5. Host. Pick: the first joiner (spec 011 decision 6); if the room has no host
    (spec 014, 017), the next joiner becomes host.
 6. Basic resume here. Spec 017 owns reconnection, but without a resume a page
    reload would add a new player and fill the room. Pick: this spec stores the
    identity and resumes with the token (AC-5); spec 017 adds the 5-minute window,
    the time-out and automatic reconnection.
 7. Remembered nickname. Options: join at once with `nock.nickname`, or prefill the
-   form with it. Pick: prefill, so each room asks once. The creator's one-tap start
-   (spec 010 AC-1) is spec 010's decision.
+   form with it. Pick: prefill, so each room asks once, for a guest arriving by
+   link. Decision (human) for the creator: the player who starts a grid from the
+   catalogue (spec 010) joins at once, no form, with `nock.nickname` or, if none
+   (or not valid), `t("room.default_nickname")` (`Invité`). One identity record
+   per room: `nock.identity.<CODE>` is the identity of everyone, the creator
+   included; spec 010's `nock.room.<CODE>` keeps only the grid number and the
+   selection (kept separate because it exists before the first snapshot and also
+   for rooms joined by link). The room page's rule is "Room page flow" step 2:
+   (a) stored identity, join at once with its nickname and token; (b) otherwise a
+   room record with a numeric `grid`, join at once as a new player with
+   `nock.nickname` or `Invité`; (c) otherwise the form. A reload after any join
+   takes (a), so it resumes the same player (AC-5 here, spec 010 AC-3). To keep
+   `nock.nickname` meaning "what I typed", it is written only after a join sent
+   from the form, as sent (AC-7). AC-6 and AC-7 check the rule.
 8. "Within 1 second" (AC-3). Pick: measured on the WebSocket from sending the join
    to receiving the snapshot, on localhost. Not covered: a slow mobile network
    (spec 036 measures under a 4G profile). The timer and budget are checked in the
@@ -348,3 +396,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
     spec has to show who joined, and spec 037 AC-4 needs a nickname on screen
     before 013 is built. Pick: a plain list here (nickname, colour, `data-state`);
     spec 013 adds the visible state and the rest of presence.
+
+## Open questions
+
+None.

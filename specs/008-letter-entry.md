@@ -11,7 +11,7 @@ The FX-01 reference grid is in `specs/_reference.md`. The grid elements are thos
 spec 006, the selection and focus rules those of spec 007, the messages those of
 spec 039. It needs nothing from specs 015 and 016: locks are read from the
 snapshot's `locked` field (spec 006 `data-locked`), so it can be built right after
-spec 007 (see open question 6).
+spec 007 (see decision 6).
 
 ## Goal
 
@@ -123,9 +123,10 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above.
 
 1. Next cell after typing. Options: the next cell even if filled, or the next empty
    cell. Pick: the next cell even if filled, skipping only locked cells.
@@ -145,3 +146,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    keep the plan, so 009's implementer writes these rules early; or build 008
    right after 007, testing the lock with snapshot locks only. Pick: build 008
    right after 007, before 009 (the lead updates `docs/build-plan.md`).
+
+## Open questions
+
+None.

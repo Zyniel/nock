@@ -141,9 +141,10 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above.
 
 1. "More than 20 edits a second" (AC-3). Options: fixed one-second buckets, or a
    sliding window; drop silently, answer an error, or disconnect. Pick: sliding
@@ -165,3 +166,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
 6. Escaping rule (AC-4). The server's nickname rule (spec 012) already refuses tags,
    so the visible check uses a mocked snapshot. Pick: the static scan bans
    `{@html` and raw HTML DOM calls in the client, plus the mocked-socket check.
+
+## Open questions
+
+None.

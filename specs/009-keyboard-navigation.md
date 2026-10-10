@@ -85,7 +85,7 @@ New `fr.json` keys:
 ### Build order
 
 The in-app keyboard reuses spec 008's letter and erase actions ("Typing a letter",
-"Erasing"), so spec 008 is built before this one (spec 008 open question 6). If
+"Erasing"), so spec 008 is built before this one (spec 008 decision 6). If
 the lead keeps the old order instead, this spec's implementer writes those two
 actions to spec 008's rules, and spec 008 later adds the physical keys.
 
@@ -95,7 +95,19 @@ actions to spec 008's rules, and spec 008 later adds the physical keys.
   letters). Desktop context: default viewport 1280 by 720, no touch.
 - Touch context: `viewport={"width": 360, "height": 740}`, `has_touch=True`,
   `is_mobile=True`; taps with `locator.tap()`. Landscape touch context: 740 by 360,
-  same flags.
+  same flags. Under Firefox, where Playwright does not support `is_mobile`, the
+  context leaves it out (as spec 006).
+- Engines: every criterion runs in Chromium, Firefox and WebKit
+  (`specs/_architecture.md`). Touch detection: in Chromium the touch contexts rely
+  on Playwright's touch emulation alone, which makes
+  `window.matchMedia("(pointer: coarse)").matches` true, so Chromium checks the
+  real detection. Firefox's and WebKit's emulation is not relied on for that media
+  feature, so in those two engines the touch contexts also run, through
+  `context.add_init_script`, a script that makes `window.matchMedia` report
+  `matches: true` for the query `(pointer: coarse)` (other queries unchanged);
+  every other check of AC-3 and AC-4 then runs there as in Chromium. The desktop
+  context never runs that script, in any engine. No test of this spec is marked
+  `only_browser("chromium")`.
 - Arrow skips on FX-02 (live server, a room on FX-02): the test finds, from
   `fx02_text` in Python, a row with a letter cell, a clue cell, then a letter cell,
   and a column with the same pattern downwards (spec 006 guarantees both).
@@ -106,8 +118,8 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-2.4.1) (browser with mocked socket on FX-01; browser with live server on FX-02) Arrow keys move to the next letter cell in that direction and skip clue cells. FX-01, after tapping (1, 1) (`across`): `ArrowDown` selects (2, 1) `down`; `ArrowRight` selects (2, 2) `across`; `ArrowUp` selects (1, 2) `down`; `ArrowLeft` from (1, 0) changes nothing (only clue cells to the left); `ArrowUp` from (0, 1) changes nothing. FX-02: from the letter cell left of a clue cell in a row, `ArrowRight` selects the letter cell right of that clue cell; from the letter cell above a clue cell in a column, `ArrowDown` selects the letter cell below it.
 - **AC-2** (AC-2.4.2) (browser with mocked socket) Tab and Shift+Tab move to the next and previous unfinished word. On a FX-01 snapshot where (1, 2), (2, 2), (3, 2), (4, 2) hold `M`, `I`, `M`, `E` (MIME finished): after tapping (0, 1) (`0,0,1`), `Tab` selects `0,3,0` on (1, 3) `down` (MIME skipped); `Shift+Tab` then selects `0,0,1` on (0, 1); `Shift+Tab` again selects `0,0,0` on (1, 0) `across`; `Shift+Tab` again wraps to `4,0,0` on (4, 1) `across`. With focus on the grid and nothing selected, `Tab` selects `0,0,0` on (1, 0).
-- **AC-3** (AC-2.4.3) (browser with mocked socket, touch and desktop contexts) On touch screens, an in-app AZERTY keyboard with 26 letters and a delete key replaces the system keyboard. In the touch context, `keyboard` is visible with three rows whose `data-key` values read `AZERTYUIOP`, `QSDFGHJKLM`, `WXCVBN`, 26 `key` elements in all and one `key-delete`; after tapping (1, 0) then the keys `T` and `A`, (1, 0) and (1, 1) show `T` and `A` and two `EditLetter` frames are sent; tapping `key-delete` then clears (1, 1) (spec 008 erase rule: the selection was on the empty (1, 2)); `document.activeElement` is never an `input`, `textarea`, `select` or contenteditable element, and the page holds none of these in the grid area, clue bar or keyboard. In the desktop context no `keyboard` element exists.
-- **AC-4** (new) (browser with mocked socket, touch contexts) The clue bar stays visible above the in-app keyboard (spec 007 AC-4). In the 360 by 740 and 740 by 360 touch contexts, after tapping (3, 1): the bottom of `clue-bar` is at or above the top of `keyboard`, the bottom of `keyboard` is at most `window.innerHeight`, the top of `clue-bar` is at least 0, the computed `font-size` of `clue-bar-text` is 14 px or more, and `grid-viewport` is at least 100 px high.
+- **AC-3** (AC-2.4.3) (browser with mocked socket, touch and desktop contexts, in Chromium, Firefox and WebKit; touch detection as in "Test harness") On touch screens, an in-app AZERTY keyboard with 26 letters and a delete key replaces the system keyboard. In the touch context, `keyboard` is visible with three rows whose `data-key` values read `AZERTYUIOP`, `QSDFGHJKLM`, `WXCVBN`, 26 `key` elements in all and one `key-delete`; after tapping (1, 0) then the keys `T` and `A`, (1, 0) and (1, 1) show `T` and `A` and two `EditLetter` frames are sent; tapping `key-delete` then clears (1, 1) (spec 008 erase rule: the selection was on the empty (1, 2)); `document.activeElement` is never an `input`, `textarea`, `select` or contenteditable element, and the page holds none of these in the grid area, clue bar or keyboard. In the desktop context no `keyboard` element exists.
+- **AC-4** (new) (browser with mocked socket, touch contexts, in Chromium, Firefox and WebKit) The clue bar stays visible above the in-app keyboard (spec 007 AC-4). In the 360 by 740 and 740 by 360 touch contexts, after tapping (3, 1): the bottom of `clue-bar` is at or above the top of `keyboard`, the bottom of `keyboard` is at most `window.innerHeight`, the top of `clue-bar` is at least 0, the computed `font-size` of `clue-bar-text` is 14 px or more, and `grid-viewport` is at least 100 px high.
 
 ## Edge cases and errors
 
@@ -149,9 +161,11 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written
+(items 6 and 7 reworded for the three browser engines the human chose). Each one
+is already part of the spec above.
 
 1. Direction after an arrow key. Options: keep the direction, or follow the key's
    axis. Pick: follow the key's axis when the new cell has a word in it.
@@ -164,12 +178,20 @@ Each pick below is already written into the spec. The lead confirms or changes i
    while the grid has the focus; leaving it is left to spec 035.
 6. "Touch screen". Options: `(pointer: coarse)`, `navigator.maxTouchPoints > 0`, or
    the window width. Pick: `(pointer: coarse)`, which Chromium reports with
-   `has_touch=True`. Not covered: real phones and tablets with a Bluetooth keyboard
-   (the in-app keyboard still shows, and physical keys still work).
+   `has_touch=True`. Browser tests run in Chromium, Firefox and WebKit (human
+   decision): the real detection is checked in Chromium; in Firefox and WebKit the
+   touch contexts force the media query with an init script (see "Test harness"),
+   so the keyboard's layout and behaviour are still checked in all three engines.
+   Not covered: real phones and tablets (an iPhone's Safari, an Android phone),
+   with or without a Bluetooth keyboard (the in-app keyboard still shows, and
+   physical keys still work).
 7. "Replaces the system keyboard" is tested by the absence of editable elements and
-   of focus on them; whether a real phone opens its keyboard cannot be observed in
-   headless Chromium.
+   of focus on them; whether a real phone opens its system keyboard cannot be
+   observed in any headless engine, and is not covered.
 8. Build order. The in-app keyboard needs spec 008's typing and erasing. Options:
    build 008 first, or build 009 first with its implementer writing those actions.
-   Pick: build 008 right after 007, then 009 (same item as spec 008 open
-   question 6).
+   Pick: build 008 right after 007, then 009 (same item as spec 008 decision 6).
+
+## Open questions
+
+None.

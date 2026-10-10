@@ -322,9 +322,10 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above.
 
 1. Where grids live. Options: one JSON file per grid in a directory, the SQLite
    store of spec 018, or Python code. Pick: one file per grid in `grids/`
@@ -349,3 +350,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
 9. Coordination: spec 011 (written in parallel) may also change `create_app`.
    Pick: this spec adds only the keyword argument `catalogue`; the lead merges it
    with 011's changes.
+
+## Open questions
+
+None.

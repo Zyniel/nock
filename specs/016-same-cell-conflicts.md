@@ -116,9 +116,10 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written.
+Each one is already part of the spec above.
 
 1. "Typing at once" (AC-1). The server cannot know which keystroke was first.
    Pick: arrival order at the room task is the truth (architecture: last edit
@@ -133,3 +134,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    implementer's choice.
 4. Lock seeding (AC-3). Checks and reveals are built later (specs 023, 024). Pick:
    tests seed locked cells through `add_room` and the mocked `cell_locked` event.
+
+## Open questions
+
+None.

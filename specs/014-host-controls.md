@@ -77,9 +77,12 @@ left, the room has no host and the next joiner becomes host (spec 012).
 
 A host who comes back after the hand-over is an ordinary player.
 
-### Protocol change (see open question 1)
+### Protocol (spec 039)
 
-`ErrorCode` gains `INVALID_TARGET = "invalid_target"` (spec 039 decision 14).
+`ErrorCode.INVALID_TARGET = "invalid_target"` is part of spec 039 (added when
+spec 039 was reopened on 2026-10-10, its decision 19); this spec gives it its
+meaning (removing or muting an unknown player, removing oneself). No other
+protocol change.
 
 ### Client
 
@@ -184,7 +187,7 @@ The words in brackets say how each criterion is tested.
   change the help mode or budget (AC-2).
 - Non-host UI (AC-1, AC-2, AC-4): a non-host sees no `host-panel` and no
   `remove-player`; a forged message gets `not_host`.
-- Removal confirmation (AC-1): none; the button acts at once (open question 4).
+- Removal confirmation (AC-1): none; the button acts at once (decision 4).
 
 ## Out of scope
 
@@ -201,14 +204,17 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written
+(item 1 settled by reopening spec 039). Each one is already part of the spec
+above.
 
 1. Protocol: an error code for a bad target. Options: `invalid_message` (which
    spec 039 reserves for parse failures) or a new `invalid_target`. Pick: add
-   `INVALID_TARGET` (spec 039 decision 14), used for removing or muting an unknown
-   player and for removing oneself.
+   `INVALID_TARGET`, used for removing or muting an unknown player and for
+   removing oneself. Decision (human): spec 039 was reopened to add it (spec 039
+   decision 19), so it is no longer a change this spec makes.
 2. "Cannot rejoin from the same browser". Guests have no account. Options: ban the
    resume token, ban an extra browser id, or ban the address. Pick: ban the resume
    token, which the browser keeps in `localStorage` and always sends; clearing site
@@ -229,3 +235,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
 8. "Announced to all players in the activity feed" (AC-4). Pick: the
    `settings_changed` event reaches every joined player, the changer included, and
    spec 013's feed shows the line; the browser check is made on both pages.
+
+## Open questions
+
+None.

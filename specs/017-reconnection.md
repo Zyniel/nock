@@ -20,26 +20,17 @@ The server holds the only true grid; clients display it and send edits. This is 
 
 ## Public interface
 
-### Protocol change (see open question 1)
+### Protocol (spec 039)
 
-Two messages without `seq` are added to spec 039, and one error code:
+The heartbeat messages and the error code this spec needs are part of spec 039
+(added when spec 039 was reopened on 2026-10-10, its decisions 17 and 20); this
+spec gives them their meaning. No other protocol change.
 
-```python
-# src/nock/protocol.py (additions)
-class Ping(ProtocolModel):            # client to server, member of ClientMessage
-    type: Literal["ping"] = "ping"
-
-
-class Pong(ProtocolModel):            # server to client, member of ServerMessage, no seq
-    type: Literal["pong"] = "pong"
-
-
-class ErrorCode(StrEnum):
-    ...
-    STALE_EDIT = "stale_edit"         # an offline edit on a cell changed since
-```
-
-Wire examples: `{"type": "ping"}`, `{"type": "pong"}`.
+- `Ping` (`nock.protocol.Ping`, client to server, member of `ClientMessage`): only
+  `type`; wire `{"type": "ping"}`.
+- `Pong` (`nock.protocol.Pong`, server to client, member of `ServerMessage`): only
+  `type`, no `seq` (like `selection_moved`); wire `{"type": "pong"}`.
+- `ErrorCode.STALE_EDIT = "stale_edit"`: an offline edit on a cell changed since.
 
 ### Server
 
@@ -114,7 +105,7 @@ When the connection is lost after the page had joined at least once:
 When the connection is lost before the first snapshot ever arrived, the page also
 retries with the same delays, with `data-status="connecting"` and no banner.
 
-The status `closed` of spec 040 is no longer produced (see open question 4).
+The status `closed` of spec 040 is no longer produced (see decision 4).
 
 New `fr.json` keys:
 
@@ -140,7 +131,7 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-4.3.1) (browser with mocked socket) A banner shows within 5 seconds of a lost connection, and I can keep typing. Given the page joined (FX-01 snapshot, `seq` 5) with a mock that answers each `ping` with `pong`: (a) when the mock closes the socket with code 1011, `connection-banner` is visible with `fr.json["room.banner.offline"]` and `data-status="reconnecting"` within 5,000 ms; tapping (1, 0) and pressing `t` then shows `T` at (1, 0) and no frame is sent while no socket is open. (b) In a second run, when the mock stops answering pings and sends nothing more, the banner is visible within 5,000 ms of the last frame the mock sent. (c) In both runs, when the mock accepts the next socket and answers its join with a snapshot, the banner is hidden and `data-status="joined"`.
 - **AC-2** (AC-4.3.2) (Python; WebSocket; browser with mocked socket) On reconnection, my offline letters are sent. Where the server's cell changed in the meantime, the server's letter is kept. Python: in a FX-01 room at seq 10 where `p2` wrote `B` at (1, 0) with seq 8, `handle_message` from `p1` with `EditLetter(row=1, column=0, letter="T", base_seq=7)` is refused with `stale_edit` and the cell keeps `B`; with `base_seq=8` it is applied; `EditLetter(row=1, column=1, letter="A", base_seq=7)` on a cell unchanged since seq 7 is applied; an edit with `base_seq=7` on a cell last changed by `p1` itself at seq 9 is applied. WebSocket: clients A and B join (seq 2); A closes its socket; B writes `B` at (1, 0); A reconnects with its token, then sends `edit_letter` (1, 0) `T` with `base_seq` 2 and (1, 1) `A` with `base_seq` 2: the first gets `error` `stale_edit` and nobody receives a `letter_changed` for it, the second is applied and both clients receive it. Browser: given the page joined with `you` = `p1`, its stored identity, a snapshot at `seq` 5, and the mock closing the socket, typing `T` at (1, 0) and `A` at (1, 1) while offline, then the mock accepting the new socket: the page's first message is `Join` with the stored nickname and `resume_token`; after the mock sends a snapshot at `seq` 9 whose (1, 0) holds `B` from `p2`, the page sends `EditLetter(row=1, column=0, letter="T", base_seq=5)` then `EditLetter(row=1, column=1, letter="A", base_seq=5)`; when the mock answers the first with `error` `stale_edit`, (1, 0) shows `B`, and when it answers the second with `letter_changed` seq 10 from `p1`, (1, 1) shows `A` with `data-unconfirmed="false"`.
-- **AC-3** (AC-4.3.3) (Python; WebSocket with a fake clock; browser with live server) Reconnecting within 5 minutes restores my nickname, colour and authorship with nothing to re-enter. Python: `p1` (`Ana`, colour 0, author of `T` at (1, 0)) disconnected at `t`; `join_room` with `p1`'s token at `t + 300` resumes `p1` (same id, nickname, colour; (1, 0) still authored by `p1`); at `t + 300.5` the same join gives `PlayerLeft(p1, reason="timed_out")` then `PlayerJoined` of a new id; `tick` at `t + 300` leaves `p1` in the room and at `t + 300.5` removes them with `PlayerLeft(timed_out)`. WebSocket: A (`Ana`) and B join; A's socket closes; after `advance(299)` and one tick, B has received no `player_left`; A's token joins again and gets `you` equal to its old id with `Ana` and colour 0. In a second run, after `advance(301)`, B receives `PlayerLeft(<A>, reason="timed_out")` within one second of real time, and A's token then joins as a new player id. Browser: on the live server, page 1 joins as `Ana` and page 2 (another context) as `Bob`; page 1 is reloaded (open question 7); it reaches `data-status="joined"` again with the same `data-you`, its roster entry `Ana` keeps the same `data-colour`, `nickname-form` is never shown, and page 2's roster still holds exactly 2 players, with `Ana` back to `data-state="active"`.
+- **AC-3** (AC-4.3.3) (Python; WebSocket with a fake clock; browser with live server) Reconnecting within 5 minutes restores my nickname, colour and authorship with nothing to re-enter. Python: `p1` (`Ana`, colour 0, author of `T` at (1, 0)) disconnected at `t`; `join_room` with `p1`'s token at `t + 300` resumes `p1` (same id, nickname, colour; (1, 0) still authored by `p1`); at `t + 300.5` the same join gives `PlayerLeft(p1, reason="timed_out")` then `PlayerJoined` of a new id; `tick` at `t + 300` leaves `p1` in the room and at `t + 300.5` removes them with `PlayerLeft(timed_out)`. WebSocket: A (`Ana`) and B join; A's socket closes; after `advance(299)` and one tick, B has received no `player_left`; A's token joins again and gets `you` equal to its old id with `Ana` and colour 0. In a second run, after `advance(301)`, B receives `PlayerLeft(<A>, reason="timed_out")` within one second of real time, and A's token then joins as a new player id. Browser: on the live server, page 1 joins as `Ana` and page 2 (another context) as `Bob`; page 1 is reloaded (decision 7); it reaches `data-status="joined"` again with the same `data-you`, its roster entry `Ana` keeps the same `data-colour`, `nickname-form` is never shown, and page 2's roster still holds exactly 2 players, with `Ana` back to `data-state="active"`.
 - **AC-4** (AC-4.3.4) (Python; WebSocket with a fake clock; browser with mocked socket) Other players see my state change in the roster within 10 seconds. Python: `tick` at `last_seen_at + 5.9` leaves an active player active; at `last_seen_at + 6.0` it gives `PlayerStateChanged(disconnected)` and a `Disconnect` with close code 4408. WebSocket: A and B join; A stops sending anything; after `advance(6)`, B receives `PlayerStateChanged(<A>, state="disconnected")` within one second of real time and A's socket is closed with 4408; when A's socket is closed by the client instead, B receives it without any clock change. Browser: given the page joined with players `p1` (`you`) and `p2`, when the mock sends `player_state_changed` for `p2` `disconnected`, `p2`'s `roster-player` gets `data-state="disconnected"` within 300 ms, and `active` again on the next such event.
 
 ## Edge cases and errors
@@ -199,21 +190,23 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written
+(items 1 and 2 settled by reopening spec 039). Each one is already part of the
+spec above.
 
 1. Protocol change: heartbeat. A browser cannot see WebSocket ping frames, and a
    dead mobile connection may not close for minutes, so neither side can meet the 5
    and 10 seconds without an application heartbeat. Options: add `ping` / `pong`
    to spec 039, or rely on uvicorn's protocol pings (server side only). Pick: add
-   `Ping` (client) and `Pong` (server, no `seq`) to spec 039; the lead reopens spec
-   039 to add them, their wire examples and their parse criteria before this spec
-   is built.
+   `Ping` (client) and `Pong` (server, no `seq`). Decision (human): spec 039 was
+   reopened and holds them, with their wire examples and parse criteria (spec 039
+   decision 17, AC-20).
 2. Protocol change: `stale_edit`. The server needs to answer an offline edit it
    refuses (spec 015 matches one answer per edit). Pick: add `STALE_EDIT` to
-   `ErrorCode` (allowed by spec 039 decision 14). If spec 039's AC-9 test checks the
-   exact count of codes, the lead updates it.
+   `ErrorCode`. Decision (human): spec 039 was reopened and holds it, with its
+   count of error codes updated (spec 039 decision 20, AC-9, AC-21).
 3. Stale rule. Options: refuse when the cell changed after `base_seq` at all, or
    only when someone else changed it. Pick: only someone else, so a player's own
    offline edits to one cell, resent in order, all apply.
@@ -232,3 +225,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    socket from the test. Pick: a page reload stands for the reconnection (same
    stored identity, same server rule); the automatic reconnection itself is covered
    by AC-1 and AC-2 with a mocked socket.
+
+## Open questions
+
+None.

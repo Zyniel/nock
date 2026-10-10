@@ -93,13 +93,23 @@ New `fr.json` key:
 - "Browser with mocked socket": spec 040's `page.route_web_socket` mock on
   `/r/ABC123`, sending a `Snapshot` built from `grid_view(fx01_grid)` with chosen
   cells replaced (`model_copy(update=...)`).
+- Engines: every browser criterion runs in Chromium, Firefox and WebKit
+  (`specs/_architecture.md`; Edge is covered by Chromium, Safari by WebKit; CI runs
+  all three, a local run Chromium and WebKit). The only Chromium-only checks of
+  this spec are the pinch and pan steps of AC-1 and the checks made after them,
+  because they drive the page through Chrome DevTools Protocol touch input, which
+  Firefox and WebKit do not have; the test that holds them is marked
+  `@pytest.mark.only_browser("chromium")`. Every other check, including the
+  at-load part of AC-1, runs in all three engines.
 - Phone: a browser context with `viewport={"width": 360, "height": 740}`,
-  `has_touch=True`, `is_mobile=True`, `device_scale_factor=2`.
-- Pinch: a CDP session (`page.context.new_cdp_session(page)`) sends
+  `has_touch=True`, `is_mobile=True`, `device_scale_factor=2`. Playwright does not
+  support `is_mobile` in Firefox, so under Firefox the context leaves it out (the
+  test reads the `browser_name` fixture); the other options stay.
+- Pinch (Chromium only): a CDP session (`page.context.new_cdp_session(page)`) sends
   `Input.dispatchTouchEvent`: `touchStart` with two points 40 px apart around the
   viewport's centre, ten `touchMove` steps moving them apart symmetrically to
   300 px, then `touchEnd`. A pinch in is the same backwards.
-- Pan: `Input.synthesizeScrollGesture` on the viewport's centre with
+- Pan (Chromium only): `Input.synthesizeScrollGesture` on the viewport's centre with
   `gestureSourceType: "touch"` and `xDistance`/`yDistance` of -200.
 - "Cut off" check on a `clue-text` element: `scrollWidth <= clientWidth + 1`,
   `scrollHeight <= clientHeight + 1`, its bounding box inside its clue cell's box
@@ -110,11 +120,11 @@ New `fr.json` key:
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-2.1.1) (browser with live server, phone emulation) On a 360 px wide screen, FX-02 can be panned and pinch-zoomed, and no clue text is cut off at full zoom. With a room on FX-02 opened in the phone context: at load `data-zoom` equals `data-zoom-min` and the grid's box is no wider than the viewport's client width; one pinch out raises `data-zoom`; pinching out again (at most five pinches) reaches `data-zoom == data-zoom-max`; the grid is then wider than the viewport, and a pan raises the viewport's `scrollLeft` and `scrollTop` above 0; every `clue-text` of the grid passes the "cut off" check; a pinch in lowers `data-zoom`.
+- **AC-1** (AC-2.1.1) (browser with live server, phone emulation; at-load part in all three engines, gesture part Chromium only) On a 360 px wide screen, FX-02 can be panned and pinch-zoomed, and no clue text is cut off at full zoom. With a room on FX-02 opened in the phone context: at load `data-zoom` equals `data-zoom-min` and the grid's box is no wider than the viewport's client width (all three engines). Then, in Chromium only (CDP touch input, see "Test harness"): one pinch out raises `data-zoom`; pinching out again (at most five pinches) reaches `data-zoom == data-zoom-max`; the grid is then wider than the viewport, and a pan raises the viewport's `scrollLeft` and `scrollTop` above 0; every `clue-text` of the grid passes the "cut off" check; a pinch in lowers `data-zoom`.
 - **AC-2** (AC-2.1.2) (browser with live server) Each clue draws its arrow on the side of its word's first letter cell. On FX-01 in a 1280 by 800 window, for each of the 8 clues: `clue-arrow` has the clue's `data-arrow` and the `data-side` of the table above, and its box centre lies on that side of the clue cell: for `right`, centre x at least the cell's centre x plus a quarter of the cell width and at most the cell's right edge plus half a cell width, centre y within the cell's top and bottom; for `bottom`, the same with x and y swapped. At (0, 0), clue 0 (`down_then_right`) has side `bottom` and clue 1 (`right_then_down`) side `right`.
 - **AC-3** (AC-2.1.3) (browser with live server) A cell with two clues shows both, separated by a line; FX-01 shows this at (0,0). The cell (0, 0) holds two `clue` elements whose `clue-text` read `Passoire fine` and `De la marine`, in that order, and one `clue-separator` that meets the line rule above and whose box lies between the two texts (its centre y at or below the bottom of clue 0's text and at or above the top of clue 1's text). Single-clue cells (0, 2) and (2, 0) hold one `clue` and no `clue-separator`.
 - **AC-4** (AC-2.1.4) (browser with live server) A new game on FX-01 renders 7 clue cells and 18 empty letter cells. A fresh room on FX-01 shows 25 `cell` elements: 7 with `data-type="clue"`, 18 with `data-type="letter"`, all 18 with `data-letter=""`, `data-locked="false"` and no visible text, and none with `data-type="empty"`; the grid has `data-width="5"` and `data-height="5"`.
-- **AC-5** (AC-2.1.5) (browser with live server, viewport emulation in Chromium) The game is a responsive web app with no native app and no install. Every screen works from 320 px wide up to desktop, in portrait and landscape, on current Chrome, Safari, Firefox and Edge. In Chromium, for each window size 320x568, 568x320, 360x740, 740x360, 768x1024, 1024x768, 1280x800 and 1920x1080, and for each page `/` and `/r/<code>` (a room on FX-02): `document.documentElement.scrollWidth <= window.innerWidth` (no horizontal page scroll); on the room page, the `grid-viewport` box lies inside the window horizontally, is at least 100 px wide and 100 px high, and at least one `cell` is inside the window.
+- **AC-5** (AC-2.1.5) (browser with live server, viewport emulation in Chromium, Firefox and WebKit) The game is a responsive web app with no native app and no install. Every screen works from 320 px wide up to desktop, in portrait and landscape, on current Chrome, Safari, Firefox and Edge. In each of the three engines (Chromium standing for Chrome and Edge, WebKit for Safari), for each window size 320x568, 568x320, 360x740, 740x360, 768x1024, 1024x768, 1280x800 and 1920x1080, and for each page `/` and `/r/<code>` (a room on FX-02): `document.documentElement.scrollWidth <= window.innerWidth` (no horizontal page scroll); on the room page, the `grid-viewport` box lies inside the window horizontally, is at least 100 px wide and 100 px high, and at least one `cell` is inside the window.
 - **AC-6** (new) (browser with mocked socket) The grid shows the letters and locks of the snapshot. Given a FX-01 snapshot whose cell (1, 0) has `letter="T"` and whose cell (1, 2) has `letter="M"`, `locked=True`, the cell (1, 0) has `data-letter="T"` and the text `T`, the cell (1, 2) has `data-letter="M"`, `data-locked="true"` and the text `M`, and the cell (1, 1) has `data-letter=""`. A second snapshot where (1, 0) is empty makes it `data-letter=""`.
 
 ## Edge cases and errors
@@ -156,20 +166,30 @@ The words in brackets say how each criterion is tested.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written,
+except item 1 (the human chose three engines) and item 2 (reworded to match).
+Each one is already part of the spec above.
 
-1. Browsers. "Current Chrome, Safari, Firefox and Edge" cannot be checked in the
-   gate, which installs Chromium only (adding Firefox and WebKit to CI is a tooling
-   change). Options: Chromium only; or add `--browser firefox --browser webkit`
-   runs. Pick: Chromium only (Edge is Chromium); Safari and Firefox are a manual
-   check before launch, not covered by tests.
+1. Browsers. "Current Chrome, Safari, Firefox and Edge". Options: Chromium only;
+   or add Firefox and WebKit runs. Decision (human): browser tests run in
+   Chromium, Firefox and WebKit (CI runs all three; a local run Chromium and
+   WebKit while Windows blocks Firefox), and every browser criterion of this spec
+   must pass in all three. Edge is covered by Chromium, Safari by WebKit. A check
+   that needs a Chromium-only feature is marked
+   `@pytest.mark.only_browser("chromium")`; here that is only the gesture part of
+   AC-1 (item 2). In Firefox the phone context leaves out `is_mobile`, which
+   Playwright does not support there. Not covered: real devices (iOS Safari on a
+   phone, Android Chrome on a phone).
 2. Pinch and pan. Playwright has no pinch API, and real fingers on real phones
    cannot run in the gate. Pick: an app-controlled zoom exposed as `data-zoom`,
    driven by touch events and tested with CDP `Input.dispatchTouchEvent` (pinch) and
-   `Input.synthesizeScrollGesture` (pan) in Chromium's touch emulation. Not
-   covered: iOS Safari gestures, the browser's own page zoom, and inertia.
+   `Input.synthesizeScrollGesture` (pan) in Chromium's touch emulation. CDP exists
+   only in Chromium, so the pinch, the pan and the full-zoom "cut off" checks of
+   AC-1 are Chromium-only (`only_browser("chromium")`); the at-load checks of AC-1
+   run in all three engines. Not covered: iOS Safari gestures, gestures in Firefox
+   and WebKit, the browser's own page zoom, and inertia.
 3. "Full zoom". Pick: `data-zoom-max`, chosen by the implementer so that no clue
    text is cut off on 360 px; zoom 1 fits the whole grid. No minimum font size is
    set here; readability thresholds belong to spec 035.
@@ -187,3 +207,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    the clue cell to the near half of the letter cell, on the correct side.
 8. Locked cells are shown (`data-locked`) here because the snapshot already holds
    them; their look is the implementer's choice until spec 016.
+
+## Open questions
+
+None.

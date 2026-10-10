@@ -107,7 +107,11 @@ nothing.
   AC-1 uses `locator.tap()` in a context with `has_touch=True`.
 - The mock records every frame the page sends; tests parse them with
   `parse_client_message`.
-- Phone window for AC-4: 360 by 640, `has_touch=True`, `is_mobile=True`.
+- Phone window for AC-4: 360 by 640, `has_touch=True`, `is_mobile=True`; under
+  Firefox, where Playwright does not support `is_mobile`, the context leaves it
+  out (as spec 006).
+- Engines: every criterion runs in Chromium, Firefox and WebKit
+  (`specs/_architecture.md`). No check of this spec is Chromium-only.
 
 ## Acceptance criteria
 
@@ -160,17 +164,21 @@ changes nothing.
 
 None.
 
-## Open questions
+## Decisions
 
-Each pick below is already written into the spec. The lead confirms or changes it.
+Approved by the human on 2026-10-10, with the pick of each item kept as written
+(item 3 reworded for the three browser engines the human chose). Each one is
+already part of the spec above.
 
 1. Direction on a first tap of a two-word cell. Options: always across, keep the
    current direction, or the direction of the longer word. Pick: keep the current
    direction when the cell has a word in it, `across` when nothing was selected.
 2. Clue tap on a full word. Pick: select its first cell.
-3. Bar "above the keyboard". The system keyboard cannot be shown in headless
-   Chromium, and spec 009 replaces it on touch screens with an in-app keyboard.
-   Pick: here, the bar stays inside the window at 14 px or more (phone emulation);
+3. Bar "above the keyboard". The system keyboard cannot be shown in any headless
+   engine (Chromium, Firefox, WebKit), and spec 009 replaces it on touch screens
+   with an in-app keyboard.
+   Pick: here, the bar stays inside the window at 14 px or more (phone emulation,
+   all three engines);
    spec 009 AC-4 checks it sits above the in-app keyboard. Not covered: the
    system keyboard of a real phone (on desktop there is none on screen).
 4. Nothing selected at start. Options: select the first word on load, or nothing.
@@ -180,3 +188,7 @@ Each pick below is already written into the spec. The lead confirms or changes i
    039) and spec 013 needs it. Pick: send it on every change (AC-5); no throttling.
 6. A cell in two words of the same direction (possible when a word starts in the
    middle of a run, spec 003 edge cases). Pick: the longest one.
+
+## Open questions
+
+None.
