@@ -1,0 +1,3 @@
+# Keep LF line endings on every platform, so Windows and the Linux CI runner
+# see the same files.
+* text=auto eol=lf

@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+
+# Claude Code: personal, per-machine files
+.claude/settings.local.json
+.claude/agent-memory-local/
+CLAUDE.local.md

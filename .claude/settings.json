@@ -1,0 +1,86 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "0"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(uv sync *)",
+      "Bash(uv lock *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(uv run black *)",
+      "Bash(uv run pyrefly *)",
+      "Bash(uv run python scripts/gate.py *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch *)",
+      "Bash(git switch *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-project",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/scripts/hooks/guard_paths.py"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "test-writer|implementer",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-project",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/scripts/hooks/role_gate.py"
+            ],
+            "timeout": 600,
+            "statusMessage": "Running the quality gate"
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv",
+            "args": [
+              "run",
+              "--no-project",
+              "python",
+              "${CLAUDE_PROJECT_DIR}/scripts/hooks/role_gate.py"
+            ],
+            "timeout": 600,
+            "statusMessage": "Running the quality gate"
+          }
+        ]
+      }
+    ]
+  }
+}
