@@ -1,7 +1,7 @@
 ---
 id: "004"
 title: Grid catalogue
-status: draft
+status: approved
 ---
 
 # 004 - Grid catalogue

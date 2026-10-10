@@ -1,7 +1,7 @@
 ---
 id: "008"
 title: Letter entry
-status: draft
+status: approved
 ---
 
 # 008 - Letter entry

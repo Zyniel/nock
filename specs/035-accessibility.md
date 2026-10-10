@@ -1,7 +1,7 @@
 ---
 id: "035"
 title: Accessibility
-status: draft
+status: approved
 ---
 
 # 035 - Accessibility

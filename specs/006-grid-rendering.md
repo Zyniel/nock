@@ -1,7 +1,7 @@
 ---
 id: "006"
 title: Grid rendering
-status: draft
+status: approved
 ---
 
 # 006 - Grid rendering

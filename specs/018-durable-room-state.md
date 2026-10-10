@@ -1,7 +1,7 @@
 ---
 id: "018"
 title: Durable room state
-status: draft
+status: approved
 ---
 
 # 018 - Durable room state

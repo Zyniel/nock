@@ -1,7 +1,7 @@
 ---
 id: "020"
 title: Pencil letters
-status: draft
+status: approved
 ---
 
 # 020 - Pencil letters

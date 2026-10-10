@@ -1,7 +1,7 @@
 ---
 id: "005"
 title: Licensed content only
-status: draft
+status: approved
 ---
 
 # 005 - Licensed content only

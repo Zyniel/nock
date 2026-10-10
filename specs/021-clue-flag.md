@@ -1,7 +1,7 @@
 ---
 id: "021"
 title: Clue flag
-status: draft
+status: approved
 ---
 
 # 021 - Clue flag

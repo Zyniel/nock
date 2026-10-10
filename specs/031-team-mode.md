@@ -1,7 +1,7 @@
 ---
 id: "031"
 title: Teams
-status: draft
+status: approved
 ---
 
 # 031 - Teams

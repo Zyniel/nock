@@ -1,7 +1,7 @@
 ---
 id: "032"
 title: Room resume
-status: draft
+status: approved
 ---
 
 # 032 - Room resume

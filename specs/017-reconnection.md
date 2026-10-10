@@ -1,7 +1,7 @@
 ---
 id: "017"
 title: Disconnection and reconnection
-status: draft
+status: approved
 ---
 
 # 017 - Disconnection and reconnection
