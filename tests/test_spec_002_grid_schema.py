@@ -227,6 +227,34 @@ def test_ac2_word_stops_before_an_empty_cell() -> None:
     assert build_grid(data).word_cells(0, 0, 0) == [(0, 1), (0, 2)]
 
 
+def test_ac2_word_stops_before_a_clue_cell_across() -> None:
+    data = {
+        "width": 4,
+        "height": 1,
+        "cells": [
+            clue_cell(0, 0, "right"),
+            letter_cell(0, 1),
+            letter_cell(0, 2),
+            clue_cell(0, 3, "right"),
+        ],
+    }
+    assert build_grid(data).word_cells(0, 0, 0) == [(0, 1), (0, 2)]
+
+
+def test_ac2_word_stops_before_a_clue_cell_down() -> None:
+    data = {
+        "width": 1,
+        "height": 4,
+        "cells": [
+            clue_cell(0, 0, "down"),
+            letter_cell(1, 0),
+            letter_cell(2, 0),
+            clue_cell(3, 0, "down"),
+        ],
+    }
+    assert build_grid(data).word_cells(0, 0, 0) == [(1, 0), (2, 0)]
+
+
 def test_ac2_one_letter_word_is_allowed() -> None:
     data = {
         "width": 2,
@@ -387,6 +415,11 @@ def test_ac3_normalize_answer_empty_result_raises_value_error(text: str) -> None
 def test_ac3_normalize_answer_digit_raises_value_error_naming_the_text() -> None:
     with pytest.raises(ValueError, match="'R2D2'"):
         normalize_answer("R2D2")
+
+
+def test_ac3_normalize_answer_error_shows_the_original_text_with_ligature() -> None:
+    with pytest.raises(ValueError, match="'CŒUR2'"):
+        normalize_answer("CŒUR2")
 
 
 def test_ac3_clue_answer_is_normalized() -> None:
