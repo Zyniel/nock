@@ -37,6 +37,19 @@ jobs:
       - name: Install the project
         run: uv sync --locked
 
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the web client
+        run: npm --prefix web ci
+
+      - name: Install the browser for browser tests
+        run: uv run playwright install --with-deps chromium
+
       # The same command you run locally and that the Claude Code hooks run.
       - name: Run the quality gate
         run: uv run python scripts/gate.py

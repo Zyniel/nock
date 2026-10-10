@@ -21,6 +21,10 @@ Everything runs through uv. Do not use `pip` or a bare `python`.
 | Fix formatting | `uv run black .` |
 | Fix lint findings | `uv run ruff check --fix .` |
 | Type check | `uv run pyrefly check` |
+| Install the web client dependencies | `npm --prefix web ci` |
+| Web client type check | `npm --prefix web run check` |
+| Build the web client | `npm --prefix web run build` |
+| Install the browser for browser tests | `uv run playwright install chromium` |
 
 Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 
@@ -29,6 +33,7 @@ Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 - `specs/NNN-short-name.md`: one spec per feature, copied from `specs/_template.md`.
 - `tests/test_spec_NNN_short_name.py`: the tests of spec NNN.
 - `src/nock/`: the package.
+- `web/`: the Svelte + TypeScript client, built by Vite into `web/dist`.
 - `scripts/gate.py`: the quality gate.
 - `.claude/agents/`: the four roles. `.claude/skills/`: standards and workflows.
   `scripts/hooks/`: the scripts that enforce the rules below.
@@ -58,11 +63,13 @@ write the implementation before its tests exist.
 | --- | --- | --- |
 | spec-writer | `specs/` | everything else |
 | test-writer | `tests/` | `src/`, `specs/` |
-| implementer | `src/`, `docs/`, `README.md` | `tests/`, `specs/`, tooling |
+| implementer | `src/`, `web/`, `docs/`, `README.md` | `tests/`, `specs/`, tooling |
 | reviewer | nothing (read-only) | everything |
 
-Tooling means `pyproject.toml`, `scripts/`, `.claude/` and `.github/`. Changing it,
-or adding a dependency, is a decision for the human: ask first.
+Tooling means `pyproject.toml`, `scripts/`, `.claude/`, `.github/` and, in `web/`,
+`package.json`, `package-lock.json` and the Vite, Svelte and TypeScript config
+files. Changing it, or adding a dependency (Python or npm), is a decision for the
+human: ask first.
 
 ## Code standards
 
