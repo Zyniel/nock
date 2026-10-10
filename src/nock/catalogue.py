@@ -140,6 +140,17 @@ class CatalogueError(ValueError):
     """A catalogue directory holds a file that cannot be loaded."""
 
 
+def _check_published_on(value: object) -> None:
+    """Accept only a text written YYYY-MM-DD (no number, boolean or null).
+
+    Raises:
+        ValueError: The value is not a text matching that pattern.
+    """
+    # The JSON value can be of any type, which is why it is typed `object`.
+    if not isinstance(value, str) or PUBLISHED_ON_PATTERN.fullmatch(value) is None:
+        raise ValueError("'published_on' must be a text written YYYY-MM-DD")
+
+
 def _read_entry(path: Path) -> CatalogueEntry:
     """Read one catalogue file.
 
@@ -153,10 +164,8 @@ def _read_entry(path: Path) -> CatalogueEntry:
         raise ValueError("the file must hold a JSON object")
     if "grid" not in payload:
         raise ValueError("the key 'grid' is missing")
-    published_on = payload.get("published_on")
-    is_text = isinstance(published_on, str)
-    if is_text and PUBLISHED_ON_PATTERN.fullmatch(published_on) is None:
-        raise ValueError("'published_on' must be written YYYY-MM-DD")
+    if "published_on" in payload:
+        _check_published_on(payload["published_on"])
     report = import_grid(json.dumps(payload["grid"]))
     payload["grid"] = report.grid
     return CatalogueEntry.model_validate(payload)
