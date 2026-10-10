@@ -1180,6 +1180,21 @@ def test_ac6_tapping_the_selected_cell_keeps_the_word_chosen_by_its_clue(
     assert sent_selections(mock) == [select_cell_message(1, 1, "down")]
 
 
+def test_ac6_a_change_of_word_alone_sends_no_second_select_cell(
+    page: Page, live_server: str
+) -> None:
+    mock = open_nested_run(page, live_server)
+    tap(page, 1, 1)
+    expect_selection(page, 1, 1, "down", "0,0,0")
+
+    clue_named(page, "Court").click()
+    settle(page)
+
+    expect_selection(page, 1, 1, "down", "1,0,0")
+    assert active_clue_texts(page) == ["Court"]
+    assert sent_selections(mock) == [select_cell_message(1, 1, "down")]
+
+
 def test_ac6_a_shared_cell_tapped_with_no_clue_involved_selects_the_longest_word(
     page: Page, live_server: str
 ) -> None:
