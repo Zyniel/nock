@@ -192,7 +192,7 @@ export function validSelection(words: Word[], selection: Selection | null): Sele
   return selection
 }
 
-function otherDirection(direction: Direction): Direction {
+export function otherDirection(direction: Direction): Direction {
   return direction === 'across' ? 'down' : 'across'
 }
 

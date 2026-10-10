@@ -2,7 +2,7 @@
 // functions: no DOM and no socket, so the rules are easy to read.
 
 import type { CellView, GridView } from './roomSession'
-import { positionKey, selectionAfterClueTap, selectionOnCell, wordAt, wordKey } from './wordSelection'
+import { otherDirection, positionKey, selectionAfterClueTap, selectionOnCell, wordAt, wordKey } from './wordSelection'
 import type { Direction, Selection, Word } from './wordSelection'
 
 export type ArrowKey = 'ArrowRight' | 'ArrowLeft' | 'ArrowDown' | 'ArrowUp'
@@ -47,8 +47,9 @@ export function selectionAfterArrow(
   return null
 }
 
-function otherDirection(direction: Direction): Direction {
-  return direction === 'across' ? 'down' : 'across'
+// Index `position` moved into the range 0..count-1, wrapping around either end.
+function wrapIndex(position: number, count: number): number {
+  return ((position % count) + count) % count
 }
 
 // Whether at least one cell of the word is not filled.
@@ -79,10 +80,13 @@ export function selectionAfterTab(
   const count = words.length
   let start = step === 1 ? -1 : count
   if (current !== null) {
-    start = words.findIndex((word) => wordKey(word) === current.word)
+    const currentIndex = words.findIndex((word) => wordKey(word) === current.word)
+    if (currentIndex !== -1) {
+      start = currentIndex
+    }
   }
   for (let distance = 1; distance <= count; distance++) {
-    const index = (((start + step * distance) % count) + count) % count
+    const index = wrapIndex(start + step * distance, count)
     if (isUnfinished(grid, words[index])) {
       return selectionAfterClueTap(grid, words[index])
     }

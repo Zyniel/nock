@@ -107,7 +107,7 @@
 
   // Put the focus back on the grid (the in-app keyboard uses it).
   export function focusGrid(): void {
-    gridElement?.focus()
+    gridElement?.focus({ preventScroll: true })
   }
 
   // Arrow keys move the selection to the next letter cell (spec 009).
@@ -132,13 +132,15 @@
   // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
     const hasModifier = event.ctrlKey || event.metaKey || event.altKey
-    if (!hasModifier && (event.key === 'Tab' || (isArrowKey(event.key) && selection !== null))) {
+    const isTab = !hasModifier && event.key === 'Tab'
+    if (isTab) {
       event.preventDefault()
-      if (event.key === 'Tab') {
-        onTabKey(event.shiftKey)
-      } else {
-        onArrowKey(event.key)
-      }
+      onTabKey(event.shiftKey)
+      return
+    }
+    if (!hasModifier && isArrowKey(event.key) && selection !== null) {
+      event.preventDefault()
+      onArrowKey(event.key)
       return
     }
     const action = actionForKey(
