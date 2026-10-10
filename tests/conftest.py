@@ -2,21 +2,70 @@
 
 from __future__ import annotations
 
+import re
 import socket
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 import uvicorn
+from playwright.sync_api import Page, expect
 
 if TYPE_CHECKING:
     from nock.catalogue import Catalogue
     from nock.server import RoomRegistry
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
+
+
+class FakeClock:
+    """A clock a test moves by hand: a callable returning `now`.
+
+    Pass it as `clock` to `RoomRegistry` (spec 011, "Test harness").
+    """
+
+    def __init__(self) -> None:
+        self.now: float = 1_000_000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        """Move the clock forward by `seconds`."""
+        self.now += seconds
+
+
+@pytest.fixture
+def fake_clock() -> FakeClock:
+    """Return a fresh fake clock starting at 1_000_000.0."""
+    return FakeClock()
+
+
+ENTER_ROOM_TIMEOUT_MS = 10_000
+
+
+def _enter_room(page: Page, url: str, nickname: str = "Ana") -> None:
+    """Open a room page and wait until the player is in the room.
+
+    Waits for `data-status` to be `joined` or `nickname` (spec 012). When it is
+    `nickname`, fills `nickname-input` with `nickname`, submits and waits for
+    `joined`.
+    """
+    page.goto(url)
+    room = page.get_by_test_id("room-page")
+    expect(room).to_have_attribute(
+        "data-status", re.compile(r"^(joined|nickname)$"), timeout=ENTER_ROOM_TIMEOUT_MS
+    )
+    if room.get_attribute("data-status") == "nickname":
+        nickname_input = page.get_by_test_id("nickname-input")
+        nickname_input.fill(nickname)
+        nickname_input.press("Enter")
+        expect(room).to_have_attribute(
+            "data-status", "joined", timeout=ENTER_ROOM_TIMEOUT_MS
+        )
 
 
 @pytest.fixture
@@ -98,3 +147,14 @@ def live_server(room_registry: RoomRegistry, catalogue: Catalogue) -> Iterator[s
         server.should_exit = True
         thread.join(timeout=SERVER_START_TIMEOUT_SECONDS)
         listening_socket.close()
+
+
+@pytest.fixture
+def enter_room() -> Callable[..., None]:
+    """Return `enter_room(page, url, nickname="Ana")`, the helper of spec 011.
+
+    It opens `url`, waits until the room page's `data-status` is `joined` or
+    `nickname`, and when it is `nickname` fills `nickname-input`, submits and
+    waits for `joined`.
+    """
+    return _enter_room
