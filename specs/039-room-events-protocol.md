@@ -1,7 +1,7 @@
 ---
 id: "039"
 title: Room events protocol
-status: approved
+status: done
 ---
 
 # 039 - Room events protocol
@@ -796,6 +796,7 @@ Approved by the human on 2026-10-10, with the pick of each item kept as written
    or only room-changing ones. Pick: `selection_moved`, `reaction` (shown for 3
    seconds, spec 022 AC-2) and `error` have none; presence states
    (`player_state_changed`) and chat do have one, since the snapshot holds them.
+   `pong` was added to the messages without `seq` by decision 17.
 3. Lowercase letters. Options: reject `"a"`, or accept and uppercase it. Pick:
    reject; the client uppercases before sending.
 4. Strictness. Options: Pydantic's default lax parsing, or strict integers and
