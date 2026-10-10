@@ -124,7 +124,7 @@ SERVER_EXAMPLES: dict[str, str] = {
     ),
     "player_joined": '{"type": "player_joined", "seq": 2, "player": PLAYER_P2}',
     "player_left": (
-        '{"type": "player_left", "seq": 40, "player_id": "p2", ' '"reason": "removed"}'
+        '{"type": "player_left", "seq": 40, "player_id": "p2", "reason": "removed"}'
     ),
     "player_state_changed": (
         '{"type": "player_state_changed", "seq": 41, "player_id": "p1", '
@@ -409,6 +409,18 @@ def test_ac1_base_seq_zero_is_accepted() -> None:
     assert message.base_seq == 0
 
 
+@pytest.mark.parametrize(
+    "type_name", ["edit_letter", "pencil_edit", "confirm_pencil", "erase"]
+)
+def test_ac1_base_seq_zero_is_accepted_on_every_cell_edit(type_name: str) -> None:
+    text = json.dumps(with_key(client_data(type_name), "base_seq", 0))
+
+    message = parse_client_message(text)
+
+    assert type(message) is protocol_class(CLIENT_CLASSES[type_name])
+    assert message.model_dump()["base_seq"] == 0
+
+
 def test_ac1_flag_with_null_clue_round_trips() -> None:
     message = parse_client_message('{"type": "flag", "clue": null}')
 
@@ -533,6 +545,39 @@ def test_ac2_cross_field_rules_are_not_checked() -> None:
     assert erased_message.letter is None
     assert erased_message.pencil is True
     assert snapshot.you == "p99"
+
+
+def test_ac2_grid_view_with_duplicate_positions_parses() -> None:
+    cell = {"type": "empty", "row": 0, "column": 0}
+    data = {"width": 2, "height": 1, "cells": [cell, cell]}
+
+    view = GridView.model_validate(data)
+
+    assert view.cells == (
+        EmptyCellView(row=0, column=0),
+        EmptyCellView(row=0, column=0),
+    )
+
+
+def test_ac2_grid_view_with_a_position_outside_the_grid_parses() -> None:
+    cell = {"type": "empty", "row": 5, "column": 7}
+    data = {"width": 2, "height": 1, "cells": [cell]}
+
+    view = GridView.model_validate(data)
+
+    assert view.cells == (EmptyCellView(row=5, column=7),)
+
+
+def test_ac2_snapshot_with_an_inconsistent_grid_view_parses() -> None:
+    data = server_data("snapshot")
+    stray_cell = {"type": "empty", "row": 9, "column": 9}
+    data["grid"]["cells"] = [stray_cell, stray_cell]
+
+    message = parse_server_message(json.dumps(data))
+
+    assert isinstance(message, Snapshot)
+    assert len(message.grid.cells) == 2
+    assert parse_server_message(message.model_dump_json()) == message
 
 
 # ---- AC-3 ---------------------------------------------------------------
@@ -911,6 +956,362 @@ def test_ac5_client_message_cannot_carry_an_event_seq() -> None:
         parse_client_message(json.dumps(data))
 
 
+PathStep = str | int
+FieldPath = tuple[PathStep, ...]
+# (side, example type, path of one field inside that example)
+FieldCase = tuple[str, str, FieldPath]
+
+BOOLEAN_FIELDS: list[FieldCase] = [
+    ("client", "vote", ("yes",)),
+    ("client", "lock_room", ("locked",)),
+    ("client", "mute_player", ("muted",)),
+    ("server", "letter_changed", ("pencil",)),
+    ("server", "cell_locked", ("revealed",)),
+    ("server", "player_muted", ("muted",)),
+    ("server", "player_joined", ("player", "is_host")),
+    ("server", "player_joined", ("player", "muted")),
+    ("server", "settings_changed", ("settings", "locked")),
+    ("server", "snapshot", ("settings", "locked")),
+    ("server", "snapshot", ("players", 0, "is_host")),
+    ("server", "snapshot", ("grid", "cells", 1, "pencil")),
+    ("server", "snapshot", ("grid", "cells", 1, "locked")),
+    ("server", "snapshot", ("grid", "cells", 1, "revealed")),
+    ("server", "snapshot", ("grid", "cells", 1, "wrong")),
+    ("server", "snapshot", ("timer_running",)),
+    ("server", "snapshot", ("solved",)),
+]
+
+INTEGER_FIELDS: list[FieldCase] = [
+    ("client", "edit_letter", ("row",)),
+    ("client", "edit_letter", ("column",)),
+    ("client", "erase", ("base_seq",)),
+    ("client", "vote", ("vote_id",)),
+    ("client", "flag", ("clue", "clue_index")),
+    ("client", "change_settings", ("reveal_budget", "letters")),
+    ("client", "change_settings", ("reveal_budget", "words")),
+    ("server", "vote_opened", ("vote_id",)),
+    ("server", "vote_opened", ("timeout_seconds",)),
+    ("server", "vote_opened", ("eligible_voters",)),
+    ("server", "vote_closed", ("vote_id",)),
+    ("server", "vote_closed", ("yes_votes",)),
+    ("server", "vote_closed", ("eligible_voters",)),
+    ("server", "grid_solved", ("elapsed_ms",)),
+    ("server", "player_joined", ("player", "colour")),
+    ("server", "reveal_result", ("reveal_budget", "letters")),
+    ("server", "settings_changed", ("reveal_budget", "words")),
+    ("server", "settings_changed", ("settings", "reveal_budget", "letters")),
+    ("server", "check_result", ("correct", 0, "row")),
+    ("server", "selection_moved", ("selection", "column")),
+    ("server", "snapshot", ("seq",)),
+    ("server", "snapshot", ("timer_elapsed_ms",)),
+    ("server", "snapshot", ("reveal_budget", "letters")),
+    ("server", "snapshot", ("reveal_budget", "words")),
+    ("server", "snapshot", ("settings", "reveal_budget", "words")),
+    ("server", "snapshot", ("grid", "width")),
+    ("server", "snapshot", ("grid", "height")),
+    ("server", "snapshot", ("grid", "cells", 1, "column")),
+    ("client", "select_cell", ("row",)),
+    ("client", "select_cell", ("column",)),
+    ("client", "erase", ("row",)),
+    ("client", "erase", ("column",)),
+    ("client", "pencil_edit", ("row",)),
+    ("client", "pencil_edit", ("column",)),
+    ("client", "confirm_pencil", ("row",)),
+    ("client", "confirm_pencil", ("column",)),
+    ("client", "check", ("target", "row")),
+    ("client", "check", ("target", "column")),
+    ("client", "check", ("target", "clue_index")),
+    ("client", "reveal", ("target", "row")),
+    ("client", "reveal", ("target", "column")),
+    ("client", "flag", ("clue", "row")),
+    ("client", "flag", ("clue", "column")),
+    ("client", "react", ("clue", "row")),
+    ("client", "react", ("clue", "column")),
+    ("client", "react", ("clue", "clue_index")),
+    ("server", "letter_changed", ("row",)),
+    ("server", "letter_changed", ("column",)),
+    ("server", "cell_locked", ("row",)),
+    ("server", "cell_locked", ("column",)),
+    ("server", "check_result", ("correct", 0, "column")),
+    ("server", "check_result", ("wrong", 0, "row")),
+    ("server", "check_result", ("wrong", 0, "column")),
+    ("server", "reveal_result", ("target", "row")),
+    ("server", "reveal_result", ("target", "column")),
+    ("server", "vote_opened", ("request", "target", "row")),
+    ("server", "vote_opened", ("request", "target", "column")),
+    ("server", "vote_opened", ("request", "target", "clue_index")),
+    ("server", "selection_moved", ("selection", "row")),
+    ("server", "flag_changed", ("clue", "row")),
+    ("server", "flag_changed", ("clue", "column")),
+    ("server", "flag_changed", ("clue", "clue_index")),
+    ("server", "snapshot", ("grid", "cells", 0, "row")),
+    ("server", "snapshot", ("grid", "cells", 0, "column")),
+    ("server", "snapshot", ("grid", "cells", 1, "row")),
+]
+# Every room-changing event carries a strict seq.
+for seq_type_name in SEQ_TYPES:
+    INTEGER_FIELDS.append(("server", seq_type_name, ("seq",)))
+
+
+def field_case_ids(cases: list[FieldCase]) -> list[str]:
+    """Return a readable test id for each field case."""
+    ids = []
+    for _side, type_name, path in cases:
+        steps = ".".join(str(step) for step in path)
+        ids.append(f"{type_name}-{steps}")
+    return ids
+
+
+def example_data(side: str, type_name: str) -> JsonData:
+    """Return the client or server example of a type as a dictionary."""
+    if side == "client":
+        return client_data(type_name)
+    return server_data(type_name)
+
+
+def parse_on_side(side: str, text: str) -> BaseModel:
+    """Parse a text with the client or the server parser."""
+    if side == "client":
+        return parse_client_message(text)
+    return parse_server_message(text)
+
+
+def value_at(data: JsonData, path: FieldPath) -> object:  # raw JSON value
+    """Return the value found at a path of keys and indexes."""
+    node: Any = data
+    for step in path:
+        node = node[step]
+    return node
+
+
+def with_value_at(
+    data: JsonData, path: FieldPath, value: object  # raw JSON value: any
+) -> JsonData:
+    """Return a deep copy of the data with the value at one path replaced."""
+    copied = copy.deepcopy(data)
+    parent: Any = copied
+    for step in path[:-1]:
+        parent = parent[step]
+    parent[path[-1]] = value
+    return copied
+
+
+def assert_field_rejects(case: FieldCase, value: object) -> None:  # raw JSON: any
+    """Check that changing only the field of the case to a value is an error."""
+    side, type_name, path = case
+    data = with_value_at(example_data(side, type_name), path, value)
+
+    with pytest.raises(ValidationError):
+        parse_on_side(side, json.dumps(data))
+
+
+def assert_server_rejects(path: FieldPath, value: object) -> None:  # raw JSON: any
+    """Check that changing one field of the snapshot example is an error."""
+    data = with_value_at(server_data("snapshot"), path, value)
+
+    with pytest.raises(ValidationError):
+        parse_server_message(json.dumps(data))
+
+
+def assert_server_accepts(path: FieldPath, value: object) -> Snapshot:  # raw: any
+    """Check that changing one field of the snapshot example still parses."""
+    data = with_value_at(server_data("snapshot"), path, value)
+
+    message = parse_server_message(json.dumps(data))
+
+    assert isinstance(message, Snapshot)
+    return message
+
+
+@pytest.mark.parametrize("case", BOOLEAN_FIELDS, ids=field_case_ids(BOOLEAN_FIELDS))
+def test_ac5_every_boolean_field_rejects_a_number(case: FieldCase) -> None:
+    side, type_name, path = case
+    current = value_at(example_data(side, type_name), path)
+
+    assert isinstance(current, bool)
+    assert_field_rejects(case, int(current))
+
+
+@pytest.mark.parametrize("case", BOOLEAN_FIELDS, ids=field_case_ids(BOOLEAN_FIELDS))
+def test_ac5_every_boolean_field_rejects_a_string(case: FieldCase) -> None:
+    side, type_name, path = case
+    current = value_at(example_data(side, type_name), path)
+
+    assert_field_rejects(case, str(current).lower())
+
+
+@pytest.mark.parametrize("case", INTEGER_FIELDS, ids=field_case_ids(INTEGER_FIELDS))
+def test_ac5_every_integer_field_rejects_a_string(case: FieldCase) -> None:
+    side, type_name, path = case
+    current = value_at(example_data(side, type_name), path)
+
+    assert isinstance(current, int)
+    assert_field_rejects(case, str(current))
+
+
+@pytest.mark.parametrize("case", INTEGER_FIELDS, ids=field_case_ids(INTEGER_FIELDS))
+def test_ac5_every_integer_field_rejects_a_float(case: FieldCase) -> None:
+    side, type_name, path = case
+    current = value_at(example_data(side, type_name), path)
+
+    assert isinstance(current, int)
+    assert_field_rejects(case, float(current))
+
+
+@pytest.mark.parametrize("bad_seq", ["1", 1.0, True])
+@pytest.mark.parametrize("type_name", ["edit_letter", "pencil_edit", "confirm_pencil"])
+def test_ac5_base_seq_must_be_a_strict_integer(type_name: str, bad_seq: object) -> None:
+    data = with_key(client_data(type_name), "base_seq", bad_seq)
+
+    with pytest.raises(ValidationError):
+        parse_client_message(json.dumps(data))
+
+
+@pytest.mark.parametrize("coordinate", ["row", "column"])
+@pytest.mark.parametrize("bad_value", ["1", 1.0, True])
+def test_ac5_empty_cell_view_position_must_be_a_strict_integer(
+    coordinate: str, bad_value: object
+) -> None:
+    cell: dict[str, object] = {"type": "empty", "row": 1, "column": 1}
+    cell[coordinate] = bad_value
+    assert_server_rejects(("grid", "cells", 1), cell)
+
+
+@pytest.mark.parametrize("size_field", ["width", "height"])
+def test_ac5_grid_view_size_of_zero_is_rejected(size_field: str) -> None:
+    assert_server_rejects(("grid", size_field), 0)
+
+
+@pytest.mark.parametrize("size_field", ["width", "height"])
+def test_ac5_grid_view_size_of_one_parses(size_field: str) -> None:
+    message = assert_server_accepts(("grid", size_field), 1)
+
+    assert getattr(message.grid, size_field) == 1
+
+
+def test_ac5_vote_closed_with_zero_eligible_voters_is_rejected() -> None:
+    data = with_key(server_data("vote_closed"), "eligible_voters", 0)
+
+    with pytest.raises(ValidationError):
+        parse_server_message(json.dumps(data))
+
+
+def test_ac5_vote_closed_with_one_eligible_voter_parses() -> None:
+    data = with_key(server_data("vote_closed"), "eligible_voters", 1)
+
+    message = parse_server_message(json.dumps(data))
+
+    assert message.model_dump()["eligible_voters"] == 1
+
+
+def test_ac5_vote_opened_with_one_second_and_one_voter_parses() -> None:
+    data = with_key(server_data("vote_opened"), "timeout_seconds", 1)
+    data["eligible_voters"] = 1
+
+    message = parse_server_message(json.dumps(data))
+
+    assert isinstance(message, VoteOpened)
+    assert message.timeout_seconds == 1
+    assert message.eligible_voters == 1
+
+
+@pytest.mark.parametrize(
+    "type_name", ["edit_letter", "pencil_edit", "confirm_pencil", "erase"]
+)
+def test_ac5_negative_base_seq_is_rejected_on_every_cell_edit(type_name: str) -> None:
+    data = with_key(client_data(type_name), "base_seq", -1)
+
+    with pytest.raises(ValidationError):
+        parse_client_message(json.dumps(data))
+
+
+def test_ac5_clue_view_text_cannot_be_empty() -> None:
+    assert_server_rejects(("grid", "cells", 0, "clues", 0, "text"), "")
+
+
+def test_ac5_clue_view_text_of_one_character_parses() -> None:
+    message = assert_server_accepts(("grid", "cells", 0, "clues", 0, "text"), "N")
+
+    clue_cell = message.grid.cells[0]
+    assert isinstance(clue_cell, ClueCellView)
+    assert clue_cell.clues[0].text == "N"
+
+
+CLUE_PATH: FieldPath = ("grid", "cells", 0, "clues")
+FIRST_CLUE = {"text": "Note", "arrow": "right"}
+SECOND_CLUE = {"text": "Autre", "arrow": "down"}
+
+
+def test_ac5_clue_cell_view_without_clues_is_rejected() -> None:
+    assert_server_rejects(CLUE_PATH, [])
+
+
+def test_ac5_clue_cell_view_with_three_clues_is_rejected() -> None:
+    assert_server_rejects(CLUE_PATH, [FIRST_CLUE, SECOND_CLUE, SECOND_CLUE])
+
+
+def test_ac5_clue_cell_view_with_two_clues_parses() -> None:
+    message = assert_server_accepts(CLUE_PATH, [FIRST_CLUE, SECOND_CLUE])
+
+    clue_cell = message.grid.cells[0]
+    assert isinstance(clue_cell, ClueCellView)
+    assert clue_cell.clues == (
+        ClueView(text="Note", arrow=Arrow.RIGHT),
+        ClueView(text="Autre", arrow=Arrow.DOWN),
+    )
+
+
+BAD_PLAYER_IDS: list[str] = ["", "p 2", "a" * 65, "é", "p!"]
+PLAYER_ID_PATHS: dict[str, FieldPath] = {
+    "author": ("grid", "cells", 1, "author"),
+    "you": ("you",),
+}
+
+
+@pytest.mark.parametrize("path_name", list(PLAYER_ID_PATHS))
+@pytest.mark.parametrize("player_id", BAD_PLAYER_IDS)
+def test_ac5_snapshot_player_ids_follow_the_pattern(
+    path_name: str, player_id: str
+) -> None:
+    assert_server_rejects(PLAYER_ID_PATHS[path_name], player_id)
+
+
+@pytest.mark.parametrize("path_name", list(PLAYER_ID_PATHS))
+@pytest.mark.parametrize("player_id", ["p1", "a_b-C9", "a" * 64])
+def test_ac5_snapshot_player_ids_accept_valid_ids(
+    path_name: str, player_id: str
+) -> None:
+    message = assert_server_accepts(PLAYER_ID_PATHS[path_name], player_id)
+
+    if path_name == "you":
+        assert message.you == player_id
+    else:
+        letter_cell = message.grid.cells[1]
+        assert isinstance(letter_cell, LetterCellView)
+        assert letter_cell.author == player_id
+
+
+def test_ac5_flag_without_clue_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message('{"type": "flag"}')
+
+
+@pytest.mark.parametrize("field", ["resume_token", "flags"])
+def test_ac5_snapshot_without_a_required_field_is_rejected(field: str) -> None:
+    data = without_key(server_data("snapshot"), field)
+
+    with pytest.raises(ValidationError):
+        parse_server_message(json.dumps(data))
+
+
+def test_ac5_player_view_without_selection_is_rejected() -> None:
+    data = server_data("player_joined")
+    del data["player"]["selection"]
+
+    with pytest.raises(ValidationError):
+        parse_server_message(json.dumps(data))
+
+
 # ---- AC-6 ---------------------------------------------------------------
 
 
@@ -1036,6 +1437,37 @@ def test_ac7_player_view_nickname_uses_the_same_rule() -> None:
         parse_server_message(json.dumps(too_short))
 
 
+# Code points written as escapes: a thumbs up with a skin tone is 2 code points,
+# a family emoji (three people joined by two zero width joiners) is 5.
+THUMBS_UP = "👍"
+SKIN_TONE = "🏽"
+FAMILY = "👨‍👩‍👧"
+
+
+def test_ac7_emoji_of_two_code_points_counts_as_two() -> None:
+    message = parse_client_message(join_with(THUMBS_UP + SKIN_TONE))
+
+    assert isinstance(message, Join)
+    assert message.nickname == THUMBS_UP + SKIN_TONE
+
+
+def test_ac7_emoji_of_one_code_point_counts_as_one() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message(join_with(THUMBS_UP))
+
+
+def test_ac7_four_family_emoji_are_twenty_code_points() -> None:
+    message = parse_client_message(join_with(FAMILY * 4))
+
+    assert isinstance(message, Join)
+    assert message.nickname == FAMILY * 4
+
+
+def test_ac7_four_family_emoji_and_one_letter_are_twenty_one_code_points() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message(join_with(FAMILY * 4 + "x"))
+
+
 # ---- AC-8 ---------------------------------------------------------------
 
 
@@ -1086,6 +1518,18 @@ def test_ac8_server_chat_message_uses_the_same_rule() -> None:
         parse_server_message(json.dumps(too_long))
     with pytest.raises(ValidationError):
         parse_server_message(json.dumps(blank))
+
+
+def test_ac8_fifty_six_family_emoji_are_280_code_points() -> None:
+    message = parse_client_message(chat_with(FAMILY * 56))
+
+    assert isinstance(message, Chat)
+    assert message.text == FAMILY * 56
+
+
+def test_ac8_family_emoji_over_280_code_points_are_rejected() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message(chat_with(FAMILY * 56 + "x"))
 
 
 # ---- AC-9 ---------------------------------------------------------------
@@ -1594,6 +2038,45 @@ def test_ac16_view_is_a_grid_view_that_round_trips(fx01_text: str) -> None:
 
     assert isinstance(view, GridView)
     assert again == view
+
+
+def test_ac16_empty_cells_are_kept_in_place() -> None:
+    grid = Grid.model_validate(
+        {
+            "width": 3,
+            "height": 2,
+            "cells": [
+                {
+                    "type": "clue",
+                    "row": 0,
+                    "column": 0,
+                    "clues": [{"text": "Note", "arrow": "right", "answer": "AB"}],
+                },
+                {"type": "letter", "row": 0, "column": 1},
+                {"type": "empty", "row": 0, "column": 2},
+                {"type": "empty", "row": 1, "column": 0},
+                {"type": "letter", "row": 1, "column": 1},
+                {"type": "empty", "row": 1, "column": 2},
+            ],
+        }
+    )
+
+    view = grid_view(grid)
+
+    assert view.width == 3
+    assert view.height == 2
+    assert [cell.type for cell in view.cells] == [
+        "clue",
+        "letter",
+        "empty",
+        "empty",
+        "letter",
+        "empty",
+    ]
+    assert view.cells[2] == EmptyCellView(row=0, column=2)
+    assert view.cells[3] == EmptyCellView(row=1, column=0)
+    assert view.cells[5] == EmptyCellView(row=1, column=2)
+    assert GridView.model_validate_json(view.model_dump_json()) == view
 
 
 # ---- AC-17 --------------------------------------------------------------
