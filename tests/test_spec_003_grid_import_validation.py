@@ -264,6 +264,60 @@ def test_ac2_horizontal_runs_are_reported_before_vertical_runs() -> None:
     assert "(2, 1)" not in message
 
 
+def _square_grid(size: int, special_cells: list[CellData]) -> str:
+    """Build a square grid from some cells, every other position being empty."""
+    special_positions = {}
+    for cell in special_cells:
+        special_positions[(cell["row"], cell["column"])] = cell
+    cells = []
+    for row in range(size):
+        for column in range(size):
+            cells.append(special_positions.get((row, column), _empty(row, column)))
+    return _small_grid(size, size, cells)
+
+
+def test_ac2_first_horizontal_run_in_row_major_order_is_reported() -> None:
+    # Each letter is a one-cell vertical word, so only the run check can fail.
+    # Run (1, 2) to (1, 3) comes first in row-major order, run (3, 0) to (3, 1)
+    # comes first in column-major order.
+    special_cells = [
+        _clue_cell(0, 2, ("Un", "down", "A")),
+        _clue_cell(0, 3, ("Deux", "down", "B")),
+        _letter(1, 2),
+        _letter(1, 3),
+        _clue_cell(2, 0, ("Trois", "down", "C")),
+        _clue_cell(2, 1, ("Quatre", "down", "D")),
+        _letter(3, 0),
+        _letter(3, 1),
+    ]
+    message = _error_message(_square_grid(4, special_cells))
+    assert "(1, 2)" in message
+    assert "(1, 3)" in message
+    assert "(3, 0)" not in message
+    assert "(3, 1)" not in message
+
+
+def test_ac2_first_vertical_run_in_column_major_order_is_reported() -> None:
+    # Each letter is a one-cell horizontal word, so only the run check can fail.
+    # Run (2, 1) to (3, 1) comes first in column-major order, run (0, 3) to
+    # (1, 3) comes first in row-major order.
+    special_cells = [
+        _clue_cell(2, 0, ("Un", "right", "A")),
+        _clue_cell(3, 0, ("Deux", "right", "B")),
+        _letter(2, 1),
+        _letter(3, 1),
+        _clue_cell(0, 2, ("Trois", "right", "C")),
+        _clue_cell(1, 2, ("Quatre", "right", "D")),
+        _letter(0, 3),
+        _letter(1, 3),
+    ]
+    message = _error_message(_square_grid(4, special_cells))
+    assert "(2, 1)" in message
+    assert "(3, 1)" in message
+    assert "(0, 3)" not in message
+    assert "(1, 3)" not in message
+
+
 def test_ac2_isolated_letters_are_not_runs(fx01_text: str) -> None:
     report = import_grid(fx01_text)
     assert report.word_count == 8
