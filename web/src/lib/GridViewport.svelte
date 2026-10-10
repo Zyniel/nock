@@ -97,7 +97,8 @@
     return () => observer.disconnect()
   })
 
-  // Taps and clicks on the grid select a word.
+  // Taps and clicks on the grid select a word. Keyboard handling is deferred to
+  // spec 009, so this listener only deals with pointer clicks.
   $effect(() => {
     const element = gridElement
     if (element === undefined) {

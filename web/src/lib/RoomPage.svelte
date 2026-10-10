@@ -24,6 +24,8 @@
   let selection = $derived(validSelection(words, rawSelection))
   let activeWord = $derived(selectedWord(words, selection))
 
+  // `selection` is already null once its word is gone; this also drops the stale
+  // `rawSelection`, so the old selection cannot come back with a later snapshot.
   $effect(() => {
     if (selection === null && rawSelection !== null) {
       rawSelection = null
@@ -35,8 +37,14 @@
     if (next === null || sameSelection(next, selection)) {
       return
     }
+    const cellChanged =
+      selection === null ||
+      selection.row !== next.row ||
+      selection.column !== next.column ||
+      selection.direction !== next.direction
     rawSelection = next
-    if (socket !== null && socket.readyState === WebSocket.OPEN) {
+    // The server only knows the cell and the direction, not the chosen word.
+    if (cellChanged && socket !== null && socket.readyState === WebSocket.OPEN) {
       const message = {
         type: 'select_cell',
         row: next.row,
@@ -117,6 +125,7 @@
       class="clue-bar"
       data-testid="clue-bar"
       data-word={activeWord === null ? '' : wordKey(activeWord)}
+      role="region"
       aria-label={t('clue_bar.label')}
     >
       <span class="clue-bar-text" data-testid="clue-bar-text"

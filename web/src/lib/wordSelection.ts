@@ -21,17 +21,22 @@ export interface Word {
   cells: Position[]
 }
 
-// One letter cell and a direction in which that cell has a word.
+// One letter cell, a direction, and the word that was chosen. The word is
+// remembered (by its key) because a clue tap may choose a word that starts
+// inside a longer run, which a cell and a direction alone cannot name.
 export interface Selection {
   row: number
   column: number
   direction: Direction
+  word: string
 }
 
+// The name of a word, "row,column,clue_index" of its clue (spec 007).
 export function wordKey(word: Word): string {
   return `${word.clueRow},${word.clueColumn},${word.clueIndex}`
 }
 
+// The name of a grid position, "row,column".
 export function positionKey(row: number, column: number): string {
   return `${row},${column}`
 }
@@ -91,12 +96,13 @@ export function computeWords(grid: GridView): Word[] {
     if (cell.type !== 'clue') {
       continue
     }
-    cell.clues.forEach((clue, clueIndex) => {
+    for (let clueIndex = 0; clueIndex < cell.clues.length; clueIndex++) {
+      const clue = cell.clues[clueIndex]
       const direction = directionOfArrow(clue.arrow)
       const start = startOfWord(cell.row, cell.column, clue.arrow)
       const positions = wordCells(cells, start, direction)
       if (positions.length === 0) {
-        return
+        continue
       }
       words.push({
         clueRow: cell.row,
@@ -106,7 +112,7 @@ export function computeWords(grid: GridView): Word[] {
         text: clue.text,
         cells: positions,
       })
-    })
+    }
   }
   return words
 }
@@ -144,11 +150,38 @@ function startsBefore(word: Word, other: Word): boolean {
   return first.row < otherFirst.row
 }
 
+// The word a selection stands for, or null when the grid no longer has that
+// word, or the word no longer holds the selected cell in the selected direction.
 export function selectedWord(words: Word[], selection: Selection | null): Word | null {
   if (selection === null) {
     return null
   }
-  return wordAt(words, selection.row, selection.column, selection.direction)
+  for (const word of words) {
+    if (wordKey(word) !== selection.word || word.direction !== selection.direction) {
+      continue
+    }
+    const holdsCell = word.cells.some(
+      (cell) => cell.row === selection.row && cell.column === selection.column,
+    )
+    if (holdsCell) {
+      return word
+    }
+  }
+  return null
+}
+
+// A selection on a cell, in a direction, with the longest word there.
+function selectionOnCell(
+  words: Word[],
+  row: number,
+  column: number,
+  direction: Direction,
+): Selection | null {
+  const word = wordAt(words, row, column, direction)
+  if (word === null) {
+    return null
+  }
+  return { row, column, direction, word: wordKey(word) }
 }
 
 // Keep a selection only while its cell still has a word in its direction.
@@ -178,13 +211,13 @@ export function selectionAfterCellTap(
   const isSelectedCell = current !== null && current.row === row && current.column === column
   if (current !== null && isSelectedCell) {
     if (hasAcross && hasDown) {
-      return { row, column, direction: otherDirection(current.direction) }
+      return selectionOnCell(words, row, column, otherDirection(current.direction))
     }
     return current
   }
   const wanted: Direction = current === null ? 'across' : current.direction
   const hasWanted = wanted === 'across' ? hasAcross : hasDown
-  return { row, column, direction: hasWanted ? wanted : otherDirection(wanted) }
+  return selectionOnCell(words, row, column, hasWanted ? wanted : otherDirection(wanted))
 }
 
 // The selection after a tap on a clue: the first cell of its word that is not
@@ -199,9 +232,15 @@ export function selectionAfterClueTap(grid: GridView, word: Word): Selection {
       break
     }
   }
-  return { row: target.row, column: target.column, direction: word.direction }
+  return {
+    row: target.row,
+    column: target.column,
+    direction: word.direction,
+    word: wordKey(word),
+  }
 }
 
+// Whether two selections have the same cell, direction and word.
 export function sameSelection(first: Selection | null, second: Selection | null): boolean {
   if (first === null || second === null) {
     return first === second
@@ -209,6 +248,7 @@ export function sameSelection(first: Selection | null, second: Selection | null)
   return (
     first.row === second.row &&
     first.column === second.column &&
-    first.direction === second.direction
+    first.direction === second.direction &&
+    first.word === second.word
   )
 }
