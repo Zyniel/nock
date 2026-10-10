@@ -157,7 +157,7 @@ Every route and rule of spec 040 stays. New HTTP routes:
 | --- | --- |
 | `GET /api/grids` | 200, JSON array of `GridSummary` (`model_dump(mode="json")` of each), `catalogue.published_summaries()` |
 | `GET /api/grids?force=N`, `N` an integer 1 to 4 | 200, the same array filtered on that force |
-| `GET /api/grids?force=X`, `X` not an integer 1 to 4 (`0`, `5`, `x`, empty) | 422, FastAPI's validation body |
+| `GET /api/grids?force=X`, `X` not exactly one of `1`, `2`, `3`, `4` (`0`, `5`, `x`, empty, `2.0`, `01`: AC-7) | 422, FastAPI's validation body |
 | `GET /api/grids/{number}`, `number` matching `GRID_NUMBER_PATTERN` and published | 200, one `GridSummary` JSON object |
 | `GET /api/grids/{number}`, unknown, unpublished, or not matching the pattern (`0`, `01`, `abc`, `-1`) | 404, `{"detail": "Not Found"}` |
 | `GET /g/{number}`, published | `index.html` as for `/r/{code}` (503 when the client is not built) |
@@ -266,6 +266,7 @@ The words in brackets say how each criterion is tested.
 - **AC-4** (AC-1.3.4) (Python, HTTP, browser with live server) An unpublished grid is absent from the list and its direct URL returns "not found". With `CAT`: no summary of `published_summaries()` has number 4 and `find_published(4)` is None; `GET /api/grids` does not list 4; `GET /api/grids/4`, `GET /g/4` and `GET /g/99` answer 404 with `{"detail": "Not Found"}` while `GET /g/2` answers 200 with `index.html`; in the browser no `catalogue-item` has `data-number="4"`.
 - **AC-5** (new) (Python) Catalogue files load as described in "Catalogue files". Given a directory holding `b.json` (number 2) and `a.json` (number 1), each wrapping the FX-01 grid, `load_catalogue` returns entries numbered `1` then `2` (file-name order) whose grids equal `Grid.model_validate_json(fx01_text)`; a missing directory returns `Catalogue()`; a file whose grid is FX-01 with the answer `MIME` changed to `MIMA` raises `CatalogueError` whose message contains that file's name and `__cause__` is a `GridImportError`.
 - **AC-6** (new) (browser with live server) The grid page shows one grid by its direct URL. With `CAT`, opening `/g/2` shows `data-testid="grid-page"` with `data-state="ready"` and one `catalogue-item` with the attributes of AC-1.
+- **AC-7** (new) (Python, HTTP) Inputs are read strictly and the same way on every platform. A catalogue file whose `published_on` is not exactly `YYYY-MM-DD` (for example `"2026-10-01T00:00:00"`, `"2026-1-1"`, `"01/10/2026"`) raises `CatalogueError` naming the file. `GET /api/grids?force=X` answers 422 unless `X` is exactly one of the characters `1`, `2`, `3`, `4` (so `2.0`, `01`, ` 1`, `+1` and `1 ` give 422, and `1` gives 200). `load_catalogue` reads only files whose name ends with `.json` in lower case and does not start with `.` (so `A.JSON` and `.x.json` are ignored), in the order of their names compared code point by code point (so `B.json` comes before `a.json` on every platform).
 
 ## Edge cases and errors
 
@@ -350,6 +351,12 @@ Each one is already part of the spec above.
 9. Coordination: spec 011 (written in parallel) may also change `create_app`.
    Pick: this spec adds only the keyword argument `catalogue`; the lead merges it
    with 011's changes.
+
+10. Strict inputs (decided by the lead on 2026-10-10, under the human's instruction to
+    take technical decisions, after the review): dates in files are exactly
+    `YYYY-MM-DD`, the `force` query is exactly one digit 1 to 4, and the file listing
+    is case-sensitive, skips dot files and sorts by code point on every platform
+    (AC-7).
 
 ## Open questions
 

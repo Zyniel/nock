@@ -59,7 +59,7 @@ the specs whose criteria this one mentions.
 | --- | --- | --- | --- | --- | --- |
 | [002](002-grid-schema.md) | US-1.1 Grid schema | E1 | MVP | 5 | - |
 | [003](003-grid-import-validation.md) | US-1.2 Grid validation at import | E1 | MVP | 7 | - |
-| [004](004-grid-catalogue.md) | US-1.3 Grid catalogue | E1 | MVP | 6 | - |
+| [004](004-grid-catalogue.md) | US-1.3 Grid catalogue | E1 | MVP | 7 | - |
 | [005](005-licensed-content.md) | US-1.4 Licensed content only | E1 | MVP | 3 | - |
 | [006](006-grid-rendering.md) | US-2.1 Grid rendering | E2 | MVP | 6 | - |
 | [007](007-word-selection.md) | US-2.2 Word selection and direction | E2 | MVP | 5 | - |
@@ -95,7 +95,7 @@ the specs whose criteria this one mentions.
 | [037](037-integrity.md) | US-10.3 Integrity | E10 | MVP | 4 | - |
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 4 | 032 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
-| [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 28 | 039 |
+| [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
 
 ## Open decisions
 

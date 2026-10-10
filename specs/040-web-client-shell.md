@@ -1,7 +1,7 @@
 ---
 id: "040"
 title: Web client shell
-status: done
+status: approved
 ---
 
 # 040 - Web client shell
@@ -292,6 +292,7 @@ The word in brackets says how each criterion is tested.
 - **AC-26** (static) Given the repository, when the demo files are looked up, then none of `web/src/lib/Counter.svelte`, `web/src/assets/hero.png`, `web/src/assets/svelte.svg`, `web/src/assets/vite.svg`, `web/public/icons.svg` exists, and no file under `web/src` contains the text `Counter` or `svelte.svg`.
 - **AC-27** (HTTP) Given a `dist_dir` holding `index.html`, `.env` with the text `SECRET=1`, `.htaccess`, `assets/.hidden.js` with the text `console.log(2)` and `.well-known/security.txt`, when `GET /.env`, `GET /.htaccess`, `GET /assets/.hidden.js`, `GET /.well-known/security.txt` or `GET /%2Eenv` is requested, then each answers 404 with the JSON body `{"detail": "Not Found"}` (so neither the file's content nor `index.html`).
 - **AC-28** (HTTP) Given a `dist_dir` holding `index.html`, `assets/app.js` and `favicon.svg`, and an empty registry, when `GET /api/`, `GET /api/rooms/`, `GET /assets/`, `GET /assets/app.js/`, `GET /favicon.svg/`, `GET /r/`, `GET /r/ABC123/` or `GET /catalogue/` is requested without following redirects, then each answers 404 directly (not a 3xx status, no `location` header) with the JSON body `{"detail": "Not Found"}`; `GET /` still answers 200 with the content of `index.html`.
+- **AC-29** (new) (HTTP) The app exposes no generated API documentation. `GET /docs`, `GET /redoc`, `GET /openapi.json` and `GET /docs/oauth2-redirect` each answer 404 with the JSON body `{"detail": "Not Found"}`, with or without a built client.
 
 ### Markup scan (AC-23)
 
@@ -450,6 +451,12 @@ reimplement" for both). Each one is part of the spec above.
     with the JSON not-found body directly; the app never answers 3xx, so FastAPI's
     slash redirect is off or never reached (AC-28). This replaces the earlier
     edge case that left `GET /r/ABC123/` to FastAPI's default behaviour.
+
+    Added after the review of spec 004, decided by the lead on 2026-10-10 under the
+    human's instruction to take technical decisions:
+19. No generated API documentation. FastAPI's `/docs`, `/redoc` and `/openapi.json`
+    are turned off: they would describe the server's API to anyone, and the route
+    table already says every other path is not found (AC-29).
 
 ## Open questions
 
