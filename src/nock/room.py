@@ -21,6 +21,7 @@ from nock.protocol import (
     CheckResult,
     ClientMessage,
     Colour,
+    ConfirmPencil,
     Coordinate,
     EditLetter,
     Erase,
@@ -37,6 +38,7 @@ from nock.protocol import (
     LetterCellView,
     LetterChanged,
     Nickname,
+    PencilEdit,
     PlayerId,
     PlayerJoined,
     PlayerLeft,
@@ -62,6 +64,7 @@ from nock.protocol import (
 Clock = Callable[[], float]  # seconds since the epoch; the default is time.time
 RoomCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{6}$")]
 
+RATE_WINDOW_SECONDS: float = 1.0  # spec 037 AC-3
 MAX_PLAYERS: int = 8  # spec 012 AC-4
 # Space, hyphen, apostrophe, right single quotation mark (U+2019), underscore.
 NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
@@ -553,15 +556,73 @@ def handle_message(
 ) -> Outcome:
     """Apply a message of a joined player (spec 015 and later).
 
-    Edits (`edit_letter`, `erase`) are handled here. Until the spec that gives
-    another message its meaning is built, the message is read and ignored: the
-    state is unchanged and nothing is sent.
+    Edits (`edit_letter`, `erase`) are handled here. `pencil_edit` and
+    `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
+    them their meaning. Until the spec that gives another message its meaning
+    is built, the message is read and ignored: the state is unchanged and
+    nothing is sent.
     """
     if isinstance(message, EditLetter):
-        return _apply_edit(state, player_id, message, now)
+        return _apply_edit(state, player_id, message, now, config)
     if isinstance(message, Erase):
-        return _apply_edit(state, player_id, message, now)
+        return _apply_edit(state, player_id, message, now, config)
+    if isinstance(message, PencilEdit | ConfirmPencil):
+        return _count_unhandled_edit(state, player_id, now, config)
     return Outcome(state=state)
+
+
+def _recent_edits(
+    state: RoomState, player_id: str, now: float
+) -> tuple[float, ...] | None:
+    """Return the times of the player's edits in the last second.
+
+    Returns:
+        The times `t` with `t > now - 1.0`, or None when the player is unknown.
+    """
+    for player in state.players:
+        if player.player_id == player_id:
+            recent: list[float] = []
+            for edit_time in player.recent_edits:
+                if edit_time > now - RATE_WINDOW_SECONDS:
+                    recent.append(edit_time)
+            return tuple(recent)
+    return None
+
+
+def _rate_limit_refusal(
+    state: RoomState, player_id: str, now: float, config: RoomConfig
+) -> Outcome | None:
+    """Return the rate_limited refusal when the player has used up the window."""
+    recent = _recent_edits(state, player_id, now)
+    if recent is not None and len(recent) >= config.max_edits_per_second:
+        return _refuse(
+            state,
+            ErrorCode.RATE_LIMITED,
+            f"At most {config.max_edits_per_second} edits a second.",
+        )
+    return None
+
+
+def _with_edit_counted(state: RoomState, player_id: str, now: float) -> RoomState:
+    """Return the state with `now` added to the player's recent edits."""
+    recent = _recent_edits(state, player_id, now)
+    if recent is None:
+        return state
+    for player in state.players:
+        if player.player_id == player_id:
+            changed = player.model_copy(update={"recent_edits": (*recent, now)})
+            return _replace_player(state, changed)
+    return state
+
+
+def _count_unhandled_edit(
+    state: RoomState, player_id: str, now: float, config: RoomConfig
+) -> Outcome:
+    """Count a pencil edit or a confirmation, which spec 020 will give a meaning."""
+    refusal = _rate_limit_refusal(state, player_id, now, config)
+    if refusal is not None:
+        return refusal
+    return Outcome(state=_with_edit_counted(state, player_id, now))
 
 
 def _refuse(state: RoomState, code: ErrorCode, text: str) -> Outcome:
@@ -577,13 +638,21 @@ def _find_cell(state: RoomState, row: int, column: int) -> CellState | None:
     return None
 
 
-def _edit_refusal(state: RoomState, edit: EditLetter | Erase) -> Outcome | None:
+def _edit_refusal(
+    state: RoomState,
+    player_id: str,
+    edit: EditLetter | Erase,
+    now: float,
+    config: RoomConfig,
+) -> Outcome | None:
     """Run the edit checks in their fixed order; return the first refusal.
 
-    Checks 1 (rate limit, spec 037), 4 (stale edit, spec 017) and 5 (solved
-    grid, spec 026) belong to later specs: they keep their place in the order
-    but never refuse yet.
+    Checks 4 (stale edit, spec 017) and 5 (solved grid, spec 026) belong to
+    later specs: they keep their place in the order but never refuse yet.
     """
+    rate_refusal = _rate_limit_refusal(state, player_id, now, config)
+    if rate_refusal is not None:
+        return rate_refusal
     cell = _find_cell(state, edit.row, edit.column)
     if cell is None:
         return _refuse(
@@ -608,10 +677,14 @@ def _letter_of(edit: EditLetter | Erase) -> str | None:
 
 
 def _apply_edit(
-    state: RoomState, player_id: str, edit: EditLetter | Erase, now: float
+    state: RoomState,
+    player_id: str,
+    edit: EditLetter | Erase,
+    now: float,
+    config: RoomConfig,
 ) -> Outcome:
     """Check one edit, then write it in the cell and number its event."""
-    refusal = _edit_refusal(state, edit)
+    refusal = _edit_refusal(state, player_id, edit, now, config)
     if refusal is not None:
         return refusal
 
@@ -634,7 +707,8 @@ def _apply_edit(
             cells.append(edited_cell)
         else:
             cells.append(cell)
-    new_state = state.model_copy(update={"cells": tuple(cells), "seq": seq})
+    counted_state = _with_edit_counted(state, player_id, now)
+    new_state = counted_state.model_copy(update={"cells": tuple(cells), "seq": seq})
     event = LetterChanged(
         seq=seq,
         row=edit.row,

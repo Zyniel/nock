@@ -20,7 +20,12 @@ from nock.catalogue import (
     load_catalogue,
     summarize,
 )
-from nock.hub import SESSION_REPLACED_CLOSE_CODE, RoomConnection, RoomRegistry
+from nock.hub import (
+    MAX_FRAME_BYTES,
+    SESSION_REPLACED_CLOSE_CODE,
+    RoomConnection,
+    RoomRegistry,
+)
 from nock.protocol import parse_client_message
 
 __all__ = ["SESSION_REPLACED_CLOSE_CODE", "RoomRegistry", "create_app"]
@@ -158,6 +163,13 @@ def _file_in_directory(directory: Path, name: str) -> FileResponse:
     return FileResponse(file_path)
 
 
+def _frame_size(raw_message: str | bytes) -> int:
+    """Return the size of a frame in bytes (UTF-8 for a text frame)."""
+    if isinstance(raw_message, str):
+        return len(raw_message.encode("utf-8"))
+    return len(raw_message)
+
+
 async def _read_frames(websocket: WebSocket, connection: RoomConnection) -> None:
     """Pass each frame of the client to the room until the client disconnects.
 
@@ -171,6 +183,9 @@ async def _read_frames(websocket: WebSocket, connection: RoomConnection) -> None
         raw_message = frame.get("text")
         if raw_message is None:
             raw_message = frame.get("bytes", b"")
+        if _frame_size(raw_message) > MAX_FRAME_BYTES:
+            connection.submit_invalid()
+            continue
         try:
             message = parse_client_message(raw_message)
         except ValidationError:

@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 ROOM_CODE_ALPHABET: str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0, O, 1, I
 ROOM_CODE_LENGTH: int = 6
 
+MAX_FRAME_BYTES: int = 4096  # spec 037: larger frames are not parsed
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
 
 _REFUSAL_TEXTS: dict[ErrorCode, str] = {
@@ -222,8 +223,7 @@ class _RoomRunner:
             self._detach_step(item.connection)
             return
         if isinstance(item, _Invalid):
-            if item.connection.player_id is None:
-                self._refuse(item.connection, ErrorCode.INVALID_MESSAGE)
+            self._refuse(item.connection, ErrorCode.INVALID_MESSAGE)
             return
         if item.connection.player_id is None:
             self._unjoined_step(item.connection, item.message)
@@ -256,7 +256,7 @@ class _RoomRunner:
             self._refuse(connection, ErrorCode.NOT_JOINED)
 
     def _refuse(self, connection: RoomConnection, code: ErrorCode) -> None:
-        """Answer an unjoined connection with an error; its socket stays open."""
+        """Answer a connection with an error; its socket stays open."""
         text = _REFUSAL_TEXTS[code]
         connection.deliver_text(ErrorMessage(code=code, message=text).model_dump_json())
 
