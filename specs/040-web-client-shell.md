@@ -120,27 +120,33 @@ The server keeps this to what the shell needs. In order:
    - a valid message that is not a `Join` gets one
      `ErrorMessage(code=ErrorCode.NOT_JOINED, message=<English text>)`;
    - the socket stays open in both cases.
-4. On the first `Join`, it sends exactly one `Snapshot` (as `model_dump_json()`):
+4. On the first `Join`, the server applies the join steps of spec 012 ("Join",
+   `join_room`). A refused join gets the reply that spec 012 gives it. An accepted
+   join gets exactly one `Snapshot` (as `model_dump_json()`, built by spec 012's
+   `snapshot_for`). On a room just registered on a grid, the first accepted join
+   gives:
 
    | Field | Value |
    | --- | --- |
-   | `seq` | `0` |
-   | `you` | a new player id for this connection, matching the `PlayerId` pattern |
-   | `resume_token` | a new random token for this connection, matching the `ResumeToken` pattern |
+   | `seq` | `1` (the joiner's own `player_joined`, spec 012 join step 6) |
+   | `you` | the joiner's player id, matching the `PlayerId` pattern |
+   | `resume_token` | the joiner's token, matching the `ResumeToken` pattern: a new random token for a new player, the player's own token on a resume (spec 012 join step 2) |
    | `grid` | `grid_view(grid)` of the registered grid |
-   | `players` | `()` (the player list belongs to spec 012) |
+   | `players` | `(<the joiner's view>,)`: the players of the room, spec 012's `player_views` |
    | `settings` | `RoomSettings(help_mode=HelpMode.FREE, reveal_budget=RevealBudget(letters=5, words=1), locked=False)` |
    | `reveal_budget` | `RevealBudget(letters=5, words=1)` |
    | `flags`, `chat` | `()` |
    | `open_vote` | `None` |
    | `timer_elapsed_ms`, `timer_running`, `solved` | `0`, `False`, `False` |
 
-   The `nickname` and `resume_token` of the `Join` are validated by the parser and
-   otherwise ignored.
-5. After the snapshot the server reads and ignores every message, sending nothing,
-   until the client disconnects. It never sends an event with a `seq`.
+   What the `nickname` and `resume_token` of the `Join` do is governed by spec
+   012's join steps: the nickname is normalised and made unique, a token of a
+   player of the room resumes that player, and any other token is ignored.
+5. After the snapshot the socket is bound to the player (spec 012, "`nock.hub` and
+   `nock.server` changes"): a second `Join` is ignored with no reply, and what the
+   other messages and events do belongs to specs 011 onwards.
 
-The server keeps no player list and no room state besides the registry.
+Room state (players, `seq`) belongs to the rooms engine of specs 011 and 012.
 
 ### Client: `web/`
 
@@ -185,7 +191,7 @@ Binding for the tests:
   | Attribute | Value |
   | --- | --- |
   | `data-room-code` | the code from the URL |
-  | `data-status` | `connecting`, `joined`, `not_found` or `closed` |
+  | `data-status` | `connecting`, `nickname`, `joining`, `joined`, `full`, `replaced`, `not_found` or `closed` (spec 012's list; spec 011 adds `throttled`) |
   | `data-seq` | `""` before the first snapshot, then the current `seq` in decimal |
   | `data-pending` | number of buffered events, in decimal, `"0"` at start |
   | `data-grid` | `""` before the first snapshot, then `<width>x<height>` of the latest snapshot's grid, for example `5x5` |
@@ -198,8 +204,10 @@ Room page behaviour, which the browser tests observe through the attributes abov
 1. On mount it opens one WebSocket to
    `ws[s]://<location.host>/api/rooms/<code>/ws` (`wss` when the page is `https`).
    Status `connecting`.
-2. When the socket opens it sends
-   `{"type": "join", "nickname": t("room.default_nickname"), "resume_token": null}`.
+2. When the socket opens, the page follows spec 012's "Room page flow" (steps 2
+   to 8): it joins at once with a stored identity or for a room created on this
+   device (status `joining`), otherwise it sends nothing and shows the nickname
+   form (status `nickname`) until the form is submitted (status `joining`).
 3. Each incoming frame is read with `JSON.parse`. A frame that is not JSON, or not
    an object with a string `type`, is ignored.
 4. `type == "snapshot"`: the snapshot becomes the latest snapshot, `seq` becomes
@@ -217,7 +225,9 @@ Room page behaviour, which the browser tests observe through the attributes abov
 8. A message with no integer `seq` (`selection_moved`, `reaction`, `error`) does not
    touch `seq` or the buffer.
 9. When the socket closes with code 4404, status `not_found`; any other close or
-   error, status `closed`. No reconnection (spec 017).
+   error, status `closed`, except the codes and errors that specs 011 and 012
+   give their own status (4429 `throttled`, 4001 `replaced`, `room_full` `full`).
+   No reconnection (spec 017).
 
 Not binding (implementer's choice): the split of the client into files, its
 TypeScript types, and the styles.
@@ -271,7 +281,7 @@ The word in brackets says how each criterion is tested.
 - **AC-5** (HTTP) Given a `dist_dir` holding `index.html`, `assets/app.js` with the text `console.log(1)` and `favicon.svg`, when `GET /assets/app.js` and `GET /favicon.svg` are requested, then each answers 200 with that file's content; `GET /assets/missing.js` and `GET /missing.svg` answer 404 with a body that is not `index.html`.
 - **AC-6** (HTTP) Given a `dist_dir` that does not exist, when `create_app(dist_dir=...)` is called, then it does not raise; `GET /` and `GET /r/ABC123` answer 503 with a `text/plain` body containing `npm --prefix web run build`; `GET /api/nope` still answers 404.
 - **AC-7** (Python) Given a `RoomRegistry` and the FX-01 grid, when `register_room` is called twice, then each code matches `^[A-Z0-9]{6}$`, the two codes differ, `find_room(code)` returns the FX-01 grid for each, and `find_room` of a code that was not returned (for example `"abc123"`) returns None.
-- **AC-8** (WebSocket) Given a room registered on FX-01, when a client connects to `/api/rooms/<code>/ws` and sends `{"type": "join", "nickname": "Ana", "resume_token": null}`, then the next message parses with `parse_server_message` to a `Snapshot` with `seq == 0`, `grid == grid_view(fx01_grid)`, `players == ()`, `settings == RoomSettings(help_mode=HelpMode.FREE, reveal_budget=RevealBudget(letters=5, words=1), locked=False)`, `reveal_budget == RevealBudget(letters=5, words=1)`, `flags == ()`, `chat == ()`, `open_vote is None`, `timer_elapsed_ms == 0`, `timer_running is False`, `solved is False`.
+- **AC-8** (WebSocket) Given a room registered on FX-01, when a client connects to `/api/rooms/<code>/ws` and sends `{"type": "join", "nickname": "Ana", "resume_token": null}`, then the next message parses with `parse_server_message` to a `Snapshot` with `seq == 1`, `grid == grid_view(fx01_grid)`, `players == (<the joiner's view>,)`, that is `(PlayerView(player_id=snapshot.you, nickname="Ana", colour=0, state=PlayerState.ACTIVE, is_host=True, muted=False, selection=None),)` (spec 012), `settings == RoomSettings(help_mode=HelpMode.FREE, reveal_budget=RevealBudget(letters=5, words=1), locked=False)`, `reveal_budget == RevealBudget(letters=5, words=1)`, `flags == ()`, `chat == ()`, `open_vote is None`, `timer_elapsed_ms == 0`, `timer_running is False`, `solved is False`. The same join sent as a binary frame gets a `Snapshot` with `seq == 1`. A join with `resume_token` set to a token that matches no player of the room (for example 24 times `A`) gets a `Snapshot` whose `resume_token` differs from the one sent.
 - **AC-9** (WebSocket) Given the snapshot of AC-8, when the raw text of the frame is searched, then it contains none of `"answer"`, `TAMIS`, `NAVAL`, `MIME`, `IDES`, `SENT`, `VIDE`, `AMEN`, `LEST`.
 - **AC-10** (WebSocket) Given a room registered on FX-01, when two clients connect and each sends the join of AC-8, then the two snapshots have different `you` values and different `resume_token` values.
 - **AC-11** (WebSocket) Given an empty registry, when a client connects to `/api/rooms/ZZZZZZ/ws` or `/api/rooms/abc/ws`, then the server closes the socket with code 4404 and the client receives no message before the close (`receive_text()` raises `WebSocketDisconnect` with `code == 4404`).
@@ -279,9 +289,9 @@ The word in brackets says how each criterion is tested.
 - **AC-13** (WebSocket) Given a connection to a registered FX-01 room, when the client first sends `{"type": "undo"}`, then it receives an `ErrorMessage` with `code == ErrorCode.NOT_JOINED`; when it then sends the join of AC-8, it receives a `Snapshot`.
 - **AC-14** (browser) Given the live server, when the page opens `/`, then the element `data-testid="catalogue-page"` is visible and contains the text of `fr.json["catalogue.heading"]`, and no `data-testid="room-page"` element exists.
 - **AC-15** (browser) Given the live server, when the page opens `/` and, separately, `/r/ABC123`, then in both cases `document.title` equals `fr.json["app.title"]` and the `<html>` element has `lang="fr"`.
-- **AC-16** (browser) Given the live server and a room registered on FX-01 with code `<code>`, when the page opens `/r/<code>`, then `data-testid="room-page"` reaches `data-room-code="<code>"`, `data-status="joined"`, `data-seq="0"` and `data-grid="5x5"`, and `data-testid="room-status"` shows `fr.json["room.status.joined"]`.
+- **AC-16** (browser) Given the live server and a room registered on FX-01 with code `<code>`, when the page enters the room through the `enter_room` fixture of spec 011 (it opens `/r/<code>` and, when the page shows the nickname form of spec 012, submits it with `Ana`), then `data-testid="room-page"` reaches `data-room-code="<code>"`, `data-status="joined"`, `data-seq="1"` and `data-grid="5x5"`, and `data-testid="room-status"` shows `fr.json["room.status.joined"]`.
 - **AC-17** (browser) Given the live server and an empty registry, when the page opens `/r/ZZZZZZ`, then the room page reaches `data-status="not_found"` with `data-seq=""`, and `data-testid="room-status"` shows `fr.json["room.status.not_found"]`.
-- **AC-18** (browser, mocked socket) Given the page on `/r/ABC123`, when the socket opens, then the first message the page sends parses with `parse_client_message` to `Join(nickname=fr.json["room.default_nickname"], resume_token=None)`, and until a snapshot is sent the room page has `data-status="connecting"`, `data-seq=""` and `data-grid=""`.
+- **AC-18** (browser, mocked socket) Given the page on `/r/ABC123` with nothing in `localStorage`, when the socket opens, then the room page shows `data-status="nickname"` and sends nothing (no frame within 300 ms); after the nickname form of spec 012 is submitted with `Ana`, the first message the page sends parses with `parse_client_message` to `Join(nickname="Ana", resume_token=None)`, the page has opened one socket only, and until a snapshot is sent the room page has `data-status="joining"`, `data-seq=""`, `data-grid=""`, `data-pending="0"`, with `data-testid="room-status"` showing `fr.json["room.status.joining"]`.
 - **AC-19** (browser, mocked socket) Given the page on `/r/ABC123` that received a FX-01 snapshot with `seq` 5, when the mock sends `letter_changed` events with `seq` 4, then 5, then 7, then the room page shows `data-seq="5"` and `data-pending="1"`; when it then sends `seq` 6, the page shows `data-seq="7"` and `data-pending="0"`.
 - **AC-20** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 5, when the mock sends the `selection_moved`, `reaction` and `error` wire examples of spec 039, then a `letter_changed` with `seq` 6, then the page shows `data-seq="6"`, `data-pending="0"` and `data-status="joined"`.
 - **AC-21** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 0, when the mock closes the socket with code 1011, then the room page reaches `data-status="closed"` and `data-testid="room-status"` shows `fr.json["room.status.closed"]`.
@@ -332,8 +342,11 @@ Applied to the text of one `.svelte` file, in this order:
   request, so the app is served once the file exists, without restart.
 - Unbuilt client, assets (AC-6): `GET /assets/app.js` answers 404.
 - Binary frames (AC-12, AC-13): handled like text frames.
-- A second `join` after the snapshot, or any later message (AC-8): no reply.
-- `resume_token` in the join (AC-8): ignored; the snapshot carries a new token.
+- A second `join` after the snapshot (AC-8): no reply (spec 012). What other later
+  messages get belongs to specs 011 onwards.
+- `resume_token` in the join (AC-8): an unknown token (one that matches no player
+  of the room) is ignored and the snapshot carries a new token; a known token
+  resumes that player (spec 012 join step 2, its AC-5).
 - Player ids (AC-10): any value matching the `PlayerId` pattern; the shell keeps
   no list of them.
 - Registry codes (AC-7): `register_room` draws codes with `secrets` and retries
@@ -402,11 +415,13 @@ the lead adds it before the build). Each one is already part of the spec above.
    Pick: close with 4404, no message.
 6. Snapshot contents. Pick: `seq` 0, `players` empty, help mode `free`, reveal
    budget 5 letters and 1 word (spec 024 AC-2 default), a new `you` and
-   `resume_token` per connection, nothing remembered between joins. Spec 012 adds
-   the player list.
+   `resume_token` per new player. Spec 012 adds the player list and the resume
+   of a known token (amended by item 20; this item first said `seq` 0, no
+   players, and nothing remembered between joins).
 7. Nickname sent by the shell. Join requires one (2 to 20 characters) and the
    nickname form is spec 012's. Pick: the shell sends `fr.json["room.default_nickname"]`
-   (`Invité`) until 012 replaces it with the form.
+   (`Invité`) until 012 replaces it with the form. (Replaced by spec 012's room
+   page flow, item 20.)
 8. Messages after the snapshot. Pick: read and ignored, no reply, until specs 015
    onwards give them meaning.
 9. How "applies later events in sequence order" is tested. The server of this spec
@@ -457,6 +472,21 @@ human's instruction to take technical decisions:
 19. No generated API documentation. FastAPI's `/docs`, `/redoc` and `/openapi.json`
     are turned off: they would describe the server's API to anyone, and the route
     table already says every other path is not found (AC-29).
+
+Added with spec 012 (guest join), decided by the lead on 2026-10-11 under the
+human's instruction to take technical decisions, as spec 012 decision 2 planned:
+20. Amendment for spec 012. Spec 012 replaces this spec's fixed snapshot with its
+    join steps and the shell's immediate `Invité` join with its room page flow.
+    The text is aligned with the updated tests, with no criterion renumbered:
+    AC-8 expects `seq == 1` and `players == (<the joiner's view>,)`, and an
+    unknown `resume_token` is ignored; AC-16 enters the room through
+    `enter_room` (the nickname form) and expects `data-seq="1"`; AC-18 expects
+    `data-status="nickname"` and no frame before the form, then
+    `Join(nickname="Ana", resume_token=None)` and `joining` (not `connecting`)
+    until the snapshot. The WebSocket steps 4 and 5, the `data-status` list, page
+    flow steps 2 and 9, the `resume_token` edge case and items 6 and 7 now point
+    to spec 012 (and to spec 011 for `throttled`) instead of stating rules of
+    their own. The status stays `done`.
 
 ## Open questions
 

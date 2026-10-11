@@ -32,8 +32,9 @@ def normalize_nickname(text: str) -> str:
 
     Rules, checked on the result:
     - 2 to 20 characters (code points);
-    - each character is a Unicode letter (category L*), a combining mark
-      (category Mn), an ASCII digit 0-9, or one of NICKNAME_PUNCTUATION;
+    - each character is a Unicode letter (category L*), a mark that attaches
+      to a letter (category Mn or Mc), an ASCII digit 0-9, or one of
+      NICKNAME_PUNCTUATION; an enclosing mark (category Me) is refused;
     - at least one character is a letter or a digit.
 
     Raises:
@@ -200,8 +201,8 @@ Room page flow (replaces spec 040 step 2):
    stored, and a submit button `data-testid="nickname-submit"` with text
    `t("join.submit")`.
 4. On submit, the page applies the rule of `normalize_nickname` in TypeScript
-   (`String.prototype.normalize("NFC")`, `trim()`, `\p{L}` and `\p{Mn}` with the
-   `u` flag). If it fails, it shows `data-testid="nickname-error"` with
+   (`String.prototype.normalize("NFC")`, `trim()`, `\p{L}`, `\p{Mn}` and `\p{Mc}`
+   with the `u` flag; `\p{Me}` is not allowed). If it fails, it shows `data-testid="nickname-error"` with
    `t("join.error.length")` (length rule) or `t("join.error.characters")` (other
    rules) and sends nothing. Otherwise it sends
    `{"type": "join", "nickname": <normalised>, "resume_token": null}`, sets
@@ -267,7 +268,7 @@ nickname. Every browser criterion runs in Chromium, Firefox and WebKit
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-3.2.1) (Python; WebSocket; browser with live server) Given a valid link, when I enter a nickname of 2 to 20 characters, then I am in the room. Python: `normalize_nickname` returns `"Ana"` for `"  Ana  "`, `"Élodie"` for `"Élodie"`, and keeps `"Jean-Luc"`, `"O'Neil"`, `"O’Neil"`, `"bob_42"`, `"Anne Marie"`, `"Zoë"`, `"12"` and 20 times `x`; it raises `ValueError` for `"A"`, `""`, `"   "`, 21 times `x`, `"<b>Eve</b>"`, `"Ana!"`, `"a@b"`, `"Ana\tB"` and `"--"`. WebSocket: on a fresh FX-01 room, the join `{"type": "join", "nickname": " Ana ", "resume_token": null}` is answered by a `Snapshot` with `seq == 1` whose `players` is one `PlayerView` with `player_id == snapshot.you`, `nickname == "Ana"`, `colour == 0`, `state == "active"`, `is_host is True`, `muted is False`, `selection is None`; `registry.room_state(code).players` holds the same player. The join `{"type": "join", "nickname": "<b>Eve</b>", "resume_token": null}` is answered by `ErrorMessage(code="invalid_nickname")`, adds no player, and a following valid join on the same socket gets a `Snapshot`. Browser: opening `/r/<code>` shows `nickname-form`; entering `Ana` and submitting reaches `data-status="joined"`, and `roster` holds one `roster-player` with `data-you="true"` whose `roster-nickname` reads `Ana`; entering `A` instead shows `nickname-error` with `fr.json["join.error.length"]` and the page stays on `data-status="nickname"`.
+- **AC-1** (AC-3.2.1) (Python; WebSocket; browser with live server) Given a valid link, when I enter a nickname of 2 to 20 characters, then I am in the room. Python: `normalize_nickname` returns `"Ana"` for `"  Ana  "`, `"Élodie"` for `"Élodie"`, and keeps `"Jean-Luc"`, `"O'Neil"`, `"O’Neil"`, `"bob_42"`, `"Anne Marie"`, `"Zoë"`, `"12"`, `"राम"` (`"राम"`, whose `ा` is category Mc) and 20 times `x`; it raises `ValueError` for `"A"`, `""`, `"   "`, 21 times `x`, `"<b>Eve</b>"`, `"Ana!"`, `"a@b"`, `"Ana\tB"`, `"--"` and `"Ana⃝"` (`"Ana⃝"`, whose `⃝` is category Me). WebSocket: on a fresh FX-01 room, the join `{"type": "join", "nickname": " Ana ", "resume_token": null}` is answered by a `Snapshot` with `seq == 1` whose `players` is one `PlayerView` with `player_id == snapshot.you`, `nickname == "Ana"`, `colour == 0`, `state == "active"`, `is_host is True`, `muted is False`, `selection is None`; `registry.room_state(code).players` holds the same player. The join `{"type": "join", "nickname": "<b>Eve</b>", "resume_token": null}` is answered by `ErrorMessage(code="invalid_nickname")`, adds no player, and a following valid join on the same socket gets a `Snapshot`. Browser: opening `/r/<code>` shows `nickname-form`; entering `Ana` and submitting reaches `data-status="joined"`, and `roster` holds one `roster-player` with `data-you="true"` whose `roster-nickname` reads `Ana`; entering `A` instead shows `nickname-error` with `fr.json["join.error.length"]` and the page stays on `data-status="nickname"`.
 - **AC-2** (AC-3.2.2) (Python; WebSocket) Each player gets a colour no other player in the room has. A duplicate nickname gets a numeric suffix. Python: 8 successive `join_room` calls on a fresh room with nicknames `Ana`, `ana`, `Ana`, `Bob`, `Cy`, `Di`, `Ed`, `Flo` give colours `0` to `7` and nicknames `Ana`, `ana 2`, `Ana 3`, `Bob`, `Cy`, `Di`, `Ed`, `Flo`; the first is host and no other is. WebSocket: three clients join a FX-01 room as `Ana`, `Ana`, `Bob`; the third client's snapshot lists `Ana` (colour 0), `Ana 2` (colour 1), `Bob` (colour 2); the first client receives `player_joined` events with seq 2 and 3 holding the views of `Ana 2` and `Bob`.
 - **AC-3** (AC-3.2.3) (WebSocket) I see the current letters, timer and hint budget within 1 second of joining. Given a FX-01 room added with `add_room` whose cell (1, 0) holds `T` (author `p9`) and (1, 1) holds `A` (author `p9`), and whose `reveal_budget` is `RevealBudget(letters=3, words=1)`, when a client sends a join, then a `Snapshot` arrives less than 1.0 second (measured with `time.monotonic()`) after the join was sent, its `grid == grid_state(registry.room_state(code))`, its cell (1, 0) has `letter == "T"` and `author == "p9"`, its `reveal_budget == RevealBudget(letters=3, words=1)`, and its `timer_elapsed_ms == 0` with `timer_running is False`.
 - **AC-4** (AC-3.2.4) (Python; WebSocket; browser with live server) Joining a room that already has 8 players shows "room full" and does not add me. Python: `join_room` on a room with 8 players returns `reply == (ErrorMessage(code="room_full", ...),)` (code compared), `close_sender is True`, no entry, and the same state. WebSocket: 8 clients join a FX-01 room; a ninth join is answered by `ErrorMessage(code="room_full")` and then a close with code 1000; the first client receives no event for it; `room_state` still holds 8 players. Browser: for a room added with 8 players (all `disconnected`), opening `/r/<code>` and submitting `Zoé` reaches `data-status="full"` and `room-status` shows `fr.json["room.status.full"]`.
@@ -277,9 +278,11 @@ The words in brackets say how each criterion is tested.
 
 ## Edge cases and errors
 
-- Nickname characters (AC-1): letters from any script (`Zoë`, `Łukasz`, `Ἀλέξης`),
-  ASCII digits, space, `-`, `'`, `’`, `_`. Rejected: `<`, `>`, `&`, `"`, `@`, `!`,
-  `.`, emoji, tabs, newlines, non-ASCII digits (`٣`). A nickname of digits only
+- Nickname characters (AC-1): letters from any script (`Zoë`, `Łukasz`, `Ἀλέξης`,
+  `राम`) with the marks that attach to them (categories Mn and Mc, such as the
+  Devanagari vowel sign U+093E in `राम`), ASCII digits, space, `-`, `'`, `’`, `_`.
+  Rejected: `<`, `>`, `&`, `"`, `@`, `!`, `.`, emoji, enclosing marks (category
+  Me, such as U+20DD in `Ana⃝`), tabs, newlines, non-ASCII digits (`٣`). A nickname of digits only
   (`"12"`) is accepted; one made only of punctuation (`"--"`, `"_ _"`) is not.
 - Length (AC-1): counted after NFC and trimming, in code points: `"É"` is
   `É`, one character, so `"É"` alone is too short. Leading and trailing
@@ -396,6 +399,19 @@ spec 010). Each one is already part of the spec above.
     spec has to show who joined, and spec 037 AC-4 needs a nickname on screen
     before 013 is built. Pick: a plain list here (nickname, colour, `data-state`);
     spec 013 adds the visible state and the rest of presence.
+
+Added after the review, decided by the lead on 2026-10-11 under the human's
+instruction to take technical decisions. It is part of the spec above.
+
+11. Combining marks. Reviewer finding: allowing only category Mn refused many
+    Indic-script names, for example `राम` (U+0930 U+093E U+092E, where U+093E is
+    a spacing mark, category Mc), which contradicts "letters from any script"
+    and item 3. Decision: allow categories Mn and Mc, the marks that attach to
+    letters and that Indic and other scripts need; still refuse Me (enclosing
+    marks such as U+20DD, which are decorative). The Python rule
+    (`normalize_nickname`) and the client rule (Room page flow step 4) change
+    together; AC-1 gains `राम` as accepted and `Ana⃝` as refused. No criterion
+    is renumbered.
 
 ## Open questions
 
