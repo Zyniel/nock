@@ -1,7 +1,7 @@
 ---
 id: "014"
 title: Host controls
-status: approved
+status: done
 ---
 
 # 014 - Host controls
