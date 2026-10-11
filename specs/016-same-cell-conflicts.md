@@ -1,7 +1,7 @@
 ---
 id: "016"
 title: Same-cell conflicts
-status: approved
+status: done
 ---
 
 # 016 - Same-cell conflicts
