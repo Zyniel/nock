@@ -47,6 +47,13 @@
     }, COPIED_DISPLAY_MS)
   }
 
+  // Leaving the page must not leave the timer to fire on a destroyed page.
+  $effect(() => {
+    return () => {
+      clearTimeout(copiedTimer)
+    }
+  })
+
   let words = $derived(session.snapshot === null ? [] : computeWords(session.snapshot.grid))
   // A new snapshot may remove the word of the selection: then nothing is selected.
   let selection = $derived(validSelection(words, rawSelection))
@@ -240,7 +247,8 @@
   <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
   {#if session.snapshot !== null}
     <div class="share-panel" data-testid="share-panel">
-      <a data-testid="share-link" href={shareLink} aria-label={t('room.share.label')}
+      <span id="share-label" class="share-label">{t('room.share.label')}</span>
+      <a data-testid="share-link" href={shareLink} aria-describedby="share-label"
         >{shareLink}</a
       >
       <button type="button" data-testid="copy-link" onclick={copyLink}

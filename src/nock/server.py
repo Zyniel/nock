@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 import secrets
+import threading
 from pathlib import Path
 from typing import Annotated
 
@@ -61,29 +63,42 @@ class CreateRoomResponse(BaseModel):
 
 
 class _WrongCodeThrottle:
-    """Remembers the wrong room codes of each client address, in memory."""
+    """Remembers the wrong room codes of each client address, in memory.
+
+    The sockets run on several threads, so every access takes the lock.
+    """
 
     def __init__(self) -> None:
         """Create a throttle with no failure."""
+        self._lock = threading.Lock()
         self._failure_times: dict[str, list[float]] = {}
 
     def is_blocked(self, address: str, now: float) -> bool:
         """Tell whether `address` has too many recent wrong codes."""
-        recent = self._recent_failures(address, now)
-        return len(recent) >= WRONG_CODE_LIMIT
+        with self._lock:
+            recent = self._forget_old_failures(address, now)
+            return len(recent) >= WRONG_CODE_LIMIT
 
     def record_failure(self, address: str, now: float) -> None:
         """Remember one wrong code from `address` at time `now`."""
-        recent = self._recent_failures(address, now)
-        recent.append(now)
-        self._failure_times[address] = recent
+        with self._lock:
+            recent = self._forget_old_failures(address, now)
+            recent.append(now)
+            self._failure_times[address] = recent
 
-    def _recent_failures(self, address: str, now: float) -> list[float]:
-        """Return the failure times of `address` inside the window."""
+    def _forget_old_failures(self, address: str, now: float) -> list[float]:
+        """Drop the failures of `address` outside the window; return the rest.
+
+        An address with no failure left has no entry. The caller holds the lock.
+        """
         recent: list[float] = []
         for failure_time in self._failure_times.get(address, []):
             if failure_time > now - WRONG_CODE_WINDOW_SECONDS:
                 recent.append(failure_time)
+        if recent:
+            self._failure_times[address] = recent
+        else:
+            self._failure_times.pop(address, None)
         return recent
 
 
@@ -227,25 +242,39 @@ async def _forward_until_disconnect(
 
 
 async def _serve_joined(
-    websocket: WebSocket, room_registry: RoomRegistry, code: str, state: RoomState
+    websocket: WebSocket, room_registry: RoomRegistry, code: str
 ) -> None:
-    """Send the snapshot, then link the socket to the room until it closes."""
+    """Link the socket to the room, send the snapshot, then serve until it closes.
+
+    The state is read and the connection attached with no wait in between, and
+    the writer starts after the snapshot, so nothing reaches the socket before
+    it. Until spec 012 nothing changes a room after its creation. Spec 012 will
+    build the snapshot inside the room task, in the same step as the attach.
+    """
+    state = room_registry.room_state(code)
+    if state is None:
+        return
     snapshot = _snapshot_for(state)
-    await websocket.send_text(snapshot.model_dump_json())
     connection = room_registry.connect(code, snapshot.you)
     if connection is None:
         return
-    writer = asyncio.create_task(
-        connection.run_writer(
-            websocket.send_text, lambda close_code: websocket.close(close_code)
-        )
-    )
+    writer: asyncio.Task[None] | None = None
     try:
+        await websocket.send_text(snapshot.model_dump_json())
+        writer = asyncio.create_task(
+            connection.run_writer(
+                websocket.send_text, lambda close_code: websocket.close(close_code)
+            )
+        )
         await _forward_until_disconnect(websocket, connection)
     finally:
         connection.leave()
-        writer.cancel()
-        await asyncio.gather(writer, return_exceptions=True)
+        if writer is not None:
+            writer.cancel()
+            # The writer may have failed on a closed socket, and the server may
+            # cancel this handler while it shuts down: neither is an error here.
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await writer
 
 
 def create_app(
@@ -338,15 +367,14 @@ def create_app(
         if wrong_codes.is_blocked(address, now):
             await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        state = room_registry.room_state(code)
-        if room_registry.find_room(code) is None or state is None:
+        if room_registry.room_state(code) is None:
             wrong_codes.record_failure(address, now)
             await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
             return
         has_joined = await _wait_for_join(websocket)
         if not has_joined:
             return
-        await _serve_joined(websocket, room_registry, code, state)
+        await _serve_joined(websocket, room_registry, code)
 
     return web_app
 

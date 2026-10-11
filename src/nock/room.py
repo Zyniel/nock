@@ -55,8 +55,6 @@ from nock.protocol import (
 )
 
 Clock = Callable[[], float]  # seconds since the epoch; the default is time.time
-PositiveSeconds = Annotated[float, Field(gt=0)]
-PositiveCount = Annotated[int, Field(ge=1)]
 RoomCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{6}$")]
 
 MAX_PLAYERS: int = 8  # spec 012 AC-4
@@ -100,9 +98,9 @@ class RoomConfig(RoomModel):
     host_handover_seconds: float = Field(default=60.0, gt=0)  # spec 014 AC-3
     silence_timeout_seconds: float = Field(default=6.0, gt=0)  # spec 017 AC-4
     resume_window_seconds: float = Field(default=300.0, gt=0)  # spec 017 AC-3
-    max_edits_per_second: PositiveCount = 20  # spec 037 AC-3
-    snapshot_every: PositiveCount = 100  # spec 018
-    tick_seconds: PositiveSeconds = 1.0  # how often the hub runs tick()
+    max_edits_per_second: int = Field(default=20, ge=1)  # spec 037 AC-3
+    snapshot_every: int = Field(default=100, ge=1)  # spec 018
+    tick_seconds: float = Field(default=1.0, gt=0)  # how often the hub runs tick()
 
 
 DEFAULT_CONFIG: RoomConfig = RoomConfig()

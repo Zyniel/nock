@@ -8,6 +8,7 @@ one task per room that applies the room's inputs one at a time.
 from __future__ import annotations
 
 import asyncio
+import logging
 import secrets
 import threading
 import time
@@ -28,6 +29,8 @@ from nock.room import (
     tick,
 )
 
+logger = logging.getLogger(__name__)
+
 ROOM_CODE_ALPHABET: str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0, O, 1, I
 ROOM_CODE_LENGTH: int = 6
 
@@ -44,14 +47,14 @@ class _Attach(NamedTuple):
 class _Message(NamedTuple):
     """Input: a client message from a joined player."""
 
-    player_id: str
+    connection: RoomConnection
     message: ClientMessage
 
 
 class _Detach(NamedTuple):
-    """Input: the connection of a player closed."""
+    """Input: a connection closed."""
 
-    player_id: str
+    connection: RoomConnection
 
 
 _Input = _Attach | _Message | _Detach
@@ -86,11 +89,11 @@ class RoomConnection:
 
     def submit(self, message: ClientMessage) -> None:
         """Pass a message of this player to the room (any thread)."""
-        self._post(_Message(self.player_id, message))
+        self._post(_Message(self, message))
 
     def leave(self) -> None:
         """Tell the room that the socket closed (any thread)."""
-        self._post(_Detach(self.player_id))
+        self._post(_Detach(self))
 
     def deliver_text(self, text: str) -> None:
         """Queue a message for the socket. Called by the room task."""
@@ -138,18 +141,25 @@ class _RoomRunner:
         self.log: list[LogEntry] = []
         self._config = config
         self._clock = clock
-        self._connections: dict[str, RoomConnection] = {}
+        self._connections: list[RoomConnection] = []
         self._inbox: asyncio.Queue[_Input] = asyncio.Queue()
         self._task: asyncio.Task[None] | None = None
+        self._is_closed = False
 
     def post(self, item: _Input) -> None:
-        """Add an input to the inbox, starting the task if it is not running."""
+        """Add an input to the inbox, starting the task if it is not running.
+
+        Once the runner is cancelled, inputs are refused and no task starts.
+        """
+        if self._is_closed:
+            return
         self._inbox.put_nowait(item)
         if self._task is None or self._task.done():
             self._task = asyncio.get_running_loop().create_task(self._run())
 
     async def cancel(self) -> None:
-        """Stop the task and wait until it is over."""
+        """Refuse further inputs, stop the task and wait until it is over."""
+        self._is_closed = True
         task = self._task
         if task is None:
             return
@@ -178,43 +188,67 @@ class _RoomRunner:
 
     def _tick_step(self) -> None:
         """Run one tick of the rules."""
-        joined = list(self._connections.values())
-        outcome = tick(self.state, self._clock(), self._config)
+        joined = list(self._connections)
+        try:
+            outcome = tick(self.state, self._clock(), self._config)
+        except Exception:
+            logger.exception("The tick of room %s failed", self.state.code)
+            return
         self._store_and_deliver(outcome, None, joined)
 
     def _input_step(self, item: _Input) -> None:
         """Run the step that one input asks for."""
         if isinstance(item, _Attach):
-            self._connections[item.connection.player_id] = item.connection
+            self._connections.append(item.connection)
             return
         if isinstance(item, _Detach):
-            self._connections.pop(item.player_id, None)
-            outcome = disconnect_player(self.state, item.player_id, self._clock())
-            self._store_and_deliver(outcome, None, list(self._connections.values()))
+            self._detach_step(item.connection)
             return
-        joined = list(self._connections.values())
-        outcome = handle_message(
-            self.state, item.player_id, item.message, self._clock(), self._config
-        )
-        self._store_and_deliver(outcome, item.player_id, joined)
+        joined = list(self._connections)
+        try:
+            outcome = handle_message(
+                self.state,
+                item.connection.player_id,
+                item.message,
+                self._clock(),
+                self._config,
+            )
+        except Exception:
+            logger.exception("A message in room %s failed", self.state.code)
+            return
+        self._store_and_deliver(outcome, item.connection, joined)
+
+    def _detach_step(self, leaving: RoomConnection) -> None:
+        """Remove one connection; the player leaves with their last connection."""
+        if leaving not in self._connections:
+            return
+        self._connections.remove(leaving)
+        for other in self._connections:
+            if other.player_id == leaving.player_id:
+                return
+        try:
+            outcome = disconnect_player(self.state, leaving.player_id, self._clock())
+        except Exception:
+            logger.exception("A disconnection in room %s failed", self.state.code)
+            return
+        self._store_and_deliver(outcome, None, list(self._connections))
 
     def _store_and_deliver(
         self,
         outcome: Outcome,
-        sender_id: str | None,
+        sender: RoomConnection | None,
         joined: list[RoomConnection],
     ) -> None:
         """Store the new state in one assignment, then deliver the outcome.
 
         Args:
             outcome: What the step produced.
-            sender_id: The player whose message made the step; None for a tick
+            sender: The connection whose message made the step; None for a tick
                 or a closed connection.
             joined: The connections that were joined before the step.
         """
         self.state = outcome.state
         self.log.extend(outcome.entries)
-        sender = self._connections.get(sender_id) if sender_id is not None else None
 
         for entry in outcome.entries:
             event_text = entry.event.model_dump_json()
@@ -228,16 +262,16 @@ class _RoomRunner:
         for moved in outcome.to_others:
             moved_text = moved.model_dump_json()
             for connection in joined:
-                if connection.player_id != sender_id:
+                if connection is not sender:
                     connection.deliver_text(moved_text)
 
         for disconnect in outcome.disconnects:
-            target = self._connections.get(disconnect.player_id)
-            if target is None:
-                continue
-            if disconnect.error is not None:
-                target.deliver_text(disconnect.error.model_dump_json())
-            target.deliver_close(disconnect.close_code)
+            for target in self._connections:
+                if target.player_id != disconnect.player_id:
+                    continue
+                if disconnect.error is not None:
+                    target.deliver_text(disconnect.error.model_dump_json())
+                target.deliver_close(disconnect.close_code)
 
         if outcome.close_sender and sender is not None:
             sender.deliver_close(_NORMAL_CLOSE_CODE)
@@ -266,6 +300,7 @@ class RoomRegistry:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
         self._closed = False
+        self._stop_task: asyncio.Task[None] | None = None
 
     @property
     def config(self) -> RoomConfig:
@@ -370,6 +405,10 @@ class RoomRegistry:
             thread = self._thread
         if loop is None or thread is None:
             return
+        if threading.current_thread() is thread:
+            # Waiting for ourselves would block: the engine stops afterwards.
+            self._stop_task = loop.create_task(self._cancel_runners_and_stop())
+            return
         stopping = asyncio.run_coroutine_threadsafe(self._cancel_runners(), loop)
         stopping.result(timeout=_STOP_TIMEOUT_SECONDS)
         loop.call_soon_threadsafe(loop.stop)
@@ -398,6 +437,11 @@ class RoomRegistry:
         """Stop the task of every room."""
         for runner in list(self._runners.values()):
             await runner.cancel()
+
+    async def _cancel_runners_and_stop(self) -> None:
+        """Stop the task of every room, then the event loop."""
+        await self._cancel_runners()
+        asyncio.get_running_loop().stop()
 
 
 def _run_loop(loop: asyncio.AbstractEventLoop) -> None:
