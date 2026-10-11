@@ -1127,6 +1127,13 @@ def wait_until(condition: Callable[[], bool], what: str) -> None:
     pytest.fail(f"timed out after {ENGINE_WAIT_SECONDS}s waiting for: {what}")
 
 
+def last_seq_of(registry: RoomRegistry, code: str) -> int:
+    """Return the seq of the last event of room `code`."""
+    state = registry.room_state(code)
+    assert state is not None
+    return state.seq
+
+
 def letter_changed(seq: int, player_id: str) -> LetterChanged:
     return LetterChanged(
         seq=seq, row=0, column=0, letter="T", pencil=False, player_id=player_id
@@ -1182,17 +1189,25 @@ class RuleRecorder:
         now: float,
         config: RoomConfig | None = None,
     ) -> Outcome:
-        """Select: two events, a reply and a selection. Undo: one event."""
+        """Select: two events, a reply and a selection. Undo: one event.
+
+        Entries follow the room's last seq, as the real rules number them.
+        """
         self._record("handle_message", f"message:{player_id}")
         if message.type == "select_cell":
+            first = state.seq + 1
             return Outcome(
-                state=state,
-                entries=(log_entry(1, player_id), log_entry(2, player_id)),
+                state=state.model_copy(update={"seq": first + 1}),
+                entries=(log_entry(first, player_id), log_entry(first + 1, player_id)),
                 reply=(Pong(),),
                 to_others=(SelectionMoved(player_id=player_id, selection=None),),
             )
         if message.type == "undo":
-            return Outcome(state=state, entries=(log_entry(3, player_id),))
+            seq = state.seq + 1
+            return Outcome(
+                state=state.model_copy(update={"seq": seq}),
+                entries=(log_entry(seq, player_id),),
+            )
         return Outcome(state=state)
 
 
@@ -1320,7 +1335,7 @@ def test_ac4_events_reach_everyone_then_the_reply_then_to_others(
     recorder: RuleRecorder, fx01_grid: Grid, dist_dir: Path
 ) -> None:
     with (
-        running_room(fx01_grid, dist_dir) as (client, _registry, code),
+        running_room(fx01_grid, dist_dir) as (client, registry, code),
         contextlib.ExitStack() as stack,
     ):
         sender, sender_id = join_and_sync(stack, client, code, recorder)
@@ -1328,16 +1343,17 @@ def test_ac4_events_reach_everyone_then_the_reply_then_to_others(
         second_other, _ = join_and_sync(stack, client, code, recorder)
         skip_player_joined(sender, 2)
         skip_player_joined(first_other, 1)
+        last_seq = last_seq_of(registry, code)
 
         sender.send_text(SELECT_TEXT)
 
-        assert receive_message(sender) == letter_changed(1, sender_id)
-        assert receive_message(sender) == letter_changed(2, sender_id)
+        assert receive_message(sender) == letter_changed(last_seq + 1, sender_id)
+        assert receive_message(sender) == letter_changed(last_seq + 2, sender_id)
         assert receive_message(sender) == Pong()
         moved = SelectionMoved(player_id=sender_id, selection=None)
         for other in [first_other, second_other]:
-            assert receive_message(other) == letter_changed(1, sender_id)
-            assert receive_message(other) == letter_changed(2, sender_id)
+            assert receive_message(other) == letter_changed(last_seq + 1, sender_id)
+            assert receive_message(other) == letter_changed(last_seq + 2, sender_id)
             assert receive_message(other) == moved
 
 
@@ -1346,12 +1362,13 @@ def test_ac4_the_sender_does_not_receive_to_others_nor_the_others_a_reply(
 ) -> None:
     """After a select, the next thing every socket gets is the next event."""
     with (
-        running_room(fx01_grid, dist_dir) as (client, _registry, code),
+        running_room(fx01_grid, dist_dir) as (client, registry, code),
         contextlib.ExitStack() as stack,
     ):
         sender, sender_id = join_and_sync(stack, client, code, recorder)
         other, _ = join_and_sync(stack, client, code, recorder)
         skip_player_joined(sender, 1)
+        last_seq = last_seq_of(registry, code)
         sender.send_text(SELECT_TEXT)
         for _ in range(3):
             receive_message(sender)
@@ -1359,8 +1376,8 @@ def test_ac4_the_sender_does_not_receive_to_others_nor_the_others_a_reply(
 
         sender.send_text(UNDO_TEXT)
 
-        assert receive_message(sender) == letter_changed(3, sender_id)
-        assert receive_message(other) == letter_changed(3, sender_id)
+        assert receive_message(sender) == letter_changed(last_seq + 3, sender_id)
+        assert receive_message(other) == letter_changed(last_seq + 3, sender_id)
 
 
 def test_ac4_the_task_stops_and_a_new_one_ticks_before_any_input(
@@ -1425,10 +1442,11 @@ def test_ac4_a_raising_rule_is_logged_and_the_room_goes_on(
             "the room to keep ticking after the error",
         )
 
+        last_seq = last_seq_of(registry, code)
         stay.send_text(SELECT_TEXT)
 
-        assert receive_message(stay) == letter_changed(1, stay_id)
-        assert receive_message(stay) == letter_changed(2, stay_id)
+        assert receive_message(stay) == letter_changed(last_seq + 1, stay_id)
+        assert receive_message(stay) == letter_changed(last_seq + 2, stay_id)
         assert receive_message(stay) == Pong()
 
     assert RULE_ERROR_TEXT in caplog.text
@@ -1460,7 +1478,7 @@ def test_ac4_two_connections_of_one_player_both_receive(
     recorder: RuleRecorder, one_player_id: str, fx01_grid: Grid, dist_dir: Path
 ) -> None:
     with (
-        running_room(fx01_grid, dist_dir) as (client, _registry, code),
+        running_room(fx01_grid, dist_dir) as (client, registry, code),
         contextlib.ExitStack() as stack,
     ):
         first, first_id = join_and_sync(stack, client, code, recorder)
@@ -1468,10 +1486,12 @@ def test_ac4_two_connections_of_one_player_both_receive(
         assert first_id == second_id == one_player_id
         skip_player_joined(first, 1)
 
+        last_seq = last_seq_of(registry, code)
         first.send_text(UNDO_TEXT)
 
-        assert receive_message(first) == letter_changed(3, one_player_id)
-        assert receive_message(second) == letter_changed(3, one_player_id)
+        undone = letter_changed(last_seq + 1, one_player_id)
+        assert receive_message(first) == undone
+        assert receive_message(second) == undone
 
 
 @pytest.mark.parametrize("leaver", ["first", "second"])
@@ -1483,7 +1503,7 @@ def test_ac4_detaching_one_connection_keeps_the_other_one(
     leaver: str,
 ) -> None:
     with (
-        running_room(fx01_grid, dist_dir) as (client, _registry, code),
+        running_room(fx01_grid, dist_dir) as (client, registry, code),
         contextlib.ExitStack() as stay_stack,
     ):
         with contextlib.ExitStack() as leave_stack:
@@ -1503,9 +1523,10 @@ def test_ac4_detaching_one_connection_keeps_the_other_one(
             "the room to apply the ping after the departure",
         )
 
+        last_seq = last_seq_of(registry, code)
         stay.send_text(UNDO_TEXT)
 
-        assert receive_message(stay) == letter_changed(3, one_player_id)
+        assert receive_message(stay) == letter_changed(last_seq + 1, one_player_id)
 
 
 def test_ac4_close_stops_the_engine_thread_and_is_idempotent(

@@ -1803,7 +1803,9 @@ def test_ac1_websocket_every_event_received_is_already_in_the_database(
                 sender = ana if index % 2 == 0 else bob
                 sender.send(
                     EditLetter(
-                        row=row, column=column, letter=string.ascii_uppercase[index]
+                        row=row,
+                        column=column,
+                        letter=string.ascii_uppercase[index % 26],
                     )
                 )
             bob.wait_for_seq(32, "the 30 letters")
@@ -1968,7 +1970,9 @@ def test_ac1_hub_saves_a_snapshot_when_the_room_task_stops(
                     row, column = cells[index]
                     ana.send(
                         EditLetter(
-                            row=row, column=column, letter=string.ascii_uppercase[index]
+                            row=row,
+                            column=column,
+                            letter=string.ascii_uppercase[index % 26],
                         )
                     )
                 ana.wait_for_seq(11, "11 events")
