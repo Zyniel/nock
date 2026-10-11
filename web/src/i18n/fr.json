@@ -38,6 +38,8 @@
   "room.share.label": "Lien d'invitation",
   "room.share.copy": "Copier le lien",
   "room.share.copied": "Lien copié",
+  "room.undo": "Annuler",
+  "undo.nothing": "Rien à annuler.",
   "grid.label": "Grille",
   "clue_bar.label": "Définition en cours",
   "clue_bar.empty": "Touchez une case ou une définition.",

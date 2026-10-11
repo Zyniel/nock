@@ -32,6 +32,7 @@
     onSelect,
     onLetter,
     onErase,
+    onUndo,
     pendingEdits,
     flashes,
   }: {
@@ -44,6 +45,8 @@
     onSelect: (next: Selection) => void
     onLetter: (letter: string) => void
     onErase: () => void
+    // Control+z or Meta+z; absent: those keys are left to the browser.
+    onUndo?: () => void
     pendingEdits: PendingEdit[]
     flashes: CellFlash[]
   } = $props()
@@ -146,6 +149,13 @@
 
   // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
+    const isUndo =
+      (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'z'
+    if (isUndo && onUndo !== undefined) {
+      event.preventDefault()
+      onUndo()
+      return
+    }
     const hasModifier = event.ctrlKey || event.metaKey || event.altKey
     const isTab = !hasModifier && event.key === 'Tab'
     if (isTab) {

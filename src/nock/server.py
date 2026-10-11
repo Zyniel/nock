@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import re
 import threading
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated
 
@@ -27,6 +29,7 @@ from nock.hub import (
     RoomRegistry,
 )
 from nock.protocol import parse_client_message
+from nock.store import RoomStore
 
 __all__ = ["SESSION_REPLACED_CLOSE_CODE", "RoomRegistry", "create_app"]
 
@@ -38,6 +41,8 @@ ROOM_NOT_FOUND_CLOSE_CODE: int = 4404  # WebSocket close code, unknown room
 THROTTLED_CLOSE_CODE: int = 4429  # WebSocket close code, too many wrong codes
 WRONG_CODE_LIMIT: int = 10
 WRONG_CODE_WINDOW_SECONDS: float = 60.0
+DATABASE_VARIABLE: str = "NOCK_DATABASE"  # path of the SQLite file (spec 018)
+MEMORY_DATABASE: str = ":memory:"
 
 _MISSING_BUILD_TEXT = "The web client is not built: run npm --prefix web run build"
 
@@ -97,6 +102,35 @@ class _WrongCodeThrottle:
         else:
             self._failure_times.pop(address, None)
         return recent
+
+
+class _RoomsHolder:
+    """The registry an app serves: the one it was given, or one it creates.
+
+    A registry created here opens its database on first use, which is when the
+    app starts, and is closed with the app. A registry given is never closed.
+    """
+
+    def __init__(self, given: RoomRegistry | None) -> None:
+        """Keep `given`, or None to create the registry on first use."""
+        self._lock = threading.Lock()
+        self._registry = given
+        self._is_created_here = False
+
+    def get(self) -> RoomRegistry:
+        """Return the registry, creating it from NOCK_DATABASE the first time."""
+        with self._lock:
+            if self._registry is None:
+                database = os.environ.get(DATABASE_VARIABLE, MEMORY_DATABASE)
+                self._registry = RoomRegistry(store=RoomStore(database))
+                self._is_created_here = True
+            return self._registry
+
+    def close_if_created(self) -> None:
+        """Close the registry (and its store) when this holder created it."""
+        with self._lock:
+            if self._registry is not None and self._is_created_here:
+                self._registry.close()
 
 
 def _not_found() -> HTTPException:
@@ -229,20 +263,33 @@ def create_app(
     """Build the app.
 
     Args:
-        rooms: The rooms the WebSocket serves. None: a new empty registry.
+        rooms: The rooms the WebSocket serves. None: a new registry on the
+            database of the environment variable NOCK_DATABASE (in memory when
+            it is unset), opened when the app starts and closed when it stops.
+            A registry given is never closed by the app.
         dist_dir: The built client. None: WEB_DIST_DIR.
         catalogue: The grids served. None: an empty catalogue.
 
     Never raises because `dist_dir` is missing or empty (see AC-6).
     """
-    room_registry = rooms if rooms is not None else RoomRegistry()
+    holder = _RoomsHolder(rooms)
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
     grid_number_regex = re.compile(GRID_NUMBER_PATTERN)
     wrong_codes = _WrongCodeThrottle()
+
+    @contextlib.asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        holder.get()
+        try:
+            yield
+        finally:
+            holder.close_if_created()
+
     # No slash redirect: a path ending with "/" matches no route and is a 404.
     web_app = FastAPI(
+        lifespan=lifespan,
         redirect_slashes=False,
         docs_url=None,
         redoc_url=None,
@@ -289,7 +336,7 @@ def create_app(
         entry = grid_catalogue.find_published(body.grid_number)
         if entry is None:
             raise _not_found()
-        code = room_registry.register_room(entry.grid, grid_number=body.grid_number)
+        code = holder.get().register_room(entry.grid, grid_number=body.grid_number)
         base_url = str(request.base_url).rstrip("/")
         return CreateRoomResponse(code=code, share_url=f"{base_url}/r/{code}")
 
@@ -305,6 +352,7 @@ def create_app(
 
     @web_app.websocket("/api/rooms/{code}/ws")
     async def room_socket(websocket: WebSocket, code: str) -> None:
+        room_registry = holder.get()
         await websocket.accept()
         address = websocket.client.host if websocket.client is not None else "unknown"
         now = room_registry.clock()

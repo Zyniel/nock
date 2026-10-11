@@ -108,6 +108,8 @@ export interface RoomSession {
   flashes: CellFlash[]
   // The id given to the next flash.
   nextFlashId: number
+  // How many times the server answered an undo with nothing_to_undo (spec 018).
+  undoRefusals: number
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -138,6 +140,7 @@ export function newSession(): RoomSession {
     pendingEdits: [],
     flashes: [],
     nextFlashId: 1,
+    undoRefusals: 0,
   }
 }
 
@@ -431,8 +434,20 @@ function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   }
 }
 
+// True when my letter_changed is the answer to my oldest pending edit: the same
+// cell and the same letter. Otherwise it is the result of an undo (spec 018).
+function answersOldestPendingEdit(session: RoomSession, event: RoomEvent): boolean {
+  const oldest = session.pendingEdits[0]
+  if (oldest === undefined) {
+    return false
+  }
+  const { message } = event
+  const letter = typeof message.letter === 'string' ? message.letter : null
+  return oldest.row === message.row && oldest.column === message.column && oldest.letter === letter
+}
+
 // A letter_changed updates the confirmed grid; one from me answers my oldest
-// pending edit (spec 015).
+// pending edit when it matches it (spec 015, spec 018).
 function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
   const { message } = event
   const cell = letterCellAt(snapshot, message.row, message.column)
@@ -444,7 +459,7 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
     cell.letter = letter
     cell.author = letter === null || typeof message.player_id !== 'string' ? null : message.player_id
   }
-  if (message.player_id === snapshot.you) {
+  if (message.player_id === snapshot.you && answersOldestPendingEdit(session, event)) {
     session.pendingEdits.shift()
   }
 }
@@ -540,6 +555,10 @@ const EDIT_ERROR_CODES: string[] = [
 
 // The errors that answer an edit, or a join: a refused nickname, or a full room.
 function receiveError(session: RoomSession, message: Record<string, unknown>): void {
+  if (message.code === 'nothing_to_undo') {
+    session.undoRefusals += 1
+    return
+  }
   if (typeof message.code === 'string' && EDIT_ERROR_CODES.includes(message.code)) {
     session.pendingEdits.shift()
     return

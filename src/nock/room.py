@@ -34,6 +34,7 @@ from nock.protocol import (
     HelpMode,
     HostChanged,
     Join,
+    LeaveReason,
     Letter,
     LetterCellView,
     LetterChanged,
@@ -56,6 +57,7 @@ from nock.protocol import (
     ServerMessage,
     SettingsChanged,
     Snapshot,
+    Undo,
     VoteClosed,
     VoteOpened,
     grid_view,
@@ -568,6 +570,8 @@ def handle_message(
         return _apply_edit(state, player_id, message, now, config)
     if isinstance(message, PencilEdit | ConfirmPencil):
         return _count_unhandled_edit(state, player_id, now, config)
+    if isinstance(message, Undo):
+        return _undo(state, player_id, now)
     return Outcome(state=state)
 
 
@@ -694,24 +698,24 @@ def _apply_edit(
     letter = _letter_of(edit)
     seq = state.seq + 1
     author = player_id if letter is not None else None
-    cells: list[CellState] = []
-    for cell in state.cells:
-        if cell.row == edit.row and cell.column == edit.column:
-            edited_cell = cell.model_copy(
-                update={
-                    "letter": letter,
-                    "pencil": False,
-                    "author": author,
-                    "wrong": False,
-                    "changed_seq": seq,
-                    "changed_by": player_id,
-                }
-            )
-            cells.append(edited_cell)
-        else:
-            cells.append(cell)
+    old_cell = _find_cell(state, edit.row, edit.column)
+    if old_cell is None:
+        return _refuse(state, ErrorCode.NOT_A_LETTER_CELL, "Not a letter cell.")
+    edited_cell = old_cell.model_copy(
+        update={
+            "letter": letter,
+            "pencil": False,
+            "author": author,
+            "wrong": False,
+            "changed_seq": seq,
+            "changed_by": player_id,
+        }
+    )
+    last_edit = _undo_entry_before(old_cell, seq)
     counted_state = _with_edit_counted(state, player_id, now)
-    new_state = counted_state.model_copy(update={"cells": tuple(cells), "seq": seq})
+    edited_state = _replace_cell(counted_state, edited_cell)
+    new_state = _with_last_edit(edited_state, player_id, last_edit)
+    new_state = new_state.model_copy(update={"seq": seq})
     event = LetterChanged(
         seq=seq,
         row=edit.row,
@@ -723,16 +727,271 @@ def _apply_edit(
     return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
 
 
+def _undo_entry_before(cell: CellState, seq: int) -> UndoEntry:
+    """Return what `last_edit` holds for an edit of `cell` numbered `seq`."""
+    return UndoEntry(
+        row=cell.row,
+        column=cell.column,
+        seq=seq,
+        letter=cell.letter,
+        pencil=cell.pencil,
+        author=cell.author,
+    )
+
+
+def _replace_cell(state: RoomState, changed: CellState) -> RoomState:
+    """Return the state with `changed` in place of the cell at the same position."""
+    cells: list[CellState] = []
+    for cell in state.cells:
+        if cell.row == changed.row and cell.column == changed.column:
+            cells.append(changed)
+        else:
+            cells.append(cell)
+    return state.model_copy(update={"cells": tuple(cells)})
+
+
+def _with_last_edit(
+    state: RoomState, player_id: str, last_edit: UndoEntry | None
+) -> RoomState:
+    """Return the state with the player's `last_edit` set (None clears it)."""
+    player = _find_player(state, player_id)
+    if player is None:
+        return state
+    changed = player.model_copy(update={"last_edit": last_edit})
+    return _replace_player(state, changed)
+
+
+def _undo(state: RoomState, player_id: str, now: float) -> Outcome:
+    """Give the cell of the player's last edit back its previous content.
+
+    The undo is refused with nothing_to_undo when the player has no last edit,
+    or when the cell was changed or locked since. It is not counted by the rate
+    limit. The grid-solved refusal belongs to spec 026.
+    """
+    player = _find_player(state, player_id)
+    if player is None or player.last_edit is None:
+        return _refuse(state, ErrorCode.NOTHING_TO_UNDO, "Nothing to undo.")
+    last_edit = player.last_edit
+    cell = _find_cell(state, last_edit.row, last_edit.column)
+    if cell is None or cell.locked or cell.changed_seq != last_edit.seq:
+        forgotten = _with_last_edit(state, player_id, None)
+        return _refuse(forgotten, ErrorCode.NOTHING_TO_UNDO, "Nothing to undo.")
+
+    seq = state.seq + 1
+    author = player_id if last_edit.letter is not None else None
+    restored_cell = cell.model_copy(
+        update={
+            "letter": last_edit.letter,
+            "pencil": last_edit.pencil,
+            "author": author,
+            "wrong": False,
+            "changed_seq": seq,
+            "changed_by": player_id,
+        }
+    )
+    restored_state = _replace_cell(state, restored_cell)
+    new_state = _with_last_edit(restored_state, player_id, None)
+    new_state = new_state.model_copy(update={"seq": seq})
+    event = LetterChanged(
+        seq=seq,
+        row=last_edit.row,
+        column=last_edit.column,
+        letter=last_edit.letter,
+        pencil=last_edit.pencil,
+        player_id=player_id,
+    )
+    entry = LogEntry(at=now, event=event, undo=True)
+    return Outcome(state=new_state, entries=(entry,))
+
+
 def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> Outcome:
     """Apply the passing of time (spec 013, 014, 017)."""
     return Outcome(state=state)
 
 
 def replay(state: RoomState, entry: LogEntry) -> RoomState:
-    """Return the state after a logged event (spec 018)."""
-    return state
+    """Return the state after the logged `entry`, as the live step left it.
+
+    Args:
+        state: The room before the entry.
+        entry: The next logged entry.
+
+    Returns:
+        The room after it, for every field the log carries. Events of later
+        specs only move `seq` until those specs extend this function.
+
+    Raises:
+        ValueError: a `player_joined` entry has no resume token.
+    """
+    event = entry.event
+    if isinstance(event, PlayerJoined):
+        replayed = _replay_player_joined(state, entry, event)
+    elif isinstance(event, PlayerStateChanged):
+        replayed = _replay_state_changed(state, entry, event)
+    elif isinstance(event, PlayerLeft):
+        replayed = _replay_player_left(state, event)
+    elif isinstance(event, LetterChanged):
+        replayed = _replay_letter_changed(state, entry, event)
+    elif isinstance(event, CellLocked):
+        replayed = _replay_cell_locked(state, event)
+    elif isinstance(event, SettingsChanged):
+        replayed = state.model_copy(
+            update={"settings": event.settings, "reveal_budget": event.reveal_budget}
+        )
+    elif isinstance(event, HostChanged):
+        replayed = _replay_host_changed(state, event)
+    elif isinstance(event, PlayerMuted):
+        replayed = _replay_player_muted(state, event)
+    else:
+        replayed = state
+    return replayed.model_copy(update={"seq": event.seq})
+
+
+def _replay_player_joined(
+    state: RoomState, entry: LogEntry, event: PlayerJoined
+) -> RoomState:
+    """Append the player of a logged join."""
+    if entry.resume_token is None:
+        raise ValueError(f"The player_joined entry {event.seq} has no resume token")
+    view = event.player
+    player = PlayerRecord(
+        player_id=view.player_id,
+        resume_token=entry.resume_token,
+        nickname=view.nickname,
+        colour=view.colour,
+        is_host=view.is_host,
+        muted=view.muted,
+        state=view.state,
+        joined_seq=event.seq,
+        last_input_at=entry.at,
+        last_seen_at=entry.at,
+    )
+    return state.model_copy(update={"players": (*state.players, player)})
+
+
+def _replay_state_changed(
+    state: RoomState, entry: LogEntry, event: PlayerStateChanged
+) -> RoomState:
+    """Set the presence of a player."""
+    player = _find_player(state, event.player_id)
+    if player is None:
+        return state
+    disconnected_at = None
+    if event.state == PlayerState.DISCONNECTED:
+        disconnected_at = entry.at
+    changed = player.model_copy(
+        update={"state": event.state, "disconnected_at": disconnected_at}
+    )
+    return _replace_player(state, changed)
+
+
+def _replay_player_left(state: RoomState, event: PlayerLeft) -> RoomState:
+    """Remove a player, and ban their token when they were removed."""
+    remaining: list[PlayerRecord] = []
+    removed_tokens = state.removed_tokens
+    for player in state.players:
+        if player.player_id != event.player_id:
+            remaining.append(player)
+        elif event.reason == LeaveReason.REMOVED:
+            removed_tokens = (*removed_tokens, player.resume_token)
+    return state.model_copy(
+        update={"players": tuple(remaining), "removed_tokens": removed_tokens}
+    )
+
+
+def _replay_letter_changed(
+    state: RoomState, entry: LogEntry, event: LetterChanged
+) -> RoomState:
+    """Write the letter in its cell and update the player's last edit."""
+    old_cell = _find_cell(state, event.row, event.column)
+    if old_cell is None:
+        return state
+    author = event.player_id if event.letter is not None else None
+    changed_cell = old_cell.model_copy(
+        update={
+            "letter": event.letter,
+            "pencil": event.pencil,
+            "author": author,
+            "wrong": False,
+            "changed_seq": event.seq,
+            "changed_by": event.player_id,
+        }
+    )
+    last_edit: UndoEntry | None = None
+    if not entry.undo:
+        last_edit = _undo_entry_before(old_cell, event.seq)
+    changed_state = _replace_cell(state, changed_cell)
+    return _with_last_edit(changed_state, event.player_id, last_edit)
+
+
+def _replay_cell_locked(state: RoomState, event: CellLocked) -> RoomState:
+    """Lock a cell with its letter; a reveal also clears the author."""
+    cell = _find_cell(state, event.row, event.column)
+    if cell is None:
+        return state
+    locked_cell = cell.model_copy(
+        update={
+            "letter": event.letter,
+            "locked": True,
+            "revealed": event.revealed,
+            "changed_seq": event.seq,
+            "changed_by": None,
+        }
+    )
+    if event.revealed:
+        locked_cell = locked_cell.model_copy(update={"author": None})
+    return _replace_cell(state, locked_cell)
+
+
+def _replay_host_changed(state: RoomState, event: HostChanged) -> RoomState:
+    """Give the host role to one player and take it from the others."""
+    players: list[PlayerRecord] = []
+    for player in state.players:
+        is_host = player.player_id == event.player_id
+        players.append(player.model_copy(update={"is_host": is_host}))
+    return state.model_copy(update={"players": tuple(players)})
+
+
+def _replay_player_muted(state: RoomState, event: PlayerMuted) -> RoomState:
+    """Set the muted flag of a player."""
+    player = _find_player(state, event.player_id)
+    if player is None:
+        return state
+    return _replace_player(state, player.model_copy(update={"muted": event.muted}))
 
 
 def after_restart(state: RoomState, now: float) -> Outcome:
-    """Apply what a server restart changes (spec 018)."""
-    return Outcome(state=state)
+    """Disconnect every player who is not, for a room loaded in a new process.
+
+    Args:
+        state: The room as loaded from the store.
+        now: Clock time of the loading.
+
+    Returns:
+        The outcome: each player not disconnected gets `disconnected_at = now`,
+        no selection and no recent edits, with one logged
+        `PlayerStateChanged(disconnected)` each, in players order.
+    """
+    seq = state.seq
+    players: list[PlayerRecord] = []
+    entries: list[LogEntry] = []
+    for player in state.players:
+        if player.state == PlayerState.DISCONNECTED:
+            players.append(player)
+            continue
+        seq += 1
+        disconnected = player.model_copy(
+            update={
+                "state": PlayerState.DISCONNECTED,
+                "disconnected_at": now,
+                "selection": None,
+                "recent_edits": (),
+            }
+        )
+        players.append(disconnected)
+        event = PlayerStateChanged(
+            seq=seq, player_id=player.player_id, state=PlayerState.DISCONNECTED
+        )
+        entries.append(LogEntry(at=now, event=event))
+    new_state = state.model_copy(update={"players": tuple(players), "seq": seq})
+    return Outcome(state=new_state, entries=tuple(entries))

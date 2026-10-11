@@ -20,6 +20,7 @@
   import type { Selection, Word } from './wordSelection'
 
   const COPIED_DISPLAY_MS = 2000
+  const UNDO_MESSAGE_MS = 3000
 
   let { code }: { code: string } = $props()
 
@@ -60,7 +61,24 @@
   $effect(() => {
     return () => {
       clearTimeout(copiedTimer)
+      clearTimeout(undoMessageTimer)
     }
+  })
+
+  // "Nothing to undo" shows for UNDO_MESSAGE_MS after each refusal of the server.
+  let isUndoMessageShown = $state(false)
+  let undoMessageTimer: ReturnType<typeof setTimeout> | undefined
+  let shownUndoRefusals = 0
+  $effect(() => {
+    if (session.undoRefusals === shownUndoRefusals) {
+      return
+    }
+    shownUndoRefusals = session.undoRefusals
+    isUndoMessageShown = true
+    clearTimeout(undoMessageTimer)
+    undoMessageTimer = setTimeout(() => {
+      isUndoMessageShown = false
+    }, UNDO_MESSAGE_MS)
   })
 
   let words = $derived(session.snapshot === null ? [] : computeWords(session.snapshot.grid))
@@ -298,6 +316,11 @@
     }
   }
 
+  // Ask the server to undo my last edit. It arrives after any edit already sent.
+  function onUndo(): void {
+    send({ type: 'undo' })
+  }
+
   function onCellTap(row: number, column: number): void {
     select(selectionAfterCellTap(words, selection, row, column))
   }
@@ -440,10 +463,17 @@
       onSelect={select}
       {onLetter}
       {onErase}
+      {onUndo}
       {words}
       pendingEdits={session.pendingEdits}
       flashes={session.flashes}
     />
+    <div class="undo-panel">
+      <button type="button" data-testid="undo-button" onclick={onUndo}>{t('room.undo')}</button>
+      {#if isUndoMessageShown}
+        <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
+      {/if}
+    </div>
     <div
       class="clue-bar"
       data-testid="clue-bar"
@@ -518,6 +548,13 @@
     width: 0.8rem;
     height: 0.8rem;
     border-radius: 50%;
+  }
+
+  .undo-panel {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
   }
 
   .share-panel {

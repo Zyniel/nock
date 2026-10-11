@@ -29,12 +29,14 @@ from nock.room import (
     Outcome,
     RoomConfig,
     RoomState,
+    after_restart,
     disconnect_player,
     handle_message,
     join_room,
     new_room,
     tick,
 )
+from nock.store import RoomStore
 
 logger = logging.getLogger(__name__)
 
@@ -156,8 +158,24 @@ class _RoomRunner:
     Everything except `state` is only touched from the engine's event loop.
     """
 
-    def __init__(self, state: RoomState, config: RoomConfig, clock: Clock) -> None:
-        """Create a runner with no task yet; the first connection starts it."""
+    def __init__(
+        self,
+        state: RoomState,
+        config: RoomConfig,
+        clock: Clock,
+        store: RoomStore,
+        snapshot_seq: int | None,
+    ) -> None:
+        """Create a runner with no task yet; the first connection starts it.
+
+        Args:
+            state: The room.
+            config: Thresholds of the rooms.
+            clock: Seconds since the epoch.
+            store: Where the steps of the room are written.
+            snapshot_seq: Seq of the newest snapshot the store holds for the
+                room, None when that is not known.
+        """
         self.state = state
         self.log: list[LogEntry] = []
         self._config = config
@@ -166,6 +184,9 @@ class _RoomRunner:
         self._inbox: asyncio.Queue[_Input] = asyncio.Queue()
         self._task: asyncio.Task[None] | None = None
         self._is_closed = False
+        self._store = store
+        self._snapshot_seq = snapshot_seq
+        self._events_since_snapshot = 0
 
     def post(self, item: _Input) -> None:
         """Add an input to the inbox, starting the task if it is not running.
@@ -187,7 +208,32 @@ class _RoomRunner:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
+    def save_snapshot(self) -> None:
+        """Save a snapshot of the room unless the store has one at this seq.
+
+        A failure is logged: the log alone is enough to rebuild the room.
+        """
+        if self._snapshot_seq == self.state.seq:
+            return
+        try:
+            self._store.save_snapshot(self.state)
+        except Exception:
+            logger.exception("The snapshot of room %s failed", self.state.code)
+            return
+        self._snapshot_seq = self.state.seq
+        self._events_since_snapshot = 0
+
     async def _run(self) -> None:
+        """Apply the inputs and the ticks until no connection is left.
+
+        A snapshot is saved when the task stops, however it stops.
+        """
+        try:
+            await self._apply_inputs()
+        finally:
+            self.save_snapshot()
+
+    async def _apply_inputs(self) -> None:
         """Apply the inputs and the ticks until no connection is left."""
         loop = asyncio.get_running_loop()
         # Time-outs that fell due while the room had no task apply first.
@@ -278,7 +324,8 @@ class _RoomRunner:
         except Exception:
             logger.exception("A join in room %s failed", self.state.code)
             return
-        self._store_and_deliver(outcome, connection, joined)
+        if not self._store_and_deliver(outcome, connection, joined):
+            return
         for reply in outcome.reply:
             if isinstance(reply, Snapshot):
                 self._attach(connection, reply.you, message.resume_token is not None)
@@ -321,17 +368,32 @@ class _RoomRunner:
         outcome: Outcome,
         sender: RoomConnection | None,
         joined: list[RoomConnection],
-    ) -> None:
-        """Store the new state in one assignment, then deliver the outcome.
+    ) -> bool:
+        """Commit the step's entries, store the new state, then deliver.
+
+        Nothing is delivered before the entries are committed (spec 011
+        delivery step 1). The commit is made in the engine's thread: it waits
+        for the disk, but a step never waits for a socket.
 
         Args:
             outcome: What the step produced.
             sender: The connection whose message made the step; None for a tick
                 or a closed connection.
             joined: The connections that were joined before the step.
+
+        Returns:
+            False when the entries could not be committed: the step is then
+            dropped, nothing is delivered and the state is left as it was.
         """
+        if len(outcome.entries) > 0:
+            try:
+                self._store.append(self.state.code, outcome.entries)
+            except Exception:
+                logger.exception("The log of room %s failed", self.state.code)
+                return False
         self.state = outcome.state
         self.log.extend(outcome.entries)
+        self._events_since_snapshot += len(outcome.entries)
 
         for entry in outcome.entries:
             event_text = entry.event.model_dump_json()
@@ -359,6 +421,10 @@ class _RoomRunner:
         if outcome.close_sender and sender is not None:
             sender.deliver_close(_NORMAL_CLOSE_CODE)
 
+        if self._events_since_snapshot >= self._config.snapshot_every:
+            self.save_snapshot()
+        return True
+
 
 class RoomRegistry:
     """The rooms of this process, by code, and the tasks that run them.
@@ -368,16 +434,24 @@ class RoomRegistry:
     """
 
     def __init__(
-        self, *, config: RoomConfig | None = None, clock: Clock | None = None
+        self,
+        *,
+        config: RoomConfig | None = None,
+        clock: Clock | None = None,
+        store: RoomStore | None = None,
     ) -> None:
-        """Create a registry with no room.
+        """Create a registry with no live room.
 
         Args:
             config: Thresholds of the rooms. None: RoomConfig().
             clock: Seconds since the epoch. None: time.time.
+            store: Where the rooms are written. None: a new in-memory store,
+                which the registry closes itself. A store given is never closed.
         """
         self._config = config if config is not None else RoomConfig()
         self._clock: Clock = clock if clock is not None else time.time
+        self._owns_store = store is None
+        self._store = store if store is not None else RoomStore(":memory:")
         self._lock = threading.Lock()
         self._runners: dict[str, _RoomRunner] = {}
         self._loop: asyncio.AbstractEventLoop | None = None
@@ -412,10 +486,11 @@ class RoomRegistry:
         with self._lock:
             self._check_open()
             code = _draw_code()
-            while code in self._runners:
+            while self._is_taken(code):
                 code = _draw_code()
             state = new_room(code, grid, self._clock(), grid_number)
-            self._runners[code] = _RoomRunner(state, self._config, self._clock)
+            self._store.create_room(state)
+            self._runners[code] = self._new_runner(state, state.seq)
             return code
 
     def add_room(self, state: RoomState) -> None:
@@ -427,9 +502,10 @@ class RoomRegistry:
         """
         with self._lock:
             self._check_open()
-            if state.code in self._runners:
+            if self._is_taken(state.code):
                 raise ValueError(f"A room with code {state.code} already exists")
-            self._runners[state.code] = _RoomRunner(state, self._config, self._clock)
+            self._store.create_room(state)
+            self._runners[state.code] = self._new_runner(state, state.seq)
 
     def find_room(self, code: str) -> Grid | None:
         """Return the grid of room `code`, or None when there is no such room."""
@@ -442,8 +518,9 @@ class RoomRegistry:
         """Return the latest state of room `code`, or None.
 
         Read-only: the returned model is the one the room task last stored.
+        A room that is only in the store is loaded first (see `_find_runner`).
         """
-        runner = self._runners.get(code)
+        runner = self._find_runner(code)
         if runner is None:
             return None
         return runner.state
@@ -462,7 +539,7 @@ class RoomRegistry:
         Raises:
             RuntimeError: the registry is closed.
         """
-        runner = self._runners.get(code)
+        runner = self._find_runner(code)
         if runner is None:
             return None
         engine_loop = self._engine_loop()
@@ -479,7 +556,8 @@ class RoomRegistry:
     def close(self) -> None:
         """Stop the room tasks and the engine thread. Idempotent.
 
-        Spec 018 adds saving a snapshot of each live room first.
+        Then a snapshot of each live room is saved, and the store is closed
+        when the registry created it.
         """
         with self._lock:
             if self._closed:
@@ -488,6 +566,7 @@ class RoomRegistry:
             loop = self._loop
             thread = self._thread
         if loop is None or thread is None:
+            self._finish()
             return
         if threading.current_thread() is thread:
             # Waiting for ourselves would block: the engine stops afterwards.
@@ -497,6 +576,49 @@ class RoomRegistry:
         stopping.result(timeout=_STOP_TIMEOUT_SECONDS)
         loop.call_soon_threadsafe(loop.stop)
         thread.join(timeout=_STOP_TIMEOUT_SECONDS)
+        self._finish()
+
+    def _is_taken(self, code: str) -> bool:
+        """Tell whether a room has this code, live or only in the store.
+
+        The caller holds the lock.
+        """
+        return code in self._runners or self._store.has_room(code)
+
+    def _new_runner(self, state: RoomState, snapshot_seq: int | None) -> _RoomRunner:
+        """Create the runner of a room."""
+        return _RoomRunner(state, self._config, self._clock, self._store, snapshot_seq)
+
+    def _find_runner(self, code: str) -> _RoomRunner | None:
+        """Return the live runner of room `code`, loading it from the store.
+
+        A room that is only in the store is loaded, made live, and goes through
+        one `after_restart` step, which is logged, before anything else. Two
+        threads asking for the same code load it once.
+        """
+        runner = self._runners.get(code)
+        if runner is not None:
+            return runner
+        with self._lock:
+            runner = self._runners.get(code)
+            if runner is not None or self._closed:
+                return runner
+            state = self._store.load_room(code)
+            if state is None:
+                return None
+            outcome = after_restart(state, self._clock())
+            if len(outcome.entries) > 0:
+                self._store.append(code, outcome.entries)
+            runner = self._new_runner(outcome.state, None)
+            self._runners[code] = runner
+            return runner
+
+    def _finish(self) -> None:
+        """Save a snapshot of each live room, then close the store if owned."""
+        for runner in list(self._runners.values()):
+            runner.save_snapshot()
+        if self._owns_store:
+            self._store.close()
 
     def _check_open(self) -> None:
         """Raise RuntimeError when the registry is closed."""
@@ -525,6 +647,7 @@ class RoomRegistry:
     async def _cancel_runners_and_stop(self) -> None:
         """Stop the task of every room, then the event loop."""
         await self._cancel_runners()
+        self._finish()
         asyncio.get_running_loop().stop()
 
 
