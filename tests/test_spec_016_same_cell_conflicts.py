@@ -18,7 +18,6 @@ from __future__ import annotations
 import contextlib
 import re
 import threading
-import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -74,9 +73,8 @@ ROUNDS = 50
 WAIT_TIMEOUT_MS = 5000
 SETTLE_MS = 400
 FLASH_SECONDS = 1.0
-FLASH_MIN_SECONDS = 0.8
-FLASH_MAX_SECONDS = 2.0
-MID_FLASH_MS = 500
+FLASH_MIN_MS = 800
+FLASH_MAX_MS = 2000
 
 Edit = EditLetter | Erase
 ChangeList = list[tuple[int, int, dict[str, object]]]
@@ -608,6 +606,37 @@ def own_letter_in_1_0() -> ChangeList:
     return [(1, 0, {"letter": "T", "author": "p1"})]
 
 
+def start_flash_log(page: Page, row: int, column: int) -> None:
+    """Record in the page every change of data-flash on one cell, with its time."""
+    page.evaluate(
+        """selector => {
+            window.__flashLog = [];
+            const observer = new MutationObserver(records => {
+                for (const record of records) {
+                    if (record.target.matches(selector)) {
+                        window.__flashLog.push([
+                            record.target.getAttribute("data-flash"),
+                            performance.now(),
+                        ]);
+                    }
+                }
+            });
+            observer.observe(document.body, {
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["data-flash"],
+            });
+        }""",
+        cell_selector(row, column),
+    )
+
+
+def read_flash_log(page: Page) -> list[tuple[str, float]]:
+    """The (data-flash value, page time in ms) changes seen since start_flash_log."""
+    raw_log = page.evaluate("window.__flashLog")
+    return [(str(value), float(at)) for value, at in raw_log]
+
+
 def background_colours(cell: Locator) -> list[str]:
     """The computed background colour of the cell and of every element inside it."""
     found = cell.evaluate(
@@ -725,16 +754,16 @@ def test_ac2_a_replaced_letter_flashes_in_the_colour_of_the_replacer_for_a_secon
     colour_of_p2 = swatch_colour(page, "p2")
     assert colour_of_p2 not in background_colours(cell)
 
-    sent_at = time.monotonic()
+    start_flash_log(page, 1, 0)
     mock.send(letter_changed_frame(6, 1, 0, "A", "p2"))
 
     expect(cell).to_have_attribute("data-flash", "3")
     assert colour_of_p2 in background_colours(cell)
-    page.wait_for_timeout(MID_FLASH_MS)
-    assert cell.get_attribute("data-flash") == "3"
-    expect(cell).to_have_attribute("data-flash", "", timeout=2000)
-    cleared_after = time.monotonic() - sent_at
-    assert FLASH_MIN_SECONDS <= cleared_after <= FLASH_MAX_SECONDS
+    expect(cell).to_have_attribute("data-flash", "", timeout=3000)
+    flash_log = read_flash_log(page)
+    assert [value for value, _ in flash_log] == ["3", ""]
+    flash_ms = flash_log[1][1] - flash_log[0][1]
+    assert FLASH_MIN_MS <= flash_ms <= FLASH_MAX_MS
     assert colour_of_p2 not in background_colours(cell)
     expect_letter(page, 1, 0, "A")
 
@@ -828,17 +857,18 @@ def test_ac2_a_new_flash_on_the_same_cell_restarts_the_second(
     page.wait_for_timeout(600)
     assert cell.get_attribute("data-flash") == "3"
 
-    second_sent_at = time.monotonic()
+    start_flash_log(page, 1, 0)
     mock.send(letter_changed_frame(7, 1, 0, "T", "p1"))
     mock.send(letter_changed_frame(8, 1, 0, "X", "p3"))
 
     expect(cell).to_have_attribute("data-flash", "5")
-    page.wait_for_timeout(MID_FLASH_MS)
-    # The first flash would have ended by now: only a restart keeps this one.
-    assert cell.get_attribute("data-flash") == "5"
-    expect(cell).to_have_attribute("data-flash", "", timeout=2000)
-    cleared_after = time.monotonic() - second_sent_at
-    assert FLASH_MIN_SECONDS <= cleared_after <= FLASH_MAX_SECONDS
+    expect(cell).to_have_attribute("data-flash", "", timeout=3000)
+    flash_log = read_flash_log(page)
+    # The first flash is never cleared on its own: the second one replaces it
+    # and runs a full second from its own start, so it was restarted.
+    assert [value for value, _ in flash_log] == ["5", ""]
+    flash_ms = flash_log[1][1] - flash_log[0][1]
+    assert FLASH_MIN_MS <= flash_ms <= FLASH_MAX_MS
 
 
 @pytest.mark.parametrize(
