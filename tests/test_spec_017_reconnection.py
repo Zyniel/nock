@@ -2014,7 +2014,7 @@ def test_ac4_an_idle_player_is_disconnected_by_silence_too(fx01_grid: Grid) -> N
 def test_ac4_a_player_already_disconnected_is_not_disconnected_again(
     fx01_grid: Grid,
 ) -> None:
-    room = disconnect_player(silent_room(fx01_grid), "p1", NOW + 1.0).state
+    room = disconnect_player(silent_room(fx01_grid), "p2", NOW + 1.0).state
     room = keep_seen(room, NOW + 100.0)
 
     outcome = tick(room, NOW + 100.0)

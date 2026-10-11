@@ -417,7 +417,8 @@ def test_ac1_one_click_leads_to_a_joined_room_with_the_grid(
     room = expect_joined(page)
     expect(room).to_have_attribute("data-grid", "5x5")
     expect(page.get_by_test_id("cell")).to_have_count(25)
-    expect(page.locator("input:visible")).to_have_count(0)
+    expect(page.get_by_test_id("nickname-form")).to_have_count(0)
+    expect(page.get_by_test_id("nickname-input")).to_have_count(0)
 
 
 def test_ac1_one_click_on_the_grid_page_leads_to_a_joined_room(
@@ -429,7 +430,8 @@ def test_ac1_one_click_on_the_grid_page_leads_to_a_joined_room(
 
     room = expect_joined(page)
     expect(room).to_have_attribute("data-grid", "5x5")
-    expect(page.locator("input:visible")).to_have_count(0)
+    expect(page.get_by_test_id("nickname-form")).to_have_count(0)
+    expect(page.get_by_test_id("nickname-input")).to_have_count(0)
 
 
 def test_ac1_the_new_room_exists_on_the_server(

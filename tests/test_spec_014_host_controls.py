@@ -542,7 +542,7 @@ def test_ac1_removed_is_answered_before_locked_full_and_nickname(
 
     outcome = join_room(
         locked_full_room,
-        new_guest("!", token_of(2)),
+        new_guest("!!", token_of(2)),
         NOW + 3,
         "another-player",
         "another-token-0000000",
@@ -1082,7 +1082,7 @@ def test_ac2_locked_is_answered_before_full(fx01_grid: Grid) -> None:
 def test_ac2_locked_is_answered_before_the_nickname_check(fx01_grid: Grid) -> None:
     room = locked(room_of_players(fx01_grid, 2))
 
-    outcome = join_room(room, new_guest("!"), NOW + 2, NEW_PLAYER_ID, NEW_TOKEN)
+    outcome = join_room(room, new_guest("!!"), NOW + 2, NEW_PLAYER_ID, NEW_TOKEN)
 
     assert sole_error(outcome.reply).code is ErrorCode.ROOM_LOCKED
 
