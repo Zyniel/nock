@@ -402,7 +402,10 @@ def random_edits(rng: random.Random, cells: list[tuple[int, int]]) -> list[Edit]
 
 
 def test_ac1_server_relay_p95_is_at_most_100_ms(
-    client: TestClient, room_code: str, fx01_grid: Grid
+    client: TestClient,
+    room_code: str,
+    fx01_grid: Grid,
+    record_property: Callable[[str, object], None],
 ) -> None:
     """A sends 200 edits one by one; time from A's send to B's receipt of it."""
     cells = letter_cells(fx01_grid)
@@ -440,6 +443,9 @@ def test_ac1_server_relay_p95_is_at_most_100_ms(
         relay_times.append(received_at - sent_at[index])
     relay_times.sort()
     p95 = relay_times[P95_INDEX]
+    record_property("relay_p95_ms", round(p95 * 1000, 2))
+    record_property("relay_max_ms", round(relay_times[-1] * 1000, 2))
+    print(f"AC-1 relay: p95 {p95 * 1000:.1f} ms, max {relay_times[-1] * 1000:.1f} ms")
     assert p95 <= MAX_RELAY_P95_SECONDS, (
         f"p95 (190th smallest) of {RELAY_SAMPLES} relay times, from A's send_text "
         f"to B's reader getting the matching letter_changed, localhost TestClient: "
@@ -463,7 +469,7 @@ def test_ac1_the_author_receives_its_own_letter_changed_too(
         peer_a, peer_b = join_peers(stack, client, room_code, ["Ana", "Bob"])
         peer_a.send(EditLetter(row=1, column=0, letter="T"))
         peer_a.wait_until(lambda: len(peer_a.answers()) == 1, "A's own answer")
-        peer_b.wait_until(lambda: len(peer_b.answers()) >= 1, "B's copy")
+        peer_b.wait_for_seq(3, "B's copy")
 
         expected = LetterChanged(
             seq=3, row=1, column=0, letter="T", pencil=False, player_id=peer_a.you()
