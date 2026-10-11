@@ -6,6 +6,7 @@ as `now`. The runtime that drives these functions is `nock.hub`.
 
 from __future__ import annotations
 
+import secrets
 import unicodedata
 from collections.abc import Callable
 from typing import Annotated
@@ -301,7 +302,7 @@ def normalize_nickname(text: str) -> str:
         category = unicodedata.category(character)
         is_letter = category.startswith("L")
         is_digit = "0" <= character <= "9"
-        is_mark = category == "Mn"
+        is_mark = category in ("Mn", "Mc")
         is_punctuation = character in NICKNAME_PUNCTUATION
         if not (is_letter or is_digit or is_mark or is_punctuation):
             raise ValueError(f"Character not allowed in a nickname: {character!r}")
@@ -402,6 +403,14 @@ def disconnect_player(state: RoomState, player_id: str, now: float) -> Outcome:
 
     The player keeps their seat. A player who is not in the room, or who is
     already disconnected, changes nothing.
+
+    Args:
+        state: The room before the connection closed.
+        player_id: Id of the player whose connection closed.
+        now: Current time in seconds.
+
+    Returns:
+        The outcome, with the player marked disconnected when they were not yet.
     """
     for player in state.players:
         if player.player_id != player_id:
@@ -433,7 +442,7 @@ def _find_by_token(state: RoomState, token: str | None) -> PlayerRecord | None:
     if token is None:
         return None
     for player in state.players:
-        if player.resume_token == token:
+        if secrets.compare_digest(player.resume_token, token):
             return player
     return None
 

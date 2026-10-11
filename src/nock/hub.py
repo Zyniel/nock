@@ -43,6 +43,11 @@ ROOM_CODE_LENGTH: int = 6
 
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
 
+_REFUSAL_TEXTS: dict[ErrorCode, str] = {
+    ErrorCode.NOT_JOINED: "Send a join message before anything else.",
+    ErrorCode.INVALID_MESSAGE: "The message is not a valid client message.",
+}
+
 _NORMAL_CLOSE_CODE = 1000
 _STOP_TIMEOUT_SECONDS = 5.0
 
@@ -252,10 +257,7 @@ class _RoomRunner:
 
     def _refuse(self, connection: RoomConnection, code: ErrorCode) -> None:
         """Answer an unjoined connection with an error; its socket stays open."""
-        if code == ErrorCode.NOT_JOINED:
-            text = "Send a join message before anything else."
-        else:
-            text = "The message is not a valid client message."
+        text = _REFUSAL_TEXTS[code]
         connection.deliver_text(ErrorMessage(code=code, message=text).model_dump_json())
 
     def _join_step(self, connection: RoomConnection, message: Join) -> None:

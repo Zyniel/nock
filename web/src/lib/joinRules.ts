@@ -42,7 +42,7 @@ export function checkNickname(text: string): NicknameCheck {
   for (const character of characters) {
     const isLetter = /^\p{L}$/u.test(character)
     const isDigit = character >= '0' && character <= '9'
-    const isMark = /^\p{Mn}$/u.test(character)
+    const isMark = /^[\p{Mn}\p{Mc}]$/u.test(character)
     if (!isLetter && !isDigit && !isMark && !NICKNAME_PUNCTUATION.includes(character)) {
       return { ok: false, reason: 'characters' }
     }
