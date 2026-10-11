@@ -220,6 +220,11 @@ The words in brackets say how each criterion is tested.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, after the spec 015 review): spec 015's
+accepted edit does not set `PlayerRecord.last_edit` yet. This spec owns it:
+its implementation must set `last_edit` on every accepted edit and erase, and
+its undo tests cover that.
+
 - Commit before broadcast (AC-1): every event any client received was committed
   first, so a crash loses no event a player saw; an edit that was being applied
   when the process died is lost and its sender's page resends it (spec 017). This

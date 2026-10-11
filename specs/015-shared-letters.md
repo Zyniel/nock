@@ -1,7 +1,7 @@
 ---
 id: "015"
 title: Shared letters
-status: approved
+status: done
 ---
 
 # 015 - Shared letters

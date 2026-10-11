@@ -1,7 +1,7 @@
 ---
 id: "010"
 title: Instant solo start
-status: approved
+status: done
 ---
 
 # 010 - Instant solo start
