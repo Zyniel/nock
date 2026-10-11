@@ -7,7 +7,10 @@ status: approved
 # 026 - Completion detection
 
 Epic E6 Help and validation (US-6.4) · Release: MVP · Epic depends on: E4
-The FX-01 reference grid and the glossary are in `specs/_reference.md`.
+The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
+engine is defined in spec 011, edits and their check order in spec 015, undo and
+`replay` in spec 018, checks in spec 023, the messages in spec 039 (`GridSolved`,
+`GridFullWrong`, `ErrorCode.GRID_SOLVED`, `Snapshot.solved`).
 
 ## Goal
 
@@ -17,17 +20,158 @@ Help is decided by the server and shared by the room, so one impatient player ca
 
 ## Public interface
 
-Not defined yet. To write following `specs/_architecture.md` before approval.
+No new protocol message, no new `ErrorCode` and no new public Python name. This
+spec adds the completion rule to `nock.room`, the solved refusals, the `replay`
+of `grid_solved`, and the completion banner on the room page.
+
+### Definitions
+
+- A letter cell is **filled** when it holds a letter that is not a pencil letter
+  (spec 020). Locked and revealed cells are filled.
+- The grid is **full** when every letter cell of `state.cells` is filled.
+- The grid is **right** when it is full and every letter equals the solution
+  letter of its cell (the letter of the normalised `answer` of a clue whose word
+  holds the cell, as in spec 023).
+
+### Server rule: completion (`nock.room.handle_message`)
+
+After any accepted step of `handle_message` whose entries contain at least one
+`letter_changed` or `cell_locked` (an edit, an undo, a reveal of spec 024, a
+confirmed pencil letter of spec 020), and while `state.solved` is False, with `s`
+the seq of the step's last entry so far:
+
+1. If the grid is right: one more entry `GridSolved(seq=s + 1, elapsed_ms=<ms>)`,
+   with `elapsed_ms = max(0, round((now - state.created_at) * 1000))`, and
+   `state.solved = True`.
+2. Else, if the grid is full now and was not full before the step: one more entry
+   `GridFullWrong(seq=s + 1)`, which carries nothing else (no cell, no count).
+3. Else nothing is added.
+
+The new entry is part of the same step: logged with it, then broadcast to every
+joined connection after the step's other entries (spec 011 delivery).
+
+### Server rule: input locked once solved
+
+While `state.solved` is True:
+
+- `edit_letter`, `erase`, `pencil_edit`, `confirm_pencil`: check 5 of spec 015
+  refuses them with `ErrorMessage(code=GRID_SOLVED)`, after checks 1 to 4.
+- `undo`: step 3 of spec 018 refuses it with `GRID_SOLVED` (after
+  `nothing_to_undo`).
+- `check` (spec 023 step 1) and `reveal` (spec 024): refused with `GRID_SOLVED`
+  before any other check of theirs.
+- Every other message works as before (`select_cell`, `ping`, chat, flags,
+  host actions, joins).
+
+Each refusal changes nothing and sends one `error` to the sender only.
+
+### `replay` additions (spec 018 table)
+
+| Event | Effect on the state |
+| --- | --- |
+| `grid_solved` | `solved = True` |
+| `grid_full_wrong` | only `seq` |
+
+`snapshot_for` already sends `solved = state.solved` (spec 012).
+
+### Client (room page)
+
+`RoomSession.solved` (spec 010) is already true after a `grid_solved` or a
+snapshot with `solved: true`.
+
+- Room page root: new attribute `data-solved`, `true` when `session.solved`, else
+  `false`.
+- `data-testid="grid-status"`, `role="status"`, shown under the clue bar when one
+  of these holds, absent otherwise:
+
+  | Condition | `data-state` | Text |
+  | --- | --- | --- |
+  | `session.solved` | `solved` | `t("completion.solved")` |
+  | not solved, and every letter cell of the confirmed grid has a letter (pending edits not counted) | `full_wrong` | `t("completion.full_wrong")` |
+
+  The `full_wrong` state is derived from the confirmed grid, so a page that joins a
+  full, wrong grid shows it too; a `grid_full_wrong` event needs no handling
+  beyond its `seq`.
+- Once solved, the page locks input: a letter key, `Backspace`, a key of the
+  in-app keyboard, `Control+z` / `Meta+z` and the `undo-button` send nothing and
+  change no cell; `undo-button` and the three check buttons (spec 023) are
+  `disabled`. Selecting cells and moving with the arrow keys still work.
+- No cell changes look when `grid_full_wrong` arrives: there is no hint of where
+  the mistake is.
+
+New `fr.json` keys:
+
+| Key | Value |
+| --- | --- |
+| `completion.solved` | `Grille terminée, bravo !` |
+| `completion.full_wrong` | `Grille complète, mais pas encore juste.` |
+
+### Test harness
+
+- Rule unit tests: `new_room("ABC123", fx01_grid, NOW)` with players `p1`, `p2`;
+  letters written with `handle_message(..., EditLetter(...))` at `NOW` unless said
+  otherwise. `FULL17` is that room after the 17 FX-01 letters other than (4, 4)
+  were written correctly by `p1` in row-major order: seq 2 + 17 = 19.
+- WebSocket tests: as spec 011, `RoomConfig(max_edits_per_second=1000)`, three
+  clients `Ana`, `Bob`, `Cy` on one FX-01 room. Times are taken with
+  `time.monotonic()` in the test.
+- "Browser with mocked socket" and "browser with live server" as spec 023.
+- Engines: Chromium and WebKit locally, Firefox too in CI; no check of this spec
+  is Chromium-only.
+- Earlier tests that change a grid after it becomes full (spec 015 AC-3 and AC-4,
+  whose random or all-`A` edits fill FX-01) now also receive `grid_full_wrong`
+  events, which take seqs. This spec's test-writer updates those tests to count
+  them (see "Edge cases"); their assertions on letters stay.
 
 ## Acceptance criteria
 
-- **AC-1** (AC-6.4.1) When the last empty cell is filled and every letter is right, the grid is marked solved for all players within 1 second and input is locked.
-- **AC-2** (AC-6.4.2) When the grid is full with at least one wrong letter, all players see "grid full, not yet correct" with no hint of where.
-- **AC-3** (AC-6.4.3) On FX-01, entering the 18 letters triggers completion. With the M at (1,2) replaced by N, it does not.
+The words in brackets say how each criterion is tested.
+
+- **AC-1** (AC-6.4.1) (rule unit test) When the last empty cell is filled and every letter is right, the grid is marked solved. Given `FULL17` and `created_at = NOW`, when `p2` writes `T` at (4, 4) at `NOW + 754.0`, then the outcome's entries are `LetterChanged(seq=20, row=4, column=4, letter="T", pencil=False, player_id="p2")` then `GridSolved(seq=21, elapsed_ms=754000)`, the new state has `solved=True` and seq 21, and `snapshot_for(state, "p1").solved` is True.
+- **AC-2** (AC-6.4.1) (WebSocket) All players learn it within 1 second. Given Ana, Bob and Cy joined on a FX-01 room where Ana and Bob typed 17 right letters, when Bob sends the 18th, then each of the three clients receives the `letter_changed` of that edit followed by `{"type": "grid_solved", ...}` with the next seq, each within 1.0 s of Bob's send.
+- **AC-3** (AC-6.4.1) (browser with live server) Every page shows the solved grid within 1 second. Two pages join one FX-01 room as `Ana` and `Bob`; Ana types the 17 letters other than (4, 4), Bob taps (4, 4) and types `T`; within 1000 ms both room pages have `data-solved="true"` and `grid-status` with `data-state="solved"` and the text `fr.json["completion.solved"]`.
+- **AC-4** (AC-6.4.1) (rule unit test) Input is locked on the server once solved. Given the solved state of AC-1, at `NOW + 755.0`: `EditLetter` at (1, 0) with `A`, `Erase` at (1, 0), `PencilEdit` at (1, 0), `ConfirmPencil` at (1, 0), `Check(target=GridTarget())` and, from `p2` (whose last edit is (4, 4)), `Undo()` are each answered with one `ErrorMessage` with code `grid_solved`, no entry, and the state keeps seq 21; `SelectCell(row=1, column=0, direction=across)` from `p1` is accepted (a `selection_moved` in `to_others`).
+- **AC-5** (AC-6.4.1) (browser with mocked socket) Input is locked on the page once solved. Given a FX-01 snapshot with `seq` 5 and every letter cell filled right, then `grid_solved` seq 6: tapping (1, 0) and pressing `B`, `Backspace` and `Control+z` sends no frame (none within 300 ms) and (1, 0) still shows its letter; `undo-button`, `check-letter`, `check-word` and `check-grid` are disabled; the grid still has `data-selected-row="1"` and `data-selected-column="0"`. The same holds for a page whose first snapshot has `solved: true`.
+- **AC-6** (AC-6.4.2) (rule unit test; WebSocket) When the grid becomes full with at least one wrong letter, all players are told, with no hint of where. Rule: given `FULL17`, when `p2` writes `X` at (4, 4), then the entries are the `letter_changed` (seq 20) then `GridFullWrong(seq=21)`, and `solved` stays False; when `p2` then writes `Y` at (4, 4), the only entry is its `letter_changed` (the grid was already full); when `p2` erases (4, 4) then writes `X` again, a new `GridFullWrong` follows that `letter_changed`. WebSocket: in the same play on a three-client room (17 right letters, then `X` at (4, 4)), each client receives, right after the `letter_changed` of the `X` with seq `n`, a frame that parses to a JSON object with exactly the keys `type` and `seq`, equal to `{"type": "grid_full_wrong", "seq": n + 1}`.
+- **AC-7** (AC-6.4.2) (browser with mocked socket; browser with live server) All players see "grid full, not yet correct". Mocked: given a FX-01 snapshot where 17 cells are filled and (4, 4) is empty, `grid-status` is absent; after `letter_changed` at (4, 4) letter `X` from `p2` and `grid_full_wrong`, `grid-status` has `data-state="full_wrong"` and the text `fr.json["completion.full_wrong"]`, no cell has `data-wrong="true"`, and the room page has `data-solved="false"`; after `letter_changed` erasing (4, 4), `grid-status` is absent again. A page whose first snapshot already holds a full, wrong grid shows the `full_wrong` status at once. Live: in the room of AC-3 with `X` typed at (4, 4) instead of `T`, both pages show `data-state="full_wrong"`.
+- **AC-8** (AC-6.4.3) (rule unit test) On FX-01, entering the 18 letters triggers completion; with the M at (1, 2) replaced by N, it does not. Given a fresh FX-01 room with `p1`, when `p1` writes the 18 solution letters in row-major order, then exactly one `GridSolved` is produced, by the 18th edit, and `solved` is True. In a second run with `N` written at (1, 2) instead of `M`, the 18th edit produces `GridFullWrong` and no `GridSolved`, `solved` is False; when `p1` then writes `M` at (1, 2), that edit produces `GridSolved`.
+- **AC-9** (new) (rule unit test) The solved state survives a reload. Given the entries of AC-1's whole play (joins, 18 edits, `grid_solved`), when they are replayed in order with `replay` from `new_room` on the same grid, then the result equals the live state for `solved`, `seq` and `cells`; and a room saved in a `RoomStore` and loaded again (spec 018) has `solved=True` and still refuses an `EditLetter` with `grid_solved`.
 
 ## Edge cases and errors
 
-None stated in the backlog. To complete during review.
+- Completion by an undo (AC-1): an undo that puts back the last right letter
+  completes the grid like an edit.
+- Completion by a lock (AC-1): a reveal (spec 024) that fills the last cell
+  completes the grid; a check (spec 023) never fills a cell, so it never completes
+  one, but a grid full of right letters is already solved before any check.
+- Same letter again (AC-6): rewriting a letter of a full, wrong grid adds only its
+  `letter_changed`; `grid_full_wrong` is sent when the grid becomes full, not on
+  every edit while full. The page's banner stays, since it is derived from the
+  grid.
+- Wrong letter fixed while others remain wrong (AC-6, AC-7): no new event (still
+  full); the banner stays.
+- Locked cells count as filled (definitions); a grid whose every cell is locked by
+  checks is solved by the edit that filled its last cell.
+- After solved (AC-4): a second `grid_solved` is never produced; the rule runs
+  only while `solved` is False.
+- `elapsed_ms` (AC-1): time since the room was created, in whole milliseconds,
+  never negative. Spec 027 (shared timer) may redefine it; the field already
+  exists in the protocol.
+- Late joiner (AC-5, AC-7): a snapshot with `solved` true locks the page; a
+  snapshot of a full, wrong grid shows the `full_wrong` banner.
+- Pending edits (AC-7): the banner uses confirmed letters only, so it appears
+  together with the server's verdict, not while the last letter is unconfirmed.
+- Earlier tests (harness): spec 015 AC-3 compares the room's final `seq` with
+  "4 joins plus 1,000"; with this spec the expected value is 4 + 1,000 + the
+  number of `grid_full_wrong` events the clients received (each client checks
+  that it received every seq exactly once, as before). Spec 015 AC-4 counts 36
+  `letter_changed` events; `grid_full_wrong` events may arrive between them and
+  are ignored by that count. Spec 037 AC-1's full game ends solved: an edit sent
+  after the last right letter would now be refused `grid_solved`, so its harness
+  keeps the erase before the grid is complete. The lead amends the text of spec
+  015 AC-3 accordingly when this spec is built.
+- Answers stay on the server (AC-6): neither `grid_solved` nor `grid_full_wrong`
+  carries a letter or a position; spec 037's traffic checker accepts them.
 
 ## Out of scope
 
@@ -35,12 +179,39 @@ None stated in the backlog. To complete during review.
 - Check a letter, a word or the grid: spec 023.
 - Reveal a letter or a word: spec 024.
 - Group decision on help: spec 025.
+- The shared timer and its pauses: spec 027; the end-of-game recap: spec 028.
+- A celebration animation, sounds, or a feed line for completion.
+- Saying how many letters are wrong in a full grid.
+- Reopening a solved grid.
 
 ## Work packages
 
 None.
 
+## Decisions
+
+Decided by the lead on 2026-10-11, under the owner's delegation of technical
+decisions. Each one is already part of the spec above.
+
+1. Numeric threshold: the backlog's 1 second is kept (owner's answer: keep the
+   backlog defaults). It is measured from the last edit sent to the last client
+   receiving `grid_solved` (WebSocket) and to both pages showing it (browser).
+2. When `grid_full_wrong` is sent. Options: after every edit while the grid is full
+   and wrong, or only when the grid becomes full. Pick: only when it becomes full,
+   to keep the log short; the page's banner is derived from the confirmed grid, so
+   it stays correct between events and for late joiners.
+3. What locks input. Options: lock every cell with `cell_locked` events, or refuse
+   input with `grid_solved`. Pick: refusals (spec 015 check 5, spec 018 undo
+   step 3, spec 023 step 1); no cell events, so the log is not flooded at the end.
+   Selection, chat, flags and host actions stay available.
+4. `elapsed_ms`: milliseconds since the room was created, until spec 027 defines
+   the shared timer.
+5. Completion runs after any step that changes a letter or a lock (edit, undo,
+   reveal, pencil confirmation), not only after `edit_letter`.
+6. Pencil letters do not fill a cell (spec 020 refers to this spec).
+7. Page texts: `Grille terminée, bravo !` and `Grille complète, mais pas encore
+   juste.`, in a `role="status"` element under the clue bar.
+
 ## Open questions
 
-- Public interface not written yet. Write it following `specs/_architecture.md` (stack decided on 2026-10-10), and say for each criterion whether it is tested as a Python test or a browser test with pytest-playwright.
-- The numeric thresholds above are proposed defaults from the backlog. Confirm or adjust them before approval.
+None.
