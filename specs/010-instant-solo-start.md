@@ -127,7 +127,7 @@ case 1 and resumes the same player. A join at once never writes `nock.nickname`
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-2.5.1) (browser with live server) From the catalogue, a grid is playable in one tap, with no sign-up. On `/`, one click on the `catalogue-play` of item 1 and no other action leads to a URL matching `/r/[A-Z0-9]{6}$` whose room page reaches `data-status="joined"`, `data-grid="5x5"`, 25 `cell` elements, and no visible `input` element; then tapping (1, 0) and pressing `t` shows `T` in (1, 0).
+- **AC-1** (AC-2.5.1) (browser with live server) From the catalogue, a grid is playable in one tap, with no sign-up. On `/`, one click on the `catalogue-play` of item 1 and no other action leads to a URL matching `/r/[A-Z0-9]{6}$` whose room page reaches `data-status="joined"`, `data-grid="5x5"`, 25 `cell` elements, and no visible `nickname-form` or `nickname-input` (amended on 2026-10-11 for spec 014: the solo player is the host and sees the host's settings form, which is not a sign-up); then tapping (1, 0) and pressing `t` shows `T` in (1, 0).
 - **AC-2** (AC-2.5.2) (browser with live server) A solo game becomes a shared room when I invite someone, and every letter is kept. Player A starts FX-01 from the catalogue and types `T`, `A` from (1, 0) across. Player B opens A's room URL in a second context and joins. Then B's grid shows `T` at (1, 0) and `A` at (1, 1); A's page still has the same `data-room-code`, still shows `T` and `A`, and was not reloaded (a value set on `window` before B joined is still there).
 - **AC-3** (AC-2.5.3) (browser with live server) Reloading the page restores my letters and my selected cell. Player A starts FX-01 from the catalogue, types `T`, `A` from (1, 0) across, then taps (2, 2) twice (`down`); after `page.reload()`, the room page reaches `data-status="joined"` with the same code and the same `data-you` as before the reload (the same player, resumed through `nock.identity.<code>`), the first frame the reloaded page sends is a `join` whose `resume_token` is the one stored before the reload, `roster` holds exactly one `roster-player`, (1, 0) and (1, 1) show `T` and `A`, and the grid has `data-selected-row="2"`, `data-selected-column="2"`, `data-direction="down"`.
 - **AC-4** (new) (browser with live server) Starting a grid marks it started on this device. After the click of AC-1, `localStorage["nock.progress"]` parses to an object whose `"1"` is `"started"`, `localStorage["nock.room.<code>"]` has `grid` 1, and going back to `/` shows item 1 with `data-progress="started"`.
@@ -223,6 +223,11 @@ above.
    it works whoever the server thinks the reloaded player is.
 6. Replay of a started grid. Options: create a new room, or reopen the last one.
    Pick: a new room; resuming is spec 032.
+
+Added on 2026-10-11 by the lead, under the human's instruction to take technical
+decisions: AC-1's "no visible input" meant no sign-up form. It now checks the
+nickname form only, since spec 014 shows the host's settings form to the solo
+player, who is the host.
 
 ## Open questions
 
