@@ -1212,3 +1212,128 @@ def test_ac4_a_pending_edit_stays_when_another_cell_changes(
 
     expect_cell(page, 1, 1, "A", unconfirmed=False, author="p2")
     expect_cell(page, 1, 0, "T", unconfirmed=True)
+
+
+# ---- AC-2: pending edits and the other specs, snapshots, locked cells ---------
+
+SOLVED_LETTERS: dict[tuple[int, int], str] = {
+    (0, 1): "N",
+    (1, 0): "T",
+    (1, 1): "A",
+    (1, 2): "M",
+    (1, 3): "I",
+    (1, 4): "S",
+    (2, 1): "V",
+    (2, 2): "I",
+    (2, 3): "D",
+    (2, 4): "E",
+    (3, 1): "A",
+    (3, 2): "M",
+    (3, 3): "E",
+    (3, 4): "N",
+    (4, 1): "L",
+    (4, 2): "E",
+    (4, 3): "S",
+    (4, 4): "T",
+}
+
+
+def solved_except(empty: list[tuple[int, int]]) -> ChangeList:
+    """Confirmed letters for every FX-01 letter cell but the `empty` ones."""
+    changes: ChangeList = []
+    for position, letter in SOLVED_LETTERS.items():
+        if position not in empty:
+            changes.append((position[0], position[1], {"letter": letter}))
+    return changes
+
+
+def clue_named(page: Page, text: str) -> Locator:
+    """The `clue` element whose text is exactly `text`."""
+    clue_text = page.get_by_test_id("clue-text").get_by_text(text, exact=True)
+    return page.get_by_test_id("clue").filter(has=clue_text)
+
+
+def expect_selected_cell(page: Page, row: int, column: int) -> None:
+    grid = page.get_by_test_id("grid")
+    expect(grid).to_have_attribute("data-selected-row", str(row))
+    expect(grid).to_have_attribute("data-selected-column", str(column))
+
+
+def test_ac2_tab_skips_a_word_whose_last_cell_holds_my_unconfirmed_letter(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    """Guards specs 009 and 007 under pending edits: a cell shows my letter.
+
+    Only (1, 4) is empty, so typing `s` there finishes the only unfinished word
+    as shown. The mock never answers, so the letter stays pending. Tab must then
+    find no unfinished word and leave the selection where it is.
+    """
+    mock = open_fx01(page, live_server, fx01_grid, changes=solved_except([(1, 4)]))
+    cell_at(page, 1, 4).click()
+    type_key(page, "s")
+    expect_cell(page, 1, 4, "S", unconfirmed=True)
+    cell_at(page, 1, 3).click()
+    expect_selected_cell(page, 1, 3)
+    frames_before_tab = len(mock.received)
+
+    page.keyboard.press("Tab")
+    page.wait_for_timeout(SETTLE_MS)
+
+    expect_selected_cell(page, 1, 3)
+    assert len(mock.received) == frames_before_tab
+
+
+def test_ac2_a_clue_tap_skips_a_cell_that_shows_my_unconfirmed_letter(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    """Guards specs 007 and 009 under pending edits: a cell shows my letter.
+
+    The mock never answers, so the `T` typed in (1, 0) stays pending. Tapping
+    the clue of that word must select (1, 1), the first cell unfilled as shown.
+    """
+    open_fx01(page, live_server, fx01_grid)
+    cell_at(page, 1, 0).click()
+    type_key(page, "t")
+    expect_cell(page, 1, 0, "T", unconfirmed=True)
+    clue_named(page, "Artiste muet").click()
+    expect_selected_cell(page, 1, 2)
+
+    clue_named(page, "Passoire fine").click()
+
+    expect_selected_cell(page, 1, 1)
+
+
+def test_ac2_a_snapshot_after_a_reconnection_keeps_the_pending_edits(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid, seq=5)
+    cell_at(page, 1, 0).click()
+    type_key(page, "t")
+    expect_cell(page, 1, 0, "T", unconfirmed=True)
+    view = with_letter_cells(
+        grid_view(fx01_grid), [(1, 1, {"letter": "A", "author": "p2"})]
+    )
+
+    mock.send(snapshot_frame(view, 9))
+
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "9")
+    expect_cell(page, 1, 1, "A", unconfirmed=False, author="p2")
+    expect_cell(page, 1, 0, "T", unconfirmed=True)
+    mock.send(letter_changed_frame(10, 1, 0, "T", "p1"))
+    expect_cell(page, 1, 0, "T", unconfirmed=False, author="p1")
+
+
+def test_ac2_a_locked_cell_shows_its_confirmed_letter_over_a_pending_edit(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid, seq=5)
+    cell_at(page, 1, 0).click()
+    type_key(page, "t")
+    expect_cell(page, 1, 0, "T", unconfirmed=True)
+    locked_cell: dict[str, object] = {"letter": "B", "author": "p2", "locked": True}
+    view = with_letter_cells(grid_view(fx01_grid), [(1, 0, locked_cell)])
+
+    mock.send(snapshot_frame(view, 9))
+
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "9")
+    expect_cell(page, 1, 0, "B", unconfirmed=False, author="p2")
