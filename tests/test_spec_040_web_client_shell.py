@@ -1129,7 +1129,7 @@ def test_ac20_events_without_seq_change_nothing(
     expect(room).to_have_attribute("data-status", "joined")
 
 
-def test_ac21_other_close_codes_mean_closed(
+def test_ac21_other_close_codes_mean_reconnecting(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = joined_mock_room(page, live_server, fx01_grid, 0)
@@ -1137,10 +1137,11 @@ def test_ac21_other_close_codes_mean_closed(
     mock.close(1011)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "reconnecting")
     expect(page.get_by_test_id("room-status")).to_have_text(
-        load_fr()["room.status.closed"]
+        load_fr()["room.status.reconnecting"]
     )
+    expect(page.get_by_test_id("connection-banner")).to_be_visible()
 
 
 def test_ac21_close_before_a_snapshot_keeps_seq_empty(
@@ -1151,8 +1152,9 @@ def test_ac21_close_before_a_snapshot_keeps_seq_empty(
     mock.close(1011)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "connecting")
     expect(room).to_have_attribute("data-seq", "")
+    expect(page.get_by_test_id("connection-banner")).to_be_hidden()
 
 
 def test_ac21_close_4404_means_not_found(page: Page, live_server: str) -> None:
