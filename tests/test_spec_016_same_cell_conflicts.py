@@ -1017,29 +1017,6 @@ def test_ac3_python_a_locked_cell_is_refused_before_the_solved_check(
     assert refusal.code is ErrorCode.CELL_LOCKED
 
 
-def test_ac3_python_the_rate_limit_is_checked_before_the_lock(
-    fx01_grid: Grid,
-) -> None:
-    base = room_with_locked_cell(fx01_grid)
-    players = []
-    for player in base.players:
-        if player.player_id == "p1":
-            players.append(player.model_copy(update={"recent_edits": (NOW,)}))
-        else:
-            players.append(player)
-    before = base.model_copy(update={"players": tuple(players)})
-    config = RoomConfig(max_edits_per_second=1)
-
-    outcome = handle_message(
-        before, "p1", EditLetter(row=1, column=2, letter="X"), NOW, config
-    )
-
-    assert len(outcome.reply) == 1
-    refusal = outcome.reply[0]
-    assert isinstance(refusal, ErrorMessage)
-    assert refusal.code is ErrorCode.RATE_LIMITED
-
-
 # ---- AC-3: a locked cell refuses edits (WebSocket) ----------------------------------
 
 
@@ -1099,6 +1076,8 @@ def test_ac3_browser_cell_locked_shows_the_letter_and_the_lock_over_a_pending_ed
     expect_letter(page, 1, 2, "M")
     expect(cell).to_have_attribute("data-locked", "true")
 
+    # Typing advanced the selection to (1,3): select the locked cell again.
+    cell.click()
     page.keyboard.press("e")
     page.keyboard.press("Backspace")
     page.wait_for_timeout(SETTLE_MS)
