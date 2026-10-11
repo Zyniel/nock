@@ -21,9 +21,12 @@ from nock.protocol import (
     ErrorCode,
     ErrorMessage,
     Join,
+    Ping,
+    Pong,
     Snapshot,
 )
 from nock.room import (
+    SILENCE_CLOSE_CODE,
     Clock,
     Outcome,
     RoomConfig,
@@ -44,6 +47,13 @@ ROOM_CODE_LENGTH: int = 6
 
 MAX_FRAME_BYTES: int = 4096  # spec 037: larger frames are not parsed
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
+__all__ = [
+    "MAX_FRAME_BYTES",
+    "SESSION_REPLACED_CLOSE_CODE",
+    "SILENCE_CLOSE_CODE",
+    "RoomConnection",
+    "RoomRegistry",
+]
 
 _REFUSAL_TEXTS: dict[ErrorCode, str] = {
     ErrorCode.NOT_JOINED: "Send a join message before anything else.",
@@ -297,6 +307,8 @@ class _RoomRunner:
         """Handle a message of a connection that has not joined yet."""
         if isinstance(message, Join):
             self._join_step(connection, message)
+        elif isinstance(message, Ping):
+            connection.deliver_text(Pong().model_dump_json())
         else:
             self._refuse(connection, ErrorCode.NOT_JOINED)
 
@@ -319,6 +331,7 @@ class _RoomRunner:
                 self._clock(),
                 secrets.token_urlsafe(8),
                 secrets.token_urlsafe(24),
+                self._config,
             )
         except Exception:
             logger.exception("A join in room %s failed", self.state.code)

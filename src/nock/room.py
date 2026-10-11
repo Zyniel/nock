@@ -40,6 +40,7 @@ from nock.protocol import (
     LetterChanged,
     Nickname,
     PencilEdit,
+    Ping,
     PlayerId,
     PlayerJoined,
     PlayerLeft,
@@ -47,6 +48,7 @@ from nock.protocol import (
     PlayerState,
     PlayerStateChanged,
     PlayerView,
+    Pong,
     ResumeToken,
     RevealBudget,
     RevealResult,
@@ -72,6 +74,7 @@ MAX_PLAYERS: int = 8  # spec 012 AC-4
 NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
 NICKNAME_MIN_LENGTH: int = 2
 NICKNAME_MAX_LENGTH: int = 20
+SILENCE_CLOSE_CODE: int = 4408  # spec 017: close code of a silent socket
 DEFAULT_REVEAL_BUDGET: RevealBudget = RevealBudget(letters=5, words=1)  # spec 024
 DEFAULT_SETTINGS: RoomSettings = RoomSettings(
     help_mode=HelpMode.FREE, reveal_budget=DEFAULT_REVEAL_BUDGET, locked=False
@@ -374,12 +377,15 @@ def join_room(
     now: float,
     new_player_id: str,
     new_resume_token: str,
+    config: RoomConfig = DEFAULT_CONFIG,
 ) -> Outcome:
     """Apply a join on a connection that has not joined yet.
 
     The steps run in this order and the first that applies ends the join: resume
     of a known player, room full, invalid nickname, new player. Spec 014 adds
-    the removed and locked refusals.
+    the removed and locked refusals. A token whose player has been disconnected
+    for more than the resume window does not resume: that player times out in
+    this same step and the join goes on as a new player.
 
     Args:
         state: The room.
@@ -387,13 +393,33 @@ def join_room(
         now: Clock time of the join.
         new_player_id: Id given to a new player.
         new_resume_token: Token given to a new player.
+        config: Thresholds of the room rules.
 
     Returns:
         The outcome. A success replies with the snapshot of the player.
     """
     resumed = _find_by_token(state, message.resume_token)
+    timeout_entries: tuple[LogEntry, ...] = ()
+    if resumed is not None and _has_timed_out(resumed, now, config):
+        timeout = _time_out_player(state, resumed, now)
+        state = timeout.state
+        timeout_entries = timeout.entries
+        resumed = None
     if resumed is not None:
         return _resume_player(state, resumed, now)
+    outcome = _join_as_new_player(state, message, now, new_player_id, new_resume_token)
+    all_entries = (*timeout_entries, *outcome.entries)
+    return outcome.model_copy(update={"entries": all_entries})
+
+
+def _join_as_new_player(
+    state: RoomState,
+    message: Join,
+    now: float,
+    new_player_id: str,
+    new_resume_token: str,
+) -> Outcome:
+    """Run the steps of a join that does not resume: full, nickname, new player."""
     if len(state.players) >= MAX_PLAYERS:
         refusal = ErrorMessage(code=ErrorCode.ROOM_FULL, message="The room is full.")
         return Outcome(state=state, reply=(refusal,), close_sender=True)
@@ -403,6 +429,50 @@ def join_room(
         refusal = ErrorMessage(code=ErrorCode.INVALID_NICKNAME, message=str(error))
         return Outcome(state=state, reply=(refusal,))
     return _add_player(state, nickname, now, new_player_id, new_resume_token)
+
+
+def _has_timed_out(player: PlayerRecord, now: float, config: RoomConfig) -> bool:
+    """Tell whether the player is disconnected for more than the resume window."""
+    if player.state != PlayerState.DISCONNECTED or player.disconnected_at is None:
+        return False
+    return now - player.disconnected_at > config.resume_window_seconds
+
+
+def _time_out_player(state: RoomState, player: PlayerRecord, now: float) -> Outcome:
+    """Remove a player who stayed away too long; their letters stay.
+
+    When the player was the host, the role moves at once to the remaining player
+    with the smallest `joined_seq` among those not disconnected, or among all of
+    them when every one is disconnected (spec 014).
+    """
+    left = PlayerLeft(
+        seq=state.seq + 1, player_id=player.player_id, reason=LeaveReason.TIMED_OUT
+    )
+    left_entry = LogEntry(at=now, event=left)
+    entries = [left_entry]
+    new_state = replay(state, left_entry)
+    if player.is_host:
+        new_host = _next_host(new_state)
+        if new_host is not None:
+            changed = HostChanged(seq=new_state.seq + 1, player_id=new_host.player_id)
+            host_entry = LogEntry(at=now, event=changed)
+            entries.append(host_entry)
+            new_state = replay(new_state, host_entry)
+    return Outcome(state=new_state, entries=tuple(entries))
+
+
+def _next_host(state: RoomState) -> PlayerRecord | None:
+    """Return the longest-present player, preferring those who are connected."""
+    connected: list[PlayerRecord] = []
+    for player in state.players:
+        if player.state != PlayerState.DISCONNECTED:
+            connected.append(player)
+    candidates = connected if connected else list(state.players)
+    best: PlayerRecord | None = None
+    for player in candidates:
+        if best is None or player.joined_seq < best.joined_seq:
+            best = player
+    return best
 
 
 def disconnect_player(state: RoomState, player_id: str, now: float) -> Outcome:
@@ -558,12 +628,28 @@ def handle_message(
 ) -> Outcome:
     """Apply a message of a joined player (spec 015 and later).
 
-    Edits (`edit_letter`, `erase`) are handled here. `pencil_edit` and
-    `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
-    them their meaning. Until the spec that gives another message its meaning
-    is built, the message is read and ignored: the state is unchanged and
-    nothing is sent.
+    Every message sets the player's `last_seen_at`. A ping is answered with a
+    pong and is not input. Edits (`edit_letter`, `erase`) are handled here.
+    `pencil_edit` and `confirm_pencil` only go through the rate limit (spec
+    037); spec 020 gives them their meaning. Until the spec that gives another
+    message its meaning is built, the message is read and ignored: nothing is
+    sent.
     """
+    outcome = _apply_message(state, player_id, message, now, config)
+    seen_state = _with_last_seen(outcome.state, player_id, now)
+    return outcome.model_copy(update={"state": seen_state})
+
+
+def _apply_message(
+    state: RoomState,
+    player_id: str,
+    message: ClientMessage,
+    now: float,
+    config: RoomConfig,
+) -> Outcome:
+    """Run the rule of one message."""
+    if isinstance(message, Ping):
+        return Outcome(state=state, reply=(Pong(),))
     if isinstance(message, EditLetter):
         return _apply_edit(state, player_id, message, now, config)
     if isinstance(message, Erase):
@@ -573,6 +659,15 @@ def handle_message(
     if isinstance(message, Undo):
         return _undo(state, player_id, now)
     return Outcome(state=state)
+
+
+def _with_last_seen(state: RoomState, player_id: str, now: float) -> RoomState:
+    """Return the state with the player's `last_seen_at` set to `now`."""
+    player = _find_player(state, player_id)
+    if player is None:
+        return state
+    seen = player.model_copy(update={"last_seen_at": now})
+    return _replace_player(state, seen)
 
 
 def _find_player(state: RoomState, player_id: str) -> PlayerRecord | None:
@@ -654,8 +749,8 @@ def _edit_refusal(
 ) -> Outcome | None:
     """Run the edit checks in their fixed order; return the first refusal.
 
-    Checks 4 (stale edit, spec 017) and 5 (solved grid, spec 026) belong to
-    later specs: they keep their place in the order but never refuse yet.
+    Check 5 (solved grid, spec 026) belongs to a later spec: it keeps its place
+    in the order but never refuses yet.
     """
     rate_refusal = _rate_limit_refusal(state, player_id, now, config)
     if rate_refusal is not None:
@@ -673,7 +768,22 @@ def _edit_refusal(
             ErrorCode.CELL_LOCKED,
             f"({edit.row}, {edit.column}) is locked.",
         )
+    if _is_stale(cell, player_id, edit):
+        return _refuse(
+            state,
+            ErrorCode.STALE_EDIT,
+            f"({edit.row}, {edit.column}) changed since the edit was made.",
+        )
     return None
+
+
+def _is_stale(cell: CellState, player_id: str, edit: EditLetter | Erase) -> bool:
+    """Tell whether someone else changed the cell after the edit's `base_seq`."""
+    if edit.base_seq is None:
+        return False
+    if cell.changed_seq <= edit.base_seq:
+        return False
+    return cell.changed_by != player_id
 
 
 def _letter_of(edit: EditLetter | Erase) -> str | None:
@@ -805,8 +915,36 @@ def _undo(state: RoomState, player_id: str, now: float) -> Outcome:
 
 
 def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> Outcome:
-    """Apply the passing of time (spec 013, 014, 017)."""
-    return Outcome(state=state)
+    """Apply the passing of time (spec 013, 014, 017).
+
+    For each player, in `players` order: a joined player silent for too long is
+    disconnected and their socket is to be closed; a player disconnected for
+    more than the resume window leaves the room.
+    """
+    current = state
+    entries: list[LogEntry] = []
+    disconnects: list[Disconnect] = []
+    for listed in state.players:
+        player = _find_player(current, listed.player_id)
+        if player is None:
+            continue
+        if player.state != PlayerState.DISCONNECTED:
+            silence = now - player.last_seen_at
+            if silence >= config.silence_timeout_seconds:
+                step = disconnect_player(current, player.player_id, now)
+                current = step.state
+                entries.extend(step.entries)
+                silent = Disconnect(
+                    player_id=player.player_id, close_code=SILENCE_CLOSE_CODE
+                )
+                disconnects.append(silent)
+        elif _has_timed_out(player, now, config):
+            step = _time_out_player(current, player, now)
+            current = step.state
+            entries.extend(step.entries)
+    return Outcome(
+        state=current, entries=tuple(entries), disconnects=tuple(disconnects)
+    )
 
 
 def replay(state: RoomState, entry: LogEntry) -> RoomState:

@@ -25,13 +25,19 @@ from nock.catalogue import (
 from nock.hub import (
     MAX_FRAME_BYTES,
     SESSION_REPLACED_CLOSE_CODE,
+    SILENCE_CLOSE_CODE,
     RoomConnection,
     RoomRegistry,
 )
 from nock.protocol import parse_client_message
 from nock.store import RoomStore
 
-__all__ = ["SESSION_REPLACED_CLOSE_CODE", "RoomRegistry", "create_app"]
+__all__ = [
+    "SESSION_REPLACED_CLOSE_CODE",
+    "SILENCE_CLOSE_CODE",
+    "RoomRegistry",
+    "create_app",
+]
 
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
 ROOM_CODE_PATTERN: str = r"^[A-Z0-9]{6}$"

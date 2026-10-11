@@ -6,7 +6,22 @@
   import { markFinished } from './catalogue'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
-  import { FLASH_MS, addPendingEdit, endFlash, gridLabel, newSession, receiveFrame, shownCell, shownGrid, statusAfterClose } from './roomSession'
+  import {
+    FLASH_MS,
+    PING_INTERVAL_MS,
+    SILENCE_LIMIT_MS,
+    addPendingEdit,
+    endFlash,
+    gridLabel,
+    isFinalClose,
+    newSession,
+    receiveFrame,
+    reconnectDelay,
+    shownCell,
+    shownGrid,
+    statusAfterFinalClose,
+    statusAfterLoss,
+  } from './roomSession'
   import {
     computeWords,
     sameSelection,
@@ -86,8 +101,13 @@
   let selection = $derived(validSelection(words, rawSelection))
   let activeWord = $derived(selectedWord(words, selection))
 
+  // True while the page retries after a loss that happened with the form shown:
+  // the form stays on screen until the new socket opens.
+  let isFormKept = $state(false)
   let isFormShown = $derived(
-    session.status === 'nickname' || (session.status === 'joining' && formJoinNickname !== null),
+    session.status === 'nickname' ||
+      (session.status === 'joining' && formJoinNickname !== null) ||
+      (session.status === 'connecting' && isFormKept),
   )
   // A nickname refused by the server is shown as a characters error.
   let shownError = $derived(formError ?? (session.nicknameRefused ? 'characters' : null))
@@ -336,51 +356,190 @@
     return `${scheme}://${location.host}/api/rooms/${roomCode}/ws`
   }
 
-  $effect(() => {
+  // ---- The connection: heartbeat, loss detection and reconnection (spec 017) ----
+
+  // The next delay of the reconnection is `reconnectDelay(reconnectAttempt)`.
+  let reconnectAttempt = 0
+  let pingTimer: ReturnType<typeof setInterval> | undefined
+  let silenceTimer: ReturnType<typeof setTimeout> | undefined
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+
+  function stopHeartbeat(): void {
+    clearInterval(pingTimer)
+    clearTimeout(silenceTimer)
+    pingTimer = undefined
+    silenceTimer = undefined
+  }
+
+  function stopReconnectTimer(): void {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = undefined
+  }
+
+  // Stop listening to a socket and close it.
+  function dropSocket(dropped: WebSocket): void {
+    dropped.onopen = null
+    dropped.onmessage = null
+    dropped.onclose = null
+    dropped.onerror = null
+    dropped.close()
+    if (socket === dropped) {
+      socket = null
+    }
+  }
+
+  // Any frame from the server shows the connection is alive: the silence count
+  // starts again.
+  function restartSilenceTimer(opened: WebSocket): void {
+    clearTimeout(silenceTimer)
+    silenceTimer = setTimeout(() => connectionSilent(opened), SILENCE_LIMIT_MS)
+  }
+
+  function startHeartbeat(opened: WebSocket): void {
+    stopHeartbeat()
+    pingTimer = setInterval(() => send({ type: 'ping' }), PING_INTERVAL_MS)
+    restartSilenceTimer(opened)
+  }
+
+  // A loss before the first snapshot keeps the nickname form on screen when it was
+  // shown, or when a join sent from it is lost (the new socket shows it again).
+  function keepFormAfterLoss(): void {
+    const wasFormShown = isFormShown
+    if (session.snapshot === null && wasFormShown) {
+      isFormKept = true
+    }
+    formJoinNickname = null
+  }
+
+  // Nothing came from the server for too long: the page closes the socket itself.
+  // The loss is shown at once; the next try is planned when the socket has
+  // closed (its close event), so a new socket never opens beside a half-open one.
+  function connectionSilent(silent: WebSocket): void {
+    if (silent !== socket) {
+      return
+    }
+    stopHeartbeat()
+    keepFormAfterLoss()
+    session.status = statusAfterLoss(session)
+    silent.close()
+  }
+
+  // The socket is lost: show it, then try again after the next delay.
+  function connectionLost(lost: WebSocket): void {
+    if (lost !== socket) {
+      return
+    }
+    stopHeartbeat()
+    dropSocket(lost)
+    keepFormAfterLoss()
+    session.status = statusAfterLoss(session)
+    const delay = reconnectDelay(reconnectAttempt)
+    reconnectAttempt += 1
+    stopReconnectTimer()
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = undefined
+      openSocket()
+    }, delay)
+  }
+
+  // The socket closed for good: no more tries.
+  function connectionEnded(ended: WebSocket, closeCode: number): void {
+    stopHeartbeat()
+    stopReconnectTimer()
+    dropSocket(ended)
+    session.status = statusAfterFinalClose(closeCode, session.status)
+  }
+
+  // The browser has a network again: do not wait for the next delay.
+  function onBrowserOnline(): void {
+    if (reconnectTimer === undefined) {
+      return
+    }
+    stopReconnectTimer()
+    openSocket()
+  }
+
+  // Send my pending edits again, oldest first, each with the base_seq it had.
+  function resendPendingEdits(): void {
+    for (const edit of session.pendingEdits) {
+      if (edit.letter === null) {
+        send({ type: 'erase', row: edit.row, column: edit.column, base_seq: edit.baseSeq })
+      } else {
+        send({
+          type: 'edit_letter',
+          row: edit.row,
+          column: edit.column,
+          letter: edit.letter,
+          base_seq: edit.baseSeq,
+        })
+      }
+    }
+  }
+
+  // The first message of a socket: the join of the stored identity, or the form.
+  function joinOnOpen(opened: WebSocket): void {
+    const plan = planAutomaticJoin(code, t('room.default_nickname'))
+    isFormKept = false
+    if (plan === null) {
+      session.status = 'nickname'
+      return
+    }
+    if (session.snapshot === null) {
+      session.status = 'joining'
+    }
+    opened.send(JSON.stringify({ type: 'join', ...plan }))
+  }
+
+  function onSocketMessage(opened: WebSocket, event: MessageEvent): void {
+    restartSilenceTimer(opened)
+    if (typeof event.data !== 'string') {
+      return
+    }
+    const snapshotBefore = session.snapshot
+    receiveFrame(session, event.data)
+    if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
+      rememberJoin(session.snapshot)
+      if (snapshotBefore === null) {
+        restoreSavedSelection(session.snapshot)
+      }
+      reconnectAttempt = 0
+      resendPendingEdits()
+    }
+    if (session.status === 'nickname') {
+      formJoinNickname = null
+    }
+  }
+
+  function openSocket(): void {
     const opened = new WebSocket(roomSocketUrl(code))
     socket = opened
 
     opened.onopen = () => {
-      const plan = planAutomaticJoin(code, t('room.default_nickname'))
-      if (plan === null) {
-        session.status = 'nickname'
-        return
-      }
-      session.status = 'joining'
-      opened.send(JSON.stringify({ type: 'join', ...plan }))
+      startHeartbeat(opened)
+      joinOnOpen(opened)
     }
-    opened.onmessage = (event: MessageEvent) => {
-      if (typeof event.data !== 'string') {
-        return
-      }
-      const snapshotBefore = session.snapshot
-      receiveFrame(session, event.data)
-      if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
-        rememberJoin(session.snapshot)
-        if (snapshotBefore === null) {
-          restoreSavedSelection(session.snapshot)
-        }
-      }
-      if (session.status === 'nickname') {
-        formJoinNickname = null
-      }
-    }
+    opened.onmessage = (event: MessageEvent) => onSocketMessage(opened, event)
     opened.onclose = (event: CloseEvent) => {
-      session.status = statusAfterClose(event.code, session.status)
-    }
-    opened.onerror = () => {
-      const isFinal = ['not_found', 'throttled', 'full', 'replaced'].includes(session.status)
-      if (!isFinal) {
-        session.status = 'closed'
+      if (isFinalClose(session, event.code)) {
+        connectionEnded(opened, event.code)
+      } else {
+        connectionLost(opened)
       }
     }
+  }
+
+  $effect(() => {
+    openSocket()
+    window.addEventListener('online', onBrowserOnline)
 
     // Leaving the page closes the socket; the handlers must not react to it.
     return () => {
-      opened.onclose = null
-      opened.onerror = null
-      opened.close()
-      socket = null
+      window.removeEventListener('online', onBrowserOnline)
+      stopHeartbeat()
+      stopReconnectTimer()
+      if (socket !== null) {
+        dropSocket(socket)
+      }
     }
   })
 </script>
@@ -396,6 +555,11 @@
 >
   <h1>{t('room.heading', { code })}</h1>
   <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+  {#if session.status === 'reconnecting'}
+    <p class="connection-banner" data-testid="connection-banner" role="status">
+      {t('room.banner.offline')}
+    </p>
+  {/if}
   {#if isFormShown}
     <form data-testid="nickname-form" class="nickname-form" onsubmit={submitNickname}>
       <h2>{t('join.heading')}</h2>
@@ -512,6 +676,13 @@
     flex-direction: column;
     gap: 0.5rem;
     max-width: 24rem;
+  }
+
+  .connection-banner {
+    margin: 0.25rem 0;
+    padding: 0.4rem 0.75rem;
+    background: #fff3cd;
+    border: 1px solid #b38600;
   }
 
   .nickname-error {

@@ -6,6 +6,7 @@ export type RoomStatus =
   | 'nickname'
   | 'joining'
   | 'joined'
+  | 'reconnecting'
   | 'full'
   | 'replaced'
   | 'not_found'
@@ -110,6 +111,9 @@ export interface RoomSession {
   nextFlashId: number
   // How many times the server answered an undo with nothing_to_undo (spec 018).
   undoRefusals: number
+  // True once the server refused the join for good: room full, locked or the
+  // player removed. The socket close that follows ends the attempts (spec 017).
+  isRefused: boolean
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -126,6 +130,11 @@ export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
 export const THROTTLED_CLOSE_CODE = 4429
 export const SESSION_REPLACED_CLOSE_CODE = 4001
 
+// Heartbeat and reconnection (spec 017).
+export const PING_INTERVAL_MS = 2000
+export const SILENCE_LIMIT_MS = 4000
+export const RECONNECT_DELAYS_MS: number[] = [1000, 2000, 4000, 8000]
+
 const PLAYER_STATES: string[] = ['active', 'idle', 'disconnected']
 const MAX_COLOUR = 7
 
@@ -141,6 +150,7 @@ export function newSession(): RoomSession {
     flashes: [],
     nextFlashId: 1,
     undoRefusals: 0,
+    isRefused: false,
   }
 }
 
@@ -553,6 +563,9 @@ const EDIT_ERROR_CODES: string[] = [
   'grid_solved',
 ]
 
+// The errors after which the server closes the socket and the page must not retry.
+const REFUSAL_ERROR_CODES: string[] = ['room_full', 'room_locked', 'removed']
+
 // The errors that answer an edit, or a join: a refused nickname, or a full room.
 function receiveError(session: RoomSession, message: Record<string, unknown>): void {
   if (message.code === 'nothing_to_undo') {
@@ -563,10 +576,13 @@ function receiveError(session: RoomSession, message: Record<string, unknown>): v
     session.pendingEdits.shift()
     return
   }
-  if (session.status !== 'joining') {
+  if (typeof message.code === 'string' && REFUSAL_ERROR_CODES.includes(message.code)) {
+    session.isRefused = true
+  }
+  if (session.status !== 'joining' && session.status !== 'reconnecting') {
     return
   }
-  if (message.code === 'invalid_nickname') {
+  if (message.code === 'invalid_nickname' && session.status === 'joining') {
     session.status = 'nickname'
     session.nicknameRefused = true
   } else if (message.code === 'room_full') {
@@ -574,9 +590,19 @@ function receiveError(session: RoomSession, message: Record<string, unknown>): v
   }
 }
 
-// The status once the socket closed. A full room closes its socket on purpose
-// and a replaced page was told why: both stay as they are.
-export function statusAfterClose(code: number, current: RoomStatus): RoomStatus {
+// True when the close of the socket ends the attempts: a close code that is
+// final, or a close that follows a refusal of the join.
+export function isFinalClose(session: RoomSession, code: number): boolean {
+  const isFinalCode =
+    code === ROOM_NOT_FOUND_CLOSE_CODE ||
+    code === THROTTLED_CLOSE_CODE ||
+    code === SESSION_REPLACED_CLOSE_CODE
+  return isFinalCode || session.isRefused
+}
+
+// The status after a final close. A refusal already set its own status (a full
+// room) or has none yet (locked, removed): it stays as it is.
+export function statusAfterFinalClose(code: number, current: RoomStatus): RoomStatus {
   if (code === ROOM_NOT_FOUND_CLOSE_CODE) {
     return 'not_found'
   }
@@ -586,10 +612,22 @@ export function statusAfterClose(code: number, current: RoomStatus): RoomStatus 
   if (code === SESSION_REPLACED_CLOSE_CODE) {
     return 'replaced'
   }
-  if (current === 'full') {
-    return 'full'
+  return current
+}
+
+// The delay before reconnection try number `attempt` (0 for the first).
+export function reconnectDelay(attempt: number): number {
+  const last = RECONNECT_DELAYS_MS.length - 1
+  return RECONNECT_DELAYS_MS[Math.min(attempt, last)]
+}
+
+// The status once the connection is lost. After a snapshot the page shows the
+// offline banner; before it, it keeps asking for a join, with no banner.
+export function statusAfterLoss(session: RoomSession): RoomStatus {
+  if (session.snapshot !== null) {
+    return 'reconnecting'
   }
-  return 'closed'
+  return 'connecting'
 }
 
 export function gridLabel(session: RoomSession): string {

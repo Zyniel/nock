@@ -35,6 +35,8 @@
   "room.status.not_found": "Ce salon n'existe pas.",
   "room.status.throttled": "Trop de codes erronés. Réessayez dans une minute.",
   "room.status.closed": "Connexion perdue.",
+  "room.status.reconnecting": "Reconnexion…",
+  "room.banner.offline": "Connexion perdue. Vous pouvez continuer : vos lettres seront envoyées au retour du réseau.",
   "room.share.label": "Lien d'invitation",
   "room.share.copy": "Copier le lien",
   "room.share.copied": "Lien copié",
