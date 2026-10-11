@@ -1,8 +1,8 @@
-import { FEED_LIMIT, feedItemFor } from './activityFeed'
-import type { FeedItem } from './activityFeed'
-
 // The state of one room page and the rules that keep it in `seq` order.
 // Plain functions: no socket and no DOM, so the rules are easy to read.
+
+import { FEED_LIMIT, feedItemFor } from './activityFeed'
+import type { FeedItem } from './activityFeed'
 
 export type RoomStatus =
   | 'connecting'
@@ -138,7 +138,7 @@ export interface RoomSession {
   // The activity feed, oldest first (spec 013).
   feed: FeedItem[]
   // The nickname of every player seen so far, by id; those who left stay.
-  names: Record<string, string>
+  names: Map<string, string>
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -178,7 +178,7 @@ export function newSession(): RoomSession {
     undoRefusals: 0,
     isRefused: false,
     feed: [],
-    names: {},
+    names: new Map(),
   }
 }
 
@@ -554,7 +554,7 @@ function addFeedItem(session: RoomSession, snapshot: Snapshot, event: RoomEvent)
   if (event.type === 'player_joined') {
     const player = toPlayer(event.message.player)
     if (player !== null) {
-      session.names[player.player_id] = player.nickname
+      session.names.set(player.player_id, player.nickname)
     }
   }
   const item = feedItemFor(snapshot, session.names, event)
@@ -606,7 +606,7 @@ function drainPending(session: RoomSession): void {
 function receiveSnapshot(session: RoomSession, snapshot: Snapshot): void {
   session.snapshot = snapshot
   for (const player of snapshot.players) {
-    session.names[player.player_id] = player.nickname
+    session.names.set(player.player_id, player.nickname)
   }
   session.seq = snapshot.seq
   session.status = 'joined'

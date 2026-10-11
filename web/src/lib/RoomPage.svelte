@@ -50,7 +50,7 @@
   let formJoinNickname: string | null = $state(null)
   let socket: WebSocket | null = null
   let gridViewport: GridViewport | undefined = $state()
-  let feedElement: HTMLElement | undefined = $state()
+  let feedElement: HTMLUListElement | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
@@ -613,8 +613,27 @@
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
-  <h1>{t('room.heading', { code })}</h1>
-  <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+  <header class="room-header">
+    <h1>{t('room.heading', { code })}</h1>
+    <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+    {#if session.snapshot !== null}
+      <div class="share-panel" data-testid="share-panel">
+        <span id="share-label" class="share-label">{t('room.share.label')}</span>
+        <a data-testid="share-link" href={shareLink} aria-describedby="share-label"
+          >{shareLink}</a
+        >
+        <button type="button" data-testid="copy-link" onclick={copyLink}
+          >{copied ? t('room.share.copied') : t('room.share.copy')}</button
+        >
+      </div>
+      <div class="undo-panel">
+        <button type="button" data-testid="undo-button" onclick={onUndo}>{t('room.undo')}</button>
+        {#if isUndoMessageShown}
+          <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
+        {/if}
+      </div>
+    {/if}
+  </header>
   {#if session.status === 'reconnecting'}
     <p class="connection-banner" data-testid="connection-banner" role="status">
       {t('room.banner.offline')}
@@ -672,9 +691,9 @@
         {/each}
       </ul>
     </section>
-    <section class="feed" data-testid="activity-feed" bind:this={feedElement}>
+    <section class="feed" data-testid="activity-feed">
       <h2>{t('feed.heading')}</h2>
-      <ul>
+      <ul bind:this={feedElement}>
         {#each session.feed as item (item.seq)}
           <li data-testid="feed-item" data-kind={item.kind} data-seq={String(item.seq)}>
             {item.text}
@@ -682,15 +701,6 @@
         {/each}
       </ul>
     </section>
-    </div>
-    <div class="share-panel" data-testid="share-panel">
-      <span id="share-label" class="share-label">{t('room.share.label')}</span>
-      <a data-testid="share-link" href={shareLink} aria-describedby="share-label"
-        >{shareLink}</a
-      >
-      <button type="button" data-testid="copy-link" onclick={copyLink}
-        >{copied ? t('room.share.copied') : t('room.share.copy')}</button
-      >
     </div>
     <GridViewport
       bind:this={gridViewport}
@@ -708,12 +718,6 @@
       flashes={session.flashes}
       {remoteSelections}
     />
-    <div class="undo-panel">
-      <button type="button" data-testid="undo-button" onclick={onUndo}>{t('room.undo')}</button>
-      {#if isUndoMessageShown}
-        <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
-      {/if}
-    </div>
     <div
       class="clue-bar"
       data-testid="clue-bar"
@@ -766,7 +770,45 @@
     color: #a4161a;
   }
 
-  /* The roster and the feed: stacked, or side by side in a low window. */
+  /* Title, status, invitation link and undo on one row; it wraps when it must. */
+  .room-header {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .room-header h1 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .room-header p {
+    margin: 0;
+  }
+
+  .share-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .share-panel a {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .undo-panel {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* The roster and the feed: stacked on a roomy window. */
   .presence {
     flex: none;
     display: flex;
@@ -817,12 +859,10 @@
     opacity: 0.45;
   }
 
-  /* A short strip that scrolls: the grid keeps the height (spec 006). */
+  /* A short list that scrolls: the grid keeps the height (spec 006). */
   .feed {
     flex: none;
     box-sizing: border-box;
-    max-height: 4.5rem;
-    overflow-y: auto;
     overflow-wrap: anywhere;
     font-size: 0.85rem;
   }
@@ -833,25 +873,11 @@
   }
 
   .feed ul {
+    max-height: 3.6rem;
+    overflow-y: auto;
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  .undo-panel {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .share-panel {
-    flex: none;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.5rem;
-    overflow-wrap: anywhere;
   }
 
   /* Below the scrolling grid, so it is always inside the window. */
@@ -869,40 +895,83 @@
     line-height: 1.3;
   }
 
-  /* A low window (a phone on its side) keeps its height for the grid. */
-  @media (max-height: 500px) {
-    main {
-      padding: 0.25rem 0.5rem;
-    }
-
-    h1 {
-      margin: 0;
+  /* A narrow or low window (a phone) keeps its height for the grid: the roster
+     and the feed are one line each, the roster scrolls sideways and the feed
+     shows its newest item and scrolls up to the older ones. */
+  @media (max-height: 500px), (max-width: 480px) {
+    .room-header h1 {
       font-size: 1rem;
     }
 
-    p {
+    .share-label {
+      display: none;
+    }
+
+    .presence {
+      gap: 0.1rem;
+    }
+
+    .roster,
+    .feed {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .roster h2,
+    .feed h2 {
+      flex: none;
       margin: 0;
+      font-size: 0.8rem;
+    }
+
+    .roster ul {
+      flex: 1 1 auto;
+      flex-wrap: nowrap;
+      min-width: 0;
+      gap: 0.75rem;
+      overflow-x: auto;
+    }
+
+    .roster li {
+      flex: none;
+      white-space: nowrap;
+    }
+
+    .feed ul {
+      flex: 1 1 auto;
+      min-width: 0;
+      max-height: 1.3rem;
+      line-height: 1.3rem;
+    }
+
+    .feed li {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  /* A low window (a phone on its side) also takes the padding down, and puts the
+     roster and the feed side by side. */
+  @media (max-height: 500px) {
+    main {
+      padding: 0.25rem 0.5rem;
     }
 
     .clue-bar {
       padding: 0.25rem 0.75rem;
     }
 
-    /* Side by side, so the feed takes no height from the grid (spec 006). */
     .presence {
       flex-direction: row;
       gap: 1rem;
     }
 
-    .roster {
-      flex: 1 1 0;
-      min-width: 0;
-    }
-
+    .roster,
     .feed {
       flex: 1 1 0;
-      min-width: 0;
-      max-height: 2.6rem;
     }
   }
 </style>

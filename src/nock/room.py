@@ -489,6 +489,8 @@ def disconnect_player(state: RoomState, player_id: str, now: float) -> Outcome:
 
     Returns:
         The outcome, with the player marked disconnected when they were not yet.
+        Their selection is cleared; when they had one, `to_others` holds the
+        `SelectionMoved` to `None` for the other players.
     """
     for player in state.players:
         if player.player_id != player_id:
@@ -555,9 +557,12 @@ def _with_state_change(state: RoomState, changed: PlayerRecord, now: float) -> O
 
 
 def _resume_player(state: RoomState, player: PlayerRecord, now: float) -> Outcome:
-    """Join `player` again on a new connection."""
+    """Join `player` again on a new connection.
+
+    A disconnected or idle player becomes active, with one `PlayerStateChanged`.
+    """
     resumed = player.model_copy(update={"last_seen_at": now, "last_input_at": now})
-    if player.state == PlayerState.DISCONNECTED:
+    if player.state != PlayerState.ACTIVE:
         resumed = resumed.model_copy(
             update={"state": PlayerState.ACTIVE, "disconnected_at": None}
         )
@@ -638,7 +643,12 @@ def handle_message(
     """Apply a message of a joined player (spec 015 and later).
 
     Every message sets the player's `last_seen_at`. A ping is answered with a
-    pong and is not input. Edits (`edit_letter`, `erase`) are handled here.
+    pong and is not input; neither is a join. Any other message is input: it
+    sets `last_input_at`, and an idle player becomes active with a
+    `PlayerStateChanged` entry ahead of the message's own entries.
+    `select_cell` stores the selection of a letter cell and relays it in
+    `to_others` (a non-letter cell is refused); edits (`edit_letter`, `erase`)
+    and `undo` are handled here.
     `pencil_edit` and `confirm_pencil` only go through the rate limit (spec
     037); spec 020 gives them their meaning. Until the spec that gives another
     message its meaning is built, the message is read and ignored: nothing is

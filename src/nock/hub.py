@@ -439,8 +439,9 @@ class _RoomRunner:
         for moved in outcome.to_others:
             moved_text = moved.model_dump_json()
             for connection in joined:
-                if connection is not sender:
-                    connection.deliver_text(moved_text)
+                if connection is sender or connection.player_id == moved.player_id:
+                    continue  # a selection is never sent to its own player
+                connection.deliver_text(moved_text)
 
         for disconnect in outcome.disconnects:
             for target in self._connections:

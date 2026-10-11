@@ -14,11 +14,9 @@ export interface FeedItem {
 }
 
 // The nickname of a player known to the page, even one who left.
-function nameOf(names: Record<string, string>, playerId: unknown): string {
-  if (typeof playerId === 'string' && playerId in names) {
-    return names[playerId]
-  }
-  return t('feed.someone')
+function nameOf(names: Map<string, string>, playerId: unknown): string {
+  const name = typeof playerId === 'string' ? names.get(playerId) : undefined
+  return name ?? t('feed.someone')
 }
 
 function helpModeText(helpMode: string): string {
@@ -141,7 +139,7 @@ function settingsItem(snapshot: Snapshot, event: RoomEvent, name: string): FeedI
 // `names` must already know the player of a `player_joined`.
 export function feedItemFor(
   snapshot: Snapshot,
-  names: Record<string, string>,
+  names: Map<string, string>,
   event: RoomEvent,
 ): FeedItem | null {
   const name = nameOf(names, event.message.player_id)

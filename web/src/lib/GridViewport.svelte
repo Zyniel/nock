@@ -55,8 +55,20 @@
     remoteSelections: RemoteSelection[]
   } = $props()
 
-  // The inset of the first remote outline, and the step between two of them.
+  // The step between two outlines on one cell, and the most the stack may take
+  // of each side of the cell, so that the innermost outline stays visible.
   const OUTLINE_STEP_PX = 3
+  const OUTLINE_STACK_MAX_SHARE = 0.4
+  const OUTLINE_BORDER_PX = 2
+  const MAX_OUTLINES = 7
+
+  // The inset of the outline at `rank`: 3 px per rank, scaled down on a small
+  // cell so that the last of the 7 other players still has room for its border.
+  function outlineInset(rank: number): number {
+    const room = cellSize * OUTLINE_STACK_MAX_SHARE - OUTLINE_BORDER_PX
+    const step = Math.min(OUTLINE_STEP_PX, room / (MAX_OUTLINES - 1))
+    return rank * Math.max(step, 1)
+  }
 
   // The remote selections that sit on a cell, in roster order.
   function outlinesOn(row: number, column: number): RemoteSelection[] {
@@ -364,7 +376,7 @@
               data-player-id={remote.playerId}
               data-colour={String(remote.colour)}
               style:--outline-colour={`var(--player-colour-${remote.colour})`}
-              style:inset="{rank * OUTLINE_STEP_PX}px"
+              style:inset="{outlineInset(rank)}px"
             ></span>{/each}</div>
       {:else if cell.type === 'clue'}
         <div
