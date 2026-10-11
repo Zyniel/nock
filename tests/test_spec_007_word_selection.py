@@ -136,11 +136,22 @@ def wait_until(page: Page, condition: Callable[[], bool]) -> None:
         waited_ms += 50
 
 
+FORM_TIMEOUT_MS = 5000
+
+
+def submit_nickname_form(page: Page, nickname: str = "Ana") -> None:
+    """Fill the nickname form of spec 012 and submit it with Enter."""
+    nickname_input = page.get_by_test_id("nickname-input")
+    nickname_input.fill(nickname, timeout=FORM_TIMEOUT_MS)
+    nickname_input.press("Enter", timeout=FORM_TIMEOUT_MS)
+
+
 def open_mock_room(page: Page, base_url: str) -> MockRoomSocket:
     """Open /r/ABC123 with a mocked socket and wait for the page's join."""
     mock = MockRoomSocket(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/ABC123")
+    submit_nickname_form(page)
     wait_until(page, lambda: len(mock.received) > 0)
     return mock
 
@@ -897,7 +908,7 @@ def test_ac4_there_is_no_clue_bar_before_the_first_snapshot(
     open_mock_room(page, live_server)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "connecting")
+    expect(room).to_have_attribute("data-status", "joining")
     expect(page.get_by_test_id("clue-bar")).to_have_count(0)
     expect(page.get_by_test_id("clue-bar-text")).to_have_count(0)
 

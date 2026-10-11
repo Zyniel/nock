@@ -7,6 +7,7 @@ import re
 import tempfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,6 +22,8 @@ from nock.protocol import (
     HelpMode,
     Join,
     LetterChanged,
+    PlayerState,
+    PlayerView,
     RevealBudget,
     RoomSettings,
     Snapshot,
@@ -67,6 +70,12 @@ WAIT_TIMEOUT_MS = 5000
 
 
 # ---- Fixtures and helpers ---------------------------------------------------
+
+
+class EnterRoom(Protocol):
+    """The `enter_room` fixture of conftest."""
+
+    def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
 
 
 @pytest.fixture
@@ -227,11 +236,22 @@ def settle(page: Page) -> None:
     page.wait_for_timeout(300)
 
 
+FORM_TIMEOUT_MS = 5000
+
+
+def submit_nickname_form(page: Page, nickname: str = "Ana") -> None:
+    """Fill the nickname form of spec 012 and submit it with Enter."""
+    nickname_input = page.get_by_test_id("nickname-input")
+    nickname_input.fill(nickname, timeout=FORM_TIMEOUT_MS)
+    nickname_input.press("Enter", timeout=FORM_TIMEOUT_MS)
+
+
 def open_mock_room(page: Page, base_url: str) -> MockRoomSocket:
-    """Open /r/ABC123 with a mocked socket and wait for the page's join."""
+    """Open /r/ABC123 with a mocked socket, submit the form, wait for the join."""
     mock = MockRoomSocket(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/ABC123")
+    submit_nickname_form(page)
     mock.wait_for_join()
     return mock
 
@@ -242,7 +262,17 @@ def snapshot_frame(grid: Grid, seq: int) -> str:
         you="p1",
         resume_token=SNAPSHOT_RESUME_TOKEN,
         grid=grid_view(grid),
-        players=(),
+        players=(
+            PlayerView(
+                player_id="p1",
+                nickname="Ana",
+                colour=0,
+                state=PlayerState.ACTIVE,
+                is_host=True,
+                muted=False,
+                selection=None,
+            ),
+        ),
         settings=EXPECTED_SETTINGS,
         reveal_budget=RevealBudget(letters=5, words=1),
         flags=(),
@@ -707,9 +737,19 @@ def test_ac8_join_gets_the_snapshot_of_the_room(
 ) -> None:
     snapshot = join_and_get_snapshot(room_client, room_code)
 
-    assert snapshot.seq == 0
+    assert snapshot.seq == 1
     assert snapshot.grid == grid_view(fx01_grid)
-    assert snapshot.players == ()
+    assert snapshot.players == (
+        PlayerView(
+            player_id=snapshot.you,
+            nickname="Ana",
+            colour=0,
+            state=PlayerState.ACTIVE,
+            is_host=True,
+            muted=False,
+            selection=None,
+        ),
+    )
     assert snapshot.settings == EXPECTED_SETTINGS
     assert snapshot.reveal_budget == RevealBudget(letters=5, words=1)
     assert snapshot.flags == ()
@@ -728,7 +768,7 @@ def test_ac8_binary_join_frame_is_handled_like_text(
         message = parse_server_message(websocket.receive_text())
 
     assert isinstance(message, Snapshot)
-    assert message.seq == 0
+    assert message.seq == 1
 
 
 def test_ac8_resume_token_of_the_join_is_ignored(
@@ -869,16 +909,20 @@ def test_ac15_title_and_language(page: Page, live_server: str, path: str) -> Non
 
 
 def test_ac16_room_page_joins_and_shows_the_grid(
-    page: Page, live_server: str, room_registry: RoomRegistry, fx01_grid: Grid
+    page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx01_grid: Grid,
+    enter_room: EnterRoom,
 ) -> None:
     code = room_registry.register_room(fx01_grid)
 
-    page.goto(f"{live_server}/r/{code}")
+    enter_room(page, f"{live_server}/r/{code}")
 
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-room-code", code)
     expect(room).to_have_attribute("data-status", "joined")
-    expect(room).to_have_attribute("data-seq", "0")
+    expect(room).to_have_attribute("data-seq", "1")
     expect(room).to_have_attribute("data-grid", "5x5")
     expect(page.get_by_test_id("room-status")).to_have_text(
         load_fr()["room.status.joined"]
@@ -902,29 +946,38 @@ def test_ac17_unknown_room_shows_not_found(page: Page, live_server: str) -> None
 # ---- AC-18 to AC-21: browser, mocked socket ---------------------------------
 
 
-def test_ac18_page_sends_the_default_join(page: Page, live_server: str) -> None:
-    mock = open_mock_room(page, live_server)
+def test_ac18_page_shows_the_form_then_sends_the_join_of_the_form(
+    page: Page, live_server: str
+) -> None:
+    mock = MockRoomSocket(page)
+    page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
+    page.goto(f"{live_server}/r/ABC123")
+    room = page.get_by_test_id("room-page")
+    expect(room).to_have_attribute("data-status", "nickname")
+    page.wait_for_timeout(300)
+    assert mock.received == []
 
+    submit_nickname_form(page, "Ana")
+
+    mock.wait_for_join()
     first_message = parse_client_message(mock.received[0])
-    assert first_message == Join(
-        nickname=load_fr()["room.default_nickname"], resume_token=None
-    )
+    assert first_message == Join(nickname="Ana", resume_token=None)
     assert len(mock.routes) == 1
 
 
-def test_ac18_before_a_snapshot_the_page_is_connecting(
+def test_ac18_before_a_snapshot_the_page_is_joining(
     page: Page, live_server: str
 ) -> None:
     open_mock_room(page, live_server)
 
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-room-code", "ABC123")
-    expect(room).to_have_attribute("data-status", "connecting")
+    expect(room).to_have_attribute("data-status", "joining")
     expect(room).to_have_attribute("data-seq", "")
     expect(room).to_have_attribute("data-grid", "")
     expect(room).to_have_attribute("data-pending", "0")
     expect(page.get_by_test_id("room-status")).to_have_text(
-        load_fr()["room.status.connecting"]
+        load_fr()["room.status.joining"]
     )
 
 

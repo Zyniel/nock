@@ -33,8 +33,10 @@ from nock.protocol import (
     ClientMessage,
     GridView,
     HelpMode,
+    Join,
     LetterCellView,
     LetterChanged,
+    PlayerJoined,
     Pong,
     RevealBudget,
     RoomSettings,
@@ -81,6 +83,10 @@ UNKNOWN_NUMBER = 99
 UNKNOWN_CODE = "ZZZZZZ"
 PHONE_VIEWPORT = {"width": 360, "height": 740}
 DESKTOP_VIEWPORT = {"width": 1280, "height": 800}
+STORED_IDENTITY_SCRIPT = (
+    "localStorage.setItem('nock.identity.ABC123', JSON.stringify("
+    "{player_id: 'p1', resume_token: 'r7Kq2mXo9vB4tY1zW8nP', nickname: 'Ana'}));"
+)
 EXPECTED_FR_VALUES = {
     "room.share.label": "Lien d'invitation",
     "room.share.copy": "Copier le lien",
@@ -232,9 +238,12 @@ def close_code_on_first_read(client: TestClient, code: str) -> int:
     pytest.fail("the server sent a message instead of closing the socket")
 
 
-def join_and_get_snapshot(client: TestClient, code: str) -> Snapshot:
+def join_and_get_snapshot(
+    client: TestClient, code: str, resume_token: str | None = None
+) -> Snapshot:
+    join_text = Join(nickname="Ana", resume_token=resume_token).model_dump_json()
     with client.websocket_connect(socket_url(code)) as websocket:
-        websocket.send_text(JOIN_TEXT)
+        websocket.send_text(join_text)
         message = parse_server_message(receive_text_or_fail(websocket))
     assert isinstance(message, Snapshot)
     return message
@@ -900,7 +909,7 @@ def test_ac3_nine_wrong_codes_do_not_throttle(
     fail_with_wrong_codes(ws_client, [UNKNOWN_CODE] * 9)
 
     snapshot = join_and_get_snapshot(ws_client, room_code)
-    assert snapshot.seq == 0
+    assert snapshot.seq == 1
 
 
 def test_ac3_after_a_minute_the_connection_is_accepted(
@@ -912,8 +921,8 @@ def test_ac3_after_a_minute_the_connection_is_accepted(
     fake_clock.advance(60)
 
     snapshot = join_and_get_snapshot(ws_client, room_code)
-    assert snapshot.seq == 0
-    assert snapshot.players == ()
+    assert snapshot.seq == 1
+    assert len(snapshot.players) == 1
 
 
 def test_ac3_window_edge_59_9_refused_and_60_accepted(
@@ -926,7 +935,7 @@ def test_ac3_window_edge_59_9_refused_and_60_accepted(
 
     fake_clock.now = START_TIME + 60.0
     snapshot = join_and_get_snapshot(ws_client, room_code)
-    assert snapshot.seq == 0
+    assert snapshot.seq == 1
 
 
 def test_ac3_throttle_applies_to_a_code_that_does_not_exist(
@@ -948,7 +957,7 @@ def test_ac3_refused_connections_do_not_extend_the_window(
 
     fake_clock.now = START_TIME + 60.0
 
-    assert join_and_get_snapshot(ws_client, room_code).seq == 0
+    assert join_and_get_snapshot(ws_client, room_code).seq == 1
 
 
 def test_ac3_the_window_slides(
@@ -961,7 +970,7 @@ def test_ac3_the_window_slides(
 
     fake_clock.now = START_TIME + 60.0
 
-    assert join_and_get_snapshot(ws_client, room_code).seq == 0
+    assert join_and_get_snapshot(ws_client, room_code).seq == 1
 
 
 @pytest.mark.parametrize(
@@ -995,18 +1004,22 @@ def test_ac3_failures_older_than_the_window_do_not_add_up(
 
     fail_with_wrong_codes(ws_client, [UNKNOWN_CODE])
 
-    assert join_and_get_snapshot(ws_client, room_code).seq == 0
+    assert join_and_get_snapshot(ws_client, room_code).seq == 1
 
 
 def test_ac3_valid_codes_never_add_a_failure(
     ws_client: TestClient, room_code: str
 ) -> None:
-    for _ in range(15):
-        join_and_get_snapshot(ws_client, room_code)
+    first = join_and_get_snapshot(ws_client, room_code)
+    for _ in range(14):
+        # Resume the same player: a ninth new player would find the room full.
+        resumed = join_and_get_snapshot(ws_client, room_code, first.resume_token)
+        assert resumed.you == first.you
 
     fail_with_wrong_codes(ws_client, [UNKNOWN_CODE] * 9)
 
-    assert join_and_get_snapshot(ws_client, room_code).seq == 0
+    last = join_and_get_snapshot(ws_client, room_code, first.resume_token)
+    assert last.you == first.you
 
 
 def test_ac3_mistyped_and_malformed_codes_count_as_wrong_codes(
@@ -1026,7 +1039,7 @@ def test_ac3_http_page_requests_are_never_counted(
         response = ws_client.get(f"/r/{UNKNOWN_CODE}")
         assert response.status_code == 200
 
-    assert join_and_get_snapshot(ws_client, room_code).seq == 0
+    assert join_and_get_snapshot(ws_client, room_code).seq == 1
 
 
 def test_ac3_the_throttle_is_per_address(
@@ -1040,7 +1053,7 @@ def test_ac3_the_throttle_is_per_address(
         fail_with_wrong_codes(noisy_client, [UNKNOWN_CODE] * 10)
 
         assert close_code_on_first_read(noisy_client, room_code) == 4429
-        assert join_and_get_snapshot(quiet_client, room_code).seq == 0
+        assert join_and_get_snapshot(quiet_client, room_code).seq == 1
 
 
 def test_ac3_each_app_has_its_own_failures(
@@ -1052,7 +1065,7 @@ def test_ac3_each_app_has_its_own_failures(
         fail_with_wrong_codes(first_client, [UNKNOWN_CODE] * 10)
 
         assert close_code_on_first_read(first_client, room_code) == 4429
-        assert join_and_get_snapshot(second_client, room_code).seq == 0
+        assert join_and_get_snapshot(second_client, room_code).seq == 1
 
 
 # ---- AC-3: browser, throttled ----------------------------------------------
@@ -1068,6 +1081,8 @@ def test_ac3_browser_4429_makes_the_room_throttled(
         route.on_message(lambda _message: route.close(code=4429))
 
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), refuse)
+    # A stored identity (spec 012) makes the page send its join at once.
+    page.context.add_init_script(STORED_IDENTITY_SCRIPT)
     page.goto(f"{live_server}/r/ABC123")
 
     room = page.get_by_test_id("room-page")
@@ -1252,6 +1267,12 @@ def receive_message(websocket: WebSocketTestSession) -> object:
     return parse_server_message(receive_text_or_fail(websocket))
 
 
+def skip_player_joined(websocket: WebSocketTestSession, count: int) -> None:
+    """Read the `player_joined` events that later joins sent to this socket."""
+    for _ in range(count):
+        assert isinstance(receive_message(websocket), PlayerJoined)
+
+
 def engine_threads() -> list[threading.Thread]:
     """The live threads named like the engine's."""
     threads: list[threading.Thread] = []
@@ -1305,6 +1326,8 @@ def test_ac4_events_reach_everyone_then_the_reply_then_to_others(
         sender, sender_id = join_and_sync(stack, client, code, recorder)
         first_other, _ = join_and_sync(stack, client, code, recorder)
         second_other, _ = join_and_sync(stack, client, code, recorder)
+        skip_player_joined(sender, 2)
+        skip_player_joined(first_other, 1)
 
         sender.send_text(SELECT_TEXT)
 
@@ -1328,6 +1351,7 @@ def test_ac4_the_sender_does_not_receive_to_others_nor_the_others_a_reply(
     ):
         sender, sender_id = join_and_sync(stack, client, code, recorder)
         other, _ = join_and_sync(stack, client, code, recorder)
+        skip_player_joined(sender, 1)
         sender.send_text(SELECT_TEXT)
         for _ in range(3):
             receive_message(sender)
@@ -1377,31 +1401,35 @@ def test_ac4_a_raising_rule_is_logged_and_the_room_goes_on(
 ) -> None:
     recorder.break_first_call_of(broken_rule)
     caplog.set_level(logging.ERROR)
-    with running_room(fx01_grid, dist_dir) as (client, registry, code):
+    with (
+        running_room(fx01_grid, dist_dir) as (client, registry, code),
+        contextlib.ExitStack() as stack,
+    ):
+        stay, stay_id = open_and_join(stack, client, code)
         state_before = registry.room_state(code)
-        with contextlib.ExitStack() as stack:
-            stay, stay_id = open_and_join(stack, client, code)
-            if broken_rule == "handle_message":
-                stay.send_text(UNDO_TEXT)
-            if broken_rule == "disconnect_player":
-                with contextlib.ExitStack() as leaving:
-                    open_and_join(leaving, client, code)
-            wait_until(
-                lambda: f"raised:{broken_rule}" in recorder.events,
-                f"{broken_rule} to be called and to raise",
-            )
-            assert registry.room_state(code) is state_before
-            ticks_at_error = recorder.count("tick")
-            wait_until(
-                lambda: recorder.count("tick") >= ticks_at_error + 3,
-                "the room to keep ticking after the error",
-            )
+        if broken_rule == "handle_message":
+            stay.send_text(UNDO_TEXT)
+        if broken_rule == "disconnect_player":
+            with contextlib.ExitStack() as leaving:
+                open_and_join(leaving, client, code)
+                state_before = registry.room_state(code)
+            skip_player_joined(stay, 1)
+        wait_until(
+            lambda: f"raised:{broken_rule}" in recorder.events,
+            f"{broken_rule} to be called and to raise",
+        )
+        assert registry.room_state(code) is state_before
+        ticks_at_error = recorder.count("tick")
+        wait_until(
+            lambda: recorder.count("tick") >= ticks_at_error + 3,
+            "the room to keep ticking after the error",
+        )
 
-            stay.send_text(SELECT_TEXT)
+        stay.send_text(SELECT_TEXT)
 
-            assert receive_message(stay) == letter_changed(1, stay_id)
-            assert receive_message(stay) == letter_changed(2, stay_id)
-            assert receive_message(stay) == Pong()
+        assert receive_message(stay) == letter_changed(1, stay_id)
+        assert receive_message(stay) == letter_changed(2, stay_id)
+        assert receive_message(stay) == Pong()
 
     assert RULE_ERROR_TEXT in caplog.text
     error_loggers = [
@@ -1438,6 +1466,7 @@ def test_ac4_two_connections_of_one_player_both_receive(
         first, first_id = join_and_sync(stack, client, code, recorder)
         second, second_id = join_and_sync(stack, client, code, recorder)
         assert first_id == second_id == one_player_id
+        skip_player_joined(first, 1)
 
         first.send_text(UNDO_TEXT)
 
@@ -1464,6 +1493,7 @@ def test_ac4_detaching_one_connection_keeps_the_other_one(
             else:
                 stay, _ = join_and_sync(stay_stack, client, code, recorder)
                 join_and_sync(leave_stack, client, code, recorder)
+                skip_player_joined(stay, 1)
         # Leaving the inner stack closed a socket, and its departure was
         # posted before this ping, which the room applies in order.
         seen_before = recorder.count("message:")
