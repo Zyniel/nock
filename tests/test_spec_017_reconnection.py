@@ -735,11 +735,11 @@ def test_ac2_websocket_an_offline_edit_on_a_changed_cell_gets_stale_edit(
             )
             assert letter_events(peer_b) == [written_by_b, applied]
             assert error_events(peer_b) == []
-        state = registry.room_state(code)
-        assert state is not None
-        assert cell_state(state, 1, 0).letter == "B"
-        assert cell_state(state, 1, 1).letter == "A"
-        assert state.seq == 6
+            state = registry.room_state(code)
+            assert state is not None
+            assert cell_state(state, 1, 0).letter == "B"
+            assert cell_state(state, 1, 1).letter == "A"
+            assert state.seq == 6
 
 
 # ---- Helpers for the browser -------------------------------------------------
