@@ -444,11 +444,10 @@ class _RoomRunner:
                 connection.deliver_text(moved_text)
 
         for disconnect in outcome.disconnects:
-            targets = [
-                connection
-                for connection in self._connections
-                if connection.player_id == disconnect.player_id
-            ]
+            targets = []
+            for connection in list(self._connections):
+                if connection.player_id == disconnect.player_id:
+                    targets.append(connection)
             for target in targets:
                 if disconnect.error is not None:
                     target.deliver_text(disconnect.error.model_dump_json())

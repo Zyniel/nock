@@ -81,6 +81,7 @@ NICKNAME_MIN_LENGTH: int = 2
 NICKNAME_MAX_LENGTH: int = 20
 _NORMAL_CLOSE_CODE: int = 1000  # a normal closing
 SILENCE_CLOSE_CODE: int = 4408  # spec 017: close code of a silent socket
+_REMOVED_TEXT: str = "You were removed from this room."
 DEFAULT_REVEAL_BUDGET: RevealBudget = RevealBudget(letters=5, words=1)  # spec 024
 DEFAULT_SETTINGS: RoomSettings = RoomSettings(
     help_mode=HelpMode.FREE, reveal_budget=DEFAULT_REVEAL_BUDGET, locked=False
@@ -405,7 +406,7 @@ def join_room(
         The outcome. A success replies with the snapshot of the player.
     """
     if _is_removed_token(state, message.resume_token):
-        refusal = ErrorMessage(code=ErrorCode.REMOVED, message=REMOVED_TEXT)
+        refusal = ErrorMessage(code=ErrorCode.REMOVED, message=_REMOVED_TEXT)
         return Outcome(state=state, reply=(refusal,), close_sender=True)
     resumed = _find_by_token(state, message.resume_token)
     timeout_entries: tuple[LogEntry, ...] = ()
@@ -656,9 +657,6 @@ def _add_player(
     return Outcome(state=new_state, entries=(entry,), reply=reply)
 
 
-REMOVED_TEXT = "You were removed from this room."
-
-
 def handle_message(
     state: RoomState,
     player_id: str,
@@ -772,7 +770,7 @@ def _remove_player(
     removal = Disconnect(
         player_id=target_id,
         close_code=_NORMAL_CLOSE_CODE,
-        error=ErrorMessage(code=ErrorCode.REMOVED, message=REMOVED_TEXT),
+        error=ErrorMessage(code=ErrorCode.REMOVED, message=_REMOVED_TEXT),
     )
     return Outcome(state=replay(state, entry), entries=(entry,), disconnects=(removal,))
 
