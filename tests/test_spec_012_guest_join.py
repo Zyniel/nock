@@ -286,6 +286,8 @@ GREEK_NAME = "\u1f08\u03bb\u03ad\u03be\u03b7\u03c2"
 POLISH_NAME = "\u0141ukasz"
 DECOMPOSED_E = "E\u0301"
 COMPOSED_E = "\u00c9"
+RAM_NAME = "\u0930\u093e\u092e"  # \u093e is a spacing mark (Mc)
+ENCLOSED_NAME = "Ana\u20dd"  # \u20dd is an enclosing mark (Me)
 
 VALID_NICKNAMES = [
     ("Ana", "Ana"),
@@ -306,6 +308,7 @@ VALID_NICKNAMES = [
     ("a-", "a-"),
     ("x" * 20, "x" * 20),
     ("q\u0323", "q\u0323"),
+    (RAM_NAME, RAM_NAME),
     (DECOMPOSED_E + "x" * 19, COMPOSED_E + "x" * 19),
 ]
 
@@ -334,6 +337,7 @@ INVALID_NICKNAMES = [
     "'\u2019",
     "\u0301\u0301",
     DECOMPOSED_E,
+    ENCLOSED_NAME,
 ]
 
 
@@ -756,6 +760,7 @@ def test_ac1_browser_a_valid_nickname_is_sent_normalised(
         ("bob_42", "bob_42"),
         ("12", "12"),
         ("Anne Marie", "Anne Marie"),
+        (RAM_NAME, RAM_NAME),
     ],
 )
 def test_ac1_browser_the_page_accepts_what_the_server_rule_accepts(
@@ -782,6 +787,7 @@ def test_ac1_browser_the_page_accepts_what_the_server_rule_accepts(
         ("Ana\U0001f600", "join.error.characters"),
         ("\u0663\u0663", "join.error.characters"),
         (DECOMPOSED_E, "join.error.length"),
+        (ENCLOSED_NAME, "join.error.characters"),
     ],
 )
 def test_ac1_browser_a_bad_nickname_shows_the_error_and_sends_nothing(
@@ -946,6 +952,16 @@ def test_ac2_the_duplicate_check_ignores_case_with_casefold(fx01_grid: Grid) -> 
     outcome = run_join(state, "STRA\u00dfE", 5)
 
     assert outcome.state.players[-1].nickname == "STRA\u00dfE 2"
+
+
+def test_ac2_the_duplicate_check_casefolds_the_taken_nickname(
+    fx01_grid: Grid,
+) -> None:
+    state = make_state(fx01_grid, [make_player(0, "STRAßE", is_host=True)])
+
+    outcome = run_join(state, "strasse", 5)
+
+    assert outcome.state.players[-1].nickname == "strasse 2"
 
 
 def test_ac2_the_duplicate_check_is_accent_sensitive(fx01_grid: Grid) -> None:
