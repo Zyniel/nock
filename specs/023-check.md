@@ -27,6 +27,11 @@ Not defined yet. To write following `specs/_architecture.md` before approval.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, from the spec 016 review): the client's
+`LetterCellView` has no `wrong` field yet. This spec must add it on the page,
+show it, and reset it to false when a `cell_locked` event or a new letter
+arrives for the cell (spec 016 applies `cell_locked`, spec 015 `letter_changed`).
+
 None stated in the backlog. To complete during review.
 
 ## Out of scope

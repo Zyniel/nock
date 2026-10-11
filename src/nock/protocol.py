@@ -115,6 +115,9 @@ class ErrorCode(StrEnum):
     RATE_LIMITED = "rate_limited"  # spec 037 AC-3
     NOTHING_TO_UNDO = "nothing_to_undo"  # spec 018 AC-3
     GRID_SOLVED = "grid_solved"  # input locked, spec 026 AC-1
+    INVALID_NICKNAME = "invalid_nickname"  # refused nickname, spec 012 join step 5
+    INVALID_TARGET = "invalid_target"  # host action on a bad player, spec 014
+    STALE_EDIT = "stale_edit"  # offline edit on a changed cell, spec 017 AC-2
 
 
 class CellRef(ProtocolModel):
@@ -325,6 +328,12 @@ class MutePlayer(ProtocolModel):
     muted: StrictBool
 
 
+class Ping(ProtocolModel):
+    """Heartbeat, spec 017. The server answers with a pong."""
+
+    type: Literal["ping"] = "ping"
+
+
 ClientMessage = Annotated[
     Join
     | SelectCell
@@ -342,7 +351,8 @@ ClientMessage = Annotated[
     | RemovePlayer
     | LockRoom
     | ChangeSettings
-    | MutePlayer,
+    | MutePlayer
+    | Ping,
     Field(discriminator="type"),
 ]
 
@@ -639,6 +649,12 @@ class GridFullWrong(ProtocolModel):
     seq: Seq
 
 
+class Pong(ProtocolModel):
+    """The answer to a ping, spec 017. Has no seq."""
+
+    type: Literal["pong"] = "pong"
+
+
 class ErrorMessage(ProtocolModel):
     """The server refused a message. Has no seq."""
 
@@ -686,6 +702,7 @@ ServerMessage = Annotated[
     | PlayerMuted
     | GridSolved
     | GridFullWrong
+    | Pong
     | ErrorMessage,
     Field(discriminator="type"),
 ]

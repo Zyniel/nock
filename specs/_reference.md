@@ -57,23 +57,23 @@ the specs whose criteria this one mentions.
 
 | Spec | Story | Epic | Release | Criteria | Refers to |
 | --- | --- | --- | --- | --- | --- |
-| [002](002-grid-schema.md) | US-1.1 Grid schema | E1 | MVP | 4 | - |
-| [003](003-grid-import-validation.md) | US-1.2 Grid validation at import | E1 | MVP | 4 | - |
-| [004](004-grid-catalogue.md) | US-1.3 Grid catalogue | E1 | MVP | 4 | - |
+| [002](002-grid-schema.md) | US-1.1 Grid schema | E1 | MVP | 5 | - |
+| [003](003-grid-import-validation.md) | US-1.2 Grid validation at import | E1 | MVP | 7 | - |
+| [004](004-grid-catalogue.md) | US-1.3 Grid catalogue | E1 | MVP | 7 | - |
 | [005](005-licensed-content.md) | US-1.4 Licensed content only | E1 | MVP | 3 | - |
-| [006](006-grid-rendering.md) | US-2.1 Grid rendering | E2 | MVP | 5 | - |
-| [007](007-word-selection.md) | US-2.2 Word selection and direction | E2 | MVP | 4 | - |
-| [008](008-letter-entry.md) | US-2.3 Letter entry | E2 | MVP | 4 | 016 |
-| [009](009-keyboard-navigation.md) | US-2.4 Keyboard and navigation | E2 | MVP | 3 | - |
-| [010](010-instant-solo-start.md) | US-2.5 Instant solo start | E2 | MVP | 3 | - |
-| [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 3 | - |
-| [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 4 | - |
-| [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 5 | - |
-| [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 4 | - |
+| [006](006-grid-rendering.md) | US-2.1 Grid rendering | E2 | MVP | 8 | - |
+| [007](007-word-selection.md) | US-2.2 Word selection and direction | E2 | MVP | 6 | - |
+| [008](008-letter-entry.md) | US-2.3 Letter entry | E2 | MVP | 5 | 016 |
+| [009](009-keyboard-navigation.md) | US-2.4 Keyboard and navigation | E2 | MVP | 4 | - |
+| [010](010-instant-solo-start.md) | US-2.5 Instant solo start | E2 | MVP | 6 | - |
+| [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 4 | - |
+| [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 7 | - |
+| [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 6 | - |
+| [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 7 | - |
 | [015](015-shared-letters.md) | US-4.1 Shared letters | E4 | MVP | 4 | - |
 | [016](016-same-cell-conflicts.md) | US-4.2 Same-cell conflicts | E4 | MVP | 3 | - |
-| [017](017-reconnection.md) | US-4.3 Disconnection and reconnection | E4 | MVP | 4 | - |
-| [018](018-durable-room-state.md) | US-4.4 Durable room state | E4 | MVP | 3 | - |
+| [017](017-reconnection.md) | US-4.3 Disconnection and reconnection | E4 | MVP | 5 | - |
+| [018](018-durable-room-state.md) | US-4.4 Durable room state | E4 | MVP | 4 | - |
 | [019](019-authorship-view.md) | US-5.1 Authorship view | E5 | V1 | 3 | 028 |
 | [020](020-pencil-letters.md) | US-5.2 Pencil letters | E5 | V1 | 3 | 026 |
 | [021](021-clue-flag.md) | US-5.3 Clue flag | E5 | V1 | 3 | - |
@@ -94,8 +94,8 @@ the specs whose criteria this one mentions.
 | [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 3 | 015 |
 | [037](037-integrity.md) | US-10.3 Integrity | E10 | MVP | 4 | - |
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 4 | 032 |
-| [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 19 | 002 |
-| [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 28 | 039 |
+| [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
+| [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
 
 ## Open decisions
 

@@ -26,6 +26,12 @@ Not defined yet. To write following `specs/_architecture.md` before approval.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, from the spec 037 review): `pencil_edit` and
+`confirm_pencil` are counted by the rate limit (spec 037) but do not yet go
+through checks 2 to 5 of spec 015's order. This spec must route them through
+the same edit checks, so a refused pencil edit (for example on a clue cell)
+is answered with its error and not counted.
+
 - AC-3 depends on behaviour owned by spec 026; test only this spec's side of it here.
 
 ## Out of scope

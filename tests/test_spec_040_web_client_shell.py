@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import re
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from fastapi.testclient import TestClient
@@ -21,6 +22,8 @@ from nock.protocol import (
     HelpMode,
     Join,
     LetterChanged,
+    PlayerState,
+    PlayerView,
     RevealBudget,
     RoomSettings,
     Snapshot,
@@ -69,6 +72,12 @@ WAIT_TIMEOUT_MS = 5000
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
+class EnterRoom(Protocol):
+    """The `enter_room` fixture of conftest."""
+
+    def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
+
+
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return Grid.model_validate_json(fx01_text)
@@ -86,14 +95,16 @@ def dist_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def empty_client(dist_dir: Path) -> TestClient:
+def empty_client(dist_dir: Path, registry: RoomRegistry) -> TestClient:
     """A client on an app with a built dist and no room."""
-    return TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+    return TestClient(create_app(rooms=registry, dist_dir=dist_dir))
 
 
 @pytest.fixture
-def registry() -> RoomRegistry:
-    return RoomRegistry()
+def registry() -> Iterator[RoomRegistry]:
+    room_registry = RoomRegistry()
+    yield room_registry
+    room_registry.close()
 
 
 @pytest.fixture
@@ -225,11 +236,22 @@ def settle(page: Page) -> None:
     page.wait_for_timeout(300)
 
 
+FORM_TIMEOUT_MS = 5000
+
+
+def submit_nickname_form(page: Page, nickname: str = "Ana") -> None:
+    """Fill the nickname form of spec 012 and submit it with Enter."""
+    nickname_input = page.get_by_test_id("nickname-input")
+    nickname_input.fill(nickname, timeout=FORM_TIMEOUT_MS)
+    nickname_input.press("Enter", timeout=FORM_TIMEOUT_MS)
+
+
 def open_mock_room(page: Page, base_url: str) -> MockRoomSocket:
-    """Open /r/ABC123 with a mocked socket and wait for the page's join."""
+    """Open /r/ABC123 with a mocked socket, submit the form, wait for the join."""
     mock = MockRoomSocket(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/ABC123")
+    submit_nickname_form(page)
     mock.wait_for_join()
     return mock
 
@@ -240,7 +262,17 @@ def snapshot_frame(grid: Grid, seq: int) -> str:
         you="p1",
         resume_token=SNAPSHOT_RESUME_TOKEN,
         grid=grid_view(grid),
-        players=(),
+        players=(
+            PlayerView(
+                player_id="p1",
+                nickname="Ana",
+                colour=0,
+                state=PlayerState.ACTIVE,
+                is_host=True,
+                muted=False,
+                selection=None,
+            ),
+        ),
         settings=EXPECTED_SETTINGS,
         reveal_budget=RevealBudget(letters=5, words=1),
         flags=(),
@@ -363,9 +395,11 @@ def test_ac5_a_directory_is_not_served_as_a_file(empty_client: TestClient) -> No
         "/assets/..%5C..%5Csecret.txt",
     ],
 )
-def test_ac5_path_traversal_never_leaves_dist_dir(dist_dir: Path, path: str) -> None:
+def test_ac5_path_traversal_never_leaves_dist_dir(
+    dist_dir: Path, registry: RoomRegistry, path: str
+) -> None:
     (dist_dir.parent / "secret.txt").write_text("TOP-SECRET", encoding="utf-8")
-    client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+    client = TestClient(create_app(rooms=registry, dist_dir=dist_dir))
 
     response = client.get(path)
 
@@ -385,6 +419,7 @@ def test_ac5_alternate_data_stream_of_index_is_not_served(
 @pytest.mark.parametrize("encoded_colon", [False, True])
 def test_ac5_drive_letter_paths_never_leave_dist_dir(
     dist_dir: Path,
+    registry: RoomRegistry,
     monkeypatch: pytest.MonkeyPatch,
     encoded_colon: bool,
 ) -> None:
@@ -401,7 +436,7 @@ def test_ac5_drive_letter_paths_never_leave_dist_dir(
         secret.write_text("TOP-SECRET", encoding="utf-8")
         monkeypatch.chdir(outside)
         try:
-            client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+            client = TestClient(create_app(rooms=registry, dist_dir=dist_dir))
             path = f"/{drive}secret.txt"
             if encoded_colon:
                 path = path.replace(":", "%3A")
@@ -497,8 +532,8 @@ def dot_dist_dir(dist_dir: Path) -> Path:
 
 
 @pytest.fixture
-def dot_client(dot_dist_dir: Path) -> TestClient:
-    return TestClient(create_app(rooms=RoomRegistry(), dist_dir=dot_dist_dir))
+def dot_client(dot_dist_dir: Path, registry: RoomRegistry) -> TestClient:
+    return TestClient(create_app(rooms=registry, dist_dir=dot_dist_dir))
 
 
 def assert_plain_not_found(response: Response) -> None:
@@ -553,12 +588,12 @@ def test_ac27_dot_files_do_not_hide_regular_files(dot_client: TestClient) -> Non
 
 @pytest.mark.parametrize("path", DOT_FILE_PATHS)
 def test_ac27_unbuilt_client_answers_404_not_503_for_dot_files(
-    tmp_path: Path, path: str
+    tmp_path: Path, registry: RoomRegistry, path: str
 ) -> None:
     unbuilt = tmp_path / "unbuilt"
     unbuilt.mkdir()
     (unbuilt / ".env").write_text("SECRET=1", encoding="utf-8")
-    client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=unbuilt))
+    client = TestClient(create_app(rooms=registry, dist_dir=unbuilt))
 
     response = client.get(path, follow_redirects=False)
 
@@ -627,12 +662,37 @@ def test_ac28_no_response_of_the_app_is_a_redirect(
         assert "location" not in response.headers, path
 
 
+API_DOCS_PATHS = ["/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"]
+
+
+@pytest.mark.parametrize("path", API_DOCS_PATHS)
+def test_ac29_api_docs_answer_json_404_with_a_built_client(
+    empty_client: TestClient, path: str
+) -> None:
+    response = empty_client.get(path, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+
+
+@pytest.mark.parametrize("path", API_DOCS_PATHS)
+def test_ac29_api_docs_answer_json_404_without_a_built_client(
+    tmp_path: Path, path: str
+) -> None:
+    client = TestClient(create_app(dist_dir=tmp_path / "does-not-exist"))
+
+    response = client.get(path, follow_redirects=False)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND_BODY
+
+
 # ---- AC-7: RoomRegistry -----------------------------------------------------
 
 
-def test_ac7_register_room_gives_distinct_valid_codes(fx01_grid: Grid) -> None:
-    registry = RoomRegistry()
-
+def test_ac7_register_room_gives_distinct_valid_codes(
+    registry: RoomRegistry, fx01_grid: Grid
+) -> None:
     first = registry.register_room(fx01_grid)
     second = registry.register_room(fx01_grid)
 
@@ -643,16 +703,22 @@ def test_ac7_register_room_gives_distinct_valid_codes(fx01_grid: Grid) -> None:
     assert registry.find_room(second) == fx01_grid
 
 
-def test_ac7_find_room_returns_none_for_unknown_code(fx01_grid: Grid) -> None:
-    registry = RoomRegistry()
+def test_ac7_find_room_returns_none_for_unknown_code(
+    registry: RoomRegistry, fx01_grid: Grid
+) -> None:
     registry.register_room(fx01_grid)
+    other_registry = RoomRegistry()
 
-    assert registry.find_room("abc123") is None
-    assert RoomRegistry().find_room("ABC123") is None
+    try:
+        assert registry.find_room("abc123") is None
+        assert other_registry.find_room("ABC123") is None
+    finally:
+        other_registry.close()
 
 
-def test_ac7_many_codes_are_all_distinct(fx01_grid: Grid) -> None:
-    registry = RoomRegistry()
+def test_ac7_many_codes_are_all_distinct(
+    registry: RoomRegistry, fx01_grid: Grid
+) -> None:
     codes = [registry.register_room(fx01_grid) for _ in range(200)]
 
     assert len(set(codes)) == 200
@@ -671,9 +737,19 @@ def test_ac8_join_gets_the_snapshot_of_the_room(
 ) -> None:
     snapshot = join_and_get_snapshot(room_client, room_code)
 
-    assert snapshot.seq == 0
+    assert snapshot.seq == 1
     assert snapshot.grid == grid_view(fx01_grid)
-    assert snapshot.players == ()
+    assert snapshot.players == (
+        PlayerView(
+            player_id=snapshot.you,
+            nickname="Ana",
+            colour=0,
+            state=PlayerState.ACTIVE,
+            is_host=True,
+            muted=False,
+            selection=None,
+        ),
+    )
     assert snapshot.settings == EXPECTED_SETTINGS
     assert snapshot.reveal_budget == RevealBudget(letters=5, words=1)
     assert snapshot.flags == ()
@@ -692,7 +768,7 @@ def test_ac8_binary_join_frame_is_handled_like_text(
         message = parse_server_message(websocket.receive_text())
 
     assert isinstance(message, Snapshot)
-    assert message.seq == 0
+    assert message.seq == 1
 
 
 def test_ac8_resume_token_of_the_join_is_ignored(
@@ -833,16 +909,20 @@ def test_ac15_title_and_language(page: Page, live_server: str, path: str) -> Non
 
 
 def test_ac16_room_page_joins_and_shows_the_grid(
-    page: Page, live_server: str, room_registry: RoomRegistry, fx01_grid: Grid
+    page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx01_grid: Grid,
+    enter_room: EnterRoom,
 ) -> None:
     code = room_registry.register_room(fx01_grid)
 
-    page.goto(f"{live_server}/r/{code}")
+    enter_room(page, f"{live_server}/r/{code}")
 
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-room-code", code)
     expect(room).to_have_attribute("data-status", "joined")
-    expect(room).to_have_attribute("data-seq", "0")
+    expect(room).to_have_attribute("data-seq", "1")
     expect(room).to_have_attribute("data-grid", "5x5")
     expect(page.get_by_test_id("room-status")).to_have_text(
         load_fr()["room.status.joined"]
@@ -866,29 +946,38 @@ def test_ac17_unknown_room_shows_not_found(page: Page, live_server: str) -> None
 # ---- AC-18 to AC-21: browser, mocked socket ---------------------------------
 
 
-def test_ac18_page_sends_the_default_join(page: Page, live_server: str) -> None:
-    mock = open_mock_room(page, live_server)
+def test_ac18_page_shows_the_form_then_sends_the_join_of_the_form(
+    page: Page, live_server: str
+) -> None:
+    mock = MockRoomSocket(page)
+    page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
+    page.goto(f"{live_server}/r/ABC123")
+    room = page.get_by_test_id("room-page")
+    expect(room).to_have_attribute("data-status", "nickname")
+    page.wait_for_timeout(300)
+    assert mock.received == []
 
+    submit_nickname_form(page, "Ana")
+
+    mock.wait_for_join()
     first_message = parse_client_message(mock.received[0])
-    assert first_message == Join(
-        nickname=load_fr()["room.default_nickname"], resume_token=None
-    )
+    assert first_message == Join(nickname="Ana", resume_token=None)
     assert len(mock.routes) == 1
 
 
-def test_ac18_before_a_snapshot_the_page_is_connecting(
+def test_ac18_before_a_snapshot_the_page_is_joining(
     page: Page, live_server: str
 ) -> None:
     open_mock_room(page, live_server)
 
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-room-code", "ABC123")
-    expect(room).to_have_attribute("data-status", "connecting")
+    expect(room).to_have_attribute("data-status", "joining")
     expect(room).to_have_attribute("data-seq", "")
     expect(room).to_have_attribute("data-grid", "")
     expect(room).to_have_attribute("data-pending", "0")
     expect(page.get_by_test_id("room-status")).to_have_text(
-        load_fr()["room.status.connecting"]
+        load_fr()["room.status.joining"]
     )
 
 
@@ -1040,7 +1129,7 @@ def test_ac20_events_without_seq_change_nothing(
     expect(room).to_have_attribute("data-status", "joined")
 
 
-def test_ac21_other_close_codes_mean_closed(
+def test_ac21_other_close_codes_mean_reconnecting(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = joined_mock_room(page, live_server, fx01_grid, 0)
@@ -1048,10 +1137,11 @@ def test_ac21_other_close_codes_mean_closed(
     mock.close(1011)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "reconnecting")
     expect(page.get_by_test_id("room-status")).to_have_text(
-        load_fr()["room.status.closed"]
+        load_fr()["room.status.reconnecting"]
     )
+    expect(page.get_by_test_id("connection-banner")).to_be_visible()
 
 
 def test_ac21_close_before_a_snapshot_keeps_seq_empty(
@@ -1062,8 +1152,9 @@ def test_ac21_close_before_a_snapshot_keeps_seq_empty(
     mock.close(1011)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "connecting")
     expect(room).to_have_attribute("data-seq", "")
+    expect(page.get_by_test_id("connection-banner")).to_be_hidden()
 
 
 def test_ac21_close_4404_means_not_found(page: Page, live_server: str) -> None:

@@ -94,6 +94,20 @@ The kit ships three skills: `python-standards` (the coding rules, preloaded into
 the test-writer, implementer and reviewer), `new-spec` and `feature` (the two
 commands above).
 
+### Running the server with a database
+
+The rooms are stored in the SQLite file named by the `NOCK_DATABASE`
+environment variable. When it is unset, rooms live in memory and are lost when
+the server stops. The folder of the file must exist:
+
+```powershell
+New-Item -ItemType Directory -Force data
+$env:NOCK_DATABASE = "data/nock.sqlite3"
+uv run uvicorn nock.server:app
+```
+
+(bash: `NOCK_DATABASE=data/nock.sqlite3 uv run uvicorn nock.server:app`)
+
 ## 4. The quality gate
 
 `scripts/gate.py` is the single definition of "done". It runs:

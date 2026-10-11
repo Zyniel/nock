@@ -67,7 +67,13 @@ interface" follows this note. Decided with the human on 2026-10-10.
 
 - Python: `pydantic`, `fastapi`, `uvicorn[standard]`; for tests `httpx2` (used
   by the FastAPI/Starlette test client) and `pytest-playwright` (Chromium
-  installed by `uv run playwright install chromium`).
+  installed by `uv run playwright install chromium firefox webkit`).
+- Browser tests run in three engines (human decision, 2026-10-10): Chromium and
+  WebKit locally (pyproject addopts), plus Firefox in CI (PYTEST_ADDOPTS in
+  ci.yml); Firefox is left out locally while Windows blocks it on the
+  maintainer's machine. A test that needs a Chromium-only feature, such as CDP
+  touch events, is marked `@pytest.mark.only_browser("chromium")` and its spec
+  says so.
 - Client: Node.js LTS; `web/` was created from the Vite `svelte-ts` template.
 - The full gate runs `npm --prefix web run check` (svelte-check and tsc) and
   `npm --prefix web run build` before pytest, so browser tests use the fresh

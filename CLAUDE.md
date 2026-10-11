@@ -24,7 +24,7 @@ Everything runs through uv. Do not use `pip` or a bare `python`.
 | Install the web client dependencies | `npm --prefix web ci` |
 | Web client type check | `npm --prefix web run check` |
 | Build the web client | `npm --prefix web run build` |
-| Install the browser for browser tests | `uv run playwright install chromium` |
+| Install the browsers for browser tests | `uv run playwright install chromium firefox webkit` |
 
 Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 

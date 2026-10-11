@@ -52,8 +52,8 @@ the listing shows a default. The `type` default only helps Python construction:
 - `Snapshot.seq` is an integer >= 0: the `seq` of the last event already
   included in the snapshot, 0 for a room where nothing has happened yet. The
   client applies only later events, in `seq` order.
-- `selection_moved`, `reaction` and `error` do not change the room: they have no
-  `seq` field, so a JSON object for them that holds `seq` is rejected
+- `selection_moved`, `reaction`, `pong` and `error` do not change the room: they
+  have no `seq` field, so a JSON object for them that holds `seq` is rejected
   (`extra="forbid"`).
 - Client messages carry no event `seq`. Cell edits carry an optional `base_seq`
   (integer >= 0): absent or `null` for a live edit, set to the last `seq` the
@@ -173,6 +173,9 @@ class ErrorCode(StrEnum):
     RATE_LIMITED = "rate_limited"            # spec 037 AC-3
     NOTHING_TO_UNDO = "nothing_to_undo"      # spec 018 AC-3
     GRID_SOLVED = "grid_solved"              # input locked, spec 026 AC-1
+    INVALID_NICKNAME = "invalid_nickname"    # refused nickname, spec 012 join step 5
+    INVALID_TARGET = "invalid_target"        # host action on a bad player, spec 014
+    STALE_EDIT = "stale_edit"                # offline edit on a changed cell, spec 017 AC-2
 
 
 class CellRef(ProtocolModel):
@@ -331,10 +334,14 @@ class MutePlayer(ProtocolModel):
     muted: StrictBool
 
 
+class Ping(ProtocolModel):            # heartbeat, spec 017; answered by pong
+    type: Literal["ping"] = "ping"
+
+
 ClientMessage = Annotated[
     Join | SelectCell | EditLetter | Erase | PencilEdit | ConfirmPencil
     | Check | Reveal | Vote | Flag | Chat | React | Undo
-    | RemovePlayer | LockRoom | ChangeSettings | MutePlayer,
+    | RemovePlayer | LockRoom | ChangeSettings | MutePlayer | Ping,
     Field(discriminator="type"),
 ]
 
@@ -540,6 +547,10 @@ class GridFullWrong(ProtocolModel):   # carries no hint of where, spec 026 AC-2
     seq: Seq
 
 
+class Pong(ProtocolModel):            # no seq; the answer to a ping, spec 017
+    type: Literal["pong"] = "pong"
+
+
 class ErrorMessage(ProtocolModel):    # no seq
     type: Literal["error"] = "error"
     code: ErrorCode
@@ -568,7 +579,7 @@ ServerMessage = Annotated[
     | PlayerStateChanged | SelectionMoved | CheckResult | RevealResult
     | VoteOpened | VoteClosed | FlagChanged | ChatMessage | ReactionShown
     | SettingsChanged | HostChanged | PlayerMuted | GridSolved | GridFullWrong
-    | ErrorMessage,
+    | Pong | ErrorMessage,
     Field(discriminator="type"),
 ]
 
@@ -591,7 +602,7 @@ built here.
 
 ### Message tables
 
-Client messages (17):
+Client messages (18):
 
 | `type` | Class | Request item |
 | --- | --- | --- |
@@ -611,9 +622,10 @@ Client messages (17):
 | `remove_player` | `RemovePlayer` | host: remove player |
 | `lock_room` | `LockRoom` | host: lock room |
 | `change_settings` | `ChangeSettings` | host: change settings |
-| `mute_player` | `MutePlayer` | host: mute (added, see open questions) |
+| `mute_player` | `MutePlayer` | host: mute (added, see decision 1) |
+| `ping` | `Ping` | heartbeat (added on reopening, see decision 17) |
 
-Server messages (20). "seq" says whether the message has a required `seq: Seq`.
+Server messages (21). "seq" says whether the message has a required `seq: Seq`.
 
 | `type` | Class | seq | Request item |
 | --- | --- | --- | --- |
@@ -632,16 +644,17 @@ Server messages (20). "seq" says whether the message has a required `seq: Seq`.
 | `chat_message` | `ChatMessage` | yes | chat message |
 | `reaction` | `ReactionShown` | no | reaction |
 | `settings_changed` | `SettingsChanged` | yes | settings changed |
-| `host_changed` | `HostChanged` | yes | added, see open questions |
-| `player_muted` | `PlayerMuted` | yes | added, see open questions |
+| `host_changed` | `HostChanged` | yes | added, see decision 1 |
+| `player_muted` | `PlayerMuted` | yes | added, see decision 1 |
 | `grid_solved` | `GridSolved` | yes | grid solved |
 | `grid_full_wrong` | `GridFullWrong` | yes | grid full but wrong |
+| `pong` | `Pong` | no | heartbeat answer (added on reopening, see decision 17) |
 | `error` | `ErrorMessage` | no | error |
 
 ### Wire examples
 
 Each line is the exact JSON text of one message (the test-writer may copy them).
-They are used by AC-1 to AC-3. `PLAYER_P2` stands for
+They are used by AC-1 to AC-3, AC-12 and AC-20. `PLAYER_P2` stands for
 `{"player_id": "p2", "nickname": "Bruno", "colour": 1, "state": "active", "is_host": false, "muted": false, "selection": null}`
 and `SETTINGS` for
 `{"help_mode": "free", "reveal_budget": {"letters": 5, "words": 1}, "locked": false}`.
@@ -666,6 +679,7 @@ Client:
 {"type": "lock_room", "locked": true}
 {"type": "change_settings", "help_mode": "vote", "reveal_budget": {"letters": 5, "words": 1}}
 {"type": "mute_player", "player_id": "p2", "muted": true}
+{"type": "ping"}
 ```
 
 Server (with `PLAYER_P2` and `SETTINGS` substituted):
@@ -690,23 +704,24 @@ Server (with `PLAYER_P2` and `SETTINGS` substituted):
 {"type": "player_muted", "seq": 51, "player_id": "p2", "muted": true}
 {"type": "grid_solved", "seq": 60, "elapsed_ms": 754000}
 {"type": "grid_full_wrong", "seq": 59}
+{"type": "pong"}
 {"type": "error", "code": "cell_locked", "message": "cell (1, 0) is locked"}
 ```
 
 ## Acceptance criteria
 
-- **AC-1** Given each of the 17 client wire examples, when it is parsed with `parse_client_message`, then the result is an instance of the class in the client table, and `parse_client_message(message.model_dump_json()) == message`.
-- **AC-2** Given each of the 20 server wire examples, when it is parsed with `parse_server_message`, then the result is an instance of the class in the server table, and `parse_server_message(message.model_dump_json()) == message`. The same holds for a `Snapshot` whose `grid` is `grid_view(fx01_grid)` with the letter cell (1, 0) set to `letter="T"`, `author="p1"`.
+- **AC-1** Given each of the 18 client wire examples, when it is parsed with `parse_client_message`, then the result is an instance of the class in the client table, and `parse_client_message(message.model_dump_json()) == message`.
+- **AC-2** Given each of the 21 server wire examples, when it is parsed with `parse_server_message`, then the result is an instance of the class in the server table, and `parse_server_message(message.model_dump_json()) == message`. The same holds for a `Snapshot` whose `grid` is `grid_view(fx01_grid)` with the letter cell (1, 0) set to `letter="T"`, `author="p1"`.
 - **AC-3** Given a wire example, when it is parsed, then its fields carry the values written in the JSON. Examples: the `edit_letter` example gives `EditLetter(row=1, column=0, letter="T", base_seq=None)`; the `vote_opened` example gives `request == Reveal(target=WordTarget(row=0, column=4, clue_index=0))`; the `check_result` example gives `target == GridTarget()`.
 - **AC-4** Given a JSON object whose `type` is unknown, missing, or belongs to the other direction, when it is parsed, then `pydantic.ValidationError` is raised. Examples: `{"type": "teleport", "row": 1, "column": 0}` and `{"row": 1, "column": 0, "letter": "T"}` with either parser; the `snapshot` example with `parse_client_message`; the `join` example with `parse_server_message`.
 - **AC-5** Given a message with a malformed field, when it is parsed, then `pydantic.ValidationError` is raised. Each line below is one case, all with `parse_client_message` unless marked: the text `not json`; `edit_letter` without `column`; `edit_letter` with `"row": -1`; with `"row": "1"`; with `"row": 1.0`; with `"row": true`; `vote` with `"yes": 1`; `vote` with `"vote_id": 0`; `undo` with an extra `"player_id": "p1"`; `flag` with `"clue_index": 2`; `remove_player` with `"player_id": ""` and with `"player_id": "p 2"`; `change_settings` with `"letters": -1`; `check` with a target that has no `scope`; and (`parse_server_message`) `player_joined` with `"colour": 8`.
 - **AC-6** Given an `edit_letter` or `pencil_edit` message, when its `letter` is exactly one character from `A` to `Z`, then it parses; when it is `"a"`, `"É"`, `"AB"`, `""`, `"1"`, `" "` or `null`, then `pydantic.ValidationError` is raised. Each of `"A"` and `"Z"` parses.
 - **AC-7** Given a `join` message, when its nickname has 2 to 20 characters after leading and trailing whitespace are removed, then it parses and `nickname` holds the trimmed text (`"  Ana  "` gives `"Ana"`; 20 times `x` parses); when it has fewer than 2 or more than 20 after trimming, then `pydantic.ValidationError` is raised (`"A"`, `"  A  "`, `""`, 21 times `x`).
 - **AC-8** Given a `chat` message, when its text has 1 to 280 characters after trimming, then it parses with the trimmed text (280 times `a` parses, `" salut "` gives `"salut"`); when it is empty, whitespace only, or 281 characters after trimming, then `pydantic.ValidationError` is raised.
-- **AC-9** Given an enumerated field, when it holds one of its listed values, then the message parses; when it holds any other string, then `pydantic.ValidationError` is raised. Listed values: `direction` across, down; `state` active, idle, disconnected; `help_mode` free, vote, none; `reaction` thumbs_up, clap, laugh, wow, thinking; `reason` left, removed, timed_out; `outcome` passed, rejected, timed_out; `scope` letter, word, grid; `code` the 16 values of `ErrorCode`. Rejected examples: `"help_mode": "auto"`, `"help_mode": "FREE"`, `"reaction": "heart"`, `"direction": "diagonal"`.
+- **AC-9** Given an enumerated field, when it holds one of its listed values, then the message parses; when it holds any other string, then `pydantic.ValidationError` is raised. Listed values: `direction` across, down; `state` active, idle, disconnected; `help_mode` free, vote, none; `reaction` thumbs_up, clap, laugh, wow, thinking; `reason` left, removed, timed_out; `outcome` passed, rejected, timed_out; `scope` letter, word, grid; `code` the 19 values of `ErrorCode` (the 16 of the first version plus `invalid_nickname`, `invalid_target`, `stale_edit`). Rejected examples: `"help_mode": "auto"`, `"help_mode": "FREE"`, `"reaction": "heart"`, `"direction": "diagonal"`.
 - **AC-10** Given a `reveal` message, when its target has `"scope": "grid"`, then `pydantic.ValidationError` is raised; the same target in a `check` message parses to `GridTarget()`.
 - **AC-11** Given each of the 16 server types marked "yes" in the seq column, when its wire example is parsed with `seq` removed, or with `"seq": 0`, or with `"seq": -1`, then `pydantic.ValidationError` is raised; with `"seq": 1` it parses and `message.seq == 1`.
-- **AC-12** Given the `selection_moved`, `reaction` or `error` wire example with an added `"seq": 5`, when it is parsed, then `pydantic.ValidationError` is raised.
+- **AC-12** Given the `selection_moved`, `reaction`, `pong` or `error` wire example with an added `"seq": 5`, when it is parsed, then `pydantic.ValidationError` is raised.
 - **AC-13** Given the `snapshot` wire example, when `seq` is 0 or 42, then it parses with that `seq`; when `seq` is -1 or missing, then `pydantic.ValidationError` is raised.
 - **AC-14** Given `Snapshot.model_json_schema()`, when every `properties` mapping in it is walked (top level and all `$defs`), then no property is named `answer` or `solution`.
 - **AC-15** Given the clue cell JSON `{"type": "clue", "row": 0, "column": 0, "clues": [{"text": "Note", "arrow": "right", "answer": "A"}]}` inside a snapshot grid, when the snapshot is parsed, then `pydantic.ValidationError` is raised; `ClueView.model_validate({"text": "Note", "arrow": "right", "answer": "A"})` also raises it.
@@ -714,6 +729,8 @@ Server (with `PLAYER_P2` and `SETTINGS` substituted):
 - **AC-17** Given `grid_view(fx01_grid).model_dump_json()`, when the text is searched, then it contains none of `"answer"`, `TAMIS`, `NAVAL`, `MIME`, `IDES`, `SENT`, `VIDE`, `AMEN`, `LEST`.
 - **AC-18** Given the `snapshot` wire example, when `players` holds 8 players (ids `p1` to `p8`), then it parses; when it holds 9, then `pydantic.ValidationError` is raised.
 - **AC-19** Given a parsed message, when a field is assigned (for example `message.row = 2` on the `edit_letter` example), then `pydantic.ValidationError` is raised and the message is unchanged.
+- **AC-20** Given the heartbeat messages, when `{"type": "ping"}` is parsed with `parse_client_message`, then the result equals `Ping()`, and when `{"type": "pong"}` is parsed with `parse_server_message`, then it equals `Pong()`; `{"type": "ping"}` with `parse_server_message`, `{"type": "pong"}` with `parse_client_message`, and `{"type": "ping", "seq": 1}`, `{"type": "ping", "id": 1}` with `parse_client_message` each raise `pydantic.ValidationError`.
+- **AC-21** Given `ErrorCode`, when its members are listed, then there are exactly 19, and `ErrorCode("invalid_nickname") is ErrorCode.INVALID_NICKNAME`, `ErrorCode("invalid_target") is ErrorCode.INVALID_TARGET` and `ErrorCode("stale_edit") is ErrorCode.STALE_EDIT`; the `error` wire example with `"code"` set to each of these three values parses to an `ErrorMessage` with that code.
 
 ## Edge cases and errors
 
@@ -757,6 +774,8 @@ Server (with `PLAYER_P2` and `SETTINGS` substituted):
   recap.
 - Accounts and "my rooms" (specs 032, 033).
 - A message to leave the room on purpose: closing the socket is leaving.
+- When a client pings, when the server answers `pong` (also before the join),
+  and what silence means: spec 017.
 - Client message ids and acknowledgements: a client recognises its own edit in
   the `letter_changed` event by cell and `player_id`.
 
@@ -777,6 +796,7 @@ Approved by the human on 2026-10-10, with the pick of each item kept as written
    or only room-changing ones. Pick: `selection_moved`, `reaction` (shown for 3
    seconds, spec 022 AC-2) and `error` have none; presence states
    (`player_state_changed`) and chat do have one, since the snapshot holds them.
+   `pong` was added to the messages without `seq` by decision 17.
 3. Lowercase letters. Options: reject `"a"`, or accept and uppercase it. Pick:
    reject; the client uppercases before sending.
 4. Strictness. Options: Pydantic's default lax parsing, or strict integers and
@@ -814,12 +834,36 @@ Approved by the human on 2026-10-10, with the pick of each item kept as written
     on cell edits. Pick: optional `base_seq`, `null` for live edits, so that the
     last-received-wins rule of spec 016 still applies to live typing.
 14. Error codes and leave reasons. Pick: the 16 `ErrorCode` values and the 3
-    `LeaveReason` values in the listing; specs 011 to 038 may add values.
+    `LeaveReason` values in the listing; specs 011 to 038 may add values. (Three
+    values were added on reopening, decisions 18 to 20: 19 in all.)
 15. `grid_view` lives in `nock.protocol`. Options: here, or in `nock/room.py`
     later. Pick: here, since it defines what a client may see of a grid.
 16. Clearing a flag. Spec 021 says a flag clears when its word is filled and a new
     flag replaces the old one, but not whether a player can remove it by hand.
     Pick: `flag` with `"clue": null` removes the sender's flag.
+
+Added when the spec was reopened, approved by the human on 2026-10-10 (status
+back to `approved` for this change). Each one is part of the spec above.
+
+17. Heartbeat (spec 017 decision 1). A browser cannot see WebSocket ping frames,
+    so spec 017 needs an application heartbeat. Decision: a client message `ping`
+    (`Ping`) and a server message `pong` (`Pong`), each with no field but `type`.
+    `pong` has no `seq`, like `selection_moved`: it does not change the room and
+    is never logged. Client messages carry no `seq`, so `ping` has none either.
+    Wire examples added; AC-1, AC-2 and AC-12 counts and lists updated; AC-20
+    added.
+18. `invalid_nickname` (spec 012 decision 1). Decision: `ErrorCode.INVALID_NICKNAME`,
+    sent when a join's nickname passes the protocol length check but breaks spec
+    012's character rules.
+19. `invalid_target` (spec 014 decision 1). Decision: `ErrorCode.INVALID_TARGET`,
+    sent when the host removes or mutes a player who is not in the room, or
+    removes themself.
+20. `stale_edit` (spec 017 decision 2). Decision: `ErrorCode.STALE_EDIT`, sent
+    when an offline edit (`base_seq` set) targets a cell another player changed
+    since.
+21. Counts. With decisions 17 to 20: 18 client messages, 21 server messages, 16
+    server messages with `seq` (unchanged), 19 `ErrorCode` values. AC-9 lists the
+    19 codes; AC-21 checks the three new ones.
 
 ## Open questions
 
