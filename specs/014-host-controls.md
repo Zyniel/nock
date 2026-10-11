@@ -155,6 +155,9 @@ The words in brackets say how each criterion is tested.
 - **AC-2** (AC-3.4.2) (WebSocket; browser with live server) The host can lock the room; new joiners then see "room locked". WebSocket: host A and player B join; A sends `lock_room` `true`; A and B receive `SettingsChanged` with `settings.locked` true and `player_id` A; a new socket without a token gets `error` `room_locked` then a close with code 1000, and the room keeps 2 players; B closes its socket and joins again with its token: accepted (`Snapshot`); a second `lock_room` `true` produces no event; `lock_room` `false` from B gets `not_host`; from A it unlocks, and a new socket then joins. Browser: Ana (host) clicks `lock-room`, which then has `aria-pressed="true"`; a second context opening the room and submitting `Bob` reaches `data-status="locked"` showing `fr.json["room.status.locked"]`.
 - **AC-3** (AC-3.4.3) (Python; WebSocket with a fake clock) If the host is disconnected for more than 60 seconds, the longest-present player becomes host. Python: host `p1` (joined first) disconnected at `t`, `p2` (joined second, active), `p3` (joined third, idle): `tick` at `t + 60` changes no host; at `t + 60.5` gives `HostChanged(player_id="p2")` with `p2.is_host` True and `p1.is_host` False; with `p2` also disconnected, the host becomes `p3`; with every other player disconnected, no `host_changed` and `p1` stays host; when `p1` then reconnects after the hand-over, `p1.is_host` stays False. WebSocket: A (host), B, C join in that order; A's socket closes; after `advance(59)` and a tick, nobody has received `host_changed`; after `advance(2)`, B and C receive `HostChanged(<B>)` within one second of real time, and B's `remove_player` on C is then accepted while A's resumed `lock_room` gets `not_host`.
 - **AC-4** (AC-3.4.4) (WebSocket; browser with live server) A change of room settings is announced to all players in the activity feed. WebSocket: host A and player B; A sends `change_settings` with help mode `vote` and budget 3 letters, 0 words; A and B receive `SettingsChanged(player_id=<A>, settings=RoomSettings(help_mode="vote", reveal_budget=RevealBudget(letters=3, words=0), locked=False), reveal_budget=RevealBudget(letters=3, words=0))`; the same message again produces no event; B's `change_settings` gets `not_host`. Browser: Ana (host) and Bob join; Ana sets `help-mode-select` to `vote`, `reveal-letters-input` to `3`, `reveal-words-input` to `0` and clicks `settings-save`; Bob's `activity-feed` gets a `feed-item` with `data-kind="settings_changed"` and the text `Ana a modifié les réglages : aide par vote, 3 lettres et 0 mots à révéler`; Ana's own feed gets the same line.
+- **AC-5** (new) (Python; WebSocket) A removed player can do nothing more. Any message from a `player_id` that is not in the room's players (removed, timed out or unknown) is refused with `not_joined` and changes nothing: no entry, no broadcast, no change to any cell. In particular, when the host removes B and B's socket sends 40 `edit_letter` frames right after, none is committed or broadcast and no cell takes B as author; the hub stops routing B's connections to the room in the same step as the removal.
+- **AC-6** (new) (Python; WebSocket) The host can mute a player's chat (the effect on chat belongs to spec 022). `mute_player` from a non-host is refused with `not_host`; for the host's own id or an unknown player with `invalid_target`; when the target's `muted` already has the requested value, nothing happens; otherwise the target's `muted` is set and one `PlayerMuted` entry is written and broadcast. The flag survives a restart (spec 018 replay).
+- **AC-7** (new) (browser with mocked socket) The host controls stay usable on small screens. At every window size of spec 006 AC-5, in desktop and touch contexts, each `remove-player` button is at least 24 by 24 CSS pixels, and when the host panel's content is wider than its box, the panel shows that more content exists (a visible scrollbar or an edge fade), while spec 013 AC-6's layout guarantees still hold.
 
 ## Edge cases and errors
 
@@ -240,6 +243,15 @@ above.
 8. "Announced to all players in the activity feed" (AC-4). Pick: the
    `settings_changed` event reaches every joined player, the changer included, and
    spec 013's feed shows the line; the browser check is made on both pages.
+
+Added after the review, decided by the lead on 2026-10-11 under the human's
+instruction to take technical decisions:
+- A removed or unknown player's messages are refused (AC-5); found by the review as
+  a reproduced hole.
+- The `mute_player` server rule declared here is built and tested here (AC-6);
+  spec 022 keeps the effect on chat and the button.
+- Remove buttons meet a 24 px target size and the host panel shows when it scrolls
+  (AC-7).
 
 ## Open questions
 
