@@ -26,6 +26,14 @@ Not defined yet. To write following `specs/_architecture.md` before approval.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, from the spec 037 review): the hub's per-room
+inbox and per-connection outbound queues are unbounded, so a member flooding
+non-edit messages, or a client that never reads its socket, can grow them
+without limit; and uvicorn's default `ws_max_size` (16 MiB) receives an
+oversized frame fully before spec 037 refuses it. This spec must decide bounds:
+a bounded outbound queue that disconnects a stalled client, a per-connection
+inbound cap, and a `ws_max_size` close to spec 037's 4096 bytes.
+
 - AC-3 depends on behaviour owned by spec 015; test only this spec's side of it here.
 
 ## Out of scope

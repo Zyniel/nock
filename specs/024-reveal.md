@@ -26,6 +26,15 @@ Not defined yet. To write following `specs/_architecture.md` before approval.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, from the spec 037 review): spec 037 AC-1's
+traffic check counts a letter as earned only when a player typed it. This
+spec must extend that check: a `cell_locked` frame with `revealed: true` earns
+its letter at that cell; any payload sent before the revealing frame that shows
+the letter is a leak; the full game must reveal a cell nobody typed and a word,
+with one late joiner's snapshot before the reveal (must not show the letter) and
+one after; the same for the browser game. The earn rule keys on the revealing
+frame, not on log order across clients.
+
 None stated in the backlog. To complete during review.
 
 ## Out of scope

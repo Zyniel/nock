@@ -63,9 +63,12 @@ sends to a browser, HTTP or WebSocket, contains:
 ### Client: escaping
 
 - Every nickname, chat text and clue text is inserted as text, never as HTML: no
-  `{@html ...}` in any `web/src/**/*.svelte` file, and no `innerHTML`,
-  `outerHTML`, `insertAdjacentHTML` or `document.write` in any `web/src/**/*.ts` or
-  `.svelte` file.
+  `{@html ...}` in any `web/src/**/*.svelte` file (whitespace or a line break
+  between `{` and `@html` included), and no `innerHTML`, `outerHTML`,
+  `insertAdjacentHTML`, `document.write`, `parseFromString`,
+  `createContextualFragment`, `setHTMLUnsafe` or `srcdoc` in any `web/src/**/*.ts`
+  or `.svelte` file (the last four added by the lead on 2026-10-11 after the
+  review).
 - The server refuses nicknames with `<`, `>` or `&` (spec 012); the client escapes
   anyway, since the protocol allows them (spec 039 checks length only).
 
@@ -97,7 +100,7 @@ The words in brackets say how each criterion is tested.
 - **AC-1** (AC-10.3.1) (WebSocket; browser with live server) No payload sent to a browser contains an answer letter the room has not earned. An automated test inspects all traffic of a full FX-01 game. WebSocket: in the full game of the test harness, every recorded frame and HTTP body passes the three rules of "What a browser may receive", and Cy's snapshot holds exactly the 9 letters typed before it joined. Browser: in the recorded traffic of the browser game, every WebSocket frame and every response body passes the same three rules, and at least one frame is a `snapshot` and 18 are `letter_changed`.
 - **AC-2** (AC-10.3.2) (Python; WebSocket) The server accepts an edit only if it is one A to Z letter, on a letter cell of the room's grid, from a member of the room. WebSocket, on a FX-01 room with a joined client: `edit_letter` with `"letter"` `"a"`, `"É"`, `"AB"`, `"1"` or `""` is answered `invalid_message`; `edit_letter` and `erase` at (0, 0) (a clue cell), (5, 0), (0, 5) and (9, 9) are answered `not_a_letter_cell`; a socket that has not joined sending a valid `edit_letter` at (1, 0) gets `not_joined`; after each, the room's `seq` and `grid_state` are unchanged and the other joined client receives nothing. A valid `edit_letter` at (1, 0) with `T` is then accepted (`letter_changed`). Python: `handle_message` with `EditLetter(row=0, column=0, letter="T")` and with `Erase(row=4, column=5)` returns the same state, no entry and one `ErrorMessage` with code `not_a_letter_cell`.
 - **AC-3** (AC-10.3.3) (Python; WebSocket with a fake clock) A client sending more than 20 edits a second is throttled. Python: on a FX-01 room with player `p1`, 21 `edit_letter` messages applied with the same `now` give 20 `letter_changed` entries then one `rate_limited` reply; at `now + 0.5` an edit is still refused; at `now + 1.0` it is accepted; a second player `p2` at `now` is not affected by `p1`'s count. WebSocket: with the fake clock frozen, a client sends 25 edits; it receives 20 `letter_changed` events and 5 `error` messages with code `rate_limited`, the other client receives exactly the 20 events, and the room's `seq` grew by 20; after `advance(1.0)` the next edit is accepted.
-- **AC-4** (AC-10.3.4) (static; WebSocket; browser with mocked socket) Nicknames and chat are escaped: a nickname containing an HTML tag displays as plain text. Static: the scan of "Client: escaping" finds no `{@html` in `.svelte` files and none of the four DOM calls in `.svelte` and `.ts` files under `web/src`. WebSocket: a join with nickname `<b>Eve</b>` is answered `invalid_nickname` (spec 012). Browser: given a snapshot whose players include `p2` with nickname `<b>Eve</b>` and `p3` with nickname `<img src=x>`, the `roster-nickname` of `p2` has the text `<b>Eve</b>` and that of `p3` the text `<img src=x>`, the roster holds no `b` and no `img` element, and no dialog opens.
+- **AC-4** (AC-10.3.4) (static; WebSocket; browser with mocked socket) Nicknames and chat are escaped: a nickname containing an HTML tag displays as plain text. Static: the scan of "Client: escaping" finds no `@html` block (with any whitespace after `{`) in `.svelte` files and none of the listed DOM calls in `.svelte` and `.ts` files under `web/src`. WebSocket: a join with nickname `<b>Eve</b>` is answered `invalid_nickname` (spec 012). Browser: given a snapshot whose players include `p2` with nickname `<b>Eve</b>` and `p3` with nickname `<img src=x>`, the `roster-nickname` of `p2` has the text `<b>Eve</b>` and that of `p3` the text `<img src=x>`, the roster holds no `b` and no `img` element, and no dialog opens.
 
 ## Edge cases and errors
 
