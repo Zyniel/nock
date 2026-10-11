@@ -6,7 +6,7 @@
   import { markFinished } from './catalogue'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
-  import { addPendingEdit, gridLabel, newSession, receiveFrame, shownCell, shownGrid, statusAfterClose } from './roomSession'
+  import { FLASH_MS, addPendingEdit, endFlash, gridLabel, newSession, receiveFrame, shownCell, shownGrid, statusAfterClose } from './roomSession'
   import {
     computeWords,
     sameSelection,
@@ -79,6 +79,22 @@
   $effect(() => {
     if (selection === null && rawSelection !== null) {
       rawSelection = null
+    }
+  })
+
+  // Each flash ends FLASH_MS after it started. A flash that a newer one replaced
+  // is no longer in the list, so its timer finds nothing to end.
+  const scheduledFlashes = new Set<number>()
+  $effect(() => {
+    for (const flash of session.flashes) {
+      if (scheduledFlashes.has(flash.id)) {
+        continue
+      }
+      scheduledFlashes.add(flash.id)
+      setTimeout(() => {
+        scheduledFlashes.delete(flash.id)
+        endFlash(session, flash.id)
+      }, FLASH_MS)
     }
   })
 
@@ -410,6 +426,7 @@
       {onErase}
       {words}
       pendingEdits={session.pendingEdits}
+      flashes={session.flashes}
     />
     <div
       class="clue-bar"

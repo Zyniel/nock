@@ -13,7 +13,7 @@
   import { actionForKey } from './letterEntry'
   import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
   import { shownCell, shownGrid } from './roomSession'
-  import type { GridView, PendingEdit } from './roomSession'
+  import type { CellFlash, GridView, PendingEdit } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
@@ -33,6 +33,7 @@
     onLetter,
     onErase,
     pendingEdits,
+    flashes,
   }: {
     grid: GridView
     words: Word[]
@@ -44,7 +45,18 @@
     onLetter: (letter: string) => void
     onErase: () => void
     pendingEdits: PendingEdit[]
+    flashes: CellFlash[]
   } = $props()
+
+  // The colour index of the flash on a cell, or '' when it does not flash.
+  function flashOf(row: number, column: number): string {
+    for (const flash of flashes) {
+      if (flash.row === row && flash.column === column) {
+        return String(flash.colour)
+      }
+    }
+    return ''
+  }
 
   let gridElement: HTMLDivElement | undefined = $state()
   let activeKey = $derived(activeWord === null ? '' : wordKey(activeWord))
@@ -305,6 +317,7 @@
           data-unconfirmed={String(shown.unconfirmed)}
           data-author={cell.author ?? ''}
           data-locked={String(cell.locked)}
+          data-flash={flashOf(cell.row, cell.column)}
           data-selected={String(isSelected(cell.row, cell.column))}
           data-in-word={String(wordPositions.has(positionKey(cell.row, cell.column)))}
           class:selected={isSelected(cell.row, cell.column)}
@@ -410,6 +423,39 @@
 
   .letter.selected {
     background: #ffd54a;
+  }
+
+  /* After the other states, so a flash shows over them. */
+  .letter[data-flash='0'] {
+    background: var(--player-colour-0);
+  }
+
+  .letter[data-flash='1'] {
+    background: var(--player-colour-1);
+  }
+
+  .letter[data-flash='2'] {
+    background: var(--player-colour-2);
+  }
+
+  .letter[data-flash='3'] {
+    background: var(--player-colour-3);
+  }
+
+  .letter[data-flash='4'] {
+    background: var(--player-colour-4);
+  }
+
+  .letter[data-flash='5'] {
+    background: var(--player-colour-5);
+  }
+
+  .letter[data-flash='6'] {
+    background: var(--player-colour-6);
+  }
+
+  .letter[data-flash='7'] {
+    background: var(--player-colour-7);
   }
 
   .clue.active {

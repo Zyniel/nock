@@ -580,15 +580,22 @@ def _find_cell(state: RoomState, row: int, column: int) -> CellState | None:
 def _edit_refusal(state: RoomState, edit: EditLetter | Erase) -> Outcome | None:
     """Run the edit checks in their fixed order; return the first refusal.
 
-    Checks 1 (rate limit, spec 037), 3 (locked cell, spec 016), 4 (stale edit,
-    spec 017) and 5 (solved grid, spec 026) belong to later specs: they keep
-    their place in the order but never refuse yet.
+    Checks 1 (rate limit, spec 037), 4 (stale edit, spec 017) and 5 (solved
+    grid, spec 026) belong to later specs: they keep their place in the order
+    but never refuse yet.
     """
-    if _find_cell(state, edit.row, edit.column) is None:
+    cell = _find_cell(state, edit.row, edit.column)
+    if cell is None:
         return _refuse(
             state,
             ErrorCode.NOT_A_LETTER_CELL,
             f"({edit.row}, {edit.column}) is not a letter cell.",
+        )
+    if cell.locked:
+        return _refuse(
+            state,
+            ErrorCode.CELL_LOCKED,
+            f"({edit.row}, {edit.column}) is locked.",
         )
     return None
 

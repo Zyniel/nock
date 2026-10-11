@@ -28,6 +28,8 @@ export interface LetterCellView {
   // `null` when the cell is empty.
   letter: string | null
   locked: boolean
+  // True when a reveal locked the cell (spec 024).
+  revealed: boolean
   // The player id of the author, `null` when none.
   author: string | null
 }
@@ -102,7 +104,21 @@ export interface RoomSession {
   solved: boolean
   // The edits sent and not answered yet, oldest first.
   pendingEdits: PendingEdit[]
+  // The cells flashing because another player replaced my letter (spec 016).
+  flashes: CellFlash[]
+  // The id given to the next flash.
+  nextFlashId: number
 }
+
+// A cell that flashes in the colour of the player who replaced my letter.
+export interface CellFlash {
+  id: number
+  row: number
+  column: number
+  colour: number
+}
+
+export const FLASH_MS = 1000
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
 export const THROTTLED_CLOSE_CODE = 4429
@@ -120,6 +136,8 @@ export function newSession(): RoomSession {
     nicknameRefused: false,
     solved: false,
     pendingEdits: [],
+    flashes: [],
+    nextFlashId: 1,
   }
 }
 
@@ -198,7 +216,8 @@ function toCell(value: unknown): CellView | null {
       return null
     }
     const author = typeof cell.author === 'string' ? cell.author : null
-    return { type: 'letter', row, column, letter, locked, author }
+    const revealed = cell.revealed === true
+    return { type: 'letter', row, column, letter, locked, revealed, author }
   }
   return null
 }
@@ -365,6 +384,53 @@ function letterCellAt(snapshot: Snapshot, row: unknown, column: unknown): Letter
   return null
 }
 
+// True when `playerId`, another player, changes a confirmed letter that I wrote.
+function isMyLetterReplaced(snapshot: Snapshot, cell: LetterCellView, playerId: unknown): boolean {
+  return playerId !== snapshot.you && cell.letter !== null && cell.author === snapshot.you
+}
+
+// Flash the cell in the colour of `playerId`; a player who is gone has colour 0.
+// A new flash on the same cell replaces the old one, so its time restarts.
+function startFlash(
+  session: RoomSession,
+  snapshot: Snapshot,
+  cell: LetterCellView,
+  playerId: unknown,
+): void {
+  let colour = 0
+  for (const player of snapshot.players) {
+    if (player.player_id === playerId) {
+      colour = player.colour
+    }
+  }
+  const others = session.flashes.filter(
+    (flash) => flash.row !== cell.row || flash.column !== cell.column,
+  )
+  others.push({ id: session.nextFlashId, row: cell.row, column: cell.column, colour })
+  session.nextFlashId += 1
+  session.flashes = others
+}
+
+// Stop a flash: used when its FLASH_MS are over.
+export function endFlash(session: RoomSession, flashId: number): void {
+  session.flashes = session.flashes.filter((flash) => flash.id !== flashId)
+}
+
+// A cell_locked locks the cell with its letter; a reveal also clears the author.
+function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
+  const { message } = event
+  const cell = letterCellAt(snapshot, message.row, message.column)
+  if (cell === null) {
+    return
+  }
+  cell.letter = typeof message.letter === 'string' ? message.letter : null
+  cell.locked = true
+  cell.revealed = message.revealed === true
+  if (cell.revealed) {
+    cell.author = null
+  }
+}
+
 // A letter_changed updates the confirmed grid; one from me answers my oldest
 // pending edit (spec 015).
 function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
@@ -372,6 +438,9 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
   const cell = letterCellAt(snapshot, message.row, message.column)
   const letter = typeof message.letter === 'string' ? message.letter : null
   if (cell !== null) {
+    if (isMyLetterReplaced(snapshot, cell, message.player_id)) {
+      startFlash(session, snapshot, cell, message.player_id)
+    }
     cell.letter = letter
     cell.author = letter === null || typeof message.player_id !== 'string' ? null : message.player_id
   }
@@ -384,6 +453,9 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   session.seq = event.seq
   if (event.type === 'letter_changed' && session.snapshot !== null) {
     applyLetterChanged(session, session.snapshot, event)
+  }
+  if (event.type === 'cell_locked' && session.snapshot !== null) {
+    applyCellLocked(session.snapshot, event)
   }
   if (event.type === 'grid_solved') {
     session.solved = true
