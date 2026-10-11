@@ -147,6 +147,7 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-3.3.3) (browser with mocked socket) When two players select the same cell, both outlines are visible. Given `p1` (`you`), `p2` (colour 1) and `p3` (colour 2), when the mock sends `selection_moved` for `p2` and for `p3`, both on (1, 1) (`p2` across, `p3` down), then (1, 1) holds two `remote-selection` elements with `data-player-id` `p2` and `p3`, both visible, with different bounding boxes and different border colours; (1, 1) has `data-tinted-by="p2 p3"`. When `p1` also taps (1, 1), the two outlines stay visible and the cell also shows `p1`'s own selection (spec 007 `data-selected="true"`).
 - **AC-4** (AC-3.3.4) (browser with mocked socket) My own selection is styled differently from every other player's. Given `p1` (`you`) and `p2`, after `p1` taps (3, 1) and the mock sends `p2`'s selection on (2, 2): (3, 1) has `data-selected="true"` and no `remote-selection` child; no cell has a `remote-selection` with `data-player-id="p1"`; the computed `border-style` of (3, 1) and of its children is never `dashed`; and the background colour of (3, 1) differs from the background colour of (2, 2) and of the tinted (2, 3).
 - **AC-5** (AC-3.3.5) (browser with mocked socket) An activity feed lists joins, departures, checks, reveals, flags and setting changes in the order they happened. Given the page joined at `seq` 5 with players `p1` (`you`, `Ana`) and `p2` (`Bob`), when the mock sends, with seqs 6 to 12: `player_joined` (`p3`, `Cy`), `check_result` (`p2`, scope word), `reveal_result` (`p3`, scope letter), `flag_changed` (`p2`, clue (0, 3, 0)), `settings_changed` (`p1`, help mode `vote`, budget 5 letters and 1 word, unlocked), `settings_changed` (`p1`, same values but `locked` true), `player_left` (`p3`, reason `removed`), then `activity-feed` holds 7 `feed-item` elements with `data-seq` 6 to 12 in that order and `data-kind` `player_joined`, `check`, `reveal`, `flag`, `settings_changed`, `room_locked`, `player_removed`, whose texts are, in order, `Cy a rejoint le salon`, `Bob a vérifié un mot`, `Cy a révélé une lettre`, `Bob bloque sur « Fatales à César »`, `Ana a modifié les réglages : aide par vote, 5 lettres et 1 mots à révéler`, `Ana a verrouillé le salon` and `Cy a été retiré du salon` (each built from `fr.json`). Sending those events out of order (seq 8 before 7) still lists them by seq.
+- **AC-6** (new) (browser with mocked socket) The roster and the feed never take the grid's room. With a snapshot of 8 players and 100 feed items, at every window size of spec 006 AC-5, in desktop and touch contexts (touch with spec 009's on-screen keyboard), and after a tap on a cell: the `grid-viewport` is at least 100 px high, the page has no vertical or horizontal scroll, the grid fits the viewport at zoom 1, and the clue bar is fully inside the window above the keyboard (specs 006 AC-5 and AC-7, 009 AC-4). On small windows the roster and the feed may be compact (for example one line each, the feed showing its newest item) as long as their content stays reachable.
 
 ## Edge cases and errors
 
@@ -221,6 +222,14 @@ AC-1 refer to is part of spec 039 since its reopening, decision 17 there.)
    so this spec writes the feed lines for lock, settings and host changes that
    spec 014 triggers. The lines for checks, reveals and flags are tested with mocked
    events, since specs 021, 023 and 024 come later.
+
+Added after the review, decided by the lead on 2026-10-11 under the human's
+instruction to take technical decisions:
+- The roster and the feed must keep the layout guarantees of specs 006 and 009 with
+  8 players and a full feed (AC-6). This also fixes the roster squeezing the grid
+  on landscape phones, which predates this spec.
+- A tick that disconnects a silent player clears their selection and relays the
+  clearing to the others, never to the silent player.
 
 ## Open questions
 
