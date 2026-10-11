@@ -6,7 +6,7 @@
   import { markFinished } from './catalogue'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
-  import { addPendingEdit, gridLabel, newSession, receiveFrame, shownCell, statusAfterClose } from './roomSession'
+  import { addPendingEdit, gridLabel, newSession, receiveFrame, shownCell, shownGrid, statusAfterClose } from './roomSession'
   import {
     computeWords,
     sameSelection,
@@ -272,7 +272,7 @@
 
   function onClueTap(word: Word): void {
     if (session.snapshot !== null) {
-      select(selectionAfterClueTap(session.snapshot.grid, word))
+      select(selectionAfterClueTap(shownGrid(session.snapshot.grid, session.pendingEdits), word))
     }
   }
 

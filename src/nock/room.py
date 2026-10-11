@@ -558,9 +558,9 @@ def handle_message(
     state is unchanged and nothing is sent.
     """
     if isinstance(message, EditLetter):
-        return _apply_edit(state, player_id, message, message.letter, now)
+        return _apply_edit(state, player_id, message, now)
     if isinstance(message, Erase):
-        return _apply_edit(state, player_id, message, None, now)
+        return _apply_edit(state, player_id, message, now)
     return Outcome(state=state)
 
 
@@ -593,24 +593,28 @@ def _edit_refusal(state: RoomState, edit: EditLetter | Erase) -> Outcome | None:
     return None
 
 
+def _letter_of(edit: EditLetter | Erase) -> str | None:
+    """Return the letter an edit writes: the typed letter, None for an erase."""
+    if isinstance(edit, EditLetter):
+        return edit.letter
+    return None
+
+
 def _apply_edit(
-    state: RoomState,
-    player_id: str,
-    edit: EditLetter | Erase,
-    letter: str | None,
-    now: float,
+    state: RoomState, player_id: str, edit: EditLetter | Erase, now: float
 ) -> Outcome:
     """Check one edit, then write it in the cell and number its event."""
     refusal = _edit_refusal(state, edit)
     if refusal is not None:
         return refusal
 
+    letter = _letter_of(edit)
     seq = state.seq + 1
     author = player_id if letter is not None else None
     cells: list[CellState] = []
     for cell in state.cells:
         if cell.row == edit.row and cell.column == edit.column:
-            cell = cell.model_copy(
+            edited_cell = cell.model_copy(
                 update={
                     "letter": letter,
                     "pencil": False,
@@ -620,7 +624,9 @@ def _apply_edit(
                     "changed_by": player_id,
                 }
             )
-        cells.append(cell)
+            cells.append(edited_cell)
+        else:
+            cells.append(cell)
     new_state = state.model_copy(update={"cells": tuple(cells), "seq": seq})
     event = LetterChanged(
         seq=seq,

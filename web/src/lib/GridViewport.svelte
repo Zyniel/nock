@@ -12,7 +12,7 @@
   } from './gridLayout'
   import { actionForKey } from './letterEntry'
   import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
-  import { shownCell } from './roomSession'
+  import { shownCell, shownGrid } from './roomSession'
   import type { GridView, PendingEdit } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
@@ -126,7 +126,7 @@
 
   // Tab and Shift+Tab select the next or previous unfinished word (spec 009).
   function onTabKey(shiftKey: boolean): void {
-    const next = selectionAfterTab(grid, words, selection, shiftKey ? -1 : 1)
+    const next = selectionAfterTab(shownGrid(grid, pendingEdits), words, selection, shiftKey ? -1 : 1)
     if (next !== null) {
       onSelect(next)
     }

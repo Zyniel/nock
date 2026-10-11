@@ -526,3 +526,17 @@ export function shownCell(
   }
   return { letter: cell.letter, unconfirmed: false }
 }
+
+// The grid as the player sees it: every letter cell holds its shown letter, so
+// pending edits count as filled or cleared.
+export function shownGrid(grid: GridView, pendingEdits: PendingEdit[]): GridView {
+  const cells: CellView[] = []
+  for (const cell of grid.cells) {
+    if (cell.type === 'letter') {
+      cells.push({ ...cell, letter: shownCell(cell, pendingEdits).letter })
+    } else {
+      cells.push(cell)
+    }
+  }
+  return { width: grid.width, height: grid.height, cells }
+}
