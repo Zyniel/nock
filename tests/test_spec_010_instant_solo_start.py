@@ -241,6 +241,18 @@ def fail_creation_with_500(route: Route) -> None:
     route.fulfill(status=500, content_type="application/json", body="{}")
 
 
+def fail_creation_with_500_and_code(route: Route) -> None:
+    route.fulfill(
+        status=500, content_type="application/json", body='{"code": "ABC123"}'
+    )
+
+
+def fail_creation_with_409_and_code(route: Route) -> None:
+    route.fulfill(
+        status=409, content_type="application/json", body='{"code": "ABC123"}'
+    )
+
+
 def fail_creation_by_abort(route: Route) -> None:
     route.abort()
 
@@ -445,7 +457,14 @@ def test_ac1_typing_in_the_new_room_shows_the_letter(
 
 
 @pytest.mark.parametrize(
-    "handler", [fail_creation_with_500, fail_creation_by_abort], ids=["500", "abort"]
+    "handler",
+    [
+        fail_creation_with_500,
+        fail_creation_with_500_and_code,
+        fail_creation_with_409_and_code,
+        fail_creation_by_abort,
+    ],
+    ids=["500", "500-with-code", "409-with-code", "abort"],
 )
 def test_ac1_creation_failure_stays_on_the_page_and_shows_the_error(
     page: Page, live_server: str, handler: Callable[[Route], None]
@@ -515,12 +534,7 @@ def test_ac1_storage_that_refuses_writes_still_creates_and_loads_the_room(
     code = start_from_catalogue(page, live_server)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute(
-        "data-status", re.compile(r"^(joined|nickname)$"), timeout=URL_TIMEOUT_MS
-    )
-    status = room.get_attribute("data-status")
-    if status == "joined":
-        expect(room).to_have_attribute("data-grid", "5x5")
+    expect(room).to_have_attribute("data-status", "nickname", timeout=URL_TIMEOUT_MS)
     assert room_registry.room_state(code) is not None
     assert read_storage(page, PROGRESS_KEY) is None
 
