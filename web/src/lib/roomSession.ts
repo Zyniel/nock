@@ -28,6 +28,18 @@ export interface LetterCellView {
   // `null` when the cell is empty.
   letter: string | null
   locked: boolean
+  // The player id of the author, `null` when none.
+  author: string | null
+}
+
+// An edit this page sent and that has no answer yet (spec 015).
+export interface PendingEdit {
+  row: number
+  column: number
+  // `null` for an erase.
+  letter: string | null
+  // The page's `seq` when the edit was made (spec 017 uses it).
+  baseSeq: number | null
 }
 
 export interface ClueCellView {
@@ -88,6 +100,8 @@ export interface RoomSession {
   nicknameRefused: boolean
   // True once the grid is solved: a snapshot with `solved: true`, or `grid_solved`.
   solved: boolean
+  // The edits sent and not answered yet, oldest first.
+  pendingEdits: PendingEdit[]
 }
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
@@ -105,6 +119,7 @@ export function newSession(): RoomSession {
     pending: [],
     nicknameRefused: false,
     solved: false,
+    pendingEdits: [],
   }
 }
 
@@ -182,7 +197,8 @@ function toCell(value: unknown): CellView | null {
     if (typeof locked !== 'boolean') {
       return null
     }
-    return { type: 'letter', row, column, letter, locked }
+    const author = typeof cell.author === 'string' ? cell.author : null
+    return { type: 'letter', row, column, letter, locked, author }
   }
   return null
 }
@@ -332,8 +348,35 @@ function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
   }
 }
 
+function letterCellAt(snapshot: Snapshot, row: unknown, column: unknown): LetterCellView | null {
+  for (const cell of snapshot.grid.cells) {
+    if (cell.type === 'letter' && cell.row === row && cell.column === column) {
+      return cell
+    }
+  }
+  return null
+}
+
+// A letter_changed updates the confirmed grid; one from me answers my oldest
+// pending edit (spec 015).
+function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
+  const { message } = event
+  const cell = letterCellAt(snapshot, message.row, message.column)
+  const letter = typeof message.letter === 'string' ? message.letter : null
+  if (cell !== null) {
+    cell.letter = letter
+    cell.author = letter === null || typeof message.player_id !== 'string' ? null : message.player_id
+  }
+  if (message.player_id === snapshot.you) {
+    session.pendingEdits.shift()
+  }
+}
+
 function applyEvent(session: RoomSession, event: RoomEvent): void {
   session.seq = event.seq
+  if (event.type === 'letter_changed' && session.snapshot !== null) {
+    applyLetterChanged(session, session.snapshot, event)
+  }
   if (event.type === 'grid_solved') {
     session.solved = true
   }
@@ -406,8 +449,21 @@ export function receiveFrame(session: RoomSession, text: string): void {
   }
 }
 
-// The errors that answer a join: a refused nickname, or a full room.
+// The errors that answer one edit (spec 015): each removes the oldest pending edit.
+const EDIT_ERROR_CODES: string[] = [
+  'rate_limited',
+  'not_a_letter_cell',
+  'cell_locked',
+  'stale_edit',
+  'grid_solved',
+]
+
+// The errors that answer an edit, or a join: a refused nickname, or a full room.
 function receiveError(session: RoomSession, message: Record<string, unknown>): void {
+  if (typeof message.code === 'string' && EDIT_ERROR_CODES.includes(message.code)) {
+    session.pendingEdits.shift()
+    return
+  }
   if (session.status !== 'joining') {
     return
   }
@@ -442,4 +498,31 @@ export function gridLabel(session: RoomSession): string {
     return ''
   }
   return `${session.snapshot.grid.width}x${session.snapshot.grid.height}`
+}
+
+// Remember an edit just sent, until the server answers it.
+export function addPendingEdit(
+  session: RoomSession,
+  row: number,
+  column: number,
+  letter: string | null,
+): void {
+  session.pendingEdits.push({ row, column, letter, baseSeq: session.seq })
+}
+
+// What a cell shows: the newest pending edit of the cell, else its confirmed
+// letter. A locked cell always shows its confirmed letter.
+export function shownCell(
+  cell: LetterCellView,
+  pendingEdits: PendingEdit[],
+): { letter: string | null; unconfirmed: boolean } {
+  if (!cell.locked) {
+    for (let index = pendingEdits.length - 1; index >= 0; index--) {
+      const edit = pendingEdits[index]
+      if (edit.row === cell.row && edit.column === cell.column) {
+        return { letter: edit.letter, unconfirmed: true }
+      }
+    }
+  }
+  return { letter: cell.letter, unconfirmed: false }
 }

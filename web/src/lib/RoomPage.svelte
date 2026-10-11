@@ -6,7 +6,7 @@
   import { markFinished } from './catalogue'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
-  import { gridLabel, newSession, receiveFrame, statusAfterClose } from './roomSession'
+  import { addPendingEdit, gridLabel, newSession, receiveFrame, shownCell, statusAfterClose } from './roomSession'
   import {
     computeWords,
     sameSelection,
@@ -214,8 +214,8 @@
     if (cell === null || cell.locked) {
       return
     }
-    if (cell.letter !== letter) {
-      cell.letter = letter
+    if (shownCell(cell, session.pendingEdits).letter !== letter) {
+      addPendingEdit(session, cell.row, cell.column, letter)
       send({
         type: 'edit_letter',
         row: cell.row,
@@ -237,10 +237,10 @@
 
   // Clear a cell that is filled and not locked, and tell the server.
   function eraseCell(cell: LetterCellView): boolean {
-    if (cell.locked || cell.letter === null) {
+    if (cell.locked || shownCell(cell, session.pendingEdits).letter === null) {
       return false
     }
-    cell.letter = null
+    addPendingEdit(session, cell.row, cell.column, null)
     send({ type: 'erase', row: cell.row, column: cell.column, base_seq: null })
     return true
   }
@@ -409,6 +409,7 @@
       {onLetter}
       {onErase}
       {words}
+      pendingEdits={session.pendingEdits}
     />
     <div
       class="clue-bar"

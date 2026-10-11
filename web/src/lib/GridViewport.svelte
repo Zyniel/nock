@@ -12,7 +12,8 @@
   } from './gridLayout'
   import { actionForKey } from './letterEntry'
   import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
-  import type { GridView } from './roomSession'
+  import { shownCell } from './roomSession'
+  import type { GridView, PendingEdit } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
@@ -31,6 +32,7 @@
     onSelect,
     onLetter,
     onErase,
+    pendingEdits,
   }: {
     grid: GridView
     words: Word[]
@@ -41,6 +43,7 @@
     onSelect: (next: Selection) => void
     onLetter: (letter: string) => void
     onErase: () => void
+    pendingEdits: PendingEdit[]
   } = $props()
 
   let gridElement: HTMLDivElement | undefined = $state()
@@ -290,6 +293,7 @@
   >
     {#each grid.cells as cell (cell.row * grid.width + cell.column)}
       {#if cell.type === 'letter'}
+        {@const shown = shownCell(cell, pendingEdits)}
         <div
           class="cell letter"
           class:locked={cell.locked}
@@ -297,7 +301,9 @@
           data-row={cell.row}
           data-column={cell.column}
           data-type="letter"
-          data-letter={cell.letter ?? ''}
+          data-letter={shown.letter ?? ''}
+          data-unconfirmed={String(shown.unconfirmed)}
+          data-author={cell.author ?? ''}
           data-locked={String(cell.locked)}
           data-selected={String(isSelected(cell.row, cell.column))}
           data-in-word={String(wordPositions.has(positionKey(cell.row, cell.column)))}
@@ -305,7 +311,7 @@
           class:in-word={wordPositions.has(positionKey(cell.row, cell.column))}
           style:grid-row={cell.row + 1}
           style:grid-column={cell.column + 1}
-        >{cell.letter ?? ''}</div>
+        >{shown.letter ?? ''}</div>
       {:else if cell.type === 'clue'}
         <div
           class="cell clue-cell"

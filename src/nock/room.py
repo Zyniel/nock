@@ -22,6 +22,8 @@ from nock.protocol import (
     ClientMessage,
     Colour,
     Coordinate,
+    EditLetter,
+    Erase,
     ErrorCode,
     ErrorMessage,
     FlagChanged,
@@ -551,10 +553,84 @@ def handle_message(
 ) -> Outcome:
     """Apply a message of a joined player (spec 015 and later).
 
-    Until the spec that gives a message its meaning is built, the message is
-    read and ignored: the state is unchanged and nothing is sent.
+    Edits (`edit_letter`, `erase`) are handled here. Until the spec that gives
+    another message its meaning is built, the message is read and ignored: the
+    state is unchanged and nothing is sent.
     """
+    if isinstance(message, EditLetter):
+        return _apply_edit(state, player_id, message, message.letter, now)
+    if isinstance(message, Erase):
+        return _apply_edit(state, player_id, message, None, now)
     return Outcome(state=state)
+
+
+def _refuse(state: RoomState, code: ErrorCode, text: str) -> Outcome:
+    """Return an outcome that changes nothing and answers with one error."""
+    return Outcome(state=state, reply=(ErrorMessage(code=code, message=text),))
+
+
+def _find_cell(state: RoomState, row: int, column: int) -> CellState | None:
+    """Return the room's state of the letter cell at (row, column), or None."""
+    for cell in state.cells:
+        if cell.row == row and cell.column == column:
+            return cell
+    return None
+
+
+def _edit_refusal(state: RoomState, edit: EditLetter | Erase) -> Outcome | None:
+    """Run the edit checks in their fixed order; return the first refusal.
+
+    Checks 1 (rate limit, spec 037), 3 (locked cell, spec 016), 4 (stale edit,
+    spec 017) and 5 (solved grid, spec 026) belong to later specs: they keep
+    their place in the order but never refuse yet.
+    """
+    if _find_cell(state, edit.row, edit.column) is None:
+        return _refuse(
+            state,
+            ErrorCode.NOT_A_LETTER_CELL,
+            f"({edit.row}, {edit.column}) is not a letter cell.",
+        )
+    return None
+
+
+def _apply_edit(
+    state: RoomState,
+    player_id: str,
+    edit: EditLetter | Erase,
+    letter: str | None,
+    now: float,
+) -> Outcome:
+    """Check one edit, then write it in the cell and number its event."""
+    refusal = _edit_refusal(state, edit)
+    if refusal is not None:
+        return refusal
+
+    seq = state.seq + 1
+    author = player_id if letter is not None else None
+    cells: list[CellState] = []
+    for cell in state.cells:
+        if cell.row == edit.row and cell.column == edit.column:
+            cell = cell.model_copy(
+                update={
+                    "letter": letter,
+                    "pencil": False,
+                    "author": author,
+                    "wrong": False,
+                    "changed_seq": seq,
+                    "changed_by": player_id,
+                }
+            )
+        cells.append(cell)
+    new_state = state.model_copy(update={"cells": tuple(cells), "seq": seq})
+    event = LetterChanged(
+        seq=seq,
+        row=edit.row,
+        column=edit.column,
+        letter=letter,
+        pencil=False,
+        player_id=player_id,
+    )
+    return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
 
 
 def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> Outcome:
