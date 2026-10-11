@@ -1,7 +1,18 @@
 // The state of one room page and the rules that keep it in `seq` order.
 // Plain functions: no socket and no DOM, so the rules are easy to read.
 
-export type RoomStatus = 'connecting' | 'joined' | 'not_found' | 'throttled' | 'closed'
+export type RoomStatus =
+  | 'connecting'
+  | 'nickname'
+  | 'joining'
+  | 'joined'
+  | 'full'
+  | 'replaced'
+  | 'not_found'
+  | 'throttled'
+  | 'closed'
+
+export type PlayerState = 'active' | 'idle' | 'disconnected'
 
 export type Arrow = 'right' | 'down' | 'right_then_down' | 'down_then_right'
 
@@ -40,17 +51,29 @@ export interface GridView {
   cells: CellView[]
 }
 
+export interface PlayerView {
+  player_id: string
+  nickname: string
+  colour: number
+  state: PlayerState
+}
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
   seq: number
+  you: string
+  resume_token: string
   grid: GridView
+  players: PlayerView[]
 }
 
 // A message with an integer `seq` that is not a snapshot.
 export interface RoomEvent {
   type: string
   seq: number
+  // The whole message, for the events that change the snapshot.
+  message: Record<string, unknown>
 }
 
 export interface RoomSession {
@@ -60,13 +83,25 @@ export interface RoomSession {
   seq: number | null
   // Events that arrived too early, waiting for the ones before them.
   pending: RoomEvent[]
+  // True after the server refused the nickname of the last join.
+  nicknameRefused: boolean
 }
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
 export const THROTTLED_CLOSE_CODE = 4429
+export const SESSION_REPLACED_CLOSE_CODE = 4001
+
+const PLAYER_STATES: string[] = ['active', 'idle', 'disconnected']
+const MAX_COLOUR = 7
 
 export function newSession(): RoomSession {
-  return { status: 'connecting', snapshot: null, seq: null, pending: [] }
+  return {
+    status: 'connecting',
+    snapshot: null,
+    seq: null,
+    pending: [],
+    nicknameRefused: false,
+  }
 }
 
 // Parse one frame. Returns null when it is not a JSON object with a string type.
@@ -201,6 +236,43 @@ function hasEveryPositionOnce(cells: CellView[], width: number, height: number):
   return true
 }
 
+// Returns null when the value is not a player of the protocol.
+function toPlayer(value: unknown): PlayerView | null {
+  const player = value as Record<string, unknown> | null
+  if (typeof player !== 'object' || player === null) {
+    return null
+  }
+  const { player_id, nickname, colour, state } = player
+  if (typeof player_id !== 'string' || typeof nickname !== 'string') {
+    return null
+  }
+  if (typeof colour !== 'number' || !Number.isInteger(colour)) {
+    return null
+  }
+  if (colour < 0 || colour > MAX_COLOUR) {
+    return null
+  }
+  if (typeof state !== 'string' || !PLAYER_STATES.includes(state)) {
+    return null
+  }
+  return { player_id, nickname, colour, state: state as PlayerState }
+}
+
+function toPlayers(value: unknown): PlayerView[] | null {
+  if (!Array.isArray(value)) {
+    return null
+  }
+  const players: PlayerView[] = []
+  for (const item of value) {
+    const player = toPlayer(item)
+    if (player === null) {
+      return null
+    }
+    players.push(player)
+  }
+  return players
+}
+
 function toSnapshot(message: Record<string, unknown>): Snapshot | null {
   const grid = toGrid(message.grid)
   if (grid === null) {
@@ -209,20 +281,58 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
   if (typeof message.seq !== 'number' || !Number.isInteger(message.seq)) {
     return null
   }
-  return { type: 'snapshot', seq: message.seq, grid }
+  const players = toPlayers(message.players)
+  if (players === null) {
+    return null
+  }
+  const { you, resume_token } = message
+  if (typeof you !== 'string' || typeof resume_token !== 'string') {
+    return null
+  }
+  return { type: 'snapshot', seq: message.seq, you, resume_token, grid, players }
 }
 
 function toEvent(message: Record<string, unknown>): RoomEvent | null {
   if (typeof message.seq !== 'number' || !Number.isInteger(message.seq)) {
     return null
   }
-  return { type: String(message.type), seq: message.seq }
+  return { type: String(message.type), seq: message.seq, message }
 }
 
-// In this spec, applying an event only advances `seq`. What each event changes
-// in the snapshot belongs to the spec that owns that event.
+// Change the kept snapshot for the events that concern the players. What the
+// other events change belongs to the spec that owns them.
+function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
+  const { message } = event
+  if (event.type === 'player_joined') {
+    const player = toPlayer(message.player)
+    if (player !== null) {
+      snapshot.players.push(player)
+    }
+    return
+  }
+  const playerId = message.player_id
+  if (event.type === 'player_left') {
+    snapshot.players = snapshot.players.filter((player) => player.player_id !== playerId)
+    return
+  }
+  if (event.type === 'player_state_changed') {
+    const state = message.state
+    if (typeof state !== 'string' || !PLAYER_STATES.includes(state)) {
+      return
+    }
+    for (const player of snapshot.players) {
+      if (player.player_id === playerId) {
+        player.state = state as PlayerState
+      }
+    }
+  }
+}
+
 function applyEvent(session: RoomSession, event: RoomEvent): void {
   session.seq = event.seq
+  if (session.snapshot !== null) {
+    applyToPlayers(session.snapshot, event)
+  }
 }
 
 // Apply every buffered event that follows `seq`, one after the other.
@@ -242,6 +352,7 @@ function receiveSnapshot(session: RoomSession, snapshot: Snapshot): void {
   session.snapshot = snapshot
   session.seq = snapshot.seq
   session.status = 'joined'
+  session.nicknameRefused = false
   session.pending = session.pending.filter((event) => event.seq > snapshot.seq)
   drainPending(session)
 }
@@ -277,18 +388,43 @@ export function receiveFrame(session: RoomSession, text: string): void {
     }
     return
   }
+  if (message.type === 'error') {
+    receiveError(session, message)
+    return
+  }
   const event = toEvent(message)
   if (event !== null) {
     receiveEvent(session, event)
   }
 }
 
-export function statusAfterClose(code: number): RoomStatus {
+// The errors that answer a join: a refused nickname, or a full room.
+function receiveError(session: RoomSession, message: Record<string, unknown>): void {
+  if (session.status !== 'joining') {
+    return
+  }
+  if (message.code === 'invalid_nickname') {
+    session.status = 'nickname'
+    session.nicknameRefused = true
+  } else if (message.code === 'room_full') {
+    session.status = 'full'
+  }
+}
+
+// The status once the socket closed. A full room closes its socket on purpose
+// and a replaced page was told why: both stay as they are.
+export function statusAfterClose(code: number, current: RoomStatus): RoomStatus {
   if (code === ROOM_NOT_FOUND_CLOSE_CODE) {
     return 'not_found'
   }
   if (code === THROTTLED_CLOSE_CODE) {
     return 'throttled'
+  }
+  if (code === SESSION_REPLACED_CLOSE_CODE) {
+    return 'replaced'
+  }
+  if (current === 'full') {
+    return 'full'
   }
   return 'closed'
 }

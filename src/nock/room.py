@@ -6,6 +6,7 @@ as `now`. The runtime that drives these functions is `nock.hub`.
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Callable
 from typing import Annotated
 
@@ -20,6 +21,7 @@ from nock.protocol import (
     ClientMessage,
     Colour,
     Coordinate,
+    ErrorCode,
     ErrorMessage,
     FlagChanged,
     GridFullWrong,
@@ -58,6 +60,10 @@ Clock = Callable[[], float]  # seconds since the epoch; the default is time.time
 RoomCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{6}$")]
 
 MAX_PLAYERS: int = 8  # spec 012 AC-4
+# Space, hyphen, apostrophe, right single quotation mark (U+2019), underscore.
+NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
+NICKNAME_MIN_LENGTH: int = 2
+NICKNAME_MAX_LENGTH: int = 20
 DEFAULT_REVEAL_BUDGET: RevealBudget = RevealBudget(letters=5, words=1)  # spec 024
 DEFAULT_SETTINGS: RoomSettings = RoomSettings(
     help_mode=HelpMode.FREE, reveal_budget=DEFAULT_REVEAL_BUDGET, locked=False
@@ -272,33 +278,67 @@ def grid_state(state: RoomState) -> GridView:
 
 
 def normalize_nickname(text: str) -> str:
-    """Return the nickname without the spaces around it (spec 012 adds the rules)."""
-    return text.strip()
+    """Return the nickname as stored: NFC-normalised, then stripped.
+
+    Args:
+        text: The nickname as typed.
+
+    Returns:
+        The nickname, 2 to 20 characters, made of letters, combining marks,
+        ASCII digits and NICKNAME_PUNCTUATION, with at least one letter or digit.
+
+    Raises:
+        ValueError: a rule is broken; the message names the rule.
+    """
+    nickname = unicodedata.normalize("NFC", text).strip()
+    if len(nickname) < NICKNAME_MIN_LENGTH or len(nickname) > NICKNAME_MAX_LENGTH:
+        raise ValueError(
+            f"The nickname must have {NICKNAME_MIN_LENGTH} to "
+            f"{NICKNAME_MAX_LENGTH} characters, got {len(nickname)}"
+        )
+    has_letter_or_digit = False
+    for character in nickname:
+        category = unicodedata.category(character)
+        is_letter = category.startswith("L")
+        is_digit = "0" <= character <= "9"
+        is_mark = category == "Mn"
+        is_punctuation = character in NICKNAME_PUNCTUATION
+        if not (is_letter or is_digit or is_mark or is_punctuation):
+            raise ValueError(f"Character not allowed in a nickname: {character!r}")
+        if is_letter or is_digit:
+            has_letter_or_digit = True
+    if not has_letter_or_digit:
+        raise ValueError("The nickname needs at least one letter or digit")
+    return nickname
 
 
 def player_views(state: RoomState) -> tuple[PlayerView, ...]:
-    """Return the players as the other players see them (spec 012)."""
+    """Return the players as the other players see them, in room order.
+
+    Args:
+        state: The room.
+
+    Returns:
+        One view per player. A view never holds the resume token.
+    """
     views: list[PlayerView] = []
     for player in state.players:
-        views.append(
-            PlayerView(
-                player_id=player.player_id,
-                nickname=player.nickname,
-                colour=player.colour,
-                state=player.state,
-                is_host=player.is_host,
-                muted=player.muted,
-                selection=player.selection,
-            )
-        )
+        views.append(_view_of(player))
     return tuple(views)
 
 
 def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
-    """Return the snapshot sent to a player of the room (spec 012).
+    """Return the snapshot that player `player_id` receives.
+
+    Args:
+        state: The room.
+        player_id: A player of the room.
+
+    Returns:
+        The snapshot, with the player's own resume token.
 
     Raises:
-        ValueError: `player_id` is not a player of `state`.
+        KeyError: no player `player_id` in the room.
     """
     for player in state.players:
         if player.player_id == player_id:
@@ -317,7 +357,7 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 timer_running=False,
                 solved=state.solved,
             )
-    raise ValueError(f"Player {player_id!r} is not in room {state.code}")
+    raise KeyError(player_id)
 
 
 def join_room(
@@ -327,13 +367,170 @@ def join_room(
     new_player_id: str,
     new_resume_token: str,
 ) -> Outcome:
-    """Apply a join (spec 012, 014, 017). For now nobody is added."""
-    return Outcome(state=state)
+    """Apply a join on a connection that has not joined yet.
+
+    The steps run in this order and the first that applies ends the join: resume
+    of a known player, room full, invalid nickname, new player. Spec 014 adds
+    the removed and locked refusals.
+
+    Args:
+        state: The room.
+        message: The join received.
+        now: Clock time of the join.
+        new_player_id: Id given to a new player.
+        new_resume_token: Token given to a new player.
+
+    Returns:
+        The outcome. A success replies with the snapshot of the player.
+    """
+    resumed = _find_by_token(state, message.resume_token)
+    if resumed is not None:
+        return _resume_player(state, resumed, now)
+    if len(state.players) >= MAX_PLAYERS:
+        refusal = ErrorMessage(code=ErrorCode.ROOM_FULL, message="The room is full.")
+        return Outcome(state=state, reply=(refusal,), close_sender=True)
+    try:
+        nickname = normalize_nickname(message.nickname)
+    except ValueError as error:
+        refusal = ErrorMessage(code=ErrorCode.INVALID_NICKNAME, message=str(error))
+        return Outcome(state=state, reply=(refusal,))
+    return _add_player(state, nickname, now, new_player_id, new_resume_token)
 
 
 def disconnect_player(state: RoomState, player_id: str, now: float) -> Outcome:
-    """Apply the closing of a player's connection (spec 012, 013)."""
+    """Apply the closing of a player's connection.
+
+    The player keeps their seat. A player who is not in the room, or who is
+    already disconnected, changes nothing.
+    """
+    for player in state.players:
+        if player.player_id != player_id:
+            continue
+        if player.state == PlayerState.DISCONNECTED:
+            break
+        changed = player.model_copy(
+            update={"state": PlayerState.DISCONNECTED, "disconnected_at": now}
+        )
+        return _with_state_change(state, changed, now)
     return Outcome(state=state)
+
+
+def _view_of(player: PlayerRecord) -> PlayerView:
+    """Return the public view of one player."""
+    return PlayerView(
+        player_id=player.player_id,
+        nickname=player.nickname,
+        colour=player.colour,
+        state=player.state,
+        is_host=player.is_host,
+        muted=player.muted,
+        selection=player.selection,
+    )
+
+
+def _find_by_token(state: RoomState, token: str | None) -> PlayerRecord | None:
+    """Return the player who owns `token`, or None."""
+    if token is None:
+        return None
+    for player in state.players:
+        if player.resume_token == token:
+            return player
+    return None
+
+
+def _replace_player(state: RoomState, changed: PlayerRecord) -> RoomState:
+    """Return the state with `changed` in place of the player of the same id."""
+    players: list[PlayerRecord] = []
+    for player in state.players:
+        if player.player_id == changed.player_id:
+            players.append(changed)
+        else:
+            players.append(player)
+    return state.model_copy(update={"players": tuple(players)})
+
+
+def _with_state_change(state: RoomState, changed: PlayerRecord, now: float) -> Outcome:
+    """Store `changed` and number one player_state_changed event for it."""
+    seq = state.seq + 1
+    event = PlayerStateChanged(
+        seq=seq, player_id=changed.player_id, state=changed.state
+    )
+    new_state = _replace_player(state, changed).model_copy(update={"seq": seq})
+    return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
+
+
+def _resume_player(state: RoomState, player: PlayerRecord, now: float) -> Outcome:
+    """Join `player` again on a new connection."""
+    resumed = player.model_copy(update={"last_seen_at": now, "last_input_at": now})
+    if player.state == PlayerState.DISCONNECTED:
+        resumed = resumed.model_copy(
+            update={"state": PlayerState.ACTIVE, "disconnected_at": None}
+        )
+        outcome = _with_state_change(state, resumed, now)
+    else:
+        outcome = Outcome(state=_replace_player(state, resumed))
+    reply = (snapshot_for(outcome.state, player.player_id),)
+    return outcome.model_copy(update={"reply": reply})
+
+
+def _unique_nickname(state: RoomState, nickname: str) -> str:
+    """Return `nickname`, or the first `nickname n` (n >= 2) no player has."""
+    taken: set[str] = set()
+    for player in state.players:
+        taken.add(player.nickname.casefold())
+    if nickname.casefold() not in taken:
+        return nickname
+    number = 2
+    while True:
+        suffix = f" {number}"
+        base = nickname[: NICKNAME_MAX_LENGTH - len(suffix)].rstrip()
+        candidate = base + suffix
+        if candidate.casefold() not in taken:
+            return candidate
+        number += 1
+
+
+def _lowest_free_colour(state: RoomState) -> int:
+    """Return the lowest colour index 0 to 7 that no player has."""
+    used: set[int] = set()
+    for player in state.players:
+        used.add(player.colour)
+    for colour in range(MAX_PLAYERS):
+        if colour not in used:
+            return colour
+    raise ValueError("Every colour is taken")
+
+
+def _add_player(
+    state: RoomState,
+    nickname: str,
+    now: float,
+    player_id: str,
+    resume_token: str,
+) -> Outcome:
+    """Add a new player at the end of the room and number their player_joined."""
+    seq = state.seq + 1
+    has_host = False
+    for existing in state.players:
+        if existing.is_host:
+            has_host = True
+    player = PlayerRecord(
+        player_id=player_id,
+        resume_token=resume_token,
+        nickname=_unique_nickname(state, nickname),
+        colour=_lowest_free_colour(state),
+        is_host=not has_host,
+        joined_seq=seq,
+        last_input_at=now,
+        last_seen_at=now,
+    )
+    new_state = state.model_copy(
+        update={"players": (*state.players, player), "seq": seq}
+    )
+    event = PlayerJoined(seq=seq, player=_view_of(player))
+    entry = LogEntry(at=now, event=event, resume_token=resume_token)
+    reply = (snapshot_for(new_state, player_id),)
+    return Outcome(state=new_state, entries=(entry,), reply=reply)
 
 
 def handle_message(

@@ -1,3 +1,15 @@
+/* One colour per player index 0 to 7 (spec 012); later specs reuse them. */
+:root {
+  --player-colour-0: #e6194b;
+  --player-colour-1: #3cb44b;
+  --player-colour-2: #4363d8;
+  --player-colour-3: #f58231;
+  --player-colour-4: #911eb4;
+  --player-colour-5: #008080;
+  --player-colour-6: #9a6324;
+  --player-colour-7: #808000;
+}
+
 body {
   margin: 0;
   font-family: system-ui, sans-serif;

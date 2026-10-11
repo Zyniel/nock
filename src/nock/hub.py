@@ -16,7 +16,13 @@ from collections.abc import Awaitable, Callable
 from typing import NamedTuple
 
 from nock.grid import Grid
-from nock.protocol import ClientMessage
+from nock.protocol import (
+    ClientMessage,
+    ErrorCode,
+    ErrorMessage,
+    Join,
+    Snapshot,
+)
 from nock.room import (
     Clock,
     LogEntry,
@@ -25,6 +31,7 @@ from nock.room import (
     RoomState,
     disconnect_player,
     handle_message,
+    join_room,
     new_room,
     tick,
 )
@@ -34,14 +41,10 @@ logger = logging.getLogger(__name__)
 ROOM_CODE_ALPHABET: str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0, O, 1, I
 ROOM_CODE_LENGTH: int = 6
 
+SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
+
 _NORMAL_CLOSE_CODE = 1000
 _STOP_TIMEOUT_SECONDS = 5.0
-
-
-class _Attach(NamedTuple):
-    """Input: a connection joined the room and must receive its messages."""
-
-    connection: RoomConnection
 
 
 class _Message(NamedTuple):
@@ -51,13 +54,19 @@ class _Message(NamedTuple):
     message: ClientMessage
 
 
+class _Invalid(NamedTuple):
+    """Input: a frame of a connection that is not a valid client message."""
+
+    connection: RoomConnection
+
+
 class _Detach(NamedTuple):
     """Input: a connection closed."""
 
     connection: RoomConnection
 
 
-_Input = _Attach | _Message | _Detach
+_Input = _Message | _Invalid | _Detach
 
 
 class _Outbound(NamedTuple):
@@ -77,12 +86,14 @@ class RoomConnection:
 
     def __init__(
         self,
-        player_id: str,
         owner_loop: asyncio.AbstractEventLoop,
         post: Callable[[_Input], None],
     ) -> None:
-        """Create a connection owned by `owner_loop`, the loop of the socket."""
-        self.player_id = player_id
+        """Create a connection owned by `owner_loop`, the loop of the socket.
+
+        `player_id` stays None until the room task accepts the connection's join.
+        """
+        self.player_id: str | None = None
         self._owner_loop = owner_loop
         self._post = post
         self._outbound: asyncio.Queue[_Outbound] = asyncio.Queue()
@@ -90,6 +101,10 @@ class RoomConnection:
     def submit(self, message: ClientMessage) -> None:
         """Pass a message of this player to the room (any thread)."""
         self._post(_Message(self, message))
+
+    def submit_invalid(self) -> None:
+        """Tell the room that this player sent an invalid frame (any thread)."""
+        self._post(_Invalid(self))
 
     def leave(self) -> None:
         """Tell the room that the socket closed (any thread)."""
@@ -198,12 +213,20 @@ class _RoomRunner:
 
     def _input_step(self, item: _Input) -> None:
         """Run the step that one input asks for."""
-        if isinstance(item, _Attach):
-            self._connections.append(item.connection)
-            return
         if isinstance(item, _Detach):
             self._detach_step(item.connection)
             return
+        if isinstance(item, _Invalid):
+            if item.connection.player_id is None:
+                self._refuse(item.connection, ErrorCode.INVALID_MESSAGE)
+            return
+        if item.connection.player_id is None:
+            self._unjoined_step(item.connection, item.message)
+            return
+        if isinstance(item.message, Join):
+            return
+        if item.connection not in self._connections:
+            return  # replaced by a newer socket of the same player
         joined = list(self._connections)
         try:
             outcome = handle_message(
@@ -218,6 +241,62 @@ class _RoomRunner:
             return
         self._store_and_deliver(outcome, item.connection, joined)
 
+    def _unjoined_step(
+        self, connection: RoomConnection, message: ClientMessage
+    ) -> None:
+        """Handle a message of a connection that has not joined yet."""
+        if isinstance(message, Join):
+            self._join_step(connection, message)
+        else:
+            self._refuse(connection, ErrorCode.NOT_JOINED)
+
+    def _refuse(self, connection: RoomConnection, code: ErrorCode) -> None:
+        """Answer an unjoined connection with an error; its socket stays open."""
+        if code == ErrorCode.NOT_JOINED:
+            text = "Send a join message before anything else."
+        else:
+            text = "The message is not a valid client message."
+        connection.deliver_text(ErrorMessage(code=code, message=text).model_dump_json())
+
+    def _join_step(self, connection: RoomConnection, message: Join) -> None:
+        """Run the join in the rules, then attach the connection if it succeeded.
+
+        The snapshot is built by the rules in the same step as the attach, so
+        the connection gets no event before it and none is missed after it.
+        """
+        joined = list(self._connections)
+        try:
+            outcome = join_room(
+                self.state,
+                message,
+                self._clock(),
+                secrets.token_urlsafe(8),
+                secrets.token_urlsafe(24),
+            )
+        except Exception:
+            logger.exception("A join in room %s failed", self.state.code)
+            return
+        self._store_and_deliver(outcome, connection, joined)
+        for reply in outcome.reply:
+            if isinstance(reply, Snapshot):
+                self._attach(connection, reply.you, message.resume_token is not None)
+
+    def _attach(
+        self, connection: RoomConnection, player_id: str, is_resume: bool
+    ) -> None:
+        """Bind a connection to its player.
+
+        A resume takes over: the older sockets of the same player are closed
+        with SESSION_REPLACED_CLOSE_CODE and are sent nothing else.
+        """
+        connection.player_id = player_id
+        if is_resume:
+            for older in list(self._connections):
+                if older.player_id == player_id:
+                    self._connections.remove(older)
+                    older.deliver_close(SESSION_REPLACED_CLOSE_CODE)
+        self._connections.append(connection)
+
     def _detach_step(self, leaving: RoomConnection) -> None:
         """Remove one connection; the player leaves with their last connection."""
         if leaving not in self._connections:
@@ -226,6 +305,8 @@ class _RoomRunner:
         for other in self._connections:
             if other.player_id == leaving.player_id:
                 return
+        if leaving.player_id is None:
+            return
         try:
             outcome = disconnect_player(self.state, leaving.player_id, self._clock())
         except Exception:
@@ -365,8 +446,11 @@ class RoomRegistry:
             return None
         return runner.state
 
-    def connect(self, code: str, player_id: str) -> RoomConnection | None:
-        """Join a socket to room `code` so that it receives the room's messages.
+    def connect(self, code: str) -> RoomConnection | None:
+        """Open a connection to room `code` for a socket that has not joined.
+
+        The connection receives the room's messages once the player's join is
+        accepted by the room task.
 
         Must be called from the event loop that serves the socket.
 
@@ -388,9 +472,7 @@ class RoomRegistry:
                 # The registry was closed: the room no longer runs.
                 return
 
-        connection = RoomConnection(player_id, asyncio.get_running_loop(), post)
-        post(_Attach(connection))
-        return connection
+        return RoomConnection(asyncio.get_running_loop(), post)
 
     def close(self) -> None:
         """Stop the room tasks and the engine thread. Idempotent.

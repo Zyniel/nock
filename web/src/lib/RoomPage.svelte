@@ -2,7 +2,8 @@
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
-  import type { LetterCellView } from './roomSession'
+  import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
+  import type { LetterCellView, Snapshot } from './roomSession'
   import { gridLabel, newSession, receiveFrame, statusAfterClose } from './roomSession'
   import {
     computeWords,
@@ -21,6 +22,11 @@
 
   let session = $state(newSession())
   let rawSelection: Selection | null = $state(null)
+  // The nickname form: what is typed, the error shown, and the nickname of a
+  // join sent from the form that no snapshot has answered yet.
+  let nicknameText = $state(readNickname() ?? '')
+  let formError: 'length' | 'characters' | null = $state(null)
+  let formJoinNickname: string | null = $state(null)
   let socket: WebSocket | null = null
   let gridViewport: GridViewport | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
@@ -59,6 +65,12 @@
   let selection = $derived(validSelection(words, rawSelection))
   let activeWord = $derived(selectedWord(words, selection))
 
+  let isFormShown = $derived(
+    session.status === 'nickname' || (session.status === 'joining' && formJoinNickname !== null),
+  )
+  // A nickname refused by the server is shown as a characters error.
+  let shownError = $derived(formError ?? (session.nicknameRefused ? 'characters' : null))
+
   // `selection` is already null once its word is gone; this also drops the stale
   // `rawSelection`, so the old selection cannot come back with a later snapshot.
   $effect(() => {
@@ -71,6 +83,41 @@
   function send(message: object): void {
     if (socket !== null && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(message))
+    }
+  }
+
+  // Check the nickname typed in the form, and join with it when it is valid.
+  function submitNickname(event: SubmitEvent): void {
+    event.preventDefault()
+    if (session.status !== 'nickname') {
+      return
+    }
+    const check = checkNickname(nicknameText)
+    if (!check.ok) {
+      formError = check.reason
+      return
+    }
+    formError = null
+    session.nicknameRefused = false
+    formJoinNickname = check.nickname
+    session.status = 'joining'
+    send({ type: 'join', nickname: check.nickname, resume_token: null })
+  }
+
+  // A snapshot answers a join: remember who I am, and the nickname I typed.
+  function rememberJoin(snapshot: Snapshot): void {
+    for (const player of snapshot.players) {
+      if (player.player_id === snapshot.you) {
+        writeIdentity(code, {
+          player_id: snapshot.you,
+          resume_token: snapshot.resume_token,
+          nickname: player.nickname,
+        })
+      }
+    }
+    if (formJoinNickname !== null) {
+      writeNickname(formJoinNickname)
+      formJoinNickname = null
     }
   }
 
@@ -208,19 +255,33 @@
     socket = opened
 
     opened.onopen = () => {
-      const join = { type: 'join', nickname: t('room.default_nickname'), resume_token: null }
-      opened.send(JSON.stringify(join))
+      const plan = planAutomaticJoin(code, t('room.default_nickname'))
+      if (plan === null) {
+        session.status = 'nickname'
+        return
+      }
+      session.status = 'joining'
+      opened.send(JSON.stringify({ type: 'join', ...plan }))
     }
     opened.onmessage = (event: MessageEvent) => {
-      if (typeof event.data === 'string') {
-        receiveFrame(session, event.data)
+      if (typeof event.data !== 'string') {
+        return
+      }
+      const snapshotBefore = session.snapshot
+      receiveFrame(session, event.data)
+      if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
+        rememberJoin(session.snapshot)
+      }
+      if (session.status === 'nickname') {
+        formJoinNickname = null
       }
     }
     opened.onclose = (event: CloseEvent) => {
-      session.status = statusAfterClose(event.code)
+      session.status = statusAfterClose(event.code, session.status)
     }
     opened.onerror = () => {
-      if (session.status !== 'not_found' && session.status !== 'throttled') {
+      const isFinal = ['not_found', 'throttled', 'full', 'replaced'].includes(session.status)
+      if (!isFinal) {
         session.status = 'closed'
       }
     }
@@ -239,13 +300,61 @@
   data-testid="room-page"
   data-room-code={code}
   data-status={session.status}
+  data-you={session.snapshot === null ? '' : session.snapshot.you}
   data-seq={session.seq === null ? '' : String(session.seq)}
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
   <h1>{t('room.heading', { code })}</h1>
   <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+  {#if isFormShown}
+    <form data-testid="nickname-form" class="nickname-form" onsubmit={submitNickname}>
+      <h2>{t('join.heading')}</h2>
+      <label for="nickname-input">{t('join.nickname_label')}</label>
+      <input
+        id="nickname-input"
+        data-testid="nickname-input"
+        type="text"
+        autocomplete="nickname"
+        placeholder={t('room.default_nickname')}
+        bind:value={nicknameText}
+      />
+      {#if shownError !== null}
+        <p class="nickname-error" data-testid="nickname-error" role="alert">
+          {shownError === 'length' ? t('join.error.length') : t('join.error.characters')}
+        </p>
+      {/if}
+      <button type="submit" data-testid="nickname-submit" disabled={session.status === 'joining'}
+        >{t('join.submit')}</button
+      >
+    </form>
+  {/if}
   {#if session.snapshot !== null}
+    <section class="roster" data-testid="roster">
+      <h2>{t('roster.heading')}</h2>
+      <ul>
+        {#each session.snapshot.players as player (player.player_id)}
+          {@const isYou = player.player_id === session.snapshot.you}
+          <li
+            data-testid="roster-player"
+            data-player-id={player.player_id}
+            data-colour={String(player.colour)}
+            data-state={player.state}
+            data-you={String(isYou)}
+          >
+            <span
+              class="roster-colour"
+              data-testid="roster-colour"
+              style:background={`var(--player-colour-${player.colour})`}
+            ></span>
+            <span data-testid="roster-nickname">{player.nickname}</span>
+            {#if isYou}
+              <span class="roster-you">{t('roster.you')}</span>
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
     <div class="share-panel" data-testid="share-panel">
       <span id="share-label" class="share-label">{t('room.share.label')}</span>
       <a data-testid="share-link" href={shareLink} aria-describedby="share-label"
@@ -298,6 +407,49 @@
     height: 100dvh;
     display: flex;
     flex-direction: column;
+  }
+
+  .nickname-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 24rem;
+  }
+
+  .nickname-error {
+    margin: 0;
+    color: #a4161a;
+  }
+
+  .roster {
+    flex: none;
+  }
+
+  .roster h2 {
+    margin: 0.25rem 0;
+    font-size: 1rem;
+  }
+
+  .roster ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .roster li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .roster-colour {
+    display: inline-block;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 50%;
   }
 
   .share-panel {

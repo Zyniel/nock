@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import re
-import secrets
 import threading
 from pathlib import Path
 from typing import Annotated
@@ -21,17 +20,10 @@ from nock.catalogue import (
     load_catalogue,
     summarize,
 )
-from nock.hub import RoomConnection, RoomRegistry
-from nock.protocol import (
-    ErrorCode,
-    ErrorMessage,
-    Join,
-    Snapshot,
-    parse_client_message,
-)
-from nock.room import RoomState, grid_state
+from nock.hub import SESSION_REPLACED_CLOSE_CODE, RoomConnection, RoomRegistry
+from nock.protocol import parse_client_message
 
-__all__ = ["RoomRegistry", "create_app"]
+__all__ = ["SESSION_REPLACED_CLOSE_CODE", "RoomRegistry", "create_app"]
 
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
 ROOM_CODE_PATTERN: str = r"^[A-Z0-9]{6}$"
@@ -166,66 +158,11 @@ def _file_in_directory(directory: Path, name: str) -> FileResponse:
     return FileResponse(file_path)
 
 
-def _snapshot_for(state: RoomState) -> Snapshot:
-    """Build the snapshot of a room for a new connection.
+async def _read_frames(websocket: WebSocket, connection: RoomConnection) -> None:
+    """Pass each frame of the client to the room until the client disconnects.
 
-    Until spec 012, nobody is added to the room: the snapshot has no player and
-    the new connection gets fresh ids that the room does not know.
-    """
-    return Snapshot(
-        seq=state.seq,
-        you=secrets.token_urlsafe(8),
-        resume_token=secrets.token_urlsafe(24),
-        grid=grid_state(state),
-        players=(),
-        settings=state.settings,
-        reveal_budget=state.reveal_budget,
-        flags=(),
-        chat=(),
-        open_vote=None,
-        timer_elapsed_ms=0,
-        timer_running=False,
-        solved=state.solved,
-    )
-
-
-async def _wait_for_join(websocket: WebSocket) -> bool:
-    """Read client messages until a Join arrives, answering the others.
-
-    Returns:
-        True when a Join was received, False when the client disconnected.
-    """
-    while True:
-        frame = await websocket.receive()
-        if frame["type"] == "websocket.disconnect":
-            return False
-        raw_message = frame.get("text")
-        if raw_message is None:
-            raw_message = frame.get("bytes", b"")
-        try:
-            message = parse_client_message(raw_message)
-        except ValidationError:
-            error = ErrorMessage(
-                code=ErrorCode.INVALID_MESSAGE,
-                message="The message is not a valid client message.",
-            )
-            await websocket.send_text(error.model_dump_json())
-            continue
-        if isinstance(message, Join):
-            return True
-        error = ErrorMessage(
-            code=ErrorCode.NOT_JOINED,
-            message="Send a join message before anything else.",
-        )
-        await websocket.send_text(error.model_dump_json())
-
-
-async def _forward_until_disconnect(
-    websocket: WebSocket, connection: RoomConnection
-) -> None:
-    """Pass each valid client message to the room until the client disconnects.
-
-    A frame that is not a valid client message is dropped.
+    The room task decides what a message means: a join, a message of a joined
+    player, or an error for a connection that has not joined.
     """
     while True:
         frame = await websocket.receive()
@@ -237,44 +174,36 @@ async def _forward_until_disconnect(
         try:
             message = parse_client_message(raw_message)
         except ValidationError:
+            connection.submit_invalid()
             continue
         connection.submit(message)
 
 
-async def _serve_joined(
+async def _serve_socket(
     websocket: WebSocket, room_registry: RoomRegistry, code: str
 ) -> None:
-    """Link the socket to the room, send the snapshot, then serve until it closes.
+    """Link the socket to the room and serve it until it closes.
 
-    The state is read and the connection attached with no wait in between, and
-    the writer starts after the snapshot, so nothing reaches the socket before
-    it. Until spec 012 nothing changes a room after its creation. Spec 012 will
-    build the snapshot inside the room task, in the same step as the attach.
+    The writer sends what the room task queues for this connection, in order:
+    the snapshot of the join, the events, the errors and the closes.
     """
-    state = room_registry.room_state(code)
-    if state is None:
-        return
-    snapshot = _snapshot_for(state)
-    connection = room_registry.connect(code, snapshot.you)
+    connection = room_registry.connect(code)
     if connection is None:
         return
-    writer: asyncio.Task[None] | None = None
-    try:
-        await websocket.send_text(snapshot.model_dump_json())
-        writer = asyncio.create_task(
-            connection.run_writer(
-                websocket.send_text, lambda close_code: websocket.close(close_code)
-            )
+    writer = asyncio.create_task(
+        connection.run_writer(
+            websocket.send_text, lambda close_code: websocket.close(close_code)
         )
-        await _forward_until_disconnect(websocket, connection)
+    )
+    try:
+        await _read_frames(websocket, connection)
     finally:
         connection.leave()
-        if writer is not None:
-            writer.cancel()
-            # The writer may have failed on a closed socket, and the server may
-            # cancel this handler while it shuts down: neither is an error here.
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await writer
+        writer.cancel()
+        # The writer may have failed on a closed socket, and the server may
+        # cancel this handler while it shuts down: neither is an error here.
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await writer
 
 
 def create_app(
@@ -371,10 +300,7 @@ def create_app(
             wrong_codes.record_failure(address, now)
             await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
             return
-        has_joined = await _wait_for_join(websocket)
-        if not has_joined:
-            return
-        await _serve_joined(websocket, room_registry, code)
+        await _serve_socket(websocket, room_registry, code)
 
     return web_app
 
