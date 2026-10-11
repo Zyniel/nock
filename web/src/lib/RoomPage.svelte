@@ -15,6 +15,8 @@
   } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
+  const COPIED_DISPLAY_MS = 2000
+
   let { code }: { code: string } = $props()
 
   let session = $state(newSession())
@@ -23,6 +25,27 @@
   let gridViewport: GridViewport | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
+
+  let shareLink = $derived(`${location.origin}/r/${code}`)
+  let copied = $state(false)
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+
+  // Write the link to the clipboard. Without a usable clipboard nothing changes.
+  async function copyLink(): Promise<void> {
+    if (navigator.clipboard === undefined || navigator.clipboard === null) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(shareLink)
+    } catch {
+      return
+    }
+    copied = true
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => {
+      copied = false
+    }, COPIED_DISPLAY_MS)
+  }
 
   let words = $derived(session.snapshot === null ? [] : computeWords(session.snapshot.grid))
   // A new snapshot may remove the word of the selection: then nothing is selected.
@@ -190,7 +213,7 @@
       session.status = statusAfterClose(event.code)
     }
     opened.onerror = () => {
-      if (session.status !== 'not_found') {
+      if (session.status !== 'not_found' && session.status !== 'throttled') {
         session.status = 'closed'
       }
     }
@@ -216,6 +239,14 @@
   <h1>{t('room.heading', { code })}</h1>
   <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
   {#if session.snapshot !== null}
+    <div class="share-panel" data-testid="share-panel">
+      <a data-testid="share-link" href={shareLink} aria-label={t('room.share.label')}
+        >{shareLink}</a
+      >
+      <button type="button" data-testid="copy-link" onclick={copyLink}
+        >{copied ? t('room.share.copied') : t('room.share.copy')}</button
+      >
+    </div>
     <GridViewport
       bind:this={gridViewport}
       grid={session.snapshot.grid}
@@ -259,6 +290,15 @@
     height: 100dvh;
     display: flex;
     flex-direction: column;
+  }
+
+  .share-panel {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    overflow-wrap: anywhere;
   }
 
   /* Below the scrolling grid, so it is always inside the window. */

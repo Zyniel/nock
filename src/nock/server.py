@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 import secrets
-import string
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query, Response, WebSocket
+from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket
 from fastapi.responses import FileResponse, PlainTextResponse
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from nock.catalogue import (
     GRIDS_DIR,
@@ -19,63 +19,72 @@ from nock.catalogue import (
     load_catalogue,
     summarize,
 )
-from nock.grid import Grid
+from nock.hub import RoomConnection, RoomRegistry
 from nock.protocol import (
     ErrorCode,
     ErrorMessage,
-    HelpMode,
     Join,
-    RevealBudget,
-    RoomSettings,
     Snapshot,
-    grid_view,
     parse_client_message,
 )
+from nock.room import RoomState, grid_state
+
+__all__ = ["RoomRegistry", "create_app"]
 
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
 ROOM_CODE_PATTERN: str = r"^[A-Z0-9]{6}$"
 GRID_NUMBER_PATTERN: str = r"^[1-9][0-9]{0,8}$"
 FORCE_PATTERN: str = r"^[1-4]$"
 ROOM_NOT_FOUND_CLOSE_CODE: int = 4404  # WebSocket close code, unknown room
+THROTTLED_CLOSE_CODE: int = 4429  # WebSocket close code, too many wrong codes
+WRONG_CODE_LIMIT: int = 10
+WRONG_CODE_WINDOW_SECONDS: float = 60.0
 
-_ROOM_CODE_LENGTH = 6
-_ROOM_CODE_ALPHABET = string.ascii_uppercase + string.digits
 _MISSING_BUILD_TEXT = "The web client is not built: run npm --prefix web run build"
 
 
-class RoomRegistry:
-    """In-memory rooms of this process, by room code.
+class CreateRoomRequest(BaseModel):
+    """The body of POST /api/rooms."""
 
-    A seam for tests until spec 011 (room creation) replaces or extends it.
-    A plain class, not a Pydantic model: it is a mutable service, not data.
-    """
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    grid_number: int = Field(ge=1, strict=True)  # a catalogue number (spec 004)
+
+
+class CreateRoomResponse(BaseModel):
+    """The answer of POST /api/rooms: never any grid data."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    code: str  # matches ROOM_CODE_PATTERN
+    share_url: str  # absolute: <scheme>://<host>/r/<code>
+
+
+class _WrongCodeThrottle:
+    """Remembers the wrong room codes of each client address, in memory."""
 
     def __init__(self) -> None:
-        """Create a registry with no room."""
-        self._grids_by_code: dict[str, Grid] = {}
+        """Create a throttle with no failure."""
+        self._failure_times: dict[str, list[float]] = {}
 
-    def register_room(self, grid: Grid) -> str:
-        """Register a new room on `grid` and return its fresh room code.
+    def is_blocked(self, address: str, now: float) -> bool:
+        """Tell whether `address` has too many recent wrong codes."""
+        recent = self._recent_failures(address, now)
+        return len(recent) >= WRONG_CODE_LIMIT
 
-        The code matches ROOM_CODE_PATTERN and differs from every code already
-        registered in this registry.
-        """
-        code = self._draw_code()
-        while code in self._grids_by_code:
-            code = self._draw_code()
-        self._grids_by_code[code] = grid
-        return code
+    def record_failure(self, address: str, now: float) -> None:
+        """Remember one wrong code from `address` at time `now`."""
+        recent = self._recent_failures(address, now)
+        recent.append(now)
+        self._failure_times[address] = recent
 
-    def find_room(self, code: str) -> Grid | None:
-        """Return the grid of the room `code`, or None when it is not registered."""
-        return self._grids_by_code.get(code)
-
-    def _draw_code(self) -> str:
-        """Return a random room code, which may already be taken."""
-        letters: list[str] = []
-        for _ in range(_ROOM_CODE_LENGTH):
-            letters.append(secrets.choice(_ROOM_CODE_ALPHABET))
-        return "".join(letters)
+    def _recent_failures(self, address: str, now: float) -> list[float]:
+        """Return the failure times of `address` inside the window."""
+        recent: list[float] = []
+        for failure_time in self._failure_times.get(address, []):
+            if failure_time > now - WRONG_CODE_WINDOW_SECONDS:
+                recent.append(failure_time)
+        return recent
 
 
 def _not_found() -> HTTPException:
@@ -142,24 +151,26 @@ def _file_in_directory(directory: Path, name: str) -> FileResponse:
     return FileResponse(file_path)
 
 
-def _snapshot_for(grid: Grid) -> Snapshot:
-    """Build the snapshot of a fresh room on `grid` for a new connection."""
-    budget = RevealBudget(letters=5, words=1)
-    settings = RoomSettings(help_mode=HelpMode.FREE, reveal_budget=budget, locked=False)
+def _snapshot_for(state: RoomState) -> Snapshot:
+    """Build the snapshot of a room for a new connection.
+
+    Until spec 012, nobody is added to the room: the snapshot has no player and
+    the new connection gets fresh ids that the room does not know.
+    """
     return Snapshot(
-        seq=0,
+        seq=state.seq,
         you=secrets.token_urlsafe(8),
         resume_token=secrets.token_urlsafe(24),
-        grid=grid_view(grid),
+        grid=grid_state(state),
         players=(),
-        settings=settings,
-        reveal_budget=budget,
+        settings=state.settings,
+        reveal_budget=state.reveal_budget,
         flags=(),
         chat=(),
         open_vote=None,
         timer_elapsed_ms=0,
         timer_running=False,
-        solved=False,
+        solved=state.solved,
     )
 
 
@@ -194,12 +205,47 @@ async def _wait_for_join(websocket: WebSocket) -> bool:
         await websocket.send_text(error.model_dump_json())
 
 
-async def _ignore_until_disconnect(websocket: WebSocket) -> None:
-    """Read and drop every frame until the client disconnects."""
+async def _forward_until_disconnect(
+    websocket: WebSocket, connection: RoomConnection
+) -> None:
+    """Pass each valid client message to the room until the client disconnects.
+
+    A frame that is not a valid client message is dropped.
+    """
     while True:
         frame = await websocket.receive()
         if frame["type"] == "websocket.disconnect":
             return
+        raw_message = frame.get("text")
+        if raw_message is None:
+            raw_message = frame.get("bytes", b"")
+        try:
+            message = parse_client_message(raw_message)
+        except ValidationError:
+            continue
+        connection.submit(message)
+
+
+async def _serve_joined(
+    websocket: WebSocket, room_registry: RoomRegistry, code: str, state: RoomState
+) -> None:
+    """Send the snapshot, then link the socket to the room until it closes."""
+    snapshot = _snapshot_for(state)
+    await websocket.send_text(snapshot.model_dump_json())
+    connection = room_registry.connect(code, snapshot.you)
+    if connection is None:
+        return
+    writer = asyncio.create_task(
+        connection.run_writer(
+            websocket.send_text, lambda close_code: websocket.close(close_code)
+        )
+    )
+    try:
+        await _forward_until_disconnect(websocket, connection)
+    finally:
+        connection.leave()
+        writer.cancel()
+        await asyncio.gather(writer, return_exceptions=True)
 
 
 def create_app(
@@ -221,6 +267,7 @@ def create_app(
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
     grid_number_regex = re.compile(GRID_NUMBER_PATTERN)
+    wrong_codes = _WrongCodeThrottle()
     # No slash redirect: a path ending with "/" matches no route and is a 404.
     web_app = FastAPI(
         redirect_slashes=False,
@@ -260,6 +307,19 @@ def create_app(
         entry = _published_entry(grid_catalogue, grid_number_regex, number)
         return summarize(entry).model_dump(mode="json")
 
+    @web_app.get("/api/rooms", include_in_schema=False)
+    def refuse_room_list() -> None:
+        raise _not_found()
+
+    @web_app.post("/api/rooms", status_code=201)
+    def create_room(body: CreateRoomRequest, request: Request) -> CreateRoomResponse:
+        entry = grid_catalogue.find_published(body.grid_number)
+        if entry is None:
+            raise _not_found()
+        code = room_registry.register_room(entry.grid, grid_number=body.grid_number)
+        base_url = str(request.base_url).rstrip("/")
+        return CreateRoomResponse(code=code, share_url=f"{base_url}/r/{code}")
+
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:
         return _file_in_directory(client_dir / "assets", file_name)
@@ -273,15 +333,20 @@ def create_app(
     @web_app.websocket("/api/rooms/{code}/ws")
     async def room_socket(websocket: WebSocket, code: str) -> None:
         await websocket.accept()
-        grid = room_registry.find_room(code)
-        if grid is None:
+        address = websocket.client.host if websocket.client is not None else "unknown"
+        now = room_registry.clock()
+        if wrong_codes.is_blocked(address, now):
+            await websocket.close(code=THROTTLED_CLOSE_CODE)
+            return
+        state = room_registry.room_state(code)
+        if room_registry.find_room(code) is None or state is None:
+            wrong_codes.record_failure(address, now)
             await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
             return
         has_joined = await _wait_for_join(websocket)
         if not has_joined:
             return
-        await websocket.send_text(_snapshot_for(grid).model_dump_json())
-        await _ignore_until_disconnect(websocket)
+        await _serve_joined(websocket, room_registry, code, state)
 
     return web_app
 

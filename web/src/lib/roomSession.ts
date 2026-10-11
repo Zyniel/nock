@@ -1,7 +1,7 @@
 // The state of one room page and the rules that keep it in `seq` order.
 // Plain functions: no socket and no DOM, so the rules are easy to read.
 
-export type RoomStatus = 'connecting' | 'joined' | 'not_found' | 'closed'
+export type RoomStatus = 'connecting' | 'joined' | 'not_found' | 'throttled' | 'closed'
 
 export type Arrow = 'right' | 'down' | 'right_then_down' | 'down_then_right'
 
@@ -63,6 +63,7 @@ export interface RoomSession {
 }
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
+export const THROTTLED_CLOSE_CODE = 4429
 
 export function newSession(): RoomSession {
   return { status: 'connecting', snapshot: null, seq: null, pending: [] }
@@ -283,7 +284,13 @@ export function receiveFrame(session: RoomSession, text: string): void {
 }
 
 export function statusAfterClose(code: number): RoomStatus {
-  return code === ROOM_NOT_FOUND_CLOSE_CODE ? 'not_found' : 'closed'
+  if (code === ROOM_NOT_FOUND_CLOSE_CODE) {
+    return 'not_found'
+  }
+  if (code === THROTTLED_CLOSE_CODE) {
+    return 'throttled'
+  }
+  return 'closed'
 }
 
 export function gridLabel(session: RoomSession): string {
