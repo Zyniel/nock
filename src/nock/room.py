@@ -662,7 +662,17 @@ def _apply_message(
 
 
 def with_last_seen(state: RoomState, player_id: str, now: float) -> RoomState:
-    """Return the state with the player's `last_seen_at` set to `now`."""
+    """Return the state with the player's `last_seen_at` set to `now`.
+
+    Args:
+        state: Room state to start from. It is not modified.
+        player_id: Id of the player who was seen.
+        now: Time the player was seen, in seconds.
+
+    Returns:
+        A new state where the player's `last_seen_at` is `now`. The given
+        state itself when the player is not in the room.
+    """
     player = _find_player(state, player_id)
     if player is None:
         return state
