@@ -16,6 +16,7 @@
   import type { CellFlash, GridView, PendingEdit } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
+  import type { RemoteSelection } from './remoteSelections'
 
   interface Finger {
     clientX: number
@@ -35,6 +36,7 @@
     onUndo,
     pendingEdits,
     flashes,
+    remoteSelections,
   }: {
     grid: GridView
     words: Word[]
@@ -49,7 +51,23 @@
     onUndo?: () => void
     pendingEdits: PendingEdit[]
     flashes: CellFlash[]
+    // The other players' selections, in roster order (spec 013).
+    remoteSelections: RemoteSelection[]
   } = $props()
+
+  // The inset of the first remote outline, and the step between two of them.
+  const OUTLINE_STEP_PX = 3
+
+  // The remote selections that sit on a cell, in roster order.
+  function outlinesOn(row: number, column: number): RemoteSelection[] {
+    return remoteSelections.filter((remote) => remote.row === row && remote.column === column)
+  }
+
+  // The remote selections whose word holds a cell, in roster order.
+  function tintsOn(row: number, column: number): RemoteSelection[] {
+    const key = positionKey(row, column)
+    return remoteSelections.filter((remote) => remote.wordPositions.has(key))
+  }
 
   // The colour index of the flash on a cell, or '' when it does not flash.
   function flashOf(row: number, column: number): string {
@@ -316,6 +334,9 @@
     {#each grid.cells as cell (cell.row * grid.width + cell.column)}
       {#if cell.type === 'letter'}
         {@const shown = shownCell(cell, pendingEdits)}
+        {@const outlines = outlinesOn(cell.row, cell.column)}
+        {@const tints = tintsOn(cell.row, cell.column)}
+        {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
         <div
           class="cell letter"
           class:locked={cell.locked}
@@ -329,12 +350,22 @@
           data-locked={String(cell.locked)}
           data-flash={flashOf(cell.row, cell.column)}
           data-selected={String(isSelected(cell.row, cell.column))}
-          data-in-word={String(wordPositions.has(positionKey(cell.row, cell.column)))}
+          data-in-word={String(isInWord)}
+          data-tinted-by={tints.map((remote) => remote.playerId).join(' ')}
           class:selected={isSelected(cell.row, cell.column)}
-          class:in-word={wordPositions.has(positionKey(cell.row, cell.column))}
+          class:in-word={isInWord}
+          class:tinted={tints.length > 0 && !isInWord}
+          style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
           style:grid-row={cell.row + 1}
           style:grid-column={cell.column + 1}
-        >{shown.letter ?? ''}</div>
+        >{shown.letter ?? ''}{#each outlines as remote, rank (remote.playerId)}<span
+              class="remote-selection"
+              data-testid="remote-selection"
+              data-player-id={remote.playerId}
+              data-colour={String(remote.colour)}
+              style:--outline-colour={`var(--player-colour-${remote.colour})`}
+              style:inset="{rank * OUTLINE_STEP_PX}px"
+            ></span>{/each}</div>
       {:else if cell.type === 'clue'}
         <div
           class="cell clue-cell"
@@ -415,6 +446,7 @@
   }
 
   .letter {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -433,6 +465,21 @@
 
   .letter.selected {
     background: #ffd54a;
+  }
+
+  /* The word of another player: their colour at low opacity. My own word
+     (in-word) and my cell (selected) keep their look. */
+  .letter.tinted {
+    background: color-mix(in srgb, var(--tint) 28%, #ffffff);
+  }
+
+  /* The cell another player selected: a dashed border in their colour, inset
+     by rank so that several outlines on one cell all stay visible. */
+  .remote-selection {
+    position: absolute;
+    box-sizing: border-box;
+    border: 2px dashed var(--outline-colour);
+    pointer-events: none;
   }
 
   /* After the other states, so a flash shows over them. */

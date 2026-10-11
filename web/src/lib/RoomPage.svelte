@@ -4,6 +4,7 @@
   import { t } from './i18n'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
+  import { remoteSelectionsOf } from './remoteSelections'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
   import {
@@ -49,6 +50,7 @@
   let formJoinNickname: string | null = $state(null)
   let socket: WebSocket | null = null
   let gridViewport: GridViewport | undefined = $state()
+  let feedElement: HTMLElement | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
@@ -101,6 +103,7 @@
   // A new snapshot may remove the word of the selection: then nothing is selected.
   let selection = $derived(validSelection(words, rawSelection))
   let activeWord = $derived(selectedWord(words, selection))
+  let remoteSelections = $derived(remoteSelectionsOf(session.snapshot, words))
 
   // True while the page retries after a loss that happened with the form shown:
   // the form stays on screen until the new socket opens.
@@ -150,6 +153,14 @@
       }
       flashTimers.clear()
       scheduledFlashes.clear()
+    }
+  })
+
+  // The newest feed item stays in view.
+  $effect(() => {
+    const itemCount = session.feed.length
+    if (feedElement !== undefined && itemCount > 0) {
+      feedElement.scrollTop = feedElement.scrollHeight
     }
   })
 
@@ -632,6 +643,7 @@
     </form>
   {/if}
   {#if session.snapshot !== null}
+    <div class="presence">
     <section class="roster" data-testid="roster">
       <h2>{t('roster.heading')}</h2>
       <ul>
@@ -650,6 +662,9 @@
               style:background={`var(--player-colour-${player.colour})`}
             ></span>
             <span data-testid="roster-nickname">{player.nickname}</span>
+            <span class="roster-state" data-testid="roster-state"
+              >{t(`presence.${player.state}`)}</span
+            >
             {#if isYou}
               <span class="roster-you">{t('roster.you')}</span>
             {/if}
@@ -657,6 +672,17 @@
         {/each}
       </ul>
     </section>
+    <section class="feed" data-testid="activity-feed" bind:this={feedElement}>
+      <h2>{t('feed.heading')}</h2>
+      <ul>
+        {#each session.feed as item (item.seq)}
+          <li data-testid="feed-item" data-kind={item.kind} data-seq={String(item.seq)}>
+            {item.text}
+          </li>
+        {/each}
+      </ul>
+    </section>
+    </div>
     <div class="share-panel" data-testid="share-panel">
       <span id="share-label" class="share-label">{t('room.share.label')}</span>
       <a data-testid="share-link" href={shareLink} aria-describedby="share-label"
@@ -680,6 +706,7 @@
       {words}
       pendingEdits={session.pendingEdits}
       flashes={session.flashes}
+      {remoteSelections}
     />
     <div class="undo-panel">
       <button type="button" data-testid="undo-button" onclick={onUndo}>{t('room.undo')}</button>
@@ -739,6 +766,13 @@
     color: #a4161a;
   }
 
+  /* The roster and the feed: stacked, or side by side in a low window. */
+  .presence {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+  }
+
   .roster {
     flex: none;
   }
@@ -768,6 +802,40 @@
     width: 0.8rem;
     height: 0.8rem;
     border-radius: 50%;
+  }
+
+  .roster-state {
+    font-size: 0.8rem;
+    color: #5b6070;
+  }
+
+  .roster li[data-state='idle'] {
+    opacity: 0.7;
+  }
+
+  .roster li[data-state='disconnected'] {
+    opacity: 0.45;
+  }
+
+  /* A short strip that scrolls: the grid keeps the height (spec 006). */
+  .feed {
+    flex: none;
+    box-sizing: border-box;
+    max-height: 4.5rem;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+    font-size: 0.85rem;
+  }
+
+  .feed h2 {
+    margin: 0;
+    font-size: 0.85rem;
+  }
+
+  .feed ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .undo-panel {
@@ -818,6 +886,23 @@
 
     .clue-bar {
       padding: 0.25rem 0.75rem;
+    }
+
+    /* Side by side, so the feed takes no height from the grid (spec 006). */
+    .presence {
+      flex-direction: row;
+      gap: 1rem;
+    }
+
+    .roster {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .feed {
+      flex: 1 1 0;
+      min-width: 0;
+      max-height: 2.6rem;
     }
   }
 </style>

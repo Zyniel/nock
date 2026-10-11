@@ -53,6 +53,7 @@ from nock.protocol import (
     RevealBudget,
     RevealResult,
     RoomSettings,
+    SelectCell,
     Selection,
     SelectionMoved,
     Seq,
@@ -495,9 +496,17 @@ def disconnect_player(state: RoomState, player_id: str, now: float) -> Outcome:
         if player.state == PlayerState.DISCONNECTED:
             break
         changed = player.model_copy(
-            update={"state": PlayerState.DISCONNECTED, "disconnected_at": now}
+            update={
+                "state": PlayerState.DISCONNECTED,
+                "disconnected_at": now,
+                "selection": None,
+            }
         )
-        return _with_state_change(state, changed, now)
+        outcome = _with_state_change(state, changed, now)
+        if player.selection is None:
+            return outcome
+        cleared = SelectionMoved(player_id=player_id, selection=None)
+        return outcome.model_copy(update={"to_others": (cleared,)})
     return Outcome(state=state)
 
 
@@ -635,9 +644,33 @@ def handle_message(
     message its meaning is built, the message is read and ignored: nothing is
     sent.
     """
-    outcome = _apply_message(state, player_id, message, now, config)
+    reactivation: tuple[LogEntry, ...] = ()
+    active_state = state
+    if not isinstance(message, Ping | Join):
+        input_step = _register_input(state, player_id, now)
+        active_state = input_step.state
+        reactivation = input_step.entries
+    outcome = _apply_message(active_state, player_id, message, now, config)
     seen_state = with_last_seen(outcome.state, player_id, now)
-    return outcome.model_copy(update={"state": seen_state})
+    all_entries = (*reactivation, *outcome.entries)
+    return outcome.model_copy(update={"state": seen_state, "entries": all_entries})
+
+
+def _register_input(state: RoomState, player_id: str, now: float) -> Outcome:
+    """Record an input of the player and wake them up when they were idle.
+
+    Returns:
+        The outcome: `last_input_at` is `now`; an idle player becomes active
+        with one `PlayerStateChanged` entry.
+    """
+    player = _find_player(state, player_id)
+    if player is None:
+        return Outcome(state=state)
+    active = player.model_copy(update={"last_input_at": now})
+    if player.state != PlayerState.IDLE:
+        return Outcome(state=_replace_player(state, active))
+    active = active.model_copy(update={"state": PlayerState.ACTIVE})
+    return _with_state_change(state, active, now)
 
 
 def _apply_message(
@@ -658,7 +691,28 @@ def _apply_message(
         return _count_unhandled_edit(state, player_id, now, config)
     if isinstance(message, Undo):
         return _undo(state, player_id, now)
+    if isinstance(message, SelectCell):
+        return _select_cell(state, player_id, message)
     return Outcome(state=state)
+
+
+def _select_cell(state: RoomState, player_id: str, message: SelectCell) -> Outcome:
+    """Store the player's selection and relay it to the other players."""
+    player = _find_player(state, player_id)
+    if player is None:
+        return Outcome(state=state)
+    if _find_cell(state, message.row, message.column) is None:
+        return _refuse(
+            state,
+            ErrorCode.NOT_A_LETTER_CELL,
+            f"({message.row}, {message.column}) is not a letter cell.",
+        )
+    selection = Selection(
+        row=message.row, column=message.column, direction=message.direction
+    )
+    changed = player.model_copy(update={"selection": selection})
+    moved = SelectionMoved(player_id=player_id, selection=selection)
+    return Outcome(state=_replace_player(state, changed), to_others=(moved,))
 
 
 def with_last_seen(state: RoomState, player_id: str, now: float) -> RoomState:
@@ -929,11 +983,13 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
 
     For each player, in `players` order: a joined player silent for too long is
     disconnected and their socket is to be closed; a player disconnected for
-    more than the resume window leaves the room.
+    more than the resume window leaves the room. Then each active player
+    without input for the idle delay becomes idle.
     """
     current = state
     entries: list[LogEntry] = []
     disconnects: list[Disconnect] = []
+    to_others: list[SelectionMoved] = []
     for listed in state.players:
         player = _find_player(current, listed.player_id)
         if player is None:
@@ -944,6 +1000,7 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
                 step = disconnect_player(current, player.player_id, now)
                 current = step.state
                 entries.extend(step.entries)
+                to_others.extend(step.to_others)
                 silent = Disconnect(
                     player_id=player.player_id, close_code=SILENCE_CLOSE_CODE
                 )
@@ -952,9 +1009,31 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
             step = _time_out_player(current, player, now)
             current = step.state
             entries.extend(step.entries)
+    idle_step = _idle_step(current, now, config)
+    entries.extend(idle_step.entries)
     return Outcome(
-        state=current, entries=tuple(entries), disconnects=tuple(disconnects)
+        state=idle_step.state,
+        entries=tuple(entries),
+        to_others=tuple(to_others),
+        disconnects=tuple(disconnects),
     )
+
+
+def _idle_step(state: RoomState, now: float, config: RoomConfig) -> Outcome:
+    """Turn the active players without input for long enough into idle ones."""
+    current = state
+    entries: list[LogEntry] = []
+    for listed in state.players:
+        player = _find_player(current, listed.player_id)
+        if player is None or player.state != PlayerState.ACTIVE:
+            continue
+        if now - player.last_input_at < config.idle_after_seconds:
+            continue
+        idle = player.model_copy(update={"state": PlayerState.IDLE})
+        step = _with_state_change(current, idle, now)
+        current = step.state
+        entries.extend(step.entries)
+    return Outcome(state=current, entries=tuple(entries))
 
 
 def replay(state: RoomState, entry: LogEntry) -> RoomState:

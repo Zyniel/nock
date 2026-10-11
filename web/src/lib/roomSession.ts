@@ -1,3 +1,6 @@
+import { FEED_LIMIT, feedItemFor } from './activityFeed'
+import type { FeedItem } from './activityFeed'
+
 // The state of one room page and the rules that keep it in `seq` order.
 // Plain functions: no socket and no DOM, so the rules are easy to read.
 
@@ -66,11 +69,28 @@ export interface GridView {
   cells: CellView[]
 }
 
+// The cell and direction another player selected (spec 013).
+export interface PlayerSelection {
+  row: number
+  column: number
+  direction: 'across' | 'down'
+}
+
 export interface PlayerView {
   player_id: string
   nickname: string
   colour: number
   state: PlayerState
+  // `null`: nothing selected, or the player is disconnected.
+  selection: PlayerSelection | null
+}
+
+// The room settings the feed compares (spec 013).
+export interface RoomSettingsView {
+  help_mode: string
+  letters: number
+  words: number
+  locked: boolean
 }
 
 // Only what the client reads from a snapshot (later specs read more).
@@ -81,6 +101,7 @@ export interface Snapshot {
   resume_token: string
   grid: GridView
   players: PlayerView[]
+  settings: RoomSettingsView
   solved: boolean
 }
 
@@ -114,6 +135,10 @@ export interface RoomSession {
   // True once the server refused the join for good: room full, locked or the
   // player removed. The socket close that follows ends the attempts (spec 017).
   isRefused: boolean
+  // The activity feed, oldest first (spec 013).
+  feed: FeedItem[]
+  // The nickname of every player seen so far, by id; those who left stay.
+  names: Record<string, string>
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -152,6 +177,8 @@ export function newSession(): RoomSession {
     nextFlashId: 1,
     undoRefusals: 0,
     isRefused: false,
+    feed: [],
+    names: {},
   }
 }
 
@@ -308,7 +335,50 @@ function toPlayer(value: unknown): PlayerView | null {
   if (typeof state !== 'string' || !PLAYER_STATES.includes(state)) {
     return null
   }
-  return { player_id, nickname, colour, state: state as PlayerState }
+  const selection = toSelection(player.selection)
+  return { player_id, nickname, colour, state: state as PlayerState, selection }
+}
+
+// Returns null when the value is not a selection of the protocol.
+function toSelection(value: unknown): PlayerSelection | null {
+  const selection = value as Record<string, unknown> | null | undefined
+  if (typeof selection !== 'object' || selection === null) {
+    return null
+  }
+  const { row, column, direction } = selection
+  if (typeof row !== 'number' || typeof column !== 'number') {
+    return null
+  }
+  if (direction !== 'across' && direction !== 'down') {
+    return null
+  }
+  return { row, column, direction }
+}
+
+const DEFAULT_SETTINGS: RoomSettingsView = {
+  help_mode: 'free',
+  letters: 5,
+  words: 1,
+  locked: false,
+}
+
+// The settings of a snapshot or of a settings_changed; the defaults of the
+// room when the value holds none.
+function toSettings(value: unknown): RoomSettingsView {
+  const settings = value as Record<string, unknown> | null | undefined
+  if (typeof settings !== 'object' || settings === null) {
+    return { ...DEFAULT_SETTINGS }
+  }
+  const budget = settings.reveal_budget as Record<string, unknown> | null | undefined
+  if (typeof budget !== 'object' || budget === null) {
+    return { ...DEFAULT_SETTINGS }
+  }
+  return {
+    help_mode: typeof settings.help_mode === 'string' ? settings.help_mode : 'free',
+    letters: Number(budget.letters),
+    words: Number(budget.words),
+    locked: settings.locked === true,
+  }
 }
 
 function toPlayers(value: unknown): PlayerView[] | null {
@@ -349,6 +419,7 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     resume_token,
     grid,
     players,
+    settings: toSettings(message.settings),
     solved: message.solved === true,
   }
 }
@@ -384,6 +455,9 @@ function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
     for (const player of snapshot.players) {
       if (player.player_id === playerId) {
         player.state = state as PlayerState
+        if (player.state === 'disconnected') {
+          player.selection = null
+        }
       }
     }
   }
@@ -475,8 +549,33 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
   }
 }
 
+// Add the feed line of an event, before the event changes the snapshot.
+function addFeedItem(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
+  if (event.type === 'player_joined') {
+    const player = toPlayer(event.message.player)
+    if (player !== null) {
+      session.names[player.player_id] = player.nickname
+    }
+  }
+  const item = feedItemFor(snapshot, session.names, event)
+  if (item === null) {
+    return
+  }
+  session.feed.push(item)
+  if (session.feed.length > FEED_LIMIT) {
+    session.feed.splice(0, session.feed.length - FEED_LIMIT)
+  }
+}
+
 function applyEvent(session: RoomSession, event: RoomEvent): void {
   session.seq = event.seq
+  if (session.snapshot !== null) {
+    addFeedItem(session, session.snapshot, event)
+  }
+  if (event.type === 'settings_changed' && session.snapshot !== null) {
+    // The next settings_changed is compared with these.
+    session.snapshot.settings = toSettings(event.message.settings)
+  }
   if (event.type === 'letter_changed' && session.snapshot !== null) {
     applyLetterChanged(session, session.snapshot, event)
   }
@@ -506,6 +605,9 @@ function drainPending(session: RoomSession): void {
 
 function receiveSnapshot(session: RoomSession, snapshot: Snapshot): void {
   session.snapshot = snapshot
+  for (const player of snapshot.players) {
+    session.names[player.player_id] = player.nickname
+  }
   session.seq = snapshot.seq
   session.status = 'joined'
   session.nicknameRefused = false
@@ -549,9 +651,26 @@ export function receiveFrame(session: RoomSession, text: string): void {
     receiveError(session, message)
     return
   }
+  if (message.type === 'selection_moved') {
+    receiveSelectionMoved(session, message)
+    return
+  }
   const event = toEvent(message)
   if (event !== null) {
     receiveEvent(session, event)
+  }
+}
+
+// Another player's selection moved. It has no seq, so it is applied at once;
+// never for me, and never for a disconnected player.
+function receiveSelectionMoved(session: RoomSession, message: Record<string, unknown>): void {
+  if (session.snapshot === null || message.player_id === session.snapshot.you) {
+    return
+  }
+  for (const player of session.snapshot.players) {
+    if (player.player_id === message.player_id && player.state !== 'disconnected') {
+      player.selection = toSelection(message.selection)
+    }
   }
 }
 
