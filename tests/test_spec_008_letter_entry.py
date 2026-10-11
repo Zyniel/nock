@@ -499,7 +499,7 @@ def test_ac1_after_the_socket_closes_cells_change_locally_and_nothing_is_sent(
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     mock.close(1011)
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "reconnecting")
     sent_before = len(mock.received)
 
     tap(page, 1, 0)

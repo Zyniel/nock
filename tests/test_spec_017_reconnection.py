@@ -1128,11 +1128,22 @@ def test_ac1_a_socket_silent_for_4_seconds_is_given_up_and_lost(
     expect_status(page, "joined")
     expect(banner(page)).to_be_hidden()
 
-    advance_page(page, 1100)
+    # Lost at 4 s of silence; stop at 4.9 s, a margin before the reconnect due
+    # at 5 s (timers fire inclusively at the exact end of an advance, and the
+    # browsers differ on when the close event reaches the page).
+    advance_page(page, 1000)
 
     expect_offline(page)
     expect(banner(page)).to_have_text(load_fr()["room.banner.offline"])
-    expect_new_connection_after(page, room, 1000)
+    assert len(room.connections) == 1
+    count = len(room.connections)
+    advance_page(page, 50)
+    assert len(room.connections) == count
+    # Some browsers only see the close once the clock stopped, which delays the
+    # reconnect: leave a margin on this side too.
+    advance_page(page, 1200)
+    wait_until(page, lambda: len(room.connections) > count)
+    assert len(room.connections) == count + 1
 
 
 def test_ac1_a_frame_of_any_kind_restarts_the_4_seconds_of_silence(

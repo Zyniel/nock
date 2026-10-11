@@ -1291,7 +1291,7 @@ def test_ac6_the_last_grid_stays_on_screen_after_the_socket_closes(
     mock.close(1011)
 
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "reconnecting")
     expect(page.get_by_test_id("grid-viewport")).to_be_visible()
     expect(page.get_by_test_id("cell")).to_have_count(25)
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")

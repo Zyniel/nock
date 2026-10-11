@@ -67,6 +67,7 @@ INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 NOW = 2_000_000.0
 OLD_TIME = 1_500_000.0
+RECENT_DISCONNECT = NOW - 10.0  # recent: well under the 300 s time-out
 START_TIME = 1_000_000.0
 RECEIVE_TIMEOUT_SECONDS = 5.0
 SETTLE_SECONDS = 0.4
@@ -232,8 +233,13 @@ def make_player(
     colour: int | None = None,
     state: PlayerState = PlayerState.ACTIVE,
     is_host: bool = False,
+    disconnected_at: float = RECENT_DISCONNECT,
 ) -> PlayerRecord:
-    """A player of a seeded room: ids and tokens are derived from `index`."""
+    """A player of a seeded room: ids and tokens are derived from `index`.
+
+    A disconnected player left `disconnected_at`, recent enough (spec 017) not
+    to be timed out.
+    """
     return PlayerRecord(
         player_id=f"player{index}",
         resume_token=f"resume-token-number-{index}",
@@ -244,7 +250,9 @@ def make_player(
         joined_seq=index + 1,
         last_input_at=OLD_TIME,
         last_seen_at=OLD_TIME,
-        disconnected_at=OLD_TIME if state is PlayerState.DISCONNECTED else None,
+        disconnected_at=(
+            disconnected_at if state is PlayerState.DISCONNECTED else None
+        ),
     )
 
 
@@ -254,11 +262,20 @@ def make_state(grid: Grid, players: list[PlayerRecord]) -> RoomState:
     return fresh.model_copy(update={"players": tuple(players), "seq": len(players)})
 
 
-def eight_players(state: PlayerState = PlayerState.ACTIVE) -> list[PlayerRecord]:
+def eight_players(
+    state: PlayerState = PlayerState.ACTIVE,
+    disconnected_at: float = RECENT_DISCONNECT,
+) -> list[PlayerRecord]:
     players: list[PlayerRecord] = []
     for index in range(MAX_PLAYERS):
         players.append(
-            make_player(index, f"Player{index}", state=state, is_host=index == 0)
+            make_player(
+                index,
+                f"Player{index}",
+                state=state,
+                is_host=index == 0,
+                disconnected_at=disconnected_at,
+            )
         )
     return players
 
@@ -1404,7 +1421,9 @@ def test_ac4_websocket_a_ninth_join_is_refused_then_the_socket_closes(
 
 
 def eight_disconnected_room(grid: Grid) -> RoomState:
-    return make_state(grid, eight_players(PlayerState.DISCONNECTED))
+    # The live server runs on the real clock: the players left 10 s ago.
+    left_at = time.time() - 10.0
+    return make_state(grid, eight_players(PlayerState.DISCONNECTED, left_at))
 
 
 def test_ac4_browser_a_full_room_shows_room_full(

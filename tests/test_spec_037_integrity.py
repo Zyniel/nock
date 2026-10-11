@@ -252,6 +252,19 @@ def player_record(state: RoomState, player_id: str) -> PlayerRecord:
     pytest.fail(f"no player {player_id}")
 
 
+def seen_at(state: RoomState, player_id: str, now: float) -> RoomState:
+    """The state with only the `last_seen_at` of the player set to `now`.
+
+    Spec 017: every message sets `last_seen_at`, a refused edit included.
+    """
+    players: list[PlayerRecord] = []
+    for player in state.players:
+        if player.player_id == player_id:
+            player = player.model_copy(update={"last_seen_at": now})
+        players.append(player)
+    return state.model_copy(update={"players": tuple(players)})
+
+
 def refusal_code(reply: tuple[ServerMessage, ...]) -> ErrorCode:
     """The code of the single error in `reply`."""
     assert len(reply) == 1
@@ -1192,7 +1205,8 @@ def one_more_edit(
     if len(outcome.entries) == 1:
         return outcome.state, True
     assert refusal_code(outcome.reply) is ErrorCode.RATE_LIMITED
-    assert outcome.state == state
+    assert outcome.state == seen_at(state, player_id, now)
+    assert player_record(outcome.state, player_id).last_seen_at == now
     return outcome.state, False
 
 
@@ -1409,7 +1423,7 @@ def test_ac3_python_the_rate_limit_is_checked_before_the_locked_cell(
 
     outcome = handle_message(first.state, "p1", locked_edit, NOW + 0.1, config)
 
-    assert outcome.state == first.state
+    assert outcome.state == seen_at(first.state, "p1", NOW + 0.1)
     assert outcome.entries == ()
     assert refusal_code(outcome.reply) is ErrorCode.RATE_LIMITED
 
@@ -1427,7 +1441,7 @@ def test_ac3_python_the_rate_limit_is_checked_before_the_letter_cell(
         first.state, "p1", EditLetter(row=0, column=0, letter="T"), NOW + 0.1, config
     )
 
-    assert outcome.state == first.state
+    assert outcome.state == seen_at(first.state, "p1", NOW + 0.1)
     assert refusal_code(outcome.reply) is ErrorCode.RATE_LIMITED
 
 

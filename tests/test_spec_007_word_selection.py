@@ -1094,7 +1094,7 @@ def test_ac5_selecting_still_works_locally_when_the_socket_is_closed(
     page.on("pageerror", lambda error: page_errors.append(str(error)))
     mock.close(1011)
     room = page.get_by_test_id("room-page")
-    expect(room).to_have_attribute("data-status", "closed")
+    expect(room).to_have_attribute("data-status", "reconnecting")
     sent_before = len(mock.received)
 
     tap(page, 2, 2)
