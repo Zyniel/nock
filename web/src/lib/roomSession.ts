@@ -99,6 +99,11 @@ export interface RoomSettingsView {
   locked: boolean
 }
 
+export interface RevealBudgetView {
+  letters: number
+  words: number
+}
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
@@ -108,6 +113,8 @@ export interface Snapshot {
   grid: GridView
   players: PlayerView[]
   settings: RoomSettingsView
+  // What is left to reveal, in letters and in words (spec 014).
+  reveal_budget: RevealBudgetView
   solved: boolean
 }
 
@@ -395,6 +402,15 @@ function toSettings(value: unknown): RoomSettingsView {
   }
 }
 
+// The remaining reveal budget of a snapshot or of a settings_changed.
+function toRevealBudget(value: unknown): RevealBudgetView {
+  const budget = value as Record<string, unknown> | null | undefined
+  if (typeof budget !== 'object' || budget === null) {
+    return { letters: 0, words: 0 }
+  }
+  return { letters: Number(budget.letters), words: Number(budget.words) }
+}
+
 function toPlayers(value: unknown): PlayerView[] | null {
   if (!Array.isArray(value)) {
     return null
@@ -434,6 +450,7 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     grid,
     players,
     settings: toSettings(message.settings),
+    reveal_budget: toRevealBudget(message.reveal_budget),
     solved: message.solved === true,
   }
 }
@@ -603,6 +620,7 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   if (event.type === 'settings_changed' && session.snapshot !== null) {
     // The next settings_changed is compared with these.
     session.snapshot.settings = toSettings(event.message.settings)
+    session.snapshot.reveal_budget = toRevealBudget(event.message.reveal_budget)
   }
   if (event.type === 'letter_changed' && session.snapshot !== null) {
     applyLetterChanged(session, session.snapshot, event)

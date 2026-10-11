@@ -40,6 +40,7 @@ from nock.protocol import (
     LetterCellView,
     LetterChanged,
     LockRoom,
+    MutePlayer,
     Nickname,
     PencilEdit,
     Ping,
@@ -404,9 +405,7 @@ def join_room(
         The outcome. A success replies with the snapshot of the player.
     """
     if _is_removed_token(state, message.resume_token):
-        refusal = ErrorMessage(
-            code=ErrorCode.REMOVED, message="You were removed from this room."
-        )
+        refusal = ErrorMessage(code=ErrorCode.REMOVED, message=REMOVED_TEXT)
         return Outcome(state=state, reply=(refusal,), close_sender=True)
     resumed = _find_by_token(state, message.resume_token)
     timeout_entries: tuple[LogEntry, ...] = ()
@@ -657,6 +656,9 @@ def _add_player(
     return Outcome(state=new_state, entries=(entry,), reply=reply)
 
 
+REMOVED_TEXT = "You were removed from this room."
+
+
 def handle_message(
     state: RoomState,
     player_id: str,
@@ -664,20 +666,23 @@ def handle_message(
     now: float,
     config: RoomConfig = DEFAULT_CONFIG,
 ) -> Outcome:
-    """Apply a message of a joined player (spec 015 and later).
+    """Apply a message of a player of the room.
 
-    Every message sets the player's `last_seen_at`. A ping is answered with a
-    pong and is not input; neither is a join. Any other message is input: it
-    sets `last_input_at`, and an idle player becomes active with a
-    `PlayerStateChanged` entry ahead of the message's own entries.
-    `select_cell` stores the selection of a letter cell and relays it in
-    `to_others` (a non-letter cell is refused); edits (`edit_letter`, `erase`)
-    and `undo` are handled here.
-    `pencil_edit` and `confirm_pencil` only go through the rate limit (spec
-    037); spec 020 gives them their meaning. Until the spec that gives another
-    message its meaning is built, the message is read and ignored: nothing is
-    sent.
+    A message from a player who is not in the room (removed, timed out or
+    unknown) is refused with `not_joined` and changes nothing, a ping included
+    (spec 014 AC-5). Otherwise every message sets the player's `last_seen_at`.
+    A ping is answered with a pong and is not input; neither is a join. Any
+    other message is input: it sets `last_input_at`, and an idle player becomes
+    active with a `PlayerStateChanged` entry ahead of the message's own entries.
+    `select_cell`, edits (`edit_letter`, `erase`), `undo` and the host actions
+    (`remove_player`, `lock_room`, `change_settings`, `mute_player`) have their
+    rules here. `pencil_edit` and `confirm_pencil` only go through the rate
+    limit (spec 037); spec 020 gives them their meaning. Until the spec that
+    gives another message its meaning is built, the message is read and
+    ignored: nothing is sent.
     """
+    if _find_player(state, player_id) is None:
+        return _refuse(state, ErrorCode.NOT_JOINED, "Join the room first.")
     reactivation: tuple[LogEntry, ...] = ()
     active_state = state
     if not isinstance(message, Ping | Join):
@@ -727,7 +732,7 @@ def _apply_message(
         return _undo(state, player_id, now)
     if isinstance(message, SelectCell):
         return _select_cell(state, player_id, message)
-    if isinstance(message, RemovePlayer | LockRoom | ChangeSettings):
+    if isinstance(message, RemovePlayer | LockRoom | ChangeSettings | MutePlayer):
         return _host_action(state, player_id, message, now)
     return Outcome(state=state)
 
@@ -735,7 +740,7 @@ def _apply_message(
 def _host_action(
     state: RoomState,
     player_id: str,
-    message: RemovePlayer | LockRoom | ChangeSettings,
+    message: RemovePlayer | LockRoom | ChangeSettings | MutePlayer,
     now: float,
 ) -> Outcome:
     """Run a host action, or refuse it with not_host for any other player."""
@@ -746,6 +751,8 @@ def _host_action(
         return _remove_player(state, sender, message.player_id, now)
     if isinstance(message, LockRoom):
         return _lock_room(state, sender, message.locked, now)
+    if isinstance(message, MutePlayer):
+        return _mute_player(state, sender, message, now)
     return _change_settings(state, sender, message, now)
 
 
@@ -765,11 +772,25 @@ def _remove_player(
     removal = Disconnect(
         player_id=target_id,
         close_code=_NORMAL_CLOSE_CODE,
-        error=ErrorMessage(
-            code=ErrorCode.REMOVED, message="You were removed from this room."
-        ),
+        error=ErrorMessage(code=ErrorCode.REMOVED, message=REMOVED_TEXT),
     )
     return Outcome(state=replay(state, entry), entries=(entry,), disconnects=(removal,))
+
+
+def _mute_player(
+    state: RoomState, host: PlayerRecord, message: MutePlayer, now: float
+) -> Outcome:
+    """Mute or unmute a player's chat; nothing happens when it already is so."""
+    target = _find_player(state, message.player_id)
+    if target is None or target.player_id == host.player_id:
+        return _refuse(state, ErrorCode.INVALID_TARGET, "That player cannot be muted.")
+    if target.muted == message.muted:
+        return Outcome(state=state)
+    event = PlayerMuted(
+        seq=state.seq + 1, player_id=target.player_id, muted=message.muted
+    )
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=replay(state, entry), entries=(entry,))
 
 
 def _announce_settings(
@@ -1125,7 +1146,9 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     For each player, in `players` order: a joined player silent for too long is
     disconnected and their socket is to be closed; a player disconnected for
     more than the resume window leaves the room. Then each active player
-    without input for the idle delay becomes idle.
+    without input for the idle delay becomes idle. Last, a host disconnected for
+    more than the hand-over delay hands the host role to the longest-present
+    connected player.
     """
     current = state
     entries: list[LogEntry] = []

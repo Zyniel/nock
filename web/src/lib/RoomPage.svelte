@@ -968,6 +968,8 @@
   }
 
   .remove-player {
+    min-width: 24px;
+    min-height: 24px;
     padding: 0 0.3rem;
     font-size: 0.75rem;
   }
@@ -1089,7 +1091,7 @@
 
     .host-panel {
       overflow-x: auto;
-      scrollbar-width: none;
+      scrollbar-width: thin;
     }
 
     .host-panel button,
@@ -1100,6 +1102,14 @@
       box-sizing: border-box;
       padding-block: 0;
       font-size: 0.75rem;
+    }
+
+    /* A target of 24 by 24 CSS pixels at least (spec 014 AC-7). */
+    .remove-player {
+      min-width: 24px;
+      min-height: 24px;
+      /* The row keeps its height: the target overflows its line, not the row. */
+      margin-block: -3px;
     }
 
     .feed li {

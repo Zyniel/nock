@@ -444,11 +444,18 @@ class _RoomRunner:
                 connection.deliver_text(moved_text)
 
         for disconnect in outcome.disconnects:
-            for target in self._connections:
-                if target.player_id != disconnect.player_id:
-                    continue
+            targets = [
+                connection
+                for connection in self._connections
+                if connection.player_id == disconnect.player_id
+            ]
+            for target in targets:
                 if disconnect.error is not None:
                     target.deliver_text(disconnect.error.model_dump_json())
+                    # A refused player is no longer routed to the room, so a
+                    # frame still in flight cannot act as that player (spec
+                    # 014 AC-5).
+                    self._connections.remove(target)
                 target.deliver_close(disconnect.close_code)
 
         if outcome.close_sender and sender is not None:
