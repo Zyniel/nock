@@ -1,7 +1,7 @@
 ---
 id: "012"
 title: Guest join
-status: approved
+status: done
 ---
 
 # 012 - Guest join
