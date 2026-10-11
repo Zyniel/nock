@@ -199,12 +199,26 @@ def expect_joined(page: Page) -> Locator:
     return room
 
 
+def is_firefox(page: Page) -> bool:
+    browser = page.context.browser
+    return browser is not None and browser.browser_type.name == "firefox"
+
+
+def fix_firefox_text(payload: str) -> str:
+    """Undo Playwright's Firefox delivering UTF-8 text frames as latin-1."""
+    try:
+        return payload.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return payload
+
+
 class FrameRecorder:
     """The frames a page sends on its room sockets, in order."""
 
     def __init__(self, page: Page) -> None:
         self.page = page
         self.frames: list[str] = []
+        self.is_firefox = is_firefox(page)
         page.on("websocket", self._on_socket)
 
     def _on_socket(self, websocket: WebSocket) -> None:
@@ -212,7 +226,10 @@ class FrameRecorder:
             websocket.on("framesent", self._on_frame)
 
     def _on_frame(self, payload: str | bytes) -> None:
-        text = payload if isinstance(payload, str) else payload.decode("utf-8")
+        if isinstance(payload, str):
+            text = fix_firefox_text(payload) if self.is_firefox else payload
+        else:
+            text = payload.decode("utf-8")
         self.frames.append(text)
 
     def wait_for_frames(self, count: int) -> None:
