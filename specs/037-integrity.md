@@ -101,6 +101,12 @@ The words in brackets say how each criterion is tested.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, from spec 016's build): the test that the rate
+limit (check 1) is applied before the locked-cell check (check 3 of spec 015's
+order) belongs here, since check 1 never refuses before this spec. Its tests
+must include it: with `max_edits_per_second=1` and a recent edit in the window,
+an edit on a locked cell is answered `rate_limited`, not `cell_locked`.
+
 - Rate window (AC-3): the window is the last second, sliding: 20 edits at `t` and
   one at `t + 0.999` refuse the latter; at `t + 1.0` the 20 no longer count
   (`t > now - 1.0` is false).
