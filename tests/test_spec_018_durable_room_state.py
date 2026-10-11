@@ -2164,7 +2164,7 @@ def test_ac4_websocket_a_join_whose_append_fails_is_closed_with_1011(
         assert controlled_store.append_failed.is_set()
         state = controlled_registry.room_state(code)
         assert state is not None
-        assert state.players == []
+        assert state.players == ()
         assert state == before
         assert controlled_store.read_log(code) == []
 
@@ -2830,6 +2830,7 @@ def test_ac3_websocket_an_undo_with_nothing_to_undo_answers_only_its_sender(
         ana.wait_for_errors(1, "the refusal")
         bob.send(EditLetter(row=1, column=0, letter="T"))
         ana.wait_for_seq(3, "Bob's letter")
+        bob.wait_for_seq(3, "Bob's letter")
 
         assert [error.code for error in ana.errors()] == [ErrorCode.NOTHING_TO_UNDO]
         assert bob.errors() == []
