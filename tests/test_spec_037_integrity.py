@@ -253,14 +253,17 @@ def player_record(state: RoomState, player_id: str) -> PlayerRecord:
 
 
 def seen_at(state: RoomState, player_id: str, now: float) -> RoomState:
-    """The state with only the `last_seen_at` of the player set to `now`.
+    """The state with only `last_seen_at` and `last_input_at` set to `now`.
 
-    Spec 017: every message sets `last_seen_at`, a refused edit included.
+    Spec 017: every message sets `last_seen_at`. Spec 013: every message except
+    join and ping sets `last_input_at`. Both hold for a refused edit too.
     """
     players: list[PlayerRecord] = []
     for player in state.players:
         if player.player_id == player_id:
-            player = player.model_copy(update={"last_seen_at": now})
+            player = player.model_copy(
+                update={"last_seen_at": now, "last_input_at": now}
+            )
         players.append(player)
     return state.model_copy(update={"players": tuple(players)})
 
@@ -1206,7 +1209,9 @@ def one_more_edit(
         return outcome.state, True
     assert refusal_code(outcome.reply) is ErrorCode.RATE_LIMITED
     assert outcome.state == seen_at(state, player_id, now)
-    assert player_record(outcome.state, player_id).last_seen_at == now
+    refused = player_record(outcome.state, player_id)
+    assert refused.last_seen_at == now
+    assert refused.last_input_at == now
     return outcome.state, False
 
 

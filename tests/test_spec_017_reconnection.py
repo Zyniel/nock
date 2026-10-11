@@ -223,11 +223,13 @@ def with_player(room: RoomState, player_id: str, **update: object) -> RoomState:
 
 
 def keep_seen(state: RoomState, now: float) -> RoomState:
-    """Return the state where every player who is not disconnected was seen `now`."""
+    """Return the state where each connected player was seen and active `now`."""
     seen = state
     for player in state.players:
         if player.state != PlayerState.DISCONNECTED:
-            seen = with_player(seen, player.player_id, last_seen_at=now)
+            seen = with_player(
+                seen, player.player_id, last_seen_at=now, last_input_at=now
+            )
     return seen
 
 
