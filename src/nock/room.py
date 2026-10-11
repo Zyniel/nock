@@ -13,13 +13,17 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
-from nock.grid import Grid, LetterCell
+from nock.grid import ClueCell, Grid, LetterCell
 from nock.protocol import (
     CellLocked,
+    CellRef,
+    CellTarget,
     CellView,
     ChangeSettings,
     ChatMessage,
+    Check,
     CheckResult,
+    CheckTarget,
     ClientMessage,
     Colour,
     ConfirmPencil,
@@ -31,6 +35,7 @@ from nock.protocol import (
     FlagChanged,
     GridFullWrong,
     GridSolved,
+    GridTarget,
     GridView,
     HelpMode,
     HostChanged,
@@ -67,6 +72,7 @@ from nock.protocol import (
     Undo,
     VoteClosed,
     VoteOpened,
+    WordTarget,
     grid_view,
 )
 
@@ -728,6 +734,8 @@ def _apply_message(
         return _count_unhandled_edit(state, player_id, now, config)
     if isinstance(message, Undo):
         return _undo(state, player_id, now)
+    if isinstance(message, Check):
+        return _check(state, message.target, player_id, now)
     if isinstance(message, SelectCell):
         return _select_cell(state, player_id, message)
     if isinstance(message, RemovePlayer | LockRoom | ChangeSettings | MutePlayer):
@@ -1061,6 +1069,106 @@ def _apply_edit(
     return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
 
 
+def _check(
+    state: RoomState, target: CheckTarget, player_id: str, now: float
+) -> Outcome:
+    """Run a check: one check_result, then one cell_locked per correct cell.
+
+    The grid-solved refusal (spec 026) comes first in the order of refusals
+    and never refuses yet. The help mode `vote` acts as `free` until spec 025.
+    """
+    if state.settings.help_mode == HelpMode.NONE:
+        return _refuse(state, ErrorCode.HELP_DISABLED, "Checks are turned off.")
+    scope = _cells_in_scope(state, target)
+    if isinstance(scope, Outcome):
+        return scope
+
+    correct: list[CellState] = []
+    wrong: list[CellState] = []
+    for cell in scope:
+        if cell.letter is None or cell.locked or cell.pencil:
+            continue
+        if cell.letter == _solution_letter(state.grid, cell.row, cell.column):
+            correct.append(cell)
+        else:
+            wrong.append(cell)
+
+    result = CheckResult(
+        seq=state.seq + 1,
+        player_id=player_id,
+        target=target,
+        correct=_refs_of(correct),
+        wrong=_refs_of(wrong),
+    )
+    entries = [LogEntry(at=now, event=result)]
+    seq = result.seq
+    for cell in correct:
+        seq += 1
+        locked = CellLocked(
+            seq=seq,
+            row=cell.row,
+            column=cell.column,
+            letter=cell.letter or "",
+            revealed=False,
+        )
+        entries.append(LogEntry(at=now, event=locked))
+
+    new_state = state
+    for entry in entries:
+        new_state = replay(new_state, entry)
+    return Outcome(state=new_state, entries=tuple(entries))
+
+
+def _refs_of(cells: list[CellState]) -> tuple[CellRef, ...]:
+    """Return the positions of the cells, in the same order."""
+    references: list[CellRef] = []
+    for cell in cells:
+        references.append(CellRef(row=cell.row, column=cell.column))
+    return tuple(references)
+
+
+def _cells_in_scope(state: RoomState, target: CheckTarget) -> list[CellState] | Outcome:
+    """Return the cells a check names, or the refusal when it names nothing."""
+    if isinstance(target, GridTarget):
+        return list(state.cells)
+    if isinstance(target, CellTarget):
+        cell = _find_cell(state, target.row, target.column)
+        if cell is None:
+            return _refuse(
+                state,
+                ErrorCode.NOT_A_LETTER_CELL,
+                f"({target.row}, {target.column}) is not a letter cell.",
+            )
+        return [cell]
+    return _cells_of_word(state, target)
+
+
+def _cells_of_word(state: RoomState, target: WordTarget) -> list[CellState] | Outcome:
+    """Return the cells of the word of a clue, in reading order."""
+    try:
+        positions = state.grid.word_cells(target.row, target.column, target.clue_index)
+    except (IndexError, ValueError):
+        return _refuse(state, ErrorCode.INVALID_TARGET, "That word does not exist.")
+    cells: list[CellState] = []
+    for row, column in positions:
+        cell = _find_cell(state, row, column)
+        if cell is not None:
+            cells.append(cell)
+    return cells
+
+
+def _solution_letter(grid: Grid, row: int, column: int) -> str | None:
+    """Return the solution letter of a letter cell, from a clue whose word holds it."""
+    for clue_cell in grid.cells:
+        if not isinstance(clue_cell, ClueCell):
+            continue
+        for clue_index, clue in enumerate(clue_cell.clues):
+            positions = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
+            if (row, column) in positions:
+                return clue.answer[positions.index((row, column))]
+    return None
+
+
 def _undo_entry_before(cell: CellState, seq: int) -> UndoEntry:
     """Return what `last_edit` holds for an edit of `cell` numbered `seq`."""
     return UndoEntry(
@@ -1254,6 +1362,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_letter_changed(state, entry, event)
     elif isinstance(event, CellLocked):
         replayed = _replay_cell_locked(state, event)
+    elif isinstance(event, CheckResult):
+        replayed = _replay_check_result(state, event)
     elif isinstance(event, SettingsChanged):
         replayed = state.model_copy(
             update={"settings": event.settings, "reveal_budget": event.reveal_budget}
@@ -1354,6 +1464,7 @@ def _replay_cell_locked(state: RoomState, event: CellLocked) -> RoomState:
             "letter": event.letter,
             "locked": True,
             "revealed": event.revealed,
+            "wrong": False,
             "changed_seq": event.seq,
             "changed_by": None,
         }
@@ -1361,6 +1472,17 @@ def _replay_cell_locked(state: RoomState, event: CellLocked) -> RoomState:
     if event.revealed:
         locked_cell = locked_cell.model_copy(update={"author": None})
     return _replace_cell(state, locked_cell)
+
+
+def _replay_check_result(state: RoomState, event: CheckResult) -> RoomState:
+    """Mark the wrong cells of a check result."""
+    replayed = state
+    for reference in event.wrong:
+        cell = _find_cell(replayed, reference.row, reference.column)
+        if cell is None:
+            continue
+        replayed = _replace_cell(replayed, cell.model_copy(update={"wrong": True}))
+    return replayed
 
 
 def _replay_host_changed(state: RoomState, event: HostChanged) -> RoomState:

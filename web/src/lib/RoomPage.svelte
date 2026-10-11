@@ -191,6 +191,9 @@
         (player) => player.player_id === session.snapshot?.you && player.is_host,
       ),
   )
+  let isCheckDisabled = $derived(
+    session.snapshot !== null && session.snapshot.settings.help_mode === 'none',
+  )
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
   // The settings form shows the settings of the room; it follows each change.
@@ -401,6 +404,28 @@
   // Ask the server to undo my last edit. It arrives after any edit already sent.
   function onUndo(): void {
     send({ type: 'undo' })
+  }
+
+  // Ask the server to check the selected letter, the selected word or the grid.
+  function onCheck(target: object): void {
+    send({ type: 'check', target })
+  }
+
+  function onCheckLetter(): void {
+    if (selection !== null) {
+      onCheck({ scope: 'letter', row: selection.row, column: selection.column })
+    }
+  }
+
+  function onCheckWord(): void {
+    if (activeWord !== null) {
+      onCheck({
+        scope: 'word',
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      })
+    }
   }
 
   function onCellTap(row: number, column: number): void {
@@ -682,6 +707,29 @@
           <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
         {/if}
       </div>
+      <div class="check-panel" data-testid="check-panel" role="group" aria-label={t('check.label')}>
+        <button
+          type="button"
+          data-testid="check-letter"
+          aria-label={t('check.letter_label')}
+          disabled={isCheckDisabled || selection === null}
+          onclick={onCheckLetter}>{t('check.letter')}</button
+        >
+        <button
+          type="button"
+          data-testid="check-word"
+          aria-label={t('check.word_label')}
+          disabled={isCheckDisabled || activeWord === null}
+          onclick={onCheckWord}>{t('check.word')}</button
+        >
+        <button
+          type="button"
+          data-testid="check-grid"
+          aria-label={t('check.grid_label')}
+          disabled={isCheckDisabled}
+          onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
+        >
+      </div>
     {/if}
   </header>
   {#if session.status === 'reconnecting'}
@@ -905,7 +953,8 @@
     white-space: nowrap;
   }
 
-  .undo-panel {
+  .undo-panel,
+  .check-panel {
     display: flex;
     align-items: center;
     gap: 0.5rem;

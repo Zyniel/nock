@@ -38,6 +38,8 @@ export interface LetterCellView {
   revealed: boolean
   // The player id of the author, `null` when none.
   author: string | null
+  // True while the letter in place was found wrong by the last check of it.
+  wrong: boolean
 }
 
 // An edit this page sent and that has no answer yet (spec 015).
@@ -271,7 +273,8 @@ function toCell(value: unknown): CellView | null {
     }
     const author = typeof cell.author === 'string' ? cell.author : null
     const revealed = cell.revealed === true
-    return { type: 'letter', row, column, letter, locked, revealed, author }
+    const wrong = cell.wrong === true
+    return { type: 'letter', row, column, letter, locked, revealed, author, wrong }
   }
   return null
 }
@@ -558,9 +561,23 @@ function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   }
   cell.letter = typeof message.letter === 'string' ? message.letter : null
   cell.locked = true
+  cell.wrong = false
   cell.revealed = message.revealed === true
   if (cell.revealed) {
     cell.author = null
+  }
+}
+
+// A check_result strikes through the letters of its wrong list.
+function applyCheckResult(snapshot: Snapshot, event: RoomEvent): void {
+  const wrongCells: Array<{ row: number; column: number }> = Array.isArray(event.message.wrong)
+    ? event.message.wrong
+    : []
+  for (const reference of wrongCells) {
+    const cell = letterCellAt(snapshot, reference.row, reference.column)
+    if (cell !== null) {
+      cell.wrong = true
+    }
   }
 }
 
@@ -587,6 +604,7 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
       startFlash(session, snapshot, cell, message.player_id)
     }
     cell.letter = letter
+    cell.wrong = false
     cell.author = letter === null || typeof message.player_id !== 'string' ? null : message.player_id
   }
   if (message.player_id === snapshot.you && answersOldestPendingEdit(session, event)) {
@@ -627,6 +645,9 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   }
   if (event.type === 'cell_locked' && session.snapshot !== null) {
     applyCellLocked(session.snapshot, event)
+  }
+  if (event.type === 'check_result' && session.snapshot !== null) {
+    applyCheckResult(session.snapshot, event)
   }
   if (event.type === 'grid_solved') {
     session.solved = true

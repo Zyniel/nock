@@ -360,6 +360,7 @@
           data-unconfirmed={String(shown.unconfirmed)}
           data-author={cell.author ?? ''}
           data-locked={String(cell.locked)}
+          data-wrong={String(cell.wrong && !shown.unconfirmed)}
           data-flash={flashOf(cell.row, cell.column)}
           data-selected={String(isSelected(cell.row, cell.column))}
           data-in-word={String(isInWord)}
@@ -465,6 +466,11 @@
     font-size: calc(var(--cell) * 0.55);
     line-height: 1;
     text-transform: uppercase;
+  }
+
+  /* A letter found wrong by a check: the line is on the cell itself. */
+  .letter[data-wrong='true'] {
+    text-decoration-line: line-through;
   }
 
   .letter.locked {
