@@ -74,3 +74,26 @@ export function isGridSummary(value: unknown): value is GridSummary {
     typeof record.word_count === 'number'
   )
 }
+
+// Set the progress of one grid on this device. A browser that refuses storage
+// keeps nothing: the page still works.
+function setProgress(number: number, progress: 'started' | 'finished'): void {
+  const stored = readStoredProgress()
+  stored[String(number)] = progress
+  try {
+    localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(stored))
+  } catch {
+    // Nothing can be remembered.
+  }
+}
+
+// A grid whose play button was tapped is started, unless it is finished.
+export function markStarted(number: number): void {
+  if (progressOf(number) !== 'finished') {
+    setProgress(number, 'started')
+  }
+}
+
+export function markFinished(number: number): void {
+  setProgress(number, 'finished')
+}

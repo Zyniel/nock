@@ -1,10 +1,28 @@
 <script lang="ts">
   import { formatPublishedOn, progressOf, type GridSummary } from './catalogue'
   import { t } from './i18n'
+  import { playGrid } from './playGrid'
 
   let { summary }: { summary: GridSummary } = $props()
 
   const progress = $derived(progressOf(summary.number))
+
+  let isStarting = $state(false)
+  let hasFailed = $state(false)
+
+  // One tap creates one room; the button stays disabled while the request runs.
+  async function play(): Promise<void> {
+    if (isStarting) {
+      return
+    }
+    isStarting = true
+    hasFailed = false
+    const started = await playGrid(summary.number)
+    if (!started) {
+      isStarting = false
+      hasFailed = true
+    }
+  }
 </script>
 
 <article
@@ -26,5 +44,11 @@
     <p data-testid="catalogue-progress">{t('catalogue.progress.started')}</p>
   {:else if progress === 'finished'}
     <p data-testid="catalogue-progress">{t('catalogue.progress.finished')}</p>
+  {/if}
+  <button type="button" data-testid="catalogue-play" disabled={isStarting} onclick={play}
+    >{t('catalogue.play')}</button
+  >
+  {#if hasFailed}
+    <p data-testid="catalogue-error" role="alert">{t('catalogue.play_failed')}</p>
   {/if}
 </article>

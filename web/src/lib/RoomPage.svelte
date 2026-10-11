@@ -3,6 +3,8 @@
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
+  import { markFinished } from './catalogue'
+  import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
   import { gridLabel, newSession, receiveFrame, statusAfterClose } from './roomSession'
   import {
@@ -11,6 +13,7 @@
     selectedWord,
     selectionAfterCellTap,
     selectionAfterClueTap,
+    selectionOnCell,
     validSelection,
     wordKey,
   } from './wordSelection'
@@ -79,6 +82,17 @@
     }
   })
 
+  // A solved grid is finished on this device, when the room knows its number.
+  $effect(() => {
+    if (!session.solved) {
+      return
+    }
+    const grid = readRoomGrid(code)
+    if (grid !== null) {
+      markFinished(grid)
+    }
+  })
+
   // Send a message when the socket is open; after a close nothing is sent.
   function send(message: object): void {
     if (socket !== null && socket.readyState === WebSocket.OPEN) {
@@ -132,6 +146,7 @@
       selection.column !== next.column ||
       selection.direction !== next.direction
     rawSelection = next
+    writeRoomSelection(code, next)
     // The server only knows the cell and the direction, not the chosen word.
     if (cellChanged) {
       send({
@@ -165,6 +180,22 @@
       direction: current.direction,
       word: current.word,
     })
+  }
+
+  // After the first snapshot, select again what this device saved, if the grid
+  // still has a word there.
+  function restoreSavedSelection(snapshot: Snapshot): void {
+    const saved = readRoomSelection(code)
+    if (saved === null) {
+      return
+    }
+    const restored = selectionOnCell(
+      computeWords(snapshot.grid),
+      saved.row,
+      saved.column,
+      saved.direction,
+    )
+    select(restored)
   }
 
   // The place of a cell in a word (-1 when the word does not contain it).
@@ -271,6 +302,9 @@
       receiveFrame(session, event.data)
       if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
         rememberJoin(session.snapshot)
+        if (snapshotBefore === null) {
+          restoreSavedSelection(session.snapshot)
+        }
       }
       if (session.status === 'nickname') {
         formJoinNickname = null

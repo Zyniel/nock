@@ -66,6 +66,7 @@ export interface Snapshot {
   resume_token: string
   grid: GridView
   players: PlayerView[]
+  solved: boolean
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -85,6 +86,8 @@ export interface RoomSession {
   pending: RoomEvent[]
   // True after the server refused the nickname of the last join.
   nicknameRefused: boolean
+  // True once the grid is solved: a snapshot with `solved: true`, or `grid_solved`.
+  solved: boolean
 }
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
@@ -101,6 +104,7 @@ export function newSession(): RoomSession {
     seq: null,
     pending: [],
     nicknameRefused: false,
+    solved: false,
   }
 }
 
@@ -289,7 +293,7 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
   if (typeof you !== 'string' || typeof resume_token !== 'string') {
     return null
   }
-  return { type: 'snapshot', seq: message.seq, you, resume_token, grid, players }
+  return { type: 'snapshot', seq: message.seq, you, resume_token, grid, players, solved: message.solved === true }
 }
 
 function toEvent(message: Record<string, unknown>): RoomEvent | null {
@@ -330,6 +334,9 @@ function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
 
 function applyEvent(session: RoomSession, event: RoomEvent): void {
   session.seq = event.seq
+  if (event.type === 'grid_solved') {
+    session.solved = true
+  }
   if (session.snapshot !== null) {
     applyToPlayers(session.snapshot, event)
   }
@@ -353,6 +360,7 @@ function receiveSnapshot(session: RoomSession, snapshot: Snapshot): void {
   session.seq = snapshot.seq
   session.status = 'joined'
   session.nicknameRefused = false
+  session.solved = snapshot.solved
   session.pending = session.pending.filter((event) => event.seq > snapshot.seq)
   drainPending(session)
 }

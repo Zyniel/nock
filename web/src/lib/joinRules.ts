@@ -27,7 +27,7 @@ export function identityKey(code: string): string {
   return `nock.identity.${code}`
 }
 
-function roomRecordKey(code: string): string {
+export function roomRecordKey(code: string): string {
   return `nock.room.${code}`
 }
 
@@ -57,7 +57,7 @@ export function checkNickname(text: string): NicknameCheck {
 }
 
 // Read a stored value; a browser that refuses storage has nothing stored.
-function readItem(key: string): string | null {
+export function readItem(key: string): string | null {
   try {
     return localStorage.getItem(key)
   } catch {
@@ -65,7 +65,7 @@ function readItem(key: string): string | null {
   }
 }
 
-function writeItem(key: string, value: string): void {
+export function writeItem(key: string, value: string): void {
   try {
     localStorage.setItem(key, value)
   } catch {
@@ -73,7 +73,7 @@ function writeItem(key: string, value: string): void {
   }
 }
 
-function parseObject(raw: string | null): Record<string, unknown> | null {
+export function parseObject(raw: string | null): Record<string, unknown> | null {
   if (raw === null) {
     return null
   }
