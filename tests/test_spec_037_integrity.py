@@ -13,8 +13,8 @@ games is accepted; the invalid-frame answer of a joined socket is tested under A
 
 Not tested here: a removed player's socket being closed (spec 014), reveals and
 chat traffic (specs 022 and 024 extend the checker), a text frame whose size in
-bytes differs from its size in characters (a valid message cannot hold a non-ASCII
-character outside a string, so only the byte rule on ASCII frames is observable).
+bytes differs from its size in characters is covered only for a join (Unicode
+spaces around the nickname are stripped, so the frame stays valid).
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ RATE_LIMIT = 20
 ANSWERS = ("TAMIS", "NAVAL", "MIME", "IDES", "SENT", "VIDE", "AMEN", "LEST")
 FORBIDDEN_KEYS = ("answer", "solution")
 # Values that are random identifiers: they could by chance spell a short answer.
-IDENTIFIER_KEYS = ("resume_token", "player_id", "you", "author")
+IDENTIFIER_KEYS = ("resume_token", "player_id", "you", "author", "code")
 
 Cell = tuple[int, int]
 Step = tuple[int, int, str | None]  # row, column, letter (None: erase)
@@ -1137,6 +1137,30 @@ def test_ac2_websocket_an_oversized_join_frame_is_an_invalid_message(
         assert isinstance(peer.messages()[1], Snapshot)
 
 
+def test_ac2_websocket_a_join_frame_over_4096_bytes_but_few_characters_is_refused(
+    registry: RoomRegistry, client: TestClient, room_code: str
+) -> None:
+    # Ana followed by ideographic spaces: valid once stripped, 1457 characters
+    # but 4257 bytes, so only a size measured in bytes refuses it.
+    nickname = "Ana" + "　" * 1400
+    frame = json.dumps(
+        {"type": "join", "nickname": nickname, "resume_token": None},
+        ensure_ascii=False,
+    )
+    assert len(frame) < MAX_FRAME_BYTES
+    assert len(frame.encode("utf-8")) > MAX_FRAME_BYTES
+    with contextlib.ExitStack() as stack:
+        peer = connect(stack, client, room_code, "Ana")
+
+        peer.send_text(frame)
+        peer.wait_for_messages(1, "the answer to the multi-byte join")
+
+        refusal = peer.messages()[0]
+        assert isinstance(refusal, ErrorMessage)
+        assert refusal.code is ErrorCode.INVALID_MESSAGE
+        assert state_of(registry, room_code).players == ()
+
+
 # ---- AC-3: the rate limit (Python) -------------------------------------------------
 
 
@@ -1489,18 +1513,23 @@ def test_ac3_websocket_a_throttled_client_stays_connected_and_others_are_free(
 # ---- AC-4: escaping (static scan) ----------------------------------------------------
 
 WEB_SRC_DIR = Path(__file__).resolve().parents[1] / "web" / "src"
-HTML_BLOCK = re.compile(r"\{@html")
-RAW_HTML_CALLS = re.compile(r"innerHTML|outerHTML|insertAdjacentHTML|document\.write")
+HTML_BLOCK = re.compile(r"\{\s*@html")
+RAW_HTML_CALLS = re.compile(
+    r"innerHTML|outerHTML|insertAdjacentHTML|document\.write|parseFromString"
+    r"|createContextualFragment|setHTMLUnsafe|srcdoc"
+)
 
 
 def banned_constructs(text: str, is_svelte: bool) -> list[str]:
-    """The lines of `text` that insert HTML instead of text."""
+    """The places of `text` that insert HTML instead of text."""
+    patterns = [RAW_HTML_CALLS]
+    if is_svelte:
+        patterns.append(HTML_BLOCK)
     found: list[str] = []
-    for number, line in enumerate(text.splitlines(), start=1):
-        if is_svelte and HTML_BLOCK.search(line):
-            found.append(f"line {number}: {line.strip()}")
-        if RAW_HTML_CALLS.search(line):
-            found.append(f"line {number}: {line.strip()}")
+    for pattern in patterns:
+        for match in pattern.finditer(text):
+            number = text.count("\n", 0, match.start()) + 1
+            found.append(f"line {number}: {match.group(0)}")
     return found
 
 
@@ -1523,6 +1552,13 @@ def test_ac4_static_the_client_never_inserts_html() -> None:
     ("text", "is_svelte"),
     [
         ("<p>{@html nickname}</p>", True),
+        ("<p>{ @html nickname}</p>", True),
+        ("<p>{\n  @html nickname}</p>", True),
+        ("new DOMParser().parseFromString(nickname, 'text/html')", False),
+        ("range.createContextualFragment(nickname)", False),
+        ("element.setHTMLUnsafe(nickname)", False),
+        ("frame.srcdoc = nickname", False),
+        ("<iframe srcdoc={nickname}></iframe>", True),
         ("element.innerHTML = nickname", False),
         ("element.outerHTML = nickname", True),
         ("element.insertAdjacentHTML('beforeend', nickname)", False),
