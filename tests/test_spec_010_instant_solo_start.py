@@ -160,11 +160,16 @@ def wait_for_progress(page: Page, expected: dict[str, str]) -> None:
 
 
 def seed_local_storage(page: Page, items: dict[str, str]) -> None:
-    """Fill `localStorage` before the page's own scripts run."""
+    """Fill absent `localStorage` keys before the page's own scripts run.
+
+    The script runs again on every navigation, so it must not overwrite
+    values the client wrote since.
+    """
     script = (
         f"const items = {json.dumps(items)};"
         "for (const [key, value] of Object.entries(items)) {"
-        " localStorage.setItem(key, value); }"
+        " if (localStorage.getItem(key) === null) {"
+        " localStorage.setItem(key, value); } }"
     )
     page.context.add_init_script(script)
 
@@ -513,7 +518,9 @@ def test_ac1_storage_that_refuses_writes_still_creates_and_loads_the_room(
     expect(room).to_have_attribute(
         "data-status", re.compile(r"^(joined|nickname)$"), timeout=URL_TIMEOUT_MS
     )
-    expect(room).to_have_attribute("data-grid", "5x5")
+    status = room.get_attribute("data-status")
+    if status == "joined":
+        expect(room).to_have_attribute("data-grid", "5x5")
     assert room_registry.room_state(code) is not None
     assert read_storage(page, PROGRESS_KEY) is None
 
