@@ -522,6 +522,9 @@ class Peer:
     def send(self, message: Sendable) -> None:
         self._websocket.send_text(message.model_dump_json())
 
+    def send_raw(self, text: str) -> None:
+        self._websocket.send_text(text)
+
     def messages(self) -> list[ServerMessage]:
         with self._changed:
             return list(self._messages)
@@ -2248,6 +2251,69 @@ def test_ac4_websocket_players_who_ping_every_3_seconds_are_never_disconnected(
         for peer in (peer_a, peer_b):
             for message in peer.events():
                 assert not isinstance(message, PlayerStateChanged)
+
+
+def send_invalid_frame_and_wait(peer: Peer) -> None:
+    """Send a frame that is not a message and wait for the error it gets."""
+    errors_before = len(error_events(peer))
+    peer.send_raw("this is not a message")
+    peer.wait_until(
+        lambda: len(error_events(peer)) > errors_before,
+        "the error answering an invalid frame",
+    )
+
+
+def test_ac4_websocket_a_player_sending_only_invalid_frames_is_not_silent(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, DEFAULT_SILENCE_CONFIG) as (
+            client,
+            _registry,
+            code,
+        ),
+        contextlib.ExitStack() as stack,
+        contextlib.ExitStack() as a_stack,
+    ):
+        peer_a, peer_b = join_two(a_stack, stack, client, code)
+
+        for _ in range(3):
+            fake_clock.advance(3)
+            send_invalid_frame_and_wait(peer_a)
+            ping_and_wait(peer_b)
+        time.sleep(SETTLE_SECONDS)
+
+        assert peer_a.close_code is None
+        assert peer_b.close_code is None
+        for message in peer_b.events():
+            assert not isinstance(message, PlayerStateChanged)
+
+
+def test_ac4_websocket_a_player_sending_only_repeated_joins_is_not_silent(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, DEFAULT_SILENCE_CONFIG) as (
+            client,
+            _registry,
+            code,
+        ),
+        contextlib.ExitStack() as stack,
+        contextlib.ExitStack() as a_stack,
+    ):
+        peer_a, peer_b = join_two(a_stack, stack, client, code)
+
+        for _ in range(3):
+            fake_clock.advance(3)
+            peer_a.send(Join(nickname="Ana", resume_token=None))
+            time.sleep(SETTLE_SECONDS)
+            ping_and_wait(peer_b)
+        time.sleep(SETTLE_SECONDS)
+
+        assert peer_a.close_code is None
+        assert peer_b.close_code is None
+        for message in peer_b.events():
+            assert not isinstance(message, PlayerStateChanged)
 
 
 def test_ac4_websocket_a_socket_closed_by_the_client_is_seen_without_the_clock(
