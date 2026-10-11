@@ -294,7 +294,7 @@ The word in brackets says how each criterion is tested.
 - **AC-18** (browser, mocked socket) Given the page on `/r/ABC123` with nothing in `localStorage`, when the socket opens, then the room page shows `data-status="nickname"` and sends nothing (no frame within 300 ms); after the nickname form of spec 012 is submitted with `Ana`, the first message the page sends parses with `parse_client_message` to `Join(nickname="Ana", resume_token=None)`, the page has opened one socket only, and until a snapshot is sent the room page has `data-status="joining"`, `data-seq=""`, `data-grid=""`, `data-pending="0"`, with `data-testid="room-status"` showing `fr.json["room.status.joining"]`.
 - **AC-19** (browser, mocked socket) Given the page on `/r/ABC123` that received a FX-01 snapshot with `seq` 5, when the mock sends `letter_changed` events with `seq` 4, then 5, then 7, then the room page shows `data-seq="5"` and `data-pending="1"`; when it then sends `seq` 6, the page shows `data-seq="7"` and `data-pending="0"`.
 - **AC-20** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 5, when the mock sends the `selection_moved`, `reaction` and `error` wire examples of spec 039, then a `letter_changed` with `seq` 6, then the page shows `data-seq="6"`, `data-pending="0"` and `data-status="joined"`.
-- **AC-21** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 0, when the mock closes the socket with code 1011, then the room page reaches `data-status="closed"` and `data-testid="room-status"` shows `fr.json["room.status.closed"]`.
+- **AC-21** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 0, when the mock closes the socket with code 1011, then the room page reaches `data-status="reconnecting"`, `data-testid="room-status"` shows `fr.json["room.status.reconnecting"]` and the `connection-banner` is visible (amended for spec 017, which reconnects after a lost connection).
 - **AC-22** (static) Given `web/src/i18n/fr.json`, when it is loaded with `json.loads`, then it is a dict whose keys all match `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`, whose values are all non-empty `str`, and which holds the ten keys of the table in "Public interface".
 - **AC-23** (static) Given every `web/src/**/*.svelte` file, when it goes through the markup scan below, then the scan finds no violation. A file holding `<p>Bonjour</p>`, `<img alt="Logo" />`, `<button title="Salon {code}">` or `<svelte:head><title>Nock</title></svelte:head>` has a violation; one holding `<p>{t("a.b")}</p>`, `<img alt="" />`, `<img alt={t("a.b")} />` or `<input placeholder="{t('a.b')}" />` has none. The scan applies to these strings as well, so the test checks both lists.
 - **AC-24** (static) Given every `web/src/**/*.svelte` and `web/src/**/*.ts` file, when every match of `\bt\(\s*["']([^"']+)["']` is collected, then each captured key is a key of `fr.json`, and at least one match exists.
@@ -362,8 +362,8 @@ Applied to the text of one `.svelte` file, in this order:
   snapshot 7: `data-seq="8"`, `data-pending="0"`.
 - A gap that never fills (AC-19): the buffer keeps its events; the shell asks for
   nothing. Catch-up belongs to specs 017 and 034.
-- Close before any snapshot (AC-21): status `closed` (or `not_found` for 4404),
-  `data-seq` stays `""`.
+- Close before any snapshot (AC-21): status `connecting` with no banner while
+  spec 017 retries (or `not_found` for 4404), `data-seq` stays `""`.
 - Strings in `.ts` files (AC-23): the scan does not cover them; the `t` rule
   applies all the same and the reviewer checks it. AC-24 checks the keys.
 
@@ -487,6 +487,10 @@ human's instruction to take technical decisions, as spec 012 decision 2 planned:
     flow steps 2 and 9, the `resume_token` edge case and items 6 and 7 now point
     to spec 012 (and to spec 011 for `throttled`) instead of stating rules of
     their own. The status stays `done`.
+
+21. Amended on 2026-10-11 for spec 017 (its Decision 4): a lost connection is
+    `reconnecting` with the connection banner, and a loss before the first
+    snapshot retries as `connecting` (AC-21 and its edge case).
 
 ## Open questions
 
