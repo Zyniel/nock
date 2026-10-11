@@ -1,6 +1,8 @@
 // The rules of joining a room: the nickname rule and what the browser stored.
 // Plain functions: the socket and the page live in RoomPage.svelte.
 
+import { parseObject, readItem, roomRecordKey, writeItem } from './storage'
+
 const NICKNAME_MIN_LENGTH = 2
 const NICKNAME_MAX_LENGTH = 20
 const NICKNAME_PUNCTUATION = " -'’_"
@@ -27,10 +29,6 @@ export function identityKey(code: string): string {
   return `nock.identity.${code}`
 }
 
-export function roomRecordKey(code: string): string {
-  return `nock.room.${code}`
-}
-
 // The same rule as `normalize_nickname` on the server.
 export function checkNickname(text: string): NicknameCheck {
   const nickname = text.normalize('NFC').trim()
@@ -54,39 +52,6 @@ export function checkNickname(text: string): NicknameCheck {
     return { ok: false, reason: 'characters' }
   }
   return { ok: true, nickname }
-}
-
-// Read a stored value; a browser that refuses storage has nothing stored.
-export function readItem(key: string): string | null {
-  try {
-    return localStorage.getItem(key)
-  } catch {
-    return null
-  }
-}
-
-export function writeItem(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value)
-  } catch {
-    // Nothing can be remembered: the page still works.
-  }
-}
-
-export function parseObject(raw: string | null): Record<string, unknown> | null {
-  if (raw === null) {
-    return null
-  }
-  let value: unknown
-  try {
-    value = JSON.parse(raw)
-  } catch {
-    return null
-  }
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return null
-  }
-  return value as Record<string, unknown>
 }
 
 function isFilled(value: unknown): value is string {

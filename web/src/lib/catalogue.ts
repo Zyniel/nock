@@ -1,5 +1,7 @@
 // What the catalogue pages know about a grid, and the progress read from this device.
 
+import { parseObject, readItem, writeItem } from './storage'
+
 export type Progress = 'none' | 'started' | 'finished'
 
 export interface GridSummary {
@@ -28,25 +30,8 @@ export function formatPublishedOn(publishedOn: string): string {
 // Read the progress stored on this device: grid number -> "started" or "finished".
 // Anything unreadable is read as an empty object.
 function readStoredProgress(): Record<string, unknown> {
-  let rawText: string | null = null
-  try {
-    rawText = localStorage.getItem(PROGRESS_STORAGE_KEY)
-  } catch {
-    return {}
-  }
-  if (rawText === null) {
-    return {}
-  }
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(rawText)
-  } catch {
-    return {}
-  }
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    return {}
-  }
-  return parsed as Record<string, unknown>
+  const stored = parseObject(readItem(PROGRESS_STORAGE_KEY))
+  return stored === null ? {} : stored
 }
 
 // Return the progress of one grid on this device.
@@ -80,11 +65,7 @@ export function isGridSummary(value: unknown): value is GridSummary {
 function setProgress(number: number, progress: 'started' | 'finished'): void {
   const stored = readStoredProgress()
   stored[String(number)] = progress
-  try {
-    localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(stored))
-  } catch {
-    // Nothing can be remembered.
-  }
+  writeItem(PROGRESS_STORAGE_KEY, JSON.stringify(stored))
 }
 
 // A grid whose play button was tapped is started, unless it is finished.
@@ -94,6 +75,7 @@ export function markStarted(number: number): void {
   }
 }
 
+// A solved grid is finished for good.
 export function markFinished(number: number): void {
   setProgress(number, 'finished')
 }

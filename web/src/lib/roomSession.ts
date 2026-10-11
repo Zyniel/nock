@@ -309,7 +309,15 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
   if (typeof you !== 'string' || typeof resume_token !== 'string') {
     return null
   }
-  return { type: 'snapshot', seq: message.seq, you, resume_token, grid, players, solved: message.solved === true }
+  return {
+    type: 'snapshot',
+    seq: message.seq,
+    you,
+    resume_token,
+    grid,
+    players,
+    solved: message.solved === true,
+  }
 }
 
 function toEvent(message: Record<string, unknown>): RoomEvent | null {

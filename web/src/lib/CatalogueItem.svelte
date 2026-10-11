@@ -5,10 +5,23 @@
 
   let { summary }: { summary: GridSummary } = $props()
 
-  const progress = $derived(progressOf(summary.number))
-
   let isStarting = $state(false)
   let hasFailed = $state(false)
+  // Bumped to read the progress again from the device.
+  let progressVersion = $state(0)
+
+  const progress = $derived.by(() => {
+    void progressVersion
+    return progressOf(summary.number)
+  })
+
+  // A page restored from the back-forward cache keeps its old state: start again.
+  function onPageShow(event: PageTransitionEvent): void {
+    if (event.persisted) {
+      isStarting = false
+      progressVersion += 1
+    }
+  }
 
   // One tap creates one room; the button stays disabled while the request runs.
   async function play(): Promise<void> {
@@ -24,6 +37,8 @@
     }
   }
 </script>
+
+<svelte:window onpageshow={onPageShow} />
 
 <article
   data-testid="catalogue-item"

@@ -1,7 +1,7 @@
 // The room record kept on this device, `nock.room.<code>` (spec 010): the
 // catalogue number of the room and the selection. Unknown fields are kept.
 
-import { parseObject, readItem, roomRecordKey, writeItem } from './joinRules'
+import { parseObject, readItem, roomRecordKey, writeItem } from './storage'
 import type { Direction } from './wordSelection'
 
 export interface SavedSelection {
