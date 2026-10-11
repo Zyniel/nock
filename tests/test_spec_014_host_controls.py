@@ -2051,6 +2051,7 @@ def test_ac5_websocket_a_silence_disconnect_stops_routing_the_late_frames(
             timeout=WS_DETECTION_SECONDS,
         )
         assert peer_b.close_code == 4408
+        ping_and_wait(peer_a)  # events about B's disconnection are now in
         received_before = len(peer_a.messages())
         before = registry.room_state(code)
         assert before is not None
@@ -2065,7 +2066,10 @@ def test_ac5_websocket_a_silence_disconnect_stops_routing_the_late_frames(
         ping_and_wait(peer_a)
 
         assert letter_changed_events(peer_a) == []
-        assert len(peer_a.messages()) == received_before + 1  # only the pong
+        received_after = peer_a.messages()[received_before:]
+        assert len(received_after) == 1, (  # only the pong
+            f"expected only the pong after the baseline, got {received_after!r}"
+        )
         after = registry.room_state(code)
         assert after is not None
         assert after.seq == before.seq
