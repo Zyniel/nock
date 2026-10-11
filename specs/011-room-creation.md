@@ -458,6 +458,7 @@ The words in brackets say how each criterion is tested.
 - **AC-1** (AC-3.1.1) (HTTP; browser with live server) Creating a room gives a share link and a 6-character room code. HTTP: with a catalogue holding FX-01 as published entry 2, `POST /api/rooms` with `{"grid_number": 2}` answers 201 with a JSON body that parses to `CreateRoomResponse`, whose `code` matches `^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$` and whose `share_url` is `http://testserver/r/<code>`; then `registry.find_room(code)` equals the FX-01 grid and `registry.room_state(code).grid_number == 2`. Browser (all three engines): for a room registered on FX-01, after `enter_room`, `share-link` has `href` and text `<base_url>/r/<code>`. Browser (Chromium only, clipboard, see "Test harness"): clicking `copy-link` puts that same text in the clipboard and shows `fr.json["room.share.copied"]` on the button.
 - **AC-2** (AC-3.1.2) (browser with live server, phone and desktop contexts) The link opens the room on the grid, on phone and desktop, with no install. For a room registered on FX-01, opening its `share_url` path `/r/<code>` with `enter_room` in the phone context and, separately, in the desktop context reaches `data-status="joined"` and `data-grid="5x5"`, and the `grid` element of spec 006 is visible with 25 `cell` elements.
 - **AC-3** (AC-3.1.3) (Python; WebSocket with a fake clock; browser with mocked socket) Room codes are random, not sequential. Ten wrong codes from one address within a minute are throttled. Python: 1,000 calls to `register_room` on one registry give 1,000 distinct codes, all matching the alphabet pattern of AC-1; at each of the 6 positions at least 20 different characters occur; and no code, read as a base-32 number over `ROOM_CODE_ALPHABET`, is exactly 1 more than the code returned just before it. WebSocket: with a registry holding one room `<code>` and a `FakeClock`, ten connections to `/api/rooms/ZZZZZZ/ws` each close with 4404; the eleventh connection, to `/api/rooms/<code>/ws`, closes with 4429 before any message; after `advance(60)` a connection to `<code>` is accepted and its join receives a `Snapshot`. Browser: when the mock closes the socket with 4429, the room page reaches `data-status="throttled"` and `room-status` shows `fr.json["room.status.throttled"]`.
+- **AC-4** (new) (Python with monkeypatched rule functions; WebSocket via TestClient) The room engine keeps its runtime guarantees, so later specs can rely on them. With `tick_seconds` small (for example 0.05) and the rule functions of `nock.room` replaced in the test by recording fakes: (a) `tick` runs repeatedly while at least one connection is attached to a room, and no longer once every connection has left; (b) for one input, the events of the outcome reach every joined connection before the `reply` reaches the sender, and `to_others` reach every joined connection except the sender, in that order; (c) when the last connection leaves, the room's task stops; the next connection starts a new task, which runs one `tick` before any input; (d) when a rule function raises, the error is logged, the room's state is unchanged, and the next input to that room is processed normally; (e) connections are tracked per connection, not per player: two connections attached under one player id are delivered to and detached independently, and detaching one never detaches the other; (f) `close()` stops the engine thread (no `nock-rooms` thread is left alive), a second `close()` does nothing, and any input posted after `close()` is refused without starting a task. Tests close every registry they create, so no engine thread outlives its test.
 
 ## Edge cases and errors
 
@@ -562,6 +563,14 @@ Each one is already part of the spec above.
     (`only_browser("chromium")`), because the clipboard permissions it grants are
     not supported by Playwright's Firefox; the share link itself is checked in all
     three. Not covered: copying on a real phone.
+
+Added after the review, decided by the lead on 2026-10-11 under the human's
+instruction to take technical decisions:
+11. The engine's runtime guarantees become a criterion (AC-4), so a regression in
+    the code every room spec relies on fails the gate. A rule that raises is
+    logged and does not kill the room; connections are keyed per connection.
+12. `RoomConfig` fields are declared exactly as the listing shows; tests pass
+    invalid values through `model_validate` rather than keyword arguments.
 
 ## Open questions
 

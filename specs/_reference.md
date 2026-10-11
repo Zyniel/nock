@@ -66,7 +66,7 @@ the specs whose criteria this one mentions.
 | [008](008-letter-entry.md) | US-2.3 Letter entry | E2 | MVP | 5 | 016 |
 | [009](009-keyboard-navigation.md) | US-2.4 Keyboard and navigation | E2 | MVP | 4 | - |
 | [010](010-instant-solo-start.md) | US-2.5 Instant solo start | E2 | MVP | 6 | - |
-| [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 3 | - |
+| [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 4 | - |
 | [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 7 | - |
 | [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 5 | - |
 | [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 4 | - |
