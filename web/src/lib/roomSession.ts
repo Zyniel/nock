@@ -14,6 +14,8 @@ export type RoomStatus =
   | 'replaced'
   | 'not_found'
   | 'throttled'
+  | 'locked'
+  | 'removed'
   | 'closed'
 
 export type PlayerState = 'active' | 'idle' | 'disconnected'
@@ -81,6 +83,10 @@ export interface PlayerView {
   nickname: string
   colour: number
   state: PlayerState
+  // True for the host of the room (spec 014).
+  is_host: boolean
+  // True while the host muted the player's chat (spec 014, spec 022).
+  muted: boolean
   // `null`: nothing selected, or the player is disconnected.
   selection: PlayerSelection | null
 }
@@ -336,7 +342,15 @@ function toPlayer(value: unknown): PlayerView | null {
     return null
   }
   const selection = toSelection(player.selection)
-  return { player_id, nickname, colour, state: state as PlayerState, selection }
+  return {
+    player_id,
+    nickname,
+    colour,
+    state: state as PlayerState,
+    is_host: player.is_host === true,
+    muted: player.muted === true,
+    selection,
+  }
 }
 
 // Returns null when the value is not a selection of the protocol.
@@ -445,6 +459,20 @@ function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
   const playerId = message.player_id
   if (event.type === 'player_left') {
     snapshot.players = snapshot.players.filter((player) => player.player_id !== playerId)
+    return
+  }
+  if (event.type === 'host_changed') {
+    for (const player of snapshot.players) {
+      player.is_host = player.player_id === playerId
+    }
+    return
+  }
+  if (event.type === 'player_muted') {
+    for (const player of snapshot.players) {
+      if (player.player_id === playerId) {
+        player.muted = message.muted === true
+      }
+    }
     return
   }
   if (event.type === 'player_state_changed') {
@@ -699,6 +727,15 @@ function receiveError(session: RoomSession, message: Record<string, unknown>): v
   if (typeof message.code === 'string' && REFUSAL_ERROR_CODES.includes(message.code)) {
     session.isRefused = true
   }
+  // Locked and removed are final, whatever the page was doing (spec 014).
+  if (message.code === 'room_locked') {
+    session.status = 'locked'
+    return
+  }
+  if (message.code === 'removed') {
+    session.status = 'removed'
+    return
+  }
   if (session.status !== 'joining' && session.status !== 'reconnecting') {
     return
   }
@@ -720,8 +757,8 @@ export function isFinalClose(session: RoomSession, code: number): boolean {
   return isFinalCode || session.isRefused
 }
 
-// The status after a final close. A refusal already set its own status (a full
-// room) or has none yet (locked, removed): it stays as it is.
+// The status after a final close. A refusal already set its own status (full,
+// locked or removed): it stays as it is.
 export function statusAfterFinalClose(code: number, current: RoomStatus): RoomStatus {
   if (code === ROOM_NOT_FOUND_CLOSE_CODE) {
     return 'not_found'

@@ -17,6 +17,7 @@ from nock.grid import Grid, LetterCell
 from nock.protocol import (
     CellLocked,
     CellView,
+    ChangeSettings,
     ChatMessage,
     CheckResult,
     ClientMessage,
@@ -38,6 +39,7 @@ from nock.protocol import (
     Letter,
     LetterCellView,
     LetterChanged,
+    LockRoom,
     Nickname,
     PencilEdit,
     Ping,
@@ -49,6 +51,7 @@ from nock.protocol import (
     PlayerStateChanged,
     PlayerView,
     Pong,
+    RemovePlayer,
     ResumeToken,
     RevealBudget,
     RevealResult,
@@ -75,6 +78,7 @@ MAX_PLAYERS: int = 8  # spec 012 AC-4
 NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
 NICKNAME_MIN_LENGTH: int = 2
 NICKNAME_MAX_LENGTH: int = 20
+_NORMAL_CLOSE_CODE: int = 1000  # a normal closing
 SILENCE_CLOSE_CODE: int = 4408  # spec 017: close code of a silent socket
 DEFAULT_REVEAL_BUDGET: RevealBudget = RevealBudget(letters=5, words=1)  # spec 024
 DEFAULT_SETTINGS: RoomSettings = RoomSettings(
@@ -382,9 +386,9 @@ def join_room(
 ) -> Outcome:
     """Apply a join on a connection that has not joined yet.
 
-    The steps run in this order and the first that applies ends the join: resume
-    of a known player, room full, invalid nickname, new player. Spec 014 adds
-    the removed and locked refusals. A token whose player has been disconnected
+    The steps run in this order and the first that applies ends the join:
+    removed token, resume of a known player, room locked, room full, invalid
+    nickname, new player. A token whose player has been disconnected
     for more than the resume window does not resume: that player times out in
     this same step and the join goes on as a new player.
 
@@ -399,6 +403,11 @@ def join_room(
     Returns:
         The outcome. A success replies with the snapshot of the player.
     """
+    if _is_removed_token(state, message.resume_token):
+        refusal = ErrorMessage(
+            code=ErrorCode.REMOVED, message="You were removed from this room."
+        )
+        return Outcome(state=state, reply=(refusal,), close_sender=True)
     resumed = _find_by_token(state, message.resume_token)
     timeout_entries: tuple[LogEntry, ...] = ()
     if resumed is not None and _has_timed_out(resumed, now, config):
@@ -420,7 +429,12 @@ def _join_as_new_player(
     new_player_id: str,
     new_resume_token: str,
 ) -> Outcome:
-    """Run the steps of a join that does not resume: full, nickname, new player."""
+    """Run the steps of a join that does not resume: locked, full, nickname, add."""
+    if state.settings.locked:
+        refusal = ErrorMessage(
+            code=ErrorCode.ROOM_LOCKED, message="The room is locked."
+        )
+        return Outcome(state=state, reply=(refusal,), close_sender=True)
     if len(state.players) >= MAX_PLAYERS:
         refusal = ErrorMessage(code=ErrorCode.ROOM_FULL, message="The room is full.")
         return Outcome(state=state, reply=(refusal,), close_sender=True)
@@ -430,6 +444,16 @@ def _join_as_new_player(
         refusal = ErrorMessage(code=ErrorCode.INVALID_NICKNAME, message=str(error))
         return Outcome(state=state, reply=(refusal,))
     return _add_player(state, nickname, now, new_player_id, new_resume_token)
+
+
+def _is_removed_token(state: RoomState, token: str | None) -> bool:
+    """Tell whether the host removed the player who owns `token`."""
+    if token is None:
+        return False
+    for removed_token in state.removed_tokens:
+        if secrets.compare_digest(removed_token, token):
+            return True
+    return False
 
 
 def _has_timed_out(player: PlayerRecord, now: float, config: RoomConfig) -> bool:
@@ -703,7 +727,114 @@ def _apply_message(
         return _undo(state, player_id, now)
     if isinstance(message, SelectCell):
         return _select_cell(state, player_id, message)
+    if isinstance(message, RemovePlayer | LockRoom | ChangeSettings):
+        return _host_action(state, player_id, message, now)
     return Outcome(state=state)
+
+
+def _host_action(
+    state: RoomState,
+    player_id: str,
+    message: RemovePlayer | LockRoom | ChangeSettings,
+    now: float,
+) -> Outcome:
+    """Run a host action, or refuse it with not_host for any other player."""
+    sender = _find_player(state, player_id)
+    if sender is None or not sender.is_host:
+        return _refuse(state, ErrorCode.NOT_HOST, "Only the host can do this.")
+    if isinstance(message, RemovePlayer):
+        return _remove_player(state, sender, message.player_id, now)
+    if isinstance(message, LockRoom):
+        return _lock_room(state, sender, message.locked, now)
+    return _change_settings(state, sender, message, now)
+
+
+def _remove_player(
+    state: RoomState, host: PlayerRecord, target_id: str, now: float
+) -> Outcome:
+    """Remove a player, ban their token and close their connection."""
+    target = _find_player(state, target_id)
+    if target is None or target.player_id == host.player_id:
+        return _refuse(
+            state, ErrorCode.INVALID_TARGET, "That player cannot be removed."
+        )
+    left = PlayerLeft(
+        seq=state.seq + 1, player_id=target_id, reason=LeaveReason.REMOVED
+    )
+    entry = LogEntry(at=now, event=left)
+    removal = Disconnect(
+        player_id=target_id,
+        close_code=_NORMAL_CLOSE_CODE,
+        error=ErrorMessage(
+            code=ErrorCode.REMOVED, message="You were removed from this room."
+        ),
+    )
+    return Outcome(state=replay(state, entry), entries=(entry,), disconnects=(removal,))
+
+
+def _announce_settings(
+    state: RoomState,
+    host: PlayerRecord,
+    settings: RoomSettings,
+    reveal_budget: RevealBudget,
+    now: float,
+) -> Outcome:
+    """Number a settings_changed event and apply it."""
+    event = SettingsChanged(
+        seq=state.seq + 1,
+        player_id=host.player_id,
+        settings=settings,
+        reveal_budget=reveal_budget,
+    )
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=replay(state, entry), entries=(entry,))
+
+
+def _lock_room(
+    state: RoomState, host: PlayerRecord, locked: bool, now: float
+) -> Outcome:
+    """Lock or unlock the room; nothing happens when it already is so."""
+    if locked == state.settings.locked:
+        return Outcome(state=state)
+    settings = state.settings.model_copy(update={"locked": locked})
+    return _announce_settings(state, host, settings, state.reveal_budget, now)
+
+
+def _remaining_count(old_allowance: int, old_remaining: int, new_allowance: int) -> int:
+    """Return the new allowance minus what was used, never below 0."""
+    used = old_allowance - old_remaining
+    return max(0, new_allowance - used)
+
+
+def _change_settings(
+    state: RoomState, host: PlayerRecord, message: ChangeSettings, now: float
+) -> Outcome:
+    """Change the help mode and the reveal allowance, keeping what was used."""
+    current = state.settings
+    if (
+        message.help_mode == current.help_mode
+        and message.reveal_budget == current.reveal_budget
+    ):
+        return Outcome(state=state)
+    settings = current.model_copy(
+        update={
+            "help_mode": message.help_mode,
+            "reveal_budget": message.reveal_budget,
+        }
+    )
+    remaining = RevealBudget(
+        letters=_remaining_count(
+            current.reveal_budget.letters,
+            state.reveal_budget.letters,
+            message.reveal_budget.letters,
+        ),
+        words=_remaining_count(
+            current.reveal_budget.words,
+            state.reveal_budget.words,
+            message.reveal_budget.words,
+        ),
+    )
+    return _announce_settings(state, host, settings, remaining, now)
 
 
 def _select_cell(state: RoomState, player_id: str, message: SelectCell) -> Outcome:
@@ -1021,8 +1152,10 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
             entries.extend(step.entries)
     idle_step = _idle_step(current, now, config)
     entries.extend(idle_step.entries)
+    handover_step = _handover_step(idle_step.state, now, config)
+    entries.extend(handover_step.entries)
     return Outcome(
-        state=idle_step.state,
+        state=handover_step.state,
         entries=tuple(entries),
         to_others=tuple(to_others),
         disconnects=tuple(disconnects),
@@ -1044,6 +1177,35 @@ def _idle_step(state: RoomState, now: float, config: RoomConfig) -> Outcome:
         current = step.state
         entries.extend(step.entries)
     return Outcome(state=current, entries=tuple(entries))
+
+
+def _handover_step(state: RoomState, now: float, config: RoomConfig) -> Outcome:
+    """Give the host role to a connected player after the host stayed away."""
+    for host in state.players:
+        if not host.is_host or host.state != PlayerState.DISCONNECTED:
+            continue
+        if host.disconnected_at is None:
+            continue
+        if now - host.disconnected_at <= config.host_handover_seconds:
+            continue
+        new_host = _longest_present_connected(state)
+        if new_host is None:
+            continue
+        changed = HostChanged(seq=state.seq + 1, player_id=new_host.player_id)
+        entry = LogEntry(at=now, event=changed)
+        return Outcome(state=replay(state, entry), entries=(entry,))
+    return Outcome(state=state)
+
+
+def _longest_present_connected(state: RoomState) -> PlayerRecord | None:
+    """Return the connected player with the smallest `joined_seq`, or None."""
+    best: PlayerRecord | None = None
+    for player in state.players:
+        if player.state == PlayerState.DISCONNECTED:
+            continue
+        if best is None or player.joined_seq < best.joined_seq:
+            best = player
+    return best
 
 
 def replay(state: RoomState, entry: LogEntry) -> RoomState:

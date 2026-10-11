@@ -38,6 +38,7 @@
 
   const COPIED_DISPLAY_MS = 2000
   const UNDO_MESSAGE_MS = 3000
+  const MAX_REVEAL_COUNT = 99
 
   let { code }: { code: string } = $props()
 
@@ -180,6 +181,55 @@
     if (socket !== null && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify(message))
     }
+  }
+
+  // ---- Host controls (spec 014) ----
+
+  let isHost = $derived(
+    session.snapshot !== null &&
+      session.snapshot.players.some(
+        (player) => player.player_id === session.snapshot?.you && player.is_host,
+      ),
+  )
+  let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
+
+  // The settings form shows the settings of the room; it follows each change.
+  let helpModeInput = $state('free')
+  let lettersInput: number | null = $state(5)
+  let wordsInput: number | null = $state(1)
+  $effect(() => {
+    if (session.snapshot === null) {
+      return
+    }
+    const { help_mode, letters, words } = session.snapshot.settings
+    helpModeInput = help_mode
+    lettersInput = letters
+    wordsInput = words
+  })
+
+  // True for a whole number from 0 to 99.
+  function isValidCount(value: number | null): value is number {
+    return value !== null && Number.isInteger(value) && value >= 0 && value <= MAX_REVEAL_COUNT
+  }
+
+  function removePlayer(playerId: string): void {
+    send({ type: 'remove_player', player_id: playerId })
+  }
+
+  function toggleLock(): void {
+    send({ type: 'lock_room', locked: !isLocked })
+  }
+
+  function submitSettings(event: SubmitEvent): void {
+    event.preventDefault()
+    if (!isValidCount(lettersInput) || !isValidCount(wordsInput)) {
+      return
+    }
+    send({
+      type: 'change_settings',
+      help_mode: helpModeInput,
+      reveal_budget: { letters: lettersInput, words: wordsInput },
+    })
   }
 
   // Check the nickname typed in the form, and join with it when it is valid.
@@ -674,6 +724,7 @@
             data-colour={String(player.colour)}
             data-state={player.state}
             data-you={String(isYou)}
+            data-host={String(player.is_host)}
           >
             <span
               class="roster-colour"
@@ -684,8 +735,19 @@
             <span class="roster-state" data-testid="roster-state"
               >{t(`presence.${player.state}`)}</span
             >
+            {#if player.is_host}
+              <span class="roster-host">{t('roster.host')}</span>
+            {/if}
             {#if isYou}
               <span class="roster-you">{t('roster.you')}</span>
+            {:else if isHost}
+              <button
+                type="button"
+                class="remove-player"
+                data-testid="remove-player"
+                aria-label={t('host.remove_label', { name: player.nickname })}
+                onclick={() => removePlayer(player.player_id)}>{t('host.remove')}</button
+              >
             {/if}
           </li>
         {/each}
@@ -701,6 +763,47 @@
         {/each}
       </ul>
     </section>
+    {#if isHost}
+      <div class="host-panel" data-testid="host-panel">
+        <strong class="host-heading">{t('settings.heading')}</strong>
+        <button type="button" data-testid="lock-room" aria-pressed={isLocked} onclick={toggleLock}
+          >{isLocked ? t('host.unlock') : t('host.lock')}</button
+        >
+        <form class="settings-form" data-testid="settings-form" onsubmit={submitSettings}>
+          <label>
+            {t('settings.help_mode_label')}
+            <select data-testid="help-mode-select" bind:value={helpModeInput}>
+              <option value="free">{t('settings.help_mode.free')}</option>
+              <option value="vote">{t('settings.help_mode.vote')}</option>
+              <option value="none">{t('settings.help_mode.none')}</option>
+            </select>
+          </label>
+          <label>
+            {t('settings.reveal_letters_label')}
+            <input
+              type="number"
+              data-testid="reveal-letters-input"
+              min="0"
+              max="99"
+              step="1"
+              bind:value={lettersInput}
+            />
+          </label>
+          <label>
+            {t('settings.reveal_words_label')}
+            <input
+              type="number"
+              data-testid="reveal-words-input"
+              min="0"
+              max="99"
+              step="1"
+              bind:value={wordsInput}
+            />
+          </label>
+          <button type="submit" data-testid="settings-save">{t('settings.save')}</button>
+        </form>
+      </div>
+    {/if}
     </div>
     <GridViewport
       bind:this={gridViewport}
@@ -859,6 +962,38 @@
     opacity: 0.45;
   }
 
+  .roster-host {
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+
+  .remove-player {
+    padding: 0 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  /* One compact row of controls for the host; it wraps on a roomy window and
+     scrolls sideways on a small one. */
+  .host-panel {
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .settings-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+  }
+
+  .settings-form input[type='number'] {
+    width: 3.5rem;
+  }
+
   /* A short list that scrolls: the grid keeps the height (spec 006). */
   .feed {
     flex: none;
@@ -946,6 +1081,27 @@
       line-height: 1.3rem;
     }
 
+    .host-panel,
+    .settings-form {
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    .host-panel {
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .host-panel button,
+    .host-panel select,
+    .host-panel input,
+    .remove-player {
+      height: 1.2rem;
+      box-sizing: border-box;
+      padding-block: 0;
+      font-size: 0.75rem;
+    }
+
     .feed li {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -970,8 +1126,10 @@
     }
 
     .roster,
-    .feed {
+    .feed,
+    .host-panel {
       flex: 1 1 0;
+      min-width: 0;
     }
   }
 </style>
