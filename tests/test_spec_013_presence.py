@@ -29,7 +29,7 @@ from typing import Protocol
 
 import pytest
 from fastapi.testclient import TestClient
-from playwright.sync_api import Locator, Page, WebSocketRoute, expect
+from playwright.sync_api import Browser, Locator, Page, WebSocketRoute, expect
 from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
@@ -115,6 +115,43 @@ SETTLE_MS = 400
 DRAW_BUDGET_MS = 300
 FORM_TIMEOUT_MS = 5000
 FEED_LIMIT = 100
+TAP_TIMEOUT_MS = 3000
+MIN_GRID_VIEWPORT_PX = 100.0
+EPSILON = 1.0
+WINDOW_SIZES = [
+    (320, 568),
+    (568, 320),
+    (360, 740),
+    (740, 360),
+    (768, 1024),
+    (1024, 768),
+    (1280, 800),
+    (1920, 1080),
+]
+EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
+
+# Makes `matchMedia("(pointer: coarse)")` report a match, other queries unchanged
+# (the script of spec 009, for the touch contexts of Firefox and WebKit).
+COARSE_POINTER_SCRIPT = r"""
+(() => {
+  const original = window.matchMedia.bind(window);
+  window.matchMedia = (query) => {
+    const result = original(query);
+    if (query.replace(/\s/g, '') !== '(pointer:coarse)') {
+      return result;
+    }
+    return new Proxy(result, {
+      get(target, property) {
+        if (property === 'matches') {
+          return true;
+        }
+        const value = target[property];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
+})();
+"""
 
 # A room that never times a silent socket out, so that only idleness changes.
 QUIET_CONFIG = RoomConfig(tick_seconds=TICK_SECONDS, silence_timeout_seconds=3600)
@@ -361,7 +398,22 @@ def test_ac1_ping_and_join_are_not_input(fx01_grid: Grid, message: Ping | Join) 
     assert player.last_input_at == NOW
 
 
-INPUT_MESSAGES = [
+InputMessage = (
+    SelectCell
+    | EditLetter
+    | Erase
+    | PencilEdit
+    | ConfirmPencil
+    | Undo
+    | Check
+    | Reveal
+    | Vote
+    | Flag
+    | Chat
+    | LockRoom
+)
+
+INPUT_MESSAGES: list[InputMessage] = [
     SelectCell(row=1, column=1, direction=Direction.DOWN),
     EditLetter(row=1, column=0, letter="T"),
     Erase(row=1, column=0),
@@ -379,7 +431,7 @@ INPUT_MESSAGES = [
 
 @pytest.mark.parametrize("message", INPUT_MESSAGES, ids=lambda m: m.type)
 def test_ac1_any_other_message_is_input_and_reactivates_before_its_own_effect(
-    fx01_grid: Grid, message: SelectCell | EditLetter | Erase | Undo
+    fx01_grid: Grid, message: InputMessage
 ) -> None:
     idle = idle_room(fx01_grid)
 
@@ -426,6 +478,34 @@ def test_ac1_a_resumed_player_starts_active_with_a_fresh_last_input(
     player = player_of(outcome.state, "p1")
     assert player.state is PlayerState.ACTIVE
     assert player.last_input_at == NOW + 200
+
+
+def test_ac1_a_resumed_idle_player_starts_active_with_an_entry(
+    fx01_grid: Grid,
+) -> None:
+    idle = idle_room(fx01_grid)
+
+    outcome = join_room(
+        idle,
+        Join(nickname="Ana", resume_token=token_of(1)),
+        NOW + 130,
+        "new-id",
+        "new-token-0000000000",
+        QUIET_CONFIG,
+    )
+
+    assert events_of(outcome.entries) == [
+        state_event(idle.seq + 1, "p1", PlayerState.ACTIVE)
+    ]
+    player = player_of(outcome.state, "p1")
+    assert player.state is PlayerState.ACTIVE
+    assert player.last_input_at == NOW + 130
+    assert player_of(outcome.state, "p2").state is PlayerState.IDLE
+    snapshots = [m for m in outcome.reply if isinstance(m, Snapshot)]
+    assert len(snapshots) == 1
+    views = {view.player_id: view for view in snapshots[0].players}
+    assert views["p1"].state is PlayerState.ACTIVE
+    assert views["p2"].state is PlayerState.IDLE
 
 
 # ---- AC-1: the idle state through the real WebSocket -------------------------
@@ -692,6 +772,61 @@ def test_ac1_websocket_a_ping_does_not_wake_an_idle_player(
 
         assert not has_state_change(peer_b, a_id, PlayerState.ACTIVE)
         assert not has_state_change(peer_a, a_id, PlayerState.ACTIVE)
+
+
+def open_resumed_peer(
+    stack: contextlib.ExitStack, client: TestClient, code: str, token: str
+) -> Peer:
+    """Open a new socket that resumes with `token`; return once its snapshot came."""
+    websocket = stack.enter_context(client.websocket_connect(socket_url(code)))
+    peer = Peer(websocket)
+    peer.send(Join(nickname="Ana", resume_token=token))
+    peer.wait_until(
+        lambda: any(isinstance(m, Snapshot) for m in peer.messages()),
+        "the snapshot of the resumed player",
+    )
+    return peer
+
+
+def test_ac1_websocket_a_resumed_idle_player_is_active_on_a_new_socket(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, QUIET_CONFIG) as (
+            client,
+            registry,
+            code,
+        ),
+        contextlib.ExitStack() as stack,
+        contextlib.ExitStack() as a_stack,
+        contextlib.ExitStack() as resumed_stack,
+    ):
+        peer_a, peer_b = join_two(a_stack, stack, client, code)
+        a_id = peer_a.snapshot().you
+        a_token = peer_a.snapshot().resume_token
+        fake_clock.advance(120)
+        peer_b.wait_until(
+            lambda: has_state_change(peer_b, a_id, PlayerState.IDLE),
+            "A idle on B",
+            WS_DETECTION_SECONDS,
+        )
+        fake_clock.advance(10)
+
+        resumed = open_resumed_peer(resumed_stack, client, code, a_token)
+
+        assert resumed.snapshot().you == a_id
+        views = {view.player_id: view for view in resumed.snapshot().players}
+        assert views[a_id].state is PlayerState.ACTIVE
+        peer_b.wait_until(
+            lambda: has_state_change(peer_b, a_id, PlayerState.ACTIVE),
+            "A active again on B",
+            WS_DETECTION_SECONDS,
+        )
+        state = registry.room_state(code)
+        assert state is not None
+        player = player_of(state, a_id)
+        assert player.state is PlayerState.ACTIVE
+        assert player.last_input_at == fake_clock.now
 
 
 # ---- AC-1: the roster in the browser -------------------------------------------
@@ -1089,6 +1224,43 @@ def test_ac2_an_idle_player_keeps_their_selection(fx01_grid: Grid) -> None:
     )
 
 
+def test_ac2_a_tick_disconnecting_a_silent_player_clears_and_relays_the_selection(
+    fx01_grid: Grid,
+) -> None:
+    config = RoomConfig(tick_seconds=TICK_SECONDS, silence_timeout_seconds=6)
+    room = room_of_players(fx01_grid, 2)
+    moved = handle_message(
+        room, "p1", SelectCell(row=2, column=3, direction=Direction.DOWN), NOW
+    )
+    awake = handle_message(moved.state, "p2", Ping(), NOW + 3)
+
+    outcome = tick(awake.state, NOW + 6, config)
+
+    assert events_of(outcome.entries) == [
+        state_event(awake.state.seq + 1, "p1", PlayerState.DISCONNECTED)
+    ]
+    assert outcome.to_others == (SelectionMoved(player_id="p1", selection=None),)
+    silent = player_of(outcome.state, "p1")
+    assert silent.state is PlayerState.DISCONNECTED
+    assert silent.selection is None
+    assert player_of(outcome.state, "p2").state is PlayerState.ACTIVE
+
+
+def test_ac2_a_tick_disconnecting_a_silent_player_without_selection_relays_nothing(
+    fx01_grid: Grid,
+) -> None:
+    config = RoomConfig(tick_seconds=TICK_SECONDS, silence_timeout_seconds=6)
+    room = room_of_players(fx01_grid, 2)
+    awake = handle_message(room, "p2", Ping(), NOW + 3)
+
+    outcome = tick(awake.state, NOW + 6, config)
+
+    assert events_of(outcome.entries) == [
+        state_event(awake.state.seq + 1, "p1", PlayerState.DISCONNECTED)
+    ]
+    assert outcome.to_others == ()
+
+
 # ---- AC-2: selections through the real WebSocket -------------------------------------
 
 
@@ -1198,6 +1370,42 @@ def test_ac2_websocket_a_joiner_sees_the_current_selections_and_a_leaver_clears_
             assert view_of_a.state is PlayerState.DISCONNECTED
 
 
+def test_ac2_websocket_a_silent_player_has_their_selection_cleared_for_the_others(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    config = RoomConfig(tick_seconds=TICK_SECONDS, silence_timeout_seconds=6)
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, config) as (
+            client,
+            _registry,
+            code,
+        ),
+        contextlib.ExitStack() as stack,
+        contextlib.ExitStack() as a_stack,
+    ):
+        peer_a, peer_b = join_two(a_stack, stack, client, code)
+        a_id = peer_a.snapshot().you
+        peer_a.send(SelectCell(row=3, column=2, direction=Direction.DOWN))
+        peer_b.wait_until(lambda: len(selection_events(peer_b)) == 1, "A's selection")
+        fake_clock.advance(3)
+        ping_and_wait(peer_b)
+
+        fake_clock.advance(3)
+
+        peer_b.wait_until(
+            lambda: len(selection_events(peer_b)) == 2,
+            "the clearing of A's selection",
+            WS_DETECTION_SECONDS,
+        )
+        tail = peer_b.events()[-2:]
+        assert tail == [
+            PlayerStateChanged(seq=3, player_id=a_id, state=PlayerState.DISCONNECTED),
+            SelectionMoved(player_id=a_id, selection=None),
+        ]
+        time.sleep(SETTLE_SECONDS)
+        assert selection_events(peer_a) == []
+
+
 # ---- AC-2, AC-3, AC-4: selections in the browser ----
 
 
@@ -1251,6 +1459,23 @@ def border_of(locator: Locator) -> tuple[str, str, float]:
     return style, colour, float(width.removesuffix("px"))
 
 
+def start_outline_log(page: Page, selector: str) -> None:
+    """Record in the page the time at which `selector` first matches an element."""
+    page.evaluate(
+        """selector => {
+            window.__outlineDrawnAt = null;
+            const observer = new MutationObserver(() => {
+                const drawn = document.querySelector(selector) !== null;
+                if (drawn && window.__outlineDrawnAt === null) {
+                    window.__outlineDrawnAt = performance.now();
+                }
+            });
+            observer.observe(document.body, { subtree: true, childList: true });
+        }""",
+        selector,
+    )
+
+
 def test_ac2_browser_the_outline_appears_within_300_ms_of_the_move(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
@@ -1260,12 +1485,20 @@ def test_ac2_browser_the_outline_appears_within_300_ms_of_the_move(
         fx01_grid,
         [player_view("p1", "Ana", 0, is_host=True), player_view("p2", "Bob", 3)],
     )
-    outline = cell_at(page, 2, 2).get_by_test_id("remote-selection")
-    expect(outline).to_have_count(0)
+    selector = (
+        '[data-testid="cell"][data-row="2"][data-column="2"] '
+        '[data-testid="remote-selection"]'
+    )
+    expect(page.locator(selector)).to_have_count(0)
+    start_outline_log(page, selector)
+    sent_at = float(page.evaluate("() => performance.now()"))
 
     mock.send(selection_frame("p2", 2, 2, Direction.ACROSS))
 
-    expect(outline).to_have_count(1, timeout=DRAW_BUDGET_MS)
+    expect(page.locator(selector)).to_have_count(1, timeout=WAIT_TIMEOUT_MS)
+    drawn_at = page.evaluate("() => window.__outlineDrawnAt")
+    assert drawn_at is not None
+    assert float(drawn_at) - sent_at <= DRAW_BUDGET_MS
 
 
 def test_ac2_browser_the_selection_of_another_player_is_outlined_and_tinted(
@@ -2065,3 +2298,108 @@ def test_ac5_fr_json_has_the_feed_texts() -> None:
     assert fr["settings.help_mode.free"] == "libre"
     assert fr["settings.help_mode.vote"] == "par vote"
     assert fr["settings.help_mode.none"] == "désactivée"
+
+
+# ---- AC-6: the roster and the feed keep the grid's room ----
+
+
+def make_page(
+    browser: Browser, browser_name: str, width: int, height: int, touch: bool
+) -> tuple[Page, Callable[[], None]]:
+    """Open a desktop or touch page (spec 009's harness); return it and its closer."""
+    viewport = {"width": width, "height": height}
+    if not touch:
+        context = browser.new_context(viewport=viewport)
+    elif browser_name == "firefox":
+        context = browser.new_context(
+            viewport=viewport, has_touch=True, device_scale_factor=2
+        )
+    else:
+        context = browser.new_context(
+            viewport=viewport,
+            has_touch=True,
+            is_mobile=True,
+            device_scale_factor=2,
+        )
+    if touch and browser_name != "chromium":
+        context.add_init_script(COARSE_POINTER_SCRIPT)
+    return context.new_page(), context.close
+
+
+def eight_players() -> list[PlayerView]:
+    players = [player_view("p1", "Ana", 0, is_host=True)]
+    for number in range(2, 9):
+        players.append(
+            player_view(f"p{number}", EIGHT_NICKNAMES[number - 1], number - 1)
+        )
+    return players
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac6_browser_the_roster_and_the_feed_keep_the_grids_room(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = make_page(browser, browser_name, width, height, touch)
+    try:
+        last_seq = 5 + FEED_LIMIT
+        mock = open_room(page, live_server, fx01_grid, eight_players(), seq=5)
+        for seq in range(6, last_seq + 1):
+            mock.send(check_frame(seq, "p2", GridTarget()))
+        expect(page.get_by_test_id("room-page")).to_have_attribute(
+            "data-seq", str(last_seq)
+        )
+
+        cell = cell_at(page, 3, 1)
+        if touch:
+            cell.tap(timeout=TAP_TIMEOUT_MS)
+        else:
+            cell.click(timeout=TAP_TIMEOUT_MS)
+
+        bar = page.get_by_test_id("clue-bar")
+        expect(bar).to_have_attribute("data-word", "3,0,0")
+        viewport = page.get_by_test_id("grid-viewport")
+        viewport_box = viewport.bounding_box()
+        bar_box = bar.bounding_box()
+        assert viewport_box is not None
+        assert bar_box is not None
+        sizes = page.evaluate(
+            "() => [document.documentElement.scrollWidth, window.innerWidth,"
+            " document.documentElement.scrollHeight, window.innerHeight]"
+        )
+        scroll_width, window_width, scroll_height, window_height = sizes
+
+        assert viewport_box["height"] >= MIN_GRID_VIEWPORT_PX
+        assert scroll_width <= window_width
+        assert scroll_height <= window_height
+        expect(viewport).to_have_attribute("data-zoom", "1")
+        grid_box = page.get_by_test_id("grid").bounding_box()
+        assert grid_box is not None
+        assert grid_box["x"] >= viewport_box["x"] - EPSILON
+        assert grid_box["y"] >= viewport_box["y"] - EPSILON
+        grid_right = grid_box["x"] + grid_box["width"]
+        grid_bottom = grid_box["y"] + grid_box["height"]
+        assert grid_right <= viewport_box["x"] + viewport_box["width"] + EPSILON
+        assert grid_bottom <= viewport_box["y"] + viewport_box["height"] + EPSILON
+        assert bar_box["x"] >= -EPSILON
+        assert bar_box["x"] + bar_box["width"] <= window_width + EPSILON
+        assert bar_box["y"] >= -EPSILON
+        bar_bottom = bar_box["y"] + bar_box["height"]
+        assert bar_bottom <= window_height + EPSILON
+        if touch:
+            keyboard_box = page.get_by_test_id("keyboard").bounding_box()
+            assert keyboard_box is not None
+            assert bar_bottom <= keyboard_box["y"] + EPSILON
+            keyboard_bottom = keyboard_box["y"] + keyboard_box["height"]
+            assert keyboard_bottom <= window_height + EPSILON
+    finally:
+        close()
