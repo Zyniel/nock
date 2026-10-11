@@ -131,6 +131,8 @@ class _RoomsHolder:
         with self._lock:
             if self._registry is not None and self._is_created_here:
                 self._registry.close()
+                self._registry = None
+                self._is_created_here = False
 
 
 def _not_found() -> HTTPException:

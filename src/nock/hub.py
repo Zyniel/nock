@@ -25,7 +25,6 @@ from nock.protocol import (
 )
 from nock.room import (
     Clock,
-    LogEntry,
     Outcome,
     RoomConfig,
     RoomState,
@@ -52,6 +51,7 @@ _REFUSAL_TEXTS: dict[ErrorCode, str] = {
 }
 
 _NORMAL_CLOSE_CODE = 1000
+_INTERNAL_ERROR_CLOSE_CODE = 1011  # the server could not save the join
 _STOP_TIMEOUT_SECONDS = 5.0
 
 
@@ -177,7 +177,6 @@ class _RoomRunner:
                 room, None when that is not known.
         """
         self.state = state
-        self.log: list[LogEntry] = []
         self._config = config
         self._clock = clock
         self._connections: list[RoomConnection] = []
@@ -325,6 +324,8 @@ class _RoomRunner:
             logger.exception("A join in room %s failed", self.state.code)
             return
         if not self._store_and_deliver(outcome, connection, joined):
+            # The player is not in the room: do not leave the joiner waiting.
+            connection.deliver_close(_INTERNAL_ERROR_CLOSE_CODE)
             return
         for reply in outcome.reply:
             if isinstance(reply, Snapshot):
@@ -347,21 +348,30 @@ class _RoomRunner:
         self._connections.append(connection)
 
     def _detach_step(self, leaving: RoomConnection) -> None:
-        """Remove one connection; the player leaves with their last connection."""
+        """Remove one connection; the player leaves with their last connection.
+
+        When the player's disconnection cannot be committed, the connection
+        stays registered: the room still shows the player as active, so it
+        still has a connection for them (a resume of the player replaces it).
+        """
         if leaving not in self._connections:
             return
-        self._connections.remove(leaving)
-        for other in self._connections:
+        others = [other for other in self._connections if other is not leaving]
+        is_last_of_player = True
+        for other in others:
             if other.player_id == leaving.player_id:
+                is_last_of_player = False
+        if is_last_of_player and leaving.player_id is not None:
+            try:
+                outcome = disconnect_player(
+                    self.state, leaving.player_id, self._clock()
+                )
+            except Exception:
+                logger.exception("A disconnection in room %s failed", self.state.code)
                 return
-        if leaving.player_id is None:
-            return
-        try:
-            outcome = disconnect_player(self.state, leaving.player_id, self._clock())
-        except Exception:
-            logger.exception("A disconnection in room %s failed", self.state.code)
-            return
-        self._store_and_deliver(outcome, None, list(self._connections))
+            if not self._store_and_deliver(outcome, None, others):
+                return
+        self._connections.remove(leaving)
 
     def _store_and_deliver(
         self,
@@ -392,7 +402,6 @@ class _RoomRunner:
                 logger.exception("The log of room %s failed", self.state.code)
                 return False
         self.state = outcome.state
-        self.log.extend(outcome.entries)
         self._events_since_snapshot += len(outcome.entries)
 
         for entry in outcome.entries:
@@ -572,11 +581,13 @@ class RoomRegistry:
             # Waiting for ourselves would block: the engine stops afterwards.
             self._stop_task = loop.create_task(self._cancel_runners_and_stop())
             return
-        stopping = asyncio.run_coroutine_threadsafe(self._cancel_runners(), loop)
-        stopping.result(timeout=_STOP_TIMEOUT_SECONDS)
-        loop.call_soon_threadsafe(loop.stop)
-        thread.join(timeout=_STOP_TIMEOUT_SECONDS)
-        self._finish()
+        try:
+            stopping = asyncio.run_coroutine_threadsafe(self._cancel_runners(), loop)
+            stopping.result(timeout=_STOP_TIMEOUT_SECONDS)
+        finally:
+            loop.call_soon_threadsafe(loop.stop)
+            thread.join(timeout=_STOP_TIMEOUT_SECONDS)
+            self._finish()
 
     def _is_taken(self, code: str) -> bool:
         """Tell whether a room has this code, live or only in the store.
