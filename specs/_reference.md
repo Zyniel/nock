@@ -72,7 +72,7 @@ the specs whose criteria this one mentions.
 | [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 4 | - |
 | [015](015-shared-letters.md) | US-4.1 Shared letters | E4 | MVP | 4 | - |
 | [016](016-same-cell-conflicts.md) | US-4.2 Same-cell conflicts | E4 | MVP | 3 | - |
-| [017](017-reconnection.md) | US-4.3 Disconnection and reconnection | E4 | MVP | 4 | - |
+| [017](017-reconnection.md) | US-4.3 Disconnection and reconnection | E4 | MVP | 5 | - |
 | [018](018-durable-room-state.md) | US-4.4 Durable room state | E4 | MVP | 4 | - |
 | [019](019-authorship-view.md) | US-5.1 Authorship view | E5 | V1 | 3 | 028 |
 | [020](020-pencil-letters.md) | US-5.2 Pencil letters | E5 | V1 | 3 | 026 |

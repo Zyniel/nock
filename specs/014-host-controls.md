@@ -158,6 +158,11 @@ The words in brackets say how each criterion is tested.
 
 ## Edge cases and errors
 
+Note from the lead (2026-10-11, from the spec 017 review): after `room_locked`
+or `removed` during a reconnection, spec 017 ends the attempts but the page
+stays on `reconnecting` with the banner. This spec must give those two cases
+their final status and text, and hide the banner.
+
 - Removing a disconnected player (AC-1): allowed; their token is banned and their
   seat freed; no socket to close.
 - Removed then another browser (AC-1): a join with no token, or a different token,
