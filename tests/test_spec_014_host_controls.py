@@ -2075,6 +2075,60 @@ def test_ac5_websocket_a_silence_disconnect_stops_routing_the_late_frames(
             assert cell.letter is None
 
 
+def test_ac5_websocket_a_new_socket_after_a_silence_close_is_routed_again(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    config = RoomConfig(tick_seconds=TICK_SECONDS)
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, config) as (
+            client,
+            _registry,
+            code,
+        ),
+        contextlib.ExitStack() as a_stack,
+        contextlib.ExitStack() as b_stack,
+        contextlib.ExitStack() as new_b_stack,
+    ):
+        peer_a, peer_b = join_in_order([a_stack, b_stack], client, code)
+        b_id = peer_b.snapshot().you
+        b_token = peer_b.snapshot().resume_token
+        peer_b.send(
+            SelectCell(row=LETTER_ROW, column=LETTER_COLUMN, direction=Direction.ACROSS)
+        )
+        ping_and_wait(peer_b)
+        fake_clock.advance(3)
+        ping_and_wait(peer_a)
+        fake_clock.advance(3)
+        peer_a.wait_until(
+            lambda: has_state_change(peer_a, b_id, PlayerState.DISCONNECTED),
+            "the silence disconnection of B",
+            timeout=WS_DETECTION_SECONDS,
+        )
+        peer_b.wait_until(
+            lambda: peer_b.close_code is not None,
+            "the silence close of B",
+            timeout=WS_DETECTION_SECONDS,
+        )
+        assert peer_b.close_code == 4408
+
+        new_b = open_peer(new_b_stack, client, code, NICKNAMES[1], b_token)
+        assert new_b.snapshot().you == b_id
+        new_b.send(EditLetter(row=LETTER_ROW, column=LETTER_COLUMN, letter="Q"))
+        peer_a.wait_until(
+            lambda: len(letter_changed_events(peer_a)) == 1,
+            "the edit of the rejoined B",
+        )
+        changed = letter_changed_events(peer_a)[0]
+        assert changed.letter == "Q"
+        assert changed.player_id == b_id
+
+        peer_a.send(EditLetter(row=LETTER_ROW, column=LETTER_COLUMN, letter="R"))
+        new_b.wait_until(
+            lambda: "R" in [event.letter for event in letter_changed_events(new_b)],
+            "the events of A reaching the rejoined B",
+        )
+
+
 def test_ac5_websocket_a_socket_that_never_joined_gets_not_joined(
     fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
 ) -> None:
@@ -3299,6 +3353,28 @@ def test_ac7_browser_a_host_panel_wider_than_its_box_shows_that_there_is_more(
             shows_scrollbar = panel_shows_a_scrollbar(info, browser_name)
             shows_marker = panel_shows_a_more_marker(page)
             assert shows_scrollbar or shows_marker, info
+    finally:
+        close()
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+def test_ac7_browser_the_narrowest_window_really_overflows_and_says_so(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = open_full_host_view(
+        browser, browser_name, live_server, fx01_grid, 320, 568, touch
+    )
+    try:
+        info = page.evaluate(PANEL_INFO_SCRIPT)
+        assert info["scrollWidth"] > info["clientWidth"], info
+        shows_scrollbar = panel_shows_a_scrollbar(info, browser_name)
+        shows_marker = panel_shows_a_more_marker(page)
+        assert shows_scrollbar or shows_marker, info
     finally:
         close()
 
