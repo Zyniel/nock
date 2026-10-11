@@ -924,16 +924,20 @@ def open_room(
     frozen: bool = False,
     identity: bool = True,
     answer_pings: bool = True,
+    init_script: str | None = None,
 ) -> MockRoom:
     """Open /r/ABC123 on a mocked socket and wait for the first socket.
 
     With `identity` the stored identity of spec 012 is seeded and the page joins
     at once; without it the nickname form is shown. With `frozen` the page clock
-    stands still until a test moves it with `advance_page`.
+    stands still until a test moves it with `advance_page`. An `init_script` is
+    added after the mock, so it wraps the mocked `WebSocket`.
     """
     room = MockRoom(page)
     room.answer_pings = answer_pings
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), room.handle)
+    if init_script is not None:
+        page.add_init_script(init_script)
     if identity:
         seed_local_storage(page, {"nock.identity.ABC123": STORED_IDENTITY})
     if frozen:
@@ -954,10 +958,17 @@ def joined_room(
     seq: int = 5,
     frozen: bool = False,
     answer_pings: bool = True,
+    init_script: str | None = None,
     changes: ChangeList | None = None,
 ) -> MockRoom:
     """Open the room, answer the join with a snapshot and wait until shown."""
-    room = open_room(page, base_url, frozen=frozen, answer_pings=answer_pings)
+    room = open_room(
+        page,
+        base_url,
+        frozen=frozen,
+        answer_pings=answer_pings,
+        init_script=init_script,
+    )
     room.connections[0].send(snapshot_frame(grid, seq, changes))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joined")
@@ -1128,22 +1139,15 @@ def test_ac1_a_socket_silent_for_4_seconds_is_given_up_and_lost(
     expect_status(page, "joined")
     expect(banner(page)).to_be_hidden()
 
-    # Lost at 4 s of silence; stop at 4.9 s, a margin before the reconnect due
-    # at 5 s (timers fire inclusively at the exact end of an advance, and the
-    # browsers differ on when the close event reaches the page).
-    advance_page(page, 1000)
+    # The last frame (the snapshot) arrived at page time 1, so the 4 s of
+    # silence end at page time 4001, the end of this advance (timers fire
+    # inclusively at the end of an advance).
+    advance_page(page, 100)
 
     expect_offline(page)
     expect(banner(page)).to_have_text(load_fr()["room.banner.offline"])
     assert len(room.connections) == 1
-    count = len(room.connections)
-    advance_page(page, 50)
-    assert len(room.connections) == count
-    # Some browsers only see the close once the clock stopped, which delays the
-    # reconnect: leave a margin on this side too.
-    advance_page(page, 1200)
-    wait_until(page, lambda: len(room.connections) > count)
-    assert len(room.connections) == count + 1
+    expect_new_connection_after(page, room, 1000)
 
 
 def test_ac1_a_frame_of_any_kind_restarts_the_4_seconds_of_silence(
@@ -1618,6 +1622,69 @@ def test_ac3_when_nobody_is_left_the_next_joiner_becomes_host(
     assert player_of(joined.state, NEW_PLAYER_ID).is_host is True
 
 
+def host_timing_out_room(
+    grid: Grid, count: int, disconnected_players: list[str]
+) -> RoomState:
+    """Return `count` players where the host `p1` is ready to time out.
+
+    `p1` disconnected at DISCONNECTED_AT; each player of `disconnected_players`
+    disconnected 250 seconds later (inside their window and under the 60 seconds
+    of spec 014's hand-over at the time-out tick); the others are active and
+    seen at the time-out tick.
+    """
+    room = disconnect_player(room_of_players(grid, count), "p1", DISCONNECTED_AT).state
+    for player_id in disconnected_players:
+        room = disconnect_player(room, player_id, DISCONNECTED_AT + 250).state
+    return keep_seen(room, DISCONNECTED_AT + 300.5)
+
+
+def test_ac3_a_timed_out_host_hands_over_to_a_connected_player_not_a_disconnected(
+    fx01_grid: Grid,
+) -> None:
+    room = host_timing_out_room(fx01_grid, 3, ["p2"])
+
+    outcome = tick(room, DISCONNECTED_AT + 300.5)
+
+    assert events_of(outcome.entries) == [
+        PlayerLeft(seq=room.seq + 1, player_id="p1", reason=LeaveReason.TIMED_OUT),
+        HostChanged(seq=room.seq + 2, player_id="p3"),
+    ]
+    assert player_ids(outcome.state) == ["p2", "p3"]
+    assert player_of(outcome.state, "p3").is_host is True
+    assert player_of(outcome.state, "p2").is_host is False
+
+
+def test_ac3_a_timed_out_host_hands_over_to_the_longest_present_connected_player(
+    fx01_grid: Grid,
+) -> None:
+    room = host_timing_out_room(fx01_grid, 4, ["p2"])
+
+    outcome = tick(room, DISCONNECTED_AT + 300.5)
+
+    assert events_of(outcome.entries) == [
+        PlayerLeft(seq=room.seq + 1, player_id="p1", reason=LeaveReason.TIMED_OUT),
+        HostChanged(seq=room.seq + 2, player_id="p3"),
+    ]
+    assert player_of(outcome.state, "p3").is_host is True
+    assert player_of(outcome.state, "p4").is_host is False
+
+
+def test_ac3_a_timed_out_host_hands_over_to_the_longest_present_when_all_are_away(
+    fx01_grid: Grid,
+) -> None:
+    room = host_timing_out_room(fx01_grid, 3, ["p2", "p3"])
+
+    outcome = tick(room, DISCONNECTED_AT + 300.5)
+
+    assert events_of(outcome.entries) == [
+        PlayerLeft(seq=room.seq + 1, player_id="p1", reason=LeaveReason.TIMED_OUT),
+        HostChanged(seq=room.seq + 2, player_id="p2"),
+    ]
+    assert player_ids(outcome.state) == ["p2", "p3"]
+    assert player_of(outcome.state, "p2").is_host is True
+    assert player_of(outcome.state, "p3").is_host is False
+
+
 def test_ac3_a_disconnected_player_keeps_the_seat_for_the_whole_window(
     fx01_grid: Grid,
 ) -> None:
@@ -1787,6 +1854,49 @@ def test_ac3_websocket_after_301_seconds_the_player_times_out_and_the_token_is_n
             assert len(ids) == 2
             new_view = next(v for v in snapshot.players if v.player_id == snapshot.you)
             assert (new_view.nickname, new_view.colour) == ("Ana", 0)
+
+
+def test_ac3_websocket_the_hub_gives_its_resume_window_to_the_join(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    """A short window in the config: the join, not only the tick, applies it.
+
+    The tick period is an hour of real time, so no tick runs: only the join of
+    the returning player can time the absent one out.
+    """
+    config = RoomConfig(
+        tick_seconds=3600.0, silence_timeout_seconds=3600, resume_window_seconds=10.0
+    )
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, config) as (
+            client,
+            _registry,
+            code,
+        ),
+        contextlib.ExitStack() as stack,
+        contextlib.ExitStack() as a_stack,
+    ):
+        peer_a, peer_b = join_two(a_stack, stack, client, code)
+        a_id = peer_a.snapshot().you
+        a_token = peer_a.snapshot().resume_token
+        a_stack.close()
+        peer_b.wait_until(
+            lambda: has_state_change(peer_b, a_id, PlayerState.DISCONNECTED),
+            "A's disconnection",
+        )
+
+        fake_clock.advance(11)
+
+        with contextlib.ExitStack() as second_stack:
+            second_a = open_peer(second_stack, client, code, "Ana", a_token)
+            assert second_a.snapshot().you != a_id
+            peer_b.wait_until(
+                lambda: len(player_left_events(peer_b)) == 1,
+                "A's time-out on B",
+            )
+            assert player_left_events(peer_b) == [
+                PlayerLeft(seq=4, player_id=a_id, reason=LeaveReason.TIMED_OUT)
+            ]
 
 
 # ---- AC-3: a reload on the live server ---------------------------------------
@@ -2186,3 +2296,277 @@ def test_ac4_browser_a_state_change_shows_in_the_roster_within_300_ms(
     connection.send(state_changed_frame(7, "p2", PlayerState.ACTIVE))
 
     expect(bob).to_have_attribute("data-state", "active", timeout=ROSTER_BUDGET_MS)
+
+
+# ---- AC-5: offline edits survive a long absence (browser) --------------------
+
+OFFLINE_EDIT_COUNT = 30
+RESEND_PER_WINDOW = 10
+RESEND_WINDOW_MS = 1000
+SAMPLE_STEP_MS = 100
+SAMPLE_SETTLE_MS = 60
+RESEND_SPAN_LIMIT_MS = 4000
+# Two page-side stand-ins for what Playwright's mocked socket cannot do (its
+# `on_close` handler raises a KeyError when the page closes without a code, and
+# a mocked socket always opens at once). Both are off unless a test switches
+# them on, and other sockets are the real (mocked) ones.
+# - `window.__hangNext`: the next socket stays CONNECTING for ever.
+# - `window.__deafClose`: `close()` is recorded in `window.__pageCloses` and
+#   goes no further: the server side never sees it and the page never gets a
+#   `close` event, while messages still arrive (as on a dead network).
+SOCKET_STAND_INS_SCRIPT = """
+(() => {
+  const RealWebSocket = window.WebSocket;
+  window.__hangNext = false;
+  window.__deafClose = false;
+  window.__hung = 0;
+  window.__pageCloses = [];
+  class HangingSocket extends EventTarget {
+    constructor(url) {
+      super();
+      this.url = String(url);
+      this.readyState = 0;
+      this.protocol = '';
+      this.extensions = '';
+      this.bufferedAmount = 0;
+      this.binaryType = 'blob';
+      this.onopen = null;
+      this.onmessage = null;
+      this.onerror = null;
+      this.onclose = null;
+    }
+    send() { throw new DOMException('not open', 'InvalidStateError'); }
+    close() { this.readyState = 2; }
+  }
+  class DeafCloseSocket extends EventTarget {
+    constructor(url, protocols) {
+      super();
+      this._ws = protocols === undefined
+        ? new RealWebSocket(url) : new RealWebSocket(url, protocols);
+      this._closedByPage = false;
+      this.onopen = null;
+      this.onmessage = null;
+      this.onerror = null;
+      this.onclose = null;
+      for (const type of ['open', 'message', 'error', 'close']) {
+        this._ws.addEventListener(type, (event) => this._forward(type, event));
+      }
+    }
+    _forward(type, event) {
+      if (type === 'close' && this._closedByPage) { return; }
+      let copy = new Event(type);
+      if (type === 'message') {
+        copy = new MessageEvent('message', { data: event.data });
+      }
+      if (type === 'close') {
+        copy = new CloseEvent('close', { code: event.code, reason: event.reason });
+      }
+      this.dispatchEvent(copy);
+      const handler = this['on' + type];
+      if (typeof handler === 'function') { handler.call(this, copy); }
+    }
+    get url() { return this._ws.url; }
+    get protocol() { return this._ws.protocol; }
+    get extensions() { return this._ws.extensions; }
+    get bufferedAmount() { return this._ws.bufferedAmount; }
+    get binaryType() { return this._ws.binaryType; }
+    set binaryType(value) { this._ws.binaryType = value; }
+    get readyState() { return this._closedByPage ? 2 : this._ws.readyState; }
+    send(data) { this._ws.send(data); }
+    close(code) {
+      this._closedByPage = true;
+      window.__pageCloses.push(code === undefined ? null : code);
+    }
+  }
+  function PatchedWebSocket(url, protocols) {
+    if (window.__hangNext) {
+      window.__hung += 1;
+      return new HangingSocket(url);
+    }
+    if (window.__deafClose) { return new DeafCloseSocket(url, protocols); }
+    if (protocols === undefined) { return new RealWebSocket(url); }
+    return new RealWebSocket(url, protocols);
+  }
+  PatchedWebSocket.prototype = RealWebSocket.prototype;
+  PatchedWebSocket.CONNECTING = 0;
+  PatchedWebSocket.OPEN = 1;
+  PatchedWebSocket.CLOSING = 2;
+  PatchedWebSocket.CLOSED = 3;
+  window.WebSocket = PatchedWebSocket;
+})();
+"""
+DEAF_CLOSE_SCRIPT = SOCKET_STAND_INS_SCRIPT + "window.__deafClose = true;"
+
+
+def offline_letter(index: int) -> str:
+    """Return the letter of the `index`-th offline edit (never twice in a row)."""
+    return chr(ord("A") + index % 26)
+
+
+def edit_summaries(edits: list[Edit]) -> list[tuple[str, int, int, str | None]]:
+    """Return (kind, row, column, letter) of each edit, without the base_seq."""
+    summaries: list[tuple[str, int, int, str | None]] = []
+    for edit in edits:
+        if isinstance(edit, EditLetter):
+            summaries.append(("edit_letter", edit.row, edit.column, edit.letter))
+        else:
+            summaries.append(("erase", edit.row, edit.column, None))
+    return summaries
+
+
+def test_ac5_a_silence_loss_does_not_wait_for_the_close_event(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    room = joined_room(
+        page,
+        live_server,
+        fx01_grid,
+        frozen=True,
+        answer_pings=False,
+        init_script=DEAF_CLOSE_SCRIPT,
+    )
+
+    advance_page(page, 4000)
+
+    expect_offline(page)
+    assert page.evaluate("window.__pageCloses.length") == 1
+    assert len(room.connections) == 1
+    expect_new_connection_after(page, room, 1000)
+    assert first_join(page, room.connections[1]) == STORED_JOIN
+
+
+def test_ac5_the_silent_socket_is_detached_and_late_frames_change_nothing(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    room = joined_room(
+        page,
+        live_server,
+        fx01_grid,
+        frozen=True,
+        answer_pings=False,
+        init_script=DEAF_CLOSE_SCRIPT,
+    )
+    advance_page(page, 4000)
+    expect_offline(page)
+
+    room.connections[0].send(snapshot_frame(fx01_grid, 8))
+    page.wait_for_timeout(SETTLE_MS)
+
+    expect_status(page, "reconnecting")
+    expect(banner(page)).to_be_visible()
+    expect(room_page(page)).to_have_attribute("data-seq", "5")
+
+
+def test_ac5_the_online_event_forces_a_try_while_a_new_socket_is_connecting(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    room = joined_room(
+        page, live_server, fx01_grid, frozen=True, init_script=SOCKET_STAND_INS_SCRIPT
+    )
+    room.connections[0].close(1011)
+    expect_offline(page)
+    page.evaluate("window.__hangNext = true")
+
+    advance_page(page, 1000)
+
+    wait_until(page, lambda: page.evaluate("window.__hung") == 1)
+    assert len(room.connections) == 1
+    page.evaluate("window.__hangNext = false")
+    page.evaluate("window.dispatchEvent(new Event('online'))")
+
+    room.wait_for_connections(2)
+    assert first_join(page, room.connections[1]) == STORED_JOIN
+    assert page.evaluate("window.__hung") == 1
+
+
+def type_offline_edits(page: Page) -> list[Edit]:
+    """Type the offline edits on (1, 0) and return the edits expected on the wire."""
+    expected: list[Edit] = []
+    for index in range(OFFLINE_EDIT_COUNT):
+        letter = offline_letter(index)
+        cell_at(page, 1, 0).click()
+        page.keyboard.press(letter.lower())
+        expected.append(EditLetter(row=1, column=0, letter=letter, base_seq=5))
+    return expected
+
+
+def test_ac5_thirty_offline_edits_are_resent_in_order_at_most_10_per_second(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    room = joined_room(page, live_server, fx01_grid, seq=5, frozen=True)
+    room.connections[0].close(1011)
+    expect_offline(page)
+    expected = type_offline_edits(page)
+    expect_new_connection_after(page, room, 1000)
+    second = room.connections[1]
+    assert second.edits() == []
+    # Time 0 is just before the snapshot; the first sample follows it by 1 ms.
+    samples: list[tuple[int, int]] = [(0, 0)]
+    second.send(snapshot_frame(fx01_grid, 9))
+    expect(room_page(page)).to_have_attribute("data-seq", "9")
+    page.wait_for_timeout(SETTLE_MS)
+    elapsed_ms = 1
+    samples.append((elapsed_ms, len(second.edits())))
+    while len(second.edits()) < OFFLINE_EDIT_COUNT:
+        assert elapsed_ms < RESEND_SPAN_LIMIT_MS, "the 30 edits did not all arrive"
+        page.clock.run_for(SAMPLE_STEP_MS)
+        page.wait_for_timeout(SAMPLE_SETTLE_MS)
+        elapsed_ms += SAMPLE_STEP_MS
+        samples.append((elapsed_ms, len(second.edits())))
+    advance_page(page, 1000)
+
+    assert second.edits() == expected
+    for start_ms, start_count in samples:
+        for end_ms, end_count in samples:
+            if 0 < end_ms - start_ms <= RESEND_WINDOW_MS:
+                sent_in_window = end_count - start_count
+                assert sent_in_window <= RESEND_PER_WINDOW, (
+                    f"{sent_in_window} edits between {start_ms} and {end_ms} ms "
+                    "after the snapshot"
+                )
+    assert elapsed_ms >= 2500, "the 30 edits were not spread over about 3 seconds"
+
+
+def test_ac5_the_resend_waits_for_the_snapshot_and_keeps_pending_edits_shown(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    room = joined_room(page, live_server, fx01_grid, seq=5, frozen=True)
+    room.connections[0].close(1011)
+    expect_offline(page)
+    type_offline_edits(page)
+    expect_new_connection_after(page, room, 1000)
+    second = room.connections[1]
+
+    advance_page(page, 3000)
+
+    assert second.edits() == []
+    expect_cell(page, 1, 0, offline_letter(OFFLINE_EDIT_COUNT - 1), unconfirmed=True)
+
+
+def test_ac5_no_edit_is_sent_between_the_new_socket_and_the_snapshot(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    room = joined_room(page, live_server, fx01_grid, seq=5)
+    room.connections[0].close(1011)
+    expect_offline(page)
+    cell_at(page, 1, 0).click()
+    page.keyboard.press("t")
+    expect_cell(page, 1, 0, "T", unconfirmed=True)
+    room.wait_for_connections(2)
+    second = room.connections[1]
+    assert first_join(page, second) == STORED_JOIN
+
+    page.keyboard.press("a")
+
+    expect_cell(page, 1, 1, "A", unconfirmed=True)
+    settle(page)
+    assert second.edits() == []
+    second.send(snapshot_frame(fx01_grid, 9))
+    wait_until(page, lambda: len(second.edits()) >= 2)
+    settle(page)
+    sent = second.edits()
+    assert edit_summaries(sent) == [
+        ("edit_letter", 1, 0, "T"),
+        ("edit_letter", 1, 1, "A"),
+    ]
+    assert sent[0] == EditLetter(row=1, column=0, letter="T", base_seq=5)
