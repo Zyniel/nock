@@ -9,8 +9,8 @@ the layout of the host's view).
 
 Not tested here, with the reason:
 
-- `mute_player` and `PlayerMuted`: no criterion covers them (the spec leaves the
-  mute button and its effect to spec 022).
+- The effect of muting on chat and the mute button: spec 022's (AC-6 only
+  covers the server rule and its log entry).
 - The `disconnects` entry when the removed player has no open connection: the spec
   says the hub skips it, and does not say whether the rule still returns it.
 - The seq of the entries of a refused join that also timed out the member in the
@@ -39,6 +39,11 @@ from nock.hub import RoomRegistry
 from nock.protocol import (
     ChangeSettings,
     CheckResult,
+    ClientMessage,
+    ConfirmPencil,
+    Direction,
+    EditLetter,
+    Erase,
     ErrorCode,
     ErrorMessage,
     GridTarget,
@@ -46,10 +51,14 @@ from nock.protocol import (
     HostChanged,
     Join,
     LeaveReason,
+    LetterChanged,
     LockRoom,
+    MutePlayer,
+    PencilEdit,
     Ping,
     PlayerJoined,
     PlayerLeft,
+    PlayerMuted,
     PlayerState,
     PlayerStateChanged,
     PlayerView,
@@ -57,9 +66,11 @@ from nock.protocol import (
     RemovePlayer,
     RevealBudget,
     RoomSettings,
+    SelectCell,
     ServerMessage,
     SettingsChanged,
     Snapshot,
+    Undo,
     grid_view,
     parse_client_message,
     parse_server_message,
@@ -75,9 +86,11 @@ from nock.room import (
     handle_message,
     join_room,
     new_room,
+    replay,
     tick,
 )
 from nock.server import create_app
+from nock.store import RoomStore
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
@@ -173,7 +186,9 @@ class EnterRoom(Protocol):
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
 
 
-Sendable = Join | Ping | RemovePlayer | LockRoom | ChangeSettings
+Sendable = (
+    Join | Ping | RemovePlayer | LockRoom | ChangeSettings | EditLetter | MutePlayer
+)
 
 
 @pytest.fixture
@@ -1768,6 +1783,482 @@ def test_ac4_websocket_a_change_reaches_both_players_once_and_only_the_host_may(
         assert state.reveal_budget == new_budget
 
 
+# ---- AC-5: a player who is not in the room can do nothing (rules) ------------
+
+LETTER_ROW = 1
+LETTER_COLUMN = 0
+FLOOD_FRAMES = 40
+FLOOD_POLL_SECONDS = 0.0005
+FLOOD_JOIN_SECONDS = 10.0
+STRANGER_MESSAGE_IDS = [
+    "edit_letter",
+    "erase",
+    "select_cell",
+    "pencil_edit",
+    "confirm_pencil",
+    "undo",
+    "remove_player",
+    "lock_room",
+    "change_settings",
+    "mute_player",
+    "ping",
+]
+
+
+def stranger_message(message_id: str) -> ClientMessage:
+    """Return the message of the kind `message_id`, as a stranger would send it."""
+    if message_id == "edit_letter":
+        return EditLetter(row=LETTER_ROW, column=LETTER_COLUMN, letter="Z")
+    if message_id == "erase":
+        return Erase(row=LETTER_ROW, column=LETTER_COLUMN)
+    if message_id == "select_cell":
+        return SelectCell(
+            row=LETTER_ROW, column=LETTER_COLUMN, direction=Direction.ACROSS
+        )
+    if message_id == "pencil_edit":
+        return PencilEdit(row=LETTER_ROW, column=LETTER_COLUMN, letter="Z")
+    if message_id == "confirm_pencil":
+        return ConfirmPencil(row=LETTER_ROW, column=LETTER_COLUMN)
+    if message_id == "undo":
+        return Undo()
+    if message_id == "remove_player":
+        return RemovePlayer(player_id="p1")
+    if message_id == "lock_room":
+        return LockRoom(locked=True)
+    if message_id == "change_settings":
+        return change(HelpMode.NONE, 0, 0)
+    if message_id == "mute_player":
+        return MutePlayer(player_id="p3", muted=True)
+    return Ping()
+
+
+def assert_refused_as_not_joined(
+    room: RoomState, player_id: str, message_id: str
+) -> None:
+    """Assert `player_id`'s message changes nothing and gets `not_joined`."""
+    message = stranger_message(message_id)
+
+    outcome = handle_message(room, player_id, message, NOW + 5)
+
+    assert sole_error(outcome.reply).code is ErrorCode.NOT_JOINED
+    assert outcome.entries == ()
+    assert outcome.to_others == ()
+    assert outcome.disconnects == ()
+    assert outcome.close_sender is False
+    assert outcome.state == room
+
+
+@pytest.mark.parametrize("message_id", STRANGER_MESSAGE_IDS)
+def test_ac5_a_message_from_an_unknown_player_is_refused_as_not_joined(
+    fx01_grid: Grid, message_id: str
+) -> None:
+    room = room_of_players(fx01_grid, 3)
+
+    assert_refused_as_not_joined(room, "zz", message_id)
+
+
+@pytest.mark.parametrize("message_id", STRANGER_MESSAGE_IDS)
+def test_ac5_a_message_from_a_removed_player_is_refused_as_not_joined(
+    fx01_grid: Grid, message_id: str
+) -> None:
+    room = removed_bob(room_of_players(fx01_grid, 3))
+
+    assert_refused_as_not_joined(room, "p2", message_id)
+
+
+@pytest.mark.parametrize("message_id", STRANGER_MESSAGE_IDS)
+def test_ac5_a_message_from_a_timed_out_player_is_refused_as_not_joined(
+    fx01_grid: Grid, message_id: str
+) -> None:
+    room = disconnect_player(room_of_players(fx01_grid, 3), "p2", NOW + 10).state
+    after_window = NOW + 10 + 300.5
+    ticked = tick(keep_seen(room, after_window), after_window, QUIET_RULES)
+    assert player_ids(ticked.state) == ["p1", "p3"]
+
+    assert_refused_as_not_joined(ticked.state, "p2", message_id)
+
+
+def test_ac5_a_removed_player_leaves_no_trace_on_the_cells(fx01_grid: Grid) -> None:
+    room = removed_bob(room_of_players(fx01_grid, 3))
+    edit = EditLetter(row=LETTER_ROW, column=LETTER_COLUMN, letter="Z")
+
+    outcome = handle_message(room, "p2", edit, NOW + 5)
+
+    cell = cell_state(outcome.state, LETTER_ROW, LETTER_COLUMN)
+    assert (cell.letter, cell.author, cell.changed_by) == (None, None, None)
+    assert outcome.state.cells == room.cells
+
+
+def test_ac5_the_host_still_edits_after_a_removal(fx01_grid: Grid) -> None:
+    room = removed_bob(room_of_players(fx01_grid, 3))
+    edit = EditLetter(row=LETTER_ROW, column=LETTER_COLUMN, letter="Z")
+
+    outcome = handle_message(room, "p1", edit, NOW + 5)
+
+    assert outcome.reply == ()
+    assert len(outcome.entries) == 1
+    assert isinstance(outcome.entries[0].event, LetterChanged)
+
+
+# ---- AC-5 and AC-6: through the real WebSocket -------------------------------
+
+
+@contextlib.contextmanager
+def stored_room(
+    grid: Grid, dist_dir: Path, clock: FakeClock
+) -> Iterator[tuple[TestClient, RoomStore, RoomRegistry, str]]:
+    """Yield a client, the store the room is written to, its registry and code."""
+    store = RoomStore(":memory:")
+    registry = RoomRegistry(clock=clock, config=QUIET_CONFIG, store=store)
+    try:
+        code = registry.register_room(grid)
+        app = create_app(rooms=registry, dist_dir=dist_dir)
+        with TestClient(app) as client:
+            yield client, store, registry, code
+    finally:
+        registry.close()
+        store.close()
+
+
+def letter_changed_events(peer: Peer) -> list[LetterChanged]:
+    found: list[LetterChanged] = []
+    for message in peer.events():
+        if isinstance(message, LetterChanged):
+            found.append(message)
+    return found
+
+
+def muted_events(peer: Peer) -> list[PlayerMuted]:
+    found: list[PlayerMuted] = []
+    for message in peer.events():
+        if isinstance(message, PlayerMuted):
+            found.append(message)
+    return found
+
+
+def flood_once_removed(
+    registry: RoomRegistry, code: str, peer: Peer, player_id: str, sent: list[int]
+) -> None:
+    """From the removed player's own thread: edit as fast as possible.
+
+    Waits for the room to drop the player (never for the player's own error or
+    close), then sends FLOOD_FRAMES edit_letter frames back to back.
+    """
+    deadline = time.monotonic() + FLOOD_JOIN_SECONDS
+    while player_id in room_players(registry, code):
+        if time.monotonic() > deadline:
+            return
+        time.sleep(FLOOD_POLL_SECONDS)
+    letters = "ABCDE"
+    for index in range(FLOOD_FRAMES):
+        edit = EditLetter(
+            row=LETTER_ROW,
+            column=LETTER_COLUMN + index % 3,
+            letter=letters[index % len(letters)],
+        )
+        with contextlib.suppress(Exception):  # the socket may already be closed
+            peer.send(edit)
+        sent.append(index)
+
+
+def test_ac5_websocket_40_edits_right_after_a_removal_are_neither_committed_nor_sent(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    with (
+        stored_room(fx01_grid, dist_dir, fake_clock) as (
+            client,
+            store,
+            registry,
+            code,
+        ),
+        contextlib.ExitStack() as a_stack,
+        contextlib.ExitStack() as b_stack,
+        contextlib.ExitStack() as c_stack,
+    ):
+        peer_a, peer_b, peer_c = join_in_order(
+            [a_stack, b_stack, c_stack], client, code
+        )
+        b_id = peer_b.snapshot().you
+        sent: list[int] = []
+        flooder = threading.Thread(
+            target=flood_once_removed,
+            args=(registry, code, peer_b, b_id, sent),
+            daemon=True,
+        )
+        flooder.start()
+
+        peer_a.send(RemovePlayer(player_id=b_id))
+        flooder.join(FLOOD_JOIN_SECONDS)
+        assert not flooder.is_alive()
+        peer_b.wait_until(lambda: peer_b.close_code is not None, "the close of B")
+        ping_and_wait(peer_a)
+        ping_and_wait(peer_c)
+        time.sleep(SETTLE_SECONDS)
+
+        assert len(sent) == FLOOD_FRAMES
+        assert letter_changed_events(peer_a) == []
+        assert letter_changed_events(peer_c) == []
+        state = registry.room_state(code)
+        assert state is not None
+        for cell in state.cells:
+            assert cell.author != b_id
+            assert cell.changed_by != b_id
+            assert cell.letter is None
+        assert state.seq == 4
+        logged = store.read_log(code)
+        for entry in logged:
+            assert not isinstance(entry.event, LetterChanged)
+        assert len(logged) == 4
+
+
+def test_ac5_websocket_a_socket_that_never_joined_gets_not_joined(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    with (
+        stored_room(fx01_grid, dist_dir, fake_clock) as (client, _store, _reg, code),
+        contextlib.ExitStack() as stack,
+    ):
+        websocket = stack.enter_context(client.websocket_connect(socket_url(code)))
+        stranger = Peer(websocket)
+
+        stranger.send(EditLetter(row=LETTER_ROW, column=LETTER_COLUMN, letter="Z"))
+        stranger.wait_until(
+            lambda: ErrorCode.NOT_JOINED in error_codes(stranger),
+            "not_joined for a socket that never joined",
+        )
+
+        assert error_codes(stranger) == [ErrorCode.NOT_JOINED]
+
+
+# ---- AC-6: mute a player (rules) ---------------------------------------------
+
+
+def muting(room: RoomState, sender: str, target: str, muted: bool) -> Outcome:
+    message = MutePlayer(player_id=target, muted=muted)
+    return handle_message(room, sender, message, NOW + 1)
+
+
+def test_ac6_a_player_who_is_not_host_gets_not_host_and_nothing_changes(
+    fx01_grid: Grid,
+) -> None:
+    room = room_of_players(fx01_grid, 3)
+
+    outcome = muting(room, "p2", "p3", True)
+
+    assert sole_error(outcome.reply).code is ErrorCode.NOT_HOST
+    assert outcome.entries == ()
+    assert player_of(outcome.state, "p3").muted is False
+    assert_nothing_changed(room, outcome.state)
+
+
+def test_ac6_a_non_host_cannot_unmute_either(fx01_grid: Grid) -> None:
+    room = muting(room_of_players(fx01_grid, 3), "p1", "p3", True).state
+
+    outcome = muting(room, "p2", "p3", False)
+
+    assert sole_error(outcome.reply).code is ErrorCode.NOT_HOST
+    assert outcome.entries == ()
+    assert player_of(outcome.state, "p3").muted is True
+
+
+@pytest.mark.parametrize("muted", [True, False])
+def test_ac6_the_host_cannot_mute_themselves(fx01_grid: Grid, muted: bool) -> None:
+    room = room_of_players(fx01_grid, 3)
+
+    outcome = muting(room, "p1", "p1", muted)
+
+    assert sole_error(outcome.reply).code is ErrorCode.INVALID_TARGET
+    assert outcome.entries == ()
+    assert player_of(outcome.state, "p1").muted is False
+    assert_nothing_changed(room, outcome.state)
+
+
+@pytest.mark.parametrize("muted", [True, False])
+def test_ac6_an_unknown_player_is_an_invalid_target(
+    fx01_grid: Grid, muted: bool
+) -> None:
+    room = room_of_players(fx01_grid, 3)
+
+    outcome = muting(room, "p1", "zz", muted)
+
+    assert sole_error(outcome.reply).code is ErrorCode.INVALID_TARGET
+    assert outcome.entries == ()
+    assert_nothing_changed(room, outcome.state)
+
+
+def test_ac6_a_removed_player_is_an_invalid_target(fx01_grid: Grid) -> None:
+    room = removed_bob(room_of_players(fx01_grid, 3))
+
+    outcome = muting(room, "p1", "p2", True)
+
+    assert sole_error(outcome.reply).code is ErrorCode.INVALID_TARGET
+    assert outcome.entries == ()
+
+
+def test_ac6_unmuting_an_unmuted_player_does_nothing(fx01_grid: Grid) -> None:
+    room = room_of_players(fx01_grid, 3)
+
+    outcome = muting(room, "p1", "p2", False)
+
+    assert outcome.reply == ()
+    assert outcome.entries == ()
+    assert outcome.to_others == ()
+    assert outcome.disconnects == ()
+    assert_nothing_changed(room, outcome.state)
+    assert player_of(outcome.state, "p2").muted is False
+
+
+def test_ac6_muting_a_muted_player_does_nothing(fx01_grid: Grid) -> None:
+    room = muting(room_of_players(fx01_grid, 3), "p1", "p2", True).state
+
+    outcome = muting(room, "p1", "p2", True)
+
+    assert outcome.reply == ()
+    assert outcome.entries == ()
+    assert_nothing_changed(room, outcome.state)
+    assert player_of(outcome.state, "p2").muted is True
+
+
+def test_ac6_muting_sets_the_flag_and_writes_one_player_muted_entry(
+    fx01_grid: Grid,
+) -> None:
+    room = room_of_players(fx01_grid, 3)
+
+    outcome = muting(room, "p1", "p2", True)
+
+    assert outcome.reply == ()
+    assert events_of(outcome.entries) == [
+        PlayerMuted(seq=4, player_id="p2", muted=True)
+    ]
+    assert outcome.state.seq == 4
+    assert player_of(outcome.state, "p2").muted is True
+    assert player_of(outcome.state, "p1").muted is False
+    assert player_of(outcome.state, "p3").muted is False
+    assert player_ids(outcome.state) == ["p1", "p2", "p3"]
+
+
+def test_ac6_unmuting_a_muted_player_writes_one_entry_and_clears_the_flag(
+    fx01_grid: Grid,
+) -> None:
+    room = muting(room_of_players(fx01_grid, 3), "p1", "p2", True).state
+
+    outcome = muting(room, "p1", "p2", False)
+
+    assert events_of(outcome.entries) == [
+        PlayerMuted(seq=5, player_id="p2", muted=False)
+    ]
+    assert player_of(outcome.state, "p2").muted is False
+
+
+def test_ac6_a_muted_player_appears_muted_in_the_snapshot(fx01_grid: Grid) -> None:
+    room = muting(room_of_players(fx01_grid, 3), "p1", "p2", True).state
+    rejoin = join_room(
+        room, new_guest("Bob", token_of(2)), NOW + 2, NEW_PLAYER_ID, NEW_TOKEN
+    )
+
+    snapshot = sole_snapshot(rejoin)
+
+    muted_flags: dict[str, bool] = {}
+    for view in snapshot.players:
+        muted_flags[view.player_id] = view.muted
+    assert muted_flags == {"p1": False, "p2": True, "p3": False}
+
+
+def test_ac6_the_flag_survives_a_replay_of_the_entries(fx01_grid: Grid) -> None:
+    start = room_of_players(fx01_grid, 3)
+    muted = muting(start, "p1", "p2", True)
+    unmuted = muting(muted.state, "p1", "p2", False)
+    muted_again = muting(unmuted.state, "p1", "p3", True)
+
+    replayed = start
+    for entry in (*muted.entries, *unmuted.entries, *muted_again.entries):
+        replayed = replay(replayed, entry)
+
+    assert player_of(replayed, "p2").muted is False
+    assert player_of(replayed, "p3").muted is True
+    assert player_of(replayed, "p1").muted is False
+    assert replayed.seq == 6
+
+
+def test_ac6_the_flag_survives_loading_the_room_from_a_store(
+    fx01_grid: Grid,
+) -> None:
+    start = room_of_players(fx01_grid, 3)
+    muted = muting(start, "p1", "p2", True)
+    store = RoomStore(":memory:")
+    try:
+        store.create_room(start)
+        store.append(start.code, muted.entries)
+
+        loaded = store.load_room(start.code)
+    finally:
+        store.close()
+
+    assert loaded is not None
+    assert player_of(loaded, "p2").muted is True
+    assert player_of(loaded, "p3").muted is False
+    assert loaded.seq == 4
+
+
+# ---- AC-6: through the real WebSocket ----------------------------------------
+
+
+def test_ac6_websocket_the_host_mutes_once_and_only_the_host_may(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    with (
+        stored_room(fx01_grid, dist_dir, fake_clock) as (
+            client,
+            store,
+            registry,
+            code,
+        ),
+        contextlib.ExitStack() as a_stack,
+        contextlib.ExitStack() as b_stack,
+        contextlib.ExitStack() as c_stack,
+    ):
+        peer_a, peer_b, peer_c = join_in_order(
+            [a_stack, b_stack, c_stack], client, code
+        )
+        a_id = peer_a.snapshot().you
+        b_id = peer_b.snapshot().you
+        c_id = peer_c.snapshot().you
+
+        peer_b.send(MutePlayer(player_id=c_id, muted=True))
+        peer_a.send(MutePlayer(player_id=a_id, muted=True))
+        peer_a.send(MutePlayer(player_id="zz", muted=True))
+        peer_a.send(MutePlayer(player_id=b_id, muted=False))
+        ping_and_wait(peer_a)
+        ping_and_wait(peer_b)
+        assert error_codes(peer_b) == [ErrorCode.NOT_HOST]
+        assert error_codes(peer_a) == [ErrorCode.INVALID_TARGET] * 2
+        assert muted_events(peer_a) == []
+
+        peer_a.send(MutePlayer(player_id=b_id, muted=True))
+        peer_a.send(MutePlayer(player_id=b_id, muted=True))
+        expected = PlayerMuted(seq=4, player_id=b_id, muted=True)
+        for peer in (peer_a, peer_b, peer_c):
+            peer.wait_until(lambda peer=peer: muted_events(peer) == [expected], "muted")
+        ping_and_wait(peer_a)
+        time.sleep(SETTLE_SECONDS)
+
+        for peer in (peer_a, peer_b, peer_c):
+            assert muted_events(peer) == [expected]
+        state = registry.room_state(code)
+        assert state is not None
+        assert player_of(state, b_id).muted is True
+        assert player_of(state, c_id).muted is False
+        loaded = store.load_room(code)
+        assert loaded is not None
+        assert player_of(loaded, b_id).muted is True
+        assert player_of(loaded, c_id).muted is False
+        logged: list[object] = []
+        for entry in store.read_log(code):
+            if isinstance(entry.event, PlayerMuted):
+                logged.append(entry.event)
+        assert logged == [expected]
+
+
 # ---- Helpers for the browser -------------------------------------------------
 
 
@@ -2599,5 +3090,201 @@ def test_ac1_browser_the_host_view_keeps_the_grids_room(
             assert bar_bottom <= keyboard_box["y"] + EPSILON
             keyboard_bottom = keyboard_box["y"] + keyboard_box["height"]
             assert keyboard_bottom <= window_height + EPSILON
+    finally:
+        close()
+
+
+# ---- AC-7: the host controls on small screens --------------------------------
+
+MIN_TARGET_PX = 24.0
+TARGET_TOLERANCE_PX = 0.01
+PANEL_INFO_SCRIPT = """
+() => {
+  const panel = document.querySelector('[data-testid="host-panel"]');
+  const style = getComputedStyle(panel);
+  let webkit = null;
+  try {
+    const bar = getComputedStyle(panel, '::-webkit-scrollbar');
+    webkit = { display: bar.display, width: bar.width, height: bar.height };
+  } catch (error) {
+    webkit = null;
+  }
+  return {
+    scrollWidth: panel.scrollWidth,
+    clientWidth: panel.clientWidth,
+    overflowX: style.overflowX,
+    scrollbarWidth: style.scrollbarWidth === undefined
+      ? 'auto' : style.scrollbarWidth,
+    webkit: webkit,
+  };
+}
+"""
+
+
+def open_full_host_view(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    grid: Grid,
+    width: int,
+    height: int,
+    touch: bool,
+) -> tuple[Page, Callable[[], None]]:
+    """Open the host's view with 8 players and a full feed; return page, closer."""
+    page, close = make_page(browser, browser_name, width, height, touch)
+    try:
+        room = joined_mock_room(page, live_server, grid, eight_players())
+        last_seq = 5 + FEED_LIMIT
+        for seq in range(6, last_seq + 1):
+            room.connections[0].send(check_frame(seq))
+        expect(room_page(page)).to_have_attribute("data-seq", str(last_seq))
+        expect(page.get_by_test_id("remove-player")).to_have_count(7)
+        expect(page.get_by_test_id("host-panel")).to_be_visible()
+    except BaseException:
+        close()
+        raise
+    return page, close
+
+
+def panel_shows_a_scrollbar(info: dict[str, object], browser_name: str) -> bool:
+    """Tell whether the panel's computed style leaves a scrollbar visible."""
+    if info["overflowX"] not in ("auto", "scroll"):
+        return False
+    if info["scrollbarWidth"] == "none":
+        return False
+    webkit = info["webkit"]
+    if browser_name == "firefox" or not isinstance(webkit, dict):
+        return True
+    if webkit["display"] == "none":
+        return False
+    return webkit["width"] != "0px" and webkit["height"] != "0px"
+
+
+def panel_shows_a_more_marker(page: Page) -> bool:
+    """Tell whether `host-panel-more` is visible at an edge of the panel."""
+    marker = page.get_by_test_id("host-panel-more")
+    if marker.count() == 0 or not marker.first.is_visible():
+        return False
+    marker_box = marker.first.bounding_box()
+    panel_box = page.get_by_test_id("host-panel").bounding_box()
+    if marker_box is None or panel_box is None:
+        return False
+    panel_right = panel_box["x"] + panel_box["width"]
+    marker_right = marker_box["x"] + marker_box["width"]
+    touches_panel = (
+        marker_box["x"] <= panel_right + EPSILON
+        and marker_right >= panel_box["x"] - EPSILON
+    )
+    inside_rows = (
+        marker_box["y"] + marker_box["height"] >= panel_box["y"] - EPSILON
+        and marker_box["y"] <= panel_box["y"] + panel_box["height"] + EPSILON
+    )
+    return touches_panel and inside_rows
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac7_browser_every_remove_button_is_at_least_24_by_24_pixels(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = open_full_host_view(
+        browser, browser_name, live_server, fx01_grid, width, height, touch
+    )
+    try:
+        buttons = page.get_by_test_id("remove-player").all()
+        assert len(buttons) == 7
+        for button in buttons:
+            box = button.bounding_box()
+            assert box is not None
+            assert box["width"] >= MIN_TARGET_PX - TARGET_TOLERANCE_PX
+            assert box["height"] >= MIN_TARGET_PX - TARGET_TOLERANCE_PX
+    finally:
+        close()
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac7_browser_a_host_panel_wider_than_its_box_shows_that_there_is_more(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = open_full_host_view(
+        browser, browser_name, live_server, fx01_grid, width, height, touch
+    )
+    try:
+        info = page.evaluate(PANEL_INFO_SCRIPT)
+        overflows = info["scrollWidth"] > info["clientWidth"]
+        if overflows:
+            shows_scrollbar = panel_shows_a_scrollbar(info, browser_name)
+            shows_marker = panel_shows_a_more_marker(page)
+            assert shows_scrollbar or shows_marker, info
+    finally:
+        close()
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac7_browser_the_layout_guarantees_of_the_grid_still_hold(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = open_full_host_view(
+        browser, browser_name, live_server, fx01_grid, width, height, touch
+    )
+    try:
+        cell = cell_at(page, 3, 1)
+        if touch:
+            cell.tap(timeout=TAP_TIMEOUT_MS)
+        else:
+            cell.click(timeout=TAP_TIMEOUT_MS)
+        bar = page.get_by_test_id("clue-bar")
+        expect(bar).to_have_attribute("data-word", "3,0,0")
+        viewport_box = page.get_by_test_id("grid-viewport").bounding_box()
+        bar_box = bar.bounding_box()
+        assert viewport_box is not None
+        assert bar_box is not None
+        sizes = page.evaluate(
+            "() => [document.documentElement.scrollWidth, window.innerWidth,"
+            " document.documentElement.scrollHeight, window.innerHeight]"
+        )
+        scroll_width, window_width, scroll_height, window_height = sizes
+
+        assert viewport_box["height"] >= MIN_GRID_VIEWPORT_PX
+        assert scroll_width <= window_width
+        assert scroll_height <= window_height
+        assert bar_box["x"] >= -EPSILON
+        assert bar_box["x"] + bar_box["width"] <= window_width + EPSILON
+        assert bar_box["y"] >= -EPSILON
+        bar_bottom = bar_box["y"] + bar_box["height"]
+        assert bar_bottom <= window_height + EPSILON
+        if touch:
+            keyboard_box = page.get_by_test_id("keyboard").bounding_box()
+            assert keyboard_box is not None
+            assert bar_bottom <= keyboard_box["y"] + EPSILON
     finally:
         close()
