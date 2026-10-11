@@ -37,8 +37,17 @@ from nock.room import (
     join_room,
     new_room,
     tick,
+    with_last_seen,
 )
 from nock.store import RoomStore
+
+__all__ = [
+    "MAX_FRAME_BYTES",
+    "SESSION_REPLACED_CLOSE_CODE",
+    "SILENCE_CLOSE_CODE",
+    "RoomConnection",
+    "RoomRegistry",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +56,6 @@ ROOM_CODE_LENGTH: int = 6
 
 MAX_FRAME_BYTES: int = 4096  # spec 037: larger frames are not parsed
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
-__all__ = [
-    "MAX_FRAME_BYTES",
-    "SESSION_REPLACED_CLOSE_CODE",
-    "SILENCE_CLOSE_CODE",
-    "RoomConnection",
-    "RoomRegistry",
-]
 
 _REFUSAL_TEXTS: dict[ErrorCode, str] = {
     ErrorCode.NOT_JOINED: "Send a join message before anything else.",
@@ -278,12 +280,14 @@ class _RoomRunner:
             self._detach_step(item.connection)
             return
         if isinstance(item, _Invalid):
+            self._note_frame_seen(item.connection)
             self._refuse(item.connection, ErrorCode.INVALID_MESSAGE)
             return
         if item.connection.player_id is None:
             self._unjoined_step(item.connection, item.message)
             return
         if isinstance(item.message, Join):
+            self._note_frame_seen(item.connection)
             return
         if item.connection not in self._connections:
             return  # replaced by a newer socket of the same player
@@ -300,6 +304,12 @@ class _RoomRunner:
             logger.exception("A message in room %s failed", self.state.code)
             return
         self._store_and_deliver(outcome, item.connection, joined)
+
+    def _note_frame_seen(self, connection: RoomConnection) -> None:
+        """Set `last_seen_at` for a frame that has no other effect (spec 017)."""
+        if connection.player_id is None or connection not in self._connections:
+            return
+        self.state = with_last_seen(self.state, connection.player_id, self._clock())
 
     def _unjoined_step(
         self, connection: RoomConnection, message: ClientMessage

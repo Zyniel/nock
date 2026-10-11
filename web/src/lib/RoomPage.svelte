@@ -7,6 +7,7 @@
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import type { LetterCellView, Snapshot } from './roomSession'
   import {
+    EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
     PING_INTERVAL_MS,
     SILENCE_LIMIT_MS,
@@ -286,7 +287,7 @@
     }
     if (shownCell(cell, session.pendingEdits).letter !== letter) {
       addPendingEdit(session, cell.row, cell.column, letter)
-      send({
+      sendEdit({
         type: 'edit_letter',
         row: cell.row,
         column: cell.column,
@@ -311,7 +312,7 @@
       return false
     }
     addPendingEdit(session, cell.row, cell.column, null)
-    send({ type: 'erase', row: cell.row, column: cell.column, base_seq: null })
+    sendEdit({ type: 'erase', row: cell.row, column: cell.column, base_seq: null })
     return true
   }
 
@@ -376,8 +377,47 @@
     reconnectTimer = undefined
   }
 
+  // Edits wait here while the socket has no snapshot yet, and are then sent one
+  // every EDIT_SEND_INTERVAL_MS (spec 017 AC-5), oldest first.
+  let isSynced = false
+  let editQueue: object[] = []
+  let editTimer: ReturnType<typeof setInterval> | undefined
+
+  function stopEditQueue(): void {
+    clearInterval(editTimer)
+    editTimer = undefined
+    editQueue = []
+    isSynced = false
+  }
+
+  function sendNextQueuedEdit(): void {
+    const next = editQueue.shift()
+    if (next === undefined) {
+      clearInterval(editTimer)
+      editTimer = undefined
+      return
+    }
+    send(next)
+  }
+
+  // Send an edit now, or behind the edits still waiting. Before the snapshot of
+  // the socket nothing is sent: the edit is pending and is resent with the others.
+  function sendEdit(message: object): void {
+    if (!isSynced) {
+      return
+    }
+    if (editTimer === undefined) {
+      send(message)
+      return
+    }
+    editQueue.push(message)
+  }
+
   // Stop listening to a socket and close it.
   function dropSocket(dropped: WebSocket): void {
+    if (socket === dropped) {
+      stopEditQueue()
+    }
     dropped.onopen = null
     dropped.onmessage = null
     dropped.onclose = null
@@ -411,17 +451,10 @@
     formJoinNickname = null
   }
 
-  // Nothing came from the server for too long: the page closes the socket itself.
-  // The loss is shown at once; the next try is planned when the socket has
-  // closed (its close event), so a new socket never opens beside a half-open one.
+  // Nothing came from the server for too long: this is a loss at once. The
+  // socket is detached, so its late frames and its close event change nothing.
   function connectionSilent(silent: WebSocket): void {
-    if (silent !== socket) {
-      return
-    }
-    stopHeartbeat()
-    keepFormAfterLoss()
-    session.status = statusAfterLoss(session)
-    silent.close()
+    connectionLost(silent)
   }
 
   // The socket is lost: show it, then try again after the next delay.
@@ -452,20 +485,34 @@
 
   // The browser has a network again: do not wait for the next delay.
   function onBrowserOnline(): void {
-    if (reconnectTimer === undefined) {
+    if (reconnectTimer !== undefined) {
+      stopReconnectTimer()
+      openSocket()
       return
     }
-    stopReconnectTimer()
-    openSocket()
+    // A socket still connecting may never open on a dead network: replace it.
+    if (socket !== null && socket.readyState === WebSocket.CONNECTING) {
+      stopHeartbeat()
+      dropSocket(socket)
+      openSocket()
+    }
   }
 
   // Send my pending edits again, oldest first, each with the base_seq it had.
+  // They are paced, the first one at once, then one every EDIT_SEND_INTERVAL_MS.
   function resendPendingEdits(): void {
+    stopEditQueue()
+    isSynced = true
     for (const edit of session.pendingEdits) {
       if (edit.letter === null) {
-        send({ type: 'erase', row: edit.row, column: edit.column, base_seq: edit.baseSeq })
+        editQueue.push({
+          type: 'erase',
+          row: edit.row,
+          column: edit.column,
+          base_seq: edit.baseSeq,
+        })
       } else {
-        send({
+        editQueue.push({
           type: 'edit_letter',
           row: edit.row,
           column: edit.column,
@@ -474,6 +521,8 @@
         })
       }
     }
+    editTimer = setInterval(sendNextQueuedEdit, EDIT_SEND_INTERVAL_MS)
+    sendNextQueuedEdit()
   }
 
   // The first message of a socket: the join of the stored identity, or the form.

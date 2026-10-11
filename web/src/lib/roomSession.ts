@@ -133,6 +133,7 @@ export const SESSION_REPLACED_CLOSE_CODE = 4001
 // Heartbeat and reconnection (spec 017).
 export const PING_INTERVAL_MS = 2000
 export const SILENCE_LIMIT_MS = 4000
+export const EDIT_SEND_INTERVAL_MS = 100
 export const RECONNECT_DELAYS_MS: number[] = [1000, 2000, 4000, 8000]
 
 const PLAYER_STATES: string[] = ['active', 'idle', 'disconnected']

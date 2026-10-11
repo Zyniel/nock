@@ -636,7 +636,7 @@ def handle_message(
     sent.
     """
     outcome = _apply_message(state, player_id, message, now, config)
-    seen_state = _with_last_seen(outcome.state, player_id, now)
+    seen_state = with_last_seen(outcome.state, player_id, now)
     return outcome.model_copy(update={"state": seen_state})
 
 
@@ -661,7 +661,7 @@ def _apply_message(
     return Outcome(state=state)
 
 
-def _with_last_seen(state: RoomState, player_id: str, now: float) -> RoomState:
+def with_last_seen(state: RoomState, player_id: str, now: float) -> RoomState:
     """Return the state with the player's `last_seen_at` set to `now`."""
     player = _find_player(state, player_id)
     if player is None:
