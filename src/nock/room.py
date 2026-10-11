@@ -571,30 +571,35 @@ def handle_message(
     return Outcome(state=state)
 
 
-def _recent_edits(
-    state: RoomState, player_id: str, now: float
-) -> tuple[float, ...] | None:
-    """Return the times of the player's edits in the last second.
-
-    Returns:
-        The times `t` with `t > now - 1.0`, or None when the player is unknown.
-    """
+def _find_player(state: RoomState, player_id: str) -> PlayerRecord | None:
+    """Return the room's record of the player, or None when the player is unknown."""
     for player in state.players:
         if player.player_id == player_id:
-            recent: list[float] = []
-            for edit_time in player.recent_edits:
-                if edit_time > now - RATE_WINDOW_SECONDS:
-                    recent.append(edit_time)
-            return tuple(recent)
+            return player
     return None
+
+
+def _recent_edits(player: PlayerRecord, now: float) -> tuple[float, ...]:
+    """Return the times of the player's edits inside the rate window.
+
+    Returns:
+        The times `t` with `t > now - RATE_WINDOW_SECONDS`.
+    """
+    recent: list[float] = []
+    for edit_time in player.recent_edits:
+        if edit_time > now - RATE_WINDOW_SECONDS:
+            recent.append(edit_time)
+    return tuple(recent)
 
 
 def _rate_limit_refusal(
     state: RoomState, player_id: str, now: float, config: RoomConfig
 ) -> Outcome | None:
     """Return the rate_limited refusal when the player has used up the window."""
-    recent = _recent_edits(state, player_id, now)
-    if recent is not None and len(recent) >= config.max_edits_per_second:
+    player = _find_player(state, player_id)
+    if player is None:
+        return None
+    if len(_recent_edits(player, now)) >= config.max_edits_per_second:
         return _refuse(
             state,
             ErrorCode.RATE_LIMITED,
@@ -605,14 +610,12 @@ def _rate_limit_refusal(
 
 def _with_edit_counted(state: RoomState, player_id: str, now: float) -> RoomState:
     """Return the state with `now` added to the player's recent edits."""
-    recent = _recent_edits(state, player_id, now)
-    if recent is None:
+    player = _find_player(state, player_id)
+    if player is None:
         return state
-    for player in state.players:
-        if player.player_id == player_id:
-            changed = player.model_copy(update={"recent_edits": (*recent, now)})
-            return _replace_player(state, changed)
-    return state
+    recent = _recent_edits(player, now)
+    changed = player.model_copy(update={"recent_edits": (*recent, now)})
+    return _replace_player(state, changed)
 
 
 def _count_unhandled_edit(
