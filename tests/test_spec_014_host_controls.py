@@ -187,7 +187,14 @@ class EnterRoom(Protocol):
 
 
 Sendable = (
-    Join | Ping | RemovePlayer | LockRoom | ChangeSettings | EditLetter | MutePlayer
+    Join
+    | Ping
+    | RemovePlayer
+    | LockRoom
+    | ChangeSettings
+    | EditLetter
+    | MutePlayer
+    | SelectCell
 )
 
 
@@ -2009,6 +2016,63 @@ def test_ac5_websocket_40_edits_right_after_a_removal_are_neither_committed_nor_
         for entry in logged:
             assert not isinstance(entry.event, LetterChanged)
         assert len(logged) == 4
+
+
+def test_ac5_websocket_a_silence_disconnect_stops_routing_the_late_frames(
+    fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
+) -> None:
+    config = RoomConfig(tick_seconds=TICK_SECONDS)
+    with (
+        running_room(fx01_grid, dist_dir, fake_clock, config) as (
+            client,
+            registry,
+            code,
+        ),
+        contextlib.ExitStack() as a_stack,
+        contextlib.ExitStack() as b_stack,
+    ):
+        peer_a, peer_b = join_in_order([a_stack, b_stack], client, code)
+        b_id = peer_b.snapshot().you
+        peer_b.send(
+            SelectCell(row=LETTER_ROW, column=LETTER_COLUMN, direction=Direction.ACROSS)
+        )
+        ping_and_wait(peer_b)
+        fake_clock.advance(3)
+        ping_and_wait(peer_a)
+        fake_clock.advance(3)
+        peer_a.wait_until(
+            lambda: has_state_change(peer_a, b_id, PlayerState.DISCONNECTED),
+            "the silence disconnection of B",
+            timeout=WS_DETECTION_SECONDS,
+        )
+        peer_b.wait_until(
+            lambda: peer_b.close_code is not None,
+            "the silence close of B",
+            timeout=WS_DETECTION_SECONDS,
+        )
+        assert peer_b.close_code == 4408
+        received_before = len(peer_a.messages())
+        before = registry.room_state(code)
+        assert before is not None
+
+        for index in range(5):
+            late_edit = EditLetter(
+                row=LETTER_ROW, column=LETTER_COLUMN, letter="ABCDE"[index]
+            )
+            with contextlib.suppress(Exception):  # the socket may be closed
+                peer_b.send(late_edit)
+        time.sleep(SETTLE_SECONDS)
+        ping_and_wait(peer_a)
+
+        assert letter_changed_events(peer_a) == []
+        assert len(peer_a.messages()) == received_before + 1  # only the pong
+        after = registry.room_state(code)
+        assert after is not None
+        assert after.seq == before.seq
+        for cell in after.cells:
+            assert cell.author != b_id
+            assert cell.changed_by != b_id
+            assert cell.letter is None
 
 
 def test_ac5_websocket_a_socket_that_never_joined_gets_not_joined(
