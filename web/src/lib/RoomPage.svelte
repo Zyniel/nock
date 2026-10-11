@@ -85,16 +85,32 @@
   // Each flash ends FLASH_MS after it started. A flash that a newer one replaced
   // is no longer in the list, so its timer finds nothing to end.
   const scheduledFlashes = new Set<number>()
+  const flashTimers = new Set<ReturnType<typeof setTimeout>>()
   $effect(() => {
     for (const flash of session.flashes) {
       if (scheduledFlashes.has(flash.id)) {
         continue
       }
       scheduledFlashes.add(flash.id)
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        flashTimers.delete(timer)
         scheduledFlashes.delete(flash.id)
         endFlash(session, flash.id)
       }, FLASH_MS)
+      flashTimers.add(timer)
+    }
+  })
+
+  // Leaving the page must not leave the flash timers to fire on a destroyed page.
+  // This is a separate effect: the one above re-runs with each new flash, and its
+  // cleanup would cancel the timers of the flashes still showing.
+  $effect(() => {
+    return () => {
+      for (const timer of flashTimers) {
+        clearTimeout(timer)
+      }
+      flashTimers.clear()
+      scheduledFlashes.clear()
     }
   })
 
