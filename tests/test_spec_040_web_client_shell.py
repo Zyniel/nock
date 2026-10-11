@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -86,14 +86,16 @@ def dist_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def empty_client(dist_dir: Path) -> TestClient:
+def empty_client(dist_dir: Path, registry: RoomRegistry) -> TestClient:
     """A client on an app with a built dist and no room."""
-    return TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+    return TestClient(create_app(rooms=registry, dist_dir=dist_dir))
 
 
 @pytest.fixture
-def registry() -> RoomRegistry:
-    return RoomRegistry()
+def registry() -> Iterator[RoomRegistry]:
+    room_registry = RoomRegistry()
+    yield room_registry
+    room_registry.close()
 
 
 @pytest.fixture
@@ -363,9 +365,11 @@ def test_ac5_a_directory_is_not_served_as_a_file(empty_client: TestClient) -> No
         "/assets/..%5C..%5Csecret.txt",
     ],
 )
-def test_ac5_path_traversal_never_leaves_dist_dir(dist_dir: Path, path: str) -> None:
+def test_ac5_path_traversal_never_leaves_dist_dir(
+    dist_dir: Path, registry: RoomRegistry, path: str
+) -> None:
     (dist_dir.parent / "secret.txt").write_text("TOP-SECRET", encoding="utf-8")
-    client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+    client = TestClient(create_app(rooms=registry, dist_dir=dist_dir))
 
     response = client.get(path)
 
@@ -385,6 +389,7 @@ def test_ac5_alternate_data_stream_of_index_is_not_served(
 @pytest.mark.parametrize("encoded_colon", [False, True])
 def test_ac5_drive_letter_paths_never_leave_dist_dir(
     dist_dir: Path,
+    registry: RoomRegistry,
     monkeypatch: pytest.MonkeyPatch,
     encoded_colon: bool,
 ) -> None:
@@ -401,7 +406,7 @@ def test_ac5_drive_letter_paths_never_leave_dist_dir(
         secret.write_text("TOP-SECRET", encoding="utf-8")
         monkeypatch.chdir(outside)
         try:
-            client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=dist_dir))
+            client = TestClient(create_app(rooms=registry, dist_dir=dist_dir))
             path = f"/{drive}secret.txt"
             if encoded_colon:
                 path = path.replace(":", "%3A")
@@ -497,8 +502,8 @@ def dot_dist_dir(dist_dir: Path) -> Path:
 
 
 @pytest.fixture
-def dot_client(dot_dist_dir: Path) -> TestClient:
-    return TestClient(create_app(rooms=RoomRegistry(), dist_dir=dot_dist_dir))
+def dot_client(dot_dist_dir: Path, registry: RoomRegistry) -> TestClient:
+    return TestClient(create_app(rooms=registry, dist_dir=dot_dist_dir))
 
 
 def assert_plain_not_found(response: Response) -> None:
@@ -553,12 +558,12 @@ def test_ac27_dot_files_do_not_hide_regular_files(dot_client: TestClient) -> Non
 
 @pytest.mark.parametrize("path", DOT_FILE_PATHS)
 def test_ac27_unbuilt_client_answers_404_not_503_for_dot_files(
-    tmp_path: Path, path: str
+    tmp_path: Path, registry: RoomRegistry, path: str
 ) -> None:
     unbuilt = tmp_path / "unbuilt"
     unbuilt.mkdir()
     (unbuilt / ".env").write_text("SECRET=1", encoding="utf-8")
-    client = TestClient(create_app(rooms=RoomRegistry(), dist_dir=unbuilt))
+    client = TestClient(create_app(rooms=registry, dist_dir=unbuilt))
 
     response = client.get(path, follow_redirects=False)
 
@@ -655,9 +660,9 @@ def test_ac29_api_docs_answer_json_404_without_a_built_client(
 # ---- AC-7: RoomRegistry -----------------------------------------------------
 
 
-def test_ac7_register_room_gives_distinct_valid_codes(fx01_grid: Grid) -> None:
-    registry = RoomRegistry()
-
+def test_ac7_register_room_gives_distinct_valid_codes(
+    registry: RoomRegistry, fx01_grid: Grid
+) -> None:
     first = registry.register_room(fx01_grid)
     second = registry.register_room(fx01_grid)
 
@@ -668,16 +673,22 @@ def test_ac7_register_room_gives_distinct_valid_codes(fx01_grid: Grid) -> None:
     assert registry.find_room(second) == fx01_grid
 
 
-def test_ac7_find_room_returns_none_for_unknown_code(fx01_grid: Grid) -> None:
-    registry = RoomRegistry()
+def test_ac7_find_room_returns_none_for_unknown_code(
+    registry: RoomRegistry, fx01_grid: Grid
+) -> None:
     registry.register_room(fx01_grid)
+    other_registry = RoomRegistry()
 
-    assert registry.find_room("abc123") is None
-    assert RoomRegistry().find_room("ABC123") is None
+    try:
+        assert registry.find_room("abc123") is None
+        assert other_registry.find_room("ABC123") is None
+    finally:
+        other_registry.close()
 
 
-def test_ac7_many_codes_are_all_distinct(fx01_grid: Grid) -> None:
-    registry = RoomRegistry()
+def test_ac7_many_codes_are_all_distinct(
+    registry: RoomRegistry, fx01_grid: Grid
+) -> None:
     codes = [registry.register_room(fx01_grid) for _ in range(200)]
 
     assert len(set(codes)) == 200

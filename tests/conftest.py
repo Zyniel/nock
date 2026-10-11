@@ -85,11 +85,13 @@ SERVER_START_TIMEOUT_SECONDS = 10.0
 
 
 @pytest.fixture
-def room_registry() -> RoomRegistry:
-    """Return the empty room registry that the live server serves."""
+def room_registry() -> Iterator[RoomRegistry]:
+    """Yield the empty room registry that the live server serves, then close it."""
     from nock.server import RoomRegistry
 
-    return RoomRegistry()
+    registry = RoomRegistry()
+    yield registry
+    registry.close()
 
 
 @pytest.fixture
