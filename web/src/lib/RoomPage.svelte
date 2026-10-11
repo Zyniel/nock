@@ -55,6 +55,35 @@
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
+  // The host panel scrolls sideways on a small window. An edge fade says so
+  // without depending on the scrollbar, which some engines hide.
+  let hostPanel: HTMLDivElement | undefined = $state()
+  let hostPanelHasMore = $state(false)
+
+  // Show the fade while content is hidden past the right edge of the panel.
+  function updateHostPanelMore(): void {
+    if (hostPanel === undefined) {
+      hostPanelHasMore = false
+      return
+    }
+    const hiddenOnTheRight = hostPanel.scrollWidth - hostPanel.clientWidth - hostPanel.scrollLeft
+    hostPanelHasMore = hiddenOnTheRight > 1
+  }
+
+  // Measure again whenever the panel or its content changes size.
+  $effect(() => {
+    if (hostPanel === undefined) {
+      return
+    }
+    const observer = new ResizeObserver(updateHostPanelMore)
+    observer.observe(hostPanel)
+    for (const child of Array.from(hostPanel.children)) {
+      observer.observe(child)
+    }
+    updateHostPanelMore()
+    return () => observer.disconnect()
+  })
+
   let shareLink = $derived(`${location.origin}/r/${code}`)
   let copied = $state(false)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -812,7 +841,12 @@
       </ul>
     </section>
     {#if isHost}
-      <div class="host-panel" data-testid="host-panel">
+      <div
+        class="host-panel"
+        data-testid="host-panel"
+        bind:this={hostPanel}
+        onscroll={updateHostPanelMore}
+      >
         <strong class="host-heading">{t('settings.heading')}</strong>
         <button type="button" data-testid="lock-room" aria-pressed={isLocked} onclick={toggleLock}
           >{isLocked ? t('host.unlock') : t('host.lock')}</button
@@ -850,6 +884,12 @@
           </label>
           <button type="submit" data-testid="settings-save">{t('settings.save')}</button>
         </form>
+        <span
+          class="host-panel-more"
+          class:shown={hostPanelHasMore}
+          data-testid="host-panel-more"
+          aria-hidden="true"
+        ></span>
       </div>
     {/if}
     </div>
@@ -1034,6 +1074,10 @@
     font-size: 0.8rem;
   }
 
+  .host-panel-more {
+    display: none;
+  }
+
   .settings-form {
     display: flex;
     flex-wrap: wrap;
@@ -1141,6 +1185,25 @@
     .host-panel {
       overflow-x: auto;
       scrollbar-width: thin;
+    }
+
+    /* A fade stuck to the right edge of the visible part of the panel. Its
+       negative margin cancels its width and the row gap: no layout change. */
+    .host-panel-more {
+      display: block;
+      flex: none;
+      position: sticky;
+      right: 0;
+      align-self: stretch;
+      width: 1.5rem;
+      margin-left: calc(-1.5rem - 0.5rem);
+      background: linear-gradient(to right, transparent, Canvas);
+      pointer-events: none;
+      visibility: hidden;
+    }
+
+    .host-panel-more.shown {
+      visibility: visible;
     }
 
     .host-panel button,
