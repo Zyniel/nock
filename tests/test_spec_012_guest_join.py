@@ -452,29 +452,29 @@ def test_ac1_websocket_join_answers_a_snapshot_with_the_player(
 
         snapshot = receive_snapshot(websocket)
 
-    assert snapshot.seq == 1
-    assert snapshot.players == (
-        PlayerView(
-            player_id=snapshot.you,
-            nickname="Ana",
-            colour=0,
-            state=PlayerState.ACTIVE,
-            is_host=True,
-            muted=False,
-            selection=None,
-        ),
-    )
-    state = registry.room_state(room_code)
-    assert state is not None
-    assert state.seq == 1
-    assert len(state.players) == 1
-    stored = state.players[0]
-    assert stored.player_id == snapshot.you
-    assert stored.resume_token == snapshot.resume_token
-    assert stored.nickname == "Ana"
-    assert stored.colour == 0
-    assert stored.is_host is True
-    assert player_views(state) == snapshot.players
+        assert snapshot.seq == 1
+        assert snapshot.players == (
+            PlayerView(
+                player_id=snapshot.you,
+                nickname="Ana",
+                colour=0,
+                state=PlayerState.ACTIVE,
+                is_host=True,
+                muted=False,
+                selection=None,
+            ),
+        )
+        state = registry.room_state(room_code)
+        assert state is not None
+        assert state.seq == 1
+        assert len(state.players) == 1
+        stored = state.players[0]
+        assert stored.player_id == snapshot.you
+        assert stored.resume_token == snapshot.resume_token
+        assert stored.nickname == "Ana"
+        assert stored.colour == 0
+        assert stored.is_host is True
+        assert player_views(state) == snapshot.players
 
 
 @pytest.mark.parametrize("typed", ["<b>Eve</b>", "Ana!", "--", "a@b"])

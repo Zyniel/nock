@@ -1444,7 +1444,7 @@ def test_ac4_a_raising_rule_is_logged_and_the_room_goes_on(
 def one_player_id(monkeypatch: pytest.MonkeyPatch) -> str:
     """Make the server give every connection the same player id.
 
-    The socket handler draws the ids of a snapshot with `secrets.token_urlsafe`;
+    The hub draws the ids of a snapshot with `secrets.token_urlsafe`;
     a constant that fits both the player id and the resume token patterns makes
     two sockets attach under one player id.
     """
@@ -1452,7 +1452,7 @@ def one_player_id(monkeypatch: pytest.MonkeyPatch) -> str:
     def constant_token(_nbytes: int | None = None) -> str:
         return SHARED_TOKEN
 
-    monkeypatch.setattr(nock.server.secrets, "token_urlsafe", constant_token)
+    monkeypatch.setattr(nock.hub.secrets, "token_urlsafe", constant_token)
     return SHARED_TOKEN
 
 
