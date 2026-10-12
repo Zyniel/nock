@@ -170,7 +170,7 @@ CONTRAST_SCAN_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
   const skippedTags = new Set(
     ['SCRIPT', 'STYLE', 'NOSCRIPT', 'OPTION', 'TITLE', 'HEAD']
   );
-  const offenders = [];
+  const measurements = [];
   for (const element of document.body.querySelectorAll('*')) {
     if (skippedTags.has(element.tagName)) {
       continue;
@@ -210,16 +210,17 @@ CONTRAST_SCAN_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
     text[3] = text[3] * opacity;
     const shown = over(text, opaqueBackground);
     const ratio = contrast(shown, opaqueBackground);
-    if (ratio < 4.5) {
-      offenders.push({
-        tag: element.tagName,
-        testid: element.getAttribute('data-testid'),
-        text: ownText,
-        ratio: Math.round(ratio * 100) / 100,
-      });
-    }
+    const row = element.closest('[data-testid="roster-player"]');
+    measurements.push({
+      tag: element.tagName,
+      testid: element.getAttribute('data-testid'),
+      rowState: row === null ? null : row.getAttribute('data-state'),
+      text: ownText,
+      opacity: opacity,
+      ratio: ratio,
+    });
   }
-  return offenders;
+  return measurements;
 }"""
 
 LANGUAGE_SCAN_SCRIPT = r"""
@@ -342,31 +343,6 @@ region => {
     subtree: true,
     attributes: true,
   });
-}
-"""
-
-# What the contrast scan sees of an element: whether it reaches the scan (own text,
-# a box, visible, not hidden or disabled) and the opacity it is composited with.
-SCAN_COVERAGE_SCRIPT = r"""
-element => {
-  let ownText = '';
-  for (const node of element.childNodes) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      ownText += node.textContent;
-    }
-  }
-  const box = element.getBoundingClientRect();
-  let opacity = 1;
-  for (let node = element; node; node = node.parentElement) {
-    opacity *= parseFloat(getComputedStyle(node).opacity);
-  }
-  const reached = ownText.trim() !== ''
-    && box.width > 0
-    && box.height > 0
-    && getComputedStyle(element).visibility === 'visible'
-    && !element.closest('.visually-hidden')
-    && !element.closest(':disabled');
-  return { scanned: reached, opacity: opacity };
 }
 """
 
@@ -621,7 +597,7 @@ def selection_frame(player_id: str, row: int, column: int, direction: Direction)
 # ---- Keyboard walker ------------------------------------------------------------
 
 
-class _Reached(NamedTuple):
+class Reached(NamedTuple):
     """An element a `tab_to` reached, with its focus outline."""
 
     test_id: str
@@ -635,7 +611,7 @@ class Walker:
 
     def __init__(self, page: Page) -> None:
         self.page = page
-        self.reached: list[_Reached] = []
+        self.reached: list[Reached] = []
         self.outlines: list[list[dict[str, Any]]] = []
 
     def active(self, selector: str) -> tuple[str | None, bool]:
@@ -667,7 +643,7 @@ class Walker:
     def record(self, test_id: str) -> None:
         outline = self.page.evaluate(FOCUS_OUTLINE_SCRIPT)
         self.reached.append(
-            _Reached(
+            Reached(
                 test_id=test_id,
                 outline_style=outline["style"],
                 outline_width=outline["width"],
@@ -725,7 +701,7 @@ class FrameRecorder:
         return self.of_type(type_name)
 
 
-class _WalkResult(NamedTuple):
+class WalkResult(NamedTuple):
     """What the walk of AC-1 left behind."""
 
     ana: Walker
@@ -869,7 +845,7 @@ def walk_the_removal(
     return bob_walker
 
 
-def run_keyboard_walk(page: Page, browser: Browser, live_server: str) -> _WalkResult:
+def run_keyboard_walk(page: Page, browser: Browser, live_server: str) -> WalkResult:
     """The whole walk of AC-1; every step uses the keyboard only."""
     recorder = FrameRecorder(page)
     walker = Walker(page)
@@ -877,7 +853,7 @@ def run_keyboard_walk(page: Page, browser: Browser, live_server: str) -> _WalkRe
     walk_the_grid(walker, recorder)
     walk_the_controls(walker, recorder)
     bob_walker = walk_the_removal(walker, recorder, browser)
-    return _WalkResult(ana=walker, recorder=recorder, bob_walker=bob_walker)
+    return WalkResult(ana=walker, recorder=recorder, bob_walker=bob_walker)
 
 
 # ---- AC-1: every action is reachable from the keyboard -------------------------
@@ -1170,34 +1146,30 @@ def test_ac4_choosing_the_same_selection_again_does_not_rewrite_the_region(
 ) -> None:
     mock = open_room(page, live_server, fx01_grid)
     announcement = announcement_of(page)
-    cell_at(page, 2, 2).click()
-    cell_at(page, 2, 2).click()
-    expect(announcement).to_have_text("Artiste muet, vertical, 4 lettres, lettre 2")
+    cell_at(page, 1, 0).click()
+    expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 1")
+    expect_selected(page, 1, 0)
+    word_before = grid_of(page).get_attribute("data-word")
     announcement.evaluate(OBSERVE_REWRITES_SCRIPT)
-    selected_before = (
-        grid_of(page).get_attribute("data-selected-row"),
-        grid_of(page).get_attribute("data-selected-column"),
-    )
 
-    # Events that leave my selection and its word unchanged.
+    # ArrowLeft cannot leave (1, 0): only clue cells lie to its left (spec 009
+    # AC-1), so the player chooses the same selection again. Remote events and
+    # Escape leave it alone too.
+    page.keyboard.press("ArrowLeft")
     page.keyboard.press("Escape")
     mock.send(selection_frame("p2", 3, 1, Direction.DOWN))
     mock.send(letter_changed_frame(6, 3, 1, "A", "p2"))
     expect(cell_at(page, 3, 1)).to_have_attribute("data-letter", "A")
     page.wait_for_timeout(SETTLE_MS)
 
-    selected_after = (
-        grid_of(page).get_attribute("data-selected-row"),
-        grid_of(page).get_attribute("data-selected-column"),
-    )
-    assert selected_after == selected_before
-    expect_word(page, "0,2,0")
-    expect(announcement).to_have_text("Artiste muet, vertical, 4 lettres, lettre 2")
+    expect_selected(page, 1, 0)
+    assert grid_of(page).get_attribute("data-word") == word_before
+    expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 1")
     assert page.evaluate("window.announcementRewrites") == 0
 
     # Control: a real move does rewrite the region, so the observer works.
-    page.keyboard.press("ArrowDown")
-    expect(announcement).to_have_text("Artiste muet, vertical, 4 lettres, lettre 3")
+    page.keyboard.press("ArrowRight")
+    expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 2")
     assert page.evaluate("window.announcementRewrites") > 0
 
 
@@ -1736,9 +1708,19 @@ STATE_NAMES = list(STATE_OPENERS)
 # ---- AC-8: text contrast ------------------------------------------------------------
 
 
+def contrast_measurements(page: Page) -> list[dict[str, Any]]:
+    """Return what the contrast scan measured for every text element it reaches."""
+    measurements = page.evaluate(CONTRAST_SCAN_SCRIPT)
+    assert isinstance(measurements, list)
+    return measurements
+
+
 def contrast_offenders(page: Page) -> list[dict[str, Any]]:
-    offenders = page.evaluate(CONTRAST_SCAN_SCRIPT)
-    assert isinstance(offenders, list)
+    """Return the scanned elements whose text contrast is under 4.5:1."""
+    offenders: list[dict[str, Any]] = []
+    for measurement in contrast_measurements(page):
+        if measurement["ratio"] < 4.5:
+            offenders.append(measurement)
     return offenders
 
 
@@ -1816,19 +1798,18 @@ def test_ac8_the_dimmed_roster_rows_are_scanned_with_their_opacity(
 ) -> None:
     open_k2(page, live_server, fx01_grid)
 
+    measurements = contrast_measurements(page)
+
     dimmed_rows = {"idle": "Cleo", "disconnected": "Dan"}
     for state, nickname in dimmed_rows.items():
-        row = page.locator(f'[data-testid="roster-player"][data-state="{state}"]')
-        expect(row).to_have_count(1)
-        nickname_element = row.get_by_test_id("roster-nickname")
-        expect(nickname_element).to_have_text(nickname)
-        coverage = nickname_element.evaluate(SCAN_COVERAGE_SCRIPT)
-        assert coverage["scanned"] is True, (state, coverage)
-        # Spec 035 allows any opacity here as long as the composited text reaches
-        # 4.5:1 (checked below), or another non-colour sign instead of dimming.
-        assert 0 < coverage["opacity"] <= 1, (state, coverage)
-
-    assert contrast_offenders(page) == []
+        found: list[dict[str, Any]] = []
+        for measurement in measurements:
+            is_nickname = measurement["testid"] == "roster-nickname"
+            if is_nickname and measurement["rowState"] == state:
+                found.append(measurement)
+        # The scan reached the nickname exactly once, with its own opacity applied.
+        assert [item["text"] for item in found] == [nickname], (state, found)
+        assert found[0]["ratio"] >= 4.5, (state, found[0])
 
 
 # ---- AC-9: the interface is in French, every string from fr.json -----------------
