@@ -1,7 +1,7 @@
 ---
 id: "026"
 title: Completion detection
-status: approved
+status: done
 ---
 
 # 026 - Completion detection
