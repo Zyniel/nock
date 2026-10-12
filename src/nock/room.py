@@ -964,7 +964,10 @@ def _with_edit_counted(state: RoomState, player_id: str, now: float) -> RoomStat
 def _count_unhandled_edit(
     state: RoomState, player_id: str, now: float, config: RoomConfig
 ) -> Outcome:
-    """Count a pencil edit or a confirmation, which spec 020 will give a meaning."""
+    """Count a pencil edit or a confirmation, which spec 020 will give a meaning.
+
+    Once the grid is solved, the edit is refused with grid_solved instead.
+    """
     refusal = _rate_limit_refusal(state, player_id, now, config)
     if refusal is not None:
         return refusal

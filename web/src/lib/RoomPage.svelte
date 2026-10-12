@@ -1131,7 +1131,7 @@
     list-style: none;
   }
 
-  /* Below the scrolling grid, so it is always inside the window. */
+  /* The grid state line, kept out of the scrolling area. */
   .grid-status {
     flex: none;
     margin: 0;
@@ -1139,6 +1139,7 @@
     font-weight: bold;
   }
 
+  /* Below the scrolling grid, so it is always inside the window. */
   .clue-bar {
     flex: none;
     box-sizing: border-box;
