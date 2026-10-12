@@ -212,8 +212,10 @@ def load_catalogue(directory: Path) -> Catalogue:
         The catalogue of those files.
 
     Raises:
-        CatalogueError: At the first file that is not valid, or when two files
-            hold the same number. The message contains the file name.
+        CatalogueError: At the first file that is not valid (including a
+            missing, blank or over-long credit: author, source or licence;
+            or a non-boolean `withdrawn`), or when two files hold the same
+            number. The message contains the file name.
     """
     if not directory.is_dir():
         return Catalogue()
