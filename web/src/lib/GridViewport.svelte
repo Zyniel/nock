@@ -15,7 +15,7 @@
   import { shownCell, shownGrid } from './roomSession'
   import type { CellFlash, GridView, PendingEdit } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
-  import type { Selection, Word } from './wordSelection'
+  import type { Position, Selection, Word } from './wordSelection'
   import type { RemoteSelection } from './remoteSelections'
 
   interface Finger {
@@ -92,6 +92,48 @@
   }
 
   let gridElement: HTMLDivElement | undefined = $state()
+
+  // The cells of each row, in column order: the grid is drawn row by row.
+  let rows = $derived(rowsOf(grid))
+
+  function rowsOf(view: GridView): GridView['cells'][number][][] {
+    const result: GridView['cells'][number][][] = []
+    for (let row = 0; row < view.height; row += 1) {
+      result.push([])
+    }
+    for (const cell of view.cells) {
+      result[cell.row].push(cell)
+    }
+    for (const rowCells of result) {
+      rowCells.sort((first, second) => first.column - second.column)
+    }
+    return result
+  }
+
+  // What a screen reader says when the selection moves (spec 035).
+  let announcement = $derived(announcementOf(selection, activeWord))
+
+  function announcementOf(current: Selection | null, word: Word | null): string {
+    if (current === null || word === null) {
+      return ''
+    }
+    const direction = t(word.direction === 'across' ? 'a11y.direction.across' : 'a11y.direction.down')
+    if (word.cells.length === 1) {
+      return t('a11y.announcement_one', { clue: word.text, direction })
+    }
+    const index = word.cells.findIndex(
+      (cell: Position) => cell.row === current.row && cell.column === current.column,
+    )
+    return t('a11y.announcement', {
+      clue: word.text,
+      direction,
+      length: word.cells.length,
+      position: index + 1,
+    })
+  }
+
+  // After Escape, the next Tab or Shift+Tab leaves the grid (spec 035).
+  let isReleased = false
   let activeKey = $derived(activeWord === null ? '' : wordKey(activeWord))
   let wordPositions = $derived(
     new Set((activeWord?.cells ?? []).map((cell) => positionKey(cell.row, cell.column))),
@@ -177,8 +219,29 @@
     }
   }
 
+  function isModifierKey(key: string): boolean {
+    return key === 'Shift' || key === 'Control' || key === 'Alt' || key === 'Meta'
+  }
+
+  function onGridFocusChange(): void {
+    isReleased = false
+  }
+
   // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
+    if (isModifierKey(event.key)) {
+      return
+    }
+    const wasReleased = isReleased
+    isReleased = false
+    const hasAnyModifier = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
+    if (event.key === 'Escape' && !hasAnyModifier) {
+      isReleased = true
+      return
+    }
+    if (event.key === 'Tab' && wasReleased && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      return
+    }
     const isUndo =
       (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'z'
     if (isUndo && onUndo !== undefined) {
@@ -231,7 +294,11 @@
     }
     element.addEventListener('click', onGridClick)
     element.addEventListener('keydown', onGridKeydown)
+    element.addEventListener('focus', onGridFocusChange)
+    element.addEventListener('blur', onGridFocusChange)
     return () => {
+      element.removeEventListener('focus', onGridFocusChange)
+      element.removeEventListener('blur', onGridFocusChange)
       element.removeEventListener('click', onGridClick)
       element.removeEventListener('keydown', onGridKeydown)
     }
@@ -334,6 +401,8 @@
     aria-label={t('grid.label')}
     role="grid"
     tabindex="0"
+    aria-describedby="grid-hint"
+    aria-activedescendant={selection === null ? undefined : `cell-${selection.row}-${selection.column}`}
     bind:this={gridElement}
     data-selected-row={selection === null ? '' : String(selection.row)}
     data-selected-column={selection === null ? '' : String(selection.column)}
@@ -343,7 +412,9 @@
     style:grid-template-columns="repeat({grid.width}, var(--cell))"
     style:grid-auto-rows="var(--cell)"
   >
-    {#each grid.cells as cell (cell.row * grid.width + cell.column)}
+    {#each rows as rowCells, rowIndex (rowIndex)}
+    <div class="row" data-testid="grid-row" role="row" data-row={rowIndex}>
+    {#each rowCells as cell (cell.column)}
       {#if cell.type === 'letter'}
         {@const shown = shownCell(cell, pendingEdits)}
         {@const outlines = outlinesOn(cell.row, cell.column)}
@@ -356,6 +427,9 @@
           data-row={cell.row}
           data-column={cell.column}
           data-type="letter"
+          role="gridcell"
+          id="cell-{cell.row}-{cell.column}"
+          aria-selected={isSelected(cell.row, cell.column)}
           data-letter={shown.letter ?? ''}
           data-unconfirmed={String(shown.unconfirmed)}
           data-author={cell.author ?? ''}
@@ -378,7 +452,12 @@
               data-colour={String(remote.colour)}
               style:--outline-colour={`var(--player-colour-${remote.colour})`}
               style:inset="{outlineInset(rank)}px"
-            ></span>{/each}</div>
+              ><span
+                class="remote-initials"
+                class:far={rank % 2 === 1}
+                data-testid="remote-initials">{remote.initials}</span
+              ></span
+            >{/each}</div>
       {:else if cell.type === 'clue'}
         <div
           class="cell clue-cell"
@@ -387,6 +466,8 @@
           data-row={cell.row}
           data-column={cell.column}
           data-type="clue"
+          role="gridcell"
+          id="cell-{cell.row}-{cell.column}"
           style:grid-row={cell.row + 1}
           style:grid-column={cell.column + 1}
         >
@@ -421,13 +502,25 @@
           data-row={cell.row}
           data-column={cell.column}
           data-type="empty"
+          role="gridcell"
+          id="cell-{cell.row}-{cell.column}"
           style:grid-row={cell.row + 1}
           style:grid-column={cell.column + 1}
         ></div>
       {/if}
     {/each}
+    </div>
+    {/each}
   </div>
 </div>
+<div
+  class="visually-hidden"
+  data-testid="grid-announcement"
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+>{announcement}</div>
+<div class="visually-hidden" id="grid-hint" data-testid="grid-hint">{t('a11y.grid_hint')}</div>
 
 <style>
   .viewport {
@@ -448,6 +541,11 @@
     display: grid;
     width: max-content;
     margin: 0 auto;
+  }
+
+  /* The rows only group the cells: the cells stay items of the CSS grid. */
+  .row {
+    display: contents;
   }
 
   .cell {
@@ -475,6 +573,7 @@
 
   .letter.locked {
     background: #dfe3ee;
+    font-weight: 700;
   }
 
   .letter.in-word {
@@ -483,6 +582,8 @@
 
   .letter.selected {
     background: #ffd54a;
+    outline: 3px solid #1f2330;
+    outline-offset: -3px;
   }
 
   /* The word of another player: their colour at low opacity. My own word
@@ -500,9 +601,30 @@
     pointer-events: none;
   }
 
+  /* The initials of the player, in a small white label in a corner. */
+  .remote-initials {
+    position: absolute;
+    top: 0;
+    left: 0;
+    padding: 0 1px;
+    font-size: calc(var(--cell) * 0.2);
+    font-weight: 700;
+    line-height: 1.1;
+    color: #1f2330;
+    background: #ffffff;
+  }
+
+  .remote-initials.far {
+    top: auto;
+    left: auto;
+    right: 0;
+    bottom: 0;
+  }
+
   /* After the other states, so a flash shows over them. */
   .letter[data-flash='0'] {
     background: var(--player-colour-0);
+    color: #000000;
   }
 
   .letter[data-flash='1'] {
@@ -511,6 +633,7 @@
 
   .letter[data-flash='2'] {
     background: var(--player-colour-2);
+    color: #ffffff;
   }
 
   .letter[data-flash='3'] {
@@ -519,26 +642,31 @@
 
   .letter[data-flash='4'] {
     background: var(--player-colour-4);
+    color: #ffffff;
   }
 
   .letter[data-flash='5'] {
     background: var(--player-colour-5);
+    color: #ffffff;
   }
 
   .letter[data-flash='6'] {
     background: var(--player-colour-6);
+    color: #ffffff;
   }
 
   .letter[data-flash='7'] {
     background: var(--player-colour-7);
+    color: #000000;
   }
 
   .clue.active {
     background: #ffd54a;
   }
 
-  .grid:focus {
-    outline: none;
+  /* The focus outline stays inside the scrolling viewport. */
+  .grid:focus-visible {
+    outline-offset: -3px;
   }
 
   .empty {

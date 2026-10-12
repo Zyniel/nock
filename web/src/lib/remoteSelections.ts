@@ -13,6 +13,28 @@ export interface RemoteSelection {
   column: number
   // The "row,column" of each cell of their selected word.
   wordPositions: Set<string>
+  // The initials of their nickname, drawn in their cursor (spec 035).
+  initials: string
+}
+
+// The initials of a nickname: split on spaces, hyphens, apostrophes (' and ’)
+// and underscores; with two or more parts, the first character of each of the
+// first two parts; with one part, its first two characters. Upper-cased with
+// toLocaleUpperCase('fr'). Characters are code points.
+export function initialsOf(nickname: string): string {
+  const parts: string[] = []
+  for (const part of nickname.split(/[ \-'’_]+/)) {
+    if (part !== '') {
+      parts.push(part)
+    }
+  }
+  let letters: string[] = []
+  if (parts.length >= 2) {
+    letters = [[...parts[0]][0], [...parts[1]][0]]
+  } else if (parts.length === 1) {
+    letters = [...parts[0]].slice(0, 2)
+  }
+  return letters.join('').toLocaleUpperCase('fr')
 }
 
 // The selections to draw, in roster order. Never mine, never a disconnected
@@ -43,6 +65,7 @@ export function remoteSelectionsOf(snapshot: Snapshot | null, words: Word[]): Re
       row: selection.row,
       column: selection.column,
       wordPositions,
+      initials: initialsOf(player.nickname),
     })
   }
   return remotes

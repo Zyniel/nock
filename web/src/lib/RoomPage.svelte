@@ -738,7 +738,11 @@
     {#if session.snapshot !== null}
       <div class="share-panel" data-testid="share-panel">
         <span id="share-label" class="share-label">{t('room.share.label')}</span>
-        <a data-testid="share-link" href={shareLink} aria-describedby="share-label"
+        <a
+          data-testid="share-link"
+          href={shareLink}
+          tabindex="0"
+          aria-describedby="share-label"
           >{shareLink}</a
         >
         <button type="button" data-testid="copy-link" onclick={copyLink}
@@ -1064,12 +1068,15 @@
     color: #5b6070;
   }
 
-  .roster li[data-state='idle'] {
-    opacity: 0.7;
+  /* No opacity: dimmed text would not reach 4.5:1 (spec 035). The state is
+     also written in the row, and the nickname shows it by its style. */
+  .roster li[data-state='idle'] [data-testid='roster-nickname'] {
+    font-style: italic;
   }
 
-  .roster li[data-state='disconnected'] {
-    opacity: 0.45;
+  .roster li[data-state='disconnected'] [data-testid='roster-nickname'] {
+    font-style: italic;
+    text-decoration: line-through;
   }
 
   .roster-host {
