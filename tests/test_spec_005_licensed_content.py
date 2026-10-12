@@ -79,15 +79,27 @@ FORBIDDEN_PATHS = [
     "xmlrpc.client",
     "websockets.client",
     "websockets.sync.client",
+    "websockets.asyncio.client",
+    "websockets.legacy.client",
+    "poplib",
+    "imaplib",
+    "telnetlib",
     "websockets.connect",
 ]
 ANYIO_CONNECT_PREFIX = "anyio.connect_"
-FORBIDDEN_CALL_NAMES = ["create_connection", "open_connection", "open_unix_connection"]
+FORBIDDEN_CALL_NAMES = [
+    "create_connection",
+    "open_connection",
+    "open_unix_connection",
+    "create_unix_connection",
+    "create_datagram_endpoint",
+    "sock_connect",
+]
 CLIENT_URL_PATTERNS = [
     re.compile(r"https?://", re.IGNORECASE),
     re.compile(r"wss?://", re.IGNORECASE),
     re.compile(r"""["'`]//[a-z0-9$]""", re.IGNORECASE),
-    re.compile(r"""url\( *["']? *//""", re.IGNORECASE),
+    re.compile(r"""url\(\s*["']?\s*//""", re.IGNORECASE),
 ]
 
 
@@ -577,6 +589,12 @@ FLAGGED_SERVER_SAMPLES = [
     "import websockets.client",
     "from websockets.sync.client import connect",
     "from websockets.sync import client",
+    "from websockets.asyncio.client import connect",
+    'import websockets.asyncio.client as c\nc.connect("wss://x")',
+    "from websockets.legacy.client import connect",
+    "import poplib",
+    'loop.create_unix_connection(f, "/tmp/s")',
+    "loop.sock_connect(s, addr)",
     'import importlib\nimportlib.import_module("socket")',
     'from importlib import import_module\nimport_module("http.client")',
     '__import__("urllib.request")',
@@ -649,6 +667,8 @@ FLAGGED_CLIENT_SAMPLES = [
     "@import url('//fonts.example.com/a.css');",
     '@import "//fonts.example.com/a.css";',
     "background: url(HTTPS://example.com/b.png);",
+    "src: url(\t//cdn.example.com/f.woff2);",
+    'background: url(\n  "//cdn.example.com/b.png");',
 ]
 
 UNFLAGGED_CLIENT_SAMPLES = [
