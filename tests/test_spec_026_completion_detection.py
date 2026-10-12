@@ -1394,3 +1394,48 @@ def test_ac9_a_stored_solved_room_loads_solved_and_still_refuses_edits(
     )
     assert refusal_code(refused) is ErrorCode.GRID_SOLVED
     assert refused.entries == ()
+
+
+def test_ac9_a_stored_full_wrong_room_loads_unsolved_and_can_still_be_solved(
+    fx01_grid: Grid,
+) -> None:
+    state = two_player_room(fx01_grid)
+    entries: list[LogEntry] = []
+    for position in ROW_MAJOR:
+        letter = "N" if position == LAST_CELL else SOLUTION[position]
+        outcome = write(state, "p1", position, letter, NOW + 100.0)
+        entries.extend(outcome.entries)
+        state = outcome.state
+    assert isinstance(entries[-2].event, LetterChanged)
+    assert isinstance(entries[-1].event, GridFullWrong)
+    assert state.solved is False
+    joins = [
+        ("p1", "Ana", FIRST_TOKEN),
+        ("p2", "Bob", SECOND_TOKEN),
+    ]
+    join_entries: list[LogEntry] = []
+    replay_state = new_room(ROOM_CODE, fx01_grid, NOW)
+    for player_id, nickname, token in joins:
+        join = Join(nickname=nickname, resume_token=None)
+        joined = join_room(replay_state, join, NOW, player_id, token)
+        join_entries.extend(joined.entries)
+        replay_state = joined.state
+
+    store = RoomStore(":memory:")
+    try:
+        store.create_room(new_room(ROOM_CODE, fx01_grid, NOW))
+        store.append(ROOM_CODE, join_entries + entries)
+
+        loaded = store.load_room(ROOM_CODE)
+    finally:
+        store.close()
+
+    assert loaded is not None
+    assert loaded.solved is False
+    assert loaded.seq == state.seq
+    assert loaded.cells == state.cells
+    fixed = handle_message(
+        loaded, "p1", EditLetter(row=4, column=4, letter="T"), NOW + 754.0
+    )
+    assert fixed.reply == ()
+    assert events_of(fixed)[-1] == GridSolved(seq=state.seq + 2, elapsed_ms=754000)

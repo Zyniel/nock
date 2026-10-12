@@ -40,6 +40,7 @@ from nock.protocol import (
     ErrorCode,
     ErrorMessage,
     GridFullWrong,
+    GridSolved,
     GridView,
     HelpMode,
     Join,
@@ -232,6 +233,14 @@ class Peer:
         found: list[int] = []
         for message in self.events():
             if isinstance(message, GridFullWrong):
+                found.append(message.seq)
+        return found
+
+    def solved_seqs(self) -> list[int]:
+        """The seq of every `grid_solved` event received (spec 026)."""
+        found: list[int] = []
+        for message in self.events():
+            if isinstance(message, GridSolved):
                 found.append(message.seq)
         return found
 
@@ -886,12 +895,17 @@ def test_ac3_four_clients_sending_1000_edits_end_with_the_same_grid(
                 range(first_expected, final_seq + 1)
             )
 
-    # Spec 026: each `grid_full_wrong` takes one seq, and every client got it.
+    # Spec 026: each `grid_full_wrong` and `grid_solved` takes one seq, and every
+    # client got it. No edit was refused (no error above), so all 1000 were
+    # accepted and each took one seq.
     full_wrong_count = len(peers[0].full_wrong_seqs())
-    edit_seqs = CLIENT_COUNT + CLIENT_COUNT * EDITS_PER_CLIENT
-    assert final_seq == edit_seqs + full_wrong_count
+    solved_count = len(peers[0].solved_seqs())
+    accepted_edits = CLIENT_COUNT * EDITS_PER_CLIENT
+    expected_seq = CLIENT_COUNT + accepted_edits + full_wrong_count + solved_count
+    assert final_seq == expected_seq
     for peer in peers:
         assert peer.full_wrong_seqs() == peers[0].full_wrong_seqs()
+        assert peer.solved_seqs() == peers[0].solved_seqs()
     filled = [value for value in expected_grid.values() if value[0] is not None]
     assert len(filled) > 0
     for letter, pencil, author in expected_grid.values():
