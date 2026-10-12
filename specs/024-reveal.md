@@ -35,6 +35,13 @@ with one late joiner's snapshot before the reveal (must not show the letter) and
 one after; the same for the browser game. The earn rule keys on the revealing
 frame, not on log order across clients.
 
+Note from the lead (2026-10-12, from the spec 026 review): spec 026's
+completion rule also triggers on `cell_locked` (`_with_completion` in
+`src/nock/room.py`), and only a reveal can fill a cell through a lock. This
+spec's tests must cover completion by a reveal: `grid_solved` after the last
+revealed letter, or `grid_full_wrong` when the grid is then full but wrong.
+Revealing on a solved grid is refused with `grid_solved` (spec 026 AC-4).
+
 None stated in the backlog. To complete during review.
 
 ## Out of scope

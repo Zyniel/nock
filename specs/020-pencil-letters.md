@@ -32,6 +32,21 @@ through checks 2 to 5 of spec 015's order. This spec must route them through
 the same edit checks, so a refused pencil edit (for example on a clue cell)
 is answered with its error and not counted.
 
+Note from the lead (2026-10-12, from the spec 026 review): completion counts
+pencil letters like normal letters (AC-3, backlog AC-5.2.3; spec 026's
+definitions and decision 6 were amended on 2026-10-12 to match). On the
+server, `_is_filled` in `src/nock/room.py` still returns False for a pencil
+letter (`cell.letter is not None and not cell.pencil`); this spec must change
+it so a pencil letter fills its cell, and a pencil edit that fills or
+completes the grid must trigger spec 026's completion rule like any letter
+change. On the client, `isGridFull` in `web/src/lib/RoomPage.svelte` (around
+line 229) checks only `cell.letter !== null`, so it already counts pencil
+letters towards the `full_wrong` banner, which is now right; it needs no
+change. `pencil_edit` and `confirm_pencil` are refused with `grid_solved` once the
+grid is solved; until this spec defines its own checks, only the rate limit
+comes before that refusal. This spec must place its own refusals before
+`grid_solved`, in the order spec 026 sets.
+
 - AC-3 depends on behaviour owned by spec 026; test only this spec's side of it here.
 
 ## Out of scope

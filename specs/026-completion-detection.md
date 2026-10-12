@@ -26,19 +26,20 @@ of `grid_solved`, and the completion banner on the room page.
 
 ### Definitions
 
-- A letter cell is **filled** when it holds a letter that is not a pencil letter
-  (spec 020). Locked and revealed cells are filled.
+- A letter cell is **filled** when it holds a letter, pencil letter (spec 020) or
+  not. Locked and revealed cells are filled.
 - The grid is **full** when every letter cell of `state.cells` is filled.
 - The grid is **right** when it is full and every letter equals the solution
   letter of its cell (the letter of the normalised `answer` of a clue whose word
-  holds the cell, as in spec 023).
+  holds the cell, as in spec 023), whatever the letter's pencil flag.
 
 ### Server rule: completion (`nock.room.handle_message`)
 
 After any accepted step of `handle_message` whose entries contain at least one
-`letter_changed` or `cell_locked` (an edit, an undo, a reveal of spec 024, a
-confirmed pencil letter of spec 020), and while `state.solved` is False, with `s`
-the seq of the step's last entry so far:
+`letter_changed` or `cell_locked` (an edit, an undo, a reveal of spec 024, and,
+once spec 020 adds them, a pencil letter written or confirmed: a pencil edit that
+fills or completes the grid triggers the rule like any other letter change), and
+while `state.solved` is False, with `s` the seq of the step's last entry so far:
 
 1. If the grid is right: one more entry `GridSolved(seq=s + 1, elapsed_ms=<ms>)`,
    with `elapsed_ms = max(0, round((now - state.created_at) * 1000))`, and
@@ -152,6 +153,12 @@ The words in brackets say how each criterion is tested.
   full); the banner stays.
 - Locked cells count as filled (definitions); a grid whose every cell is locked by
   checks is solved by the edit that filled its last cell.
+- Pencil letters (definitions): a pencil letter fills its cell and is compared
+  with the solution like any letter (backlog AC-5.2.3, spec 020 AC-3). A grid
+  whose last letter is written in pencil is full, and solved if every letter is
+  right; confirming a pencil letter changes neither fullness nor rightness. No
+  pencil letter exists until spec 020 is built, so no criterion of this spec
+  tests it; spec 020 does.
 - After solved (AC-4): a second `grid_solved` is never produced; the rule runs
   only while `solved` is False.
 - `elapsed_ms` (AC-1): time since the room was created, in whole milliseconds,
@@ -207,8 +214,21 @@ decisions. Each one is already part of the spec above.
 4. `elapsed_ms`: milliseconds since the room was created, until spec 027 defines
    the shared timer.
 5. Completion runs after any step that changes a letter or a lock (edit, undo,
-   reveal, pencil confirmation), not only after `edit_letter`.
-6. Pencil letters do not fill a cell (spec 020 refers to this spec).
+   reveal, pencil edit or pencil confirmation), not only after `edit_letter`.
+6. Pencil letters fill a cell and are compared with the solution like normal
+   letters, as the backlog (AC-5.2.3) and spec 020 AC-3 require. Amended on
+   2026-10-12; see the note below.
+
+Note from the lead (2026-10-12): decision 6 first said "Pencil letters do not
+fill a cell", and the definition of "filled" excluded pencil letters. That
+contradicted the human-written backlog (`specs/_archive/complete.md`, AC-5.2.3:
+"Completion (US-6.4) evaluates pencil and normal letters the same way") and
+spec 020 AC-3, so this spec was wrong. "Filled" now counts any letter, pencil or
+not; rightness compares the letter whatever its pencil flag; a pencil edit that
+fills or completes the grid triggers the completion rule like any letter change.
+No pencil letter can exist until spec 020 is built, so nothing observable
+changes now and no criterion was added or removed. The server's `_is_filled` in
+`src/nock/room.py` still excludes pencil letters; spec 020 changes it.
 7. Page texts: `Grille terminée, bravo !` and `Grille complète, mais pas encore
    juste.`, in a `role="status"` element under the clue bar.
 
