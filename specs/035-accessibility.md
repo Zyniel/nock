@@ -171,7 +171,9 @@ assistive technology (1 px clipped box, `position: absolute`, `overflow: hidden`
   - K5: room page with the nickname form showing `join.error.characters`;
   - K6: a FX-01 snapshot with every cell right and `solved` true
     (`grid-status` `solved`), and one full and wrong (`full_wrong`);
-  - K7: `/r/ZZZZZZ` on the live server (`not_found`) and `/g/99` (not found page).
+  - K7: `/r/ZZZZZZ` on the live server (`not_found`). (Note from the lead,
+    2026-10-12: `/g/99` was dropped from K7. The server answers it with a JSON
+    404 of spec 004 AC-4 and serves no page, so there is nothing to scan.)
 - Language scan, run on K1 to K7: each visible direct text node (trimmed) and each
   `aria-label`, `title`, `placeholder` and `alt` value must either fully match a
   `fr.json` value read as a pattern (each `{name}` matches one or more
