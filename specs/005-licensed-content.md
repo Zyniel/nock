@@ -1,7 +1,7 @@
 ---
 id: "005"
 title: Licensed content only
-status: approved
+status: done
 ---
 
 # 005 - Licensed content only
