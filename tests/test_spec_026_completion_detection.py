@@ -842,10 +842,31 @@ def expect_selection(page: Page, row: int, column: int) -> None:
     expect(grid).to_have_attribute("data-selected-column", str(column))
 
 
-def grid_html(page: Page) -> str:
-    html = page.get_by_test_id("grid").evaluate("el => el.outerHTML")
-    assert isinstance(html, str)
-    return html
+GRID_CONTENT_SCRIPT = """
+grid => Array.from(grid.querySelectorAll('*')).map(element => {
+    const data = {};
+    for (const attribute of element.attributes) {
+        if (attribute.name.startsWith('data-')) {
+            data[attribute.name] = attribute.value;
+        }
+    }
+    const ownText = Array.from(element.childNodes)
+        .filter(node => node.nodeType === Node.TEXT_NODE)
+        .map(node => node.textContent.trim())
+        .join('');
+    return [element.tagName, ownText, data];
+})
+"""
+
+
+def grid_content(page: Page) -> list[object]:
+    """Letters and data-* attributes of every element of the grid.
+
+    Style and sizing are left out: the grid may be resized when a banner shows.
+    """
+    content = page.get_by_test_id("grid").evaluate(GRID_CONTENT_SCRIPT)
+    assert isinstance(content, list)
+    return content
 
 
 # ---- AC-5: input is locked on the page once solved ----
@@ -1139,12 +1160,12 @@ def test_ac7_grid_full_wrong_changes_no_cell(
     mock = open_fx01(page, live_server, fx01_grid, letters_except([LAST_CELL]))
     mock.send(letter_changed_frame(6, 4, 4, "X", "p2"))
     expect_seq(page, 6)
-    before = grid_html(page)
+    before = grid_content(page)
 
     mock.send(grid_full_wrong_frame(7))
 
     expect_seq(page, 7)
-    assert grid_html(page) == before
+    assert grid_content(page) == before
 
 
 def test_ac7_a_page_that_joins_a_full_wrong_grid_shows_the_banner_at_once(
