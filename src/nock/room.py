@@ -679,11 +679,11 @@ def handle_message(
     other message is input: it sets `last_input_at`, and an idle player becomes
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
     `select_cell`, edits (`edit_letter`, `erase`), `undo` and the host actions
-    (`remove_player`, `lock_room`, `change_settings`, `mute_player`) have their
-    rules here. `pencil_edit` and `confirm_pencil` only go through the rate
-    limit (spec 037); spec 020 gives them their meaning. Until the spec that
-    gives another message its meaning is built, the message is read and
-    ignored: nothing is sent.
+    (`remove_player`, `lock_room`, `change_settings`, `mute_player`) and
+    `check` (input, not rate-limited) have their rules here. `pencil_edit` and
+    `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
+    them their meaning. Until the spec that gives another message its meaning
+    is built, the message is read and ignored: nothing is sent.
     """
     if _find_player(state, player_id) is None:
         return _refuse(state, ErrorCode.NOT_JOINED, "Join the room first.")
@@ -1079,9 +1079,10 @@ def _check(
     """
     if state.settings.help_mode == HelpMode.NONE:
         return _refuse(state, ErrorCode.HELP_DISABLED, "Checks are turned off.")
+    refusal = _refuse_bad_target(state, target)
+    if refusal is not None:
+        return refusal
     scope = _cells_in_scope(state, target)
-    if isinstance(scope, Outcome):
-        return scope
 
     correct: list[CellState] = []
     wrong: list[CellState] = []
@@ -1127,10 +1128,8 @@ def _refs_of(cells: list[CellState]) -> tuple[CellRef, ...]:
     return tuple(references)
 
 
-def _cells_in_scope(state: RoomState, target: CheckTarget) -> list[CellState] | Outcome:
-    """Return the cells a check names, or the refusal when it names nothing."""
-    if isinstance(target, GridTarget):
-        return list(state.cells)
+def _refuse_bad_target(state: RoomState, target: CheckTarget) -> Outcome | None:
+    """Return the refusal when a check names nothing, else None."""
     if isinstance(target, CellTarget):
         cell = _find_cell(state, target.row, target.column)
         if cell is None:
@@ -1139,16 +1138,27 @@ def _cells_in_scope(state: RoomState, target: CheckTarget) -> list[CellState] | 
                 ErrorCode.NOT_A_LETTER_CELL,
                 f"({target.row}, {target.column}) is not a letter cell.",
             )
-        return [cell]
+    if isinstance(target, WordTarget):
+        try:
+            state.grid.word_cells(target.row, target.column, target.clue_index)
+        except (IndexError, ValueError):
+            return _refuse(state, ErrorCode.INVALID_TARGET, "That word does not exist.")
+    return None
+
+
+def _cells_in_scope(state: RoomState, target: CheckTarget) -> list[CellState]:
+    """Return the cells a check names. The target is already known valid."""
+    if isinstance(target, GridTarget):
+        return list(state.cells)
+    if isinstance(target, CellTarget):
+        cell = _find_cell(state, target.row, target.column)
+        return [] if cell is None else [cell]
     return _cells_of_word(state, target)
 
 
-def _cells_of_word(state: RoomState, target: WordTarget) -> list[CellState] | Outcome:
+def _cells_of_word(state: RoomState, target: WordTarget) -> list[CellState]:
     """Return the cells of the word of a clue, in reading order."""
-    try:
-        positions = state.grid.word_cells(target.row, target.column, target.clue_index)
-    except (IndexError, ValueError):
-        return _refuse(state, ErrorCode.INVALID_TARGET, "That word does not exist.")
+    positions = state.grid.word_cells(target.row, target.column, target.clue_index)
     cells: list[CellState] = []
     for row, column in positions:
         cell = _find_cell(state, row, column)
