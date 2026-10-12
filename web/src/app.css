@@ -22,3 +22,22 @@ main {
   margin: 0 auto;
   padding: 2rem 1rem;
 }
+
+/* A visible focus on every focusable element after a keyboard move (spec 035). */
+:focus-visible {
+  outline: 3px solid #1a4fd6;
+  outline-offset: 2px;
+}
+
+/* Hidden from sight but read by assistive technology (spec 035). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
