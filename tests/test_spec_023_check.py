@@ -7,7 +7,7 @@ server. AC-5 and AC-9 drive the room page with a mocked socket.
 Not tested here, because spec 026 (`grid_solved`) is not built yet: the refusal of a
 check on a solved grid, its place before `help_disabled`, and the buttons disabled
 once the grid is solved. Pencil letters (spec 020) are not tested either: no cell
-holds one yet. The idle-player wake-up of a check (spec 013) is not tested.
+holds one yet.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import json
 import re
 import threading
 from collections.abc import Callable, Iterator
+from datetime import date
 from pathlib import Path
 from typing import NamedTuple, Protocol
 
@@ -25,6 +26,7 @@ from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Locator, Page, WebSocketRoute, expect
 from starlette.testclient import WebSocketTestSession
 
+from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -47,6 +49,7 @@ from nock.protocol import (
     LetterCellView,
     LetterChanged,
     PlayerState,
+    PlayerStateChanged,
     PlayerView,
     RevealBudget,
     RoomSettings,
@@ -69,6 +72,7 @@ from nock.room import (
     join_room,
     new_room,
     replay,
+    tick,
 )
 from nock.server import create_app
 
@@ -87,6 +91,7 @@ WAIT_TIMEOUT_MS = 5000
 SETTLE_MS = 400
 
 Cell = tuple[int, int]
+Step = tuple[int, int, str | None]  # row, column, letter (None: erase)
 ChangeList = list[tuple[int, int, dict[str, object]]]
 
 TAMIS = WordTarget(row=0, column=0, clue_index=0)
@@ -115,6 +120,19 @@ def dist_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def catalogue(fx01_grid: Grid) -> Catalogue:
+    """A catalogue holding FX-01 as published entry 1."""
+    entry = CatalogueEntry(
+        number=1,
+        published_on=date(2026, 10, 1),
+        force=2,
+        published=True,
+        grid=fx01_grid,
+    )
+    return Catalogue(entries=(entry,))
+
+
+@pytest.fixture
 def registry() -> Iterator[RoomRegistry]:
     """A registry whose throttle never refuses and that never times a socket out."""
     config = RoomConfig(max_edits_per_second=1000, silence_timeout_seconds=600)
@@ -129,9 +147,11 @@ def room_code(registry: RoomRegistry, fx01_grid: Grid) -> str:
 
 
 @pytest.fixture
-def client(registry: RoomRegistry, dist_dir: Path) -> Iterator[TestClient]:
+def client(
+    registry: RoomRegistry, dist_dir: Path, catalogue: Catalogue
+) -> Iterator[TestClient]:
     """One TestClient (one event loop) on an app serving `registry`."""
-    app = create_app(rooms=registry, dist_dir=dist_dir)
+    app = create_app(rooms=registry, dist_dir=dist_dir, catalogue=catalogue)
     with TestClient(app) as test_client:
         yield test_client
 
@@ -439,6 +459,60 @@ def test_ac1_a_check_by_p2_does_not_change_the_other_player(fx01_grid: Grid) -> 
     after = handle_message(state, "p2", Check(target=TAMIS), CHECK_NOW).state
 
     assert player_record(after, "p1") == player_record(state, "p1")
+
+
+def idle_room(grid: Grid) -> RoomState:
+    """`S1` after two minutes of silence: `p1` then `p2` turned idle (seq 10)."""
+    config = RoomConfig(silence_timeout_seconds=3600)
+    outcome = tick(s1_room(grid), NOW + 120, config)
+    assert outcome.state.seq == 10
+    assert player_record(outcome.state, "p1").state is PlayerState.IDLE
+    assert player_record(outcome.state, "p2").state is PlayerState.IDLE
+    return outcome.state
+
+
+def test_ac1_a_check_wakes_an_idle_player_before_its_own_entries(
+    fx01_grid: Grid,
+) -> None:
+    state = idle_room(fx01_grid)
+
+    outcome = handle_message(state, "p1", Check(target=TAMIS), NOW + 130)
+
+    assert outcome.reply == ()
+    assert [entry.event for entry in outcome.entries] == [
+        PlayerStateChanged(seq=11, player_id="p1", state=PlayerState.ACTIVE),
+        CheckResult(
+            seq=12,
+            player_id="p1",
+            target=TAMIS,
+            correct=refs((1, 0), (1, 3), (1, 4)),
+            wrong=refs((1, 1)),
+        ),
+        CellLocked(seq=13, row=1, column=0, letter="T", revealed=False),
+        CellLocked(seq=14, row=1, column=3, letter="I", revealed=False),
+        CellLocked(seq=15, row=1, column=4, letter="S", revealed=False),
+    ]
+    assert outcome.state.seq == 15
+    assert player_record(outcome.state, "p1").state is PlayerState.ACTIVE
+    assert player_record(outcome.state, "p1").last_input_at == NOW + 130
+    assert player_record(outcome.state, "p2").state is PlayerState.IDLE
+
+
+def test_ac1_a_grid_check_wakes_an_idle_player_even_when_it_finds_nothing(
+    fx01_grid: Grid,
+) -> None:
+    state = tick(
+        two_player_room(fx01_grid), NOW + 120, RoomConfig(silence_timeout_seconds=3600)
+    ).state
+    assert state.seq == 4
+
+    outcome = handle_message(state, "p2", Check(target=GridTarget()), NOW + 130)
+
+    assert [entry.event for entry in outcome.entries] == [
+        PlayerStateChanged(seq=5, player_id="p2", state=PlayerState.ACTIVE),
+        CheckResult(seq=6, player_id="p2", target=GridTarget(), correct=(), wrong=()),
+    ]
+    assert player_record(outcome.state, "p1").state is PlayerState.IDLE
 
 
 # ---- AC-2: a letter check and a grid check apply the same rule ----
@@ -766,6 +840,12 @@ def join_peers(
     for peer in peers:
         peer.wait_for_seq(len(names), "every player_joined event")
     return peers
+
+
+def state_of(registry: RoomRegistry, code: str) -> RoomState:
+    state = registry.room_state(code)
+    assert state is not None
+    return state
 
 
 def snapshot_cell(snapshot: Snapshot, row: int, column: int) -> LetterCellView:
@@ -1380,41 +1460,121 @@ def replay_problems(log: TrafficLog) -> list[str]:
     return problems
 
 
-def send_letters(
-    peer: Peer, log: TrafficLog, steps: list[tuple[int, int, str]]
-) -> None:
-    """Send the letters in order, noting each as earned before it leaves."""
+def send_steps(peer: Peer, log: TrafficLog, steps: list[Step]) -> None:
+    """Send the steps in order, noting each letter as earned before it leaves."""
     for row, column, letter in steps:
-        log.earn(row, column, letter)
-        peer.send(EditLetter(row=row, column=column, letter=letter))
+        if letter is None:
+            peer.send(Erase(row=row, column=column))
+        else:
+            log.earn(row, column, letter)
+            peer.send(EditLetter(row=row, column=column, letter=letter))
+
+
+FX01_SOLUTION: dict[Cell, str] = {(0, 1): "N"}
+for _column, _letter in enumerate("TAMIS"):
+    FX01_SOLUTION[(1, _column)] = _letter
+for _row, _word in ((2, "VIDE"), (3, "AMEN"), (4, "LEST")):
+    for _offset, _letter in enumerate(_word):
+        FX01_SOLUTION[(_row, _offset + 1)] = _letter
+
+# A correct letter, then the three wrong letters of spec 037, then the grid check.
+CORRECT_BEFORE_CHECK: list[Step] = [(1, 1, "A")]
+WRONG_LETTERS: list[Step] = [(1, 0, "X"), (2, 2, "X"), (4, 4, "X")]
+# The check locked (1, 1): the later edits skip that cell. With the letter before
+# the check, the game types all 18 letters, and keeps the erase of spec 037.
+AFTER_CHECK_FIRST: list[Step] = [
+    (1, 0, "T"),
+    (1, 2, "M"),
+    (1, 3, "I"),
+    (1, 4, "S"),
+    (2, 1, "V"),
+    (2, 2, "I"),
+    (2, 3, "D"),
+    (2, 4, "E"),
+    (4, 4, None),
+]
+BOBS_LETTER: list[Step] = [(0, 1, "N")]
+ANAS_LAST_WORDS: list[Step] = [
+    (3, 1, "A"),
+    (3, 2, "M"),
+    (3, 3, "E"),
+    (3, 4, "N"),
+    (4, 1, "L"),
+    (4, 2, "E"),
+    (4, 3, "S"),
+    (4, 4, "T"),
+]
+SEQ_AFTER_CHECK = 2 + len(CORRECT_BEFORE_CHECK) + len(WRONG_LETTERS) + 2
+FINAL_SEQ = (
+    SEQ_AFTER_CHECK
+    + 1
+    + len(AFTER_CHECK_FIRST)
+    + len(BOBS_LETTER)
+    + len(ANAS_LAST_WORDS)
+)
 
 
 def test_ac7_websocket_a_game_with_a_grid_check_carries_only_earned_letters(
-    client: TestClient, room_code: str
+    registry: RoomRegistry, client: TestClient
 ) -> None:
     log = TrafficLog()
+    created = client.post("/api/rooms", json={"grid_number": 1})
+    assert created.status_code == 201
+    log.see("POST /api/rooms", created.text)
+    code = created.json()["code"]
+    for path in ("/api/grids", "/api/grids/1"):
+        listed = client.get(path)
+        assert listed.status_code == 200
+        log.see(f"GET {path}", listed.text)
+
     with contextlib.ExitStack() as stack:
-        ana, bob = join_peers(stack, client, room_code, ["Ana", "Bob"], log)
+        ana, bob = join_peers(stack, client, code, ["Ana", "Bob"], log)
 
-        send_letters(ana, log, [(1, 1, "A")])
-        send_letters(ana, log, [(1, 0, "X"), (2, 2, "X"), (4, 4, "X")])
+        send_steps(ana, log, CORRECT_BEFORE_CHECK)
+        send_steps(ana, log, WRONG_LETTERS)
         ana.send(Check(target=GridTarget()))
-        # The check locked (1, 1): the later edits skip that cell.
-        send_letters(ana, log, [(1, 0, "T"), (1, 2, "M"), (2, 2, "I"), (4, 4, "T")])
-        send_letters(bob, log, [(0, 1, "N")])
         for peer in (ana, bob):
-            peer.wait_for_seq(13, f"every event on {peer.name}")
+            peer.wait_for_seq(SEQ_AFTER_CHECK, f"the check events on {peer.name}")
 
-        for peer in (ana, bob):
+        cy = connect(stack, client, code, "Cy", log)
+        cy.send(Join(nickname="Cy", resume_token=None))
+        cy.wait_for_messages(1, "the snapshot of Cy")
+        locked = snapshot_cell(cy.snapshot(), 1, 1)
+        assert (locked.letter, locked.locked, locked.wrong) == ("A", True, False)
+        for row, column in ((1, 0), (2, 2), (4, 4)):
+            struck = snapshot_cell(cy.snapshot(), row, column)
+            assert (struck.letter, struck.locked, struck.wrong) == ("X", False, True)
+
+        send_steps(ana, log, AFTER_CHECK_FIRST)
+        send_steps(bob, log, BOBS_LETTER)
+        send_steps(ana, log, ANAS_LAST_WORDS)
+        for peer in (ana, bob, cy):
+            peer.wait_for_seq(FINAL_SEQ, f"every event on {peer.name}")
+
+        for peer in (ana, bob, cy):
             assert peer.errors() == []
+        for peer in (ana, bob):
             results = peer.check_results()
             assert len(results) == 1
+            assert results[0].seq == SEQ_AFTER_CHECK - 1
             assert results[0].correct == refs((1, 1))
             assert results[0].wrong == refs((1, 0), (2, 2), (4, 4))
             assert peer.cell_locks() == [
-                CellLocked(seq=8, row=1, column=1, letter="A", revealed=False)
+                CellLocked(
+                    seq=SEQ_AFTER_CHECK, row=1, column=1, letter="A", revealed=False
+                )
             ]
 
+    final = state_of(registry, code)
+    final_letters: dict[Cell, str] = {}
+    locked_cells: list[Cell] = []
+    for cell in final.cells:
+        if cell.letter is not None:
+            final_letters[(cell.row, cell.column)] = cell.letter
+        if cell.locked:
+            locked_cells.append((cell.row, cell.column))
+    assert final_letters == FX01_SOLUTION
+    assert locked_cells == [(1, 1)]
     assert replay_problems(log) == []
 
 
@@ -1594,6 +1754,73 @@ def test_ac9_settings_changed_to_none_disables_all_three_buttons(
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "6")
     for scope in ("letter", "word", "grid"):
         expect(page.get_by_test_id(f"check-{scope}")).to_be_disabled()
+
+
+@pytest.mark.parametrize(
+    ("taps", "row", "column", "word"),
+    [(1, 0, 1, "0,0,1"), (2, 1, 1, "0,0,1")],
+    ids=["tap-n-once", "tap-a-twice"],
+)
+def test_ac9_the_word_button_sends_the_clue_index_of_the_second_clue(
+    page: Page,
+    live_server: str,
+    fx01_grid: Grid,
+    taps: int,
+    row: int,
+    column: int,
+    word: str,
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid)
+    for _ in range(taps):
+        cell_at(page, row, column).click()
+    expect_selection(page, row, column, "down", word)
+
+    page.get_by_test_id("check-word").click()
+
+    wait_until_page(page, lambda: len(sent_checks(mock)) >= 1)
+    page.wait_for_timeout(SETTLE_MS)
+    naval = WordTarget(row=0, column=0, clue_index=1)
+    assert sent_checks(mock) == [Check(target=naval)]
+    raw_checks = [
+        json.loads(frame)
+        for frame in mock.received
+        if json.loads(frame).get("type") == "check"
+    ]
+    assert raw_checks == [
+        {
+            "type": "check",
+            "target": {"scope": "word", "row": 0, "column": 0, "clue_index": 1},
+        }
+    ]
+    expect_selection(page, row, column, "down", word)
+
+
+@pytest.mark.parametrize(
+    "code",
+    [ErrorCode.HELP_DISABLED, ErrorCode.INVALID_TARGET],
+    ids=["help-disabled", "invalid-target"],
+)
+def test_ac9_a_refused_check_leaves_the_pending_edit_alone(
+    page: Page, live_server: str, fx01_grid: Grid, code: ErrorCode
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid)
+    cell_at(page, 1, 1).click()
+    page.keyboard.press("b")
+    cell = cell_at(page, 1, 1)
+    expect(cell).to_have_attribute("data-unconfirmed", "true")
+    wait_until_page(page, lambda: len(sent_letters(mock)) == 1)
+
+    mock.send(ErrorMessage(code=code, message="refused").model_dump_json())
+    page.wait_for_timeout(SETTLE_MS)
+
+    expect(cell).to_have_attribute("data-letter", "B")
+    expect(cell).to_have_attribute("data-unconfirmed", "true")
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "5")
+    # Control: an edit answer still drops the pending edit, so it was there.
+    locked_answer = ErrorMessage(code=ErrorCode.CELL_LOCKED, message="locked")
+    mock.send(locked_answer.model_dump_json())
+    expect(cell).to_have_attribute("data-letter", "")
+    expect(cell).to_have_attribute("data-unconfirmed", "false")
 
 
 # ---- AC-10: a check that cannot apply is refused and changes nothing ----
