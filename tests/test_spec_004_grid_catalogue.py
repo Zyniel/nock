@@ -56,6 +56,12 @@ PROGRESS_KEY = "nock.progress"
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
+def credits() -> dict[str, str]:
+    """Return the credit fields of a catalogue entry (tests/fixtures/credits.json)."""
+    credits_path = Path(__file__).parent / "fixtures" / "credits.json"
+    return json.loads(credits_path.read_text(encoding="utf-8"))
+
+
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return Grid.model_validate_json(fx01_text)
@@ -69,6 +75,7 @@ def make_entry(
         published_on=published_on,
         force=force,
         published=published,
+        **credits(),
         grid=grid,
     )
 
@@ -138,6 +145,7 @@ def write_catalogue_file(
         "published_on": "2026-10-01",
         "force": 2,
         "published": True,
+        **credits(),
         "grid": json.loads(grid_text),
     }
     for key, value in overrides.items():

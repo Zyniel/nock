@@ -98,6 +98,12 @@ EXPECTED_FR_VALUES = {
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
+def credits() -> dict[str, str]:
+    """Return the credit fields of a catalogue entry (tests/fixtures/credits.json)."""
+    credits_path = Path(__file__).parent / "fixtures" / "credits.json"
+    return json.loads(credits_path.read_text(encoding="utf-8"))
+
+
 class FakeClock(Protocol):
     """The `fake_clock` fixture of conftest: a clock moved by hand."""
 
@@ -135,6 +141,7 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
         published_on=date(2026, 10, 1),
         force=2,
         published=True,
+        **credits(),
         grid=fx01_grid,
     )
     unpublished = CatalogueEntry(
@@ -142,6 +149,7 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
         published_on=date(2026, 10, 2),
         force=2,
         published=False,
+        **credits(),
         grid=fx01_grid,
     )
     return Catalogue(entries=(published, unpublished))
