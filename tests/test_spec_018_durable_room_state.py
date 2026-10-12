@@ -50,7 +50,7 @@ from nock.protocol import (
     Erase,
     ErrorCode,
     ErrorMessage,
-    GridSolved,
+    GridFullWrong,
     GridView,
     HelpMode,
     HostChanged,
@@ -375,7 +375,8 @@ def drive_room(
         )
         state = commit(store, ROOM_CODE, outcome)
 
-    cells = letter_cells(grid)
+    # The last cell is never touched, so the grid never fills (spec 026).
+    cells = letter_cells(grid)[:-1]
     letters = string.ascii_uppercase
     for cycle in range(DRIVE_CYCLES):
         player_id = f"p{cycle % 3 + 1}"
@@ -1099,7 +1100,7 @@ def test_ac1_replay_an_event_of_a_later_spec_only_moves_the_seq(
 ) -> None:
     base = two_player_room(fx01_grid)
 
-    replayed = replay(base, LogEntry(at=NOW, event=GridSolved(seq=3, elapsed_ms=1000)))
+    replayed = replay(base, LogEntry(at=NOW, event=GridFullWrong(seq=3)))
 
     assert replayed == base.model_copy(update={"seq": 3})
 
@@ -1792,7 +1793,7 @@ def test_ac1_websocket_every_event_received_is_already_in_the_database(
     one = Process(path, dist_dir, SERVER_CONFIG)
     try:
         code = one.registry.register_room(fx01_grid)
-        cells = letter_cells(fx01_grid)
+        cells = letter_cells(fx01_grid)[:-1]  # never full
         with contextlib.ExitStack() as stack:
             http_client = stack.enter_context(TestClient(one.app))
             checker = commit_checker(path, code)
@@ -1823,7 +1824,7 @@ def test_ac1_websocket_players_reconnect_after_a_restart_to_the_same_grid(
     tmp_path: Path, dist_dir: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "nock.sqlite3"
-    cells = letter_cells(fx01_grid)
+    cells = letter_cells(fx01_grid)[:-1]  # never full
     with contextlib.ExitStack() as cleanup:
         one = Process(path, dist_dir, SERVER_CONFIG)
         # Process one is never closed during the test, as a crash would not.
@@ -1907,7 +1908,7 @@ def test_ac1_hub_saves_a_snapshot_every_100_logged_events(
     tmp_path: Path, dist_dir: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "nock.sqlite3"
-    cells = letter_cells(fx01_grid)
+    cells = letter_cells(fx01_grid)[:-1]  # never full
     one = Process(path, dist_dir, SNAPSHOT_CONFIG)
     try:
         code = one.registry.register_room(fx01_grid)
@@ -1959,7 +1960,7 @@ def test_ac1_hub_saves_a_snapshot_when_the_room_task_stops(
     tmp_path: Path, dist_dir: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "nock.sqlite3"
-    cells = letter_cells(fx01_grid)
+    cells = letter_cells(fx01_grid)[:-1]  # never full
     one = Process(path, dist_dir, SNAPSHOT_CONFIG)
     try:
         code = one.registry.register_room(fx01_grid)
@@ -2236,7 +2237,7 @@ def test_ac2_websocket_a_joiner_gets_a_snapshot_then_every_event_without_a_gap(
     room_code: str,
     fx01_grid: Grid,
 ) -> None:
-    cells = letter_cells(fx01_grid)
+    cells = letter_cells(fx01_grid)[:-1]  # never full
     rng = random.Random(182)
     plans = [random_plan(rng, cells, EDITS_PER_WRITER) for _ in range(2)]
     with contextlib.ExitStack() as stack:
@@ -2284,7 +2285,7 @@ def test_ac2_websocket_the_same_holds_for_a_room_loaded_after_a_restart(
     tmp_path: Path, dist_dir: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "nock.sqlite3"
-    cells = letter_cells(fx01_grid)
+    cells = letter_cells(fx01_grid)[:-1]  # never full
     rng = random.Random(183)
     with contextlib.ExitStack() as cleanup:
         one = Process(path, dist_dir, SERVER_CONFIG)
