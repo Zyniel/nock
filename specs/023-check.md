@@ -1,7 +1,7 @@
 ---
 id: "023"
 title: Check a letter, a word or the grid
-status: approved
+status: done
 ---
 
 # 023 - Check a letter, a word or the grid
