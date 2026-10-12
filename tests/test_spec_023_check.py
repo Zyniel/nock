@@ -4,10 +4,10 @@ AC-1, AC-2, AC-6 and AC-10 check the rule on `handle_message` (and `replay`). AC
 and AC-7 check it on the real WebSocket. AC-4 and AC-8 run two browsers on the live
 server. AC-5 and AC-9 drive the room page with a mocked socket.
 
-Not tested here, because spec 026 (`grid_solved`) is not built yet: the refusal of a
-check on a solved grid, its place before `help_disabled`, and the buttons disabled
-once the grid is solved. Pencil letters (spec 020) are not tested either: no cell
-holds one yet.
+Spec 026 adds to AC-10 the refusal of a check on a solved grid, first in the order
+of refusals (before `help_disabled`), and to AC-9 the check buttons disabled once
+the grid is solved. Pencil letters (spec 020) are not tested here: no cell holds
+one yet.
 """
 
 from __future__ import annotations
@@ -42,6 +42,7 @@ from nock.protocol import (
     Erase,
     ErrorCode,
     ErrorMessage,
+    GridSolved,
     GridTarget,
     GridView,
     HelpMode,
@@ -990,6 +991,7 @@ def snapshot_frame(
     seq: int,
     players: tuple[PlayerView, ...],
     help_mode: HelpMode = HelpMode.FREE,
+    solved: bool = False,
 ) -> str:
     snapshot = Snapshot(
         seq=seq,
@@ -1008,7 +1010,7 @@ def snapshot_frame(
         open_vote=None,
         timer_elapsed_ms=0,
         timer_running=False,
-        solved=False,
+        solved=solved,
     )
     return snapshot.model_dump_json()
 
@@ -1032,6 +1034,7 @@ def open_fx01(
     changes: ChangeList | None = None,
     help_mode: HelpMode = HelpMode.FREE,
     seq: int = 5,
+    solved: bool = False,
 ) -> MockRoomSocket:
     """Open /r/ABC123 on a mocked socket and show FX-01 as `p1` at `seq`."""
     mock = MockRoomSocket()
@@ -1044,7 +1047,7 @@ def open_fx01(
     view = grid_view(fx01_grid)
     if changes is not None:
         view = with_letter_cells(view, changes)
-    mock.send(snapshot_frame(view, seq, default_players(), help_mode))
+    mock.send(snapshot_frame(view, seq, default_players(), help_mode, solved))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
     expect(page.get_by_test_id("cell")).to_have_count(25)
     return mock
@@ -1505,12 +1508,14 @@ ANAS_LAST_WORDS: list[Step] = [
     (4, 4, "T"),
 ]
 SEQ_AFTER_CHECK = 2 + len(CORRECT_BEFORE_CHECK) + len(WRONG_LETTERS) + 2
+# The last letter of Ana completes the grid: one more entry, `grid_solved` (026).
 FINAL_SEQ = (
     SEQ_AFTER_CHECK
     + 1
     + len(AFTER_CHECK_FIRST)
     + len(BOBS_LETTER)
     + len(ANAS_LAST_WORDS)
+    + 1
 )
 
 
@@ -1941,3 +1946,85 @@ def test_ac10_websocket_a_refused_check_reaches_only_its_sender(
         assert bob.errors() == []
         assert len(bob.check_results()) == 1
         assert bob.check_results()[0].seq == 3
+
+
+# ---- Spec 026: a check on a solved grid is refused ----
+
+
+def solved_room(grid: Grid) -> RoomState:
+    """`S1` with the `solved` flag set (seq 8)."""
+    return s1_room(grid).model_copy(update={"solved": True})
+
+
+@pytest.mark.parametrize(
+    "target",
+    [TAMIS, CellTarget(row=1, column=0), GridTarget()],
+    ids=["word", "letter", "grid"],
+)
+def test_ac10_a_solved_grid_refuses_every_kind_of_check(
+    fx01_grid: Grid, target: CheckTarget
+) -> None:
+    state = solved_room(fx01_grid)
+
+    outcome = handle_message(state, "p1", Check(target=target), CHECK_NOW)
+
+    assert refusal_code(outcome.reply) is ErrorCode.GRID_SOLVED
+    assert outcome.entries == ()
+    assert outcome.state.seq == 8
+    assert outcome.state.cells == state.cells
+    assert outcome.to_others == ()
+
+
+@pytest.mark.parametrize(
+    "target",
+    [CellTarget(row=0, column=0), WordTarget(row=9, column=9, clue_index=0)],
+    ids=["not-a-letter-cell", "invalid-target"],
+)
+def test_ac10_grid_solved_is_answered_before_the_target_is_looked_at(
+    fx01_grid: Grid, target: CheckTarget
+) -> None:
+    state = solved_room(fx01_grid)
+
+    outcome = handle_message(state, "p1", Check(target=target), CHECK_NOW)
+
+    assert refusal_code(outcome.reply) is ErrorCode.GRID_SOLVED
+
+
+def test_ac10_grid_solved_is_answered_before_help_disabled(fx01_grid: Grid) -> None:
+    state = host_sets(solved_room(fx01_grid), HelpMode.NONE)
+
+    outcome = handle_message(state, "p1", Check(target=GridTarget()), CHECK_NOW)
+
+    assert refusal_code(outcome.reply) is ErrorCode.GRID_SOLVED
+    assert outcome.entries == ()
+
+
+# ---- Spec 026: the check buttons are disabled once solved ----
+
+
+def test_ac9_a_solved_snapshot_disables_the_three_buttons(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid, solved=True)
+    cell_at(page, 2, 2).click()
+
+    for scope in ("letter", "word", "grid"):
+        expect(page.get_by_test_id(f"check-{scope}")).to_be_disabled()
+    page.wait_for_timeout(SETTLE_MS)
+    assert sent_checks(mock) == []
+
+
+def test_ac9_a_grid_solved_event_disables_the_three_buttons(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid)
+    cell_at(page, 2, 2).click()
+    expect(page.get_by_test_id("check-letter")).to_be_enabled()
+    expect(page.get_by_test_id("check-word")).to_be_enabled()
+    expect(page.get_by_test_id("check-grid")).to_be_enabled()
+
+    mock.send(GridSolved(seq=6, elapsed_ms=1000).model_dump_json())
+
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "6")
+    for scope in ("letter", "word", "grid"):
+        expect(page.get_by_test_id(f"check-{scope}")).to_be_disabled()

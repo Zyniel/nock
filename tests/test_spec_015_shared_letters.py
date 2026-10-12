@@ -6,6 +6,9 @@ a mocked socket. AC-3 and AC-4 drive the real WebSocket with Python clients, eac
 with one reader thread. `handle_message` is also tested directly, under AC-3,
 for the fields of an accepted edit.
 
+Spec 026 adds `grid_full_wrong` events, which take seqs: the random runs of AC-1
+and AC-3 and the 36 edits of AC-4 fill FX-01, so those tests count them.
+
 Not tested here: the order and the effect of the checks of specs 016, 017, 026
 and 037, the `last_edit` and `recent_edits` fields of an accepted edit (specs 018
 and 037), and the `wrong` flag on the page (spec 023 owns its attribute).
@@ -36,6 +39,7 @@ from nock.protocol import (
     Erase,
     ErrorCode,
     ErrorMessage,
+    GridFullWrong,
     GridView,
     HelpMode,
     Join,
@@ -222,6 +226,14 @@ class Peer:
             if isinstance(seq, int):
                 last = seq
         return last
+
+    def full_wrong_seqs(self) -> list[int]:
+        """The seq of every `grid_full_wrong` event received (spec 026)."""
+        found: list[int] = []
+        for message in self.events():
+            if isinstance(message, GridFullWrong):
+                found.append(message.seq)
+        return found
 
     def answers(self) -> list[LetterChanged | ErrorMessage]:
         """The messages that answer this client's own edits."""
@@ -431,13 +443,17 @@ def test_ac1_server_relay_p95_is_at_most_100_ms(
             "all the letter_changed events on B",
         )
         relayed = relayed_from(peer_b, a_id)
+        full_wrong_seqs = peer_b.full_wrong_seqs()
 
     assert len(relayed) == RELAY_SAMPLES
     first_seq = relayed[0][1].seq
     relay_times: list[float] = []
     for index, (received_at, event) in enumerate(relayed):
         edit = edits[index]
-        assert event.seq == first_seq + index
+        # A `grid_full_wrong` (spec 026) takes the seq after the edit that fills
+        # the grid: the later letter_changed events are shifted by it.
+        shift = len([seq for seq in full_wrong_seqs if seq < event.seq])
+        assert event.seq == first_seq + index + shift
         assert (event.row, event.column, event.letter) == answer_of(edit)
         assert event.pencil is False
         relay_times.append(received_at - sent_at[index])
@@ -870,7 +886,12 @@ def test_ac3_four_clients_sending_1000_edits_end_with_the_same_grid(
                 range(first_expected, final_seq + 1)
             )
 
-    assert final_seq == CLIENT_COUNT + CLIENT_COUNT * EDITS_PER_CLIENT
+    # Spec 026: each `grid_full_wrong` takes one seq, and every client got it.
+    full_wrong_count = len(peers[0].full_wrong_seqs())
+    edit_seqs = CLIENT_COUNT + CLIENT_COUNT * EDITS_PER_CLIENT
+    assert final_seq == edit_seqs + full_wrong_count
+    for peer in peers:
+        assert peer.full_wrong_seqs() == peers[0].full_wrong_seqs()
     filled = [value for value in expected_grid.values() if value[0] is not None]
     assert len(filled) > 0
     for letter, pencil, author in expected_grid.values():
@@ -1158,7 +1179,12 @@ def test_ac4_two_clients_editing_different_cells_at_once_lose_nothing(
             lambda: all(len(letter_events(peer)) >= 36 for peer in (peer_a, peer_b)),
             "36 letter_changed events on both clients",
         )
-        settled_server_seq(registry, room_code)
+        final_seq = settled_server_seq(registry, room_code)
+        wait_with_progress(
+            [peer_a, peer_b],
+            lambda: all(peer.last_seq() >= final_seq for peer in (peer_a, peer_b)),
+            "both clients to receive the last seq",
+        )
 
         events_a = letter_events(peer_a)
         events_b = letter_events(peer_b)
@@ -1189,7 +1215,10 @@ def test_ac4_two_clients_editing_different_cells_at_once_lose_nothing(
         assert grid_of_peer(peer_b) == expected_grid
         state = registry.room_state(room_code)
         assert state is not None
-        assert state.seq == 2 + 36
+        # The grid becomes full once, with wrong letters: one `grid_full_wrong`.
+        assert state.seq == 2 + 36 + 1
+        assert peer_a.full_wrong_seqs() == peer_b.full_wrong_seqs()
+        assert len(peer_a.full_wrong_seqs()) == 1
 
 
 def letter_events(peer: Peer) -> list[LetterChanged]:

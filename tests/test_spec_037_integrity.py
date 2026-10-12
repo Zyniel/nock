@@ -675,6 +675,7 @@ FIRST_NINE_LETTERS = {
 }
 EVENTS_BEFORE_CY = len(WRONG_LETTERS) + len(FIRST_NINE_AND_ERASE)
 EVENTS_OF_THE_GAME = EVENTS_BEFORE_CY + len(BOBS_LETTER) + len(ANAS_LAST_WORDS)
+PLAYERS = 3  # Ana, Bob and Cy: three player_joined events
 
 
 def test_ac1_websocket_the_traffic_of_a_full_game_carries_only_earned_letters(
@@ -710,6 +711,13 @@ def test_ac1_websocket_the_traffic_of_a_full_game_carries_only_earned_letters(
         cy.wait_for_letter_events(
             EVENTS_OF_THE_GAME - EVENTS_BEFORE_CY, "every later event, on Cy"
         )
+
+        # The last letter completes the grid (spec 026): `grid_solved` follows it,
+        # and the leak scan has to see that frame too. The erase of (4, 4) came
+        # before the grid was complete, so no edit was refused.
+        for peer in (ana, bob, cy):
+            peer.wait_for_seq(PLAYERS + EVENTS_OF_THE_GAME + 1, "the grid_solved event")
+            assert peer.messages()[-1].type == "grid_solved"
 
         assert letters_of_snapshot(cy.snapshot()) == FIRST_NINE_LETTERS
         assert len(ana.letter_events()) == EVENTS_OF_THE_GAME
