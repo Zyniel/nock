@@ -12,8 +12,6 @@ Not tested here, and why:
   exists to scan (see the report). `/r/ZZZZZZ` is scanned.
 - The announcement of a word of one cell (`a11y.announcement_one`): FX-01 holds no
   such word and the spec gives no hand-built view for it.
-- A same-selection announcement staying silent: not observable through the live
-  region text.
 """
 
 from __future__ import annotations
@@ -21,10 +19,9 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import pytest
 from playwright.sync_api import (
@@ -332,6 +329,47 @@ LETTER_OUTLINES_SCRIPT = r"""
 }
 """
 
+# Counts, in `window.announcementRewrites`, the mutations of a live region.
+OBSERVE_REWRITES_SCRIPT = r"""
+region => {
+  window.announcementRewrites = 0;
+  const observer = new MutationObserver(records => {
+    window.announcementRewrites += records.length;
+  });
+  observer.observe(region, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+    attributes: true,
+  });
+}
+"""
+
+# What the contrast scan sees of an element: whether it reaches the scan (own text,
+# a box, visible, not hidden or disabled) and the opacity it is composited with.
+SCAN_COVERAGE_SCRIPT = r"""
+element => {
+  let ownText = '';
+  for (const node of element.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      ownText += node.textContent;
+    }
+  }
+  const box = element.getBoundingClientRect();
+  let opacity = 1;
+  for (let node = element; node; node = node.parentElement) {
+    opacity *= parseFloat(getComputedStyle(node).opacity);
+  }
+  const reached = ownText.trim() !== ''
+    && box.width > 0
+    && box.height > 0
+    && getComputedStyle(element).visibility === 'visible'
+    && !element.closest('.visually-hidden')
+    && !element.closest(':disabled');
+  return { scanned: reached, opacity: opacity };
+}
+"""
+
 # ---- Fixtures and small helpers -------------------------------------------------
 
 
@@ -583,8 +621,7 @@ def selection_frame(player_id: str, row: int, column: int, direction: Direction)
 # ---- Keyboard walker ------------------------------------------------------------
 
 
-@dataclass
-class Reached:
+class _Reached(NamedTuple):
     """An element a `tab_to` reached, with its focus outline."""
 
     test_id: str
@@ -598,7 +635,7 @@ class Walker:
 
     def __init__(self, page: Page) -> None:
         self.page = page
-        self.reached: list[Reached] = []
+        self.reached: list[_Reached] = []
         self.outlines: list[list[dict[str, Any]]] = []
 
     def active(self, selector: str) -> tuple[str | None, bool]:
@@ -630,7 +667,7 @@ class Walker:
     def record(self, test_id: str) -> None:
         outline = self.page.evaluate(FOCUS_OUTLINE_SCRIPT)
         self.reached.append(
-            Reached(
+            _Reached(
                 test_id=test_id,
                 outline_style=outline["style"],
                 outline_width=outline["width"],
@@ -688,8 +725,7 @@ class FrameRecorder:
         return self.of_type(type_name)
 
 
-@dataclass
-class WalkResult:
+class _WalkResult(NamedTuple):
     """What the walk of AC-1 left behind."""
 
     ana: Walker
@@ -833,7 +869,7 @@ def walk_the_removal(
     return bob_walker
 
 
-def run_keyboard_walk(page: Page, browser: Browser, live_server: str) -> WalkResult:
+def run_keyboard_walk(page: Page, browser: Browser, live_server: str) -> _WalkResult:
     """The whole walk of AC-1; every step uses the keyboard only."""
     recorder = FrameRecorder(page)
     walker = Walker(page)
@@ -841,7 +877,7 @@ def run_keyboard_walk(page: Page, browser: Browser, live_server: str) -> WalkRes
     walk_the_grid(walker, recorder)
     walk_the_controls(walker, recorder)
     bob_walker = walk_the_removal(walker, recorder, browser)
-    return WalkResult(ana=walker, recorder=recorder, bob_walker=bob_walker)
+    return _WalkResult(ana=walker, recorder=recorder, bob_walker=bob_walker)
 
 
 # ---- AC-1: every action is reachable from the keyboard -------------------------
@@ -1129,6 +1165,42 @@ def test_ac4_the_announcement_follows_the_selection(
     expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 1")
 
 
+def test_ac4_choosing_the_same_selection_again_does_not_rewrite_the_region(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_room(page, live_server, fx01_grid)
+    announcement = announcement_of(page)
+    cell_at(page, 2, 2).click()
+    cell_at(page, 2, 2).click()
+    expect(announcement).to_have_text("Artiste muet, vertical, 4 lettres, lettre 2")
+    announcement.evaluate(OBSERVE_REWRITES_SCRIPT)
+    selected_before = (
+        grid_of(page).get_attribute("data-selected-row"),
+        grid_of(page).get_attribute("data-selected-column"),
+    )
+
+    # Events that leave my selection and its word unchanged.
+    page.keyboard.press("Escape")
+    mock.send(selection_frame("p2", 3, 1, Direction.DOWN))
+    mock.send(letter_changed_frame(6, 3, 1, "A", "p2"))
+    expect(cell_at(page, 3, 1)).to_have_attribute("data-letter", "A")
+    page.wait_for_timeout(SETTLE_MS)
+
+    selected_after = (
+        grid_of(page).get_attribute("data-selected-row"),
+        grid_of(page).get_attribute("data-selected-column"),
+    )
+    assert selected_after == selected_before
+    expect_word(page, "0,2,0")
+    expect(announcement).to_have_text("Artiste muet, vertical, 4 lettres, lettre 2")
+    assert page.evaluate("window.announcementRewrites") == 0
+
+    # Control: a real move does rewrite the region, so the observer works.
+    page.keyboard.press("ArrowDown")
+    expect(announcement).to_have_text("Artiste muet, vertical, 4 lettres, lettre 3")
+    assert page.evaluate("window.announcementRewrites") > 0
+
+
 def test_ac4_the_announcement_texts_come_from_fr_json() -> None:
     fr_json = load_fr()
 
@@ -1392,6 +1464,32 @@ def test_ac6_the_initials_follow_a_moved_selection(
     expect(remote_initials(page, 3, 1)).to_have_text(["JL"])
     expect(remote_initials(page, 2, 2)).to_have_text(["AN"])
     assert_initials_inside_the_cell(page, 3, 1)
+
+
+def test_ac6_two_players_with_the_same_initials_are_both_shown(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    players = [
+        player_view("p1", "Ana", 0, is_host=True),
+        player_view(
+            "p2",
+            "Anne",
+            1,
+            selection=Selection(row=2, column=2, direction=Direction.DOWN),
+        ),
+        player_view(
+            "p3",
+            "Anouk",
+            2,
+            selection=Selection(row=2, column=2, direction=Direction.ACROSS),
+        ),
+    ]
+
+    open_room(page, live_server, fx01_grid, players=players)
+
+    expect(cell_at(page, 2, 2).get_by_test_id("remote-selection")).to_have_count(2)
+    expect(remote_initials(page, 2, 2)).to_have_text(["AN", "AN"])
+    assert_initials_inside_the_cell(page, 2, 2)
 
 
 def test_ac6_a_disconnected_player_has_no_cursor_and_no_initials(
@@ -1660,6 +1758,57 @@ def test_ac8_text_contrast_is_at_least_4_5_to_1(
     offenders = contrast_offenders(page)
 
     assert offenders == [], f"{state} at {width}x{height}: {offenders}"
+    if state == "k3_flash":
+        # The flash must not have ended during the scan.
+        expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", "1")
+
+
+# Who replaces my letter to make a cell flash in each colour 0 to 7: colour 0 is the
+# flash of a player not in the roster, the others are the roster's colours.
+FLASH_PLAYERS = {
+    0: "p9",
+    1: "p2",
+    2: "p3",
+    3: "p4",
+    4: "p5",
+    5: "p6",
+    6: "p7",
+    7: "p8",
+}
+FLASH_COLOURS = list(FLASH_PLAYERS)
+
+
+@pytest.mark.parametrize("colour", FLASH_COLOURS)
+@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=["desktop", "phone"])
+def test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    colour: int,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    mock = open_k2(page, live_server, fx01_grid)
+    seq = 14
+    for index, joining in enumerate(["p6", "p7", "p8"]):
+        joined = PlayerJoined(
+            seq=seq, player=player_view(joining, f"Joueur{index}", 5 + index)
+        )
+        mock.send(joined.model_dump_json())
+        seq += 1
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq - 1))
+
+    # Make (1, 3) mine again, then let the player of this colour replace it.
+    mock.send(letter_changed_frame(seq, 1, 3, "I", "p1"))
+    mock.send(letter_changed_frame(seq + 1, 1, 3, "O", FLASH_PLAYERS[colour]))
+    expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", str(colour))
+
+    offenders = contrast_offenders(page)
+
+    assert offenders == [], f"flash colour {colour} at {width}x{height}: {offenders}"
+    # The flash must not have ended during the scan.
+    expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", str(colour))
 
 
 def test_ac8_the_dimmed_roster_rows_are_scanned_with_their_opacity(
@@ -1667,8 +1816,18 @@ def test_ac8_the_dimmed_roster_rows_are_scanned_with_their_opacity(
 ) -> None:
     open_k2(page, live_server, fx01_grid)
 
-    roster_rows = page.get_by_test_id("roster-player")
-    expect(roster_rows).to_have_count(5)
+    dimmed_rows = {"idle": "Cleo", "disconnected": "Dan"}
+    for state, nickname in dimmed_rows.items():
+        row = page.locator(f'[data-testid="roster-player"][data-state="{state}"]')
+        expect(row).to_have_count(1)
+        nickname_element = row.get_by_test_id("roster-nickname")
+        expect(nickname_element).to_have_text(nickname)
+        coverage = nickname_element.evaluate(SCAN_COVERAGE_SCRIPT)
+        assert coverage["scanned"] is True, (state, coverage)
+        # Spec 035 allows any opacity here as long as the composited text reaches
+        # 4.5:1 (checked below), or another non-colour sign instead of dimming.
+        assert 0 < coverage["opacity"] <= 1, (state, coverage)
+
     assert contrast_offenders(page) == []
 
 
