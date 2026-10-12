@@ -84,6 +84,14 @@
     return () => observer.disconnect()
   })
 
+  // Chromium does not scroll a sideways list to a focused control that is only
+  // partly hidden, which would clip its focus outline: scroll it ourselves.
+  function scrollIntoSight(event: FocusEvent): void {
+    if (event.currentTarget instanceof HTMLElement) {
+      event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+  }
+
   let shareLink = $derived(`${location.origin}/r/${code}`)
   let copied = $state(false)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -738,6 +746,7 @@
     {#if session.snapshot !== null}
       <div class="share-panel" data-testid="share-panel">
         <span id="share-label" class="share-label">{t('room.share.label')}</span>
+        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
         <a
           data-testid="share-link"
           href={shareLink}
@@ -828,7 +837,7 @@
               data-testid="roster-colour"
               style:background={`var(--player-colour-${player.colour})`}
             ></span>
-            <span data-testid="roster-nickname">{player.nickname}</span>
+            <span class="roster-nickname" data-testid="roster-nickname">{player.nickname}</span>
             <span class="roster-state" data-testid="roster-state"
               >{t(`presence.${player.state}`)}</span
             >
@@ -843,6 +852,7 @@
                 class="remove-player"
                 data-testid="remove-player"
                 aria-label={t('host.remove_label', { name: player.nickname })}
+                onfocus={scrollIntoSight}
                 onclick={() => removePlayer(player.player_id)}>{t('host.remove')}</button
               >
             {/if}
@@ -1070,11 +1080,11 @@
 
   /* No opacity: dimmed text would not reach 4.5:1 (spec 035). The state is
      also written in the row, and the nickname shows it by its style. */
-  .roster li[data-state='idle'] [data-testid='roster-nickname'] {
+  .roster li[data-state='idle'] .roster-nickname {
     font-style: italic;
   }
 
-  .roster li[data-state='disconnected'] [data-testid='roster-nickname'] {
+  .roster li[data-state='disconnected'] .roster-nickname {
     font-style: italic;
     text-decoration: line-through;
   }
@@ -1198,6 +1208,11 @@
       min-width: 0;
       gap: 0.75rem;
       overflow-x: auto;
+      /* Room for the focus outline (3px + 2px offset), which a scroll container
+         would clip; the negative margin keeps the row height. */
+      padding: 8px;
+      margin: -8px;
+      scroll-padding: 8px;
     }
 
     .roster li {
@@ -1221,6 +1236,10 @@
     .host-panel {
       overflow-x: auto;
       scrollbar-width: thin;
+      /* Room for the focus outline, as for the roster list. */
+      padding: 8px;
+      margin: -8px;
+      scroll-padding: 8px;
     }
 
     /* A fade stuck to the right edge of the visible part of the panel. Its
