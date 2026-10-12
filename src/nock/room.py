@@ -723,6 +723,18 @@ def _apply_message(
     now: float,
     config: RoomConfig,
 ) -> Outcome:
+    """Run the rule of one message, then the completion rule (spec 026)."""
+    outcome = _run_message(state, player_id, message, now, config)
+    return _with_completion(state, outcome, now)
+
+
+def _run_message(
+    state: RoomState,
+    player_id: str,
+    message: ClientMessage,
+    now: float,
+    config: RoomConfig,
+) -> Outcome:
     """Run the rule of one message."""
     if isinstance(message, Ping):
         return Outcome(state=state, reply=(Pong(),))
@@ -956,7 +968,65 @@ def _count_unhandled_edit(
     refusal = _rate_limit_refusal(state, player_id, now, config)
     if refusal is not None:
         return refusal
+    if state.solved:
+        return _refuse_solved(state)
     return Outcome(state=_with_edit_counted(state, player_id, now))
+
+
+def _refuse_solved(state: RoomState) -> Outcome:
+    """Refuse an input because the grid is already solved."""
+    return _refuse(state, ErrorCode.GRID_SOLVED, "The grid is already solved.")
+
+
+def _is_filled(cell: CellState) -> bool:
+    """Tell whether a letter cell holds a letter that is not a pencil letter."""
+    return cell.letter is not None and not cell.pencil
+
+
+def _is_full(state: RoomState) -> bool:
+    """Tell whether every letter cell of the room is filled."""
+    return all(_is_filled(cell) for cell in state.cells)
+
+
+def _is_right(state: RoomState) -> bool:
+    """Tell whether the grid is full and every letter is the solution letter."""
+    if not _is_full(state):
+        return False
+    for cell in state.cells:
+        if cell.letter != _solution_letter(state.grid, cell.row, cell.column):
+            return False
+    return True
+
+
+def _with_completion(before: RoomState, outcome: Outcome, now: float) -> Outcome:
+    """Add the `grid_solved` or `grid_full_wrong` entry a step calls for.
+
+    Only a step that changed a letter or a lock on a grid that is not yet solved
+    can complete it.
+    """
+    if before.solved or not outcome.entries:
+        return outcome
+    changes_cells = False
+    for entry in outcome.entries:
+        if isinstance(entry.event, LetterChanged | CellLocked):
+            changes_cells = True
+    if not changes_cells:
+        return outcome
+
+    next_seq = outcome.entries[-1].event.seq + 1
+    event: GridSolved | GridFullWrong
+    if _is_right(outcome.state):
+        elapsed_ms = max(0, round((now - before.created_at) * 1000))
+        event = GridSolved(seq=next_seq, elapsed_ms=elapsed_ms)
+    elif _is_full(outcome.state) and not _is_full(before):
+        event = GridFullWrong(seq=next_seq)
+    else:
+        return outcome
+    entry = LogEntry(at=now, event=event)
+    new_state = replay(outcome.state, entry)
+    return outcome.model_copy(
+        update={"state": new_state, "entries": (*outcome.entries, entry)}
+    )
 
 
 def _refuse(state: RoomState, code: ErrorCode, text: str) -> Outcome:
@@ -981,8 +1051,7 @@ def _edit_refusal(
 ) -> Outcome | None:
     """Run the edit checks in their fixed order; return the first refusal.
 
-    Check 5 (solved grid, spec 026) belongs to a later spec: it keeps its place
-    in the order but never refuses yet.
+    Check 5 refuses every edit once the grid is solved (spec 026).
     """
     rate_refusal = _rate_limit_refusal(state, player_id, now, config)
     if rate_refusal is not None:
@@ -1006,6 +1075,8 @@ def _edit_refusal(
             ErrorCode.STALE_EDIT,
             f"({edit.row}, {edit.column}) changed since the edit was made.",
         )
+    if state.solved:
+        return _refuse_solved(state)
     return None
 
 
@@ -1074,9 +1145,11 @@ def _check(
 ) -> Outcome:
     """Run a check: one check_result, then one cell_locked per correct cell.
 
-    The grid-solved refusal (spec 026) comes first in the order of refusals
-    and never refuses yet. The help mode `vote` acts as `free` until spec 025.
+    The grid-solved refusal (spec 026) comes first in the order of refusals.
+    The help mode `vote` acts as `free` until spec 025.
     """
+    if state.solved:
+        return _refuse_solved(state)
     if state.settings.help_mode == HelpMode.NONE:
         return _refuse(state, ErrorCode.HELP_DISABLED, "Checks are turned off.")
     refusal = _refuse_bad_target(state, target)
@@ -1218,7 +1291,8 @@ def _undo(state: RoomState, player_id: str, now: float) -> Outcome:
 
     The undo is refused with nothing_to_undo when the player has no last edit,
     or when the cell was changed or locked since. It is not counted by the rate
-    limit. The grid-solved refusal belongs to spec 026.
+    limit. Once the grid is solved it is refused with grid_solved, after the
+    nothing_to_undo checks (spec 026).
     """
     player = _find_player(state, player_id)
     if player is None or player.last_edit is None:
@@ -1228,6 +1302,8 @@ def _undo(state: RoomState, player_id: str, now: float) -> Outcome:
     if cell is None or cell.locked or cell.changed_seq != last_edit.seq:
         forgotten = _with_last_edit(state, player_id, None)
         return _refuse(forgotten, ErrorCode.NOTHING_TO_UNDO, "Nothing to undo.")
+    if state.solved:
+        return _refuse_solved(state)
 
     seq = state.seq + 1
     author = player_id if last_edit.letter is not None else None
@@ -1382,6 +1458,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_host_changed(state, event)
     elif isinstance(event, PlayerMuted):
         replayed = _replay_player_muted(state, event)
+    elif isinstance(event, GridSolved):
+        replayed = state.model_copy(update={"solved": True})
     else:
         replayed = state
     return replayed.model_copy(update={"seq": event.seq})

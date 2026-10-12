@@ -221,8 +221,16 @@
       ),
   )
   let isCheckDisabled = $derived(
-    session.snapshot !== null && session.snapshot.settings.help_mode === 'none',
+    session.solved ||
+      (session.snapshot !== null && session.snapshot.settings.help_mode === 'none'),
   )
+
+  // True when every letter cell of the confirmed grid holds a letter (spec 026).
+  let isGridFull = $derived(
+    session.snapshot !== null &&
+      session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
+  )
+  let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
   // The settings form shows the settings of the room; it follows each change.
@@ -371,7 +379,7 @@
 
   // Type a letter on the selected cell, then move to the next unlocked cell.
   function onLetter(letter: string): void {
-    if (selection === null || activeWord === null) {
+    if (session.solved || selection === null || activeWord === null) {
       return
     }
     const cell = letterCellAt(selection.row, selection.column)
@@ -411,7 +419,7 @@
 
   // Backspace: clear the selected cell, or step back and clear the previous one.
   function onErase(): void {
-    if (selection === null || activeWord === null) {
+    if (session.solved || selection === null || activeWord === null) {
       return
     }
     const cell = letterCellAt(selection.row, selection.column)
@@ -432,11 +440,17 @@
 
   // Ask the server to undo my last edit. It arrives after any edit already sent.
   function onUndo(): void {
+    if (session.solved) {
+      return
+    }
     send({ type: 'undo' })
   }
 
   // Ask the server to check the selected letter, the selected word or the grid.
   function onCheck(target: object): void {
+    if (session.solved) {
+      return
+    }
     send({ type: 'check', target })
   }
 
@@ -714,6 +728,7 @@
   data-status={session.status}
   data-you={session.snapshot === null ? '' : session.snapshot.you}
   data-seq={session.seq === null ? '' : String(session.seq)}
+  data-solved={String(session.solved)}
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
@@ -731,7 +746,8 @@
         >
       </div>
       <div class="undo-panel">
-        <button type="button" data-testid="undo-button" onclick={onUndo}>{t('room.undo')}</button>
+        <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
+          >{t('room.undo')}</button>
         {#if isUndoMessageShown}
           <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
         {/if}
@@ -920,6 +936,11 @@
         >{activeWord === null ? t('clue_bar.empty') : activeWord.text}</span
       >
     </div>
+    {#if gridStatus !== null}
+      <p class="grid-status" data-testid="grid-status" data-state={gridStatus} role="status">
+        {gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
+      </p>
+    {/if}
     {#if isTouchScreen}
       <InAppKeyboard
         {onLetter}
@@ -1111,6 +1132,13 @@
   }
 
   /* Below the scrolling grid, so it is always inside the window. */
+  .grid-status {
+    flex: none;
+    margin: 0;
+    padding: 0.25rem 0.75rem;
+    font-weight: bold;
+  }
+
   .clue-bar {
     flex: none;
     box-sizing: border-box;
