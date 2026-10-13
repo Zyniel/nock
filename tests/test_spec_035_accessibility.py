@@ -1024,6 +1024,11 @@ FOCUS_BAND_SCRIPT = r"""
   // only a positioned element, a stacking context or a scroll container that
   // comes later in the document (browsers paint it as its own layer) on the way
   // up from `hit`, below the nearest ancestor shared with `element`, covers it.
+  // Limits: the rule relies on `elementFromPoint`, so it cannot see a cover with
+  // `pointer-events: none` (like the host-panel fade). It only counts later
+  // positioned, stacking-context or scroll-container elements, which is sound
+  // because the focused list is its own layer. It is not meant for reuse on
+  // other targets as is.
   const isPaintedAbove = (hit, element) => {
     for (let node = hit; node && !node.contains(element); node = node.parentElement) {
       const nodeStyle = getComputedStyle(node);
@@ -1063,7 +1068,39 @@ FOCUS_BAND_SCRIPT = r"""
 
 FEED_LIST_SELECTOR = '[data-testid="activity-feed"] ul'
 FEED_LIST_TEST_ID = "feed list"
-FEED_SIZES = [(360, 740), (568, 320)]
+FEED_SIZES = [(360, 740), (568, 320), (1280, 720)]
+FIRST_EXTRA_FEED_SEQ = 14
+EXTRA_FEED_EVENTS = 40
+FEED_OVERFLOWS_SCRIPT = """
+selector => {
+  const list = document.querySelector(selector);
+  return list.scrollHeight > list.clientHeight;
+}
+"""
+
+
+def fill_feed_until_it_scrolls(page: Page, mock: MockRoomSocket) -> None:
+    """Send extra check results until the feed list overflows and scrolls.
+
+    Args:
+        page: The room page, already in state K2 (last event `seq` 13).
+        mock: The mocked room socket that sends the extra feed events.
+    """
+    last_seq = FIRST_EXTRA_FEED_SEQ + EXTRA_FEED_EVENTS - 1
+    for seq in range(FIRST_EXTRA_FEED_SEQ, last_seq + 1):
+        result = CheckResult(
+            seq=seq,
+            player_id="p2",
+            target=WordTarget(row=0, column=2, clue_index=0),
+            correct=(),
+            wrong=(),
+        )
+        mock.send(result.model_dump_json())
+    expect(page.get_by_test_id("room-page")).to_have_attribute(
+        "data-seq", str(last_seq)
+    )
+    overflows = page.evaluate(FEED_OVERFLOWS_SCRIPT, FEED_LIST_SELECTOR)
+    assert overflows is True, "the feed list does not scroll after extra events"
 
 
 def mobile_context(browser: Browser, touch: bool) -> BrowserContext:
@@ -1088,6 +1125,15 @@ def visible_centre(page: Page, test_id: str) -> tuple[float, float] | None:
 
 
 def focused_test_id(page: Page) -> str | None:
+    """The `data-testid` of the focused element.
+
+    Args:
+        page: The page to inspect.
+
+    Returns:
+        The test id of the focused element, or None when nothing is focused or
+        the focused element has no test id.
+    """
     found = page.evaluate(ACTIVE_ELEMENT_SCRIPT, "")
     if found is None:
         return None
@@ -1159,7 +1205,8 @@ def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
 ) -> None:
     context = browser.new_context(viewport={"width": width, "height": height})
     page = context.new_page()
-    open_k2(page, live_server, fx01_grid)
+    mock = open_k2(page, live_server, fx01_grid)
+    fill_feed_until_it_scrolls(page, mock)
     page.evaluate("document.activeElement.blur()")
     reached = False
     for _ in range(MAX_TABS):
@@ -1173,9 +1220,11 @@ def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
         if is_feed:
             reached = True
             break
-    if not reached:
+    if not reached and browser.browser_type.name != "chromium":
+        # Engine guard: not every browser makes a scroll container focusable.
         context.close()
         pytest.skip(f"this browser does not make the {FEED_LIST_TEST_ID} a Tab stop")
+    assert reached, f"Tab never reached the {FEED_LIST_TEST_ID} at {width}x{height}"
     page.wait_for_timeout(SETTLE_MS)
     band = page.evaluate(FOCUS_BAND_SCRIPT)
     context.close()
