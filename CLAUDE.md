@@ -56,6 +56,11 @@ write the implementation before its tests exist.
   to a criterion that does not exist.
 - Spec status is one of `draft`, `approved`, `done`, on a line `status: ...` in the
   front matter.
+- An agent may refine an `approved` or `done` spec (a review finding, a
+  contradiction, a missing rule). It keeps the status and adds a dated note next
+  to each change; the tests follow before the code. Only a human sets `approved`.
+- The gate leaves out the tests of a browser engine that is not installed, with a
+  warning (`scripts/gate_browsers.py`); CI still runs all three engines.
 
 ## Who may write what
 

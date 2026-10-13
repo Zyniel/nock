@@ -19,6 +19,11 @@ next free three-digit number in `specs/`. Keep the front matter and the section
 headings of the template exactly as they are: the quality gate parses them.
 
 - Leave `status: draft`. Only the human moves a spec to `approved`.
+- You may refine a spec that is already `approved` or `done` when a review or
+  the lead asks for it (human decision, 2026-10-13). Keep its status, and add a
+  dated note next to each change saying what changed and why, for example
+  "(Note from the lead, 2026-10-13: ...)". The tests of a changed criterion
+  must then be updated by the test-writer before the implementer runs.
 - Write each acceptance criterion as a bullet that starts with a bold id,
   `- **AC-1** ...`, numbered from 1 with no gaps. The gate links tests to
   criteria through these ids.
