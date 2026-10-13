@@ -1305,6 +1305,13 @@
       outline-offset: -3px;
     }
 
+    /* The feed list scrolls and is a Tab stop in Chromium. Drawn outside, the
+       bottom edge of its outline is painted over by the next panel (spec 035
+       AC-2), so draw it inside the list's own box. */
+    .feed ul:focus-visible {
+      outline-offset: -3px;
+    }
+
     /* The target is taller than the row: 2px of it sticks out of the list on
        each side, so its outline goes deeper to stay whole. */
     .roster ul .remove-player:focus-visible {
