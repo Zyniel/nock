@@ -1174,6 +1174,39 @@ def test_ac4_choosing_the_same_selection_again_does_not_rewrite_the_region(
     assert page.evaluate("window.announcementRewrites") > 0
 
 
+@pytest.mark.parametrize("first_step", ["cell", "clue"])
+def test_ac4_tapping_the_clue_of_the_selected_word_does_not_rewrite_the_region(
+    page: Page, live_server: str, fx01_grid: Grid, first_step: str
+) -> None:
+    open_room(page, live_server, fx01_grid)
+    announcement = announcement_of(page)
+    passoire_clue = page.get_by_test_id("clue").filter(has_text="Passoire fine")
+    # Spec 007: a clue tap selects the word's first unfilled cell. The grid is
+    # empty, so for "Passoire fine" that is (1, 0), across: the cell tap below
+    # and the clue tap choose the very same selection.
+    if first_step == "cell":
+        cell_at(page, 1, 0).click()
+    else:
+        passoire_clue.click()
+    expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 1")
+    expect_selected(page, 1, 0)
+    expect_word(page, "0,0,0")
+    announcement.evaluate(OBSERVE_REWRITES_SCRIPT)
+
+    passoire_clue.click()
+    page.wait_for_timeout(SETTLE_MS)
+
+    expect_selected(page, 1, 0)
+    expect_word(page, "0,0,0")
+    expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 1")
+    assert page.evaluate("window.announcementRewrites") == 0
+
+    # Control: a real move does rewrite the region, so the observer works.
+    page.keyboard.press("ArrowRight")
+    expect(announcement).to_have_text("Passoire fine, horizontal, 5 lettres, lettre 2")
+    assert page.evaluate("window.announcementRewrites") > 0
+
+
 def test_ac4_the_announcement_texts_come_from_fr_json() -> None:
     fr_json = load_fr()
 
