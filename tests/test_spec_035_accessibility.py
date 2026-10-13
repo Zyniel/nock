@@ -27,6 +27,7 @@ import pytest
 from playwright.sync_api import (
     Browser,
     BrowserContext,
+    FloatRect,
     Locator,
     Page,
     WebSocket,
@@ -109,6 +110,8 @@ NEW_KEYS = {
         "Flèches pour se déplacer, Tab pour le mot suivant. "
         "Échap puis Tab pour quitter la grille."
     ),
+    "grid.remote_overflow": "+{count}",
+    "a11y.remote_overflow": "{count} autres joueurs",
 }
 
 # ---- In-page scripts ----------------------------------------------------------
@@ -558,8 +561,9 @@ def open_room(
     players: list[PlayerView] | None = None,
     seq: int = 5,
     solved: bool = False,
+    cell_count: int = 25,
 ) -> MockRoomSocket:
-    """Open /r/ABC123 on a mocked socket and show FX-01 as `p1` at `seq`."""
+    """Open /r/ABC123 on a mocked socket and show a grid (FX-01) as `p1` at `seq`."""
     mock = open_nickname_form(page, base_url)
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana", timeout=WAIT_TIMEOUT_MS)
@@ -571,7 +575,7 @@ def open_room(
     shown_players = default_players() if players is None else players
     mock.send(snapshot_frame(view, seq, shown_players, solved))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
-    expect(page.get_by_test_id("cell")).to_have_count(25)
+    expect(page.get_by_test_id("cell")).to_have_count(cell_count)
     return mock
 
 
@@ -1735,6 +1739,15 @@ def assert_initials_inside_the_cell(page: Page, row: int, column: int) -> None:
         assert computed(initials.nth(index), "visibility") == "visible"
 
 
+def corners_of(page: Page, row: int, column: int) -> list[str | None]:
+    """The `data-corner` of each `remote-initials` of a cell, in document order."""
+    corners: list[str | None] = []
+    initials = remote_initials(page, row, column)
+    for index in range(initials.count()):
+        corners.append(initials.nth(index).get_attribute("data-corner"))
+    return corners
+
+
 def test_ac6_each_remote_cursor_carries_the_initials_of_its_player(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
@@ -1749,7 +1762,17 @@ def test_ac6_each_remote_cursor_carries_the_initials_of_its_player(
     assert_initials_inside_the_cell(page, 1, 0)
 
 
-def test_ac6_each_cursor_holds_exactly_one_initials_element(
+def test_ac6_data_corner_holds_the_name_of_the_corner(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(page, live_server, fx01_grid, players=initials_players())
+
+    expect(remote_initials(page, 2, 2)).to_have_text(["JL", "AN"])
+    assert corners_of(page, 2, 2) == ["top-left", "bottom-right"]
+    assert corners_of(page, 1, 0) == ["top-left"]
+
+
+def test_ac6_each_labelled_cursor_holds_exactly_one_initials_element(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid, players=initials_players())
@@ -1772,6 +1795,8 @@ def test_ac6_the_initials_follow_a_moved_selection(
     expect(remote_initials(page, 3, 1)).to_have_text(["JL"])
     expect(remote_initials(page, 2, 2)).to_have_text(["AN"])
     assert_initials_inside_the_cell(page, 3, 1)
+    assert corners_of(page, 3, 1) == ["top-left"]
+    assert corners_of(page, 2, 2) == ["top-left"]
 
 
 def test_ac6_two_players_with_the_same_initials_are_both_shown(
@@ -1955,6 +1980,89 @@ def test_ac7_other_unlocked_letters_are_not_bold(
     for row, column in [(1, 1), (1, 3), (1, 4), (2, 2)]:
         weight = int(computed(cell_at(page, row, column), "fontWeight"))
         assert weight < BOLD_WEIGHT, (row, column)
+
+
+ROSTER_ROWS = [
+    ("p2", "actif", "normal", False),
+    ("p3", "inactif", "italic", False),
+    ("p4", "déconnecté", "italic", True),
+]
+
+NON_OPAQUE_SCRIPT = """
+row => {
+  const found = [];
+  const nodes = [row, ...row.querySelectorAll('*')];
+  for (let node = row.parentElement; node; node = node.parentElement) {
+    nodes.push(node);
+  }
+  for (const node of nodes) {
+    const opacity = getComputedStyle(node).opacity;
+    if (opacity !== '1') {
+      found.push([node.getAttribute('data-testid') || node.tagName, opacity]);
+    }
+  }
+  return found;
+}
+"""
+
+
+def roster_row(page: Page, player_id: str) -> Locator:
+    selector = f'[data-testid="roster-player"][data-player-id="{player_id}"]'
+    return page.locator(selector)
+
+
+@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=["desktop", "phone"])
+@pytest.mark.parametrize(("player_id", "state_text", "style", "struck"), ROSTER_ROWS)
+def test_ac7_roster_rows_use_no_opacity(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    player_id: str,
+    state_text: str,
+    style: str,
+    struck: bool,
+) -> None:
+    page = new_page(width, height)
+    open_k2(page, live_server, fx01_grid)
+
+    row = roster_row(page, player_id)
+    expect(row).to_have_count(1)
+    assert row.evaluate(NON_OPAQUE_SCRIPT) == []
+
+
+@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=["desktop", "phone"])
+@pytest.mark.parametrize(("player_id", "state_text", "style", "struck"), ROSTER_ROWS)
+def test_ac7_roster_state_is_shown_by_font_style_and_line_through(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    player_id: str,
+    state_text: str,
+    style: str,
+    struck: bool,
+) -> None:
+    page = new_page(width, height)
+    open_k2(page, live_server, fx01_grid)
+
+    nickname = roster_row(page, player_id).get_by_test_id("roster-nickname")
+    assert computed(nickname, "fontStyle") == style
+    line = computed(nickname, "textDecorationLine")
+    assert ("line-through" in line) is struck, line
+
+
+@pytest.mark.parametrize("player_id", ["p2", "p3", "p4"])
+def test_ac7_roster_state_is_written_in_the_row(
+    page: Page, live_server: str, fx01_grid: Grid, player_id: str
+) -> None:
+    open_k2(page, live_server, fx01_grid)
+
+    expected = {"p2": "actif", "p3": "inactif", "p4": "déconnecté"}[player_id]
+    state = roster_row(page, player_id).get_by_test_id("roster-state")
+    expect(state).to_have_text(expected)
 
 
 # ---- States K1 to K7 for AC-8 and AC-9 -------------------------------------------
@@ -2282,3 +2390,644 @@ def test_ac9_the_page_is_in_french_with_every_string_from_fr_json(
     }
     unknown = unknown_texts(texts, data)
     assert unknown == [], f"{state} at {width}x{height}: {unknown}"
+
+
+# ---- AC-10: the in-app keyboard keys stay out of the Tab order --------------------
+
+COARSE_POINTER_SCRIPT = """
+(() => {
+  const original = window.matchMedia.bind(window);
+  window.matchMedia = (query) => {
+    const result = original(query);
+    if (query.replace(/\\s/g, '') !== '(pointer:coarse)') {
+      return result;
+    }
+    return new Proxy(result, {
+      get(target, property) {
+        if (property === 'matches') {
+          return true;
+        }
+        const value = target[property];
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  };
+})();
+"""
+
+KEY_MARKUP_SCRIPT = """
+() => {
+  const keys = [...document.querySelectorAll('[data-testid="key"]')];
+  const reports = keys.map(key => ({
+    name: key.getAttribute('data-key'),
+    tag: key.tagName,
+    type: key.getAttribute('type'),
+    tabindex: key.getAttribute('tabindex'),
+    tabIndex: key.tabIndex,
+  }));
+  const del = document.querySelector('[data-testid="key-delete"]');
+  reports.push({
+    name: 'delete',
+    tag: del.tagName,
+    type: del.getAttribute('type'),
+    tabindex: del.getAttribute('tabindex'),
+    tabIndex: del.tabIndex,
+  });
+  return reports;
+}
+"""
+
+KEY_HIDING_SCRIPT = """
+() => {
+  const targets = [
+    ...document.querySelectorAll('[data-testid="key"]'),
+    document.querySelector('[data-testid="key-delete"]'),
+  ];
+  const offenders = [];
+  for (const key of targets) {
+    for (let node = key; node; node = node.parentElement) {
+      const role = node.getAttribute('role');
+      const hides = node.getAttribute('aria-hidden') === 'true'
+        || node.hasAttribute('inert')
+        || role === 'presentation' || role === 'none';
+      if (hides) {
+        offenders.push([key.getAttribute('data-key'), node.tagName]);
+      }
+    }
+  }
+  return offenders;
+}
+"""
+
+FOCUSED_KIND_SCRIPT = """
+() => {
+  const element = document.activeElement;
+  if (element === null) {
+    return null;
+  }
+  return {
+    testId: element.getAttribute('data-testid'),
+    isBody: element === document.body,
+  };
+}
+"""
+
+LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+@pytest.fixture
+def touch_page(browser: Browser, browser_name: str) -> Iterator[Page]:
+    """A 360 by 740 touch page, as in spec 009's harness."""
+    viewport = {"width": 360, "height": 740}
+    if browser_name == "firefox":
+        context = browser.new_context(viewport=viewport, has_touch=True)
+    else:
+        context = browser.new_context(viewport=viewport, has_touch=True, is_mobile=True)
+    if browser_name != "chromium":
+        context.add_init_script(COARSE_POINTER_SCRIPT)
+    yield context.new_page()
+    context.close()
+
+
+def key_of(page: Page, letter: str) -> Locator:
+    return page.locator(f'[data-testid="key"][data-key="{letter}"]')
+
+
+def test_ac10_every_key_is_a_button_with_tabindex_minus_one(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+    expect(touch_page.get_by_test_id("key")).to_have_count(26)
+
+    reports = touch_page.evaluate(KEY_MARKUP_SCRIPT)
+
+    assert sorted(report["name"] for report in reports) == sorted([*LETTERS, "delete"])
+    for report in reports:
+        assert report["tag"] == "BUTTON", report
+        assert report["type"] == "button", report
+        assert report["tabindex"] == "-1", report
+        assert report["tabIndex"] == -1, report
+
+
+def test_ac10_every_letter_key_has_the_letter_as_accessible_name(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+    keyboard = touch_page.get_by_test_id("keyboard")
+
+    for letter in LETTERS:
+        by_name = keyboard.get_by_role("button", name=letter, exact=True)
+        expect(by_name, letter).to_have_count(1)
+        expect(by_name, letter).to_have_attribute("data-key", letter)
+        expect(by_name, letter).to_have_attribute("data-testid", "key")
+
+
+def test_ac10_the_delete_key_is_named_effacer(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+
+    name = load_fr()["keyboard.delete"]
+    assert name == "Effacer"
+    by_name = touch_page.get_by_role("button", name=name, exact=True)
+    expect(by_name).to_have_count(1)
+    expect(by_name).to_have_attribute("data-testid", "key-delete")
+
+
+def test_ac10_no_key_and_no_ancestor_hides_the_keys_from_assistive_technology(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+
+    assert touch_page.evaluate(KEY_HIDING_SCRIPT) == []
+
+
+def test_ac10_a_tap_on_a_key_keeps_the_focus_on_the_grid(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+
+    cell_at(touch_page, 1, 0).tap()
+    expect_focus_on_grid(touch_page)
+    key_of(touch_page, "T").tap()
+    expect(cell_at(touch_page, 1, 0)).to_contain_text("T")
+    expect_focus_on_grid(touch_page)
+    touch_page.get_by_test_id("key-delete").tap()
+    expect_focus_on_grid(touch_page)
+
+
+@pytest.mark.parametrize("shift", [False, True], ids=["tab", "shift_tab"])
+def test_ac10_tab_never_lands_on_a_key(
+    touch_page: Page, live_server: str, fx01_grid: Grid, shift: bool
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+    cell_at(touch_page, 1, 0).tap()
+    expect_focus_on_grid(touch_page)
+    key = "Shift+Tab" if shift else "Tab"
+
+    touch_page.keyboard.press("Escape")
+    for _ in range(MAX_TABS + 1):
+        touch_page.keyboard.press(key)
+        focused = touch_page.evaluate(FOCUSED_KIND_SCRIPT)
+        assert focused is not None
+        assert focused["testId"] not in ("key", "key-delete"), focused
+        if focused["testId"] == "grid" or focused["isBody"]:
+            break
+
+
+def test_ac10_a_key_focused_with_focus_shows_the_visible_focus(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+    cell_at(touch_page, 1, 0).tap()
+    expect_focus_on_grid(touch_page)
+    touch_page.keyboard.press("ArrowRight")
+
+    key_of(touch_page, "A").evaluate("element => element.focus()")
+
+    outline = touch_page.evaluate(FOCUS_OUTLINE_SCRIPT)
+    assert outline["style"] not in ("none", "auto"), outline
+    assert outline["width"] >= MIN_OUTLINE_PX, outline
+    assert outline["ratio"] >= MIN_FOCUS_CONTRAST, outline
+
+
+# ---- AC-11: the "+N" rule for crowded cells -----------------------------------------
+
+FX02_PATH = Path(__file__).parent / "fixtures" / "fx02.json"
+CORNER_ORDER = ["top-left", "bottom-right", "top-right", "bottom-left"]
+MIN_LABEL_FONT_PX = 7.0
+CORNER_TOLERANCE_PX = 3.0
+CURSOR_NICKNAMES = [
+    "Jean-Luc",
+    "Ana",
+    "zoé",
+    "Wanda Moreau",
+    "Max",
+    "Lou Ann",
+    "Ned Orr",
+]
+CURSOR_INITIALS = ["JL", "AN", "ZO", "WM", "MA", "LA", "NO"]
+
+LABELS_SCRIPT = """
+cell => {
+  const found = [];
+  const selector = '[data-testid="remote-initials"], [data-testid="remote-overflow"]';
+  for (const label of cell.querySelectorAll(selector)) {
+    const box = label.getBoundingClientRect();
+    const style = getComputedStyle(label);
+    found.push({
+      kind: label.getAttribute('data-testid'),
+      text: label.textContent.trim(),
+      corner: label.getAttribute('data-corner'),
+      count: label.getAttribute('data-count'),
+      ariaHidden: label.getAttribute('aria-hidden'),
+      insideSelection: label.closest('[data-testid="remote-selection"]') !== null,
+      fontSize: parseFloat(style.fontSize),
+      visibility: style.visibility,
+      left: box.left, top: box.top, right: box.right, bottom: box.bottom,
+    });
+  }
+  return found;
+}
+"""
+
+
+class Label(NamedTuple):
+    """A `remote-initials` or `remote-overflow` element as the page draws it."""
+
+    kind: str
+    text: str
+    corner: str | None
+    count: str | None
+    aria_hidden: str | None
+    inside_selection: bool
+    font_size: float
+    visibility: str
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+
+def fx02_letter_cells() -> list[Cell]:
+    """The letter cells of FX-02 in row-major order, read from the fixture."""
+    grid = json.loads(FX02_PATH.read_text(encoding="utf-8"))
+    cells = [cell for cell in grid["cells"] if cell["type"] == "letter"]
+    cells.sort(key=lambda cell: (cell["row"], cell["column"]))
+    return [(cell["row"], cell["column"]) for cell in cells]
+
+
+def labels_of(page: Page, row: int, column: int) -> list[Label]:
+    raw_labels = cell_at(page, row, column).evaluate(LABELS_SCRIPT)
+    labels: list[Label] = []
+    for raw in raw_labels:
+        labels.append(
+            Label(
+                kind=raw["kind"],
+                text=raw["text"],
+                corner=raw["corner"],
+                count=raw["count"],
+                aria_hidden=raw["ariaHidden"],
+                inside_selection=raw["insideSelection"],
+                font_size=raw["fontSize"],
+                visibility=raw["visibility"],
+                left=raw["left"],
+                top=raw["top"],
+                right=raw["right"],
+                bottom=raw["bottom"],
+            )
+        )
+    return labels
+
+
+def cell_side(page: Page, row: int, column: int) -> float:
+    box = cell_at(page, row, column).bounding_box()
+    assert box is not None
+    return box["width"]
+
+
+def assert_cell_tier(
+    page: Page, row: int, column: int, at_least: float, below: float | None
+) -> None:
+    """Fail with the measured side when the cell is not in the expected tier."""
+    side = cell_side(page, row, column)
+    in_tier = side >= at_least and (below is None or side < below)
+    assert in_tier, (
+        f"cell ({row}, {column}) side is {side}px, expected at least {at_least}px"
+        f" and below {below}px: the layout changed, revisit this example"
+    )
+
+
+def overlap(first: Label, second: Label) -> tuple[float, float]:
+    width = min(first.right, second.right) - max(first.left, second.left)
+    height = min(first.bottom, second.bottom) - max(first.top, second.top)
+    return width, height
+
+
+def corner_gap(label: Label, cell: FloatRect) -> tuple[float, float]:
+    """Distance on both axes between the label's corner and the cell's corner."""
+    corner = label.corner
+    assert corner is not None
+    if corner.endswith("left"):
+        gap_x = label.left - cell["x"]
+    else:
+        gap_x = (cell["x"] + cell["width"]) - label.right
+    if corner.startswith("top"):
+        gap_y = label.top - cell["y"]
+    else:
+        gap_y = (cell["y"] + cell["height"]) - label.bottom
+    return gap_x, gap_y
+
+
+def assert_label_layout(page: Page, row: int, column: int) -> None:
+    """Check the layout rules of "Initials on a crowded cell" for one cell."""
+    cell_box = cell_at(page, row, column).bounding_box()
+    assert cell_box is not None
+    labels = labels_of(page, row, column)
+    for label in labels:
+        assert label.left >= cell_box["x"] - EPSILON, label
+        assert label.top >= cell_box["y"] - EPSILON, label
+        assert label.right <= cell_box["x"] + cell_box["width"] + EPSILON, label
+        assert label.bottom <= cell_box["y"] + cell_box["height"] + EPSILON, label
+        gap_x, gap_y = corner_gap(label, cell_box)
+        assert abs(gap_x) <= CORNER_TOLERANCE_PX, (label, gap_x)
+        assert abs(gap_y) <= CORNER_TOLERANCE_PX, (label, gap_y)
+        assert label.font_size >= MIN_LABEL_FONT_PX, label
+        assert label.visibility == "visible", label
+    for first_index, first in enumerate(labels):
+        for second in labels[first_index + 1 :]:
+            width, height = overlap(first, second)
+            assert width <= EPSILON or height <= EPSILON, (first, second)
+
+
+def assert_slots(
+    page: Page,
+    row: int,
+    column: int,
+    initials: dict[str, str],
+    overflow: tuple[str, int] | None,
+) -> None:
+    """Check the labels of a cell: initials by corner and the overflow label.
+
+    Args:
+        page: The room page.
+        row: Row of the cell.
+        column: Column of the cell.
+        initials: Expected text of each `remote-initials`, by corner name.
+        overflow: Expected corner and count `k` of the overflow label, or None
+            when the cell holds no overflow label at all.
+    """
+    labels = labels_of(page, row, column)
+    shown_initials: dict[str, str] = {}
+    overflows: list[Label] = []
+    for label in labels:
+        if label.kind == "remote-initials":
+            assert label.corner is not None, label
+            shown_initials[label.corner] = label.text
+        else:
+            overflows.append(label)
+    initials_count = len([label for label in labels if label.kind == "remote-initials"])
+    assert initials_count == len(initials), labels
+    assert shown_initials == initials, labels
+
+    hidden_label = cell_at(page, row, column).get_by_test_id("remote-overflow-label")
+    if overflow is None:
+        assert overflows == [], labels
+        expect(hidden_label).to_have_count(0)
+        return
+    corner, count = overflow
+    assert len(overflows) == 1, labels
+    only = overflows[0]
+    assert only.corner == corner, only
+    assert only.count == str(count), only
+    assert only.text == f"+{count}", only
+    assert only.aria_hidden == "true", only
+    assert not only.inside_selection, only
+    expect(hidden_label).to_have_count(1)
+    expect(hidden_label).to_have_text(f"{count} autres joueurs")
+    expect(hidden_label).to_have_class(re.compile(r"\bvisually-hidden\b"))
+
+
+def cursors_on(cell: Cell, count: int, first_id: int = 2) -> list[PlayerView]:
+    """The `p1` (`you`) player followed by `count` cursors all on `cell`."""
+    players = [player_view("p1", "Ana", 0, is_host=True)]
+    for index in range(count):
+        selection = Selection(row=cell[0], column=cell[1], direction=Direction.ACROSS)
+        players.append(
+            player_view(
+                f"p{first_id + index}",
+                CURSOR_NICKNAMES[index],
+                (index + 1) % 8,
+                selection=selection,
+            )
+        )
+    return players
+
+
+def initials_by_corner(texts: list[str], corners: list[str]) -> dict[str, str]:
+    return dict(zip(corners, texts, strict=True))
+
+
+FX01_CROWDED: Cell = (2, 2)
+# (cursors, initials shown, overflow count) on a cell of 44 px or more: 4 slots.
+LARGE_CELL_CASES = [
+    (1, 1, 0),
+    (2, 2, 0),
+    (3, 3, 0),
+    (4, 4, 0),
+    (5, 3, 2),
+    (6, 3, 3),
+    (7, 3, 4),
+]
+# On a cell from 20 px to 44 px: 2 slots.
+SMALL_CELL_CASES = [(1, 1, 0), (2, 2, 0), (3, 1, 2), (4, 1, 3), (7, 1, 6)]
+
+
+def expected_slots(
+    initials_shown: int, overflow_count: int, slots: list[str], offset: int = 0
+) -> tuple[dict[str, str], tuple[str, int] | None]:
+    """Expected initials by corner and overflow for a case of the spec's tables."""
+    texts = CURSOR_INITIALS[offset : offset + initials_shown]
+    corners = slots[:initials_shown]
+    overflow = None
+    if overflow_count > 0:
+        overflow = (slots[-1], overflow_count)
+    return initials_by_corner(texts, corners), overflow
+
+
+@pytest.mark.parametrize(("cursors", "shown", "hidden"), LARGE_CELL_CASES)
+def test_ac11_a_large_cell_has_four_slots(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    cursors: int,
+    shown: int,
+    hidden: int,
+) -> None:
+    page = new_page(1280, 720)
+    players = cursors_on(FX01_CROWDED, cursors)
+    open_room(page, live_server, fx01_grid, players=players)
+    expect(cell_at(page, 2, 2).get_by_test_id("remote-selection")).to_have_count(
+        cursors
+    )
+    assert_cell_tier(page, 2, 2, 44, None)
+
+    initials, overflow = expected_slots(shown, hidden, CORNER_ORDER)
+    assert_slots(page, 2, 2, initials, overflow)
+    assert_label_layout(page, 2, 2)
+
+
+def test_ac11_the_players_without_a_label_hold_no_initials(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(1280, 720)
+    players = cursors_on(FX01_CROWDED, 5)
+    open_room(page, live_server, fx01_grid, players=players)
+    assert_cell_tier(page, 2, 2, 44, None)
+
+    selections = cell_at(page, 2, 2).get_by_test_id("remote-selection")
+    expect(selections).to_have_count(5)
+    with_initials = 0
+    without_initials = 0
+    for index in range(5):
+        found = selections.nth(index).get_by_test_id("remote-initials").count()
+        assert found in (0, 1), index
+        if found == 1:
+            with_initials += 1
+        else:
+            without_initials += 1
+    assert (with_initials, without_initials) == (3, 2)
+    expect(remote_initials(page, 2, 2)).to_have_text(["JL", "AN", "ZO"])
+
+
+def test_ac11_a_cursor_leaving_a_crowded_cell_frees_a_slot_for_the_next(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(1280, 720)
+    players = cursors_on(FX01_CROWDED, 5)
+    mock = open_room(page, live_server, fx01_grid, players=players)
+    assert_cell_tier(page, 2, 2, 44, None)
+    expect(cell_at(page, 2, 2).get_by_test_id("remote-overflow")).to_have_count(1)
+
+    mock.send(selection_frame("p6", 3, 1, Direction.ACROSS))
+
+    expect(remote_initials(page, 2, 2)).to_have_count(4)
+    initials = {
+        "top-left": "JL",
+        "bottom-right": "AN",
+        "top-right": "ZO",
+        "bottom-left": "WM",
+    }
+    assert_slots(page, 2, 2, initials, None)
+    assert_label_layout(page, 2, 2)
+    assert_slots(page, 3, 1, {"top-left": "MA"}, None)
+    assert_label_layout(page, 3, 1)
+
+
+def test_ac11_a_disconnected_player_is_not_counted(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(1280, 720)
+    players = cursors_on(FX01_CROWDED, 5)
+    players[5] = players[5].model_copy(update={"state": PlayerState.DISCONNECTED})
+    open_room(page, live_server, fx01_grid, players=players)
+    assert_cell_tier(page, 2, 2, 44, None)
+
+    expect(cell_at(page, 2, 2).get_by_test_id("remote-selection")).to_have_count(4)
+    initials = {
+        "top-left": "JL",
+        "bottom-right": "AN",
+        "top-right": "ZO",
+        "bottom-left": "WM",
+    }
+    assert_slots(page, 2, 2, initials, None)
+
+
+@pytest.mark.parametrize(("cursors", "shown", "hidden"), SMALL_CELL_CASES)
+def test_ac11_a_small_cell_has_two_slots(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx02_text: str,
+    cursors: int,
+    shown: int,
+    hidden: int,
+) -> None:
+    page = new_page(360, 740)
+    first_cell = fx02_letter_cells()[0]
+    fx02_grid = Grid.model_validate_json(fx02_text)
+    players = cursors_on(first_cell, cursors)
+    open_room(
+        page,
+        live_server,
+        fx02_grid,
+        players=players,
+        cell_count=fx02_grid.width * fx02_grid.height,
+    )
+    row, column = first_cell
+    assert_cell_tier(page, row, column, 20, 44)
+
+    initials, overflow = expected_slots(shown, hidden, CORNER_ORDER[:2])
+    assert_slots(page, row, column, initials, overflow)
+    assert_label_layout(page, row, column)
+
+
+def test_ac11_a_small_cell_shows_two_initials_when_the_third_cursor_leaves(
+    new_page: Callable[[int, int], Page], live_server: str, fx02_text: str
+) -> None:
+    page = new_page(360, 740)
+    cells = fx02_letter_cells()
+    first_cell = cells[0]
+    fx02_grid = Grid.model_validate_json(fx02_text)
+    # Jean-Luc, Ana and Wanda Moreau join in that order and all select the cell.
+    players = cursors_on(first_cell, 3)
+    players[3] = players[3].model_copy(update={"nickname": "Wanda Moreau"})
+    mock = open_room(
+        page,
+        live_server,
+        fx02_grid,
+        players=players,
+        cell_count=fx02_grid.width * fx02_grid.height,
+    )
+    row, column = first_cell
+    assert_cell_tier(page, row, column, 20, 44)
+    assert_slots(page, row, column, {"top-left": "JL"}, ("bottom-right", 2))
+    assert_label_layout(page, row, column)
+
+    other = cells[1]
+    mock.send(selection_frame("p2", other[0], other[1], Direction.ACROSS))
+
+    expect(remote_initials(page, row, column)).to_have_text(["AN", "WM"])
+    assert_slots(page, row, column, {"top-left": "AN", "bottom-right": "WM"}, None)
+    assert_label_layout(page, row, column)
+
+
+@pytest.mark.parametrize("cursors", [1, 2, 3, 7])
+def test_ac11_a_tiny_cell_has_one_slot(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx02_text: str,
+    cursors: int,
+) -> None:
+    page = new_page(568, 320)
+    first_cell = fx02_letter_cells()[0]
+    fx02_grid = Grid.model_validate_json(fx02_text)
+    players = cursors_on(first_cell, cursors)
+    open_room(
+        page,
+        live_server,
+        fx02_grid,
+        players=players,
+        cell_count=fx02_grid.width * fx02_grid.height,
+    )
+    row, column = first_cell
+    assert_cell_tier(page, row, column, 0, 20)
+
+    if cursors == 1:
+        assert_slots(page, row, column, {"top-left": "JL"}, None)
+    else:
+        assert_slots(page, row, column, {}, ("top-left", cursors))
+
+
+def test_ac11_the_overflow_label_passes_the_language_and_contrast_scans(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(1280, 720)
+    players = cursors_on(FX01_CROWDED, 5)
+    open_room(page, live_server, fx01_grid, players=players)
+    assert_cell_tier(page, 2, 2, 44, None)
+    expect(cell_at(page, 2, 2).get_by_test_id("remote-overflow")).to_have_count(1)
+
+    texts = page.evaluate(LANGUAGE_SCAN_SCRIPT)
+    assert isinstance(texts, list)
+    assert "+2" in texts
+    assert "2 autres joueurs" in texts
+    data = {
+        "Ana",
+        *CURSOR_NICKNAMES,
+        *CURSOR_INITIALS,
+        *FX01_CLUES,
+        ROOM_CODE,
+        f"{live_server}/r/{ROOM_CODE}",
+    }
+    assert unknown_texts(texts, data) == []
+    assert contrast_offenders(page) == []

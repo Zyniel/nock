@@ -72,6 +72,31 @@ word). To leave the grid:
 - A `data-testid="grid-hint"` element, `id="grid-hint"`, class `visually-hidden`,
   holds `t("a11y.grid_hint")`.
 
+### In-app keyboard (spec 009, touch screens)
+
+(Note from the lead, 2026-10-13: added in place of "its keys are focusable and get
+the visible focus", which contradicted spec 009. The human asked for the best
+accessibility option. Tested by AC-10.)
+
+Spec 009 already fixes these points, and this spec does not test them again: the 26
+`key` elements are buttons with `data-key` and the letter as text; `key-delete` is a
+button with `aria-label` `t("keyboard.delete")` and an icon; the `keyboard` element
+has `aria-label` `t("keyboard.label")`; tapping a key never moves the focus off the
+grid. Spec 009 AC-3 checks the rows and the typing, and spec 009 has no test that the
+focus stays on the grid. This spec adds the following:
+
+- Each `key` and the `key-delete` is a `<button type="button">` with
+  `tabindex="-1"`, so it is never a Tab stop.
+- Each key has an accessible name. For a letter key it is the letter (`A` to `Z`),
+  and for `key-delete` it is `fr.json["keyboard.delete"]` (`Effacer`). Neither the
+  keys nor any of their ancestors have `aria-hidden="true"`, the `inert` attribute,
+  or `role="presentation"` or `role="none"`. A screen reader user on a touch screen
+  reaches the keys by swipe navigation.
+- After a tap on a key, `document.activeElement` is the `grid` element.
+- If a key gets the focus anyway (a screen reader can move the focus there), it
+  shows the visible focus of "Visible focus and non-colour signals" (AC-2's
+  outline).
+
 ### Visible focus and non-colour signals
 
 - Every element that can take the keyboard focus (links, buttons, inputs,
@@ -85,10 +110,23 @@ word). To leave the grid:
   or not; other letter cells have `outline-style` `none`.
 - A locked letter cell (spec 016) shows its letter with a computed `font-weight`
   of at least 700; an unlocked letter cell's `font-weight` is below 700.
-- Each `remote-selection` element (spec 013) holds one
-  `data-testid="remote-initials"` element whose text is the initials of that
-  player, drawn inside the cell's box.
+- Each `remote-selection` element (spec 013) of a player who gets a label (see
+  "Initials on a crowded cell") holds one `data-testid="remote-initials"` element
+  whose text is the initials of that player, drawn inside the cell's box. The
+  `remote-selection` of a player who gets no label holds no `remote-initials`.
+  (Note from the lead, 2026-10-13: "each `remote-selection` holds one" became "each
+  labelled player's", for the "+N" rule of AC-11.)
 - Struck-through wrong letters are spec 023's (`line-through`).
+- Roster states (spec 013) are not shown by dimming. The `roster-player` items, their
+  descendants and their ancestors have a computed `opacity` of 1. The
+  `roster-nickname` of an `idle` player has a computed `font-style` of `italic`
+  and no `line-through` in its computed `text-decoration-line`. The
+  `roster-nickname` of a `disconnected` player has `italic` and `line-through`. The
+  `roster-nickname` of an `active` player has `normal` and no `line-through`. The
+  state is also written in the row: `roster-state` holds `t("presence.<state>")`,
+  as in spec 013. (Note from the lead, 2026-10-13: settled here in place of "dimmed
+  rows that still reach 4.5:1". Without opacity the text keeps its full contrast,
+  and the state does not depend on colour. Tested by AC-7.)
 
 Initials (`web/src/lib/remoteSelections.ts`):
 
@@ -107,6 +145,85 @@ export interface RemoteSelection {
 
 Examples: `Ana` gives `AN`, `Jean-Luc` gives `JL`, `marie ève` gives `MÈ`,
 `R2` gives `R2`, `Zoé` gives `ZO`, `_Max_` gives `MA`.
+
+### Initials on a crowded cell
+
+(Note from the lead, 2026-10-13: added for the "+N" rule the human approved. On
+FX-02 at 360 px wide a cell is about 25 px, the labels have a font of at least
+7 px, and three or more cursors on one cell made the labels overlap. Tested by
+AC-11.)
+
+Terms:
+
+- The cursors of a cell are the other players whose `remote-selection` is drawn
+  on that cell (spec 013: never `you`, never a disconnected player), in roster
+  order (the order of the `roster-player` items, which is the join order of spec
+  013). `n` is their number.
+- A label is a `remote-initials` element or the overflow label below.
+- The cell side `c` is the width of the `cell` element's bounding box, in CSS
+  pixels.
+- A corner is one of `top-left`, `bottom-right`, `top-right`, `bottom-left`. These
+  four names, in this order, are the slots of a cell.
+
+How many slots a cell has (`S`):
+
+| Cell side `c` | Slots `S` | Corners used |
+| --- | --- | --- |
+| 44 px or more | 4 | `top-left`, `bottom-right`, `top-right`, `bottom-left` |
+| at least 20 px and below 44 px | 2 | `top-left`, `bottom-right` |
+| below 20 px | 1 | `top-left` |
+
+Why these values: the label font is `max(7px, 0.2 × c)`, with line height 1.1 and
+1 px of padding on each side, so two bold capitals are at most about
+`1.9 × font + 2` px wide and `1.1 × font` px high. Two labels side by side, as the
+four-corner layout needs, fit from about 44 px. Two labels in diagonal corners,
+one above the other, fit from about 18 px. Below 20 px only one label is placed.
+
+Who gets a label:
+
+- When `n <= S`, every cursor gets a label: cursor `i` (0-based, roster order)
+  takes slot `i`.
+- When `n > S`, cursors 0 to `S - 2` get labels in slots 0 to `S - 2`, and the last
+  slot (slot `S - 1`) holds one overflow label for the `k = n - S + 1` cursors
+  without a label. With `S = 1`, nobody gets initials and the overflow label reads
+  `+n`.
+
+| `S` | `n` | Labels |
+| --- | --- | --- |
+| 4 | 1 to 4 | one `remote-initials` per cursor |
+| 4 | 5, 6, 7 | 3 `remote-initials`, then `+2`, `+3`, `+4` at `bottom-left` |
+| 2 | 1, 2 | one `remote-initials` per cursor |
+| 2 | 3 to 7 | 1 `remote-initials` at `top-left`, then `+2` to `+6` at `bottom-right` |
+| 1 | 1 | one `remote-initials` at `top-left` |
+| 1 | 2 to 7 | only `+2` to `+7` at `top-left` |
+
+Markup:
+
+- Each `remote-initials` has `data-corner` set to the name of its corner.
+- The overflow label is `data-testid="remote-overflow"`, a descendant of the `cell`
+  (not of any `remote-selection`). It has `data-corner`, `data-count` equal to `k`,
+  `aria-hidden="true"`, and the text `t("grid.remote_overflow", { count: k })`, for
+  example `+2`. It has the same font and colours as `remote-initials`.
+- The same `cell` holds one `data-testid="remote-overflow-label"` element with the
+  class `visually-hidden` and the text `t("a11y.remote_overflow", { count: k })`,
+  for example `2 autres joueurs`. A screen reader reads it with the cell, in place
+  of the `+2`. Because `k` is always 2 or more, no singular form is needed.
+- A cell with `n <= S` holds no `remote-overflow` and no `remote-overflow-label`.
+
+Layout, for every cell with `c` of at least 20 px:
+
+- Each label's bounding box lies inside the cell's bounding box (1 px tolerance).
+- The labels of one cell never overlap. For any two of them, their bounding boxes
+  overlap by at most 1 px horizontally or by at most 1 px vertically.
+- A label in corner X has the X corner of its bounding box within 3 px of the X
+  corner of the cell's bounding box, on both axes. For example, a `top-left` label
+  has its left edge at most 3 px right of the cell's left edge and its top edge at
+  most 3 px below the cell's top edge.
+- Every label has a computed `font-size` of at least 7 px and a computed
+  `visibility` of `visible`. Its contrast is covered by AC-8.
+
+Below 20 px, the slot and count rules still apply, but a 7 px label may not fit
+inside the cell. The player can zoom in (spec 006).
 
 ### Text contrast
 
@@ -136,6 +253,11 @@ assistive technology (1 px clipped box, `position: absolute`, `overflow: hidden`
 | `a11y.direction.across` | `horizontal` |
 | `a11y.direction.down` | `vertical` |
 | `a11y.grid_hint` | `Flèches pour se déplacer, Tab pour le mot suivant. Échap puis Tab pour quitter la grille.` |
+| `grid.remote_overflow` | `+{count}` |
+| `a11y.remote_overflow` | `{count} autres joueurs` |
+
+(Note from the lead, 2026-10-13: the last two keys were added for the "+N" rule of
+AC-11.)
 
 ### Test harness
 
@@ -180,6 +302,16 @@ assistive technology (1 px clipped box, `position: absolute`, `overflow: hidden`
   characters, everything else literally), or be data of the test: a nickname of
   the snapshot or its initials, a clue text of FX-01, one letter `A` to `Z`, the
   room code, the share URL, or digits only.
+- Touch context (AC-10): as spec 009's "Test harness": 360 by 740,
+  `has_touch=True`, `is_mobile=True` (left out under Firefox). In Firefox and
+  WebKit, the same init script as spec 009 makes `(pointer: coarse)` match. Keys
+  are tapped with `locator.tap()`, and Tab presses use `page.keyboard`. (Note from
+  the lead, 2026-10-13.)
+- Crowded cells (AC-11): the mocked socket sends snapshots where several players
+  have their selection on one cell. FX-02 snapshots are built from
+  `tests/fixtures/fx02.json` (spec 006). Label boxes are read with
+  `locator.bounding_box()`. Two boxes are disjoint when the width or the height of
+  their intersection is at most 1 px. (Note from the lead, 2026-10-13.)
 - Engines: Chromium and WebKit locally, Firefox too in CI. No check of this spec
   is Chromium-only.
 
@@ -193,9 +325,19 @@ The words in brackets say how each criterion is tested.
 - **AC-4** (AC-10.1.2) (browser with mocked socket) On selecting a cell, a screen reader announces the clue, direction, word length and position. On a FX-01 snapshot, after tapping (2, 2) twice (down word MIME selected), `grid-announcement` has `role="status"`, `aria-live="polite"`, the class `visually-hidden`, and the exact text `Artiste muet, vertical, 4 lettres, lettre 2`; after `ArrowDown` it reads `Artiste muet, vertical, 4 lettres, lettre 3`; after `ArrowUp` it reads `Artiste muet, vertical, 4 lettres, lettre 2` again; after tapping (2, 2) once more (spec 007: the selected cell switches to its across word VIDE) it reads `Sans contenu, horizontal, 4 lettres, lettre 2`; after tapping (1, 0) it reads `Passoire fine, horizontal, 5 lettres, lettre 1`.
 - **AC-5** (new, from spec 006's review) (browser with mocked socket) The grid exposes grid, row and gridcell roles. On a FX-01 snapshot: `page.get_by_role("grid")` has one element; it has 5 `grid-row` children with `role="row"` and `data-row` 0 to 4; each holds 5 elements with `role="gridcell"`, `data-row` equal to its row and `data-column` 0 to 4 in order; `page.get_by_role("gridcell")` counts 25; `cell-2-2` is the `cell` at (2, 2); with nothing selected the grid has no `aria-activedescendant` and every letter cell has `aria-selected="false"`; after tapping (2, 2) the grid's `aria-activedescendant` is `cell-2-2`, that cell has `aria-selected="true"` and the 17 other letter cells `false`; spec 006's layout criteria (cell squares, positions) still pass.
 - **AC-6** (AC-10.1.3) (browser with mocked socket) Colour is never the only signal: each player's cursor also carries their initials. Given a FX-01 snapshot with `p1` (`you`), `p2` `Jean-Luc` selecting (2, 2) `down`, `p3` `Ana` selecting (2, 2) `across` and `p4` `zoé` selecting (1, 0): the cell (2, 2) holds two `remote-selection` elements whose `remote-initials` read `JL` and `AN`, each inside the cell's bounding box (1 px tolerance) with computed `visibility` `visible`; (1, 0) holds one reading `ZO`; after `selection_moved` of `p2` to (3, 1), (3, 1) holds `JL` and (2, 2) only `AN`.
-- **AC-7** (AC-10.1.3) (browser with mocked socket) Locked letters differ by more than colour. In state K2, (1, 0) (locked) has a computed `font-weight` of 700 or more and (1, 2) (not locked) below 700.
+- **AC-7** (AC-10.1.3) (browser with mocked socket) Locked letters and roster states differ by more than colour. In state K2, (1, 0) (locked) has a computed `font-weight` of 700 or more and (1, 2) (not locked) below 700. In the same state, at 1280 by 720 and at 360 by 740, the roster items behave as follows. The `roster-player` items of `p2` (active), `p3` (idle) and `p4` (disconnected), each of their descendants and each of their ancestors have a computed `opacity` of `1`. The `roster-nickname` of `p3` has `font-style` `italic` and a `text-decoration-line` without `line-through`, and its `roster-state` reads `inactif`. The `roster-nickname` of `p4` has `font-style` `italic` and a `text-decoration-line` containing `line-through`, and its `roster-state` reads `déconnecté`. The `roster-nickname` of `p2` has `font-style` `normal` and no `line-through`, and its `roster-state` reads `actif`. (Note from the lead, 2026-10-13: the roster part was added. It settles the "Translucent styles" edge case.)
 - **AC-8** (AC-10.1.3) (browser with live server and mocked socket) Text contrast is at least 4.5:1. The contrast scan of the test harness finds no offending element in each of the states K1 to K7, at both window sizes.
-- **AC-9** (AC-10.1.4) (browser with live server and mocked socket; static) The interface is in French by default, with every string in a translation file. In each state K1 to K7, `document.documentElement.lang` is `fr` and the language scan of the test harness finds no text outside `fr.json` and the test's data; the scan's checker flags the samples `Loading…`, `Salon` (alone, no template is exactly `Salon`) and `Check word`, and accepts `Salon ABC123`, `Grille n° 2` and `Ana a rejoint le salon`. The five keys of "New `fr.json` keys" exist with those values.
+- **AC-9** (AC-10.1.4) (browser with live server and mocked socket; static) The interface is in French by default, with every string in a translation file. In each state K1 to K7, `document.documentElement.lang` is `fr` and the language scan of the test harness finds no text outside `fr.json` and the test's data; the scan's checker flags the samples `Loading…`, `Salon` (alone, no template is exactly `Salon`) and `Check word`, and accepts `Salon ABC123`, `Grille n° 2` and `Ana a rejoint le salon`. The seven keys of "New `fr.json` keys" exist with those values. (Note from the lead, 2026-10-13: five keys became seven, with `grid.remote_overflow` and `a11y.remote_overflow`.)
+- **AC-10** (new, from the spec 009 and 035 contradiction) (browser with mocked socket, touch context, in Chromium, Firefox and WebKit) The in-app keyboard keys stay out of the Tab order but stay in the accessibility tree. Given a FX-01 snapshot in the touch context:
+  - Markup: each of the 26 `key` elements and the `key-delete` is a `BUTTON` element with `type="button"` and the attribute `tabindex="-1"` (its `tabIndex` property is `-1`). For each letter `L` from `A` to `Z`, `page.get_by_role("button", name=L, exact=True)` inside `keyboard` resolves to exactly the `key` with `data-key=L`. `page.get_by_role("button", name="Effacer", exact=True)` resolves to exactly `key-delete`. No key and no ancestor of a key has `aria-hidden="true"`, the `inert` attribute, or `role` `presentation` or `none`.
+  - Focus after a tap: after tapping (1, 0), then the key `T`, then `key-delete`, `document.activeElement` is the `grid` after each tap.
+  - Tab order: with the focus on the grid, `Escape` then `Tab`, followed by up to 60 more `Tab` presses (stopping early if the focus comes back to the grid or reaches `document.body`), never puts the focus on a `key` or on `key-delete`. The same holds with `Escape` then `Shift+Tab` and up to 60 more `Shift+Tab` presses.
+  - Focus forced onto a key: after any key press on the page, calling `focus()` on the key `A` from `page.evaluate` gives it a computed outline with a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white (AC-2).
+- **AC-11** (AC-10.1.3, "+N" rule approved by the human, 2026-10-13) (browser with mocked socket) When too many cursors share a cell, the cell shows as many initials as fit, then one "+k" label, and no two labels overlap. The rules are those of "Initials on a crowded cell". In every case below, the layout rules hold for each label (inside the cell with 1 px tolerance, pairwise disjoint, corner within 3 px, `font-size` at least 7 px, `visibility` `visible`). The test first reads the side `c` of the cell. If `c` is not in the expected tier, the test fails and reports the measured size, which means the layout has changed and the example must be revisited.
+  - FX-01, large cells: window 1280 by 720, desktop context. In the snapshot, `p1` is `you`, and `p2` `Jean-Luc`, `p3` `Ana`, `p4` `zoé`, `p5` `Wanda Moreau` and `p6` `Max` all select (2, 2), joined in that order. Expected tier: `c` is at least 44. (2, 2) shows `JL` at `top-left`, `AN` at `bottom-right` and `ZO` at `top-right` (3 `remote-initials`). It shows one `remote-overflow` at `bottom-left` with the text `+2` and `data-count="2"`. Its `remote-overflow-label` reads `2 autres joueurs`. The `remote-selection` elements of `p5` and `p6` hold no `remote-initials`. After `selection_moved` of `p6` to (3, 1), (2, 2) shows four `remote-initials`: `JL` `top-left`, `AN` `bottom-right`, `ZO` `top-right` and `WM` `bottom-left`. It holds no `remote-overflow` and no `remote-overflow-label`. (3, 1) shows `MA` at `top-left`.
+  - FX-02, small cells: window 360 by 740, desktop context, FX-02 snapshot. The cell used is the first letter cell in row-major order, found from `tests/fixtures/fx02.json`. `p2` `Jean-Luc`, `p3` `Ana` and `p4` `Wanda Moreau` select that cell, joined in that order. Expected tier: `c` is at least 20 and below 44 (about 25 px). The cell shows `JL` at `top-left` and one `remote-overflow` reading `+2` at `bottom-right`, and its `remote-overflow-label` reads `2 autres joueurs`. After `selection_moved` of `p2` to another letter cell, the first cell shows `AN` at `top-left` and `WM` at `bottom-right`, with no `remote-overflow`. With `p2` to `p8` (7 cursors) on the first cell, it shows one `remote-initials` (`p2`'s) at `top-left` and `+6` at `bottom-right`.
+  - FX-02, tiny cells: window 568 by 320, desktop context, same cell, with `p2` and `p3` on it. Expected tier: `c` is below 20. The cell holds no `remote-initials` and one `remote-overflow` with `data-corner="top-left"`, the text `+2` and `data-count="2"`. Only the slot and count rules are checked here, not the layout rules.
+  - Language and contrast: in the FX-01 state with five cursors, the language scan of AC-9 accepts `+2` and `2 autres joueurs`, and the contrast scan of AC-8 finds no offending element.
 
 ## Edge cases and errors
 
@@ -216,21 +358,40 @@ Other cases:
 - Same selection chosen again (AC-4): the text does not change, so a polite live
   region stays silent.
 - Remote selection of a disconnected player (AC-6): not drawn (spec 013), so no
-  initials.
+  initials. It is not counted in `n` (AC-11).
+- Crowded cell, labels re-flow (AC-11): labels follow the current cursors. When a
+  cursor leaves a cell or a player disconnects, the remaining cursors take the slots
+  again in roster order, and the overflow label disappears once `n <= S`. (Note from
+  the lead, 2026-10-13.)
+- Crowded cell and zoom (AC-11): `S` follows the current cell side, so zooming in
+  (spec 006) can turn `+k` into initials. (Note from the lead, 2026-10-13.)
+- Crowded cell, my own selection on it (AC-11): `you` has no cursor (spec 013), so
+  it does not count. The selected cell's outline (AC-2) does not move the labels.
+  (Note from the lead, 2026-10-13.)
 - Two players with the same initials (AC-6): both are shown; colours and the roster
   tell them apart. Initials of a nickname of one character (not possible: spec 012
   needs 2) would be that character.
 - `Escape` with nothing selected (AC-3): the release works the same; `Tab` then
   leaves the grid.
 - `Escape` on other controls (AC-3): left to the browser.
-- In-app keyboard (spec 009, touch screens): its keys are buttons, so they are
-  focusable and get the visible focus of AC-2; they keep the grid focused after a
-  tap.
+- In-app keyboard (spec 009, touch screens) (AC-10): the keys stay out of the Tab
+  order (`tabindex="-1"`). Each key duplicates a physical key, so WCAG 2.1.1 is met
+  by the physical keyboard, and about 30 more Tab stops would hurt keyboard users
+  (2.4.3). The keys are still real buttons in the accessibility tree, with an
+  accessible name (the letter, or `Effacer`) and no `aria-hidden`, so screen reader
+  users on a touch screen reach them by swipe navigation. A tap never moves the
+  focus off the grid. If a key gets the focus anyway (screen reader focus), it shows
+  the visible focus of AC-2. (Note from the lead, 2026-10-13: rewritten. The old
+  text said the keys are focusable, which contradicted spec 009.)
 - Flash colours (AC-8, state K3): a letter on a flashing cell must still reach
   4.5:1; the implementer may change how the flash is drawn (spec 016 only fixes
   its colour and duration).
-- Translucent styles (AC-8): spec 013's dimmed roster rows (`opacity` 0.7 and 0.45)
-  must still reach 4.5:1 once composited, or use another non-colour sign.
+- Translucent styles (AC-7, AC-8): the idle and disconnected roster rows use no
+  opacity. The nickname is italic for idle, and italic with line-through for
+  disconnected, and the state text (`inactif`, `déconnecté`) is written in the
+  row. The text keeps 4.5:1, and the state does not rely on colour. (Note from the
+  lead, 2026-10-13: settled. It replaces "dimmed rows with `opacity` 0.7 and 0.45
+  must still reach 4.5:1, or use another non-colour sign".)
 - Hidden text (AC-8, AC-9): text inside `visually-hidden` elements is in the
   language scan but not in the contrast scan.
 - Disabled buttons (AC-8): exempt from contrast (WCAG), still in the language scan.
@@ -250,6 +411,10 @@ Other cases:
   region (the feed list is readable as is).
 - Reduced motion settings and zoom beyond spec 006.
 - Keyboard shortcuts for checks, reveals or chat.
+- Swipe navigation with a real screen reader on a phone (AC-10 checks the
+  accessibility tree, not TalkBack or VoiceOver). A way to list every player on a
+  crowded cell (the roster gives the names; AC-11 shows `+k` only). (Note from the
+  lead, 2026-10-13.)
 
 ## Work packages
 
@@ -287,6 +452,25 @@ decisions. Each one is already part of the spec above.
    backlog defaults.
 8. Language: spec 040's static checks stay; this spec adds a scan of the rendered
    pages, so strings built in TypeScript are covered too.
+
+Added on 2026-10-13. The human allowed agents to refine approved and done specs,
+and these are the lead's decisions:
+
+9. In-app keyboard keys (AC-10). Options: make the keys Tab stops; hide them from
+   assistive technology; or keep them out of the Tab order but in the accessibility
+   tree. Pick: the last. Physical keys already cover WCAG 2.1.1, about 30 Tab stops
+   would hurt the focus order (2.4.3), and screen reader users on touch still reach
+   the keys by swipe. A key that gets the focus anyway shows the visible focus.
+10. Roster states (AC-7). Options: dimmed rows tuned to reach 4.5:1, or no opacity
+    with a typographic sign. Pick: no opacity. The nickname is italic for idle, and
+    italic with line-through for disconnected, and the state text stays in the row.
+11. Crowded cells (AC-11). The human approved a "+N" rule. Pick: 4 corner slots
+    from a 44 px cell, 2 diagonal slots from 20 px, and 1 slot below that. Labels go
+    to cursors in roster order, and the last slot holds `+k` when the cursors
+    outnumber the slots. The thresholds come from the label font
+    (`max(7px, 0.2 × cell)`) and the widest two-capital initials. The `+k` is
+    hidden from assistive technology and replaced by `k autres joueurs` in a
+    visually hidden element of the cell.
 
 ## Open questions
 

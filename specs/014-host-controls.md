@@ -112,6 +112,12 @@ Host panel `data-testid="host-panel"`, shown only while `you` is host:
   submit button `data-testid="settings-save"` with `t("settings.save")`. The form
   shows the current settings; submitting sends
   `{"type": "change_settings", "help_mode": ..., "reveal_budget": {"letters": ..., "words": ...}}`.
+- `data-testid="host-panel-more"`: the edge fade of AC-7, inside `host-panel`, with
+  `aria-hidden="true"` and no text. It is visible at the panel's right edge while
+  panel content is hidden past that edge. It is not visible (computed `visibility`
+  `hidden` or `display` `none`) while a host panel control has the focus from the
+  keyboard (AC-7). (Note from the lead, 2026-10-13: this element was already in the
+  code and the tests, and is now written here.)
 
 Refused or removed:
 
@@ -157,7 +163,8 @@ The words in brackets say how each criterion is tested.
 - **AC-4** (AC-3.4.4) (WebSocket; browser with live server) A change of room settings is announced to all players in the activity feed. WebSocket: host A and player B; A sends `change_settings` with help mode `vote` and budget 3 letters, 0 words; A and B receive `SettingsChanged(player_id=<A>, settings=RoomSettings(help_mode="vote", reveal_budget=RevealBudget(letters=3, words=0), locked=False), reveal_budget=RevealBudget(letters=3, words=0))`; the same message again produces no event; B's `change_settings` gets `not_host`. Browser: Ana (host) and Bob join; Ana sets `help-mode-select` to `vote`, `reveal-letters-input` to `3`, `reveal-words-input` to `0` and clicks `settings-save`; Bob's `activity-feed` gets a `feed-item` with `data-kind="settings_changed"` and the text `Ana a modifié les réglages : aide par vote, 3 lettres et 0 mots à révéler`; Ana's own feed gets the same line.
 - **AC-5** (new) (Python; WebSocket) A removed player can do nothing more. Any message from a `player_id` that is not in the room's players (removed, timed out or unknown) is refused with `not_joined` and changes nothing: no entry, no broadcast, no change to any cell. In particular, when the host removes B and B's socket sends 40 `edit_letter` frames right after, none is committed or broadcast and no cell takes B as author; the hub stops routing B's connections to the room in the same step as the removal.
 - **AC-6** (new) (Python; WebSocket) The host can mute a player's chat (the effect on chat belongs to spec 022). `mute_player` from a non-host is refused with `not_host`; for the host's own id or an unknown player with `invalid_target`; when the target's `muted` already has the requested value, nothing happens; otherwise the target's `muted` is set and one `PlayerMuted` entry is written and broadcast. The flag survives a restart (spec 018 replay).
-- **AC-7** (new) (browser with mocked socket) The host controls stay usable on small screens. At every window size of spec 006 AC-5, in desktop and touch contexts, each `remove-player` button is at least 24 by 24 CSS pixels, and when the host panel's content is wider than its box, the panel shows that more content exists (a visible scrollbar or an edge fade), while spec 013 AC-6's layout guarantees still hold.
+- **AC-7** (new) (browser with mocked socket) The host controls stay usable on small screens. At every window size of spec 006 AC-5, in desktop and touch contexts, each `remove-player` button is at least 24 by 24 CSS pixels, and when the host panel's content is wider than its box, the panel shows that more content exists (a visible scrollbar or the edge fade `host-panel-more`), while spec 013 AC-6's layout guarantees still hold. One exception: while a control inside `host-panel` has the focus from the keyboard (reached with `Tab` or `Shift+Tab`), `host-panel-more` is not visible, so it never covers the focused control. A focus from a pointer keeps the fade. Example at 320 by 568, where the panel overflows: `Tab` to `lock-room`, and `host-panel-more` is not visible. Then click `lock-room` (desktop context) or tap it (touch context). It keeps the focus, content is still hidden past the panel's right edge (`scrollWidth - clientWidth - scrollLeft > 1`), and the panel again shows that more content exists. (Note from the lead, 2026-10-13: the keyboard-focus exception was added. It describes how the code behaves.)
+- **AC-8** (new, from the review of 2026-10-13) (browser with mocked socket) The whole box of each "Retirer" button can be tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, with `you` host and at least two other players, the test first scrolls each `remove-player` into view (`scrollIntoView({block: "nearest", inline: "nearest"})`). Then, for the centre of every whole CSS pixel inside the button's bounding box (`x = k + 0.5` for each integer `k` with `left <= k` and `k + 1 <= right`, and the same for `y`), `document.elementFromPoint(x, y)` returns the button or one of its descendants. This includes 320 by 568, 568 by 320, 360 by 740 and 740 by 360, where the roster is one line that scrolls sideways. A button that sticks out of the scrolling roster list (for example with a negative `margin-block`) fails, because the list clips the part outside it. (Note from the lead, 2026-10-13: added because `.remove-player` used `margin-block: -3px`. On phones the 24 px button stuck 2 px out of the list on each side, and only about 20 px of its height could be tapped.)
 
 ## Edge cases and errors
 
@@ -196,6 +203,14 @@ their final status and text, and hide the banner.
 - Non-host UI (AC-1, AC-2, AC-4): a non-host sees no `host-panel` and no
   `remove-player`; a forged message gets `not_host`.
 - Removal confirmation (AC-1): none; the button acts at once (decision 4).
+- Keyboard then pointer in the host panel (AC-7): a pointer press anywhere ends the
+  keyboard-focus exception, so the fade shows again if content is still hidden
+  past the right edge. A focus that leaves the panel ends it too. (Note from the
+  lead, 2026-10-13.)
+- Remove button and the roster row height (AC-8): a target taller than the
+  roster's one-line row must make the row or the list taller. It must not overflow
+  the scrolling list. Spec 013 AC-6's layout guarantees (AC-7) still apply. (Note
+  from the lead, 2026-10-13.)
 
 ## Out of scope
 
@@ -252,6 +267,14 @@ instruction to take technical decisions:
   spec 022 keeps the effect on chat and the button.
 - Remove buttons meet a 24 px target size and the host panel shows when it scrolls
   (AC-7).
+
+Added on 2026-10-13. The human allowed agents to refine approved and done specs,
+and these are the lead's decisions:
+- The edge fade is hidden while a host panel control has keyboard focus, so it
+  never covers the focused control and its outline. A pointer focus keeps the fade:
+  the user has just touched the control, so it does not need to be uncovered (AC-7).
+- The 24 px target is useless if part of it cannot be tapped. The whole bounding box
+  of a remove button must be hit-testable, which `elementFromPoint` checks (AC-8).
 
 ## Open questions
 

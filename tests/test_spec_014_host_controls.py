@@ -3432,3 +3432,158 @@ def test_ac7_browser_the_layout_guarantees_of_the_grid_still_hold(
             assert bar_bottom <= keyboard_box["y"] + EPSILON
     finally:
         close()
+
+
+# ---- AC-7 (amended): the fade hides while a panel control has the keyboard focus --
+
+FADE_STATE_SCRIPT = """
+() => {
+  const panel = document.querySelector('[data-testid="host-panel"]');
+  const fade = document.querySelector('[data-testid="host-panel-more"]');
+  const style = getComputedStyle(fade);
+  return {
+    hidden: style.visibility === 'hidden' || style.display === 'none',
+    hiddenPastRightEdge:
+      panel.scrollWidth - panel.clientWidth - panel.scrollLeft > 1,
+  };
+}
+"""
+FOCUSED_TEST_ID_SCRIPT = (
+    "() => document.activeElement && document.activeElement.getAttribute('data-testid')"
+)
+MAX_TABS = 60
+
+
+def tab_to_control(page: Page, test_id: str) -> None:
+    """Press Tab until the control has the focus; Escape frees Tab from the grid."""
+    for _ in range(MAX_TABS):
+        page.keyboard.press("Tab")
+        focused = page.evaluate(FOCUSED_TEST_ID_SCRIPT)
+        if focused == test_id:
+            return
+        if focused == "grid":
+            page.keyboard.press("Escape")
+    pytest.fail(f"{test_id} not reached in {MAX_TABS} Tab presses")
+
+
+def press_at_centre(page: Page, test_id: str, touch: bool) -> None:
+    """Click or tap the centre of a control without scrolling it into view."""
+    box = page.get_by_test_id(test_id).bounding_box()
+    assert box is not None
+    x = box["x"] + box["width"] / 2
+    y = box["y"] + box["height"] / 2
+    if touch:
+        page.touchscreen.tap(x, y)
+    else:
+        page.mouse.click(x, y)
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+def test_ac7_browser_a_keyboard_focus_in_the_host_panel_hides_the_fade(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = open_full_host_view(
+        browser, browser_name, live_server, fx01_grid, 320, 568, touch
+    )
+    try:
+        before = page.evaluate(FADE_STATE_SCRIPT)
+        assert before["hiddenPastRightEdge"] is True, before
+        assert before["hidden"] is False, before
+
+        for control in ("lock-room", "help-mode-select", "settings-save"):
+            tab_to_control(page, control)
+            page.wait_for_timeout(300)
+            state = page.evaluate(FADE_STATE_SCRIPT)
+            assert state["hidden"] is True, (control, state)
+    finally:
+        close()
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+def test_ac7_browser_a_pointer_focus_in_the_host_panel_keeps_the_fade(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = open_full_host_view(
+        browser, browser_name, live_server, fx01_grid, 320, 568, touch
+    )
+    try:
+        tab_to_control(page, "lock-room")
+        page.wait_for_timeout(300)
+        assert page.evaluate(FADE_STATE_SCRIPT)["hidden"] is True
+
+        press_at_centre(page, "lock-room", touch)
+        page.wait_for_timeout(300)
+
+        assert page.evaluate(FOCUSED_TEST_ID_SCRIPT) == "lock-room"
+        state = page.evaluate(FADE_STATE_SCRIPT)
+        assert state["hiddenPastRightEdge"] is True, state
+        assert state["hidden"] is False, state
+        assert panel_shows_a_more_marker(page)
+    finally:
+        close()
+
+
+# ---- AC-8: the whole box of each remove button can be tapped ------------------
+
+HIT_TEST_SCRIPT = """
+button => {
+  button.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  const box = button.getBoundingClientRect();
+  const misses = [];
+  let tested = 0;
+  for (let y = Math.ceil(box.top); y + 1 <= box.bottom; y += 1) {
+    for (let x = Math.ceil(box.left); x + 1 <= box.right; x += 1) {
+      tested += 1;
+      const hit = document.elementFromPoint(x + 0.5, y + 0.5);
+      if (hit === null || !(hit === button || button.contains(hit))) {
+        const name = hit === null ? 'nothing' : (
+          hit.getAttribute('data-testid') || hit.tagName
+        );
+        misses.push([x, y, name]);
+      }
+    }
+  }
+  return {
+    tested, missCount: misses.length, firstMisses: misses.slice(0, 5),
+    size: [box.width, box.height],
+  };
+}
+"""
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize(
+    ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
+)
+def test_ac8_browser_every_pixel_of_a_remove_button_hits_the_button(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page, close = make_page(browser, browser_name, width, height, touch)
+    try:
+        joined_mock_room(page, live_server, fx01_grid, eight_players())
+        buttons = page.get_by_test_id("remove-player")
+        expect(buttons).to_have_count(7)
+
+        for index in range(7):
+            report = buttons.nth(index).evaluate(HIT_TEST_SCRIPT)
+            assert report["tested"] >= 24 * 24 - 2 * 24, report
+            assert report["missCount"] == 0, (index, report)
+    finally:
+        close()
