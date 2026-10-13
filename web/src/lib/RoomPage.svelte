@@ -70,6 +70,21 @@
     hostPanelHasMore = hiddenOnTheRight > 1
   }
 
+  // Chromium does not scroll a control that is already partly visible when it gets
+  // the focus, so its outline stays cut. Scroll it fully into view, but only for
+  // keyboard focus: a click on a button is not :focus-visible, and scrolling then
+  // would move a partly visible "Retirer" away from under the pointer.
+  function scrollKeyboardFocusIntoView(event: FocusEvent): void {
+    const target = event.target
+    if (!(target instanceof HTMLElement)) {
+      return
+    }
+    if (!target.matches(':focus-visible')) {
+      return
+    }
+    target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+
   // Measure again whenever the panel or its content changes size.
   $effect(() => {
     if (hostPanel === undefined) {
@@ -813,7 +828,7 @@
     <div class="presence">
     <section class="roster" data-testid="roster">
       <h2>{t('roster.heading')}</h2>
-      <ul>
+      <ul onfocusin={scrollKeyboardFocusIntoView}>
         {#each session.snapshot.players as player (player.player_id)}
           {@const isYou = player.player_id === session.snapshot.you}
           <li
@@ -867,6 +882,7 @@
         data-testid="host-panel"
         bind:this={hostPanel}
         onscroll={updateHostPanelMore}
+        onfocusin={scrollKeyboardFocusIntoView}
       >
         <strong class="host-heading">{t('settings.heading')}</strong>
         <button type="button" data-testid="lock-room" aria-pressed={isLocked} onclick={toggleLock}
@@ -1260,8 +1276,10 @@
       outline-offset: -5px;
     }
 
-    /* The fade never covers a control that has the focus. */
-    .host-panel:focus-within .host-panel-more {
+    /* The fade never covers a control that has the keyboard focus. A mouse click
+       or a tap also focuses a control, but it must not hide the fade (spec 014
+       AC-7), so this uses :focus-visible and not :focus-within. */
+    .host-panel:has(:focus-visible) .host-panel-more {
       visibility: hidden;
     }
 
