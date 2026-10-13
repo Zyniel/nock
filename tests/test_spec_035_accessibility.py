@@ -934,6 +934,259 @@ def test_ac2_no_cell_is_outlined_before_a_selection(
         assert outline["style"] == "none", outline
 
 
+# Pointer focus must not disturb the host panel's fade (spec 014 AC-7); a keyboard
+# focus on a panel control hides it. The probes run in K2 on a 320x568 phone.
+
+PHONE_SIZE = {"width": 320, "height": 568}
+PANEL_CONTROLS = [
+    "lock-room",
+    "help-mode-select",
+    "reveal-letters-input",
+    "reveal-words-input",
+]
+
+HOST_PANEL_STATE_SCRIPT = r"""
+() => {
+  const panel = document.querySelector('[data-testid="host-panel"]');
+  const fade = document.querySelector('[data-testid="host-panel-more"]');
+  return {
+    fade: fade === null ? null : getComputedStyle(fade).visibility,
+    scrollLeft: Math.round(panel.scrollLeft),
+    moreToTheRight: panel.scrollLeft + panel.clientWidth < panel.scrollWidth - 1,
+  };
+}
+"""
+
+# Put the control in the panel so that it is fully shown ("full") or cut by the
+# right edge of the panel ("partial"), without any focus change.
+SCROLL_CONTROL_SCRIPT = r"""
+([testId, mode]) => {
+  const panel = document.querySelector('[data-testid="host-panel"]');
+  const control = document.querySelector(`[data-testid="${testId}"]`);
+  const panelBox = panel.getBoundingClientRect();
+  const box = control.getBoundingClientRect();
+  const left = box.left - panelBox.left + panel.scrollLeft;
+  panel.scrollLeft = mode === 'full'
+    ? left - 10
+    : left + box.width * 0.6 - panel.clientWidth;
+}
+"""
+
+# The outline band of the focused element: how much an ancestor scroll container
+# cuts of its outer edge, and which other elements cover the band (sampled along
+# the four sides and at the four corners with `elementFromPoint`).
+FOCUS_BAND_SCRIPT = r"""
+() => {
+  const element = document.activeElement;
+  const style = getComputedStyle(element);
+  const width = parseFloat(style.outlineWidth);
+  const offset = parseFloat(style.outlineOffset);
+  const box = element.getBoundingClientRect();
+  const grow = offset + width;
+  const outer = {
+    left: box.left - grow, top: box.top - grow,
+    right: box.right + grow, bottom: box.bottom + grow,
+  };
+  const clip = {left: 0, top: 0, right: innerWidth, bottom: innerHeight};
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const nodeStyle = getComputedStyle(node);
+    if (nodeStyle.overflowX === 'visible' && nodeStyle.overflowY === 'visible') {
+      continue;
+    }
+    const rect = node.getBoundingClientRect();
+    clip.left = Math.max(clip.left, rect.left + node.clientLeft);
+    clip.top = Math.max(clip.top, rect.top + node.clientTop);
+    clip.right = Math.min(clip.right, rect.left + node.clientLeft + node.clientWidth);
+    clip.bottom = Math.min(clip.bottom, rect.top + node.clientTop + node.clientHeight);
+  }
+  const cut = {
+    top: Math.max(clip.top - outer.top, 0),
+    right: Math.max(outer.right - clip.right, 0),
+    bottom: Math.max(outer.bottom - clip.bottom, 0),
+    left: Math.max(clip.left - outer.left, 0),
+  };
+  const half = width / 2;
+  const left = outer.left + half;
+  const right = outer.right - half;
+  const top = outer.top + half;
+  const bottom = outer.bottom - half;
+  const points = [];
+  for (let x = left; x <= right; x += 2) {
+    points.push([x, top]);
+    points.push([x, bottom]);
+  }
+  for (let y = top; y <= bottom; y += 2) {
+    points.push([left, y]);
+    points.push([right, y]);
+  }
+  points.push([left, top], [right, top], [left, bottom], [right, bottom]);
+  // An outline paints above the in-flow, non-positioned content around it, so
+  // only a positioned element, a stacking context or a scroll container that
+  // comes later in the document (browsers paint it as its own layer) on the way
+  // up from `hit`, below the nearest ancestor shared with `element`, covers it.
+  const isPaintedAbove = (hit, element) => {
+    for (let node = hit; node && !node.contains(element); node = node.parentElement) {
+      const nodeStyle = getComputedStyle(node);
+      const positioned = nodeStyle.position !== 'static';
+      const stacking = nodeStyle.zIndex !== 'auto' || nodeStyle.transform !== 'none'
+        || Number(nodeStyle.opacity) < 1 || nodeStyle.isolation === 'isolate';
+      const scroller = nodeStyle.overflowX !== 'visible'
+        || nodeStyle.overflowY !== 'visible';
+      const follows = Boolean(
+        element.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
+      );
+      if (positioned || stacking || (scroller && follows)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const coveredBy = {};
+  let covered = 0;
+  for (const [x, y] of points) {
+    const hit = document.elementFromPoint(x, y);
+    const paintsOver = hit !== null && hit !== element
+      && !element.contains(hit) && !hit.contains(element)
+      && isPaintedAbove(hit, element);
+    if (paintsOver) {
+      covered += 1;
+      const name = hit.getAttribute('data-testid') || hit.tagName;
+      coveredBy[name] = (coveredBy[name] || 0) + 1;
+    }
+  }
+  return {
+    style: style.outlineStyle, width, cut, covered, coveredBy,
+    sampled: points.length,
+  };
+}
+"""
+
+FEED_LIST_SELECTOR = '[data-testid="activity-feed"] ul'
+FEED_LIST_TEST_ID = "feed list"
+FEED_SIZES = [(360, 740), (568, 320)]
+
+
+def mobile_context(browser: Browser, touch: bool) -> BrowserContext:
+    """A 320x568 context; `touch` adds a touch screen like a phone has."""
+    is_mobile = touch and browser.browser_type.name != "firefox"
+    return browser.new_context(
+        viewport=PHONE_SIZE, has_touch=touch, is_mobile=is_mobile
+    )
+
+
+def visible_centre(page: Page, test_id: str) -> tuple[float, float] | None:
+    """The centre of the part of a host-panel control that the panel shows."""
+    box = page.get_by_test_id(test_id).bounding_box()
+    panel = page.get_by_test_id("host-panel").bounding_box()
+    assert box is not None
+    assert panel is not None
+    left = max(box["x"], panel["x"]) + 2
+    right = min(box["x"] + box["width"], panel["x"] + panel["width"]) - 2
+    if right <= left:
+        return None
+    return (left + right) / 2, box["y"] + box["height"] / 2
+
+
+def focused_test_id(page: Page) -> str | None:
+    found = page.evaluate(ACTIVE_ELEMENT_SCRIPT, "")
+    if found is None:
+        return None
+    return found["testId"]
+
+
+@pytest.mark.parametrize("scroll_mode", ["partial", "full"])
+@pytest.mark.parametrize("target", PANEL_CONTROLS)
+@pytest.mark.parametrize("touch", [False, True], ids=["mouse", "touch"])
+def test_ac2_a_pointer_focus_keeps_the_host_panel_fade_and_scroll(
+    browser: Browser,
+    live_server: str,
+    fx01_grid: Grid,
+    touch: bool,
+    target: str,
+    scroll_mode: str,
+) -> None:
+    context = mobile_context(browser, touch)
+    page = context.new_page()
+    open_k2(page, live_server, fx01_grid)
+    page.evaluate(SCROLL_CONTROL_SCRIPT, [target, scroll_mode])
+    page.wait_for_timeout(SETTLE_MS)
+    before = page.evaluate(HOST_PANEL_STATE_SCRIPT)
+    centre = visible_centre(page, target)
+    if centre is None:
+        context.close()
+        pytest.skip(f"{target} has no visible part in mode {scroll_mode}")
+
+    # Raw coordinates: `.click()` scrolls the element into view and hides the bug.
+    x, y = centre
+    if touch:
+        page.touchscreen.tap(x, y)
+    else:
+        page.mouse.click(x, y)
+    page.wait_for_timeout(SETTLE_MS)
+    after = page.evaluate(HOST_PANEL_STATE_SCRIPT)
+    context.close()
+
+    assert after["scrollLeft"] == before["scrollLeft"], (before, after)
+    assert after["fade"] == before["fade"], (before, after)
+    if before["moreToTheRight"]:
+        assert after["fade"] == "visible", (before, after)
+
+
+@pytest.mark.parametrize("target", PANEL_CONTROLS)
+def test_ac2_a_keyboard_focus_in_the_host_panel_hides_the_fade(
+    browser: Browser, live_server: str, fx01_grid: Grid, target: str
+) -> None:
+    context = mobile_context(browser, touch=False)
+    page = context.new_page()
+    open_k2(page, live_server, fx01_grid)
+    page.evaluate("document.activeElement.blur()")
+    walker = Walker(page)
+    walker.tab_to(target)
+    page.wait_for_timeout(SETTLE_MS)
+    state = page.evaluate(HOST_PANEL_STATE_SCRIPT)
+    context.close()
+
+    assert state["fade"] == "hidden", state
+
+
+@pytest.mark.parametrize(("width", "height"), FEED_SIZES)
+def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
+    browser: Browser,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    context = browser.new_context(viewport={"width": width, "height": height})
+    page = context.new_page()
+    open_k2(page, live_server, fx01_grid)
+    page.evaluate("document.activeElement.blur()")
+    reached = False
+    for _ in range(MAX_TABS):
+        page.keyboard.press("Tab")
+        if focused_test_id(page) == "grid":
+            page.keyboard.press("Escape")
+        is_feed = page.evaluate(
+            "selector => document.activeElement.matches(selector)",
+            FEED_LIST_SELECTOR,
+        )
+        if is_feed:
+            reached = True
+            break
+    if not reached:
+        context.close()
+        pytest.skip(f"this browser does not make the {FEED_LIST_TEST_ID} a Tab stop")
+    page.wait_for_timeout(SETTLE_MS)
+    band = page.evaluate(FOCUS_BAND_SCRIPT)
+    context.close()
+
+    assert band["style"] not in ("none", "auto"), band
+    assert band["width"] >= MIN_OUTLINE_PX, band
+    no_cut = {"top": 0, "right": 0, "bottom": 0, "left": 0}
+    assert {side: round(px) for side, px in band["cut"].items()} == no_cut, band
+    assert band["coveredBy"] == {}, band
+
+
 # ---- AC-3: a keyboard player can leave the grid ---------------------------------
 
 
