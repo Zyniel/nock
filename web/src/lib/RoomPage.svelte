@@ -70,19 +70,52 @@
     hostPanelHasMore = hiddenOnTheRight > 1
   }
 
+  // The last way the user acted: a key press or a pointer (mouse, touch, pen).
+  // :focus-visible cannot tell them apart, because a select or an input that is
+  // focused by a pointer is :focus-visible too.
+  let lastActionWasKeyboard = false
+  // True while a host panel control has the focus from the keyboard.
+  let hostPanelHasKeyboardFocus = $state(false)
+
+  $effect(() => {
+    const onKeyDown = (): void => {
+      lastActionWasKeyboard = true
+    }
+    const onPointerDown = (): void => {
+      lastActionWasKeyboard = false
+      hostPanelHasKeyboardFocus = false
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    window.addEventListener('pointerdown', onPointerDown, true)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true)
+      window.removeEventListener('pointerdown', onPointerDown, true)
+    }
+  })
+
   // Chromium does not scroll a control that is already partly visible when it gets
   // the focus, so its outline stays cut. Scroll it fully into view, but only for
-  // keyboard focus: a click on a button is not :focus-visible, and scrolling then
-  // would move a partly visible "Retirer" away from under the pointer.
+  // keyboard focus: scrolling after a click would move a partly visible "Retirer"
+  // away from under the pointer.
   function scrollKeyboardFocusIntoView(event: FocusEvent): void {
     const target = event.target
     if (!(target instanceof HTMLElement)) {
       return
     }
-    if (!target.matches(':focus-visible')) {
+    if (!lastActionWasKeyboard) {
       return
     }
     target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
+
+  // Remember whether the focus inside the host panel comes from the keyboard.
+  function followHostPanelFocus(event: FocusEvent): void {
+    hostPanelHasKeyboardFocus = lastActionWasKeyboard
+    scrollKeyboardFocusIntoView(event)
+  }
+
+  function leaveHostPanelFocus(): void {
+    hostPanelHasKeyboardFocus = false
   }
 
   // Measure again whenever the panel or its content changes size.
@@ -882,7 +915,9 @@
         data-testid="host-panel"
         bind:this={hostPanel}
         onscroll={updateHostPanelMore}
-        onfocusin={scrollKeyboardFocusIntoView}
+        onfocusin={followHostPanelFocus}
+        onfocusout={leaveHostPanelFocus}
+        class:keyboard-focus={hostPanelHasKeyboardFocus}
       >
         <strong class="host-heading">{t('settings.heading')}</strong>
         <button type="button" data-testid="lock-room" aria-pressed={isLocked} onclick={toggleLock}
@@ -1278,8 +1313,8 @@
 
     /* The fade never covers a control that has the keyboard focus. A mouse click
        or a tap also focuses a control, but it must not hide the fade (spec 014
-       AC-7), so this uses :focus-visible and not :focus-within. */
-    .host-panel:has(:focus-visible) .host-panel-more {
+       AC-7), so this follows a class set only for keyboard focus. */
+    .host-panel.keyboard-focus .host-panel-more {
       visibility: hidden;
     }
 
