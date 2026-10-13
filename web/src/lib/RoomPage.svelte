@@ -84,14 +84,6 @@
     return () => observer.disconnect()
   })
 
-  // Chromium does not scroll a sideways list to a focused control that is only
-  // partly hidden, which would clip its focus outline: scroll it ourselves.
-  function scrollIntoSight(event: FocusEvent): void {
-    if (event.currentTarget instanceof HTMLElement) {
-      event.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-  }
-
   let shareLink = $derived(`${location.origin}/r/${code}`)
   let copied = $state(false)
   let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -852,7 +844,6 @@
                 class="remove-player"
                 data-testid="remove-player"
                 aria-label={t('host.remove_label', { name: player.nickname })}
-                onfocus={scrollIntoSight}
                 onclick={() => removePlayer(player.player_id)}>{t('host.remove')}</button
               >
             {/if}
@@ -1208,10 +1199,7 @@
       min-width: 0;
       gap: 0.75rem;
       overflow-x: auto;
-      /* Room for the focus outline (3px + 2px offset), which a scroll container
-         would clip; the negative margin keeps the row height. */
-      padding: 8px;
-      margin: -8px;
+      /* A focused control is scrolled whole into view, outline included. */
       scroll-padding: 8px;
     }
 
@@ -1236,10 +1224,8 @@
     .host-panel {
       overflow-x: auto;
       scrollbar-width: thin;
-      /* Room for the focus outline, as for the roster list. */
-      padding: 8px;
-      margin: -8px;
-      scroll-padding: 8px;
+      /* A focused control is scrolled clear of the edge fade on the right. */
+      scroll-padding: 0 2rem 0 8px;
     }
 
     /* A fade stuck to the right edge of the visible part of the panel. Its
@@ -1259,6 +1245,24 @@
 
     .host-panel-more.shown {
       visibility: visible;
+    }
+
+    /* A scroll container clips an outline drawn outside a control: draw it
+       inside instead (3px wide, so spec 035 AC-2 still holds). */
+    .roster ul :focus-visible,
+    .host-panel :focus-visible {
+      outline-offset: -3px;
+    }
+
+    /* The target is taller than the row: 2px of it sticks out of the list on
+       each side, so its outline goes deeper to stay whole. */
+    .roster ul .remove-player:focus-visible {
+      outline-offset: -5px;
+    }
+
+    /* The fade never covers a control that has the focus. */
+    .host-panel:focus-within .host-panel-more {
+      visibility: hidden;
     }
 
     .host-panel button,

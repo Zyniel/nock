@@ -430,101 +430,101 @@
   >
     {#each rows as rowCells, rowIndex (rowIndex)}
       <div class="row" data-testid="grid-row" role="row" data-row={rowIndex}>
-      {#each rowCells as cell (cell.column)}
-        {#if cell.type === 'letter'}
-          {@const shown = shownCell(cell, pendingEdits)}
-          {@const outlines = outlinesOn(cell.row, cell.column)}
-          {@const tints = tintsOn(cell.row, cell.column)}
-          {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
-          <div
-            class="cell letter"
-            class:locked={cell.locked}
-            data-testid="cell"
-            data-row={cell.row}
-            data-column={cell.column}
-            data-type="letter"
-            role="gridcell"
-            id={cellId(cell.row, cell.column)}
-            aria-selected={isSelected(cell.row, cell.column)}
-            data-letter={shown.letter ?? ''}
-            data-unconfirmed={String(shown.unconfirmed)}
-            data-author={cell.author ?? ''}
-            data-locked={String(cell.locked)}
-            data-wrong={String(cell.wrong && !shown.unconfirmed)}
-            data-flash={flashOf(cell.row, cell.column)}
-            data-selected={String(isSelected(cell.row, cell.column))}
-            data-in-word={String(isInWord)}
-            data-tinted-by={tints.map((remote) => remote.playerId).join(' ')}
-            class:selected={isSelected(cell.row, cell.column)}
-            class:in-word={isInWord}
-            class:tinted={tints.length > 0 && !isInWord}
-            style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
-            style:grid-row={cell.row + 1}
-            style:grid-column={cell.column + 1}
-          >{shown.letter ?? ''}{#each outlines as remote, rank (remote.playerId)}<span
-                class="remote-selection"
-                data-testid="remote-selection"
-                data-player-id={remote.playerId}
-                data-colour={String(remote.colour)}
-                style:--outline-colour={`var(--player-colour-${remote.colour})`}
-                style:inset="{outlineInset(rank)}px"
-                ><span
-                  class="remote-initials"
-                  data-corner={rank % 4}
-                  data-testid="remote-initials">{remote.initials}</span
-                ></span
-              >{/each}</div>
-        {:else if cell.type === 'clue'}
-          <div
-            class="cell clue-cell"
-            class:two={cell.clues.length === 2}
-            data-testid="cell"
-            data-row={cell.row}
-            data-column={cell.column}
-            data-type="clue"
-            role="gridcell"
-            id={cellId(cell.row, cell.column)}
-            style:grid-row={cell.row + 1}
-            style:grid-column={cell.column + 1}
-          >
-            {#each cell.clues as clue, index (index)}
-              {#if index === 1}
-                <div class="separator" data-testid="clue-separator"></div>
-              {/if}
-              <div
-                class="clue"
-                data-testid="clue"
-                data-clue-index={index}
-                data-arrow={clue.arrow}
-                data-active={String(activeKey === `${cell.row},${cell.column},${index}`)}
-                class:active={activeKey === `${cell.row},${cell.column},${index}`}
-              >
-                <span class="clue-text" data-testid="clue-text">{clue.text}</span>
-                <span
-                  class="arrow {arrowSide(clue.arrow)}"
-                  data-testid="clue-arrow"
+        {#each rowCells as cell (cell.column)}
+          {#if cell.type === 'letter'}
+            {@const shown = shownCell(cell, pendingEdits)}
+            {@const outlines = outlinesOn(cell.row, cell.column)}
+            {@const tints = tintsOn(cell.row, cell.column)}
+            {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
+            <div
+              class="cell letter"
+              class:locked={cell.locked}
+              data-testid="cell"
+              data-row={cell.row}
+              data-column={cell.column}
+              data-type="letter"
+              role="gridcell"
+              id={cellId(cell.row, cell.column)}
+              aria-selected={isSelected(cell.row, cell.column)}
+              data-letter={shown.letter ?? ''}
+              data-unconfirmed={String(shown.unconfirmed)}
+              data-author={cell.author ?? ''}
+              data-locked={String(cell.locked)}
+              data-wrong={String(cell.wrong && !shown.unconfirmed)}
+              data-flash={flashOf(cell.row, cell.column)}
+              data-selected={String(isSelected(cell.row, cell.column))}
+              data-in-word={String(isInWord)}
+              data-tinted-by={tints.map((remote) => remote.playerId).join(' ')}
+              class:selected={isSelected(cell.row, cell.column)}
+              class:in-word={isInWord}
+              class:tinted={tints.length > 0 && !isInWord}
+              style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
+              style:grid-row={cell.row + 1}
+              style:grid-column={cell.column + 1}
+            >{shown.letter ?? ''}{#each outlines as remote, rank (remote.playerId)}<span
+                  class="remote-selection"
+                  data-testid="remote-selection"
+                  data-player-id={remote.playerId}
+                  data-colour={String(remote.colour)}
+                  style:--outline-colour={`var(--player-colour-${remote.colour})`}
+                  style:inset="{outlineInset(rank)}px"
+                  ><span
+                    class="remote-initials"
+                    data-corner={rank % 4}
+                    data-testid="remote-initials">{remote.initials}</span
+                  ></span
+                >{/each}</div>
+          {:else if cell.type === 'clue'}
+            <div
+              class="cell clue-cell"
+              class:two={cell.clues.length === 2}
+              data-testid="cell"
+              data-row={cell.row}
+              data-column={cell.column}
+              data-type="clue"
+              role="gridcell"
+              id={cellId(cell.row, cell.column)}
+              style:grid-row={cell.row + 1}
+              style:grid-column={cell.column + 1}
+            >
+              {#each cell.clues as clue, index (index)}
+                {#if index === 1}
+                  <div class="separator" data-testid="clue-separator"></div>
+                {/if}
+                <div
+                  class="clue"
+                  data-testid="clue"
+                  data-clue-index={index}
                   data-arrow={clue.arrow}
-                  data-side={arrowSide(clue.arrow)}
-                  aria-hidden="true"
-                  style:--along={arrowPosition(cell.clues, index)}
-                ></span>
-              </div>
-            {/each}
-          </div>
-        {:else}
-          <div
-            class="cell empty"
-            data-testid="cell"
-            data-row={cell.row}
-            data-column={cell.column}
-            data-type="empty"
-            role="gridcell"
-            id={cellId(cell.row, cell.column)}
-            style:grid-row={cell.row + 1}
-            style:grid-column={cell.column + 1}
-          ></div>
-        {/if}
-      {/each}
+                  data-active={String(activeKey === `${cell.row},${cell.column},${index}`)}
+                  class:active={activeKey === `${cell.row},${cell.column},${index}`}
+                >
+                  <span class="clue-text" data-testid="clue-text">{clue.text}</span>
+                  <span
+                    class="arrow {arrowSide(clue.arrow)}"
+                    data-testid="clue-arrow"
+                    data-arrow={clue.arrow}
+                    data-side={arrowSide(clue.arrow)}
+                    aria-hidden="true"
+                    style:--along={arrowPosition(cell.clues, index)}
+                  ></span>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div
+              class="cell empty"
+              data-testid="cell"
+              data-row={cell.row}
+              data-column={cell.column}
+              data-type="empty"
+              role="gridcell"
+              id={cellId(cell.row, cell.column)}
+              style:grid-row={cell.row + 1}
+              style:grid-column={cell.column + 1}
+            ></div>
+          {/if}
+        {/each}
       </div>
     {/each}
   </div>
@@ -631,7 +631,9 @@
   }
 
   /* Four corners, by rank: top-left (0), bottom-right (1), top-right (2),
-     bottom-left (3), so that up to four labels never cover each other. */
+     bottom-left (3). Labels of different ranks never share a corner, but on a
+     small cell two labels can still overlap when they are wider than half
+     of it. */
   .remote-initials[data-corner='1'] {
     top: auto;
     left: auto;
