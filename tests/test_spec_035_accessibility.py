@@ -1152,9 +1152,10 @@ def test_ac4_choosing_the_same_selection_again_does_not_rewrite_the_region(
     word_before = grid_of(page).get_attribute("data-word")
     announcement.evaluate(OBSERVE_REWRITES_SCRIPT)
 
-    # ArrowLeft cannot leave (1, 0): only clue cells lie to its left (spec 009
-    # AC-1), so the player chooses the same selection again. Remote events and
-    # Escape leave it alone too.
+    # (1, 0) has only an across word, so tapping it again chooses the very same
+    # selection. ArrowLeft cannot leave it (only clue cells lie to its left), and
+    # Escape, remote events leave it alone too.
+    cell_at(page, 1, 0).click()
     page.keyboard.press("ArrowLeft")
     page.keyboard.press("Escape")
     mock.send(selection_frame("p2", 3, 1, Direction.DOWN))
@@ -1807,9 +1808,54 @@ def test_ac8_the_dimmed_roster_rows_are_scanned_with_their_opacity(
             is_nickname = measurement["testid"] == "roster-nickname"
             if is_nickname and measurement["rowState"] == state:
                 found.append(measurement)
-        # The scan reached the nickname exactly once, with its own opacity applied.
+        # The scan reached the nickname exactly once.
         assert [item["text"] for item in found] == [nickname], (state, found)
         assert found[0]["ratio"] >= 4.5, (state, found[0])
+
+
+INJECT_PROBE_SCRIPT = """
+opacity => {
+  let probe = document.querySelector('[data-testid="opacity-probe"]');
+  if (probe === null) {
+    probe = document.createElement('p');
+    probe.setAttribute('data-testid', 'opacity-probe');
+    probe.textContent = 'Sonde opacité';
+    document.body.appendChild(probe);
+  }
+  probe.style.color = '#5b6070';
+  probe.style.backgroundColor = '#ffffff';
+  probe.style.opacity = String(opacity);
+}
+"""
+
+
+def probe_measurement(page: Page, opacity: float) -> dict[str, Any]:
+    """Inject the probe text at an opacity and return what the scan measured."""
+    page.evaluate(INJECT_PROBE_SCRIPT, opacity)
+    found: list[dict[str, Any]] = []
+    for measurement in contrast_measurements(page):
+        if measurement["testid"] == "opacity-probe":
+            found.append(measurement)
+    assert len(found) == 1, found
+    return found[0]
+
+
+def test_ac8_the_contrast_scan_folds_in_opacity(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_k2(page, live_server, fx01_grid)
+
+    # The same colours pass at full opacity and fail once the element is faded.
+    opaque = probe_measurement(page, 1)
+    opaque_flagged = opaque in contrast_offenders(page)
+    faded = probe_measurement(page, 0.45)
+    faded_flagged = faded in contrast_offenders(page)
+
+    assert opaque["ratio"] >= 4.5, opaque
+    assert not opaque_flagged
+    assert faded["ratio"] < 4.5, faded
+    assert faded["ratio"] < opaque["ratio"]
+    assert faded_flagged
 
 
 # ---- AC-9: the interface is in French, every string from fr.json -----------------
