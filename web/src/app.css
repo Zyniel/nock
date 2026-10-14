@@ -23,9 +23,14 @@ main {
   padding: 2rem 1rem;
 }
 
-/* A visible focus on every focusable element after a keyboard move (spec 035). */
+/* A visible focus on every focusable element after a keyboard move (spec 035).
+   The outline is a variable for the controls that draw it on :focus instead. */
+:root {
+  --focus-outline: 3px solid #1a4fd6;
+}
+
 :focus-visible {
-  outline: 3px solid #1a4fd6;
+  outline: var(--focus-outline);
   outline-offset: 2px;
 }
 

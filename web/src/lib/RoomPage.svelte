@@ -39,6 +39,9 @@
   const COPIED_DISPLAY_MS = 2000
   const UNDO_MESSAGE_MS = 3000
   const MAX_REVEAL_COUNT = 99
+  // The remove buttons are compact in a roster list narrower than this many root
+  // font sizes (spec 014 AC-9).
+  const COMPACT_REMOVE_BELOW_ROOT_FONTS = 4.5
 
   let { code }: { code: string } = $props()
 
@@ -130,6 +133,40 @@
     }
     updateHostPanelMore()
     return () => observer.disconnect()
+  })
+
+  // On a small window the roster list is narrow: every remove button then shows a
+  // short text instead of "Retirer" (spec 014 AC-9).
+  let rosterList: HTMLUListElement | null = $state(null)
+  let isRemoveCompact = $state(false)
+
+  // Compare the width of the list with the root font size, both in CSS pixels.
+  function updateRemoveForm(): void {
+    if (rosterList === null) {
+      return
+    }
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+    isRemoveCompact = rosterList.clientWidth < COMPACT_REMOVE_BELOW_ROOT_FONTS * rootFontSize
+  }
+
+  // Measure again when the list changes size (a resize, a rotation) and when a
+  // style or a class on <html> changes the root font.
+  $effect(() => {
+    if (rosterList === null) {
+      return
+    }
+    const sizeObserver = new ResizeObserver(updateRemoveForm)
+    sizeObserver.observe(rosterList)
+    const rootObserver = new MutationObserver(updateRemoveForm)
+    rootObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    })
+    updateRemoveForm()
+    return () => {
+      sizeObserver.disconnect()
+      rootObserver.disconnect()
+    }
   })
 
   let shareLink = $derived(`${location.origin}/r/${code}`)
@@ -861,7 +898,7 @@
     <div class="presence">
     <section class="roster" data-testid="roster">
       <h2>{t('roster.heading')}</h2>
-      <ul onfocusin={scrollKeyboardFocusIntoView}>
+      <ul bind:this={rosterList} onfocusin={scrollKeyboardFocusIntoView}>
         {#each session.snapshot.players as player (player.player_id)}
           {@const isYou = player.player_id === session.snapshot.you}
           <li
@@ -890,9 +927,11 @@
               <button
                 type="button"
                 class="remove-player"
+                class:compact={isRemoveCompact}
                 data-testid="remove-player"
                 aria-label={t('host.remove_label', { name: player.nickname })}
-                onclick={() => removePlayer(player.player_id)}>{t('host.remove')}</button
+                onclick={() => removePlayer(player.player_id)}
+                >{isRemoveCompact ? t('host.remove_short') : t('host.remove')}</button
               >
             {/if}
           </li>
@@ -1085,6 +1124,10 @@
   }
 
   .roster {
+    /* The smallest remove button (spec 014 AC-7), and the room after the last
+       item of the list that keeps the last button whole (spec 014 AC-8). */
+    --remove-size: 24px;
+    --list-end-room: 3px;
     flex: none;
     /* A little room under the last row. A browser tests a tap against about one
        pixel around the point, so an element that starts at the bottom edge of a
@@ -1142,10 +1185,19 @@
   }
 
   .remove-player {
-    min-width: 24px;
-    min-height: 24px;
+    min-width: var(--remove-size);
+    min-height: var(--remove-size);
     padding: 0 0.3rem;
     font-size: 0.75rem;
+  }
+
+  /* The short button is exactly as wide as the smallest size, whatever the root
+     font and the font that draws its sign: the roster list keeps room for this
+     width (spec 014 AC-10). */
+  .remove-player.compact {
+    box-sizing: border-box;
+    width: var(--remove-size);
+    padding-inline: 0;
   }
 
   /* One compact row of controls for the host; it wraps on a roomy window and
@@ -1251,14 +1303,16 @@
       font-size: 0.8rem;
     }
 
+    /* No scroll padding: the focus outline is drawn inside the buttons (see
+       below), and the list can be only 3px wider than a button (spec 014
+       AC-10). A padding of 8px would push a button scrolled into view out of
+       the list. */
     .roster ul {
       flex: 1 1 auto;
       flex-wrap: nowrap;
       min-width: 0;
       gap: 0.75rem;
       overflow-x: auto;
-      /* A focused control is scrolled whole into view, outline included. */
-      scroll-padding: 8px;
     }
 
     .roster li {
@@ -1271,11 +1325,13 @@
        a pixel out of the list, where a tap does not reach it. A few pixels of
        room after the last item keep the button whole (spec 014 AC-8). */
     .roster li:last-child {
-      padding-right: 3px;
+      padding-right: var(--list-end-room);
     }
 
+    /* The line takes the room that the heading leaves, so a squeezed feed cuts
+       the heading only when the line has no room left (spec 014 AC-10). */
     .feed ul {
-      flex: 1 1 auto;
+      flex: 1 1 0;
       min-width: 0;
       margin: 0;
       max-height: 1.3rem;
@@ -1348,8 +1404,8 @@
     /* A target of 24 by 24 CSS pixels at least (spec 014 AC-7). It may make the
        row taller, but never sticks out of the scrolling list (spec 014 AC-8). */
     .remove-player {
-      min-width: 24px;
-      min-height: 24px;
+      min-width: var(--remove-size);
+      min-height: var(--remove-size);
     }
 
     .feed li {
@@ -1360,7 +1416,7 @@
   }
 
   /* A low window (a phone on its side) also takes the padding down, and puts the
-     roster and the feed side by side. */
+     roster, the feed and the host panel side by side. */
   @media (max-height: 500px) {
     main {
       padding: 0.25rem 0.5rem;
@@ -1370,25 +1426,64 @@
       padding: 0.25rem 0.75rem;
     }
 
+    /* The header buttons get the same size in every engine. WebKit on a touch
+       screen gives a button a 16px font and a taller padding than Chromium and
+       Firefox, and then the header needs a third row (spec 013 AC-6). */
+    .room-header button {
+      padding-block: 1px;
+      font-size: 0.8rem;
+    }
+
     /* The grid comes right after this row, so the room under the remove buttons
        goes under the whole row, not under the roster alone (spec 014 AC-8). On
        the roster alone, the feed and the host panel would stretch 3px taller and
        their content would sit 1.5px lower than the roster's. */
     .presence {
+      --presence-gap: 1rem;
       flex-direction: row;
-      gap: 1rem;
+      gap: var(--presence-gap);
       padding-bottom: 3px;
     }
 
+    /* The three boxes start as thirds of the row. The host panel keeps its third
+       and scrolls sideways. The roster takes more width only when its list needs
+       it for one remove button, and it takes that width from the feed alone
+       (spec 014 AC-10). */
     .roster,
-    .feed,
-    .host-panel {
+    .feed {
       flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .host-panel {
+      flex: 0 0 calc((100% - 2 * var(--presence-gap)) / 3);
       min-width: 0;
     }
 
     .roster {
       padding-bottom: 0;
+      /* Never narrower than the heading, the gap and the list at its minimum. */
+      min-width: min-content;
+    }
+
+    /* The list takes no width from its content (a box with inline-size
+       containment measures zero), so the roster is not as wide as its eight
+       players, and a change of the buttons' text cannot change the width of the
+       list. The list is never narrower than one compact remove button and the
+       room after it. */
+    .roster ul {
+      contain: inline-size;
+      min-width: calc(var(--remove-size) + var(--list-end-room));
+    }
+
+    /* The feed gives up width when the roster needs it: its heading ends with an
+       ellipsis instead of spilling out of the box. */
+    .feed h2 {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
 </style>

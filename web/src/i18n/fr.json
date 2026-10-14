@@ -27,6 +27,7 @@
   "roster.host": "hôte",
   "host.remove": "Retirer",
   "host.remove_label": "Retirer {name} du salon",
+  "host.remove_short": "✕",
   "host.lock": "Verrouiller le salon",
   "host.unlock": "Déverrouiller le salon",
   "settings.heading": "Réglages",
