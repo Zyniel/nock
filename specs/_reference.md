@@ -74,26 +74,26 @@ the specs whose criteria this one mentions.
 | [016](016-same-cell-conflicts.md) | US-4.2 Same-cell conflicts | E4 | MVP | 3 | - |
 | [017](017-reconnection.md) | US-4.3 Disconnection and reconnection | E4 | MVP | 5 | - |
 | [018](018-durable-room-state.md) | US-4.4 Durable room state | E4 | MVP | 4 | - |
-| [019](019-authorship-view.md) | US-5.1 Authorship view | E5 | V1 | 3 | 028 |
-| [020](020-pencil-letters.md) | US-5.2 Pencil letters | E5 | V1 | 3 | 026 |
-| [021](021-clue-flag.md) | US-5.3 Clue flag | E5 | V1 | 3 | - |
-| [022](022-chat-reactions.md) | US-5.4 Chat and reactions | E5 | V1 | 4 | - |
+| [019](019-authorship-view.md) | US-5.1 Authorship view | E5 | V1 | 5 | 006, 007, 009, 012, 013, 014, 015, 016, 017, 018, 020, 023, 024, 028, 035 |
+| [020](020-pencil-letters.md) | US-5.2 Pencil letters | E5 | V1 | 7 | 006, 008, 009, 013, 015, 016, 017, 018, 019, 023, 024, 026, 035, 037 |
+| [021](021-clue-flag.md) | US-5.3 Clue flag | E5 | V1 | 11 | 006, 013, 014, 017, 018, 024, 026, 035 |
+| [022](022-chat-reactions.md) | US-5.4 Chat and reactions | E5 | V1 | 16 | 006, 013, 014, 024, 025, 027, 032, 035, 037, 038, 039 |
 | [023](023-check.md) | US-6.1 Check a letter, a word or the grid | E6 | MVP | 10 | 013, 015, 016, 025, 026, 037 |
-| [024](024-reveal.md) | US-6.2 Reveal a letter or a word | E6 | V1 | 3 | - |
-| [025](025-help-mode-vote.md) | US-6.3 Group decision on help | E6 | V1 | 4 | - |
+| [024](024-reveal.md) | US-6.2 Reveal a letter or a word | E6 | V1 | 10 | 006, 008, 009, 013, 014, 015, 016, 018, 020, 023, 025, 026, 028, 035, 037 |
+| [025](025-help-mode-vote.md) | US-6.3 Group decision on help | E6 | V1 | 9 | 006, 010, 012, 013, 014, 017, 018, 023, 024, 026, 035, 037 |
 | [026](026-completion-detection.md) | US-6.4 Completion detection | E6 | MVP | 9 | 015, 018, 023 |
-| [027](027-shared-timer.md) | US-7.1 Shared timer | E7 | V1 | 3 | - |
-| [028](028-end-of-game-recap.md) | US-7.2 End-of-game recap | E7 | V1 | 4 | - |
-| [029](029-game-history.md) | US-7.3 Game history | E7 | V1 | 2 | - |
+| [027](027-shared-timer.md) | US-7.1 Shared timer | E7 | V1 | 8 | 006, 013, 017, 024, 026, 035 |
+| [028](028-end-of-game-recap.md) | US-7.2 End-of-game recap | E7 | V1 | 10 | 006, 011, 013, 014, 018, 019, 024, 026, 027, 035, 037 |
+| [029](029-game-history.md) | US-7.3 Game history | E7 | V1 | 7 | 004, 005, 006, 010, 012, 026, 027, 032, 033, 035, 037, 038 |
 | [030](030-race-mode.md) | US-8.1 Race | E8 | Later | 4 | - |
 | [031](031-team-mode.md) | US-8.2 Teams | E8 | Later | 2 | 030 |
-| [032](032-room-resume.md) | US-9.1 Room resume | E9 | V1 | 3 | - |
-| [033](033-optional-account.md) | US-9.2 Optional account | E9 | V1 | 3 | - |
-| [034](034-catch-up.md) | US-9.3 Catching up after an absence | E9 | V1 | 2 | - |
+| [032](032-room-resume.md) | US-9.1 Room resume | E9 | V1 | 6 | 006, 010, 012, 014, 017, 018, 024, 027, 035 |
+| [033](033-optional-account.md) | US-9.2 Optional account | E9 | V1 | 11 | 005, 006, 009, 012, 013, 014, 017, 023, 024, 026, 028, 032, 035, 036, 037, 038, 039 |
+| [034](034-catch-up.md) | US-9.3 Catching up after an absence | E9 | V1 | 5 | 007, 010, 013, 017, 018, 020, 023, 024, 026, 032, 035, 037, 040 |
 | [035](035-accessibility.md) | US-10.1 Accessibility | E10 | MVP | 12 | 006, 009, 013, 014, 023, 026, 040 |
 | [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 11 | 015, 018, 037 |
 | [037](037-integrity.md) | US-10.3 Integrity | E10 | MVP | 4 | - |
-| [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 4 | 032 |
+| [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 11 | 005, 006, 008, 010, 011, 018, 020, 022, 026, 032, 035, 036, 037 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
 | [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
 
