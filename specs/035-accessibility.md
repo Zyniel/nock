@@ -354,7 +354,7 @@ AC-11.)
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-10.1.1) (browser with live server, keyboard only) Every action is reachable from the keyboard. With `CAT` served: on `/`, `tab_to` `force-filter` `data-force="1"` then `Enter` makes it `aria-pressed="true"`; `tab_to` the `catalogue-play` of item 1 then `Enter` opens the room page, which reaches `data-status="joined"` (Ana, host). There: `tab_to` `grid` then `Tab` selects `0,0,0` on (1, 0); `T` then `A` fill (1, 0) and (1, 1); `ArrowDown` moves the selection; `Backspace` erases; `Control+z` sends `undo`; `Escape` then `Tab` leaves the grid: the focus moves to the sentinel of "Test harness", which the test adds once the room page is `joined`. `tab_to` `check-word` and `Enter` sends a `check`; the same for `check-letter`, `check-grid` and `undo-button`; `tab_to` `copy-link` and `share-link` focus them; `tab_to` `lock-room` then `Enter` makes it `aria-pressed="true"` and again unlocks; `tab_to` `help-mode-select`, `ArrowDown`, then `tab_to` `settings-save` and `Enter` sends `change_settings`. A second page (Bob) opens the room link and, keyboard only, `tab_to` `nickname-input`, types `Bob`, presses `Enter` and reaches `joined`; then on Ana's page `tab_to` the `remove-player` of Bob and `Enter` removes him (Bob's page reaches `data-status="removed"`). (Note from the lead, 2026-10-14: the sentinel was added so that leaving the grid shows in every engine, and each `tab_to` follows its new definition in "Test harness". The walk's steps and intent are unchanged.)
-- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white; this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to the sentinel (AC-1). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".)
+- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white; this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to the sentinel (AC-1). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".) The scrolling list of `activity-feed`, a Tab stop in Chromium, shows its whole focus outline at three window sizes ("Focus outline of the feed's scrolling list" in "Edge cases and errors"). (Note from the lead, 2026-10-14: this sentence was added. The tests already ran that check, but the spec did not describe it.)
 - **AC-3** (new, from spec 009 decision 5) (browser with mocked socket, keyboard only) A keyboard player can leave the grid. Given a FX-01 snapshot (`you` host, so the host panel shows) and the focus on the grid with (1, 0) selected, the following holds. (Note from the lead, 2026-10-14: split into the cases below, with the sentinel and the `Tab` listener of "Test harness", so that every check holds in Chromium, Firefox and WebKit. The old text required "`document.activeElement` is not the grid" even when nothing follows the grid, which Firefox under automation cannot show.)
   - Word navigation: `Tab` selects `0,0,1` and the focus stays on the grid (as spec 009).
   - Forward, with the sentinel: with the sentinel of "Test harness" added, `Escape` then `Tab` moves the focus to the first focusable element after the grid in document order, which is the sentinel while the page has none of its own after the grid. The selection is unchanged.
@@ -482,6 +482,62 @@ Other cases:
   2026-10-13 required an unchanged `scrollLeft` and failed in WebKit for
   `help-mode-select` because of WebKit's own scroll, while the fade stayed
   visible. The page's code scrolls only on a keyboard focus.)
+- Focus outline of the feed's scrolling list (AC-2): the list of `activity-feed`
+  (spec 013) is the `ul` element in it that holds the `feed-item` elements, and it
+  is the element that scrolls. With the feed full enough to scroll, Chromium makes
+  that list a Tab stop. While the list has the focus, its outline must be fully
+  visible: not clipped by the window or by an ancestor that clips its overflow,
+  and not covered by another element, as the points below define them. (Note from
+  the lead, 2026-10-14: added. The tests already ran this check, but the spec only
+  named it under "Engines" and did not say what it measures.)
+  - Setup: at each window size 360 by 740, 568 by 320 and 1280 by 720, in a
+    desktop context (that viewport, no touch), state K2 (browser with mocked
+    socket; K2's tap on (1, 3) is part of the setup). The mock then sends 40 more
+    `check_result` events like K2's (by `p2` on the word `0,2,0` with empty
+    lists), with `seq` 14 to 53, so the feed holds 43 items. Once `room-page` has
+    `data-seq` 53, the list must scroll: its `scrollHeight` is greater than its
+    `clientHeight`, or the test fails. The test finds the list with the selector
+    `[data-testid="activity-feed"] ul`.
+  - Reaching the list: the test calls `document.activeElement.blur()` from
+    `page.evaluate`, then presses `Tab` at most 60 times (only `Tab`; this walk
+    does not use `tab_to`). After each press, if the grid has the focus, it presses
+    `Escape`, which releases the grid's next `Tab` (AC-3). It stops as soon as the
+    list has the focus, and measures 300 ms later.
+  - Engines: if the list never gets the focus in those 60 presses, the test fails
+    under Chromium. Under any other engine it skips the check at that window size,
+    because that engine does not make the list a Tab stop. WebKit is one
+    ("Engines" in "Test harness").
+  - Style and width: the list's computed `outline-style` is neither `none` nor
+    `auto`, and its `outline-width` is at least 2 px. This check does not measure
+    the outline's colour.
+  - Not clipped: the outline's outer edge is the list's bounding box
+    (`getBoundingClientRect()`) grown on each side by the computed `outline-offset`
+    plus `outline-width`. A negative offset draws the outline inside the box. That
+    edge lies inside the window (`innerWidth` by `innerHeight`) and inside the
+    client area of every ancestor of the list whose computed `overflow-x` or
+    `overflow-y` is not `visible`. A client area is the box inside the borders,
+    without scrollbars: the ancestor's `getBoundingClientRect()` moved in by
+    `clientLeft` and `clientTop`, `clientWidth` wide and `clientHeight` high. On
+    each side, the edge may go past by at most 0.5 px (the test rounds to whole
+    pixels).
+  - Not covered: the test samples points on the middle line of the outline band,
+    half the `outline-width` in from the outer edge: every 2 px along each side,
+    from its left or top end, and the four corners. At each point,
+    `document.elementFromPoint` gives the topmost element. The point is covered
+    when that element is not the list, not inside it and not one of its
+    ancestors, and when that element, or one of its ancestors that does not
+    contain the list, is one of these: positioned (computed `position` other than
+    `static`); a stacking context (`z-index` other than `auto`, `transform` other
+    than `none`, `opacity` below 1, or `isolation` `isolate`); or a scroll
+    container (`overflow-x` or `overflow-y` other than `visible`) that comes after
+    the list in document order. A positioned or stacking-context element counts
+    wherever it is in the document; only a scroll container must come after the
+    list. No point may be covered. Why: an outline paints above the in-flow,
+    non-positioned content around it, so that content does not count, while a
+    later scroll container is painted as its own layer and can paint over it.
+    Limits: `elementFromPoint` skips elements with `pointer-events: none`, so the
+    check cannot see such a cover. A point outside the window finds no element;
+    "Not clipped" covers that case.
 
 ## Out of scope
 
