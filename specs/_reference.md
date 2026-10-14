@@ -69,7 +69,7 @@ the specs whose criteria this one mentions.
 | [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 4 | - |
 | [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 7 | - |
 | [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 6 | - |
-| [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 8 | - |
+| [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 10 | 006, 013, 035 |
 | [015](015-shared-letters.md) | US-4.1 Shared letters | E4 | MVP | 4 | - |
 | [016](016-same-cell-conflicts.md) | US-4.2 Same-cell conflicts | E4 | MVP | 3 | - |
 | [017](017-reconnection.md) | US-4.3 Disconnection and reconnection | E4 | MVP | 5 | - |

@@ -15,6 +15,22 @@ Not tested here, with the reason:
   says the hub skips it, and does not say whether the rule still returns it.
 - The seq of the entries of a refused join that also timed out the member in the
   same step: the spec does not say what a refused join leaves in the log.
+- The minimum list width when the roster holds no `remove-player` (AC-10, "Host
+  alone, or not host"): the spec only says the minimum does not apply, so there is
+  no behaviour to observe.
+- A root font changed by a browser setting (AC-9, "Root font source"): the tests
+  change it with a style on `html`, as the spec's harness says.
+
+Choices where the spec leaves room (AC-8 to AC-10, small windows):
+
+- AC-10 runs with one long line in the feed (a `settings_changed` event on top of
+  the AC-9 setup): with an empty feed there is no line to cut inside the feed's box.
+- AC-10 "the rules apply again" (live) is one scenario of mine: a resize to
+  300x480, then root fonts of 20, 24, 12 and 16 px, then a resize back. After each
+  step every AC-10 rule must hold within 1 s.
+- Before they measure a layout, the window tests wait up to 1 s for the buttons to
+  follow the rule of AC-9 (the spec lets a text check poll that long). A page that
+  never follows it is reported by the AC-9 tests, not by the others.
 """
 
 from __future__ import annotations
@@ -26,7 +42,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 import pytest
 from fastapi.testclient import TestClient
@@ -3535,9 +3551,10 @@ def test_ac7_browser_a_pointer_focus_in_the_host_panel_keeps_the_fade(
 
 # ---- AC-8: the whole box of each remove button can be tapped ------------------
 
-HIT_TEST_SCRIPT = """
-button => {
-  button.scrollIntoView({block: 'nearest', inline: 'nearest'});
+# The check itself, for the button where it stands now. AC-8 scrolls the button into
+# view first (HIT_TEST_SCRIPT); AC-9 runs it as it is (HIT_TEST_IN_PLACE_SCRIPT),
+# once the page scrolled a focused button by itself.
+HIT_TEST_BODY = """
   const box = button.getBoundingClientRect();
   const misses = [];
   let tested = 0;
@@ -3557,8 +3574,13 @@ button => {
     tested, missCount: misses.length, firstMisses: misses.slice(0, 5),
     size: [box.width, box.height],
   };
-}
 """
+HIT_TEST_SCRIPT = (
+    "button => { button.scrollIntoView({block: 'nearest', inline: 'nearest'});"
+    + HIT_TEST_BODY
+    + "}"
+)
+HIT_TEST_IN_PLACE_SCRIPT = "button => {" + HIT_TEST_BODY + "}"
 
 
 @pytest.mark.parametrize("context_kind", ["desktop", "touch"])
@@ -3587,3 +3609,957 @@ def test_ac8_browser_every_pixel_of_a_remove_button_hits_the_button(
             assert report["missCount"] == 0, (index, report)
     finally:
         close()
+
+
+# ---- Small windows (AC-8 to AC-10): the windows and what the tests share -------
+
+REMOVE_BUTTON_COUNT = 7
+DEFAULT_ROOT_FONT_PX = 16
+SWITCH_IN_ROOT_FONTS = 4.5  # AC-9: compact while the list is narrower than 4.5rem
+SWITCH_TOLERANCE_PX = 1.0  # AC-9: within 1 px of the threshold, either form passes
+LIST_ROOM_PX = 3  # AC-10: the room after the last item
+LOW_LAYOUT_MAX_HEIGHT_PX = 500  # the low layout: window.innerHeight <= 500
+LIVE_CHANGE_MS = 1000  # AC-9, AC-10: a change applies "within 1 s"
+POLL_MS = 50
+MIN_HIT_PIXELS = 24 * 24 - 2 * 24
+MIN_OUTLINE_PX = 2.0
+MIN_FOCUS_CONTRAST = 3.0
+MIN_TEXT_CONTRAST = 4.5
+
+
+class Window(NamedTuple):
+    """A window size in CSS px, and the root font size in px to run it at."""
+
+    width: int
+    height: int
+    root_font: int
+
+
+def window_id(window: Window) -> str:
+    return f"{window.width}x{window.height}-{window.root_font}px"
+
+
+# The narrow and low windows of the spec's "Test harness".
+NARROW_LOW_WINDOWS = [
+    Window(300, 480, 16),
+    Window(300, 480, 20),
+    Window(300, 480, 12),
+    Window(300, 480, 24),
+    Window(320, 480, 16),
+    Window(320, 480, 20),
+    Window(360, 500, 16),
+    Window(360, 500, 20),
+    Window(400, 480, 16),
+    Window(400, 480, 20),
+    Window(480, 500, 16),
+    Window(480, 500, 20),
+]
+NARROW_LOW_IDS = [window_id(window) for window in NARROW_LOW_WINDOWS]
+
+ROOT_FONT_SCRIPT = "size => { document.documentElement.style.fontSize = size; }"
+ROOT_FONT_READS_SCRIPT = (
+    "size => getComputedStyle(document.documentElement).fontSize === size"
+)
+TWO_FRAMES_SCRIPT = """
+() => new Promise(resolve => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve(true)));
+})
+"""
+# `w` is the clientWidth of the roster list and `r` the computed font size of `html`
+# in CSS px (spec 014, "Small windows"), then the text of each remove button.
+BUTTONS_STATE_SCRIPT = """
+() => {
+  const list = document.querySelector('[data-testid="roster"] ul');
+  const buttons = document.querySelectorAll('[data-testid="remove-player"]');
+  const texts = [];
+  for (const button of buttons) {
+    texts.push(button.textContent.trim());
+  }
+  return {
+    listWidth: list.clientWidth,
+    rootFont: parseFloat(getComputedStyle(document.documentElement).fontSize),
+    texts: texts,
+  };
+}
+"""
+
+
+def wait_for_root_font(page: Page, size_px: int) -> None:
+    """Wait until `html` computes that font size, then for two animation frames."""
+    page.wait_for_function(
+        ROOT_FONT_READS_SCRIPT, arg=f"{size_px}px", timeout=WAIT_TIMEOUT_MS
+    )
+    page.evaluate(TWO_FRAMES_SCRIPT)
+
+
+def set_root_font(page: Page, size_px: int) -> None:
+    """Set the root font size with a style on `html`, as the spec's harness says."""
+    page.evaluate(ROOT_FONT_SCRIPT, f"{size_px}px")
+    wait_for_root_font(page, size_px)
+
+
+def use_root_font(page: Page, size_px: int) -> None:
+    """Give the page the root font size of a window.
+
+    16 px is the browser default, so nothing is added for it.
+    """
+    if size_px == DEFAULT_ROOT_FONT_PX:
+        wait_for_root_font(page, size_px)
+    else:
+        set_root_font(page, size_px)
+
+
+class ButtonsState(NamedTuple):
+    """What AC-9 reads: the list width `w`, the root font `r` and the texts."""
+
+    list_width: float
+    root_font: float
+    texts: list[str]
+
+
+def read_buttons_state(page: Page) -> ButtonsState:
+    raw = page.evaluate(BUTTONS_STATE_SCRIPT)
+    return ButtonsState(
+        list_width=raw["listWidth"], root_font=raw["rootFont"], texts=raw["texts"]
+    )
+
+
+def remove_texts() -> tuple[str, str]:
+    """Return the full and the compact text of a remove button, from fr.json."""
+    fr = load_fr()
+    assert "host.remove_short" in fr, "fr.json has no key host.remove_short"
+    return fr["host.remove"], fr["host.remove_short"]
+
+
+def rule_violation(
+    state: ButtonsState, full_text: str, compact_text: str
+) -> str | None:
+    """Return how a state breaks the rule of AC-9, or None when it holds.
+
+    Compact while `w < 4.5 r`, full from `w >= 4.5 r`; within 1 px of `4.5 r`
+    either passes; all the buttons show the same one.
+    """
+    if len(state.texts) != REMOVE_BUTTON_COUNT:
+        return f"expected {REMOVE_BUTTON_COUNT} remove buttons: {state}"
+    if len(set(state.texts)) != 1:
+        return f"the buttons do not all have the same form: {state}"
+    threshold = SWITCH_IN_ROOT_FONTS * state.root_font
+    if state.list_width < threshold - SWITCH_TOLERANCE_PX:
+        allowed = [compact_text]
+    elif state.list_width > threshold + SWITCH_TOLERANCE_PX:
+        allowed = [full_text]
+    else:
+        allowed = [compact_text, full_text]
+    shown = state.texts[0]
+    if shown in allowed:
+        return None
+    return (
+        f"w={state.list_width} and 4.5 x r = {threshold}: the buttons should read "
+        f"{allowed} but read {shown!r} ({state})"
+    )
+
+
+def wait_for_the_form(page: Page) -> None:
+    """Give the buttons up to 1 s to take the form that AC-9 asks for.
+
+    The tests that measure the layout call this before measuring, so that a page
+    that follows a root font change a moment later is not measured half-way. It
+    never fails: the AC-9 tests report a wrong form, the other tests measure what
+    is there. Without the key `host.remove_short` there is nothing to wait for.
+    """
+    fr = load_fr()
+    compact_text = fr.get("host.remove_short")
+    if compact_text is None:
+        return
+    waited_ms = 0
+    while waited_ms < LIVE_CHANGE_MS:
+        state = read_buttons_state(page)
+        if rule_violation(state, fr["host.remove"], compact_text) is None:
+            return
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
+
+
+class OpenSmallWindow(Protocol):
+    """The `small_window` fixture: open the host's view in a window."""
+
+    def __call__(
+        self, window: Window, touch: bool = False
+    ) -> tuple[Page, MockRoom]: ...
+
+
+@pytest.fixture
+def small_window(
+    browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
+) -> Iterator[OpenSmallWindow]:
+    """Return `small_window(window, touch=False)`: the host's view in that window.
+
+    The setup of AC-8 (FX-01, `you` host, 8 players, so 7 `remove-player` buttons)
+    in a desktop or a touch context of the window's size. The call returns the page
+    and the mocked room once the roster is shown, the root font is set and the
+    buttons had their moment to follow it. The contexts close after the test.
+    """
+    closers: list[Callable[[], None]] = []
+
+    def open_window(window: Window, touch: bool = False) -> tuple[Page, MockRoom]:
+        page, close = make_page(
+            browser, browser_name, window.width, window.height, touch
+        )
+        closers.append(close)
+        room = joined_mock_room(page, live_server, fx01_grid, eight_players())
+        buttons = page.get_by_test_id("remove-player")
+        expect(buttons).to_have_count(REMOVE_BUTTON_COUNT)
+        use_root_font(page, window.root_font)
+        wait_for_the_form(page)
+        page.evaluate(TWO_FRAMES_SCRIPT)
+        return page, room
+
+    yield open_window
+    for close in closers:
+        close()
+
+
+# ---- AC-8 (extended): the narrow and low windows --------------------------------
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", NARROW_LOW_WINDOWS, ids=NARROW_LOW_IDS)
+def test_ac8_browser_every_pixel_of_a_remove_button_hits_it_at_narrow_and_low_windows(
+    small_window: OpenSmallWindow, window: Window, context_kind: str
+) -> None:
+    page, _room = small_window(window, touch=context_kind == "touch")
+
+    buttons = page.get_by_test_id("remove-player")
+    for index in range(REMOVE_BUTTON_COUNT):
+        report = buttons.nth(index).evaluate(HIT_TEST_SCRIPT)
+        assert report["tested"] >= MIN_HIT_PIXELS, report
+        assert report["missCount"] == 0, (window, index, report)
+
+
+# ---- AC-9: the compact remove button --------------------------------------------
+
+
+MULTIPLICATION_X = chr(0x2715)  # U+2715, the sign of the compact remove button
+
+
+def test_ac9_fr_json_holds_the_compact_remove_text() -> None:
+    fr = load_fr()
+
+    assert fr.get("host.remove_short") == MULTIPLICATION_X
+    assert len(fr["host.remove_short"]) == 1
+
+
+# Where the spec names the form of the buttons: True for the compact `✕`, False
+# for "Retirer". At every window size of spec 006 AC-5 the root font is the
+# default one.
+COMPACT_WINDOWS = [
+    Window(300, 480, 16),
+    Window(320, 480, 16),
+    Window(360, 500, 16),
+    Window(400, 480, 16),
+    Window(300, 480, 20),
+    Window(320, 480, 20),
+    Window(360, 500, 20),
+    Window(400, 480, 20),
+    Window(480, 500, 20),
+    Window(300, 480, 12),
+    Window(300, 480, 24),
+]
+FULL_WINDOWS = [
+    Window(480, 500, 16),
+    Window(740, 360, 20),
+    *[Window(width, height, 16) for width, height in WINDOW_SIZES],
+]
+NAMED_FORMS = [
+    *[(window, True) for window in COMPACT_WINDOWS],
+    *[(window, False) for window in FULL_WINDOWS],
+]
+NAMED_FORM_IDS = [window_id(window) for window, _compact in NAMED_FORMS]
+# Both forms are checked for the label and the target size: the compact one at
+# every narrow and low window it shows at, the full one at 480x500 and 740x360.
+LABEL_WINDOWS = [*NARROW_LOW_WINDOWS, Window(740, 360, 20)]
+LABEL_IDS = [window_id(window) for window in LABEL_WINDOWS]
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize(("window", "compact"), NAMED_FORMS, ids=NAMED_FORM_IDS)
+def test_ac9_browser_the_buttons_show_the_form_of_their_window(
+    small_window: OpenSmallWindow, window: Window, compact: bool, context_kind: str
+) -> None:
+    full_text, compact_text = remove_texts()
+    page, _room = small_window(window, touch=context_kind == "touch")
+
+    state = read_buttons_state(page)
+
+    assert state.root_font == window.root_font, state
+    violation = rule_violation(state, full_text, compact_text)
+    assert violation is None, violation
+    expected = compact_text if compact else full_text
+    assert state.texts == [expected] * REMOVE_BUTTON_COUNT, (window, state)
+
+
+OWNER_SCRIPT = """
+element => {
+  const row = element.closest('[data-testid="roster-player"]');
+  return row === null ? null : row.getAttribute('data-player-id');
+}
+"""
+
+
+def assert_label_and_target(page: Page, player_id: str, nickname: str) -> None:
+    """One remove button: its `aria-label`, the way a role query finds it, its size."""
+    label = load_fr()["host.remove_label"].replace("{name}", nickname)
+    button = roster_item(page, player_id).get_by_test_id("remove-player")
+    assert button.get_attribute("aria-label") == label
+    named = page.get_by_role("button", name=label, exact=True)
+    assert named.count() == 1, label
+    assert named.get_attribute("data-testid") == "remove-player", label
+    assert named.evaluate(OWNER_SCRIPT) == player_id, label
+    box = button.bounding_box()
+    assert box is not None, label
+    assert box["width"] >= MIN_TARGET_PX - TARGET_TOLERANCE_PX, (label, box)
+    assert box["height"] >= MIN_TARGET_PX - TARGET_TOLERANCE_PX, (label, box)
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", LABEL_WINDOWS, ids=LABEL_IDS)
+def test_ac9_browser_both_forms_keep_the_label_and_the_24_pixel_target(
+    small_window: OpenSmallWindow, window: Window, context_kind: str
+) -> None:
+    full_text, compact_text = remove_texts()
+    page, _room = small_window(window, touch=context_kind == "touch")
+
+    # The checks below must run on the form that this window is meant to show.
+    form_text = compact_text if window in COMPACT_WINDOWS else full_text
+    state = read_buttons_state(page)
+    assert state.texts == [form_text] * REMOVE_BUTTON_COUNT, (window, state)
+    for number in range(2, 9):
+        assert_label_and_target(page, f"p{number}", NICKNAMES[number - 1])
+
+
+def wait_for_the_buttons_to_read(page: Page, text: str) -> None:
+    """Fail unless the seven buttons all read `text` within 1 s."""
+    expected = [text] * REMOVE_BUTTON_COUNT
+    waited_ms = 0
+    state = read_buttons_state(page)
+    while state.texts != expected:
+        if waited_ms >= LIVE_CHANGE_MS:
+            pytest.fail(f"the buttons do not read {text!r} within 1 s: {state}")
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
+        state = read_buttons_state(page)
+
+
+LIVE_WINDOW = Window(480, 500, DEFAULT_ROOT_FONT_PX)
+
+
+def test_ac9_browser_the_buttons_switch_live_when_the_root_font_changes(
+    small_window: OpenSmallWindow,
+) -> None:
+    full_text, compact_text = remove_texts()
+    page, _room = small_window(LIVE_WINDOW)
+    wait_for_the_buttons_to_read(page, full_text)
+
+    set_root_font(page, 20)
+    wait_for_the_buttons_to_read(page, compact_text)
+
+    set_root_font(page, DEFAULT_ROOT_FONT_PX)
+    wait_for_the_buttons_to_read(page, full_text)
+
+
+def test_ac9_browser_the_buttons_switch_live_when_the_window_is_resized(
+    small_window: OpenSmallWindow,
+) -> None:
+    full_text, compact_text = remove_texts()
+    page, _room = small_window(LIVE_WINDOW)
+    wait_for_the_buttons_to_read(page, full_text)
+
+    page.set_viewport_size({"width": 360, "height": 500})
+    wait_for_the_buttons_to_read(page, compact_text)
+
+    page.set_viewport_size({"width": 480, "height": 500})
+    wait_for_the_buttons_to_read(page, full_text)
+
+
+# The colour helpers and the focus outline, as in spec 035's harness (the same
+# text as tests/test_spec_035_accessibility.py: parseColour, over, contrast).
+COLOUR_HELPERS = r"""
+const canvas = document.createElement('canvas');
+canvas.width = 1;
+canvas.height = 1;
+const drawing = canvas.getContext('2d', { willReadFrequently: true });
+function parseColour(text) {
+  const match = text.match(/^rgba?\(([^)]*)\)$/);
+  if (match) {
+    const parts = match[1].split(/[\s,\/]+/).filter(part => part !== '');
+    let alpha = 1;
+    if (parts.length > 3) {
+      alpha = parts[3].endsWith('%') ? parseFloat(parts[3]) / 100 : Number(parts[3]);
+    }
+    return [Number(parts[0]), Number(parts[1]), Number(parts[2]), alpha];
+  }
+  drawing.clearRect(0, 0, 1, 1);
+  drawing.fillStyle = '#000000';
+  drawing.fillStyle = text;
+  drawing.fillRect(0, 0, 1, 1);
+  const data = drawing.getImageData(0, 0, 1, 1).data;
+  return [data[0], data[1], data[2], data[3] / 255];
+}
+function over(top, bottom) {
+  const alpha = top[3];
+  return [
+    top[0] * alpha + bottom[0] * (1 - alpha),
+    top[1] * alpha + bottom[1] * (1 - alpha),
+    top[2] * alpha + bottom[2] * (1 - alpha),
+    1,
+  ];
+}
+function channel(value) {
+  const scaled = value / 255;
+  if (scaled <= 0.03928) {
+    return scaled / 12.92;
+  }
+  return Math.pow((scaled + 0.055) / 1.055, 2.4);
+}
+function luminance(colour) {
+  return 0.2126 * channel(colour[0]) + 0.7152 * channel(colour[1])
+    + 0.0722 * channel(colour[2]);
+}
+function contrast(first, second) {
+  const lighter = Math.max(luminance(first), luminance(second));
+  const darker = Math.min(luminance(first), luminance(second));
+  return (lighter + 0.05) / (darker + 0.05);
+}
+const WHITE = [255, 255, 255, 1];
+"""
+FOCUS_OUTLINE_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
+  const element = document.activeElement;
+  const style = getComputedStyle(element);
+  const colour = over(parseColour(style.outlineColor), WHITE);
+  return {
+    style: style.outlineStyle,
+    width: parseFloat(style.outlineWidth),
+    ratio: contrast(colour, WHITE),
+  };
+}"""
+FOCUSED_REMOVE_SCRIPT = """
+() => {
+  const active = document.activeElement;
+  if (active === null || active.getAttribute('data-testid') !== 'remove-player') {
+    return null;
+  }
+  const row = active.closest('[data-testid="roster-player"]');
+  return row === null ? null : row.getAttribute('data-player-id');
+}
+"""
+# Resolves when the element has stood still for three animation frames: the page
+# scrolls a focused button by itself, and the check waits for that scroll to end.
+STILL_SCRIPT = """
+element => new Promise(resolve => {
+  let previous = '';
+  let still = 0;
+  let frames = 0;
+  const look = () => {
+    const box = element.getBoundingClientRect();
+    const current = box.left + ',' + box.top;
+    still = current === previous ? still + 1 : 0;
+    previous = current;
+    frames += 1;
+    if (still >= 3 || frames >= 120) {
+      resolve(frames);
+    } else {
+      requestAnimationFrame(look);
+    }
+  };
+  requestAnimationFrame(look);
+})
+"""
+FOCUS_WINDOWS = [
+    Window(300, 480, 16),
+    Window(300, 480, 20),
+    Window(360, 500, 16),
+    Window(360, 500, 20),
+]
+FOCUS_IDS = [window_id(window) for window in FOCUS_WINDOWS]
+
+
+def focus_problems(page: Page, player_id: str, compact_text: str) -> list[str]:
+    """Return what is wrong with the focused remove button of `player_id`."""
+    button = roster_item(page, player_id).get_by_test_id("remove-player")
+    button.evaluate(STILL_SCRIPT)
+    problems: list[str] = []
+    shown = button.evaluate("element => element.textContent.trim()")
+    if shown != compact_text:
+        problems.append(f"{player_id} reads {shown!r}, not {compact_text!r}")
+    outline = page.evaluate(FOCUS_OUTLINE_SCRIPT)
+    if outline["style"] in ("none", "auto"):
+        problems.append(f"{player_id} outline style {outline['style']}")
+    if outline["width"] < MIN_OUTLINE_PX:
+        problems.append(f"{player_id} outline width {outline['width']}")
+    if outline["ratio"] < MIN_FOCUS_CONTRAST:
+        problems.append(f"{player_id} outline contrast {outline['ratio']}")
+    report = button.evaluate(HIT_TEST_IN_PLACE_SCRIPT)
+    if report["tested"] < MIN_HIT_PIXELS:
+        problems.append(f"{player_id} only {report['tested']} pixels tested")
+    if report["missCount"] != 0:
+        problems.append(f"{player_id} taps miss it: {report}")
+    return problems
+
+
+@pytest.mark.parametrize("window", FOCUS_WINDOWS, ids=FOCUS_IDS)
+def test_ac9_browser_a_focused_compact_button_keeps_its_outline_and_stays_whole(
+    small_window: OpenSmallWindow, window: Window
+) -> None:
+    _full_text, compact_text = remove_texts()
+    page, _room = small_window(window)
+
+    tab_to_control(page, "remove-player")
+    problems: list[str] = []
+    for number in range(2, 2 + REMOVE_BUTTON_COUNT):
+        if number > 2:
+            page.keyboard.press("Tab")
+        player_id = f"p{number}"
+        assert page.evaluate(FOCUSED_REMOVE_SCRIPT) == player_id
+        problems.extend(focus_problems(page, player_id, compact_text))
+
+    assert problems == []
+
+
+# The contrast scan of spec 035's harness, as in tests/test_spec_035_accessibility.py
+# (the same measure of every text element). Each measurement also says which remove
+# button holds the element, so that the test can read the buttons only.
+CONTRAST_SCAN_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
+  const skippedTags = new Set(
+    ['SCRIPT', 'STYLE', 'NOSCRIPT', 'OPTION', 'TITLE', 'HEAD']
+  );
+  const measurements = [];
+  for (const element of document.body.querySelectorAll('*')) {
+    if (skippedTags.has(element.tagName)) {
+      continue;
+    }
+    let ownText = '';
+    for (const node of element.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        ownText += node.textContent;
+      }
+    }
+    ownText = ownText.trim();
+    if (ownText === '') {
+      continue;
+    }
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0 || style.visibility !== 'visible') {
+      continue;
+    }
+    if (element.closest('.visually-hidden') || element.closest(':disabled')) {
+      continue;
+    }
+    let opacity = 1;
+    let background = null;
+    for (let node = element; node; node = node.parentElement) {
+      const nodeStyle = getComputedStyle(node);
+      opacity *= parseFloat(nodeStyle.opacity);
+      if (background === null) {
+        const candidate = parseColour(nodeStyle.backgroundColor);
+        if (candidate[3] > 0) {
+          background = candidate;
+        }
+      }
+    }
+    const opaqueBackground = background === null ? WHITE : over(background, WHITE);
+    const text = parseColour(style.color);
+    text[3] = text[3] * opacity;
+    const shown = over(text, opaqueBackground);
+    const ratio = contrast(shown, opaqueBackground);
+    const button = element.closest('[data-testid="remove-player"]');
+    const row = element.closest('[data-testid="roster-player"]');
+    measurements.push({
+      text: ownText,
+      ratio: ratio,
+      removeFor: button === null || row === null
+        ? null : row.getAttribute('data-player-id'),
+    });
+  }
+  return measurements;
+}"""
+# The language scan of spec 035's harness, on the remove buttons and what they hold:
+# each visible direct text node (trimmed) and each aria-label, title, placeholder
+# and alt value.
+REMOVE_LANGUAGE_SCAN_SCRIPT = r"""
+() => {
+  const attributes = ['aria-label', 'title', 'placeholder', 'alt'];
+  const found = [];
+  for (const button of document.querySelectorAll('[data-testid="remove-player"]')) {
+    const scanned = [button, ...button.querySelectorAll('*')];
+    for (const element of scanned) {
+      const rendered = element.getClientRects().length > 0;
+      if (!rendered || getComputedStyle(element).visibility !== 'visible') {
+        continue;
+      }
+      for (const node of element.childNodes) {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '') {
+          found.push(node.textContent.trim());
+        }
+      }
+      for (const name of attributes) {
+        const value = element.getAttribute(name);
+        if (value !== null && value.trim() !== '') {
+          found.push(value.trim());
+        }
+      }
+    }
+  }
+  return found;
+}
+"""
+
+
+class Contrast(NamedTuple):
+    """The contrast ratio the scan measured for a text of one remove button."""
+
+    player_id: str
+    text: str
+    ratio: float
+
+
+def remove_button_contrasts(page: Page) -> list[Contrast]:
+    """Run the contrast scan and keep what it measured inside the remove buttons."""
+    found: list[Contrast] = []
+    for measurement in page.evaluate(CONTRAST_SCAN_SCRIPT):
+        player_id = measurement["removeFor"]
+        if player_id is not None:
+            found.append(Contrast(player_id, measurement["text"], measurement["ratio"]))
+    return found
+
+
+def template_pattern(template: str) -> re.Pattern[str]:
+    """A `fr.json` value as a pattern: each `{name}` matches one or more characters."""
+    literal_parts = re.split(r"\{[A-Za-z_]+\}", template)
+    escaped_parts = [re.escape(part) for part in literal_parts]
+    return re.compile(".+".join(escaped_parts), re.DOTALL)
+
+
+def normalised(text: str) -> str:
+    return " ".join(text.split())
+
+
+def unknown_texts(texts: list[str]) -> list[str]:
+    """The texts that are no `fr.json` value, nor one letter, nor digits only."""
+    patterns = [template_pattern(normalised(value)) for value in load_fr().values()]
+    unknown: list[str] = []
+    for text in texts:
+        shown = normalised(text)
+        if re.fullmatch(r"[0-9]+", shown) or re.fullmatch(r"[A-Z]", shown):
+            continue
+        if any(pattern.fullmatch(shown) for pattern in patterns):
+            continue
+        unknown.append(text)
+    return unknown
+
+
+SCAN_WINDOW = Window(300, 480, DEFAULT_ROOT_FONT_PX)
+
+
+def test_ac9_browser_the_compact_buttons_pass_the_contrast_scan(
+    small_window: OpenSmallWindow,
+) -> None:
+    _full_text, compact_text = remove_texts()
+    page, _room = small_window(SCAN_WINDOW)
+    assert read_buttons_state(page).texts == [compact_text] * REMOVE_BUTTON_COUNT
+
+    contrasts = remove_button_contrasts(page)
+
+    scanned_players = sorted(contrast.player_id for contrast in contrasts)
+    assert scanned_players == [f"p{number}" for number in range(2, 9)]
+    for contrast in contrasts:
+        assert contrast.text == compact_text, contrast
+        assert contrast.ratio >= MIN_TEXT_CONTRAST, contrast
+
+
+def test_ac9_browser_the_compact_buttons_pass_the_language_scan(
+    small_window: OpenSmallWindow,
+) -> None:
+    _full_text, compact_text = remove_texts()
+    page, _room = small_window(SCAN_WINDOW)
+    assert read_buttons_state(page).texts == [compact_text] * REMOVE_BUTTON_COUNT
+
+    texts = page.evaluate(REMOVE_LANGUAGE_SCAN_SCRIPT)
+
+    assert texts.count(compact_text) == REMOVE_BUTTON_COUNT, texts
+    label_template = load_fr()["host.remove_label"]
+    for number in range(2, 9):
+        label = label_template.replace("{name}", NICKNAMES[number - 1])
+        assert texts.count(label) == 1, (label, texts)
+    assert unknown_texts(texts) == []
+
+
+# ---- AC-10: the roster list keeps room for one whole button --------------------
+
+LOW_LAYOUT_SCRIPT = """
+() => {
+  const boxOf = (element) => {
+    const box = element.getBoundingClientRect();
+    return [box.left, box.top, box.right, box.bottom];
+  };
+  const byTestId = (id) => document.querySelector('[data-testid="' + id + '"]');
+  const childrenOf = (parent) => {
+    const children = [];
+    for (const child of parent.children) {
+      children.push({tag: child.tagName, box: boxOf(child)});
+    }
+    return children;
+  };
+  const roster = byTestId('roster');
+  const feed = byTestId('activity-feed');
+  const panel = byTestId('host-panel');
+  const widths = [];
+  for (const button of document.querySelectorAll('[data-testid="remove-player"]')) {
+    widths.push(button.offsetWidth);
+  }
+  return {
+    innerWidth: window.innerWidth,
+    innerHeight: window.innerHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    roster: boxOf(roster),
+    feed: boxOf(feed),
+    panel: boxOf(panel),
+    listWidth: roster.querySelector('ul').clientWidth,
+    buttonWidths: widths,
+    rosterChildren: childrenOf(roster),
+    feedChildren: childrenOf(feed),
+    panelHiddenRight: panel.scrollWidth - panel.clientWidth - panel.scrollLeft,
+  };
+}
+"""
+# The host changes the settings once, so that the feed holds a long line: the
+# longest of spec 013's texts, "Ana a modifié les réglages : aide par vote, ...".
+FEED_LINE_SETTINGS = RoomSettings(
+    help_mode=HelpMode.VOTE,
+    reveal_budget=RevealBudget(letters=3, words=0),
+    locked=False,
+)
+
+
+class Box(NamedTuple):
+    """The edges of a bounding box in CSS px."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+    @property
+    def width(self) -> float:
+        return self.right - self.left
+
+
+class LowLayout(NamedTuple):
+    """What AC-10 measures in the low layout, read in one go."""
+
+    inner_width: float
+    inner_height: float
+    scroll_width: float
+    roster: Box
+    feed: Box
+    panel: Box
+    list_width: float
+    button_widths: list[int]
+    roster_children: list[tuple[str, Box]]
+    feed_children: list[tuple[str, Box]]
+    panel_hidden_right: float
+
+
+def read_low_layout(page: Page) -> LowLayout:
+    """Measure the three boxes and what they hold, all at the same moment."""
+    raw = page.evaluate(LOW_LAYOUT_SCRIPT)
+    roster_children: list[tuple[str, Box]] = []
+    for child in raw["rosterChildren"]:
+        roster_children.append((child["tag"], Box(*child["box"])))
+    feed_children: list[tuple[str, Box]] = []
+    for child in raw["feedChildren"]:
+        feed_children.append((child["tag"], Box(*child["box"])))
+    layout = LowLayout(
+        inner_width=raw["innerWidth"],
+        inner_height=raw["innerHeight"],
+        scroll_width=raw["scrollWidth"],
+        roster=Box(*raw["roster"]),
+        feed=Box(*raw["feed"]),
+        panel=Box(*raw["panel"]),
+        list_width=raw["listWidth"],
+        button_widths=raw["buttonWidths"],
+        roster_children=roster_children,
+        feed_children=feed_children,
+        panel_hidden_right=raw["panelHiddenRight"],
+    )
+    assert layout.inner_height <= LOW_LAYOUT_MAX_HEIGHT_PX, layout
+    return layout
+
+
+class OpenLowLayout(Protocol):
+    """The `low_layout` fixture: open the host's view in a window, feed filled."""
+
+    def __call__(self, window: Window, touch: bool = False) -> Page: ...
+
+
+@pytest.fixture
+def low_layout(small_window: OpenSmallWindow) -> OpenLowLayout:
+    """Return `low_layout(window, touch=False)`: `small_window` plus a feed line."""
+
+    def open_layout(window: Window, touch: bool = False) -> Page:
+        page, room = small_window(window, touch)
+        room.connections[0].send(settings_frame(6, "p1", FEED_LINE_SETTINGS))
+        expect(room_page(page)).to_have_attribute("data-seq", "6")
+        expect(feed_lines(page, "settings_changed")).to_have_count(1)
+        page.evaluate(TWO_FRAMES_SCRIPT)
+        return page
+
+    return open_layout
+
+
+def assert_list_keeps_room_for_a_button(layout: LowLayout) -> None:
+    """Minimum: the list is at least one button plus 3 px wide, for every button."""
+    assert len(layout.button_widths) == REMOVE_BUTTON_COUNT, layout
+    for button_width in layout.button_widths:
+        assert layout.list_width >= button_width + LIST_ROOM_PX, layout
+
+
+def assert_one_row(layout: LowLayout) -> None:
+    """One row: roster, feed and host panel, left to right, in that order."""
+    assert layout.feed.left >= layout.roster.right - EPSILON, layout
+    assert layout.panel.left >= layout.feed.right - EPSILON, layout
+    top = max(layout.roster.top, layout.feed.top, layout.panel.top)
+    bottom = min(layout.roster.bottom, layout.feed.bottom, layout.panel.bottom)
+    assert top < bottom, layout
+
+
+def assert_host_panel_share(layout: LowLayout) -> None:
+    """The host panel keeps a third of the three boxes' widths, minus 1 px."""
+    total = layout.roster.width + layout.feed.width + layout.panel.width
+    assert layout.panel.width >= total / 3 - EPSILON, layout
+
+
+def assert_fade_visible(page: Page, layout: LowLayout) -> None:
+    """The panel's content is hidden past its right edge, and the fade says so."""
+    assert layout.panel_hidden_right > EPSILON, layout
+    assert panel_shows_a_more_marker(page), layout
+
+
+def assert_content_inside_its_box(layout: LowLayout) -> None:
+    """Every element child of the roster and of the feed is inside its parent."""
+    parents = (
+        ("roster", layout.roster, layout.roster_children),
+        ("activity-feed", layout.feed, layout.feed_children),
+    )
+    for name, parent, children in parents:
+        for tag, child in children:
+            assert child.left >= parent.left - EPSILON, (name, tag, layout)
+            assert child.right <= parent.right + EPSILON, (name, tag, layout)
+
+
+def assert_page_fits(layout: LowLayout) -> None:
+    """No horizontal scroll, and the three boxes are inside the window."""
+    assert layout.scroll_width <= layout.inner_width, layout
+    boxes = (
+        ("roster", layout.roster),
+        ("activity-feed", layout.feed),
+        ("host-panel", layout.panel),
+    )
+    for name, box in boxes:
+        assert box.left >= -EPSILON, (name, layout)
+        assert box.right <= layout.inner_width + EPSILON, (name, layout)
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", NARROW_LOW_WINDOWS, ids=NARROW_LOW_IDS)
+def test_ac10_browser_the_roster_list_keeps_room_for_one_whole_button(
+    low_layout: OpenLowLayout, window: Window, context_kind: str
+) -> None:
+    page = low_layout(window, touch=context_kind == "touch")
+
+    assert_list_keeps_room_for_a_button(read_low_layout(page))
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", NARROW_LOW_WINDOWS, ids=NARROW_LOW_IDS)
+def test_ac10_browser_the_roster_the_feed_and_the_host_panel_sit_in_one_row(
+    low_layout: OpenLowLayout, window: Window, context_kind: str
+) -> None:
+    page = low_layout(window, touch=context_kind == "touch")
+
+    assert_one_row(read_low_layout(page))
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", NARROW_LOW_WINDOWS, ids=NARROW_LOW_IDS)
+def test_ac10_browser_the_host_panel_keeps_a_third_of_the_row_and_its_fade(
+    low_layout: OpenLowLayout, window: Window, context_kind: str
+) -> None:
+    page = low_layout(window, touch=context_kind == "touch")
+    layout = read_low_layout(page)
+
+    assert_host_panel_share(layout)
+    assert_fade_visible(page, layout)
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", NARROW_LOW_WINDOWS, ids=NARROW_LOW_IDS)
+def test_ac10_browser_the_roster_and_the_feed_keep_their_content_inside_their_boxes(
+    low_layout: OpenLowLayout, window: Window, context_kind: str
+) -> None:
+    page = low_layout(window, touch=context_kind == "touch")
+
+    assert_content_inside_its_box(read_low_layout(page))
+
+
+@pytest.mark.parametrize("context_kind", ["desktop", "touch"])
+@pytest.mark.parametrize("window", NARROW_LOW_WINDOWS, ids=NARROW_LOW_IDS)
+def test_ac10_browser_the_page_has_no_horizontal_scroll_and_the_boxes_fit_the_window(
+    low_layout: OpenLowLayout, window: Window, context_kind: str
+) -> None:
+    page = low_layout(window, touch=context_kind == "touch")
+
+    assert_page_fits(read_low_layout(page))
+
+
+def check_the_low_layout(page: Page) -> None:
+    """Every rule of AC-10, on the page as it is now."""
+    layout = read_low_layout(page)
+    assert_list_keeps_room_for_a_button(layout)
+    assert_one_row(layout)
+    assert_host_panel_share(layout)
+    assert_fade_visible(page, layout)
+    assert_content_inside_its_box(layout)
+    assert_page_fits(layout)
+
+
+def holds_within_a_second(page: Page, step: str, check: Callable[[Page], None]) -> None:
+    """Run `check` until it passes, for up to 1 s; then fail with its last failure."""
+    waited_ms = 0
+    while True:
+        try:
+            check(page)
+            return
+        except AssertionError as failure:
+            if waited_ms >= LIVE_CHANGE_MS:
+                raise AssertionError(f"{step}: {failure}") from failure
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
+
+
+def test_ac10_browser_the_rules_apply_again_after_a_resize_and_a_root_font_change(
+    low_layout: OpenLowLayout,
+) -> None:
+    page = low_layout(LIVE_WINDOW)
+    holds_within_a_second(page, "at 480x500, 16 px", check_the_low_layout)
+
+    page.set_viewport_size({"width": 300, "height": 480})
+    holds_within_a_second(page, "resized to 300x480", check_the_low_layout)
+
+    for size_px in (20, 24, 12, DEFAULT_ROOT_FONT_PX):
+        set_root_font(page, size_px)
+        step = f"at 300x480, root font {size_px} px"
+        holds_within_a_second(page, step, check_the_low_layout)
+
+    page.set_viewport_size({"width": 480, "height": 500})
+    holds_within_a_second(page, "resized back to 480x500", check_the_low_layout)

@@ -94,9 +94,12 @@ Roster (spec 012) additions, in each `roster-player`:
 - `data-host`: `true` on the host's item, else `false`; the host's item shows
   `t("roster.host")`.
 - When `you` is host, each other player's item holds a button
-  `data-testid="remove-player"` with the text `t("host.remove")` and
-  `aria-label` `t("host.remove_label", {name})`. Clicking it sends
-  `{"type": "remove_player", "player_id": <that id>}` at once.
+  `data-testid="remove-player"` with the text `t("host.remove")`, or
+  `t("host.remove_short")` while the roster list is narrow (see "Small windows"
+  below and AC-9), and, in both forms, the `aria-label`
+  `t("host.remove_label", {name})`. Clicking it sends
+  `{"type": "remove_player", "player_id": <that id>}` at once. (Note from the
+  lead, 2026-10-14: the compact text was added.)
 
 Host panel `data-testid="host-panel"`, shown only while `you` is host:
 
@@ -119,6 +122,32 @@ Host panel `data-testid="host-panel"`, shown only while `you` is host:
   keyboard (AC-7). (Note from the lead, 2026-10-13: this element was already in the
   code and the tests, and is now written here.)
 
+Small windows (Note from the lead, 2026-10-14: added with AC-9 and AC-10, from
+measurements on Chromium with 8 players):
+
+- The roster list is the `ul` element inside `roster` (`[data-testid="roster"] ul`)
+  that holds the `roster-player` items. `w` is its `clientWidth`, and `r` is the
+  computed `font-size` of the `html` element in CSS px (1rem).
+- Compact remove button (AC-9): while `w < 4.5 × r`, every `remove-player` holds
+  the text `t("host.remove_short")` in place of `t("host.remove")`. That text is
+  the button's content in the DOM (its `textContent`), not CSS generated content
+  or an image. These stay the same in both forms: the `aria-label`, the 24 by 24
+  CSS px minimum (AC-7), the whole-box tap target (AC-8), and spec 035's visible
+  focus and 4.5:1 contrast. All buttons have the same form at any time. The form
+  follows `w` and `r` when they change (resize, rotation, root font).
+- Low layout: the room page in a window 500 CSS px high or less
+  (`window.innerHeight <= 500`). There `roster`, `activity-feed` and `host-panel`
+  (when shown) sit side by side in one row, in that order.
+- Minimum list width (AC-10): in the low layout, while the roster holds at least
+  one `remove-player`, `w >= button.offsetWidth + 3` for every remove button: one
+  button plus the 3 px of room after the last item. This holds in any window from
+  300 px wide and with any root font from 12 to 24 px. The roster takes that width
+  from `activity-feed` alone. `host-panel` keeps at least a third of the three
+  boxes' total width and keeps scrolling sideways (AC-7). The feed's heading and
+  line stay inside the feed's box: they are cut or end with an ellipsis, and may
+  shrink to no width at all. Nothing overflows the page horizontally (spec 006
+  AC-5).
+
 Refused or removed:
 
 - An `error` with code `room_locked` (on join) sets `data-status="locked"`; with
@@ -135,6 +164,7 @@ New `fr.json` keys:
 | `roster.host` | `hôte` |
 | `host.remove` | `Retirer` |
 | `host.remove_label` | `Retirer {name} du salon` |
+| `host.remove_short` | `✕` |
 | `host.lock` | `Verrouiller le salon` |
 | `host.unlock` | `Déverrouiller le salon` |
 | `settings.heading` | `Réglages` |
@@ -145,6 +175,12 @@ New `fr.json` keys:
 | `room.status.locked` | `Ce salon est verrouillé.` |
 | `room.status.removed` | `Vous avez été retiré de ce salon.` |
 
+(Note from the lead, 2026-10-14: `host.remove_short` was added for the compact
+remove button of AC-9. Its value is the single character U+2715 (MULTIPLICATION
+X). Spec 035 AC-9 needs every visible string to come from `fr.json`, so the sign
+is not written in the markup. The key belongs to this spec, and spec 035's list of
+keys does not change.)
+
 The feed lines for these events (`room_locked`, `room_unlocked`,
 `settings_changed`, `player_removed`, `host_changed`) are spec 013's.
 
@@ -152,6 +188,24 @@ The feed lines for these events (`room_locked`, `room_unlocked`,
 
 As spec 011. Browser criteria with two players use two browser contexts on the live
 server (two "browsers": separate `localStorage`), each through `enter_room`.
+
+Small windows (AC-8 to AC-10). (Note from the lead, 2026-10-14: added.)
+
+- Narrow and low windows: 300x480, 320x480, 360x500, 400x480 and 480x500 at root
+  fonts of 16 and 20 px, and 300x480 at root fonts of 12 and 24 px. Each runs in a
+  desktop context (that viewport, no touch) and a touch context, as AC-7 and AC-8
+  already do. The touch context has that viewport, `has_touch=True`,
+  `device_scale_factor=2`, and `is_mobile=True` except under Firefox. Under Firefox
+  and WebKit it also has spec 009's `(pointer: coarse)` init script. The mocked
+  snapshot is AC-8's: FX-01, `you` host, 8 players, so 7 `remove-player` buttons.
+- Root font: 16 px is the browser default, with nothing added. For 12, 20 or 24 px,
+  the test sets `document.documentElement.style.fontSize` to that size, with
+  `page.evaluate` once the roster is shown or earlier from an init script. Before
+  measuring, it waits until `getComputedStyle(document.documentElement).fontSize`
+  reads that size and two animation frames have passed. A check of a button's text
+  may poll for up to 1 s.
+- Scans (AC-9): the contrast scan and the language scan of spec 035's "Test
+  harness", run on the elements that AC-9 names.
 
 ## Acceptance criteria
 
@@ -164,7 +218,21 @@ The words in brackets say how each criterion is tested.
 - **AC-5** (new) (Python; WebSocket) A removed player can do nothing more. Any message from a `player_id` that is not in the room's players (removed, timed out or unknown) is refused with `not_joined` and changes nothing: no entry, no broadcast, no change to any cell. In particular, when the host removes B and B's socket sends 40 `edit_letter` frames right after, none is committed or broadcast and no cell takes B as author; the hub stops routing B's connections to the room in the same step as the removal.
 - **AC-6** (new) (Python; WebSocket) The host can mute a player's chat (the effect on chat belongs to spec 022). `mute_player` from a non-host is refused with `not_host`; for the host's own id or an unknown player with `invalid_target`; when the target's `muted` already has the requested value, nothing happens; otherwise the target's `muted` is set and one `PlayerMuted` entry is written and broadcast. The flag survives a restart (spec 018 replay).
 - **AC-7** (new) (browser with mocked socket) The host controls stay usable on small screens. At every window size of spec 006 AC-5, in desktop and touch contexts, each `remove-player` button is at least 24 by 24 CSS pixels, and when the host panel's content is wider than its box, the panel shows that more content exists (a visible scrollbar or the edge fade `host-panel-more`), while spec 013 AC-6's layout guarantees still hold. One exception: while a control inside `host-panel` has the focus from the keyboard (reached with `Tab` or `Shift+Tab`), `host-panel-more` is not visible, so it never covers the focused control. A focus from a pointer keeps the fade. Example at 320 by 568, where the panel overflows: `Tab` to `lock-room`, and `host-panel-more` is not visible. Then click `lock-room` (desktop context) or tap it (touch context). It keeps the focus, content is still hidden past the panel's right edge (`scrollWidth - clientWidth - scrollLeft > 1`), and the panel again shows that more content exists. (Note from the lead, 2026-10-13: the keyboard-focus exception was added. It describes how the code behaves.)
-- **AC-8** (new, from the review of 2026-10-13) (browser with mocked socket) The whole box of each "Retirer" button can be tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, with `you` host and at least two other players, the test first scrolls each `remove-player` into view (`scrollIntoView({block: "nearest", inline: "nearest"})`). Then, for the centre of every whole CSS pixel inside the button's bounding box (`x = k + 0.5` for each integer `k` with `left <= k` and `k + 1 <= right`, and the same for `y`), `document.elementFromPoint(x, y)` returns the button or one of its descendants. This includes 320 by 568, 568 by 320, 360 by 740 and 740 by 360, where the roster is one line that scrolls sideways. A button that sticks out of the scrolling roster list (for example with a negative `margin-block`) fails, because the list clips the part outside it. (Note from the lead, 2026-10-13: added because `.remove-player` used `margin-block: -3px`. On phones the 24 px button stuck 2 px out of the list on each side, and only about 20 px of its height could be tapped.)
+- **AC-8** (new, from the review of 2026-10-13) (browser with mocked socket) The whole box of each remove button (`Retirer` or `✕`, AC-9) can be tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, with `you` host and at least two other players, the test first scrolls each `remove-player` into view (`scrollIntoView({block: "nearest", inline: "nearest"})`). Then, for the centre of every whole CSS pixel inside the button's bounding box (`x = k + 0.5` for each integer `k` with `left <= k` and `k + 1 <= right`, and the same for `y`), `document.elementFromPoint(x, y)` returns the button or one of its descendants. This includes 320 by 568, 568 by 320, 360 by 740 and 740 by 360, where the roster is one line that scrolls sideways. A button that sticks out of the scrolling roster list (for example with a negative `margin-block`) fails, because the list clips the part outside it. (Note from the lead, 2026-10-13: added because `.remove-player` used `margin-block: -3px`. On phones the 24 px button stuck 2 px out of the list on each side, and only about 20 px of its height could be tapped.) The same check also runs at every narrow and low window of "Test harness", at each of its root fonts, in desktop and touch contexts. There the buttons follow AC-9, and the list keeps the minimum of AC-10. (Note from the lead, 2026-10-14: these windows were added, and the first sentence now names both forms of the button. With a 16 px root font the list was 24.7 px wide at 300x480, 31.4 px at 320x480 and 44.7 px at 360x500. That is narrower than the 49.6 px "Retirer" button, so no scrolling could show the button whole, and no test covered those windows.)
+- **AC-9** (new, from the lead's measurements of 2026-10-14; compact button approved by the human) (browser with mocked socket; static) A remove button shows a compact `✕` while the roster list is narrower than 4.5rem. Setup: FX-01, `you` host and 8 players (7 `remove-player` buttons). `w` is the roster list's `clientWidth`, and `r` is the root font size in px ("Small windows", "Test harness"). (Note from the lead, 2026-10-14: added.)
+  - Rule: every `remove-player` has the text (`textContent`, trimmed) `fr.json["host.remove_short"]` when `w < 4.5 × r`, and `fr.json["host.remove"]` when `w >= 4.5 × r`. When `w` is within 1 px of `4.5 × r`, either text passes, but all seven buttons must show the same one. In both forms, each button has the `aria-label` `fr.json["host.remove_label"]` with `{name}` replaced by that player's nickname. `page.get_by_role("button", name=<that label>, exact=True)` resolves to exactly that button, and its bounding box is at least 24 by 24 CSS px. At every window below, the test checks the rule against the measured `w` and `r`, and also checks the named results.
+  - Named results, desktop and touch contexts. With a 16 px root font (threshold 72 px), `✕` shows at 300x480, 320x480, 360x500 and 400x480. Those lists are 24.7 px today (at least 27 px once AC-10 holds), 31.4, 44.7 and 58.1 px. `Retirer` shows at 480x500 (84.7 px) and at every window size of spec 006 AC-5: 568x320 and 740x360 have lists of 114.1 and 138.1 px, and the other six are wider. With a 20 px root font (threshold 90 px), `✕` shows at 300x480, 320x480, 360x500, 400x480 and 480x500 (480x500: about 66 px, computed), and `Retirer` at 740x360 (about 153 px, computed). With 12 and 24 px root fonts, `✕` shows at 300x480.
+  - Live changes, desktop context. At 480x500 with a 16 px root font, the buttons read `Retirer`. After the test sets the root font to 20 px, they read `✕` within 1 s. They read `Retirer` again within 1 s of the font going back to 16 px. With a 16 px root font, `page.set_viewport_size` from 480x500 to 360x500 turns them to `✕` within 1 s. Going back to 480x500 turns them to `Retirer`.
+  - Focus, desktop context, keyboard only (`page.keyboard`, no click or tap), at 300x480 and 360x500 with root fonts of 16 and 20 px. The test presses `Tab` until the first `remove-player` has the focus (at most 60 presses), then presses `Tab` six more times. Each of the seven buttons, while focused, reads `✕`. Its computed outline meets spec 035 AC-2: style neither `none` nor `auto`, width at least 2 px, and a colour with contrast of at least 3:1 against white. AC-8's pixel check also finds no miss on it, without the test's `scrollIntoView` step: the page itself scrolls the focused button whole into the list.
+  - Scans, desktop context, 300x480, 16 px root font. Spec 035's contrast scan, run on the seven `remove-player` elements, finds none below 4.5:1. Spec 035's language scan accepts their text `✕` and their `aria-label` values.
+  - Static: `fr.json["host.remove_short"]` is `✕` (U+2715, one character).
+- **AC-10** (new, from the lead's measurements of 2026-10-14) (browser with mocked socket) In the low layout, the roster list keeps room for one whole remove button, and the activity feed gives up that width. Setup as AC-9, at every narrow and low window of "Test harness", in desktop and touch contexts. (Note from the lead, 2026-10-14: added.)
+  - Minimum: for every `remove-player`, the roster list's `clientWidth` is at least the button's `offsetWidth` plus 3.
+  - One row: `roster`, `activity-feed` and `host-panel` appear in that order from left to right. Each box's left edge is at or right of the previous box's right edge (1 px tolerance). The vertical ranges of the three boxes overlap.
+  - Host panel share: the width of `host-panel` is at least a third of the sum of the three boxes' widths, minus 1 px, so the roster's extra width does not come from the host panel. `host-panel-more` is visible, since the panel's content is hidden past its right edge (AC-7).
+  - Inside the boxes: every element child of `roster` and of `activity-feed` has a bounding box inside its parent's box horizontally (1 px tolerance). The feed's heading and line are cut or end with an ellipsis instead of spilling out.
+  - Page: there is no horizontal scroll (`document.documentElement.scrollWidth <= window.innerWidth`). The three boxes lie inside the window horizontally: left at least 0, right at most `window.innerWidth`, 1 px tolerance.
+  - Examples from the lead's measurements of today's code. With a 16 px root font the list is 24.7 px at 300x480. A compact button is about 24 px, so the list must grow by about 2.3 px, which the feed loses. At 320x480, 360x500, 400x480 and 480x500 the list is 31.4, 44.7, 58.1 and 84.7 px, which already meets the minimum. With a 20 px root font the list is 5.9, 12.6 and 25.9 px at 300x480, 320x480 and 360x500, below one compact button, so the roster grows by the missing width. At 300x480 the feed, 80 px wide today, then keeps about 55 px or less. That can be less than its heading `Activité` needs, so the heading is cut inside the feed's box. The 39.2 px list at 400x480 already meets the minimum.
 
 ## Edge cases and errors
 
@@ -211,6 +279,42 @@ their final status and text, and hide the banner.
   roster's one-line row must make the row or the list taller. It must not overflow
   the scrolling list. Spec 013 AC-6's layout guarantees (AC-7) still apply. (Note
   from the lead, 2026-10-13.)
+- Switch threshold (AC-9): `clientWidth` is a whole number of pixels, and engines
+  lay out fractions differently. So within 1 px of `4.5 × r` either form passes.
+  The seven buttons never mix forms. (Note from the lead, 2026-10-14.)
+- Live changes (AC-9, AC-10): a resize, a rotation or a change of the root font
+  applies both rules again within 1 s, without a reload. (Note from the lead,
+  2026-10-14.)
+- Root font source (AC-9, AC-10): the tests change the root font with a style on
+  `html`. A media query measures `em` and `rem` against the browser's default font
+  size and ignores that style, so a media query alone cannot implement the rules.
+  `r` is the computed `font-size` of `html`, which a browser font setting changes
+  too. (Note from the lead, 2026-10-14.)
+- Host alone, or not host (AC-10): with no `remove-player` in the roster, the
+  minimum does not apply. (Note from the lead, 2026-10-14.)
+- Scroll padding at the minimum width (AC-8, AC-10): AC-8's step and the page's
+  own keyboard-focus scrolling both call `scrollIntoView` with
+  `inline: "nearest"`. That call keeps a target clear of the list's inline scroll
+  padding, which is 8 px in today's code. When a button is wider than the list
+  minus twice that padding, the call lines the button up 8 px inside one edge of
+  the list. The button then stays whole only if the list is at least 8 px wider
+  than the button. For example, at 320x480 with a 16 px root font, a 24 px compact
+  button in the 31.4 px list would stick 0.6 px out of it. At the minimum of AC-10
+  the list is only 3 px wider than the button. The implementer must keep each
+  button whole after that call, with a smaller inline scroll padding or a wider
+  list. (Note from the lead, 2026-10-14: worked out from today's CSS and the
+  CSSOM View "nearest" rule, not measured.)
+- Feed squeezed (AC-10): at 300 px wide with a root font of 20 px or more, the feed
+  can end up narrower than its heading, with no room for its line. That is
+  accepted. The heading and line are cut inside the feed's box, never painted over
+  the roster or the host panel. At the sizes of spec 006 AC-5 the roster never
+  needs extra width (its narrowest list there is 114 px). So spec 013 AC-6's
+  compact feed does not change at those sizes. (Note from the lead, 2026-10-14.)
+- Text width across fonts (AC-9): "Retirer" is 49.6 px wide at a 16 px root font in
+  the lead's Chromium. It is about 14% wider in DejaVu Sans, a common Linux
+  fallback for `system-ui`, and the 4.5rem threshold leaves room for that
+  (decisions). The `✕` may also come from a fallback font. Its button keeps the
+  24 by 24 minimum either way. (Note from the lead, 2026-10-14.)
 
 ## Out of scope
 
@@ -222,6 +326,14 @@ their final status and text, and hide the banner.
 - Banning by address or across browsers; un-banning a removed player.
 - The effect of help mode and budget on checks and reveals (specs 023 to 025), and
   of muting on chat (spec 022, which owns the mute button).
+- Windows narrower than 300 px, and root fonts below 12 px or above 24 px (AC-10).
+  (Note from the lead, 2026-10-14.)
+- A short form for any other text: roster states, `hôte`, `(vous)`, the host
+  panel's controls. Only the remove button has one (AC-9). (Note from the lead,
+  2026-10-14.)
+- Spec 013 AC-6's guarantees on the grid's height and the clue bar at the narrow
+  and low windows of AC-10. They stay tested at the sizes of spec 006 AC-5. (Note
+  from the lead, 2026-10-14.)
 
 ## Work packages
 
@@ -275,6 +387,44 @@ and these are the lead's decisions:
   the user has just touched the control, so it does not need to be uncovered (AC-7).
 - The 24 px target is useless if part of it cannot be tapped. The whole bounding box
   of a remove button must be hit-testable, which `elementFromPoint` checks (AC-8).
+
+Added on 2026-10-14, from the lead's measurements on Chromium with 8 players
+(FX-01). The human approved a compact remove button. The other points are the
+lead's decisions, under the human's permission to refine approved and done specs:
+- Compact remove button (AC-9). While the roster list is narrower than 4.5rem,
+  every remove button shows `✕`, from the new key `host.remove_short` (U+2715). It
+  keeps the same `aria-label`, the 24 px minimum, AC-8, and spec 035's focus and
+  contrast. The threshold is in rem because the button grows with the root font:
+  "Retirer" is 49.6 px (3.1rem) at a 16 px root font and 61 px (3.05rem) at 20 px,
+  nearly the same in rem. Options: 3.5rem (first proposed) or 4.5rem. Pick: 4.5rem
+  (72 px at 16 px, 90 px at 20 px). A text button needs more than its own width:
+  the 3 px after the last item, up to about 14% more in a wider fallback font, and,
+  while the list keeps its 8 px scroll padding, 8 px beside it when scrolled into
+  view. With 3.5rem, 400x480 at 16 px would show "Retirer" in a 58.1 px list. The
+  49.6 px button plus that 8 px leaves half a pixel to spare for AC-8, in the
+  lead's font only. With 4.5rem it shows `✕`. Every size of spec 006 AC-5 keeps
+  "Retirer": the narrowest list there, 114 px at 568x320, is 7.1rem.
+- The compact text replaces the button's text in the DOM (`textContent`). It is not
+  CSS generated content or an image. So spec 035's scans see `✕`, and the AC-1
+  tests that read the button text at 1280 by 720 still pass. All buttons switch
+  together, and they follow resizes and root font changes.
+- Minimum list width (AC-10). In the low layout, while the roster holds a remove
+  button, `ul.clientWidth >= button.offsetWidth + 3`. This holds at every window
+  from 300 px wide and every root font from 12 to 24 px. The compact button alone
+  is not enough at 300 px or with a larger font: the list is 24.7 px at 300x480
+  with a 16 px root font, and 5.9 px with 20 px.
+- The width comes from the activity feed alone, which already truncates its line.
+  The host panel keeps at least a third of the row and keeps scrolling sideways
+  (AC-7). At 300 px with large fonts the feed may lose its line and part of its
+  heading. They stay cut inside its box.
+- Test windows (AC-8 to AC-10). 300x480, 320x480, 360x500 and 400x480 are the
+  lead's. 480x500 is added because it shows the rem rule: "Retirer" at 16 px and
+  `✕` at 20 px. Each window runs at 16 and 20 px root fonts, and 300x480 also at 12
+  and 24 px, the ends of the font range, in desktop and touch contexts. Spec 006
+  AC-5 keeps its eight sizes. The tests set the root font with a style on `html`,
+  and the rules read the computed font size of `html`.
+- Two new criteria, AC-9 for the button and AC-10 for the list, one behaviour each.
+  AC-8 runs at the new windows too.
 
 ## Open questions
 
