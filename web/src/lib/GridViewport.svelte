@@ -664,11 +664,14 @@
   /* The initials of a player or the "+k" label, in a small white label in a
      corner of the cell. An initials label sits inside the outline span, which
      is inset: --shift (the inset plus the border) takes it back to the corner
-     of the cell. The "+k" label is a child of the cell, so --shift is 0. */
+     of the cell. The "+k" label is a child of the cell, so --shift is 0.
+     No padding above or below: a label is then 1.1 times its font high, and two
+     labels in diagonal corners fit one above the other from a 20px cell, the
+     size where a cell gets its second slot (spec 035 AC-11). */
   .remote-label {
     --corner-offset: calc(var(--shift, 0px) * -1);
     position: absolute;
-    padding: 1px;
+    padding: 0 1px;
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;
     line-height: 1.1;

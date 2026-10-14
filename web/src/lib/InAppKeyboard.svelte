@@ -111,8 +111,9 @@
 
   /* A key is never focused by a pointer (a tap keeps the focus on the grid), and
      it is out of the Tab order, so it has the focus only when a screen reader or
-     a script gives it (spec 035 AC-10). Firefox does not match :focus-visible
-     for a focus() call from a script, so the outline of app.css is drawn on
+     a script gives it (spec 035 AC-10). In Firefox, a key that a script focused
+     with focus() after a pointer interaction (a tap that put the focus on the
+     grid) did not match :focus-visible, so the outline of app.css is drawn on
      :focus here. */
   .key:focus {
     outline: var(--focus-outline);

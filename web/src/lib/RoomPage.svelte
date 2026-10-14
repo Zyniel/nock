@@ -6,6 +6,13 @@
   import { markFinished } from './catalogue'
   import { remoteSelectionsOf } from './remoteSelections'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
+  import {
+    followListTabStop,
+    keepFeedEndOnResize,
+    keepFeedPlace,
+    noteFeedPlace,
+  } from './scrollingLists'
+  import type { FeedPlace } from './scrollingLists'
   import type { LetterCellView, Snapshot } from './roomSession'
   import {
     EDIT_SEND_INTERVAL_MS,
@@ -54,18 +61,18 @@
   let formJoinNickname: string | null = $state(null)
   let socket: WebSocket | null = null
   let gridViewport: GridViewport | undefined = $state()
-  let feedElement: HTMLUListElement | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
   // The host panel scrolls sideways on a small window. An edge fade says so
-  // without depending on the scrollbar, which some engines hide.
-  let hostPanel: HTMLDivElement | undefined = $state()
+  // without depending on the scrollbar, which some engines hide. Svelte sets
+  // the element back to null when the panel goes (the host role moved away).
+  let hostPanel: HTMLElement | null = $state(null)
   let hostPanelHasMore = $state(false)
 
   // Show the fade while content is hidden past the right edge of the panel.
   function updateHostPanelMore(): void {
-    if (hostPanel === undefined) {
+    if (hostPanel === null) {
       hostPanelHasMore = false
       return
     }
@@ -123,7 +130,7 @@
 
   // Measure again whenever the panel or its content changes size.
   $effect(() => {
-    if (hostPanel === undefined) {
+    if (hostPanel === null) {
       return
     }
     const observer = new ResizeObserver(updateHostPanelMore)
@@ -167,6 +174,25 @@
       sizeObserver.disconnect()
       rootObserver.disconnect()
     }
+  })
+
+  // The list of the activity feed, which scrolls up to the older lines.
+  let feedList: HTMLUListElement | null = $state(null)
+
+  // A list that scrolls with nothing focusable inside is a Tab stop, so that a
+  // keyboard player can scroll it with the arrow keys (spec 035 AC-12).
+  $effect(() => {
+    if (rosterList === null) {
+      return
+    }
+    return followListTabStop(rosterList)
+  })
+
+  $effect(() => {
+    if (feedList === null) {
+      return
+    }
+    return followListTabStop(feedList)
   })
 
   let shareLink = $derived(`${location.origin}/r/${code}`)
@@ -271,12 +297,40 @@
     }
   })
 
-  // The newest feed item stays in view.
-  $effect(() => {
-    const itemCount = session.feed.length
-    if (feedElement !== undefined && itemCount > 0) {
-      feedElement.scrollTop = feedElement.scrollHeight
+  // The feed list keeps the reader's place (spec 013 AC-7): a new line brings
+  // the list to its newest line only if the list was at its end just before.
+  // Each new line has a new seq, also when it removes the oldest line.
+  let newestFeedSeq = $derived(
+    session.feed.length === 0 ? null : session.feed[session.feed.length - 1].seq,
+  )
+  let feedPlaceBeforeNewLine: FeedPlace | null = null
+
+  // Runs before the new line is on the page: note where the list is.
+  $effect.pre(() => {
+    const newestSeq = newestFeedSeq
+    if (feedList === null || newestSeq === null) {
+      return
     }
+    feedPlaceBeforeNewLine = noteFeedPlace(feedList)
+  })
+
+  // Runs once the new line is on the page.
+  $effect(() => {
+    const newestSeq = newestFeedSeq
+    if (feedList === null || newestSeq === null || feedPlaceBeforeNewLine === null) {
+      return
+    }
+    keepFeedPlace(feedList, feedPlaceBeforeNewLine)
+    feedPlaceBeforeNewLine = null
+  })
+
+  // A feed list at its end stays at its end through a resize, a rotation or a
+  // new root font, so the newest line stays in view (spec 013 AC-8).
+  $effect(() => {
+    if (feedList === null) {
+      return
+    }
+    return keepFeedEndOnResize(feedList)
   })
 
   // A solved grid is finished on this device, when the room knows its number.
@@ -897,8 +951,15 @@
   {#if session.snapshot !== null}
     <div class="presence">
     <section class="roster" data-testid="roster">
-      <h2>{t('roster.heading')}</h2>
-      <ul bind:this={rosterList} onfocusin={scrollKeyboardFocusIntoView}>
+      <h2 id="roster-heading">{t('roster.heading')}</h2>
+      <!-- The explicit role: WebKit does not expose a list without bullets as a
+           list. The tabindex is set from the script (spec 035 AC-12). -->
+      <ul
+        bind:this={rosterList}
+        role="list"
+        aria-labelledby="roster-heading"
+        onfocusin={scrollKeyboardFocusIntoView}
+      >
         {#each session.snapshot.players as player (player.player_id)}
           {@const isYou = player.player_id === session.snapshot.you}
           <li
@@ -939,8 +1000,8 @@
       </ul>
     </section>
     <section class="feed" data-testid="activity-feed">
-      <h2>{t('feed.heading')}</h2>
-      <ul bind:this={feedElement}>
+      <h2 id="feed-heading">{t('feed.heading')}</h2>
+      <ul bind:this={feedList} role="list" aria-labelledby="feed-heading">
         {#each session.feed as item (item.seq)}
           <li data-testid="feed-item" data-kind={item.kind} data-seq={String(item.seq)}>
             {item.text}
@@ -1118,22 +1179,23 @@
 
   /* The roster and the feed: stacked on a roomy window. */
   .presence {
+    /* The smallest remove button (spec 014 AC-7), and the room left after a
+       remove button so that a tap reaches all of it (spec 014 AC-8): after the
+       last item of the scrolling roster list, and under the last row. */
+    --remove-size: 24px;
+    --list-end-room: 3px;
     flex: none;
     display: flex;
     flex-direction: column;
   }
 
   .roster {
-    /* The smallest remove button (spec 014 AC-7), and the room after the last
-       item of the list that keeps the last button whole (spec 014 AC-8). */
-    --remove-size: 24px;
-    --list-end-room: 3px;
     flex: none;
     /* A little room under the last row. A browser tests a tap against about one
        pixel around the point, so an element that starts at the bottom edge of a
        remove button would take a tap on the last pixel row of the button
        (spec 014 AC-8). */
-    padding-bottom: 3px;
+    padding-bottom: var(--list-end-room);
   }
 
   .roster h2 {
@@ -1242,6 +1304,10 @@
   .feed ul {
     max-height: 3.6rem;
     overflow-y: auto;
+    /* The page keeps the reader's place itself when lines come and go (spec
+       013 AC-7), the same way in every engine: no scroll anchoring from the
+       browser on top of it. */
+    overflow-anchor: none;
     /* Room for the focus outline drawn outside the list (spec 035 AC-2): it
        stays clear of the heading above and of the next panel. */
     margin: 0.25rem 0;
@@ -1282,6 +1348,15 @@
 
     .share-label {
       display: none;
+    }
+
+    /* The header buttons get the same size in every engine. WebKit on a touch
+       screen gives a button a 16px font and a taller padding than Chromium and
+       Firefox, and then the header needs a third row, on a low window and on a
+       narrow tall one alike (spec 013 AC-6). */
+    .room-header button {
+      padding-block: 1px;
+      font-size: 0.8rem;
     }
 
     .presence {
@@ -1377,9 +1452,11 @@
       outline-offset: -3px;
     }
 
-    /* The feed list scrolls and is a Tab stop in Chromium. Drawn outside, the
-       bottom edge of its outline is painted over by the next panel (spec 035
-       AC-2), so draw it inside the list's own box. */
+    /* A list that scrolls is a Tab stop (spec 035 AC-12). Drawn outside, the
+       bottom edge of its outline is painted over by the next panel, or by the
+       grid that comes right after the row on a low window (spec 035 AC-2), so
+       draw it inside the list's own box. */
+    .roster ul:focus-visible,
     .feed ul:focus-visible {
       outline-offset: -3px;
     }
@@ -1426,14 +1503,6 @@
       padding: 0.25rem 0.75rem;
     }
 
-    /* The header buttons get the same size in every engine. WebKit on a touch
-       screen gives a button a 16px font and a taller padding than Chromium and
-       Firefox, and then the header needs a third row (spec 013 AC-6). */
-    .room-header button {
-      padding-block: 1px;
-      font-size: 0.8rem;
-    }
-
     /* The grid comes right after this row, so the room under the remove buttons
        goes under the whole row, not under the roster alone (spec 014 AC-8). On
        the roster alone, the feed and the host panel would stretch 3px taller and
@@ -1442,7 +1511,7 @@
       --presence-gap: 1rem;
       flex-direction: row;
       gap: var(--presence-gap);
-      padding-bottom: 3px;
+      padding-bottom: var(--list-end-room);
     }
 
     /* The three boxes start as thirds of the row. The host panel keeps its third
@@ -1466,11 +1535,13 @@
       min-width: min-content;
     }
 
-    /* The list takes no width from its content (a box with inline-size
-       containment measures zero), so the roster is not as wide as its eight
-       players, and a change of the buttons' text cannot change the width of the
-       list. The list is never narrower than one compact remove button and the
-       room after it. */
+    /* Without inline-size containment, the list would ask for the width of all
+       its items in one line: with eight players the roster would span all eight
+       of them and push the feed and the host panel out of the row. With it, the
+       list takes no width from its content (a box with inline-size containment
+       measures zero), so it takes the width the row leaves and scrolls, and a
+       change of the buttons' text cannot change the width of the list. The list
+       is never narrower than one compact remove button and the room after it. */
     .roster ul {
       contain: inline-size;
       min-width: calc(var(--remove-size) + var(--list-end-room));
