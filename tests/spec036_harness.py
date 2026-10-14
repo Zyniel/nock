@@ -110,6 +110,7 @@ FLOOD_CODE = 1008
 TOO_BIG_CODE = 1009
 MAX_WS_FRAME_BYTES = 8192
 OUTBOUND_LIMIT = 20  # AC-5's max_outbound_messages
+EDIT_GROUP_SIZE = 10  # AC-5: B's edits go in groups, its own queue is bounded too
 INBOUND_LIMIT = 5  # AC-6's max_inbound_pending
 DEFAULT_OUTBOUND_LIMIT = 1000
 DEFAULT_INBOUND_LIMIT = 100
@@ -1146,15 +1147,54 @@ class StallRun(NamedTuple):
     b_messages_after_40: list[ServerMessage]
 
 
+def submit_b_edit_group(b: HubClient, first_index: int) -> None:
+    """B sends EDIT_GROUP_SIZE edits, the first one being edit `first_index`.
+
+    Args:
+        b: B's connection.
+        first_index: Index (see `b_edit`) of the first edit of the group.
+    """
+    for index in range(first_index, first_index + EDIT_GROUP_SIZE):
+        b.connection.submit(b_edit(index))
+
+
+async def wait_for_b_letters(b: HubClient, b_id: str, count: int) -> None:
+    """Wait until B's `send_text` has recorded `count` of its own letter_changed.
+
+    The outbound bound of the registry applies to B's connection too. One burst of
+    30 edits queues 30 letter_changed for B within a few milliseconds, and B is
+    itself closed as stalled when its writer is not scheduled in that window.
+    Waiting for B's own letter_changed between the groups keeps B's queue at
+    EDIT_GROUP_SIZE + 1 messages at most, far under the bound.
+
+    Args:
+        b: B's connection.
+        b_id: B's player id.
+        count: Number of letter_changed of B to wait for, in all.
+    """
+    await wait_until_async(
+        lambda: len(own_letter_changes(b.socket.messages(), b_id)) >= count,
+        f"B's {count} letter_changed",
+    )
+
+
 async def stalled_client_scenario(registry: RoomRegistry, code: str) -> StallRun:
-    """A never reads; B sends 30 edits, then 10 more (AC-5)."""
+    """A never reads; B sends 30 edits in three groups of 10, then 10 more (AC-5).
+
+    B sends a group only once it has received the previous one. A's queue holds
+    B's player_joined (and A's snapshot, unless the stuck `send_text` has taken it)
+    and one letter_changed per edit of B: A stalls on B's 19th or 20th edit, so
+    during the second group either way. The exact edit is not asserted.
+    """
     a = open_hub_client(registry, code, StuckSocket())
     a_id = (await join_hub_client(a, "Ana")).you
     b = open_hub_client(registry, code, FakeSocket())
     b_id = (await join_hub_client(b, "Bob")).you
 
-    for index in range(30):
-        b.connection.submit(b_edit(index))
+    submit_b_edit_group(b, 0)
+    await wait_for_b_letters(b, b_id, EDIT_GROUP_SIZE)
+    submit_b_edit_group(b, EDIT_GROUP_SIZE)
+    # The 1 s of the spec starts when B has sent the last edit of the second group.
     await wait_until_async(
         lambda: len(a.socket.close_codes) > 0 and a.writer.done(),
         "A's close and the end of A's writer",
@@ -1162,6 +1202,8 @@ async def stalled_client_scenario(registry: RoomRegistry, code: str) -> StallRun
     )
     close_codes_within_budget = list(a.socket.close_codes)
     writer_returned = not a.writer.cancelled() and a.writer.exception() is None
+    await wait_for_b_letters(b, b_id, 2 * EDIT_GROUP_SIZE)
+    submit_b_edit_group(b, 2 * EDIT_GROUP_SIZE)
 
     def b_saw_the_stall() -> bool:
         messages = b.socket.messages()
@@ -1172,12 +1214,8 @@ async def stalled_client_scenario(registry: RoomRegistry, code: str) -> StallRun
     await wait_until_async(b_saw_the_stall, "B's 30 letter_changed and A's new state")
     b_messages_after_30 = b.socket.messages()
 
-    for index in range(30, 40):
-        b.connection.submit(b_edit(index))
-    await wait_until_async(
-        lambda: len(own_letter_changes(b.socket.messages(), b_id)) >= 40,
-        "B's 10 more letter_changed",
-    )
+    submit_b_edit_group(b, 3 * EDIT_GROUP_SIZE)
+    await wait_for_b_letters(b, b_id, 4 * EDIT_GROUP_SIZE)
     await asyncio.sleep(SETTLE_SECONDS)
     return StallRun(
         a_id=a_id,

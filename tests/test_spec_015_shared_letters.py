@@ -118,10 +118,16 @@ def dist_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def registry() -> Iterator[RoomRegistry]:
-    """A registry whose throttle never refuses and that never times a socket out."""
+    """A registry whose throttle never refuses and that never times a socket out.
+
+    AC-1 and AC-3 send bursts of about 1,000 edits, so each client receives about
+    1,000 letter_changed: as many as the default outbound bound. A reader that
+    falls behind for a moment would be closed with 4507, so the bound is lifted.
+    """
     config = RoomConfig(
         max_edits_per_second=1000,
         max_inbound_pending=1000,
+        max_outbound_messages=5000,
         silence_timeout_seconds=600,
     )
     room_registry = RoomRegistry(config=config)
