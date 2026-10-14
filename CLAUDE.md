@@ -37,6 +37,8 @@ Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 - `scripts/gate.py`: the quality gate.
 - `.claude/agents/`: the four roles. `.claude/skills/`: standards and workflows.
   `scripts/hooks/`: the scripts that enforce the rules below.
+- `.claude/hooks/session-start.sh`: in a Claude Code cloud session, installs the
+  Python and web dependencies and the three test browsers before the first prompt.
 
 ## How a feature gets built
 
