@@ -342,6 +342,12 @@ AC-11.)
   `Escape` then `Tab` when nothing follows the grid (AC-3). (Note from the lead,
   2026-10-14: added after the first run on all three engines, Chromium 153,
   Firefox 155 and WebKit 26.6, as CI runs them.)
+  One check is skipped under WebKit: whether the focus outline of the scrolling
+  list in `activity-feed` is fully visible (AC-2), at all three of its window
+  sizes (360 by 740, 568 by 320 and 1280 by 720), because WebKit does not make
+  that list a Tab stop. (Note from the lead, 2026-10-14: added after a review
+  finding. The test already skipped this check under WebKit, but only the Firefox
+  skip was listed here.)
 
 ## Acceptance criteria
 
