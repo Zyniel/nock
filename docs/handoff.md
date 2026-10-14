@@ -34,8 +34,14 @@ Update it at the end of each session.
     `server_config`), plus `pytest.register_assert_rewrite` for the
     `specNNN_harness` modules in `tests/conftest.py`.
 - Then item 3's remaining bullets: full three-engine gate, reviewer, close 035
-  and 036, then the pull request (the human wants it once Phase 5 is green;
-  the lead opens it on request).
+  and 036, then the pull request (the human asked the lead to open it once
+  Phase 5 is green, and to follow its CI).
+- Right after the pull request (human decision): split every remaining test
+  file over about 800 lines by criterion group (018, 017, 039, 012, 023, 037,
+  011, 026, 006, 015, 040, 007, 016, 004, 010, 005, 009, 008), and bring the
+  036 and 014 harness modules under about 800 lines. Same method and checks
+  as the first four splits: identical collected ids and per-test outcomes on
+  the three engines, one worktree per file, cherry-picked onto the branch.
 
 ## In flight when this was written
 
