@@ -68,7 +68,7 @@ the specs whose criteria this one mentions.
 | [010](010-instant-solo-start.md) | US-2.5 Instant solo start | E2 | MVP | 6 | - |
 | [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 4 | - |
 | [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 7 | - |
-| [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 6 | - |
+| [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 8 | 006, 009, 035 |
 | [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 10 | 006, 013, 035 |
 | [015](015-shared-letters.md) | US-4.1 Shared letters | E4 | MVP | 4 | - |
 | [016](016-same-cell-conflicts.md) | US-4.2 Same-cell conflicts | E4 | MVP | 3 | - |
@@ -90,8 +90,8 @@ the specs whose criteria this one mentions.
 | [032](032-room-resume.md) | US-9.1 Room resume | E9 | V1 | 3 | - |
 | [033](033-optional-account.md) | US-9.2 Optional account | E9 | V1 | 3 | - |
 | [034](034-catch-up.md) | US-9.3 Catching up after an absence | E9 | V1 | 2 | - |
-| [035](035-accessibility.md) | US-10.1 Accessibility | E10 | MVP | 11 | 006, 009, 013, 014, 023, 026, 040 |
-| [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 7 | 015, 037 |
+| [035](035-accessibility.md) | US-10.1 Accessibility | E10 | MVP | 12 | 006, 009, 013, 014, 023, 026, 040 |
+| [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 11 | 015, 018, 037 |
 | [037](037-integrity.md) | US-10.3 Integrity | E10 | MVP | 4 | - |
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 4 | 032 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
