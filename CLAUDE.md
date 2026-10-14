@@ -31,7 +31,9 @@ Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 ## Layout
 
 - `specs/NNN-short-name.md`: one spec per feature, copied from `specs/_template.md`.
-- `tests/test_spec_NNN_short_name.py`: the tests of spec NNN.
+- `tests/test_spec_NNN_*.py`: the tests of spec NNN, in one file
+  (`test_spec_NNN_short_name.py`) or, past about 800 lines, one file per
+  criterion group with the shared setup in `tests/specNNN_harness.py`.
 - `src/nock/`: the package.
 - `web/`: the Svelte + TypeScript client, built by Vite into `web/dist`.
 - `scripts/gate.py`: the quality gate.
