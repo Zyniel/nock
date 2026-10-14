@@ -265,9 +265,34 @@ AC-11.)
   fixture as in specs 040, 004 and 023. The reference catalogue `CAT` of spec 004
   holds FX-01 entries (with spec 005's credits).
 - Keyboard only: the test uses `page.keyboard` and never `click`, `tap`, `hover`
-  or `mouse`. `tab_to(page, test_id, shift=False)` presses `Tab` (or `Shift+Tab`)
-  up to 60 times until `document.activeElement` has that `data-testid`, and fails
-  otherwise.
+  or `mouse`.
+- `tab_to(page, test_id, selector="")` moves the focus to its target: the element
+  that has that `data-testid` and, when `selector` is given, also matches it (for
+  example `[data-force="1"]`); exactly one element must match. Before each press,
+  if the target is `document.activeElement`, it stops. Otherwise, if the grid has
+  the focus, it first presses `Escape`, which releases the grid's next `Tab` or
+  `Shift+Tab`. Then it presses `Shift+Tab` when the target comes before the
+  focused element in document order, and `Tab` otherwise, including when no
+  element has the focus (`document.activeElement` is `body`). It fails when the
+  target does not have the focus after 60 presses of `Tab` or `Shift+Tab` (the
+  `Escape` presses do not count). So it never relies on `Tab` wrapping past the
+  end of the document. (Note from the lead, 2026-10-14: it used to press only
+  `Tab`, or only `Shift+Tab`, so a target before the focused element was reached
+  only by going past the grid and wrapping past the end of the document, which
+  Firefox under automation does not do. The walks keep their intent.)
+- Sentinel (AC-1 to AC-3): a `<button type="button" data-testid="tab-sentinel">`
+  with a short text, which the test appends as the last child of `body` with
+  `page.evaluate` (setup, allowed in a keyboard-only test). It is placed so that
+  the page's layout does not change, for example with `position: fixed` in a
+  corner. The room page has nothing focusable after the grid, so the sentinel
+  becomes the first focusable element after it, and `Escape` then `Tab` moves the
+  focus to it in every engine. It is never a `tab_to` target, and no contrast or
+  language scan runs while it is on the page. (Note from the lead, 2026-10-14:
+  added.)
+- `Tab` listener (AC-3): a `keydown` listener that the test adds on `window`
+  (bubble phase) with `page.evaluate` once the grid is shown. For each `Tab`
+  keydown, with or without `Shift`, it records `defaultPrevented`, which tells
+  whether the page cancelled it. (Note from the lead, 2026-10-14: added.)
 - Contrast scan, run in the page with `page.evaluate`: for each element that has
   a direct non-empty text node (after trimming), is visible (non-zero box,
   `visibility` `visible`, not inside a `visually-hidden` element, not a disabled
@@ -313,15 +338,25 @@ AC-11.)
   `locator.bounding_box()`. Two boxes are disjoint when the width or the height of
   their intersection is at most 1 px. (Note from the lead, 2026-10-13.)
 - Engines: Chromium and WebKit locally, Firefox too in CI. No check of this spec
-  is Chromium-only.
+  is Chromium-only. One check is skipped under Firefox: where the focus goes after
+  `Escape` then `Tab` when nothing follows the grid (AC-3). (Note from the lead,
+  2026-10-14: added after the first run on all three engines, Chromium 153,
+  Firefox 155 and WebKit 26.6, as CI runs them.)
 
 ## Acceptance criteria
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-10.1.1) (browser with live server, keyboard only) Every action is reachable from the keyboard. With `CAT` served: on `/`, `tab_to` `force-filter` `data-force="1"` then `Enter` makes it `aria-pressed="true"`; `tab_to` the `catalogue-play` of item 1 then `Enter` opens the room page, which reaches `data-status="joined"` (Ana, host). There: `tab_to` `grid` then `Tab` selects `0,0,0` on (1, 0); `T` then `A` fill (1, 0) and (1, 1); `ArrowDown` moves the selection; `Backspace` erases; `Control+z` sends `undo`; `Escape` then `Tab` leaves the grid. `tab_to` `check-word` and `Enter` sends a `check`; the same for `check-letter`, `check-grid` and `undo-button`; `tab_to` `copy-link` and `share-link` focus them; `tab_to` `lock-room` then `Enter` makes it `aria-pressed="true"` and again unlocks; `tab_to` `help-mode-select`, `ArrowDown`, then `tab_to` `settings-save` and `Enter` sends `change_settings`. A second page (Bob) opens the room link and, keyboard only, `tab_to` `nickname-input`, types `Bob`, presses `Enter` and reaches `joined`; then on Ana's page `tab_to` the `remove-player` of Bob and `Enter` removes him (Bob's page reaches `data-status="removed"`).
-- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white; this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it away.
-- **AC-3** (new, from spec 009 decision 5) (browser with mocked socket, keyboard only) A keyboard player can leave the grid. Given a FX-01 snapshot (`you` host, so the host panel shows) and the focus on the grid with (1, 0) selected: `Tab` selects `0,0,1` and the focus stays on the grid (as spec 009); `Escape` then `Tab` moves the focus to the first focusable element after the grid in document order, or out of the page content when there is none (`document.activeElement` is not the grid in either case), and the selection is unchanged; back on the grid with `Shift+Tab`, `Escape` then `Shift+Tab` focuses the last focusable element before the grid in document order (the host panel's `settings-save` or a later control). `Escape`, then `T`, then `Tab` types `T` and then selects the next word (the release ended). The grid's `aria-describedby` is `grid-hint`, whose text is `fr.json["a11y.grid_hint"]`.
+- **AC-1** (AC-10.1.1) (browser with live server, keyboard only) Every action is reachable from the keyboard. With `CAT` served: on `/`, `tab_to` `force-filter` `data-force="1"` then `Enter` makes it `aria-pressed="true"`; `tab_to` the `catalogue-play` of item 1 then `Enter` opens the room page, which reaches `data-status="joined"` (Ana, host). There: `tab_to` `grid` then `Tab` selects `0,0,0` on (1, 0); `T` then `A` fill (1, 0) and (1, 1); `ArrowDown` moves the selection; `Backspace` erases; `Control+z` sends `undo`; `Escape` then `Tab` leaves the grid: the focus moves to the sentinel of "Test harness", which the test adds once the room page is `joined`. `tab_to` `check-word` and `Enter` sends a `check`; the same for `check-letter`, `check-grid` and `undo-button`; `tab_to` `copy-link` and `share-link` focus them; `tab_to` `lock-room` then `Enter` makes it `aria-pressed="true"` and again unlocks; `tab_to` `help-mode-select`, `ArrowDown`, then `tab_to` `settings-save` and `Enter` sends `change_settings`. A second page (Bob) opens the room link and, keyboard only, `tab_to` `nickname-input`, types `Bob`, presses `Enter` and reaches `joined`; then on Ana's page `tab_to` the `remove-player` of Bob and `Enter` removes him (Bob's page reaches `data-status="removed"`). (Note from the lead, 2026-10-14: the sentinel was added so that leaving the grid shows in every engine, and each `tab_to` follows its new definition in "Test harness". The walk's steps and intent are unchanged.)
+- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white; this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to the sentinel (AC-1). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".)
+- **AC-3** (new, from spec 009 decision 5) (browser with mocked socket, keyboard only) A keyboard player can leave the grid. Given a FX-01 snapshot (`you` host, so the host panel shows) and the focus on the grid with (1, 0) selected, the following holds. (Note from the lead, 2026-10-14: split into the cases below, with the sentinel and the `Tab` listener of "Test harness", so that every check holds in Chromium, Firefox and WebKit. The old text required "`document.activeElement` is not the grid" even when nothing follows the grid, which Firefox under automation cannot show.)
+  - Word navigation: `Tab` selects `0,0,1` and the focus stays on the grid (as spec 009).
+  - Forward, with the sentinel: with the sentinel of "Test harness" added, `Escape` then `Tab` moves the focus to the first focusable element after the grid in document order, which is the sentinel while the page has none of its own after the grid. The selection is unchanged.
+  - Backward: from there, `Shift+Tab` puts the focus back on the grid. Then `Escape` then `Shift+Tab` focuses the last focusable element before the grid in document order (the host panel's `settings-save` or a later control). The selection is unchanged.
+  - Forward, without the sentinel (a separate run on the page as it is, where nothing focusable follows the grid): after `Escape` then `Tab` the selection is unchanged, and the focus leaves the page content wherever the browser can move it: `document.activeElement` is not the grid, or `document.hasFocus()` is false. Under Firefox the test skips only this focus check, because Firefox under automation has no toolbar to move the focus to and leaves it on the grid ("Nothing focusable after the grid" in "Edge cases and errors"). There, the next check is what shows that the page released the `Tab`.
+  - Not cancelled: in every engine, for each `Tab` or `Shift+Tab` pressed right after `Escape` in the cases above, the `Tab` listener of "Test harness" records `defaultPrevented` false.
+  - Release ended: `Escape`, then `T`, then `Tab` types `T` and then selects the next word.
+  - Hint: the grid's `aria-describedby` is `grid-hint`, whose text is `fr.json["a11y.grid_hint"]`.
 - **AC-4** (AC-10.1.2) (browser with mocked socket) On selecting a cell, a screen reader announces the clue, direction, word length and position. On a FX-01 snapshot, after tapping (2, 2) twice (down word MIME selected), `grid-announcement` has `role="status"`, `aria-live="polite"`, the class `visually-hidden`, and the exact text `Artiste muet, vertical, 4 lettres, lettre 2`; after `ArrowDown` it reads `Artiste muet, vertical, 4 lettres, lettre 3`; after `ArrowUp` it reads `Artiste muet, vertical, 4 lettres, lettre 2` again; after tapping (2, 2) once more (spec 007: the selected cell switches to its across word VIDE) it reads `Sans contenu, horizontal, 4 lettres, lettre 2`; after tapping (1, 0) it reads `Passoire fine, horizontal, 5 lettres, lettre 1`.
 - **AC-5** (new, from spec 006's review) (browser with mocked socket) The grid exposes grid, row and gridcell roles. On a FX-01 snapshot: `page.get_by_role("grid")` has one element; it has 5 `grid-row` children with `role="row"` and `data-row` 0 to 4; each holds 5 elements with `role="gridcell"`, `data-row` equal to its row and `data-column` 0 to 4 in order; `page.get_by_role("gridcell")` counts 25; `cell-2-2` is the `cell` at (2, 2); with nothing selected the grid has no `aria-activedescendant` and every letter cell has `aria-selected="false"`; after tapping (2, 2) the grid's `aria-activedescendant` is `cell-2-2`, that cell has `aria-selected="true"` and the 17 other letter cells `false`; spec 006's layout criteria (cell squares, positions) still pass.
 - **AC-6** (AC-10.1.3) (browser with mocked socket) Colour is never the only signal: each player's cursor also carries their initials. Given a FX-01 snapshot with `p1` (`you`), `p2` `Jean-Luc` selecting (2, 2) `down`, `p3` `Ana` selecting (2, 2) `across` and `p4` `zoé` selecting (1, 0): the cell (2, 2) holds two `remote-selection` elements whose `remote-initials` read `JL` and `AN`, each inside the cell's bounding box (1 px tolerance) with computed `visibility` `visible`; (1, 0) holds one reading `ZO`; after `selection_moved` of `p2` to (3, 1), (3, 1) holds `JL` and (2, 2) only `AN`.
@@ -371,9 +406,28 @@ Other cases:
 - Two players with the same initials (AC-6): both are shown; colours and the roster
   tell them apart. Initials of a nickname of one character (not possible: spec 012
   needs 2) would be that character.
-- `Escape` with nothing selected (AC-3): the release works the same; `Tab` then
-  leaves the grid.
+- `Escape` with nothing selected (AC-3): the release works the same. With the
+  sentinel added, `Tab` then moves the focus to it, and nothing becomes selected.
+  (Note from the lead, 2026-10-14: "leaves the grid" is now measured with the
+  sentinel, as in AC-3, so that it holds in every engine.)
 - `Escape` on other controls (AC-3): left to the browser.
+- Nothing focusable after the grid (AC-1 to AC-3): on the room page the grid is
+  the last focusable element in document order (the lead checked it with a
+  script). After `Escape` then `Tab`, the page leaves the `Tab` to the browser in
+  every engine (`defaultPrevented` false), and the browser decides where the focus
+  goes. Under automation, Chromium and WebKit move it out of the document
+  (`document.hasFocus()` false, `document.activeElement` is `body`). A real Firefox
+  moves it to its toolbar, but Firefox under automation (Playwright) has none, so
+  the focus stays on the grid, `document.hasFocus()` stays true and no `blur`
+  fires. The released key press still ends the release, so a second `Tab` there
+  selects the next word. That is why AC-1 to AC-3 add the sentinel, and why
+  `tab_to` presses `Escape` before each press while the grid has the focus. For
+  the same reason, AC-10's Tab order check stops at once under Firefox. It still
+  does its job: the in-app keyboard comes after the grid in document order, so a
+  key that is a Tab stop would take the focus there. (Note from the lead,
+  2026-10-14: added from the first run under Firefox. A `keydown` listener on
+  `window` saw `defaultPrevented` false in all three engines, so a real Firefox
+  user reaches the toolbar.)
 - In-app keyboard (spec 009, touch screens) (AC-10): the keys stay out of the Tab
   order (`tabindex="-1"`). Each key duplicates a physical key, so WCAG 2.1.1 is met
   by the physical keyboard, and about 30 more Tab stops would hurt keyboard users
@@ -395,6 +449,33 @@ Other cases:
 - Hidden text (AC-8, AC-9): text inside `visually-hidden` elements is in the
   language scan but not in the contrast scan.
 - Disabled buttons (AC-8): exempt from contrast (WCAG), still in the language scan.
+- Pointer focus in the host panel (AC-2, spec 014 AC-7): a keyboard focus on a
+  host-panel control hides `host-panel-more`, so that the fade never covers the
+  outline of AC-2 (spec 014). On a pointer focus (a click or a tap), the page's own
+  code never scrolls the panel, and the fade stays visible while panel content is
+  still hidden past the panel's right edge
+  (`scrollWidth - clientWidth - scrollLeft > 1`). A scroll that the browser makes
+  by itself to show a focused form control is allowed: WebKit, for example,
+  scrolls a partly visible `<select>` into view when it is clicked or tapped. So
+  the test does not compare the panel's `scrollLeft` before and after the press;
+  it spies on the page's scroll calls. This check uses a pointer, unlike the rest
+  of AC-2. Setup: state K2 in a 320 by 568 window, with a mouse click in a desktop
+  context and a tap in a touch context (`has_touch=True`, and `is_mobile=True`
+  except under Firefox), on each of `lock-room`, `help-mode-select`,
+  `reveal-letters-input` and `reveal-words-input`. The test first sets the
+  panel's `scrollLeft` so that the control is partly hidden past the right edge,
+  or fully shown. Then it wraps `scrollIntoView`, `scrollIntoViewIfNeeded` (where
+  the engine has it), `scroll`, `scrollTo`, `scrollBy` and the `scrollLeft` setter
+  of `Element.prototype`, so that each call made on `host-panel` or on an element
+  inside it is recorded. It presses the centre of the control's visible part at
+  raw coordinates (`page.mouse.click` or `page.touchscreen.tap`), because
+  `locator.click()` would scroll the control into view first. 300 ms after the
+  press, no call has been recorded, and `host-panel-more` is visible (computed
+  `visibility` `visible`, `display` not `none`) if panel content is still hidden
+  past the right edge. (Note from the lead, 2026-10-14: added. The check of
+  2026-10-13 required an unchanged `scrollLeft` and failed in WebKit for
+  `help-mode-select` because of WebKit's own scroll, while the fade stayed
+  visible. The page's code scrolls only on a keyboard focus.)
 
 ## Out of scope
 
@@ -415,6 +496,12 @@ Other cases:
   accessibility tree, not TalkBack or VoiceOver). A way to list every player on a
   crowded cell (the roster gives the names; AC-11 shows `+k` only). (Note from the
   lead, 2026-10-13.)
+- Moving the focus somewhere when nothing focusable follows the grid: after the
+  released `Tab`, the browser decides where the focus goes (AC-3). (Note from the
+  lead, 2026-10-14.)
+- Cancelling or undoing a scroll that the browser makes by itself when a form
+  control gets the focus, such as WebKit scrolling a clicked `<select>` into view
+  (AC-2). (Note from the lead, 2026-10-14.)
 
 ## Work packages
 
@@ -471,6 +558,36 @@ and these are the lead's decisions:
     (`max(7px, 0.2 × cell)`) and the widest two-capital initials. The `+k` is
     hidden from assistive technology and replaced by `k autres joueurs` in a
     visually hidden element of the cell.
+
+Added on 2026-10-14, after the first run of the full suite on Chromium 153,
+Firefox 155 and WebKit 26.6, as CI runs it. The lead probed each failure. The
+human allowed agents to refine approved and done specs, and these are the lead's
+decisions:
+
+12. Leaving the grid, in every engine (AC-1 to AC-3). Nothing focusable follows the
+    grid on the room page. After `Escape` then `Tab`, Chromium and WebKit move the
+    focus out of the document, and Firefox under automation, which has no
+    toolbar, leaves it on the grid. In none of them is the `Tab` cancelled.
+    Options: keep "the focus is not on the grid" and run it in Chromium and WebKit
+    only; add a focusable element after the grid to the page; or check what the
+    page controls in every engine. Pick: the last. In every engine the `Tab` after
+    `Escape` must not be cancelled, and a test-only sentinel at the end of `body`
+    gives the forward exit a place to go. The check that the focus leaves the page
+    as it is stays, skipped under Firefox. `tab_to` picks `Tab` or `Shift+Tab`
+    from document order and presses `Escape` before each press while the grid has
+    the focus, so no step relies on `Tab` wrapping past the end of the document.
+    The page's behaviour does not change.
+13. Pointer focus and the browser's own scroll (AC-2, spec 014 AC-7). The check
+    added on 2026-10-13 required the host panel's `scrollLeft` to stay the same
+    after a click or tap. WebKit scrolls a partly visible `<select>` into view by
+    itself when it is clicked or tapped, so the check failed for
+    `help-mode-select`, although the page's code scrolls only on a keyboard focus
+    and the fade stayed visible. Options: keep the `scrollLeft` check and make the
+    page undo the browser's scroll, which fights native behaviour and could
+    misplace the select's menu; or forbid only the page's own scrolling. Pick: the
+    latter. A spy on the page's scroll calls still catches the bug the check
+    guards against (the page's focus scroll moving a partly visible control away
+    from under the pointer), and the fade rule does not change.
 
 ## Open questions
 

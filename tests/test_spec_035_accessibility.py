@@ -271,21 +271,92 @@ FOCUS_OUTLINE_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
 }"""
 
 ACTIVE_ELEMENT_SCRIPT = r"""
-selector => {
+() => {
   const element = document.activeElement;
   if (element === null) {
     return null;
   }
-  return {
-    testId: element.getAttribute('data-testid'),
-    selectorMatches: selector === '' ? true : element.matches(selector),
+  return {testId: element.getAttribute('data-testid')};
+}
+"""
+
+# What `Walker.tab_to` needs to know before each press: how many elements are the
+# target (they have the test id and, when a selector is given, match it) and, when
+# there is exactly one, whether it has the focus, whether the grid has the focus,
+# and whether the target comes before the focused element in document order. With
+# the focus on `body`, the target never comes before it.
+TAB_TARGET_SCRIPT = r"""
+([testId, selector]) => {
+  const targets = [];
+  for (const element of document.querySelectorAll(`[data-testid="${testId}"]`)) {
+    if (selector === '' || element.matches(selector)) {
+      targets.push(element);
+    }
+  }
+  const grid = document.querySelector('[data-testid="grid"]');
+  const focused = document.activeElement;
+  const state = {
+    matches: targets.length,
+    onTarget: false,
+    onGrid: focused !== null && focused === grid,
+    targetIsBefore: false,
   };
+  if (targets.length === 1 && focused !== null) {
+    state.onTarget = focused === targets[0];
+    const position = focused.compareDocumentPosition(targets[0]);
+    state.targetIsBefore = (position & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+  }
+  return state;
+}
+"""
+
+SENTINEL_TEST_ID = "tab-sentinel"
+
+# The sentinel of the spec's "Test harness": a button appended as the last child of
+# `body`, fixed in a corner so that the layout does not change. The room page has
+# nothing focusable after the grid, so the sentinel becomes the first focusable
+# element after it, and `Escape` then `Tab` moves the focus there in every engine.
+ADD_SENTINEL_SCRIPT = r"""
+() => {
+  const sentinel = document.createElement('button');
+  sentinel.type = 'button';
+  sentinel.setAttribute('data-testid', 'tab-sentinel');
+  sentinel.textContent = 'Sentinel';
+  sentinel.style.position = 'fixed';
+  sentinel.style.left = '0';
+  sentinel.style.bottom = '0';
+  document.body.appendChild(sentinel);
+}
+"""
+
+# The `Tab` listener of the spec's "Test harness": on `window`, bubble phase, it
+# records `defaultPrevented` of each Tab keydown (with or without Shift), which tells
+# whether the page cancelled it.
+TAB_LISTENER_SCRIPT = r"""
+() => {
+  window.tabKeydowns = [];
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Tab') {
+      window.tabKeydowns.push({
+        shift: event.shiftKey,
+        defaultPrevented: event.defaultPrevented,
+      });
+    }
+  });
+}
+"""
+
+# After the released Tab, with nothing focusable after the grid: the focus left the
+# page content wherever the browser could move it.
+FOCUS_LEFT_THE_PAGE_CONTENT_SCRIPT = r"""
+() => {
+  const grid = document.querySelector('[data-testid="grid"]');
+  return document.activeElement !== grid || !document.hasFocus();
 }
 """
 
 # Is the focus where a plain Tab (direction 1) or Shift+Tab (direction -1) from the
-# grid leads: the next (previous) focusable element in document order, or, when
-# there is none, anywhere but the grid.
+# grid leads: on the next (previous) focusable element in document order.
 NEIGHBOUR_FOCUSED_SCRIPT = r"""
 direction => {
   const grid = document.querySelector('[data-testid="grid"]');
@@ -306,10 +377,7 @@ direction => {
     focusable.push(element);
   }
   const neighbour = focusable[focusable.indexOf(grid) + direction];
-  if (neighbour === undefined) {
-    return document.activeElement !== grid;
-  }
-  return document.activeElement === neighbour;
+  return neighbour !== undefined && document.activeElement === neighbour;
 }
 """
 
@@ -610,6 +678,26 @@ class Reached(NamedTuple):
     outline_contrast: float
 
 
+class TabState(NamedTuple):
+    """Where the focus is, compared with the target of a `tab_to`."""
+
+    match_count: int
+    on_target: bool
+    on_grid: bool
+    target_is_before: bool
+
+
+def read_tab_state(page: Page, test_id: str, selector: str) -> TabState:
+    """Count the elements that are the target and say where the focus is."""
+    found = page.evaluate(TAB_TARGET_SCRIPT, [test_id, selector])
+    return TabState(
+        match_count=found["matches"],
+        on_target=found["onTarget"],
+        on_grid=found["onGrid"],
+        target_is_before=found["targetIsBefore"],
+    )
+
+
 class Walker:
     """Keyboard-only navigation of one page (spec 035, "Test harness")."""
 
@@ -618,31 +706,36 @@ class Walker:
         self.reached: list[Reached] = []
         self.outlines: list[list[dict[str, Any]]] = []
 
-    def active(self, selector: str) -> tuple[str | None, bool]:
-        """The `data-testid` of the focused element and whether it matches."""
-        found = self.page.evaluate(ACTIVE_ELEMENT_SCRIPT, selector)
-        if found is None:
-            return None, False
-        return found["testId"], found["selectorMatches"]
+    def tab_to(self, test_id: str, selector: str = "") -> None:
+        """Move the focus to the one element with `test_id` that matches `selector`.
 
-    def tab_to(self, test_id: str, *, shift: bool = False, selector: str = "") -> None:
-        """Press Tab (or Shift+Tab) until the focused element has `test_id`.
-
-        `selector` narrows the target to the elements it matches. When the focus
-        passes over the grid on the way to another target, `Escape` releases it
-        so that the next Tab leaves the grid (spec 035, "Leaving the grid").
-        Fails after 60 presses.
+        Before each press, it stops when the target has the focus. When the grid
+        has the focus, it first presses `Escape`, which releases the grid's next
+        Tab or Shift+Tab (spec 035, "Leaving the grid"). Then it presses Shift+Tab
+        when the target comes before the focused element in document order, and
+        Tab otherwise. It fails after 60 presses of Tab or Shift+Tab (the Escape
+        presses do not count), so it never relies on Tab wrapping past the end of
+        the document.
         """
-        key = "Shift+Tab" if shift else "Tab"
-        for _ in range(MAX_TABS):
-            self.page.keyboard.press(key)
-            focused_id, selector_matches = self.active(selector)
-            if focused_id == test_id and selector_matches:
-                self.record(test_id)
-                return
-            if focused_id == "grid":
+        # The target may appear a moment after the page asks for it (a roster row).
+        wait_until(
+            self.page,
+            lambda: read_tab_state(self.page, test_id, selector).match_count > 0,
+        )
+        state = read_tab_state(self.page, test_id, selector)
+        if state.match_count != 1:
+            pytest.fail(f"{state.match_count} elements match {test_id} {selector}")
+        presses = 0
+        while not state.on_target:
+            if presses == MAX_TABS:
+                pytest.fail(f"{test_id} {selector} not reached in {MAX_TABS} presses")
+            if state.on_grid:
                 self.page.keyboard.press("Escape")
-        pytest.fail(f"{test_id} {selector} not reached in {MAX_TABS} presses")
+            key = "Shift+Tab" if state.target_is_before else "Tab"
+            self.page.keyboard.press(key)
+            presses += 1
+            state = read_tab_state(self.page, test_id, selector)
+        self.record(test_id)
 
     def record(self, test_id: str) -> None:
         outline = self.page.evaluate(FOCUS_OUTLINE_SCRIPT)
@@ -654,6 +747,32 @@ class Walker:
                 outline_contrast=outline["ratio"],
             )
         )
+
+
+def add_sentinel(page: Page) -> None:
+    """Append the test-only button that follows the grid in the Tab order.
+
+    Args:
+        page: A page that shows the grid. No contrast or language scan may run
+            while the sentinel is on the page.
+    """
+    page.evaluate(ADD_SENTINEL_SCRIPT)
+
+
+def expect_focus_on_sentinel(page: Page) -> None:
+    expect(page.get_by_test_id(SENTINEL_TEST_ID)).to_be_focused()
+
+
+def watch_tab_keys(page: Page) -> None:
+    """Record, from now on, whether the page cancelled each Tab keydown."""
+    page.evaluate(TAB_LISTENER_SCRIPT)
+
+
+def tab_keydowns(page: Page) -> list[dict[str, Any]]:
+    """The Tab keydowns recorded since `watch_tab_keys`: `shift`, `defaultPrevented`."""
+    recorded = page.evaluate("window.tabKeydowns")
+    assert isinstance(recorded, list)
+    return recorded
 
 
 def letter_outlines(page: Page) -> list[dict[str, Any]]:
@@ -746,8 +865,13 @@ def walk_the_catalogue(walker: Walker, live_server: str) -> None:
 
 
 def walk_the_grid(walker: Walker, recorder: FrameRecorder) -> None:
-    """In the room: select, type, move, erase, undo and leave the grid."""
+    """In the room: select, type, move, erase, undo and leave the grid.
+
+    The room is `joined`, so the sentinel is added first: leaving the grid moves
+    the focus to it.
+    """
     page = walker.page
+    add_sentinel(page)
     walker.tab_to("grid")
     page.keyboard.press("Tab")
     expect_word(page, "0,0,0")
@@ -777,8 +901,7 @@ def walk_the_grid(walker: Walker, recorder: FrameRecorder) -> None:
 
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
-    focused_id, _ = walker.active("")
-    assert focused_id != "grid"
+    expect_focus_on_sentinel(page)
     walker.outlines.append(letter_outlines(page))
 
 
@@ -915,6 +1038,7 @@ def test_ac2_the_selected_cell_keeps_its_outline_without_the_focus(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid)
+    add_sentinel(page)
     walker = Walker(page)
     walker.tab_to("grid")
     page.keyboard.press("Tab")
@@ -924,7 +1048,7 @@ def test_ac2_the_selected_cell_keeps_its_outline_without_the_focus(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
-    expect(grid_of(page)).not_to_be_focused()
+    expect_focus_on_sentinel(page)
     expect_selected(page, 1, 0)
     assert_only_selected_cell_is_outlined(letter_outlines(page))
 
@@ -940,6 +1064,9 @@ def test_ac2_no_cell_is_outlined_before_a_selection(
 
 # Pointer focus must not disturb the host panel's fade (spec 014 AC-7); a keyboard
 # focus on a panel control hides it. The probes run in K2 on a 320x568 phone.
+# On a pointer focus the page's own code never scrolls the panel, but the browser may
+# (WebKit scrolls a partly visible select into view), so the test spies on the
+# page's scroll calls instead of comparing the panel's `scrollLeft`.
 
 PHONE_SIZE = {"width": 320, "height": 568}
 PANEL_CONTROLS = [
@@ -953,11 +1080,51 @@ HOST_PANEL_STATE_SCRIPT = r"""
 () => {
   const panel = document.querySelector('[data-testid="host-panel"]');
   const fade = document.querySelector('[data-testid="host-panel-more"]');
+  const fadeStyle = fade === null ? null : getComputedStyle(fade);
   return {
-    fade: fade === null ? null : getComputedStyle(fade).visibility,
-    scrollLeft: Math.round(panel.scrollLeft),
+    fade: fadeStyle === null ? null : fadeStyle.visibility,
+    fadeDisplay: fadeStyle === null ? null : fadeStyle.display,
     moreToTheRight: panel.scrollLeft + panel.clientWidth < panel.scrollWidth - 1,
   };
+}
+"""
+
+# Records in `window.panelScrollCalls` each scroll call that the page makes on the
+# host panel or on an element inside it: the scroll methods of `Element.prototype`
+# (`scrollIntoViewIfNeeded` where the engine has it) and the `scrollLeft` setter. A
+# scroll that the browser makes by itself does not go through them.
+SCROLL_SPY_SCRIPT = r"""
+() => {
+  const panel = document.querySelector('[data-testid="host-panel"]');
+  window.panelScrollCalls = [];
+  const record = (name, element) => {
+    if (element === panel || panel.contains(element)) {
+      window.panelScrollCalls.push(name);
+    }
+  };
+  const methods = [
+    'scrollIntoView', 'scrollIntoViewIfNeeded', 'scroll', 'scrollTo', 'scrollBy',
+  ];
+  for (const name of methods) {
+    const originalMethod = Element.prototype[name];
+    if (typeof originalMethod !== 'function') {
+      continue;
+    }
+    Element.prototype[name] = function (...args) {
+      record(name, this);
+      return originalMethod.apply(this, args);
+    };
+  }
+  const scrollLeft = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft');
+  Object.defineProperty(Element.prototype, 'scrollLeft', {
+    configurable: true,
+    enumerable: scrollLeft.enumerable,
+    get: scrollLeft.get,
+    set(value) {
+      record('scrollLeft', this);
+      scrollLeft.set.call(this, value);
+    },
+  });
 }
 """
 
@@ -1138,7 +1305,7 @@ def focused_test_id(page: Page) -> str | None:
         The test id of the focused element, or None when nothing is focused or
         the focused element has no test id.
     """
-    found = page.evaluate(ACTIVE_ELEMENT_SCRIPT, "")
+    found = page.evaluate(ACTIVE_ELEMENT_SCRIPT)
     if found is None:
         return None
     return found["testId"]
@@ -1147,7 +1314,7 @@ def focused_test_id(page: Page) -> str | None:
 @pytest.mark.parametrize("scroll_mode", ["partial", "full"])
 @pytest.mark.parametrize("target", PANEL_CONTROLS)
 @pytest.mark.parametrize("touch", [False, True], ids=["mouse", "touch"])
-def test_ac2_a_pointer_focus_keeps_the_host_panel_fade_and_scroll(
+def test_ac2_a_pointer_focus_keeps_the_host_panel_fade_and_makes_no_scroll_call(
     browser: Browser,
     live_server: str,
     fx01_grid: Grid,
@@ -1160,12 +1327,13 @@ def test_ac2_a_pointer_focus_keeps_the_host_panel_fade_and_scroll(
     open_k2(page, live_server, fx01_grid)
     page.evaluate(SCROLL_CONTROL_SCRIPT, [target, scroll_mode])
     page.wait_for_timeout(SETTLE_MS)
-    before = page.evaluate(HOST_PANEL_STATE_SCRIPT)
     centre = visible_centre(page, target)
     if centre is None:
         context.close()
         pytest.skip(f"{target} has no visible part in mode {scroll_mode}")
 
+    # The spy goes in after the set-up scroll above, which it must not record.
+    page.evaluate(SCROLL_SPY_SCRIPT)
     # Raw coordinates: `.click()` scrolls the element into view and hides the bug.
     x, y = centre
     if touch:
@@ -1173,13 +1341,14 @@ def test_ac2_a_pointer_focus_keeps_the_host_panel_fade_and_scroll(
     else:
         page.mouse.click(x, y)
     page.wait_for_timeout(SETTLE_MS)
-    after = page.evaluate(HOST_PANEL_STATE_SCRIPT)
+    scroll_calls = page.evaluate("window.panelScrollCalls")
+    state = page.evaluate(HOST_PANEL_STATE_SCRIPT)
     context.close()
 
-    assert after["scrollLeft"] == before["scrollLeft"], (before, after)
-    assert after["fade"] == before["fade"], (before, after)
-    if before["moreToTheRight"]:
-        assert after["fade"] == "visible", (before, after)
+    assert scroll_calls == [], state
+    if state["moreToTheRight"]:
+        assert state["fade"] == "visible", state
+        assert state["fadeDisplay"] != "none", state
 
 
 @pytest.mark.parametrize("target", PANEL_CONTROLS)
@@ -1261,6 +1430,7 @@ def test_ac3_tab_stays_on_the_grid_then_escape_tab_leaves_forward(
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
     expect(page.get_by_test_id("host-panel")).to_be_visible()
+    add_sentinel(page)
     walker = Walker(page)
     focus_grid_with_first_word(page, walker)
 
@@ -1271,9 +1441,10 @@ def test_ac3_tab_stays_on_the_grid_then_escape_tab_leaves_forward(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
-    expect(grid_of(page)).not_to_be_focused()
+    expect_focus_on_sentinel(page)
     assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, 1) is True
     expect_word(page, "0,0,1")
+    expect_selected(page, 0, 1)
 
 
 def test_ac3_escape_then_shift_tab_leaves_backward(
@@ -1291,25 +1462,78 @@ def test_ac3_escape_then_shift_tab_leaves_backward(
     expect(grid_of(page)).not_to_be_focused()
     assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, -1) is True
     expect_word(page, "0,0,1")
+    expect_selected(page, 0, 1)
 
 
 def test_ac3_coming_back_to_the_grid_with_shift_tab_works_both_ways(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
+    add_sentinel(page)
     walker = Walker(page)
     focus_grid_with_first_word(page, walker)
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
-    expect(grid_of(page)).not_to_be_focused()
+    expect_focus_on_sentinel(page)
 
-    walker.tab_to("grid", shift=True)
+    page.keyboard.press("Shift+Tab")
+    expect_focus_on_grid(page)
+    expect_word(page, "0,0,0")
     page.keyboard.press("Escape")
     page.keyboard.press("Shift+Tab")
 
     expect(grid_of(page)).not_to_be_focused()
     assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, -1) is True
     expect_word(page, "0,0,0")
+    expect_selected(page, 1, 0)
+
+
+def test_ac3_escape_tab_with_nothing_after_the_grid_leaves_the_page_content(
+    page: Page, live_server: str, fx01_grid: Grid, browser_name: str
+) -> None:
+    open_host_room(page, live_server, fx01_grid)
+    walker = Walker(page)
+    focus_grid_with_first_word(page, walker)
+
+    page.keyboard.press("Escape")
+    page.keyboard.press("Tab")
+
+    expect_word(page, "0,0,0")
+    expect_selected(page, 1, 0)
+    if browser_name == "firefox":
+        # Firefox under automation has no toolbar to move the focus to, so it leaves
+        # the focus on the grid. That the page released the Tab is checked in every
+        # engine by test_ac3_a_tab_pressed_right_after_escape_is_not_cancelled.
+        pytest.skip("Firefox under automation keeps the focus on the grid")
+    wait_until(page, lambda: page.evaluate(FOCUS_LEFT_THE_PAGE_CONTENT_SCRIPT) is True)
+
+
+@pytest.mark.parametrize(
+    ("with_sentinel", "key"),
+    [(True, "Tab"), (False, "Shift+Tab"), (False, "Tab")],
+    ids=["forward_with_sentinel", "backward", "forward_without_sentinel"],
+)
+def test_ac3_a_tab_pressed_right_after_escape_is_not_cancelled(
+    page: Page, live_server: str, fx01_grid: Grid, with_sentinel: bool, key: str
+) -> None:
+    open_host_room(page, live_server, fx01_grid)
+    if with_sentinel:
+        add_sentinel(page)
+    walker = Walker(page)
+    focus_grid_with_first_word(page, walker)
+    watch_tab_keys(page)
+
+    # Control: the Tab that selects the next word is cancelled (spec 009), so the
+    # listener does tell a cancelled Tab from a released one.
+    page.keyboard.press("Tab")
+    expect_word(page, "0,0,1")
+    page.keyboard.press("Escape")
+    page.keyboard.press(key)
+
+    assert tab_keydowns(page) == [
+        {"shift": False, "defaultPrevented": True},
+        {"shift": key == "Shift+Tab", "defaultPrevented": False},
+    ]
 
 
 def test_ac3_a_letter_after_escape_is_typed_and_the_release_ends(
@@ -1392,6 +1616,7 @@ def test_ac3_escape_with_nothing_selected_lets_tab_leave(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
+    add_sentinel(page)
     walker = Walker(page)
     walker.tab_to("grid")
     expect(grid_of(page)).to_have_attribute("data-word", "")
@@ -1399,9 +1624,11 @@ def test_ac3_escape_with_nothing_selected_lets_tab_leave(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
-    expect(grid_of(page)).not_to_be_focused()
-    assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, 1) is True
+    expect_focus_on_sentinel(page)
     expect(grid_of(page)).to_have_attribute("data-word", "")
+    expect(grid_of(page)).not_to_have_attribute(
+        "aria-activedescendant", re.compile(r".")
+    )
 
 
 def test_ac3_the_grid_is_described_by_the_hint_with_the_exit_method(
