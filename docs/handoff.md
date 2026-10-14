@@ -16,6 +16,27 @@ Update it at the end of each session.
   recommended answer to every open question. Not built.
 - Phase 7 (030, 031): untouched, only if the human wants competitive modes.
 
+## Update, late 2026-10-14
+
+- Done since the first version: lane A's code is committed (de12363); spec
+  036's code is on the branch (77dcd18); the spec 013, 035 and 036 tests are
+  split into files per criterion group (ed17f7e, 8abc954, 6a899c4), with
+  `search-path = ["src", "tests"]` for pyrefly (d15bb2b). Items 1 and 2 below
+  are therefore done.
+- Still open, in worktrees of the lead's session (if they are lost, redo them):
+  - The spec 014 test split (same method as the other three).
+  - Spec 036 AC-5 race: `test_ac5_a_client_that_never_reads_is_closed_as_
+    stalled_and_disconnected` fails about 3 times in 5 under CPU load ("timed
+    out after 10.0s waiting for B's 30 letter_changed"), passes idle. Root
+    cause to find in `src/nock/hub.py`; reproduce with four busy-loop
+    processes running alongside the test.
+  - Item 3's first two bullets (015/018 burst fixtures, `live_server` with
+    `server_config`), plus `pytest.register_assert_rewrite` for the
+    `specNNN_harness` modules in `tests/conftest.py`.
+- Then item 3's remaining bullets: full three-engine gate, reviewer, close 035
+  and 036, then the pull request (the human wants it once Phase 5 is green;
+  the lead opens it on request).
+
 ## In flight when this was written
 
 1. **Lane A code, uncommitted when this file was first written:** `web/src/`
