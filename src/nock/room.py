@@ -131,6 +131,10 @@ class RoomConfig(RoomModel):
     max_edits_per_second: int = Field(default=20, ge=1)  # spec 037 AC-3
     snapshot_every: int = Field(default=100, ge=1)  # spec 018
     tick_seconds: float = Field(default=1.0, gt=0)  # how often the hub runs tick()
+    # spec 036 AC-5: messages a connection's outbound queue may hold
+    max_outbound_messages: int = Field(default=1000, ge=1)
+    # spec 036 AC-6: inputs of a connection that may wait to be applied
+    max_inbound_pending: int = Field(default=100, ge=1)
 
 
 DEFAULT_CONFIG: RoomConfig = RoomConfig()

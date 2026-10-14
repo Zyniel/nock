@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte'
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
@@ -46,6 +47,8 @@
   const COPIED_DISPLAY_MS = 2000
   const UNDO_MESSAGE_MS = 3000
   const MAX_REVEAL_COUNT = 99
+  // The performance mark set once the grid takes taps and keys (spec 036).
+  const INTERACTIVE_MARK = 'nock:interactive'
   // The remove buttons are compact in a roster list narrower than this many root
   // font sizes (spec 014 AC-9).
   const COMPACT_REMOVE_BELOW_ROOT_FONTS = 4.5
@@ -493,6 +496,14 @@
     })
   }
 
+  // Mark the time from the start of the page load to a grid that takes taps and
+  // keys (spec 036). `tick` resolves once the DOM shows the new state, so the
+  // grid of the first snapshot is on the page when the mark is set.
+  async function markInteractive(): Promise<void> {
+    await tick()
+    performance.mark(INTERACTIVE_MARK)
+  }
+
   // After the first snapshot, select again what this device saved, if the grid
   // still has a word there.
   function restoreSavedSelection(snapshot: Snapshot): void {
@@ -816,8 +827,11 @@
     receiveFrame(session, event.data)
     if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
       rememberJoin(session.snapshot)
+      // Only the first snapshot of the page: a reconnection keeps the old
+      // snapshot until the new one arrives, so it sets no second mark.
       if (snapshotBefore === null) {
         restoreSavedSelection(session.snapshot)
+        void markInteractive()
       }
       reconnectAttempt = 0
       resendPendingEdits()

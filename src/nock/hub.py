@@ -3,6 +3,10 @@
 The pure rules live in `nock.room`. This module owns the time and the threads:
 a registry runs its rooms on its own asyncio event loop in a daemon thread, with
 one task per room that applies the room's inputs one at a time.
+
+Each connection bounds what waits for it in both directions (spec 036): a client
+that never reads its socket is closed as stalled, and a client that sends faster
+than its room applies is closed as flooding.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from nock.protocol import (
     Snapshot,
 )
 from nock.room import (
+    DEFAULT_CONFIG,
     SILENCE_CLOSE_CODE,
     Clock,
     Outcome,
@@ -42,9 +47,11 @@ from nock.room import (
 from nock.store import RoomStore
 
 __all__ = [
+    "FLOOD_CLOSE_CODE",
     "MAX_FRAME_BYTES",
     "SESSION_REPLACED_CLOSE_CODE",
     "SILENCE_CLOSE_CODE",
+    "STALLED_CLOSE_CODE",
     "RoomConnection",
     "RoomRegistry",
 ]
@@ -56,6 +63,8 @@ ROOM_CODE_LENGTH: int = 6
 
 MAX_FRAME_BYTES: int = 4096  # spec 037: larger frames are not parsed
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
+STALLED_CLOSE_CODE: int = 4507  # spec 036: the client did not read its messages
+FLOOD_CLOSE_CODE: int = 1008  # spec 036: the client sent faster than the room applies
 
 _REFUSAL_TEXTS: dict[ErrorCode, str] = {
     ErrorCode.NOT_JOINED: "Send a join message before anything else.",
@@ -81,7 +90,7 @@ class _Invalid(NamedTuple):
 
 
 class _Detach(NamedTuple):
-    """Input: a connection closed."""
+    """Input: a connection closed, or stalled (spec 036)."""
 
     connection: RoomConnection
 
@@ -102,41 +111,95 @@ class RoomConnection:
     The outbound queue belongs to the event loop of the socket's handler. The
     room task puts items in it without waiting, so a slow socket never delays
     the room or any other connection.
+
+    Both directions are bounded (spec 036):
+
+    - Stalled: when the room delivers a message while `max_outbound` items wait
+      in the queue, the queued items are dropped, the connection gets nothing
+      more, its writer closes the socket with STALLED_CLOSE_CODE and the room
+      disconnects the connection.
+    - Flooded: when a frame arrives while `max_inbound` inputs of the connection
+      wait to be applied by the room, that frame and every later one are
+      dropped, and the socket is closed with FLOOD_CLOSE_CODE once the items
+      already queued are sent.
+
+    The room's thread and the socket's thread both change the counts behind
+    these bounds, so a lock guards them.
     """
 
     def __init__(
         self,
         owner_loop: asyncio.AbstractEventLoop,
         post: Callable[[_Input], None],
+        max_outbound: int = DEFAULT_CONFIG.max_outbound_messages,
+        max_inbound: int = DEFAULT_CONFIG.max_inbound_pending,
     ) -> None:
         """Create a connection owned by `owner_loop`, the loop of the socket.
 
         `player_id` stays None until the room task accepts the connection's join.
+
+        Args:
+            owner_loop: The event loop of the socket's handler.
+            post: Passes an input to the room task, from any thread.
+            max_outbound: How many items may wait in the outbound queue.
+            max_inbound: How many inputs may wait to be applied by the room.
         """
         self.player_id: str | None = None
         self._owner_loop = owner_loop
         self._post = post
+        self._max_outbound = max_outbound
+        self._max_inbound = max_inbound
         self._outbound: asyncio.Queue[_Outbound] = asyncio.Queue()
+        self._stall_alarm = asyncio.Event()  # set on the owner loop once stalled
+        self._lock = threading.Lock()
+        self._outbound_count = 0  # items queued and not taken by the writer yet
+        self._inbound_count = 0  # inputs passed on and not applied by the room yet
+        self._is_stalled = False
+        self._is_flooded = False
 
     def submit(self, message: ClientMessage) -> None:
-        """Pass a message of this player to the room (any thread)."""
-        self._post(_Message(self, message))
+        """Pass a message of this player to the room (any thread).
+
+        The message is dropped when it floods the connection, or comes after.
+        """
+        if self._admit_frame():
+            self._post(_Message(self, message))
 
     def submit_invalid(self) -> None:
-        """Tell the room that this player sent an invalid frame (any thread)."""
-        self._post(_Invalid(self))
+        """Tell the room that this player sent an invalid frame (any thread).
+
+        The frame is dropped when it floods the connection, or comes after.
+        """
+        if self._admit_frame():
+            self._post(_Invalid(self))
 
     def leave(self) -> None:
-        """Tell the room that the socket closed (any thread)."""
+        """Tell the room that the socket closed (any thread).
+
+        Never dropped, even after a flood, and not counted as an input.
+        """
         self._post(_Detach(self))
 
+    def mark_input_applied(self) -> None:
+        """Count one input of this connection as applied. Called by the room task.
+
+        The room calls it when it finished the step of a message or of an
+        invalid frame that this connection passed on.
+        """
+        with self._lock:
+            self._inbound_count -= 1
+
     def deliver_text(self, text: str) -> None:
-        """Queue a message for the socket. Called by the room task."""
-        self._enqueue(_Outbound(text=text, close_code=None))
+        """Queue a message for the socket. Called by the room task.
+
+        The message is dropped when it stalls the connection, or comes after.
+        """
+        if self._admit_message():
+            self._enqueue(_Outbound(text=text, close_code=None))
 
     def deliver_close(self, close_code: int) -> None:
         """Queue the closing of the socket. Called by the room task."""
-        self._enqueue(_Outbound(text=None, close_code=close_code))
+        self._queue_close(close_code)
 
     async def run_writer(
         self,
@@ -145,15 +208,102 @@ class RoomConnection:
     ) -> None:
         """Write the queued items to the socket, in order, until a close.
 
+        Then `close` is called once, with the code of the close item. When the
+        connection stalls, the writer stops waiting for the text it is sending,
+        even one that never completes, and the code is STALLED_CLOSE_CODE.
+
         Must run on the event loop that owns this connection.
+        """
+        close_code = await self._send_until_close(send_text)
+        await close(close_code)
+
+    async def _send_until_close(
+        self, send_text: Callable[[str], Awaitable[None]]
+    ) -> int:
+        """Send the queued texts until a close item comes or the connection stalls.
+
+        Returns:
+            The code of the close item, or STALLED_CLOSE_CODE.
+        """
+        sending = asyncio.create_task(self._send_queued_texts(send_text))
+        stalled = asyncio.create_task(self._stall_alarm.wait())
+        try:
+            await asyncio.wait({sending, stalled}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            # Neither task is awaited: a send that never completes is left behind.
+            sending.cancel()
+            stalled.cancel()
+        if sending.done():
+            return sending.result()
+        return STALLED_CLOSE_CODE
+
+    async def _send_queued_texts(
+        self, send_text: Callable[[str], Awaitable[None]]
+    ) -> int:
+        """Send the queued texts, in order, until a close item.
+
+        Returns:
+            The code of the close item.
         """
         while True:
             item = await self._outbound.get()
+            with self._lock:
+                self._outbound_count -= 1
+            if item.close_code is not None:
+                return item.close_code
             if item.text is not None:
                 await send_text(item.text)
-            elif item.close_code is not None:
-                await close(item.close_code)
+
+    def _admit_frame(self) -> bool:
+        """Count a frame of the client as one more input waiting for the room.
+
+        A frame that arrives while `max_inbound` inputs wait floods the
+        connection: the socket is closed with FLOOD_CLOSE_CODE through the
+        outbound queue, without waiting for the room task.
+
+        Returns:
+            True when the frame goes to the room; False when it is dropped
+            because it flooded the connection, or came after the flood.
+        """
+        with self._lock:
+            if self._is_flooded:
+                return False
+            if self._inbound_count < self._max_inbound:
+                self._inbound_count += 1
+                return True
+            self._is_flooded = True
+        self._queue_close(FLOOD_CLOSE_CODE)
+        return False
+
+    def _admit_message(self) -> bool:
+        """Count a message of the room as one more item in the outbound queue.
+
+        A message that comes while `max_outbound` items wait stalls the
+        connection: the writer drops the queued items and closes the socket
+        with STALLED_CLOSE_CODE, and the room is asked to disconnect it.
+
+        Returns:
+            True when the message is queued; False when it is dropped because
+            it stalled the connection, or came after the stall.
+        """
+        with self._lock:
+            if self._is_stalled:
+                return False
+            if self._outbound_count < self._max_outbound:
+                self._outbound_count += 1
+                return True
+            self._is_stalled = True
+        self._stop_writer()
+        self._post(_Detach(self))
+        return False
+
+    def _queue_close(self, close_code: int) -> None:
+        """Queue the closing of the socket, unless the connection is stalled."""
+        with self._lock:
+            if self._is_stalled:
                 return
+            self._outbound_count += 1
+        self._enqueue(_Outbound(text=None, close_code=close_code))
 
     def _enqueue(self, item: _Outbound) -> None:
         """Put an item in the queue from any thread."""
@@ -162,6 +312,23 @@ class RoomConnection:
         except RuntimeError:
             # The socket's event loop is closed: nobody is left to read.
             return
+
+    def _stop_writer(self) -> None:
+        """Make the writer drop the queue and close as stalled, from any thread."""
+        try:
+            self._owner_loop.call_soon_threadsafe(self._drop_queue_and_wake_writer)
+        except RuntimeError:
+            # The socket's event loop is closed: there is no writer to stop.
+            return
+
+    def _drop_queue_and_wake_writer(self) -> None:
+        """Drop the items waiting in the queue, then wake the writer.
+
+        Runs on the event loop that owns this connection.
+        """
+        while not self._outbound.empty():
+            self._outbound.get_nowait()
+        self._stall_alarm.set()
 
 
 class _RoomRunner:
@@ -260,9 +427,20 @@ class _RoomRunner:
                 item = await asyncio.wait_for(self._inbox.get(), wait_seconds)
             except TimeoutError:
                 continue
-            self._input_step(item)
+            self._apply_input(item)
             if not self._connections and self._inbox.empty():
                 return
+
+    def _apply_input(self, item: _Input) -> None:
+        """Run the step of one input, then tell its connection it is applied.
+
+        A detach is not one of the inputs a connection counts (spec 036).
+        """
+        try:
+            self._input_step(item)
+        finally:
+            if not isinstance(item, _Detach):
+                item.connection.mark_input_applied()
 
     def _tick_step(self) -> None:
         """Run one tick of the rules."""
@@ -568,7 +746,8 @@ class RoomRegistry:
         """Open a connection to room `code` for a socket that has not joined.
 
         The connection receives the room's messages once the player's join is
-        accepted by the room task.
+        accepted by the room task. Its bounds are the registry's
+        `max_outbound_messages` and `max_inbound_pending` (spec 036).
 
         Must be called from the event loop that serves the socket.
 
@@ -590,7 +769,12 @@ class RoomRegistry:
                 # The registry was closed: the room no longer runs.
                 return
 
-        return RoomConnection(asyncio.get_running_loop(), post)
+        return RoomConnection(
+            asyncio.get_running_loop(),
+            post,
+            max_outbound=self._config.max_outbound_messages,
+            max_inbound=self._config.max_inbound_pending,
+        )
 
     def close(self) -> None:
         """Stop the room tasks and the engine thread. Idempotent.

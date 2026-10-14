@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Annotated
 
+import uvicorn
 from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -35,8 +36,10 @@ from nock.store import RoomStore
 __all__ = [
     "SESSION_REPLACED_CLOSE_CODE",
     "SILENCE_CLOSE_CODE",
+    "WS_MAX_SIZE_BYTES",
     "RoomRegistry",
     "create_app",
+    "server_config",
 ]
 
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
@@ -49,6 +52,7 @@ WRONG_CODE_LIMIT: int = 10
 WRONG_CODE_WINDOW_SECONDS: float = 60.0
 DATABASE_VARIABLE: str = "NOCK_DATABASE"  # path of the SQLite file (spec 018)
 MEMORY_DATABASE: str = ":memory:"
+WS_MAX_SIZE_BYTES: int = 8192  # spec 036: uvicorn refuses larger frames (close 1009)
 
 _MISSING_BUILD_TEXT = "The web client is not built: run npm --prefix web run build"
 
@@ -374,6 +378,29 @@ def create_app(
         await _serve_socket(websocket, room_registry, code)
 
     return web_app
+
+
+def server_config(
+    app: FastAPI, host: str = "127.0.0.1", port: int = 8000, log_level: str = "info"
+) -> uvicorn.Config:
+    """Return the uvicorn configuration of the server.
+
+    `ws_max_size` is WS_MAX_SIZE_BYTES: uvicorn refuses a larger frame before
+    it is buffered whole, and closes the socket with 1009. Every other option
+    is uvicorn's default.
+
+    Args:
+        app: The app to serve.
+        host: The address the server listens on.
+        port: The port the server listens on.
+        log_level: The level of uvicorn's logs.
+
+    Returns:
+        The configuration to give to `uvicorn.Server`.
+    """
+    return uvicorn.Config(
+        app, host=host, port=port, log_level=log_level, ws_max_size=WS_MAX_SIZE_BYTES
+    )
 
 
 app: FastAPI = create_app(catalogue=load_catalogue(GRIDS_DIR))
