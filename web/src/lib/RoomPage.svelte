@@ -1086,6 +1086,11 @@
 
   .roster {
     flex: none;
+    /* A little room under the last row. A browser tests a tap against about one
+       pixel around the point, so an element that starts at the bottom edge of a
+       remove button would take a tap on the last pixel row of the button
+       (spec 014 AC-8). */
+    padding-bottom: 3px;
   }
 
   .roster h2 {
@@ -1185,7 +1190,9 @@
   .feed ul {
     max-height: 3.6rem;
     overflow-y: auto;
-    margin: 0;
+    /* Room for the focus outline drawn outside the list (spec 035 AC-2): it
+       stays clear of the heading above and of the next panel. */
+    margin: 0.25rem 0;
     padding: 0;
     list-style: none;
   }
@@ -1259,9 +1266,18 @@
       white-space: nowrap;
     }
 
+    /* The list scrolls sideways and its width is rarely a whole number of
+       pixels, so at the end of the scroll the last button can stay a fraction of
+       a pixel out of the list, where a tap does not reach it. A few pixels of
+       room after the last item keep the button whole (spec 014 AC-8). */
+    .roster li:last-child {
+      padding-right: 3px;
+    }
+
     .feed ul {
       flex: 1 1 auto;
       min-width: 0;
+      margin: 0;
       max-height: 1.3rem;
       line-height: 1.3rem;
     }
@@ -1312,12 +1328,6 @@
       outline-offset: -3px;
     }
 
-    /* The target is taller than the row: 2px of it sticks out of the list on
-       each side, so its outline goes deeper to stay whole. */
-    .roster ul .remove-player:focus-visible {
-      outline-offset: -5px;
-    }
-
     /* The fade never covers a control that has the keyboard focus. A mouse click
        or a tap also focuses a control, but it must not hide the fade (spec 014
        AC-7), so this follows a class set only for keyboard focus. */
@@ -1335,12 +1345,11 @@
       font-size: 0.75rem;
     }
 
-    /* A target of 24 by 24 CSS pixels at least (spec 014 AC-7). */
+    /* A target of 24 by 24 CSS pixels at least (spec 014 AC-7). It may make the
+       row taller, but never sticks out of the scrolling list (spec 014 AC-8). */
     .remove-player {
       min-width: 24px;
       min-height: 24px;
-      /* The row keeps its height: the target overflows its line, not the row. */
-      margin-block: -3px;
     }
 
     .feed li {
@@ -1361,9 +1370,14 @@
       padding: 0.25rem 0.75rem;
     }
 
+    /* The grid comes right after this row, so the room under the remove buttons
+       goes under the whole row, not under the roster alone (spec 014 AC-8). On
+       the roster alone, the feed and the host panel would stretch 3px taller and
+       their content would sit 1.5px lower than the roster's. */
     .presence {
       flex-direction: row;
       gap: 1rem;
+      padding-bottom: 3px;
     }
 
     .roster,
@@ -1371,6 +1385,10 @@
     .host-panel {
       flex: 1 1 0;
       min-width: 0;
+    }
+
+    .roster {
+      padding-bottom: 0;
     }
   }
 </style>

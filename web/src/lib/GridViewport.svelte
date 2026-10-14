@@ -70,6 +70,39 @@
     return rank * Math.max(step, 1)
   }
 
+  // The corners where a cell can hold a label, in the order they are filled.
+  const LABEL_CORNERS = ['top-left', 'bottom-right', 'top-right', 'bottom-left']
+  const FOUR_SLOTS_MIN_CELL_PX = 44
+  const TWO_SLOTS_MIN_CELL_PX = 20
+
+  interface LabelPlan {
+    // The number of corners the cell has (1, 2 or 4).
+    slots: number
+    // The first cursors, in roster order, that show their initials.
+    initialsCount: number
+    // The number of cursors folded into the "+k" label (0 for no label).
+    overflowCount: number
+  }
+
+  function slotsFor(side: number): number {
+    if (side >= FOUR_SLOTS_MIN_CELL_PX) {
+      return 4
+    }
+    if (side >= TWO_SLOTS_MIN_CELL_PX) {
+      return 2
+    }
+    return 1
+  }
+
+  // Who gets initials and who is folded into "+k" on a cell (spec 035 AC-11).
+  function labelPlanOf(cursorCount: number, side: number): LabelPlan {
+    const slots = slotsFor(side)
+    if (cursorCount <= slots) {
+      return { slots, initialsCount: cursorCount, overflowCount: 0 }
+    }
+    return { slots, initialsCount: slots - 1, overflowCount: cursorCount - slots + 1 }
+  }
+
   // The DOM id of a cell, used by aria-activedescendant.
   function cellId(row: number, column: number): string {
     return `cell-${row}-${column}`
@@ -434,6 +467,7 @@
           {#if cell.type === 'letter'}
             {@const shown = shownCell(cell, pendingEdits)}
             {@const outlines = outlinesOn(cell.row, cell.column)}
+            {@const plan = labelPlanOf(outlines.length, cellSize)}
             {@const tints = tintsOn(cell.row, cell.column)}
             {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
             <div
@@ -468,12 +502,22 @@
                   data-colour={String(remote.colour)}
                   style:--outline-colour={`var(--player-colour-${remote.colour})`}
                   style:inset="{outlineInset(rank)}px"
-                  ><span
-                    class="remote-initials"
-                    data-corner={rank % 4}
-                    data-testid="remote-initials">{remote.initials}</span
-                  ></span
-                >{/each}</div>
+                  style:--shift="{outlineInset(rank) + OUTLINE_BORDER_PX}px"
+                  >{#if rank < plan.initialsCount}<span
+                      class="remote-label remote-initials"
+                      data-corner={LABEL_CORNERS[rank]}
+                      data-testid="remote-initials">{remote.initials}</span
+                    >{/if}</span
+                >{/each}{#if plan.overflowCount > 0}<span
+                  class="remote-label remote-overflow"
+                  data-corner={LABEL_CORNERS[plan.slots - 1]}
+                  data-count={plan.overflowCount}
+                  data-testid="remote-overflow"
+                  aria-hidden="true"
+                  >{t('grid.remote_overflow', { count: plan.overflowCount })}</span
+                ><span class="visually-hidden" data-testid="remote-overflow-label"
+                  >{t('a11y.remote_overflow', { count: plan.overflowCount })}</span
+                >{/if}</div>
           {:else if cell.type === 'clue'}
             <div
               class="cell clue-cell"
@@ -617,12 +661,14 @@
     pointer-events: none;
   }
 
-  /* The initials of the player, in a small white label in a corner. */
-  .remote-initials {
+  /* The initials of a player or the "+k" label, in a small white label in a
+     corner of the cell. An initials label sits inside the outline span, which
+     is inset: --shift (the inset plus the border) takes it back to the corner
+     of the cell. The "+k" label is a child of the cell, so --shift is 0. */
+  .remote-label {
+    --corner-offset: calc(var(--shift, 0px) * -1);
     position: absolute;
-    top: 0;
-    left: 0;
-    padding: 0 1px;
+    padding: 1px;
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;
     line-height: 1.1;
@@ -630,25 +676,24 @@
     background: #ffffff;
   }
 
-  /* Four corners, by rank: top-left (0), bottom-right (1), top-right (2),
-     bottom-left (3). Labels of different ranks never share a corner, but on a
-     small cell two labels can still overlap when they are wider than half
-     of it. */
-  .remote-initials[data-corner='1'] {
-    top: auto;
-    left: auto;
-    right: 0;
-    bottom: 0;
+  .remote-label[data-corner='top-left'] {
+    top: var(--corner-offset);
+    left: var(--corner-offset);
   }
 
-  .remote-initials[data-corner='2'] {
-    left: auto;
-    right: 0;
+  .remote-label[data-corner='bottom-right'] {
+    bottom: var(--corner-offset);
+    right: var(--corner-offset);
   }
 
-  .remote-initials[data-corner='3'] {
-    top: auto;
-    bottom: 0;
+  .remote-label[data-corner='top-right'] {
+    top: var(--corner-offset);
+    right: var(--corner-offset);
+  }
+
+  .remote-label[data-corner='bottom-left'] {
+    bottom: var(--corner-offset);
+    left: var(--corner-offset);
   }
 
   /* After the other states, so a flash shows over them. */

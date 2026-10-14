@@ -95,5 +95,7 @@
   "a11y.announcement_one": "{clue}, {direction}, 1 lettre",
   "a11y.direction.across": "horizontal",
   "a11y.direction.down": "vertical",
-  "a11y.grid_hint": "Flèches pour se déplacer, Tab pour le mot suivant. Échap puis Tab pour quitter la grille."
+  "a11y.grid_hint": "Flèches pour se déplacer, Tab pour le mot suivant. Échap puis Tab pour quitter la grille.",
+  "grid.remote_overflow": "+{count}",
+  "a11y.remote_overflow": "{count} autres joueurs"
 }
