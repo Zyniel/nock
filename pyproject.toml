@@ -66,6 +66,9 @@ required-imports = ["from __future__ import annotations"]
 # --- pyrefly: type checker ----------------------------------------------------
 [tool.pyrefly]
 project-includes = ["src", "tests", "scripts"]
+# tests/ on the import path, so split test files can import their spec's
+# shared harness module, e.g. `from spec035_harness import ...` (2026-10-14).
+search-path = ["src", "tests"]
 python-version = "3.13"
 
 # --- pytest -------------------------------------------------------------------
