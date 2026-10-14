@@ -12,6 +12,30 @@ Not tested here, and why:
   exists to scan (see the report). `/r/ZZZZZZ` is scanned.
 - The announcement of a word of one cell (`a11y.announcement_one`): FX-01 holds no
   such word and the spec gives no hand-built view for it.
+
+Choices where the spec leaves room:
+
+- AC-10, backward Tab order: the keys come after the grid in document order, so a
+  backward walk from the grid never crosses them. The backward walk starts from
+  the sentinel of the harness (the last child of `body`, after the keys), must
+  come back to the grid without landing on a key, then goes on as the spec's walk
+  from the grid.
+- AC-11, a cell just above 20 px: the layout rules hold for every cell of 20 px or
+  more. Besides the spec's examples, one test runs them on the first letter cell
+  of FX-02 at 320 px wide and the lowest window height that makes its side more
+  than 20 px (it must stay below 20.6 px), where the two diagonal labels have the
+  least room.
+- AC-12, setups: where the criterion says a list does not scroll, the test also
+  checks that from the list's measures, as it does where it says a list scrolls,
+  so that a changed layout is reported as such.
+- AC-12, "No `fr.json` key is added": not observable as such. The test checks that
+  each list's name is the text of its section's `h2`, through `aria-labelledby`.
+- AC-12, visible focus: the "Not clipped" and "Not covered" measures run on both
+  lists; for the feed list they repeat AC-2's check.
+- AC-12, arrow keys: after a key scrolled the list, the test lets the scroll stand
+  still before the next key, since a smooth scroll may still be moving.
+- AC-12, new feed lines: after each event, the test also waits for the feed to
+  hold the new line before it reads the list.
 """
 
 from __future__ import annotations
@@ -45,6 +69,7 @@ from nock.protocol import (
     ErrorMessage,
     GridView,
     HelpMode,
+    HostChanged,
     LetterCellView,
     LetterChanged,
     PlayerJoined,
@@ -116,115 +141,23 @@ NEW_KEYS = {
 
 # ---- In-page scripts ----------------------------------------------------------
 
-# Colour helpers shared by the scripts: `parseColour` gives [r, g, b, alpha] from a
-# computed colour (rgb() fast path, a canvas for any other CSS colour syntax),
-# `over` composites a colour on an opaque one, `contrast` is the WCAG 2.x ratio.
-COLOUR_HELPERS = r"""
-const canvas = document.createElement('canvas');
-canvas.width = 1;
-canvas.height = 1;
-const drawing = canvas.getContext('2d', { willReadFrequently: true });
-function parseColour(text) {
-  const match = text.match(/^rgba?\(([^)]*)\)$/);
-  if (match) {
-    const parts = match[1].split(/[\s,\/]+/).filter(part => part !== '');
-    let alpha = 1;
-    if (parts.length > 3) {
-      alpha = parts[3].endsWith('%') ? parseFloat(parts[3]) / 100 : Number(parts[3]);
-    }
-    return [Number(parts[0]), Number(parts[1]), Number(parts[2]), alpha];
-  }
-  drawing.clearRect(0, 0, 1, 1);
-  drawing.fillStyle = '#000000';
-  drawing.fillStyle = text;
-  drawing.fillRect(0, 0, 1, 1);
-  const data = drawing.getImageData(0, 0, 1, 1).data;
-  return [data[0], data[1], data[2], data[3] / 255];
-}
-function over(top, bottom) {
-  const alpha = top[3];
-  return [
-    top[0] * alpha + bottom[0] * (1 - alpha),
-    top[1] * alpha + bottom[1] * (1 - alpha),
-    top[2] * alpha + bottom[2] * (1 - alpha),
-    1,
-  ];
-}
-function channel(value) {
-  const scaled = value / 255;
-  if (scaled <= 0.03928) {
-    return scaled / 12.92;
-  }
-  return Math.pow((scaled + 0.055) / 1.055, 2.4);
-}
-function luminance(colour) {
-  return 0.2126 * channel(colour[0]) + 0.7152 * channel(colour[1])
-    + 0.0722 * channel(colour[2]);
-}
-function contrast(first, second) {
-  const lighter = Math.max(luminance(first), luminance(second));
-  const darker = Math.min(luminance(first), luminance(second));
-  return (lighter + 0.05) / (darker + 0.05);
-}
-const WHITE = [255, 255, 255, 1];
-"""
-
-CONTRAST_SCAN_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
-  const skippedTags = new Set(
-    ['SCRIPT', 'STYLE', 'NOSCRIPT', 'OPTION', 'TITLE', 'HEAD']
-  );
-  const measurements = [];
-  for (const element of document.body.querySelectorAll('*')) {
-    if (skippedTags.has(element.tagName)) {
-      continue;
-    }
-    let ownText = '';
-    for (const node of element.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        ownText += node.textContent;
-      }
-    }
-    ownText = ownText.trim();
-    if (ownText === '') {
-      continue;
-    }
-    const style = getComputedStyle(element);
-    const box = element.getBoundingClientRect();
-    if (box.width === 0 || box.height === 0 || style.visibility !== 'visible') {
-      continue;
-    }
-    if (element.closest('.visually-hidden') || element.closest(':disabled')) {
-      continue;
-    }
-    let opacity = 1;
-    let background = null;
-    for (let node = element; node; node = node.parentElement) {
-      const nodeStyle = getComputedStyle(node);
-      opacity *= parseFloat(nodeStyle.opacity);
-      if (background === null) {
-        const candidate = parseColour(nodeStyle.backgroundColor);
-        if (candidate[3] > 0) {
-          background = candidate;
-        }
-      }
-    }
-    const opaqueBackground = background === null ? WHITE : over(background, WHITE);
-    const text = parseColour(style.color);
-    text[3] = text[3] * opacity;
-    const shown = over(text, opaqueBackground);
-    const ratio = contrast(shown, opaqueBackground);
-    const row = element.closest('[data-testid="roster-player"]');
-    measurements.push({
-      tag: element.tagName,
-      testid: element.getAttribute('data-testid'),
-      rowState: row === null ? null : row.getAttribute('data-state'),
-      text: ownText,
-      opacity: opacity,
-      ratio: ratio,
-    });
-  }
-  return measurements;
-}"""
+# The colour helpers, the contrast scan and the focus outline reader of the spec's
+# "Test harness" are in tests/colour_contrast.js, which the spec 014 tests read
+# too, so that both files always measure the same way. That file only declares
+# them; each script below wraps it in a function for `page.evaluate` that returns
+# one measurement.
+COLOUR_CONTRAST_JS = (Path(__file__).parent / "colour_contrast.js").read_text(
+    encoding="utf-8"
+)
+# Each measurement: tag, testid, rowState (the `data-state` of the roster row that
+# holds the element, or None), removeFor, text, opacity and ratio.
+CONTRAST_SCAN_SCRIPT = (
+    "() => {\n" + COLOUR_CONTRAST_JS + "\nreturn scanTextContrast();\n}"
+)
+# The outline of the focused element: style, width (px) and ratio (against white).
+FOCUS_OUTLINE_SCRIPT = (
+    "() => {\n" + COLOUR_CONTRAST_JS + "\nreturn readFocusOutline();\n}"
+)
 
 LANGUAGE_SCAN_SCRIPT = r"""
 () => {
@@ -258,17 +191,6 @@ LANGUAGE_SCAN_SCRIPT = r"""
   return found;
 }
 """
-
-FOCUS_OUTLINE_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
-  const element = document.activeElement;
-  const style = getComputedStyle(element);
-  const colour = over(parseColour(style.outlineColor), WHITE);
-  return {
-    style: style.outlineStyle,
-    width: parseFloat(style.outlineWidth),
-    ratio: contrast(colour, WHITE),
-  };
-}"""
 
 ACTIVE_ELEMENT_SCRIPT = r"""
 () => {
@@ -1192,13 +1114,16 @@ FOCUS_BAND_SCRIPT = r"""
   }
   points.push([left, top], [right, top], [left, bottom], [right, bottom]);
   // An outline paints above the in-flow, non-positioned content around it, so
-  // only a positioned element, a stacking context or a scroll container that
-  // comes later in the document (browsers paint it as its own layer) on the way
-  // up from `hit`, below the nearest ancestor shared with `element`, covers it.
+  // that content never covers it. On the way up from `hit`, below the nearest
+  // ancestor shared with `element`, the cover is any of these: a positioned
+  // element or a stacking context, wherever it is in the document; or a scroll
+  // container that comes after `element` in document order. Only a later scroll
+  // container counts because the focused list is a scroll container too, and
+  // browsers paint each one as its own layer, in document order.
   // Limits: the rule relies on `elementFromPoint`, so it cannot see a cover with
-  // `pointer-events: none` (like the host-panel fade). It only counts later
-  // positioned, stacking-context or scroll-container elements, which is sound
-  // because the focused list is its own layer. It is not meant for reuse on
+  // `pointer-events: none` (like the host-panel fade). A point outside the window
+  // finds no element; `cut` covers that case. It is written for the scrolling
+  // lists of AC-2 and AC-12, which are scroll containers, and is not meant for
   // other targets as is.
   const isPaintedAbove = (hit, element) => {
     for (let node = hit; node && !node.contains(element); node = node.parentElement) {
@@ -1250,8 +1175,12 @@ selector => {
 """
 
 
-def fill_feed_until_it_scrolls(page: Page, mock: MockRoomSocket) -> None:
-    """Send extra check results until the feed list overflows and scrolls.
+def fill_feed_and_check_it_scrolls(page: Page, mock: MockRoomSocket) -> None:
+    """Send 40 more check results, then fail unless the feed list scrolls.
+
+    The count is fixed: the events have `seq` 14 to 53, so the feed holds 43
+    items. Once the page shows `seq` 53, the list must be taller inside than its
+    box (`scrollHeight` greater than `clientHeight`).
 
     Args:
         page: The room page, already in state K2 (last event `seq` 13).
@@ -1379,7 +1308,7 @@ def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
     context = browser.new_context(viewport={"width": width, "height": height})
     page = context.new_page()
     mock = open_k2(page, live_server, fx01_grid)
-    fill_feed_until_it_scrolls(page, mock)
+    fill_feed_and_check_it_scrolls(page, mock)
     page.evaluate("document.activeElement.blur()")
     reached = False
     for _ in range(MAX_TABS):
@@ -1393,17 +1322,19 @@ def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
         if is_feed:
             reached = True
             break
-    if not reached and browser.browser_type.name != "chromium":
-        # Engine guard: not every browser makes a scroll container focusable.
+    # No engine is skipped: AC-12 makes the list a Tab stop in every engine.
+    if not reached:
         context.close()
-        pytest.skip(f"this browser does not make the {FEED_LIST_TEST_ID} a Tab stop")
     assert reached, f"Tab never reached the {FEED_LIST_TEST_ID} at {width}x{height}"
     page.wait_for_timeout(SETTLE_MS)
     band = page.evaluate(FOCUS_BAND_SCRIPT)
+    outline = page.evaluate(FOCUS_OUTLINE_SCRIPT)
     context.close()
 
     assert band["style"] not in ("none", "auto"), band
     assert band["width"] >= MIN_OUTLINE_PX, band
+    # The colour, as for every outline of AC-2's walk: 3:1 against white.
+    assert outline["ratio"] >= MIN_FOCUS_CONTRAST, outline
     no_cut = {"top": 0, "right": 0, "bottom": 0, "left": 0}
     assert {side: round(px) for side, px in band["cut"].items()} == no_cut, band
     assert band["coveredBy"] == {}, band
@@ -1589,6 +1520,19 @@ def test_ac3_losing_then_regaining_the_focus_ends_the_release(
     expect_focus_on_grid(page)
 
 
+def frames_without_pings(mock: MockRoomSocket) -> list[str]:
+    """The frames the page sent, without its keep-alive `ping` frames.
+
+    The page sends a `ping` on its own timer, so one can fall between two reads
+    whatever the test does.
+    """
+    frames: list[str] = []
+    for frame in mock.received:
+        if json.loads(frame)["type"] != "ping":
+            frames.append(frame)
+    return frames
+
+
 def test_ac3_escape_changes_nothing_else(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
@@ -1599,12 +1543,12 @@ def test_ac3_escape_changes_nothing_else(
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")
     expect_selected(page, 1, 1)
     page.wait_for_timeout(SETTLE_MS)
-    sent_before = len(mock.received)
+    sent_before = frames_without_pings(mock)
 
     page.keyboard.press("Escape")
     page.wait_for_timeout(SETTLE_MS)
 
-    assert len(mock.received) == sent_before
+    assert frames_without_pings(mock) == sent_before
     expect_word(page, "0,0,0")
     expect_selected(page, 1, 1)
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")
@@ -2464,15 +2408,15 @@ def test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour(
     expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", str(colour))
 
 
-def test_ac8_the_dimmed_roster_rows_are_scanned_with_their_opacity(
+def test_ac8_the_idle_and_disconnected_nicknames_are_scanned_and_reach_4_5_to_1(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_k2(page, live_server, fx01_grid)
 
     measurements = contrast_measurements(page)
 
-    dimmed_rows = {"idle": "Cleo", "disconnected": "Dan"}
-    for state, nickname in dimmed_rows.items():
+    nickname_of_state = {"idle": "Cleo", "disconnected": "Dan"}
+    for state, nickname in nickname_of_state.items():
         found: list[dict[str, Any]] = []
         for measurement in measurements:
             is_nickname = measurement["testid"] == "roster-nickname"
@@ -2783,23 +2727,65 @@ def test_ac10_a_tap_on_a_key_keeps_the_focus_on_the_grid(
     expect_focus_on_grid(touch_page)
 
 
-@pytest.mark.parametrize("shift", [False, True], ids=["tab", "shift_tab"])
+KEY_TEST_IDS = ("key", "key-delete")
+
+
+def walk_the_tab_order(page: Page, key: str, presses: int) -> str | None:
+    """Press `key` up to `presses` times; fail as soon as the focus is on a key.
+
+    Args:
+        page: The touch page.
+        key: `Tab` or `Shift+Tab`.
+        presses: How many presses at most.
+
+    Returns:
+        `grid` or `body` when the walk stopped because the focus reached the grid
+        or `document.body`, or None when it made every press.
+    """
+    for _ in range(presses):
+        page.keyboard.press(key)
+        focused = page.evaluate(FOCUSED_KIND_SCRIPT)
+        assert focused is not None
+        assert focused["testId"] not in KEY_TEST_IDS, (key, focused)
+        if focused["testId"] == "grid":
+            return "grid"
+        if focused["isBody"]:
+            return "body"
+    return None
+
+
 def test_ac10_tab_never_lands_on_a_key(
-    touch_page: Page, live_server: str, fx01_grid: Grid, shift: bool
+    touch_page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(touch_page, live_server, fx01_grid)
+    expect(touch_page.get_by_test_id("keyboard")).to_be_visible()
     cell_at(touch_page, 1, 0).tap()
     expect_focus_on_grid(touch_page)
-    key = "Shift+Tab" if shift else "Tab"
 
     touch_page.keyboard.press("Escape")
-    for _ in range(MAX_TABS + 1):
-        touch_page.keyboard.press(key)
-        focused = touch_page.evaluate(FOCUSED_KIND_SCRIPT)
-        assert focused is not None
-        assert focused["testId"] not in ("key", "key-delete"), focused
-        if focused["testId"] == "grid" or focused["isBody"]:
-            break
+    walk_the_tab_order(touch_page, "Tab", MAX_TABS + 1)
+
+
+def test_ac10_shift_tab_from_after_the_keys_never_lands_on_a_key(
+    touch_page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(touch_page, live_server, fx01_grid)
+    expect(touch_page.get_by_test_id("keyboard")).to_be_visible()
+    cell_at(touch_page, 1, 0).tap()
+    expect_focus_on_grid(touch_page)
+    # The keys come after the grid in document order, so a backward walk from the
+    # grid never crosses them. The sentinel is the last child of `body`, after the
+    # keys: from there, Shift+Tab has to cross them to come back to the grid.
+    add_sentinel(touch_page)
+    touch_page.get_by_test_id(SENTINEL_TEST_ID).focus()
+    expect_focus_on_sentinel(touch_page)
+
+    stop = walk_the_tab_order(touch_page, "Shift+Tab", MAX_TABS)
+
+    assert stop == "grid", f"Shift+Tab from the sentinel stopped at {stop}"
+    # Then the spec's walk from the grid: Escape, Shift+Tab and up to 60 more.
+    touch_page.keyboard.press("Escape")
+    walk_the_tab_order(touch_page, "Shift+Tab", MAX_TABS + 1)
 
 
 def test_ac10_a_key_focused_with_focus_shows_the_visible_focus(
@@ -3208,6 +3194,123 @@ def test_ac11_a_small_cell_shows_two_initials_when_the_third_cursor_leaves(
     assert_label_layout(page, row, column)
 
 
+# A cell just above 20 px: the smallest cells of the two-slot tier, where the two
+# labels in diagonal corners, one above the other, have the least room. At 320 px
+# wide the FX-02 grid fits the window's height there, but each engine needs its own
+# height (today about 565 px in Chromium and 588 px in WebKit). So the test looks
+# for the lowest window height that makes the cell side more than 20 px.
+TWO_SLOT_TIER_PX = 20.0
+JUST_ABOVE_TIER_PX = 20.6
+SEARCH_WIDTH = 320
+LOWEST_SEARCH_HEIGHT = 520  # taller than the low layout of 500 px
+HIGHEST_SEARCH_HEIGHT = 900
+JUST_ABOVE_CASES = [(2, 2, 0), (3, 1, 2)]  # (cursors, initials shown, overflow k)
+# Resolves with the cell side once it has stood still for three animation frames:
+# after a resize, the page measures its viewport again and redraws the grid.
+SETTLED_SIDE_SCRIPT = """
+cell => new Promise(resolve => {
+  let previous = -1;
+  let stillFrames = 0;
+  let frames = 0;
+  const look = () => {
+    const side = cell.getBoundingClientRect().width;
+    stillFrames = side === previous ? stillFrames + 1 : 0;
+    previous = side;
+    frames += 1;
+    if (stillFrames >= 3 || frames >= 120) {
+      resolve(side);
+    } else {
+      requestAnimationFrame(look);
+    }
+  };
+  requestAnimationFrame(look);
+})
+"""
+
+
+def side_at_height(page: Page, cell: Cell, height: int) -> float:
+    """Resize the window to `height` and return the cell side once it settled.
+
+    Args:
+        page: The room page. Its window keeps the search width.
+        cell: Row and column of the cell to measure.
+        height: The new window height in CSS px.
+
+    Returns:
+        The width of the cell's bounding box.
+    """
+    page.set_viewport_size({"width": SEARCH_WIDTH, "height": height})
+    cell_at(page, cell[0], cell[1]).evaluate(SETTLED_SIDE_SCRIPT)
+    return cell_side(page, cell[0], cell[1])
+
+
+def lowest_height_above_the_tier(page: Page, cell: Cell) -> int:
+    """Return the lowest window height that makes the cell side more than 20 px.
+
+    A taller window never gives a smaller cell, so the search halves the range
+    between a height whose cell is 20 px or less and one whose cell is larger.
+
+    Args:
+        page: The room page.
+        cell: Row and column of the cell to measure.
+
+    Returns:
+        The window height in CSS px, at the search width.
+    """
+    low = LOWEST_SEARCH_HEIGHT
+    high = HIGHEST_SEARCH_HEIGHT
+    low_side = side_at_height(page, cell, low)
+    high_side = side_at_height(page, cell, high)
+    assert low_side <= TWO_SLOT_TIER_PX < high_side, (
+        f"the cell side is {low_side}px at {SEARCH_WIDTH}x{low} and {high_side}px"
+        f" at {SEARCH_WIDTH}x{high}: the layout changed, revisit this example"
+    )
+    while high - low > 1:
+        middle = (low + high) // 2
+        if side_at_height(page, cell, middle) > TWO_SLOT_TIER_PX:
+            high = middle
+        else:
+            low = middle
+    return high
+
+
+@pytest.mark.parametrize(
+    ("cursors", "shown", "hidden"),
+    JUST_ABOVE_CASES,
+    ids=["two_initials", "initials_and_overflow"],
+)
+def test_ac11_the_labels_do_not_overlap_on_a_cell_just_above_20_px(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx02_text: str,
+    cursors: int,
+    shown: int,
+    hidden: int,
+) -> None:
+    page = new_page(SEARCH_WIDTH, LOWEST_SEARCH_HEIGHT)
+    first_cell = fx02_letter_cells()[0]
+    fx02_grid = Grid.model_validate_json(fx02_text)
+    open_room(
+        page,
+        live_server,
+        fx02_grid,
+        players=cursors_on(first_cell, cursors),
+        cell_count=fx02_grid.width * fx02_grid.height,
+    )
+    height = lowest_height_above_the_tier(page, first_cell)
+    side = side_at_height(page, first_cell, height)
+    row, column = first_cell
+    assert TWO_SLOT_TIER_PX < side < JUST_ABOVE_TIER_PX, (
+        f"cell ({row}, {column}) side is {side}px at {SEARCH_WIDTH}x{height},"
+        f" expected above {TWO_SLOT_TIER_PX}px and below {JUST_ABOVE_TIER_PX}px:"
+        " the layout changed, revisit this example"
+    )
+
+    initials, overflow = expected_slots(shown, hidden, CORNER_ORDER[:2])
+    assert_slots(page, row, column, initials, overflow)
+    assert_label_layout(page, row, column)
+
+
 @pytest.mark.parametrize("cursors", [1, 2, 3, 7])
 def test_ac11_a_tiny_cell_has_one_slot(
     new_page: Callable[[int, int], Page],
@@ -3258,3 +3361,647 @@ def test_ac11_the_overflow_label_passes_the_language_and_contrast_scans(
     }
     assert unknown_texts(texts, data) == []
     assert contrast_offenders(page) == []
+
+
+# ---- AC-12: a list that scrolls with no control inside is a Tab stop -------------
+
+ROSTER_LIST_SELECTOR = '[data-testid="roster"] ul'
+LIST_SELECTORS = {"roster": ROSTER_LIST_SELECTOR, "feed": FEED_LIST_SELECTOR}
+LIST_FOLLOW_MS = 300  # the attribute follows every change within 300 ms
+POLL_MS = 25
+NO_CUT = {"top": 0, "right": 0, "bottom": 0, "left": 0}
+
+# One list of "Scrolling lists": whether it scrolls (the spec's terms), its
+# `tabindex` attribute, whether it has the focus, where it is scrolled to, how
+# many remove buttons it holds, and the measures behind "scrolls".
+LIST_STATE_SCRIPT = """
+selector => {
+  const list = document.querySelector(selector);
+  const style = getComputedStyle(list);
+  const canScroll = value => value === 'auto' || value === 'scroll';
+  const scrollsSideways = canScroll(style.overflowX)
+    && list.scrollWidth > list.clientWidth;
+  const scrollsDown = canScroll(style.overflowY)
+    && list.scrollHeight > list.clientHeight;
+  return {
+    scrolls: scrollsSideways || scrollsDown,
+    tabindex: list.getAttribute('tabindex'),
+    tabIndex: list.tabIndex,
+    focused: document.activeElement === list,
+    scrollTop: list.scrollTop,
+    scrollLeft: list.scrollLeft,
+    removeButtons: list.querySelectorAll('[data-testid="remove-player"]').length,
+    measures: {
+      overflowX: style.overflowX,
+      overflowY: style.overflowY,
+      scrollWidth: list.scrollWidth,
+      clientWidth: list.clientWidth,
+      scrollHeight: list.scrollHeight,
+      clientHeight: list.clientHeight,
+    },
+  };
+}
+"""
+
+# What has the focus: its test id, which list of AC-12 it is (or null), and the
+# player of the roster row that holds it (or null).
+FOCUS_STEP_SCRIPT = """
+() => {
+  const element = document.activeElement;
+  if (element === null) {
+    return {testId: null, list: null, playerId: null};
+  }
+  let list = null;
+  if (element === document.querySelector('[data-testid="roster"] ul')) {
+    list = 'roster';
+  } else if (element === document.querySelector('[data-testid="activity-feed"] ul')) {
+    list = 'feed';
+  }
+  const row = element.closest('[data-testid="roster-player"]');
+  return {
+    testId: element.getAttribute('data-testid'),
+    list: list,
+    playerId: row === null ? null : row.getAttribute('data-player-id'),
+  };
+}
+"""
+
+# Resolves once the list's scroll position has stood still for three animation
+# frames: an arrow key can start a smooth scroll that is still moving.
+SCROLL_SETTLED_SCRIPT = """
+selector => new Promise(resolve => {
+  const list = document.querySelector(selector);
+  let previous = '';
+  let stillFrames = 0;
+  let frames = 0;
+  const look = () => {
+    const current = list.scrollTop + ',' + list.scrollLeft;
+    stillFrames = current === previous ? stillFrames + 1 : 0;
+    previous = current;
+    frames += 1;
+    if (stillFrames >= 3 || frames >= 120) {
+      resolve(true);
+    } else {
+      requestAnimationFrame(look);
+    }
+  };
+  requestAnimationFrame(look);
+})
+"""
+
+IS_THE_ELEMENT_SCRIPT = (
+    "(element, selector) => element === document.querySelector(selector)"
+)
+
+
+class ListState(NamedTuple):
+    """One list of AC-12 as the page shows it now."""
+
+    scrolls: bool
+    tabindex: str | None  # the attribute
+    tab_index: int  # the `tabIndex` property
+    focused: bool
+    scroll_top: float
+    scroll_left: float
+    remove_buttons: int
+    measures: dict[str, Any]
+
+    @property
+    def distance_to_end(self) -> float:
+        """`scrollHeight - clientHeight - scrollTop`, as spec 013 defines it."""
+        scroll_height = self.measures["scrollHeight"]
+        client_height = self.measures["clientHeight"]
+        return scroll_height - client_height - self.scroll_top
+
+
+class FocusStep(NamedTuple):
+    """The element that had the focus after one press of a Tab walk."""
+
+    test_id: str | None
+    list_name: str | None
+    player_id: str | None
+
+
+def read_list_state(page: Page, list_name: str) -> ListState:
+    raw = page.evaluate(LIST_STATE_SCRIPT, LIST_SELECTORS[list_name])
+    return ListState(
+        scrolls=raw["scrolls"],
+        tabindex=raw["tabindex"],
+        tab_index=raw["tabIndex"],
+        focused=raw["focused"],
+        scroll_top=raw["scrollTop"],
+        scroll_left=raw["scrollLeft"],
+        remove_buttons=raw["removeButtons"],
+        measures=raw["measures"],
+    )
+
+
+def read_focus_step(page: Page) -> FocusStep:
+    raw = page.evaluate(FOCUS_STEP_SCRIPT)
+    return FocusStep(
+        test_id=raw["testId"], list_name=raw["list"], player_id=raw["playerId"]
+    )
+
+
+def assert_scrolls(state: ListState, list_name: str) -> None:
+    """Fail when a list that the setup must make scroll does not."""
+    assert state.scrolls, (
+        f"the {list_name} list does not scroll ({state.measures}): the setup no"
+        " longer shows what it should"
+    )
+
+
+def assert_does_not_scroll(state: ListState, list_name: str) -> None:
+    """Fail when a list that the setup must leave still scrolls."""
+    assert not state.scrolls, (
+        f"the {list_name} list scrolls ({state.measures}): the setup no longer"
+        " shows what it should"
+    )
+
+
+def has_tab_stop(state: ListState) -> bool:
+    return state.tabindex == "0"
+
+
+def has_no_tabindex(state: ListState) -> bool:
+    return state.tabindex is None
+
+
+def has_tabindex_minus_one(state: ListState) -> bool:
+    return state.tabindex == "-1"
+
+
+def tabindex_follows_scroll(state: ListState) -> bool:
+    """`tabindex="0"` while the list scrolls, no attribute while it does not."""
+    if state.scrolls:
+        return state.tabindex == "0"
+    return state.tabindex is None
+
+
+def wait_for_list(
+    page: Page, list_name: str, condition: Callable[[ListState], bool]
+) -> ListState:
+    """Fail unless the list meets `condition` within 300 ms; return its state."""
+    waited_ms = 0
+    state = read_list_state(page, list_name)
+    while not condition(state):
+        if waited_ms >= LIST_FOLLOW_MS:
+            pytest.fail(
+                f"the {list_name} list does not meet {condition.__name__} within"
+                f" {LIST_FOLLOW_MS} ms: {state}"
+            )
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
+        state = read_list_state(page, list_name)
+    return state
+
+
+def start_tab_walk(page: Page) -> None:
+    """Put the focus on `share-link`, where every Tab walk of AC-12 starts."""
+    share_link = page.get_by_test_id("share-link")
+    share_link.evaluate("element => element.focus()")
+    expect(share_link).to_be_focused()
+
+
+def tab_walk_to_the_grid(page: Page) -> list[FocusStep]:
+    """The Tab walk of the harness: from `share-link`, Tab until the grid.
+
+    Returns:
+        What had the focus after each press, the grid last.
+    """
+    start_tab_walk(page)
+    steps: list[FocusStep] = []
+    for _ in range(MAX_TABS):
+        page.keyboard.press("Tab")
+        step = read_focus_step(page)
+        steps.append(step)
+        if step.test_id == "grid":
+            return steps
+    pytest.fail(f"the Tab walk did not reach the grid in {MAX_TABS} presses: {steps}")
+
+
+def tab_walk_to_the_list(page: Page, list_name: str) -> None:
+    """The Tab walk of the harness, stopped as soon as the list has the focus."""
+    start_tab_walk(page)
+    steps: list[FocusStep] = []
+    for _ in range(MAX_TABS):
+        page.keyboard.press("Tab")
+        step = read_focus_step(page)
+        steps.append(step)
+        if step.list_name == list_name:
+            return
+        if step.test_id == "grid":
+            break
+    pytest.fail(f"the Tab walk never focused the {list_name} list: {steps}")
+
+
+def times_focused(steps: list[FocusStep], list_name: str) -> int:
+    count = 0
+    for step in steps:
+        if step.list_name == list_name:
+            count += 1
+    return count
+
+
+def s1_players() -> list[PlayerView]:
+    """S1: `p1` (`you`, not host), `p2` (host), `p3` (idle), `p4` (disconnected)."""
+    return [
+        player_view("p1", "Ana", 0),
+        player_view("p2", "Bob", 1, is_host=True),
+        player_view("p3", "Cleo", 2, state=PlayerState.IDLE),
+        player_view("p4", "Dan", 3, state=PlayerState.DISCONNECTED),
+    ]
+
+
+def open_s1(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
+    """State S1 of the harness: the room page of a guest, with an empty feed."""
+    mock = open_room(page, live_server, grid, players=s1_players(), seq=10)
+    expect(page.get_by_test_id("feed-item")).to_have_count(0)
+    expect(page.get_by_test_id("remove-player")).to_have_count(0)
+    expect(page.get_by_test_id("host-panel")).to_have_count(0)
+    return mock
+
+
+def open_s2(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
+    """State S2 of the harness: K2, then 40 more feed lines (`seq` 14 to 53)."""
+    mock = open_k2(page, live_server, grid)
+    fill_feed_and_check_it_scrolls(page, mock)
+    return mock
+
+
+SCROLL_STATES: dict[str, Callable[[Page, str, Grid], MockRoomSocket]] = {
+    "s1": open_s1,
+    "s2": open_s2,
+    "k2": open_k2,
+}
+
+
+def check_result_frame(seq: int) -> str:
+    """A `check_result` like K2's: by `p2` on the word `0,2,0`, empty lists."""
+    result = CheckResult(
+        seq=seq,
+        player_id="p2",
+        target=WordTarget(row=0, column=2, clue_index=0),
+        correct=(),
+        wrong=(),
+    )
+    return result.model_dump_json()
+
+
+def host_changed_frame(seq: int, player_id: str) -> str:
+    return HostChanged(seq=seq, player_id=player_id).model_dump_json()
+
+
+def resize_to(page: Page, width: int, height: int) -> None:
+    """Resize the window, then wait until the page reads the new width."""
+    page.set_viewport_size({"width": width, "height": height})
+    page.wait_for_function(
+        "width => window.innerWidth === width", arg=width, timeout=WAIT_TIMEOUT_MS
+    )
+
+
+def size_ids(cases: list[tuple[str, str, int, int]]) -> list[str]:
+    return [f"{state}-{name}-{width}x{height}" for state, name, width, height in cases]
+
+
+# (state, list, width, height): a list that scrolls with no control inside.
+SCROLLING_LIST_CASES = [
+    ("s2", "feed", 360, 740),
+    ("s2", "feed", 568, 320),
+    ("s2", "feed", 1280, 720),
+    ("s1", "roster", 568, 320),
+    ("s1", "roster", 320, 568),
+]
+SCROLLING_LIST_IDS = size_ids(SCROLLING_LIST_CASES)
+# In S1: a list that does not scroll.
+STILL_LIST_CASES = [
+    ("s1", "feed", 568, 320),
+    ("s1", "feed", 320, 568),
+    ("s1", "feed", 1280, 720),
+    ("s1", "roster", 1280, 720),
+]
+STILL_LIST_IDS = size_ids(STILL_LIST_CASES)
+SMALL_WINDOWS = [(568, 320), (320, 568)]
+NAME_CASES = [("s1", 568, 320), ("s1", 1280, 720), ("k2", 568, 320), ("k2", 1280, 720)]
+# (list, section, heading id, fr.json key, the name it gives).
+LIST_NAMES = [
+    ("roster", "roster", "roster-heading", "roster.heading", "Joueurs"),
+    ("feed", "activity-feed", "feed-heading", "feed.heading", "Activité"),
+]
+# The arrow keys of each list, in order: the key, the scroll position it changes
+# ("top" or "left") and the sign of the change.
+LIST_ARROWS = {
+    "feed": [("ArrowUp", "top", -1), ("ArrowDown", "top", 1)],
+    "roster": [("ArrowRight", "left", 1), ("ArrowLeft", "left", -1)],
+}
+
+
+@pytest.mark.parametrize(
+    ("state", "list_name", "width", "height"),
+    SCROLLING_LIST_CASES,
+    ids=SCROLLING_LIST_IDS,
+)
+def test_ac12_a_scrolling_list_with_no_control_inside_is_a_tab_stop(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    state: str,
+    list_name: str,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    SCROLL_STATES[state](page, live_server, fx01_grid)
+    page.wait_for_timeout(LIST_FOLLOW_MS)
+    shown = read_list_state(page, list_name)
+    assert_scrolls(shown, list_name)
+
+    steps = tab_walk_to_the_grid(page)
+
+    assert shown.tabindex == "0", shown
+    assert times_focused(steps, list_name) == 1, steps
+
+
+@pytest.mark.parametrize(
+    ("state", "list_name", "width", "height"), STILL_LIST_CASES, ids=STILL_LIST_IDS
+)
+def test_ac12_a_list_that_does_not_scroll_is_not_a_tab_stop(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    state: str,
+    list_name: str,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    SCROLL_STATES[state](page, live_server, fx01_grid)
+    page.wait_for_timeout(LIST_FOLLOW_MS)
+    shown = read_list_state(page, list_name)
+    assert_does_not_scroll(shown, list_name)
+
+    steps = tab_walk_to_the_grid(page)
+
+    assert shown.tabindex is None, shown
+    assert times_focused(steps, list_name) == 0, steps
+
+
+@pytest.mark.parametrize(("width", "height"), SMALL_WINDOWS, ids=["568x320", "320x568"])
+def test_ac12_the_hosts_roster_list_with_remove_buttons_is_not_a_tab_stop(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    open_k2(page, live_server, fx01_grid)
+    page.wait_for_timeout(LIST_FOLLOW_MS)
+    shown = read_list_state(page, "roster")
+    assert_scrolls(shown, "roster")
+
+    assert shown.remove_buttons == 4, shown
+    assert shown.tabindex == "-1", shown
+    assert shown.tab_index == -1, shown
+    steps = tab_walk_to_the_grid(page)
+    button_owners: list[str] = []
+    for step in steps:
+        if step.test_id == "remove-player" and step.player_id is not None:
+            button_owners.append(step.player_id)
+    assert sorted(button_owners) == ["p2", "p3", "p4", "p5"], steps
+    assert times_focused(steps, "roster") == 0, steps
+
+
+@pytest.mark.parametrize(
+    ("state", "width", "height"),
+    NAME_CASES,
+    ids=[f"{state}-{width}x{height}" for state, width, height in NAME_CASES],
+)
+def test_ac12_each_list_is_named_by_the_heading_of_its_section(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    state: str,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    SCROLL_STATES[state](page, live_server, fx01_grid)
+    fr_json = load_fr()
+
+    for list_name, section, heading_id, key, name in LIST_NAMES:
+        assert fr_json[key] == name
+        by_role = page.get_by_role("list", name=name, exact=True)
+        expect(by_role, name).to_have_count(1)
+        selector = LIST_SELECTORS[list_name]
+        assert by_role.evaluate(IS_THE_ELEMENT_SCRIPT, selector) is True, name
+        named_list = page.locator(selector)
+        expect(named_list).to_have_attribute("role", "list")
+        expect(named_list).to_have_attribute("aria-labelledby", heading_id)
+        heading = page.get_by_test_id(section).locator("h2")
+        expect(heading).to_have_attribute("id", heading_id)
+        expect(heading).to_have_text(fr_json[key])
+
+
+def press_and_expect_a_scroll(
+    page: Page, list_name: str, key: str, axis: str, sign: int
+) -> None:
+    """Press an arrow key; fail unless the focused list scrolls that way in 300 ms.
+
+    Args:
+        page: The room page, with the focus on the list.
+        list_name: `roster` or `feed`.
+        key: The arrow key to press.
+        axis: `top` for `scrollTop`, `left` for `scrollLeft`.
+        sign: 1 when the position must grow, -1 when it must shrink.
+    """
+    before = read_list_state(page, list_name)
+    page.keyboard.press(key)
+    waited_ms = 0
+    while True:
+        now = read_list_state(page, list_name)
+        assert now.focused, (key, now)
+        if axis == "top":
+            change = now.scroll_top - before.scroll_top
+        else:
+            change = now.scroll_left - before.scroll_left
+        if change * sign > 0:
+            break
+        if waited_ms >= LIST_FOLLOW_MS:
+            pytest.fail(
+                f"{key} did not scroll the {list_name} list within"
+                f" {LIST_FOLLOW_MS} ms: {before} then {now}"
+            )
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
+    page.evaluate(SCROLL_SETTLED_SCRIPT, LIST_SELECTORS[list_name])
+    assert read_list_state(page, list_name).focused, key
+
+
+@pytest.mark.parametrize(
+    ("state", "list_name", "width", "height"),
+    SCROLLING_LIST_CASES,
+    ids=SCROLLING_LIST_IDS,
+)
+def test_ac12_the_arrow_keys_scroll_the_focused_list(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    state: str,
+    list_name: str,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    SCROLL_STATES[state](page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, list_name), list_name)
+    tab_walk_to_the_list(page, list_name)
+
+    for key, axis, sign in LIST_ARROWS[list_name]:
+        press_and_expect_a_scroll(page, list_name, key, axis, sign)
+
+
+@pytest.mark.parametrize(
+    ("state", "list_name", "width", "height"),
+    SCROLLING_LIST_CASES,
+    ids=SCROLLING_LIST_IDS,
+)
+def test_ac12_a_focused_scrolling_list_shows_its_whole_focus_outline(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    state: str,
+    list_name: str,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    SCROLL_STATES[state](page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, list_name), list_name)
+    tab_walk_to_the_list(page, list_name)
+    page.wait_for_timeout(LIST_FOLLOW_MS)
+
+    outline = page.evaluate(FOCUS_OUTLINE_SCRIPT)
+    band = page.evaluate(FOCUS_BAND_SCRIPT)
+
+    assert outline["style"] not in ("none", "auto"), outline
+    assert outline["width"] >= MIN_OUTLINE_PX, outline
+    assert outline["ratio"] >= MIN_FOCUS_CONTRAST, outline
+    assert {side: round(px) for side, px in band["cut"].items()} == NO_CUT, band
+    assert band["coveredBy"] == {}, band
+
+
+def test_ac12_the_roster_list_tab_stop_follows_a_resize(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(568, 320)
+    open_s1(page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, "roster"), "roster")
+    wait_for_list(page, "roster", has_tab_stop)
+
+    resize_to(page, 1280, 720)
+    wait_for_list(page, "roster", has_no_tabindex)
+
+    resize_to(page, 568, 320)
+    wait_for_list(page, "roster", has_tab_stop)
+
+
+def test_ac12_the_feed_list_tab_stop_follows_new_lines(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(568, 320)
+    mock = open_s1(page, live_server, fx01_grid)
+    wait_for_list(page, "feed", has_no_tabindex)
+
+    for line_count, seq in enumerate((11, 12, 13), start=1):
+        mock.send(check_result_frame(seq))
+        expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
+        expect(page.get_by_test_id("feed-item")).to_have_count(line_count)
+        shown = wait_for_list(page, "feed", tabindex_follows_scroll)
+        if line_count >= 2:
+            assert_scrolls(shown, "feed")
+
+
+def test_ac12_the_roster_list_tab_stop_follows_the_host_role(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(568, 320)
+    mock = open_s1(page, live_server, fx01_grid)
+    remove_buttons = page.get_by_test_id("remove-player")
+
+    mock.send(host_changed_frame(11, "p1"))
+    expect(remove_buttons.first).to_be_visible()
+    assert_scrolls(read_list_state(page, "roster"), "roster")
+    wait_for_list(page, "roster", has_tabindex_minus_one)
+
+    mock.send(host_changed_frame(12, "p2"))
+    expect(remove_buttons).to_have_count(0)
+    assert_scrolls(read_list_state(page, "roster"), "roster")
+    wait_for_list(page, "roster", has_tab_stop)
+
+
+def test_ac12_a_focused_list_keeps_its_tab_stop_until_the_focus_leaves(
+    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
+) -> None:
+    page = new_page(568, 320)
+    mock = open_s1(page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, "roster"), "roster")
+    tab_walk_to_the_list(page, "roster")
+
+    mock.send(host_changed_frame(11, "p1"))
+    expect(page.get_by_test_id("remove-player").first).to_be_visible()
+    page.wait_for_timeout(LIST_FOLLOW_MS)
+    kept = read_list_state(page, "roster")
+    page.keyboard.press("Tab")
+    step = read_focus_step(page)
+
+    assert kept.focused, kept
+    assert kept.tabindex == "0", kept
+    assert (step.test_id, step.player_id) == ("remove-player", "p2"), step
+    wait_for_list(page, "roster", has_tabindex_minus_one)
+
+
+STILL_READ_MS = 100
+STILL_READ_LIMIT = 20  # 2 s of reads, 100 ms apart
+NEW_LINE_SEQ = 54
+FEED_ITEMS_AFTER_NEW_LINE = 44
+
+
+def wait_for_a_still_scroll_top(page: Page, list_name: str) -> ListState:
+    """Read the list every 100 ms until two reads in a row give one `scrollTop`."""
+    previous = read_list_state(page, list_name)
+    for _ in range(STILL_READ_LIMIT):
+        page.wait_for_timeout(STILL_READ_MS)
+        current = read_list_state(page, list_name)
+        if current.scroll_top == previous.scroll_top:
+            return current
+        previous = current
+    pytest.fail(f"the {list_name} list kept scrolling for 2 s: {previous}")
+
+
+@pytest.mark.parametrize(("width", "height"), FEED_SIZES)
+def test_ac12_a_new_line_leaves_the_focused_feed_list_where_the_keys_put_it(
+    new_page: Callable[[int, int], Page],
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page = new_page(width, height)
+    mock = open_s2(page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, "feed"), "feed")
+    tab_walk_to_the_list(page, "feed")
+    page.keyboard.press("ArrowUp")
+    before = wait_for_a_still_scroll_top(page, "feed")
+    assert before.distance_to_end > 1, f"ArrowUp left the list at its end: {before}"
+
+    mock.send(check_result_frame(NEW_LINE_SEQ))
+    expect(page.get_by_test_id("room-page")).to_have_attribute(
+        "data-seq", str(NEW_LINE_SEQ)
+    )
+    page.wait_for_timeout(LIST_FOLLOW_MS)
+    after = read_list_state(page, "feed")
+
+    expect(page.get_by_test_id("feed-item")).to_have_count(FEED_ITEMS_AFTER_NEW_LINE)
+    assert abs(after.scroll_top - before.scroll_top) <= EPSILON, (before, after)
+    assert after.focused, after

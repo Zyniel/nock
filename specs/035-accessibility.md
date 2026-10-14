@@ -26,6 +26,8 @@ No new Python name and no new protocol message. Client only (`web/src/`).
 ### Build order
 
 This spec is built after specs 023 and 026: its keyboard walk uses their controls.
+AC-12's "Reading older lines" check also needs spec 013 AC-7. (Note from the lead,
+2026-10-14: added with that check.)
 
 ### Grid roles (replaces spec 006's bare `role="grid"`)
 
@@ -97,14 +99,91 @@ focus stays on the grid. This spec adds the following:
   shows the visible focus of "Visible focus and non-colour signals" (AC-2's
   outline).
 
+### Scrolling lists (AC-12)
+
+(Note from the lead, 2026-10-14: added with AC-12. WebKit does not make a scroll
+container a Tab stop on its own, so in WebKit these lists could not be scrolled
+from the keyboard. Tested by AC-12.)
+
+Two lists of the room page can scroll with nothing focusable inside them:
+
+- The roster list: the `ul` element inside `roster` (`[data-testid="roster"] ul`,
+  spec 014 "Small windows"). On a small window it scrolls sideways.
+- The feed list: the `ul` element inside `activity-feed`
+  (`[data-testid="activity-feed"] ul`) that holds the `feed-item` elements. It
+  scrolls vertically, and on a small window it shows one line.
+
+Terms:
+
+- A list scrolls while its computed `overflow-x` is `auto` or `scroll` and its
+  `scrollWidth` is greater than its `clientWidth`, or while its computed
+  `overflow-y` is `auto` or `scroll` and its `scrollHeight` is greater than its
+  `clientHeight`.
+- A Tab stop is an element that `Tab` or `Shift+Tab` can move the focus to. A
+  list holds a focusable element while at least one element inside it is a Tab
+  stop. On the room page only the host's roster list can, through its
+  `remove-player` buttons (spec 014), while another player is in the room. The
+  feed list never does.
+
+Rules:
+
+- The `h2` of `roster` has `id="roster-heading"`, and the `h2` of `activity-feed`
+  has `id="feed-heading"`.
+- In every state, each list has `role="list"` and an `aria-labelledby` equal to
+  the `id` of the `h2` of its own section. So the roster list is named
+  `t("roster.heading")` (`Joueurs`) and the feed list `t("feed.heading")`
+  (`Activité`). No new `fr.json` key is needed. The explicit role is there because
+  WebKit does not expose a `ul` styled with `list-style: none` as a list.
+- While a list scrolls and holds no focusable element, it has `tabindex="0"`, so
+  it is a Tab stop in every engine.
+- While a list scrolls and holds a focusable element, it has `tabindex="-1"`, so
+  no engine makes it a Tab stop of its own. Only the host's roster list can be in
+  this state. Without the attribute, Firefox may make it a Tab stop by its own
+  rule while Chromium and WebKit do not, so `-1` gives the same Tab order in every
+  engine. (Note from the lead, 2026-10-14: added. In this state the list used to
+  have no `tabindex` attribute, and the page left Firefox's own Tab stop alone.)
+- While a list does not scroll, it has no `tabindex` attribute.
+- The three rules above give way to this one: a list that has the focus keeps its
+  `tabindex` attribute, with its value, until another element, a descendant
+  included, has the focus, even if meanwhile it stops scrolling, or comes to hold
+  or stops holding a focusable element. Then the three rules apply again. (Note
+  from the lead, 2026-10-14: "a list that has `tabindex="0"` and the
+  focus keeps `tabindex="0"`" became "a list that has the focus keeps its
+  `tabindex`", so that it also covers a list with `tabindex="-1"` that a click
+  focused. See "Pointer focus of the host's roster list" in "Edge cases and
+  errors".)
+- The attribute follows every change within 300 ms, whatever the cause: a resize
+  or a rotation, a change of the root font, a new feed line, a player who joins or
+  leaves, or the host role moving (which adds or removes the remove buttons). How
+  the page sets it (in the markup or from a script) is the implementer's choice.
+- The page does not handle keys on the lists. The arrow keys keep the browser's
+  own action, which scrolls the focused list.
+- A new feed line leaves the feed list where the keys put it, unless the list was
+  at its end (spec 013 AC-7, checked here in AC-12, "Reading older lines"). (Note
+  from the lead, 2026-10-14: added with spec 013 AC-7.)
+
+The other scroll containers of the room page are left as they are. `grid-viewport`
+(spec 006) always holds the `grid`, which is a Tab stop, and does not scroll at
+zoom 1. `host-panel` (spec 014) scrolls sideways on a small window and always holds
+its controls. Boxes cut with `overflow: hidden` (the share link, and on a small
+window the feed lines and the feed heading) cannot be scrolled by anyone. The page
+adds no Tab stop to these. It also does not take away a Tab stop that a browser
+adds by its own rule to one of them, as Firefox can to `host-panel` while it
+scrolls (decision 14). (Note from the lead, 2026-10-14: this sentence used to
+cover every scroll container that holds focusable elements, the host's roster
+list included. That list now has `tabindex="-1"` while it scrolls and holds a
+remove button.)
+
 ### Visible focus and non-colour signals
 
 - Every element that can take the keyboard focus (links, buttons, inputs,
-  selects, the `grid`) shows, while it has the focus after a keyboard move, an
-  outline whose computed `outline-style` is neither `none` nor `auto` and whose
-  computed `outline-width` is at least 2 px, with an `outline-color` of contrast at
-  least 3:1 against the page background. (A global `:focus-visible` rule is
-  enough; spec 006's `.grid:focus { outline: none; }` goes.)
+  selects, the `grid`, the scrolling lists of AC-12) shows, while it has the focus
+  after a keyboard move, an outline whose computed `outline-style` is neither
+  `none` nor `auto` and whose computed `outline-width` is at least 2 px, with an
+  `outline-color` of contrast at least 3:1 against the page background. (A global
+  `:focus-visible` rule is enough; spec 006's `.grid:focus { outline: none; }`
+  goes.) (Note from the lead, 2026-10-14: the scrolling lists of AC-12 were added
+  to the list of elements in brackets.)
 - The selected letter cell (spec 007) always has a computed `outline-style` of
   `solid` and an `outline-width` of at least 2 px, whether the grid has the focus
   or not; other letter cells have `outline-style` `none`.
@@ -337,24 +416,50 @@ AC-11.)
   `tests/fixtures/fx02.json` (spec 006). Label boxes are read with
   `locator.bounding_box()`. Two boxes are disjoint when the width or the height of
   their intersection is at most 1 px. (Note from the lead, 2026-10-13.)
+- Scroll states (AC-12), with the mocked socket, in a desktop context (that
+  viewport, no touch). (Note from the lead, 2026-10-14: added with AC-12.)
+  - S1 (not host): room page, FX-01 snapshot `seq` 10, `you` `p1` (`Ana`, not
+    host), players `p1`, `p2` (`Bob`, host), `p3` (`Cleo`, idle) and `p4` (`Dan`,
+    disconnected), with no selections. No event and no tap follow, so the feed is
+    empty, and no `remove-player` and no `host-panel` show.
+  - S2 (full feed): K2, then the 40 `check_result` events of "Focus outline of the
+    feed's scrolling list" (`seq` 14 to 53), so the feed holds 43 items. This is
+    the setup of that check.
+  - K2 itself is the host's state: its roster list holds four `remove-player`
+    buttons (for `p2` to `p5`).
+- Tab walk (AC-12): the test calls `focus()` on `share-link` from `page.evaluate`
+  (setup, allowed in a keyboard-only test). `share-link` is the first focusable
+  element of the room page in document order. Then the test presses `Tab` until
+  the `grid` has the focus, at most 60 times, and notes each element that had the
+  focus after a press. Both lists come between `share-link` and the grid in
+  document order, so the walk passes every Tab stop they make. A walk to a list
+  stops as soon as that list has the focus. (Note from the lead, 2026-10-14:
+  added with AC-12. Starting from a focused element makes the walk start at the
+  same place in every engine.)
 - Engines: Chromium and WebKit locally, Firefox too in CI. No check of this spec
   is Chromium-only. One check is skipped under Firefox: where the focus goes after
   `Escape` then `Tab` when nothing follows the grid (AC-3). (Note from the lead,
   2026-10-14: added after the first run on all three engines, Chromium 153,
   Firefox 155 and WebKit 26.6, as CI runs them.)
-  One check is skipped under WebKit: whether the focus outline of the scrolling
-  list in `activity-feed` is fully visible (AC-2), at all three of its window
-  sizes (360 by 740, 568 by 320 and 1280 by 720), because WebKit does not make
-  that list a Tab stop. (Note from the lead, 2026-10-14: added after a review
-  finding. The test already skipped this check under WebKit, but only the Firefox
-  skip was listed here.)
+  No check is skipped under WebKit. The check of the focus outline of the
+  scrolling list in `activity-feed` (AC-2) runs in all three engines, at all three
+  of its window sizes (360 by 740, 568 by 320 and 1280 by 720). (Note from the
+  lead, 2026-10-14: that check used to be skipped under WebKit, which does not
+  make the list a Tab stop on its own. AC-12 gives the list `tabindex="0"` while
+  it scrolls, so it is a Tab stop in WebKit too, and the skip is gone.)
+  AC-12 is checked whole in all three engines. (Note from the lead, 2026-10-14:
+  the check that the Tab walk never focuses the host's roster list in K2 used to
+  be skipped under Firefox, which can make a scroll container that holds
+  focusable elements a Tab stop by its own rule. The page now gives that list
+  `tabindex="-1"` while it scrolls and holds a remove button (decision 14), so
+  Firefox adds no Tab stop there, and the check runs in all three engines.)
 
 ## Acceptance criteria
 
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-10.1.1) (browser with live server, keyboard only) Every action is reachable from the keyboard. With `CAT` served: on `/`, `tab_to` `force-filter` `data-force="1"` then `Enter` makes it `aria-pressed="true"`; `tab_to` the `catalogue-play` of item 1 then `Enter` opens the room page, which reaches `data-status="joined"` (Ana, host). There: `tab_to` `grid` then `Tab` selects `0,0,0` on (1, 0); `T` then `A` fill (1, 0) and (1, 1); `ArrowDown` moves the selection; `Backspace` erases; `Control+z` sends `undo`; `Escape` then `Tab` leaves the grid: the focus moves to the sentinel of "Test harness", which the test adds once the room page is `joined`. `tab_to` `check-word` and `Enter` sends a `check`; the same for `check-letter`, `check-grid` and `undo-button`; `tab_to` `copy-link` and `share-link` focus them; `tab_to` `lock-room` then `Enter` makes it `aria-pressed="true"` and again unlocks; `tab_to` `help-mode-select`, `ArrowDown`, then `tab_to` `settings-save` and `Enter` sends `change_settings`. A second page (Bob) opens the room link and, keyboard only, `tab_to` `nickname-input`, types `Bob`, presses `Enter` and reaches `joined`; then on Ana's page `tab_to` the `remove-player` of Bob and `Enter` removes him (Bob's page reaches `data-status="removed"`). (Note from the lead, 2026-10-14: the sentinel was added so that leaving the grid shows in every engine, and each `tab_to` follows its new definition in "Test harness". The walk's steps and intent are unchanged.)
-- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white; this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to the sentinel (AC-1). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".) The scrolling list of `activity-feed`, a Tab stop in Chromium, shows its whole focus outline at three window sizes ("Focus outline of the feed's scrolling list" in "Edge cases and errors"). (Note from the lead, 2026-10-14: this sentence was added. The tests already ran that check, but the spec did not describe it.)
+- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white; this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to the sentinel (AC-1). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".) The scrolling list of `activity-feed`, a Tab stop in every engine while it scrolls (AC-12), shows its whole focus outline at three window sizes ("Focus outline of the feed's scrolling list" in "Edge cases and errors"). (Note from the lead, 2026-10-14: this sentence was added. The tests already ran that check, but the spec did not describe it.) (Note from the lead, 2026-10-14: "a Tab stop in Chromium" became "a Tab stop in every engine while it scrolls (AC-12)", so this check now runs in Chromium, Firefox and WebKit.)
 - **AC-3** (new, from spec 009 decision 5) (browser with mocked socket, keyboard only) A keyboard player can leave the grid. Given a FX-01 snapshot (`you` host, so the host panel shows) and the focus on the grid with (1, 0) selected, the following holds. (Note from the lead, 2026-10-14: split into the cases below, with the sentinel and the `Tab` listener of "Test harness", so that every check holds in Chromium, Firefox and WebKit. The old text required "`document.activeElement` is not the grid" even when nothing follows the grid, which Firefox under automation cannot show.)
   - Word navigation: `Tab` selects `0,0,1` and the focus stays on the grid (as spec 009).
   - Forward, with the sentinel: with the sentinel of "Test harness" added, `Escape` then `Tab` moves the focus to the first focusable element after the grid in document order, which is the sentinel while the page has none of its own after the grid. The selection is unchanged.
@@ -379,6 +484,16 @@ The words in brackets say how each criterion is tested.
   - FX-02, small cells: window 360 by 740, desktop context, FX-02 snapshot. The cell used is the first letter cell in row-major order, found from `tests/fixtures/fx02.json`. `p2` `Jean-Luc`, `p3` `Ana` and `p4` `Wanda Moreau` select that cell, joined in that order. Expected tier: `c` is at least 20 and below 44 (about 25 px). The cell shows `JL` at `top-left` and one `remote-overflow` reading `+2` at `bottom-right`, and its `remote-overflow-label` reads `2 autres joueurs`. After `selection_moved` of `p2` to another letter cell, the first cell shows `AN` at `top-left` and `WM` at `bottom-right`, with no `remote-overflow`. With `p2` to `p8` (7 cursors) on the first cell, it shows one `remote-initials` (`p2`'s) at `top-left` and `+6` at `bottom-right`.
   - FX-02, tiny cells: window 568 by 320, desktop context, same cell, with `p2` and `p3` on it. Expected tier: `c` is below 20. The cell holds no `remote-initials` and one `remote-overflow` with `data-corner="top-left"`, the text `+2` and `data-count="2"`. Only the slot and count rules are checked here, not the layout rules.
   - Language and contrast: in the FX-01 state with five cursors, the language scan of AC-9 accepts `+2` and `2 autres joueurs`, and the contrast scan of AC-8 finds no offending element.
+- **AC-12** (AC-10.1.1; new, from the WebKit skip of AC-2) (browser with mocked socket, keyboard only after the setup, in Chromium, Firefox and WebKit) A list that scrolls with no control inside can be scrolled from the keyboard in every engine. The two lists, "scrolls", "holds a focusable element" and the rules are those of "Scrolling lists". The states S1, S2 and K2 and the Tab walk are in "Test harness". Wherever this criterion says that a list scrolls, the test first checks it from the list's measures, and fails if it does not: the setup would no longer show what it should. (Note from the lead, 2026-10-14: added. WebKit does not make a scroll container a Tab stop on its own, so a keyboard-only player in WebKit could not scroll the feed list, or the roster list of a player who is not host on a small window.)
+  - Tab stop: in S2 at 360 by 740, 568 by 320 and 1280 by 720, the feed list scrolls, has `tabindex="0"`, and the Tab walk focuses it once. In S1 at 568 by 320 and 320 by 568, the roster list scrolls, has `tabindex="0"`, and the Tab walk focuses it once.
+  - Not a Tab stop, because it does not scroll: in S1 at 568 by 320, 320 by 568 and 1280 by 720, the feed list, which is empty, has no `tabindex` attribute, and the Tab walk never focuses it. At 1280 by 720 the same holds for the roster list, which wraps there instead of scrolling.
+  - Not a Tab stop, because it holds a focusable element: in K2 at 568 by 320 and 320 by 568, the roster list scrolls and holds four `remove-player` buttons. It has the attribute `tabindex="-1"` (its `tabIndex` property is `-1`). In all three engines, the Tab walk focuses each of the four buttons and never the list itself. (Note from the lead, 2026-10-14: "It has no `tabindex` attribute" became `tabindex="-1"`, and the Tab walk check, which used to skip Firefox, now runs in all three engines; decision 14.)
+  - Name: in S1 and in K2, at 568 by 320 and at 1280 by 720, `page.get_by_role("list", name="Joueurs", exact=True)` resolves to exactly the roster list, and `page.get_by_role("list", name="Activité", exact=True)` to exactly the feed list. Each list has `role="list"` and an `aria-labelledby` equal to the `id` of the `h2` of its section (`roster-heading` or `feed-heading`), and the text of that `h2` is `fr.json["roster.heading"]` or `fr.json["feed.heading"]`. Each list's accessible name thus comes from the `h2` of its section through `aria-labelledby`: `fr.json["roster.heading"]` is `Joueurs`, and `fr.json["feed.heading"]` is `Activité`. (Note from the lead, 2026-10-14: this sentence replaced "No `fr.json` key is added", which the tests do not check and could not observe. It states the rule they check: where each name comes from.)
+  - Arrow keys: once a Tab walk has stopped on the list (the feed list in S2 at its three window sizes, the roster list in S1 at its two), `ArrowUp` makes the feed list's `scrollTop` smaller within 300 ms, since the list starts at its newest item (spec 013), and `ArrowDown` then makes it larger again. `ArrowRight` makes the roster list's `scrollLeft` larger within 300 ms, since the list starts at its left end, and `ArrowLeft` then makes it smaller again. The list keeps the focus throughout.
+  - Visible focus: in the same cases, 300 ms after the walk stops on the list, its computed outline has a style other than `none` and `auto`, a width of at least 2 px, and a colour of contrast at least 3:1 against white (AC-2). The outline is also fully visible. For the feed list, that is AC-2's check ("Focus outline of the feed's scrolling list"), which now runs in every engine. For the roster list, the test runs the "Not clipped" and "Not covered" measures of that check on the roster list.
+  - Reading older lines: in S2 at 360 by 740, 568 by 320 and 1280 by 720, once a Tab walk has stopped on the feed list, the test presses `ArrowUp` once and waits until the list's `scrollTop` reads the same in two reads 100 ms apart. The list is then not at its end as spec 013 defines it: its `scrollHeight - clientHeight - scrollTop` is more than 1 (the test checks it, and fails otherwise). The mock sends one more `check_result` like K2's, with `seq` 54. 300 ms after `room-page` has `data-seq` 54, the feed holds 44 items, the list's `scrollTop` is within 1 px of its value before the event, and the list still has the focus (spec 013 AC-7). (Note from the lead, 2026-10-14: added with spec 013 AC-7. A new line used to bring the list back to its newest item, which took a keyboard reader's place away; decision 15.)
+  - Live changes, in S1 at 568 by 320. Each check passes if it holds within 300 ms of the moment the test sees the change. Resize: the roster list has `tabindex="0"`. After `page.set_viewport_size` to 1280 by 720 (once `window.innerWidth` reads 1280), it has no `tabindex` attribute, and back at 568 by 320 it has `tabindex="0"` again. New feed lines: the empty feed list has no `tabindex` attribute. The mock sends three `check_result` events like K2's (by `p2` on the word `0,2,0` with empty lists), with `seq` 11, 12 and 13, one at a time. Once `room-page` has each event's `data-seq`, the feed list has `tabindex="0"` if it scrolls and no `tabindex` attribute if it does not, and from the second event on it scrolls. Host role: the mock sends `host_changed` for `p1` (`seq` 11). Once a `remove-player` shows, the roster list scrolls and has `tabindex="-1"`. The mock then sends `host_changed` for `p2` (`seq` 12). Once no `remove-player` is left, the roster list scrolls and has `tabindex="0"`. (Note from the lead, 2026-10-14: "has no `tabindex` attribute" became "scrolls and has `tabindex="-1"`".)
+  - Focus kept: in S1 at 568 by 320, a Tab walk stops on the roster list. The mock sends `host_changed` for `p1` (`seq` 11). 300 ms after a `remove-player` shows, the roster list still has the focus and `tabindex="0"`. `Tab` then moves the focus to the `remove-player` of `p2`, and within 300 ms the roster list has `tabindex="-1"`. (Note from the lead, 2026-10-14: "has no `tabindex` attribute" became "has `tabindex="-1"`".)
 
 ## Edge cases and errors
 
@@ -484,8 +599,10 @@ Other cases:
   visible. The page's code scrolls only on a keyboard focus.)
 - Focus outline of the feed's scrolling list (AC-2): the list of `activity-feed`
   (spec 013) is the `ul` element in it that holds the `feed-item` elements, and it
-  is the element that scrolls. With the feed full enough to scroll, Chromium makes
-  that list a Tab stop. While the list has the focus, its outline must be fully
+  is the element that scrolls. With the feed full enough to scroll, that list is a
+  Tab stop in every engine (AC-12). (Note from the lead, 2026-10-14: "Chromium
+  makes that list a Tab stop" became "that list is a Tab stop in every engine
+  (AC-12)".) While the list has the focus, its outline must be fully
   visible: not clipped by the window or by an ancestor that clips its overflow,
   and not covered by another element, as the points below define them. (Note from
   the lead, 2026-10-14: added. The tests already ran this check, but the spec only
@@ -503,13 +620,17 @@ Other cases:
     does not use `tab_to`). After each press, if the grid has the focus, it presses
     `Escape`, which releases the grid's next `Tab` (AC-3). It stops as soon as the
     list has the focus, and measures 300 ms later.
-  - Engines: if the list never gets the focus in those 60 presses, the test fails
-    under Chromium. Under any other engine it skips the check at that window size,
-    because that engine does not make the list a Tab stop. WebKit is one
-    ("Engines" in "Test harness").
+  - Engines: if the list never gets the focus in those 60 presses, the test fails,
+    in Chromium, Firefox and WebKit alike: AC-12 makes the list a Tab stop in every
+    engine while it scrolls. (Note from the lead, 2026-10-14: the test used to
+    skip the check under an engine that does not make the list a Tab stop on its
+    own, such as WebKit. AC-12 removes that reason, so the skip is gone.)
   - Style and width: the list's computed `outline-style` is neither `none` nor
-    `auto`, and its `outline-width` is at least 2 px. This check does not measure
-    the outline's colour.
+    `auto`, and its `outline-width` is at least 2 px. This check also measures the
+    outline's colour: its computed `outline-color`, composited over white when it
+    is translucent, has a contrast of at least 3:1 against white, as in AC-2's
+    walk. (Note from the lead, 2026-10-14: this sentence used to say "This check
+    does not measure the outline's colour". The test now checks the contrast too.)
   - Not clipped: the outline's outer edge is the list's bounding box
     (`getBoundingClientRect()`) grown on each side by the computed `outline-offset`
     plus `outline-width`. A negative offset draws the outline inside the box. That
@@ -538,6 +659,65 @@ Other cases:
     Limits: `elementFromPoint` skips elements with `pointer-events: none`, so the
     check cannot see such a cover. A point outside the window finds no element;
     "Not clipped" covers that case.
+- Scroll threshold (AC-12): `scrollWidth`, `clientWidth`, `scrollHeight` and
+  `clientHeight` are whole numbers, so content that passes a list by less than
+  about 1 px can read as not scrolling. The list then counts as not scrolling. The
+  states of AC-12 are far from that threshold, except while the feed fills one
+  line at a time ("Live changes"), where the test compares the attribute with the
+  measures it reads. (Note from the lead, 2026-10-14.)
+- A change while a list has the focus (AC-12): the list keeps its `tabindex` until
+  the focus leaves it ("Scrolling lists"). If the attribute went at once when the
+  list stops scrolling, the browser would drop the keyboard focus to `body`, and
+  the player would lose their place. (Note from the lead, 2026-10-14. Changed the
+  same day: "keeps `tabindex="0"`" became "keeps its `tabindex`", for the
+  `tabindex="-1"` state.)
+- The host's roster list (AC-12): its `remove-player` buttons take the focus, and
+  the page scrolls each one whole into the list on a keyboard focus (spec 014
+  AC-9), so the list needs no Tab stop of its own. Firefox can make a scroll
+  container that holds focusable elements a Tab stop by its own rule, so while
+  the list scrolls and holds a remove button, the page sets `tabindex="-1"` on it.
+  No engine then stops on the list, and AC-12 checks the Tab walk there in all
+  three engines. `host-panel` can get the same Tab stop from Firefox, and the page
+  leaves it to the browser ("Out of scope"). (Note from the lead, 2026-10-14.
+  Changed the same day: the page used to leave Firefox's own Tab stop on the list,
+  and AC-12 checked the walk there only under Chromium and WebKit; decision 14.)
+- Pointer focus of the host's roster list (AC-12): `tabindex="-1"` keeps the list
+  out of the Tab order, but a click on the list, or a script, can still give it
+  the focus. An engine that does not focus a button on a click, as Safari on
+  macOS does not, can give the focus to the list when a `remove-player` is
+  clicked, because the list is the button's nearest focusable ancestor. The list
+  then keeps its `tabindex` until the focus leaves it ("Scrolling lists"), so the
+  focus does not drop to `body` when the list stops scrolling, for example after
+  that removal. AC-2's outline is only required after a keyboard move, so this
+  spec does not measure the outline of a list focused this way. (Note from the
+  lead, 2026-10-14: added with `tabindex="-1"`.)
+- Host alone (AC-12): with no other player, the host's roster list holds no
+  button, so it is a Tab stop while it scrolls, as a guest's is. (Note from the
+  lead, 2026-10-14.)
+- Cut heading (AC-12): in the low layout the feed heading can end with an ellipsis
+  or shrink to no width (spec 014 AC-10). The feed list is still named by the
+  heading's whole text, because `aria-labelledby` reads the text, not what is
+  shown. (Note from the lead, 2026-10-14.)
+- Other Tab order checks (AC-12 with AC-1 to AC-3, AC-10 and spec 014). (Note from
+  the lead, 2026-10-14: checked when AC-12 was added. None of them changes.)
+  - Both lists come before the grid in document order. So "Nothing focusable after
+    the grid" still holds, and the sentinel stays the first focusable element after
+    the grid.
+  - In the AC-1 walk, the feed list becomes a Tab stop once the feed scrolls, as it
+    already was in Chromium and Firefox. Before Bob joins, Ana's roster list holds
+    no button, so it would be one too if it scrolled. `tab_to` presses on past such
+    a Tab stop, and AC-2 measures only the elements that `tab_to` reaches.
+  - In AC-3 the host panel follows both lists, so `settings-save` stays the last
+    focusable element before the grid, whatever the lists do.
+  - AC-10's keys come after the grid and keep `tabindex="-1"`.
+  - Spec 014 AC-9's focus walk runs as host, at windows where the roster list
+    scrolls: the list has `tabindex="-1"`, so no engine stops on it, and the feed
+    list comes after it, so no Tab stop falls between the remove buttons. (Note
+    from the lead, 2026-10-14: "the roster list gets no `tabindex`" became "the
+    list has `tabindex="-1"`".)
+    Spec 014 AC-7 to AC-10 measure boxes, which `tabindex`, `role` and
+    `aria-labelledby` do not change, and spec 013 AC-6's layout does not change
+    either.
 
 ## Out of scope
 
@@ -564,6 +744,19 @@ Other cases:
 - Cancelling or undoing a scroll that the browser makes by itself when a form
   control gets the focus, such as WebKit scrolling a clicked `<select>` into view
   (AC-2). (Note from the lead, 2026-10-14.)
+- Taking away a Tab stop that a browser adds by its own rule to `host-panel`, or to
+  another scroll container that holds focusable elements, as Firefox can (AC-12).
+  The host's roster list is the one exception: the page sets `tabindex="-1"` on it
+  while it scrolls and holds a remove button ("Scrolling lists"). (Note from the
+  lead, 2026-10-14. Changed the same day: the host's roster list left this line
+  when the page took its Tab stop away.)
+- (Note from the lead, 2026-10-14: "Keeping the feed list where the player
+  scrolled it" left this list. Spec 013 AC-7 now keeps the feed list where the
+  player scrolled it unless it was at its end, and AC-12 checks it after the arrow
+  keys moved the list; decision 15.)
+- Showing the whole text of boxes cut with `overflow: hidden` (the share link, and
+  on a small window the feed lines and the feed heading). They clip and do not
+  scroll, so AC-12 does not apply to them. (Note from the lead, 2026-10-14.)
 
 ## Work packages
 
@@ -650,6 +843,54 @@ decisions:
     latter. A spy on the page's scroll calls still catches the bug the check
     guards against (the page's focus scroll moving a partly visible control away
     from under the pointer), and the fade rule does not change.
+
+Added on 2026-10-14, with AC-12. The human delegated accessibility choices to the
+lead ("choose best accessibility option"), and this is the lead's decision:
+
+14. Keyboard access to the scrolling lists (AC-12, WCAG 2.1.1). A region that
+    scrolls with nothing focusable inside can be scrolled from the keyboard only if
+    it takes the focus itself. Chromium and Firefox make it a Tab stop on their
+    own, and WebKit does not. So in WebKit a keyboard-only player could not scroll
+    the feed list, or the roster list of a player who is not host on a small
+    window, and AC-2's feed outline check was skipped there. Options: leave it to
+    each engine; give both lists `tabindex="0"` at all times; or give a list
+    `tabindex="0"` only while it scrolls and holds no focusable element. Pick: the
+    last. It is the rule that Chromium applies by itself, now set by the page so
+    that it holds in every engine. A list that does not scroll has nothing to
+    scroll, and the host's roster list has its remove buttons, which take the
+    focus and which the page scrolls into view. A Tab stop on either would only
+    make the Tab order longer (WCAG 2.4.3). A list that does not scroll gets no
+    `tabindex`. The host's roster list, while it scrolls, can still get a Tab stop
+    from Firefox, which adds one by its own rule to a scroll container that holds
+    focusable elements. Options: leave that Tab stop to the browser, as decision
+    13 leaves the browser's own scroll alone; or set `tabindex="-1"` on the list.
+    Pick: `tabindex="-1"`, so the Tab order is the same in every engine and AC-12
+    checks the Tab walk in all three. `host-panel` stays as the browser makes it.
+    (Note from the lead, 2026-10-14: the lead took the `tabindex="-1"` option,
+    offered when AC-12 was added, in place of leaving Firefox's Tab stop on the
+    host's roster list. The Firefox-only exception of AC-12 is gone, and "keeps its
+    Tab stop" below became "keeps its `tabindex`", so that it covers both values.)
+    Each list is named by its heading through `aria-labelledby`, so no `fr.json`
+    key is added. It also gets `role="list"`, because WebKit does not expose a `ul`
+    with `list-style: none` as a list. A focused list keeps its `tabindex` until the
+    focus leaves it, so a live change never drops the keyboard focus. The attribute
+    follows changes within 300 ms, the time this spec waits before its focus
+    measurements and the time of spec 013's live outlines. AC-2's feed outline
+    check now runs in WebKit too.
+
+Added on 2026-10-14, with spec 013 AC-7. The human allowed agents to refine
+approved and done specs, and this is the lead's decision:
+
+15. Reading older lines in the feed list (AC-12, spec 013 AC-7). A new feed line
+    used to bring the feed list back to its newest item, also after a keyboard
+    player had moved it up with the arrow keys to read older lines, and "Out of
+    scope" said so. Spec 013 AC-7 now leaves the list where the player put it,
+    unless it was at its end within 1 px. AC-12 checks the keyboard case: after
+    `ArrowUp` on the focused list, a new line leaves its `scrollTop` and the focus
+    as they were. The check is here, not in spec 013, because it needs the list to
+    be a Tab stop in WebKit, which AC-12 gives. Spec 013 checks the same rule with
+    a script, which stands for the mouse wheel and touch. The "Out of scope" line
+    is gone.
 
 ## Open questions
 

@@ -25,6 +25,11 @@ Choices where the spec leaves room (AC-8 to AC-10, small windows):
 
 - AC-10 runs with one long line in the feed (a `settings_changed` event on top of
   the AC-9 setup): with an empty feed there is no line to cut inside the feed's box.
+- AC-10 "cut or end with an ellipsis": each element child of the feed (its heading
+  and its line) either holds its content within its width (`scrollWidth` at most
+  `clientWidth`, 1 px tolerance) or clips the rest (computed `overflow-x` other
+  than `visible`), with or without an ellipsis. So its text never paints outside
+  its own box, which lies inside the feed's box.
 - AC-10 "the rules apply again" (live) is one scenario of mine: a resize to
   300x480, then root fonts of 20, 24, 12 and 16 px, then a resize back. After each
   step every AC-10 rule must hold within 1 s.
@@ -42,7 +47,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import NamedTuple, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import pytest
 from fastapi.testclient import TestClient
@@ -2949,6 +2954,8 @@ def test_ac3_browser_host_changed_takes_the_controls_away_from_the_old_host(
     room = joined_mock_room(page, live_server, fx01_grid, three_players("p1"), you="p1")
     expect(page.get_by_test_id("host-panel")).to_be_visible()
     expect(page.get_by_test_id("remove-player")).to_have_count(2)
+    page_errors: list[str] = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
 
     room.connections[0].send(host_frame(6, "p2"))
 
@@ -2956,6 +2963,8 @@ def test_ac3_browser_host_changed_takes_the_controls_away_from_the_old_host(
     expect(roster_item(page, "p1")).to_have_attribute("data-host", "false")
     expect(page.get_by_test_id("host-panel")).to_have_count(0)
     expect(page.get_by_test_id("remove-player")).to_have_count(0)
+    settle(page)
+    assert page_errors == []
 
 
 # ---- AC-4: browser -----------------------------------------------------------
@@ -3981,67 +3990,24 @@ def test_ac9_browser_the_buttons_switch_live_when_the_window_is_resized(
     wait_for_the_buttons_to_read(page, full_text)
 
 
-# The colour helpers and the focus outline, as in spec 035's harness (the same
-# text as tests/test_spec_035_accessibility.py: parseColour, over, contrast).
-COLOUR_HELPERS = r"""
-const canvas = document.createElement('canvas');
-canvas.width = 1;
-canvas.height = 1;
-const drawing = canvas.getContext('2d', { willReadFrequently: true });
-function parseColour(text) {
-  const match = text.match(/^rgba?\(([^)]*)\)$/);
-  if (match) {
-    const parts = match[1].split(/[\s,\/]+/).filter(part => part !== '');
-    let alpha = 1;
-    if (parts.length > 3) {
-      alpha = parts[3].endsWith('%') ? parseFloat(parts[3]) / 100 : Number(parts[3]);
-    }
-    return [Number(parts[0]), Number(parts[1]), Number(parts[2]), alpha];
-  }
-  drawing.clearRect(0, 0, 1, 1);
-  drawing.fillStyle = '#000000';
-  drawing.fillStyle = text;
-  drawing.fillRect(0, 0, 1, 1);
-  const data = drawing.getImageData(0, 0, 1, 1).data;
-  return [data[0], data[1], data[2], data[3] / 255];
-}
-function over(top, bottom) {
-  const alpha = top[3];
-  return [
-    top[0] * alpha + bottom[0] * (1 - alpha),
-    top[1] * alpha + bottom[1] * (1 - alpha),
-    top[2] * alpha + bottom[2] * (1 - alpha),
-    1,
-  ];
-}
-function channel(value) {
-  const scaled = value / 255;
-  if (scaled <= 0.03928) {
-    return scaled / 12.92;
-  }
-  return Math.pow((scaled + 0.055) / 1.055, 2.4);
-}
-function luminance(colour) {
-  return 0.2126 * channel(colour[0]) + 0.7152 * channel(colour[1])
-    + 0.0722 * channel(colour[2]);
-}
-function contrast(first, second) {
-  const lighter = Math.max(luminance(first), luminance(second));
-  const darker = Math.min(luminance(first), luminance(second));
-  return (lighter + 0.05) / (darker + 0.05);
-}
-const WHITE = [255, 255, 255, 1];
-"""
-FOCUS_OUTLINE_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
-  const element = document.activeElement;
-  const style = getComputedStyle(element);
-  const colour = over(parseColour(style.outlineColor), WHITE);
-  return {
-    style: style.outlineStyle,
-    width: parseFloat(style.outlineWidth),
-    ratio: contrast(colour, WHITE),
-  };
-}"""
+# The colour helpers, the contrast scan and the focus outline reader of spec 035's
+# "Test harness" are in tests/colour_contrast.js, which the spec 035 tests read
+# too, so that both files always measure the same way. That file only declares
+# them; each script below wraps it in a function for `page.evaluate` that returns
+# one measurement.
+COLOUR_CONTRAST_JS = (Path(__file__).parent / "colour_contrast.js").read_text(
+    encoding="utf-8"
+)
+# The outline of the focused element: style, width (px) and ratio (against white).
+FOCUS_OUTLINE_SCRIPT = (
+    "() => {\n" + COLOUR_CONTRAST_JS + "\nreturn readFocusOutline();\n}"
+)
+# Each measurement: text, ratio and removeFor (the player id of the roster row when
+# the element is inside a remove button, else None), with tag, testid, rowState
+# and opacity.
+CONTRAST_SCAN_SCRIPT = (
+    "() => {\n" + COLOUR_CONTRAST_JS + "\nreturn scanTextContrast();\n}"
+)
 FOCUSED_REMOVE_SCRIPT = """
 () => {
   const active = document.activeElement;
@@ -4125,64 +4091,6 @@ def test_ac9_browser_a_focused_compact_button_keeps_its_outline_and_stays_whole(
     assert problems == []
 
 
-# The contrast scan of spec 035's harness, as in tests/test_spec_035_accessibility.py
-# (the same measure of every text element). Each measurement also says which remove
-# button holds the element, so that the test can read the buttons only.
-CONTRAST_SCAN_SCRIPT = "() => {" + COLOUR_HELPERS + r"""
-  const skippedTags = new Set(
-    ['SCRIPT', 'STYLE', 'NOSCRIPT', 'OPTION', 'TITLE', 'HEAD']
-  );
-  const measurements = [];
-  for (const element of document.body.querySelectorAll('*')) {
-    if (skippedTags.has(element.tagName)) {
-      continue;
-    }
-    let ownText = '';
-    for (const node of element.childNodes) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        ownText += node.textContent;
-      }
-    }
-    ownText = ownText.trim();
-    if (ownText === '') {
-      continue;
-    }
-    const style = getComputedStyle(element);
-    const box = element.getBoundingClientRect();
-    if (box.width === 0 || box.height === 0 || style.visibility !== 'visible') {
-      continue;
-    }
-    if (element.closest('.visually-hidden') || element.closest(':disabled')) {
-      continue;
-    }
-    let opacity = 1;
-    let background = null;
-    for (let node = element; node; node = node.parentElement) {
-      const nodeStyle = getComputedStyle(node);
-      opacity *= parseFloat(nodeStyle.opacity);
-      if (background === null) {
-        const candidate = parseColour(nodeStyle.backgroundColor);
-        if (candidate[3] > 0) {
-          background = candidate;
-        }
-      }
-    }
-    const opaqueBackground = background === null ? WHITE : over(background, WHITE);
-    const text = parseColour(style.color);
-    text[3] = text[3] * opacity;
-    const shown = over(text, opaqueBackground);
-    const ratio = contrast(shown, opaqueBackground);
-    const button = element.closest('[data-testid="remove-player"]');
-    const row = element.closest('[data-testid="roster-player"]');
-    measurements.push({
-      text: ownText,
-      ratio: ratio,
-      removeFor: button === null || row === null
-        ? null : row.getAttribute('data-player-id'),
-    });
-  }
-  return measurements;
-}"""
 # The language scan of spec 035's harness, on the remove buttons and what they hold:
 # each visible direct text node (trimmed) and each aria-label, title, placeholder
 # and alt value.
@@ -4306,7 +4214,13 @@ LOW_LAYOUT_SCRIPT = """
   const childrenOf = (parent) => {
     const children = [];
     for (const child of parent.children) {
-      children.push({tag: child.tagName, box: boxOf(child)});
+      children.push({
+        tag: child.tagName,
+        box: boxOf(child),
+        scrollWidth: child.scrollWidth,
+        clientWidth: child.clientWidth,
+        overflowX: getComputedStyle(child).overflowX,
+      });
     }
     return children;
   };
@@ -4354,6 +4268,21 @@ class Box(NamedTuple):
         return self.right - self.left
 
 
+class Child(NamedTuple):
+    """An element child of `roster` or `activity-feed`, as AC-10 measures it.
+
+    `scroll_width` is the width of its content, text included, and `client_width`
+    the width inside its box; both are whole CSS px. `overflow_x` is its computed
+    `overflow-x`: anything but `visible` clips what does not fit in the box.
+    """
+
+    tag: str
+    box: Box
+    scroll_width: int
+    client_width: int
+    overflow_x: str
+
+
 class LowLayout(NamedTuple):
     """What AC-10 measures in the low layout, read in one go."""
 
@@ -4365,20 +4294,32 @@ class LowLayout(NamedTuple):
     panel: Box
     list_width: float
     button_widths: list[int]
-    roster_children: list[tuple[str, Box]]
-    feed_children: list[tuple[str, Box]]
+    roster_children: list[Child]
+    feed_children: list[Child]
     panel_hidden_right: float
+
+
+# Any: the JSON that `page.evaluate` returns, which Playwright types as Any.
+def children_of(raw_children: list[dict[str, Any]]) -> list[Child]:
+    """Turn the children that LOW_LAYOUT_SCRIPT read into `Child` values."""
+    children: list[Child] = []
+    for raw in raw_children:
+        child = Child(
+            tag=raw["tag"],
+            box=Box(*raw["box"]),
+            scroll_width=raw["scrollWidth"],
+            client_width=raw["clientWidth"],
+            overflow_x=raw["overflowX"],
+        )
+        children.append(child)
+    return children
 
 
 def read_low_layout(page: Page) -> LowLayout:
     """Measure the three boxes and what they hold, all at the same moment."""
     raw = page.evaluate(LOW_LAYOUT_SCRIPT)
-    roster_children: list[tuple[str, Box]] = []
-    for child in raw["rosterChildren"]:
-        roster_children.append((child["tag"], Box(*child["box"])))
-    feed_children: list[tuple[str, Box]] = []
-    for child in raw["feedChildren"]:
-        feed_children.append((child["tag"], Box(*child["box"])))
+    roster_children = children_of(raw["rosterChildren"])
+    feed_children = children_of(raw["feedChildren"])
     layout = LowLayout(
         inner_width=raw["innerWidth"],
         inner_height=raw["innerHeight"],
@@ -4452,9 +4393,24 @@ def assert_content_inside_its_box(layout: LowLayout) -> None:
         ("activity-feed", layout.feed, layout.feed_children),
     )
     for name, parent, children in parents:
-        for tag, child in children:
-            assert child.left >= parent.left - EPSILON, (name, tag, layout)
-            assert child.right <= parent.right + EPSILON, (name, tag, layout)
+        for child in children:
+            assert child.box.left >= parent.left - EPSILON, (name, child.tag, layout)
+            assert child.box.right <= parent.right + EPSILON, (name, child.tag, layout)
+
+
+def assert_feed_text_is_cut_inside_its_boxes(layout: LowLayout) -> None:
+    """The feed's heading and line never paint their text outside their own box.
+
+    Each element child of the feed either holds its content within its width, or
+    clips what does not fit (computed `overflow-x` other than `visible`): the
+    text is then cut at the edge of its box, with or without an ellipsis. A
+    heading that shrinks below its text and lets it overflow would paint it over
+    the feed's line or over the host panel.
+    """
+    for child in layout.feed_children:
+        fits = child.scroll_width <= child.client_width + EPSILON
+        is_cut = child.overflow_x != "visible"
+        assert fits or is_cut, ("activity-feed", child, layout)
 
 
 def assert_page_fits(layout: LowLayout) -> None:
@@ -4508,8 +4464,10 @@ def test_ac10_browser_the_roster_and_the_feed_keep_their_content_inside_their_bo
     low_layout: OpenLowLayout, window: Window, context_kind: str
 ) -> None:
     page = low_layout(window, touch=context_kind == "touch")
+    layout = read_low_layout(page)
 
-    assert_content_inside_its_box(read_low_layout(page))
+    assert_content_inside_its_box(layout)
+    assert_feed_text_is_cut_inside_its_boxes(layout)
 
 
 @pytest.mark.parametrize("context_kind", ["desktop", "touch"])
@@ -4530,6 +4488,7 @@ def check_the_low_layout(page: Page) -> None:
     assert_host_panel_share(layout)
     assert_fade_visible(page, layout)
     assert_content_inside_its_box(layout)
+    assert_feed_text_is_cut_inside_its_boxes(layout)
     assert_page_fits(layout)
 
 
