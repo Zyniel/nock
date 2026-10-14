@@ -116,14 +116,23 @@ TestClient socket of the same `with TestClient(app) as client` block, each keepi
 its own copy of the grid: the snapshot's `grid`, then every `letter_changed`
 applied in `seq` order (setting `letter`, `pencil` and `author`). Random choices
 use `random.Random(15)`. The registries of AC-1 and AC-3 use
-`RoomConfig(max_edits_per_second=1000, max_inbound_pending=1000)` so that spec
-037's throttle (built later) does not refuse the test's edits (spec 011 harness)
-and spec 036's inbound cap does not close the test's sockets. (Note from the lead,
+`RoomConfig(max_edits_per_second=1000, max_inbound_pending=1000,
+max_outbound_messages=5000)` so that spec 037's throttle (built later) does not
+refuse the test's edits (spec 011 harness), spec 036's inbound cap does not close
+the test's sockets and spec 036's outbound bound does not close the socket of a
+client whose reader falls behind. (Note from the lead,
 2026-10-14: `max_inbound_pending=1000` added. Spec 036 AC-6 closes with 1008
 (`FLOOD_CLOSE_CODE`) a connection with more than `max_inbound_pending` unapplied
 inputs, 100 by default, and AC-3's clients send their 250 edits with no pause,
 faster than the room applies them. 1000 is above any connection's burst here
 (250 edits). The default stays at 100: real players never queue that many inputs.)
+(Note from the lead, 2026-10-14: `max_outbound_messages=5000` added. Spec 036
+closes with 4507 (`STALLED_CLOSE_CODE`) a connection that already has
+`max_outbound_messages` messages waiting, 1,000 by default, and in AC-3 each client
+receives about 1,000 `letter_changed` (one per edit of the four clients), so a
+client whose reader thread falls behind by that much on a busy machine is closed
+as stalled and the test flakes. 5,000 is about five times what any client of AC-1
+(about 200 messages) or AC-3 (about 1,000) receives. The default stays at 1,000.)
 
 ## Acceptance criteria
 
