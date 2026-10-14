@@ -208,7 +208,14 @@ New `fr.json` keys:
   registry nor the store (as a crash would not), and drops them; process two is a
   new `RoomStore(path)`, a new registry and a new app. Both run in the test process.
 - Mid-game join (AC-2): two writer threads keep sending edits
-  (`RoomConfig(max_edits_per_second=1000)`) while a third client joins.
+  (`RoomConfig(max_edits_per_second=1000, max_inbound_pending=1000)`, so that
+  spec 036's inbound cap does not close the test's sockets) while a third client
+  joins. (Note from the lead, 2026-10-14: `max_inbound_pending=1000` added.
+  Spec 036 AC-6 closes with 1008 (`FLOOD_CLOSE_CODE`) a connection with more
+  than `max_inbound_pending` unapplied inputs, 100 by default, and the writers
+  send their 200 edits each faster than the room applies them. 1000 is above
+  any connection's burst here (200 edits). The default stays at 100: real
+  players never queue that many inputs.)
 
 ## Acceptance criteria
 
