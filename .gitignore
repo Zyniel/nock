@@ -13,6 +13,7 @@ build/
 # Claude Code: personal, per-machine files
 .claude/settings.local.json
 .claude/agent-memory-local/
+.claude/worktrees/
 CLAUDE.local.md
 
 # Editors and IDEs
