@@ -1,12 +1,12 @@
 ---
 id: "022"
 title: Chat and reactions
-status: draft
+status: approved
 ---
 
 # 022 - Chat and reactions
 
-(Note from the lead, 2026-10-14: back to draft for the human's re-approval after the Phase 6 refine)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
 Epic E5 Collaboration aids (US-5.4) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms

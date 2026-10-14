@@ -1,12 +1,12 @@
 ---
 id: "029"
 title: Game history
-status: draft
+status: approved
 ---
 
 # 029 - Game history
 
-(Note from the lead, 2026-10-14: back to draft for the human's re-approval after the Phase 6 refine)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
 Epic E7 Completion and recap (US-7.3) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid is in `specs/_reference.md`. The catalogue page and
