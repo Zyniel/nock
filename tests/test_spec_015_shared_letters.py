@@ -119,7 +119,11 @@ def dist_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def registry() -> Iterator[RoomRegistry]:
     """A registry whose throttle never refuses and that never times a socket out."""
-    config = RoomConfig(max_edits_per_second=1000, silence_timeout_seconds=600)
+    config = RoomConfig(
+        max_edits_per_second=1000,
+        max_inbound_pending=1000,
+        silence_timeout_seconds=600,
+    )
     room_registry = RoomRegistry(config=config)
     yield room_registry
     room_registry.close()

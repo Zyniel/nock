@@ -46,8 +46,6 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import ValidationError
 from starlette.testclient import WebSocketTestSession
 
-import nock.server
-from nock.catalogue import Catalogue
 from nock.grid import Arrow, ClueCell, Grid, LetterCell
 from nock.hub import RoomConnection, RoomRegistry
 from nock.protocol import (
@@ -71,7 +69,7 @@ from nock.protocol import (
     parse_server_message,
 )
 from nock.room import LogEntry, RoomConfig, RoomState
-from nock.server import WEB_DIST_DIR, create_app
+from nock.server import WEB_DIST_DIR
 from nock.store import RoomStore
 
 # ---- Values of the spec ---------------------------------------------------------
@@ -1486,39 +1484,7 @@ def expect_reconnection_after_close(
     expect(room).to_have_attribute("data-status", "joined")
 
 
-# ---- Live server with the production limits (AC-7) --------------------------------
-
-
-@contextlib.contextmanager
-def production_live_server(
-    registry: RoomRegistry, catalogue: Catalogue
-) -> Generator[str]:
-    """Run the app like conftest's `live_server`, but built with `server_config`.
-
-    Yields the base URL. Fails (not skips) when the client is not built.
-    """
-    if not (WEB_DIST_DIR / "index.html").is_file():
-        pytest.fail(MISSING_BUILD_MESSAGE)
-    app = create_app(rooms=registry, dist_dir=WEB_DIST_DIR, catalogue=catalogue)
-    server = uvicorn.Server(nock.server.server_config(app, log_level="warning"))
-    listening_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    listening_socket.bind(("127.0.0.1", 0))
-    port = listening_socket.getsockname()[1]
-    thread = threading.Thread(
-        target=server.run, kwargs={"sockets": [listening_socket]}, daemon=True
-    )
-    thread.start()
-    try:
-        deadline = time.monotonic() + SERVER_START_SECONDS
-        while not server.started and time.monotonic() < deadline:
-            time.sleep(POLL_SECONDS)
-        if not server.started:
-            pytest.fail("the live server built with server_config did not start")
-        yield f"http://127.0.0.1:{port}"
-    finally:
-        server.should_exit = True
-        thread.join(timeout=SERVER_START_SECONDS)
-        listening_socket.close()
+# ---- Frames at the socket (AC-7) ---------------------------------------------------
 
 
 def socket_url(base_url: str, code: str) -> str:

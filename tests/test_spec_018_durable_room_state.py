@@ -125,7 +125,9 @@ PlayerSummary = tuple[
     str, str, str, int, bool, bool, PlayerState, int, UndoEntry | None
 ]
 
-SERVER_CONFIG = RoomConfig(max_edits_per_second=1000, silence_timeout_seconds=600)
+SERVER_CONFIG = RoomConfig(
+    max_edits_per_second=1000, max_inbound_pending=1000, silence_timeout_seconds=600
+)
 SNAPSHOT_CONFIG = RoomConfig(
     max_edits_per_second=1000, silence_timeout_seconds=600, snapshot_every=100
 )

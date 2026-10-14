@@ -18,6 +18,14 @@ if TYPE_CHECKING:
     from nock.catalogue import Catalogue
     from nock.server import RoomRegistry
 
+# The harness modules hold helpers with plain `assert`s. pytest rewrites the asserts
+# of test files and conftests only, so these modules are registered here: the call
+# has to come before the first test module imports them. A name with no module
+# behind it is harmless.
+pytest.register_assert_rewrite(
+    "spec013_harness", "spec014_harness", "spec035_harness", "spec036_harness"
+)
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
@@ -117,10 +125,11 @@ def live_server(room_registry: RoomRegistry, catalogue: Catalogue) -> Iterator[s
     """Run the real app on a free local port and yield its base URL.
 
     The app serves the real web/dist, `room_registry` and `catalogue`, so a test
-    can register rooms after the server started. The test fails (it is not
-    skipped) when the client has not been built.
+    can register rooms after the server started. The server is built with
+    `nock.server.server_config` (spec 036), so it has the production limits. The
+    test fails (it is not skipped) when the client has not been built.
     """
-    from nock.server import WEB_DIST_DIR, create_app
+    from nock.server import WEB_DIST_DIR, create_app, server_config
 
     if not (WEB_DIST_DIR / "index.html").is_file():
         pytest.fail(MISSING_BUILD_MESSAGE)
@@ -128,7 +137,7 @@ def live_server(room_registry: RoomRegistry, catalogue: Catalogue) -> Iterator[s
     app = create_app(rooms=room_registry, dist_dir=WEB_DIST_DIR, catalogue=catalogue)
     listening_socket = _bind_free_port()
     port = listening_socket.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
+    server = uvicorn.Server(server_config(app, log_level="warning"))
     thread = threading.Thread(
         target=server.run, kwargs={"sockets": [listening_socket]}, daemon=True
     )

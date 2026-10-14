@@ -7,11 +7,9 @@ The shared setup is in `spec036_harness`.
 
 Notes:
 
-- conftest's `live_server` moves to `server_config` in a commit after the
-  implementer's (spec decision 9), so it is not changed here: AC-7's live
-  checks start their own server with `server_config` (`production_live_server`),
-  and the other browser tests use conftest's `live_server`, whose frame limit
-  they never come near.
+- conftest's `live_server` is built with `server_config` (spec decision 9, in a
+  commit after the implementer's), so AC-7's live checks use it. They would
+  fail if it went back to uvicorn's default `ws_max_size`.
 """
 
 from __future__ import annotations
@@ -23,7 +21,6 @@ import uvicorn
 from playwright.sync_api import Page
 
 import nock.server
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -43,7 +40,6 @@ from spec036_harness import (
     TOO_BIG_CODE,
     UVICORN_DEFAULT_OPTIONS,
     padded_frame,
-    production_live_server,
     socket_url,
 )
 
@@ -110,8 +106,8 @@ def test_ac7_server_config_leaves_every_other_option_at_uvicorns_default(
 @pytest.mark.parametrize("binary", [False, True], ids=["text", "binary"])
 def test_ac7_a_frame_over_8192_bytes_closes_the_socket_with_1009(
     page: Page,
+    live_server: str,
     room_registry: RoomRegistry,
-    catalogue: Catalogue,
     fx01_grid: Grid,
     size: int,
     binary: bool,
@@ -119,15 +115,14 @@ def test_ac7_a_frame_over_8192_bytes_closes_the_socket_with_1009(
     code = room_registry.register_room(fx01_grid)
     frame = padded_frame(size)
     assert len(frame.encode("utf-8")) == size
-    with production_live_server(room_registry, catalogue) as base_url:
-        page.goto(f"{base_url}/")
-        arguments = {
-            "url": socket_url(base_url, code),
-            "frame": frame,
-            "binary": binary,
-        }
+    page.goto(f"{live_server}/")
+    arguments = {
+        "url": socket_url(live_server, code),
+        "frame": frame,
+        "binary": binary,
+    }
 
-        result = page.evaluate(OVERSIZED_FRAME_SCRIPT, arguments)
+    result = page.evaluate(OVERSIZED_FRAME_SCRIPT, arguments)
 
     assert result["opened"] is True
     assert result["closeCode"] == TOO_BIG_CODE
@@ -138,8 +133,8 @@ def test_ac7_a_frame_over_8192_bytes_closes_the_socket_with_1009(
 @pytest.mark.parametrize("binary", [False, True], ids=["text", "binary"])
 def test_ac7_a_frame_of_4097_to_8192_bytes_gets_invalid_message_and_stays_open(
     page: Page,
+    live_server: str,
     room_registry: RoomRegistry,
-    catalogue: Catalogue,
     fx01_grid: Grid,
     size: int,
     binary: bool,
@@ -148,16 +143,15 @@ def test_ac7_a_frame_of_4097_to_8192_bytes_gets_invalid_message_and_stays_open(
     frame = padded_frame(size)
     assert len(frame.encode("utf-8")) == size
     join = Join(nickname="Ana", resume_token=None).model_dump_json()
-    with production_live_server(room_registry, catalogue) as base_url:
-        page.goto(f"{base_url}/")
-        arguments = {
-            "url": socket_url(base_url, code),
-            "join": join,
-            "frame": frame,
-            "binary": binary,
-        }
+    page.goto(f"{live_server}/")
+    arguments = {
+        "url": socket_url(live_server, code),
+        "join": join,
+        "frame": frame,
+        "binary": binary,
+    }
 
-        result = page.evaluate(ANSWERED_FRAME_SCRIPT, arguments)
+    result = page.evaluate(ANSWERED_FRAME_SCRIPT, arguments)
 
     received: list[ServerMessage] = []
     for text in result["received"]:
