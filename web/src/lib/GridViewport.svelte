@@ -18,6 +18,7 @@
   import { positionKey, wordKey } from './wordSelection'
   import type { Position, Selection, Word } from './wordSelection'
   import type { RemoteSelection } from './remoteSelections'
+  import type { ClueFlagMarker } from './clueFlags'
 
   interface Finger {
     clientX: number
@@ -40,6 +41,7 @@
     remoteSelections,
     isAuthorsViewOn,
     playerColours,
+    clueFlags,
   }: {
     grid: GridView
     words: Word[]
@@ -60,6 +62,9 @@
     isAuthorsViewOn: boolean
     // The colour index of each player now in the room, by player id.
     playerColours: Map<string, number>
+    // The marker of each flagged clue, by clue key "row,column,clue_index"
+    // (spec 021). A clue nobody flagged has no entry.
+    clueFlags: Map<string, ClueFlagMarker>
   } = $props()
 
   // The step between two outlines on one cell, and the most the stack may take
@@ -296,6 +301,19 @@
     isReleased = false
   }
 
+  // The browser's Tab or Shift+Tab that leaves the grid starts from the grid.
+  // WebKit starts it from the node last clicked, a cell or a clue inside the
+  // grid, so Shift+Tab found the grid itself and the focus stayed there (spec
+  // 021 AC-10 selects a word with a tap first). Focusing the grid anew makes
+  // the grid the starting point in every engine.
+  function startTabNavigationFromGrid(): void {
+    if (gridElement === undefined) {
+      return
+    }
+    gridElement.blur()
+    gridElement.focus({ preventScroll: true })
+  }
+
   // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
     if (isModifierKey(event.key)) {
@@ -310,6 +328,7 @@
     }
     const isPlainTab = event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey
     if (isPlainTab && wasReleased) {
+      startTabNavigationFromGrid()
       return
     }
     const isUndo =
@@ -578,6 +597,7 @@
               style:grid-column={cell.column + 1}
             >
               {#each cell.clues as clue, index (index)}
+                {@const flagMarker = clueFlags.get(`${cell.row},${cell.column},${index}`)}
                 {#if index === 1}
                   <div class="separator" data-testid="clue-separator"></div>
                 {/if}
@@ -587,6 +607,7 @@
                   data-clue-index={index}
                   data-arrow={clue.arrow}
                   data-active={String(activeKey === `${cell.row},${cell.column},${index}`)}
+                  data-flagged={String(flagMarker !== undefined)}
                   class:active={activeKey === `${cell.row},${cell.column},${index}`}
                 >
                   <span class="clue-text" data-testid="clue-text">{clue.text}</span>
@@ -598,6 +619,20 @@
                     aria-hidden="true"
                     style:--along={arrowPosition(cell.clues, index)}
                   ></span>
+                  {#if flagMarker !== undefined}
+                    <!-- Over the top left corner of the clue: it takes no room
+                         from the clue text (spec 021). -->
+                    <span
+                      class="clue-flag"
+                      class:second={index === 1}
+                      data-testid="clue-flag"
+                      data-flagged-by={flagMarker.flaggedBy}
+                      aria-hidden="true">{t('flag.marker')}</span
+                    >
+                    <span class="visually-hidden" data-testid="clue-flag-label"
+                      >{t('flag.marker_label', { names: flagMarker.names })}</span
+                    >
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -936,6 +971,24 @@
 
   .two .clue-text {
     font-size: calc(var(--cell) * 0.09);
+  }
+
+  /* The flag marker of spec 021, laid over the top left corner of its clue: the
+     clue cell's corner for the first clue, just under the separator for the
+     second one. Positioned against the clue cell, like the arrows, so it adds no
+     layout; a tap on it is a tap on its clue. Dark red keeps 4.5:1 on the cell
+     and on the selected clue. */
+  .clue-flag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: max(7px, calc(var(--cell) * 0.15));
+    line-height: 1;
+    color: #a4161a;
+  }
+
+  .clue-flag.second {
+    top: calc(var(--cell) * 0.46);
   }
 
   .separator {

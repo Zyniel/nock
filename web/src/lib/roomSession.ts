@@ -123,6 +123,19 @@ export interface VoteView {
 // How a vote ended (spec 025).
 type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
 
+// A word, named by its clue: the clue cell and the clue's index in it.
+export interface ClueRefView {
+  row: number
+  column: number
+  clue_index: number
+}
+
+// A clue flagged by a player (spec 021).
+export interface FlagView {
+  player_id: string
+  clue: ClueRefView
+}
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
@@ -137,6 +150,8 @@ export interface Snapshot {
   solved: boolean
   // From the snapshot's open_vote, then from vote_opened and vote_closed.
   open_vote: VoteView | null
+  // The flags of the room, one per flagging player (spec 021).
+  flags: FlagView[]
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -503,6 +518,58 @@ function applyVoteClosed(session: RoomSession, snapshot: Snapshot, event: RoomEv
   session.closedVote = { vote_id, outcome: outcome as VoteOutcome }
 }
 
+// Returns null when the value is not a clue reference of three integers.
+function toClueRef(value: unknown): ClueRefView | null {
+  const clue = value as Record<string, unknown> | null | undefined
+  if (typeof clue !== 'object' || clue === null) {
+    return null
+  }
+  const { row, column, clue_index } = clue
+  if (!Number.isInteger(row) || !Number.isInteger(column) || !Number.isInteger(clue_index)) {
+    return null
+  }
+  return { row: row as number, column: column as number, clue_index: clue_index as number }
+}
+
+// The flags of a snapshot. An entry that is not an object with a string
+// player_id and a clue of three integers is skipped.
+function toFlags(value: unknown): FlagView[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const flags: FlagView[] = []
+  for (const item of value) {
+    const entry = item as Record<string, unknown> | null
+    if (typeof entry !== 'object' || entry === null || typeof entry.player_id !== 'string') {
+      continue
+    }
+    const clue = toClueRef(entry.clue)
+    if (clue !== null) {
+      flags.push({ player_id: entry.player_id, clue })
+    }
+  }
+  return flags
+}
+
+// A flag_changed sets the player's flag, replacing their previous one; with
+// `clue: null` it removes it (spec 021).
+function applyFlagChanged(snapshot: Snapshot, event: RoomEvent): void {
+  const { player_id, clue } = event.message
+  if (typeof player_id !== 'string') {
+    return
+  }
+  const others = snapshot.flags.filter((flag) => flag.player_id !== player_id)
+  if (clue === null) {
+    snapshot.flags = others
+    return
+  }
+  const newClue = toClueRef(clue)
+  if (newClue !== null) {
+    others.push({ player_id, clue: newClue })
+    snapshot.flags = others
+  }
+}
+
 function toPlayers(value: unknown): PlayerView[] | null {
   if (!Array.isArray(value)) {
     return null
@@ -545,6 +612,7 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     reveal_budget: toRevealBudget(message.reveal_budget),
     solved: message.solved === true,
     open_vote: toVoteView(message.open_vote),
+    flags: toFlags(message.flags),
   }
 }
 
@@ -568,7 +636,9 @@ function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
   }
   const playerId = message.player_id
   if (event.type === 'player_left') {
+    // The player leaves with their flag (spec 021).
     snapshot.players = snapshot.players.filter((player) => player.player_id !== playerId)
+    snapshot.flags = snapshot.flags.filter((flag) => flag.player_id !== playerId)
     return
   }
   if (event.type === 'host_changed') {
@@ -757,6 +827,9 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   }
   if (event.type === 'vote_closed' && session.snapshot !== null) {
     applyVoteClosed(session, session.snapshot, event)
+  }
+  if (event.type === 'flag_changed' && session.snapshot !== null) {
+    applyFlagChanged(session.snapshot, event)
   }
   if (event.type === 'grid_solved') {
     session.solved = true

@@ -123,5 +123,9 @@
   "vote.cast": "Vote enregistré.",
   "vote.result.passed": "Vote accepté.",
   "vote.result.rejected": "Vote refusé.",
-  "vote.result.timed_out": "Temps écoulé, vote annulé."
+  "vote.result.timed_out": "Temps écoulé, vote annulé.",
+  "flag.button": "Je bloque",
+  "flag.button_label": "Je bloque sur ce mot",
+  "flag.marker": "⚑",
+  "flag.marker_label": "Bloqué : {names}"
 }

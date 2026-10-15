@@ -25,6 +25,7 @@ from nock.protocol import (
     CheckResult,
     CheckTarget,
     ClientMessage,
+    ClueRef,
     Colour,
     ConfirmPencil,
     Coordinate,
@@ -32,7 +33,9 @@ from nock.protocol import (
     Erase,
     ErrorCode,
     ErrorMessage,
+    Flag,
     FlagChanged,
+    FlagView,
     GridFullWrong,
     GridSolved,
     GridTarget,
@@ -190,6 +193,7 @@ class PlayerRecord(RoomModel):
     # spec 037 AC-3: times of the edits accepted in the last second
     recent_edits: tuple[float, ...] = ()
     last_edit: UndoEntry | None = None  # spec 018 AC-3
+    flag: ClueRef | None = None  # spec 021: the clue this player flagged
 
 
 class OpenVote(RoomModel):
@@ -403,7 +407,7 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 players=player_views(state),
                 settings=state.settings,
                 reveal_budget=state.reveal_budget,
-                flags=(),
+                flags=_flag_views(state),
                 chat=(),
                 open_vote=open_vote,
                 timer_elapsed_ms=0,
@@ -411,6 +415,15 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 solved=state.solved,
             )
     raise KeyError(player_id)
+
+
+def _flag_views(state: RoomState) -> tuple[FlagView, ...]:
+    """Return one view per player who holds a flag, in players order (spec 021)."""
+    views: list[FlagView] = []
+    for player in state.players:
+        if player.flag is not None:
+            views.append(FlagView(player_id=player.player_id, clue=player.flag))
+    return tuple(views)
 
 
 def join_room(
@@ -709,10 +722,12 @@ def handle_message(
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
     `select_cell`, edits (`edit_letter`, `erase`, `pencil_edit`,
     `confirm_pencil`), `undo` and the host actions (`remove_player`,
-    `lock_room`, `change_settings`, `mute_player`), `check`, `reveal` and `vote`
-    (input, not rate-limited) have their rules here. Before a `check`, a
-    `reveal` or a `vote`, an open vote whose time is over closes, with its entry
-    after the wake-up entry (spec 025). Until the spec that gives another
+    `lock_room`, `change_settings`, `mute_player`), `check`, `reveal`, `vote`
+    and `flag` (input, not rate-limited) have their rules here. Before a
+    `check`, a `reveal` or a `vote`, an open vote whose time is over closes,
+    with its entry after the wake-up entry (spec 025). A step that changes a
+    letter or a lock clears every flag whose word is now full (spec 021),
+    before the completion entry of spec 026. Until the spec that gives another
     message its meaning is built, the message is read and ignored: nothing is
     sent.
     """
@@ -754,9 +769,13 @@ def _apply_message(
     now: float,
     config: RoomConfig,
 ) -> Outcome:
-    """Run the rule of one message, then the completion rule (spec 026)."""
+    """Run the rule of one message, the flag clearing (spec 021), then completion.
+
+    The completion rule is spec 026's; its entry comes after the clearing ones.
+    """
     outcome = _run_message(state, player_id, message, now, config)
-    return _with_completion(state, outcome, now)
+    cleared = _with_full_flags_cleared(outcome, now)
+    return _with_completion(state, cleared, now)
 
 
 def _run_message(
@@ -781,7 +800,96 @@ def _run_message(
         return _select_cell(state, player_id, message)
     if isinstance(message, RemovePlayer | LockRoom | ChangeSettings | MutePlayer):
         return _host_action(state, player_id, message, now)
+    if isinstance(message, Flag):
+        return _flag(state, player_id, message.clue, now)
     return Outcome(state=state)
+
+
+def _flag(
+    state: RoomState, player_id: str, clue: ClueRef | None, now: float
+) -> Outcome:
+    """Set or remove the sender's flag; the first case that applies decides.
+
+    Removing a flag one does not hold, or flagging the clue one already flagged,
+    changes nothing. A clue that names no word, or whose word is full, is refused
+    with invalid_target. Otherwise one flag_changed is numbered (spec 021).
+    """
+    player = _find_player(state, player_id)
+    if player is None:
+        return Outcome(state=state)
+    if clue is None:
+        if player.flag is None:
+            return Outcome(state=state)
+        return _announce_flag(state, player_id, None, now)
+    word_cells = _word_cells_of_clue(state, clue)
+    if word_cells is None:
+        return _refuse(state, ErrorCode.INVALID_TARGET, "That clue names no word.")
+    if _is_word_full(word_cells):
+        return _refuse(state, ErrorCode.INVALID_TARGET, "That word is already full.")
+    if clue == player.flag:
+        return Outcome(state=state)
+    return _announce_flag(state, player_id, clue, now)
+
+
+def _announce_flag(
+    state: RoomState, player_id: str, clue: ClueRef | None, now: float
+) -> Outcome:
+    """Number one flag_changed for a player and apply it."""
+    event = FlagChanged(seq=state.seq + 1, player_id=player_id, clue=clue)
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=replay(state, entry), entries=(entry,))
+
+
+def _word_cells_of_clue(state: RoomState, clue: ClueRef) -> list[CellState] | None:
+    """Return the cells of the word a clue names, or None when it names none."""
+    try:
+        positions = state.grid.word_cells(clue.row, clue.column, clue.clue_index)
+    except (IndexError, ValueError):
+        return None
+    cells: list[CellState] = []
+    for row, column in positions:
+        cell = _find_cell(state, row, column)
+        if cell is not None:
+            cells.append(cell)
+    return cells
+
+
+def _is_word_full(cells: list[CellState]) -> bool:
+    """Tell whether every cell of a word holds a letter, a pencil letter included."""
+    return all(_is_filled(cell) for cell in cells)
+
+
+def _changes_cells(outcome: Outcome) -> bool:
+    """Tell whether a step's entries hold a letter_changed or a cell_locked."""
+    for entry in outcome.entries:
+        if isinstance(entry.event, LetterChanged | CellLocked):
+            return True
+    return False
+
+
+def _with_full_flags_cleared(outcome: Outcome, now: float) -> Outcome:
+    """Clear, in players order, every flag whose word a step made full (spec 021).
+
+    Only a step that changed a letter or a lock can fill a word. Each cleared
+    flag gets one flag_changed with no clue, numbered after the step's entries.
+    """
+    if not _changes_cells(outcome):
+        return outcome
+    new_state = outcome.state
+    entries = list(outcome.entries)
+    for player in outcome.state.players:
+        if player.flag is None:
+            continue
+        word_cells = _word_cells_of_clue(new_state, player.flag)
+        if word_cells is None or not _is_word_full(word_cells):
+            continue
+        cleared = FlagChanged(
+            seq=new_state.seq + 1, player_id=player.player_id, clue=None
+        )
+        entry = LogEntry(at=now, event=cleared)
+        new_state = replay(new_state, entry)
+        entries.append(entry)
+    return outcome.model_copy(update={"state": new_state, "entries": tuple(entries)})
 
 
 def _host_action(
@@ -1019,11 +1127,7 @@ def _with_completion(before: RoomState, outcome: Outcome, now: float) -> Outcome
     """
     if before.solved or not outcome.entries:
         return outcome
-    changes_cells = False
-    for entry in outcome.entries:
-        if isinstance(entry.event, LetterChanged | CellLocked):
-            changes_cells = True
-    if not changes_cells:
+    if not _changes_cells(outcome):
         return outcome
 
     next_seq = outcome.entries[-1].event.seq + 1
@@ -1806,6 +1910,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_vote_opened(state, entry, event)
     elif isinstance(event, VoteClosed):
         replayed = state.model_copy(update={"open_vote": None})
+    elif isinstance(event, FlagChanged):
+        replayed = _replay_flag_changed(state, event)
     else:
         replayed = state
     return replayed.model_copy(update={"seq": event.seq})
@@ -1956,6 +2062,14 @@ def _replay_host_changed(state: RoomState, event: HostChanged) -> RoomState:
         is_host = player.player_id == event.player_id
         players.append(player.model_copy(update={"is_host": is_host}))
     return state.model_copy(update={"players": tuple(players)})
+
+
+def _replay_flag_changed(state: RoomState, event: FlagChanged) -> RoomState:
+    """Set or clear a player's flag; nothing when the player is not in the room."""
+    player = _find_player(state, event.player_id)
+    if player is None:
+        return state
+    return _replace_player(state, player.model_copy(update={"flag": event.clue}))
 
 
 def _replay_player_muted(state: RoomState, event: PlayerMuted) -> RoomState:

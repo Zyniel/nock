@@ -4,6 +4,7 @@
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
+  import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
   import { remoteSelectionsOf } from './remoteSelections'
@@ -850,6 +851,52 @@
     })
   }
 
+  // ---- The clue flag (spec 021) ----
+
+  // The kept flags, and what the marker of each flagged clue shows.
+  let keptFlags = $derived(session.snapshot === null ? [] : session.snapshot.flags)
+  let clueFlags = $derived(clueFlagMarkers(keptFlags, session.snapshot?.players ?? []))
+  // My kept flag: the flag whose player_id is `you`.
+  let myFlag = $derived(session.snapshot === null ? null : flagOf(keptFlags, session.snapshot.you))
+  // Pressed while my flag is on the selected word's clue.
+  let isFlagPressed = $derived(
+    activeWord !== null && myFlag !== null && isClueOfWord(myFlag, activeWord),
+  )
+  let isFlagDisabled = $derived(
+    activeWord === null || (isWordFullShown(activeWord) && !isFlagPressed),
+  )
+
+  // True when every cell of the word shows a letter, pending edits included.
+  function isWordFullShown(word: Word): boolean {
+    for (const position of word.cells) {
+      const cell = letterCellAt(position.row, position.column)
+      if (cell === null || shownCell(cell, session.pendingEdits).letter === null) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Flag the selected word's clue, or remove my flag from it. The page makes no
+  // guess: the button and the marker follow the server's flag_changed.
+  function onFlag(): void {
+    if (isFlagDisabled || activeWord === null) {
+      return
+    }
+    if (isFlagPressed) {
+      send({ type: 'flag', clue: null })
+      return
+    }
+    send({
+      type: 'flag',
+      clue: {
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      },
+    })
+  }
+
   // ---- Votes (spec 025) ----
 
   let openVote = $derived(session.snapshot === null ? null : session.snapshot.open_vote)
@@ -1295,6 +1342,15 @@
         {/if}
         <button
           type="button"
+          class="flag-button"
+          data-testid="flag-button"
+          aria-label={t('flag.button_label')}
+          aria-pressed={isFlagPressed}
+          disabled={isFlagDisabled}
+          onclick={onFlag}>{t('flag.button')}</button
+        >
+        <button
+          type="button"
           class="authors-switch"
           data-testid="authors-switch"
           aria-pressed={isAuthorsViewOn}
@@ -1521,6 +1577,7 @@
         {remoteSelections}
         {isAuthorsViewOn}
         {playerColours}
+        {clueFlags}
       />
     </div>
     <!-- The completion status line. The page shows it in one of two places,
@@ -1632,9 +1689,9 @@
     flex: none;
   }
 
-  /* The room toolbar holds the undo, pencil, check and reveal controls (specs
-     024 and 020). On a roomy window it is one item of the header row, and it
-     wraps when it must. */
+  /* The room toolbar holds the undo, pencil, check and reveal controls, the flag
+     button and the authors switch (specs 024, 020, 021 and 019). On a roomy
+     window it is one item of the header row, and it wraps when it must. */
   .room-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -1677,6 +1734,15 @@
     text-decoration: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 2px;
+  }
+
+  /* A target of 24 by 24 CSS px at least, whatever the engine's button style
+     (spec 021, spec 014 AC-7). It never shrinks in the toolbar's row. */
+  .flag-button {
+    flex: none;
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
   }
 
   .host-panel-more,
@@ -1804,7 +1870,10 @@
     font-size: 0.85rem;
   }
 
+  /* The list keeps the room of one line while it is empty, so its first line
+     (a flag's, for one) does not move the grid (spec 021 AC-9). */
   .feed ul {
+    min-height: 1lh;
     max-height: 3.6rem;
     overflow-y: auto;
     /* The page keeps the reader's place itself when lines come and go (spec
@@ -2162,6 +2231,13 @@
   @media (max-height: 500px) {
     main {
       padding: 0.25rem 0.5rem;
+    }
+
+    /* The header's two rows sit 1px apart: the room toolbar's row is 24px high
+       for the flag button's target (spec 021 AC-11), and the grid keeps the
+       height it had before. */
+    .room-header {
+      row-gap: 1px;
     }
 
     .clue-bar {
