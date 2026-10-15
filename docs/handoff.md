@@ -1,11 +1,11 @@
 # Handoff
 
 Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
-`docs/build-plan.md`. It replaces the long conversation of the session that
-wrote it (2026-10-12 to 2026-10-15), so a fresh session can continue cheaply.
+`docs/build-plan.md`. It replaces the long conversations of the sessions that
+wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-15, evening)
+## Where things stand (2026-10-16, around midnight)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch; it is restarted from
   `main` after each merge, keeping unmerged commits).
@@ -13,49 +13,48 @@ Update it at the end of each session.
   019, the spec 026 AC-10 fix). Tag `v0.1.0` exists locally on #6's merge commit
   but could not be pushed from the cloud session (tag pushes are refused): the
   human pushes it from a clone.
-- Open: PR #8 (019 refinements, 020, 021, 022; 025 closed). The human
-  commented on #8 that all open points and assumptions are fine. CI: Ubuntu
-  green on every run; the Windows job failed twice on a spec 019 drawing-order
-  test (a corner label's text area reaches past its box with Windows' font;
-  test fixed in fbbfa34, not yet confirmed on Windows) and once on a spec 006
-  pinch-zoom timeout (passed on the run before; root-cause it if it fails
-  again). Check PR #8's CI first.
+- Open: PR #8 (019 refinements, 020, 021, 022 and its first review round, the
+  CI speed-up). Green on 958442b, all seven jobs and `Quality gate`. Its
+  description is up to date. The human was asked to require the `Quality gate`
+  check in `main`'s ruleset.
 - Phase 6 specs: 019, 020, 021, 022, 024, 025 are `done`. Still to build, in
   this order: 027, 028, 032 (with the 012/017 seat-back refinement), 038
   (refines 036), 034 (refines 013), 033 (refines 005 and 018), 029.
 
+## Work in flight (not pushed)
+
+- Spec 022, second review round: the spec is committed locally (a97f860,
+  decisions 20 to 22, new AC-19 and AC-20); its tests are being written in the
+  main tree; then the implementer: `chat.wait` becomes "Patientez avant
+  d'envoyer.", the focus goes back to `chat-input` after a send, a shared Escape
+  helper for `ChatPanel.svelte` and `ReactionPicker.svelte`, `isConnected`
+  renamed `isJoined`, `after_restart`'s rebound loop variable. Push the spec,
+  tests and code together: a spec pushed before its tests fails the gate's
+  traceability (it happened on 595597d).
+- Spec 027 (shared timer): tests 854ee70 in worktree `agent-abc0fc6...`, with a
+  fix commit coming for two test defects (Playwright for Python reads a numeric
+  `page.clock` time in seconds, not milliseconds; AC-4's second page needs
+  another room code) and a load-proof AC-5 refresh test. Implementation 0329ee5
+  in worktree `agent-ac73bc7...` (on c0c0ebb, a cherry-pick of 854ee70): new
+  `RoomTimer.svelte` and `timer.ts`. When it lands: add
+  `test_spec_027_ac02_ac03_live_pages.py` to `SERIAL_TEST_FILES`, then review.
+- Spec 028 (recap): tests e563c92 in worktree `agent-a0de19b...`, on 11059de (a
+  cherry-pick of 854ee70; drop it when integrating). Build after 027 is reviewed.
+- Commit trailers: the implementer and test-writer roles run on Sonnet
+  (`model: sonnet` in `.claude/agents/`), but until 2026-10-15 the lead's prompts
+  gave them the Opus trailer. Pushed history keeps it (the PR description says
+  so); fix the trailer of their unpushed commits when integrating them, and tell
+  agents to use the trailer of their own environment.
+
 ## First tasks for the next session
 
-1. Follow PR #8 to green (subscribe to it).
-2. The CI speed-up the human approved on 2026-10-15 ("Go with the first 2"),
-   a tooling change done by the lead:
-   - `pytest-xdist` as a dev dependency (`uv add --dev pytest-xdist`), and the
-     gate runs the tests in parallel; timing-sensitive files stay serial (spec
-     036's performance tests, spec 022 AC-10's pacing test, and any file that
-     flakes in parallel: find them by running the suite in parallel a few
-     times), for example with a marker and two pytest passes;
-   - the engines chosen by the gate from an option or an environment variable
-     instead of the fixed `--browser` list in `pyproject.toml`'s addopts;
-   - CI: one job per engine (Ubuntu and Windows × Chromium, Firefox, WebKit on
-     Python 3.14) plus one Ubuntu 3.13 job for the static checks and the
-     non-browser tests; target about 25 to 30 minutes of wall-clock.
-   Update `CLAUDE.md`'s command table and this file with the new commands.
-3. Spec 022's review suggestions (it approved; none blocking):
-   - the vote banner hides the top of an open chat panel at small windows;
-     spec 022 must say which wins during a vote (suggestion: the banner, for
-     its 20 s, with the chat list's focus rule exempted meanwhile);
-   - `after_restart` keeps `recent_chat` and `recent_reactions`; clear them
-     there like `recent_edits` (spec 018's rule), with a dated note in 022;
-   - the empty unread slot of `chat-toggle` changes height when the panel
-     opens: give it a fixed height;
-   - tests: a staggered limit case (sends at t to t+8, then t+10.0 accepted
-     and t+10.5 dropped) to prove the window slides, and dropped or muted
-     reactions not counted;
-   - the picker stays open with live options when `react-button` becomes
-     disabled (muted, selection cleared); a mute while typing drops the focus
-     from `chat-input`;
-   - `RoomPage.svelte` is over 3,000 lines: move the chat into
-     `ChatPanel.svelte` and `ReactionPicker.svelte`.
+1. PR #8: subscribe to it and keep it green. If it merged, restart the branch
+   from `main` (keeping the unmerged commits) and open the next pull request
+   once the next batch is green.
+2. Finish the work in flight above, in that order, through the roles.
+3. Then 028, and the rest of Phase 6 in the order above. Pass `model: "opus"`
+   to the implementer and to the test-writer of a whole spec (their definitions
+   default to Sonnet); Sonnet for small spec notes and mechanical test edits.
 - Phase 7 (030, 031): untouched.
 
 ## How a feature is built here
@@ -90,17 +89,25 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 ## How to verify (what the lead runs before any code commit)
 
-- Full gate as CI runs it, three engines (about 70 to 90 minutes now):
-  `PYTEST_ADDOPTS="--browser firefox" uv run python scripts/gate.py`. It
-  collects the tests at its start and builds `web/dist`: do not rebuild the
-  client or commit red tests while it runs, and expect load flakes when agents
-  run browsers at the same time (rerun a single failure before trusting it).
-- Targeted runs: `PYTEST_ADDOPTS="--browser firefox" uv run pytest tests/test_spec_NNN*.py -q`.
+- The gate runs the tests in parallel (pytest-xdist, one worker per CPU), then
+  the files of `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) on their own. It
+  warms each browser up once before its first test.
+- Static checks and the tests without a browser (1 minute):
+  `uv run python scripts/gate.py --tests other`.
+- One engine's browser tests, as a CI job runs them (7 to 15 minutes here):
+  `uv run python scripts/gate.py --skip-static --tests browser --browsers firefox`.
+  `--browsers all` runs all three engines; the default is chromium,webkit
+  (`NOCK_BROWSERS` overrides it).
+- Targeted runs, in parallel:
+  `PYTHONPATH=scripts uv run pytest -p gate_browsers -n auto --browser chromium --browser webkit --browser firefox tests/test_spec_NNN*.py -q`.
+  A bare `uv run pytest` runs the browser tests in Chromium only.
+- The gate builds `web/dist` at its start: do not rebuild the client while it
+  runs, and expect load flakes when agents run browsers at the same time
+  (rerun a single failure before trusting it).
 - Fonts: CI's Ubuntu runner uses DejaVu Sans, this machine Inter. Layout files
-  run a second time with
-  `FONTCONFIG_FILE=/tmp/claude-0/-home-user-nock/189ffddd-b0b7-58e2-88b6-f8006dfcb8c1/scratchpad/fonts/fonts.conf`
-  (a session scratchpad file: recreate it in a new session's scratchpad and use
-  that path; `fc-match sans-serif` must then say DejaVu Sans). Its content:
+  run a second time with `FONTCONFIG_FILE=<scratchpad>/fonts/fonts.conf` (a
+  session scratchpad file: recreate it in a new session's scratchpad;
+  `fc-match sans-serif` must then say DejaVu Sans). Its content:
 
   ```xml
   <?xml version="1.0"?>
@@ -116,9 +123,13 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
     </selectfont>
   </fontconfig>
   ```
-- CI runs only on pull requests and pushes to `main`; it cancels a run when a
-  new commit is pushed to the pull request. The Windows job is the slowest
-  (about 80 minutes) and the most timing-sensitive.
+- CI runs only on pull requests and pushes to `main`, and cancels a run when a
+  new commit is pushed. Seven jobs (static and non-browser tests on Ubuntu
+  3.13; each engine on Ubuntu and Windows, Python 3.14), then `Quality gate`,
+  which passes only when all seven passed. About 17 to 19 minutes; Firefox on
+  Windows is the slowest job. The Windows jobs widen the ephemeral port range
+  (the parallel tests once exhausted the default one) and print the TIME_WAIT
+  count when they fail.
 
 ## Decisions the human made
 
@@ -132,6 +143,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   keep only their italics during a flash (spec 020 decision 12); a focused
   button that becomes disabled may drop the focus (specs 023 to 025); the spec
   019 small-cell trade-offs and the optional spec 020 test tightenings stand.
+- 2026-10-15: the CI speed-up ("Go with the first 2"): pytest-xdist, engines
+  chosen by the gate, one CI job per engine. The human then agreed to one
+  summary check (`Quality gate`) for the branch rule. The browser warm-up and
+  the Windows port range are the lead's follow-up fixes to that change.
 
 ## Lead decisions of 2026-10-15 worth knowing
 
@@ -143,6 +158,11 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   Spec 032 AC-7: a timed-out player gets their seat back (nickname taken
   meanwhile gives "Ana 2"). Specs 020-025: a refused message still wakes an
   idle sender. Spec 039: a chat text strips as `str.strip()` does.
+- Spec 022, review rounds: the vote banner wins over an open chat panel; a
+  restart clears every player's chat and reaction windows; a mute closes the
+  picker (focus to the grid) and moves the focus from the chat form to
+  `chat-toggle`; the chat notes sit in one always-present one-line slot and the
+  mute note wins over the wait note; after a send the focus is on `chat-input`.
 
 ## Pending questions for the human
 
@@ -161,6 +181,7 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 - Start a fresh session when the lead's context grows large.
 - Cheaper models (Sonnet) for small spec notes and mechanical test edits; Opus
-  for building, test-writing of whole specs and reviews.
+  for building, test-writing of whole specs and reviews (pass `model: "opus"`:
+  the implementer and test-writer definitions default to Sonnet).
 - Do not run the local full gate while agents run browsers; CI is the full
   check once a pull request is open.
