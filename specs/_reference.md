@@ -77,7 +77,7 @@ the specs whose criteria this one mentions.
 | [019](019-authorship-view.md) | US-5.1 Authorship view | E5 | V1 | 5 | 006, 007, 009, 012, 013, 014, 015, 016, 017, 018, 020, 023, 024, 028, 035 |
 | [020](020-pencil-letters.md) | US-5.2 Pencil letters | E5 | V1 | 7 | 006, 008, 009, 013, 015, 016, 017, 018, 019, 023, 024, 026, 035, 037 |
 | [021](021-clue-flag.md) | US-5.3 Clue flag | E5 | V1 | 11 | 006, 013, 014, 017, 018, 024, 026, 035 |
-| [022](022-chat-reactions.md) | US-5.4 Chat and reactions | E5 | V1 | 16 | 006, 013, 014, 024, 025, 027, 032, 035, 037, 038, 039 |
+| [022](022-chat-reactions.md) | US-5.4 Chat and reactions | E5 | V1 | 18 | 006, 013, 014, 024, 025, 027, 032, 035, 037, 038, 039 |
 | [023](023-check.md) | US-6.1 Check a letter, a word or the grid | E6 | MVP | 10 | 013, 015, 016, 025, 026, 037 |
 | [024](024-reveal.md) | US-6.2 Reveal a letter or a word | E6 | V1 | 10 | 006, 008, 009, 013, 014, 015, 016, 018, 020, 023, 025, 026, 028, 035, 037 |
 | [025](025-help-mode-vote.md) | US-6.3 Group decision on help | E6 | V1 | 9 | 006, 010, 012, 013, 014, 017, 018, 023, 024, 026, 035, 037 |

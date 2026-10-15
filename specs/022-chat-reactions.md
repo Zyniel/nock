@@ -132,12 +132,19 @@ Spec 014's `mute_player` rule and its `player_muted` entry are unchanged. Its
 effect is case 1 of `Chat` and the first drop case of `React`. A muted player can
 still type letters, check, flag (spec 021) and use every other control.
 
-### `snapshot_for` (spec 012) and `replay` (spec 018)
+### `snapshot_for` (spec 012), `replay` and `after_restart` (spec 018)
 
 - `snapshot_for` sends `chat = state.chat`.
 - `replay` of `chat_message`: the event is added at the end of `chat`.
 - `recent_chat` and `recent_reactions` are not logged, like `recent_edits`
   (spec 018): replay does not restore them.
+- `after_restart` (spec 018) sets `recent_chat = ()` and `recent_reactions = ()`
+  on every player of the room, disconnected or not, as it clears `recent_edits`,
+  and adds no entry for it. A room loaded from a snapshot (which stores them) and
+  one rebuilt from the log alone thus give every player a fresh window after a
+  restart. (Note from the lead, 2026-10-15: added; `after_restart` kept both
+  tuples, so a restart from a snapshot kept limits that a restart from the log
+  lost, decision 17 (review of spec 022).)
 
 ### Where chat is kept
 
@@ -190,6 +197,13 @@ export interface Snapshot {
   present only while the panel is closed and at least one line is unread. Its text
   is the number of unread lines in decimal digits, from 1 to 99, or
   `t("chat.unread_many")` (`99+`) above 99.
+- Height of the toggle: `chat-unread` sits in a slot of `chat-toggle` whose height
+  is fixed, kept empty while `chat-unread` is absent, so the toggle's bounding box
+  has the same height (1 px tolerance) with the panel closed and no unread line,
+  with the panel closed and `chat-unread` showing (one digit, two digits or `99+`),
+  and with the panel open. Its width may change with the count. (Note from the
+  lead, 2026-10-15: added; the toggle grew or shrank when the count appeared or
+  went, decision 18 (review of spec 022).)
 - Unread lines. The page keeps `lastSeenChatSeq`. At the page's first snapshot it
   is that snapshot's `seq`. While the panel is open it is the seq of the newest
   line of the history. A line is unread when its seq is greater than
@@ -219,6 +233,28 @@ export interface Snapshot {
   show, `document.elementFromPoint` at the centre of `vote-yes` and of `vote-no`
   returns that button. A size such as `min(22rem, 100vw - 1rem)` wide, below the
   header, is the implementer's choice.
+- The vote banner wins over the panel. On a small window spec 025's
+  `vote-banner` (laid over the top of `grid-viewport`) can overlap the panel.
+  While `vote-banner` is on the page (an open vote, then its result for spec 025's
+  `VOTE_RESULT_MS`), it is drawn above the panel: at the centre of the banner's
+  bounding box and at each of its four corners moved 2 px inwards on both axes,
+  `document.elementFromPoint` returns `vote-banner` or one of its descendants,
+  never `chat-panel` or one of its descendants. Meanwhile the panel stays open and
+  usable under it: `chat-panel` stays present with the bounding box it had before
+  the banner came (1 px tolerance), the focus stays where it was, and text typed in
+  `chat-input` then `Enter` sends its `chat` frame as at any other time. The part
+  of the panel under the banner is hidden for that time, and the panel's own
+  rules that would bring it into view are suspended: the page makes no scroll
+  call on `chat-panel`, `chat-list` or the document to uncover it, `chat-list`
+  keeps its `scrollTop` apart from what spec 013's scroll rules do on a new line,
+  and the rule of "Client: the chat list" that the focused list's outline is fully
+  visible does not apply to the part under the banner. Once `vote-banner` has
+  left the page, the panel is fully visible again: at the centre of the panel's
+  bounding box and at each of its four corners moved 2 px inwards,
+  `document.elementFromPoint` returns `chat-panel` or one of its descendants (with
+  the picker closed). (Note from the lead, 2026-10-15: added; at small windows the
+  banner hid the top of an open panel and the spec did not say which wins,
+  decision 16 (review of spec 022).)
 
 ### Client: the chat list
 
@@ -241,7 +277,10 @@ export interface Snapshot {
   The page handles no key on it; the arrow keys scroll it. While it has the focus
   after a keyboard move, its outline meets spec 035 AC-2 and is fully visible, as
   spec 035 requires of the feed's list ("Focus outline of the feed's scrolling
-  list": not clipped, not covered).
+  list": not clipped, not covered), except, while spec 025's `vote-banner` is on
+  the page, for the part under the banner ("Client: chat toggle and panel").
+  (Note from the lead, 2026-10-15: the exception is added, decision 16 (review of
+  spec 022).)
 
 ### Client: sending, pacing and mute
 
@@ -266,6 +305,12 @@ export interface Snapshot {
 - Muted: while my own `muted` is true (snapshot, or `player_muted`, applied by
   spec 014), `chat-input` and `chat-send` are disabled, `data-testid="chat-muted"`
   shows `t("chat.muted")`, and `react-button` is disabled.
+- Focus at a mute: when my `muted` becomes true while the focus is on `chat-input`
+  or `chat-send`, the focus moves to `chat-toggle` at once, never to
+  `document.body`; the panel stays open, and the text typed in `chat-input` stays
+  in it. `chat-toggle` is the target because it is always present and is where
+  `Escape` from the panel puts the focus. (Note from the lead, 2026-10-15: added;
+  the disabled input kept or dropped the focus, decision 19 (review of spec 022).)
 
 ### Client: the host's mute buttons
 
@@ -308,6 +353,15 @@ sees `chat-moderation`.
   the bounding box of no element outside it, leaves `react-button` uncovered and
   never covers spec 025's vote buttons (the same `elementFromPoint` checks as the
   panel's).
+- When `react-button` becomes disabled while the picker is open (I am muted, or
+  nothing is selected any more), the picker closes at once, sending nothing, and
+  `react-button` gets `aria-expanded="false"`; it never stays open with live
+  options. If the focus was inside the picker, it moves to the `grid` element, as
+  spec 025 does when the vote banner leaves while it holds the focus (its decision
+  19), never to `document.body`. A focus on `react-button` itself when it becomes
+  disabled gets no target from this spec. (Note from the lead, 2026-10-15: added;
+  the picker stayed open with live options after a mute, decision 19 (review of
+  spec 022).)
 - The picker and the panel are independent: either may be open whether the other
   is open or not, and opening, using or closing one leaves the other as it was
   (open or closed, same bounding box, 1 px tolerance). While both are open, each
@@ -400,6 +454,10 @@ value is a bare placeholder or two placeholders around a space).
   `feed-item`; a line event is a `chat_message` from `p2` with the text
   `Ligne <seq>`. "Settled", the scroll probe and "items in view" are spec 013's.
 - Pacing (AC-10): real time, or Playwright's page clock as spec 017 AC-5 does.
+- Votes and mutes (AC-15, AC-17, AC-18): vote frames are built with spec 039's
+  `VoteOpened` and `VoteClosed`, as in spec 025's harness, and mutes with
+  `PlayerMuted`. (Note from the lead, 2026-10-15: added with AC-17 and AC-18
+  (review of spec 022).)
 - Scans: spec 035's contrast and language scans. Chat text is user content, not an
   interface string: a language scan run on a state with chat lines adds the texts
   of the lines the test sent (in the snapshot or in events) to its test data, as it
@@ -426,9 +484,10 @@ The words in brackets say how each criterion is tested.
   - `chat_message` seq 9 (`p2`) arrives and is listed; `Escape` closes the panel and puts the focus on `chat-toggle`; no `chat-unread` exists. Then seq 10 (`p2`): `chat-unread` reads `1`.
   - The mock closes the socket with code 1011 and answers the page's next join with a snapshot with `seq` 12 whose `chat` holds the lines above plus seq 11 (`p2`) and seq 12 (`p3`): `chat-unread` reads `3`.
   - In a separate run, 100 `chat_message` from `p2` after the snapshot: `chat-unread` reads `fr.json["chat.unread_many"]` and the `aria-label` is `Discussion, 100 messages non lus`.
+  - Toggle height: the steps above run at 1280 by 720 and again at 568 by 320. At each size, the height of `chat-toggle`'s bounding box is the same (1 px tolerance) in each of these states: at load (panel closed, no `chat-unread`), with `chat-unread` reading `2`, with the panel open, with `chat-unread` reading `1`, and, in the separate run, with `chat-unread` reading `99+`. (Note from the lead, 2026-10-15: added, decision 18 (review of spec 022).)
 - **AC-7** (AC-5.4.4) (Python; WebSocket; browser with live server) The host can mute a player's chat. Python: after `MutePlayer(player_id="p2", muted=True)` from the host `p1` (spec 014 AC-6), `Chat(text="salut")` from `p2` is answered with one `ErrorMessage` with code `muted`, gives no entry and leaves `state.chat` unchanged, and `React` from `p2` gives no entry, no reply and an empty `to_others`; after `MutePlayer(player_id="p2", muted=False)`, the same chat gives its `ChatMessage`. WebSocket: host A and B join; A mutes B; B's `chat` gets `error` `muted` and A receives nothing for it; A unmutes B; B's next `chat` reaches A and B. Browser: Ana (host) and Bob join one FX-01 room and open their chat; Bob's panel holds no `chat-moderation`; Ana's holds one `mute-row` for Bob whose `mute-player` reads `fr.json["chat.mute"]`, with the `aria-label` `Couper la discussion de Bob` and `data-muted="false"`. Ana clicks it: within 1 s Bob's `chat-input` and `chat-send` are disabled, his `chat-muted` shows `fr.json["chat.muted"]` and his `react-button` is disabled, and Ana's button reads `fr.json["chat.unmute"]` with `data-muted="true"`. Ana clicks it again: within 1 s Bob's `chat-input` is enabled and his `chat-muted` is gone.
 - **AC-8** (AC-5.4.4) (Python with a `RoomStore`; WebSocket with captured logs) Chat is kept only with its room, so that deleting the room at expiry deletes it. Python: a `RoomStore` on a file in `tmp_path` holds rooms `AAAAAA` and `BBBBBB`, each created with `create_room`; the entries of a play in `AAAAAA` where `p1` sends `Chat(text="secret-a-42")` are appended, and a snapshot of its state is saved; reading the file with `sqlite3`, at least one row holds the text `secret-a-42`, and every row of every table that holds it in one of its columns has a column `code` equal to `AAAAAA`. WebSocket: with `caplog` capturing every logger at level DEBUG, A and B join a FX-01 room and A sends `secret-b-77`; B receives it, and no captured log record's message holds `secret-b-77`. Deleting the room at expiry is tested by spec 032 AC-1 and spec 038 AC-2.
-- **AC-9** (new) (Python; WebSocket with a fake clock) Each player may send at most 5 chat messages and 5 reactions in any 10 seconds; the server drops the rest without an answer. Python: in the two-player room, six `Chat` from `p1` at `NOW`: the first five give their `ChatMessage` (seq 3 to 7), the sixth gives no entry and no reply and leaves `state.chat` unchanged; at `NOW + 9.9` a `Chat` from `p1` is dropped as well; at `NOW + 10.0` it is accepted with seq 8; a `Chat` from `p2` at `NOW` is accepted whatever `p1` sent; a refused (`muted`) or dropped message is not counted. Six `React` from `p1` at `NOW`: the first five are relayed (`reply` and `to_others`), the sixth gives nothing; at `NOW + 10.0` one is relayed again. WebSocket: with the fake clock frozen, B sends seven `chat` messages; A receives exactly five `chat_message`, B receives those five and no `error`; after `advance(10)`, B's next `chat` reaches A.
+- **AC-9** (new) (Python; WebSocket with a fake clock) Each player may send at most 5 chat messages and 5 reactions in any 10 seconds; the server drops the rest without an answer. Python: in the two-player room, six `Chat` from `p1` at `NOW`: the first five give their `ChatMessage` (seq 3 to 7), the sixth gives no entry and no reply and leaves `state.chat` unchanged; at `NOW + 9.9` a `Chat` from `p1` is dropped as well; at `NOW + 10.0` it is accepted with seq 8; a `Chat` from `p2` at `NOW` is accepted whatever `p1` sent; a refused (`muted`) or dropped message is not counted. Six `React` from `p1` at `NOW`: the first five are relayed (`reply` and `to_others`), the sixth gives nothing; at `NOW + 10.0` one is relayed again. A dropped `React` (from a muted player, on a clue that names no word, or over the limit) is not counted either: it leaves `recent_reactions` unchanged. (Note from the lead, 2026-10-15: this sentence is added; "is not counted" was written for `Chat` only (review of spec 022).) Restart: after five `Chat` and five `React` from `p1` at `NOW`, `after_restart(state, NOW + 1)` gives a state in which every player has `recent_chat == ()` and `recent_reactions == ()`, and whose entries are only spec 018's `player_state_changed` (`disconnected`) ones, one per player in players order. (Note from the lead, 2026-10-15: added, decision 17 (review of spec 022).) WebSocket: with the fake clock frozen, B sends seven `chat` messages; A receives exactly five `chat_message`, B receives those five and no `error`; after `advance(10)`, B's next `chat` reaches A.
 - **AC-10** (new) (browser with mocked socket) The page paces its own chat messages and reactions under the server's limit. With the panel open, the player sends `m1` to `m5` with `Enter`, and the mock answers each with its `chat_message` from `p1`: the mock received exactly five `chat` frames; `chat-send` is then disabled, `chat-wait` shows `fr.json["chat.wait"]`, and `Enter` in the non-empty input sends nothing (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted); 12 seconds after the first send, `chat-send` is enabled again and `chat-wait` is gone. Likewise, after five reactions chosen in the picker within a few seconds, every `reaction-option` is disabled, and they are enabled again 12 seconds after the first. The mock sends no `error` in this test.
 - **AC-11** (new) (browser with mocked socket) A new line brings the chat list to its newest line only when the list was at its end; otherwise the reader keeps their place. The rules are spec 013's "Client: feed scroll position" applied to the chat list ("Client: the chat list"); the setup, "settled", the probe and "items in view" are those of "Chat scroll states" in "Test harness". The cases of spec 013 AC-7 run in its order, at 1280 by 720 and at 360 by 740, with these changes: "Filling" sends seq 6 to 15; "My own action" is replaced by: the player types `moi` in `chat-input` and presses `Enter`, the mock answers with the `chat_message` of `p1` with the next seq once it received the `chat` frame, and the probe, started just before `Enter`, stays put; "Full feed" sends lines up to seq 205, so that the list holds 200 lines (seq 6 to 205), and the line with seq 206 leaves the first `chat-message` with `data-seq` 7. The cases of spec 013 AC-8 (smaller window, larger root font, larger window) then run on the chat list at its end.
 - **AC-12** (new) (browser with mocked socket, keyboard only after the setup) The chat list can be scrolled from the keyboard in every engine. With `you` not host (the snapshot makes `p2` host, so the panel holds no `chat-moderation`), the panel open and 40 lines from `p2`, at 360 by 740, 568 by 320 and 1280 by 720: `chat-list` scrolls (the test checks it from its measures), has `role="list"` and `tabindex="0"`, and `page.get_by_role("list", name=fr.json["chat.heading"], exact=True)` resolves to exactly it; with the focus on `chat-input` (where opening the panel puts it), one `Shift+Tab` puts the focus on `chat-list`, whose outline then meets spec 035 AC-2 and passes spec 035's "Not clipped" and "Not covered" measures; `ArrowUp` makes its `scrollTop` smaller within 300 ms and it keeps the focus; a new line from `p2` then leaves its `scrollTop` within 1 px and the focus on it; `Tab` then puts the focus back on `chat-input`. With two lines only, the list does not scroll and has no `tabindex` attribute, and one `Shift+Tab` from `chat-input` puts the focus on an element outside `chat-panel`.
@@ -441,6 +500,16 @@ The words in brackets say how each criterion is tested.
   - Votes: with spec 025's vote banner showing `vote-yes` and `vote-no` (a `vote_opened` from `p2` whose request is a grid check) and the panel open, and again once the picker is open too (both open), `document.elementFromPoint` at the centre of each vote button returns it. (Note from the lead, 2026-10-15: "then the picker open" became "and again once the picker is open too (both open)", decision 15 (spec 022's tests).)
   - `chat-input` is not inside `grid-viewport`, `clue-bar`, `keyboard` or `grid`.
 - **AC-16** (new) (browser with mocked socket, keyboard only after the setup) The chat and reaction controls are reachable from the keyboard and readable in French. At 1280 by 720, `you` host, after a tap on the clue cell (0, 3): `tab_to` reaches `react-button` and `chat-toggle`, and with the picker open each `reaction-option`, and with the panel open `chat-input`, `chat-send` and the `mute-player` of `p2`; each shows spec 035 AC-2's outline; typing `Bonne idée !` in `chat-input` and pressing `Enter` sends it. With the panel open and then the picker opened too (its first option takes the focus), one `Tab` from the last `reaction-option` puts the focus on an element inside `chat-panel`. (Note from the lead, 2026-10-15: added; the keyboard side of "the picker comes before `chat-panel`", tested with both open, decision 15 (spec 022's tests).) At 1280 by 720 and 360 by 740, in a state with the panel open (lines `IDES, je crois` from `p2` and `Bonne idée !` from `p3`) and a `clap` reaction of `p2` shown on IDES, and in a state with the panel closed and 3 unread lines: spec 035's contrast scan finds no offending element, and its language scan, with the chat texts added to its test data ("Test harness"), finds no text outside `fr.json` and the test's data; it accepts `Discussion, 3 messages non lus`, `Bob : Bravo` and `👏`.
+- **AC-17** (new) (browser with mocked socket) While the vote banner shows, it is drawn above an open chat panel, which stays open and usable under it and is fully visible again once the banner has gone. Setup: AC-15's, except that `p2` is host (so the panel holds no `chat-moderation` and `Shift+Tab` from `chat-input` reaches `chat-list`, as in AC-12), with the panel open, the picker closed and 100 lines from `p2` in the snapshot's `chat` (the test checks from its measures that `chat-list` scrolls, as AC-12 does); "the five banner points" are the centre of `vote-banner`'s bounding box and its four corners each moved 2 px inwards on both axes, and "the five panel points" are the same points of `chat-panel`'s box. At each window size of spec 006 AC-5, in desktop and touch contexts:
+  - Typing: the test types `ok` in `chat-input` (which has the focus), reads the bounding box of `chat-panel` and the `scrollTop` of `chat-list`, then the mock sends `vote_opened` (the next seq, by `p2`, a grid check). Once `vote-banner` shows, and again 1,000 ms later: `document.elementFromPoint` at each of the five banner points returns `vote-banner` or a descendant; `chat-panel` is present with the bounding box read before (1 px tolerance); `chat-list`'s `scrollTop` is the one read before (1 px tolerance); `window.scrollX` and `window.scrollY` are 0; `document.activeElement` is `chat-input`. `Enter` then sends exactly one `chat` frame, whose `text` is `ok` (spec 017's heartbeat `ping` frames are not counted).
+  - List focus: in a second run, before the `vote_opened`, the test presses `Shift+Tab` from `chat-input` so that `chat-list` has the focus, then reads the same values; after the `vote_opened`, at the same two moments, the same checks hold with `document.activeElement` being `chat-list`. No check of the outline of `chat-list` is made while the banner shows.
+  - After the vote: in each run the mock then sends `vote_closed` (the next seq, `rejected`); once `vote-banner` has left the page (spec 025: between 2,500 and 4,500 ms later), `document.elementFromPoint` at each of the five panel points returns `chat-panel` or a descendant, and `chat-panel` still has the bounding box read before (1 px tolerance).
+  (Note from the lead, 2026-10-15: added, decision 16 (review of spec 022).)
+- **AC-18** (new) (browser with mocked socket) A mute closes the reaction picker and moves the focus off the disabled chat controls. Given a FX-01 snapshot with `seq` 5 in which `p2` is host (so `you`, `p1`, is not), at 1280 by 720 and at 360 by 740; "the mute" is the mock's `player_muted` with seq 6 for `p1` with `muted` true:
+  - Picker: after a tap on the clue cell (2, 0) (VIDE) and a click on `react-button`, the picker is open and its first `reaction-option` has the focus; after the mute, within 300 ms, there is no `reaction-picker`, `react-button` is disabled with `aria-expanded="false"`, and `document.activeElement` is the `grid` element; the mock received no `react` frame. In a second run with the panel opened first (by a click on `chat-toggle`), then VIDE tapped and the picker opened (its first option has the focus): after the mute, within 300 ms, there is no `reaction-picker`, `document.activeElement` is the `grid` element, and `chat-panel` is present with the bounding box it had before the mute (1 px tolerance).
+  - Chat input: with the panel open, the test types `salut` in `chat-input` (which has the focus); after the mute, within 300 ms, `chat-input` and `chat-send` are disabled, `chat-muted` shows, `chat-panel` is present, `chat-input`'s value is `salut`, and `document.activeElement` is `chat-toggle`.
+  - Send button: as the previous case, but with one `Tab` from `chat-input` after typing, so that `chat-send` (enabled) has the focus before the mute; after it, within 300 ms, `document.activeElement` is `chat-toggle`.
+  (Note from the lead, 2026-10-15: added, decision 19 (review of spec 022).)
 
 ## Edge cases and errors
 
@@ -504,6 +573,21 @@ The words in brackets say how each criterion is tested.
   are outside it in the DOM, right after it.
 - Votes (AC-15): the panel and the picker never cover spec 025's vote buttons, so a
   player who is chatting still sees a vote and can answer it within its 20 seconds.
+- Vote banner over the panel (AC-17): on a small window the banner may hide the
+  top of an open panel (its heading, the oldest visible lines) while it shows; the
+  panel does not move or close, and the page does not scroll it into view. (Note
+  from the lead, 2026-10-15: added, decision 16 (review of spec 022).)
+- Restart (AC-9): a restart gives every player a fresh chat and reaction window,
+  as it does for spec 037's edit limit. (Note from the lead, 2026-10-15: added,
+  decision 17 (review of spec 022).)
+- Mute while reacting or typing (AC-18): the picker closes and the focus goes to
+  the `grid` element; a focus on `chat-input` or `chat-send` goes to
+  `chat-toggle`. The typed text is kept, and can be sent once unmuted. (Note from
+  the lead, 2026-10-15: added, decision 19 (review of spec 022).)
+- Selection cleared while the picker is open (AC-18's rule): spec 007 clears the
+  selection only when a second snapshot no longer has its word, which cannot
+  happen on one room's grid, so only the mute case is tested. (Note from the
+  lead, 2026-10-15: added (review of spec 022).)
 - Feed (AC-1): chat adds no line to the activity feed (spec 013 decision 4).
 
 ## Out of scope
@@ -614,6 +698,33 @@ the spec above. (Note from the lead, 2026-10-15: added (spec 022's tests).)
     320 by 568 the picker fits above or below the panel. The other option would
     also lose the text typed in `chat-input`, which exists only while the panel
     is open, each time a player reacts.
+
+Decided by the lead on 2026-10-15, under the human's delegation of layout and
+accessibility choices, on the reviewer's suggestions (none blocking). Each one is
+already part of the spec above. (Note from the lead, 2026-10-15: added (review of
+spec 022).)
+
+16. Vote banner and chat panel (AC-17). On a small window spec 025's banner, laid
+    over the top of `grid-viewport`, can overlap the panel, and the spec did not
+    say which is on top. Pick: the banner, for as long as it shows (its 20 seconds
+    and its result's 3 seconds): a vote is short and shared by the whole room,
+    while the panel can wait. The panel stays open, keeps its box and the focus,
+    and the page makes no scroll call to uncover it; the list's "fully visible
+    outline" rule does not apply to the hidden part meanwhile.
+17. Limit windows at a restart (AC-9). `after_restart` cleared `recent_edits`
+    (spec 018) and kept `recent_chat` and `recent_reactions`, so a room loaded from
+    a snapshot kept windows that one rebuilt from the log lost. Pick: it clears
+    both, for every player, as spec 025 decision 16 makes the two loads give the
+    same vote.
+18. Height of `chat-toggle` (AC-6). Pick: the unread count sits in a slot of fixed
+    height, so the toggle keeps its height when the count appears or goes and when
+    the panel opens; the toolbar row (spec 024) then never moves.
+19. Mute while the picker is open or the chat form has the focus (AC-18). Pick: the
+    picker closes whenever `react-button` becomes disabled, with the focus, if it
+    was inside, on the `grid` element (as spec 025 decision 19 for the banner); a
+    focus on `chat-input` or `chat-send` moves to `chat-toggle`, the always-present
+    control where `Escape` from the panel goes. Both targets are fixed, never
+    `document.body`.
 
 ## Open questions
 
