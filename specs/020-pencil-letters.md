@@ -1,7 +1,7 @@
 ---
 id: "020"
 title: Pencil letters
-status: approved
+status: done
 ---
 
 # 020 - Pencil letters

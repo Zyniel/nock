@@ -1,7 +1,7 @@
 ---
 id: "019"
 title: Authorship view
-status: approved
+status: done
 ---
 
 # 019 - Authorship view
