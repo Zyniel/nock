@@ -96,6 +96,14 @@ commands above).
 
 ### Running the server with a database
 
+Start the server with `uv run python -m nock`. It listens on
+`http://127.0.0.1:8000`; the `NOCK_HOST` and `NOCK_PORT` environment variables
+change the address and the port. An empty variable counts as unset. `NOCK_PORT`
+must be a whole number from 1 to 65535, written with the digits 0 to 9; any
+other value stops the start with a message. Use this command rather than
+`uvicorn nock.server:app`: it also sets the WebSocket frame limit of spec 036
+(8,192 bytes), where uvicorn alone accepts frames of 16 MiB.
+
 The rooms are stored in the SQLite file named by the `NOCK_DATABASE`
 environment variable. When it is unset, rooms live in memory and are lost when
 the server stops. The folder of the file must exist:
@@ -103,10 +111,10 @@ the server stops. The folder of the file must exist:
 ```powershell
 New-Item -ItemType Directory -Force data
 $env:NOCK_DATABASE = "data/nock.sqlite3"
-uv run uvicorn nock.server:app
+uv run python -m nock
 ```
 
-(bash: `NOCK_DATABASE=data/nock.sqlite3 uv run uvicorn nock.server:app`)
+(bash: `NOCK_DATABASE=data/nock.sqlite3 uv run python -m nock`)
 
 ## 4. The quality gate
 

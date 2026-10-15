@@ -20,6 +20,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -29,6 +30,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SPECS_DIR = PROJECT_ROOT / "specs"
 TESTS_DIR = PROJECT_ROOT / "tests"
+SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 
 # A spec file is named NNN-short-name.md, for example 001-slugify.md.
 SPEC_FILE_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
@@ -50,7 +52,9 @@ RUNTIME_STEPS: list[tuple[str, list[str]]] = [
     ("pyrefly (types)", ["pyrefly", "check"]),
     ("svelte-check (web types)", ["npm", "--prefix", "web", "run", "check"]),
     ("vite build (web)", ["npm", "--prefix", "web", "run", "build"]),
-    ("pytest (tests)", ["pytest", "--quiet"]),
+    # gate_browsers leaves out the browser engines that are not installed, with
+    # a warning; in CI it fails instead (see scripts/gate_browsers.py).
+    ("pytest (tests)", ["pytest", "--quiet", "-p", "gate_browsers"]),
 ]
 
 
@@ -79,7 +83,15 @@ def run_step(step_name: str, command: list[str]) -> bool:
         return False
 
     full_command = [executable_path, *command[1:]]
-    completed = subprocess.run(full_command, cwd=PROJECT_ROOT, check=False)
+    # scripts/ on the import path, so that pytest can load the gate_browsers plugin.
+    environment = dict(os.environ)
+    python_path = environment.get("PYTHONPATH", "")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(SCRIPTS_DIR), python_path) if part
+    )
+    completed = subprocess.run(
+        full_command, cwd=PROJECT_ROOT, env=environment, check=False
+    )
     if completed.returncode != 0:
         print(f"FAIL: {step_name} exited with code {completed.returncode}")
         return False

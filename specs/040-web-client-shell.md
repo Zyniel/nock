@@ -72,8 +72,14 @@ def create_app(
     """
 
 
-app: FastAPI  # create_app(); run with: uv run uvicorn nock.server:app
+app: FastAPI  # create_app(); run with: uv run python -m nock (spec 036)
 ```
+
+(Note from the lead, 2026-10-15: the comment above used to name
+`uv run uvicorn nock.server:app`. That command skips spec 036's 8,192-byte frame
+limit, which only `python -m nock` sets, through `server_config`; the README
+already says `uv run python -m nock`. The live-server fixture of the test harness
+below starts `uvicorn.Server` itself; it is not a run command and is unchanged.)
 
 `WEB_DIST_DIR` is computed from the module file
 (`Path(__file__).resolve().parents[2] / "web" / "dist"`), never from the current
@@ -208,6 +214,9 @@ Room page behaviour, which the browser tests observe through the attributes abov
    to 8): it joins at once with a stored identity or for a room created on this
    device (status `joining`), otherwise it sends nothing and shows the nickname
    form (status `nickname`) until the form is submitted (status `joining`).
+   (Note from the lead, 2026-10-15: "sends nothing" leaves aside the heartbeat
+   `ping` frames of spec 017, which the page may send at any time once the
+   socket is open.)
 3. Each incoming frame is read with `JSON.parse`. A frame that is not JSON, or not
    an object with a string `type`, is ignored.
 4. `type == "snapshot"`: the snapshot becomes the latest snapshot, `seq` becomes
@@ -291,7 +300,7 @@ The word in brackets says how each criterion is tested.
 - **AC-15** (browser) Given the live server, when the page opens `/` and, separately, `/r/ABC123`, then in both cases `document.title` equals `fr.json["app.title"]` and the `<html>` element has `lang="fr"`.
 - **AC-16** (browser) Given the live server and a room registered on FX-01 with code `<code>`, when the page enters the room through the `enter_room` fixture of spec 011 (it opens `/r/<code>` and, when the page shows the nickname form of spec 012, submits it with `Ana`), then `data-testid="room-page"` reaches `data-room-code="<code>"`, `data-status="joined"`, `data-seq="1"` and `data-grid="5x5"`, and `data-testid="room-status"` shows `fr.json["room.status.joined"]`.
 - **AC-17** (browser) Given the live server and an empty registry, when the page opens `/r/ZZZZZZ`, then the room page reaches `data-status="not_found"` with `data-seq=""`, and `data-testid="room-status"` shows `fr.json["room.status.not_found"]`.
-- **AC-18** (browser, mocked socket) Given the page on `/r/ABC123` with nothing in `localStorage`, when the socket opens, then the room page shows `data-status="nickname"` and sends nothing (no frame within 300 ms); after the nickname form of spec 012 is submitted with `Ana`, the first message the page sends parses with `parse_client_message` to `Join(nickname="Ana", resume_token=None)`, the page has opened one socket only, and until a snapshot is sent the room page has `data-status="joining"`, `data-seq=""`, `data-grid=""`, `data-pending="0"`, with `data-testid="room-status"` showing `fr.json["room.status.joining"]`.
+- **AC-18** (browser, mocked socket) Given the page on `/r/ABC123` with nothing in `localStorage`, when the socket opens, then the room page shows `data-status="nickname"` and sends nothing (no frame within 300 ms; Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted, so the test ignores any `ping` among the frames it reads); after the nickname form of spec 012 is submitted with `Ana`, the first message the page sends parses with `parse_client_message` to `Join(nickname="Ana", resume_token=None)`, the page has opened one socket only, and until a snapshot is sent the room page has `data-status="joining"`, `data-seq=""`, `data-grid=""`, `data-pending="0"`, with `data-testid="room-status"` showing `fr.json["room.status.joining"]`.
 - **AC-19** (browser, mocked socket) Given the page on `/r/ABC123` that received a FX-01 snapshot with `seq` 5, when the mock sends `letter_changed` events with `seq` 4, then 5, then 7, then the room page shows `data-seq="5"` and `data-pending="1"`; when it then sends `seq` 6, the page shows `data-seq="7"` and `data-pending="0"`.
 - **AC-20** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 5, when the mock sends the `selection_moved`, `reaction` and `error` wire examples of spec 039, then a `letter_changed` with `seq` 6, then the page shows `data-seq="6"`, `data-pending="0"` and `data-status="joined"`.
 - **AC-21** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 0, when the mock closes the socket with code 1011, then the room page reaches `data-status="reconnecting"`, `data-testid="room-status"` shows `fr.json["room.status.reconnecting"]` and the `connection-banner` is visible (amended for spec 017, which reconnects after a lost connection).
@@ -481,7 +490,8 @@ human's instruction to take technical decisions, as spec 012 decision 2 planned:
     AC-8 expects `seq == 1` and `players == (<the joiner's view>,)`, and an
     unknown `resume_token` is ignored; AC-16 enters the room through
     `enter_room` (the nickname form) and expects `data-seq="1"`; AC-18 expects
-    `data-status="nickname"` and no frame before the form, then
+    `data-status="nickname"` and no frame before the form (Note from the lead,
+    2026-10-15: spec 017's heartbeat `ping` frames are not counted), then
     `Join(nickname="Ana", resume_token=None)` and `joining` (not `connecting`)
     until the snapshot. The WebSocket steps 4 and 5, the `data-status` list, page
     flow steps 2 and 9, the `resume_token` edge case and items 6 and 7 now point

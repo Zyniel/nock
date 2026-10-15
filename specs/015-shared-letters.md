@@ -57,8 +57,10 @@ An accepted edit, with `seq = state.seq + 1`:
   `changed_seq = seq`, `changed_by = p`; `locked` and `revealed` stay `False`;
 - (spec 018) `p`'s `last_edit` records the cell as it was before;
 - (spec 037) `now` is added to `p`'s `recent_edits`;
-- `state.seq = seq`;
-- one entry `LogEntry(at=now, event=LetterChanged(seq, row, column, letter, pencil=False, player_id=p))`.
+- `state.seq = seq` (`seq + 1` when spec 026 adds a completion entry, below);
+- one entry `LogEntry(at=now, event=LetterChanged(seq, row, column, letter, pencil=False, player_id=p))`,
+  followed, when spec 026's completion rule applies, by one `grid_full_wrong` or
+  `grid_solved` entry with the next seq (spec 026).
 
 An edit is accepted even when it does not change the cell (the same letter again,
 or erasing an empty cell): it still gets its `letter_changed`. Every edit a client
@@ -114,8 +116,23 @@ TestClient socket of the same `with TestClient(app) as client` block, each keepi
 its own copy of the grid: the snapshot's `grid`, then every `letter_changed`
 applied in `seq` order (setting `letter`, `pencil` and `author`). Random choices
 use `random.Random(15)`. The registries of AC-1 and AC-3 use
-`RoomConfig(max_edits_per_second=1000)` so that spec 037's throttle (built later)
-does not refuse the test's edits (spec 011 harness).
+`RoomConfig(max_edits_per_second=1000, max_inbound_pending=1000,
+max_outbound_messages=5000)` so that spec 037's throttle (built later) does not
+refuse the test's edits (spec 011 harness), spec 036's inbound cap does not close
+the test's sockets and spec 036's outbound bound does not close the socket of a
+client whose reader falls behind. (Note from the lead,
+2026-10-14: `max_inbound_pending=1000` added. Spec 036 AC-6 closes with 1008
+(`FLOOD_CLOSE_CODE`) a connection with more than `max_inbound_pending` unapplied
+inputs, 100 by default, and AC-3's clients send their 250 edits with no pause,
+faster than the room applies them. 1000 is above any connection's burst here
+(250 edits). The default stays at 100: real players never queue that many inputs.)
+(Note from the lead, 2026-10-14: `max_outbound_messages=5000` added. Spec 036
+closes with 4507 (`STALLED_CLOSE_CODE`) a connection that already has
+`max_outbound_messages` messages waiting, 1,000 by default, and in AC-3 each client
+receives about 1,000 `letter_changed` (one per edit of the four clients), so a
+client whose reader thread falls behind by that much on a busy machine is closed
+as stalled and the test flakes. 5,000 is about five times what any client of AC-1
+(about 200 messages) or AC-3 (about 1,000) receives. The default stays at 1,000.)
 
 ## Acceptance criteria
 
@@ -123,10 +140,20 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-4.1.1) (WebSocket; browser with live server) A letter typed by one player appears for the others within 300 ms at the 95th percentile on a 4G connection. WebSocket (server relay): clients A and B join a FX-01 room; A sends 200 `edit_letter` messages one after the other on random letter cells, each sent only after A received the `letter_changed` of the previous one; for each, the time from A sending it to B receiving the matching `letter_changed` (same seq order, same cell and letter, `player_id` A) is measured with `time.monotonic()`; the 95th percentile is at most 100 ms and every edit reached B. Browser: two pages on the live server join one FX-01 room as `Ana` and `Bob`; Ana taps (1, 0) and types `TAMIS`; for each letter, Bob's matching cell reaches that `data-letter` within 300 ms of the key press (`expect(...).to_have_attribute(..., timeout=300)`).
 - **AC-2** (AC-4.1.2) (browser with mocked socket) My own letter appears at once, before the server confirms it. Given the page joined with a FX-01 snapshot (`you` = `p1`, `seq` 5) and a mock that never answers edits, tapping (1, 0) and pressing `t` gives (1, 0) `data-letter="T"` and `data-unconfirmed="true"` at once and one `EditLetter(row=1, column=0, letter="T")` sent; when the mock then sends `letter_changed` seq 6 for (1, 0) letter `B` from `p2`, the cell still shows `T` with `data-unconfirmed="true"` and `data-author="p2"`; when it sends `letter_changed` seq 7 for (1, 0) letter `T` from `p1`, the cell shows `T` with `data-unconfirmed="false"` and `data-author="p1"`. In a second run, after the page sends `T`, the mock answers `error` with code `cell_locked`: the cell shows its confirmed letter (`""`) with `data-unconfirmed="false"`.
-- **AC-3** (AC-4.1.3) (WebSocket, simulated clients) Given 4 simulated clients sending 1,000 random edits on FX-01, when the edits stop, then all clients and the server hold the same grid. Four clients join one FX-01 room; each, in its own thread, sends 250 edits on random letter cells (90 % `edit_letter` with a random letter A to Z, 10 % `erase`) with no pause, while reading its socket. Once every client has received its 250 answers and the server's `room_state(code).seq` has stopped moving, then: each client's grid equals `grid_state(registry.room_state(code))` cell by cell (`letter`, `pencil`, `author`); every client received every seq from its snapshot's `seq + 1` to the final `seq` exactly once, in order; and the room's `seq` equals 4 (joins) plus 1,000.
-- **AC-4** (AC-4.1.4) (WebSocket; browser with mocked socket) Edits to different cells never delay or cancel each other. WebSocket: clients A and B each send, at the same time from two threads, 18 edits, one per FX-01 letter cell, A with letter `A` in row-major order and B with letter `B` in reverse order, each on a different cell from the other's at the same index; after both received 36 `letter_changed` events, every cell holds the letter of whichever edit to it came last in seq order, both clients agree with `grid_state`, and no edit got an error. Browser: given the page joined with a FX-01 snapshot (`you` = `p1`) and a pending `T` typed at (1, 0), when the mock sends `letter_changed` for (1, 1) letter `A` from `p2`, then (1, 1) shows `A` with `data-unconfirmed="false"` and (1, 0) still shows `T` with `data-unconfirmed="true"`.
+- **AC-3** (AC-4.1.3) (WebSocket, simulated clients) Given 4 simulated clients sending 1,000 random edits on FX-01, when the edits stop, then all clients and the server hold the same grid. Four clients join one FX-01 room; each, in its own thread, sends 250 edits on random letter cells (90 % `edit_letter` with a random letter A to Z, 10 % `erase`) with no pause, while reading its socket. Once every client has received its 250 answers and the server's `room_state(code).seq` has stopped moving, then: each client's grid equals `grid_state(registry.room_state(code))` cell by cell (`letter`, `pencil`, `author`); every client received every seq from its snapshot's `seq + 1` to the final `seq` exactly once, in order; and the room's `seq` equals 4 (joins) plus the number of accepted edits (1,000, unless the run solves the grid: spec 026 then refuses every later edit with `grid_solved`) plus the number of `grid_full_wrong` and `grid_solved` events (spec 026) the clients received.
+- **AC-4** (AC-4.1.4) (WebSocket; browser with mocked socket) Edits to different cells never delay or cancel each other. WebSocket: clients A and B each send, at the same time from two threads, 18 edits, one per FX-01 letter cell, A with letter `A` in row-major order and B with letter `B` in reverse order, each on a different cell from the other's at the same index; after both received 36 `letter_changed` events (a `grid_full_wrong` event of spec 026 arriving among them is not counted), every cell holds the letter of whichever edit to it came last in seq order, both clients agree with `grid_state`, and no edit got an error. Browser: given the page joined with a FX-01 snapshot (`you` = `p1`) and a pending `T` typed at (1, 0), when the mock sends `letter_changed` for (1, 1) letter `A` from `p2`, then (1, 1) shows `A` with `data-unconfirmed="false"` and (1, 0) still shows `T` with `data-unconfirmed="true"`.
 
 ## Edge cases and errors
+
+Note from the lead (2026-10-12, for spec 026): spec 026 adds two log events that
+take seqs, `grid_full_wrong` (when the grid becomes full with a wrong letter) and
+`grid_solved` (when it becomes full and right). They follow the `letter_changed`
+of the edit that caused them, in the same step, and are not answers to that edit
+(the pending queue ignores them). The random runs of AC-3 and AC-4 fill FX-01, so
+AC-3's expected final `seq` now counts these events and AC-4's count of 36
+`letter_changed` events ignores them; the wording of AC-3, AC-4, the accepted-edit
+rule above and the seq count below was adjusted. No criterion was added or
+removed.
 
 - Same letter again (AC-2, AC-3): the server answers it with a `letter_changed`
   (the page of spec 008 does not send it, but a simulated client may).
@@ -146,8 +173,9 @@ The words in brackets say how each criterion is tested.
   because the server answers each connection's edits in the order it sent them
   (spec 011 delivery order, one queue per connection).
 - 95th percentile (AC-1): the 190th smallest of the 200 relay times.
-- Seq count (AC-3): every accepted edit adds exactly one seq; the room's final
-  `seq` proves that no edit was dropped or merged.
+- Seq count (AC-3): every accepted edit adds exactly one seq, and so does every
+  `grid_full_wrong` or `grid_solved` event (spec 026); the room's final `seq`
+  proves that no edit was dropped or merged.
 
 ## Out of scope
 

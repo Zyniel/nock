@@ -132,8 +132,10 @@ The words in brackets say how each criterion is tested.
   switches to `down` when the new cell has a down word.
 - Only the selected word unfinished (AC-2): `Tab` re-selects that word's first
   unfilled cell.
-- Every word finished (AC-2): `Tab` and `Shift+Tab` change nothing and send nothing;
-  the focus stays on the grid.
+- Every word finished (AC-2): `Tab` and `Shift+Tab` change nothing and send nothing
+  (Note from the lead, 2026-10-15: "send nothing" leaves aside the heartbeat
+  `ping` frames of spec 017, which the page may send at any time once the socket
+  is open); the focus stays on the grid.
 - Locked cells (AC-2): they are filled; a word whose remaining cells are all locked
   or filled is finished.
 - Tab outside the grid (AC-2): with the focus on another control, `Tab` moves the

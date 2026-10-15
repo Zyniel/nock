@@ -132,11 +132,85 @@ New `fr.json` keys:
 | `settings.help_mode.vote` | `par vote` |
 | `settings.help_mode.none` | `désactivée` |
 
+### Client: feed scroll position
+
+(Note from the lead, 2026-10-14: added with AC-7 and AC-8. A new line used to
+bring the feed list back to its newest item even when the player had scrolled up
+to read older lines, with the arrow keys (spec 035 AC-12), the mouse or touch.
+That pulled the text away from the reader. The feed's order does not change:
+oldest first and the newest at the bottom (decision 4), and a list that nobody
+scrolls still shows its newest item.)
+
+Terms:
+
+- The feed list is the `ul` element inside `activity-feed` that holds the
+  `feed-item` elements (`[data-testid="activity-feed"] ul`). It scrolls vertically
+  once its items do not fit, and on a small window it shows one line (AC-6).
+- Its distance to the end is `scrollHeight - clientHeight - scrollTop`, read from
+  those properties of the list. The list is at its end while that distance is at
+  most 1 px. A list that does not scroll is at its end. So the list starts at its
+  end, and stays there while nobody scrolls it.
+
+Rules:
+
+- New line at the end (AC-7): when the page adds a `feed-item` (AC-5) and the list
+  was at its end just before, the list is at its end again within 300 ms of the
+  item showing, so the newest line is in view. Lines that come one right after
+  another follow the same rule: if the list was at its end before the first, it is
+  at its end within 300 ms after the last shows.
+- New line while the player reads older lines (AC-7): when the page adds a
+  `feed-item` and the list was not at its end just before, the page leaves the
+  list where it is. Every item that stays in the list keeps its place in the
+  window: the `top` of its bounding box moves by at most 1 px. While the feed
+  holds fewer than 100 items, the new item goes below the others, and `scrollTop`
+  keeps its value within 1 px. When the feed already holds 100 items, the new item
+  also removes the oldest ("Feed length" in "Edge cases and errors"). `scrollTop`
+  then goes down by the distance the other items moved up, so that they stay in
+  place. If `scrollTop` is smaller than that distance, it becomes 0, and the items
+  move up by the rest.
+- No special case (AC-7): these two rules apply to every line, whatever it
+  reports. A line about the player's own action (their check, their lock, their
+  settings) does not bring the list to its end either.
+- Layout change at the end (AC-8): when the list is at its end and its size or the
+  height of its items changes for another reason than a new line (a resize or a
+  rotation of the window, a change of the root font), the list is at its end again
+  within 300 ms. When it is not at its end, the page does not scroll it then. The
+  browser may still move it, for example to keep `scrollTop` within the new range.
+- Only the position counts, not what put the list there: the arrow keys or
+  `Page Up` on the focused list (spec 035 AC-12), the mouse wheel, the scrollbar,
+  touch, or a script. Apart from these rules, the page never changes the list's
+  scroll position.
+- How the page keeps these rules (a `scroll` listener, a `ResizeObserver`, the
+  browser's scroll anchoring and `overflow-anchor`, or its own script) is the
+  implementer's choice, as long as they hold in Chromium, Firefox and WebKit.
+
 ### Test harness
 
 As spec 011. Mocked-socket tests send events built with the `nock.protocol` models
 (the wire examples of spec 039 with chosen seqs). Relay timing uses
 `time.monotonic()` on the test side.
+
+Feed scroll states (AC-7, AC-8). (Note from the lead, 2026-10-14: added.)
+
+- Browser with mocked socket, desktop context (that viewport, no touch). The
+  snapshot is AC-5's: FX-01, `seq` 5, `p1` (`you`, `Ana`, host) and `p2` (`Bob`).
+  The window is 1280 by 720, where the feed list shows a few lines, or 360 by 740,
+  where it shows one line (AC-6).
+- A line event is a `check_result` by `p2` with scope `grid` and empty lists,
+  with the `seq` given. Each one adds the line `Bob a vérifié la grille`.
+- The feed list, its distance to the end and "at its end" are those of "Client:
+  feed scroll position". "Once `room-page` has `data-seq` N" is spec 040's
+  attribute.
+- Settled: the test reads the list's `scrollTop` every 100 ms and goes on once two
+  reads in a row are equal. It fails after 2 s.
+- Scroll probe: a `requestAnimationFrame` loop, which the test starts in the page
+  with `page.evaluate`, reads the list's `scrollTop` at every frame, from just
+  before the test sends the event (or clicks) until 300 ms after `room-page` has
+  that event's `data-seq`. "The probe stays put" means that every value it read is
+  within 1 px of the `scrollTop` read just before it started. So a jump to the end
+  and back also fails.
+- Items in view: the `feed-item` elements whose bounding box overlaps the list's
+  bounding box vertically by more than 1 px.
 
 ## Acceptance criteria
 
@@ -148,6 +222,18 @@ The words in brackets say how each criterion is tested.
 - **AC-4** (AC-3.3.4) (browser with mocked socket) My own selection is styled differently from every other player's. Given `p1` (`you`) and `p2`, after `p1` taps (3, 1) and the mock sends `p2`'s selection on (2, 2): (3, 1) has `data-selected="true"` and no `remote-selection` child; no cell has a `remote-selection` with `data-player-id="p1"`; the computed `border-style` of (3, 1) and of its children is never `dashed`; and the background colour of (3, 1) differs from the background colour of (2, 2) and of the tinted (2, 3).
 - **AC-5** (AC-3.3.5) (browser with mocked socket) An activity feed lists joins, departures, checks, reveals, flags and setting changes in the order they happened. Given the page joined at `seq` 5 with players `p1` (`you`, `Ana`) and `p2` (`Bob`), when the mock sends, with seqs 6 to 12: `player_joined` (`p3`, `Cy`), `check_result` (`p2`, scope word), `reveal_result` (`p3`, scope letter), `flag_changed` (`p2`, clue (0, 3, 0)), `settings_changed` (`p1`, help mode `vote`, budget 5 letters and 1 word, unlocked), `settings_changed` (`p1`, same values but `locked` true), `player_left` (`p3`, reason `removed`), then `activity-feed` holds 7 `feed-item` elements with `data-seq` 6 to 12 in that order and `data-kind` `player_joined`, `check`, `reveal`, `flag`, `settings_changed`, `room_locked`, `player_removed`, whose texts are, in order, `Cy a rejoint le salon`, `Bob a vérifié un mot`, `Cy a révélé une lettre`, `Bob bloque sur « Fatales à César »`, `Ana a modifié les réglages : aide par vote, 5 lettres et 1 mots à révéler`, `Ana a verrouillé le salon` and `Cy a été retiré du salon` (each built from `fr.json`). Sending those events out of order (seq 8 before 7) still lists them by seq.
 - **AC-6** (new) (browser with mocked socket) The roster and the feed never take the grid's room. With a snapshot of 8 players and 100 feed items, at every window size of spec 006 AC-5, in desktop and touch contexts (touch with spec 009's on-screen keyboard), and after a tap on a cell: the `grid-viewport` is at least 100 px high, the page has no vertical or horizontal scroll, the grid fits the viewport at zoom 1, and the clue bar is fully inside the window above the keyboard (specs 006 AC-5 and AC-7, 009 AC-4). On small windows the roster and the feed may be compact (for example one line each, the feed showing its newest item) as long as their content stays reachable.
+- **AC-7** (AC-3.3.5; new, from the lead's review of 2026-10-14) (browser with mocked socket) A new feed line brings the feed list to the newest line only when the list was already at its end; otherwise the player keeps their place. The rules are those of "Client: feed scroll position". The setup, "settled", the scroll probe and "items in view" are in "Feed scroll states" in "Test harness". The cases below run in this order on one page, at 1280 by 720 and again at 360 by 740, each from the state the case before it left. Wherever a case says that the list scrolls, or that it is or is not at its end before an event, the test first checks it from the list's measures and fails if it does not hold. (Note from the lead, 2026-10-14: added.)
+  - Filling: the mock sends ten line events, `seq` 6 to 15, one right after another without waiting. Once `room-page` has `data-seq` 15, the list scrolls, and within 300 ms it is at its end.
+  - At the end: the mock sends the line event with `seq` 16. Within 300 ms after `room-page` has `data-seq` 16, the list is at its end.
+  - Scrolled up: the test sets the list's `scrollTop` to `Math.floor((scrollHeight - clientHeight) / 2)` with `page.evaluate` and waits until it is settled. The list is not at its end. The mock sends the line event with `seq` 17. The probe stays put, and the last `feed-item` has `data-seq` 17.
+  - My own action: the list is still where the case before left it. The test clicks `lock-room` (spec 014). Once the page has sent `lock_room`, the mock answers with a `settings_changed` by `p1` that carries the snapshot's settings with `locked` true (`seq` 18), so the feed gets the line `Ana a verrouillé le salon`. The probe, started just before the click, stays put.
+  - Back at the end: the test sets the list's `scrollTop` to its `scrollHeight` (the browser stops it at the end) and waits until it is settled. The list is at its end. The mock sends the line event with `seq` 19. Within 300 ms after `room-page` has `data-seq` 19, the list is at its end.
+  - Within 1 px of the end: the test sets `scrollTop` to `scrollHeight - clientHeight - 1` and waits until it is settled. The distance to the end is at most 1, so the list is at its end. The mock sends the line event with `seq` 20. Within 300 ms after `room-page` has `data-seq` 20, the list is at its end, which it would not be if the page had left it where it was.
+  - Full feed: the mock sends the line events with `seq` 21 to 105, one right after another. Once `room-page` has `data-seq` 105, the feed holds 100 items (`seq` 6 to 105), and within 300 ms the list is at its end. The test sets `scrollTop` to `Math.floor((scrollHeight - clientHeight) / 2)`, waits until it is settled, and notes the `data-seq` and the bounding box `top` of each item in view. The mock sends the line event with `seq` 106. 300 ms after `room-page` has `data-seq` 106, the first `feed-item` has `data-seq` 7 and the last has `data-seq` 106 (AC-5), and each noted item has its `top` within 1 px of the noted value.
+- **AC-8** (new, from the lead's review of 2026-10-14) (browser with mocked socket) A feed list at its end stays at its end when the window or the root font changes, so the newest line stays in view. Setup: "Feed scroll states" in "Test harness", at 1280 by 720, with the ten line events of AC-7's "Filling" (`seq` 6 to 15) and the list at its end (the test checks it). The rules are those of "Client: feed scroll position". (Note from the lead, 2026-10-14: added with AC-7.)
+  - Smaller window: the test calls `page.set_viewport_size` with 360 by 740. Once `window.innerWidth` reads 360, the list scrolls, and within 300 ms it is at its end.
+  - Larger root font: the test then sets the root font to 20 px as spec 014's "Test harness" does: it sets `document.documentElement.style.fontSize` with `page.evaluate` and waits until the computed `font-size` of `html` reads `20px`. Within 300 ms after that, the list is at its end.
+  - Larger window: the test calls `page.set_viewport_size` with 1280 by 720. Once `window.innerWidth` reads 1280, the list is at its end within 300 ms.
 
 ## Edge cases and errors
 
@@ -177,6 +263,34 @@ The words in brackets say how each criterion is tested.
 - Plural (AC-5): the text uses the numbers as they are (`1 mots`); proper plural
   forms are left to a later wording pass.
 - Text injection (AC-5): names and clue texts are inserted as text (spec 037 AC-4).
+- Feed list that does not scroll (AC-7): it is at its end, so the line that first
+  makes it scroll comes into view, and a list that nobody scrolls always shows its
+  newest line. (Note from the lead, 2026-10-14.)
+- Player scrolled up on a full feed (AC-7): each new line removes the oldest, and
+  the lines in view stay in place until `scrollTop` reaches 0. From then on, each
+  new line moves the items up by one. A player who stays there sees the oldest
+  lines go, since the feed keeps 100 items. (Note from the lead, 2026-10-14.)
+- Feed list with the focus (AC-7, spec 035 AC-12): a new line leaves the focus on
+  the list, and the list keeps its place unless it was at its end. (Note from the
+  lead, 2026-10-14.)
+- Back at the end (AC-7): once the player scrolls the list back to within 1 px of
+  its end, the next line brings it to its end again. Nothing else marks the
+  change. (Note from the lead, 2026-10-14.)
+- The player's own lines (AC-7): no special case. The player sees the result of
+  their action where they made it (the lock button, the grid, the settings form),
+  and a jump to the newest line would take their place away all the same
+  (decisions). (Note from the lead, 2026-10-14.)
+- Wheel, scrollbar and touch (AC-7): they move the list as the keys do, and the
+  rules depend only on the position. The tests move the list with a script here
+  and with the arrow keys in spec 035 AC-12, because Playwright cannot swipe in
+  every engine. (Note from the lead, 2026-10-14.)
+- Layout change while the player reads older lines (AC-8): the page does not
+  scroll the list. The browser may move it, to keep `scrollTop` within the new
+  range or by its own scroll anchoring. The list follows new lines again once it
+  is at its end. (Note from the lead, 2026-10-14.)
+- Rounding (AC-7, AC-8): `scrollHeight` and `clientHeight` are whole numbers,
+  while `scrollTop` can have a fraction, so "at its end" allows 1 px. (Note from
+  the lead, 2026-10-14.)
 
 ## Out of scope
 
@@ -188,6 +302,9 @@ The words in brackets say how each criterion is tested.
   the feed.
 - Cursor trails, typing indicators, avatars.
 - Showing selections of disconnected players.
+- A sign that new lines came in while the player reads older ones, or a control
+  that jumps to the newest line (AC-7). The player scrolls back to the end with the
+  keys, the wheel, the scrollbar or touch. (Note from the lead, 2026-10-14.)
 
 ## Work packages
 
@@ -230,6 +347,35 @@ instruction to take technical decisions:
   on landscape phones, which predates this spec.
 - A tick that disconnects a silent player clears their selection and relays the
   clearing to the others, never to the silent player.
+
+Added on 2026-10-14, decided by the lead under the human's permission to refine
+approved and done specs:
+- Feed scroll position (AC-7). A new line used to bring the feed list back to its
+  newest line even while the player was reading older lines, with the arrow keys
+  (spec 035 AC-12), the mouse or touch. That pulled the text away from the reader:
+  a usability problem, and the closest WCAG rule, 2.2.2 (Pause, Stop, Hide), asks
+  that a reader can stop auto-updating content. Pick: a new line brings the list
+  to its end only if the list was at its end, within 1 px, just before. Otherwise
+  the page leaves the list where the player put it, and the lines in view keep
+  their place, also when the 101st line removes the oldest. The feed's order
+  (decision 4) does not change, and a list that nobody scrolls still shows its
+  newest line.
+- The player's own lines (AC-7). Options: bring the list to its end for a line
+  about the player's own action, or treat it like any other line. Pick: like any
+  other line. The spec had no such case, the player sees the result of the action
+  where they made it, and a jump would still take their place away.
+- Layout changes (AC-8). With the rule of AC-7 alone, a list at its end that a
+  resize, a rotation or a new root font moves away from its end would stop
+  following new lines, while before this change the next line brought it back.
+  Pick: a list at its end stays at its end through such a change, within 300 ms,
+  so the compact feed of AC-6 keeps showing its newest line.
+- Tests (AC-7, AC-8). The measures are the list's `scrollTop`, `scrollHeight` and
+  `clientHeight`, with 1 px of tolerance. A probe reads `scrollTop` at every frame,
+  so that a jump to the end and back also fails. A script moves the list here, and
+  stands for the wheel and touch. Spec 035 AC-12 checks the same rule after the
+  arrow keys, because that needs the list to be a Tab stop in WebKit, which spec
+  035 gives. AC-7 clicks spec 014's `lock-room`, which exists since spec 014 is
+  done; decision 7's build order was for the first build of this spec.
 
 ## Open questions
 

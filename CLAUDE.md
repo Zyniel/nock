@@ -31,12 +31,16 @@ Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 ## Layout
 
 - `specs/NNN-short-name.md`: one spec per feature, copied from `specs/_template.md`.
-- `tests/test_spec_NNN_short_name.py`: the tests of spec NNN.
+- `tests/test_spec_NNN_*.py`: the tests of spec NNN, in one file
+  (`test_spec_NNN_short_name.py`) or, past about 800 lines, one file per
+  criterion group with the shared setup in `tests/specNNN_harness.py`.
 - `src/nock/`: the package.
 - `web/`: the Svelte + TypeScript client, built by Vite into `web/dist`.
 - `scripts/gate.py`: the quality gate.
 - `.claude/agents/`: the four roles. `.claude/skills/`: standards and workflows.
   `scripts/hooks/`: the scripts that enforce the rules below.
+- `.claude/hooks/session-start.sh`: in a Claude Code cloud session, installs the
+  Python and web dependencies and the three test browsers before the first prompt.
 
 ## How a feature gets built
 
@@ -56,6 +60,11 @@ write the implementation before its tests exist.
   to a criterion that does not exist.
 - Spec status is one of `draft`, `approved`, `done`, on a line `status: ...` in the
   front matter.
+- An agent may refine an `approved` or `done` spec (a review finding, a
+  contradiction, a missing rule). It keeps the status and adds a dated note next
+  to each change; the tests follow before the code. Only a human sets `approved`.
+- The gate leaves out the tests of a browser engine that is not installed, with a
+  warning (`scripts/gate_browsers.py`); CI still runs all three engines.
 
 ## Who may write what
 

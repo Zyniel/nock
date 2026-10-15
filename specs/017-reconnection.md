@@ -80,6 +80,12 @@ Heartbeat and loss detection:
 | `SILENCE_LIMIT_MS` | 4,000: when no frame of any kind has arrived for this long while the socket is open, the page closes it itself and treats it as lost |
 | `RECONNECT_DELAYS_MS` | 1,000, 2,000, 4,000, 8,000, then 8,000 for every later try |
 
+(Note from the lead, 2026-10-15, after a CI finding on spec 012 AC-1: the page may
+send a heartbeat `ping` at any time once the socket is open, so the "sends
+nothing", "sends no frame" and "nothing is sent" rules of specs 007, 008, 009,
+010, 012, 016, 019, 020, 022, 024, 026, 027 and 040 leave the `ping` frames
+aside, and a test that checks what the page sent does not count them.)
+
 A connection is lost when the socket closes or errors with any code other than a
 final one, or by the silence rule. Final: close 4404 (`not_found`), 4429
 (`throttled`), 4001 (`replaced`), and a close that follows an `error` with code

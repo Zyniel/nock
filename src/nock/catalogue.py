@@ -13,6 +13,7 @@ from pydantic import (
     ConfigDict,
     Field,
     StrictBool,
+    StringConstraints,
     model_validator,
 )
 
@@ -22,13 +23,17 @@ from nock.grid_import import import_grid
 GridNumber = Annotated[int, Field(ge=1, le=999_999_999, strict=True)]
 Force = Annotated[int, Field(ge=1, le=4, strict=True)]
 
+CreditText = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
+]
+
 PUBLISHED_ON_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 GRIDS_DIR: Path = Path(__file__).resolve().parents[2] / "grids"
 
 
 class CatalogueEntry(BaseModel):
-    """One grid of the catalogue and its listing data."""
+    """One grid of the catalogue, its listing data and its rights."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -36,6 +41,10 @@ class CatalogueEntry(BaseModel):
     published_on: date
     force: Force
     published: StrictBool
+    author: CreditText
+    source: CreditText
+    licence: CreditText
+    withdrawn: StrictBool = False
     grid: Grid
 
 
@@ -106,7 +115,7 @@ class Catalogue(BaseModel):
         return self
 
     def published_summaries(self, force: int | None = None) -> list[GridSummary]:
-        """Summaries of the published entries, newest first.
+        """Summaries of the published, not withdrawn entries, newest first.
 
         Args:
             force: Keep only the entries of that force. None keeps them all.
@@ -117,7 +126,7 @@ class Catalogue(BaseModel):
         """
         shown_entries: list[CatalogueEntry] = []
         for entry in self.entries:
-            if not entry.published:
+            if not entry.published or entry.withdrawn:
                 continue
             if force is not None and entry.force != force:
                 continue
@@ -129,8 +138,10 @@ class Catalogue(BaseModel):
         return summaries
 
     def find_published(self, number: int) -> CatalogueEntry | None:
-        """Return the published entry `number`, or None if unknown or unpublished."""
+        """Return entry `number` if published and not withdrawn, else None."""
         for entry in self.entries:
+            if entry.withdrawn:
+                continue
             if entry.number == number and entry.published:
                 return entry
         return None
@@ -201,8 +212,10 @@ def load_catalogue(directory: Path) -> Catalogue:
         The catalogue of those files.
 
     Raises:
-        CatalogueError: At the first file that is not valid, or when two files
-            hold the same number. The message contains the file name.
+        CatalogueError: At the first file that is not valid (including a
+            missing, blank or over-long credit: author, source or licence;
+            or a non-boolean `withdrawn`), or when two files hold the same
+            number. The message contains the file name.
     """
     if not directory.is_dir():
         return Catalogue()

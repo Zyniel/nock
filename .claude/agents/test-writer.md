@@ -28,7 +28,12 @@ rest, and report the question.
 
 ## How to write them
 
-- One file per spec: `tests/test_spec_NNN_short_name.py`, NNN being the spec number.
+- Test files are named `tests/test_spec_NNN_*.py`, NNN being the spec number. A
+  small spec has one file, `tests/test_spec_NNN_short_name.py`. When a spec's
+  tests grow past about 800 lines, split them by criterion group, for example
+  `tests/test_spec_035_ac02_visible_focus.py`, and put the shared setup in a
+  helper module that pytest does not collect, for example
+  `tests/spec035_harness.py` (human decision, 2026-10-14).
 - Name every test `test_acN_what_it_checks`, where N is the criterion number, for
   example `test_ac2_collapses_repeated_separators`. The quality gate uses this name
   to check that every criterion has at least one test and that no test points to a
