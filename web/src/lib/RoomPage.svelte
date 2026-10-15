@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import ChatPanel from './ChatPanel.svelte'
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
+  import ReactionPicker from './ReactionPicker.svelte'
   import { t } from './i18n'
-  import { nameOf } from './activityFeed'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import {
     chatToggleLabel,
@@ -11,7 +12,6 @@
     isPaced,
     msUntilNextExpiry,
     sendsInWindow,
-    shownChatLines,
     unreadBadgeText,
     unreadCount,
   } from './chat'
@@ -25,7 +25,6 @@
     keepFeedEndOnResize,
     keepFeedPlace,
     noteFeedPlace,
-    scrollToEnd,
     watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
@@ -41,7 +40,6 @@
     FLASH_MS,
     PING_INTERVAL_MS,
     REACTION_MS,
-    REACTION_VALUES,
     SILENCE_LIMIT_MS,
     VOTE_RESULT_MS,
     addPendingEdit,
@@ -960,19 +958,6 @@
     return () => observer.disconnect()
   })
 
-  // Call `onEscape` when Escape is pressed while the focus is inside `element`.
-  // Returns a function that stops listening.
-  function listenForEscape(element: HTMLElement, onEscape: () => void): () => void {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onEscape()
-      }
-    }
-    element.addEventListener('keydown', onKeyDown)
-    return () => element.removeEventListener('keydown', onKeyDown)
-  }
-
   let you = $derived(session.snapshot === null ? '' : session.snapshot.you)
   // True while the host muted my chat and my reactions.
   let isMuted = $derived(
@@ -1009,9 +994,6 @@
   let isChatOpen = $state(false)
   let chatText = $state('')
   let chatToggle: HTMLButtonElement | null = $state(null)
-  let chatPanel: HTMLElement | null = $state(null)
-  let chatInput: HTMLInputElement | null = $state(null)
-  let chatList: HTMLUListElement | null = $state(null)
   // Lines up to this seq are read: the seq of the page's first snapshot, then
   // the seq of the newest line while the panel is open. A reconnection keeps it,
   // so the lines that came meanwhile count as unread. null before the first
@@ -1019,20 +1001,9 @@
   let lastSeenChatSeq: number | null = $state(null)
 
   let chatHistory = $derived(session.snapshot === null ? [] : session.snapshot.chat)
-  let chatLines = $derived(shownChatLines(chatHistory))
   let unreadLines = $derived(
     isChatOpen || lastSeenChatSeq === null ? 0 : unreadCount(chatHistory, lastSeenChatSeq, you),
   )
-  // The other players, in roster order: the host's mute buttons.
-  let otherPlayers = $derived(
-    session.snapshot === null
-      ? []
-      : session.snapshot.players.filter((player) => player.player_id !== you),
-  )
-  let isChatSendDisabled = $derived(
-    chatText.trim() === '' || session.status !== 'joined' || isMuted || isChatPaced,
-  )
-
   // While the panel is open, every line of the history is read.
   $effect(() => {
     if (!isChatOpen || chatHistory.length === 0) {
@@ -1050,18 +1021,6 @@
       return
     }
     isChatOpen = true
-    void focusChatAfterOpening()
-  }
-
-  // `tick` resolves once the panel is on the page. A muted player's input is
-  // disabled: the focus then stays on the toggle.
-  async function focusChatAfterOpening(): Promise<void> {
-    await tick()
-    if (chatInput !== null && !chatInput.disabled) {
-      chatInput.focus()
-    } else {
-      chatToggle?.focus()
-    }
   }
 
   function closeChat(): void {
@@ -1069,36 +1028,10 @@
     chatToggle?.focus()
   }
 
-  // Runs before the page disables the chat controls at a mute: when the focus
-  // is on the input or the send button, it goes to the toggle instead of being
-  // lost. The panel stays open and the typed text stays in the input.
-  $effect.pre(() => {
-    if (!isMuted) {
-      return
-    }
-    const focused = document.activeElement
-    const chatForm = chatInput?.form
-    if (focused !== null && chatForm?.contains(focused)) {
-      chatToggle?.focus()
-    }
-  })
-
-  $effect(() => {
-    if (chatPanel === null) {
-      return
-    }
-    return listenForEscape(chatPanel, closeChat)
-  })
-
-  // Send the trimmed text and empty the input. The line shows when the
-  // server's chat_message comes back: no local echo.
-  function submitChat(event: SubmitEvent): void {
-    event.preventDefault()
-    if (isChatSendDisabled) {
-      return
-    }
-    send({ type: 'chat', text: chatText.trim() })
-    chatText = ''
+  // Send a message; the line shows when the server's chat_message comes back:
+  // no local echo.
+  function sendChat(text: string): void {
+    send({ type: 'chat', text })
     chatSendTimes = [...chatSendTimes, performance.now()]
     refreshPacing()
   }
@@ -1109,64 +1042,10 @@
     send({ type: 'mute_player', player_id: playerId, muted: !isPlayerMuted })
   }
 
-  // The chat list keeps the reader's place as the feed list does (spec 013
-  // AC-7): a new line brings the list to its newest line only if the list was
-  // at its end just before. The list starts at its newest line each time the
-  // panel opens. `chatPlaceList` is the list whose place is followed.
-  let newestChatSeq = $derived(chatLines.length === 0 ? null : chatLines[chatLines.length - 1].seq)
-  let chatPlaceList: HTMLUListElement | null = null
-  let chatPlaceBeforeNewLine: FeedPlace | null = null
-
-  // Runs before the new line is on the page: note where the list is.
-  $effect.pre(() => {
-    const newestSeq = newestChatSeq
-    const list = chatList
-    if (list === null || newestSeq === null || list !== chatPlaceList) {
-      return
-    }
-    chatPlaceBeforeNewLine = noteFeedPlace(list)
-  })
-
-  // Runs once the new line is on the page, or once the list is on the page.
-  $effect(() => {
-    const newestSeq = newestChatSeq
-    const list = chatList
-    if (list === null) {
-      chatPlaceList = null
-      return
-    }
-    if (list !== chatPlaceList) {
-      chatPlaceList = list
-      chatPlaceBeforeNewLine = null
-      scrollToEnd(list)
-      return
-    }
-    if (newestSeq === null || chatPlaceBeforeNewLine === null) {
-      return
-    }
-    keepFeedPlace(list, chatPlaceBeforeNewLine)
-    chatPlaceBeforeNewLine = null
-  })
-
-  // The chat list is a Tab stop while it scrolls (spec 035 AC-12), and at its
-  // end it stays at its end through a resize or a new root font (spec 013 AC-8).
-  $effect(() => {
-    if (chatList === null) {
-      return
-    }
-    const stopTabStop = followListTabStop(chatList)
-    const stopEndOnResize = keepFeedEndOnResize(chatList)
-    return () => {
-      stopTabStop()
-      stopEndOnResize()
-    }
-  })
-
   // ---- The reaction button and picker ----
 
   let isPickerOpen = $state(false)
   let reactButton: HTMLButtonElement | null = $state(null)
-  let reactionPicker: HTMLElement | null = $state(null)
   let isReactDisabled = $derived(activeWord === null || isMuted)
 
   function toggleReactionPicker(): void {
@@ -1175,19 +1054,6 @@
       return
     }
     isPickerOpen = true
-    void focusFirstReactionOption()
-  }
-
-  // `tick` resolves once the picker is on the page. While the reactions are
-  // paced, every option is disabled: the focus then stays on the button.
-  async function focusFirstReactionOption(): Promise<void> {
-    await tick()
-    const firstOption = reactionPicker?.querySelector('button')
-    if (firstOption instanceof HTMLButtonElement && !firstOption.disabled) {
-      firstOption.focus()
-    } else {
-      reactButton?.focus()
-    }
   }
 
   function closeReactionPicker(): void {
@@ -1195,43 +1061,27 @@
     reactButton?.focus()
   }
 
-  // Runs before the page disables the button (a mute, or no word selected):
-  // the picker closes at once and sends nothing. When the focus was inside it,
-  // the focus goes to the grid instead of falling back to the page.
-  $effect.pre(() => {
-    if (!isReactDisabled || !isPickerOpen) {
-      return
-    }
-    const focused = document.activeElement
-    if (reactionPicker !== null && focused !== null && reactionPicker.contains(focused)) {
-      gridViewport?.focusGrid()
-    }
+  // Close the picker and leave the focus where it is.
+  function dismissReactionPicker(): void {
     isPickerOpen = false
-  })
+  }
 
-  $effect(() => {
-    if (reactionPicker === null) {
+  // React on the selected word's clue.
+  function sendReaction(reaction: ReactionValue): void {
+    if (activeWord === null || isReactionPaced) {
       return
     }
-    return listenForEscape(reactionPicker, closeReactionPicker)
-  })
-
-  // React on the selected word's clue, then close the picker.
-  function sendReaction(reaction: ReactionValue): void {
-    if (activeWord !== null && !isReactionPaced) {
-      send({
-        type: 'react',
-        clue: {
-          row: activeWord.clueRow,
-          column: activeWord.clueColumn,
-          clue_index: activeWord.clueIndex,
-        },
-        reaction,
-      })
-      reactionSendTimes = [...reactionSendTimes, performance.now()]
-      refreshPacing()
-    }
-    closeReactionPicker()
+    send({
+      type: 'react',
+      clue: {
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      },
+      reaction,
+    })
+    reactionSendTimes = [...reactionSendTimes, performance.now()]
+    refreshPacing()
   }
 
   // What each clue shows of the reactions. Each reaction ends REACTION_MS after
@@ -1774,115 +1624,33 @@
        document order, outside it (its sideways scrolling would clip them), and
        are drawn over the page (spec 022). -->
   {#if session.snapshot !== null && isPickerOpen}
-    <div
-      class="reaction-picker"
-      id="reaction-picker"
-      data-testid="reaction-picker"
-      role="group"
-      aria-label={t('reaction.picker_label')}
-      bind:this={reactionPicker}
-    >
-      {#each REACTION_VALUES as reaction (reaction)}
-        <button
-          type="button"
-          class="reaction-option"
-          data-testid="reaction-option"
-          data-reaction={reaction}
-          aria-label={t(`reaction.${reaction}_label`)}
-          disabled={isReactionPaced}
-          onclick={() => sendReaction(reaction)}>{t(`reaction.${reaction}`)}</button
-        >
-      {/each}
-    </div>
+    <ReactionPicker
+      isPaced={isReactionPaced}
+      isButtonDisabled={isReactDisabled}
+      onPick={sendReaction}
+      onClose={closeReactionPicker}
+      onDismiss={dismissReactionPicker}
+      onFocusButton={() => reactButton?.focus()}
+      onFocusGrid={() => gridViewport?.focusGrid()}
+    />
   {/if}
   {#if session.snapshot !== null && isChatOpen}
-    <section
-      class="chat-panel"
-      class:below-picker={!isPopoverSideBySide}
-      id="chat-panel"
-      data-testid="chat-panel"
-      aria-labelledby="chat-heading"
-      bind:this={chatPanel}
-    >
-      <h2 id="chat-heading">{t('chat.heading')}</h2>
-      <!-- The tabindex is set from the script (spec 035 AC-12). -->
-      <ul
-        class="chat-list"
-        data-testid="chat-list"
-        role="list"
-        aria-labelledby="chat-heading"
-        bind:this={chatList}
-      >
-        {#each chatLines as line (line.seq)}
-          <li
-            data-testid="chat-message"
-            data-seq={String(line.seq)}
-            data-player-id={line.player_id}
-            data-you={String(line.player_id === you)}
-          >
-            <span class="chat-author" data-testid="chat-author"
-              >{nameOf(session.names, line.player_id)}</span
-            ><span class="chat-text" data-testid="chat-text">{line.text}</span>
-          </li>
-        {/each}
-      </ul>
-      {#if isHost}
-        <section
-          class="chat-moderation"
-          data-testid="chat-moderation"
-          aria-labelledby="chat-moderation-heading"
-        >
-          <h3 id="chat-moderation-heading">{t('chat.moderation_heading')}</h3>
-          <div class="mute-rows">
-            {#each otherPlayers as player (player.player_id)}
-              <div class="mute-row" data-testid="mute-row" data-player-id={player.player_id}>
-                <span data-testid="mute-name">{player.nickname}</span>
-                <button
-                  type="button"
-                  class="mute-player"
-                  data-testid="mute-player"
-                  data-muted={String(player.muted)}
-                  aria-label={player.muted
-                    ? t('chat.unmute_label', { name: player.nickname })
-                    : t('chat.mute_label', { name: player.nickname })}
-                  onclick={() => toggleMute(player.player_id, player.muted)}
-                  >{player.muted ? t('chat.unmute') : t('chat.mute')}</button
-                >
-              </div>
-            {/each}
-          </div>
-        </section>
-      {/if}
-      <form class="chat-form" onsubmit={submitChat}>
-        <label class="visually-hidden" for="chat-input">{t('chat.input_label')}</label>
-        <input
-          id="chat-input"
-          data-testid="chat-input"
-          type="text"
-          maxlength="280"
-          autocomplete="off"
-          placeholder={t('chat.placeholder')}
-          disabled={isMuted}
-          bind:value={chatText}
-          bind:this={chatInput}
-        />
-        <button
-          type="submit"
-          class="chat-send"
-          data-testid="chat-send"
-          disabled={isChatSendDisabled}>{t('chat.send')}</button
-        >
-      </form>
-      <!-- Always present, so the panel keeps its height when a note comes or
-           goes (spec 022 AC-18). -->
-      <p class="chat-note">
-        {#if isMuted}
-          <span data-testid="chat-muted">{t('chat.muted')}</span>
-        {:else if isChatPaced}
-          <span data-testid="chat-wait">{t('chat.wait')}</span>
-        {/if}
-      </p>
-    </section>
+    <ChatPanel
+      history={chatHistory}
+      players={session.snapshot.players}
+      names={session.names}
+      {you}
+      {isHost}
+      {isMuted}
+      isPaced={isChatPaced}
+      isConnected={session.status === 'joined'}
+      isBelowPicker={!isPopoverSideBySide}
+      bind:text={chatText}
+      onSend={sendChat}
+      onMute={toggleMute}
+      onClose={closeChat}
+      onFocusToggle={() => chatToggle?.focus()}
+    />
   {/if}
   {#if session.status === 'reconnecting'}
     <p class="connection-banner" data-testid="connection-banner" role="status">
@@ -2293,157 +2061,6 @@
     line-height: 1;
     color: #ffffff;
     background: #a4161a;
-  }
-
-  /* The reaction picker and the chat panel are drawn over the page below the
-     header, like the vote banner: absolutely placed, so they move nothing. The
-     vote banner comes later in the document with the same z-index, so it is
-     drawn over them and its buttons always stay uncovered. */
-  .reaction-picker,
-  .chat-panel {
-    position: absolute;
-    z-index: 1;
-    box-sizing: border-box;
-    top: var(--popover-top);
-    background: #ffffff;
-    border: 1px solid #5b6070;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
-  }
-
-  /* One row of five options at the left: 2.25rem and its border high. */
-  .reaction-picker {
-    left: 0.5rem;
-    display: flex;
-    gap: 0.25rem;
-    padding: 0.25rem;
-  }
-
-  .reaction-picker .reaction-option {
-    box-sizing: border-box;
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    font-size: 1rem;
-    line-height: 1;
-  }
-
-  /* At the right, as wide as the room allows up to 22rem, and never past the
-     bottom of the window: the list gives up its height first. */
-  .chat-panel {
-    /* The picker's height and the gap under it. */
-    --picker-row: calc(2.5rem + 2px);
-    right: 0.5rem;
-    width: min(22rem, 100% - 1rem);
-    max-height: calc(100% - var(--popover-top) - 0.5rem);
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    font-size: 0.875rem;
-  }
-
-  /* On a narrow page the picker's row stays free above the panel, whether the
-     picker is open or not, so the two never overlap and the panel does not move
-     when the picker opens (spec 022 decision 15). */
-  .chat-panel.below-picker {
-    top: calc(var(--popover-top) + var(--picker-row));
-    max-height: calc(100% - var(--popover-top) - var(--picker-row) - 0.5rem);
-  }
-
-  .chat-panel h2 {
-    flex: none;
-    margin: 0;
-    font-size: 1rem;
-  }
-
-  /* About seven lines; the older ones scroll (spec 022 AC-11). The page keeps
-     the reader's place itself, as for the feed: no scroll anchoring. Room is
-     left around it for its focus outline, drawn outside (spec 035 AC-2). */
-  .chat-list {
-    flex: 0 1 auto;
-    height: 9rem;
-    min-height: 2.75rem;
-    overflow-y: auto;
-    overflow-anchor: none;
-    overflow-wrap: anywhere;
-    margin: 0.25rem 0;
-    padding: 0 0.25rem;
-    list-style: none;
-    line-height: 1.3;
-  }
-
-  .chat-author {
-    margin-right: 0.4em;
-    font-weight: bold;
-  }
-
-  /* The host's mute buttons. On a low window they give up height after the
-     list, and scroll; the focus outline is then drawn inside the buttons. */
-  .chat-moderation {
-    flex: 0 1 auto;
-    min-height: 2rem;
-    overflow-y: auto;
-  }
-
-  .chat-moderation h3 {
-    margin: 0 0 0.25rem;
-    font-size: 0.875rem;
-  }
-
-  .chat-moderation :focus-visible {
-    outline-offset: -3px;
-  }
-
-  .mute-rows {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-  }
-
-  .mute-row {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .mute-player {
-    box-sizing: border-box;
-    min-width: 24px;
-    min-height: 24px;
-    padding: 0 0.4rem;
-    font-size: 0.8rem;
-  }
-
-  .chat-form {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .chat-form input {
-    flex: 1 1 auto;
-    min-width: 0;
-    box-sizing: border-box;
-    min-height: 28px;
-    font: inherit;
-  }
-
-  .chat-send {
-    flex: none;
-    box-sizing: border-box;
-    min-width: 24px;
-    min-height: 28px;
-  }
-
-  .chat-note {
-    flex: none;
-    margin: 0;
-    min-height: 1.2em;
-    line-height: 1.2;
-    font-size: 0.8rem;
-    color: #4a4f5c;
   }
 
   .host-panel-more,
