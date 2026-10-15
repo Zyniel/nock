@@ -24,9 +24,11 @@ from nock.protocol import (
     FlagChanged,
     FlagView,
     PlayerJoined,
+    PlayerState,
+    PlayerStateChanged,
     grid_view,
 )
-from nock.room import PlayerRecord, RoomState
+from nock.room import PlayerRecord, RoomConfig, RoomState, tick
 from spec021_harness import (
     EIGHT_WORDS,
     IDES,
@@ -57,6 +59,7 @@ from spec024_harness import (
     grid_from_text,
     load_fr,
     make_catalogue,
+    player_record,
     player_view,
     refusal_code,
     seen_at,
@@ -65,6 +68,7 @@ from spec024_harness import (
 )
 
 LATER = NOW + 5.0
+WOKEN_AT = NOW + 130.0  # after the two minutes of silence that make a player idle
 SOLVED_AT = NOW + 754.0
 AFTER_SOLVED = NOW + 760.0
 NO_WORD_CLUES = [
@@ -301,6 +305,41 @@ def test_ac5_on_the_solved_grid_every_word_is_refused_as_full(
     state = solved_state(fx01_grid)
 
     assert_refused_without_change(state, "p1", EIGHT_WORDS[word], AFTER_SOLVED)
+
+
+def idle_with_mime_written(grid: Grid) -> RoomState:
+    """MIME written by `p1`, then two minutes of silence: both players idle (seq 8)."""
+    quiet = RoomConfig(silence_timeout_seconds=3600)
+    idle = tick(mime_written_by_p1(grid), NOW + 120, quiet).state
+    assert idle.seq == 8
+    assert player_record(idle, "p1").state is PlayerState.IDLE
+    assert player_record(idle, "p2").state is PlayerState.IDLE
+    return idle
+
+
+@pytest.mark.parametrize(
+    "clue",
+    [MIME, *NO_WORD_CLUES],
+    ids=["full-word", "letter-cell", "missing-index", "outside"],
+)
+def test_ac5_a_refused_flag_from_an_idle_player_still_wakes_them(
+    fx01_grid: Grid, clue: ClueRef
+) -> None:
+    idle = idle_with_mime_written(fx01_grid)
+
+    outcome = send_flag(idle, "p2", clue, WOKEN_AT)
+
+    assert events_of(outcome) == [
+        PlayerStateChanged(seq=9, player_id="p2", state=PlayerState.ACTIVE)
+    ]
+    assert refusal_code(outcome) is ErrorCode.INVALID_TARGET
+    assert outcome.state.seq == 9
+    sender = player_record(outcome.state, "p2")
+    assert sender.state is PlayerState.ACTIVE
+    assert sender.flag is None
+    assert (sender.last_input_at, sender.last_seen_at) == (WOKEN_AT, WOKEN_AT)
+    assert player_record(outcome.state, "p1") == player_record(idle, "p1")
+    assert outcome.state.cells == idle.cells
 
 
 def test_ac5_on_the_solved_grid_removing_no_flag_still_writes_nothing(

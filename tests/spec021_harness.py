@@ -20,10 +20,8 @@ the flag steps on `handle_message`, the snapshot with flags sent on the mocked
 socket, and the reading of a clue's marker. It builds on spec 024's harness (the
 rooms `FULL17`, the simulated WebSocket client, the mocked socket that answers
 pings, spec 035's walker and scans, spec 013's contexts): the test files import
-those from `spec024_harness` directly.
-
-Not tested, as the spec allows: pencil letters filling a flagged word (spec 020 is
-not built, so no cell holds one).
+those from `spec024_harness` directly. The pencil edits of spec 020 come from
+`spec020_harness`.
 """
 
 from __future__ import annotations

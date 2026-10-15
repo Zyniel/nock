@@ -4,9 +4,12 @@ The rule on `handle_message` ("Server rule: a flag clears when its word is full"
 an edit, the `FULL17` example, a letter or word reveal, several flaggers in
 `players` order, the completion entry last), the real WebSocket, and the page with
 a mocked socket. The edge cases of AC-3 are here too: a check never clears a flag
-by itself, and an undo or an erase does not bring a cleared flag back. Pencil
-letters (spec 020) are not built, so no test fills a word with one. The shared
-setup is in `spec021_harness`.
+by itself, an undo or an erase does not bring a cleared flag back, and a pencil
+letter (spec 020) that fills the last empty cell clears the flag like a normal
+one. Two tests named `test_ac5_...` are here as well, because they are about the
+same fact: a pencil letter fills its cell, so a word full of them is full and a
+`Flag` on it is refused (case 4 of "Server rule: `Flag`"). The shared setup is in
+`spec021_harness`, `spec020_harness` and `spec024_harness`.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ from nock.protocol import (
     Check,
     EditLetter,
     Erase,
+    ErrorCode,
     Flag,
     FlagChanged,
     FlagView,
@@ -42,12 +46,14 @@ from nock.protocol import (
 )
 from nock.room import RoomState, handle_message
 from nock.server import create_app
+from spec020_harness import accepted_pencil
 from spec021_harness import (
     IDES,
     LEST,
     MIME,
     MIME_CELLS,
     SENT,
+    Cell,
     accepted_flag,
     expect_marker,
     expect_unflagged,
@@ -57,6 +63,7 @@ from spec021_harness import (
     flagged_map,
     flags_by_player,
     open_flag_room,
+    send_flag,
     snapshot_flags,
 )
 from spec024_harness import (
@@ -72,10 +79,13 @@ from spec024_harness import (
     make_catalogue,
     make_dist_dir,
     make_registry,
+    refusal_code,
+    seen_at,
     two_player_room,
     write,
 )
 
+LATER = NOW + 5.0
 FIRST_THREE_OF_IDES = [(1, 3, "I"), (2, 3, "D"), (3, 3, "E")]
 # `p2` writes the last letter of `FULL17` at (4, 4): its entry, seq 22.
 T_AT_4_4 = LetterChanged(
@@ -138,6 +148,16 @@ def ides_but_its_last_letter(state: RoomState) -> RoomState:
     """`p1` writes `I`, `D` and `E` in IDES: only (4, 3) stays empty."""
     for row, column, letter in FIRST_THREE_OF_IDES:
         state = write(state, "p1", row, column, letter).state
+    return state
+
+
+def written_in_pencil(
+    state: RoomState, player_id: str, cells: list[Cell], letters: str
+) -> RoomState:
+    """A player writes `letters` in `cells` in pencil, one `PencilEdit` per cell."""
+    for index, (row, column) in enumerate(cells):
+        letter = letters[index]
+        state = accepted_pencil(state, player_id, row, column, letter).state
     return state
 
 
@@ -348,6 +368,100 @@ def test_ac3_an_erase_that_empties_the_word_does_not_bring_the_flag_back(
     assert cell_state(outcome.state, 4, 3).letter is None
     assert flag_changes_of(events_of(outcome)) == []
     assert flag_of(outcome.state, "p2") is None
+
+
+# ---- AC-3, rule: pencil letters of spec 020 (edge case) ----
+
+
+def test_ac3_a_pencil_letter_in_the_last_empty_cell_clears_the_flag(
+    fx01_grid: Grid,
+) -> None:
+    state = ides_but_its_last_letter(ides_flagged_by_p2(fx01_grid))
+    assert state.seq == 6
+
+    outcome = accepted_pencil(state, "p1", 4, 3, "S")
+
+    assert events_of(outcome) == [
+        LetterChanged(seq=7, row=4, column=3, letter="S", pencil=True, player_id="p1"),
+        FlagChanged(seq=8, player_id="p2", clue=None),
+    ]
+    assert outcome.state.seq == 8
+    assert flag_of(outcome.state, "p2") is None
+    assert snapshot_flags(outcome.state) == ()
+
+
+def test_ac3_a_word_written_only_in_pencil_clears_the_flag_on_its_last_letter(
+    fx01_grid: Grid,
+) -> None:
+    state = ides_flagged_by_p2(fx01_grid)
+
+    for number, (row, column, letter) in enumerate(FIRST_THREE_OF_IDES):
+        outcome = accepted_pencil(state, "p1", row, column, letter)
+        assert events_of(outcome) == [
+            LetterChanged(
+                seq=4 + number,
+                row=row,
+                column=column,
+                letter=letter,
+                pencil=True,
+                player_id="p1",
+            )
+        ]
+        assert flag_of(outcome.state, "p2") == IDES
+        state = outcome.state
+
+    last = accepted_pencil(state, "p1", 4, 3, "X")
+
+    assert events_of(last) == [
+        LetterChanged(seq=7, row=4, column=3, letter="X", pencil=True, player_id="p1"),
+        FlagChanged(seq=8, player_id="p2", clue=None),
+    ]
+    assert flag_of(last.state, "p2") is None
+
+
+def test_ac3_a_pencil_letter_that_solves_the_grid_clears_the_flags_before_it(
+    fx01_grid: Grid,
+) -> None:
+    state = accepted_flag(full17(fx01_grid), "p1", LEST).state
+    state = accepted_flag(state, "p2", SENT).state
+    assert state.seq == 21
+
+    outcome = accepted_pencil(state, "p2", 4, 4, "T", now=NOW + 754.0)
+
+    assert events_of(outcome) == [
+        LetterChanged(seq=22, row=4, column=4, letter="T", pencil=True, player_id="p2"),
+        FlagChanged(seq=23, player_id="p1", clue=None),
+        FlagChanged(seq=24, player_id="p2", clue=None),
+        GridSolved(seq=25, elapsed_ms=754000),
+    ]
+    assert flags_by_player(outcome.state) == {"p1": None, "p2": None}
+
+
+def test_ac5_a_word_full_of_pencil_letters_is_refused_as_full(
+    fx01_grid: Grid,
+) -> None:
+    state = written_in_pencil(two_player_room(fx01_grid), "p1", MIME_CELLS, "MIME")
+    assert state.seq == 6
+
+    outcome = send_flag(state, "p2", MIME, LATER)
+
+    assert refusal_code(outcome) is ErrorCode.INVALID_TARGET
+    assert outcome.entries == ()
+    assert outcome.state == seen_at(state, "p2", LATER)
+    assert flag_of(outcome.state, "p2") is None
+
+
+def test_ac5_a_word_with_one_empty_cell_among_pencil_letters_can_be_flagged(
+    fx01_grid: Grid,
+) -> None:
+    state = written_in_pencil(two_player_room(fx01_grid), "p1", MIME_CELLS[:3], "MIM")
+    assert state.seq == 5
+
+    outcome = send_flag(state, "p2", MIME)
+
+    assert outcome.reply == ()
+    assert events_of(outcome) == [FlagChanged(seq=6, player_id="p2", clue=MIME)]
+    assert flag_of(outcome.state, "p2") == MIME
 
 
 # ---- AC-3, WebSocket ----
