@@ -69,7 +69,10 @@ def _port_number(text: str) -> int | None:
     significant_digits = text.lstrip("0")
     if len(significant_digits) > len(str(MAX_PORT)):
         return None  # far too big, and int() refuses numbers of 4,300 digits
-    port = int(text)
+    if significant_digits == "":
+        significant_digits = "0"  # all zeros: the number 0, below MIN_PORT
+    # Convert without the leading zeros: int() also refuses 4,300 of them.
+    port = int(significant_digits)
     if port < MIN_PORT or port > MAX_PORT:
         return None
     return port
