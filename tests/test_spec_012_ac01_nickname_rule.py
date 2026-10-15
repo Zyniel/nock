@@ -498,7 +498,7 @@ def test_ac1_browser_a_bad_nickname_shows_the_error_and_sends_nothing(
     expect(room).to_have_attribute("data-status", "nickname")
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 def test_ac1_browser_the_server_refusing_a_nickname_brings_the_form_back(

@@ -41,6 +41,7 @@ from nock.protocol import (
     ErrorCode,
     ErrorMessage,
     Join,
+    Ping,
     PlayerJoined,
     PlayerState,
     PlayerView,
@@ -282,13 +283,26 @@ class MockRoomSocket:
     def close(self, code: int) -> None:
         self.routes[0].close(code=code)
 
+    def frames_without_pings(self) -> list[str]:
+        """The frames received so far, spec 017's heartbeat `ping` frames left aside.
+
+        The page pings every 2 s from the opening of the socket, also before a
+        join, so a slow engine can send a `ping` at any point of a test.
+        """
+        frames: list[str] = []
+        for frame in self.received:
+            if parse_client_message(frame) != Ping():
+                frames.append(frame)
+        return frames
+
     def wait_for_frames(self, count: int) -> None:
-        wait_until(self.page, lambda: len(self.received) >= count)
+        """Wait for `count` frames, the heartbeat `ping` frames not counted."""
+        wait_until(self.page, lambda: len(self.frames_without_pings()) >= count)
 
     def joins(self) -> list[Join]:
-        """The frames received so far, each parsed as a Join."""
+        """The frames received so far, each parsed as a Join, pings left aside."""
         parsed: list[Join] = []
-        for frame in self.received:
+        for frame in self.frames_without_pings():
             message = parse_client_message(frame)
             assert isinstance(message, Join), frame
             parsed.append(message)

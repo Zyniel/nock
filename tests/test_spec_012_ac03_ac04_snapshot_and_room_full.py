@@ -343,7 +343,7 @@ def test_ac4_browser_room_full_is_final_even_after_the_close(
     settle(page)
     expect(room).to_have_attribute("data-status", "full")
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
-    assert len(mock.received) == 1
+    assert len(mock.frames_without_pings()) == 1
     assert len(mock.routes) == 1
 
 

@@ -80,7 +80,7 @@ def test_ac6_a_stored_identity_joins_at_once_with_its_token(
     mock = open_mock_room(page, live_server, {"nock.identity.ABC123": STORED_IDENTITY})
     mock.wait_for_frames(1)
 
-    assert parse_client_message(mock.received[0]) == Join(
+    assert parse_client_message(mock.frames_without_pings()[0]) == Join(
         nickname="Ana 2", resume_token=MOCK_TOKEN
     )
     room = page.get_by_test_id("room-page")
@@ -90,7 +90,7 @@ def test_ac6_a_stored_identity_joins_at_once_with_its_token(
     )
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
     settle(page)
-    assert len(mock.received) == 1
+    assert len(mock.frames_without_pings()) == 1
 
 
 @pytest.mark.parametrize(
@@ -109,7 +109,7 @@ def test_ac6_a_stored_identity_wins_over_the_record_and_the_remembered_nickname(
     mock = open_mock_room(page, live_server, items)
     mock.wait_for_frames(1)
 
-    assert parse_client_message(mock.received[0]) == Join(
+    assert parse_client_message(mock.frames_without_pings()[0]) == Join(
         nickname="Ana 2", resume_token=MOCK_TOKEN
     )
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joining")
@@ -123,7 +123,7 @@ def test_ac6_a_catalogue_room_joins_at_once_with_the_remembered_nickname(
     mock = open_mock_room(page, live_server, items)
     mock.wait_for_frames(1)
 
-    assert parse_client_message(mock.received[0]) == Join(
+    assert parse_client_message(mock.frames_without_pings()[0]) == Join(
         nickname="Zo\u00e9", resume_token=None
     )
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joining")
@@ -144,7 +144,7 @@ def test_ac6_a_catalogue_room_without_a_valid_nickname_joins_as_the_default(
     mock = open_mock_room(page, live_server, items)
     mock.wait_for_frames(1)
 
-    assert parse_client_message(mock.received[0]) == Join(
+    assert parse_client_message(mock.frames_without_pings()[0]) == Join(
         nickname=load_fr()["room.default_nickname"], resume_token=None
     )
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joining")
@@ -173,7 +173,7 @@ def test_ac6_without_identity_or_catalogue_record_the_form_is_shown(
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     expect(page.get_by_test_id("nickname-input")).to_have_value("")
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 def test_ac6_the_form_is_prefilled_with_the_remembered_nickname(
@@ -186,7 +186,7 @@ def test_ac6_the_form_is_prefilled_with_the_remembered_nickname(
     )
     expect(page.get_by_test_id("nickname-input")).to_have_value("Zo\u00e9")
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 CORRUPT_IDENTITIES = [
@@ -209,7 +209,7 @@ def test_ac6_a_corrupt_identity_is_ignored_and_the_form_is_shown(
     )
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 @pytest.mark.parametrize("identity", CORRUPT_IDENTITIES)
@@ -220,7 +220,7 @@ def test_ac6_a_corrupt_identity_falls_back_to_the_catalogue_record(
     mock = open_mock_room(page, live_server, items)
     mock.wait_for_frames(1)
 
-    assert parse_client_message(mock.received[0]) == Join(
+    assert parse_client_message(mock.frames_without_pings()[0]) == Join(
         nickname=load_fr()["room.default_nickname"], resume_token=None
     )
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
