@@ -1,7 +1,7 @@
 ---
 id: "022"
 title: Chat and reactions
-status: approved
+status: done
 ---
 
 # 022 - Chat and reactions
