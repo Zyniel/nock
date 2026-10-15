@@ -903,35 +903,37 @@
           >{copied ? t('room.share.copied') : t('room.share.copy')}</button
         >
       </div>
-      <div class="undo-panel">
-        <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
-          >{t('room.undo')}</button>
-        {#if isUndoMessageShown}
-          <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
-        {/if}
-      </div>
-      <div class="check-panel" data-testid="check-panel" role="group" aria-label={t('check.label')}>
-        <button
-          type="button"
-          data-testid="check-letter"
-          aria-label={t('check.letter_label')}
-          disabled={isCheckDisabled || selection === null}
-          onclick={onCheckLetter}>{t('check.letter')}</button
-        >
-        <button
-          type="button"
-          data-testid="check-word"
-          aria-label={t('check.word_label')}
-          disabled={isCheckDisabled || activeWord === null}
-          onclick={onCheckWord}>{t('check.word')}</button
-        >
-        <button
-          type="button"
-          data-testid="check-grid"
-          aria-label={t('check.grid_label')}
-          disabled={isCheckDisabled}
-          onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
-        >
+      <div class="header-actions">
+        <div class="undo-panel">
+          <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
+            >{t('room.undo')}</button>
+          {#if isUndoMessageShown}
+            <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
+          {/if}
+        </div>
+        <div class="check-panel" data-testid="check-panel" role="group" aria-label={t('check.label')}>
+          <button
+            type="button"
+            data-testid="check-letter"
+            aria-label={t('check.letter_label')}
+            disabled={isCheckDisabled || selection === null}
+            onclick={onCheckLetter}>{t('check.letter')}</button
+          >
+          <button
+            type="button"
+            data-testid="check-word"
+            aria-label={t('check.word_label')}
+            disabled={isCheckDisabled || activeWord === null}
+            onclick={onCheckWord}>{t('check.word')}</button
+          >
+          <button
+            type="button"
+            data-testid="check-grid"
+            aria-label={t('check.grid_label')}
+            disabled={isCheckDisabled}
+            onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
+          >
+        </div>
       </div>
     {/if}
   </header>
@@ -1184,6 +1186,17 @@
     white-space: nowrap;
   }
 
+  /* Only the link gives way when the panel is short of room: the button keeps
+     its label on one line. */
+  .share-panel button {
+    flex: none;
+  }
+
+  /* On a roomy window the undo and check panels are items of the header row. */
+  .header-actions {
+    display: contents;
+  }
+
   .undo-panel,
   .check-panel {
     display: flex;
@@ -1371,6 +1384,25 @@
     .room-header button {
       padding-block: 1px;
       font-size: 0.8rem;
+    }
+
+    /* The header takes two rows whatever the width of the system font (a wider
+       font made it take three, and the grid lost its room): the title, the
+       status and the invitation link on the first, the undo and check buttons
+       on the second. The link has a basis that is smaller than its text, so the
+       panel stays on the first row and the link shrinks, with its ellipsis, to
+       the room left there. The undo and check panels are one block, too wide to
+       fit beside the link, so they always go to the second row (spec 013 AC-6,
+       spec 014 AC-7). */
+    .share-panel {
+      flex: 1 1 17rem;
+    }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem 0.75rem;
     }
 
     .presence {
