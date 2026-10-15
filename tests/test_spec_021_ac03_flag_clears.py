@@ -4,7 +4,9 @@ The rule on `handle_message` ("Server rule: a flag clears when its word is full"
 an edit, the `FULL17` example, a letter or word reveal, several flaggers in
 `players` order, the completion entry last), the real WebSocket, and the page with
 a mocked socket. The edge cases of AC-3 are here too: a check never clears a flag
-by itself, an undo or an erase does not bring a cleared flag back, and a pencil
+by itself, an undo that fills the word's last empty cell clears its flag (the rule
+names undo among its triggers), an undo or an erase does not bring a cleared flag
+back, and a pencil
 letter (spec 020) that fills the last empty cell clears the flag like a normal
 one. Two tests named `test_ac5_...` are here as well, because they are about the
 same fact: a pencil letter fills its cell, so a word full of them is full and a
@@ -338,6 +340,28 @@ def test_ac3_a_check_that_locks_cells_never_clears_a_flag_by_itself(
     assert len(events_of(outcome)) > 1
     assert flag_changes_of(events_of(outcome)) == []
     assert flag_of(outcome.state, "p2") == IDES
+
+
+def test_ac3_an_undo_that_fills_the_last_empty_cell_clears_the_flag(
+    fx01_grid: Grid,
+) -> None:
+    written = ides_but_its_last_letter(two_player_room(fx01_grid))
+    written = write(written, "p1", 4, 3, "S").state
+    erased = handle_message(written, "p1", Erase(row=4, column=3), NOW)
+    assert erased.reply == ()
+    flagged = accepted_flag(erased.state, "p2", IDES).state
+    assert flagged.seq == 8
+
+    outcome = handle_message(flagged, "p1", Undo(), NOW)
+
+    assert outcome.reply == ()
+    assert events_of(outcome) == [
+        LetterChanged(seq=9, row=4, column=3, letter="S", pencil=False, player_id="p1"),
+        FlagChanged(seq=10, player_id="p2", clue=None),
+    ]
+    assert outcome.state.seq == 10
+    assert flag_of(outcome.state, "p2") is None
+    assert snapshot_flags(outcome.state) == ()
 
 
 def test_ac3_an_undo_that_empties_the_word_does_not_bring_the_flag_back(

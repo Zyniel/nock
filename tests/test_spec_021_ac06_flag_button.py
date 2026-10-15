@@ -7,12 +7,13 @@ on MIME, a click that sends one frame and no local guess before the server's
 `flag_changed`; the second click that sends `clue: null`; another player's flag
 on MIME; disabled on the full word TAMIS; then the edge case "Pending edits" (a
 word I just typed full is full for the button) and an `invalid_target` error that
-changes no attribute on the page, pending edits included. The shared setup is in
-`spec021_harness`.
+changes no attribute on the page, pending edits included. A third page holds my
+flag on a word I then type full: the button stays enabled and pressed, since my
+flag is on it ("Client: the flag button"), and a click removes my flag. The shared
+setup is in `spec021_harness`.
 
-Spec 019 is not built, so the page has no `authors-switch`: the check that the
-button comes before it applies once the switch exists (the toolbar order is
-relative, spec 024 AC-8).
+Spec 019 is built, so the page has an `authors-switch` and the button must come
+before it.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ from spec021_harness import (
 from spec024_harness import (
     SETTLE_MS,
     ChangeList,
+    MockRoomSocket,
     expect_seq,
     grid_from_text,
     make_catalogue,
@@ -58,7 +60,7 @@ MIME_WIRE = {"type": "flag", "clue": {"row": 0, "column": 2, "clue_index": 0}}
 NULL_WIRE = {"type": "flag", "clue": None}
 
 # The place of `flag-button`: inside `room-toolbar`, after `reveal-panel`, and
-# before `authors-switch` when the page has one (spec 019, not built yet).
+# before `authors-switch` (spec 019), which must exist.
 PLACE_SCRIPT = """
 () => {
   const follows = (first, second) => Boolean(
@@ -78,7 +80,7 @@ PLACE_SCRIPT = """
     type: button.getAttribute('type'),
     inToolbar: toolbar !== null && toolbar.contains(button),
     afterReveal: reveal !== null && follows(reveal, button),
-    beforeAuthors: authors === null || follows(button, authors),
+    beforeAuthors: authors !== null && follows(button, authors),
   };
 }
 """
@@ -135,6 +137,18 @@ def assert_one_flag_frame(frames: list[str], expected_wire: object) -> None:
     assert wire(frames[0]) == expected_wire
     sent = parse_client_message(frames[0])
     assert isinstance(sent, Flag)
+
+
+def type_lest_pending(page: Page, mock: MockRoomSocket) -> None:
+    """Type `lest` in the selected LEST: four edits the mock leaves pending."""
+    for letter in "lest":
+        page.keyboard.press(letter)
+    wait_until_page(page, lambda: mock.edit_count() == 4, "the four edits")
+    for column in range(1, 5):
+        cell = page.locator(
+            f'[data-testid="cell"][data-row="4"][data-column="{column}"]'
+        )
+        expect(cell).to_have_attribute("data-unconfirmed", "true")
 
 
 # ---- AC-6 ----
@@ -213,14 +227,7 @@ def test_ac6_browser_a_word_i_typed_full_disables_it_and_an_error_changes_nothin
         expect(button).to_be_enabled()
 
         # The shown grid counts: four pending letters make LEST full.
-        for letter in "lest":
-            page.keyboard.press(letter)
-        wait_until_page(page, lambda: mock.edit_count() == 4, "the four edits")
-        for column in range(1, 5):
-            cell = page.locator(
-                f'[data-testid="cell"][data-row="4"][data-column="{column}"]'
-            )
-            expect(cell).to_have_attribute("data-unconfirmed", "true")
+        type_lest_pending(page, mock)
         expect(button).to_be_disabled()
 
         # An `invalid_target` error answering a flag changes no attribute.
@@ -231,5 +238,36 @@ def test_ac6_browser_a_word_i_typed_full_disables_it_and_an_error_changes_nothin
         page.wait_for_timeout(SETTLE_MS)
         after = page_attributes(page)
         assert after == before
+    finally:
+        close()
+
+
+def test_ac6_browser_my_flag_on_a_word_full_on_the_page_keeps_the_button_pressed(
+    browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
+) -> None:
+    page, close = open_context_page(browser, browser_name, WIDTH, HEIGHT, False)
+    try:
+        mock = open_flag_room(page, live_server, grid_view(fx01_grid))
+        button = page.get_by_test_id("flag-button")
+        select_word(page, LEST)
+        mock.send(flag_changed_frame(6, "p1", LEST))
+        expect_seq(page, 6)
+        expect(button).to_have_attribute("aria-pressed", "true")
+
+        # LEST is full on the page and my flag is still on it: enabled, pressed.
+        type_lest_pending(page, mock)
+        expect(page.get_by_test_id("grid")).to_have_attribute("data-word", "4,0,0")
+        expect(button).to_be_enabled()
+        expect(button).to_have_attribute("aria-pressed", "true")
+
+        # A click removes my flag; once the server says so, the full word with no
+        # flag of mine disables the button.
+        frames = frames_sent_by(page, mock, button.click)
+        assert_one_flag_frame(frames, NULL_WIRE)
+        expect(button).to_have_attribute("aria-pressed", "true")
+        mock.send(flag_changed_frame(7, "p1", None))
+        expect_seq(page, 7)
+        expect(button).to_have_attribute("aria-pressed", "false")
+        expect(button).to_be_disabled()
     finally:
         close()

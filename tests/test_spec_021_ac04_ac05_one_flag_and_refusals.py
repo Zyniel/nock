@@ -2,11 +2,12 @@
 
 AC-4 on `handle_message` (a new flag replaces the previous one, the snapshot's
 `flags` in `players` order) and on the page with a mocked socket (the marker moves;
-several flaggers in roster order, joiners appended; an unknown player id; snapshot
-entries that are not well formed). AC-5 on `handle_message`: the five cases of
-"Server rule: `Flag`" that write nothing or refuse, on an empty room, `FULL17`, the
-solved state of spec 026 AC-1 and a full but wrong grid. The shared setup is in
-`spec021_harness`.
+several flaggers in roster order, joiners appended; an unknown player id; flaggers
+not in the roster after the roster's players, by id as plain strings, "Order of
+the flaggers"; snapshot entries that are not well formed). AC-5 on
+`handle_message`: the five cases of "Server rule: `Flag`" that write nothing or
+refuse, on an empty room, `FULL17`, the solved state of spec 026 AC-1 and a full
+but wrong grid. The shared setup is in `spec021_harness`.
 """
 
 from __future__ import annotations
@@ -68,6 +69,7 @@ from spec024_harness import (
 )
 
 LATER = NOW + 5.0
+SOMEONE = "Quelqu'un"  # the name of a flagger not in the roster, `feed.someone`
 WOKEN_AT = NOW + 130.0  # after the two minutes of silence that make a player idle
 SOLVED_AT = NOW + 754.0
 AFTER_SOLVED = NOW + 760.0
@@ -218,6 +220,31 @@ def test_ac4_browser_flaggers_follow_roster_order_and_an_unknown_id_is_someone(
     expect_marker(page, IDES, "p9", [load_fr()["feed.someone"]])
 
     assert flagged_map(page) == expected_flagged_map([IDES, SENT])
+
+
+def test_ac4_browser_flaggers_not_in_the_roster_come_last_by_id(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    ides_flag = FlagView(player_id="p2", clue=IDES)
+    mock = open_flag_room(page, live_server, grid_view(fx01_grid), flags=[ides_flag])
+    mock.send(flag_changed_frame(6, "p2", MIME))
+    mock.send(flag_changed_frame(7, "p3", MIME))
+    expect_seq(page, 7)
+    expect_marker(page, MIME, "p2 p3", ["Bob", "Cy"])
+
+    mock.send(flag_changed_frame(8, "p9", MIME))
+    expect_seq(page, 8)
+    expect_marker(page, MIME, "p2 p3 p9", ["Bob", "Cy", SOMEONE])
+    mock.send(flag_changed_frame(9, "p7", MIME))
+    expect_seq(page, 9)
+    expect_marker(page, MIME, "p2 p3 p7 p9", ["Bob", "Cy", SOMEONE, SOMEONE])
+    assert flagged_map(page) == expected_flagged_map([MIME])
+
+    # Plain string order: `p10` comes before `p7`.
+    mock.send(flag_changed_frame(10, "p10", MIME))
+    expect_seq(page, 10)
+    names = ["Bob", "Cy", SOMEONE, SOMEONE, SOMEONE]
+    expect_marker(page, MIME, "p2 p3 p10 p7 p9", names)
 
 
 def test_ac4_browser_snapshot_flag_entries_that_are_not_well_formed_are_skipped(

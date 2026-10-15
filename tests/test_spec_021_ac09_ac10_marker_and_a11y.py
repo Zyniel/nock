@@ -5,10 +5,12 @@ AC-9 on the page with a mocked socket: the `clue-flag` of IDES on FX-01 at 1280 
 720, and of the first clue of FX-02 at 360 by 740 and 568 by 320, lies inside its
 clue cell, is visible, is at least 7 px, and leaves the `clue-text` where it was
 before the flag arrived; at 1280 by 720 spec 035's contrast scan finds no
-offender, and it measured the marker. AC-10: the four `fr.json` texts; `tab_to`
-reaches `flag-button` with spec 035 AC-2's outline and `Enter` flags MIME; the
-language and contrast scans with `p2`'s flag on IDES at 1280 by 720 and 360 by
-740. The shared setup is in `spec021_harness`.
+offender, and it measured the marker. AC-9 also measures the marker of NAVAL, the
+clue of index 1 of (0, 0), at 1280 by 720: the same checks, and the marker just
+under the cell's `clue-separator` and clear of NAVAL's `clue-text`. AC-10: the
+four `fr.json` texts; `tab_to` reaches `flag-button` with spec 035 AC-2's outline
+and `Enter` flags MIME; the language and contrast scans with `p2`'s flag on IDES at
+1280 by 720 and 360 by 740. The shared setup is in `spec021_harness`.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from spec021_harness import (
     FLAG_MARKER,
     IDES,
     MIME,
+    NAVAL,
     clue_at,
     expect_marker,
     flag_changed_frame,
@@ -57,8 +60,9 @@ MIN_MARKER_FONT_PX = 7.0
 NICKNAMES = ["Ana", "Bob", "Cy"]
 MARKER_CASES = [("FX-01", 1280, 720), ("FX-02", 360, 740), ("FX-02", 568, 320)]
 
-# The boxes of a clue's cell, its `clue-text` and its `clue-flag`, with the
-# marker's computed visibility and font size.
+# The boxes of a clue's cell, the cell's `clue-separator` (null when it has
+# none), the clue's `clue-text` and its `clue-flag`, with the marker's computed
+# visibility and font size. A box is [left, top, right, bottom].
 GEOMETRY_SCRIPT = r"""
 clue => {
   const box = (element) => {
@@ -66,9 +70,15 @@ clue => {
     return [rect.left, rect.top, rect.right, rect.bottom];
   };
   const cell = clue.closest('[data-testid="cell"]');
+  const separator = cell.querySelector('[data-testid="clue-separator"]');
   const text = clue.querySelector('[data-testid="clue-text"]');
   const markers = clue.querySelectorAll('[data-testid="clue-flag"]');
-  const result = {cell: box(cell), text: box(text), markers: markers.length};
+  const result = {
+    cell: box(cell),
+    separator: separator === null ? null : box(separator),
+    text: box(text),
+    markers: markers.length,
+  };
   if (markers.length === 1) {
     const style = getComputedStyle(markers[0]);
     result.marker = box(markers[0]);
@@ -150,6 +160,46 @@ def moved_edges(before: list[float], after: list[float]) -> list[str]:
     return moved
 
 
+def under_separator_problems(reading: dict[str, Any]) -> list[str]:
+    """How a clue's `clue-flag` is not just under its cell's `clue-separator`.
+
+    Its top must be at least the separator's bottom minus TOLERANCE_PX, and at
+    most a tenth of the cell's height below the separator's bottom (AC-9).
+    """
+    if reading["separator"] is None:
+        return ["the clue cell has no clue-separator"]
+    separator_bottom = reading["separator"][3]
+    marker_top = reading["marker"][1]
+    cell_height = reading["cell"][3] - reading["cell"][1]
+    problems: list[str] = []
+    if marker_top < separator_bottom - TOLERANCE_PX:
+        problems.append(f"marker top {marker_top} above separator {separator_bottom}")
+    if marker_top > separator_bottom + cell_height / 10:
+        problems.append(
+            f"marker top {marker_top} more than a tenth of the cell's height"
+            f" ({cell_height}) under separator {separator_bottom}"
+        )
+    return problems
+
+
+def overlap_px(first: list[float], second: list[float]) -> float:
+    """By how much two boxes overlap: the smaller of their two axis overlaps.
+
+    Args:
+        first: A box as [left, top, right, bottom].
+        second: Another box, the same way.
+
+    Returns:
+        0 when the boxes are apart or only touch, else the width or the height of
+        their common part, whichever is smaller.
+    """
+    first_left, first_top, first_right, first_bottom = first
+    second_left, second_top, second_right, second_bottom = second
+    across = min(first_right, second_right) - max(first_left, second_left)
+    down = min(first_bottom, second_bottom) - max(first_top, second_top)
+    return max(0.0, min(across, down))
+
+
 def measured_texts(page: Page) -> list[str]:
     """The texts that spec 035's contrast scan measured."""
     texts: list[str] = []
@@ -213,6 +263,30 @@ def test_ac9_browser_the_marker_sits_in_its_clue_cell_and_keeps_the_clue_text(
         if grid_name == "FX-01":
             assert contrast_problems(page) == []
             assert FLAG_MARKER in measured_texts(page)
+    finally:
+        close()
+
+
+def test_ac9_browser_the_marker_of_a_second_clue_sits_just_under_the_separator(
+    browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
+) -> None:
+    page, close = open_context_page(browser, browser_name, 1280, 720, False)
+    try:
+        mock = open_flag_room(page, live_server, grid_view(fx01_grid))
+        before = read_geometry(page, NAVAL)
+        assert before["markers"] == 0
+
+        mock.send(flag_changed_frame(6, "p2", NAVAL))
+        expect_seq(page, 6)
+        expect(clue_at(page, NAVAL)).to_have_attribute("data-flagged", "true")
+        page.wait_for_timeout(300)
+        after = read_geometry(page, NAVAL)
+
+        assert marker_problems(after) == []
+        assert moved_edges(before["text"], after["text"]) == []
+        assert under_separator_problems(after) == []
+        overlap = overlap_px(after["marker"], after["text"])
+        assert overlap <= TOLERANCE_PX, (after["marker"], after["text"])
     finally:
         close()
 
