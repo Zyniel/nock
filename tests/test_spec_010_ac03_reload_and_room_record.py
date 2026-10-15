@@ -203,7 +203,7 @@ def test_ac3_an_invalid_saved_selection_is_ignored_and_nothing_is_sent(
     settle(page)
     expect_nothing_selected(page)
     assert sent_selects(mock) == []
-    assert len(mock.received) == 1
+    assert len(mock.frames_without_pings()) == 1
 
 
 def test_ac3_a_null_saved_selection_selects_nothing(
@@ -216,7 +216,7 @@ def test_ac3_a_null_saved_selection_selects_nothing(
 
     settle(page)
     expect_nothing_selected(page)
-    assert len(mock.received) == 1
+    assert len(mock.frames_without_pings()) == 1
 
 
 def test_ac3_unknown_fields_of_the_room_record_are_kept(
@@ -249,7 +249,7 @@ def test_ac3_a_corrupt_room_record_is_read_as_no_record(
     expect(room).to_have_attribute("data-status", "nickname")
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 def test_ac3_a_corrupt_room_record_is_replaced_when_the_selection_changes(

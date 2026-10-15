@@ -11,6 +11,7 @@ The shared setup is in `tests/spec040_harness.py`.
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable
 from typing import Protocol
@@ -72,8 +73,20 @@ class MockRoomSocket:
     def close(self, code: int) -> None:
         self.routes[0].close(code=code)
 
+    def frames_without_pings(self) -> list[str]:
+        """The frames the page sent, without its keep-alive `ping` frames.
+
+        The page sends a `ping` every 2 s once the socket is open (spec 017), so
+        one can fall between two reads whatever the test does.
+        """
+        frames: list[str] = []
+        for frame in self.received:
+            if json.loads(frame)["type"] != "ping":
+                frames.append(frame)
+        return frames
+
     def wait_for_join(self) -> None:
-        wait_until(self.page, lambda: len(self.received) > 0)
+        wait_until(self.page, lambda: len(self.frames_without_pings()) > 0)
 
 
 def wait_until(page: Page, condition: Callable[[], bool]) -> None:
@@ -223,12 +236,12 @@ def test_ac18_page_shows_the_form_then_sends_the_join_of_the_form(
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-status", "nickname")
     page.wait_for_timeout(300)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
     submit_nickname_form(page, "Ana")
 
     mock.wait_for_join()
-    first_message = parse_client_message(mock.received[0])
+    first_message = parse_client_message(mock.frames_without_pings()[0])
     assert first_message == Join(nickname="Ana", resume_token=None)
     assert len(mock.routes) == 1
 
@@ -307,7 +320,7 @@ def test_ac19_a_gap_that_never_fills_keeps_the_buffer(
 
     expect(room).to_have_attribute("data-pending", "2")
     expect(room).to_have_attribute("data-seq", "5")
-    assert len(mock.received) == 1
+    assert len(mock.frames_without_pings()) == 1
 
 
 def test_ac19_junk_frames_are_ignored(

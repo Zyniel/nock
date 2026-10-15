@@ -198,7 +198,7 @@ def test_ac2_when_every_word_is_finished_tab_changes_nothing_and_keeps_the_focus
     expect_selection(page, 1, 1, "across", ACROSS_W1)
     expect(grid).to_be_focused()
     assert sent_selections(mock) == [across(1, 1)]
-    assert len(mock.received) == 2
+    assert len(mock.frames_without_pings()) == 2
 
 
 def test_ac2_a_word_whose_remaining_cells_are_locked_or_filled_is_finished(

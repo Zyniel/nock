@@ -260,13 +260,13 @@ def test_ac5_letters_erase_and_undo_keys_send_nothing_once_solved(
     cell_at(page, 1, 0).click()
     expect_selection(page, 1, 0)
     page.wait_for_timeout(SETTLE_MS)
-    already_sent = len(mock.received)
+    already_sent = len(mock.frames_without_pings())
 
     for key in ("b", "Backspace", "Control+z", "Meta+z"):
         page.keyboard.press(key)
     page.wait_for_timeout(QUIET_MS)
 
-    assert mock.received[already_sent:] == []
+    assert mock.frames_without_pings()[already_sent:] == []
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")
     expect_selection(page, 1, 0)
 
@@ -315,7 +315,7 @@ def test_ac5_control_an_unsolved_page_sends_the_same_keys(
     cell_at(page, 1, 0).click()
     expect_selection(page, 1, 0)
     page.wait_for_timeout(SETTLE_MS)
-    already_sent = len(mock.received)
+    already_sent = len(mock.frames_without_pings())
 
     page.keyboard.press("b")
     page.keyboard.press("Control+z")
@@ -353,11 +353,11 @@ def test_ac5_the_in_app_keyboard_sends_nothing_once_solved(
     expect_selection(touch_page, 1, 0)
     expect(touch_page.get_by_test_id("keyboard")).to_be_visible()
     touch_page.wait_for_timeout(SETTLE_MS)
-    already_sent = len(mock.received)
+    already_sent = len(mock.frames_without_pings())
 
     touch_page.locator('[data-testid="key"][data-key="B"]').tap()
     touch_page.get_by_test_id("key-delete").tap()
     touch_page.wait_for_timeout(QUIET_MS)
 
-    assert mock.received[already_sent:] == []
+    assert mock.frames_without_pings()[already_sent:] == []
     expect(cell_at(touch_page, 1, 0)).to_have_attribute("data-letter", "T")

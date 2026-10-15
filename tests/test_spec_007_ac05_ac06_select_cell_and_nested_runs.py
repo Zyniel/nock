@@ -124,7 +124,7 @@ def test_ac5_selecting_still_works_locally_when_the_socket_is_closed(
     mock.close(1011)
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-status", "reconnecting")
-    sent_before = len(mock.received)
+    sent_before = len(mock.frames_without_pings())
 
     tap(page, 2, 2)
     expect_selection(page, 2, 2, "across", "2,0,0")
@@ -132,7 +132,7 @@ def test_ac5_selecting_still_works_locally_when_the_socket_is_closed(
     expect_selection(page, 2, 2, "down", "0,2,0")
     settle(page)
 
-    assert len(mock.received) == sent_before
+    assert len(mock.frames_without_pings()) == sent_before
     assert sent_selections(mock) == []
     assert page_errors == []
     assert positions_with(page, "data-in-word") == [(1, 2), (2, 2), (3, 2), (4, 2)]

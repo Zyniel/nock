@@ -395,9 +395,22 @@ class MockRoomSocket:
     def send(self, frame: str) -> None:
         self.routes[0].send(frame)
 
-    def sent_types(self) -> list[str]:
-        types: list[str] = []
+    def frames_without_pings(self) -> list[str]:
+        """The frames the page sent, without its keep-alive `ping` frames.
+
+        The page sends a `ping` every 2 s once the socket is open (spec 017), so
+        one can fall between two reads whatever the test does.
+        """
+        frames: list[str] = []
         for frame in self.received:
+            if json.loads(frame)["type"] != "ping":
+                frames.append(frame)
+        return frames
+
+    def sent_types(self) -> list[str]:
+        """The `type` of every frame the page sent but its `ping` frames."""
+        types: list[str] = []
+        for frame in self.frames_without_pings():
             parsed = parse_client_message(frame)
             types.append(parsed.type)
         return types
@@ -484,7 +497,7 @@ def open_fx01(
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana", timeout=WAIT_TIMEOUT_MS)
     nickname_input.press("Enter", timeout=WAIT_TIMEOUT_MS)
-    wait_until_page(page, lambda: len(mock.received) > 0)
+    wait_until_page(page, lambda: len(mock.frames_without_pings()) > 0)
     view = with_letter_cells(grid_view(fx01_grid), changes)
     mock.send(snapshot_frame(view, seq, solved))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))

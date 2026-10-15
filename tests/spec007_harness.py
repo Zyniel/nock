@@ -89,6 +89,18 @@ class MockRoomSocket:
     def close(self, code: int) -> None:
         self.routes[0].close(code=code)
 
+    def frames_without_pings(self) -> list[str]:
+        """The frames the page sent, without its keep-alive `ping` frames.
+
+        The page sends a `ping` every 2 s once the socket is open (spec 017), so
+        one can fall between two reads whatever the test does.
+        """
+        frames: list[str] = []
+        for frame in self.received:
+            if json.loads(frame)["type"] != "ping":
+                frames.append(frame)
+        return frames
+
 
 def wait_until(page: Page, condition: Callable[[], bool]) -> None:
     waited_ms = 0
@@ -112,7 +124,7 @@ def open_mock_room(page: Page, base_url: str) -> MockRoomSocket:
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/ABC123")
     submit_nickname_form(page)
-    wait_until(page, lambda: len(mock.received) > 0)
+    wait_until(page, lambda: len(mock.frames_without_pings()) > 0)
     return mock
 
 
@@ -236,8 +248,8 @@ def active_clue_texts(page: Page) -> list[str]:
 
 
 def sent_messages(mock: MockRoomSocket) -> list[object]:
-    """Every frame the page sent, parsed."""
-    return [parse_client_message(frame) for frame in mock.received]
+    """Every frame the page sent but its `ping` frames, parsed."""
+    return [parse_client_message(frame) for frame in mock.frames_without_pings()]
 
 
 def sent_selections(mock: MockRoomSocket) -> list[SelectCell]:

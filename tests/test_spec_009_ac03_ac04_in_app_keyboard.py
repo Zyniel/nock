@@ -293,14 +293,14 @@ def test_ac3_keys_do_nothing_without_a_selection(
 ) -> None:
     mock = open_fx01(touch_page, live_server, fx01_grid)
     expect(touch_page.get_by_test_id("keyboard")).to_be_visible()
-    frames_before = len(mock.received)
+    frames_before = len(mock.frames_without_pings())
 
     key_named(touch_page, "Q").tap()
     touch_page.get_by_test_id("key-delete").tap()
 
     settle(touch_page)
     expect(touch_page.locator('[data-testid="cell"][data-letter=""]')).to_have_count(18)
-    assert len(mock.received) == frames_before
+    assert len(mock.frames_without_pings()) == frames_before
 
 
 def test_ac3_focus_is_never_on_an_editable_element_and_none_exists(

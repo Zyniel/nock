@@ -198,6 +198,19 @@ def fix_firefox_text(payload: str) -> str:
         return payload
 
 
+def without_pings(frames: list[str]) -> list[str]:
+    """The frames without the keep-alive `ping` frames of the page.
+
+    The page sends a `ping` every 2 s once the socket is open (spec 017), so one
+    can fall between two reads whatever the test does.
+    """
+    kept: list[str] = []
+    for frame in frames:
+        if json.loads(frame)["type"] != "ping":
+            kept.append(frame)
+    return kept
+
+
 class FrameRecorder:
     """The frames a page sends on its room sockets, in order."""
 
@@ -219,12 +232,14 @@ class FrameRecorder:
         self.frames.append(text)
 
     def wait_for_frames(self, count: int) -> None:
-        wait_until(self.page, lambda: len(self.frames) >= count)
+        """Wait until the page has sent `count` frames, `ping` frames not counted."""
+        wait_until(self.page, lambda: len(without_pings(self.frames)) >= count)
 
     def first_join(self) -> Join:
         self.wait_for_frames(1)
-        message = parse_client_message(self.frames[0])
-        assert isinstance(message, Join), self.frames[0]
+        first_frame = without_pings(self.frames)[0]
+        message = parse_client_message(first_frame)
+        assert isinstance(message, Join), first_frame
         return message
 
 
@@ -253,13 +268,19 @@ class MockRoomSocket:
     def close(self, code: int) -> None:
         self.routes[0].close(code=code)
 
+    def frames_without_pings(self) -> list[str]:
+        """The frames the page sent, without its keep-alive `ping` frames."""
+        return without_pings(self.received)
+
     def wait_for_frames(self, count: int) -> None:
-        wait_until(self.page, lambda: len(self.received) >= count)
+        """Wait until the page has sent `count` frames, `ping` frames not counted."""
+        wait_until(self.page, lambda: len(self.frames_without_pings()) >= count)
 
     def first_join(self) -> Join:
         self.wait_for_frames(1)
-        message = parse_client_message(self.received[0])
-        assert isinstance(message, Join), self.received[0]
+        first_frame = self.frames_without_pings()[0]
+        message = parse_client_message(first_frame)
+        assert isinstance(message, Join), first_frame
         return message
 
 

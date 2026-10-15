@@ -235,7 +235,7 @@ def test_ac1_keys_do_nothing_without_a_selection_or_with_the_focus_elsewhere(
     settle(page)
     expect(grid).to_have_attribute("data-selected-row", "")
     expect(page.locator('[data-testid="cell"][data-letter="A"]')).to_have_count(0)
-    assert len(mock.received) == 1
+    assert len(mock.frames_without_pings()) == 1
 
     tap(page, 1, 0)
     expect_selection(page, 1, 0, "across", ACROSS_W1)
@@ -267,7 +267,7 @@ def test_ac1_after_the_socket_closes_cells_change_locally_and_nothing_is_sent(
     mock.close(1011)
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-status", "reconnecting")
-    sent_before = len(mock.received)
+    sent_before = len(mock.frames_without_pings())
 
     tap(page, 1, 0)
     press_all(page, ["t", "a"])
@@ -275,5 +275,5 @@ def test_ac1_after_the_socket_closes_cells_change_locally_and_nothing_is_sent(
     expect_letters(page, {(1, 0): "T", (1, 1): "A"})
     expect_selection(page, 1, 2, "across", ACROSS_W1)
     settle(page)
-    assert len(mock.received) == sent_before
+    assert len(mock.frames_without_pings()) == sent_before
     assert page_errors == []

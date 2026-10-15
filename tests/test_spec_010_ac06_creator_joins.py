@@ -182,7 +182,7 @@ def test_ac6_a_corrupt_identity_without_a_room_record_shows_the_form(
     expect(room).to_have_attribute("data-status", "nickname")
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 def test_ac6_a_record_without_a_grid_shows_the_form(
@@ -195,7 +195,7 @@ def test_ac6_a_record_without_a_grid_shows_the_form(
     expect(room).to_have_attribute("data-status", "nickname")
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     settle(page)
-    assert mock.received == []
+    assert mock.frames_without_pings() == []
 
 
 def test_ac6_a_refused_creator_falls_back_to_the_nickname_form(

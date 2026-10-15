@@ -22,6 +22,7 @@ imported from here would be an unused import for ruff.
 from __future__ import annotations
 
 import contextlib
+import json
 import re
 import threading
 from collections.abc import Callable
@@ -288,6 +289,18 @@ class MockRoomSocket:
     def send(self, frame: str) -> None:
         self.routes[0].send(frame)
 
+    def frames_without_pings(self) -> list[str]:
+        """The frames the page sent, without its keep-alive `ping` frames.
+
+        The page sends a `ping` every 2 s once the socket is open (spec 017), so
+        one can fall between two reads whatever the test does.
+        """
+        frames: list[str] = []
+        for frame in self.received:
+            if json.loads(frame)["type"] != "ping":
+                frames.append(frame)
+        return frames
+
 
 def wait_until_page(page: Page, condition: Callable[[], bool]) -> None:
     waited_ms = 0
@@ -371,7 +384,7 @@ def open_fx01(
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana", timeout=WAIT_TIMEOUT_MS)
     nickname_input.press("Enter", timeout=WAIT_TIMEOUT_MS)
-    wait_until_page(page, lambda: len(mock.received) > 0)
+    wait_until_page(page, lambda: len(mock.frames_without_pings()) > 0)
     view = grid_view(fx01_grid)
     if changes is not None:
         view = with_letter_cells(view, changes)

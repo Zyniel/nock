@@ -102,7 +102,7 @@ def test_ac5_a_dispatched_backspace_with_no_selection_changes_nothing(
 ) -> None:
     mock = unselected_focused_grid
     letters_before = letters_shown(page)
-    frames_before = len(mock.received)
+    frames_before = len(mock.frames_without_pings())
 
     dispatch_key(page, "Backspace")
 
@@ -110,7 +110,7 @@ def test_ac5_a_dispatched_backspace_with_no_selection_changes_nothing(
     assert letters_shown(page) == letters_before
     assert page.get_by_test_id("grid").get_attribute("data-selected-row") == ""
     assert sent_edits(mock) == []
-    assert len(mock.received) == frames_before
+    assert len(mock.frames_without_pings()) == frames_before
 
 
 def test_ac5_a_dispatched_backspace_with_no_selection_keeps_the_room_url(
@@ -126,11 +126,11 @@ def test_ac5_a_real_backspace_with_no_selection_keeps_the_room_url(
     page: Page, live_server: str, unselected_focused_grid: MockRoomSocket
 ) -> None:
     mock = unselected_focused_grid
-    frames_before = len(mock.received)
+    frames_before = len(mock.frames_without_pings())
 
     page.keyboard.press("Backspace")
 
     settle(page)
     assert page.url == f"{live_server}/r/ABC123"
     assert sent_edits(mock) == []
-    assert len(mock.received) == frames_before
+    assert len(mock.frames_without_pings()) == frames_before

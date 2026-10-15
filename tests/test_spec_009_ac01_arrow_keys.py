@@ -249,7 +249,7 @@ def test_ac1_arrows_do_nothing_without_a_selection(
     mock = open_fx01(page, live_server, fx01_grid)
     grid = page.get_by_test_id("grid")
     grid.focus()
-    frames_before = len(mock.received)
+    frames_before = len(mock.frames_without_pings())
 
     for key in ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]:
         page.keyboard.press(key)
@@ -257,7 +257,7 @@ def test_ac1_arrows_do_nothing_without_a_selection(
     settle(page)
     expect(grid).to_have_attribute("data-selected-row", "")
     expect(grid).to_have_attribute("data-selected-column", "")
-    assert len(mock.received) == frames_before
+    assert len(mock.frames_without_pings()) == frames_before
 
 
 def test_ac1_a_handled_arrow_is_prevented_and_a_modified_one_is_left_alone(

@@ -98,7 +98,7 @@ def test_ac2_digits_space_and_punctuation_are_ignored(
     press_all(page, ["é", "à", "ç"])
     expect_selection(page, 1, 3, "across", ACROSS_W1)
     expect_edits(page, mock, [put(1, 0, "E"), put(1, 1, "A"), put(1, 2, "C")])
-    frames_before = len(mock.received)
+    frames_before = len(mock.frames_without_pings())
 
     press_all(page, ["1", "Space", ".", "-", "'", "?"])
 
@@ -107,7 +107,7 @@ def test_ac2_digits_space_and_punctuation_are_ignored(
     expect_letters(
         page, {(1, 0): "E", (1, 1): "A", (1, 2): "C", (1, 3): "", (1, 4): ""}
     )
-    assert len(mock.received) == frames_before
+    assert len(mock.frames_without_pings()) == frames_before
 
 
 def test_ac2_ligatures_and_other_letters_that_do_not_fold_are_ignored(
@@ -115,7 +115,7 @@ def test_ac2_ligatures_and_other_letters_that_do_not_fold_are_ignored(
 ) -> None:
     mock = open_fx01(page, live_server, fx01_grid)
     tap(page, 1, 0)
-    frames_before = len(mock.received)
+    frames_before = len(mock.frames_without_pings())
 
     # oe ligature, ae ligature, sharp s, o with stroke, then named keys
     press_all(page, ["œ", "æ", "ß", "ø"])
@@ -126,7 +126,7 @@ def test_ac2_ligatures_and_other_letters_that_do_not_fold_are_ignored(
     settle(page)
     expect_selection(page, 1, 0, "across", ACROSS_W1)
     expect(page.locator('[data-testid="cell"][data-letter=""]')).to_have_count(18)
-    assert len(mock.received) == frames_before
+    assert len(mock.frames_without_pings()) == frames_before
 
 
 def test_ac2_shift_a_gives_a_capital_a(
