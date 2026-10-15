@@ -42,8 +42,26 @@ fills or completes the grid triggers the rule like any other letter change), and
 while `state.solved` is False, with `s` the seq of the step's last entry so far:
 
 1. If the grid is right: one more entry `GridSolved(seq=s + 1, elapsed_ms=<ms>)`,
-   with `elapsed_ms = max(0, round((now - state.created_at) * 1000))`, and
-   `state.solved = True`.
+   with `elapsed_ms = timer_value_ms(state, now)` (spec 027), `state` being the
+   state after the step's earlier entries, and `state.solved = True`. (Note from the
+   lead, 2026-10-15: spec 027 (shared timer: "Changes to spec 026" and its decision
+   5) asks for this change. The formula used to be
+   `max(0, round((now - state.created_at) * 1000))`, the time since the room was
+   created. `elapsed_ms` is now the shared timer's value of spec 027: the time
+   counted from the first letter typed, leaving out the time when no player is
+   connected, in whole milliseconds, never negative. It is computed on the state
+   after the step's earlier entries (so after the start of a first letter that would
+   also solve the grid), and applying the `grid_solved` entry stops the timer. The
+   two formulas agree when the first letter is typed at the room's creation time and
+   a player stays connected, which is the case in the rule tests of AC-1 (letters at
+   `NOW`, last letter at `NOW + 754.0`: `elapsed_ms=754000`, unchanged). They differ
+   in the room that the tests of AC-9 load from a store and solve: `p1` and `p2`
+   joined at `NOW` and stay connected; `p1` writes the 18 letters at `NOW + 100.0`,
+   with `N` at (4, 4), so the timer starts at `NOW + 100.0` and the grid is full and
+   wrong; `RoomStore.load_room` replays the entries, with no `after_restart`, so the
+   timer is still running; `p1` then writes `T` at (4, 4) at `NOW + 754.0`, and
+   `elapsed_ms = 0 + round((754.0 - 100.0) * 1000) = 654000`, where the old formula
+   gave 754000.)
 2. Else, if the grid is full now and was not full before the step: one more entry
    `GridFullWrong(seq=s + 1)`, which carries nothing else (no cell, no count).
 3. Else nothing is added.
@@ -164,9 +182,15 @@ The words in brackets say how each criterion is tested.
   tests it; spec 020 does.
 - After solved (AC-4): a second `grid_solved` is never produced; the rule runs
   only while `solved` is False.
-- `elapsed_ms` (AC-1): time since the room was created, in whole milliseconds,
-  never negative. Spec 027 (shared timer) may redefine it; the field already
-  exists in the protocol.
+- `elapsed_ms` (AC-1): the shared timer's value of spec 027 when the grid is solved,
+  in whole milliseconds, never negative. The field already exists in the protocol.
+  (Note from the lead, 2026-10-15: spec 027 asks for this change. The sentence said
+  "time since the room was created, in whole milliseconds, never negative. Spec 027
+  (shared timer) may redefine it; the field already exists in the protocol." Spec 027
+  redefines it: `elapsed_ms` counts from the first letter typed and leaves out the
+  time when no player is connected. See the note in the completion rule for the
+  formula and the case that changes, `654000` instead of `754000`. AC-1's own
+  example is unchanged.)
 - Late joiner (AC-5, AC-7): a snapshot with `solved` true locks the page; a
   snapshot of a full, wrong grid shows the `full_wrong` banner.
 - Pending edits (AC-7): the banner uses confirmed letters only, so it appears
@@ -214,8 +238,12 @@ decisions. Each one is already part of the spec above.
    input with `grid_solved`. Pick: refusals (spec 015 check 5, spec 018 undo
    step 3, spec 023 step 1); no cell events, so the log is not flooded at the end.
    Selection, chat, flags and host actions stay available.
-4. `elapsed_ms`: milliseconds since the room was created, until spec 027 defines
-   the shared timer.
+4. `elapsed_ms`: the shared timer's value, in milliseconds, as spec 027 defines it.
+   (Note from the lead, 2026-10-15: spec 027 (its decision 5) asks for this change.
+   This decision said "milliseconds since the room was created, until spec 027
+   defines the shared timer." Spec 027 defines it, so the "until" has come. The
+   reason is unchanged: the field already existed in the protocol, so no protocol
+   change is needed.)
 5. Completion runs after any step that changes a letter or a lock (edit, undo,
    reveal, pencil edit or pencil confirmation), not only after `edit_letter`.
 6. Pencil letters fill a cell and are compared with the solution like normal

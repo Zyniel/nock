@@ -116,7 +116,18 @@ letter is the confirmed one (no pending edit, spec 015), else `false`. A cell wi
 ### Client: check controls
 
 Shown on the room page once it has a snapshot, in the room header beside the undo
-control (spec 018):
+control (spec 018), while the kept settings' `help_mode` is not `none`. With `none`,
+`check-panel` is absent from the page, and its three buttons with it (spec 025:
+"`check-panel` (spec 023) and `reveal-panel` (spec 024) are absent from the page";
+AC-4: "neither `check-panel` nor `reveal-panel` exists"). A `settings_changed` to `none`
+removes it; a `settings_changed` to `free` or `vote` shows it again, with its three
+buttons.
+(Note from the lead, 2026-10-15: spec 025 (AC-4, decision 10) asks for this change.
+This paragraph used to end after "(spec 018):" and the help mode `none` was handled
+by disabling the buttons, in the bullet below. Why: a group that has chosen no help
+sees no help controls, as spec 025 words it for both help panels. Spec 025 AC-4 says
+that with `vote` the panel shows too, and that it shows again after `none` gives way
+to `free`.)
 
 - `data-testid="check-panel"`, a `role="group"` with `aria-label`
   `t("check.label")`, holding three buttons in this order:
@@ -128,8 +139,12 @@ control (spec 018):
   | `check-grid` | `t("check.grid")` | `t("check.grid_label")` | `{"type": "check", "target": {"scope": "grid"}}` |
 
 - `check-letter` and `check-word` are `disabled` while nothing is selected. All
-  three are `disabled` while the snapshot's `settings.help_mode` is `none`, and
-  (spec 026) while the grid is solved.
+  three are `disabled` while the grid is solved (spec 026). (Note from the lead,
+  2026-10-15: spec 025 (AC-4, decision 10) asks for this change. This sentence said
+  "All three are `disabled` while the snapshot's `settings.help_mode` is `none`, and
+  (spec 026) while the grid is solved." Help mode `none` no longer disables the
+  buttons: it removes the panel, see the paragraph above. The solved rule is
+  unchanged.)
 - Pressing a button sends its message once and does not move the selection; the
   page waits for the server's events (no local guess of the result).
 - An `error` answering a check (`help_disabled`, `invalid_target`,
@@ -184,7 +199,7 @@ The words in brackets say how each criterion is tested.
 - **AC-6** (AC-6.1.2) (rule unit test) Empty cells in the scope are ignored. Given `S1`, when `p1` checks `WordTarget(row=0, column=2, clue_index=0)` (MIME: (1, 2) empty, (2, 2) `Q`, (3, 2) and (4, 2) empty), then `correct == ()`, `wrong == (CellRef(row=2, column=2),)`, no `CellLocked` follows, and (1, 2), (3, 2), (4, 2) are unchanged (`letter=None`, `locked=False`, `wrong=False`). Checking `CellTarget(row=1, column=2)` gives a `CheckResult` with `correct == ()` and `wrong == ()`, one entry only, and seq 9.
 - **AC-7** (AC-6.1.3) (rule unit test; WebSocket) The result is computed on the server from the letters in place, and the answer is not sent. Rule: given `S1` where `p2` then writes `A` at (1, 1) (seq 9), a check of TAMIS by `p1` lists (1, 1) in `correct` and locks it with letter `A`. WebSocket: the full FX-01 game of spec 037's test harness, where Ana sends a grid check right after the three wrong letters `X` are typed (and the remaining edits skip cells that the check locked), passes spec 037's three rules of "What a browser may receive" on every recorded frame, and every `cell_locked` with `revealed` false holds a letter typed at that cell before it.
 - **AC-8** (AC-6.1.4) (browser with live server) Each check adds a line to the activity feed with the player and the scope. In the room of AC-4, after Ana's `check-word`, both pages' `activity-feed` hold one new `feed-item` with `data-kind="check"` and the text `fr.json["feed.check.word"]` with `{name}` = `Ana`; after Bob selects (2, 1) and clicks `check-letter`, then `check-grid`, both feeds end with the texts of `feed.check.letter` and `feed.check.grid` with `{name}` = `Bob`.
-- **AC-9** (new) (browser with mocked socket) The check controls send the right message and are disabled when they cannot apply. Given a FX-01 snapshot (`help_mode` `free`): `check-panel` holds `check-letter`, `check-word`, `check-grid` in that order with the texts and `aria-label`s of the table; with nothing selected `check-letter` and `check-word` are disabled and `check-grid` is enabled, and clicking `check-grid` sends one frame that parses to `Check(target=GridTarget())`; after tapping (2, 2) twice (`down`, word `0,2,0`), `check-letter` sends `Check(target=CellTarget(row=2, column=2))` and `check-word` sends `Check(target=WordTarget(row=0, column=2, clue_index=0))`, and the selection is still (2, 2) `down`. When the mock then sends `settings_changed` with `help_mode` `none`, all three buttons are disabled.
+- **AC-9** (new) (browser with mocked socket) The check controls send the right message and are disabled when they cannot apply. Given a FX-01 snapshot (`help_mode` `free`): `check-panel` holds `check-letter`, `check-word`, `check-grid` in that order with the texts and `aria-label`s of the table; with nothing selected `check-letter` and `check-word` are disabled and `check-grid` is enabled, and clicking `check-grid` sends one frame that parses to `Check(target=GridTarget())`; after tapping (2, 2) twice (`down`, word `0,2,0`), `check-letter` sends `Check(target=CellTarget(row=2, column=2))` and `check-word` sends `Check(target=WordTarget(row=0, column=2, clue_index=0))`, and the selection is still (2, 2) `down`. When the mock then sends `settings_changed` (seq 6) with `help_mode` `none`, `check-panel` does not exist, and neither do `check-letter`, `check-word` and `check-grid`; when it then sends `settings_changed` (seq 7) with `help_mode` `free`, `check-panel` shows again with its three buttons, all enabled since the selection is still (2, 2) `down`; in a second run, `vote` instead of `free` shows it too. A first snapshot whose `help_mode` is `none` shows no `check-panel` either. (Note from the lead, 2026-10-15: spec 025 (AC-4, decision 10) asks for this change. The sentence used to end "When the mock then sends `settings_changed` with `help_mode` `none`, all three buttons are disabled." Why: help mode `none` now removes the panel instead of disabling its buttons, and the panel comes back with `free` or `vote`, as spec 025 AC-4 words it. The seqs 6 and 7 are those of spec 025 AC-4, the mock's FX-01 snapshot being at seq 5. The last sentence, on a first snapshot in `none`, is the rule of "Client: check controls" restated: it covers the test that used to read "a help mode `none` in the snapshot disables all three buttons". The test-writer of spec 025 updates the two tests of this criterion that check `none`.)
 - **AC-10** (new) (rule unit test) A check that cannot apply is refused and changes nothing. Given `S1`: with `help_mode` `none` (set by a `ChangeSettings` from the host), any check is answered `help_disabled`; `CellTarget(row=0, column=0)` (a clue cell) and `CellTarget(row=5, column=0)` are answered `not_a_letter_cell`; `WordTarget(row=1, column=0, clue_index=0)` (a letter cell), `WordTarget(row=0, column=2, clue_index=1)` (one clue only) and `WordTarget(row=9, column=9, clue_index=0)` are answered `invalid_target`. Each refusal returns the state it was given apart from the player's `last_seen_at` and `last_input_at` (seq unchanged: 9 after the `ChangeSettings`, 8 otherwise), no entry and exactly one `ErrorMessage` in `reply`. With `help_mode` `vote`, a check of TAMIS gives the result of AC-1.
 
 ## Edge cases and errors
