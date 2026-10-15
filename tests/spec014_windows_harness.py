@@ -133,6 +133,13 @@ def panel_shows_a_more_marker(page: Page) -> bool:
 FOCUSED_TEST_ID_SCRIPT = (
     "() => document.activeElement && document.activeElement.getAttribute('data-testid')"
 )
+# True when a control inside `host-panel` has the focus (the panel itself counts).
+PANEL_HAS_FOCUS_SCRIPT = """
+() => {
+  const panel = document.querySelector('[data-testid="host-panel"]');
+  return panel.contains(document.activeElement);
+}
+"""
 MAX_TABS = 60
 
 

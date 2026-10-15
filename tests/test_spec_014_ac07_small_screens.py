@@ -14,6 +14,7 @@ host controls, which the spec ties to AC-7. Its name is kept as it was.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable
 
 import pytest
@@ -27,6 +28,7 @@ from spec014_windows_harness import (
     EPSILON,
     FOCUSED_TEST_ID_SCRIPT,
     MIN_TARGET_PX,
+    PANEL_HAS_FOCUS_SCRIPT,
     TARGET_TOLERANCE_PX,
     WINDOW_SIZES,
     eight_players,
@@ -344,6 +346,18 @@ FADE_STATE_SCRIPT = """
 """
 
 
+FOCUS_LEAVING_PLATFORMS = ("win32", "darwin")
+
+
+def engine_drops_the_focus_after_a_press(browser_name: str) -> bool:
+    """Tell whether a click or tap takes the focus off the button (spec 014 AC-7).
+
+    That is WebKit on Windows and macOS. Every other pair of engine and operating
+    system (`sys.platform`) keeps the focus on the clicked button.
+    """
+    return browser_name == "webkit" and sys.platform in FOCUS_LEAVING_PLATFORMS
+
+
 def press_at_centre(page: Page, test_id: str, touch: bool) -> None:
     """Click or tap the centre of a control without scrolling it into view."""
     box = page.get_by_test_id(test_id).bounding_box()
@@ -402,7 +416,10 @@ def test_ac7_browser_a_pointer_focus_in_the_host_panel_keeps_the_fade(
         press_at_centre(page, "lock-room", touch)
         page.wait_for_timeout(300)
 
-        assert page.evaluate(FOCUSED_TEST_ID_SCRIPT) == "lock-room"
+        if engine_drops_the_focus_after_a_press(browser_name):
+            assert page.evaluate(PANEL_HAS_FOCUS_SCRIPT) is False
+        else:
+            assert page.evaluate(FOCUSED_TEST_ID_SCRIPT) == "lock-room"
         state = page.evaluate(FADE_STATE_SCRIPT)
         assert state["hiddenPastRightEdge"] is True, state
         assert state["hidden"] is False, state
