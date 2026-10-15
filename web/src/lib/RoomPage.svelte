@@ -2121,6 +2121,17 @@
       white-space: nowrap;
     }
 
+    /* The clue text has priority over the author (spec 019 decision 11). The
+       author's flex basis is 0, so it never takes width from the clue text: it
+       grows into the room the clue text leaves, up to its whole text
+       (max-content), and never goes under 6 times its font size. When the row
+       is too short for that minimum, the clue text is the one that shrinks. */
+    .clue-bar.with-author .clue-bar-author {
+      flex: 1 1 0;
+      min-width: 6em;
+      max-width: max-content;
+    }
+
     .clue-bar.with-author .grid-status {
       margin-left: auto;
     }

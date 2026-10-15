@@ -662,8 +662,12 @@
     background: #ffffff;
   }
 
+  /* A letter cell is a stacking context of its own (isolation), so the z-index
+     of the author band and of the corner labels below orders them inside the
+     cell only, and never against the rest of the page (the vote banner). */
   .letter {
     position: relative;
+    isolation: isolate;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -716,30 +720,65 @@
     background: color-mix(in srgb, var(--tint) 28%, #ffffff);
   }
 
-  /* The authors view (spec 019): a band along the bottom of the cell, in the
-     author's colour (set on the element), or in a neutral grey that is none of
-     the eight player colours for an author who is no longer in the room. It is
+  /* The authors view (spec 019): a band along the bottom of the cell. It is
      drawn over the cell's background and replaces none of it. It keeps 3px
      inside the cell's padding box, 4px inside its edge, so the selected cell's
-     outline (3px, drawn inside the cell) never covers it. It comes before the
-     other players' outlines and labels, which are drawn over its ends. */
+     outline (3px, drawn inside the cell) never covers it. Its z-index draws it
+     above the other players' outlines, so no outline crosses it; only their
+     corner labels (z-index 2, below) are drawn over its ends. */
   .author-mark {
     position: absolute;
+    z-index: 1;
     left: 3px;
     right: 3px;
     bottom: 3px;
     height: max(4px, calc(var(--cell) * 0.11));
-    background-color: #737885;
     pointer-events: none;
   }
 
   /* A small cell (a large grid on a small window) has no room for those gaps:
-     the band only stays inside the cell. */
+     the band only stays inside the cell, on its bottom edge, and below the
+     letter's baseline. */
   .small-cells .author-mark {
     left: 1px;
     right: 1px;
-    bottom: 1px;
-    height: calc(var(--cell) * 0.2);
+    bottom: 0;
+    height: calc(var(--cell) * 0.25);
+  }
+
+  /* A player's band is in the author's colour (set on the element), between
+     two 1px edges in the cell's text colour, one along its top and one along
+     its bottom. The text colour keeps at least 4.5:1 on every background of the
+     cell, the flash included (the data-flash rules below), so the band always
+     keeps 3:1 thanks to its edges while its main colour stays the author's. */
+  .author-mark:not([data-colour=''])::before,
+  .author-mark:not([data-colour=''])::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background-color: currentColor;
+  }
+
+  .author-mark:not([data-colour=''])::before {
+    top: 0;
+  }
+
+  .author-mark:not([data-colour=''])::after {
+    bottom: 0;
+  }
+
+  /* The band of an author who is no longer in the room (their colour may now
+     be someone else's): diagonal stripes of a dark grey and white, a pattern
+     no player's band has. One of the two greys keeps 3:1 on every background
+     of the cell. */
+  .author-mark[data-colour=''] {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--author-departed-dark) 0 2px,
+      var(--author-departed-light) 2px 4px
+    );
   }
 
   /* The cell another player selected: a dashed border in their colour, inset
@@ -757,10 +796,13 @@
      of the cell. The "+k" label is a child of the cell, so --shift is 0.
      No padding above or below: a label is then 1.1 times its font high, and two
      labels in diagonal corners fit one above the other from a 20px cell, the
-     size where a cell gets its second slot (spec 035 AC-11). */
+     size where a cell gets its second slot (spec 035 AC-11). A label is drawn
+     over the author band (z-index 1) where they meet, from the band's ends
+     inward (spec 019). */
   .remote-label {
     --corner-offset: calc(var(--shift, 0px) * -1);
     position: absolute;
+    z-index: 2;
     padding: 0 1px;
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;

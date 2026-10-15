@@ -8,6 +8,13 @@
   --player-colour-5: #008080;
   --player-colour-6: #9a6324;
   --player-colour-7: #808000;
+
+  /* The neutral colours of the authors view (spec 019): the two greys of the
+     hatched band of an author who is no longer in the room. They are greys, so
+     neither is a player colour, and between them they keep at least 3:1 on every
+     background a letter cell can have. */
+  --author-departed-dark: #333333;
+  --author-departed-light: #ffffff;
 }
 
 body {
