@@ -4,7 +4,12 @@ This module is not a test file: pytest does not collect it. The tests of spec 01
 are in `tests/test_spec_019_*.py`, one file per criterion group:
 
 - `test_spec_019_ac01_ac02_marks_and_switch.py`: AC-1 and AC-2 (the marks with the
-  switch on, the neutral look with the switch off);
+  switch on, the departed author's hatched band, the neutral look with the switch
+  off);
+- `test_spec_019_ac01_band_contrast.py`: AC-1's contrast run (3:1 in every state
+  of the cell, the flash included);
+- `test_spec_019_ac01_box_and_drawing_order.py`: AC-1's box run (box rules, the
+  letter's baseline and the drawing order at three window sizes);
 - `test_spec_019_ac03_authorship_kept.py`: AC-3 (rules, WebSocket, live browser);
 - `test_spec_019_ac04_author_in_words.py`: AC-4 (`clue-bar-author`);
 - `test_spec_019_ac05_switch_in_toolbar.py`: AC-5 (the switch in `room-toolbar`,
@@ -16,11 +21,12 @@ live server, and AC-3 pins the server's existing behaviour with `nock.room`,
 `nock.store` and the real WebSocket.
 
 This module holds what more than one of those files uses: the mocked room, the
-snapshot builders, the AC-1 snapshot, the reading of the marks and of the roster
-swatches, the desktop and touch windows and spec 013 AC-6's layout checks. What
-only one file uses stays in that file. Fixtures are thin wrappers defined in each
-file (`fx01_grid`, `window`): a fixture imported from here would be an unused
-import for ruff.
+snapshot builders, the AC-1 snapshot, spec 026's FX-02 snapshot with eight
+players, the reading of the marks, of their colours and of the roster swatches,
+the desktop and touch windows and spec 013 AC-6's layout checks. What only one
+file uses stays in that file. Fixtures are thin wrappers defined in each file
+(`fx01_grid`, `window`): a fixture imported from here would be an unused import
+for ruff.
 
 Choices where the spec leaves room:
 
@@ -29,15 +35,26 @@ Choices where the spec leaves room:
   half side and tenth of a side are used as written.
 - "Within 300 ms of each event the page applies" (AC-1) is measured from the moment
   `room-page` shows the event's `data-seq` (spec 040's attribute).
+- The band's colours (AC-1, "Contrast") are read with spec 035's colour helpers,
+  shared through spec 024's `COLOUR_CONTRAST_JS`. Spec 024's `MARK_COLOURS_JS`
+  measures a corner mark with other size limits and no gradient, so the band has
+  its own reader, `BAND_COLOURS_JS`: the computed `background-color` and the
+  colour stops of the computed `background-image` of `author-mark` and of each
+  layer at least half the cell side wide and 1 px high. Like spec 024's, it
+  composites each colour over the cell's computed background (itself over white)
+  and keeps the highest ratio. "The cell side" is the cell's width.
+- The colours of the "layers" whose `background-image` must be `none` (players'
+  bands) are those of the same reader, so the same size limits apply.
 """
 
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import NamedTuple, Protocol
+from typing import Any, NamedTuple, Protocol
 
 import pytest
 from playwright.sync_api import (
@@ -49,7 +66,7 @@ from playwright.sync_api import (
     expect,
 )
 
-from nock.grid import Grid
+from nock.grid import Grid, LetterCell
 from nock.protocol import (
     CellLocked,
     CellView,
@@ -71,6 +88,7 @@ from nock.protocol import (
     grid_view,
     parse_client_message,
 )
+from spec024_harness import COLOUR_CONTRAST_JS
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 ROOM_CODE = "ABC123"
@@ -545,6 +563,376 @@ def swatch_colour(page: Page, player_id: str) -> str:
     selector = f'[data-testid="roster-player"][data-player-id="{player_id}"]'
     swatch = page.locator(selector).get_by_test_id("roster-colour")
     return background_of(swatch)
+
+
+# ---- The band's colours (AC-1, "Contrast" and the departed band) ------------
+
+MIN_BAND_CONTRAST = 3.0
+GREY_CHANNEL_SPREAD = 8.0  # "its red, green and blue channels are within 8"
+ANGLE_TOLERANCE_DEGREES = 0.001
+
+# Declares `readBand(cell)`, after spec 035's colour helpers (`parseColour`,
+# `over`, `contrast`, `WHITE`). It returns the cell's computed background and,
+# for its one `author-mark`, the mark's computed background colour and image, the
+# images of its layers, the colour stops of the mark's own image and every colour
+# of the band with its ratio against the cell. A layer is an element inside the
+# mark, or the mark's `::before` or `::after` whose computed `content` is not
+# `none`, at least half the cell side wide and 1 px high.
+BAND_COLOURS_JS = COLOUR_CONTRAST_JS + r"""
+const BAND_COLOUR_PATTERN = new RegExp(
+  '(?:rgba?|hsla?|hwb|oklab|oklch|lab|lch|color)\\([^()]*\\)'
+  + '|\\btransparent\\b|\\bcurrentcolor\\b',
+  'gi'
+);
+function imageColours(image, style) {
+  if (image === 'none') {
+    return [];
+  }
+  const found = [];
+  for (const text of image.match(BAND_COLOUR_PATTERN) || []) {
+    found.push(text.toLowerCase() === 'currentcolor' ? style.color : text);
+  }
+  return found;
+}
+function bandLayers(cell, mark) {
+  const side = cell.getBoundingClientRect().width;
+  const layers = [{source: 'author-mark', style: getComputedStyle(mark)}];
+  for (const element of mark.querySelectorAll('*')) {
+    const box = element.getBoundingClientRect();
+    if (box.width >= side / 2 && box.height >= 1) {
+      layers.push({source: element.tagName.toLowerCase(),
+                   style: getComputedStyle(element)});
+    }
+  }
+  for (const pseudo of ['::before', '::after']) {
+    const style = getComputedStyle(mark, pseudo);
+    if (style.content === 'none') {
+      continue;
+    }
+    if (parseFloat(style.width) >= side / 2 && parseFloat(style.height) >= 1) {
+      layers.push({source: pseudo, style: style});
+    }
+  }
+  return layers;
+}
+function readBand(cell) {
+  const marks = cell.querySelectorAll('[data-testid="author-mark"]');
+  const backgroundText = getComputedStyle(cell).backgroundColor;
+  const reading = {
+    marks: marks.length, background: backgroundText, markBackground: '',
+    markImage: '', layerImages: [], markStops: [], colours: [],
+  };
+  if (marks.length !== 1) {
+    return reading;
+  }
+  const cellBackground = over(parseColour(backgroundText), WHITE);
+  const addColour = (source, text) => {
+    const rgba = parseColour(text);
+    const ratio = contrast(over(rgba, cellBackground), cellBackground);
+    reading.colours.push({source: source, text: text, rgba: rgba, ratio: ratio});
+  };
+  for (const layer of bandLayers(cell, marks[0])) {
+    const image = layer.style.backgroundImage;
+    const stops = imageColours(image, layer.style);
+    if (layer.source === 'author-mark') {
+      reading.markBackground = layer.style.backgroundColor;
+      reading.markImage = image;
+      for (const text of stops) {
+        reading.markStops.push(parseColour(text));
+      }
+    } else {
+      reading.layerImages.push([layer.source, image]);
+    }
+    addColour(layer.source + ' background-color', layer.style.backgroundColor);
+    for (const text of stops) {
+      addColour(layer.source + ' background-image', text);
+    }
+  }
+  return reading;
+}
+"""
+
+BANDS_SCRIPT = "cells => {\n" + BAND_COLOURS_JS + r"""
+  const found = [];
+  for (const [row, column] of cells) {
+    const cell = document.querySelector(
+      `[data-testid="cell"][data-row="${row}"][data-column="${column}"]`
+    );
+    found.push(readBand(cell));
+  }
+  return found;
+}
+"""
+
+Rgba = tuple[float, float, float, float]
+
+
+class BandColour(NamedTuple):
+    """One colour of a band: where it comes from, its text, value and ratio."""
+
+    source: str
+    text: str
+    rgba: Rgba
+    ratio: float
+
+
+class BandReading(NamedTuple):
+    """A cell's computed background and the colours of its `author-mark`."""
+
+    marks: int
+    background: str
+    mark_background: str
+    mark_image: str
+    layer_images: list[tuple[str, str]]
+    mark_stops: list[Rgba]
+    colours: list[BandColour]
+
+
+def rgba_from(raw: list[float]) -> Rgba:
+    """The (red, green, blue, alpha) tuple of a colour read in the page."""
+    return (float(raw[0]), float(raw[1]), float(raw[2]), float(raw[3]))
+
+
+# Any: a JSON object returned by `readBand` in the page.
+def band_reading_from(raw: dict[str, Any]) -> BandReading:
+    """Turn what `readBand` returned into a `BandReading`."""
+    colours: list[BandColour] = []
+    for colour in raw["colours"]:
+        colours.append(
+            BandColour(
+                source=colour["source"],
+                text=colour["text"],
+                rgba=rgba_from(colour["rgba"]),
+                ratio=float(colour["ratio"]),
+            )
+        )
+    layer_images: list[tuple[str, str]] = []
+    for source, image in raw["layerImages"]:
+        layer_images.append((source, image))
+    mark_stops: list[Rgba] = []
+    for stop in raw["markStops"]:
+        mark_stops.append(rgba_from(stop))
+    return BandReading(
+        marks=int(raw["marks"]),
+        background=raw["background"],
+        mark_background=raw["markBackground"],
+        mark_image=raw["markImage"],
+        layer_images=layer_images,
+        mark_stops=mark_stops,
+        colours=colours,
+    )
+
+
+def band_readings(page: Page, cells: list[Cell]) -> list[BandReading]:
+    """Read the bands of several cells in one `page.evaluate`, in that order."""
+    raw_readings = page.evaluate(BANDS_SCRIPT, [list(cell) for cell in cells])
+    readings: list[BandReading] = []
+    for raw in raw_readings:
+        readings.append(band_reading_from(raw))
+    return readings
+
+
+def counted_colours(reading: BandReading) -> list[BandColour]:
+    """The colours of a band that count: every one whose alpha is not 0."""
+    counted: list[BandColour] = []
+    for colour in reading.colours:
+        if colour.rgba[3] > 0:
+            counted.append(colour)
+    return counted
+
+
+def band_contrast(reading: BandReading) -> float:
+    """The band's contrast: the highest ratio of its colours against the cell."""
+    highest = 0.0
+    for colour in counted_colours(reading):
+        highest = max(highest, colour.ratio)
+    return highest
+
+
+def describe_colours(reading: BandReading) -> str:
+    """The band's colours and ratios, for a failure message."""
+    parts: list[str] = []
+    for colour in reading.colours:
+        parts.append(f"{colour.source} {colour.text} ({colour.ratio:.2f}:1)")
+    return "; ".join(parts)
+
+
+def band_contrast_problems(reading: BandReading, swatch: str | None) -> list[str]:
+    """How a band breaks "Contrast" and its first item (empty: none).
+
+    Args:
+        reading: The band of one cell, in the state to check.
+        swatch: The computed background colour of the author's `roster-colour`,
+            which the mark's own background colour must equal; None for a
+            departed author, who has no swatch.
+
+    Returns:
+        One line per broken rule: a colour that counts but is not opaque, a
+        contrast under 3:1, a main colour that is not the author's swatch.
+    """
+    if reading.marks != 1:
+        return [f"{reading.marks} author-mark elements in the cell"]
+    problems: list[str] = []
+    for colour in counted_colours(reading):
+        if colour.rgba[3] < 1.0:
+            problems.append(f"{colour.source} {colour.text} is not opaque")
+    contrast = band_contrast(reading)
+    if contrast < MIN_BAND_CONTRAST:
+        problems.append(
+            f"contrast {contrast:.2f}:1 on {reading.background}: "
+            f"{describe_colours(reading)}"
+        )
+    if swatch is not None and reading.mark_background != swatch:
+        problems.append(
+            f"background-color {reading.mark_background}, not the swatch {swatch}"
+        )
+    return problems
+
+
+def first_gradient_argument(image: str) -> str:
+    """The text before the first top-level comma inside a gradient's brackets."""
+    inside = image[image.index("(") + 1 :]
+    depth = 0
+    for index, character in enumerate(inside):
+        if character == "(":
+            depth += 1
+        elif character == ")" and depth > 0:
+            depth -= 1
+        elif character in ",)" and depth == 0:
+            return inside[:index].strip()
+    return inside.strip()
+
+
+ANGLE_PATTERN = re.compile(
+    r"^(-?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(deg|grad|rad|turn)$"
+)
+DEGREES_PER_UNIT = {"deg": 1.0, "grad": 0.9, "rad": 180.0 / math.pi, "turn": 360.0}
+VERTICAL_SIDES = {"top", "bottom"}
+HORIZONTAL_SIDES = {"left", "right"}
+
+
+def is_diagonal(direction: str) -> bool:
+    """Tell whether a gradient's first argument draws a diagonal line.
+
+    An angle that is not a whole multiple of 90 degrees, or a corner keyword such
+    as `to top right`, is diagonal. A side keyword, a multiple of 90 degrees or a
+    missing direction (the first argument is then a colour stop) is not.
+    """
+    match = ANGLE_PATTERN.match(direction)
+    if match is not None:
+        degrees = float(match.group(1)) * DEGREES_PER_UNIT[match.group(2)]
+        nearest_right_angle = 90.0 * round(degrees / 90.0)
+        return abs(degrees - nearest_right_angle) > ANGLE_TOLERANCE_DEGREES
+    words = direction.split()
+    if len(words) != 3 or words[0] != "to":
+        return False
+    sides = {words[1], words[2]}
+    return len(sides & VERTICAL_SIDES) == 1 and len(sides & HORIZONTAL_SIDES) == 1
+
+
+def is_grey(rgba: Rgba) -> bool:
+    """Tell whether a colour's red, green and blue channels are within 8."""
+    red, green, blue, _alpha = rgba
+    return max(red, green, blue) - min(red, green, blue) <= GREY_CHANNEL_SPREAD
+
+
+def hatched_problems(reading: BandReading) -> list[str]:
+    """How a departed author's band fails to be hatched in greys (empty: none).
+
+    Its computed `background-image` is a `repeating-linear-gradient` whose line
+    is diagonal and whose colour stops hold at least two different colours, and
+    each colour of the band that counts is a grey.
+    """
+    if reading.marks != 1:
+        return [f"{reading.marks} author-mark elements in the cell"]
+    problems: list[str] = []
+    image = reading.mark_image
+    if not image.startswith("repeating-linear-gradient("):
+        problems.append(f"background-image {image!r} is no repeating-linear-gradient")
+    else:
+        direction = first_gradient_argument(image)
+        if not is_diagonal(direction):
+            problems.append(f"the gradient's line {direction!r} is not diagonal")
+    different_stops = set(reading.mark_stops)
+    if len(different_stops) < 2:
+        problems.append(f"the colour stops of {image!r} hold under two colours")
+    for colour in counted_colours(reading):
+        if not is_grey(colour.rgba):
+            problems.append(f"{colour.source} {colour.text} is not a grey")
+    return problems
+
+
+def pattern_problems(reading: BandReading) -> list[str]:
+    """How a player's band has a pattern (empty: none).
+
+    The computed `background-image` of `author-mark` and of each of its layers is
+    `none`.
+    """
+    if reading.marks != 1:
+        return [f"{reading.marks} author-mark elements in the cell"]
+    problems: list[str] = []
+    if reading.mark_image != "none":
+        problems.append(f"author-mark has the background-image {reading.mark_image}")
+    for source, image in reading.layer_images:
+        if image != "none":
+            problems.append(f"its layer {source} has the background-image {image}")
+    return problems
+
+
+# ---- FX-02 with eight players (spec 026's `FX02_FULL_WRONG`) ----------------
+
+FX02_CELL_COUNT = 13 * 17
+# Spec 013 AC-6's players, as spec 026's status snapshots give them: `p1` (`Ana`,
+# host, colour 0) and `p2` to `p8`, with colours 1 to 7.
+EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
+
+
+def letter_positions_of(grid: Grid) -> list[Cell]:
+    """The (row, column) of every letter cell of a grid, in grid order."""
+    positions: list[Cell] = []
+    for cell in grid.cells:
+        if isinstance(cell, LetterCell):
+            positions.append((cell.row, cell.column))
+    return positions
+
+
+def fx02_full_wrong_view(grid: Grid) -> GridView:
+    """`FX02_FULL_WRONG` of spec 026: every letter cell holds `E` by `p2`."""
+    changes: ChangeList = []
+    for row, column in letter_positions_of(grid):
+        changes.append((row, column, {"letter": "E", "author": "p2"}))
+    return with_letter_cells(grid_view(grid), changes)
+
+
+def eight_players(second_nickname: str = "Bob") -> list[PlayerView]:
+    """`p1` (`Ana`, host, colour 0) and `p2` to `p8` (colours 1 to 7).
+
+    Args:
+        second_nickname: The nickname of `p2`.
+
+    Returns:
+        The eight players, `p1` first.
+    """
+    players = [player_view("p1", EIGHT_NICKNAMES[0], 0, is_host=True)]
+    for number in range(2, 9):
+        nickname = EIGHT_NICKNAMES[number - 1]
+        if number == 2:
+            nickname = second_nickname
+        players.append(player_view(f"p{number}", nickname, number - 1))
+    return players
+
+
+def with_selection(
+    players: list[PlayerView], player_ids: list[str], selection: Selection
+) -> list[PlayerView]:
+    """The players, those of `player_ids` selecting `selection` (spec 013)."""
+    result: list[PlayerView] = []
+    for player in players:
+        if player.player_id in player_ids:
+            result.append(player.model_copy(update={"selection": selection}))
+        else:
+            result.append(player)
+    return result
 
 
 # ---- Two pages on the live server (AC-1 and AC-3) ---------------------------
