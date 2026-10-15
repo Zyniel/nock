@@ -48,6 +48,9 @@ pending edit.
   (`false` or `true`) and the text `t("authors.switch")`, last in spec 024's
   `room-toolbar`. It is `false` at each page load, and each click flips it. It is
   never disabled (the view is useful on a solved grid too) and sends nothing.
+  (Note from the lead, 2026-10-15: "sends nothing" leaves aside the heartbeat
+  `ping` frames of spec 017, which the page may send at any time once the socket
+  is open.)
 
 ### Client: the view, switch on
 

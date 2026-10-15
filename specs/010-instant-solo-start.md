@@ -145,7 +145,9 @@ The words in brackets say how each criterion is tested.
   stays `"finished"`.
 - Saved selection no longer valid (AC-3): a record selection on a clue cell, outside
   the grid, or with a direction the cell has no word in is ignored; nothing is
-  selected and nothing is sent.
+  selected and nothing is sent. (Note from the lead, 2026-10-15: "nothing is
+  sent" leaves aside the heartbeat `ping` frames of spec 017, which the page may
+  send at any time once the socket is open.)
 - Corrupt record (AC-3, AC-5): `nock.room.ABC123` set to `not json` or `[]` is
   read as no record; the page joins as spec 012 says for a guest.
 - Room gone (AC-3): if the reloaded room answers 4404, the page shows

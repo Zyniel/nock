@@ -236,9 +236,12 @@ confirmation on a solved grid's normal letter.)
 - AC-3 depends on behaviour owned by spec 026; test only this spec's side of it here.
 - Typing the same letter (AC-1): in pencil mode, typing `L` on a cell that shows a
   pencil `L` sends nothing and moves on (spec 008 decision 4); on a normal `L` it
-  sends a `pencil_edit` (open question 3).
+  sends a `pencil_edit` (open question 3). (Note from the lead, 2026-10-15:
+  "sends nothing" leaves aside the heartbeat `ping` frames of spec 017, which the
+  page may send at any time once the socket is open.)
 - A locked cell (AC-1, AC-4): typing in pencil mode does nothing and sends nothing
-  (spec 008); the server refuses a pencil edit there with `cell_locked`.
+  (spec 008); the server refuses a pencil edit there with `cell_locked`. (Note
+  from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted.)
 - Two confirmations at once (AC-2): the second is refused `stale_edit`, since the
   cell then holds a normal letter, and its page shows the first confirmer's letter.
 - The flash (spec 016): a confirmation of my pencil letter by another player makes
@@ -264,7 +267,8 @@ confirmation on a solved grid's normal letter.)
 - The in-app keyboard (AC-1): its keys follow pencil mode; it gets no pencil key,
   since the toolbar's toggle serves touch screens too.
 - Solved grid (AC-3, AC-7): `pencil-toggle` and `confirm-pencil` are disabled, and
-  spec 026's input lock sends nothing.
+  spec 026's input lock sends nothing. (Note from the lead, 2026-10-15: spec 017's
+  heartbeat `ping` frames are not counted.)
 - Rate (AC-4): pencil edits and confirmations count with letter edits (spec 037),
   and the resend pacing of spec 017 AC-5 applies to them.
 - Integrity (spec 037 AC-1): a pencil letter is typed, so it is earned at its cell

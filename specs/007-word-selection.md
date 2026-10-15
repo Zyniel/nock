@@ -90,7 +90,9 @@ Spec 009 places the in-app keyboard below the bar (spec 009 AC-4).
 Each time the selection changes (cell or direction), the page sends one
 `{"type": "select_cell", "row": r, "column": c, "direction": "across"|"down"}`
 (spec 039 `SelectCell`), if the socket is open. A tap that changes nothing sends
-nothing.
+nothing. (Note from the lead, 2026-10-15: "sends nothing", here and in the rest
+of this spec, leaves aside the heartbeat `ping` frames of spec 017, which the
+page may send at any time once the socket is open.)
 
 ### New `fr.json` keys
 
@@ -121,7 +123,7 @@ The words in brackets say how each criterion is tested.
 - **AC-2** (AC-2.2.2) (browser with mocked socket) Tapping the selected cell again switches between its across and down word. On a cell with one word (N or T in FX-01), nothing changes. Tapping (1, 1) gives `across`, `data-word="0,0,0"`; tapping it again gives `down`, `data-word="0,0,1"`; a third tap gives `across` again. Tapping (0, 1) gives `down`, `data-word="0,0,1"`, and tapping it again leaves `down` and `0,0,1`; tapping (1, 0) gives `across`, `0,0,0`, and again leaves them.
 - **AC-3** (AC-2.2.3) (browser with mocked socket) Tapping a clue selects the first empty cell of its word. In a two-clue cell, each half selects its own word. With a snapshot where (1, 2) holds `M`, tapping the clue `Artiste muet` gives (2, 2), `down`, `data-word="0,2,0"`. Tapping the clue `Passoire fine` gives (1, 0), `across`, `0,0,0`; tapping `De la marine` gives (0, 1), `down`, `0,0,1`. With a snapshot where (1, 3), (2, 3), (3, 3), (4, 3) hold `I`, `D`, `E`, `S`, tapping `Fatales à César` gives (1, 3), `down`, `0,3,0`.
 - **AC-4** (AC-2.2.4) (browser with mocked socket, phone window) The selected word's clue is repeated at 14 px or more in a bar that stays visible above the keyboard. After tapping (3, 1), `clue-bar-text` reads `Fin de prière`, `clue-bar` has `data-word="3,0,0"`, its computed `font-size` is 14 px or more, and its box lies inside the window (top at least 0, bottom at most `window.innerHeight`). It stays inside the window after `window.scrollTo(0, 10000)` and after scrolling `grid-viewport` to its end. Before any tap it reads `fr.json["clue_bar.empty"]`. The in-app keyboard part is spec 009 AC-4.
-- **AC-5** (new) (browser with mocked socket) Each selection change sends one `select_cell`. Tapping (1, 1), then (1, 1) again, then (0, 1) twice makes the page send, after its `join`, exactly `SelectCell(row=1, column=1, direction="across")`, `SelectCell(row=1, column=1, direction="down")`, `SelectCell(row=0, column=1, direction="down")`, in that order, and nothing for the last tap.
+- **AC-5** (new) (browser with mocked socket) Each selection change sends one `select_cell`. Tapping (1, 1), then (1, 1) again, then (0, 1) twice makes the page send, after its `join`, exactly `SelectCell(row=1, column=1, direction="across")`, `SelectCell(row=1, column=1, direction="down")`, `SelectCell(row=0, column=1, direction="down")`, in that order, and nothing for the last tap (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted).
 - **AC-6** (new) (browser with mocked socket) The selected word is the word that was chosen, even when it starts inside a longer run. With a hand-built view where a clue's word starts in the middle of a longer word of the same direction (so a cell belongs to two words of one direction), tapping that clue selects its own word: `data-word` names the clue's word and only its cells have `data-in-word`; the clue bar shows that clue. Tapping a cell afterwards applies AC-1 and Decision 6 again (the longest word of the direction), unless the tapped cell is the selected cell. With no clue involved, a cell shared by two words of one direction selects the longest one (Decision 6), and this is tested with a hand-built view. The `clue-bar` has `role="region"` so its `aria-label` is announced.
 
 ## Edge cases and errors
@@ -131,8 +133,9 @@ The words in brackets say how each criterion is tested.
 - Direction forced (AC-1): with `down` selected, tapping (1, 0) (T, across only)
   gives `across`.
 - Empty cells and separators (AC-1, AC-3): tapping them changes nothing and sends
-  nothing. FX-01 has no empty cell, so the test uses the hand-built view described
-  after this list; the separator is tested on FX-01 (0, 0) with
+  nothing (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames
+  are not counted). FX-01 has no empty cell, so the test uses the hand-built view
+  described after this list; the separator is tested on FX-01 (0, 0) with
   `locator.dispatch_event("click")`, since it is only 1 px high.
 - Word with every cell filled (AC-3): the first cell is selected.
 - Locked cells (AC-1, AC-3): they are selectable and count as filled.
@@ -140,8 +143,11 @@ The words in brackets say how each criterion is tested.
   which may move the selected cell back; it sends `select_cell` only if the
   selection changed.
 - Second snapshot (AC-1): the selection is kept when its cell and direction still
-  have a word; otherwise it is cleared (`data-word=""`), and nothing is sent.
-- Socket closed (AC-5): selecting still works locally and sends nothing.
+  have a word; otherwise it is cleared (`data-word=""`), and nothing is sent
+  (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not
+  counted).
+- Socket closed (AC-5): selecting still works locally and sends nothing (Note
+  from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted).
 - Before the first snapshot: no grid, no clue bar.
 - Server replies: the shell server ignores `select_cell`; spec 013 gives it meaning.
 
