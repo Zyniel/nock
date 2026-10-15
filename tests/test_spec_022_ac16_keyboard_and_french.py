@@ -2,7 +2,10 @@
 keyboard and readable in French.
 
 The keyboard walk is keyboard only after its setup (the snapshot with `you` host
-and the tap on the clue cell (0, 3)) and uses spec 035's `tab_to`. The contrast
+and the tap on the clue cell (0, 3)) and uses spec 035's `tab_to`. On the same
+page, once the chat message is sent with the panel still open, it opens the
+picker too and checks that one `Tab` from the last option lands inside
+`chat-panel` (decision 15). The contrast
 and language scans are spec 035's; the language scan's test data holds the
 nicknames, the clues, the room code and link, and the chat texts the test sent
 ("Test harness": chat text is user content). The static test reads the new keys
@@ -82,6 +85,18 @@ OPEN_CHAT = [
 UNREAD_TEXTS = ["Ligne 6", "Ligne 7", "Ligne 8"]
 ACCEPTED_SAMPLES = ["Discussion, 3 messages non lus", "Bob : Bravo", "\U0001f44f"]
 TYPED_TEXT = "Bonne idée !"
+# Whether `chat-panel` exists and holds the focused element (not the panel itself).
+FOCUS_IN_PANEL_SCRIPT = r"""
+() => {
+  const panel = document.querySelector('[data-testid="chat-panel"]');
+  const focused = document.activeElement;
+  return {
+    panel: panel !== null,
+    insidePanel: panel !== null && focused !== null && focused !== panel
+      && panel.contains(focused),
+  };
+}
+"""
 
 
 @pytest.fixture
@@ -135,6 +150,16 @@ def test_ac16_browser_every_chat_and_reaction_control_is_reached_from_the_keyboa
     page.keyboard.press("Enter")
     wait_for_frame_count(page, mock, "chat", 1)
 
+    # The panel still open, the picker opened too: one Tab from its last option.
+    expect(page.get_by_test_id("chat-panel")).to_be_visible()
+    walker.tab_to("react-button")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("reaction-picker")).to_be_visible()
+    expect(page.get_by_test_id("reaction-option").first).to_be_focused()
+    walker.tab_to("reaction-option", f'[data-reaction="{REACTION_VALUES[-1]}"]')
+    page.keyboard.press("Tab")
+    focus_after_last_option = page.evaluate(FOCUS_IN_PANEL_SCRIPT)
+
     reached = [step.test_id for step in walker.reached]
     expected = [
         "react-button",
@@ -144,8 +169,11 @@ def test_ac16_browser_every_chat_and_reaction_control_is_reached_from_the_keyboa
         "chat-send",
         "mute-player",
         "chat-input",
+        "react-button",
+        "reaction-option",
     ]
     assert reached == expected
+    assert focus_after_last_option == {"panel": True, "insidePanel": True}
     for step in walker.reached:
         assert (
             outline_problems(

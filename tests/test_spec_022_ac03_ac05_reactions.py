@@ -9,10 +9,10 @@ with a mocked socket, where an in-page probe reads the reaction at every animati
 frame and times its life with `performance.now()`. AC-5 checks the button and the
 picker with a mocked socket. The order in the toolbar is relative (spec 024
 AC-8). "Sends nothing" and "exactly one frame" leave the heartbeat `ping` frames
-aside (the lead's note of 2026-10-15).
-
-Not tested: "before `chat-panel`" for the picker's place, which needs the panel
-and the picker open at once; the spec does not say whether they can be.
+aside (the lead's note of 2026-10-15). AC-5's last step opens the panel, then the
+picker, and checks their document order with both open (decision 15); after
+`Escape` in the picker, the test waits SETTLE_MS before it checks that the panel
+is still there, so that a panel closing with a transition is not missed.
 
 The shared setup is in `spec022_harness`.
 """
@@ -43,7 +43,7 @@ from nock.protocol import (
 )
 from nock.room import RoomConfig, tick
 from nock.store import RoomStore
-from spec021_harness import IDES, SENT, VIDE, clue_at, select_word
+from spec021_harness import IDES, SENT, VIDE, clue_at, clue_key, select_word
 from spec022_harness import (
     LIVE_WITHIN_SECONDS,
     POPOVER_PLACE,
@@ -56,6 +56,7 @@ from spec022_harness import (
     frames_after,
     new_player_page,
     open_chat_room,
+    open_panel,
     own_player_id,
     popover_place,
     reaction_frame,
@@ -471,6 +472,23 @@ OPTIONS_SCRIPT = r"""
   return options;
 }
 """
+# With both open: whether the picker comes before the panel in document order,
+# neither holding the other.
+PICKER_BEFORE_PANEL_SCRIPT = r"""
+() => {
+  const picker = document.querySelector('[data-testid="reaction-picker"]');
+  const panel = document.querySelector('[data-testid="chat-panel"]');
+  if (picker === null || panel === null) {
+    return {picker: picker !== null, panel: panel !== null};
+  }
+  const position = picker.compareDocumentPosition(panel);
+  return {
+    pickerBeforePanel: Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING),
+    nested: picker.contains(panel) || panel.contains(picker),
+  };
+}
+"""
+PICKER_BEFORE_PANEL = {"pickerBeforePanel": True, "nested": False}
 
 
 def expected_options() -> list[list[str]]:
@@ -530,9 +548,29 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(picker).to_have_count(0)
     expect(button).to_be_focused()
 
+    # Last: with VIDE still selected, the panel, then the picker (decision 15).
+    panel = page.get_by_test_id("chat-panel")
+    open_panel(page)
+    expect(page.get_by_test_id("grid")).to_have_attribute("data-word", clue_key(VIDE))
+    button.click()
+    expect(picker).to_be_visible()
+    expect(panel).to_be_visible()
+    expect(page.get_by_test_id("reaction-option").first).to_be_focused()
+    picker_place_with_panel = popover_place(page, "reaction-picker")
+    panel_place_with_picker = popover_place(page, "chat-panel")
+    pair_order = page.evaluate(PICKER_BEFORE_PANEL_SCRIPT)
+    page.keyboard.press("Escape")
+    expect(picker).to_have_count(0)
+    expect(button).to_be_focused()
+    page.wait_for_timeout(SETTLE_MS)
+    expect(panel).to_be_visible()
+
     assert order == {"insideToolbar": True, "afterFlag": True, "beforeAuthors": True}
     assert options == expected_options()
     assert place == POPOVER_PLACE
+    assert picker_place_with_panel == POPOVER_PLACE
+    assert panel_place_with_picker == POPOVER_PLACE
+    assert pair_order == PICKER_BEFORE_PANEL
     assert len(frames) == 1, frames
     parsed = parse_client_message(json.dumps(frames[0]))
     assert parsed == React(

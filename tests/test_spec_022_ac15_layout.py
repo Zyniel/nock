@@ -6,8 +6,14 @@ The setup is spec 024 AC-8's (spec 013 AC-6's FX-01 snapshot with `you` host amo
 from `p2`, at the eight window sizes of spec 006 AC-5, in desktop and touch
 contexts. One page per window size and context runs every check of the criterion,
 in its order: "Collapsed", "Targets", "Open" (the panel, then the picker after a
-tap on the clue cell (0, 3)), "Votes" and the place of `chat-input`. Every
+tap on the clue cell (0, 3), then both: the panel with a non-empty input, then the
+picker), "Votes" (the panel, then both) and the place of `chat-input`. Every
 threshold comes from the spec, none from what one machine's fonts show.
+
+With both open, `react-button` is scrolled into view before the panel's box is
+read, so that the click which opens the picker does not scroll the toolbar; then
+each toggle button is scrolled into view before its `elementFromPoint` check, as
+in "Collapsed", since on a small window the toolbar cannot show both at once.
 
 Spec 024 AC-8's toolbar checks are the ones the criterion names: one row on the
 four small windows (with spec 024's edge fade while content is hidden), the
@@ -548,17 +554,22 @@ def target_problems(page: Page, test_ids: list[str]) -> list[str]:
     return problems
 
 
-def layout_boxes(page: Page, touch: bool) -> dict[str, list[float]]:
-    """The boxes of `grid-viewport`, `clue-bar` and, when touch, `keyboard`."""
-    test_ids = ["grid-viewport", "clue-bar"]
-    if touch:
-        test_ids.append("keyboard")
+def boxes_of(page: Page, test_ids: list[str]) -> dict[str, list[float]]:
+    """The boxes (x, y, width, height) of the elements of these test ids."""
     boxes: dict[str, list[float]] = {}
     for test_id in test_ids:
         box = page.get_by_test_id(test_id).bounding_box()
         assert box is not None, test_id
         boxes[test_id] = [box["x"], box["y"], box["width"], box["height"]]
     return boxes
+
+
+def layout_boxes(page: Page, touch: bool) -> dict[str, list[float]]:
+    """The boxes of `grid-viewport`, `clue-bar` and, when touch, `keyboard`."""
+    test_ids = ["grid-viewport", "clue-bar"]
+    if touch:
+        test_ids.append("keyboard")
+    return boxes_of(page, test_ids)
 
 
 def moved_boxes(
@@ -574,14 +585,8 @@ def moved_boxes(
     return moved
 
 
-def open_state_problems(
-    page: Page,
-    popover: str,
-    opener: str,
-    before: dict[str, list[float]],
-    touch: bool,
-) -> list[str]:
-    """How an open panel or picker breaks "Open"."""
+def placement_problems(page: Page, popover: str) -> list[str]:
+    """How an open panel or picker breaks "Open": window, toolbar, page scroll."""
     placement = page.evaluate(PLACEMENT_SCRIPT, popover)
     if placement is None:
         return [f"no {popover}"]
@@ -594,11 +599,64 @@ def open_state_problems(
     scroll_width, window_width, scroll_height, window_height = placement["scroll"]
     if scroll_width > window_width or scroll_height > window_height:
         problems.append(f"page scroll {placement['scroll']} with {popover} open")
+    return problems
+
+
+def open_state_problems(
+    page: Page,
+    popover: str,
+    opener: str,
+    before: dict[str, list[float]],
+    touch: bool,
+) -> list[str]:
+    """How an open panel or picker breaks "Open"."""
+    problems = placement_problems(page, popover)
     hit = page.evaluate(HIT_AT_CENTRE_SCRIPT, opener)
     if hit["hits"] is not True:
         problems.append(f"{opener} covered by {hit['hit']} with {popover} open")
     for moved in moved_boxes(before, layout_boxes(page, touch)):
         problems.append(f"{popover} moved {moved}")
+    return problems
+
+
+def overlap_problems(page: Page) -> list[str]:
+    """Whether `chat-panel` and `reaction-picker` overlap by more than 1 px."""
+    boxes = boxes_of(page, ["chat-panel", "reaction-picker"])
+    panel_x, panel_y, panel_width, panel_height = boxes["chat-panel"]
+    picker_x, picker_y, picker_width, picker_height = boxes["reaction-picker"]
+    left = max(panel_x, picker_x)
+    right = min(panel_x + panel_width, picker_x + picker_width)
+    top = max(panel_y, picker_y)
+    bottom = min(panel_y + panel_height, picker_y + picker_height)
+    if right - left <= EPSILON or bottom - top <= EPSILON:
+        return []
+    return [f"chat-panel and reaction-picker overlap: {boxes}"]
+
+
+def both_open_problems(
+    page: Page,
+    before: dict[str, list[float]],
+    panel_before: dict[str, list[float]],
+    touch: bool,
+) -> list[str]:
+    """How the state with the panel and the picker both open breaks "Open".
+
+    Args:
+        page: The page, with `chat-panel` and `reaction-picker` open.
+        before: The layout boxes before the panel opened.
+        panel_before: The box of `chat-panel` before the picker opened.
+        touch: Whether the context is a touch one.
+    """
+    problems = placement_problems(page, "chat-panel")
+    problems += placement_problems(page, "reaction-picker")
+    for moved in moved_boxes(before, layout_boxes(page, touch)):
+        problems.append(f"both open moved {moved}")
+    problems += overlap_problems(page)
+    panel_after = boxes_of(page, ["chat-panel"])
+    for moved in moved_boxes(panel_before, panel_after):
+        problems.append(f"the picker moved {moved}")
+    for opener in NEW_BUTTONS:
+        problems += hit_problems(page, opener)
     return problems
 
 
@@ -689,7 +747,25 @@ def test_ac15_browser_the_chat_and_reaction_controls_keep_the_rooms_layout(
         page.keyboard.press("Escape")
         expect(picker).to_have_count(0)
 
-        # Votes: the banner of a grid check by `p2`, then the panel, then the picker.
+        # Open: both, (0, 3) still selected: the panel with a non-empty input,
+        # then the picker.
+        before = layout_boxes(page, touch)
+        open_panel(page, touch)
+        page.get_by_test_id("chat-input").fill("Bonjour")
+        page.evaluate(SCROLL_INTO_VIEW_SCRIPT, "react-button")
+        page.wait_for_timeout(SETTLE_MS)
+        panel_before = boxes_of(page, ["chat-panel"])
+        press(page, "react-button", touch)
+        expect(picker).to_be_visible()
+        expect(panel).to_be_visible()
+        page.wait_for_timeout(SETTLE_MS)
+        problems["both"] = both_open_problems(page, before, panel_before, touch)
+        page.keyboard.press("Escape")
+        expect(picker).to_have_count(0)
+        page.get_by_test_id("chat-toggle").dispatch_event("click")
+        expect(panel).to_have_count(0)
+
+        # Votes: the banner of a grid check by `p2`, then the panel, then both.
         mock.send(opened(VOTE_SEQ, 1, "p2", GRID_CHECK, 8).model_dump_json())
         expect(page.get_by_test_id("vote-yes")).to_be_visible()
         expect(page.get_by_test_id("vote-no")).to_be_visible()
@@ -697,12 +773,11 @@ def test_ac15_browser_the_chat_and_reaction_controls_keep_the_rooms_layout(
         expect(panel).to_be_visible()
         page.wait_for_timeout(SETTLE_MS)
         votes = vote_problems(page, "chat-panel")
-        page.get_by_test_id("chat-toggle").dispatch_event("click")
-        expect(panel).to_have_count(0)
         page.get_by_test_id("react-button").dispatch_event("click")
         expect(picker).to_be_visible()
+        expect(panel).to_be_visible()
         page.wait_for_timeout(SETTLE_MS)
-        votes += vote_problems(page, "reaction-picker")
+        votes += vote_problems(page, "chat-panel and reaction-picker")
         problems["votes"] = votes
     finally:
         close()
@@ -712,6 +787,7 @@ def test_ac15_browser_the_chat_and_reaction_controls_keep_the_rooms_layout(
         "panel": [],
         "picker": [],
         "targets": [],
+        "both": [],
         "votes": [],
     }
     assert input_inside == []

@@ -14,6 +14,7 @@ from pydantic import ValidationError
 
 from nock.protocol import (
     Chat,
+    ChatMessage,
     EditLetter,
     Join,
     LetterCellView,
@@ -262,3 +263,43 @@ def test_ac8_fifty_six_family_emoji_are_280_code_points() -> None:
 def test_ac8_family_emoji_over_280_code_points_are_rejected() -> None:
     with pytest.raises(ValidationError):
         parse_client_message(chat_with(FAMILY * 56 + "x"))
+
+
+# The refined rule (the lead's note of 2026-10-15): trimming is `str.strip()`, so
+# the separators U+001C to U+001F count as whitespace.
+SEPARATORS = ["\u001c", "\u001d", "\u001e", "\u001f"]
+
+
+def test_ac8_chat_text_is_stripped_of_the_separators_as_str_strip_does() -> None:
+    message = parse_client_message(chat_with("\u001fsalut\u001c"))
+
+    assert isinstance(message, Chat)
+    assert message.text == "salut"
+
+
+def test_ac8_chat_text_of_two_separators_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message(chat_with("\u001c\u001d"))
+
+
+@pytest.mark.parametrize("separator", SEPARATORS, ids=["1c", "1d", "1e", "1f"])
+def test_ac8_chat_text_of_one_separator_is_rejected(separator: str) -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message(chat_with(separator))
+
+
+def test_ac8_chat_text_of_separators_and_spaces_is_rejected() -> None:
+    with pytest.raises(ValidationError):
+        parse_client_message(chat_with(" \u001e\t\u001f "))
+
+
+def test_ac8_server_chat_message_strips_the_separators_too() -> None:
+    padded = with_key(server_data("chat_message"), "text", "\u001fsalut\u001c")
+    blank = with_key(server_data("chat_message"), "text", "\u001c\u001d")
+
+    message = parse_server_message(json.dumps(padded))
+
+    assert isinstance(message, ChatMessage)
+    assert message.text == "salut"
+    with pytest.raises(ValidationError):
+        parse_server_message(json.dumps(blank))

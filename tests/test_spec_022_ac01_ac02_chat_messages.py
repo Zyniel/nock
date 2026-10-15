@@ -7,11 +7,11 @@ and with two browsers on the live server. The edge cases the spec files under
 AC-1 ("Order", "Departed authors", "History size", "Feed") are checked on the
 page: the first three with a mocked socket, the feed with the live browsers.
 AC-2 is tested on the WebSocket (280, 281, empty and blank texts, trimming) and
-on the page's chat form.
-
-Not tested: the edge case of AC-2 on the separators U+001C to U+001F, which the
-spec says Python's `strip()` empties; the protocol's `ChatText` (spec 039) keeps
-them today, so the expected answer is a question for the lead (see the report).
+on the page's chat form. Its edge case "Length" on a text that the page's `trim()`
+keeps but Python's `str.strip()` empties (only whitespace, with at least one of
+the separators U+001C to U+001F or U+0085) is tested on the WebSocket: such a text
+gets `invalid_message`, as spec 039's refined `ChatText` (its AC-8, decision 14)
+strips as `str.strip()` does.
 
 The shared setup is in `spec022_harness`.
 """
@@ -373,6 +373,44 @@ def test_ac2_websocket_a_message_holds_1_to_280_characters_after_trimming(
     assert seq_after_refusals == 3
     assert ana_messages == [first, trimmed]
     assert bob_messages == [first, trimmed]
+
+
+# Texts that `trim()` keeps and `str.strip()` empties (edge case "Length", the
+# lead's note of 2026-10-15): spec 039 AC-8's example, every separator from U+001C
+# to U+001F among ordinary whitespace, and U+0085.
+TEXTS_ONLY_STRIP_EMPTIES = ["\u001c\u001d", " \u001c\u001d\t\u001e\u001f ", "\u0085"]
+
+
+def test_ac2_websocket_a_text_that_only_str_strip_empties_gets_invalid_message(
+    fx01_grid: Grid, dist_dir: Path
+) -> None:
+    refused_count = len(TEXTS_ONLY_STRIP_EMPTIES)
+    with (
+        chat_room(fx01_grid, dist_dir, WS_CONFIG) as (client, registry, code),
+        contextlib.ExitStack() as stack,
+    ):
+        ana, bob = join_peers(stack, client, code, ["Ana", "Bob"])
+        bob_count = len(bob.messages())
+        ana_count = len(ana.messages())
+        seq_before = room_seq(registry, code)
+
+        for text in TEXTS_ONLY_STRIP_EMPTIES:
+            ana.send_text(chat_json(text))
+        ana.wait_until(
+            lambda: len(errors_of(ana.messages()[ana_count:])) >= refused_count,
+            f"{refused_count} errors",
+        )
+        ping_and_wait(ana)
+        ping_and_wait(bob)
+        refusals = errors_of(ana.messages()[ana_count:])
+        ana_chat = chat_messages_of(ana)
+        bob_meanwhile = without_pongs(bob.messages()[bob_count:])
+        seq_after = room_seq(registry, code)
+
+    assert refusals == [ErrorCode.INVALID_MESSAGE] * refused_count
+    assert ana_chat == []
+    assert bob_meanwhile == []
+    assert seq_after == seq_before == 2
 
 
 # ---- AC-2: the page's chat form ----
