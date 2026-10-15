@@ -30,13 +30,13 @@ Checked against the code on `main`, 2026-10-15, and the specs named.
 | Need | Detail | Source |
 | --- | --- | --- |
 | One process, one instance | `python -m nock` runs one uvicorn server for the app. Rooms are live in memory, one asyncio task per room, and one SQLite file is the store. Two processes on one file are not supported. Scaling out would need rooms pinned to an instance. | `src/nock/__main__.py`, `specs/_architecture.md` "How the server works", spec 018 "Out of scope" |
-| Start command | `uv run python -m nock`, not `uvicorn nock.server:app`: only `main()` applies `server_config` (8,192-byte frame limit, and with spec 038 no access log and the `warning` log level). | `src/nock/__main__.py:23-28`, `src/nock/server.py:385-405`, spec 036, spec 038 "Logs" |
+| Start command | `uv run python -m nock`, not `uvicorn nock.server:app`: only `main()` applies `server_config` (8,192-byte frame limit, and with spec 038 no access log and the `warning` log level). | `src/nock/__main__.py:24-40`, `src/nock/server.py:383-403`, spec 036, spec 038 "Logs" |
 | Address and port | `NOCK_HOST` (default `127.0.0.1`), `NOCK_PORT` (default `8000`). In a container the host must be `0.0.0.0`; behind a proxy on the same machine keep `127.0.0.1`. | spec 036, `src/nock/__main__.py` |
 | Python and Node | Python 3.13 or later (3.14 in development) through uv; Node.js LTS only to build the client. | `pyproject.toml`, `specs/_architecture.md` "Toolchain" |
-| Built client | `npm --prefix web ci && npm --prefix web run build` writes `web/dist`. Without it, pages answer 503. | `src/nock/server.py:155-164`, spec 040 |
-| Files read from the source tree | `web/dist`, `grids/` and (spec 033) `web/src/i18n/fr.json` are found relative to the package's source folder. The app must run from a checkout of the repository (with `uv sync`), not from a wheel installed elsewhere. | `src/nock/server.py:47`, `src/nock/catalogue.py:32`, spec 033 `nock.i18n` |
-| WebSockets end to end | Every room is a WebSocket on `/api/rooms/{code}/ws`. The page uses `wss://` when it was loaded over HTTPS. The page pings every 2 s and drops a socket silent for 4 s, so proxy idle timeouts are never reached. | `src/nock/server.py:367-380`, `web/src/lib/RoomPage.svelte:635`, spec 017 |
-| Persistent disk | `NOCK_DATABASE` names the SQLite file, in WAL mode with `synchronous=FULL`. Its folder must exist. Unset means in memory: every room is lost at restart. A local block disk is required (not a network file share). | spec 018, `src/nock/server.py:136`, README "Running the server with a database" |
+| Built client | `npm --prefix web ci && npm --prefix web run build` writes `web/dist`. Without it, pages answer 503. | `src/nock/server.py:153-162`, spec 040 |
+| Files read from the source tree | `web/dist`, `grids/` and (spec 033) `web/src/i18n/fr.json` are found relative to the package's source folder. The app must run from a checkout of the repository (with `uv sync`), not from a wheel installed elsewhere. | `src/nock/server.py:45`, `src/nock/catalogue.py:32`, spec 033 `nock.i18n` |
+| WebSockets end to end | Every room is a WebSocket on `/api/rooms/{code}/ws`. The page uses `wss://` when it was loaded over HTTPS. The page pings every 2 s and drops a socket silent for 4 s, so proxy idle timeouts are never reached. | `src/nock/server.py:365-378`, `web/src/lib/RoomPage.svelte:635`, spec 017 |
+| Persistent disk | `NOCK_DATABASE` names the SQLite file, in WAL mode with `synchronous=FULL`. Its folder must exist. Unset means in memory: every room is lost at restart. A local block disk is required (not a network file share). | spec 018, `src/nock/server.py:134`, README "Running the server with a database" |
 | TLS | The app speaks plain HTTP. TLS is the proxy's or the platform's job. `NOCK_PUBLIC_URL` must be `https://...` so the session cookie gets `Secure`. | spec 033 "Configuration" and AC-1 |
 | Outgoing mail (V1) | SMTP to a provider, port 587 (STARTTLS) by default. Accounts are on only when `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` are both set. | spec 033 "Configuration", `nock.mailer` |
 | Secrets (V1) | `NOCK_OPERATOR_TOKEN` (32 to 256 URL-safe characters; unset turns `/ops` off), `NOCK_SMTP_PASSWORD`. An invalid value stops the start with a message that never shows the secret. | spec 038 "Operator access", spec 033 "Configuration" |
@@ -259,7 +259,7 @@ the hosting's logs out of scope (spec 038 "Out of scope"), so:
 - **App logs**: stdout and stderr to journald (A) or the platform's log view.
   Keep them 14 days (journald `MaxRetentionSec=14day`).
 - **Uptime**: an external check of `GET /` every minute or five (200 when the
-  client is built, 503 when not, `src/nock/server.py:155-164`), alerting you by
+  client is built, 503 when not, `src/nock/server.py:153-162`), alerting you by
   e-mail. The checker only sees its own requests, so it carries no player data.
 - **Disk**: alert when the disk holding the database is 80 % full.
 - **Game health**: the operator dashboard `/ops` (spec 038): rooms created,
@@ -283,11 +283,13 @@ resent (spec 017). Keep the downtime well under 5 minutes.
 - Stop the old process before starting the new one: never two processes on the
   same file (spec 018 "Out of scope"). So no blue-green or rolling deploy.
 - Stop with `SIGTERM` (systemd and the platforms do), and give the process time to
-  close (for example 30 s), so `close()` saves its snapshots. A kill is still
+  close (for example 30 s), so `close()` saves its snapshots. On shutdown uvicorn
+  closes open sockets with code 1012, which is not a final close for the page
+  (spec 017), so the page reconnects. A kill is still
   safe (the log is replayed) but slower to load.
 - Build `web/dist` before the restart, not in the live folder while players load
   pages: the server checks `index.html` on each request
-  (`src/nock/server.py:155-164`).
+  (`src/nock/server.py:153-162`).
 - Deploy only a commit that passed the full gate in CI (`.github/workflows/ci.yml`),
   ideally a tag (`docs/build-plan.md`, `git tag v1.0.0`).
 - Take a backup just before each deploy that changes the database (specs 032 and
