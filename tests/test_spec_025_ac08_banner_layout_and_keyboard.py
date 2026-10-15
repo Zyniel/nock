@@ -4,8 +4,10 @@ reached from the keyboard.
 Setup: spec 013 AC-6's (FX-01, `you` host among 8 players, 100 feed items), in
 vote mode, then the mock's `vote_opened` by `p2` (a grid check). The layout is
 read at the eight window sizes of spec 006 AC-5 in desktop and touch contexts;
-the keyboard, contrast and language checks use spec 035's harness. The shared
-setup is in `spec025_harness`.
+the keyboard, contrast and language checks use spec 035's harness. After a ballot
+the focus is on `vote-status`, and on the `grid` once the vote closes or the
+banner leaves (decision 19); the contrast and language scans run in the state
+before the ballot. The shared setup is in `spec025_harness`.
 
 The room header has no test id in any spec: the test reads it as the `header`
 element that holds `share-panel` (spec 024: `room-toolbar` is "inside the room
@@ -18,7 +20,7 @@ import pytest
 from playwright.sync_api import Browser, FloatRect, Locator, Page, expect
 
 from nock.grid import Grid
-from nock.protocol import Vote
+from nock.protocol import GridSolved, Vote, VoteOutcome
 from spec025_harness import (
     EIGHT_NICKNAMES,
     GRID_CHECK,
@@ -26,7 +28,9 @@ from spec025_harness import (
     MockRoomSocket,
     box_of,
     cell_at,
+    closed,
     eight_players,
+    fr_text,
     grid_check_line_frame,
     grid_from_text,
     make_page,
@@ -64,6 +68,12 @@ WINDOW_SIZES = [
 ]
 KEYBOARD_SIZES = [(1280, 720), (568, 320)]
 SCAN_SIZES = [(1280, 720), (360, 740)]
+NEXT_SEQ = VOTE_SEQ + 1  # the seq of the event after the `vote_opened`
+EIGHT_ELIGIBLE = 8
+FIVE_YES = 5  # the majority of 8 eligible voters
+
+# What can take the focus inside an element, `tabindex="-1"` included.
+FOCUSABLE_SELECTOR = "a[href], button, input, select, textarea, [tabindex]"
 
 # Whether `document.elementFromPoint` at the centre of the element returns it.
 ELEMENT_AT_CENTRE_SCRIPT = (
@@ -95,6 +105,23 @@ def send_grid_check_vote(page: Page, mock: MockRoomSocket) -> None:
     mock.send(opened(VOTE_SEQ, 1, "p2", GRID_CHECK, 8).model_dump_json())
     expect(page.get_by_test_id("vote-banner")).to_be_visible()
     expect(page.get_by_test_id("vote-no")).to_be_visible()
+
+
+def vote_yes_from_the_keyboard(page: Page, mock: MockRoomSocket) -> None:
+    """From the `grid`: `Escape`, `Shift+Tab` twice to `vote-yes`, then `Enter`.
+
+    Returns once the page sent its ballot, `Vote(vote_id=1, yes=True)`.
+    """
+    walker = Walker(page)
+    walker.tab_to("grid")
+    page.keyboard.press("Escape")
+    page.keyboard.press("Shift+Tab")
+    expect(page.get_by_test_id("vote-no")).to_be_focused()
+    page.keyboard.press("Shift+Tab")
+    expect(page.get_by_test_id("vote-yes")).to_be_focused()
+    page.keyboard.press("Enter")
+    wait_until(page, lambda: len(mock.votes()) >= 1)
+    assert mock.votes() == [Vote(vote_id=1, yes=True)]
 
 
 def room_header(page: Page) -> Locator:
@@ -250,7 +277,119 @@ def test_ac8_keyboard_shift_tab_from_the_grid_reaches_no_then_yes_and_enter_vote
         close()
 
 
-# ---- AC-8: contrast and language with the banner shown ----
+# ---- AC-8: where the focus goes after a ballot (decision 19) ----
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), KEYBOARD_SIZES, ids=[f"{w}x{h}" for w, h in KEYBOARD_SIZES]
+)
+def test_ac8_keyboard_after_enter_on_yes_the_focus_is_on_vote_status(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page, close = make_page(browser, browser_name, width, height, touch=False)
+    try:
+        mock = open_spec_013_room(page, live_server, fx01_grid)
+        send_grid_check_vote(page, mock)
+
+        vote_yes_from_the_keyboard(page, mock)
+
+        status = page.get_by_test_id("vote-status")
+        expect(status).to_be_visible()
+        expect(status).to_have_attribute("tabindex", "-1")
+        expect(status).to_be_focused()
+        assert page.evaluate("document.activeElement !== document.body") is True
+    finally:
+        close()
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), KEYBOARD_SIZES, ids=[f"{w}x{h}" for w, h in KEYBOARD_SIZES]
+)
+def test_ac8_keyboard_a_grid_solved_moves_the_focus_from_vote_status_to_the_grid(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page, close = make_page(browser, browser_name, width, height, touch=False)
+    try:
+        mock = open_spec_013_room(page, live_server, fx01_grid)
+        send_grid_check_vote(page, mock)
+        vote_yes_from_the_keyboard(page, mock)
+        expect(page.get_by_test_id("vote-status")).to_be_focused()
+
+        mock.send(GridSolved(seq=NEXT_SEQ, elapsed_ms=60_000).model_dump_json())
+
+        room = page.get_by_test_id("room-page")
+        expect(room).to_have_attribute("data-solved", "true")
+        expect(page.get_by_test_id("vote-banner")).to_be_hidden()
+        expect(page.get_by_test_id("grid")).to_be_focused()
+    finally:
+        close()
+
+
+def test_ac8_a_click_on_no_sends_false_and_leaves_the_focus_on_vote_status(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+) -> None:
+    page, close = make_page(browser, browser_name, 1280, 720, touch=False)
+    try:
+        mock = open_spec_013_room(page, live_server, fx01_grid)
+        send_grid_check_vote(page, mock)
+
+        page.get_by_test_id("vote-no").click()
+
+        wait_until(page, lambda: len(mock.votes()) >= 1)
+        settle(page)
+        assert mock.votes() == [Vote(vote_id=1, yes=False)]
+        status = page.get_by_test_id("vote-status")
+        expect(status).to_have_text(fr_text("vote.cast"))
+        expect(status).to_be_focused()
+    finally:
+        close()
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), KEYBOARD_SIZES, ids=[f"{w}x{h}" for w, h in KEYBOARD_SIZES]
+)
+def test_ac8_keyboard_a_vote_closed_moves_the_focus_from_vote_status_to_the_grid(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page, close = make_page(browser, browser_name, width, height, touch=False)
+    try:
+        mock = open_spec_013_room(page, live_server, fx01_grid)
+        send_grid_check_vote(page, mock)
+        vote_yes_from_the_keyboard(page, mock)
+        expect(page.get_by_test_id("vote-status")).to_be_focused()
+
+        passed = closed(NEXT_SEQ, 1, VoteOutcome.PASSED, FIVE_YES, EIGHT_ELIGIBLE)
+        mock.send(passed.model_dump_json())
+
+        banner = page.get_by_test_id("vote-banner")
+        result = banner.get_by_test_id("vote-result")
+        expect(result).to_be_visible()
+        expect(result).to_have_text(fr_text("vote.result.passed"))
+        expect(page.get_by_test_id("grid")).to_be_focused()
+        expect(banner.locator(FOCUSABLE_SELECTOR)).to_have_count(0)
+    finally:
+        close()
+
+
+# ---- AC-8: contrast and language in the state before the ballot ----
 
 
 @pytest.mark.parametrize(

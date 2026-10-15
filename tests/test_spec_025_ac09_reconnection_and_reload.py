@@ -1,7 +1,9 @@
 """Tests of spec 025, AC-9: an open vote survives a reconnection and a reload.
 
 The rule on `snapshot_for`, `replay`, `after_restart` and `tick` (the room `V3`),
-and the real WebSocket. The shared setup is in `spec025_harness`.
+spec 018's store (a restart from a snapshot taken after a ballot, and one from the
+log alone, decision 16), and the real WebSocket. The shared setup is in
+`spec025_harness`.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ from nock.protocol import (
 )
 from nock.room import (
     LogEntry,
+    Outcome,
     RoomState,
     after_restart,
     new_room,
@@ -36,11 +39,13 @@ from nock.room import (
     tick,
 )
 from nock.server import create_app
+from nock.store import RoomStore
 from spec025_harness import (
     NOW,
     QUIET,
     REVEAL_1_0,
     ROOM_CODE,
+    VOTE_SETTINGS,
     Peer,
     Play,
     closed,
@@ -56,10 +61,13 @@ from spec025_harness import (
     opened,
     set_vote_mode,
     v3,
+    vote_room,
 )
 
 OPENED_AT = NOW + 7.0
 OPENING = opened(5, 1, "p1", REVEAL_1_0, 3)
+RESTART_AT = NOW + 5.0  # the store case of AC-9: vote 1 opened at NOW
+V3_PLAYERS = ("p1", "p2", "p3")
 
 # ---- Fixtures ----
 
@@ -102,7 +110,72 @@ def client(
         yield test_client
 
 
+@pytest.fixture
+def store(tmp_path: Path) -> Iterator[RoomStore]:
+    """The store of AC-9 (spec 018's harness)."""
+    room_store = RoomStore(tmp_path / "nock.sqlite3")
+    yield room_store
+    room_store.close()
+
+
+@pytest.fixture
+def log_only_store(tmp_path: Path) -> Iterator[RoomStore]:
+    """A second store, which never gets a snapshot after `create_room`."""
+    room_store = RoomStore(tmp_path / "log-only.sqlite3")
+    yield room_store
+    room_store.close()
+
+
 # ---- Helpers ----
+
+
+class RecordedPlay(Play):
+    """A `Play` whose every step appends its entries to stores, as the hub does."""
+
+    def __init__(self, state: RoomState, stores: list[RoomStore]) -> None:
+        super().__init__(state)
+        self.stores = stores
+
+    def apply(self, outcome: Outcome) -> Outcome:
+        """Append the entries of one step to each store, then keep the step."""
+        if len(outcome.entries) > 0:
+            for room_store in self.stores:
+                room_store.append(ROOM_CODE, outcome.entries)
+        return super().apply(outcome)
+
+
+def recorded_vote_1(grid: Grid, stores: list[RoomStore]) -> RecordedPlay:
+    """`V3` and vote 1 (`p1`'s reveal of (1, 0) at NOW, seq 5), in each store.
+
+    The room `new_room` gives is recorded with `create_room`, then each step of
+    `V3` and of vote 1 appends its entries.
+    """
+    room = new_room(ROOM_CODE, grid, NOW)
+    for room_store in stores:
+        room_store.create_room(room)
+    play = RecordedPlay(room, stores)
+    for number in (1, 2, 3):
+        play.join(number)
+    assert play.send("p1", VOTE_SETTINGS).reply == ()
+    assert play.state.seq == 4
+    assert events_of(play.send("p1", REVEAL_1_0)) == [OPENING]
+    return play
+
+
+def cast_no_of_p2(play: Play) -> None:
+    """`p2`'s `Vote(vote_id=1, yes=False)` at NOW + 1, which adds no entry."""
+    ballot = play.send("p2", Vote(vote_id=1, yes=False), NOW + 1.0)
+    assert ballot.entries == ()
+    live_vote = open_vote_of(play.state)
+    assert live_vote is not None
+    assert live_vote.no == ("p2",)
+
+
+def loaded(room_store: RoomStore) -> RoomState:
+    """`load_room` of the room of AC-9."""
+    state = room_store.load_room(ROOM_CODE)
+    assert state is not None, "the store lost the room"
+    return state
 
 
 def with_vote_1(grid: Grid) -> Play:
@@ -212,6 +285,101 @@ def test_ac9_a_vote_open_at_a_restart_stays_open_and_expires_at_its_time(
     early = tick(restart.state, OPENED_AT + 19.9, QUIET)
     assert early.entries == ()
     due = tick(early.state, OPENED_AT + 20.0, QUIET)
+    assert events_of(due) == [closed(9, 1, VoteOutcome.TIMED_OUT, 1, 3)]
+    assert open_vote_of(due.state) is None
+
+
+def test_ac9_after_restart_resets_a_yes_ballot_and_the_vote_expires_with_one_yes(
+    fx01_grid: Grid,
+) -> None:
+    play = vote_room(fx01_grid, 4)
+    opening = opened(6, 1, "p1", REVEAL_1_0, 4)
+    assert events_of(play.send("p1", REVEAL_1_0, OPENED_AT)) == [opening]
+    assert play.send("p2", Vote(vote_id=1, yes=True), OPENED_AT + 1.0).entries == ()
+    live_vote = open_vote_of(play.state)
+    assert live_vote is not None
+    assert live_vote.yes == ("p1", "p2")
+
+    restart = after_restart(play.state, OPENED_AT + 5.0)
+
+    # The reset adds no entry: only spec 018's disconnections are logged.
+    assert events_of(restart) == [
+        PlayerStateChanged(seq=7, player_id="p1", state=PlayerState.DISCONNECTED),
+        PlayerStateChanged(seq=8, player_id="p2", state=PlayerState.DISCONNECTED),
+        PlayerStateChanged(seq=9, player_id="p3", state=PlayerState.DISCONNECTED),
+        PlayerStateChanged(seq=10, player_id="p4", state=PlayerState.DISCONNECTED),
+    ]
+    eligible = ("p1", "p2", "p3", "p4")
+    expected = open_vote(opening, OPENED_AT, eligible, ("p1",))
+    assert open_vote_of(restart.state) == expected
+    assert last_vote_id_of(restart.state) == 1
+    due = tick(restart.state, OPENED_AT + 20.0, QUIET)
+    assert events_of(due) == [closed(11, 1, VoteOutcome.TIMED_OUT, 1, 4)]
+
+
+# ---- AC-9: the store (decision 16) ----
+
+
+def test_ac9_store_a_snapshot_saved_after_a_ballot_loads_with_that_ballot(
+    fx01_grid: Grid, store: RoomStore
+) -> None:
+    play = recorded_vote_1(fx01_grid, [store])
+    cast_no_of_p2(play)
+
+    store.save_snapshot(play.state)
+
+    loaded_vote = open_vote_of(loaded(store))
+    assert loaded_vote is not None
+    assert loaded_vote.no == ("p2",)
+
+
+def test_ac9_store_after_restart_resets_the_ballots_that_a_snapshot_brought_back(
+    fx01_grid: Grid, store: RoomStore
+) -> None:
+    play = recorded_vote_1(fx01_grid, [store])
+    cast_no_of_p2(play)
+    store.save_snapshot(play.state)
+    state = loaded(store)
+
+    restart = after_restart(state, RESTART_AT)
+
+    restarted_vote = open_vote_of(restart.state)
+    assert restarted_vote is not None
+    assert restarted_vote.no == ()
+    assert restarted_vote.yes == ("p1",)
+    assert restarted_vote == open_vote(OPENING, NOW, V3_PLAYERS, ("p1",))
+    assert last_vote_id_of(restart.state) == 1
+
+
+def test_ac9_store_a_snapshot_load_and_a_log_only_load_give_the_same_vote(
+    fx01_grid: Grid, store: RoomStore, log_only_store: RoomStore
+) -> None:
+    play = recorded_vote_1(fx01_grid, [store, log_only_store])
+    cast_no_of_p2(play)
+    store.save_snapshot(play.state)
+
+    from_snapshot = after_restart(loaded(store), RESTART_AT).state
+    from_log = after_restart(loaded(log_only_store), RESTART_AT).state
+
+    assert open_vote_of(from_log) == open_vote(OPENING, NOW, V3_PLAYERS, ("p1",))
+    assert open_vote_of(from_snapshot) == open_vote_of(from_log)
+    assert last_vote_id_of(from_log) == 1
+    assert last_vote_id_of(from_snapshot) == last_vote_id_of(from_log)
+
+
+def test_ac9_store_a_vote_restored_from_a_snapshot_expires_at_its_time(
+    fx01_grid: Grid, store: RoomStore
+) -> None:
+    play = recorded_vote_1(fx01_grid, [store])
+    cast_no_of_p2(play)
+    store.save_snapshot(play.state)
+    restart = after_restart(loaded(store), RESTART_AT)
+    assert restart.state.seq == 8
+
+    early = tick(restart.state, NOW + 19.9, QUIET)
+    due = tick(early.state, NOW + 20.0, QUIET)
+
+    assert early.entries == ()
     assert events_of(due) == [closed(9, 1, VoteOutcome.TIMED_OUT, 1, 3)]
     assert open_vote_of(due.state) is None
 

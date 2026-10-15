@@ -1,8 +1,9 @@
 """Tests of spec 025, AC-2: in vote mode, a reveal or a grid check needs a majority.
 
 The rule on `handle_message` (the room `V3` and rooms of 2 to 8 players), the real
-WebSocket, and two browsers on the live server. The shared setup is in
-`spec025_harness`.
+WebSocket, two browsers on the live server, and the activity feed on a page with a
+mocked socket (votes add no line; a passed vote's reveal names its requester). The
+shared setup is in `spec025_harness`.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
@@ -35,6 +36,8 @@ from nock.protocol import (
     RevealResult,
     SelectCell,
     Vote,
+    VoteClosed,
+    VoteOpened,
     VoteOutcome,
 )
 from nock.room import RoomConfig
@@ -45,6 +48,7 @@ from spec025_harness import (
     NOW,
     REVEAL_1_0,
     EnterRoom,
+    MockRoomSocket,
     all_but_last_cell,
     cell_at,
     closed,
@@ -58,10 +62,12 @@ from spec025_harness import (
     make_catalogue,
     make_dist_dir,
     make_registry,
+    open_room,
     open_vote,
     open_vote_of,
     opened,
     set_vote_mode,
+    settle,
     v3,
     vote_room,
     vote_timeout_of,
@@ -70,6 +76,9 @@ from spec025_harness import (
 
 WITHIN_MS = 1000  # "within 1 s"
 FOUR_AND_ONE = RevealBudget(letters=4, words=1)
+
+# The numbered events the feed tests send to the page.
+FeedTestEvent = VoteOpened | VoteClosed | RevealResult | CellLocked | PlayerLeft
 
 # ---- Fixtures ----
 
@@ -112,15 +121,32 @@ def client(
         yield test_client
 
 
+def feed_items(page: Page) -> Locator:
+    """Every line of the activity feed (spec 013)."""
+    return page.get_by_test_id("activity-feed").get_by_test_id("feed-item")
+
+
+def send_event(page: Page, mock: MockRoomSocket, event: FeedTestEvent) -> None:
+    """Have the mocked socket send a numbered event; return once it is applied."""
+    mock.send(event.model_dump_json())
+    expected_seq = str(event.seq)
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", expected_seq)
+
+
+def reveal_of_1_0_event(seq: int, requester: str) -> RevealResult:
+    """The `reveal_result` of a passed vote on the reveal of (1, 0), budget 5/1."""
+    return RevealResult(
+        seq=seq,
+        player_id=requester,
+        target=CellTarget(row=1, column=0),
+        reveal_budget=FOUR_AND_ONE,
+    )
+
+
 def reveal_of_1_0_applied(first_seq: int, requester: str) -> list[object]:
     """The `reveal_result` and `cell_locked` of the reveal of (1, 0), budget 5/1."""
     return [
-        RevealResult(
-            seq=first_seq,
-            player_id=requester,
-            target=CellTarget(row=1, column=0),
-            reveal_budget=FOUR_AND_ONE,
-        ),
+        reveal_of_1_0_event(first_seq, requester),
         CellLocked(seq=first_seq + 1, row=1, column=0, letter="T", revealed=True),
     ]
 
@@ -400,3 +426,70 @@ def test_ac2_browser_bob_votes_yes_and_both_pages_show_the_revealed_letter(
             )
     finally:
         bob_context.close()
+
+
+# ---- AC-2: votes and the activity feed (browser with mocked socket) ----
+
+
+def test_ac2_browser_vote_events_add_no_feed_line(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_room(page, live_server, fx01_grid)
+    items = feed_items(page)
+    lines_before = items.count()
+
+    send_event(page, mock, opened(6, 1, "p2", REVEAL_1_0, 3))
+    send_event(page, mock, closed(7, 1, VoteOutcome.REJECTED, 1, 3))
+    send_event(page, mock, opened(8, 2, "p3", GRID_CHECK, 3))
+    send_event(page, mock, closed(9, 2, VoteOutcome.TIMED_OUT, 1, 3))
+
+    expect(page.get_by_test_id("vote-result")).to_have_text(
+        fr_text("vote.result.timed_out")
+    )
+    settle(page)
+    expect(items).to_have_count(lines_before)
+
+
+def test_ac2_browser_a_passed_votes_reveal_line_names_the_requester(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_room(page, live_server, fx01_grid)
+    items = feed_items(page)
+    lines_before = items.count()
+
+    send_event(page, mock, opened(6, 1, "p2", REVEAL_1_0, 3))
+    send_event(page, mock, closed(7, 1, VoteOutcome.PASSED, 2, 3))
+    send_event(page, mock, reveal_of_1_0_event(8, "p2"))
+    send_event(
+        page, mock, CellLocked(seq=9, row=1, column=0, letter="T", revealed=True)
+    )
+
+    expect(items).to_have_count(lines_before + 1)
+    reveal_line = feed_lines(page, "reveal")
+    expect(reveal_line).to_have_count(1)
+    expect(reveal_line).to_have_attribute("data-seq", "8")
+    expect(reveal_line).to_have_text(fr_text("feed.reveal.letter", name="Bob"))
+
+
+def test_ac2_browser_the_reveal_line_names_a_requester_who_left_during_the_vote(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    mock = open_room(page, live_server, fx01_grid)
+    items = feed_items(page)
+    lines_before = items.count()
+
+    send_event(page, mock, opened(6, 1, "p2", REVEAL_1_0, 3))
+    removal = PlayerLeft(seq=7, player_id="p2", reason=LeaveReason.REMOVED)
+    send_event(page, mock, removal)
+    send_event(page, mock, closed(8, 1, VoteOutcome.PASSED, 2, 3))
+    send_event(page, mock, reveal_of_1_0_event(9, "p2"))
+    send_event(
+        page, mock, CellLocked(seq=10, row=1, column=0, letter="T", revealed=True)
+    )
+
+    expect(items).to_have_count(lines_before + 2)
+    expect(feed_lines(page, "player_removed")).to_have_count(1)
+    reveal_line = feed_lines(page, "reveal")
+    expect(reveal_line).to_have_count(1)
+    expect(reveal_line).to_have_attribute("data-seq", "9")
+    expect(reveal_line).to_have_text(fr_text("feed.reveal.letter", name="Bob"))

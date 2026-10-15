@@ -279,6 +279,39 @@ def test_ac7_a_page_that_voted_still_shows_vote_cast_after_a_reconnection(
     assert mock.votes() == [Vote(vote_id=1, yes=True)]
 
 
+def test_ac7_the_buttons_are_disabled_while_reconnecting_and_enabled_once_joined(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    vote = opened(5, 4, "p3", Check(target=GridTarget()), 3)
+    mock = open_room(page, live_server, fx01_grid, vote=vote)
+    room = page.get_by_test_id("room-page")
+    buttons = [page.get_by_test_id("vote-yes"), page.get_by_test_id("vote-no")]
+    for button in buttons:
+        expect(button).to_be_enabled()
+
+    mock.close(1011)
+
+    expect(room).to_have_attribute("data-status", "reconnecting")
+    for button in buttons:
+        expect(button).to_be_visible()
+        expect(button).to_be_disabled()
+    # The new socket is open and its join sent, but not answered yet.
+    mock.wait_for_join_on_socket(1)
+    expect(room).to_have_attribute("data-status", "reconnecting")
+    for button in buttons:
+        expect(button).to_be_visible()
+        expect(button).to_be_disabled()
+
+    mock.send(snapshot_frame(fx01_grid, seq=5, vote=vote))
+
+    expect(room).to_have_attribute("data-status", "joined")
+    for button in buttons:
+        expect(button).to_be_visible()
+        expect(button).to_be_enabled()
+    expect(page.get_by_test_id("vote-status")).to_have_count(0)
+    assert mock.votes() == []
+
+
 def test_ac7_a_new_vote_in_the_result_time_replaces_the_result_at_once(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:

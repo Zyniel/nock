@@ -27,8 +27,10 @@ from nock.protocol import (
     Check,
     CheckResult,
     Direction,
+    EditLetter,
     ErrorCode,
     HelpMode,
+    HostChanged,
     PlayerState,
     PlayerStateChanged,
     Reveal,
@@ -110,6 +112,23 @@ def opened_reveal_vote(grid: Grid) -> Play:
     play = v3(grid)
     outcome = play.send("p1", REVEAL_1_0)
     assert events_of(outcome) == [opened(5, 1, "p1", REVEAL_1_0, 3)]
+    return play
+
+
+def vote_among_idle_players(grid: Grid) -> Play:
+    """`V3` where `p2` and `p3` went idle, then vote 1 opened at NOW + 121.
+
+    `p1` wrote `X` at (1, 1) at NOW + 100 (seq 5), the tick at NOW + 120 made `p2`
+    and `p3` idle (seq 6 and 7), and `p1`'s reveal of (1, 0) at NOW + 121 opened
+    vote 1 (seq 8), which expires at NOW + 141.
+    """
+    play = v3(grid)
+    play.send("p1", EditLetter(row=1, column=1, letter="X"), NOW + 100.0)
+    play.tick(NOW + 120.0)
+    states = [player.state for player in play.state.players]
+    assert states == [PlayerState.ACTIVE, PlayerState.IDLE, PlayerState.IDLE]
+    opening = play.send("p1", REVEAL_1_0, NOW + 121.0)
+    assert events_of(opening) == [opened(8, 1, "p1", REVEAL_1_0, 3)]
     return play
 
 
@@ -265,6 +284,66 @@ def test_ac3_the_expiry_entry_comes_after_the_wake_up_of_an_idle_voter(
         closed(9, 1, VoteOutcome.TIMED_OUT, 1, 3),
     ]
     assert refusal_code(outcome) is ErrorCode.NO_OPEN_VOTE
+
+
+def test_ac3_the_expiry_entry_comes_after_the_wake_up_and_before_a_letter_check(
+    fx01_grid: Grid,
+) -> None:
+    play = vote_among_idle_players(fx01_grid)
+    letter_check = Check(target=CellTarget(row=1, column=1))
+
+    outcome = play.send("p2", letter_check, NOW + 141.0)
+
+    assert events_of(outcome) == [
+        PlayerStateChanged(seq=9, player_id="p2", state=PlayerState.ACTIVE),
+        closed(10, 1, VoteOutcome.TIMED_OUT, 1, 3),
+        CheckResult(
+            seq=11,
+            player_id="p2",
+            target=CellTarget(row=1, column=1),
+            correct=(),
+            wrong=(CellRef(row=1, column=1),),
+        ),
+    ]
+    assert outcome.reply == ()
+    assert open_vote_of(play.state) is None
+
+
+def test_ac3_the_expiry_entry_comes_after_the_wake_up_and_before_a_reveal(
+    fx01_grid: Grid,
+) -> None:
+    play = vote_among_idle_players(fx01_grid)
+    request = Reveal(target=CellTarget(row=2, column=1))
+
+    outcome = play.send("p2", request, NOW + 141.0)
+
+    assert events_of(outcome) == [
+        PlayerStateChanged(seq=9, player_id="p2", state=PlayerState.ACTIVE),
+        closed(10, 1, VoteOutcome.TIMED_OUT, 1, 3),
+        opened(11, 2, "p2", request, 3),
+    ]
+    assert outcome.reply == ()
+
+
+def test_ac3_tick_closes_a_due_vote_after_the_host_hand_over_of_the_same_tick(
+    fx01_grid: Grid,
+) -> None:
+    play = v3(fx01_grid)
+    play.disconnect("p1", NOW + 1.0)
+    opening = play.send("p2", REVEAL_1_0, NOW + 50.0)
+    assert events_of(opening) == [opened(6, 1, "p2", REVEAL_1_0, 2)]
+
+    # At NOW + 70 the host has been away for 69 s (more than 60) and the vote,
+    # opened at NOW + 50, is due: both steps act in this one tick.
+    outcome = play.tick(NOW + 70.0)
+
+    assert events_of(outcome) == [
+        HostChanged(seq=7, player_id="p2"),
+        closed(8, 1, VoteOutcome.TIMED_OUT, 1, 2),
+    ]
+    assert open_vote_of(play.state) is None
+    hosts = [player.player_id for player in play.state.players if player.is_host]
+    assert hosts == ["p2"]
 
 
 # ---- AC-3: the rule, a vote that passes when its request can no longer apply ----
