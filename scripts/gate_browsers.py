@@ -17,6 +17,9 @@ It also marks every test, so the gate can pick them with `-m` (2026-10-15):
 - `serial`: the test is timing-sensitive and runs after the parallel pass, on
   its own, because the load of parallel workers makes it flaky. The files are
   listed in SERIAL_TEST_FILES.
+
+And it warms each browser up once, before the first test that uses it (see
+`warm_up_browser`).
 """
 
 from __future__ import annotations
@@ -26,9 +29,14 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Browser, sync_playwright
 
 ENGINE_NAMES: tuple[str, ...] = ("chromium", "firefox", "webkit")
+
+# The browsers of this process already warmed up, by id (a session's browsers
+# live until its end, so an id is never reused meanwhile).
+warmed_browser_ids: set[int] = set()
+WARM_UP_TIMEOUT_MS = 60_000
 
 # Test files whose tests measure time or pace, and so run serially.
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
@@ -68,6 +76,37 @@ def engine_of(item: pytest.Item) -> str | None:
     if callspec is None:
         return None
     return callspec.params.get("browser_name")
+
+
+@pytest.fixture(autouse=True)
+def warm_up_browser(request: pytest.FixtureRequest) -> None:
+    """Before the first test of each browser, open a page in it and type a key.
+
+    A browser just launched can be slow on its first page and its first key
+    press: in CI, Firefox on Windows took over 10 s for the first `Enter` of the
+    serial pass, which starts a fresh process with the timing-sensitive tests
+    (2026-10-15). The warm-up takes that cost, with a generous timeout, in a
+    context of its own that it closes, so that no test pays it.
+
+    Args:
+        request: The test's request; tests without a browser are left alone.
+    """
+    if "browser_name" not in request.fixturenames:
+        return
+    browser: Browser = request.getfixturevalue("browser")
+    if id(browser) in warmed_browser_ids:
+        return
+    warmed_browser_ids.add(id(browser))
+    context = browser.new_context()
+    try:
+        page = context.new_page()
+        page.set_default_timeout(WARM_UP_TIMEOUT_MS)
+        page.set_content('<input aria-label="warm-up">')
+        field = page.get_by_role("textbox")
+        field.fill("warm-up")
+        field.press("Enter")
+    finally:
+        context.close()
 
 
 # A wrapper: its code before `yield` runs before pytest's `-m` filter, so the
