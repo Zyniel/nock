@@ -788,13 +788,56 @@
     return t(`vote.question.${vote.kind}`, { name })
   }
 
-  // Send my ballot on the open vote, once.
+  // The ballot buttons are disabled while the page is not joined: a ballot sent
+  // then would be dropped while the page showed it as cast (decision 18).
+  let isVotingOffline = $derived(session.status !== 'joined')
+
+  // Send my ballot on the open vote, once, then give the focus to the status
+  // that replaces the buttons, so it never falls back to the page (decision 19).
   function castVote(yes: boolean): void {
-    if (openVote === null || session.votedIds.includes(openVote.vote_id)) {
+    if (openVote === null || isVotingOffline || session.votedIds.includes(openVote.vote_id)) {
       return
     }
     send({ type: 'vote', vote_id: openVote.vote_id, yes })
     session.votedIds.push(openVote.vote_id)
+    void focusVoteStatus()
+  }
+
+  // `tick` resolves once the DOM shows `vote-status` instead of the buttons.
+  async function focusVoteStatus(): Promise<void> {
+    await tick()
+    voteStatus?.focus()
+  }
+
+  // ---- Focus when the banner changes (decision 19) ----
+
+  let voteBanner: HTMLElement | null = $state(null)
+  let voteStatus: HTMLElement | null = $state(null)
+
+  // What the banner holds: nothing, the question of one vote, or a result.
+  let bannerContent = $derived(
+    !isVoteBannerShown ? 'none' : openVote !== null ? `vote-${openVote.vote_id}` : 'result',
+  )
+  let lastBannerContent = 'none'
+
+  // Runs before the page changes the banner: when the focus is inside it, the
+  // vote closed or the banner leaves, and the focus goes to the grid instead of
+  // falling back to the page.
+  $effect.pre(() => {
+    const content = bannerContent
+    if (content === lastBannerContent) {
+      return
+    }
+    lastBannerContent = content
+    const focused = document.activeElement
+    if (voteBanner !== null && focused !== null && voteBanner.contains(focused)) {
+      void focusGridAfterUpdate()
+    }
+  })
+
+  async function focusGridAfterUpdate(): Promise<void> {
+    await tick()
+    gridViewport?.focusGrid()
   }
 
   // The result of a closed vote shows for VOTE_RESULT_MS. A new vote, or a
@@ -1328,22 +1371,32 @@
           data-testid="vote-banner"
           role="group"
           aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
+          bind:this={voteBanner}
         >
           {#if openVote !== null}
             <p id="vote-question" class="vote-text" data-testid="vote-question">
               {voteQuestionText}
             </p>
             <div class="vote-actions">
-              {#if isMyRequest}
-                <span data-testid="vote-status">{t('vote.waiting')}</span>
-              {:else if hasVoted}
-                <span data-testid="vote-status">{t('vote.cast')}</span>
-              {:else}
-                <button type="button" data-testid="vote-yes" onclick={() => castVote(true)}
-                  >{t('vote.yes')}</button
+              {#if isMyRequest || hasVoted}
+                <!-- Not a Tab stop, but it takes the focus after a ballot. -->
+                <span
+                  data-testid="vote-status"
+                  tabindex="-1"
+                  bind:this={voteStatus}>{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
                 >
-                <button type="button" data-testid="vote-no" onclick={() => castVote(false)}
-                  >{t('vote.no')}</button
+              {:else}
+                <button
+                  type="button"
+                  data-testid="vote-yes"
+                  disabled={isVotingOffline}
+                  onclick={() => castVote(true)}>{t('vote.yes')}</button
+                >
+                <button
+                  type="button"
+                  data-testid="vote-no"
+                  disabled={isVotingOffline}
+                  onclick={() => castVote(false)}>{t('vote.no')}</button
                 >
               {/if}
             </div>
@@ -1696,6 +1749,14 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  /* A disabled ballot button (offline) keeps a readable text. */
+  .vote-actions button:disabled {
+    color: #4a4f5c;
+    background-color: #f2f3f6;
+    border-style: dashed;
+    cursor: not-allowed;
   }
 
   /* At least 24 by 24 CSS px, whatever the engine's button style. */

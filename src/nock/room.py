@@ -1941,7 +1941,8 @@ def after_restart(state: RoomState, now: float) -> Outcome:
     Returns:
         The outcome: each player not disconnected gets `disconnected_at = now`,
         no selection and no recent edits, with one logged
-        `PlayerStateChanged(disconnected)` each, in players order.
+        `PlayerStateChanged(disconnected)` each, in players order. An open vote
+        keeps the requester's yes only, with no entry (spec 025 decision 16).
     """
     seq = state.seq
     players: list[PlayerRecord] = []
@@ -1964,5 +1965,22 @@ def after_restart(state: RoomState, now: float) -> Outcome:
             seq=seq, player_id=player.player_id, state=PlayerState.DISCONNECTED
         )
         entries.append(LogEntry(at=now, event=event))
-    new_state = state.model_copy(update={"players": tuple(players), "seq": seq})
+    new_state = state.model_copy(
+        update={
+            "players": tuple(players),
+            "seq": seq,
+            "open_vote": _without_ballots(state.open_vote),
+        }
+    )
     return Outcome(state=new_state, entries=tuple(entries))
+
+
+def _without_ballots(vote: OpenVote | None) -> OpenVote | None:
+    """Return the vote with the requester's yes as its only ballot.
+
+    A saved snapshot holds the ballots and the log does not, so this makes a
+    room loaded from a snapshot hold the same vote as one rebuilt from the log.
+    """
+    if vote is None:
+        return None
+    return vote.model_copy(update={"yes": (vote.opened.player_id,), "no": ()})
