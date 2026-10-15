@@ -197,7 +197,8 @@ CELL_SIDES_SCRIPT = r"""
 
 # The drawing order on one cell, after `scrollIntoView`:`elementFromPoint` along
 # the band's middle line, with `pointer-events: auto !important` on every
-# descendant of every cell. Points within 1 px of a label's box are not judged, as
+# descendant of every cell. Points within 1 px of a label's area (its box and the
+# client rects of its text) are not judged, as
 # the spec says; on a small cell that can be every point (at 568 by 320 today the
 # band's middle line runs within 1 px of the bottom edge of the cell's label).
 DRAWING_ORDER_SCRIPT = r"""
@@ -224,7 +225,17 @@ DRAWING_ORDER_SCRIPT = r"""
     const labels = Array.from(cell.querySelectorAll(
       '[data-testid="remote-initials"], [data-testid="remote-overflow"]'
     ));
-    const labelBoxes = labels.map(label => label.getBoundingClientRect());
+    // A label's area is the union of its bounding box and the client rects of its
+    // text. The label's box is as tall as its line height (1.1), while the text's
+    // inline content area (the font's ascent plus descent) is taller with some
+    // fonts (Windows' default one), so the text, which hit-testing returns as the
+    // label, extends past `getBoundingClientRect()`. That text is still the
+    // corner label, which the spec lets be drawn over the band.
+    const labelAreas = labels.map(label => {
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      return [label.getBoundingClientRect(), ...Array.from(range.getClientRects())];
+    });
     const box = mark.getBoundingClientRect();
     const y = box.top + box.height / 2;
     const xs = [];
@@ -241,14 +252,15 @@ DRAWING_ORDER_SCRIPT = r"""
       const insideLabels = [];
       let outsideAll = true;
       labels.forEach((label, index) => {
-        const labelBox = labelBoxes[index];
-        if (x > labelBox.left + 1 && x < labelBox.right - 1
-            && y > labelBox.top + 1 && y < labelBox.bottom - 1) {
-          insideLabels.push(label);
-        }
-        if (!(x < labelBox.left - 1 || x > labelBox.right + 1
-              || y < labelBox.top - 1 || y > labelBox.bottom + 1)) {
-          outsideAll = false;
+        for (const area of labelAreas[index]) {
+          if (x > area.left + 1 && x < area.right - 1
+              && y > area.top + 1 && y < area.bottom - 1) {
+            insideLabels.push(label);
+          }
+          if (!(x < area.left - 1 || x > area.right + 1
+                || y < area.top - 1 || y > area.bottom + 1)) {
+            outsideAll = false;
+          }
         }
       });
       let right = true;
