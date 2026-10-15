@@ -15,6 +15,11 @@ the order.
 
 Reading of "the room header": the `header` element that holds `share-panel`
 ("inside the room header after share-panel").
+
+"Pointer focus" (the lead's refinement of 2026-10-15) is tested as spec 035 tests
+the host panel: the test spies on the page's scroll calls on the toolbar instead
+of comparing `scrollLeft`, since a scroll that the browser makes by itself is
+allowed (spec 035 decision 13).
 """
 
 from __future__ import annotations
@@ -575,3 +580,145 @@ def test_ac8_each_button_is_hit_at_its_centre_once_scrolled_into_view(
         close()
 
     assert misses == []
+
+
+# ---- Pointer focus (320 by 568, click and tap) ----
+
+POINTER_FOCUS_SIZE = (320, 568)
+AFTER_PRESS_MS = 300
+
+# Sets the toolbar's `scrollLeft` so that the button's centre is on the toolbar's
+# right edge, clamped to the toolbar's scroll range.
+CENTRE_ON_RIGHT_EDGE_SCRIPT = """
+testId => {
+  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
+  const button = document.querySelector(`[data-testid="${testId}"]`);
+  const toolbarBox = toolbar.getBoundingClientRect();
+  const box = button.getBoundingClientRect();
+  const areaLeft = toolbarBox.left + toolbar.clientLeft;
+  const centre = box.left + box.width / 2 - areaLeft + toolbar.scrollLeft;
+  const largest = Math.max(toolbar.scrollWidth - toolbar.clientWidth, 0);
+  toolbar.scrollLeft = Math.min(Math.max(centre - toolbar.clientWidth, 0), largest);
+}
+"""
+
+# Records in `window.toolbarScrollCalls` each scroll call that the page makes on
+# `room-toolbar` or on an element inside it: `scrollIntoView`,
+# `scrollIntoViewIfNeeded` (where the engine has it), `scroll`, `scrollTo` and
+# `scrollBy` of `Element.prototype`, and its `scrollLeft` setter. A scroll that
+# the browser makes by itself does not go through them.
+TOOLBAR_SCROLL_SPY_SCRIPT = r"""
+() => {
+  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
+  window.toolbarScrollCalls = [];
+  const record = (name, element) => {
+    if (element === toolbar || toolbar.contains(element)) {
+      window.toolbarScrollCalls.push(name);
+    }
+  };
+  const methods = [
+    'scrollIntoView', 'scrollIntoViewIfNeeded', 'scroll', 'scrollTo', 'scrollBy',
+  ];
+  for (const name of methods) {
+    const originalMethod = Element.prototype[name];
+    if (typeof originalMethod !== 'function') {
+      continue;
+    }
+    Element.prototype[name] = function (...args) {
+      record(name, this);
+      return originalMethod.apply(this, args);
+    };
+  }
+  const scrollLeft = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft');
+  Object.defineProperty(Element.prototype, 'scrollLeft', {
+    configurable: true,
+    enumerable: scrollLeft.enumerable,
+    get: scrollLeft.get,
+    set(value) {
+      record('scrollLeft', this);
+      scrollLeft.set.call(this, value);
+    },
+  });
+}
+"""
+
+# The centre of the button's visible part: its box cut to the toolbar's client
+# area, with the size of that part.
+VISIBLE_PART_SCRIPT = """
+testId => {
+  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
+  const button = document.querySelector(`[data-testid="${testId}"]`);
+  const toolbarBox = toolbar.getBoundingClientRect();
+  const box = button.getBoundingClientRect();
+  const areaLeft = toolbarBox.left + toolbar.clientLeft;
+  const areaTop = toolbarBox.top + toolbar.clientTop;
+  const left = Math.max(box.left, areaLeft);
+  const right = Math.min(box.right, areaLeft + toolbar.clientWidth);
+  const top = Math.max(box.top, areaTop);
+  const bottom = Math.min(box.bottom, areaTop + toolbar.clientHeight);
+  return {
+    x: (left + right) / 2,
+    y: (top + bottom) / 2,
+    width: right - left,
+    height: bottom - top,
+  };
+}
+"""
+
+# After the press: the recorded calls, how much toolbar content is hidden past
+# the right edge, and whether the edge fade is visible.
+AFTER_PRESS_SCRIPT = """
+() => {
+  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
+  const fade = document.querySelector('[data-testid="room-toolbar-more"]');
+  let fadeVisible = false;
+  if (fade !== null) {
+    const style = getComputedStyle(fade);
+    fadeVisible = style.visibility === 'visible' && style.display !== 'none';
+  }
+  return {
+    calls: window.toolbarScrollCalls,
+    hiddenPastRight: toolbar.scrollWidth - toolbar.clientWidth - toolbar.scrollLeft,
+    scrollLeft: toolbar.scrollLeft,
+    fadeVisible: fadeVisible,
+  };
+}
+"""
+
+
+@pytest.mark.parametrize("test_id", SIX_BUTTONS)
+@pytest.mark.parametrize("context_kind", CONTEXTS)
+def test_ac8_a_pointer_focus_keeps_the_fade_and_makes_no_scroll_call(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    context_kind: str,
+    test_id: str,
+) -> None:
+    touch = context_kind == "touch"
+    width, height = POINTER_FOCUS_SIZE
+    page, close = open_toolbar_room(
+        browser, browser_name, live_server, fx01_grid, width, height, touch
+    )
+    try:
+        page.evaluate(CENTRE_ON_RIGHT_EDGE_SCRIPT, test_id)
+        page.wait_for_timeout(SETTLE_MS)
+        part = page.evaluate(VISIBLE_PART_SCRIPT, test_id)
+        assert part["width"] > 0, part
+        assert part["height"] > 0, part
+        # The spy goes in after the set-up scroll above, which it must not record.
+        page.evaluate(TOOLBAR_SCROLL_SPY_SCRIPT)
+        # Raw coordinates: `locator.click()` would scroll the button into view.
+        if touch:
+            page.touchscreen.tap(part["x"], part["y"])
+        else:
+            page.mouse.click(part["x"], part["y"])
+        page.wait_for_timeout(AFTER_PRESS_MS)
+        after = page.evaluate(AFTER_PRESS_SCRIPT)
+    finally:
+        close()
+
+    assert after["calls"] == [], after
+    if after["hiddenPastRight"] > 1:
+        assert after["fadeVisible"] is True, after

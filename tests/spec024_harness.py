@@ -318,6 +318,17 @@ def refusal_code(outcome: Outcome) -> ErrorCode:
 
 
 def cell_state(state: RoomState, row: int, column: int) -> CellState:
+    """The state of one letter cell of a room.
+
+    Args:
+        state: The room.
+        row: The cell's row.
+        column: The cell's column.
+
+    Returns:
+        The cell's `CellState`. The test fails when the room has no letter cell
+        there.
+    """
     for cell in state.cells:
         if (cell.row, cell.column) == (row, column):
             return cell
@@ -325,6 +336,17 @@ def cell_state(state: RoomState, row: int, column: int) -> CellState:
 
 
 def cell_view(state: RoomState, row: int, column: int) -> LetterCellView:
+    """The view of one letter cell that `grid_state` gives for a room.
+
+    Args:
+        state: The room.
+        row: The cell's row.
+        column: The cell's column.
+
+    Returns:
+        The cell's `LetterCellView`. The test fails when the view has no letter
+        cell there.
+    """
     for cell in grid_state(state).cells:
         if isinstance(cell, LetterCellView) and (cell.row, cell.column) == (
             row,
@@ -335,10 +357,47 @@ def cell_view(state: RoomState, row: int, column: int) -> LetterCellView:
 
 
 def player_record(state: RoomState, player_id: str) -> PlayerRecord:
+    """The record of one player of a room.
+
+    Args:
+        state: The room.
+        player_id: The player's id, for example `p1`.
+
+    Returns:
+        The player's `PlayerRecord`. The test fails when the room has no such
+        player.
+    """
     for player in state.players:
         if player.player_id == player_id:
             return player
     pytest.fail(f"no player {player_id}")
+
+
+def host_change_outcome(
+    state: RoomState,
+    help_mode: HelpMode,
+    letters: int,
+    words: int,
+    now: float = NOW,
+) -> Outcome:
+    """The step of `p1` (host) sending `ChangeSettings`, checked as accepted.
+
+    Args:
+        state: The room, where `p1` is the host.
+        help_mode: The help mode the message sets.
+        letters: The letter allowance the message sets.
+        words: The word allowance the message sets.
+        now: The clock time of the step.
+
+    Returns:
+        The outcome of `handle_message`, whose `reply` is empty.
+    """
+    change = ChangeSettings(
+        help_mode=help_mode, reveal_budget=RevealBudget(letters=letters, words=words)
+    )
+    outcome = handle_message(state, "p1", change, now)
+    assert outcome.reply == (), outcome.reply
+    return outcome
 
 
 def host_changes(
@@ -349,12 +408,71 @@ def host_changes(
     now: float = NOW,
 ) -> RoomState:
     """The room after `p1` (host) sent `ChangeSettings`, checked as accepted."""
-    change = ChangeSettings(
-        help_mode=help_mode, reveal_budget=RevealBudget(letters=letters, words=words)
-    )
-    outcome = handle_message(state, "p1", change, now)
-    assert outcome.reply == (), outcome.reply
-    return outcome.state
+    return host_change_outcome(state, help_mode, letters, words, now).state
+
+
+def single_settings_changed(outcome: Outcome) -> SettingsChanged:
+    """The one `SettingsChanged` a step logged, after checking it is alone.
+
+    Args:
+        outcome: The step of a `ChangeSettings` that changed something.
+
+    Returns:
+        The step's only logged event.
+    """
+    events = events_of(outcome)
+    assert len(events) == 1, events
+    event = events[0]
+    assert isinstance(event, SettingsChanged), events
+    return event
+
+
+# AC-2's allowance example: from a fresh room, the letters (1, 0), (1, 1) and
+# (1, 3) are revealed, then the word MIME; the host then sets 1 letter and 0 words.
+ALLOWANCE_EXAMPLE_LETTERS: list[Cell] = [(1, 0), (1, 1), (1, 3)]
+
+
+def three_letters_and_mime(grid: Grid) -> tuple[RoomState, list[LogEntry]]:
+    """AC-2's allowance example up to its four reveals (seq 13).
+
+    From a fresh FX-01 room with `p1` (host) and `p2`, `p1` reveals the letters
+    (1, 0), (1, 1) and (1, 3), then the word MIME.
+
+    Args:
+        grid: FX-01.
+
+    Returns:
+        The state and every logged entry from the first join on (seq 1 to 13).
+    """
+    state, entries = joined_room(grid)
+    for row, column in ALLOWANCE_EXAMPLE_LETTERS:
+        outcome = accepted_reveal(state, CellTarget(row=row, column=column))
+        entries.extend(outcome.entries)
+        state = outcome.state
+    word = accepted_reveal(state, MIME)
+    entries.extend(word.entries)
+    assert word.state.seq == 13
+    return word.state, entries
+
+
+def allowance_cut(grid: Grid) -> tuple[RoomState, list[LogEntry]]:
+    """AC-2's allowance example up to its first `ChangeSettings` (seq 14).
+
+    `three_letters_and_mime`, then the host's
+    `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=1,
+    words=0))`.
+
+    Args:
+        grid: FX-01.
+
+    Returns:
+        The state and every logged entry from the first join on (seq 1 to 14).
+    """
+    state, entries = three_letters_and_mime(grid)
+    outcome = host_change_outcome(state, HelpMode.FREE, 1, 0)
+    entries.extend(outcome.entries)
+    assert outcome.state.seq == 14
+    return outcome.state, entries
 
 
 def check_cell(state: RoomState, row: int, column: int) -> RoomState:
@@ -428,6 +546,7 @@ class TrafficLog:
             self._items.append(HttpBody(source, text))
 
     def items(self) -> list[TrafficItem]:
+        """Return a copy of every item recorded so far, in the order recorded."""
         with self._lock:
             return list(self._items)
 
@@ -473,24 +592,43 @@ class Peer:
             self._arrived.notify_all()
 
     def send(self, message: ClientMessage) -> None:
+        """Send one client message as its JSON text.
+
+        Args:
+            message: The message to send.
+        """
         self._websocket.send_text(message.model_dump_json())
 
     def send_text(self, text: str) -> None:
+        """Send a raw text frame, as a browser could.
+
+        Args:
+            text: The frame's text, sent as it is.
+        """
         self._websocket.send_text(text)
 
     def messages(self) -> list[ServerMessage]:
+        """Return a copy of every message received so far, the snapshot first."""
         with self._arrived:
             return list(self._received)
 
     def snapshot(self) -> Snapshot:
+        """Return the first message received, after checking it is a snapshot."""
         first = self.messages()[0]
         assert isinstance(first, Snapshot), first
         return first
 
     def you(self) -> str:
+        """Return the player id that the room gave this peer (its snapshot's `you`)."""
         return self.snapshot().you
 
     def last_seq(self) -> int:
+        """Return the highest seq this peer has seen.
+
+        Returns:
+            The seq of the last numbered message received, or the snapshot's seq
+            when none came after it.
+        """
         last = self.snapshot().seq
         for message in self.messages()[1:]:
             seq = getattr(message, "seq", None)
@@ -499,6 +637,7 @@ class Peer:
         return last
 
     def reveal_results(self) -> list[RevealResult]:
+        """Return every `reveal_result` received after the snapshot, in order."""
         found: list[RevealResult] = []
         for message in self.messages()[1:]:
             if isinstance(message, RevealResult):
@@ -506,6 +645,7 @@ class Peer:
         return found
 
     def cell_locks(self) -> list[CellLocked]:
+        """Return every `cell_locked` received after the snapshot, in order."""
         found: list[CellLocked] = []
         for message in self.messages()[1:]:
             if isinstance(message, CellLocked):
@@ -513,6 +653,7 @@ class Peer:
         return found
 
     def errors(self) -> list[ErrorMessage]:
+        """Return every `error` received after the snapshot, in order."""
         found: list[ErrorMessage] = []
         for message in self.messages()[1:]:
             if isinstance(message, ErrorMessage):
@@ -520,6 +661,7 @@ class Peer:
         return found
 
     def pong_count(self) -> int:
+        """Return how many `pong` messages this peer has received."""
         count = 0
         for message in self.messages():
             if isinstance(message, Pong):
@@ -527,9 +669,21 @@ class Peer:
         return count
 
     def wait_for_messages(self, count: int, what: str) -> None:
+        """Wait until this peer has received at least `count` messages.
+
+        Args:
+            count: The number of messages to wait for, the snapshot included.
+            what: What is awaited, for the failure message.
+        """
         self.wait_until(lambda: len(self.messages()) >= count, what)
 
     def wait_for_seq(self, seq: int, what: str) -> None:
+        """Wait until this peer has seen a message numbered `seq` or later.
+
+        Args:
+            seq: The seq to wait for.
+            what: What is awaited, for the failure message.
+        """
         self.wait_until(lambda: self.last_seq() >= seq, what)
 
     def wait_until(self, condition: Callable[[], bool], what: str) -> None:
@@ -595,6 +749,16 @@ def ping_and_wait(peer: Peer) -> None:
 
 
 def snapshot_cell(snapshot: Snapshot, row: int, column: int) -> LetterCellView:
+    """One letter cell of a snapshot's grid.
+
+    Args:
+        snapshot: The snapshot a peer received.
+        row: The cell's row.
+        column: The cell's column.
+
+    Returns:
+        The cell's view. The test fails when the grid has no letter cell there.
+    """
     for cell in snapshot.grid.cells:
         if isinstance(cell, LetterCellView) and (cell.row, cell.column) == (
             row,
@@ -608,20 +772,32 @@ def snapshot_cell(snapshot: Snapshot, row: int, column: int) -> LetterCellView:
 
 
 def cell_selector(row: int, column: int) -> str:
+    """The CSS selector of the `cell` element at a row and a column."""
     return f'[data-testid="cell"][data-row="{row}"][data-column="{column}"]'
 
 
 def cell_at(page: Page, row: int, column: int) -> Locator:
+    """The locator of the `cell` element at a row and a column of the page."""
     return page.locator(cell_selector(row, column))
 
 
 def expect_seq(page: Page, seq: int) -> None:
+    """Wait until the room page shows `seq` as its `data-seq`, else fail."""
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
 
 
 def expect_selection(
     page: Page, row: int, column: int, direction: str, word: str
 ) -> None:
+    """Wait until the grid shows a selection, else fail.
+
+    Args:
+        page: The room page.
+        row: The selected cell's row (`data-selected-row`).
+        column: The selected cell's column (`data-selected-column`).
+        direction: `across` or `down` (`data-direction`).
+        word: The selected word's clue key, such as `0,2,0` (`data-word`).
+    """
     grid = page.get_by_test_id("grid")
     expect(grid).to_have_attribute("data-selected-row", str(row))
     expect(grid).to_have_attribute("data-selected-column", str(column))
@@ -644,6 +820,11 @@ class MockRoomSocket:
         self.routes: list[WebSocketRoute] = []
 
     def handle(self, route: WebSocketRoute) -> None:
+        """Take one socket the page opened (the handler of `route_web_socket`).
+
+        Args:
+            route: The routed socket; its frames are recorded from now on.
+        """
         self.routes.append(route)
 
         def on_message(message: str | bytes) -> None:
@@ -658,6 +839,11 @@ class MockRoomSocket:
             route.send(Pong().model_dump_json())
 
     def send(self, frame: str) -> None:
+        """Send one server frame to the page on its first socket.
+
+        Args:
+            frame: The frame's JSON text.
+        """
         self.routes[0].send(frame)
 
     def frames_without_pings(self) -> list[str]:
@@ -691,6 +877,7 @@ class MockRoomSocket:
         return found
 
     def edit_count(self) -> int:
+        """Return how many `edit_letter` frames the page has sent."""
         count = 0
         for frame in self.frames_without_pings():
             if json.loads(frame)["type"] == "edit_letter":
@@ -701,6 +888,13 @@ class MockRoomSocket:
 def wait_until_page(
     page: Page, condition: Callable[[], bool], what: str = "the page"
 ) -> None:
+    """Check `condition` every 50 ms of page time until it holds, else fail.
+
+    Args:
+        page: The page whose clock paces the checks.
+        condition: The check, made in Python.
+        what: What is awaited, for the failure message.
+    """
     waited_ms = 0
     while not condition():
         if waited_ms >= WAIT_TIMEOUT_MS:
@@ -712,6 +906,17 @@ def wait_until_page(
 def player_view(
     player_id: str, nickname: str, colour: int, *, is_host: bool = False
 ) -> PlayerView:
+    """An active, unmuted player of a snapshot's roster, with no selection.
+
+    Args:
+        player_id: The player's id.
+        nickname: The player's nickname.
+        colour: The player's colour index, 0 to 7.
+        is_host: Whether the player is the host.
+
+    Returns:
+        The player's view.
+    """
     return PlayerView(
         player_id=player_id,
         nickname=nickname,
@@ -729,6 +934,16 @@ def default_players() -> list[PlayerView]:
 
 
 def with_letter_cells(view: GridView, changes: ChangeList) -> GridView:
+    """A grid view with some letter cells updated.
+
+    Args:
+        view: The grid view to start from.
+        changes: For each cell to change, its row, its column and the fields of
+            its `LetterCellView` to update.
+
+    Returns:
+        A new view; the other cells are unchanged.
+    """
     new_cells: list[CellView] = []
     for cell in view.cells:
         new_cell = cell
@@ -749,6 +964,20 @@ def snapshot_frame(
     allowance: RevealBudget,
     solved: bool,
 ) -> str:
+    """The JSON text of a snapshot for `p1`, with no flag, chat, vote or timer.
+
+    Args:
+        view: The grid view.
+        seq: The snapshot's seq.
+        players: The roster.
+        help_mode: The settings' help mode.
+        left: The `reveal_budget` (what is left).
+        allowance: The settings' `reveal_budget` (the allowance).
+        solved: Whether the grid is solved.
+
+    Returns:
+        The snapshot frame, ready for `MockRoomSocket.send`.
+    """
     snapshot = Snapshot(
         seq=seq,
         you="p1",
@@ -817,6 +1046,17 @@ def open_room(
 def reveal_result_frame(
     seq: int, target: RevealTargetArg, left: RevealBudget, player_id: str = "p2"
 ) -> str:
+    """The JSON text of a `reveal_result`.
+
+    Args:
+        seq: The event's seq.
+        target: The revealed cell or word.
+        left: The event's `reveal_budget` (what is left after the reveal).
+        player_id: The revealer.
+
+    Returns:
+        The frame, ready for `MockRoomSocket.send`.
+    """
     event = RevealResult(
         seq=seq, player_id=player_id, target=target, reveal_budget=left
     )
@@ -826,6 +1066,17 @@ def reveal_result_frame(
 def settings_changed_frame(
     seq: int, help_mode: HelpMode, allowance: RevealBudget, left: RevealBudget
 ) -> str:
+    """The JSON text of a `settings_changed` from `p1`, the room unlocked.
+
+    Args:
+        seq: The event's seq.
+        help_mode: The new help mode.
+        allowance: The new `settings.reveal_budget`.
+        left: The event's `reveal_budget` (what is left).
+
+    Returns:
+        The frame, ready for `MockRoomSocket.send`.
+    """
     settings = RoomSettings(help_mode=help_mode, reveal_budget=allowance, locked=False)
     event = SettingsChanged(
         seq=seq, player_id="p1", settings=settings, reveal_budget=left
@@ -836,6 +1087,18 @@ def settings_changed_frame(
 def cell_locked_frame(
     seq: int, row: int, column: int, letter: str, revealed: bool
 ) -> str:
+    """The JSON text of a `cell_locked`.
+
+    Args:
+        seq: The event's seq.
+        row: The cell's row.
+        column: The cell's column.
+        letter: The letter the cell is locked on.
+        revealed: True for a reveal, False for a check.
+
+    Returns:
+        The frame, ready for `MockRoomSocket.send`.
+    """
     event = CellLocked(
         seq=seq, row=row, column=column, letter=letter, revealed=revealed
     )
@@ -857,10 +1120,67 @@ COLOUR_CONTRAST_JS = (Path(__file__).parent / "colour_contrast.js").read_text(
     encoding="utf-8"
 )
 
-# What the rules of the corner mark need, measured on the `cell` element. A
-# translucent colour is composited as spec 035's contrast scan does: the cell's
-# computed background over white, the mark's over the cell's.
-MARK_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + r"""
+MARK_TOLERANCE_PX = 1.0
+MARK_EDGE_PX = 4.0
+MARK_MIN_PX = 6.0
+MARK_MIN_CONTRAST = 3.0
+
+# The colours of a corner mark, as "Client: revealed cells" measures them (the
+# lead's refinement of 2026-10-15). The JavaScript declares `markColours(cell,
+# mark)`, to be used after COLOUR_CONTRAST_JS. Its colours are the computed
+# `background-color` of `reveal-mark` and of each layer inside it that is at least
+# MARK_MIN_PX and a quarter of the cell side wide and high: an element descendant
+# (sized by its bounding box), or the mark's `::before` or `::after` whose
+# computed `content` is not `none` (sized by its computed `width` and `height`).
+# Each colour is composited over the cell's computed background (itself over
+# white), as the check of a one-colour mark does, and measured against it. The
+# mark's contrast is the highest of these ratios. Where each colour shows is the
+# reviewer's check, not the tests' (the spec says so).
+MARK_COLOURS_JS = f"const MARK_MIN_PX = {MARK_MIN_PX};\n" + r"""
+function markColours(cell, mark) {
+  const cellBox = cell.getBoundingClientRect();
+  const minWidth = Math.max(MARK_MIN_PX, cellBox.width / 4);
+  const minHeight = Math.max(MARK_MIN_PX, cellBox.height / 4);
+  const cellBackground = over(
+    parseColour(getComputedStyle(cell).backgroundColor), WHITE
+  );
+  const colours = [];
+  const addColour = (source, text) => {
+    const shown = over(parseColour(text), cellBackground);
+    const ratio = contrast(shown, cellBackground);
+    colours.push({source: source, colour: text, ratio: ratio});
+  };
+  addColour('reveal-mark', getComputedStyle(mark).backgroundColor);
+  for (const layer of mark.querySelectorAll('*')) {
+    const box = layer.getBoundingClientRect();
+    if (box.width >= minWidth && box.height >= minHeight) {
+      addColour(layer.tagName, getComputedStyle(layer).backgroundColor);
+    }
+  }
+  for (const pseudo of ['::before', '::after']) {
+    const style = getComputedStyle(mark, pseudo);
+    if (style.content === 'none') {
+      continue;
+    }
+    const width = parseFloat(style.width);
+    const height = parseFloat(style.height);
+    if (width >= minWidth && height >= minHeight) {
+      addColour(pseudo, style.backgroundColor);
+    }
+  }
+  return colours;
+}
+function highestRatio(colours) {
+  let highest = 0;
+  for (const colour of colours) {
+    highest = Math.max(highest, colour.ratio);
+  }
+  return highest;
+}
+"""
+
+# What the rules of the corner mark need, measured on the `cell` element.
+MARK_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + MARK_COLOURS_JS + r"""
   const marks = cell.querySelectorAll('[data-testid="reveal-mark"]');
   const result = {marks: marks.length};
   if (marks.length !== 1) {
@@ -870,23 +1190,17 @@ MARK_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + r"""
   const cellBox = cell.getBoundingClientRect();
   const markBox = mark.getBoundingClientRect();
   const markStyle = getComputedStyle(mark);
-  const cellBackground = over(
-    parseColour(getComputedStyle(cell).backgroundColor), WHITE
-  );
-  const markColour = over(parseColour(markStyle.backgroundColor), cellBackground);
+  const colours = markColours(cell, mark);
   result.ariaHidden = mark.getAttribute('aria-hidden');
   result.text = mark.textContent;
   result.visibility = markStyle.visibility;
   result.cell = [cellBox.left, cellBox.top, cellBox.right, cellBox.bottom];
   result.mark = [markBox.left, markBox.top, markBox.right, markBox.bottom];
-  result.ratio = contrast(markColour, cellBackground);
+  result.colours = colours;
+  result.ratio = highestRatio(colours);
   return result;
 }
 """
-MARK_TOLERANCE_PX = 1.0
-MARK_EDGE_PX = 4.0
-MARK_MIN_PX = 6.0
-MARK_MIN_CONTRAST = 3.0
 
 
 def read_mark(cell: Locator) -> dict[str, Any]:
@@ -897,7 +1211,7 @@ def read_mark(cell: Locator) -> dict[str, Any]:
 
 
 def mark_contrast(cell: Locator) -> float:
-    """The contrast of the cell's mark colour against the cell's background."""
+    """The mark's contrast against the cell: the highest over the mark's colours."""
     reading = read_mark(cell)
     assert reading["marks"] == 1, reading
     return float(reading["ratio"])
@@ -936,7 +1250,7 @@ def mark_problems(cell: Locator) -> list[str]:
     if mark_bottom - mark_top < min_height:
         problems.append(f"height {mark_bottom - mark_top} below {min_height}")
     if reading["ratio"] < MARK_MIN_CONTRAST:
-        problems.append(f"contrast {reading['ratio']} below 3:1")
+        problems.append(f"contrast {reading['ratio']} below 3:1: {reading['colours']}")
     return problems
 
 
