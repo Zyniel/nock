@@ -201,6 +201,9 @@ class RoomState(RoomModel):
     players: tuple[PlayerRecord, ...] = Field(default=(), max_length=8)
     settings: RoomSettings = DEFAULT_SETTINGS
     reveal_budget: RevealBudget = DEFAULT_REVEAL_BUDGET  # what is left
+    # spec 024: the reveals accepted so far, as two counts. A snapshot stored
+    # before spec 024 has no such key and loads with 0 and 0, its exact value.
+    reveals_used: RevealBudget = RevealBudget(letters=0, words=0)
     removed_tokens: tuple[ResumeToken, ...] = ()  # spec 014 AC-1
     solved: StrictBool = False  # spec 026
 
@@ -846,16 +849,19 @@ def _lock_room(
     return _announce_settings(state, host, settings, state.reveal_budget, now)
 
 
-def _remaining_count(old_allowance: int, old_remaining: int, new_allowance: int) -> int:
-    """Return the new allowance minus what was used, never below 0."""
-    used = old_allowance - old_remaining
+def _remaining_count(new_allowance: int, used: int) -> int:
+    """Return the new allowance minus the reveals already used, never below 0."""
     return max(0, new_allowance - used)
 
 
 def _change_settings(
     state: RoomState, host: PlayerRecord, message: ChangeSettings, now: float
 ) -> Outcome:
-    """Change the help mode and the reveal allowance, keeping what was used."""
+    """Change the help mode and the reveal allowance, keeping what was used.
+
+    What was used is `state.reveals_used` (spec 024 decision 13), so that a cut
+    of the allowance to 0 forgets no reveal.
+    """
     current = state.settings
     if (
         message.help_mode == current.help_mode
@@ -868,17 +874,10 @@ def _change_settings(
             "reveal_budget": message.reveal_budget,
         }
     )
+    used = state.reveals_used
     remaining = RevealBudget(
-        letters=_remaining_count(
-            current.reveal_budget.letters,
-            state.reveal_budget.letters,
-            message.reveal_budget.letters,
-        ),
-        words=_remaining_count(
-            current.reveal_budget.words,
-            state.reveal_budget.words,
-            message.reveal_budget.words,
-        ),
+        letters=_remaining_count(message.reveal_budget.letters, used.letters),
+        words=_remaining_count(message.reveal_budget.words, used.words),
     )
     return _announce_settings(state, host, settings, remaining, now)
 
@@ -1550,7 +1549,7 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
     elif isinstance(event, CheckResult):
         replayed = _replay_check_result(state, event)
     elif isinstance(event, RevealResult):
-        replayed = state.model_copy(update={"reveal_budget": event.reveal_budget})
+        replayed = _replay_reveal_result(state, event)
     elif isinstance(event, SettingsChanged):
         replayed = state.model_copy(
             update={"settings": event.settings, "reveal_budget": event.reveal_budget}
@@ -1564,6 +1563,18 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
     else:
         replayed = state
     return replayed.model_copy(update={"seq": event.seq})
+
+
+def _replay_reveal_result(state: RoomState, event: RevealResult) -> RoomState:
+    """Take the budget left and count one more reveal of the target's kind."""
+    used = state.reveals_used
+    if isinstance(event.target, CellTarget):
+        new_used = RevealBudget(letters=used.letters + 1, words=used.words)
+    else:
+        new_used = RevealBudget(letters=used.letters, words=used.words + 1)
+    return state.model_copy(
+        update={"reveal_budget": event.reveal_budget, "reveals_used": new_used}
+    )
 
 
 def _replay_player_joined(

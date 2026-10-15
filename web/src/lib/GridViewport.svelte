@@ -648,17 +648,19 @@
   }
 
   /* A revealed cell: a triangle in its top-right corner, a shape that does not
-     rely on colour (spec 024). It is drawn in the ink colour, which keeps 3:1
-     against the locked, selected, word and tinted backgrounds of a cell. A
-     remote label in the same corner comes
-     later in the cell, so it is drawn over the mark. */
+     rely on colour (spec 024). It is drawn in the cell's text colour
+     (currentColor), so it keeps 3:1 in every state of the cell: the ink on the
+     locked, selected, word and tinted backgrounds, and the text colour of each
+     flash (the data-flash rules below) while the cell flashes. The flash keeps
+     its full length (spec 024 decision 14). A remote label in the same corner
+     comes later in the cell, so it is drawn over the mark. */
   .reveal-mark {
     position: absolute;
     top: 0;
     right: 0;
     width: max(6px, calc(var(--cell) * 0.3));
     height: max(6px, calc(var(--cell) * 0.3));
-    background-color: #1f2330;
+    background-color: currentColor;
     clip-path: polygon(0 0, 100% 0, 100% 100%);
     pointer-events: none;
   }
@@ -722,7 +724,9 @@
     left: var(--corner-offset);
   }
 
-  /* After the other states, so a flash shows over them. */
+  /* After the other states, so a flash shows over them. Each text colour keeps
+     at least 4.5:1 on its flash colour; the corner mark of a revealed cell is
+     drawn in it too. */
   .letter[data-flash='0'] {
     background: var(--player-colour-0);
     color: #000000;

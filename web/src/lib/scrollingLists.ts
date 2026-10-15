@@ -1,8 +1,11 @@
-// The two lists of the room page that scroll: the roster list and the feed list.
+// The parts of the room page that scroll: the roster list, the feed list and
+// the room toolbar.
 //
+// - Any of them can follow its changes of size and content (watchListChanges).
+//   The room toolbar, a row that scrolls sideways, uses only this (spec 024).
 // - A list that scrolls with nothing focusable inside is a Tab stop in every
 //   engine, so that a keyboard player can scroll it with the arrow keys (spec
-//   035 AC-12).
+//   035 AC-12). This is for the roster list and the feed list.
 // - The feed list keeps the reader's place when a new line comes in, and a feed
 //   list at its end stays at its end (spec 013 AC-7, AC-8).
 
