@@ -6,7 +6,7 @@ status: approved
 
 # 024 - Reveal a letter or a word
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 11 and 12 below, and "Open questions" says "None.")
 
 Epic E6 Help and validation (US-6.2) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -32,6 +32,16 @@ spec gives `Reveal` its meaning in `nock.room.handle_message`, extends
 `nock.room.replay`, extends spec 037's traffic rule to revealed letters, and adds
 to the room page the reveal controls, the look of a revealed cell and the room
 toolbar.
+
+(Note from the lead, 2026-10-15: this spec touches three `done` specs, and none of
+the human's answers, decisions 11 and 12, adds another. No criterion or test of them
+changes. Spec 018: its `undo-button` moves into `room-toolbar`, and its criteria do
+not say where that button sits; the `cell_locked` row of its `replay` table gains
+`pencil = False`, which changes nothing before spec 020 since no pencil letter
+exists. Spec 023: `check-panel` moves into `room-toolbar`, which stays "in the room
+header beside the undo control", as its "Client: check controls" says. Spec 037: its
+traffic rule is extended in this spec's own copy of the checker ("Test harness"),
+not in spec 037's tests.)
 
 ### Server rule: `Reveal` in `nock.room.handle_message`
 
@@ -189,11 +199,16 @@ AC-6. This section is the plan for the controls of this spec and of specs 019, 0
 and 025.)
 
 - `data-testid="room-toolbar"`, inside the room header after `share-panel`, holds
-  the room's tools in this order: the undo control (`undo-button` and
-  `undo-message`, spec 018), the pencil controls (spec 020, once built),
-  `check-panel` (spec 023), `reveal-panel` (this spec), the authors switch (spec
-  019, once built). Moving the undo control and `check-panel` into it changes none
-  of their test ids, texts, labels or behaviour.
+  the tools of specs 018, 020, 023, 024 and 019 in this relative order, each
+  before the next: the undo control (`undo-button` and `undo-message`, spec 018),
+  the pencil controls (spec 020, once built), `check-panel` (spec 023),
+  `reveal-panel` (this spec), the authors switch (spec 019, once built). This is
+  not the toolbar's exact content: specs 021, 022 and 027 add theirs, and other
+  controls may sit before, between or after these. (Note from the lead,
+  2026-10-15: the order is relative, so that the controls of specs 019-022 and 027
+  can join the toolbar without changing this criterion.) Moving the undo control
+  and `check-panel` into it changes none of their test ids, texts, labels or
+  behaviour.
 - A small window is one with `window.innerHeight <= 500` or
   `window.innerWidth <= 480` (the room page's existing breakpoint). On a small
   window:
@@ -307,7 +322,7 @@ The words in brackets say how each criterion is tested.
 - **AC-7** (new) (browser with mocked socket) The reveal controls send the right message and are disabled when they cannot apply. Given a FX-01 snapshot (`help_mode` `free`, budget 5 letters and 1 word): `reveal-panel` is inside `room-toolbar` right after `check-panel`, has `role="group"` and the `aria-label` `fr.json["reveal.label"]`, and holds `reveal-letter` then `reveal-word`; with nothing selected both are disabled. After tapping (2, 2) twice (`down`, word `0,2,0`), clicking `reveal-letter` sends one frame that parses to `Reveal(target=CellTarget(row=2, column=2))` and clicking `reveal-word` one that parses to `Reveal(target=WordTarget(row=0, column=2, clue_index=0))`; the selection is still (2, 2) `down`, and no cell changes until the mock answers. With a snapshot where (2, 2) is locked, after selecting it `reveal-letter` is disabled and `reveal-word` enabled; with every cell of MIME locked, `reveal-word` is disabled too. After the mock sends `grid_solved`, both are disabled. A snapshot with `help_mode` `none` shows no `reveal-panel`; a `settings_changed` to `free` shows it, and one back to `none` removes it.
 - **AC-8** (new) (browser with mocked socket) The room toolbar keeps the grid's room on small windows, and every control in it can be reached. Setup: spec 013 AC-6's (FX-01 snapshot, `you` host among 8 players, 100 feed items, (3, 1) tapped), with help mode `free` and the budget 5 letters and 1 word. At every window size of spec 006 AC-5, in desktop and touch contexts:
   - Layout: spec 013 AC-6's checks pass with the toolbar and the reveal panel shown.
-  - Order: `room-toolbar` is inside the room header and holds, in document order, `undo-button`, `check-letter`, `check-word`, `check-grid`, `reveal-letter`, `reveal-word`.
+  - Order: `room-toolbar` is inside the room header and holds `undo-button`, `check-letter`, `check-word`, `check-grid`, `reveal-letter`, `reveal-word` in this relative document order, each before the next, with other controls allowed before, between or after them when other specs add them, and with no other button whose `data-testid` starts with `reveal-`; the test checks the relative order of these six elements, not the toolbar's exact children. (Note from the lead, 2026-10-15: the order is relative, so that the controls of specs 019-022 and 027 can join the toolbar without changing this criterion.)
   - One row, at 320 by 568, 568 by 320, 360 by 740 and 740 by 360: the vertical ranges of any two of these six buttons overlap. When the toolbar's `scrollWidth` is more than its `clientWidth` plus 1, its computed `overflow-x` is `auto` or `scroll` and, with `scrollLeft` 0, `room-toolbar-more` is visible. At the four other sizes `room-toolbar-more` is not visible.
   - Keyboard, desktop context: after the test calls `focus()` on `share-link` from `page.evaluate`, it presses `Tab` until each of the six buttons has had the focus (at most 60 presses). While each one has the focus: its box lies inside the toolbar's client area (1 px tolerance); its computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white (spec 035 AC-2); the outline passes the "Not clipped" measure of spec 035's "Focus outline of the feed's scrolling list", with the toolbar among the clipping ancestors; and `room-toolbar-more` is not visible.
   - Pointer: for each of the six buttons, after `scrollIntoView({block: "nearest", inline: "nearest"})`, `document.elementFromPoint` at the centre of its box returns the button or one of its descendants.
@@ -337,7 +352,8 @@ Revealing on a solved grid is refused with `grid_solved` (spec 026 AC-4).
 - A right letter already in the cell (AC-1): revealed all the same. It loses its
   author, so the recap credits it to nobody (spec 028 AC-3), and the budget is
   spent. Skipping it would tell the group that the letter was right, which is a
-  free check (decision 4, open question 1).
+  free check (decisions 4 and 11). (Note from the lead, 2026-10-15: "decision 4,
+  open question 1" became "decisions 4 and 11", the human's answer.)
 - A wrong letter (AC-1): replaced by the solution letter; its strike goes, on the
   server (`wrong = False`) and on the page (`cell_locked` clears `wrong`, spec 023).
 - Locked cells in a word (AC-1, AC-4): left out of the reveal; a word whose cells
@@ -387,7 +403,8 @@ Revealing on a solved grid is refused with `grid_solved` (spec 026 AC-4).
 - A confirmation step before a reveal.
 - Keyboard shortcuts for reveals (spec 035 leaves them out too).
 - Showing on the cell who revealed it (the feed says it).
-- A collapsible help menu in place of the toolbar (open question 2).
+- A collapsible help menu in place of the toolbar (decision 12). (Note from the
+  lead, 2026-10-15: "open question 2" became "decision 12", the human's answer.)
 
 ## Work packages
 
@@ -395,8 +412,9 @@ None.
 
 ## Decisions
 
-Proposed in the Phase 6 refine of 2026-10-14, for the human's re-approval. Each one
-is already part of the spec above; items 4 and 8 are also open questions.
+Proposed in the Phase 6 refine of 2026-10-14 and approved by the human with the
+spec. Each one is already part of the spec above. Items 4 and 8 were also open
+questions: the human's answers to them are items 11 and 12 below.
 
 1. No protocol change. `Reveal`, `RevealResult`, `CellLocked(revealed=True)` and
    `budget_exhausted` already exist (spec 039).
@@ -423,14 +441,21 @@ is already part of the spec above; items 4 and 8 are also open questions.
 10. The reveal panel is hidden in `none` mode from this spec on (spec 025 AC-4),
     rather than disabled first and hidden later.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+11. A cell that already holds the right letter, inside a reveal's target (former
+    open question 1). Options: reveal it all the same, spending the budget, so its
+    author loses the credit in the recap; skip it, which tells the group the letter
+    was right (a free check); or refuse a letter reveal of such a cell, which tells
+    the same. Pick: reveal it all the same (decision 4).
+12. Room toolbar on small windows (former open question 2). Options: one row that
+    scrolls sideways, with an edge fade; or, on small windows, one `Aide` button
+    that opens the check and reveal controls over the page, which hides them behind
+    one more tap. Pick: the row that scrolls sideways, the pattern the host panel
+    already uses (decision 8). The other specs that add controls to the toolbar
+    (019, 020, 021, 022, 027) follow it.
+
 ## Open questions
 
-1. A cell that already holds the right letter, inside a reveal's target. Options:
-   (a) reveal it all the same, spending the budget, and its author loses the
-   credit in the recap; (b) skip it, which tells the group the letter was right
-   (a free check); (c) refuse a letter reveal of such a cell, which tells the same.
-   Pick: (a). The spec is written with it.
-2. Room toolbar on small windows. Options: (a) one row that scrolls sideways, with
-   an edge fade (the spec as written); (b) on small windows, one `Aide` button that
-   opens the check and reveal controls over the page, which hides them behind one
-   more tap. Pick: (a), the pattern the host panel already uses.
+None.
