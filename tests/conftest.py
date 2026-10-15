@@ -18,13 +18,14 @@ if TYPE_CHECKING:
     from nock.catalogue import Catalogue
     from nock.server import RoomRegistry
 
-# The harness modules hold helpers with plain `assert`s. pytest rewrites the asserts
-# of test files and conftests only, so these modules are registered here: the call
-# has to come before the first test module imports them. A name with no module
-# behind it is harmless.
-pytest.register_assert_rewrite(
-    "spec013_harness", "spec014_harness", "spec035_harness", "spec036_harness"
+# The harness modules (`specNNN_harness.py`) hold helpers with plain `assert`s.
+# pytest rewrites the asserts of test files and conftests only, so every harness
+# module is registered here: the call has to come before the first test module
+# imports them.
+HARNESS_MODULES = sorted(
+    path.stem for path in Path(__file__).parent.glob("spec*_harness.py")
 )
+pytest.register_assert_rewrite(*HARNESS_MODULES)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
