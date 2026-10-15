@@ -153,8 +153,12 @@ class RoomRegistry:
   is closed when the app stops. A registry passed as `rooms` is never closed by the
   app.
 - The production run command sets it, for example
-  `NOCK_DATABASE=data/nock.sqlite3 uv run uvicorn nock.server:app` (the
-  implementer documents it in `README.md`).
+  `NOCK_DATABASE=data/nock.sqlite3 uv run python -m nock` (the
+  implementer documents it in `README.md`). (Note from the lead, 2026-10-15: the
+  command used to be `NOCK_DATABASE=data/nock.sqlite3 uv run uvicorn nock.server:app`.
+  That command skips spec 036's 8,192-byte frame limit, which only
+  `python -m nock` sets, through `server_config`; the README already says
+  `uv run python -m nock`.)
 
 ### Undo (`nock.room.handle_message` for `Undo`)
 

@@ -72,8 +72,14 @@ def create_app(
     """
 
 
-app: FastAPI  # create_app(); run with: uv run uvicorn nock.server:app
+app: FastAPI  # create_app(); run with: uv run python -m nock (spec 036)
 ```
+
+(Note from the lead, 2026-10-15: the comment above used to name
+`uv run uvicorn nock.server:app`. That command skips spec 036's 8,192-byte frame
+limit, which only `python -m nock` sets, through `server_config`; the README
+already says `uv run python -m nock`. The live-server fixture of the test harness
+below starts `uvicorn.Server` itself; it is not a run command and is unchanged.)
 
 `WEB_DIST_DIR` is computed from the module file
 (`Path(__file__).resolve().parents[2] / "web" / "dist"`), never from the current
