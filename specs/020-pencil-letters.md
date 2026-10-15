@@ -142,12 +142,23 @@ export function shownCell(
 
 On the `cell` element of each letter cell, new attribute `data-pencil`: `true` when
 the shown letter is a pencil letter, else `false`. A cell with `data-pencil="true"`
-shows its letter in italics (computed `font-style` `italic`) and in grey: its
+shows its letter in italics (computed `font-style` `italic`) in every state, the
+flash of spec 016 included. (Note from the lead, 2026-10-15: the italics hold in
+every state including the flash, since they are then the only sign left (review of
+spec 020).) Outside a flash (`data-flash` is `""`), it also shows it in grey: its
 computed `color` differs from the `color` of a normal letter in a cell in the same
 state, and has a contrast of at least 4.5:1 against the cell's background in every
-state of AC-7 (spec 035 AC-8). The italics are the sign that does not rely on
-colour (spec 035 AC-6 and AC-7). A cell with `data-pencil="false"` has the
-`font-style` `normal`.
+state of AC-7 other than the flash (spec 035 AC-8). (Note from the lead,
+2026-10-15: the colour rule holds in every state except the flash. It replaces "in
+every state of AC-7", because on flash colours 0, 5 and 7 every colour that keeps
+4.5:1 is almost indistinguishable from the normal letter's text colour (review of
+spec 020).) While the cell flashes (`data-flash` is not `""`), its pencil letter
+takes the flash's text colour, the same `color` as a normal letter in that state,
+and the italics alone mark it as a pencil letter; its contrast against the flash
+colour is at least 4.5:1 (spec 035 AC-8, state K3). (Note from the lead,
+2026-10-15: added, decision 12 (review of spec 020).) The italics are the sign that
+does not rely on colour (spec 035 AC-6 and AC-7). A cell with `data-pencil="false"`
+has the `font-style` `normal`.
 
 ### Client: pencil mode and the confirm control
 
@@ -205,7 +216,11 @@ than confirming a letter the player never saw (decision 3).
   word; for each colour index k from 0 to 7, a pencil letter in a cell tinted by
   another player of colour k (spec 013), with `you` given a colour other than k;
   and for each k, a `letter_changed` with `pencil` true from a player of colour k
-  replacing a letter of mine, scanned within its 1-second flash (spec 016).
+  replacing a letter of mine, scanned within its 1-second flash (spec 016). (Note
+  from the lead, 2026-10-15: these eight flash states are the "flash states" of
+  AC-7. In them the pencil letter has the flash's text colour, so only its italics
+  and its 4.5:1 contrast are checked, not a colour difference (review of spec
+  020).)
 - Window sizes and contexts: as spec 024 (the eight sizes of spec 006 AC-5,
   desktop and touch contexts).
 - Engines: every browser criterion runs in Chromium and WebKit locally and also
@@ -215,13 +230,13 @@ than confirming a letter the player never saw (decision 3).
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-5.2.1) (rule unit test; WebSocket; browser with mocked socket; browser with live server) A letter typed in pencil mode shows in grey italics for every player. Rule: in a FX-01 room with `p1` and `p2` (seq 2), `PencilEdit(row=1, column=0, letter="T")` from `p1` gives one entry `LetterChanged(seq=3, row=1, column=0, letter="T", pencil=True, player_id="p1")`, and the cell has `letter="T"`, `pencil=True`, `author="p1"`, which `grid_state` shows too. WebSocket: A and B join a FX-01 room; A sends `{"type": "pencil_edit", "row": 1, "column": 0, "letter": "T", "base_seq": null}`; A and B receive that `letter_changed` with `pencil` true; a client C joining afterwards gets a snapshot whose (1, 0) has `letter="T"` and `pencil=True`. Mocked: given a FX-01 snapshot (`you` = `p1`, `seq` 5) where (1, 2) holds `M` (normal, by `p2`), a click on `pencil-toggle` (which then has `aria-pressed="true"`), a tap on (1, 0) and the key `t` show `T` at (1, 0) at once with `data-pencil="true"`, `data-unconfirmed="true"`, the computed `font-style` `italic` and a computed `color` different from the `color` of (1, 2), which has `data-pencil="false"` and `font-style` `normal`; one edit frame is sent (spec 008's harness leaves `select_cell` frames aside), which parses to `PencilEdit(row=1, column=0, letter="T")`, and the selection moves to (1, 1); when the mock answers `letter_changed` (seq 6) at (1, 0) `T` with `pencil` true from `p1`, the cell keeps its pencil `T` with `data-unconfirmed="false"`; a `letter_changed` (seq 7) at (2, 2) `I` with `pencil` true from `p2` shows a pencil `I` there; a snapshot whose (3, 1) holds a pencil `A` shows it in pencil. With pencil mode off, typing sends `EditLetter` and the letter is not in italics. Live: two pages join one FX-01 room as `Ana` and `Bob`; Ana clicks `pencil-toggle`, taps (1, 0) and types `T`; within 300 ms of the key press (spec 015 AC-1), Bob's (1, 0) shows `T` with `data-pencil="true"` and the computed `font-style` `italic`.
+- **AC-1** (AC-5.2.1) (rule unit test; WebSocket; browser with mocked socket; browser with live server) A letter typed in pencil mode shows in italics, and in grey outside a flash, for every player. (Note from the lead, 2026-10-15: "in grey italics" became "in italics, and in grey outside a flash", decision 12 (review of spec 020).) Rule: in a FX-01 room with `p1` and `p2` (seq 2), `PencilEdit(row=1, column=0, letter="T")` from `p1` gives one entry `LetterChanged(seq=3, row=1, column=0, letter="T", pencil=True, player_id="p1")`, and the cell has `letter="T"`, `pencil=True`, `author="p1"`, which `grid_state` shows too. WebSocket: A and B join a FX-01 room; A sends `{"type": "pencil_edit", "row": 1, "column": 0, "letter": "T", "base_seq": null}`; A and B receive that `letter_changed` with `pencil` true; a client C joining afterwards gets a snapshot whose (1, 0) has `letter="T"` and `pencil=True`. Mocked: given a FX-01 snapshot (`you` = `p1`, `seq` 5) where (1, 2) holds `M` (normal, by `p2`), a click on `pencil-toggle` (which then has `aria-pressed="true"`), a tap on (1, 0) and the key `t` show `T` at (1, 0) at once with `data-pencil="true"`, `data-unconfirmed="true"`, the computed `font-style` `italic` and a computed `color` different from the `color` of (1, 2), which has `data-pencil="false"` and `font-style` `normal`; one edit frame is sent (spec 008's harness leaves `select_cell` frames aside), which parses to `PencilEdit(row=1, column=0, letter="T")`, and the selection moves to (1, 1); when the mock answers `letter_changed` (seq 6) at (1, 0) `T` with `pencil` true from `p1`, the cell keeps its pencil `T` with `data-unconfirmed="false"`; a `letter_changed` (seq 7) at (2, 2) `I` with `pencil` true from `p2` shows a pencil `I` there; a snapshot whose (3, 1) holds a pencil `A` shows it in pencil. With pencil mode off, typing sends `EditLetter` and the letter is not in italics. Live: two pages join one FX-01 room as `Ana` and `Bob`; Ana clicks `pencil-toggle`, taps (1, 0) and types `T`; within 300 ms of the key press (spec 015 AC-1), Bob's (1, 0) shows `T` with `data-pencil="true"` and the computed `font-style` `italic`.
 - **AC-2** (AC-5.2.2) (rule unit test; browser with mocked socket; browser with live server) Any player can confirm a pencil letter with one action; it then shows as a normal letter. Rule: in the room of AC-1 after `p1`'s pencil `T` at (1, 0) (seq 3), `ConfirmPencil(row=1, column=0)` from `p2` gives one entry `LetterChanged(seq=4, row=1, column=0, letter="T", pencil=False, player_id="p2")`, and the cell has `pencil=False` and `author="p2"`; `p1` can confirm its own pencil letter the same way; a `ConfirmPencil` on an empty cell, or on a normal letter, is refused `stale_edit`. In another run, `p1` writes a pencil `T` (seq 3) then a pencil `A` (seq 4) at (1, 0): `p2`'s `ConfirmPencil(row=1, column=0, base_seq=3)` is refused `stale_edit`, and with `base_seq=4` it is accepted and confirms `A`. Mocked: given a FX-01 snapshot (`you` = `p1`, `seq` 5) where (1, 0) holds a pencil `T` by `p2`: with nothing selected, and with (1, 1) (empty) selected, `confirm-pencil` is disabled; after a tap on (1, 0) it is enabled, and a click sends one frame that parses to `ConfirmPencil(row=1, column=0, base_seq=5)`, shows `T` at once with `data-pencil="false"` and `data-unconfirmed="true"`, and leaves the selection on (1, 0); when the mock answers `letter_changed` (seq 6) at (1, 0) `T` with `pencil` false from `p1`, the cell shows a normal `T` with `data-unconfirmed="false"` and `data-author="p1"`. In a second run the mock answers `error` `stale_edit`, and the cell shows its confirmed pencil `T` again. Live: Ana writes a pencil `T` at (1, 0); Bob taps (1, 0) and clicks `confirm-pencil`; on both pages, (1, 0) then shows `T` with `data-pencil="false"` and the computed `font-style` `normal`.
 - **AC-3** (AC-5.2.3) (rule unit test) Completion (spec 026, backlog US-6.4) evaluates pencil and normal letters the same way. Given `FULL17`: `PencilEdit(row=4, column=4, letter="T")` from `p2` at `NOW + 754.0` gives `LetterChanged(seq=20, row=4, column=4, letter="T", pencil=True, player_id="p2")` then `GridSolved(seq=21, elapsed_ms=754000)`; in a second run, a `PencilEdit` with `X` gives the `letter_changed` then `GridFullWrong(seq=21)`, and confirming that `X` (`ConfirmPencil`) then gives only its `letter_changed`; in a fresh FX-01 room where `p1` writes the 18 solution letters with `PencilEdit` in row-major order, exactly one `GridSolved` comes, after the 18th. On the solved grid of the first run, `PencilEdit` and `ConfirmPencil` at (4, 4) are refused `grid_solved`.
 - **AC-4** (new, from the lead's note of 2026-10-11 on spec 037) (rule unit test; WebSocket) `pencil_edit` and `confirm_pencil` go through the edit checks of spec 015 in their order, and a refused one is not counted. Rule, in a FX-01 room with `p1` and `p2`: a `PencilEdit` and a `ConfirmPencil` at (0, 0) and at (5, 0) are refused `not_a_letter_cell`; on a locked cell, `cell_locked`; with a `base_seq` older than another player's change of the cell, `stale_edit`; on a solved grid, `grid_solved`. Each refusal leaves the state, its `seq` and `p1.recent_edits` as they were (apart from `last_seen_at`, `last_input_at` and, for a sender who was idle, their state and the seq raised by spec 013's wake entry, which a refusal does not undo) and sends one error. (Note from the lead, 2026-10-15: an idle sender is woken even when its message is refused, as spec 013's input rule and the code do.) Order: with `max_edits_per_second=1` and an edit in the last second, a pencil edit on a locked cell is refused `rate_limited`; a pencil edit on a clue cell of a solved grid is refused `not_a_letter_cell`; a confirmation on a locked cell with an old `base_seq` is refused `cell_locked`; a confirmation with an old `base_seq` on a solved grid is refused `stale_edit`; a confirmation of a normal letter on a solved grid is refused `grid_solved`. Twenty-one pencil edits at one `now` give 20 `letter_changed` and one `rate_limited`, and pencil edits share the window with `edit_letter` (spec 037 AC-3). WebSocket: a `pencil_edit` at (0, 0) is answered `not_a_letter_cell` to its sender only, and the other client receives nothing.
 - **AC-5** (new) (rule unit test) Pencil letters survive an undo and a reload. Rule, in one play on a FX-01 room with `p1` and `p2`: `p1`'s pencil `T` at (1, 0) then `Undo()` gives one `letter_changed` with `letter=None` and `pencil=False`, logged with `undo=True`; `p1`'s normal `A` at (1, 1), then pencil `B` there, then `Undo()` gives back `A` with `pencil=False`; `p1` then writes a pencil `T` at (1, 0) again, `p2` confirms it, and `p2`'s `Undo()` gives back `T` with `pencil=True` and `author="p2"` (spec 018: the undoer is the author). Replaying all the entries of this play in order from `new_room` gives the same cells (`letter`, `pencil`, `author`) as the live state, and so does the room saved in a `RoomStore` and loaded again (spec 018).
 - **AC-6** (new) (browser with mocked socket) Pending pencil edits and confirmations are matched and resent by their kind. Given a FX-01 snapshot (`you` = `p1`, `seq` 5): with pencil mode on, the player types `T` at (1, 0); the mock sends `letter_changed` (seq 6) at (1, 0) `T` with `pencil` false from `p1`, which does not answer the pending pencil edit (an undo's result has that shape): the cell still shows the pending pencil `T` with `data-unconfirmed="true"`; the mock then sends `letter_changed` (seq 7) at (1, 0) `T` with `pencil` true from `p1`, which answers it: `data-unconfirmed="false"`. Then the mock closes the socket with code 1011; offline, the player types a pencil `A` at (1, 1), taps (1, 0) and clicks `confirm-pencil`; the mock accepts the next socket and answers its join with a snapshot (`seq` 9) whose (1, 0) still holds the pencil `T`: the edit messages the page then sends are, in this order, `PencilEdit(row=1, column=1, letter="A", base_seq=7)` and `ConfirmPencil(row=1, column=0, base_seq=7)` (spec 017 AC-2; pings and selections aside).
-- **AC-7** (new) (browser with mocked socket) The pencil controls and pencil letters meet spec 035 and keep the grid's room. At every window size of spec 006 AC-5, in desktop and touch contexts, with spec 013 AC-6's setup (FX-01, `you` host among 8 players, 100 feed items, (3, 1) tapped): spec 013 AC-6's checks pass with `pencil-toggle` and `confirm-pencil` shown; both are in `room-toolbar` right after `undo-button`, and spec 024 AC-8's toolbar rules hold for them (one row on small windows; with the keyboard focus, inside the toolbar's client area and an outline that is not clipped; `elementFromPoint` at their centre after `scrollIntoView`). In a separate run on a FX-01 snapshot with nothing selected, at 1280 by 720, keyboard only (spec 035's harness): `tab_to` `pencil-toggle` and `Enter` sets `aria-pressed="true"`; `tab_to` `grid`, `Tab` selects `0,0,0` on (1, 0) (spec 009), and `t` sends `PencilEdit(row=1, column=0, letter="T")` and moves the selection to (1, 1); `ArrowLeft` brings it back to (1, 0); `Escape`, then `tab_to` `confirm-pencil` and `Enter` send `ConfirmPencil(row=1, column=0, base_seq=...)`; each of the two buttons shows spec 035 AC-2's outline when reached. In every contrast state of "Test harness", spec 035's contrast scan finds no offending element, and its language scan accepts the texts of the two buttons.
+- **AC-7** (new) (browser with mocked socket) The pencil controls and pencil letters meet spec 035 and keep the grid's room. At every window size of spec 006 AC-5, in desktop and touch contexts, with spec 013 AC-6's setup (FX-01, `you` host among 8 players, 100 feed items, (3, 1) tapped): spec 013 AC-6's checks pass with `pencil-toggle` and `confirm-pencil` shown; both are in `room-toolbar` right after `undo-button`, and spec 024 AC-8's toolbar rules hold for them (one row on small windows; with the keyboard focus, inside the toolbar's client area and an outline that is not clipped; `elementFromPoint` at their centre after `scrollIntoView`). In a separate run on a FX-01 snapshot with nothing selected, at 1280 by 720, keyboard only (spec 035's harness): `tab_to` `pencil-toggle` and `Enter` sets `aria-pressed="true"`; `tab_to` `grid`, `Tab` selects `0,0,0` on (1, 0) (spec 009), and `t` sends `PencilEdit(row=1, column=0, letter="T")` and moves the selection to (1, 1); `ArrowLeft` brings it back to (1, 0); `Escape`, then `tab_to` `confirm-pencil` and `Enter` send `ConfirmPencil(row=1, column=0, base_seq=...)`; each of the two buttons shows spec 035 AC-2's outline when reached. In every contrast state of "Test harness", spec 035's contrast scan finds no offending element, and its language scan accepts the texts of the two buttons. Flash states: for each colour index k from 0 to 7, in the flash state of "Test harness" (a pencil `letter_changed` from a player of colour k replacing a letter of mine, checked within the 1-second flash), the flashing cell has `data-flash` equal to `k` and `data-pencil="true"`, its computed `font-style` is `italic`, and the computed `color` of its text has a contrast of at least 4.5:1 against the flash colour (the cell's computed `background-color`, or that of its overlay, spec 016); no colour difference with a normal letter is expected there. (Note from the lead, 2026-10-15: added, decision 12. It narrows the colour rule of "Client: pencil letters on the page" to the states other than the flash, and checks the italics and the 4.5:1 contrast in the flash (review of spec 020).)
 
 ## Edge cases and errors
 
@@ -266,7 +281,9 @@ confirmation on a solved grid's normal letter.)
   letter does, the same letter included (spec 016's edge case "Same letter from
   both"); a pencil edit by another player over my letter flashes too (decision
   11). (Note from the lead, 2026-10-15: "open question 4" became "decision 11", the
-  human's answer.)
+  human's answer.) While my cell flashes with a pencil letter in it, the letter
+  keeps its italics and takes the flash's text colour (decision 12, AC-7). (Note
+  from the lead, 2026-10-15: added (review of spec 020).)
 - Authors (spec 019): a pencil letter has an author and a band like any letter; a
   confirmation makes the confirmer its author, so the band takes their colour
   (decision 1).
@@ -330,8 +347,13 @@ a fourth question.
 4. Typing the same letter in the other mode changes its pencil flag.
 5. Pencil letters fill their cells and count for completion (spec 026 decision 6,
    backlog AC-5.2.3).
-6. Grey italics: the italics are the sign that does not rely on colour; the grey
-   keeps 4.5:1 on every background a cell can have.
+6. Grey italics: the italics are the sign that does not rely on colour, and they
+   hold in every state, the flash included; outside a flash, the grey differs from
+   the colour of a normal letter and keeps 4.5:1 on every background a cell can
+   have. During a flash, see decision 12. (Note from the lead, 2026-10-15: "the grey
+   keeps 4.5:1 on every background a cell can have" and the colour difference held
+   in every state, which no colour can do on the flash backgrounds (review of spec
+   020).)
 7. The two controls go right after the undo control in spec 024's toolbar, since
    they are used while typing.
 
@@ -355,6 +377,22 @@ open question. Each one is already part of the spec above.
     4). Options: it flashes, which is spec 016 as written (another player changed
     my letter); or no flash when the letter stays the same, which would amend spec
     016 AC-2. Pick: it flashes, so spec 016 does not change.
+
+Decided by the lead on 2026-10-15 after the review, under the owner's delegation of
+accessibility choices. It is already part of the spec above.
+
+12. The colour of a pencil letter during the flash (review of spec 020). During the
+    flash of spec 016 (1,000 ms, the cell's background is the colour of the player
+    who changed it, its text takes the flash's own text colour), the reviewer
+    computed that on flash colours 0, 5 and 7 every colour that keeps 4.5:1 is almost
+    indistinguishable from the normal letter's text colour, so a colour difference
+    cannot hold in every flash state. Options: a grey that differs from the normal
+    letter in every flash state, which breaks 4.5:1 on some of them; or a pencil
+    letter that takes the flash's text colour while the cell flashes, with its
+    italics alone marking it. Pick: the second. While the cell flashes, a pencil
+    letter has the same `color` as a normal letter in that state; outside a flash,
+    the colour rule and the 4.5:1 grey are unchanged. The italics hold in every
+    state, the flash included (AC-7).
 
 ## Open questions
 
