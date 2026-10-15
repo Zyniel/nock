@@ -93,6 +93,8 @@
   "reveal.letter_none_label": "Révéler la lettre : plus de lettre à révéler",
   "reveal.word_none_label": "Révéler le mot : plus de mot à révéler",
   "undo.nothing": "Rien à annuler.",
+  "authors.switch": "Auteurs",
+  "authors.selected": "Lettre de {name}",
   "grid.label": "Grille",
   "clue_bar.label": "Définition en cours",
   "clue_bar.empty": "Touchez une case ou une définition.",

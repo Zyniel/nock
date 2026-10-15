@@ -3,6 +3,7 @@
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
+  import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
   import { remoteSelectionsOf } from './remoteSelections'
@@ -302,6 +303,36 @@
   let selection = $derived(validSelection(words, rawSelection))
   let activeWord = $derived(selectedWord(words, selection))
   let remoteSelections = $derived(remoteSelectionsOf(session.snapshot, words))
+
+  // ---- The authors view (spec 019) ----
+
+  // Off at each page load, and for this page only: the switch sends nothing.
+  let isAuthorsViewOn = $state(false)
+  let playerColours = $derived(colourByPlayer(session.snapshot?.players ?? []))
+  // The clue bar's line naming the author of the selected letter, or null.
+  let selectedAuthorLine = $derived(selectedAuthorLineOf(isAuthorsViewOn, selection))
+
+  function toggleAuthorsView(): void {
+    isAuthorsViewOn = !isAuthorsViewOn
+  }
+
+  // The line naming the author of the selected cell's confirmed letter, while
+  // the view is on; null when it is off, when nothing is selected, or when the
+  // selected cell is empty or revealed.
+  function selectedAuthorLineOf(isViewOn: boolean, current: Selection | null): string | null {
+    if (!isViewOn || current === null) {
+      return null
+    }
+    const cell = letterCellAt(current.row, current.column)
+    if (cell === null) {
+      return null
+    }
+    const author = shownAuthorOf(cell)
+    if (author === null) {
+      return null
+    }
+    return authorLine(author, session.names)
+  }
 
   // True while the page retries after a loss that happened with the form shown:
   // the form stays on screen until the new socket opens.
@@ -1201,6 +1232,13 @@
             >
           </div>
         {/if}
+        <button
+          type="button"
+          class="authors-switch"
+          data-testid="authors-switch"
+          aria-pressed={isAuthorsViewOn}
+          onclick={toggleAuthorsView}>{t('authors.switch')}</button
+        >
         <span
           class="room-toolbar-more"
           class:shown={roomToolbarHasMore}
@@ -1420,6 +1458,8 @@
         pendingEdits={session.pendingEdits}
         flashes={session.flashes}
         {remoteSelections}
+        {isAuthorsViewOn}
+        {playerColours}
       />
     </div>
     <!-- The completion status line. The page shows it in one of two places,
@@ -1432,6 +1472,7 @@
     <div
       class="clue-bar"
       class:with-status={isStatusInClueBar}
+      class:with-author={selectedAuthorLine !== null}
       data-testid="clue-bar"
       data-word={activeWord === null ? '' : wordKey(activeWord)}
       role="region"
@@ -1440,6 +1481,9 @@
       <span class="clue-bar-text" data-testid="clue-bar-text"
         >{activeWord === null ? t('clue_bar.empty') : activeWord.text}</span
       >
+      {#if selectedAuthorLine !== null}
+        <span class="clue-bar-author" data-testid="clue-bar-author">{selectedAuthorLine}</span>
+      {/if}
       {#if isStatusInClueBar}
         {@render gridStatusLine()}
       {/if}
@@ -1559,6 +1603,15 @@
     background-color: #f2f3f6;
     border-style: dashed;
     cursor: not-allowed;
+  }
+
+  /* The authors switch when it is on: its text is underlined, like the band it
+     draws under the letters. A text decoration shows on the engines' own button
+     look and keeps the button's size. */
+  .authors-switch[aria-pressed='true'] {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
   }
 
   .host-panel-more,
@@ -1815,6 +1868,26 @@
     white-space: nowrap;
   }
 
+  /* The author of the selected letter (spec 019) follows the clue text: on its
+     line when there is room, otherwise on a line of its own, where it ends with
+     an ellipsis if that line is too short. */
+  .clue-bar.with-author {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+  }
+
+  .clue-bar-author {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    line-height: 1.3;
+    color: #4a4f5c;
+  }
+
   /* A narrow or low window (a phone) keeps its height for the grid: the roster
      and the feed are one line each, the roster scrolls sideways and the feed
      shows its newest item and scrolls up to the older ones. */
@@ -2027,6 +2100,29 @@
 
     .clue-bar {
       padding: 0.25rem 0.75rem;
+    }
+
+    /* The author shares the clue text's row too and adds no height (spec 019
+       AC-4): the clue text and the author give up the width and end with an
+       ellipsis. The author follows the clue text, and the status keeps the end
+       of the row. Centred like the status: the author's smaller text has a
+       shorter line than the clue text, so the row keeps the clue text's
+       height. */
+    .clue-bar.with-author {
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+
+    .clue-bar.with-author .clue-bar-text {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .clue-bar.with-author .grid-status {
+      margin-left: auto;
     }
 
     /* The grid comes right after this row, so the room under the remove buttons
