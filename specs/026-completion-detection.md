@@ -120,10 +120,22 @@ snapshot with `solved: true`.
   100 px floor of spec 013 AC-6.)
   - On a window at most 500 px high (`window.innerHeight <= 500`, the height part
     of spec 024's small window), `grid-status` sits in `clue-bar`'s row, after
-    `clue-bar-text`, and adds no height: `clue-bar` is as high with it as without
-    it. When the row is too narrow for both, `clue-bar-text` is cut at its end with
-    an ellipsis (CSS `text-overflow: ellipsis`), and `grid-status` keeps its whole
-    text, on one line. `clue-bar-text` keeps its whole text in the DOM and its
+    `clue-bar-text`, and never makes `clue-bar` higher than it is on the same page
+    without the status. (Note from the lead, 2026-10-15: this sentence said "adds no
+    height: `clue-bar` is as high with it as without it". That cannot hold for a
+    clue long enough to wrap, since an ellipsis works on one line only, so the bar
+    can be lower with the status, never higher. Arrowword clues are short, they fit
+    in a clue cell and FX-02's longest has 31 characters, so in practice the height
+    is the same. (second review of spec 024)) While the status sits in the row,
+    `clue-bar-text` is one line (CSS `white-space: nowrap` and `overflow: hidden`),
+    cut at its end with an ellipsis (CSS `text-overflow: ellipsis`) when the row is
+    too narrow for both, and `grid-status` keeps its whole text, on one line. A clue
+    that would wrap onto several lines without the status makes `clue-bar` lower
+    with it. (Note from the lead, 2026-10-15: this sentence said "When the row is
+    too narrow for both, `clue-bar-text` is cut at its end with an ellipsis", which
+    is true of one line only; the clue text is now one line while the status is in
+    the row, and a wrapping clue makes the bar lower, never higher. (second review
+    of spec 024)) `clue-bar-text` keeps its whole text in the DOM and its
     computed `font-size` of 14 px or more (spec 007), whatever it shows (a clue, or
     `t("clue_bar.empty")` when nothing is selected). (Note from the lead,
     2026-10-15: added.)
@@ -216,7 +228,7 @@ The words in brackets say how each criterion is tested.
 - **AC-7** (AC-6.4.2) (browser with mocked socket; browser with live server) All players see "grid full, not yet correct". Mocked: given a FX-01 snapshot where 17 cells are filled and (4, 4) is empty, `grid-status` is absent; after `letter_changed` at (4, 4) letter `X` from `p2` and `grid_full_wrong`, `grid-status` has `data-state="full_wrong"` and the text `fr.json["completion.full_wrong"]`, no cell has `data-wrong="true"`, and the room page has `data-solved="false"`; after `letter_changed` erasing (4, 4), `grid-status` is absent again. A page whose first snapshot already holds a full, wrong grid shows the `full_wrong` status at once. Live: in the room of AC-3 with `X` typed at (4, 4) instead of `T`, both pages show `data-state="full_wrong"`.
 - **AC-8** (AC-6.4.3) (rule unit test) On FX-01, entering the 18 letters triggers completion; with the M at (1, 2) replaced by N, it does not. Given a fresh FX-01 room with `p1`, when `p1` writes the 18 solution letters in row-major order, then exactly one `GridSolved` is produced, by the 18th edit, and `solved` is True. In a second run with `N` written at (1, 2) instead of `M`, the 18th edit produces `GridFullWrong` and no `GridSolved`, `solved` is False; when `p1` then writes `M` at (1, 2), that edit produces `GridSolved`.
 - **AC-9** (new) (rule unit test) The solved state survives a reload. Given the entries of AC-1's whole play (joins, 18 edits, `grid_solved`), when they are replayed in order with `replay` from `new_room` on the same grid, then the result equals the live state for `solved`, `seq` and `cells`; and a room saved in a `RoomStore` and loaded again (spec 018) has `solved=True` and still refuses an `EditLetter` with `grid_solved`.
-- **AC-10** (new, from the lead's decision of 2026-10-15) (browser with mocked socket) The completion status never takes the grid's room: on a window at most 500 px high it sits in the clue bar's row. Setup: "Status snapshots (AC-10)" in "Test harness", run with `FX02_FULL_WRONG` and again with `FX02_SOLVED`, the clue at (0, 6) tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, `grid-status` shows with the snapshot's `data-state` and the text `fr.json["completion.full_wrong"]` or `fr.json["completion.solved"]`, and spec 013 AC-6's checks pass. At 568 by 320 and 740 by 360, in both contexts: the box of `grid-status` lies inside the box of `clue-bar`; its vertical range overlaps that of `clue-bar-text`, and its left edge is at or right of the right edge of `clue-bar-text`; its whole text shows (`scrollWidth <= clientWidth + 1`); `clue-bar-text` still has the text `On la glisse dans une enveloppe` and a computed `font-size` of 14 px or more; and the height of `clue-bar` equals its height on a page given `FX02_EMPTY` with the same feed, tap, window and context, where `grid-status` is absent. At 1280 by 720, in both contexts, the top of `grid-status` is at or below the bottom of `clue-bar`, and its bottom is at most `window.innerHeight`. Each comparison of boxes has 1 px of tolerance. (Note from the lead, 2026-10-15: added. A test-writer found that `grid-status`, then always under the clue bar, left `grid-viewport` about 75 px high at 568 by 320 in the touch context with a full grid, in all three engines, and that no test covered the room layout while the status shows. Spec 019 AC-4 checks spec 013 AC-6 with every letter cell filled, so it relies on this rule too.) At 568 by 320 in the touch context, with each of the two snapshots, spec 035's contrast scan (its AC-8) and language scan (its AC-9) find no offending element, FX-02's clue texts counting as data of the test as FX-01's do. (Note from the lead, 2026-10-15: this sentence was added after the criterion, so that the status inside the clue bar's row is scanned too; spec 035's own scans run only at 1280 by 720 and 360 by 740, where the status sits under the clue bar. Spec 035's language scan lists the clue texts of FX-01 only as test data, so this sentence adds FX-02's.)
+- **AC-10** (new, from the lead's decision of 2026-10-15) (browser with mocked socket) The completion status never takes the grid's room: on a window at most 500 px high it sits in the clue bar's row. Setup: "Status snapshots (AC-10)" in "Test harness", run with `FX02_FULL_WRONG` and again with `FX02_SOLVED`, the clue at (0, 6) tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, `grid-status` shows with the snapshot's `data-state` and the text `fr.json["completion.full_wrong"]` or `fr.json["completion.solved"]`, and spec 013 AC-6's checks pass. At 568 by 320 and 740 by 360, in both contexts: the box of `grid-status` lies inside the box of `clue-bar`; its vertical range overlaps that of `clue-bar-text`, and its left edge is at or right of the right edge of `clue-bar-text`; its whole text shows (`scrollWidth <= clientWidth + 1`); `clue-bar-text` still has the text `On la glisse dans une enveloppe`, a computed `font-size` of 14 px or more, and computed `text-overflow` `ellipsis`, `white-space` `nowrap` and `overflow` `hidden`; and the height of `clue-bar` equals its height on a page given `FX02_EMPTY` with the same feed, tap, window and context, where `grid-status` is absent. (Note from the lead, 2026-10-15: the computed `text-overflow`, `white-space` and `overflow` checks were added, to pin the one-line rule of "Where `grid-status` sits". The rule itself is that the status never makes `clue-bar` higher. The check that the heights are equal stays, and still holds in this test, since FX-02's 31-character clue fits on one line at both sizes, with and without the status; no test needs a clue that wraps. (second review of spec 024)) At 1280 by 720, in both contexts, the top of `grid-status` is at or below the bottom of `clue-bar`, and its bottom is at most `window.innerHeight`. Each comparison of boxes has 1 px of tolerance. (Note from the lead, 2026-10-15: added. A test-writer found that `grid-status`, then always under the clue bar, left `grid-viewport` about 75 px high at 568 by 320 in the touch context with a full grid, in all three engines, and that no test covered the room layout while the status shows. Spec 019 AC-4 checks spec 013 AC-6 with every letter cell filled, so it relies on this rule too.) At 568 by 320 in the touch context, with each of the two snapshots, spec 035's contrast scan (its AC-8) and language scan (its AC-9) find no offending element, FX-02's clue texts counting as data of the test as FX-01's do. (Note from the lead, 2026-10-15: this sentence was added after the criterion, so that the status inside the clue bar's row is scanned too; spec 035's own scans run only at 1280 by 720 and 360 by 740, where the status sits under the clue bar. Spec 035's language scan lists the clue texts of FX-01 only as test data, so this sentence adds FX-02's.)
 
 ## Edge cases and errors
 
@@ -337,9 +349,14 @@ choices. (Note from the lead, 2026-10-15: added with AC-10.)
    with the in-app keyboard and a full grid, `grid-viewport` was about 75 px high
    in all three engines, below the 100 px floor of spec 013 AC-6, and no test
    covered the room layout while the status shows. Pick: on windows at most 500 px
-   high, the status sits in `clue-bar`'s row after the clue text and adds no
-   height; the clue text gives up width and ends with an ellipsis, and the status
-   keeps its whole text. Taller windows keep it under the clue bar. 500 px is the
+   high, the status sits in `clue-bar`'s row after the clue text and never makes
+   the bar higher; the clue text, on one line while the status is there, gives up
+   width and ends with an ellipsis, and the status keeps its whole text. A clue
+   that would wrap without the status makes the bar lower with it. (Note from the
+   lead, 2026-10-15: this said "adds no height", which an ellipsis cannot give a
+   wrapping clue; the clue is now one line and the bar is never higher with the
+   status, in practice the same height since clues are short. (second review of
+   spec 024)) Taller windows keep it under the clue bar. 500 px is the
    height part of spec 024's small-window breakpoint, so the two of the eight
    sizes of spec 006 AC-5 that are low (568 by 320 and 740 by 360) use the clue
    bar's row. (Note from the lead, 2026-10-15: added.)
