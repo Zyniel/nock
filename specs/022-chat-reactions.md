@@ -32,11 +32,13 @@ These four aids give back what a shared paper grid offers for free: seeing who w
 ## Public interface
 
 No new protocol message and no new `ErrorCode`. Spec 039 already has `Chat` and
-`ChatMessage` (with a seq, logged), `ChatText` (1 to 280 code points after
-trimming, its AC-8), `React` and `ReactionShown` (no seq, never logged, its
-decision 2), the five `Reaction` values (its decision 9), `MutePlayer`,
-`PlayerMuted`, `ErrorCode.MUTED` and `Snapshot.chat` (the full history in seq
-order, its decision 12). Spec 014 built the `mute_player` rule (its AC-6) and left
+`ChatMessage` (with a seq, logged), `ChatText` (stripped as Python's
+`str.strip()` does, then 1 to 280 code points, its AC-8), `React` and
+`ReactionShown` (no seq, never logged, its decision 2), the five `Reaction` values
+(its decision 9), `MutePlayer`, `PlayerMuted`, `ErrorCode.MUTED` and
+`Snapshot.chat` (the full history in seq order, its decision 12). (Note from the
+lead, 2026-10-15: "after trimming" became "stripped as Python's `str.strip()`
+does", the refined rule of spec 039 AC-8, decision 14 (spec 022's tests).) Spec 014 built the `mute_player` rule (its AC-6) and left
 its effect on chat, and the mute button, to this spec.
 
 ### Terms
@@ -200,9 +202,12 @@ export interface Snapshot {
   panel closes it and puts the focus on `chat-toggle`.
 - `data-testid="chat-panel"`, `id="chat-panel"`, present only while open, outside
   `room-toolbar` (whose sideways scrolling would clip it), right after the toolbar
-  in document order and before the roster, the feed and the grid; `Tab` thus
-  reaches it after the toolbar's last control, and opening it puts the focus
-  inside it. It is a `section` with `aria-labelledby="chat-heading"`. It holds, in
+  in document order (after `reaction-picker` while both are open) and before the
+  roster, the feed and the grid; `Tab` thus reaches it after the toolbar's last
+  control (after the picker's last option while both are open), and opening it
+  puts the focus inside it. (Note from the lead, 2026-10-15: the two parentheses
+  are added; the picker and the panel may be open together, decision 15 (spec
+  022's tests).) It is a `section` with `aria-labelledby="chat-heading"`. It holds, in
   document order: an `h2` with `id="chat-heading"` and the text
   `t("chat.heading")`; `chat-list`; `chat-moderation` when `you` is host; the chat
   form; `chat-muted` or `chat-wait` when they apply.
@@ -303,6 +308,17 @@ sees `chat-moderation`.
   the bounding box of no element outside it, leaves `react-button` uncovered and
   never covers spec 025's vote buttons (the same `elementFromPoint` checks as the
   panel's).
+- The picker and the panel are independent: either may be open whether the other
+  is open or not, and opening, using or closing one leaves the other as it was
+  (open or closed, same bounding box, 1 px tolerance). While both are open, each
+  keeps every placement rule it has alone, `chat-toggle` and `react-button` are
+  both uncovered, and the two do not overlap: the intersection of their bounding
+  boxes is at most 1 px wide or at most 1 px high. Where each sits is the
+  implementer's choice within these rules, for example the picker beside the
+  panel on a wide or low window and above or below it on a narrow one. In
+  document order the toolbar comes first, then the picker, then the panel.
+  (Note from the lead, 2026-10-15: added; the spec did not say whether both could
+  be open at once, decision 15 (spec 022's tests).)
 
 ### Client: a shown reaction
 
@@ -402,7 +418,7 @@ The words in brackets say how each criterion is tested.
 - **AC-2** (AC-5.4.1) (WebSocket; browser with mocked socket) A message holds 1 to 280 characters. WebSocket: on a FX-01 room with two joined clients, a `chat` with 280 times `a` gets its `chat_message`; a `chat` with 281 times `a`, one with `""` and one with `"   "` each get one `error` with code `invalid_message` (spec 039 AC-8), the other client receives nothing for them and the room's seq is unchanged; `" salut "` gets a `chat_message` whose text is `salut`. Browser: with the panel open, `chat-input` has `maxlength="280"`, and after the test types 300 times `a` its value holds 280 characters; with an empty input, and with an input of three spaces, `chat-send` is disabled and `Enter` sends no frame (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted); with `  salut  ` in the input, a click on `chat-send` sends one frame whose JSON `text` is `salut`.
 - **AC-3** (AC-5.4.2) (Python; WebSocket; browser with live server) A reaction from the set of 5 appears on the chosen word for every player. Python: in the two-player room, `React(clue=ClueRef(row=0, column=3, clue_index=0), reaction=Reaction.CLAP)` from `p2` gives no entry, `reply == (ReactionShown(player_id="p2", clue=ClueRef(row=0, column=3, clue_index=0), reaction=Reaction.CLAP),)`, `to_others` equal to the same tuple, and the same seq. WebSocket: A and B join; B sends `{"type": "react", "clue": {"row": 0, "column": 3, "clue_index": 0}, "reaction": "clap"}`; A and B each receive exactly one frame for it, a JSON object with no `seq` key that parses to that `ReactionShown`; the room's seq is unchanged and the registry's store holds no new log entry. Browser: Ana and Bob join one FX-01 room; Bob taps the clue cell (0, 3), clicks `react-button`, then the `reaction-option` with `data-reaction="clap"`; within 1 s both pages show, in the IDES clue, one `clue-reaction` with `data-reaction="clap"`, Bob's id in `data-player-id` and the text `fr.json["reaction.clap"]`.
 - **AC-4** (AC-5.4.2) (browser with mocked socket) A shown reaction lasts 3 seconds, and a newer one on the same word replaces it. Given a FX-01 snapshot with `seq` 5, when the mock sends a `reaction` of `p2` on IDES with `wow`, the IDES clue holds one `clue-reaction` with `data-reaction="wow"` and `data-player-id="p2"` within 300 ms, its `clue-reaction-label` reads `Bob : Waouh`, it is still there 2,700 ms after it appeared, and no `clue-reaction` is left 3,500 ms after it appeared. In a second run, a `thinking` of `p3` on IDES arrives 1,000 ms after a `wow` of `p2`: IDES then holds one `clue-reaction`, `thinking` from `p3`, still there 2,700 ms after it appeared and gone 3,500 ms after. A `reaction` on `ClueRef(row=1, column=0, clue_index=0)` (a letter cell) shows nothing; no `reaction` frame changes `data-seq`, and a `letter_changed` with `seq` 6 sent after them is applied.
-- **AC-5** (AC-5.4.2) (browser with mocked socket) The picker offers the 5 reactions and reacts on the selected word. At 1280 by 720, `react-button` is inside `room-toolbar`, right after `flag-button` and before `authors-switch` in document order, with the text `fr.json["reaction.button"]`, the `aria-label` `fr.json["reaction.button_label"]` and `aria-expanded="false"`, and it is disabled while nothing is selected. After a tap on the clue cell (2, 0) (VIDE), a click opens `reaction-picker` (`aria-expanded="true"`), which has `role="group"` and the `aria-label` `fr.json["reaction.picker_label"]` and holds five `reaction-option` whose `data-reaction` are `thumbs_up`, `clap`, `laugh`, `wow`, `thinking` in that order, each with the text `fr.json["reaction.<value>"]` and the `aria-label` `fr.json["reaction.<value>_label"]`; the first has the focus. A click on `laugh` sends exactly one frame, which parses to `React(clue=ClueRef(row=2, column=0, clue_index=0), reaction=Reaction.LAUGH)`, closes the picker and puts the focus on `react-button`. When the picker is opened again, `Escape` closes it, sends nothing and puts the focus on `react-button`. (Note from the lead, 2026-10-15: "exactly one frame" and "sends nothing" leave aside the heartbeat `ping` frames of spec 017, which the page may send at any time once the socket is open.)
+- **AC-5** (AC-5.4.2) (browser with mocked socket) The picker offers the 5 reactions and reacts on the selected word. At 1280 by 720, `react-button` is inside `room-toolbar`, right after `flag-button` and before `authors-switch` in document order, with the text `fr.json["reaction.button"]`, the `aria-label` `fr.json["reaction.button_label"]` and `aria-expanded="false"`, and it is disabled while nothing is selected. After a tap on the clue cell (2, 0) (VIDE), a click opens `reaction-picker` (`aria-expanded="true"`), which has `role="group"` and the `aria-label` `fr.json["reaction.picker_label"]` and holds five `reaction-option` whose `data-reaction` are `thumbs_up`, `clap`, `laugh`, `wow`, `thinking` in that order, each with the text `fr.json["reaction.<value>"]` and the `aria-label` `fr.json["reaction.<value>_label"]`; the first has the focus. A click on `laugh` sends exactly one frame, which parses to `React(clue=ClueRef(row=2, column=0, clue_index=0), reaction=Reaction.LAUGH)`, closes the picker and puts the focus on `react-button`. When the picker is opened again, `Escape` closes it, sends nothing and puts the focus on `react-button`. (Note from the lead, 2026-10-15: "exactly one frame" and "sends nothing" leave aside the heartbeat `ping` frames of spec 017, which the page may send at any time once the socket is open.) Last, with VIDE still selected, a click on `chat-toggle` opens the panel and then a click on `react-button` opens the picker while `chat-panel` stays present: neither is inside `room-toolbar`, and `reaction-picker` comes after `room-toolbar` and before `chat-panel` in document order; `Escape` in the picker then closes it, puts the focus on `react-button` and leaves `chat-panel` present. (Note from the lead, 2026-10-15: added; the picker and the panel may be open together, so their document order is tested with both open, decision 15 (spec 022's tests).)
 - **AC-6** (AC-5.4.3) (browser with mocked socket) The chat can be collapsed, and then shows an unread count. Given a FX-01 snapshot with `seq` 5 whose `chat` holds `Salut` (seq 3, `p2`) and `Bonjour` (seq 4, `p1`):
   - At load: `chat-toggle` has `aria-expanded="false"` and the `aria-label` `fr.json["chat.toggle"]`; there is no `chat-panel` and no `chat-unread`.
   - After the mock's `chat_message` seq 6 (`p2`), 7 (`p3`) and 8 (`p1`): `chat-unread` reads `2` and the toggle's `aria-label` is `Discussion, 2 messages non lus`.
@@ -421,10 +437,10 @@ The words in brackets say how each criterion is tested.
 - **AC-15** (new) (browser with mocked socket) The chat and reaction controls keep the room's layout on every window. Setup: spec 024 AC-8's (spec 013 AC-6's FX-01 snapshot with `you` host among 8 players, 100 feed items, (3, 1) tapped, help mode `free`). At each window size of spec 006 AC-5, in desktop and touch contexts:
   - Collapsed: with 100 unread lines added (`chat-unread` reads `99+`), every check of spec 013 AC-6 holds; `chat-toggle` is in `room-toolbar` before `undo-button` in document order, with no control of specs 018 to 024 before it (only spec 027's timer controls may come first); and spec 024 AC-8's toolbar checks hold with `chat-toggle` and `react-button` among the toolbar's buttons (on the four small windows, the one row; with the keyboard focus, inside the toolbar's client area with the outline not clipped; `elementFromPoint` at the centre after `scrollIntoView`). On the four small windows, with the toolbar's `scrollLeft` at 0, `chat-unread` lies inside the toolbar's client area.
   - Targets: `chat-toggle`, `react-button`, each `reaction-option`, each `mute-player` and `chat-send` have a bounding box of at least 24 by 24 CSS px.
-  - Open: in that state with the panel open (a non-empty `chat-input`), and in a second state with the picker open after a tap on the clue cell (0, 3), the panel or the picker lies inside the window (1 px tolerance) and is outside `room-toolbar`; `chat-toggle` or `react-button` is uncovered (`document.elementFromPoint` at its centre returns it or a descendant); the page has no scroll (`document.documentElement.scrollWidth <= window.innerWidth` and `document.documentElement.scrollHeight <= window.innerHeight`); and `grid-viewport`, `clue-bar` and, in touch contexts, `keyboard` have the bounding boxes they had before it opened (1 px tolerance).
-  - Votes: with spec 025's vote banner showing `vote-yes` and `vote-no` (a `vote_opened` from `p2` whose request is a grid check) and the panel open, then the picker open, `document.elementFromPoint` at the centre of each vote button returns it.
+  - Open: in that state with the panel open (a non-empty `chat-input`), and in a second state with the picker open after a tap on the clue cell (0, 3), the panel or the picker lies inside the window (1 px tolerance) and is outside `room-toolbar`; `chat-toggle` or `react-button` is uncovered (`document.elementFromPoint` at its centre returns it or a descendant); the page has no scroll (`document.documentElement.scrollWidth <= window.innerWidth` and `document.documentElement.scrollHeight <= window.innerHeight`); and `grid-viewport`, `clue-bar` and, in touch contexts, `keyboard` have the bounding boxes they had before it opened (1 px tolerance). In a third state with both open (after the tap on the clue cell (0, 3), the panel opened with a non-empty `chat-input`, then the picker), each of these checks holds for each of the two, `chat-toggle` and `react-button` are both uncovered, the intersection of the bounding boxes of `chat-panel` and `reaction-picker` is at most 1 px wide or at most 1 px high, and `chat-panel` has the bounding box it had before the picker opened (1 px tolerance). (Note from the lead, 2026-10-15: the third state is added; the picker and the panel may be open together, decision 15 (spec 022's tests).)
+  - Votes: with spec 025's vote banner showing `vote-yes` and `vote-no` (a `vote_opened` from `p2` whose request is a grid check) and the panel open, and again once the picker is open too (both open), `document.elementFromPoint` at the centre of each vote button returns it. (Note from the lead, 2026-10-15: "then the picker open" became "and again once the picker is open too (both open)", decision 15 (spec 022's tests).)
   - `chat-input` is not inside `grid-viewport`, `clue-bar`, `keyboard` or `grid`.
-- **AC-16** (new) (browser with mocked socket, keyboard only after the setup) The chat and reaction controls are reachable from the keyboard and readable in French. At 1280 by 720, `you` host, after a tap on the clue cell (0, 3): `tab_to` reaches `react-button` and `chat-toggle`, and with the picker open each `reaction-option`, and with the panel open `chat-input`, `chat-send` and the `mute-player` of `p2`; each shows spec 035 AC-2's outline; typing `Bonne idée !` in `chat-input` and pressing `Enter` sends it. At 1280 by 720 and 360 by 740, in a state with the panel open (lines `IDES, je crois` from `p2` and `Bonne idée !` from `p3`) and a `clap` reaction of `p2` shown on IDES, and in a state with the panel closed and 3 unread lines: spec 035's contrast scan finds no offending element, and its language scan, with the chat texts added to its test data ("Test harness"), finds no text outside `fr.json` and the test's data; it accepts `Discussion, 3 messages non lus`, `Bob : Bravo` and `👏`.
+- **AC-16** (new) (browser with mocked socket, keyboard only after the setup) The chat and reaction controls are reachable from the keyboard and readable in French. At 1280 by 720, `you` host, after a tap on the clue cell (0, 3): `tab_to` reaches `react-button` and `chat-toggle`, and with the picker open each `reaction-option`, and with the panel open `chat-input`, `chat-send` and the `mute-player` of `p2`; each shows spec 035 AC-2's outline; typing `Bonne idée !` in `chat-input` and pressing `Enter` sends it. With the panel open and then the picker opened too (its first option takes the focus), one `Tab` from the last `reaction-option` puts the focus on an element inside `chat-panel`. (Note from the lead, 2026-10-15: added; the keyboard side of "the picker comes before `chat-panel`", tested with both open, decision 15 (spec 022's tests).) At 1280 by 720 and 360 by 740, in a state with the panel open (lines `IDES, je crois` from `p2` and `Bonne idée !` from `p3`) and a `clap` reaction of `p2` shown on IDES, and in a state with the panel closed and 3 unread lines: spec 035's contrast scan finds no offending element, and its language scan, with the chat texts added to its test data ("Test harness"), finds no text outside `fr.json` and the test's data; it accepts `Discussion, 3 messages non lus`, `Bob : Bravo` and `👏`.
 
 ## Edge cases and errors
 
@@ -434,8 +450,14 @@ The words in brackets say how each criterion is tested.
 - Length (AC-2): characters are code points (spec 039): an emoji made of several
   code points counts as several. `maxlength` counts UTF-16 units, which is never
   fewer than code points, so the page never sends more than 280. A text that the
-  page's `trim()` keeps but Python's `strip()` empties (only the separators U+001C
-  to U+001F) gets `invalid_message`, which the page ignores; the message is lost.
+  page's `trim()` keeps but Python's `str.strip()` empties (one made only of
+  whitespace, with at least one of the characters that `trim()` keeps: the
+  separators U+001C to U+001F and U+0085) fails spec 039's `ChatText`, which strips
+  as `str.strip()` does (its AC-8, `"\u001c\u001d"` among its examples), and gets
+  `invalid_message`, which the page ignores; the message is lost. (Note from the
+  lead, 2026-10-15: this sentence now cites spec 039's refined `ChatText` rule
+  (decision 14); U+0085, which `trim()` also keeps, is added to the list (spec
+  022's tests).)
 - Frame size (AC-2): a 280-character message stays far below spec 037's 4,096
   bytes, even with every character escaped in JSON.
 - Own lines (AC-6): never unread. My own line arriving while the panel is closed
@@ -564,6 +586,34 @@ open question. Each one is already part of the spec above.
     toolbar row, as spec 024 decision 12 decides for the whole toolbar. `chat-toggle`
     comes first in the row so that its unread count shows before any sideways
     scroll, and `react-button` sits beside the other word actions (decision 6).
+
+Decided by the lead on 2026-10-15, under the owner's delegation of technical and
+layout choices, on two questions of the test-writer. Each one is already part of
+the spec above. (Note from the lead, 2026-10-15: added (spec 022's tests).)
+
+14. Control characters in a chat text (AC-2, edge case "Length"). The edge case
+    relied on Python's `str.strip()`, while spec 039's `ChatText` used pydantic's
+    whitespace stripping, which keeps the separators U+001C to U+001F, so
+    `"\u001c\u001d"` parsed as a valid chat of two invisible characters. Pick: both
+    follow Python's `str.strip()`, since these separators are invisible and never
+    meant as chat text. Spec 039 (`done`, status kept) is refined: its `ChatText`
+    is stripped as `str.strip()` does, then holds 1 to 280 characters, and its
+    AC-8 gains `"\u001fsalut\u001c"` (gives `"salut"`) and `"\u001c\u001d"`
+    (refused). Its AC-8 tests are updated before its code.
+15. The reaction picker and the chat panel at once (AC-5, AC-15, AC-16). The spec
+    did not say whether both can be open together, so "the picker comes before
+    `chat-panel`" could not be tested. Options: both may be open, each where it
+    sits alone and without overlapping the other; or opening one closes the
+    other, the order rule becoming that of `react-button` and `chat-toggle` in
+    the toolbar. Pick: both may be open, with the document-order rule kept and
+    tested with both open. The layout criteria do not rule it out: both are
+    drawn over the page (decision 6), so together they still move nothing and
+    take no room from the grid; at 568 by 320 a panel of the example width
+    `min(22rem, 100vw - 1rem)` (352 px) leaves about 200 px of the width beside
+    it, room for one row of five options of 24 px, and on a narrow window such as
+    320 by 568 the picker fits above or below the panel. The other option would
+    also lose the text typed in `chat-input`, which exists only while the panel
+    is open, each time a player reacts.
 
 ## Open questions
 
