@@ -213,6 +213,21 @@ def test_ac10_a_port_with_leading_zeros_or_at_the_bounds_is_accepted(
     assert ports == [expected_port]
 
 
+def test_ac10_a_port_of_5000_zeros_then_8000_is_8000_beyond_the_int_digit_limit(
+    monkeypatch: pytest.MonkeyPatch, server_runs: list[uvicorn.Config]
+) -> None:
+    long_port = "0" * 5000 + "8000"
+    assert len(long_port) == 5004
+    monkeypatch.delenv(HOST_VARIABLE, raising=False)
+    monkeypatch.setenv(PORT_VARIABLE, long_port)
+    main = entry_point()
+
+    main()
+
+    addresses = [(config.host, config.port) for config in server_runs]
+    assert addresses == [(DEFAULT_HOST, DEFAULT_PORT)]
+
+
 @pytest.mark.parametrize(
     "nock_host",
     [

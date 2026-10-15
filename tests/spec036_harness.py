@@ -112,6 +112,8 @@ MAX_WS_FRAME_BYTES = 8192
 OUTBOUND_LIMIT = 20  # AC-5's max_outbound_messages
 EDIT_GROUP_SIZE = 10  # AC-5: B's edits go in groups, its own queue is bounded too
 INBOUND_LIMIT = 5  # AC-6's max_inbound_pending
+PACED_EDIT_COUNT = 20  # AC-6's second case: A to T, one at a time
+ANSWER_BUDGET_SECONDS = 1.0  # AC-6's second case: the wait for each answer
 DEFAULT_OUTBOUND_LIMIT = 1000
 DEFAULT_INBOUND_LIMIT = 100
 OVERSIZED_FRAME_BYTES = 9000  # AC-9's frame
@@ -1408,6 +1410,89 @@ async def close_after_flood_scenario(
     ana.connection.leave()  # what the server's socket handler does once closed
     await release_and_wait_for_t(registry, store, code)
     return ana_snapshot.you, await join_cleo(registry, code)
+
+
+def paced_edit(index: int) -> EditLetter:
+    """The edit number `index` of AC-6's second case: one letter at (1, 0).
+
+    The letter is the one at place `index` of the alphabet.
+
+    Args:
+        index: 0 for the first edit (`A`) up to 19 for the last (`T`).
+    """
+    letter = string.ascii_uppercase[index]
+    return EditLetter(row=1, column=0, letter=letter)
+
+
+def letter_changes_in(messages: list[ServerMessage]) -> list[LetterChanged]:
+    """Every letter_changed among `messages`, whoever made the change."""
+    found: list[LetterChanged] = []
+    for message in messages:
+        if isinstance(message, LetterChanged):
+            found.append(message)
+    return found
+
+
+def errors_in(messages: list[ServerMessage]) -> list[ErrorMessage]:
+    """Every error among `messages`."""
+    found: list[ErrorMessage] = []
+    for message in messages:
+        if isinstance(message, ErrorMessage):
+            found.append(message)
+    return found
+
+
+class PacedRun(NamedTuple):
+    """What the paced scenario of AC-6's second case saw."""
+
+    you: str
+    messages: list[ServerMessage]
+    close_codes: list[int]
+    letter_in_room: str | None
+
+
+async def wait_for_answers(client: HubClient, count: int) -> None:
+    """Wait until the client's socket holds `count` answers to its edits, at most 1 s.
+
+    An answer is a letter_changed or, for a refused edit, an error: a refusal then
+    shows in the test's assertions instead of as a time-out. A missing answer fails
+    the test.
+
+    Args:
+        client: The client that sent the edits.
+        count: How many answers its socket must hold, in all.
+    """
+
+    def answers_received() -> bool:
+        messages = client.socket.messages()
+        answers = letter_changes_in(messages) + errors_in(messages)
+        return len(answers) >= count
+
+    await wait_until_async(
+        answers_received,
+        f"the answer to edit number {count}",
+        timeout=ANSWER_BUDGET_SECONDS,
+    )
+
+
+async def paced_edits_scenario(registry: RoomRegistry, code: str) -> PacedRun:
+    """A joins, then sends 20 edits one at a time, each after the answer to the last.
+
+    The edits are `paced_edit(0)` to `paced_edit(19)`. Before each one, A's socket
+    must hold the answers to all the earlier ones (AC-6, second case).
+    """
+    ana = open_hub_client(registry, code, FakeSocket())
+    you = (await join_hub_client(ana, "Ana")).you
+    for index in range(PACED_EDIT_COUNT):
+        ana.connection.submit(paced_edit(index))
+        await wait_for_answers(ana, index + 1)
+    await asyncio.sleep(SETTLE_SECONDS)  # anything unexpected still on its way
+    return PacedRun(
+        you=you,
+        messages=ana.socket.messages(),
+        close_codes=list(ana.socket.close_codes),
+        letter_in_room=letter_in_state(registry.room_state(code), 1, 0),
+    )
 
 
 def error_types(error: ValidationError) -> list[str]:

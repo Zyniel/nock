@@ -33,21 +33,26 @@ from spec036_harness import (
     FLOOD_CODE,
     INBOUND_LIMIT,
     OUTBOUND_LIMIT,
+    PACED_EDIT_COUNT,
     STALLED_CODE,
     BlockingStore,
     b_edit,
     close_after_flood_scenario,
     error_types,
+    errors_in,
     expect_reconnection_after_close,
     flood_scenario,
     frame_after_flood_scenario,
     inbound_bound_scenario,
+    letter_changes_in,
     letter_in_snapshot,
     letter_in_state,
     open_mock_room,
     open_registry,
     outbound_bound_scenario,
     own_letter_changes,
+    paced_edit,
+    paced_edits_scenario,
     run_hub_scenario,
     stalled_client_scenario,
     state_changes_of,
@@ -192,6 +197,24 @@ def test_ac6_five_unapplied_inputs_are_allowed_a_sixth_closes_the_connection(
     assert run.close_codes_at_bound == []
     assert run.writer_done_at_bound is False
     assert run.close_codes_over_bound == [FLOOD_CODE]
+
+
+def test_ac6_twenty_edits_applied_as_they_come_never_flood_the_connection(
+    fx01_grid: Grid,
+) -> None:
+    config = RoomConfig(max_inbound_pending=INBOUND_LIMIT, max_edits_per_second=1000)
+    with open_registry(config) as registry:
+        code = registry.register_room(fx01_grid)
+        run = run_hub_scenario(paced_edits_scenario(registry, code))
+
+    assert isinstance(run.messages[0], Snapshot), run.messages[0]
+    changes = letter_changes_in(run.messages[1:])
+    sent = [paced_edit(index) for index in range(PACED_EDIT_COUNT)]
+    assert triples(changes) == triples(sent)
+    assert [change.player_id for change in changes] == [run.you] * PACED_EDIT_COUNT
+    assert errors_in(run.messages) == []
+    assert run.close_codes == []
+    assert run.letter_in_room == "T"
 
 
 @pytest.mark.parametrize("frame", ["ping", "invalid"])
