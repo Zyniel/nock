@@ -16,7 +16,7 @@ The shared setup is in `spec022_harness`.
 from __future__ import annotations
 
 import pytest
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import ChatMessage
@@ -33,7 +33,7 @@ from spec022_harness import (
     read_chat_lines,
     three_players,
 )
-from spec024_harness import grid_from_text, load_fr
+from spec024_harness import grid_from_text, load_fr, open_context_page
 from spec025_harness import fr_text
 
 SNAPSHOT_CHAT = [
@@ -41,6 +41,8 @@ SNAPSHOT_CHAT = [
     ChatMessage(seq=4, player_id="p1", text="Bonjour"),
 ]
 RECONNECT_CLOSE_CODE = 1011
+HEIGHT_SIZES = [(1280, 720), (568, 320)]
+HEIGHT_TOLERANCE_PX = 1.0  # "the same height (1 px tolerance)"
 
 
 @pytest.fixture
@@ -234,3 +236,84 @@ def test_ac6_browser_sending_is_disabled_while_the_page_is_reconnecting(
     expect(send).to_be_enabled()
 
     assert chats_while_away == []
+
+
+def toggle_height(page: Page) -> float:
+    """The height of `chat-toggle`'s bounding box now."""
+    box = page.get_by_test_id("chat-toggle").bounding_box()
+    assert box is not None, "chat-toggle has no box"
+    return box["height"]
+
+
+def height_ids() -> list[str]:
+    return [f"{width}x{height}" for width, height in HEIGHT_SIZES]
+
+
+@pytest.mark.parametrize(("width", "height"), HEIGHT_SIZES, ids=height_ids())
+def test_ac6_browser_the_toggle_keeps_its_height_as_the_count_comes_and_goes(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page, close = open_context_page(browser, browser_name, width, height, False)
+    try:
+        mock = open_chat_room(page, live_server, fx01_grid, seq=5, chat=SNAPSHOT_CHAT)
+        toggle = page.get_by_test_id("chat-toggle")
+        unread = page.get_by_test_id("chat-unread")
+        heights: dict[str, float] = {"at load": toggle_height(page)}
+
+        for seq, player_id in ((6, "p2"), (7, "p3"), (8, "p1")):
+            mock.send(chat_frame(seq, player_id, f"Ligne {seq}"))
+        expect(unread).to_have_text("2")
+        heights["unread 2"] = toggle_height(page)
+
+        toggle.click()
+        expect(page.get_by_test_id("chat-panel")).to_be_visible()
+        expect(unread).to_have_count(0)
+        heights["panel open"] = toggle_height(page)
+
+        page.keyboard.press("Escape")
+        expect(page.get_by_test_id("chat-panel")).to_have_count(0)
+        mock.send(chat_frame(9, "p2", "Ligne 9"))
+        expect(unread).to_have_text("1")
+        heights["unread 1"] = toggle_height(page)
+    finally:
+        close()
+
+    reference = heights["at load"]
+    off_reference = {}
+    for state, state_height in heights.items():
+        if abs(state_height - reference) > HEIGHT_TOLERANCE_PX:
+            off_reference[state] = state_height
+    assert off_reference == {}, (reference, heights)
+
+
+@pytest.mark.parametrize(("width", "height"), HEIGHT_SIZES, ids=height_ids())
+def test_ac6_browser_the_toggle_keeps_its_height_with_the_99_plus_count(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    page, close = open_context_page(browser, browser_name, width, height, False)
+    try:
+        mock = open_chat_room(page, live_server, fx01_grid, seq=5)
+        height_at_load = toggle_height(page)
+        for seq in range(6, 106):
+            mock.send(chat_frame(seq, "p2", f"Ligne {seq}"))
+        expect(page.get_by_test_id("chat-unread")).to_have_text(
+            load_fr()["chat.unread_many"]
+        )
+        height_with_99_plus = toggle_height(page)
+    finally:
+        close()
+
+    assert abs(height_with_99_plus - height_at_load) <= HEIGHT_TOLERANCE_PX, (
+        height_at_load,
+        height_with_99_plus,
+    )

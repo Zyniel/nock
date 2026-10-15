@@ -33,6 +33,7 @@ from nock.protocol import (
     ChatMessage,
     Check,
     CheckResult,
+    ClueRef,
     ErrorCode,
     ErrorMessage,
     FlagChanged,
@@ -48,6 +49,7 @@ from nock.room import (
     LogEntry,
     RoomConfig,
     RoomState,
+    after_restart,
     handle_message,
     join_room,
     new_room,
@@ -551,6 +553,129 @@ def test_ac9_python_a_dropped_chat_message_still_wakes_an_idle_sender(
     assert events_of(dropped) == [woken]
     assert dropped.reply == ()
     assert dropped.state.chat == idle.chat
+
+
+# ---- AC-9: the sliding window, dropped reactions, restart ----
+
+STAGGER_SECONDS = (0.0, 1.0, 2.0, 3.0, 4.0)  # the five sends of the window
+NO_WORD = ClueRef(row=1, column=0, clue_index=0)  # a letter cell: names no word
+
+
+def test_ac9_python_the_chat_window_slides_with_staggered_sends(
+    fx01_grid: Grid,
+) -> None:
+    state = two_player_room(fx01_grid)
+    for offset in STAGGER_SECONDS:
+        outcome = send_chat(state, "p1", f"m{offset}", NOW + offset)
+        assert len(events_of(outcome)) == 1, offset
+        state = outcome.state
+
+    accepted = send_chat(state, "p1", "m10", NOW + 10.0)
+    dropped = send_chat(accepted.state, "p1", "m10.5", NOW + 10.5)
+
+    assert events_of(accepted) == [ChatMessage(seq=8, player_id="p1", text="m10")]
+    assert dropped.entries == ()
+    assert dropped.reply == ()
+    assert dropped.state == seen_at(accepted.state, "p1", NOW + 10.5)
+
+
+def test_ac9_python_the_reaction_window_slides_with_staggered_sends(
+    fx01_grid: Grid,
+) -> None:
+    state = two_player_room(fx01_grid)
+    expected = (shown("p1", IDES, Reaction.WOW),)
+    for offset in STAGGER_SECONDS:
+        outcome = send_react(state, "p1", IDES, Reaction.WOW, NOW + offset)
+        assert outcome.reply == expected, offset
+        state = outcome.state
+
+    accepted = send_react(state, "p1", IDES, Reaction.WOW, NOW + 10.0)
+    dropped = send_react(accepted.state, "p1", IDES, Reaction.WOW, NOW + 10.5)
+
+    assert accepted.reply == expected
+    assert accepted.to_others == expected
+    assert dropped.reply == ()
+    assert dropped.to_others == ()
+    assert dropped.entries == ()
+
+
+def test_ac9_python_a_muted_reaction_is_not_counted(fx01_grid: Grid) -> None:
+    state = set_muted(two_player_room(fx01_grid), "p2", True)
+    for _ in range(CHAT_LIMIT + 1):
+        dropped = send_react(state, "p2", IDES, Reaction.CLAP)
+        assert dropped.reply == ()
+        state = dropped.state
+    assert player_record(state, "p2").recent_reactions == ()
+
+    state = set_muted(state, "p2", False)
+    expected = (shown("p2", IDES, Reaction.CLAP),)
+    for number in range(1, CHAT_LIMIT + 1):
+        relayed = send_react(state, "p2", IDES, Reaction.CLAP)
+        assert relayed.reply == expected, number
+        assert relayed.to_others == expected, number
+        state = relayed.state
+
+
+def test_ac9_python_a_reaction_on_no_word_is_not_counted(fx01_grid: Grid) -> None:
+    state = two_player_room(fx01_grid)
+    for _ in range(CHAT_LIMIT + 1):
+        dropped = send_react(state, "p1", NO_WORD, Reaction.CLAP)
+        assert dropped.reply == ()
+        state = dropped.state
+    assert player_record(state, "p1").recent_reactions == ()
+
+    expected = (shown("p1", IDES, Reaction.CLAP),)
+    for number in range(1, CHAT_LIMIT + 1):
+        relayed = send_react(state, "p1", IDES, Reaction.CLAP)
+        assert relayed.reply == expected, number
+        state = relayed.state
+
+
+def test_ac9_python_a_reaction_over_the_limit_is_not_counted(
+    fx01_grid: Grid,
+) -> None:
+    state = two_player_room(fx01_grid)
+    for _ in range(CHAT_LIMIT):
+        state = send_react(state, "p1", IDES, Reaction.CLAP).state
+    kept = player_record(state, "p1").recent_reactions
+
+    for _ in range(CHAT_LIMIT):
+        dropped = send_react(state, "p1", IDES, Reaction.CLAP, NOW + 9)
+        assert dropped.reply == ()
+        state = dropped.state
+    again = send_react(state, "p1", IDES, Reaction.CLAP, NOW + WINDOW_SECONDS)
+
+    assert player_record(state, "p1").recent_reactions == kept
+    assert again.reply == (shown("p1", IDES, Reaction.CLAP),)
+
+
+def test_ac9_python_a_restart_gives_every_player_fresh_windows(
+    fx01_grid: Grid,
+) -> None:
+    state = two_player_room(fx01_grid)
+    for number in range(1, CHAT_LIMIT + 1):
+        state = send_chat(state, "p1", f"m{number}").state
+        state = send_react(state, "p1", IDES, Reaction.CLAP).state
+    assert len(player_record(state, "p1").recent_chat) == CHAT_LIMIT
+    assert len(player_record(state, "p1").recent_reactions) == CHAT_LIMIT
+
+    outcome = after_restart(state, NOW + 1)
+
+    events = [entry.event for entry in outcome.entries]
+    expected_events: list[object] = []
+    for index, player in enumerate(state.players, start=1):
+        expected_events.append(
+            PlayerStateChanged(
+                seq=state.seq + index,
+                player_id=player.player_id,
+                state=PlayerState.DISCONNECTED,
+            )
+        )
+    assert events == expected_events
+    assert len(outcome.state.players) == len(state.players)
+    for player in outcome.state.players:
+        assert player.recent_chat == (), player.player_id
+        assert player.recent_reactions == (), player.player_id
 
 
 # ---- AC-9: the WebSocket with a fake clock ----
