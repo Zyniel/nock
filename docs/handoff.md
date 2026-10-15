@@ -5,140 +5,110 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-15), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-15)
+## Where things stand (2026-10-15, evening)
 
-- Branch `feat/phase5-mvp-ldddid`, pushed, with pull request #6 to `main`
-  ("Phase 5 (MVP): check, completion, licensed content, accessibility,
-  performance"). The lead is subscribed to its CI and reviews.
-- Phase 5 (MVP) is complete: every MVP spec is `done`, including 005, 023, 026,
-  035 and 036. The final reviewer approved with no blocking findings; its
-  suggestions are applied (spec notes 7094c0b, tests 394f9a7, fix 18740a3).
-- Phase 6 (V1): the 13 specs 019-022, 024, 025, 027-029, 032-034, 038 have
-  public interfaces and were approved by the human on 2026-10-14 with the
-  recommended answer to every open question. Not built.
-- Phase 7 (030, 031): untouched, only if the human wants competitive modes.
+- Branch `feat/phase5-mvp-ldddid` (the designated branch; it is restarted from
+  `main` after each merge, keeping unmerged commits).
+- Merged: PR #6 (Phase 5, MVP), PR #7 (Phase 6: specs 024, 025, first version of
+  019, the spec 026 AC-10 fix). Tag `v0.1.0` exists locally on #6's merge commit
+  but could not be pushed from the cloud session (tag pushes are refused): the
+  human pushes it from a clone.
+- Open: PR #8 (specs 019 refinements, 020, 021, 025 closed). CI ran green on
+  Ubuntu; one Windows Firefox failure was a test bug, fixed in bcab487. The
+  human commented on #8 that all open points and assumptions are fine.
+- Phase 6 specs: 019, 020, 021, 024, 025 are `done`. 022 (chat and reactions)
+  is being built: its red tests are committed locally after df10019 (5a1b304,
+  cd1f3ef) and are not pushed, so PR #8's head stays green; push them with
+  022's code. Still to build, in this order: 027, 028, 032 (with the 012/017
+  seat-back refinement), 038 (refines 036), 034 (refines 013), 033 (refines
+  005 and 018), 029.
+- Phase 7 (030, 031): untouched.
+
+## How a feature is built here
+
+1. Spec answers and refinements first (spec-writer), then tests (test-writer),
+   then code (implementer), then review (reviewer). One commit per phase.
+2. Test-writers can run ahead in worktrees (`isolation: worktree`, first
+   `git merge --ff-only feat/phase5-mvp-ldddid`); the lead cherry-picks their
+   commits when the feature's turn comes. Implementers run one at a time per
+   shared file set (they all touch `room.py` and `RoomPage.svelte`), in the main
+   tree or a worktree.
+3. Review findings go back through the roles, two rounds at most; what is left
+   goes to the human in the pull request description.
+4. Red test commits stay local until their code lands; when a red commit sits
+   under a commit that must be pushed, the lead rebuilds the chain with
+   `git commit-tree` (never rewriting pushed history) and pushes up to the green
+   commit with `git push origin <sha>:refs/heads/feat/phase5-mvp-ldddid`.
+5. Agents hit their turn limits (60 for test-writers, 80 for implementers):
+   resume them with SendMessage, they keep their context.
 
 ## Test layout
 
 Every test file over about 800 lines is split by criterion group:
-`tests/test_spec_NNN_acNN[_acMM]_<topic>.py`, with the setup shared by several
-files in `tests/specNNN_harness.py` (spec 014 also has `spec014_windows_harness.py`;
-spec 036 has `spec036_hub_harness.py`, `spec036_browser_harness.py` and
-`spec036_frames_harness.py`). `tests/conftest.py`
-registers every `spec*_harness.py` for assert rewriting by glob. Fixtures are
-thin per-file wrappers around harness functions, so no imported fixture trips
-ruff F401. Each split was checked by identical collected ids (file path
-stripped) and identical per-test outcomes on the three engines, and by an AST
-comparison of the top-level definitions; the whole suite's 5,451 ids were
-identical before and after.
-
-## Next steps
-
-1. Follow PR #6 to green (Ubuntu 3.13 and 3.14, Windows 3.14, three engines).
-   Spec 036 AC-2 (p95 33 ms locally against 50 ms) passed on the runners. The
-   first CI runs found three problems, all fixed on the branch (2026-10-15):
-   - Ubuntu: the room header wrapped to three rows with DejaVu Sans, leaving
-     the grid under 100 px at 568x320 touch (specs 013 AC-6, 014 AC-1/AC-7).
-     Fixed in `RoomPage.svelte`, checked with Inter, DejaVu Sans and a third
-     font.
-   - Windows WebKit: a click moves the focus off a button (spec 014 AC-7 now
-     says so); spec 035's mocked socket did not answer pings, so a slow setup
-     looked like a lost connection (it answers now).
-   - Windows Chromium: a heartbeat `ping` (every 2 s from the socket's opening)
-     broke "sends nothing" checks; the specs now leave pings aside (ec6634c)
-     and so do the tests.
-   - Follow-up: most specs' mocked sockets (012 and others) still never answer
-     a `ping`, so a browser test that runs more than 4 s on a slow engine sees
-     the page go to `reconnecting` (spec 017 AC-4). Make every mock answer pings
-     with a `pong` as specs 014, 035 and 036 do, except where spec 017 tests the
-     silence itself.
-2. After the merge, `docs/build-plan.md` says to tag `v0.1.0`. Ask the human
-   before pushing a tag.
-3. Phase 6: a spec-writer folds the approved answers into the 13 specs (each
-   spec's "Open questions" become dated decisions) and makes the follow-on
-   refinements they name: 005 (allow `smtplib` in `src/nock/mailer.py` only),
-   012 and 017 (a timed-out player gets their seat back, from 032), 013
-   (word-completed lines during live play, from 034; feed keys no longer unique
-   by `seq`), 018 (033's erasure as a second exception to "the log is never
-   rewritten"), 023 (check buttons hidden, not disabled, in `none` mode, from
-   025; two 023 tests change), 026 (`elapsed_ms` from the 027 timer; one 026
-   test changes), 036 (038's log settings and variables). Then build in the
-   order of `docs/build-plan.md` Phase 6.
+`tests/test_spec_NNN_acNN[_acMM]_<topic>.py`, with shared setup in
+`tests/specNNN_harness.py`. `tests/conftest.py` registers every
+`spec*_harness.py` for assert rewriting. Fixtures are thin per-file wrappers.
+Mocked room sockets answer `ping` with `pong`; "sends nothing" checks leave
+pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 ## How to verify (what the lead runs before any code commit)
 
-- Full gate as CI runs it, all three engines (about 55 minutes):
-  `PYTEST_ADDOPTS="--browser firefox" uv run python scripts/gate.py`.
-- Targeted runs while working:
-  `PYTEST_ADDOPTS="--browser firefox" uv run pytest tests/test_spec_NNN*.py -q`.
-- The session-start hook (`.claude/hooks/session-start.sh`) installs the
-  Python and web dependencies and Chromium, Firefox and WebKit in cloud
-  sessions. The gate skips an engine that is not installed, with a warning
-  (`scripts/gate_browsers.py`); CI fails instead.
-- CI cancels a run when a new commit is pushed to the pull request, so batch
-  pushes while a run is in progress.
-- Fonts differ: cloud sessions resolve `system-ui, sans-serif` to Inter, CI's
-  Ubuntu runner to DejaVu Sans (wider). Layout tests can pass here and fail on
-  CI. To run as CI does, hide Inter with a fontconfig file:
-  `FONTCONFIG_FILE=<file> uv run pytest ...`, where the file includes
-  `/etc/fonts/fonts.conf` and rejects the Inter families (`<selectfont>
-  <rejectfont>`); `fc-match sans-serif` must then say DejaVu Sans.
+- Full gate as CI runs it, three engines (about 70 to 90 minutes now):
+  `PYTEST_ADDOPTS="--browser firefox" uv run python scripts/gate.py`. It
+  collects the tests at its start and builds `web/dist`: do not rebuild the
+  client or commit red tests while it runs, and expect load flakes when agents
+  run browsers at the same time (rerun a single failure before trusting it).
+- Targeted runs: `PYTEST_ADDOPTS="--browser firefox" uv run pytest tests/test_spec_NNN*.py -q`.
+- Fonts: CI's Ubuntu runner uses DejaVu Sans, this machine Inter. Layout files
+  run a second time with
+  `FONTCONFIG_FILE=/tmp/claude-0/-home-user-nock/189ffddd-b0b7-58e2-88b6-f8006dfcb8c1/scratchpad/fonts/fonts.conf`
+  (a session scratchpad file: recreate it in a new session; it includes
+  `/etc/fonts/fonts.conf` and rejects the Inter families).
+- CI runs only on pull requests and pushes to `main`; it cancels a run when a
+  new commit is pushed to the pull request. The Windows job is the slowest
+  (about 80 minutes) and the most timing-sensitive.
 
-## Decisions the human made (2026-10-13 to 15)
+## Decisions the human made
 
-- The gate skips missing browser engines locally; CI runs all three.
-- Agents may refine an approved or done spec, with a dated note; only the
-  human sets `approved`.
-- Accessibility choices are delegated to the lead: in-app keyboard keys stay
-  out of the Tab order (`tabindex="-1"`) but named; roster states use italic
-  and line-through, no opacity; a crowded cell shows "+N"; scrolling lists
-  with nothing focusable are Tab stops (035 AC-12).
-- Spec 014: compact "✕" remove button on narrow lists, minimum roster width.
-- The 13 Phase 6 specs: approved with the recommended answers (above).
-- Test files past about 800 lines are split by criterion group (approved
-  2026-10-14; all files split 2026-10-15, after the pull request was opened).
-- Open the pull request once Phase 5 is green, and follow its CI.
-- Work in parallel with several agents; resume automatically when a usage
-  limit resets; prefer a fresh session when the lead's context grows large.
+- 2026-10-13 to 15 (Phase 5): the gate skips missing engines locally; agents
+  may refine approved or done specs with dated notes; accessibility and layout
+  choices are delegated to the lead; split test files past about 800 lines;
+  work in parallel; open pull requests when green and follow their CI.
+- 2026-10-14: the 13 Phase 6 specs approved with the recommended answers.
+- 2026-10-15: tag `v0.1.0`; open the Phase 6 pull requests when green; on PR #8,
+  "I agree with all comments. Open points assumptions are fine": pencil letters
+  keep only their italics during a flash (spec 020 decision 12); a focused
+  button that becomes disabled may drop the focus (specs 023 to 025); the spec
+  019 small-cell trade-offs and the optional spec 020 test tightenings stand.
+
+## Lead decisions of 2026-10-15 worth knowing
+
+- Spec 024: the room keeps `reveals_used`, so allowance changes never give
+  spent reveals back. Spec 025: a restart resets an open vote's ballots to the
+  requester's yes; vote buttons are disabled offline; focus rules after a
+  ballot. Spec 026 AC-10: on windows at most 500 px high the completion status
+  sits in the clue bar's row. Spec 013: the feed list has a fixed height.
+  Spec 032 AC-7: a timed-out player gets their seat back (nickname taken
+  meanwhile gives "Ana 2"). Specs 020-025: a refused message still wakes an
+  idle sender. Spec 039: a chat text strips as `str.strip()` does.
 
 ## Pending questions for the human
 
-- `scripts/hooks/role_gate.py` gives the gate 540 s, but the full gate takes
-  about 55 minutes, so the hook always times out and never blocks an
-  implementer (and an implementer may sit waiting on a full gate run).
-  Proposal: run the changed spec's tests plus the static checks in the hook.
-- Proposal: make local browser tests use CI's fonts by default (for example,
-  the session-start hook writes the fontconfig file above and exports
-  `FONTCONFIG_FILE`), so a layout that depends on Inter fails here first. This
-  is a tooling change.
+- `scripts/hooks/role_gate.py` gives the gate 540 s, but the gate takes over an
+  hour, so the hook always times out. Proposal: run the changed spec's tests
+  and the static checks in the hook.
+- Proposal: make local browser tests use CI's fonts by default (the
+  session-start hook could write the fontconfig file and export
+  `FONTCONFIG_FILE`). A tooling change.
 - Spec 036 AC-11: should a `NOCK_PORT` value with a control character appear
   raw or escaped in the error message? The tests accept both.
-- Please confirm the tooling changes made for the test split: `CLAUDE.md`
-  ("Layout"), `.claude/agents/test-writer.md`, and pyrefly's
-  `search-path = ["src", "tests"]` in `pyproject.toml`.
-- The reviewer noted `RoomConnection.mark_input_applied` (`src/nock/hub.py`) is
-  public but not in spec 036's interface. The lead kept it: only the room task
-  calls it, and a private name called from another class reads worse.
-
-## Conventions that kept the branch healthy
-
-- One commit per phase: spec, tests (red), code, then closing. Specs with new
-  criteria are committed together with their tests, or the gate's
-  traceability fails.
-- Never commit half-written tests or unverified code; stage explicit paths
-  (`git add <files>`), never `-A` (agent worktrees live in `.claude/`).
-- Agents that share a file must not run at the same time; work that would
-  collide runs in a git worktree (`isolation: worktree`). Worktrees start on an
-  old `main`, so the agent first runs
-  `git merge --ff-only feat/phase5-mvp-ldddid`; the lead cherry-picks the
-  result. Tell each agent the exact commit trailer to use.
-- Review findings go back through the roles: spec-writer, then test-writer,
-  then implementer.
+- A separate cloud session ("Nock hosting plan (document only)") drafts
+  `docs/hosting.md` on branch `docs/hosting-plan`.
 
 ## Keeping the cost down
 
-- Start a fresh session when the lead's context passes a few hundred thousand
-  tokens; every turn re-reads it.
-- Use a cheaper model (Sonnet 5.5, Haiku 5.5) for small spec notes and
-  mechanical edits; keep Opus for building and reviewing.
-- Cap review rounds at two, then list the remaining findings for the human.
+- Start a fresh session when the lead's context grows large.
+- Cheaper models (Sonnet) for small spec notes and mechanical test edits; Opus
+  for building, test-writing of whole specs and reviews.
+- Do not run the local full gate while agents run browsers; CI is the full
+  check once a pull request is open.
