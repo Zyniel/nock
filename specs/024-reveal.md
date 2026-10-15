@@ -1,7 +1,7 @@
 ---
 id: "024"
 title: Reveal a letter or a word
-status: approved
+status: done
 ---
 
 # 024 - Reveal a letter or a word
