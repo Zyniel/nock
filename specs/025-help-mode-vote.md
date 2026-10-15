@@ -301,7 +301,9 @@ are disabled". AC-4 here hides `check-panel` instead. The lead amends spec 023's
 this spec's test-writer updates the two tests of spec 023 that check it
 (`test_ac9_a_help_mode_none_in_the_snapshot_disables_all_three_buttons` and
 `test_ac9_settings_changed_to_none_disables_all_three_buttons` in
-`tests/test_spec_023_check.py`) before the implementer runs. Spec 023 AC-10's last
+`tests/test_spec_023_ac08_ac09_feed_and_controls.py`) (Note from the lead, 2026-10-15:
+they were in `tests/test_spec_023_check.py` before the spec 023 tests were split into
+one file per criterion group) before the implementer runs. Spec 023 AC-10's last
 sentence (a word check in vote mode gives AC-1's result) still holds (AC-5 here).
 
 - Who may vote (AC-2, AC-6): the eligible set is fixed when the vote opens. A

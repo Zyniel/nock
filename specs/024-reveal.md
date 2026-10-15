@@ -259,8 +259,11 @@ decision 7.
   `p1` in row-major order, in a room with `p1` and `p2` created at `NOW`: seq 19.
 - WebSocket tests: as spec 011 (`TestClient`, FX-01 room,
   `RoomConfig(max_edits_per_second=1000)`).
-- Traffic checker: spec 037's (`TrafficLog`, `leaks_in`, `replay_problems` in
-  `tests/test_spec_037_integrity.py`) with the reveal rule of "What a browser may
+- Traffic checker: spec 037's (`TrafficLog` in `tests/spec037_harness.py`; `leaks_in`
+  and `replay_problems` in `tests/test_spec_037_ac01_full_game_traffic.py`) (Note
+  from the lead, 2026-10-15: the old path was `tests/test_spec_037_integrity.py`,
+  before the spec 037 tests were split into one file per criterion group) with the
+  reveal rule of "What a browser may
   receive" added; this spec's test file holds its own copy, as spec 023's does.
 - Full game with reveals (AC-5, WebSocket): spec 037's full-game setup (every text
   frame of each client and every HTTP body recorded; the room created by

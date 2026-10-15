@@ -7,7 +7,10 @@ status: done
 # 001 - Slugify a text
 
 This is the worked example that ships with the starter kit. It shows what a
-finished spec looks like next to its tests (`tests/test_spec_001_slugify.py`) and
+finished spec looks like next to its tests
+(`specs/_archive/001-slugify/test_spec_001_slugify.py.txt`) (Note from the lead,
+2026-10-15: `tests/test_spec_001_slugify.py` no longer exists, the tests file is kept
+beside this spec) and
 its code (`src/nock/text.py`). Delete the three files once you have your own.
 
 ## Goal
