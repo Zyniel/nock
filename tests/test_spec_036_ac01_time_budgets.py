@@ -5,7 +5,8 @@ profile (CPU throttling, plus the 4G network profile for AC-1 and AC-2, both sen
 through CDP before the first `page.goto`), with the in-page timing of the test
 harness. AC-3 measures the server's relay with eight simulated clients.
 
-The shared setup is in `spec036_harness`.
+The shared setup is in `spec036_harness` and `spec036_browser_harness`. What
+only this file uses is defined below the imports.
 
 Notes:
 
@@ -21,78 +22,457 @@ from __future__ import annotations
 import contextlib
 import random
 import statistics
+import string
+import threading
+import time
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Page, expect
+from starlette.testclient import WebSocketTestSession
 
-from nock.grid import Grid
+from nock.grid import Arrow, ClueCell, Grid, LetterCell
 from nock.hub import RoomRegistry
+from nock.protocol import (
+    EditLetter,
+    ErrorMessage,
+    Join,
+    LetterChanged,
+    ServerMessage,
+    Snapshot,
+    parse_server_message,
+)
+from nock.room import RoomConfig
 from nock.server import create_app
-from spec036_harness import (
-    ANA_GAP_MS,
-    ANA_KEYS,
-    COLD_LOADS,
-    EDITS_PER_RELAY_CLIENT,
+from spec036_browser_harness import (
     FX02_AT_MARK,
-    INTERACTIVE_BUDGET_MS,
-    LOAD_CLIENT_NAMES,
-    LOAD_PLAN_EDITS,
-    LOAD_SEED,
-    LOAD_WARM_UP_MS,
-    LOCAL_ECHO_BUDGET_MS,
-    LOCAL_ECHO_GAP_MS,
-    LOCAL_ECHO_KEYS,
     MARK_PROBE_SCRIPT,
-    MARK_TIMEOUT_MS,
     PAGE_WAIT_MS,
-    PROPAGATION_BUDGET_MS,
-    RELAY_BUDGET_SECONDS,
-    RELAY_CLIENT_NAMES,
-    RELAY_EDIT_COUNT,
-    RELAY_TIME_COUNT,
-    SETTLE_MS,
     TYPING_PROBE_SCRIPT,
-    TypingLoad,
-    across_words,
-    ana_keystrokes,
-    ana_words,
+    Cell,
+    Keystroke,
     auto_join_script,
     cell_at,
-    every_edit_answered,
-    every_seq_received,
     expect_fx02_room_shown,
     expect_last_letters_shown,
     expect_reconnection_after_close,
     interactive_mark_times,
-    join_simulated_clients,
-    letter_cells,
-    local_echo_keystrokes,
     local_echo_times,
     measured_times,
     missing_keystrokes,
     open_mock_room,
     open_phone_page,
-    percentile_95,
     propagation_times,
-    random_edit_plans,
     read_probe,
-    relay_times,
     states_at_mark,
     tap_word_start,
-    triples,
     type_keystrokes,
-    wait_for,
     wait_for_interactive_mark,
 )
+from spec036_harness import POLL_SECONDS, WAIT_SECONDS, triples
 
 # The fixtures of the harness. pytest looks for a test's fixtures among the names of
 # its module, so they are imported by name. `x as x` is the explicit re-export
 # form: it keeps ruff from reporting the import as unused or as redefined.
-from spec036_harness import default_registry as default_registry
 from spec036_harness import fx01_grid as fx01_grid
-from spec036_harness import fx02_grid as fx02_grid
+
+# ---- Values of the spec --------------------------------------------------------------
+
+INTERACTIVE_BUDGET_MS = 2500.0
+LOCAL_ECHO_BUDGET_MS = 50.0
+PROPAGATION_BUDGET_MS = 300.0
+RELAY_BUDGET_SECONDS = 0.100
+
+COLD_LOADS = 3
+LOCAL_ECHO_KEYS = 40
+LOCAL_ECHO_GAP_MS = 250
+ANA_KEYS = 20
+ANA_GAP_MS = 500
+
+RELAY_CLIENT_NAMES = ("Ana", "Bob", "Cleo", "Dan", "Eve", "Finn", "Gus", "Hugo")
+LOAD_CLIENT_NAMES = ("Cleo", "Dan", "Eve", "Finn", "Gus", "Hugo")
+LOAD_SEED = 36
+EDIT_INTERVAL_SECONDS = 0.5
+START_OFFSET_SECONDS = 0.0625
+EDITS_PER_RELAY_CLIENT = 20  # one every 500 ms for 10 seconds
+RELAY_EDIT_COUNT = 160
+RELAY_TIME_COUNT = 1120  # 160 edits times 7 other clients
+
+
+# ---- Values of the test harness ------------------------------------------------------
+
+MARK_TIMEOUT_MS = 20_000
+SETTLE_MS = 500
+LOAD_WARM_UP_MS = 1_000
+LOAD_PLAN_EDITS = 80  # more than AC-4 ever sends: its load stops after Ana's keys
+
+SENDER_LEAD_SECONDS = 0.2
+SENDER_LIMIT_SECONDS = 60.0
+
+
+# ---- Fixtures ------------------------------------------------------------------------
+
+
+@pytest.fixture
+def fx02_grid(fx02_text: str) -> Grid:
+    return Grid.model_validate_json(fx02_text)
+
+
+@pytest.fixture
+def default_registry() -> Iterator[RoomRegistry]:
+    """A registry with `RoomConfig()` defaults: spec 037's 20 edits a second apply."""
+    registry = RoomRegistry(config=RoomConfig())
+    yield registry
+    registry.close()
+
+
+# ---- Measurements --------------------------------------------------------------------
+
+
+def percentile_95(samples: Sequence[float]) -> float:
+    """The p95 of the spec: the ceil(0.95 * n)-th smallest of n samples."""
+    ordered = sorted(samples)
+    rank = (95 * len(ordered) + 99) // 100  # ceil(0.95 * n), in whole numbers
+    return ordered[rank - 1]
+
+
+# ---- Grids ---------------------------------------------------------------------------
+
+
+def letter_cells(grid: Grid) -> list[Cell]:
+    """The letter cells of `grid`, in row-major order."""
+    positions: list[Cell] = []
+    for cell in grid.cells:
+        if isinstance(cell, LetterCell):
+            positions.append((cell.row, cell.column))
+    positions.sort()
+    return positions
+
+
+class Word(NamedTuple):
+    """An across word: its cells in reading order and its answer."""
+
+    cells: list[Cell]
+    answer: str
+
+
+def across_words(grid: Grid) -> list[Word]:
+    """The across words of `grid`, ordered by their first cell (row-major)."""
+    words: list[Word] = []
+    for cell in grid.cells:
+        if not isinstance(cell, ClueCell):
+            continue
+        for index, clue in enumerate(cell.clues):
+            if clue.arrow in (Arrow.RIGHT, Arrow.DOWN_THEN_RIGHT):
+                cells = grid.word_cells(cell.row, cell.column, index)
+                words.append(Word(cells=cells, answer=clue.answer))
+    words.sort(key=lambda word: word.cells[0])
+    return words
+
+
+def local_echo_keystrokes(grid: Grid) -> list[Keystroke]:
+    """AC-2's 40 keys: the answers of the across words, word after word."""
+    keystrokes: list[Keystroke] = []
+    for word in across_words(grid):
+        for index, (row, column) in enumerate(word.cells):
+            if len(keystrokes) == LOCAL_ECHO_KEYS:
+                return keystrokes
+            keystrokes.append(Keystroke(row, column, word.answer[index], index == 0))
+    return keystrokes
+
+
+def ana_words(grid: Grid) -> list[Word]:
+    """Ana's two across words in AC-4: the two longest, in row-major order.
+
+    Among words of the same length, the first in row-major order is taken.
+    """
+    longest_first = sorted(
+        across_words(grid), key=lambda word: len(word.cells), reverse=True
+    )
+    chosen = longest_first[:2]
+    chosen.sort(key=lambda word: word.cells[0])
+    return chosen
+
+
+def next_letter(letter: str) -> str:
+    """The letter after `letter` in the alphabet, Z giving A."""
+    index = string.ascii_uppercase.index(letter)
+    return string.ascii_uppercase[(index + 1) % len(string.ascii_uppercase)]
+
+
+def ana_keystrokes(words: list[Word]) -> list[Keystroke]:
+    """AC-4's 20 keys on Ana's words: their answers, then other letters.
+
+    The second pass types the same cells again with the next letter of the
+    alphabet, so every key changes its cell.
+    """
+    keystrokes: list[Keystroke] = []
+    for pass_number in range(2):
+        for word in words:
+            for index, (row, column) in enumerate(word.cells):
+                if len(keystrokes) == ANA_KEYS:
+                    return keystrokes
+                letter = word.answer[index]
+                if pass_number == 1:
+                    letter = next_letter(letter)
+                keystrokes.append(Keystroke(row, column, letter, index == 0))
+    return keystrokes
+
+
+# ---- Simulated players (spec 015's Python clients) -----------------------------------
+
+
+class SimulatedClient:
+    """A simulated player: one TestClient socket and a reader thread.
+
+    The reader keeps each message with the `time.monotonic()` taken as soon as
+    `receive_text` returned, before parsing. Each edit is kept with the
+    `time.monotonic()` taken just before its `send_text`.
+    """
+
+    def __init__(self, websocket: WebSocketTestSession, name: str) -> None:
+        self.name = name
+        self._websocket = websocket
+        self._arrived = threading.Condition()
+        self._received: list[tuple[float, ServerMessage]] = []
+        self._sent: list[tuple[float, EditLetter]] = []
+        self._failures: list[str] = []
+        reader = threading.Thread(target=self._read, daemon=True)
+        reader.start()
+
+    def _read(self) -> None:
+        while True:
+            try:
+                text = self._websocket.receive_text()
+            except BaseException:  # the socket closed at the end of the test
+                return
+            received_at = time.monotonic()
+            try:
+                message = parse_server_message(text)
+            except ValueError as error:
+                with self._arrived:
+                    self._failures.append(f"{self.name} got {text!r}: {error}")
+                    self._arrived.notify_all()
+                continue
+            with self._arrived:
+                self._received.append((received_at, message))
+                self._arrived.notify_all()
+
+    def join(self) -> None:
+        """Join with this client's name and wait for the snapshot."""
+        join = Join(nickname=self.name, resume_token=None)
+        self._websocket.send_text(join.model_dump_json())
+        with self._arrived:
+            has_snapshot = self._arrived.wait_for(
+                lambda: len(self._received) > 0 or len(self._failures) > 0,
+                WAIT_SECONDS,
+            )
+        self.check_failures()
+        assert has_snapshot, f"{self.name} got no snapshot"
+        assert isinstance(self.messages()[0], Snapshot), self.messages()[0]
+
+    def send_edit(self, edit: EditLetter) -> None:
+        """Send one edit, keeping the time taken just before it left."""
+        frame = edit.model_dump_json()
+        sent_at = time.monotonic()
+        self._websocket.send_text(frame)
+        with self._arrived:
+            self._sent.append((sent_at, edit))
+
+    def check_failures(self) -> None:
+        """Fail the test when the reader got a message it could not parse."""
+        with self._arrived:
+            failures = list(self._failures)
+        if failures:
+            pytest.fail(failures[0])
+
+    def timed_messages(self) -> list[tuple[float, ServerMessage]]:
+        with self._arrived:
+            return list(self._received)
+
+    def messages(self) -> list[ServerMessage]:
+        return [message for _, message in self.timed_messages()]
+
+    def sent(self) -> list[tuple[float, EditLetter]]:
+        with self._arrived:
+            return list(self._sent)
+
+    def you(self) -> str:
+        first = self.messages()[0]
+        assert isinstance(first, Snapshot), first
+        return first.you
+
+    def errors(self) -> list[ErrorMessage]:
+        found: list[ErrorMessage] = []
+        for message in self.messages():
+            if isinstance(message, ErrorMessage):
+                found.append(message)
+        return found
+
+    def letter_changes(self) -> list[LetterChanged]:
+        found: list[LetterChanged] = []
+        for message in self.messages():
+            if isinstance(message, LetterChanged):
+                found.append(message)
+        return found
+
+    def own_letter_changes(self) -> list[LetterChanged]:
+        """The letter_changed events of this client's own edits: its answers."""
+        you = self.you()
+        found: list[LetterChanged] = []
+        for event in self.letter_changes():
+            if event.player_id == you:
+                found.append(event)
+        return found
+
+    def answer_count(self) -> int:
+        """How many of this client's edits got an answer, accepted or refused."""
+        return len(self.own_letter_changes()) + len(self.errors())
+
+    def letter_change_times(self) -> dict[int, float]:
+        """When each letter_changed arrived, by seq."""
+        times: dict[int, float] = {}
+        for received_at, message in self.timed_messages():
+            if isinstance(message, LetterChanged):
+                times[message.seq] = received_at
+        return times
+
+
+def join_simulated_clients(
+    stack: contextlib.ExitStack,
+    test_client: TestClient,
+    code: str,
+    names: Sequence[str],
+) -> list[SimulatedClient]:
+    """Open one socket per name in `stack` and join with each, one after the other."""
+    clients: list[SimulatedClient] = []
+    for name in names:
+        websocket = stack.enter_context(
+            test_client.websocket_connect(f"/api/rooms/{code}/ws")
+        )
+        simulated = SimulatedClient(websocket, name)
+        simulated.join()
+        clients.append(simulated)
+    return clients
+
+
+def random_edit_plans(
+    rng: random.Random, cells: list[Cell], client_count: int, edit_count: int
+) -> list[list[EditLetter]]:
+    """One plan per client: `edit_count` random letters on random cells of `cells`."""
+    plans: list[list[EditLetter]] = []
+    for _ in range(client_count):
+        plan: list[EditLetter] = []
+        for _ in range(edit_count):
+            row, column = rng.choice(cells)
+            letter = rng.choice(string.ascii_uppercase)
+            plan.append(EditLetter(row=row, column=column, letter=letter))
+        plans.append(plan)
+    return plans
+
+
+class TypingLoad:
+    """Simulated players typing one edit every 500 ms, starting 62.5 ms apart.
+
+    Each client sends from a thread of its own, on an absolute schedule, until
+    its plan ends or the load is stopped.
+    """
+
+    def __init__(
+        self, clients: list[SimulatedClient], plans: list[list[EditLetter]]
+    ) -> None:
+        self._clients = clients
+        self._plans = plans
+        self._stop = threading.Event()
+        self._problems: list[str] = []
+        self._threads: list[threading.Thread] = []
+
+    def start(self) -> None:
+        start_at = time.monotonic() + SENDER_LEAD_SECONDS
+        pairs = zip(self._clients, self._plans, strict=True)
+        for index, (client, plan) in enumerate(pairs):
+            first_send_at = start_at + index * START_OFFSET_SECONDS
+            thread = threading.Thread(
+                target=self._send_plan, args=(client, plan, first_send_at), daemon=True
+            )
+            self._threads.append(thread)
+            thread.start()
+
+    def _send_plan(
+        self, client: SimulatedClient, plan: list[EditLetter], first_send_at: float
+    ) -> None:
+        try:
+            for index, edit in enumerate(plan):
+                delay = first_send_at + index * EDIT_INTERVAL_SECONDS - time.monotonic()
+                if delay > 0 and self._stop.wait(delay):
+                    return
+                if self._stop.is_set():
+                    return
+                client.send_edit(edit)
+        except Exception as error:  # reported by the test thread
+            self._problems.append(f"{client.name}: {error!r}")
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def wait_until_sent(self) -> list[str]:
+        """Wait for every sender to end; return the problems they met."""
+        for thread in self._threads:
+            thread.join(timeout=SENDER_LIMIT_SECONDS)
+            assert not thread.is_alive(), "a sender thread did not end"
+        return list(self._problems)
+
+
+def wait_for(
+    condition: Callable[[], bool], what: str, timeout: float = WAIT_SECONDS
+) -> None:
+    """Poll `condition` from the test thread until it holds, else fail the test."""
+    deadline = time.monotonic() + timeout
+    while not condition():
+        if time.monotonic() >= deadline:
+            pytest.fail(f"timed out after {timeout}s waiting for {what}")
+        time.sleep(POLL_SECONDS)
+
+
+def every_edit_answered(clients: list[SimulatedClient]) -> bool:
+    """Whether every edit sent so far got its answer."""
+    for client in clients:
+        client.check_failures()
+        if client.answer_count() < len(client.sent()):
+            return False
+    return True
+
+
+def every_seq_received(clients: list[SimulatedClient], seqs: set[int]) -> bool:
+    """Whether every client received a letter_changed for each of `seqs`."""
+    for client in clients:
+        client.check_failures()
+        if not seqs <= set(client.letter_change_times()):
+            return False
+    return True
+
+
+def relay_times(clients: list[SimulatedClient]) -> list[float]:
+    """For each edit and each other client: its letter_changed's receipt minus its send.
+
+    The seq of an edit is the one of its sender's own answer.
+    """
+    receipts: dict[str, dict[int, float]] = {}
+    for client in clients:
+        receipts[client.name] = client.letter_change_times()
+    times: list[float] = []
+    for sender in clients:
+        answers = sender.own_letter_changes()
+        for (sent_at, _edit), answer in zip(sender.sent(), answers, strict=True):
+            for receiver in clients:
+                if receiver is sender:
+                    continue
+                times.append(receipts[receiver.name][answer.seq] - sent_at)
+    return times
+
 
 # ---- AC-1: FX-02 is interactive within 2.5 seconds --------------------------------
 

@@ -5,7 +5,8 @@ FX-01 room, and talk to it from a page in every engine. AC-10 and AC-11 call
 `nock.__main__.main()` in the test process, with `uvicorn.Server.run` replaced by
 the harness's recorder.
 
-The shared setup is in `spec036_harness`.
+The shared setup is in `spec036_harness` and `spec036_frames_harness`. What
+only this file uses is defined below the imports.
 
 Notes:
 
@@ -25,11 +26,18 @@ Notes:
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import os
+import socket
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Callable, Generator
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 import uvicorn
@@ -37,32 +45,15 @@ from playwright.sync_api import Page
 
 import nock.server
 from nock.grid import Grid
+from nock.hub import RoomRegistry
 from nock.protocol import Join, Snapshot, grid_view, parse_server_message
 from nock.server import WEB_DIST_DIR
-from spec036_harness import (
-    ARABIC_INDIC_8000,
-    DATABASE_FILE_NAME,
-    DATABASE_VARIABLE,
-    DEFAULT_HOST,
-    DEFAULT_PORT,
-    FIRST_MESSAGE_SCRIPT,
-    FULLWIDTH_8000,
-    HOST_VARIABLE,
-    LOG_FILE_NAME,
+from nock.store import RoomStore
+from spec036_frames_harness import (
     MAX_WS_FRAME_BYTES,
-    OVERSIZED_FRAME_BYTES,
     OVERSIZED_FRAME_SCRIPT,
-    PORT_VARIABLE,
-    PROCESS_EXIT_LIMIT_SECONDS,
-    SERVER_LOG_LEVEL,
-    SUPERSCRIPT_TWO,
     TOO_BIG_CODE,
-    database_with_room,
-    entry_point,
-    nock_process,
     padded_frame,
-    refusal_message,
-    set_variable,
     socket_url,
 )
 
@@ -70,7 +61,265 @@ from spec036_harness import (
 # its module, so they are imported by name. `x as x` is the explicit re-export
 # form: it keeps ruff from reporting the import as unused or as redefined.
 from spec036_harness import fx01_grid as fx01_grid
-from spec036_harness import server_runs as server_runs
+
+# ---- Values of the spec --------------------------------------------------------------
+
+OVERSIZED_FRAME_BYTES = 9000  # AC-9's frame
+
+HOST_VARIABLE = "NOCK_HOST"
+PORT_VARIABLE = "NOCK_PORT"
+DATABASE_VARIABLE = "NOCK_DATABASE"  # spec 018
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 8000
+SERVER_LOG_LEVEL = "info"  # server_config's default, which main() keeps
+
+# Digits outside ASCII, which NOCK_PORT refuses (int() reads the first two as 8000;
+# str.isdigit() takes all three).
+FULLWIDTH_8000 = "\N{FULLWIDTH DIGIT EIGHT}" + "\N{FULLWIDTH DIGIT ZERO}" * 3
+ARABIC_INDIC_8000 = "\N{ARABIC-INDIC DIGIT EIGHT}" + "\N{ARABIC-INDIC DIGIT ZERO}" * 3
+SUPERSCRIPT_TWO = "\N{SUPERSCRIPT TWO}"
+
+
+# ---- Values of the test harness ------------------------------------------------------
+
+MISSING_BUILD_MESSAGE = "web/dist is missing: run npm --prefix web run build"
+
+SERVER_START_SECONDS = 10.0  # also how long AC-8 and AC-9 poll GET /
+
+DATABASE_FILE_NAME = "nock.sqlite3"
+LOG_FILE_NAME = "python-m-nock.log"
+REQUEST_TIMEOUT_SECONDS = 2.0
+START_POLL_SECONDS = 0.05
+PROCESS_STOP_SECONDS = 10.0
+PROCESS_EXIT_LIMIT_SECONDS = 30.0
+
+
+# ---- The production entry point in a subprocess (AC-8, AC-9) -------------------------
+
+
+def database_with_room(path: Path, grid: Grid) -> str:
+    """Write a SQLite file at `path` holding one room on `grid`; return its code.
+
+    The room is registered by `RoomRegistry(store=RoomStore(path))`; then the
+    registry, then the store, are closed.
+    """
+    store = RoomStore(path)
+    registry = RoomRegistry(store=store)
+    code = registry.register_room(grid)
+    registry.close()
+    store.close()
+    return code
+
+
+def free_local_port() -> int:
+    """A free port of 127.0.0.1: bound with port 0, then released."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        port: int = probe.getsockname()[1]
+    return port
+
+
+def nock_environment(database: Path, port: int) -> dict[str, str]:
+    """The test's own environment plus NOCK_DATABASE and NOCK_PORT, no NOCK_HOST."""
+    environment = dict(os.environ)
+    environment.pop(HOST_VARIABLE, None)
+    environment[DATABASE_VARIABLE] = str(database)
+    environment[PORT_VARIABLE] = str(port)
+    return environment
+
+
+class HttpAnswer(NamedTuple):
+    """The status and the body of an HTTP answer."""
+
+    status: int
+    body: bytes
+
+
+def get_directly(url: str) -> HttpAnswer:
+    """GET `url` without the proxies of the environment; return the answer.
+
+    Raises:
+        OSError: nothing answered (connection refused or reset, timeout).
+    """
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        with opener.open(url, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+            return HttpAnswer(status=response.status, body=response.read())
+    except urllib.error.HTTPError as error:
+        return HttpAnswer(status=error.code, body=error.read())
+
+
+def process_output(log_path: Path) -> str:
+    """What the process wrote on stdout and stderr so far."""
+    return log_path.read_text(encoding="utf-8", errors="replace")
+
+
+def wait_for_first_answer(
+    process: subprocess.Popen[bytes], url: str, log_path: Path
+) -> HttpAnswer:
+    """Poll GET `url` until the server answers, for up to 10 seconds.
+
+    Fails the test when the process ends first, or when nothing answers in time.
+    """
+    deadline = time.monotonic() + SERVER_START_SECONDS
+    while True:
+        exit_status = process.poll()
+        if exit_status is not None:
+            pytest.fail(
+                f"python -m nock ended with status {exit_status} before answering "
+                f"GET {url}:\n{process_output(log_path)}"
+            )
+        try:
+            return get_directly(url)
+        except OSError as error:
+            if time.monotonic() >= deadline:
+                pytest.fail(
+                    f"python -m nock did not answer GET {url} within "
+                    f"{SERVER_START_SECONDS:.0f} s ({error}):\n"
+                    f"{process_output(log_path)}"
+                )
+        time.sleep(START_POLL_SECONDS)
+
+
+def stop_process(process: subprocess.Popen[bytes]) -> None:
+    """Terminate the process, then kill it when it has not ended in 10 seconds."""
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=PROCESS_STOP_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=PROCESS_STOP_SECONDS)
+
+
+class NockServer(NamedTuple):
+    """A running `python -m nock`: its base URL and its first answer to GET /."""
+
+    base_url: str
+    first_answer: HttpAnswer
+
+
+@contextlib.contextmanager
+def nock_process(database: Path, log_path: Path) -> Generator[NockServer]:
+    """Run `python -m nock` on the SQLite file `database`, on a free port.
+
+    Runs `[sys.executable, "-m", "nock"]` with the environment of
+    `nock_environment`, its output going to `log_path`, and yields once GET /
+    got an answer. Fails (not skips) when the client is not built. The process
+    is terminated at the end, then killed if it does not stop.
+    """
+    if not (WEB_DIST_DIR / "index.html").is_file():
+        pytest.fail(MISSING_BUILD_MESSAGE)
+    port = free_local_port()
+    base_url = f"http://127.0.0.1:{port}"
+    with log_path.open("wb") as log_file:
+        process = subprocess.Popen(
+            [sys.executable, "-m", "nock"],
+            env=nock_environment(database, port),
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+        )
+        try:
+            first_answer = wait_for_first_answer(process, f"{base_url}/", log_path)
+            yield NockServer(base_url=base_url, first_answer=first_answer)
+        finally:
+            stop_process(process)
+
+
+# Opens a socket and sends a join as soon as it is open; reports the first
+# message it received, or the close that came instead. Gives up after 5 seconds.
+FIRST_MESSAGE_SCRIPT = """
+async ({ url, join }) => {
+  const socket = new WebSocket(url);
+  let firstMessage = null;
+  let closeCode = null;
+  socket.addEventListener("message", (event) => {
+    if (firstMessage === null) {
+      firstMessage = typeof event.data === "string" ? event.data : "(binary)";
+    }
+  });
+  socket.addEventListener("close", (event) => {
+    closeCode = event.code;
+  });
+  const deadline = performance.now() + 5000;
+  const waitFor = async (condition) => {
+    while (!condition() && closeCode === null && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  await waitFor(() => socket.readyState === WebSocket.OPEN);
+  const opened = socket.readyState === WebSocket.OPEN;
+  if (opened) {
+    socket.send(join);
+    await waitFor(() => firstMessage !== null);
+  }
+  const closeCodeBefore = closeCode;
+  socket.close();
+  return { opened, firstMessage, closeCode: closeCodeBefore };
+}
+"""
+
+
+# ---- The production entry point in the test process (AC-10, AC-11) -------------------
+
+
+@pytest.fixture
+def server_runs(monkeypatch: pytest.MonkeyPatch) -> list[uvicorn.Config]:
+    """Replace `uvicorn.Server.run` by the harness's recorder; return what it keeps.
+
+    The recorder keeps the `config` of each server whose `run` is called and
+    returns None. `uvicorn.Server.serve` is replaced too, so that a server
+    started without `run` fails the test instead of serving in it.
+    """
+    configs: list[uvicorn.Config] = []
+
+    def record_run(
+        server: uvicorn.Server, sockets: list[socket.socket] | None = None
+    ) -> None:
+        configs.append(server.config)
+
+    async def refuse_serve(
+        server: uvicorn.Server, sockets: list[socket.socket] | None = None
+    ) -> None:
+        raise AssertionError("main() must start its server with uvicorn.Server.run")
+
+    monkeypatch.setattr(uvicorn.Server, "run", record_run)
+    monkeypatch.setattr(uvicorn.Server, "serve", refuse_serve)
+    return configs
+
+
+def entry_point() -> Callable[[], None]:
+    """Import `nock.__main__` and return its `main`.
+
+    Called by each test of AC-10 and AC-11 once the recorder is in place, so that
+    a missing module fails those tests, not the collection of this file.
+    """
+    from nock.__main__ import main
+
+    return main
+
+
+def set_variable(monkeypatch: pytest.MonkeyPatch, name: str, value: str | None) -> None:
+    """Set the environment variable `name` to `value`; None deletes it."""
+    if value is None:
+        monkeypatch.delenv(name, raising=False)
+    else:
+        monkeypatch.setenv(name, value)
+
+
+def refusal_message(main: Callable[[], None]) -> str:
+    """Call `main`, which must raise SystemExit naming NOCK_PORT; return its code.
+
+    Fails the test when the code of the SystemExit is not a `str`.
+    """
+    with pytest.raises(SystemExit, match=PORT_VARIABLE) as caught:
+        main()
+    message = caught.value.code
+    assert isinstance(message, str), f"the SystemExit code {message!r} is no message"
+    return message
+
 
 # ---- AC-8: python -m nock serves the app on the port of NOCK_PORT -----------------
 

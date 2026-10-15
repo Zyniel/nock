@@ -2,7 +2,9 @@
 
 AC-5 and AC-6 drive the hub directly, each scenario on an event loop of its own.
 
-The shared setup is in `spec036_harness`.
+The shared setup is in `spec036_harness`, `spec036_hub_harness` and
+`spec036_browser_harness`. What only this file uses is defined below the
+imports.
 
 Notes:
 
@@ -17,6 +19,7 @@ Notes:
 from __future__ import annotations
 
 import inspect
+from collections.abc import Iterator
 
 import pytest
 from playwright.sync_api import Page
@@ -25,29 +28,28 @@ from pydantic import ValidationError
 import nock.hub
 from nock.grid import Grid
 from nock.hub import RoomConnection
-from nock.protocol import PlayerState, Snapshot, parse_server_message
+from nock.protocol import LetterCellView, PlayerState, Snapshot, parse_server_message
 from nock.room import RoomConfig
-from spec036_harness import (
-    DEFAULT_INBOUND_LIMIT,
-    DEFAULT_OUTBOUND_LIMIT,
-    FLOOD_CODE,
+from spec036_browser_harness import expect_reconnection_after_close, open_mock_room
+
+# The fixtures of the harness. pytest looks for a test's fixtures among the names of
+# its module, so they are imported by name. `x as x` is the explicit re-export
+# form: it keeps ruff from reporting the import as unused or as redefined.
+from spec036_harness import fx01_grid as fx01_grid
+from spec036_harness import triples
+from spec036_hub_harness import (
     INBOUND_LIMIT,
     OUTBOUND_LIMIT,
     PACED_EDIT_COUNT,
-    STALLED_CODE,
     BlockingStore,
     b_edit,
     close_after_flood_scenario,
-    error_types,
     errors_in,
-    expect_reconnection_after_close,
     flood_scenario,
     frame_after_flood_scenario,
     inbound_bound_scenario,
     letter_changes_in,
-    letter_in_snapshot,
     letter_in_state,
-    open_mock_room,
     open_registry,
     outbound_bound_scenario,
     own_letter_changes,
@@ -57,14 +59,46 @@ from spec036_harness import (
     stalled_client_scenario,
     state_changes_of,
     stranger_flood_scenario,
-    triples,
 )
 
-# The fixtures of the harness. pytest looks for a test's fixtures among the names of
-# its module, so they are imported by name. `x as x` is the explicit re-export
-# form: it keeps ruff from reporting the import as unused or as redefined.
-from spec036_harness import blocking_store as blocking_store
-from spec036_harness import fx01_grid as fx01_grid
+# ---- Values of the spec --------------------------------------------------------------
+
+STALLED_CODE = 4507
+FLOOD_CODE = 1008
+
+DEFAULT_OUTBOUND_LIMIT = 1000
+DEFAULT_INBOUND_LIMIT = 100
+
+
+# ---- Fixtures ------------------------------------------------------------------------
+
+
+@pytest.fixture
+def blocking_store() -> Iterator[BlockingStore]:
+    store = BlockingStore()
+    yield store
+    store.release()
+    store.close()
+
+
+# ---- Reading the results -------------------------------------------------------------
+
+
+def letter_in_snapshot(snapshot: Snapshot, row: int, column: int) -> str | None:
+    """The letter a snapshot shows at (row, column)."""
+    for cell in snapshot.grid.cells:
+        if isinstance(cell, LetterCellView) and (cell.row, cell.column) == (
+            row,
+            column,
+        ):
+            return cell.letter
+    pytest.fail(f"no letter cell at ({row}, {column}) in the snapshot")
+
+
+def error_types(error: ValidationError) -> list[str]:
+    """The pydantic error type of each problem of `error`."""
+    return [problem["type"] for problem in error.errors()]
+
 
 # ---- AC-5: a client that never reads is disconnected ------------------------------
 

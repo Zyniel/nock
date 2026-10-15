@@ -3,7 +3,8 @@
 AC-7 checks `server_config`, then the frame size limit on a live server built with
 it, in every engine.
 
-The shared setup is in `spec036_harness`.
+The shared setup is in `spec036_harness` and `spec036_frames_harness`. What
+only this file uses is defined below the imports.
 
 Notes:
 
@@ -33,12 +34,10 @@ from nock.protocol import (
     parse_server_message,
 )
 from nock.server import create_app
-from spec036_harness import (
-    ANSWERED_FRAME_SCRIPT,
+from spec036_frames_harness import (
     MAX_WS_FRAME_BYTES,
     OVERSIZED_FRAME_SCRIPT,
     TOO_BIG_CODE,
-    UVICORN_DEFAULT_OPTIONS,
     padded_frame,
     socket_url,
 )
@@ -47,6 +46,59 @@ from spec036_harness import (
 # its module, so they are imported by name. `x as x` is the explicit re-export
 # form: it keeps ruff from reporting the import as unused or as redefined.
 from spec036_harness import fx01_grid as fx01_grid
+
+# ---- Scripts and options of the live checks ------------------------------------------
+
+# Opens a socket, joins, sends one big frame, then a ping, waiting up to 5
+# seconds for an answer to each; reports what arrived and the socket's state.
+ANSWERED_FRAME_SCRIPT = """
+async ({ url, join, frame, binary }) => {
+  const socket = new WebSocket(url);
+  const received = [];
+  let closeCode = null;
+  socket.addEventListener("message", (event) => received.push(event.data));
+  socket.addEventListener("close", (event) => {
+    closeCode = event.code;
+  });
+  const waitFor = async (condition) => {
+    const deadline = performance.now() + 5000;
+    while (!condition() && closeCode === null && performance.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  };
+  await waitFor(() => socket.readyState === WebSocket.OPEN);
+  socket.send(join);
+  await waitFor(() => received.length >= 1);
+  const afterJoin = received.length;
+  socket.send(binary ? new TextEncoder().encode(frame) : frame);
+  await waitFor(() => received.length > afterJoin);
+  const afterFrame = received.length;
+  socket.send(JSON.stringify({ type: "ping" }));
+  await waitFor(() => received.length > afterFrame);
+  const readyState = socket.readyState;
+  const closeCodeBefore = closeCode;
+  socket.close();
+  return { received, readyState, closeCode: closeCodeBefore };
+}
+"""
+
+# uvicorn options that `server_config` leaves at uvicorn's default.
+UVICORN_DEFAULT_OPTIONS = (
+    "ws",
+    "ws_max_queue",
+    "ws_ping_interval",
+    "ws_ping_timeout",
+    "ws_per_message_deflate",
+    "http",
+    "lifespan",
+    "interface",
+    "proxy_headers",
+    "timeout_keep_alive",
+    "limit_concurrency",
+    "backlog",
+    "root_path",
+)
+
 
 # ---- AC-7: oversized frames are refused at the socket -----------------------------
 
