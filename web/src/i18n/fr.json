@@ -83,6 +83,15 @@
   "check.letter_label": "Vérifier la lettre",
   "check.word_label": "Vérifier le mot",
   "check.grid_label": "Vérifier la grille",
+  "reveal.label": "Révéler",
+  "reveal.letter": "Lettre ({count})",
+  "reveal.word": "Mot ({count})",
+  "reveal.letter_label": "Révéler la lettre (reste {count})",
+  "reveal.word_label": "Révéler le mot (reste {count})",
+  "reveal.letter_none": "Plus de lettre",
+  "reveal.word_none": "Plus de mot",
+  "reveal.letter_none_label": "Révéler la lettre : plus de lettre à révéler",
+  "reveal.word_none_label": "Révéler le mot : plus de mot à révéler",
   "undo.nothing": "Rien à annuler.",
   "grid.label": "Grille",
   "clue_bar.label": "Définition en cours",
@@ -98,5 +107,6 @@
   "a11y.direction.down": "vertical",
   "a11y.grid_hint": "Flèches pour se déplacer, Tab pour le mot suivant. Échap puis Tab pour quitter la grille.",
   "grid.remote_overflow": "+{count}",
-  "a11y.remote_overflow": "{count} autres joueurs"
+  "a11y.remote_overflow": "{count} autres joueurs",
+  "a11y.revealed": "lettre révélée"
 }

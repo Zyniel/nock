@@ -484,6 +484,7 @@
               data-unconfirmed={String(shown.unconfirmed)}
               data-author={cell.author ?? ''}
               data-locked={String(cell.locked)}
+              data-revealed={String(cell.revealed)}
               data-wrong={String(cell.wrong && !shown.unconfirmed)}
               data-flash={flashOf(cell.row, cell.column)}
               data-selected={String(isSelected(cell.row, cell.column))}
@@ -495,7 +496,13 @@
               style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
               style:grid-row={cell.row + 1}
               style:grid-column={cell.column + 1}
-            >{shown.letter ?? ''}{#each outlines as remote, rank (remote.playerId)}<span
+            >{shown.letter ?? ''}{#if cell.revealed}<span
+                  class="reveal-mark"
+                  data-testid="reveal-mark"
+                  aria-hidden="true"
+                ></span><span class="visually-hidden" data-testid="reveal-label"
+                  >{t('a11y.revealed')}</span
+                >{/if}{#each outlines as remote, rank (remote.playerId)}<span
                   class="remote-selection"
                   data-testid="remote-selection"
                   data-player-id={remote.playerId}
@@ -638,6 +645,22 @@
 
   .letter.in-word {
     background: #cfe3ff;
+  }
+
+  /* A revealed cell: a triangle in its top-right corner, a shape that does not
+     rely on colour (spec 024). It is drawn in the ink colour, which keeps 3:1
+     against the locked, selected, word and tinted backgrounds of a cell. A
+     remote label in the same corner comes
+     later in the cell, so it is drawn over the mark. */
+  .reveal-mark {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: max(6px, calc(var(--cell) * 0.3));
+    height: max(6px, calc(var(--cell) * 0.3));
+    background-color: #1f2330;
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+    pointer-events: none;
   }
 
   .letter.selected {

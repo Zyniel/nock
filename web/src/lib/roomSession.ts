@@ -405,7 +405,7 @@ function toSettings(value: unknown): RoomSettingsView {
   }
 }
 
-// The remaining reveal budget of a snapshot or of a settings_changed.
+// The remaining reveal budget of a snapshot, a settings_changed or a reveal_result.
 function toRevealBudget(value: unknown): RevealBudgetView {
   const budget = value as Record<string, unknown> | null | undefined
   if (typeof budget !== 'object' || budget === null) {
@@ -648,6 +648,10 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   }
   if (event.type === 'check_result' && session.snapshot !== null) {
     applyCheckResult(session.snapshot, event)
+  }
+  if (event.type === 'reveal_result' && session.snapshot !== null) {
+    // What is left after the reveal; its letters come in the cell_locked events.
+    session.snapshot.reveal_budget = toRevealBudget(event.message.reveal_budget)
   }
   if (event.type === 'grid_solved') {
     session.solved = true

@@ -59,6 +59,7 @@ from nock.protocol import (
     Pong,
     RemovePlayer,
     ResumeToken,
+    Reveal,
     RevealBudget,
     RevealResult,
     RoomSettings,
@@ -683,8 +684,8 @@ def handle_message(
     other message is input: it sets `last_input_at`, and an idle player becomes
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
     `select_cell`, edits (`edit_letter`, `erase`), `undo` and the host actions
-    (`remove_player`, `lock_room`, `change_settings`, `mute_player`) and
-    `check` (input, not rate-limited) have their rules here. `pencil_edit` and
+    (`remove_player`, `lock_room`, `change_settings`, `mute_player`), `check`
+    and `reveal` (input, not rate-limited) have their rules here. `pencil_edit` and
     `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
     them their meaning. Until the spec that gives another message its meaning
     is built, the message is read and ignored: nothing is sent.
@@ -752,6 +753,8 @@ def _run_message(
         return _undo(state, player_id, now)
     if isinstance(message, Check):
         return _check(state, message.target, player_id, now)
+    if isinstance(message, Reveal):
+        return _reveal(state, message.target, player_id, now)
     if isinstance(message, SelectCell):
         return _select_cell(state, player_id, message)
     if isinstance(message, RemovePlayer | LockRoom | ChangeSettings | MutePlayer):
@@ -1200,6 +1203,95 @@ def _check(
     return Outcome(state=new_state, entries=tuple(entries))
 
 
+def _reveal(
+    state: RoomState, target: CellTarget | WordTarget, player_id: str, now: float
+) -> Outcome:
+    """Run a reveal: one reveal_result, then one cell_locked per revealed cell.
+
+    The refusals come in this order (spec 024): solved grid, help mode `none`,
+    a target that names nothing, nothing left to reveal, spent budget. The help
+    mode `vote` acts as `free` until spec 025.
+    """
+    if state.solved:
+        return _refuse_solved(state)
+    if state.settings.help_mode == HelpMode.NONE:
+        return _refuse(state, ErrorCode.HELP_DISABLED, "Reveals are turned off.")
+    refusal = _refuse_bad_target(state, target)
+    if refusal is not None:
+        return refusal
+    cells_to_reveal = _unlocked_cells(_cells_in_scope(state, target))
+    if not cells_to_reveal:
+        return _refuse(
+            state, ErrorCode.INVALID_TARGET, "Nothing is left to reveal there."
+        )
+    if _is_budget_spent(state.reveal_budget, target):
+        return _refuse(state, ErrorCode.BUDGET_EXHAUSTED, "The reveal budget is spent.")
+
+    result = RevealResult(
+        seq=state.seq + 1,
+        player_id=player_id,
+        target=target,
+        reveal_budget=_budget_after_reveal(state.reveal_budget, target),
+    )
+    entries = [LogEntry(at=now, event=result)]
+    seq = result.seq
+    for cell in cells_to_reveal:
+        seq += 1
+        locked = CellLocked(
+            seq=seq,
+            row=cell.row,
+            column=cell.column,
+            letter=_required_solution_letter(state.grid, cell),
+            revealed=True,
+        )
+        entries.append(LogEntry(at=now, event=locked))
+
+    new_state = state
+    for entry in entries:
+        new_state = replay(new_state, entry)
+    return Outcome(state=new_state, entries=tuple(entries))
+
+
+def _unlocked_cells(cells: list[CellState]) -> list[CellState]:
+    """Return the cells that are not locked, in the same order."""
+    unlocked: list[CellState] = []
+    for cell in cells:
+        if not cell.locked:
+            unlocked.append(cell)
+    return unlocked
+
+
+def _is_budget_spent(budget: RevealBudget, target: CellTarget | WordTarget) -> bool:
+    """Tell whether no letter (letter target) or no word (word target) is left."""
+    if isinstance(target, CellTarget):
+        return budget.letters == 0
+    return budget.words == 0
+
+
+def _budget_after_reveal(
+    budget: RevealBudget, target: CellTarget | WordTarget
+) -> RevealBudget:
+    """Return the budget left once a reveal is paid: one letter, or one word."""
+    if isinstance(target, CellTarget):
+        return RevealBudget(letters=budget.letters - 1, words=budget.words)
+    return RevealBudget(letters=budget.letters, words=budget.words - 1)
+
+
+def _required_solution_letter(grid: Grid, cell: CellState) -> str:
+    """Return the solution letter of a letter cell.
+
+    Raises:
+        ValueError: the cell belongs to no word of the grid, so it has no
+            solution letter.
+    """
+    letter = _solution_letter(grid, cell.row, cell.column)
+    if letter is None:
+        raise ValueError(
+            f"The letter cell ({cell.row}, {cell.column}) belongs to no word"
+        )
+    return letter
+
+
 def _refs_of(cells: list[CellState]) -> tuple[CellRef, ...]:
     """Return the positions of the cells, in the same order."""
     references: list[CellRef] = []
@@ -1209,7 +1301,7 @@ def _refs_of(cells: list[CellState]) -> tuple[CellRef, ...]:
 
 
 def _refuse_bad_target(state: RoomState, target: CheckTarget) -> Outcome | None:
-    """Return the refusal when a check names nothing, else None."""
+    """Return the refusal when a check or a reveal names nothing, else None."""
     if isinstance(target, CellTarget):
         cell = _find_cell(state, target.row, target.column)
         if cell is None:
@@ -1457,6 +1549,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_cell_locked(state, event)
     elif isinstance(event, CheckResult):
         replayed = _replay_check_result(state, event)
+    elif isinstance(event, RevealResult):
+        replayed = state.model_copy(update={"reveal_budget": event.reveal_budget})
     elif isinstance(event, SettingsChanged):
         replayed = state.model_copy(
             update={"settings": event.settings, "reveal_budget": event.reveal_budget}
@@ -1550,13 +1644,14 @@ def _replay_letter_changed(
 
 
 def _replay_cell_locked(state: RoomState, event: CellLocked) -> RoomState:
-    """Lock a cell with its letter; a reveal also clears the author."""
+    """Lock a cell with its letter, never a pencil one; a reveal clears the author."""
     cell = _find_cell(state, event.row, event.column)
     if cell is None:
         return state
     locked_cell = cell.model_copy(
         update={
             "letter": event.letter,
+            "pencil": False,
             "locked": True,
             "revealed": event.revealed,
             "wrong": False,

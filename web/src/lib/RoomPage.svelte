@@ -12,6 +12,7 @@
     keepFeedEndOnResize,
     keepFeedPlace,
     noteFeedPlace,
+    watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
   import type { LetterCellView, Snapshot } from './roomSession'
@@ -73,14 +74,27 @@
   let hostPanel: HTMLElement | null = $state(null)
   let hostPanelHasMore = $state(false)
 
+  // The room toolbar (spec 024) scrolls sideways on a small window too, with the
+  // same edge fade.
+  let roomToolbar: HTMLElement | null = $state(null)
+  let roomToolbarHasMore = $state(false)
+
+  // True while content is hidden past the right edge of a row that scrolls.
+  function hasContentPastRightEdge(row: HTMLElement | null): boolean {
+    if (row === null) {
+      return false
+    }
+    const hiddenOnTheRight = row.scrollWidth - row.clientWidth - row.scrollLeft
+    return hiddenOnTheRight > 1
+  }
+
   // Show the fade while content is hidden past the right edge of the panel.
   function updateHostPanelMore(): void {
-    if (hostPanel === null) {
-      hostPanelHasMore = false
-      return
-    }
-    const hiddenOnTheRight = hostPanel.scrollWidth - hostPanel.clientWidth - hostPanel.scrollLeft
-    hostPanelHasMore = hiddenOnTheRight > 1
+    hostPanelHasMore = hasContentPastRightEdge(hostPanel)
+  }
+
+  function updateRoomToolbarMore(): void {
+    roomToolbarHasMore = hasContentPastRightEdge(roomToolbar)
   }
 
   // The last way the user acted: a key press or a pointer (mouse, touch, pen).
@@ -89,6 +103,8 @@
   let lastActionWasKeyboard = false
   // True while a host panel control has the focus from the keyboard.
   let hostPanelHasKeyboardFocus = $state(false)
+  // True while a room toolbar control has the focus from the keyboard.
+  let roomToolbarHasKeyboardFocus = $state(false)
 
   $effect(() => {
     const onKeyDown = (): void => {
@@ -97,6 +113,7 @@
     const onPointerDown = (): void => {
       lastActionWasKeyboard = false
       hostPanelHasKeyboardFocus = false
+      roomToolbarHasKeyboardFocus = false
     }
     window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('pointerdown', onPointerDown, true)
@@ -130,6 +147,27 @@
   function leaveHostPanelFocus(): void {
     hostPanelHasKeyboardFocus = false
   }
+
+  // The same for the room toolbar: a keyboard focus hides its edge fade.
+  function followRoomToolbarFocus(event: FocusEvent): void {
+    roomToolbarHasKeyboardFocus = lastActionWasKeyboard
+    scrollKeyboardFocusIntoView(event)
+  }
+
+  function leaveRoomToolbarFocus(): void {
+    roomToolbarHasKeyboardFocus = false
+  }
+
+  // Measure again whenever the toolbar changes size or content: a resize, the
+  // reveal panel coming or going, a button text that changes.
+  $effect(() => {
+    if (roomToolbar === null) {
+      return
+    }
+    const stopWatching = watchListChanges(roomToolbar, updateRoomToolbarMore)
+    updateRoomToolbarMore()
+    return stopWatching
+  })
 
   // Measure again whenever the panel or its content changes size.
   $effect(() => {
@@ -621,6 +659,82 @@
     }
   }
 
+  // ---- Reveal controls (spec 024) ----
+
+  // The panel is shown unless the help is off. Help mode `vote` acts as `free`
+  // until spec 025.
+  let isRevealShown = $derived(
+    session.snapshot !== null && session.snapshot.settings.help_mode !== 'none',
+  )
+  // What is left of the room's budget.
+  let lettersLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.letters)
+  let wordsLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.words)
+  let selectedCell = $derived(
+    selection === null ? null : letterCellAt(selection.row, selection.column),
+  )
+
+  // True when every cell of the word is locked: nothing is left to reveal there.
+  function isWordLocked(word: Word): boolean {
+    for (const position of word.cells) {
+      const cell = letterCellAt(position.row, position.column)
+      if (cell !== null && !cell.locked) {
+        return false
+      }
+    }
+    return true
+  }
+
+  let isRevealLetterDisabled = $derived(
+    session.solved || selectedCell === null || selectedCell.locked || lettersLeft === 0,
+  )
+  let isRevealWordDisabled = $derived(
+    session.solved || activeWord === null || isWordLocked(activeWord) || wordsLeft === 0,
+  )
+
+  // A spent budget replaces the count with the reason the button is disabled.
+  let revealLetterText = $derived(
+    lettersLeft === 0 ? t('reveal.letter_none') : t('reveal.letter', { count: lettersLeft }),
+  )
+  let revealLetterLabel = $derived(
+    lettersLeft === 0
+      ? t('reveal.letter_none_label')
+      : t('reveal.letter_label', { count: lettersLeft }),
+  )
+  let revealWordText = $derived(
+    wordsLeft === 0 ? t('reveal.word_none') : t('reveal.word', { count: wordsLeft }),
+  )
+  let revealWordLabel = $derived(
+    wordsLeft === 0 ? t('reveal.word_none_label') : t('reveal.word_label', { count: wordsLeft }),
+  )
+
+  // Ask the server to reveal the selected cell. The letter comes back in a
+  // cell_locked event: the page never guesses it.
+  function onRevealLetter(): void {
+    if (isRevealLetterDisabled || selection === null) {
+      return
+    }
+    send({
+      type: 'reveal',
+      target: { scope: 'letter', row: selection.row, column: selection.column },
+    })
+  }
+
+  // Ask the server to reveal the selected word.
+  function onRevealWord(): void {
+    if (isRevealWordDisabled || activeWord === null) {
+      return
+    }
+    send({
+      type: 'reveal',
+      target: {
+        scope: 'word',
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      },
+    })
+  }
+
   function onCellTap(row: number, column: number): void {
     select(selectionAfterCellTap(words, selection, row, column))
   }
@@ -903,7 +1017,15 @@
           >{copied ? t('room.share.copied') : t('room.share.copy')}</button
         >
       </div>
-      <div class="header-actions">
+      <div
+        class="room-toolbar"
+        data-testid="room-toolbar"
+        bind:this={roomToolbar}
+        onscroll={updateRoomToolbarMore}
+        onfocusin={followRoomToolbarFocus}
+        onfocusout={leaveRoomToolbarFocus}
+        class:keyboard-focus={roomToolbarHasKeyboardFocus}
+      >
         <div class="undo-panel">
           <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
             >{t('room.undo')}</button>
@@ -934,6 +1056,35 @@
             onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
           >
         </div>
+        {#if isRevealShown}
+          <div
+            class="reveal-panel"
+            data-testid="reveal-panel"
+            role="group"
+            aria-label={t('reveal.label')}
+          >
+            <button
+              type="button"
+              data-testid="reveal-letter"
+              aria-label={revealLetterLabel}
+              disabled={isRevealLetterDisabled}
+              onclick={onRevealLetter}>{revealLetterText}</button
+            >
+            <button
+              type="button"
+              data-testid="reveal-word"
+              aria-label={revealWordLabel}
+              disabled={isRevealWordDisabled}
+              onclick={onRevealWord}>{revealWordText}</button
+            >
+          </div>
+        {/if}
+        <span
+          class="room-toolbar-more"
+          class:shown={roomToolbarHasMore}
+          data-testid="room-toolbar-more"
+          aria-hidden="true"
+        ></span>
       </div>
     {/if}
   </header>
@@ -1154,7 +1305,8 @@
     color: #a4161a;
   }
 
-  /* Title, status, invitation link and undo on one row; it wraps when it must. */
+  /* Title, status, invitation link and the room toolbar on one row; it wraps
+     when it must. */
   .room-header {
     flex: none;
     display: flex;
@@ -1192,16 +1344,43 @@
     flex: none;
   }
 
-  /* On a roomy window the undo and check panels are items of the header row. */
-  .header-actions {
-    display: contents;
+  /* The room toolbar holds the undo, check and reveal controls (spec 024). On a
+     roomy window it is one item of the header row, and it wraps when it must. */
+  .room-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
   }
 
   .undo-panel,
-  .check-panel {
+  .check-panel,
+  .reveal-panel {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  /* A toolbar that scrolls cuts an outline drawn outside a control: draw it
+     inside instead (3px wide, so spec 035 AC-2 still holds). The same on a roomy
+     window, so the outline always stays inside the toolbar. */
+  .room-toolbar :focus-visible {
+    outline-offset: -3px;
+  }
+
+  /* A reveal button disabled by a spent budget says why with its own text
+     ("Plus de lettre"), so the text keeps 4.5:1 against the button instead of
+     the browser's pale grey (spec 024). The dashed border shows it is disabled. */
+  .reveal-panel button:disabled {
+    color: #4a4f5c;
+    background-color: #f2f3f6;
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+
+  .host-panel-more,
+  .room-toolbar-more {
+    display: none;
   }
 
   /* The roster and the feed: stacked on a roomy window. */
@@ -1300,10 +1479,6 @@
     font-size: 0.8rem;
   }
 
-  .host-panel-more {
-    display: none;
-  }
-
   .settings-form {
     display: flex;
     flex-wrap: wrap;
@@ -1388,21 +1563,36 @@
 
     /* The header takes two rows whatever the width of the system font (a wider
        font made it take three, and the grid lost its room): the title, the
-       status and the invitation link on the first, the undo and check buttons
-       on the second. The link has a basis that is smaller than its text, so the
-       panel stays on the first row and the link shrinks, with its ellipsis, to
-       the room left there. The undo and check panels are one block, too wide to
-       fit beside the link, so they always go to the second row (spec 013 AC-6,
-       spec 014 AC-7). */
+       status and the invitation link on the first, the room toolbar on the
+       second. The link has a basis that is smaller than its text, so the panel
+       stays on the first row and the link shrinks, with its ellipsis, to the
+       room left there. The toolbar has a basis of the whole width, so it always
+       goes to the second row (spec 013 AC-6, spec 014 AC-7). */
     .share-panel {
       flex: 1 1 17rem;
     }
 
-    .header-actions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.25rem 0.75rem;
+    /* The toolbar is one row that never wraps, so new controls cost no height,
+       and it scrolls sideways when its content is wider (spec 024). Its
+       scrollbar is hidden: it would take height, and the edge fade already
+       shows that more content is hidden. */
+    .room-toolbar {
+      flex: 1 1 100%;
+      min-width: 0;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .room-toolbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .undo-panel,
+    .check-panel,
+    .reveal-panel {
+      flex: none;
     }
 
     .presence {
@@ -1472,22 +1662,32 @@
       scroll-padding: 0 2rem 0 8px;
     }
 
-    /* A fade stuck to the right edge of the visible part of the panel. Its
-       negative margin cancels its width and the row gap: no layout change. */
-    .host-panel-more {
+    /* A fade stuck to the right edge of the visible part of the host panel or
+       the toolbar. Its negative margin cancels its width and the gap before
+       it: no layout change. */
+    .host-panel-more,
+    .room-toolbar-more {
       display: block;
       flex: none;
       position: sticky;
       right: 0;
       align-self: stretch;
       width: 1.5rem;
-      margin-left: calc(-1.5rem - 0.5rem);
       background: linear-gradient(to right, transparent, Canvas);
       pointer-events: none;
       visibility: hidden;
     }
 
-    .host-panel-more.shown {
+    .host-panel-more {
+      margin-left: calc(-1.5rem - 0.5rem);
+    }
+
+    .room-toolbar-more {
+      margin-left: calc(-1.5rem - 0.75rem);
+    }
+
+    .host-panel-more.shown,
+    .room-toolbar-more.shown {
       visibility: visible;
     }
 
@@ -1510,7 +1710,8 @@
     /* The fade never covers a control that has the keyboard focus. A mouse click
        or a tap also focuses a control, but it must not hide the fade (spec 014
        AC-7), so this follows a class set only for keyboard focus. */
-    .host-panel.keyboard-focus .host-panel-more {
+    .host-panel.keyboard-focus .host-panel-more,
+    .room-toolbar.keyboard-focus .room-toolbar-more {
       visibility: hidden;
     }
 

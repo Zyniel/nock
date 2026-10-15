@@ -11,7 +11,8 @@
 // Call `onChange` after the list or one of its items changes size (a resize, a
 // rotation, a new root font), and after its content changes (an item comes or
 // goes, a button shows or goes, a text changes). Returns a function that stops.
-function watchListChanges(list: HTMLElement, onChange: () => void): () => void {
+// The room toolbar, a row that scrolls sideways, uses it too (spec 024).
+export function watchListChanges(list: HTMLElement, onChange: () => void): () => void {
   const sizeObserver = new ResizeObserver(onChange)
   // The items come and go, so the size observer follows the items of the moment.
   function observeSizes(): void {
