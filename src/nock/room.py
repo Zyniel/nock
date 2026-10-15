@@ -707,14 +707,14 @@ def handle_message(
     A ping is answered with a pong and is not input; neither is a join. Any
     other message is input: it sets `last_input_at`, and an idle player becomes
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
-    `select_cell`, edits (`edit_letter`, `erase`), `undo` and the host actions
-    (`remove_player`, `lock_room`, `change_settings`, `mute_player`), `check`,
-    `reveal` and `vote` (input, not rate-limited) have their rules here. Before a
-    `check`, a `reveal` or a `vote`, an open vote whose time is over closes, with
-    its entry after the wake-up entry (spec 025). `pencil_edit` and
-    `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
-    them their meaning. Until the spec that gives another message its meaning
-    is built, the message is read and ignored: nothing is sent.
+    `select_cell`, edits (`edit_letter`, `erase`, `pencil_edit`,
+    `confirm_pencil`), `undo` and the host actions (`remove_player`,
+    `lock_room`, `change_settings`, `mute_player`), `check`, `reveal` and `vote`
+    (input, not rate-limited) have their rules here. Before a `check`, a
+    `reveal` or a `vote`, an open vote whose time is over closes, with its entry
+    after the wake-up entry (spec 025). Until the spec that gives another
+    message its meaning is built, the message is read and ignored: nothing is
+    sent.
     """
     if _find_player(state, player_id) is None:
         return _refuse(state, ErrorCode.NOT_JOINED, "Join the room first.")
@@ -769,12 +769,10 @@ def _run_message(
     """Run the rule of one message."""
     if isinstance(message, Ping):
         return Outcome(state=state, reply=(Pong(),))
-    if isinstance(message, EditLetter):
+    if isinstance(message, EditLetter | Erase | PencilEdit):
         return _apply_edit(state, player_id, message, now, config)
-    if isinstance(message, Erase):
-        return _apply_edit(state, player_id, message, now, config)
-    if isinstance(message, PencilEdit | ConfirmPencil):
-        return _count_unhandled_edit(state, player_id, now, config)
+    if isinstance(message, ConfirmPencil):
+        return _confirm_pencil(state, player_id, message, now, config)
     if isinstance(message, Undo):
         return _undo(state, player_id, now)
     if isinstance(message, Check | Reveal | Vote):
@@ -988,29 +986,14 @@ def _with_edit_counted(state: RoomState, player_id: str, now: float) -> RoomStat
     return _replace_player(state, changed)
 
 
-def _count_unhandled_edit(
-    state: RoomState, player_id: str, now: float, config: RoomConfig
-) -> Outcome:
-    """Count a pencil edit or a confirmation, which spec 020 will give a meaning.
-
-    Once the grid is solved, the edit is refused with grid_solved instead.
-    """
-    refusal = _rate_limit_refusal(state, player_id, now, config)
-    if refusal is not None:
-        return refusal
-    if state.solved:
-        return _refuse_solved(state)
-    return Outcome(state=_with_edit_counted(state, player_id, now))
-
-
 def _refuse_solved(state: RoomState) -> Outcome:
     """Refuse an input because the grid is already solved."""
     return _refuse(state, ErrorCode.GRID_SOLVED, "The grid is already solved.")
 
 
 def _is_filled(cell: CellState) -> bool:
-    """Tell whether a letter cell holds a letter that is not a pencil letter."""
-    return cell.letter is not None and not cell.pencil
+    """Tell whether a letter cell holds a letter, a pencil letter included."""
+    return cell.letter is not None
 
 
 def _is_full(state: RoomState) -> bool:
@@ -1075,13 +1058,14 @@ def _find_cell(state: RoomState, row: int, column: int) -> CellState | None:
 def _edit_refusal(
     state: RoomState,
     player_id: str,
-    edit: EditLetter | Erase,
+    edit: EditLetter | Erase | PencilEdit | ConfirmPencil,
     now: float,
     config: RoomConfig,
 ) -> Outcome | None:
     """Run the edit checks in their fixed order; return the first refusal.
 
-    Check 5 refuses every edit once the grid is solved (spec 026).
+    Check 5 refuses every edit once the grid is solved (spec 026). A
+    confirmation has one more check of its own, after these five (spec 020).
     """
     rate_refusal = _rate_limit_refusal(state, player_id, now, config)
     if rate_refusal is not None:
@@ -1110,7 +1094,11 @@ def _edit_refusal(
     return None
 
 
-def _is_stale(cell: CellState, player_id: str, edit: EditLetter | Erase) -> bool:
+def _is_stale(
+    cell: CellState,
+    player_id: str,
+    edit: EditLetter | Erase | PencilEdit | ConfirmPencil,
+) -> bool:
     """Tell whether someone else changed the cell after the edit's `base_seq`."""
     if edit.base_seq is None:
         return False
@@ -1119,9 +1107,9 @@ def _is_stale(cell: CellState, player_id: str, edit: EditLetter | Erase) -> bool
     return cell.changed_by != player_id
 
 
-def _letter_of(edit: EditLetter | Erase) -> str | None:
+def _letter_of(edit: EditLetter | Erase | PencilEdit) -> str | None:
     """Return the letter an edit writes: the typed letter, None for an erase."""
-    if isinstance(edit, EditLetter):
+    if isinstance(edit, EditLetter | PencilEdit):
         return edit.letter
     return None
 
@@ -1129,25 +1117,72 @@ def _letter_of(edit: EditLetter | Erase) -> str | None:
 def _apply_edit(
     state: RoomState,
     player_id: str,
-    edit: EditLetter | Erase,
+    edit: EditLetter | Erase | PencilEdit,
     now: float,
     config: RoomConfig,
 ) -> Outcome:
-    """Check one edit, then write it in the cell and number its event."""
+    """Check one edit, then write it in the cell and number its event.
+
+    A `pencil_edit` writes a pencil letter (spec 020); the other two write a
+    normal letter or empty the cell.
+    """
     refusal = _edit_refusal(state, player_id, edit, now, config)
     if refusal is not None:
         return refusal
-
-    letter = _letter_of(edit)
-    seq = state.seq + 1
-    author = player_id if letter is not None else None
     old_cell = _find_cell(state, edit.row, edit.column)
     if old_cell is None:
         return _refuse(state, ErrorCode.NOT_A_LETTER_CELL, "Not a letter cell.")
+    letter = _letter_of(edit)
+    is_pencil = isinstance(edit, PencilEdit)
+    return _write_cell(state, player_id, old_cell, letter, is_pencil, now)
+
+
+def _confirm_pencil(
+    state: RoomState,
+    player_id: str,
+    confirmation: ConfirmPencil,
+    now: float,
+    config: RoomConfig,
+) -> Outcome:
+    """Check a confirmation, then make the cell's pencil letter a normal letter.
+
+    After the five edit checks, a cell that holds no pencil letter is refused
+    with stale_edit (spec 020 decision 2). The confirmer becomes the author.
+    """
+    refusal = _edit_refusal(state, player_id, confirmation, now, config)
+    if refusal is not None:
+        return refusal
+    old_cell = _find_cell(state, confirmation.row, confirmation.column)
+    if old_cell is None:
+        return _refuse(state, ErrorCode.NOT_A_LETTER_CELL, "Not a letter cell.")
+    if old_cell.letter is None or not old_cell.pencil:
+        return _refuse(
+            state,
+            ErrorCode.STALE_EDIT,
+            f"({confirmation.row}, {confirmation.column}) holds no pencil letter.",
+        )
+    return _write_cell(state, player_id, old_cell, old_cell.letter, False, now)
+
+
+def _write_cell(
+    state: RoomState,
+    player_id: str,
+    old_cell: CellState,
+    letter: str | None,
+    is_pencil: bool,
+    now: float,
+) -> Outcome:
+    """Write an accepted edit in its cell, count it and number its event.
+
+    The player becomes the author of the letter (an empty cell has none) and
+    their `last_edit` records the cell as it was (spec 018).
+    """
+    seq = state.seq + 1
+    author = player_id if letter is not None else None
     edited_cell = old_cell.model_copy(
         update={
             "letter": letter,
-            "pencil": False,
+            "pencil": is_pencil,
             "author": author,
             "wrong": False,
             "changed_seq": seq,
@@ -1161,10 +1196,10 @@ def _apply_edit(
     new_state = new_state.model_copy(update={"seq": seq})
     event = LetterChanged(
         seq=seq,
-        row=edit.row,
-        column=edit.column,
+        row=old_cell.row,
+        column=old_cell.column,
         letter=letter,
-        pencil=False,
+        pencil=is_pencil,
         player_id=player_id,
     )
     return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))

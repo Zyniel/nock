@@ -16,7 +16,7 @@
     watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
-  import type { LetterCellView, Snapshot, VoteView } from './roomSession'
+  import type { LetterCellView, PendingEdit, Snapshot, VoteView } from './roomSession'
   import {
     EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
@@ -619,7 +619,74 @@
     )
   }
 
+  // The letter cell of the selection, which the pencil and reveal controls act on.
+  let selectedCell = $derived(
+    selection === null ? null : letterCellAt(selection.row, selection.column),
+  )
+
+  // ---- Pencil letters (spec 020) ----
+
+  // Off at each page load; each click of the toggle flips it.
+  let isPencilMode = $state(false)
+
+  function togglePencilMode(): void {
+    isPencilMode = !isPencilMode
+  }
+
+  // The message of an edit by its kind: edit_letter or erase for 'edit',
+  // pencil_edit for 'pencil', confirm_pencil for 'confirm'.
+  function editMessage(
+    edit: Pick<PendingEdit, 'row' | 'column' | 'letter' | 'kind'>,
+    baseSeq: number | null,
+  ): object {
+    const { row, column, letter } = edit
+    if (edit.kind === 'confirm') {
+      return { type: 'confirm_pencil', row, column, base_seq: baseSeq }
+    }
+    if (edit.kind === 'pencil') {
+      return { type: 'pencil_edit', row, column, letter, base_seq: baseSeq }
+    }
+    if (letter === null) {
+      return { type: 'erase', row, column, base_seq: baseSeq }
+    }
+    return { type: 'edit_letter', row, column, letter, base_seq: baseSeq }
+  }
+
+  // Show an edit of a cell at once, keep it pending until the server answers,
+  // and send it with `baseSeq`.
+  function startEdit(
+    cell: LetterCellView,
+    letter: string | null,
+    kind: PendingEdit['kind'],
+    baseSeq: number | null,
+  ): void {
+    addPendingEdit(session, cell.row, cell.column, letter, kind)
+    sendEdit(editMessage({ row: cell.row, column: cell.column, letter, kind }, baseSeq))
+  }
+
+  // The confirm control works on the selected cell when it shows a pencil
+  // letter (confirmed or pending), is not locked, and the grid is not solved.
+  let isConfirmPencilDisabled = $derived(
+    session.solved ||
+      selectedCell === null ||
+      selectedCell.locked ||
+      !shownCell(selectedCell, session.pendingEdits).pencil,
+  )
+
+  // Confirm the selected cell's pencil letter. The page's seq goes in base_seq,
+  // so that a letter another player changed meanwhile is refused (decision 3).
+  // The selection does not move.
+  function onConfirmPencil(): void {
+    if (isConfirmPencilDisabled || selectedCell === null) {
+      return
+    }
+    const shown = shownCell(selectedCell, session.pendingEdits)
+    startEdit(selectedCell, shown.letter, 'confirm', session.seq)
+  }
+
   // Type a letter on the selected cell, then move to the next unlocked cell.
+  // With pencil mode on it is a pencil letter. A cell that already shows the
+  // letter with the mode's pencil flag sends nothing.
   function onLetter(letter: string): void {
     if (session.solved || selection === null || activeWord === null) {
       return
@@ -628,15 +695,10 @@
     if (cell === null || cell.locked) {
       return
     }
-    if (shownCell(cell, session.pendingEdits).letter !== letter) {
-      addPendingEdit(session, cell.row, cell.column, letter)
-      sendEdit({
-        type: 'edit_letter',
-        row: cell.row,
-        column: cell.column,
-        letter,
-        base_seq: null,
-      })
+    const shown = shownCell(cell, session.pendingEdits)
+    const isAlreadyShown = shown.letter === letter && shown.pencil === isPencilMode
+    if (!isAlreadyShown) {
+      startEdit(cell, letter, isPencilMode ? 'pencil' : 'edit', null)
     }
     const here = indexInWord(activeWord, cell)
     for (let index = here + 1; index < activeWord.cells.length; index++) {
@@ -654,8 +716,7 @@
     if (cell.locked || shownCell(cell, session.pendingEdits).letter === null) {
       return false
     }
-    addPendingEdit(session, cell.row, cell.column, null)
-    sendEdit({ type: 'erase', row: cell.row, column: cell.column, base_seq: null })
+    startEdit(cell, null, 'edit', null)
     return true
   }
 
@@ -718,9 +779,6 @@
   // What is left of the room's budget.
   let lettersLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.letters)
   let wordsLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.words)
-  let selectedCell = $derived(
-    selection === null ? null : letterCellAt(selection.row, selection.column),
-  )
 
   // True when every cell of the word is locked: nothing is left to reveal there.
   function isWordLocked(word: Word): boolean {
@@ -1039,28 +1097,14 @@
     }
   }
 
-  // Send my pending edits again, oldest first, each with the base_seq it had.
-  // They are paced, the first one at once, then one every EDIT_SEND_INTERVAL_MS.
+  // Send my pending edits again, oldest first, each as the message of its kind
+  // and with the base_seq it had. They are paced, the first one at once, then
+  // one every EDIT_SEND_INTERVAL_MS.
   function resendPendingEdits(): void {
     stopEditQueue()
     isSynced = true
     for (const edit of session.pendingEdits) {
-      if (edit.letter === null) {
-        editQueue.push({
-          type: 'erase',
-          row: edit.row,
-          column: edit.column,
-          base_seq: edit.baseSeq,
-        })
-      } else {
-        editQueue.push({
-          type: 'edit_letter',
-          row: edit.row,
-          column: edit.column,
-          letter: edit.letter,
-          base_seq: edit.baseSeq,
-        })
-      }
+      editQueue.push(editMessage(edit, edit.baseSeq))
     }
     editTimer = setInterval(sendNextQueuedEdit, EDIT_SEND_INTERVAL_MS)
     sendNextQueuedEdit()
@@ -1180,6 +1224,23 @@
           {#if isUndoMessageShown}
             <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
           {/if}
+        </div>
+        <div class="pencil-panel">
+          <button
+            type="button"
+            class="pencil-toggle"
+            data-testid="pencil-toggle"
+            aria-pressed={isPencilMode}
+            disabled={session.solved}
+            onclick={togglePencilMode}>{t('pencil.toggle')}</button
+          >
+          <button
+            type="button"
+            data-testid="confirm-pencil"
+            aria-label={t('pencil.confirm_label')}
+            disabled={isConfirmPencilDisabled}
+            onclick={onConfirmPencil}>{t('pencil.confirm')}</button
+          >
         </div>
         {#if isHelpShown}
           <div
@@ -1571,8 +1632,9 @@
     flex: none;
   }
 
-  /* The room toolbar holds the undo, check and reveal controls (spec 024). On a
-     roomy window it is one item of the header row, and it wraps when it must. */
+  /* The room toolbar holds the undo, pencil, check and reveal controls (specs
+     024 and 020). On a roomy window it is one item of the header row, and it
+     wraps when it must. */
   .room-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -1581,6 +1643,7 @@
   }
 
   .undo-panel,
+  .pencil-panel,
   .check-panel,
   .reveal-panel {
     display: flex;
@@ -1607,8 +1670,10 @@
 
   /* The authors switch when it is on: its text is underlined, like the band it
      draws under the letters. A text decoration shows on the engines' own button
-     look and keeps the button's size. */
-  .authors-switch[aria-pressed='true'] {
+     look and keeps the button's size. The pencil toggle shows that it is on the
+     same way. */
+  .authors-switch[aria-pressed='true'],
+  .pencil-toggle[aria-pressed='true'] {
     text-decoration: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 2px;
@@ -1938,6 +2003,7 @@
     }
 
     .undo-panel,
+    .pencil-panel,
     .check-panel,
     .reveal-panel {
       flex: none;

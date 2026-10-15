@@ -40,16 +40,21 @@ export interface LetterCellView {
   author: string | null
   // True while the letter in place was found wrong by the last check of it.
   wrong: boolean
+  // True while the letter in place is a pencil letter (spec 020).
+  pencil: boolean
 }
 
 // An edit this page sent and that has no answer yet (spec 015).
 export interface PendingEdit {
   row: number
   column: number
-  // `null` for an erase.
+  // `null` for an erase. For a confirmation, the letter it confirms.
   letter: string | null
   // The page's `seq` when the edit was made (spec 017 uses it).
   baseSeq: number | null
+  // The message that made it: 'edit' (edit_letter or erase), 'pencil'
+  // (pencil_edit) or 'confirm' (confirm_pencil).
+  kind: 'edit' | 'pencil' | 'confirm'
 }
 
 export interface ClueCellView {
@@ -298,7 +303,8 @@ function toCell(value: unknown): CellView | null {
     const author = typeof cell.author === 'string' ? cell.author : null
     const revealed = cell.revealed === true
     const wrong = cell.wrong === true
-    return { type: 'letter', row, column, letter, locked, revealed, author, wrong }
+    const pencil = cell.pencil === true
+    return { type: 'letter', row, column, letter, locked, revealed, author, wrong, pencil }
   }
   return null
 }
@@ -636,7 +642,8 @@ export function endFlash(session: RoomSession, flashId: number): void {
   session.flashes = session.flashes.filter((flash) => flash.id !== flashId)
 }
 
-// A cell_locked locks the cell with its letter; a reveal also clears the author.
+// A cell_locked locks the cell with its letter, never a pencil one; a reveal
+// also clears the author.
 function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   const { message } = event
   const cell = letterCellAt(snapshot, message.row, message.column)
@@ -646,6 +653,7 @@ function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   cell.letter = typeof message.letter === 'string' ? message.letter : null
   cell.locked = true
   cell.wrong = false
+  cell.pencil = false
   cell.revealed = message.revealed === true
   if (cell.revealed) {
     cell.author = null
@@ -666,7 +674,8 @@ function applyCheckResult(snapshot: Snapshot, event: RoomEvent): void {
 }
 
 // True when my letter_changed is the answer to my oldest pending edit: the same
-// cell and the same letter. Otherwise it is the result of an undo (spec 018).
+// cell, the same letter and the same pencil flag (true for a pencil edit only).
+// Otherwise it is the result of an undo (spec 018, spec 020).
 function answersOldestPendingEdit(session: RoomSession, event: RoomEvent): boolean {
   const oldest = session.pendingEdits[0]
   if (oldest === undefined) {
@@ -674,7 +683,10 @@ function answersOldestPendingEdit(session: RoomSession, event: RoomEvent): boole
   }
   const { message } = event
   const letter = typeof message.letter === 'string' ? message.letter : null
-  return oldest.row === message.row && oldest.column === message.column && oldest.letter === letter
+  const pencil = message.pencil === true
+  const isPencilEdit = oldest.kind === 'pencil'
+  const isSameCell = oldest.row === message.row && oldest.column === message.column
+  return isSameCell && oldest.letter === letter && isPencilEdit === pencil
 }
 
 // A letter_changed updates the confirmed grid; one from me answers my oldest
@@ -688,6 +700,7 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
       startFlash(session, snapshot, cell, message.player_id)
     }
     cell.letter = letter
+    cell.pencil = message.pencil === true
     cell.wrong = false
     cell.author = letter === null || typeof message.player_id !== 'string' ? null : message.player_id
   }
@@ -935,25 +948,27 @@ export function addPendingEdit(
   row: number,
   column: number,
   letter: string | null,
+  kind: PendingEdit['kind'],
 ): void {
-  session.pendingEdits.push({ row, column, letter, baseSeq: session.seq })
+  session.pendingEdits.push({ row, column, letter, baseSeq: session.seq, kind })
 }
 
-// What a cell shows: the newest pending edit of the cell, else its confirmed
-// letter. A locked cell always shows its confirmed letter.
+// What a cell shows: the newest pending edit of the cell, else the confirmed
+// letter; a locked cell always shows its confirmed letter (specs 015, 016). The
+// pencil flag of a pending edit is true for a pencil edit only (spec 020).
 export function shownCell(
   cell: LetterCellView,
   pendingEdits: PendingEdit[],
-): { letter: string | null; unconfirmed: boolean } {
+): { letter: string | null; pencil: boolean; unconfirmed: boolean } {
   if (!cell.locked) {
     for (let index = pendingEdits.length - 1; index >= 0; index--) {
       const edit = pendingEdits[index]
       if (edit.row === cell.row && edit.column === cell.column) {
-        return { letter: edit.letter, unconfirmed: true }
+        return { letter: edit.letter, pencil: edit.kind === 'pencil', unconfirmed: true }
       }
     }
   }
-  return { letter: cell.letter, unconfirmed: false }
+  return { letter: cell.letter, pencil: cell.pencil, unconfirmed: false }
 }
 
 // The grid as the player sees it: every letter cell holds its shown letter, so
@@ -962,7 +977,8 @@ export function shownGrid(grid: GridView, pendingEdits: PendingEdit[]): GridView
   const cells: CellView[] = []
   for (const cell of grid.cells) {
     if (cell.type === 'letter') {
-      cells.push({ ...cell, letter: shownCell(cell, pendingEdits).letter })
+      const shown = shownCell(cell, pendingEdits)
+      cells.push({ ...cell, letter: shown.letter, pencil: shown.pencil })
     } else {
       cells.push(cell)
     }

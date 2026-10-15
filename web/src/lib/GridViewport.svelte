@@ -510,6 +510,7 @@
               aria-selected={isSelected(cell.row, cell.column)}
               data-letter={shown.letter ?? ''}
               data-unconfirmed={String(shown.unconfirmed)}
+              data-pencil={String(shown.pencil)}
               data-author={cell.author ?? ''}
               data-author-colour={authorMark ?? ''}
               data-locked={String(cell.locked)}
@@ -681,6 +682,16 @@
     text-decoration-line: line-through;
   }
 
+  /* A pencil letter (spec 020): in italics, the sign that does not rely on
+     colour, and in a grey that keeps at least 4.5:1 on the plain, word,
+     selected and tinted backgrounds. A cell that flashes takes the text colour
+     of its flash (the data-flash rules below), the one colour that keeps 4.5:1
+     on that flash. */
+  .letter[data-pencil='true'] {
+    font-style: italic;
+    color: #505050;
+  }
+
   .letter.locked {
     background: #dfe3ee;
     font-weight: 700;
@@ -832,8 +843,8 @@
   }
 
   /* After the other states, so a flash shows over them. Each text colour keeps
-     at least 4.5:1 on its flash colour; the corner mark of a revealed cell is
-     drawn in it too. */
+     at least 4.5:1 on its flash colour, for a pencil letter too; the corner mark
+     of a revealed cell is drawn in it too. */
   .letter[data-flash='0'] {
     background: var(--player-colour-0);
     color: #000000;
@@ -841,6 +852,7 @@
 
   .letter[data-flash='1'] {
     background: var(--player-colour-1);
+    color: #1f2330;
   }
 
   .letter[data-flash='2'] {
@@ -850,6 +862,7 @@
 
   .letter[data-flash='3'] {
     background: var(--player-colour-3);
+    color: #1f2330;
   }
 
   .letter[data-flash='4'] {
