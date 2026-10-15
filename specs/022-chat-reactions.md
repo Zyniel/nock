@@ -139,12 +139,19 @@ still type letters, check, flag (spec 021) and use every other control.
 - `recent_chat` and `recent_reactions` are not logged, like `recent_edits`
   (spec 018): replay does not restore them.
 - `after_restart` (spec 018) sets `recent_chat = ()` and `recent_reactions = ()`
-  on every player of the room, disconnected or not, as it clears `recent_edits`,
-  and adds no entry for it. A room loaded from a snapshot (which stores them) and
-  one rebuilt from the log alone thus give every player a fresh window after a
-  restart. (Note from the lead, 2026-10-15: added; `after_restart` kept both
-  tuples, so a restart from a snapshot kept limits that a restart from the log
-  lost, decision 17 (review of spec 022).)
+  on every player of the room, connected or disconnected, and adds no entry for
+  it. Spec 018 clears `recent_edits` only on the players the restart disconnects
+  (the players who were not disconnected yet, one `player_state_changed` entry
+  each); a player already disconnected before the restart has no entry from it,
+  and still gets both windows of this spec emptied. A room loaded from a snapshot
+  (which stores them) and one rebuilt from the log alone thus give every player a
+  fresh window after a restart. (Note from the lead, 2026-10-15: added;
+  `after_restart` kept both tuples, so a restart from a snapshot kept limits that
+  a restart from the log lost, decision 17 (review of spec 022).) (Note from the
+  lead, 2026-10-15: "disconnected or not, as it clears `recent_edits`" became
+  "connected or disconnected" and the difference with `recent_edits`, which spec
+  018 clears only for the players the restart disconnects (second review of spec
+  022).)
 
 ### Where chat is kept
 
@@ -197,13 +204,15 @@ export interface Snapshot {
   present only while the panel is closed and at least one line is unread. Its text
   is the number of unread lines in decimal digits, from 1 to 99, or
   `t("chat.unread_many")` (`99+`) above 99.
-- Height of the toggle: `chat-unread` sits in a slot of `chat-toggle` whose height
-  is fixed, kept empty while `chat-unread` is absent, so the toggle's bounding box
-  has the same height (1 px tolerance) with the panel closed and no unread line,
-  with the panel closed and `chat-unread` showing (one digit, two digits or `99+`),
-  and with the panel open. Its width may change with the count. (Note from the
-  lead, 2026-10-15: added; the toggle grew or shrank when the count appeared or
-  went, decision 18 (review of spec 022).)
+- Height of the toggle: the bounding box of `chat-toggle` keeps its height (1 px
+  tolerance) with the panel closed and no unread line, with the panel closed and
+  `chat-unread` showing (one digit, two digits or `99+`), and with the panel open.
+  Its width may change with the count. How the toggle keeps its height is the
+  implementer's choice. (Note from the lead, 2026-10-15: added; the toggle grew or
+  shrank when the count appeared or went, decision 18 (review of spec 022).) (Note
+  from the lead, 2026-10-15: reworded; the rule named a slot of fixed height for
+  `chat-unread`, which is a way to keep the height and not what users see: it now
+  requires the toggle's height only, decision 18 (second review of spec 022).)
 - Unread lines. The page keeps `lastSeenChatSeq`. At the page's first snapshot it
   is that snapshot's `seq`. While the panel is open it is the seq of the newest
   line of the history. A line is unread when its seq is greater than
@@ -224,7 +233,10 @@ export interface Snapshot {
   022's tests).) It is a `section` with `aria-labelledby="chat-heading"`. It holds, in
   document order: an `h2` with `id="chat-heading"` and the text
   `t("chat.heading")`; `chat-list`; `chat-moderation` when `you` is host; the chat
-  form; `chat-muted` or `chat-wait` when they apply.
+  form; the slot of the chat notes, which holds `chat-muted` or `chat-wait` when
+  one applies ("Client: sending, pacing and mute"). (Note from the lead,
+  2026-10-15: the slot replaces "`chat-muted` or `chat-wait` when they apply",
+  decision 20 (second review of spec 022).)
 - Placement: the panel is drawn over the page, like spec 025's vote banner.
   Opening or closing it changes the bounding box of no element outside it (1 px
   tolerance). It lies entirely inside the window, and `chat-toggle` stays
@@ -295,6 +307,16 @@ export interface Snapshot {
   pacing rule below holds. A submit (a click or `Enter` in the input) when it is
   enabled sends `{"type": "chat", "text": <the trimmed text>}` and empties the
   input. The page shows a line only when its `chat_message` arrives: no local echo.
+- Focus after sending: once a chat message is sent, the focus is on `chat-input`,
+  whichever way it was sent: `Enter` in `chat-input`, or the activation of
+  `chat-send` from the keyboard or by a click or tap. The submit empties the
+  input, which disables `chat-send`, so a focus that was on `chat-send` moves to
+  `chat-input`; it is never left on the disabled `chat-send` and never drops to
+  `document.body`. It holds too when the send starts the pacing below (`chat-send`
+  is then disabled, and `chat-input`, which pacing does not disable, has the
+  focus). (Note from the lead, 2026-10-15: added; the spec said nothing about the
+  focus after a send, so the focus of a keyboard or tap user could fall to
+  `document.body`, decision 21 (second review of spec 022).)
 - Pacing: the page sends a chat message only while fewer than 5 of its own chat
   messages were sent in the last 12,000 ms. While 5 were, `chat-send` is disabled
   and `data-testid="chat-wait"` shows `t("chat.wait")`. The page paces reactions
@@ -305,6 +327,19 @@ export interface Snapshot {
 - Muted: while my own `muted` is true (snapshot, or `player_muted`, applied by
   spec 014), `chat-input` and `chat-send` are disabled, `data-testid="chat-muted"`
   shows `t("chat.muted")`, and `react-button` is disabled.
+- Chat notes: `chat-muted` and `chat-wait` sit in one slot of the panel, after the
+  chat form. The slot is always present, empty when neither note applies, and one
+  line high; it shows one note at a time, and each note fits on that one line at
+  every window size of spec 006 AC-5 (at the default root font size). A note
+  coming or going thus leaves `chat-panel`'s bounding box unchanged (1 px
+  tolerance). `t("chat.wait")` is short so that it fits at 320 px wide (`fr.json`
+  keys). When both notes apply (a mute while the pacing holds), only `chat-muted`
+  shows; `chat-wait` shows again after an unmute if the pacing still holds. (Note
+  from the lead, 2026-10-15: added; the spec did not say that a note leaves the
+  panel's box alone, and the long wait text did not fit one line at 320 px wide,
+  decision 20 (second review of spec 022).) (Note from the lead, 2026-10-15: the
+  last sentence is added; it was an open question, decision 22 (second review of
+  spec 022).)
 - Focus at a mute: when my `muted` becomes true while the focus is on `chat-input`
   or `chat-send`, the focus moves to `chat-toggle` at once, never to
   `document.body`; the panel stays open, and the text typed in `chat-input` stays
@@ -405,7 +440,7 @@ sees `chat-moderation`.
 | `chat.input_label` | `Message` |
 | `chat.placeholder` | `Écrire au salon` |
 | `chat.send` | `Envoyer` |
-| `chat.wait` | `Patientez un instant avant le prochain message.` |
+| `chat.wait` | `Patientez avant d'envoyer.` |
 | `chat.muted` | `L'hôte a coupé votre discussion.` |
 | `chat.moderation_heading` | `Sourdine` |
 | `chat.mute` | `Couper` |
@@ -427,6 +462,10 @@ sees `chat-moderation`.
 | `reaction.thinking_label` | `Je réfléchis` |
 | `reaction.shown_label` | `{name} : {reaction}` |
 
+(Note from the lead, 2026-10-15: `chat.wait` was `Patientez un instant avant le
+prochain message.`; it is shortened so that it fits on the one line of the chat
+notes' slot at 320 px wide, decision 20 (second review of spec 022).)
+
 The five emoji are U+1F44D, U+1F44F, U+1F602, U+1F62E and U+1F914.
 Spec 035 AC-9's checker reads every `fr.json` value as a pattern and must still
 flag `Loading…`, `Salon` and `Check word`; none of these values matches them (no
@@ -437,7 +476,9 @@ value is a bare placeholder or two placeholders around a space).
 - Rule tests: `new_room("ABC123", fx01_grid, NOW)`, players `p1` (host) and `p2`
   added with `join_room` at `NOW` (seq 2); messages applied with
   `handle_message(state, player_id, message, now)`; mutes with `MutePlayer` from
-  `p1`.
+  `p1`; a closed connection with `disconnect_player(state, player_id, now)`
+  (spec 012). (Note from the lead, 2026-10-15: `disconnect_player` is added for
+  AC-9's restart case (second review of spec 022).)
 - WebSocket tests: spec 011's `TestClient` on a FX-01 room with
   `RoomConfig(max_edits_per_second=1000)`; AC-1 also sets `chat_limit=1000`; AC-9
   uses spec 011's `FakeClock` with
@@ -454,10 +495,11 @@ value is a bare placeholder or two placeholders around a space).
   `feed-item`; a line event is a `chat_message` from `p2` with the text
   `Ligne <seq>`. "Settled", the scroll probe and "items in view" are spec 013's.
 - Pacing (AC-10): real time, or Playwright's page clock as spec 017 AC-5 does.
-- Votes and mutes (AC-15, AC-17, AC-18): vote frames are built with spec 039's
-  `VoteOpened` and `VoteClosed`, as in spec 025's harness, and mutes with
+- Votes and mutes (AC-15, AC-17, AC-18, AC-19): vote frames are built with spec
+  039's `VoteOpened` and `VoteClosed`, as in spec 025's harness, and mutes with
   `PlayerMuted`. (Note from the lead, 2026-10-15: added with AC-17 and AC-18
-  (review of spec 022).)
+  (review of spec 022).) (Note from the lead, 2026-10-15: AC-19 is added to the
+  list, it mutes and unmutes `you` (second review of spec 022).)
 - Scans: spec 035's contrast and language scans. Chat text is user content, not an
   interface string: a language scan run on a state with chat lines adds the texts
   of the lines the test sent (in the snapshot or in events) to its test data, as it
@@ -487,7 +529,7 @@ The words in brackets say how each criterion is tested.
   - Toggle height: the steps above run at 1280 by 720 and again at 568 by 320. At each size, the height of `chat-toggle`'s bounding box is the same (1 px tolerance) in each of these states: at load (panel closed, no `chat-unread`), with `chat-unread` reading `2`, with the panel open, with `chat-unread` reading `1`, and, in the separate run, with `chat-unread` reading `99+`. (Note from the lead, 2026-10-15: added, decision 18 (review of spec 022).)
 - **AC-7** (AC-5.4.4) (Python; WebSocket; browser with live server) The host can mute a player's chat. Python: after `MutePlayer(player_id="p2", muted=True)` from the host `p1` (spec 014 AC-6), `Chat(text="salut")` from `p2` is answered with one `ErrorMessage` with code `muted`, gives no entry and leaves `state.chat` unchanged, and `React` from `p2` gives no entry, no reply and an empty `to_others`; after `MutePlayer(player_id="p2", muted=False)`, the same chat gives its `ChatMessage`. WebSocket: host A and B join; A mutes B; B's `chat` gets `error` `muted` and A receives nothing for it; A unmutes B; B's next `chat` reaches A and B. Browser: Ana (host) and Bob join one FX-01 room and open their chat; Bob's panel holds no `chat-moderation`; Ana's holds one `mute-row` for Bob whose `mute-player` reads `fr.json["chat.mute"]`, with the `aria-label` `Couper la discussion de Bob` and `data-muted="false"`. Ana clicks it: within 1 s Bob's `chat-input` and `chat-send` are disabled, his `chat-muted` shows `fr.json["chat.muted"]` and his `react-button` is disabled, and Ana's button reads `fr.json["chat.unmute"]` with `data-muted="true"`. Ana clicks it again: within 1 s Bob's `chat-input` is enabled and his `chat-muted` is gone.
 - **AC-8** (AC-5.4.4) (Python with a `RoomStore`; WebSocket with captured logs) Chat is kept only with its room, so that deleting the room at expiry deletes it. Python: a `RoomStore` on a file in `tmp_path` holds rooms `AAAAAA` and `BBBBBB`, each created with `create_room`; the entries of a play in `AAAAAA` where `p1` sends `Chat(text="secret-a-42")` are appended, and a snapshot of its state is saved; reading the file with `sqlite3`, at least one row holds the text `secret-a-42`, and every row of every table that holds it in one of its columns has a column `code` equal to `AAAAAA`. WebSocket: with `caplog` capturing every logger at level DEBUG, A and B join a FX-01 room and A sends `secret-b-77`; B receives it, and no captured log record's message holds `secret-b-77`. Deleting the room at expiry is tested by spec 032 AC-1 and spec 038 AC-2.
-- **AC-9** (new) (Python; WebSocket with a fake clock) Each player may send at most 5 chat messages and 5 reactions in any 10 seconds; the server drops the rest without an answer. Python: in the two-player room, six `Chat` from `p1` at `NOW`: the first five give their `ChatMessage` (seq 3 to 7), the sixth gives no entry and no reply and leaves `state.chat` unchanged; at `NOW + 9.9` a `Chat` from `p1` is dropped as well; at `NOW + 10.0` it is accepted with seq 8; a `Chat` from `p2` at `NOW` is accepted whatever `p1` sent; a refused (`muted`) or dropped message is not counted. Six `React` from `p1` at `NOW`: the first five are relayed (`reply` and `to_others`), the sixth gives nothing; at `NOW + 10.0` one is relayed again. A dropped `React` (from a muted player, on a clue that names no word, or over the limit) is not counted either: it leaves `recent_reactions` unchanged. (Note from the lead, 2026-10-15: this sentence is added; "is not counted" was written for `Chat` only (review of spec 022).) Restart: after five `Chat` and five `React` from `p1` at `NOW`, `after_restart(state, NOW + 1)` gives a state in which every player has `recent_chat == ()` and `recent_reactions == ()`, and whose entries are only spec 018's `player_state_changed` (`disconnected`) ones, one per player in players order. (Note from the lead, 2026-10-15: added, decision 17 (review of spec 022).) WebSocket: with the fake clock frozen, B sends seven `chat` messages; A receives exactly five `chat_message`, B receives those five and no `error`; after `advance(10)`, B's next `chat` reaches A.
+- **AC-9** (new) (Python; WebSocket with a fake clock) Each player may send at most 5 chat messages and 5 reactions in any 10 seconds; the server drops the rest without an answer. Python: in the two-player room, six `Chat` from `p1` at `NOW`: the first five give their `ChatMessage` (seq 3 to 7), the sixth gives no entry and no reply and leaves `state.chat` unchanged; at `NOW + 9.9` a `Chat` from `p1` is dropped as well; at `NOW + 10.0` it is accepted with seq 8; a `Chat` from `p2` at `NOW` is accepted whatever `p1` sent; a refused (`muted`) or dropped message is not counted. Six `React` from `p1` at `NOW`: the first five are relayed (`reply` and `to_others`), the sixth gives nothing; at `NOW + 10.0` one is relayed again. A dropped `React` (from a muted player, on a clue that names no word, or over the limit) is not counted either: it leaves `recent_reactions` unchanged. (Note from the lead, 2026-10-15: this sentence is added; "is not counted" was written for `Chat` only (review of spec 022).) Restart: after five `Chat` and five `React` from `p1` at `NOW`, a `Chat` and a `React` from `p2` at `NOW`, and `disconnect_player(state, "p2", NOW)` (spec 012), so that `p2` is already disconnected (`p1`'s two tuples hold 5 times each, `p2`'s hold 1), `after_restart(state, NOW + 1)` gives a state in which every player, connected or disconnected, has `recent_chat == ()` and `recent_reactions == ()`, and whose only entry is spec 018's `player_state_changed` (`disconnected`) of `p1`: the restart writes one such entry for each player who was not disconnected, in players order, and none for `p2`. (Note from the lead, 2026-10-15: added, decision 17 (review of spec 022).) (Note from the lead, 2026-10-15: the case now has `p2` disconnected before the restart; "every player" became "every player, connected or disconnected" and "one per player" became "one for each player who was not disconnected", because spec 018's `after_restart` writes an entry only for those (second review of spec 022).) WebSocket: with the fake clock frozen, B sends seven `chat` messages; A receives exactly five `chat_message`, B receives those five and no `error`; after `advance(10)`, B's next `chat` reaches A.
 - **AC-10** (new) (browser with mocked socket) The page paces its own chat messages and reactions under the server's limit. With the panel open, the player sends `m1` to `m5` with `Enter`, and the mock answers each with its `chat_message` from `p1`: the mock received exactly five `chat` frames; `chat-send` is then disabled, `chat-wait` shows `fr.json["chat.wait"]`, and `Enter` in the non-empty input sends nothing (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted); 12 seconds after the first send, `chat-send` is enabled again and `chat-wait` is gone. Likewise, after five reactions chosen in the picker within a few seconds, every `reaction-option` is disabled, and they are enabled again 12 seconds after the first. The mock sends no `error` in this test.
 - **AC-11** (new) (browser with mocked socket) A new line brings the chat list to its newest line only when the list was at its end; otherwise the reader keeps their place. The rules are spec 013's "Client: feed scroll position" applied to the chat list ("Client: the chat list"); the setup, "settled", the probe and "items in view" are those of "Chat scroll states" in "Test harness". The cases of spec 013 AC-7 run in its order, at 1280 by 720 and at 360 by 740, with these changes: "Filling" sends seq 6 to 15; "My own action" is replaced by: the player types `moi` in `chat-input` and presses `Enter`, the mock answers with the `chat_message` of `p1` with the next seq once it received the `chat` frame, and the probe, started just before `Enter`, stays put; "Full feed" sends lines up to seq 205, so that the list holds 200 lines (seq 6 to 205), and the line with seq 206 leaves the first `chat-message` with `data-seq` 7. The cases of spec 013 AC-8 (smaller window, larger root font, larger window) then run on the chat list at its end.
 - **AC-12** (new) (browser with mocked socket, keyboard only after the setup) The chat list can be scrolled from the keyboard in every engine. With `you` not host (the snapshot makes `p2` host, so the panel holds no `chat-moderation`), the panel open and 40 lines from `p2`, at 360 by 740, 568 by 320 and 1280 by 720: `chat-list` scrolls (the test checks it from its measures), has `role="list"` and `tabindex="0"`, and `page.get_by_role("list", name=fr.json["chat.heading"], exact=True)` resolves to exactly it; with the focus on `chat-input` (where opening the panel puts it), one `Shift+Tab` puts the focus on `chat-list`, whose outline then meets spec 035 AC-2 and passes spec 035's "Not clipped" and "Not covered" measures; `ArrowUp` makes its `scrollTop` smaller within 300 ms and it keeps the focus; a new line from `p2` then leaves its `scrollTop` within 1 px and the focus on it; `Tab` then puts the focus back on `chat-input`. With two lines only, the list does not scroll and has no `tabindex` attribute, and one `Shift+Tab` from `chat-input` puts the focus on an element outside `chat-panel`.
@@ -505,11 +547,18 @@ The words in brackets say how each criterion is tested.
   - List focus: in a second run, before the `vote_opened`, the test presses `Shift+Tab` from `chat-input` so that `chat-list` has the focus, then reads the same values; after the `vote_opened`, at the same two moments, the same checks hold with `document.activeElement` being `chat-list`. No check of the outline of `chat-list` is made while the banner shows.
   - After the vote: in each run the mock then sends `vote_closed` (the next seq, `rejected`); once `vote-banner` has left the page (spec 025: between 2,500 and 4,500 ms later), `document.elementFromPoint` at each of the five panel points returns `chat-panel` or a descendant, and `chat-panel` still has the bounding box read before (1 px tolerance).
   (Note from the lead, 2026-10-15: added, decision 16 (review of spec 022).)
-- **AC-18** (new) (browser with mocked socket) A mute closes the reaction picker and moves the focus off the disabled chat controls. Given a FX-01 snapshot with `seq` 5 in which `p2` is host (so `you`, `p1`, is not), at 1280 by 720 and at 360 by 740; "the mute" is the mock's `player_muted` with seq 6 for `p1` with `muted` true:
-  - Picker: after a tap on the clue cell (2, 0) (VIDE) and a click on `react-button`, the picker is open and its first `reaction-option` has the focus; after the mute, within 300 ms, there is no `reaction-picker`, `react-button` is disabled with `aria-expanded="false"`, and `document.activeElement` is the `grid` element; the mock received no `react` frame. In a second run with the panel opened first (by a click on `chat-toggle`), then VIDE tapped and the picker opened (its first option has the focus): after the mute, within 300 ms, there is no `reaction-picker`, `document.activeElement` is the `grid` element, and `chat-panel` is present with the bounding box it had before the mute (1 px tolerance).
+- **AC-18** (new) (browser with mocked socket) A mute closes the reaction picker and moves the focus off the disabled chat controls. Given a FX-01 snapshot with `seq` 5 in which `p2` is host (so `you`, `p1`, is not), at 1280 by 720 and at 360 by 740; "the mute" is the mock's `player_muted` with seq 6 for `p1` with `muted` true. In every case below, "within 300 ms" counts from the moment the mock sends the mute frame and is one deadline for all the checks of the case: each check holds at the latest 300 ms after that moment (the test gives each check the time left to that deadline, not 300 ms of its own):
+  - Picker: after a tap on the clue cell (2, 0) (VIDE) and a click on `react-button`, the picker is open and its first `reaction-option` has the focus; after the mute, within 300 ms, there is no `reaction-picker`, `react-button` is disabled with `aria-expanded="false"`, and `document.activeElement` is the `grid` element; the mock received no `react` frame. In a second run, the test taps VIDE first, then opens the panel (a click on `chat-toggle`), then the picker (a click on `react-button`; its first option has the focus), in this order because on a narrow window the open panel may cover the clue cell: after the mute, within 300 ms, there is no `reaction-picker`, `document.activeElement` is the `grid` element, and `chat-panel` is present with the bounding box it had before the mute (1 px tolerance).
   - Chat input: with the panel open, the test types `salut` in `chat-input` (which has the focus); after the mute, within 300 ms, `chat-input` and `chat-send` are disabled, `chat-muted` shows, `chat-panel` is present, `chat-input`'s value is `salut`, and `document.activeElement` is `chat-toggle`.
   - Send button: as the previous case, but with one `Tab` from `chat-input` after typing, so that `chat-send` (enabled) has the focus before the mute; after it, within 300 ms, `document.activeElement` is `chat-toggle`.
-  (Note from the lead, 2026-10-15: added, decision 19 (review of spec 022).)
+  (Note from the lead, 2026-10-15: added, decision 19 (review of spec 022).) (Note from the lead, 2026-10-15: the second picker run now taps VIDE before it opens the panel, which on a narrow window may cover the cell; and the 300 ms count from the mute frame, one deadline for all the checks of a case, where each check could be read as having 300 ms of its own (second review of spec 022).)
+- **AC-19** (new) (browser with mocked socket) The chat notes take no room from the panel, fit on one line and show one at a time. Setup: a FX-01 snapshot with `seq` 25 in which `p2` is host (so `you`, `p1`, is not, as in AC-18) and whose `chat` holds 20 lines from `p2` (seq 3 to 22), so that the list is full before and after the five lines of the wait and both runs; the panel is open. "The panel's box" is the left, top, width and height of the bounding box of `chat-panel`. A note is "on one line" when the rectangles that `Range.getClientRects()` returns for the contents of the note (`selectNodeContents`) all have the same `top` and all lie inside the panel's box, each within 1 px. Each run starts on a new page by reading the panel's box with neither `chat-muted` nor `chat-wait` on the page. At each window size of spec 006 AC-5, in a desktop context, the first two runs; at 1280 by 720 and at 320 by 568 only, the third:
+  - Muted: the mock sends `player_muted` (seq 26, `p1`, `muted` true); once `chat-muted` shows `fr.json["chat.muted"]`, the panel's box is the one read at the start (1 px tolerance) and `chat-muted` is on one line. The mock then sends `player_muted` (seq 27, `p1`, `muted` false); once `chat-muted` is gone, the panel's box is still the one read at the start (1 px tolerance).
+  - Wait: the test types `m1` to `m5` with the keyboard, each followed by `Enter`, the mock answering each with its `chat_message` from `p1` (seq 26 to 30); once `chat-wait` shows `fr.json["chat.wait"]`, the panel's box is the one read at the start (1 px tolerance) and `chat-wait` is on one line.
+  - Both: the test sends `m1` to `m5` as in the wait run, and once `chat-wait` shows, the mock sends `player_muted` (seq 31, `p1`, `muted` true); once `chat-muted` shows `fr.json["chat.muted"]`, the page holds no `chat-wait` and the panel's box is the one read at the start (1 px tolerance). The mock then sends `player_muted` (seq 32, `p1`, `muted` false), less than 12 seconds after the first send, so that the pacing still holds; once `chat-muted` is gone, `chat-wait` shows `fr.json["chat.wait"]` again and the panel's box is still the one read at the start (1 px tolerance).
+  (Note from the lead, 2026-10-15: added, decision 20 (second review of spec 022).) (Note from the lead, 2026-10-15: the "Both" run is added, and the title says "show one at a time", decision 22 (second review of spec 022).)
+- **AC-20** (new) (browser with mocked socket) After a chat message is sent, the focus is on `chat-input`, whichever way it was sent (`Enter`, a keyboard activation of `chat-send`, a click or a tap), and also when the send starts the pacing. Given a FX-01 snapshot with `seq` 5 (the players of "Test harness", `p1` host) and the panel open (`chat-input` has the focus), at 1280 by 720 and at 360 by 740 in a desktop context, the player sends `m1` to `m5` in this order, the mock answering each with its `chat_message` from `p1` (seq 6 to 10): `m1` with `Enter` in `chat-input`; `m2` with one `Tab` (the focus is on `chat-send`, which is enabled) then `Enter`; `m3` with a click on `chat-send`; `m4` as `m2`; `m5` as `m3`. The test types each text with the keyboard into the focused field and does not set the value of `chat-input` directly, so that a lost focus fails the test. After each of the five sends, within 300 ms of the key or the click: the mock has received one `chat` frame whose `text` is that text (spec 017's heartbeat `ping` frames are not counted), `chat-input` is empty, and `document.activeElement` is `chat-input`, neither `chat-send` nor `document.body`. After `m5`, which starts the pacing, the same holds, and `chat-send` is disabled and `chat-wait` shows within that deadline too. Touch: at 360 by 740 in a touch context, with the panel open (opened by a tap on `chat-toggle`), the player types `t1` in `chat-input` and taps `chat-send`, the mock answering with its `chat_message` from `p1` (seq 6): within 300 ms of the tap, the mock has received one `chat` frame whose `text` is `t1`, `chat-input` is empty and `document.activeElement` is `chat-input`.
+  (Note from the lead, 2026-10-15: added, decision 21 (second review of spec 022).) (Note from the lead, 2026-10-15: the touch case is added (second review of spec 022).)
 
 ## Edge cases and errors
 
@@ -577,9 +626,12 @@ The words in brackets say how each criterion is tested.
   top of an open panel (its heading, the oldest visible lines) while it shows; the
   panel does not move or close, and the page does not scroll it into view. (Note
   from the lead, 2026-10-15: added, decision 16 (review of spec 022).)
-- Restart (AC-9): a restart gives every player a fresh chat and reaction window,
-  as it does for spec 037's edit limit. (Note from the lead, 2026-10-15: added,
-  decision 17 (review of spec 022).)
+- Restart (AC-9): a restart gives every player, connected or disconnected, a fresh
+  chat and reaction window. For spec 037's edit limit it does so only for the
+  players it disconnects (spec 018). (Note from the lead, 2026-10-15: added,
+  decision 17 (review of spec 022).) (Note from the lead, 2026-10-15: "as it does
+  for spec 037's edit limit" is replaced by the difference with `recent_edits`
+  (second review of spec 022).)
 - Mute while reacting or typing (AC-18): the picker closes and the focus goes to
   the `grid` element; a focus on `chat-input` or `chat-send` goes to
   `chat-toggle`. The typed text is kept, and can be sent once unmuted. (Note from
@@ -588,6 +640,22 @@ The words in brackets say how each criterion is tested.
   selection only when a second snapshot no longer has its word, which cannot
   happen on one room's grid, so only the mute case is tested. (Note from the
   lead, 2026-10-15: added (review of spec 022).)
+- Notes and the panel's box (AC-19): `chat-muted` and `chat-wait` share one slot
+  that is always there, so the panel is as high and as wide with a note as
+  without; `t("chat.wait")` is short for the narrowest window, 320 px wide. The
+  one-line rule is for the default root font size, at zoom 1 as the window sizes
+  of spec 006 AC-5 are; no criterion tests a note at a larger root font. When
+  both notes apply, only `chat-muted` shows, and `chat-wait` comes back after an
+  unmute if the pacing still holds; `chat-wait` going away when its 12 seconds
+  end is AC-10's, not AC-19's. (Note from the lead, 2026-10-15: added, decision 20
+  (second review of spec 022).) (Note from the lead, 2026-10-15: the both-notes
+  sentence is added, decision 22 (second review of spec 022).)
+- Focus after a send (AC-20): the focus is on `chat-input` after a send, not on
+  `chat-send`, which the send disables, and not on `document.body`. On a touch
+  screen this keeps the system keyboard from being closed by a send; whether a
+  real phone does keep it cannot be checked headless. A mute that comes later
+  moves the focus as "Focus at a mute" says (AC-18). (Note from the lead,
+  2026-10-15: added, decision 21 (second review of spec 022).)
 - Feed (AC-1): chat adds no line to the activity feed (spec 013 decision 4).
 
 ## Out of scope
@@ -702,7 +770,8 @@ the spec above. (Note from the lead, 2026-10-15: added (spec 022's tests).)
 Decided by the lead on 2026-10-15, under the human's delegation of layout and
 accessibility choices, on the reviewer's suggestions (none blocking). Each one is
 already part of the spec above. (Note from the lead, 2026-10-15: added (review of
-spec 022).)
+spec 022).) (Note from the lead, 2026-10-15: decisions 20 to 22 are added, and
+decisions 17 and 18 are reworded (second review of spec 022).)
 
 16. Vote banner and chat panel (AC-17). On a small window spec 025's banner, laid
     over the top of `grid-viewport`, can overlap the panel, and the spec did not
@@ -711,20 +780,55 @@ spec 022).)
     while the panel can wait. The panel stays open, keeps its box and the focus,
     and the page makes no scroll call to uncover it; the list's "fully visible
     outline" rule does not apply to the hidden part meanwhile.
-17. Limit windows at a restart (AC-9). `after_restart` cleared `recent_edits`
-    (spec 018) and kept `recent_chat` and `recent_reactions`, so a room loaded from
-    a snapshot kept windows that one rebuilt from the log lost. Pick: it clears
-    both, for every player, as spec 025 decision 16 makes the two loads give the
-    same vote.
-18. Height of `chat-toggle` (AC-6). Pick: the unread count sits in a slot of fixed
-    height, so the toggle keeps its height when the count appears or goes and when
-    the panel opens; the toolbar row (spec 024) then never moves.
+17. Limit windows at a restart (AC-9). `after_restart` cleared `recent_edits` on
+    the players it disconnects (spec 018) and kept `recent_chat` and
+    `recent_reactions` on all of them, so a room loaded from a snapshot kept
+    windows that one rebuilt from the log lost. Pick: it clears both, for every
+    player, connected or disconnected, as spec 025 decision 16 makes the two loads
+    give the same vote. (Note from the lead, 2026-10-15: "on the players it
+    disconnects" and "connected or disconnected" are added; spec 018 clears
+    `recent_edits` only for the players the restart disconnects (second review of
+    spec 022).)
+18. Height of `chat-toggle` (AC-6). Pick: the toggle keeps its height when the
+    count appears or goes and when the panel opens; the toolbar row (spec 024)
+    then never moves. How the toggle keeps it is the implementer's choice. (Note
+    from the lead, 2026-10-15: reworded; the pick named a slot of fixed height for
+    the count, a mechanism, where the rule is what users see: the toggle's height
+    (second review of spec 022).)
 19. Mute while the picker is open or the chat form has the focus (AC-18). Pick: the
     picker closes whenever `react-button` becomes disabled, with the focus, if it
     was inside, on the `grid` element (as spec 025 decision 19 for the banner); a
     focus on `chat-input` or `chat-send` moves to `chat-toggle`, the always-present
     control where `Escape` from the panel goes. Both targets are fixed, never
     `document.body`.
+20. Chat notes (AC-19). The spec did not say that a note leaves the panel's box
+    alone, nor how long a note may be, and the French wait text did not fit one
+    line at 320 px wide. Pick: `chat-muted` and `chat-wait` sit in one slot of the
+    panel that is always present, empty when neither applies, and one line high, so
+    that a note coming or going never moves the panel's box; `chat.wait` becomes
+    `Patientez avant d'envoyer.` so that it fits that line at every window size of
+    spec 006 AC-5. Which note shows when both apply is decision 22. (Note from the
+    lead, 2026-10-15: added (second review of spec 022).)
+21. Focus after sending (AC-20). The submit empties `chat-input`, which disables
+    `chat-send`, and the spec did not say where the focus goes after a send (a
+    pre-existing gap). Pick: after a send, by `Enter` in `chat-input` or by
+    activating `chat-send` (keyboard, click or tap), the focus is on `chat-input`,
+    also when the send starts the pacing (`chat-send` is then disabled); it never
+    drops to `document.body`. (Note from the lead, 2026-10-15: added (second review
+    of spec 022).)
+22. Both chat notes at once (AC-19). A player who sent 5 messages in the last 12
+    seconds and is then muted has `chat-muted` and `chat-wait` both to show, in a
+    slot one line high. Options: (a) only `chat-muted` shows while the mute lasts,
+    then `chat-wait` shows if the pacing still holds after the unmute; (b) only
+    `chat-wait` shows while the pacing lasts; (c) both show, one under the other,
+    so that the slot and the panel grow by a line for that time (the panel's box
+    then changes, which decision 20 is meant to prevent). Pick: (a): the mute is
+    the host's decision and the reason why the form is disabled, the wait adds
+    nothing while the player cannot send, and the panel's box never changes; it
+    is also what the page does today. AC-19 tests it at 1280 by 720 and at 320 by
+    568. (Note from the lead, 2026-10-15: added; the lead's answer, under the
+    delegation of layout choices, to the question the spec-writer raised in the
+    second review of spec 022.)
 
 ## Open questions
 
