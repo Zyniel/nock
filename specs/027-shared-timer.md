@@ -6,7 +6,7 @@ status: approved
 
 # 027 - Shared timer
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 7 to 9 below, and "Open questions" says "None." The one refinement of a `done` spec is the one of spec 026, described under "Changes to spec 026".)
 
 Epic E7 Completion and recap (US-7.1) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -200,9 +200,25 @@ letter is typed at the room's creation time and a player stays connected, which
 is the case in spec 026's rule tests of AC-1. Spec 026's AC-9 test that loads a
 full, wrong room from a store and solves it ("a stored full wrong room loads
 unsolved and can still be solved") types its first letter at `NOW + 100.0` and
-expects `elapsed_ms=754000` at `NOW + 754.0`; the timer gives `654000`. This
-spec's test-writer updates that expectation before the implementer runs, and the
-lead adds a dated note to spec 026's completion rule and decision 4.
+expects `elapsed_ms=754000` at `NOW + 754.0`; the timer gives `654000`. The lead
+adds a dated note to spec 026's completion rule, its `elapsed_ms` edge case and its
+decision 4 before this spec's tests are written. This spec's test-writer then
+updates that expectation before the implementer runs.
+
+(Note from the lead, 2026-10-15: spec 026 is `done`, and this spec changes it in
+three places, all dated notes that the lead adds before the test-writer of this
+spec starts: the completion rule (its formula for `elapsed_ms`, from
+`state.created_at`), the `elapsed_ms` edge case ("time since the room was created")
+and decision 4. No acceptance criterion of spec 026 changes: its AC-1
+keeps `elapsed_ms=754000`, which the timer gives (AC-6 here). One test of spec 026
+changes, `test_ac9_a_stored_full_wrong_room_loads_unsolved_and_can_still_be_solved`
+in `tests/test_spec_026_ac08_ac09_letters_and_reload.py`, a test of its AC-9: it
+expects `elapsed_ms=754000` and must expect `654000`. The other tests of spec 026
+that read `elapsed_ms` (AC-1) type their first letter at `NOW` with a player
+connected, so the timer gives them the same value. The human's answers, decisions
+7 to 9, change nothing in spec 026. Spec 012 (`done`) already leaves the two
+snapshot fields to this spec, and its snapshot criterion (AC-3) reads a room where
+no letter was typed through the rules, where they stay `0` and `False`.)
 
 ### Test harness
 
@@ -258,7 +274,8 @@ The words in brackets say how each criterion is tested.
   really left.
 - Server restart (AC-7): the timer of a running room counts until the restart step
   (`after_restart`), which pauses it; the time between a crash and the restart is
-  counted. See "Open questions".
+  counted. See decision 7. (Note from the lead, 2026-10-15: 'See "Open
+  questions"' became "See decision 7", the human's answer.)
 - Page offline (AC-3): a page that lost its socket keeps counting on its own; the
   next snapshot sets the value again, so the shown time may step back.
 - Solved (AC-6): stopped for good; joins, chat and flags after the solve do not
@@ -294,8 +311,10 @@ None.
 
 The backlog's number is kept, as the human answered on 2026-10-14 ("numeric
 thresholds keep the backlog defaults"): the same reading for every player within
-1 second. The items below were proposed in the Phase 6 refine (2026-10-14), for
-the human's re-approval with this spec. Each one is already part of the spec above.
+1 second. The items below were proposed in the Phase 6 refine (2026-10-14) and
+approved by the human with this spec. Each one is already part of the spec above.
+Item 6 partly answers the last two open questions; the human's answers to all three
+are items 7 to 9 below.
 
 1. No protocol change. The snapshot's two timer fields, the first `letter_changed`
    with a letter and `grid_solved` are enough for every page to show the same
@@ -311,14 +330,23 @@ the human's re-approval with this spec. Each one is already part of the spec abo
    with a one-symbol toggle; hiding is a per-browser choice stored in
    `localStorage`.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+7. Time while the server is down (former open question 1). Options: counted until
+   the restart step pauses the timer, which is simple and the same in `replay`; or
+   paused at the last logged event before the crash, which needs the restart step
+   to log that time, for example a new field of `LogEntry`. Pick: counted until the
+   restart step (`after_restart`).
+8. Scope of hiding (former open question 2). Options: one choice per browser for
+   every room; or one choice per room (`nock.timer_hidden.<CODE>`). Pick: one
+   choice per browser, in `nock.timer_hidden` (decision 6).
+9. Small windows (former open question 3). Options: one toolbar row that scrolls
+   sideways, with an edge fade; or an `Aide` menu, with the timer still in the
+   header since it is read, not used. Pick: the toolbar row, as spec 024 decision 12
+   decides for the whole toolbar. The timer comes first in the row, so it shows
+   before any sideways scroll (decision 6).
+
 ## Open questions
 
-1. Time while the server is down. Options: (a) counted until the restart step
-   pauses the timer (pick, as written; simple, and the same in replay);
-   (b) paused at the last logged event before the crash, which needs the restart
-   step to log that time, for example a new field of `LogEntry`.
-2. Scope of hiding. Options: (a) one choice per browser for every room (pick);
-   (b) one choice per room (`nock.timer_hidden.<CODE>`).
-3. Small windows follow spec 024's open question 2 (one toolbar row that scrolls
-   sideways, or an `Aide` menu). This spec is written for the toolbar row. With a
-   menu, the timer should still stay in the header, since it is read, not used.
+None.

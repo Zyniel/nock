@@ -6,7 +6,7 @@ status: approved
 
 # 019 - Authorship view
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 6 to 8 below, and "Open questions" says "None.")
 
 Epic E5 Collaboration aids (US-5.1) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The grid
@@ -195,8 +195,9 @@ None.
 
 ## Decisions
 
-Proposed in the Phase 6 refine of 2026-10-14, for the human's re-approval. Each one
-is already part of the spec above; items 1 to 3 are also open questions.
+Proposed in the Phase 6 refine of 2026-10-14 and approved by the human with the
+spec. Each one is already part of the spec above. Items 1 to 3 were also open
+questions: the human's answers to them are items 6 to 8 below.
 
 1. The tint is a band along the bottom of the cell, not the cell's whole
    background. The background already shows my selection and word (spec 007),
@@ -212,16 +213,23 @@ is already part of the spec above; items 1 to 3 are also open questions.
    pins it with tests.
 5. The switch starts off at each page load and acts on this page only.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+6. How the author is shown ("tints each filled cell", former open question 1).
+   Options: a band in the author's colour along the bottom of the cell; or the
+   whole background of the cell in the author's colour, which while the switch is
+   on would replace spec 013's word tints and the own-word highlight of spec 007 on
+   filled cells. Pick: the band (decision 1).
+7. Letters of a player who left the room (former open question 2). Options: a
+   neutral band; or the colour they had, which a new player may now have. Pick: the
+   neutral band (decision 2).
+8. The non-colour signal (former open question 3). Options: the selected cell's
+   author named in the clue bar; the author's initials on every cell, which collide
+   with the corner labels of spec 035 AC-11 on small cells; or the name next to the
+   switch in the toolbar, which may be scrolled out of view on small windows. Pick:
+   the clue bar (decision 3).
+
 ## Open questions
 
-1. "Tints each filled cell": options (a) a band in the author's colour along the
-   bottom of the cell (the spec as written); (b) the whole background of the cell
-   in the author's colour, which while the switch is on would replace spec 013's
-   word tints and the own-word highlight of spec 007 on filled cells. Pick: (a).
-2. Letters of a player who left the room. Options: (a) a neutral band (the spec as
-   written); (b) the colour they had, which a new player may now have. Pick: (a).
-3. The non-colour signal. Options: (a) the selected cell's author named in the
-   clue bar (the spec as written); (b) the author's initials on every cell, which
-   collide with the corner labels of spec 035 AC-11 on small cells; (c) the name
-   next to the switch in the toolbar, which may be scrolled out of view on small
-   windows. Pick: (a).
+None.

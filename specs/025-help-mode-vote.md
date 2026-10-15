@@ -6,7 +6,7 @@ status: approved
 
 # 025 - Group decision on help
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 11 to 15 below, and "Open questions" says "None." The one refinement of a `done` spec is the amendment of spec 023, described under "Edge cases and errors".)
 
 Epic E6 Help and validation (US-6.3) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -46,7 +46,8 @@ A room starts in `free` (`DEFAULT_SETTINGS`, spec 011). The host picks the mode 
 spec 014's settings form (`help-mode-select`), which the creator of a room sees
 from the room's first snapshot, before anyone else joins. That moment is "at room
 creation" (backlog AC-6.3.1): no step is added before the room exists, so spec
-010's one-tap start stays (decision 1, open question 1).
+010's one-tap start stays (decisions 1 and 11). (Note from the lead, 2026-10-15:
+"decision 1, open question 1" became "decisions 1 and 11", the human's answer.)
 
 ### `nock.room` additions
 
@@ -127,7 +128,8 @@ again, the help mode `none` included, and only the vote step is left out.
 - If one refuses (meanwhile the grid was solved, the host set `none` or lowered the
   budget, or the target got locked): the vote closes `rejected` instead, with one
   `VoteClosed` entry holding `outcome=rejected` and the yes count, and nothing else
-  happens; no error is sent (decision 6, open question 2).
+  happens; no error is sent (decisions 6 and 12). (Note from the lead, 2026-10-15:
+  "decision 6, open question 2" became "decisions 6 and 12", the human's answer.)
 
 ### Expiry
 
@@ -235,7 +237,8 @@ Where the banner goes (spec 024's toolbar note: no spare height at 568 by 320):
   viewport's box (1 px tolerance), and showing it changes no layout: the boxes of
   the room header, `grid-viewport`, `clue-bar` and, on touch screens, `keyboard`
   are the same with and without it (1 px tolerance). It covers part of the grid
-  while it shows (decision 9, open question 5).
+  while it shows (decisions 9 and 15). (Note from the lead, 2026-10-15: "decision
+  9, open question 5" became "decisions 9 and 15", the human's answer.)
 - In document order it comes before the `grid` (spec 035: nothing focusable
   follows the grid), so after `Escape` on the grid, `Shift+Tab` reaches `vote-no`
   first.
@@ -293,18 +296,26 @@ The words in brackets say how each criterion is tested.
 
 ## Edge cases and errors
 
-Spec 023 amendment (needed before this spec is built): spec 023 says the three
-check buttons are `disabled` while `help_mode` is `none`, and its AC-9 ends "When
-the mock then sends `settings_changed` with `help_mode` `none`, all three buttons
-are disabled". AC-4 here hides `check-panel` instead. The lead amends spec 023's
-"Client: check controls" and the last sentence of its AC-9 with a dated note, and
-this spec's test-writer updates the two tests of spec 023 that check it
+Spec 023 amendment (spec 023 is `done`; the lead makes the amendment before this
+spec's tests are written): spec 023 says the three check buttons are `disabled`
+while `help_mode` is `none`, and its AC-9 ends "When the mock then sends
+`settings_changed` with `help_mode` `none`, all three buttons are disabled". AC-4
+here hides `check-panel` instead. Before this spec's tests are written, the lead
+amends spec 023's "Client: check controls" and the last sentence of its AC-9 with a
+dated note. This spec's test-writer then updates the two tests of spec 023 that
+check it
 (`test_ac9_a_help_mode_none_in_the_snapshot_disables_all_three_buttons` and
 `test_ac9_settings_changed_to_none_disables_all_three_buttons` in
 `tests/test_spec_023_ac08_ac09_feed_and_controls.py`) (Note from the lead, 2026-10-15:
 they were in `tests/test_spec_023_check.py` before the spec 023 tests were split into
 one file per criterion group) before the implementer runs. Spec 023 AC-10's last
 sentence (a word check in vote mode gives AC-1's result) still holds (AC-5 here).
+(Note from the lead, 2026-10-15: the amendment concerns spec 023's "Client: check
+controls" and its AC-9, and nothing else in spec 023. The test of spec 023 AC-10
+for vote mode, `test_ac10_help_mode_vote_acts_as_free`, checks a word check and
+still passes. The human's answers, decisions 11 to 15, change nothing in spec 023.
+The lead makes the amendment before the test-writer of this spec starts, so that
+this test-writer works from an amended spec 023.)
 
 - Who may vote (AC-2, AC-6): the eligible set is fixed when the vote opens. A
   player who joins during the vote is not eligible; their page still shows the
@@ -347,7 +358,8 @@ sentence (a word check in vote mode gives AC-1's result) still holds (AC-5 here)
 - Reveal a letter or a word: spec 024.
 - Completion detection: spec 026.
 - A choice of help mode before the room exists, in the catalogue or in the
-  creation request (open question 1).
+  creation request (decision 11). (Note from the lead, 2026-10-15: "open question
+  1" became "decision 11", the human's answer.)
 - Showing the tally while a vote is open (spec 039 has no ballot event), a
   countdown (the snapshot does not carry the opening time), changing a ballot,
   cancelling a vote.
@@ -363,8 +375,9 @@ None.
 
 ## Decisions
 
-Proposed in the Phase 6 refine of 2026-10-14, for the human's re-approval. Each one
-is already part of the spec above; items 1, 4, 5, 6 and 9 are also open questions.
+Proposed in the Phase 6 refine of 2026-10-14 and approved by the human with the
+spec. Each one is already part of the spec above. Items 1, 4, 5, 6 and 9 were also
+open questions: the human's answers to them are items 11 to 15 below.
 
 1. "At room creation" is the host panel of spec 014, shown to the creator from the
    room's first snapshot; the room starts in `free`. Nothing is asked before the
@@ -391,26 +404,35 @@ is already part of the spec above; items 1, 4, 5, 6 and 9 are also open question
 10. `none` mode hides both help panels (AC-4); spec 023's "disabled" rule is
     amended.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+11. "At room creation the host picks a help mode" (former open question 1).
+    Options: the host panel's select, shown to the creator from the first
+    snapshot, with the room starting in `free`; or a choice before the room
+    exists, next to the catalogue's `Jouer` button or in `POST /api/rooms`, which
+    adds a step to spec 010's one-tap start. Pick: the host panel's select
+    (decision 1).
+12. A vote that passes when its request can no longer apply: the grid solved, the
+    host set `none` or lowered the budget, the target locked meanwhile (former open
+    question 2). Options: it closes `rejected` and nothing happens; it closes
+    `passed` and nothing happens; or the host cannot change the settings while a
+    vote is open, and the solving step closes the vote. Pick: it closes `rejected`
+    and nothing happens (decision 6).
+13. A requester who is the only connected player (former open question 3). Options:
+    the request applies at once with no vote events; or a vote of one opens and
+    passes in the same step, which shows a banner for nothing. Pick: it applies at
+    once (decision 4).
+14. Who votes, and how often (former open question 4). Options: the players
+    connected when the vote opens, one ballot each that cannot be changed; also
+    players who join during the vote; or ballots that can be changed until the vote
+    closes. Pick: the players connected at the opening, one unchangeable ballot
+    each (decision 5).
+15. Where the vote shows (former open question 5). Options: a banner over the top
+    of the grid, which covers part of the grid for at most 20 seconds and changes
+    no layout; or a row above the grid, which pushes the grid down and breaks spec
+    013 AC-6 at 568 by 320. Pick: the banner over the grid (decision 9).
+
 ## Open questions
 
-1. "At room creation the host picks a help mode". Options: (a) the host panel's
-   select, shown to the creator from the first snapshot, with the room starting in
-   `free` (the spec as written); (b) a choice before the room exists, next to the
-   catalogue's `Jouer` button or in `POST /api/rooms`, which adds a step to spec
-   010's one-tap start. Pick: (a).
-2. A vote that passes when its request can no longer apply (the grid solved, the
-   host set `none` or lowered the budget, the target locked meanwhile). Options:
-   (a) it closes `rejected` and nothing happens (the spec as written); (b) it
-   closes `passed` and nothing happens; (c) the host cannot change the settings
-   while a vote is open, and the solving step closes the vote. Pick: (a).
-3. A requester who is the only connected player. Options: (a) the request applies
-   at once with no vote events (the spec as written); (b) a vote of one opens and
-   passes in the same step, which shows a banner for nothing. Pick: (a).
-4. Who votes, and how often. Options: (a) the players connected when the vote
-   opens, one ballot each that cannot be changed (the spec as written); (b) also
-   players who join during the vote; (c) ballots that can be changed until the vote
-   closes. Pick: (a).
-5. Where the vote shows. Options: (a) a banner over the top of the grid, which
-   covers part of the grid for at most 20 seconds and changes no layout (the spec as
-   written); (b) a row above the grid, which pushes the grid down and breaks spec
-   013 AC-6 at 568 by 320. Pick: (a).
+None.

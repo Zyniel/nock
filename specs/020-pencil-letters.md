@@ -6,7 +6,7 @@ status: approved
 
 # 020 - Pencil letters
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 8 to 11 below, "Open questions" says "None.", and the refinements of `done` specs are listed in the note under "Public interface".)
 
 Epic E5 Collaboration aids (US-5.2) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The grid
@@ -33,6 +33,17 @@ spec gives `pencil_edit` and `confirm_pencil` their meaning in
 private `_is_filled` of `nock.room` so that a pencil letter fills its cell (spec
 026), and adds pencil mode, the look of pencil letters and the confirm control to
 the room page.
+
+(Note from the lead, 2026-10-15: this spec refines four `done` specs, and none of
+the human's answers, decisions 8 to 11, adds another: decision 11 keeps spec 016 as
+it is. Each refinement is described where it applies below. None changes a
+criterion or a test of the spec it refines, because their tests show no pencil
+letter, so every pencil flag they compare is `false`. Spec 008, tested by its AC-1
+and AC-4: step 2 of "Typing a letter" also compares the pencil flag. Spec 018,
+tested by its AC-3: "Pending queue matching" also compares the pencil flag. Spec
+017, tested by its AC-2: the resend after a reconnection sends each pending edit as
+the message of its kind. Spec 026: `_is_filled`, whose text was already amended on
+2026-10-12. The new cases are tested by AC-1 to AC-7 here.)
 
 ### Server rule: `PencilEdit` and `ConfirmPencil` in `nock.room.handle_message`
 
@@ -236,9 +247,10 @@ confirmation on a solved grid's normal letter.)
 - AC-3 depends on behaviour owned by spec 026; test only this spec's side of it here.
 - Typing the same letter (AC-1): in pencil mode, typing `L` on a cell that shows a
   pencil `L` sends nothing and moves on (spec 008 decision 4); on a normal `L` it
-  sends a `pencil_edit` (open question 3). (Note from the lead, 2026-10-15:
+  sends a `pencil_edit` (decision 10). (Note from the lead, 2026-10-15:
   "sends nothing" leaves aside the heartbeat `ping` frames of spec 017, which the
-  page may send at any time once the socket is open.)
+  page may send at any time once the socket is open.) (Note from the lead,
+  2026-10-15: "open question 3" became "decision 10", the human's answer.)
 - A locked cell (AC-1, AC-4): typing in pencil mode does nothing and sends nothing
   (spec 008); the server refuses a pencil edit there with `cell_locked`. (Note
   from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted.)
@@ -247,8 +259,9 @@ confirmation on a solved grid's normal letter.)
 - The flash (spec 016): a confirmation of my pencil letter by another player makes
   my cell flash in their colour, as any `letter_changed` from another player on my
   letter does, the same letter included (spec 016's edge case "Same letter from
-  both"); a pencil edit by another player over my letter flashes too (open
-  question 4).
+  both"); a pencil edit by another player over my letter flashes too (decision
+  11). (Note from the lead, 2026-10-15: "open question 4" became "decision 11", the
+  human's answer.)
 - Authors (spec 019): a pencil letter has an author and a band like any letter; a
   confirmation makes the confirmer its author, so the band takes their colour
   (decision 1).
@@ -293,8 +306,10 @@ None.
 
 ## Decisions
 
-Proposed in the Phase 6 refine of 2026-10-14, for the human's re-approval. Each one
-is already part of the spec above; items 1, 2 and 4 are also open questions.
+Proposed in the Phase 6 refine of 2026-10-14 and approved by the human with the
+spec. Each one is already part of the spec above. Items 1, 2 and 4 were also open
+questions: the human's answers to them are items 8 to 10 below, and item 11 answers
+a fourth question.
 
 1. The confirmer becomes the author of the confirmed letter. `letter_changed`
    carries one `player_id`, which the page takes as the author (spec 015), as spec
@@ -315,19 +330,27 @@ is already part of the spec above; items 1, 2 and 4 are also open questions.
 7. The two controls go right after the undo control in spec 024's toolbar, since
    they are used while typing.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+8. Who is the author of a confirmed pencil letter (former open question 1).
+   Options: the confirmer, with no protocol change; or the player who wrote it in
+   pencil, which needs a new field in `letter_changed` (a change to spec 039).
+   Pick: the confirmer (decision 1).
+9. Confirming a cell that holds no pencil letter, by a race or a forged message
+   (former open question 2). Options: `stale_edit`, with no protocol change; or a
+   new `ErrorCode` such as `not_pencil` (a change to spec 039, and the page must
+   treat it as an edit answer). Pick: `stale_edit` (decision 2).
+10. Typing the letter a cell already shows, in the other mode (former open question
+    3). Options: it changes the pencil flag; or it sends nothing, as spec 008 does
+    for the same letter. Pick: it changes the pencil flag, so pencil mode can mark
+    a doubt on a letter without retyping it, and normal typing can firm it up
+    (decision 4).
+11. The flash when another player confirms my pencil letter (former open question
+    4). Options: it flashes, which is spec 016 as written (another player changed
+    my letter); or no flash when the letter stays the same, which would amend spec
+    016 AC-2. Pick: it flashes, so spec 016 does not change.
+
 ## Open questions
 
-1. Who is the author of a confirmed pencil letter. Options: (a) the confirmer (the
-   spec as written, no protocol change); (b) the player who wrote it in pencil,
-   which needs a new field in `letter_changed` (a change to spec 039). Pick: (a).
-2. Confirming a cell that holds no pencil letter (a race, or a forged message).
-   Options: (a) `stale_edit` (the spec as written, no protocol change); (b) a new
-   `ErrorCode` such as `not_pencil` (a change to spec 039, and the page must treat it
-   as an edit answer). Pick: (a).
-3. Typing the letter a cell already shows, in the other mode. Options: (a) it
-   changes the pencil flag (the spec as written); (b) it sends nothing, as spec 008
-   does for the same letter. Pick: (a), so pencil mode can mark a doubt on a
-   letter without retyping it, and normal typing can firm it up.
-4. The flash when another player confirms my pencil letter. Options: (a) it flashes
-   (spec 016 as written: another player changed my letter); (b) no flash when the
-   letter stays the same, which amends spec 016 AC-2. Pick: (a).
+None.

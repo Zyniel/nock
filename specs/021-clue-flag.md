@@ -6,7 +6,7 @@ status: approved
 
 # 021 - Clue flag
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 7 and 8 below, and "Open questions" says "None.")
 
 Epic E5 Collaboration aids (US-5.3) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -266,7 +266,8 @@ The words in brackets say how each criterion is tested.
 - Several flaggers (AC-4): one clue holds one marker; `data-flagged-by` and the
   label list every flagger in roster order.
 - Flag of a full word (AC-5): refused, so a flag never stays on a full word, also
-  when the grid is full but wrong (spec 026). See "Open questions".
+  when the grid is full but wrong (spec 026). See decision 7. (Note from the lead,
+  2026-10-15: 'See "Open questions"' became "See decision 7", the human's answer.)
 - A reveal (spec 024) or a pencil letter (spec 020) that fills the last empty cell
   of a flagged word clears the flag like an edit (AC-3). A check (spec 023) never
   fills a cell, so it never clears a flag by itself.
@@ -316,8 +317,9 @@ None.
 
 ## Decisions
 
-Proposed in the Phase 6 refine (2026-10-14), for the human's re-approval with this
-spec. Each one is already part of the spec above.
+Proposed in the Phase 6 refine (2026-10-14) and approved by the human with this
+spec. Each one is already part of the spec above. Items 7 and 8 below record the
+human's answers to the two open questions.
 
 1. Where the flag lives. Options: a list on `RoomState`, or a field on each
    `PlayerRecord`. Pick: `PlayerRecord.flag`, so "one flag per player" holds by
@@ -338,12 +340,20 @@ spec. Each one is already part of the spec above.
    and does not move the clue text; who flagged is in a visually hidden label and
    in `data-flagged-by`.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+7. Flagging a full word (former open question 1). Options: refused, so a flag never
+   stays on a full word (the backlog's AC-5.3.2 read literally); or allowed, and
+   cleared at the next letter change in that word, which lets players point at a
+   doubtful word when the grid is full but wrong (spec 026). Pick: refused. AC-5
+   and the server rule above (case 4 of `Flag`) are written with it.
+8. Small windows (former open question 2). Options: one toolbar row that scrolls
+   sideways, with an edge fade; or an `Aide` menu, where `flag-button` would move
+   (AC-6 and AC-11 would change). Pick: the toolbar row, as spec 024 decision 12
+   decides for the whole toolbar. `flag-button` stays in the row, after
+   `reveal-panel` (decision 5).
+
 ## Open questions
 
-1. Flagging a full word. Options: (a) refused, so a flag never stays on a full
-   word (the backlog's AC-5.3.2 read literally); (b) allowed, and cleared at the
-   next letter change in that word, which lets players point at a doubtful word
-   when the grid is full but wrong (spec 026). Pick: (a), as written.
-2. Small windows follow spec 024's open question 2 (one toolbar row that scrolls
-   sideways, or an `Aide` menu). This spec is written for the toolbar row; with a
-   menu, `flag-button` would move into it and AC-6 and AC-11 would change.
+None.

@@ -6,7 +6,7 @@ status: approved
 
 # 022 - Chat and reactions
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 9 to 13 below, and "Open questions" says "None.")
 
 Epic E5 Collaboration aids (US-5.4) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -77,7 +77,10 @@ class Outcome(RoomModel):
 `to_others` was `tuple[SelectionMoved, ...]`. The hub's delivery does not change:
 each item goes to every joined connection except the sender's and except the
 connections of the item's own `player_id` (spec 011 delivery step 4; both types
-have a `player_id`).
+have a `player_id`). (Note from the lead, 2026-10-15: this widens a field of spec
+011's `Outcome`, and spec 011 is `done`. No criterion of spec 011 changes: its steps
+still put only `SelectionMoved` there, and its delivery rule is the one quoted
+above.)
 
 ### Server rule: `Chat` in `nock.room.handle_message`
 
@@ -500,8 +503,10 @@ None.
 
 The backlog's numbers are kept, as the human answered on 2026-10-14 ("numeric
 thresholds keep the backlog defaults"): 280 characters, a set of 5 reactions, 3
-seconds. The items below were proposed in the Phase 6 refine (2026-10-14), for the
-human's re-approval with this spec. Each one is already part of the spec above.
+seconds. The items below were proposed in the Phase 6 refine (2026-10-14) and
+approved by the human with this spec. Each one is already part of the spec above.
+Items 1, 3, 4, 6 and 7 were also open questions: the human's answers to them are
+items 9 to 13 below.
 
 1. Limits (spec 037 throttles edits only). Pick: 5 chat messages and 5 reactions
    per player in any 10 seconds, sliding, counted separately from spec 037's 20
@@ -528,21 +533,31 @@ human's re-approval with this spec. Each one is already part of the spec above.
 8. A shown reaction is drawn over the clue of its word, the newest one only, for
    3 seconds from its arrival.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question. Each one is already part of the spec above.
+
+9. Limits: values and answer (former open question 1). Options: 5 chat messages and
+   5 reactions per player in 10 seconds, dropped without an answer; the same values
+   answered with `rate_limited`, accepting that a page past the limit may drop an
+   unrelated pending edit (spec 015); or reopen spec 039 to add a chat-specific
+   `ErrorCode`. Pick: 5 and 5 in 10 seconds, dropped without an answer (decision 1).
+   Other values are a one-line change in `RoomConfig`.
+10. Mute scope (former open question 2). Options: mute stops chat and reactions; or
+    chat only, as the backlog's words say ("mute a player's chat"). Pick: chat and
+    reactions (decision 3).
+11. Where the host mutes (former open question 3). Options: in the chat panel; or a
+    button beside `remove-player` in the roster, which needs spec 014 AC-9 and AC-10
+    reworked for two buttons per player in the low layout. Pick: the chat panel
+    (decision 4), so spec 014 does not change.
+12. Lines on the page (former open question 4). Options: the last 200, like the
+    feed's 100; or the whole history. Pick: the last 200 (decision 7).
+13. Small windows (former open question 5). Options: one toolbar row that scrolls
+    sideways, with an edge fade; or an `Aide` menu, where `react-button` could move
+    while `chat-toggle` stays visible in the header for its unread count. Pick: the
+    toolbar row, as spec 024 decision 12 decides for the whole toolbar. `chat-toggle`
+    comes first in the row so that its unread count shows before any sideways
+    scroll, and `react-button` sits beside the other word actions (decision 6).
+
 ## Open questions
 
-1. Limits: values and answer. Options: (a) 5 chat messages and 5 reactions per
-   player in 10 seconds, dropped without an answer (pick, as written); (b) the same
-   values answered with `rate_limited`, accepting that a page past the limit may
-   drop an unrelated pending edit (spec 015); (c) reopen spec 039 to add a
-   chat-specific `ErrorCode`. Other values are a one-line change in `RoomConfig`.
-2. Mute scope. Options: (a) mute stops chat and reactions (pick); (b) chat only, as
-   the backlog's words say ("mute a player's chat").
-3. Where the host mutes. Options: (a) in the chat panel (pick); (b) a button beside
-   `remove-player` in the roster, which needs spec 014 AC-9 and AC-10 reworked for
-   two buttons per player in the low layout.
-4. Lines on the page. Options: (a) the last 200, like the feed's 100 (pick);
-   (b) the whole history.
-5. Small windows follow spec 024's open question 2 (one toolbar row that scrolls
-   sideways, or an `Aide` menu). This spec is written for the toolbar row. With a
-   menu, `react-button` could move into it, but `chat-toggle` should stay visible
-   in the header for its unread count.
+None.
