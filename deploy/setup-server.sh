@@ -6,10 +6,11 @@
 #   sudo bash setup-server.sh /dev/sdb     # with the data block volume (Oracle)
 #   sudo bash setup-server.sh              # no separate volume: data on the boot disk
 #
-# It installs Docker, SQLite and rclone, opens ports 80 and 443 in the server's
-# firewall, keeps logs 14 days, mounts the data volume at /srv/nock, creates the
-# folders, copies this deploy folder to /srv/nock/deploy, and turns on the
-# nightly backup and monthly restore-test timers.
+# It installs Docker (with BuildKit), git, SQLite and rclone, opens ports 80 and
+# 443 in the server's firewall, keeps logs 14 days, mounts the data volume at
+# /srv/nock, creates the folders, copies this deploy folder to /srv/nock/deploy,
+# turns on the nightly backup and monthly restore-test timers, and creates the
+# key the server uses to read the repository (printed at the end).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -32,8 +33,8 @@ step "System updates and packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get -y upgrade
-apt-get -y install docker.io docker-compose-v2 sqlite3 rclone curl \
-    unattended-upgrades iptables-persistent
+apt-get -y install docker.io docker-compose-v2 docker-buildx git sqlite3 \
+    rclone curl unattended-upgrades iptables-persistent
 systemctl enable --now docker
 usermod -aG docker "$ADMIN_USER"
 
@@ -90,10 +91,10 @@ else
 fi
 
 step "Folders"
-mkdir -p "$ROOT"/{deploy,data,grids,backups,caddy/data,caddy/config}
+mkdir -p "$ROOT"/{deploy,src,data,grids,backups,caddy/data,caddy/config}
 chown "$APP_UID:$APP_UID" "$ROOT/data" "$ROOT/backups"
 chmod 700 "$ROOT/data" "$ROOT/backups"
-chown "$ADMIN_USER:$ADMIN_USER" "$ROOT/deploy" "$ROOT/grids"
+chown "$ADMIN_USER:$ADMIN_USER" "$ROOT/deploy" "$ROOT/src" "$ROOT/grids"
 
 step "Deploy files"
 if [ "$SCRIPT_DIR" != "$ROOT/deploy" ]; then
@@ -107,7 +108,20 @@ cp "$ROOT"/deploy/systemd/*.service "$ROOT"/deploy/systemd/*.timer /etc/systemd/
 systemctl daemon-reload
 systemctl enable --now nock-backup.timer nock-restore-test.timer
 
+step "Key to read the repository (deploy.sh fetches each version with it)"
+admin_home="$(getent passwd "$ADMIN_USER" | cut -d: -f6)"
+repo_key="${admin_home}/.ssh/nock_repo"
+if [ ! -f "$repo_key" ]; then
+    sudo -u "$ADMIN_USER" mkdir -p "${admin_home}/.ssh"
+    sudo -u "$ADMIN_USER" ssh-keygen -q -t ed25519 -N "" -C "nock server (read-only)" -f "$repo_key"
+fi
+
 echo
-echo "Done. Next (docs/oracle-setup.md): create ${ROOT}/deploy/.env from"
-echo ".env.example, and ${ROOT}/deploy/backup.env from backup.env.example."
-echo "Log out and in again so that ${ADMIN_USER} can use docker."
+echo "Done. Next (docs/oracle-setup.md):"
+echo "- add this key on GitHub as a read-only deploy key (step 11):"
+echo
+cat "${repo_key}.pub"
+echo
+echo "- create ${ROOT}/deploy/.env from .env.example (step 9),"
+echo "  and ${ROOT}/deploy/backup.env from backup.env.example (step 10);"
+echo "- log out and in again so that ${ADMIN_USER} can use docker."

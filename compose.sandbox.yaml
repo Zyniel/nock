@@ -3,8 +3,7 @@
 # that keeps every e-mail on this computer (read them on http://localhost:8025).
 #
 #   docker compose -f compose.sandbox.yaml up --build     the working copy
-#   NOCK_IMAGE=ghcr.io/zyniel/nock:v1.0.0 docker compose -f compose.sandbox.yaml up --no-build
-#                                                         a released version
+#   git checkout v1.0.0, then the first command          a released version
 #   docker compose -f compose.sandbox.yaml down           stop (data kept)
 #   docker compose -f compose.sandbox.yaml down -v        stop and delete the data
 #

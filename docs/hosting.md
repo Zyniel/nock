@@ -337,32 +337,46 @@ resent (spec 017). Keep the downtime well under 5 minutes.
 - Take a backup just before each deploy that changes the database (specs 032 and
   033 add tables and columns).
 
-### The chosen pipeline (option D, automatic)
+### The chosen pipeline (option D, built on the server)
 
-**When.** On a pushed version tag (`v1.0.0`, `v1.0.1`, ...), as in
-`docs/build-plan.md`. Not on every push to `main`: the agents push many commits
-there, and a tag is a release you decided. You release by asking Claude to "tag
-and release v1.x.y" (or by `git tag` and `git push --tags`).
+Changed on 2026-10-15 at the owner's request, to spend few GitHub Actions
+minutes: the repository is private, so Actions minutes count against the free
+allowance (section 13, item 8). The image is built on the server, which is an
+Arm machine like the image it needs, and no test is run again at deploy time:
+the tagged commit already passed CI, and the agents run the full gate locally
+before each commit (`scripts/hooks/role_gate.py`).
 
-**What the workflow does** (a new file in `.github/workflows/`, section 13):
+**When.** For a version tag (`v1.0.0`, `v1.0.1`, ...) on a commit of `main` whose
+CI is green, as in `docs/build-plan.md`. Not on every push to `main`: a tag is a
+release you decided.
 
-1. Runs the full gate on the tagged commit, as CI does. It stops on a failure.
-2. Builds the Docker image (section 13, item 1), which builds `web/dist` inside
-   it, for `linux/arm64` (the Oracle VM) and `linux/amd64` (the sandbox on your
-   computer). It pushes the image to the GitHub Container Registry
-   (`ghcr.io/zyniel/nock:v1.x.y`), which is free for this use.
-3. Connects to the VM by SSH, with a key stored as a GitHub secret, and runs the
-   deploy script on the VM:
-   1. Backup (section 6).
-   2. `docker compose pull`, then `docker compose up -d`. Compose stops the old
-      container with `SIGTERM`, waits up to 30 s, then starts the new one. Players
-      see "reconnecting" for a few seconds.
-   3. Checks that `GET /` answers 200 within 60 s. Otherwise it puts back the
-      previous image tag, restarts, and the workflow fails, which e-mails you.
+**Who starts it.** Either you, with one SSH command from your computer (no
+Actions minutes), or the optional workflow `.github/workflows/deploy.yml` when
+the tag is pushed. The workflow checks that CI passed on the tagged commit, then
+runs the same command over SSH. It costs the minutes of the server's build
+(a few) and runs no tests.
 
-Rollback by hand: run the workflow again on the previous tag. This is safe only
-when the release did not change the database's tables. Releases that do say so
-in their notes.
+**What `deploy/deploy.sh` does on the server:**
+
+1. Fetches the tagged source from GitHub with a read-only deploy key.
+2. Updates the deploy files on the server from that tag.
+3. Builds the image `nock:<tag>` with Docker on the server. Docker's cache keeps
+   the steps whose inputs did not change (for example the npm and Python
+   dependencies), so later builds are faster. A failed build stops here: the
+   site is not touched.
+4. Backup (section 6).
+5. `docker compose up -d` with the new image. Compose stops the old container
+   with `SIGTERM`, waits up to 30 s, then starts the new one. Players see
+   "reconnecting" for a few seconds.
+6. Checks that `GET /` answers 200 within 60 s. Otherwise it starts the previous
+   image again and fails (the workflow, when used, then e-mails you).
+7. Keeps the images of the live version and the previous one, and deletes older
+   ones.
+
+Rollback by hand: run the command again with the previous tag. Its image is
+still on the server, so it skips steps 1 to 3 and takes seconds. This is safe
+only when the release did not change the database's tables. Releases that do
+say so in their notes.
 
 ### Sandbox on your computer
 
@@ -449,16 +463,18 @@ HTTP, gives `https://` share links (so the forwarded scheme and address are
 trusted), and carries a game over `wss://`; a typed letter and the player's seat
 survive a restart; `backup.sh` makes an encrypted off-site copy (with a local
 folder standing in for the bucket) and `restore-test.sh` restores and starts it;
-`deploy.sh` deploys a good version and puts back the previous one after a
-version that does not start (with a local registry standing in for GHCR); the
-sandbox starts with Mailpit. Not tested: the arm64 build, the Oracle server
+`deploy.sh` (with a local Git repository standing in for GitHub) fetches a
+tag, updates the deploy files, builds and starts it, leaves the site untouched
+when a build fails, puts back the previous version after a version that does
+not start, and redeploys an already built version without building; the
+sandbox starts with Mailpit. Not tested: the build on Arm, the Oracle server
 itself, the GitHub workflow (linted with actionlint only), and Object Storage.
 
 1. **Done: `Dockerfile`** and `.dockerignore`: two stages. Node builds `web/dist`, then Python with uv
    (`uv sync --locked --no-dev`). It copies the repository tree in (section 1,
    files read from the source tree) and runs `python -m nock` as a non-root user,
-   with `NOCK_HOST=0.0.0.0` and `NOCK_DATABASE=/data/nock.sqlite3`. It builds for
-   arm64 and amd64.
+   with `NOCK_HOST=0.0.0.0` and `NOCK_DATABASE=/data/nock.sqlite3`. It builds on
+   the server (arm64) and on a PC (amd64) alike.
 2. **Done: Compose and Caddy files**: `deploy/compose.yaml` (the `caddy` and `nock`
    containers of section 4, `FORWARDED_ALLOW_IPS=*`, secrets read from a
    `/srv/nock/deploy/.env` file that stays on the VM, template
@@ -469,16 +485,36 @@ itself, the GitHub workflow (linted with actionlint only), and Object Storage.
    the backup script (`VACUUM INTO`, encryption, upload to Object Storage, 14-day
    rule, `backup.env.example`) with its nightly timer, plus a restore-test
    script with a monthly timer (`deploy/systemd/`).
-4. **Done: deploy workflow** `.github/workflows/deploy.yml`: on a `v*` tag, gate,
-   build, push to GHCR, deploy by SSH (section 10). It needs four secrets in a
-   GitHub environment `production`: the VM's address, the SSH user, an SSH
-   private key, and the server's host key.
+4. **Done: optional deploy workflow** `.github/workflows/deploy.yml`: on a `v*`
+   tag, checks that CI passed on that commit, then runs `deploy.sh` over SSH
+   (section 10). No gate, no build, no registry on GitHub. It needs four secrets
+   in a GitHub environment `production`: the VM's address, the SSH user, an SSH
+   private key, and the server's host key. The server reads the repository with
+   a read-only deploy key.
 5. **Load test** (a spec): 20 rooms of 8 simulated players on the VM size, before
    the public launch (spec 036 measures one room only).
 6. **Spec 011 note**: one dated line saying that, in production, uvicorn reads the
    client address from Caddy's `X-Forwarded-For` (section 4).
 7. **Deletion journal** (a spec), only if you want restores to re-apply account
    deletions on their own (section 6).
+8. **Fewer Actions minutes for CI** (`.github/workflows/ci.yml`). Not changed
+   here: the build session uses CI on its pull request right now. The figures,
+   from the run of 2026-10-15 on `main`: each run has three jobs of about 55,
+   55 and 64 minutes, and Windows minutes count double, so about **240 billed
+   minutes per run**. The free plan has 2,000 minutes a month for a private
+   repository: about 8 runs. Every push to a pull request and every merge to
+   `main` starts a run. Options, cheapest first:
+
+   | Option | Effect | Cost |
+   | --- | --- | --- |
+   | Make the repository public | Actions on standard runners are free without limit | The code becomes visible; no secret is in it, and grids are not in the repository. Your decision |
+   | A self-hosted runner on your PC | Jobs run on your computer, free | They wait while your PC is off; your PC must have the browsers installed |
+   | Pull requests: Ubuntu, Python 3.14 only. Python 3.13 and Windows: only on `main`, or once a week | About 55 minutes per pull-request push instead of 240 | A Windows-only problem shows up at merge or in the weekly run |
+   | Run CI on pull requests only when they are marked ready for review (not on every agent push) | Fewer runs | The agents' local gate is the only check until then (it already runs before each commit) |
+
+   Recommended: the third and fourth together, with the deploy workflow's check
+   still finding a green run on the merged commit of `main`. The first is the
+   simplest if you are fine with a public repository.
 
 No new Python or npm dependency is needed. Docker, Caddy and Mailpit run as
 images, outside the project's dependencies.
@@ -493,7 +529,8 @@ These need your accounts. `docs/oracle-setup.md` walks through each one.
    capacity", retry later.
 3. Add the DNS record `nock.<your domain>` pointing to the VM's IP, at your
    domain's registrar.
-4. Put the four deploy secrets in the GitHub repository settings (item 4 above).
+4. Add the server's read-only key as a deploy key of the repository, and,
+   only for the optional deploy workflow, its four secrets (item 4 above).
 5. Create the `/srv/nock/deploy/.env` file on the VM with the secrets of section 7 (the
    operator token can be generated for you).
 6. Later, for V1 accounts: create the Brevo account, add its SPF, DKIM and DMARC

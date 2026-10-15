@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
-# Deploy one version of the Nock image on the server (docs/hosting.md, section 10).
+# Deploy one version of Nock on the server (docs/hosting.md, section 10).
 #
 # Usage: deploy.sh <tag>        for example: deploy.sh v1.0.0
 #
-# Run by the deploy workflow over SSH, after it logged Docker in to ghcr.io; it
-# can also be run by hand on the server. Steps: pull the new image, back up the
-# database, restart with the new image, check that the app answers. When the
-# check fails, the previous version is started again and the script fails.
+# Run on the server: by hand over SSH from your computer, or by the optional
+# Deploy workflow. Everything happens here, with no image registry:
+#   1. fetch the tagged source from GitHub (read-only deploy key),
+#   2. update these deploy files from that tag,
+#   3. build the image on the server (an Arm machine: no emulation),
+#   4. back up the database,
+#   5. restart with the new image and check that the app answers; when it does
+#      not, start the previous version again and fail.
+# Deploying a version whose image is already built (a rollback) skips 1 to 3.
 set -euo pipefail
 
-cd "$(dirname "$0")"
+DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
+SOURCE_DIR=/srv/nock/src
+REPO_URL="${NOCK_REPO_URL:-git@github.com:Zyniel/nock.git}"
+REPO_KEY="${HOME}/.ssh/nock_repo"  # created by setup-server.sh
+# Files of deploy/ that come from the tagged version. deploy.sh replaces itself
+# by a rename, which is safe while it runs.
+DEPLOY_FILES="compose.yaml Caddyfile deploy.sh backup.sh restore-test.sh setup-server.sh .env.example backup.env.example"
+
+cd "$DEPLOY_DIR"
 
 if [ "$#" -ne 1 ] || [[ ! "$1" =~ ^v[0-9A-Za-z._-]+$ ]]; then
     echo "usage: deploy.sh <tag>, for example deploy.sh v1.0.0" >&2
@@ -18,7 +31,7 @@ fi
 new_tag="$1"
 
 if [ ! -f .env ]; then
-    echo "missing $(pwd)/.env: copy .env.example and fill it in" >&2
+    echo "missing ${DEPLOY_DIR}/.env: copy .env.example and fill it in" >&2
     exit 1
 fi
 
@@ -50,10 +63,56 @@ wait_for_app() {
     return 1
 }
 
-echo "NOCK_TAG=${new_tag}" >tag.env.new
+fetch_source() {
+    export GIT_SSH_COMMAND="ssh -i ${REPO_KEY} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+    if [ ! -d "${SOURCE_DIR}/.git" ]; then
+        git init --quiet "$SOURCE_DIR"
+        git -C "$SOURCE_DIR" remote add origin "$REPO_URL"
+    fi
+    git -C "$SOURCE_DIR" fetch --quiet --force --depth 1 origin \
+        "refs/tags/${new_tag}:refs/tags/${new_tag}"
+    git -C "$SOURCE_DIR" checkout --quiet --force --detach "$new_tag"
+    git -C "$SOURCE_DIR" clean --quiet -fdx
+}
 
-echo "== Pulling ${new_tag}"
-compose_with tag.env.new pull
+update_deploy_files() {
+    local name
+    for name in $DEPLOY_FILES; do
+        if [ -f "${SOURCE_DIR}/deploy/${name}" ]; then
+            cp "${SOURCE_DIR}/deploy/${name}" "${name}.new"
+            mv "${name}.new" "$name"
+        fi
+    done
+    mkdir -p systemd
+    cp "${SOURCE_DIR}"/deploy/systemd/* systemd/
+    chmod +x ./*.sh
+}
+
+remove_old_images() {
+    # Keep the live version and the one before it (for a quick rollback).
+    local image
+    docker image ls --format '{{.Repository}}:{{.Tag}}' nock \
+        | while read -r image; do
+            if [ "$image" != "nock:${new_tag}" ] && [ "$image" != "nock:${previous_tag}" ]; then
+                docker image rm "$image" >/dev/null || true
+            fi
+        done
+    docker image prune --force >/dev/null
+    docker builder prune --force --filter until=720h >/dev/null
+}
+
+if docker image inspect "nock:${new_tag}" >/dev/null 2>&1; then
+    echo "== Image nock:${new_tag} is already built"
+else
+    echo "== Fetching ${new_tag}"
+    fetch_source
+    update_deploy_files
+    echo "== Building nock:${new_tag} (a few minutes)"
+    docker build --quiet --tag "nock:${new_tag}" "$SOURCE_DIR" >/dev/null
+fi
+
+echo "NOCK_TAG=${new_tag}" >tag.env.new
+compose_with tag.env.new pull --quiet caddy
 
 echo "== Backing up the database"
 sudo ./backup.sh
@@ -65,7 +124,7 @@ compose_with tag.env up -d --remove-orphans
 echo "== Checking that the app answers"
 if wait_for_app; then
     echo "== ${new_tag} is live"
-    docker image prune --force >/dev/null
+    remove_old_images
     exit 0
 fi
 

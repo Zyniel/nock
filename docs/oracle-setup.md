@@ -13,7 +13,7 @@ help. Paste the step number and what you see.
 Players ──HTTPS──▶ nock.<your-domain> ──▶ Oracle server (Paris or Marseille)
                                             ├─ Caddy: HTTPS certificates, no access log
                                             └─ Nock: the game, its database on a separate disk
-GitHub ── on each version tag: tests, build, deploy ──▶ the server
+You (one command) or GitHub (on a version tag) ──▶ the server fetches, builds, starts
 Server ── every night: encrypted backup ──▶ Oracle Object Storage (kept 14 days)
 ```
 
@@ -27,11 +27,11 @@ The files that do this are in the repository:
 | `deploy/.env.example` | Template of the server's settings and secrets. |
 | `deploy/backup.env.example` | Template of the backup settings. |
 | `deploy/setup-server.sh` | One-time preparation of a new server. |
-| `deploy/deploy.sh` | Installs one version, checks it, goes back if it fails. |
+| `deploy/deploy.sh` | Fetches one version from GitHub, builds it on the server, starts it, checks it, goes back if it fails. |
 | `deploy/backup.sh` | Nightly backup (and before each deploy). |
 | `deploy/restore-test.sh` | Monthly check that the latest backup really restores. |
 | `deploy/systemd/` | The timers that run the backup and the restore test. |
-| `.github/workflows/deploy.yml` | The automatic deployment on each version tag. |
+| `.github/workflows/deploy.yml` | Optional: starts `deploy.sh` when a version tag is pushed, after checking that CI passed. It runs no tests and builds nothing, so it costs only a few Actions minutes. |
 | `compose.sandbox.yaml` | The sandbox on your own computer. |
 
 ## Before you start
@@ -178,8 +178,9 @@ sudo bash /tmp/nock-deploy/setup-server.sh /dev/sdb
 
 It installs the software, opens the firewall, prepares the disk (it asks you to
 type `yes` before formatting the new disk), and turns on the backup timers. It
-takes a few minutes. At the end, log out (`exit`) and log in again with the same
-`ssh` command.
+takes a few minutes. At the end it prints a line starting with `ssh-ed25519`:
+the server's key to read the repository. Copy it for step 11. Then log out
+(`exit`) and log in again with the same `ssh` command.
 
 ## Step 9. The server's settings and secrets
 
@@ -247,11 +248,27 @@ backup is ever missed.
 
 The first real backup runs after the first deployment (step 12).
 
-## Step 11. Let GitHub deploy to the server
+## Step 11. Let the server read the repository
 
-**A deploy key.** GitHub needs its own key to log in to the server. On your
-computer, in PowerShell (press `Enter` twice when asked for a passphrase: this
-key must work unattended):
+The server fetches each version from GitHub itself and builds it there, so
+nothing heavy runs on GitHub. It needs read-only access to the private
+repository.
+
+On GitHub, in the repository: **Settings** > **Deploy keys** > **Add deploy
+key**: title `nock server`, key: the `ssh-ed25519 ...` line printed at the end
+of step 8 (on the server, `cat ~/.ssh/nock_repo.pub` shows it again). Leave
+**Allow write access** unticked. **Add key**.
+
+### Optional: deploy from GitHub when a tag is pushed
+
+Skip this part if you prefer to deploy with one command from your computer
+(step 12). With it, pushing a version tag deploys on its own, after GitHub has
+checked that CI passed on that commit. It costs a few Actions minutes per
+release (the time the server takes to build), and runs no tests.
+
+GitHub needs its own key to log in to the server. On your computer, in
+PowerShell (press `Enter` twice when asked for a passphrase: this key must work
+unattended):
 
 ```powershell
 ssh-keygen -t ed25519 -f $HOME\.ssh\nock_deploy -C "github deploy"
@@ -259,13 +276,12 @@ Get-Content $HOME\.ssh\nock_deploy.pub | ssh -i $HOME\.ssh\nock_admin ubuntu@<IP
 ssh-keyscan <IP>
 ```
 
-Keep the output of `ssh-keyscan` (a few lines starting with `<IP>`) for the next
-part.
+Keep the output of `ssh-keyscan` (a few lines starting with `<IP>`).
 
-**The secrets.** On GitHub, in the repository: **Settings** > **Environments** >
-**New environment**, name `production`. Optional: tick **Required reviewers** and
-add yourself, to get an "Approve" button before each deployment. Then **Add
-environment secret**, four times:
+On GitHub: **Settings** > **Environments** > **New environment**, name
+`production`. Optional: tick **Required reviewers** and add yourself, to get an
+"Approve" button before each deployment. Then **Add environment secret**, four
+times:
 
 | Name | Value |
 | --- | --- |
@@ -280,8 +296,9 @@ move it to the password manager.
 ## Step 12. First deployment
 
 The deployment files must be on `main` (merge the `docs/hosting-plan` branch
-first). A deployment starts when a version tag is pushed. Ask a Claude session
-to "tag and release v0.x.y", or in PowerShell:
+first), and the version you deploy must have a tag. Tag only a commit of
+`main` whose CI is green (a green check next to it on GitHub). Ask a Claude
+session to "tag v0.x.y", or in PowerShell:
 
 ```powershell
 git checkout main
@@ -290,12 +307,22 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-On GitHub, **Actions** > **Deploy** shows three jobs: the quality gate (about 15
-minutes), the image (about 10 minutes), then the deployment (1 minute). When
-all three are green, open `https://<DOMAIN>`: the game's home page shows, with
-a padlock.
+**With the optional workflow** of step 11, the push starts the deployment: on
+GitHub, **Actions** > **Deploy** turns green after a few minutes.
 
-Then, on the server, check the backups once by hand:
+**Without it**, start the deployment from your computer:
+
+```powershell
+ssh -i $HOME\.ssh\nock_admin ubuntu@<IP> /srv/nock/deploy/deploy.sh v0.2.0
+```
+
+It shows each stage (fetching, building, backing up, starting, checking) and
+ends with `v0.2.0 is live`. The first build takes several minutes; later ones
+are faster, because the server keeps what did not change.
+
+Then open `https://<DOMAIN>`: the game's home page shows, with a padlock.
+
+Check the backups once by hand, on the server:
 
 ```bash
 sudo /srv/nock/deploy/backup.sh
@@ -340,8 +367,8 @@ Only once a version with accounts is released.
 
 | You want to | Do |
 | --- | --- |
-| Release a new version | Push a tag `v...` (or ask Claude to). Deployment follows. If the new version does not start, the server goes back to the previous one by itself and GitHub e-mails you the failure. |
-| Deploy an older version again | Actions > Deploy > **Run workflow**, with its tag. Only safe if the newer version did not change the database (its release notes say so). |
+| Release a new version | Tag a green commit of `main` `v...` and push the tag (or ask Claude to). Then run `ssh -i $HOME\.ssh\nock_admin ubuntu@<IP> /srv/nock/deploy/deploy.sh v...`, or let the optional workflow do it. If the new version does not start, the server goes back to the previous one by itself (and the workflow, if used, e-mails you the failure). |
+| Deploy an older version again | The same command with its tag (instant: the server keeps the previous image), or Actions > Deploy > **Run workflow**. Only safe if the newer version did not change the database (its release notes say so). |
 | See whether the app runs | `ssh -i $HOME\.ssh\nock_admin ubuntu@<IP>`, then `cd /srv/nock/deploy && docker compose --env-file .env --env-file tag.env ps` |
 | Read the app's logs | on the server: `journalctl -t nock --since today` (Caddy: `-t caddy`) |
 | See the game's figures | `https://<DOMAIN>/ops`, with the operator token |
@@ -370,7 +397,7 @@ the root of the repository to see them in the catalogue. `Ctrl+C` stops it;
 | `ssh` says "Connection timed out" | Wrong IP, or the server is stopped (console > Instances > Start). |
 | The site does not open at all | The DNS record (step 7) does not point to `<IP>` yet, or a port rule is missing (step 5). Check both. |
 | The browser warns about the certificate | Caddy could not get it: the DNS was not ready when it started. Once `Resolve-DnsName` shows `<IP>`, run on the server `cd /srv/nock/deploy && docker compose --env-file .env --env-file tag.env restart caddy`, wait a minute, and look at `journalctl -t caddy --since "10 min ago"`. |
-| The Deploy workflow is red | Open the failed job in Actions: the gate (a test failed: nothing was deployed), the image, or the deployment (the server went back to the previous version). Paste the end of the log into a Claude session. |
+| A deployment failed | The output (in your terminal, or in Actions > Deploy) says where: "CI has not passed" (tag a green commit), a fetch error (the deploy key of step 11), a build error (nothing was changed on the site), or "does not answer" (the server went back to the previous version). Paste the end of the output into a Claude session. |
 | A budget alert e-mail arrived | Something is no longer free. Look at Billing > Cost Analysis, and ask for help before deleting anything. |
 | The server disappeared | Should not happen on Pay As You Go. Rebuild it (steps 4 to 12; step 6 is not needed: attach the existing `nock-data` disk), or restore the latest backup on a new one (ask a Claude session to guide you). |
 

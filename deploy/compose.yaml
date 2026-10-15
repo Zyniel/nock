@@ -14,7 +14,9 @@ name: nock
 
 services:
   nock:
-    image: ghcr.io/zyniel/nock:${NOCK_TAG:?run deploy.sh, which writes tag.env}
+    # Built on the server by deploy.sh; never pulled from a registry.
+    image: nock:${NOCK_TAG:?run deploy.sh, which writes tag.env}
+    pull_policy: never
     restart: unless-stopped
     env_file: .env
     environment:

@@ -70,7 +70,7 @@ echo "integrity ok, ${tables} tables"
 
 docker run --detach --name "$CONTAINER" --network none \
     --volume "${work}:/data" \
-    "ghcr.io/zyniel/nock:${tag}" >/dev/null
+    "nock:${tag}" >/dev/null
 
 for _ in $(seq 1 30); do
     if docker exec "$CONTAINER" python -c \
