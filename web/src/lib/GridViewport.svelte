@@ -684,9 +684,10 @@
 
   /* A pencil letter (spec 020): in italics, the sign that does not rely on
      colour, and in a grey that keeps at least 4.5:1 on the plain, word,
-     selected and tinted backgrounds. A cell that flashes takes the text colour
-     of its flash (the data-flash rules below), the one colour that keeps 4.5:1
-     on that flash. */
+     selected and tinted backgrounds. While the cell flashes, a pencil letter
+     takes the flash's text colour like a normal letter (the data-flash rules
+     below) and its italics alone mark it (spec 020 decision 12): on flashes 0,
+     5 and 7, no colour that keeps 4.5:1 differs visibly from the normal text. */
   .letter[data-pencil='true'] {
     font-style: italic;
     color: #505050;
@@ -732,18 +733,25 @@
   }
 
   /* The authors view (spec 019): a band along the bottom of the cell. It is
-     drawn over the cell's background and replaces none of it. It keeps 3px
-     inside the cell's padding box, 4px inside its edge, so the selected cell's
-     outline (3px, drawn inside the cell) never covers it. Its z-index draws it
-     above the other players' outlines, so no outline crosses it; only their
-     corner labels (z-index 2, below) are drawn over its ends. */
+     drawn over the cell's background and replaces none of it. Its sides keep
+     3px inside the cell's padding box (4px inside its edge) and its bottom 2px
+     (3px inside its edge), so the selected cell's outline (3px, drawn inside
+     the cell) never covers it. Its z-index draws it above the other players'
+     outlines, so no outline crosses it; only their corner labels (z-index 2,
+     below) are drawn over its ends.
+     Its height is 11% of the cell side and at least 4px, but at most a quarter
+     of the side less 2px. That cap only acts on cells of 20 to 24px, where the
+     letter's baseline can be as little as 6px above the cell's bottom: it keeps
+     the band's top at or below the baseline, within the spec's 1px tolerance
+     (spec 019 decision 13), and the band still at least 3px high (the box
+     rules of spec 019). */
   .author-mark {
     position: absolute;
     z-index: 1;
     left: 3px;
     right: 3px;
-    bottom: 3px;
-    height: max(4px, calc(var(--cell) * 0.11));
+    bottom: 2px;
+    height: min(max(4px, calc(var(--cell) * 0.11)), calc(var(--cell) * 0.25 - 2px));
     pointer-events: none;
   }
 
@@ -843,8 +851,9 @@
   }
 
   /* After the other states, so a flash shows over them. Each text colour keeps
-     at least 4.5:1 on its flash colour, for a pencil letter too; the corner mark
-     of a revealed cell is drawn in it too. */
+     at least 4.5:1 on its flash colour. A pencil letter takes it too, and keeps
+     only its italics during the flash (spec 020 decision 12); the corner mark of
+     a revealed cell is drawn in it too. */
   .letter[data-flash='0'] {
     background: var(--player-colour-0);
     color: #000000;

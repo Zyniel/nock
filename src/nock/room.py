@@ -1055,17 +1055,21 @@ def _find_cell(state: RoomState, row: int, column: int) -> CellState | None:
     return None
 
 
-def _edit_refusal(
+def _check_edit(
     state: RoomState,
     player_id: str,
     edit: EditLetter | Erase | PencilEdit | ConfirmPencil,
     now: float,
     config: RoomConfig,
-) -> Outcome | None:
-    """Run the edit checks in their fixed order; return the first refusal.
+) -> CellState | Outcome:
+    """Run the edit checks in their fixed order.
 
     Check 5 refuses every edit once the grid is solved (spec 026). A
     confirmation has one more check of its own, after these five (spec 020).
+
+    Returns:
+        The edited cell as it is now when every check passes, or else the
+        outcome of the first refusal.
     """
     rate_refusal = _rate_limit_refusal(state, player_id, now, config)
     if rate_refusal is not None:
@@ -1091,7 +1095,7 @@ def _edit_refusal(
         )
     if state.solved:
         return _refuse_solved(state)
-    return None
+    return cell
 
 
 def _is_stale(
@@ -1126,12 +1130,10 @@ def _apply_edit(
     A `pencil_edit` writes a pencil letter (spec 020); the other two write a
     normal letter or empty the cell.
     """
-    refusal = _edit_refusal(state, player_id, edit, now, config)
-    if refusal is not None:
-        return refusal
-    old_cell = _find_cell(state, edit.row, edit.column)
-    if old_cell is None:
-        return _refuse(state, ErrorCode.NOT_A_LETTER_CELL, "Not a letter cell.")
+    cell_or_refusal = _check_edit(state, player_id, edit, now, config)
+    if isinstance(cell_or_refusal, Outcome):
+        return cell_or_refusal
+    old_cell = cell_or_refusal
     letter = _letter_of(edit)
     is_pencil = isinstance(edit, PencilEdit)
     return _write_cell(state, player_id, old_cell, letter, is_pencil, now)
@@ -1149,12 +1151,10 @@ def _confirm_pencil(
     After the five edit checks, a cell that holds no pencil letter is refused
     with stale_edit (spec 020 decision 2). The confirmer becomes the author.
     """
-    refusal = _edit_refusal(state, player_id, confirmation, now, config)
-    if refusal is not None:
-        return refusal
-    old_cell = _find_cell(state, confirmation.row, confirmation.column)
-    if old_cell is None:
-        return _refuse(state, ErrorCode.NOT_A_LETTER_CELL, "Not a letter cell.")
+    cell_or_refusal = _check_edit(state, player_id, confirmation, now, config)
+    if isinstance(cell_or_refusal, Outcome):
+        return cell_or_refusal
+    old_cell = cell_or_refusal
     if old_cell.letter is None or not old_cell.pencil:
         return _refuse(
             state,
