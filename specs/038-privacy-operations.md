@@ -8,6 +8,10 @@ status: approved
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
+(Note from the lead, 2026-10-15: folded in. The answers are decisions 9 and 10, and
+"Open questions" is empty. Spec 036 is refined by the lead before this spec's tests
+are written.)
+
 Epic E10 Quality bar (US-10.4) · Release: MVP · Epic depends on: All
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; guests and the stored identity in spec 012; the
@@ -34,17 +38,29 @@ These criteria apply to every story above and belong in each agent's definition 
 | Process logs (stdout, stderr) | warnings and errors of the server and of the app, with room codes and error descriptions | the operator's choice; they hold no client address, no resume token, no operator token and no chat text |
 | The player's device | `localStorage` (specs 004, 010, 012, 032 to 034, 029); the ops page's token in `sessionStorage` (this spec) | until the player clears the site's data, or the tab is closed for `sessionStorage` |
 | Accounts (spec 033) | defined there | defined there |
+| SQLite, history of each account (spec 029) | one record per finished room of the account: its code, grid number, width and height, the time it was solved, the time it took, and the team-mates' nicknames, guests included, with their player ids | until the account is deleted (spec 033), also after the room itself is deleted; when a team-mate's own account is deleted, their nickname becomes `--` (spec 033's `FORMER_PLAYER_NICKNAME`), shown as `Ancien joueur` (spec 029 AC-6) |
+
+(Note from the lead, 2026-10-15: the row "history of each account" was added after
+spec 029's decision 6, approved by the human on 2026-10-14: an account's history
+keeps the team-mates' nicknames after the room is gone. Without it, this spec said
+that a deleted room leaves no byte behind, which spec 029 contradicts.)
 
 - Personal data about a guest is their nickname and two random identifiers, the
   player id and the resume token (AC-1). Every other field of `PlayerRecord` and
   `PastPlayer` is the state of the game in that room, kept and deleted with the room.
   The server stores no client address, no user agent, no language, no cookie value
   and no device identifier.
+  A guest's nickname and player id can also stay in the history record of an
+  account that played with them (spec 029), until that account is deleted. (Note
+  from the lead, 2026-10-15: added after spec 029's decision 6.)
 - Deletion: `RoomStore` runs with SQLite's `PRAGMA secure_delete = ON`, so deleted
   rows are overwritten with zeros, and `delete_room` (spec 032) ends with
   `PRAGMA wal_checkpoint(TRUNCATE)` on a file database, so no copy of the room stays
   in the write-ahead log. Once a room is deleted, no byte of its data remains in the
-  database files (AC-4). Backups are outside this spec.
+  database files (AC-4), except the history records that accounts keep of it when
+  it was solved (spec 029, the row "history of each account" above). (Note from the
+  lead, 2026-10-15: the exception was added after spec 029's decision 6.)
+  Backups are outside this spec.
 - Cookies: no route sets a cookie for a guest, and the client writes none (AC-2).
   Spec 033 adds one session cookie, for a signed-in account only. Everything the
   client keeps is in `localStorage` and `sessionStorage`, for the game itself.
@@ -450,6 +466,11 @@ The words in brackets say how each criterion is tested.
   file (for example `QJ7WXK`), and room B gets another.
 - Database pages (AC-4): `secure_delete` zeroes deleted rows and freed pages; the
   `-shm` file holds no row data. The criterion checks the main file and the WAL file.
+- Account history (AC-4): AC-4's rooms belong to no account, so nothing of them
+  stays. A solved room in which an account played keeps that account's history
+  record after the deletion (spec 029: code, grid, size, date, time taken and
+  team-mates' nicknames), outside the room's data, until the account is deleted.
+  (Note from the lead, 2026-10-15: added after spec 029's decision 6.)
 - Restart after a crash (AC-4): rows deleted before the crash are not in the database
   after it (the deletion is committed); spec 032's lookups and sweep go on deleting
   expired rooms after the restart.
@@ -496,8 +517,9 @@ The words in brackets say how each criterion is tested.
 - Performance: spec 036.
 - Integrity: spec 037.
 - Backups, log retention and the hosting's own logs (proxy, load balancer).
-- End-to-end sync latency measured in the browsers (open question 2), charts, alerts,
-  exports, and figures per grid or per day.
+- End-to-end sync latency measured in the browsers (decision 10), charts, alerts,
+  exports, and figures per grid or per day. (Note from the lead, 2026-10-15: "open
+  question 2" became "decision 10".)
 - Operator accounts, roles, sign-in with a password, and rotating the token without a
   restart.
 - A consent banner: the game sets no cookie and uses no tracker.
@@ -532,7 +554,8 @@ defaults). They are part of the spec above and are approved with it.
 5. Latency from the room log (AC-5, AC-11). The log held no time that measures
    sync. Pick: a private `relay_ms` on the entries of each client step, the server's
    share of the sync time (spec 015 decision 1 gives it 100 ms). The network share
-   needs reports from the browsers (open question 2).
+   needs reports from the browsers (decision 10). (Note from the lead, 2026-10-15:
+   "open question 2" became "decision 10".)
 6. Disconnection rate (AC-5). Pick: drops per joined player, a drop being a lost
    connection that came back (`disconnected` then `active`), so that closing a tab
    for good does not count as a bad network.
@@ -542,17 +565,27 @@ defaults). They are part of the spec above and are approved with it.
    letter and player, and a step control that shows the grid's letters after any
    number of edits, computed in the page from that list.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question.
+
+9. Changes to spec 036 (former open question 1). This spec changes `server_config`
+   and `main()`, while spec 036 (a `done` spec) says that every other uvicorn option
+   is the default, that `main()` logs at `info`, and that `python -m nock` reads only
+   `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE`. Options: (a) the lead refines spec
+   036 with a dated note pointing here; (b) keep spec 036 and filter client
+   addresses out of uvicorn's info lines, which depends on uvicorn's wording. Pick:
+   (a). Already part of the spec above ("Logs (changes to spec 036)" and `main()`).
+   The lead refines spec 036 before this spec's tests are written: `server_config`
+   gets `access_log=False` and the default `log_level` `"warning"`; `main()` first
+   checks `NOCK_OPERATOR_TOKEN` (`operator_token_from_env`); `python -m nock` also
+   reads `NOCK_OPERATOR_TOKEN`. The test-writer then updates spec 036's tests that
+   expect the `info` level before the implementer runs.
+10. End-to-end sync latency (former open question 2). Options: (a) only the
+    server's share, from the log; (b) also the browsers' measure, reported to the
+    server, which needs a new client message (a change to spec 039) and storage.
+    Pick: (a) now, (b) only if the server's share does not explain a bad game.
+    Already part of the spec above (`relay_ms`, AC-5, AC-11, "Out of scope").
+
 ## Open questions
 
-1. Changes to spec 036. This spec changes `server_config` (`access_log=False`, default
-   log level `warning`) and `main()` (it checks `NOCK_OPERATOR_TOKEN`), while spec 036
-   says that every other uvicorn option is the default, that `main()` logs at `info`
-   and that `python -m nock` reads only `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE`.
-   Options: (a) the lead refines spec 036 with a dated note pointing here (my pick);
-   (b) keep spec 036 as it is and filter client addresses out of uvicorn's info lines,
-   which depends on uvicorn's wording.
-2. End-to-end sync latency. Options: (a) only the server's share, from the log (as
-   written); (b) also the browsers' measure of the time from an edit to its
-   `letter_changed`, reported to the server, which needs a new client message (a
-   change to spec 039) and storage for it. Pick: (a) now, (b) only if the server's
-   share does not explain a bad game.
+None.

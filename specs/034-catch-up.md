@@ -8,6 +8,9 @@ status: approved
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
+(Note from the lead, 2026-10-15: folded in. The answer is decision 7, and "Open
+questions" is empty. Spec 013 is refined after this spec is built.)
+
 Epic E9 Accounts and resume (US-9.3) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; the stored identity and the room page flow in spec
@@ -261,7 +264,15 @@ Applying a catch-up:
 5. `room-page` gains `data-catch-up`: `""` until a catch-up is applied, then
    `"<after_seq>-<until_seq>"` of the last one applied (for example `"5-9"`).
 
-Live events add no `word_completed` line (only the catch-up does; open question 1).
+Live events add no `word_completed` line until spec 013 is refined, after this spec
+is built (decision 7). Once it is, a live `letter_changed` adds exactly the lines
+that `build_catch_up` gives for it: same rule ("Complete word"), `data-kind`, text,
+`data-seq` and clue order. The catch-up covers only the events that this page never
+applied (`seen seq < seq <= snapshot seq`), and live lines only the events applied
+after the snapshot, so no line shows twice, and a player who stayed and one who
+comes back see the same check, reveal and word lines for the time of the absence.
+(Note from the lead, 2026-10-15: this paragraph replaced "Live events add no
+`word_completed` line (only the catch-up does; open question 1)".)
 
 ### New `fr.json` keys
 
@@ -321,9 +332,14 @@ The words in brackets say how each criterion is tested.
 
 - First visit (AC-5): no stored `seen_seq`, no catch-up: the device has no "last
   visit". Another device of the same player (spec 033) has its own seen seq.
-- Coming back as a new player (AC-2, AC-4): after spec 017's time-out, the page joins
-  as a new player; the return still applies, with the new token, which is a current
-  member's.
+- Coming back after a time-out (AC-2, AC-4): after spec 017's time-out, the page's
+  join seats the player back with the same id and token (spec 032 AC-7), and the
+  return applies as usual. A full or locked room refuses that join (spec 032 AC-7),
+  so no snapshot comes and there is no return; the stored `seen_seq` stays for a
+  later visit. A player who comes back without their token joins as a new player,
+  whose token is a current member's, and the return applies with it. (Note from the
+  lead, 2026-10-15: this item was "Coming back as a new player", where the page always
+  joined as a new player; changed after spec 032's decision 11.)
 - Expired, then a new room with the same code (AC-5): the stored `seen_seq` of the old
   room may be compared with the new room's seqs; at worst a first visit to the new
   room shows a catch-up of its own events. Codes are drawn from about 10^9, so this is
@@ -368,8 +384,10 @@ The words in brackets say how each criterion is tested.
 - Payments and subscriptions (epic E9).
 - Room resume: spec 032.
 - Optional account: spec 033 (a seen seq shared by the devices of an account).
-- A "word completed" line for live play (open question 1), and lines for letters,
-  chat, flags or presence in the catch-up.
+- A "word completed" line for live play, which spec 013's refinement adds after this
+  spec is built (decision 7), and lines for letters, chat, flags or presence in the
+  catch-up. (Note from the lead, 2026-10-15: "(open question 1)" became the pointer
+  to spec 013's refinement and decision 7.)
 - A summary banner ("6 cases ont changé"), a button to show the highlight again, a
   marker separating the catch-up lines from the live ones.
 - Showing what each changed cell held before.
@@ -390,6 +408,9 @@ They are part of the spec above and are approved with it.
 2. "My last visit" (AC-5). Options: kept by the server per player, or by the device.
    Pick: by the device, as the seen seq in the room record, since spec 017 forgets a
    player 5 minutes after they leave and the player usually comes back as a new one.
+   (Note from the lead, 2026-10-15: since spec 032's decision 11, a player who comes
+   back with their token is seated back with the same id. The pick stands: the
+   server keeps no seen seq for a past player, and each device keeps its own.)
 3. Where the catch-up comes from (AC-1, AC-3). Options: a snapshot as it was at the
    seen seq, then the missed events replayed in the page; a new WebSocket message (a
    change to spec 039, whose decision 12 keeps feed history out of the snapshot); or
@@ -409,10 +430,36 @@ They are part of the spec above and are approved with it.
    join. Pick: the catch-up carries the nicknames of the players its lines name,
    departed ones included.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question.
+
+7. Live "word completed" lines (former open question 1). Spec 013's live feed had
+   no such line, so a player who stays would see fewer lines than one who comes
+   back. Options: (a) catch-up only; (b) also add the line live, in spec 013's feed.
+   Pick: (b), as a refinement of spec 013 made after this spec is built. What
+   changed here: the paragraph after "Applying a catch-up" and "Out of scope" point
+   to that refinement; the catch-up itself, its criteria and its tests do not
+   change. Spec 013, a `done` spec, is then refined by the lead with dated notes:
+   - its list of events that add a feed item gains a row: a `letter_changed` with a
+     letter, on a cell that was empty just before it, adds one item per word
+     through that cell that is complete just after it (each cell holds a letter,
+     pencil or not), with `data-kind` `word_completed`, the text
+     `t("feed.word_completed", {name, clue})` of this spec, `clue` the clue's text,
+     `data-seq` the event's seq, the words in clue order (`row`, `column`,
+     `clue_index`). A reveal's `cell_locked` adds none;
+   - "Other events (`letter_changed`, ...) add no item" then names a
+     `letter_changed` that completes no word;
+   - "empty just before" and "complete just after" are read on the kept snapshot
+     (the confirmed letters, spec 040), never on the letters shown with pending
+     edits, so the live lines are those that this spec's server finds in the log;
+   - feed items are no longer unique by `data-seq`: one `letter_changed` that
+     completes two words adds two items with the same `data-seq`, and a
+     `letter_changed` adds no other item. The client keys feed items by `seq` and
+     clue (or by position), never by `seq` alone. Items still follow `seq` order,
+     with equal seqs in clue order, as this spec's step 3 already says;
+   - its feed criterion (AC-5) gains a case, for example on FX-01 one letter at
+     (2, 4) completing `SENT` then `VIDE` gives two items with one `data-seq`.
+
 ## Open questions
 
-1. Live "word completed" lines. The backlog asks for word completions in the
-   catch-up, and spec 013's live feed has no such line, so a player who stays sees
-   fewer lines than one who comes back. Options: (a) catch-up only (as written); (b)
-   also add the line live, in spec 013's feed, which changes spec 013's list of
-   events that add a line. Pick: (b), as a refinement of spec 013 after this spec.
+None.

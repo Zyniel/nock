@@ -8,6 +8,9 @@ status: approved
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
+(Note from the lead, 2026-10-15: folded in. The answers are decisions 8 to 12, and
+"Open questions" is empty.)
+
 Epic E7 Completion and recap (US-7.2) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
 engine (`nock.room`, `nock.hub`, `new_room`, `register_room`, the wrong-code
@@ -63,8 +66,13 @@ On a solved room (spec 026), from its log (every entry from seq 1 to the room's
   order, with the nickname of their join, those who left or were removed included,
   since their letters stay in the grid. An author whose id has no `player_joined`
   (only in a state built by hand) is listed after them, with no nickname.
+  A player id with several `player_joined` entries (a player seated back after a
+  time-out, spec 032 AC-7) is listed once, at the place of its first one, with the
+  nickname of its last one. (Note from the lead, 2026-10-15: added, decision 12.)
 - Team (share page): the nicknames of the players who were not removed by the host
   (no `player_left` with reason `removed`), in join order, each nickname once.
+  Join order here is the order of "Players" above. (Note from the lead,
+  2026-10-15: added, decision 12.)
 
 ### `nock.recap`
 
@@ -356,7 +364,8 @@ The words in brackets say how each criterion is tested.
 
 - Wrong letters on the way (AC-2, AC-3): only the solved grid's authors count for
   letters; a word completed with a wrong letter counts for whoever wrote its last
-  missing letter, until an erase takes the completion away. See "Open questions".
+  missing letter, until an erase takes the completion away. See decision 8. (Note
+  from the lead, 2026-10-15: "See "Open questions"" became "See decision 8".)
 - One edit, two words (AC-3): the letter at the crossing of two words completes
   both.
 - Erase and undo (AC-3): an erase or an undo that empties a cell of a full word
@@ -373,9 +382,18 @@ The words in brackets say how each criterion is tested.
   row and their letters; on the page their swatch is the neutral grey of spec 019,
   since their colour may now be someone else's. A removed player with no letter and
   no word gets no row, and the share page never names a removed player.
-- Rejoined players (AC-2): a player who timed out and joined again has a new id
-  (spec 017), so the recap has two rows, possibly with one nickname; the team names
-  each nickname once.
+- Rejoined players (AC-2): a player who timed out and came back with their stored
+  token is seated back with the same id (spec 032 AC-7), so the recap has one row
+  for them, and their letters and words count once. For example, in a log where
+  `p2` (`Bob`) joins, writes, times out, joins again with the same id and writes
+  again, `players` holds one `p2` row, at the place of its first join, whose
+  `letters` and `words` count every cell and word credited to `p2`, before and
+  after the time-out. A player who comes back
+  without their token (another device, cleared storage, or a past record dropped by
+  spec 032's cap of 100) has a new id, so the recap has two rows, possibly with one
+  nickname; the team names each nickname once. (Note from the lead, 2026-10-15: this
+  item used to say that a player who timed out and joined again always had a new
+  id; decision 12.)
 - Late joiner (AC-7): a player who joins a solved room sees `recap-open` and the
   same recap; their own row shows 0 letters and 0 words.
 - Time (AC-1): the timer's `elapsed_ms` (spec 027); a hidden timer does not change
@@ -431,22 +449,35 @@ spec. Each one is already part of the spec above.
 7. Colours: a swatch per row with spec 019's colour rule, so the recap matches the
    authors view; the nickname is always written.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question.
+
+8. "Words they completed by writing the last missing letter" (former open question
+   1). Options: (a) the player whose letter filled the word's last empty cell, right
+   or wrong, the last such completion counting; (b) the player whose letter made
+   the word full and right. Pick: (a), the backlog's words. Already part of the
+   spec above.
+9. Share link (former open question 2). Options: (a) a page of its own,
+   `/recap/<token>`, with a random token per room; (b) a text to copy, with no link
+   and no page. Pick: (a). Already part of the spec above.
+10. Team on the share page (former open question 3). Options: (a) every player who
+    joined, minus those the host removed; (b) only the players present at the
+    solve; (c) only the players with at least one letter or word. Pick: (a).
+    Already part of the spec above.
+11. Opening the recap (former open question 4). Options: (a) a button that opens
+    it; (b) open it by itself at `grid_solved`, which needs spec 026 AC-5's tests to
+    close it first. Pick: (a). Already part of the spec above.
+12. Dependency on spec 019's author rule (former open question 5). Options: (a)
+    spec 019 keeps its rule as written; (b) the recap follows a changed rule.
+    Settled: (a). Spec 019 keeps the author as the player of the last
+    `letter_changed` (the undoer and the confirmer credited, nobody for a reveal),
+    and the neutral band for authors who are no longer in the room, so AC-2 and the
+    swatch rule stand as written. What changed: with spec 032's seat back (its
+    decision 11), a player who times out and comes back with their token keeps one
+    id, so their letters and words count once. "Players" now lists a player id with
+    several `player_joined` entries once, "Team" follows that order, and the edge
+    case "Rejoined players" says so.
+
 ## Open questions
 
-1. "Words they completed by writing the last missing letter". Options: (a) the
-   player whose letter filled the word's last empty cell, right or wrong, the last
-   such completion counting (pick, the backlog's words); (b) the player whose
-   letter made the word full and right, which credits the one who corrected it.
-2. Share link. Options: (a) a page of its own, `/recap/<token>`, with a random
-   token per room (pick); (b) a text to copy (time and team) with no link and no
-   page.
-3. Team on the share page. Options: (a) every player who joined, minus those the
-   host removed (pick); (b) only the players present at the solve; (c) only the
-   players with at least one letter or word.
-4. Opening the recap. Options: (a) a button that opens it (pick); (b) open it by
-   itself at `grid_solved`, which needs spec 026 AC-5's tests to close it before
-   they tap the grid.
-5. Spec 019 dependency: this spec reads the author as spec 019 defines it today
-   (last `letter_changed`, undoer and confirmer credited, none for a reveal). If
-   spec 019's re-approval changes that rule, or the neutral colour of a departed
-   author, AC-2 and the swatch rule follow it.
+None.

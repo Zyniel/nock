@@ -8,6 +8,10 @@ status: approved
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
+(Note from the lead, 2026-10-15: folded in. The answers are decisions 11 and 12,
+and "Open questions" is empty. Spec 005 is refined by the lead before this spec's
+tests are written.)
+
 Epic E9 Accounts and resume (US-9.2) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; joining, the stored identity and the room page flow
@@ -187,10 +191,10 @@ def sign_in_message(settings: AccountSettings, to: str, token: str) -> EmailMess
 ```python
 # src/nock/accounts.py
 SESSION_COOKIE: str = "nock_session"
-LINK_LIFE_SECONDS: float = 1_800.0  # 30 minutes (proposed, open question 1)
-SESSION_LIFE_SECONDS: float = 7_776_000.0  # 90 days (proposed, open question 1)
-LINKS_PER_EMAIL_PER_HOUR: int = 3  # proposed, open question 1
-LINKS_PER_ADDRESS_PER_HOUR: int = 10  # proposed, open question 1
+LINK_LIFE_SECONDS: float = 1_800.0  # 30 minutes (decision 11)
+SESSION_LIFE_SECONDS: float = 7_776_000.0  # 90 days (decision 11)
+LINKS_PER_EMAIL_PER_HOUR: int = 3  # decision 11
+LINKS_PER_ADDRESS_PER_HOUR: int = 10  # decision 11
 EMAIL_MAX_LENGTH: int = 254
 
 
@@ -315,6 +319,10 @@ class AccountStore:
     def close(self) -> None:
         """Close the database. Idempotent."""
 ```
+
+(Note from the lead, 2026-10-15: the comments of `LINK_LIFE_SECONDS`,
+`SESSION_LIFE_SECONDS`, `LINKS_PER_EMAIL_PER_HOUR` and `LINKS_PER_ADDRESS_PER_HOUR`
+said "proposed, open question 1"; the human kept these values, decision 11.)
 
 ### `nock.room`, `nock.store` and `nock.hub`: erasing a player
 
@@ -584,8 +592,12 @@ The words in brackets say how each criterion is tested.
   it was asked; a mail scanner that fetches the link gets `index.html` only, since the
   token is in the fragment and is used by the page's `POST`.
 - Signed in elsewhere (AC-2): opening the room on device 2 resumes Ana's player while
-  her resume window lasts (spec 017); device 1 shows `replaced`. After a time-out the
-  identity no longer resumes (spec 032, open question 1).
+  her resume window lasts (spec 017); device 1 shows `replaced`. After a time-out,
+  the identity seats Ana back with the same player id, her nickname (with spec 012's
+  suffix if a player took it meanwhile) and her colour while no player of the room
+  has it (spec 032 AC-7), unless the room is full or locked. (Note from the lead, 2026-10-15: "After a time-out the identity no
+  longer resumes (spec 032, open question 1)" became the sentence above, after spec
+  032's decision 11.)
 - An existing account (AC-1): a link for an address that has an account signs in to
   it and links the room's identity to it.
 - Room gone or player gone before the link is used (AC-1): the account is created or
@@ -629,7 +641,10 @@ The words in brackets say how each criterion is tested.
 - Removing the deleted player's messages from the chat, and erasing data from backups.
 - Merging two accounts, or a room identity linked to two accounts at once (the later
   link wins on each device).
-- Getting a timed-out player back in a room (spec 032, open question 1).
+- Getting a timed-out player back in a room: spec 032 AC-7, which seats them back
+  with their token, also the token an account gives a device. (Note from the lead,
+  2026-10-15: "(spec 032, open question 1)" became "spec 032 AC-7", after spec 032's
+  decision 11.)
 
 ## Work packages
 
@@ -671,13 +686,24 @@ above and are approved with it.
     tools (AC-9); the dialog sits outside the toolbar so that its scrolling cannot
     clip it.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question.
+
+11. Thresholds, none of which is in the backlog (former open question 1). Options:
+    keep the proposed values, or set others (the texts `account.sent` and
+    `email.sign_in.body` say "30 minutes" and would change with them). Pick: keep
+    them: a sign-in link lives 30 minutes and works once, a session lives 90 days,
+    and at most 3 links per address and 10 per client address are sent per hour.
+    Already part of the spec above; the comments of the four constants of
+    `nock.accounts` now point here.
+12. Spec 005's scan (former open question 2). Options: (a) one exception, so that
+    `src/nock/mailer.py` may import `smtplib` and `ssl`; (b) send mail from a
+    separate process outside `src/`, which splits the server in two. Pick: (a).
+    Already part of the spec above ("Spec 005 amendment", decision 6). The lead
+    refines spec 005, a `done` spec, with a dated note before this spec's tests are
+    written, and the test-writer updates spec 005's scan tests before the
+    implementer runs.
+
 ## Open questions
 
-1. Proposed thresholds, none of which is in the backlog: a sign-in link lives 30
-   minutes and works once; a session lives 90 days; at most 3 links per address and
-   10 per client address per hour. Options: keep them (my pick), or set others; the
-   texts `account.sent` and `email.sign_in.body` say "30 minutes" and change with it.
-2. Spec 005's scan. This spec needs the lead to refine spec 005 (a `done` spec) so
-   that `src/nock/mailer.py` may import `smtplib` and `ssl`. Options: (a) that one
-   exception (my pick); (b) send mail from a separate process outside `src/`, which
-   splits the server in two.
+None.

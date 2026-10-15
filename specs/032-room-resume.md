@@ -8,6 +8,8 @@ status: approved
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
+(Note from the lead, 2026-10-15: folded in. The answer is decision 11 (seat back, AC-7). Specs 012 and 017 are refined by the lead before this spec's tests are written. "Open questions" holds one new question that the seat back raised.)
+
 Epic E9 Accounts and resume (US-9.1) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine, `RoomConfig`
 and the fake-clock harness are defined in spec 011; joining, the stored identity and
@@ -124,15 +126,75 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
     """
 ```
 
-`replay` (spec 018 table), changed row:
+`replay` (spec 018 table), changed rows:
 
 | Event | Effect on the state |
 | --- | --- |
+| `player_joined` | the player is appended to `players`, as before (spec 012). When `past_players` holds a `PastPlayer` with the same `player_id`, that record is removed from `past_players` (seat back, AC-7) |
 | `player_left` | the player is removed from `players`, as before. Reason `removed`: their token is added to `removed_tokens` (spec 014). Reason `timed_out` or `left`: `PastPlayer(player_id, resume_token, nickname, colour)` of their record is appended to `past_players`, after dropping the oldest one when it already holds `MAX_PAST_PLAYERS` |
 
+(Note from the lead, 2026-10-15: the `player_joined` row was added with AC-7,
+decision 11.)
+
 The live time-out (spec 017, in `tick` and in `join_room`) builds its state with
-`replay`, so a live room and a replayed one agree. A past player's token still does
-not resume (spec 017 is unchanged; see open question 1).
+`replay`, so a live room and a replayed one agree. A past player's token does not
+resume them (spec 012 step 2 looks only at `players`); a join with it seats them
+back, as "Seat back" below says. (Note from the lead, 2026-10-15: this sentence
+used to say that a past player's token still does not resume, spec 017 being
+unchanged, and pointed to open question 1; decision 11 settles it.)
+
+### Seat back (`nock.room.join_room`)
+
+(Note from the lead, 2026-10-15: this section was added with AC-7, decision 11.
+Specs 012 (join steps) and 017 (AC-3 and its edge case "After a time-out") are
+refined by the lead to match, with dated notes, before this spec's tests are
+written.)
+
+A join whose `resume_token` belongs to a past player of the room brings that player
+back. Spec 012's join steps gain one step, after step 4 (room full) and before
+step 5 (nickname):
+
+- Steps before it, unchanged: step 1 (removed token, spec 014), step 2 (resume of a
+  player of `players`, within spec 017's window), step 3 (room locked, spec 014) and
+  step 4 (room full). So in a locked room the join gets
+  `ErrorMessage(code=ROOM_LOCKED)` and in a full room
+  `ErrorMessage(code=ROOM_FULL)`, each with `close_sender`, no entry and the state
+  unchanged. The past player stays in `past_players`, and their token stays a
+  member's (AC-4).
+- Seat back: `message.resume_token` equals, compared with `secrets.compare_digest`,
+  the `resume_token` of a `PastPlayer` of `state.past_players`. With
+  `seq = state.seq + 1`, a `PlayerRecord` is appended at the end of `players`, built
+  as spec 012 step 6 builds a new player, except for these fields:
+  - `player_id` and `resume_token`: the past player's. `new_player_id` and
+    `new_resume_token` are not used.
+  - `nickname`: the past player's, made unique by spec 012's "Duplicate nicknames"
+    rule against the nicknames of `players`. So it is kept unless a player of
+    `players` has it under `casefold()` (new open question 1).
+  - `colour`: the past player's when no player of `players` (connected or
+    disconnected) has it, else the lowest index 0 to 7 that no player of `players`
+    has, as spec 012 step 6 assigns it.
+  - `message.nickname` is ignored and not checked, as in a resume, so step 5 does not
+    apply.
+
+  The other fields are those of a new player: `is_host` is True only when no player
+  of the room is host, `muted` is False, `state = active`, `joined_seq = seq` and
+  `last_input_at = last_seen_at = now`. The `PastPlayer` is removed from
+  `past_players`. There is one entry,
+  `LogEntry(at=now, event=PlayerJoined(seq, player=<its view>), resume_token=<the past player's token>)`,
+  and `reply = (snapshot_for(new_state, player_id),)`. The other players receive the
+  `player_joined`, as for any joiner. The hub binds the socket to the snapshot's
+  `you` (spec 012), so the connection belongs to the player who came back.
+- Letters: cells keep their `author` and `changed_by` ids (spec 017), so the
+  authorship view (spec 019) and the recap (spec 028) see one person with one id.
+- Time-out in the same step: when spec 017's resume step times out the token's
+  player (disconnected for more than `resume_window_seconds`), that player becomes a
+  past player in this step (a `player_left` with reason `timed_out`, then a
+  `host_changed` when they were host and another player remains), and the join goes
+  on with steps 3 and 4, then
+  seats them back. So whether a player gets their seat back does not depend on
+  whether a tick saw the time-out first.
+- Removed players are never past players (the `player_left` row above), and step 1
+  refuses their token (spec 014), so a removed player is never seated back.
 
 ### `nock.store`
 
@@ -360,10 +422,20 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-9.1.1) (Python) A room's life runs 30 days from its last edit. With a store file and a FX-01 room created at `t0` (`new_room(code, grid, t0)`, then `create_room`): `last_edit_at(code) == t0`; after appending, one at a time, a `player_joined` at `t0 + 5`, a `letter_changed` at `t0 + 10`, a `chat_message` at `t0 + 20`, a `check_result` at `t0 + 25` and a `cell_locked` at `t0 + 30`, it reads `t0`, `t0 + 10`, `t0 + 10`, `t0 + 10` and `t0 + 30`; then `expired_codes(t0 + 30)` does not hold the code and `expired_codes(t0 + 30.5)` does, so the room is still open at `t0 + 30 + LIFE` and expired at `t0 + 30.5 + LIFE`. `is_edit` is True for a `letter_changed` with a letter, a `letter_changed` erasing, a `cell_locked` of a check and one of a reveal, and False for `player_joined`, `player_state_changed`, `chat_message`, `check_result`, `settings_changed` and `grid_solved`. `create_room(state, last_edit_at=t0 + 99)` starts the last edit time at `t0 + 99`. A file written before this spec (see "Test harness") holding room A, created at `t0` with a `letter_changed` at `t0 + 10` then a `player_state_changed` at `t0 + 50`, and room B, created at `t0 + 1` with no entry, opened with `RoomStore(path)`, gives `last_edit_at(A) == t0 + 10` and `last_edit_at(B) == t0 + 1`, and an edit appended to B at `t0 + 60` makes it `t0 + 60`.
 - **AC-2** (AC-9.1.1) (Python; WebSocket with a fake clock) An expired room is deleted, and nobody can reach it any more. Python: a registry with a fake clock and a store file holds room A (last edit at `t0 + 10`) and room B (last edit at `t0 + 20`). With the clock at `t0 + 10 + LIFE`, `expire_rooms()` returns `[]`; at `t0 + 11 + LIFE` it returns `[A]`, then `store.has_room(A)` is False, `store.read_log(A) == []`, `store.load_room(A)` is None, `room_state(A)`, `find_room(A)` and `peek_room(A)` are None, B still loads with its log, and `add_room` of a fresh state with A's code succeeds. Without any call of `expire_rooms`, with the clock moved to `t0 + 21 + LIFE`, `room_state(B)` is None and `store.has_room(B)` is False. WebSocket: with no tick changing anything and `expiry_sweep_seconds=0.05`, `Ana` and `Bob` join a FX-01 room and Ana writes `T` at (1, 0); after `advance(LIFE + 1)`, both sockets are closed with code 4404 within 1 second of real time, and neither receives a message after Ana's `letter_changed`; a new socket to the same code is then closed with 4404 before any message.
-- **AC-3** (AC-9.1.2) (WebSocket with a fake clock and a simulated restart; browser with live server) Opening the link on another device shows the same letters, timer and hint budget, also the next day and after a restart. WebSocket: in process one (store file, fake clock), a FX-01 room is created at `t0`; `Ana` joins at `t0`, writes `T` at (1, 0) at `t0 + 10` and `A` at (1, 1) at `t0 + 20`, reveals the letter (4, 4) at `t0 + 30` (spec 024), and her socket closes at `t0 + 100`; process one stops. The clock moves to `t0 + 100 + DAY` and process two starts on the same file. A client with no token (another device) joins as `Bob`: its snapshot's `grid` equals `grid_state` of the room as process one left it (`T` and `A` authored by Ana's id, `T` at (4, 4) locked and revealed), its `reveal_budget` is `RevealBudget(letters=4, words=1)`, and its `timer_elapsed_ms` is within 1,000 of 90,000, since the timer ran from the first letter at `t0 + 10` until nobody was connected at `t0 + 100` (spec 027 AC-1, AC-2). Then a client joining with Ana's token (her device; she timed out, so she joins as a new player, spec 017) receives a snapshot with the same `grid` and `reveal_budget` as Bob's, and a `timer_elapsed_ms` within 1,000 of Bob's. Browser: on the live server, page 1 (context 1) enters a FX-01 room as `Ana`, types `T` then `A` from (1, 0) across, and is closed; page 2 in context 2 (empty storage) opens the room's link, enters as `Bob`, and its cells (1, 0) and (1, 1) have `data-letter` `T` and `A`.
+- **AC-3** (AC-9.1.2) (WebSocket with a fake clock and a simulated restart; browser with live server) Opening the link on another device shows the same letters, timer and hint budget, also the next day and after a restart. WebSocket: in process one (store file, fake clock), a FX-01 room is created at `t0`; `Ana` joins at `t0`, writes `T` at (1, 0) at `t0 + 10` and `A` at (1, 1) at `t0 + 20`, reveals the letter (4, 4) at `t0 + 30` (spec 024), and her socket closes at `t0 + 100`; process one stops. The clock moves to `t0 + 100 + DAY` and process two starts on the same file. A client with no token (another device) joins as `Bob`: its snapshot's `grid` equals `grid_state` of the room as process one left it (`T` and `A` authored by Ana's id, `T` at (4, 4) locked and revealed), its `reveal_budget` is `RevealBudget(letters=4, words=1)`, and its `timer_elapsed_ms` is within 1,000 of 90,000, since the timer ran from the first letter at `t0 + 10` until nobody was connected at `t0 + 100` (spec 027 AC-1, AC-2). Then a client joining with Ana's token (her device; she timed out, so she is seated back, AC-7) receives a snapshot whose `you` is Ana's player id of process one, with the same `grid` and `reveal_budget` as Bob's, and a `timer_elapsed_ms` within 1,000 of Bob's. (Note from the lead, 2026-10-15: "she joins as a new player, spec 017" became "she is seated back, AC-7", and the check of `you` was added, which shows that past players survive the restart; decision 11.) Browser: on the live server, page 1 (context 1) enters a FX-01 room as `Ana`, types `T` then `A` from (1, 0) across, and is closed; page 2 in context 2 (empty storage) opens the room's link, enters as `Bob`, and its cells (1, 0) and (1, 1) have `data-letter` `T` and `A`.
 - **AC-4** (AC-9.1.3) (Python; HTTP) The server gives a room's summary only to a member of the room. Python: a `player_left` with reason `timed_out` replayed on a state holding `Bob` (token `TB`, colour 1) removes him from `players` and appends `PastPlayer(player_id=<Bob>, resume_token=TB, nickname="Bob", colour=1)` to `past_players`; with reason `removed` nothing is appended and `TB` goes to `removed_tokens`; on a state with `MAX_PAST_PLAYERS` past players, one more time-out drops the oldest and keeps 100. `member_id` gives Bob's id for `TB` after his time-out, `None` after his removal, and `None` for an unknown token. With past players `Bob`, `ana` and players `Ana`, `Cy`, `team_nicknames` is `("Bob", "ana", "Cy")`. HTTP: on room A (FX-01, grid number 1) where `Ana` (token `TA`), `Bob` (`TB`) and `Cy` (`TC`) joined, Ana wrote `T` at (1, 0) at `t0 + 10`, Ana removed Cy and Bob timed out, and room B (FX-01 added with `grid_number` None) where `Dan` (`TD`) wrote a letter at `t0 + 50`: `POST /api/rooms/summaries` with A's code and `TA` answers 200 with a JSON array of one item, which `RoomSummary.model_validate` turns into `RoomSummary(code=A, grid_number=1, width=5, height=5, players=("Bob", "Ana"), last_activity_at=<t0 + 10 as a UTC datetime>, solved=False)` (compared as models, so that fields a later spec adds with a default, such as spec 029's, keep it passing); with `TB` the same; with `TC`, with a token no player ever had, or with the code `ZZZZZZ`, `[]`; with A by `TA`, B by `TD` and A again by `TB`, two summaries, B then A. A body with 101 keys, a code `abc`, a token of 15 characters or an extra key answers 422. A room that only the store holds keeps the same log after the request. An expired room is left out and deleted.
 - **AC-5** (AC-9.1.3) (browser with mocked routes; browser with live server) "My rooms" lists my open rooms with their grid, players and last activity. Mocked: with valid identities stored for `XYZ789` and `ABC234` and a corrupt `nock.identity.QQQQQQ` (`not json`), the page sends one `POST /api/rooms/summaries` whose body holds exactly the keys of `XYZ789` and `ABC234` with their stored tokens. When the answer is the summary of `XYZ789` (grid 2, 5 by 5, players `Ana`, `Bob`, last activity `2026-10-14T08:30:00Z`, not solved) then that of `ABC234` (grid null, 13 by 17, players `Ana`, last activity `2026-10-13T20:05:00Z`, solved), `my-rooms` reaches `data-state="ready"` with two `my-room` items in that order. The first has `data-code="XYZ789"`, `data-grid="2"`, `data-solved="false"`, the texts `Grille n° 2`, `5 × 5`, `Joueurs : Ana, Bob` and `Dernière activité : 14 octobre 2026 à 10:30`, no `my-room-solved`, and a `my-room-link` with `href="/r/XYZ789"`, text `Reprendre` and `aria-label` `Reprendre le salon XYZ789`. The second has `data-grid=""`, the texts `Grille hors catalogue`, `13 × 17`, `Joueurs : Ana` and `Dernière activité : 13 octobre 2026 à 22:05`, and a `my-room-solved` reading `Terminée`. An answer `[]` shows `fr.json["my_rooms.empty"]`; an answer with status 500 gives `data-state="error"` and `fr.json["my_rooms.error"]`, while the catalogue list still reaches `data-state="ready"`. With no identity stored, the page has no `my-rooms` element and sends no summaries request. Live: Ana (context 1) starts FX-01 from the catalogue (spec 010) and types `T` at (1, 0); Bob (context 2) joins her room; Ana's context then opens `/`: `my-rooms` holds one `my-room` with her room's code, `data-grid="1"` and the text `Joueurs : Ana, Bob`; clicking its `my-room-link` opens `/r/<code>`, whose room page reaches `data-status="joined"` with the same `data-you` as before, without showing `nickname-form`.
 - **AC-6** (new) (browser with mocked routes; keyboard only for the walk) "My rooms" meets spec 035 and the window sizes of spec 006 AC-5. With the two summaries of AC-5, at 1280 by 720 and at 360 by 740: spec 035's contrast scan and language scan find no offending element on `/`; keyboard only, `tab_to` (spec 035 "Test harness") reaches each `my-room-link`, which then shows spec 035 AC-2's outline (style neither `none` nor `auto`, width at least 2 px, colour of contrast at least 3:1 against white), and `Enter` on the first loads `/r/XYZ789`. At each window size of spec 006 AC-5, `document.documentElement.scrollWidth <= window.innerWidth`, also when the first summary lists 8 players whose nicknames have 20 characters each.
+- **AC-7** (new, decision 11) (Python; WebSocket and HTTP with a fake clock) A player who comes back after spec 017's time-out with their stored token gets their seat back: the same player id, nickname and letters, and the same colour while no player of the room has it. The rules are those of "Seat back". Python, on a FX-01 room with the `RoomConfig` of "no tick changes anything" (see "Test harness") except `resume_window_seconds`, left at its default of 300: `Ana` (token `TA`), `Bob` (`TB`) and `Cy` (`TC`) join at `t0` (seq 1 to 3, colours 0 to 2, Ana host); Ana writes `T` at (1, 0) (seq 4); her connection closes at `t0 + 10` (`disconnect_player`, seq 5); `tick` at `t0 + 311` gives `PlayerLeft(player_id=<Ana>, reason="timed_out")` (seq 6) then `HostChanged(player_id=<Bob>)` (seq 7), and `past_players` holds Ana. Then:
+  - Seat back: `join_room` with `Join(nickname="Autre", resume_token=TA)` at `t0 + 400`, `new_player_id="pNEW"` and a fresh `new_resume_token`, gives exactly one entry, a `PlayerJoined` with seq 8 whose `player` is `PlayerView(player_id=<Ana>, nickname="Ana", colour=0, state="active", is_host=False, muted=False, selection=None)`, logged with `resume_token == TA`. Its reply is one `Snapshot` with `you == <Ana>` and `resume_token == TA`, and `close_sender` is False. In the new state Ana is last in `players` with `joined_seq == 8`, `past_players` is empty, (1, 0) has `author == <Ana>`, `member_id(state, TA) == <Ana>`, and no player has the id `pNEW`. Replaying every entry from `new_room` gives the same `past_players` and the same player ids, nicknames, colours and `is_host` in `players`.
+  - Colour taken: in a second run, after the time-out, `Dan` joins and gets colour 0 (spec 012). Ana's join with `TA` then gives her old id, the nickname `Ana` and colour 3, the lowest index that no player has.
+  - Nickname taken: in a third run, after the time-out, `ana` joins and keeps the nickname `ana`, since no player has it, with colour 0. Ana's join with `TA` then gives her old id, the nickname `Ana 2` (spec 012's duplicate rule; new open question 1) and colour 3.
+  - Full: in a run where six more players join after the time-out, so that `players` holds 8, Ana's join with `TA` gives `reply == (ErrorMessage(code="room_full", ...),)` (code compared), `close_sender` True, no entry and the same state. Ana stays in `past_players`, and `member_id(state, TA)` is still her id.
+  - Locked: in a run where Bob, host since the time-out, sends `LockRoom(locked=True)`, Ana's join with `TA` gives `ErrorMessage(code="room_locked")` with the same checks as a full room. After Bob sends `LockRoom(locked=False)`, the same join seats her back.
+  - Time-out in the join: in a run with no tick after the disconnection, Ana's join with `TA` at `t0 + 310.5` (300.5 seconds after her disconnection) gives three entries: `PlayerLeft(player_id=<Ana>, reason="timed_out")`, `HostChanged(player_id=<Bob>)`, then a `PlayerJoined` of `<Ana>` with nickname `Ana`, colour 0 and `is_host` False. Its snapshot has `you == <Ana>`.
+  - Removed: in a run where Ana removes Cy (spec 014) at `t0 + 5`, before her disconnection, a join with `TC` at `t0 + 400` gets `ErrorMessage(code="removed")` with `close_sender` True and no entry, and `past_players` holds Ana only.
+
+  WebSocket and HTTP: on a registry with a fake clock, a store file and the same `RoomConfig` with `tick_seconds=0.05`, clients A (`Ana`) and B (`Bob`) join a FX-01 room and A writes `T` at (1, 0); A's socket closes; after `advance(301)`, B receives `PlayerLeft(player_id=<A>, reason="timed_out")` within 1 second of real time. A new socket that sends `{"type": "join", "nickname": "Autre", "resume_token": <A's token>}` receives a `Snapshot` with `you == <A>`, `resume_token` equal to A's token, A's view with the nickname `Ana` and colour 0, and (1, 0) with `author == <A>`; B receives a `player_joined` whose `player.player_id` is `<A>`. Then `POST /api/rooms/summaries` with the room's code and A's token answers one summary whose `players` is `("Bob", "Ana")`, each name once. (Note from the lead, 2026-10-15: added, decision 11.)
 
 ## Edge cases and errors
 
@@ -395,9 +467,45 @@ The words in brackets say how each criterion is tested.
 - Timer (AC-3): its value is spec 027's. This spec checks only that another device,
   or the same device the next day, gets the value the room kept.
 - Past players (AC-4): a past player's token makes them a member for summaries
-  (spec 029 and 034 use the same rule), but it does not resume them in the room
-  (spec 017; open question 1). A player who times out again under a new id adds
-  another past record. Removed players are never past players.
+  (spec 029 and 034 use the same rule), and a join with it seats them back (AC-7).
+  A player who is seated back leaves `past_players`, so a player who times out
+  again has one past record, under their one id. Removed players are never past
+  players. (Note from the lead, 2026-10-15: "but it does not resume them in the
+  room (spec 017; open question 1). A player who times out again under a new id
+  adds another past record" became the text above, decision 11.)
+- Seat back, colour taken (AC-7): a newcomer may take the colour of a past player
+  (spec 012 gives the lowest free index). The past player then comes back with the
+  lowest index that no player of `players` has, and their letters show that colour
+  in the authorship view (spec 019). (Note from the lead, 2026-10-15: added,
+  decision 11.)
+- Seat back, nickname taken (AC-7): a newcomer may take the nickname of a past
+  player, since spec 012 only compares with `players`. The past player then comes
+  back with spec 012's suffix (`Ana 2`), and their stored identity takes the new
+  nickname from the next snapshot (spec 012). See new open question 1. (Note from
+  the lead, 2026-10-15: added, decision 11.)
+- Seat back in a full or locked room (AC-7): refused as a newcomer would be, with
+  `room_full` or `room_locked`, which is final on the page (spec 017), so it shows
+  `data-status="full"` (spec 012) or `data-status="locked"` (spec 014). The player stays
+  a past player and a member: "My rooms" still lists the room, and the same token
+  seats them back once a seat is free or the room is unlocked. (Note from the lead,
+  2026-10-15: added, decision 11.)
+- Host role and mute after a seat back (AC-7): the host role is not given back
+  (spec 014: a host who comes back after the hand-over is an ordinary player), and
+  `muted` starts False, as for a new player, since `PastPlayer` keeps no flag. The
+  host can mute the player again (spec 022). (Note from the lead, 2026-10-15:
+  added, decision 11.)
+- Removing a past player (AC-7): not possible, since spec 014's `remove_player`
+  targets players of `players` (`invalid_target` otherwise). Once seated back, the
+  player can be removed like any other, and their token is then refused (spec 014).
+  (Note from the lead, 2026-10-15: added, decision 11.)
+- Past record dropped by the cap (AC-4, AC-7): a past player dropped by the cap of
+  100 is no longer known. Their token then matches nobody, and the join makes a new
+  player (spec 012, "Unknown resume token"). (Note from the lead, 2026-10-15: added,
+  decision 11.)
+- Two devices of one player (AC-7): the first device whose join seats the player
+  back takes the seat. The other device's join with the same token is then a resume
+  of a player of `players` (spec 012 step 2), and the older socket is closed with
+  4001 (`replaced`). (Note from the lead, 2026-10-15: added, decision 11.)
 - Cap (AC-4): with 100 past players, the oldest is dropped; that device's token no
   longer gets the summary, so the room leaves its "My rooms".
 - Duplicate keys (AC-4): several keys for one room give one summary; it is enough that
@@ -426,8 +534,10 @@ The words in brackets say how each criterion is tested.
   spec 038.
 - A warning before expiry, extending a room by hand, restoring a deleted room,
   backups.
-- Getting back one's old player id, colour and authorship after a time-out (open
-  question 1).
+- Giving back the host role or the `muted` flag after a time-out: AC-7 seats a
+  player back as an ordinary, unmuted player. (Note from the lead, 2026-10-15: this
+  line used to read "Getting back one's old player id, colour and authorship after
+  a time-out (open question 1)", which AC-7 now does; decision 11.)
 - Leaving a room for good, or removing a room from "My rooms".
 - Clearing the device's stored identities of deleted rooms.
 - Sorting or filtering "My rooms".
@@ -475,17 +585,39 @@ part of the spec above and are approved with it.
     sockets of a deleted room; `nock.server` re-exports it, so spec 040's and 011's
     tests are unchanged.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question.
+
+11. Getting one's player back after a time-out (former open question 1). Spec 017
+    makes a player who stays away more than 5 minutes leave the room, so a player
+    who came back the next day with their stored token joined as a new player, and
+    the authorship view (spec 019), the recap (spec 028) and an account's "same
+    seat, colour and authorship" (spec 033 AC-2) split one person in two. Options:
+    (a) keep spec 017 as it is; (b) a join whose token belongs to a past player
+    brings that player back. Pick: (b). What it changed: the "Seat back" section,
+    the `player_joined` row of `replay`, AC-7 (new), AC-3's join with Ana's token,
+    the edge cases on past players and seat backs, and "Out of scope". The player
+    comes back with the same id and nickname (spec 012's suffix when a player took
+    the nickname meanwhile, open question 1), and the same colour when no player of
+    `players` has it, connected or disconnected, since spec 012 keeps a disconnected
+    player's colour (else the lowest free index, as spec 012 assigns it), as long as
+    the room is neither full nor locked. A full or locked room refuses the join with
+    spec 012's and 014's refusals (`room_full`, `room_locked`). A removed player is
+    never seated back (spec 012's step 1, built by spec 014). Their letters keep their author
+    id, so specs 019 and 028 see one person. The lead refines spec 012 (join steps,
+    and the edge cases on colours, duplicates, unknown tokens, full rooms and the
+    order of refusals) and spec 017 (AC-3 and its edge case "After a time-out"),
+    with dated notes, before this spec's tests are written; the test-writer then
+    updates their tests before the implementer runs.
+
 ## Open questions
 
-1. Getting one's player back after a time-out. Spec 017 makes a player who stayed
-   away more than 5 minutes leave the room; when they come back the next day with
-   their stored token, they join as a new player, with a new id and possibly another
-   colour, and their letters keep the old id. The authorship view (spec 019), the
-   recap (spec 028) and an account's "same seat, colour and authorship" (spec 033
-   AC-1) then split one person in two. Options: (a) keep spec 017 as it is (this
-   spec as written); (b) a join whose token belongs to a past player brings that
-   player back with the same id and nickname, and the same colour when it is free
-   (else the lowest free one), as long as the room is not full or locked; this needs
-   a refinement of spec 017 (AC-3 and its edge case "After a time-out") and of spec
-   012's join steps, and would be one more criterion here. Pick: (b), as a refinement
-   of specs 017 and 012 before this spec is built.
+1. Nickname taken while a player was away (AC-7, new on 2026-10-15). Spec 012 makes
+   nicknames unique only among `players`, so a newcomer may take the nickname of a
+   past player (`ana` after `Ana` timed out). When the past player is seated back,
+   options: (a) keep their nickname as it was, so two players of `players` have the
+   same nickname under `casefold()`, against spec 012's rule; (b) apply spec 012's
+   duplicate rule, as for a newcomer, so they come back as `Ana 2`, with the same
+   id, colour rule and letters. Pick: (b). The spec above follows (b) ("Seat back",
+   AC-7's "Nickname taken", and the edge case "Seat back, nickname taken"); with
+   (a), those three places change and nothing else does.

@@ -8,6 +8,9 @@ status: approved
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.)
 
+(Note from the lead, 2026-10-15: folded in. The answer is decision 6, and "Open
+questions" is empty.)
+
 Epic E7 Completion and recap (US-7.3) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid is in `specs/_reference.md`. The catalogue page and
 `nock.progress` are those of spec 004; the play flow of spec 010; the stored identity
@@ -247,6 +250,13 @@ The words in brackets say how each criterion is tested.
   a room with a suffix only while both are present).
 - Former players (AC-2, AC-6): a team-mate erased by spec 033 reads `Ancien joueur`;
   a name already stored on another device stays as it was (spec 033).
+- Team-mates after the room is gone (AC-3, AC-6, AC-7): an account's records keep
+  the team-mates' nicknames, guests included, with their player ids, after the
+  room is deleted at expiry (spec 032), until that account is deleted. The nickname
+  of a team-mate whose account is deleted becomes `--`, shown as `Ancien joueur`
+  (AC-6). Spec 038's list of what the server keeps names these records, as the
+  exception to its deletion of a room's data at expiry (spec 038 AC-4). (Note from
+  the lead, 2026-10-15: added, decision 6.)
 - Limit (AC-2): the 101st device record drops the oldest by `finished_at`.
 - Unpublished or withdrawn grid (AC-4): the creation request answers 404 (specs 004,
   005), and the item shows the error.
@@ -290,10 +300,20 @@ spec above and are approved with it.
 5. Replay (AC-4). Pick: spec 010's play flow for the grid number, so a replay is a new
    room exactly like a start from the catalogue.
 
+Decided by the human on 2026-10-14, who approved the recommended answer to every
+open question.
+
+6. Team-mates' nicknames after the room is gone (former open question 1). An
+   account's records keep other players' nicknames, guests included, after spec 038
+   AC-4 (backlog AC-10.4.2) deletes the room's data at expiry. Options: (a) keep
+   them, as the backlog asks for "team-mates' nicknames", an erased account's
+   nickname becoming "former player"; (b) keep only the number of team-mates. Pick:
+   (a). Already part of the spec above (`HistoryRecord.teammates`, erasure, AC-6).
+   What changed: the edge case "Team-mates after the room is gone" states it, and
+   spec 038, which said that no byte of a deleted room's data remains, now names
+   these records as the exception, with dated notes (its table "What the server
+   keeps", its "Deletion" and personal data bullets, and an edge case of AC-4).
+
 ## Open questions
 
-1. Team-mates' nicknames after the room is gone. An account's records keep the
-   nicknames of other players, guests included, after the room is deleted at expiry,
-   while spec 038 AC-2 deletes room data then. Options: (a) keep them, as the backlog
-   asks for "team-mates' nicknames" (as written; an erased account's nickname becomes
-   "former player"); (b) keep only the number of team-mates. Pick: (a).
+None.
