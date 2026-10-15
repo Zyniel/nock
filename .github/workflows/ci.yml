@@ -87,3 +87,14 @@ jobs:
       # The same command you run locally and that the Claude Code hooks run.
       - name: Run the quality gate
         run: uv run python scripts/gate.py ${{ matrix.gate-options }}
+
+  # One check that passes only when every gate job passed, so the branch rule
+  # of main needs to require this name only, whatever the matrix holds.
+  all-gates:
+    name: Quality gate
+    if: always()
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that every gate job passed
+        run: test "${{ needs.gate.result }}" = "success"
