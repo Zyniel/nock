@@ -6,8 +6,9 @@ vote mode, then the mock's `vote_opened` by `p2` (a grid check). The layout is
 read at the eight window sizes of spec 006 AC-5 in desktop and touch contexts;
 the keyboard, contrast and language checks use spec 035's harness. After a ballot
 the focus is on `vote-status`, and on the `grid` once the vote closes or the
-banner leaves (decision 19); the contrast and language scans run in the state
-before the ballot. The shared setup is in `spec025_harness`.
+banner leaves (decision 19), while a focus outside the banner stays where it is;
+the contrast and language scans run in the state before the ballot. The shared
+setup is in `spec025_harness`.
 
 The room header has no test id in any spec: the test reads it as the `header`
 element that holds `share-panel` (spec 024: `room-toolbar` is "inside the room
@@ -50,6 +51,7 @@ from spec035_harness import (
 )
 
 TAP_TIMEOUT_MS = 3000
+BANNER_GONE_TIMEOUT_MS = 6000  # the result stays 2.5 to 4.5 s (AC-3, AC-7)
 EPSILON = 1.0
 MIN_GRID_VIEWPORT_PX = 100.0
 MIN_TARGET_PX = 24.0
@@ -122,6 +124,13 @@ def vote_yes_from_the_keyboard(page: Page, mock: MockRoomSocket) -> None:
     page.keyboard.press("Enter")
     wait_until(page, lambda: len(mock.votes()) >= 1)
     assert mock.votes() == [Vote(vote_id=1, yes=True)]
+
+
+def active_test_id(page: Page) -> str | None:
+    """The `data-testid` of `document.activeElement`, None if it has none."""
+    test_id = page.evaluate("document.activeElement?.getAttribute('data-testid')")
+    assert test_id is None or isinstance(test_id, str), test_id
+    return test_id
 
 
 def room_header(page: Page) -> Locator:
@@ -385,6 +394,34 @@ def test_ac8_keyboard_a_vote_closed_moves_the_focus_from_vote_status_to_the_grid
         expect(result).to_have_text(fr_text("vote.result.passed"))
         expect(page.get_by_test_id("grid")).to_be_focused()
         expect(banner.locator(FOCUSABLE_SELECTOR)).to_have_count(0)
+    finally:
+        close()
+
+
+def test_ac8_a_focus_outside_the_banner_stays_where_it_is(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+) -> None:
+    page, close = make_page(browser, browser_name, 1280, 720, touch=False)
+    try:
+        mock = open_spec_013_room(page, live_server, fx01_grid)
+        send_grid_check_vote(page, mock)
+        page.get_by_test_id("copy-link").focus()
+        assert active_test_id(page) == "copy-link"
+
+        passed = closed(NEXT_SEQ, 1, VoteOutcome.PASSED, FIVE_YES, EIGHT_ELIGIBLE)
+        mock.send(passed.model_dump_json())
+
+        banner = page.get_by_test_id("vote-banner")
+        result = banner.get_by_test_id("vote-result")
+        expect(result).to_be_visible()
+        expect(result).to_have_text(fr_text("vote.result.passed"))
+        assert active_test_id(page) == "copy-link"
+
+        expect(banner).to_be_hidden(timeout=BANNER_GONE_TIMEOUT_MS)
+        assert active_test_id(page) == "copy-link"
     finally:
         close()
 
