@@ -1,11 +1,11 @@
 """Tests of spec 019, AC-1's box run: box rules, letter and drawing order.
 
-In the desktop context, with the switch on, on three mocked pages: FX-01 at 1280 by
+In the desktop context, with the switch on, on four mocked pages: FX-01 at 1280 by
 720 (the snapshot of AC-1 with `p3` to `p6` added, colours 1, 2, 4 and 5, and `p2`
-to `p6` selecting (1, 0) `across`), and FX-02 at 320 by 568 and at 568 by 320
-(spec 026's `FX02_FULL_WRONG` snapshot without its feed items or tap, its row 1
-letters by `p9` instead of `p2`, and `p2` to `p6` selecting (1, 6) `down`). Each
-test opens one page and checks, together:
+to `p6` selecting (1, 0) `across`), and FX-02 at 320 by 568, at 568 by 320 and at
+296 by 640 (spec 026's `FX02_FULL_WRONG` snapshot without its feed items or tap,
+its row 1 letters by `p9` instead of `p2`, and `p2` to `p6` selecting (1, 6)
+`down`). Each test opens one page and checks, together:
 
 - every `author-mark` against the box rules of "The view, switch on", held to the
   rule of its own cell's measured side (20 px or more, or smaller);
@@ -14,11 +14,19 @@ test opens one page and checks, together:
   at most 0.5 px;
 - at 568 by 320, that FX-02's cells are under 20 px, so the small-cell rule is the
   one tested there (the spec says so, after spec 035 AC-11);
+- at 296 by 640, that FX-02's cells measure 20 to 21 px (the width of their
+  bounding box), asserted before the box rules and the drawing order, so that the
+  page keeps testing the cells closest to the letter rule's limit; the bands are
+  then held to the full rules of a cell of 20 px or more;
 - the drawing order on the cell with the five outlines: `elementFromPoint` along
   the band's middle line finds the corner labels inside their boxes and the band
   everywhere else, never a `remote-selection`.
 
 Choices where the spec leaves room:
+
+- "The measured side of a letter cell" is read on every cell that holds a band
+  (on that page, every letter cell); the smallest and the largest side must both
+  lie in [20, 21] px, with no tolerance, as the spec writes the interval.
 
 - The letter's text node is the first text node of the cell whose trimmed text is
   the cell's `data-letter`, outside the mark, the outlines and their labels.
@@ -63,13 +71,23 @@ from spec019_harness import (
 BASELINE_TOLERANCE_PX = 1.0
 PROBE_SHIFT_MAX_PX = 0.5
 SMALL_CELL_WINDOW = (568, 320)
+# The window where FX-02's cells measure 20 to 21 px, and the range their side
+# must lie in.
+CLOSE_TO_LIMIT_WINDOW = (296, 640)
+CLOSE_TO_LIMIT_SIDE_MIN_PX = 20.0
+CLOSE_TO_LIMIT_SIDE_MAX_PX = 21.0
 
 SELECTORS = ["p2", "p3", "p4", "p5", "p6"]
 FX01_CROWDED: Cell = (1, 0)
 FX02_CROWDED: Cell = (1, 6)
 FX01_MARKED_CELLS = 4  # (1, 0) to (1, 3) in the snapshot of AC-1
 
-BOX_PAGES = [("fx01", 1280, 720), ("fx02", 320, 568), ("fx02", 568, 320)]
+BOX_PAGES = [
+    ("fx01", 1280, 720),
+    ("fx02", 320, 568),
+    ("fx02", 568, 320),
+    ("fx02", 296, 640),
+]
 BOX_PAGE_IDS = [f"{name}-{width}x{height}" for name, width, height in BOX_PAGES]
 
 # For every cell holding an `author-mark`: its box, its marks' count and first
@@ -163,7 +181,21 @@ BOX_RUN_SCRIPT = r"""
 }
 """
 
-# The drawing order on one cell, after `scrollIntoView`: `elementFromPoint` along
+# The measured side (the width of the bounding box) of every cell holding an
+# `author-mark`, for the page that must keep cells of 20 to 21 px.
+CELL_SIDES_SCRIPT = r"""
+() => {
+  const sides = [];
+  for (const cell of document.querySelectorAll('[data-testid="cell"]')) {
+    if (cell.querySelector('[data-testid="author-mark"]') !== null) {
+      sides.push(cell.getBoundingClientRect().width);
+    }
+  }
+  return sides;
+}
+"""
+
+# The drawing order on one cell, after `scrollIntoView`:`elementFromPoint` along
 # the band's middle line, with `pointer-events: auto !important` on every
 # descendant of every cell. Points within 1 px of a label's box are not judged, as
 # the spec says; on a small cell that can be every point (at 568 by 320 today the
@@ -310,8 +342,23 @@ def box_run_problems(
             problems.append(f"{where} ({side:.1f} px): {problem}")
         if small_cells_expected and side >= MIN_SIDE_FOR_BOX_RULES_PX:
             problems.append(f"{where}: the cell is {side:.1f} px, not under 20 px")
-        problems.extend(baseline_problems(where, mark_box, item))
+        problems.extend(baseline_problems(f"{where} ({side:.2f} px)", mark_box, item))
     return problems
+
+
+def cell_side_problems(page: Page) -> list[str]:
+    """How the cells' measured side is outside 20 to 21 px (empty: none)."""
+    sides: list[float] = page.evaluate(CELL_SIDES_SCRIPT)
+    if not sides:
+        return ["no cell holds a band, so no cell side was measured"]
+    smallest = min(sides)
+    largest = max(sides)
+    if smallest < CLOSE_TO_LIMIT_SIDE_MIN_PX or largest > CLOSE_TO_LIMIT_SIDE_MAX_PX:
+        return [
+            f"the cells measure {smallest:.2f} to {largest:.2f} px, not "
+            f"{CLOSE_TO_LIMIT_SIDE_MIN_PX:.0f} to {CLOSE_TO_LIMIT_SIDE_MAX_PX:.0f} px"
+        ]
+    return []
 
 
 def baseline_problems(where: str, mark_box: Box, item: dict[str, object]) -> list[str]:
@@ -379,6 +426,9 @@ def test_ac1_every_band_meets_the_box_rules_and_the_drawing_order(
     turn_switch_on(page)
 
     expect(page.get_by_test_id("author-mark")).to_have_count(expected_cells)
+    if (width, height) == CLOSE_TO_LIMIT_WINDOW:
+        side_problems = cell_side_problems(page)
+        assert side_problems == [], f"{grid_name} at {width}x{height}: {side_problems}"
     small_cells_expected = (width, height) == SMALL_CELL_WINDOW
     problems = box_run_problems(page, expected_cells, small_cells_expected)
     problems.extend(drawing_order_problems(page, crowded))
