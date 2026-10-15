@@ -11,9 +11,10 @@
     fitCellSize,
   } from './gridLayout'
   import { actionForKey } from './letterEntry'
+  import { authorMarkColour } from './authorsView'
   import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
   import { shownCell, shownGrid } from './roomSession'
-  import type { CellFlash, GridView, PendingEdit } from './roomSession'
+  import type { CellFlash, GridView, LetterCellView, PendingEdit } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Position, Selection, Word } from './wordSelection'
   import type { RemoteSelection } from './remoteSelections'
@@ -37,6 +38,8 @@
     pendingEdits,
     flashes,
     remoteSelections,
+    isAuthorsViewOn,
+    playerColours,
   }: {
     grid: GridView
     words: Word[]
@@ -53,6 +56,10 @@
     flashes: CellFlash[]
     // The other players' selections, in roster order (spec 013).
     remoteSelections: RemoteSelection[]
+    // The authors view of spec 019: true while its switch is on.
+    isAuthorsViewOn: boolean
+    // The colour index of each player now in the room, by player id.
+    playerColours: Map<string, number>
   } = $props()
 
   // The step between two outlines on one cell, and the most the stack may take
@@ -101,6 +108,20 @@
       return { slots, initialsCount: cursorCount, overflowCount: 0 }
     }
     return { slots, initialsCount: slots - 1, overflowCount: cursorCount - slots + 1 }
+  }
+
+  // From this cell side up, an author mark keeps clear of the selected cell's
+  // outline and has its full size (spec 019); on a smaller cell it only stays
+  // inside the cell.
+  const FULL_AUTHOR_MARK_MIN_CELL_PX = 20
+
+  // The colour of a letter cell's author mark (see authorMarkColour), or null
+  // while the authors view is off: then no cell has a mark.
+  function authorMarkOf(cell: LetterCellView): string | null {
+    if (!isAuthorsViewOn) {
+      return null
+    }
+    return authorMarkColour(cell, playerColours)
   }
 
   // The DOM id of a cell, used by aria-activedescendant.
@@ -226,10 +247,15 @@
     if (element === undefined) {
       return
     }
+    // The exact size, rounded down. clientWidth and clientHeight round to the
+    // nearest pixel, sometimes up, and a grid fitted to them then overflows the
+    // viewport by a fraction of a pixel: Firefox makes such a viewport a Tab
+    // stop between the vote banner and the grid (spec 025 AC-8).
     function measure(): void {
       if (element !== undefined) {
-        areaWidth = element.clientWidth
-        areaHeight = element.clientHeight
+        const box = element.getBoundingClientRect()
+        areaWidth = Math.floor(box.width)
+        areaHeight = Math.floor(box.height)
       }
     }
     measure()
@@ -457,6 +483,7 @@
     data-selected-column={selection === null ? '' : String(selection.column)}
     data-direction={selection === null ? '' : selection.direction}
     data-word={activeKey}
+    class:small-cells={cellSize < FULL_AUTHOR_MARK_MIN_CELL_PX}
     style:--cell="{cellSize}px"
     style:grid-template-columns="repeat({grid.width}, var(--cell))"
     style:grid-auto-rows="var(--cell)"
@@ -470,6 +497,7 @@
             {@const plan = labelPlanOf(outlines.length, cellSize)}
             {@const tints = tintsOn(cell.row, cell.column)}
             {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
+            {@const authorMark = authorMarkOf(cell)}
             <div
               class="cell letter"
               class:locked={cell.locked}
@@ -483,7 +511,9 @@
               data-letter={shown.letter ?? ''}
               data-unconfirmed={String(shown.unconfirmed)}
               data-author={cell.author ?? ''}
+              data-author-colour={authorMark ?? ''}
               data-locked={String(cell.locked)}
+              data-revealed={String(cell.revealed)}
               data-wrong={String(cell.wrong && !shown.unconfirmed)}
               data-flash={flashOf(cell.row, cell.column)}
               data-selected={String(isSelected(cell.row, cell.column))}
@@ -495,7 +525,21 @@
               style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
               style:grid-row={cell.row + 1}
               style:grid-column={cell.column + 1}
-            >{shown.letter ?? ''}{#each outlines as remote, rank (remote.playerId)}<span
+            >{shown.letter ?? ''}{#if authorMark !== null}<span
+                  class="author-mark"
+                  data-testid="author-mark"
+                  data-colour={authorMark}
+                  aria-hidden="true"
+                  style:background-color={authorMark === ''
+                    ? null
+                    : `var(--player-colour-${authorMark})`}
+                ></span>{/if}{#if cell.revealed}<span
+                  class="reveal-mark"
+                  data-testid="reveal-mark"
+                  aria-hidden="true"
+                ></span><span class="visually-hidden" data-testid="reveal-label"
+                  >{t('a11y.revealed')}</span
+                >{/if}{#each outlines as remote, rank (remote.playerId)}<span
                   class="remote-selection"
                   data-testid="remote-selection"
                   data-player-id={remote.playerId}
@@ -526,6 +570,7 @@
               data-row={cell.row}
               data-column={cell.column}
               data-type="clue"
+              data-author-colour=""
               role="gridcell"
               id={cellId(cell.row, cell.column)}
               style:grid-row={cell.row + 1}
@@ -562,6 +607,7 @@
               data-row={cell.row}
               data-column={cell.column}
               data-type="empty"
+              data-author-colour=""
               role="gridcell"
               id={cellId(cell.row, cell.column)}
               style:grid-row={cell.row + 1}
@@ -640,6 +686,24 @@
     background: #cfe3ff;
   }
 
+  /* A revealed cell: a triangle in its top-right corner, a shape that does not
+     rely on colour (spec 024). It is drawn in the cell's text colour
+     (currentColor), so it keeps 3:1 in every state of the cell: the ink on the
+     locked, selected, word and tinted backgrounds, and the text colour of each
+     flash (the data-flash rules below) while the cell flashes. The flash keeps
+     its full length (spec 024 decision 14). A remote label in the same corner
+     comes later in the cell, so it is drawn over the mark. */
+  .reveal-mark {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: max(6px, calc(var(--cell) * 0.3));
+    height: max(6px, calc(var(--cell) * 0.3));
+    background-color: currentColor;
+    clip-path: polygon(0 0, 100% 0, 100% 100%);
+    pointer-events: none;
+  }
+
   .letter.selected {
     background: #ffd54a;
     outline: 3px solid #1f2330;
@@ -650,6 +714,32 @@
      (in-word) and my cell (selected) keep their look. */
   .letter.tinted {
     background: color-mix(in srgb, var(--tint) 28%, #ffffff);
+  }
+
+  /* The authors view (spec 019): a band along the bottom of the cell, in the
+     author's colour (set on the element), or in a neutral grey that is none of
+     the eight player colours for an author who is no longer in the room. It is
+     drawn over the cell's background and replaces none of it. It keeps 3px
+     inside the cell's padding box, 4px inside its edge, so the selected cell's
+     outline (3px, drawn inside the cell) never covers it. It comes before the
+     other players' outlines and labels, which are drawn over its ends. */
+  .author-mark {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    height: max(4px, calc(var(--cell) * 0.11));
+    background-color: #737885;
+    pointer-events: none;
+  }
+
+  /* A small cell (a large grid on a small window) has no room for those gaps:
+     the band only stays inside the cell. */
+  .small-cells .author-mark {
+    left: 1px;
+    right: 1px;
+    bottom: 1px;
+    height: calc(var(--cell) * 0.2);
   }
 
   /* The cell another player selected: a dashed border in their colour, inset
@@ -699,7 +789,9 @@
     left: var(--corner-offset);
   }
 
-  /* After the other states, so a flash shows over them. */
+  /* After the other states, so a flash shows over them. Each text colour keeps
+     at least 4.5:1 on its flash colour; the corner mark of a revealed cell is
+     drawn in it too. */
   .letter[data-flash='0'] {
     background: var(--player-colour-0);
     color: #000000;

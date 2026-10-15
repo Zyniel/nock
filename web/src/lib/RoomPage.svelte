@@ -3,6 +3,7 @@
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
+  import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
   import { remoteSelectionsOf } from './remoteSelections'
@@ -12,14 +13,16 @@
     keepFeedEndOnResize,
     keepFeedPlace,
     noteFeedPlace,
+    watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
-  import type { LetterCellView, Snapshot } from './roomSession'
+  import type { LetterCellView, Snapshot, VoteView } from './roomSession'
   import {
     EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
     PING_INTERVAL_MS,
     SILENCE_LIMIT_MS,
+    VOTE_RESULT_MS,
     addPendingEdit,
     endFlash,
     gridLabel,
@@ -67,20 +70,48 @@
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
+  // A low window (at most 500 px high, a phone on its side), the same breakpoint
+  // as the styles below. There the completion status sits in the clue bar's row,
+  // so that it takes no height from the grid (spec 026 AC-10). It follows a
+  // resize or a rotation.
+  const lowWindowQuery = window.matchMedia('(max-height: 500px)')
+  let isLowWindow = $state(lowWindowQuery.matches)
+
+  $effect(() => {
+    const onChange = (): void => {
+      isLowWindow = lowWindowQuery.matches
+    }
+    lowWindowQuery.addEventListener('change', onChange)
+    return () => lowWindowQuery.removeEventListener('change', onChange)
+  })
+
   // The host panel scrolls sideways on a small window. An edge fade says so
   // without depending on the scrollbar, which some engines hide. Svelte sets
   // the element back to null when the panel goes (the host role moved away).
   let hostPanel: HTMLElement | null = $state(null)
   let hostPanelHasMore = $state(false)
 
+  // The room toolbar (spec 024) scrolls sideways on a small window too, with the
+  // same edge fade.
+  let roomToolbar: HTMLElement | null = $state(null)
+  let roomToolbarHasMore = $state(false)
+
+  // True while content is hidden past the right edge of a row that scrolls.
+  function hasContentPastRightEdge(row: HTMLElement | null): boolean {
+    if (row === null) {
+      return false
+    }
+    const hiddenOnTheRight = row.scrollWidth - row.clientWidth - row.scrollLeft
+    return hiddenOnTheRight > 1
+  }
+
   // Show the fade while content is hidden past the right edge of the panel.
   function updateHostPanelMore(): void {
-    if (hostPanel === null) {
-      hostPanelHasMore = false
-      return
-    }
-    const hiddenOnTheRight = hostPanel.scrollWidth - hostPanel.clientWidth - hostPanel.scrollLeft
-    hostPanelHasMore = hiddenOnTheRight > 1
+    hostPanelHasMore = hasContentPastRightEdge(hostPanel)
+  }
+
+  function updateRoomToolbarMore(): void {
+    roomToolbarHasMore = hasContentPastRightEdge(roomToolbar)
   }
 
   // The last way the user acted: a key press or a pointer (mouse, touch, pen).
@@ -89,6 +120,8 @@
   let lastActionWasKeyboard = false
   // True while a host panel control has the focus from the keyboard.
   let hostPanelHasKeyboardFocus = $state(false)
+  // True while a room toolbar control has the focus from the keyboard.
+  let roomToolbarHasKeyboardFocus = $state(false)
 
   $effect(() => {
     const onKeyDown = (): void => {
@@ -97,6 +130,7 @@
     const onPointerDown = (): void => {
       lastActionWasKeyboard = false
       hostPanelHasKeyboardFocus = false
+      roomToolbarHasKeyboardFocus = false
     }
     window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('pointerdown', onPointerDown, true)
@@ -130,6 +164,27 @@
   function leaveHostPanelFocus(): void {
     hostPanelHasKeyboardFocus = false
   }
+
+  // The same for the room toolbar: a keyboard focus hides its edge fade.
+  function followRoomToolbarFocus(event: FocusEvent): void {
+    roomToolbarHasKeyboardFocus = lastActionWasKeyboard
+    scrollKeyboardFocusIntoView(event)
+  }
+
+  function leaveRoomToolbarFocus(): void {
+    roomToolbarHasKeyboardFocus = false
+  }
+
+  // Measure again whenever the toolbar changes size or content: a resize, the
+  // reveal panel coming or going, a button text that changes.
+  $effect(() => {
+    if (roomToolbar === null) {
+      return
+    }
+    const stopWatching = watchListChanges(roomToolbar, updateRoomToolbarMore)
+    updateRoomToolbarMore()
+    return stopWatching
+  })
 
   // Measure again whenever the panel or its content changes size.
   $effect(() => {
@@ -249,6 +304,36 @@
   let activeWord = $derived(selectedWord(words, selection))
   let remoteSelections = $derived(remoteSelectionsOf(session.snapshot, words))
 
+  // ---- The authors view (spec 019) ----
+
+  // Off at each page load, and for this page only: the switch sends nothing.
+  let isAuthorsViewOn = $state(false)
+  let playerColours = $derived(colourByPlayer(session.snapshot?.players ?? []))
+  // The clue bar's line naming the author of the selected letter, or null.
+  let selectedAuthorLine = $derived(selectedAuthorLineOf(isAuthorsViewOn, selection))
+
+  function toggleAuthorsView(): void {
+    isAuthorsViewOn = !isAuthorsViewOn
+  }
+
+  // The line naming the author of the selected cell's confirmed letter, while
+  // the view is on; null when it is off, when nothing is selected, or when the
+  // selected cell is empty or revealed.
+  function selectedAuthorLineOf(isViewOn: boolean, current: Selection | null): string | null {
+    if (!isViewOn || current === null) {
+      return null
+    }
+    const cell = letterCellAt(current.row, current.column)
+    if (cell === null) {
+      return null
+    }
+    const author = shownAuthorOf(cell)
+    if (author === null) {
+      return null
+    }
+    return authorLine(author, session.names)
+  }
+
   // True while the page retries after a loss that happened with the form shown:
   // the form stays on screen until the new socket opens.
   let isFormKept = $state(false)
@@ -362,10 +447,13 @@
         (player) => player.player_id === session.snapshot?.you && player.is_host,
       ),
   )
-  let isCheckDisabled = $derived(
-    session.solved ||
-      (session.snapshot !== null && session.snapshot.settings.help_mode === 'none'),
+  // The check and reveal panels are absent while the help is off (spec 025).
+  let isHelpShown = $derived(
+    session.snapshot !== null && session.snapshot.settings.help_mode !== 'none',
   )
+  // While a vote is open, the requests that need a vote are disabled; the checks
+  // of a letter or a word are not (spec 025).
+  let isVoteOpen = $derived(session.snapshot !== null && session.snapshot.open_vote !== null)
 
   // True when every letter cell of the confirmed grid holds a letter (spec 026).
   let isGridFull = $derived(
@@ -373,6 +461,10 @@
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
   let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
+  // Where the status shows: in the clue bar's row on a low window, under the clue
+  // bar otherwise (spec 026 AC-10).
+  let isStatusInClueBar = $derived(gridStatus !== null && isLowWindow)
+  let isStatusUnderClueBar = $derived(gridStatus !== null && !isLowWindow)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
   // The settings form shows the settings of the room; it follows each change.
@@ -620,6 +712,176 @@
       })
     }
   }
+
+  // ---- Reveal controls (spec 024) ----
+
+  // What is left of the room's budget.
+  let lettersLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.letters)
+  let wordsLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.words)
+  let selectedCell = $derived(
+    selection === null ? null : letterCellAt(selection.row, selection.column),
+  )
+
+  // True when every cell of the word is locked: nothing is left to reveal there.
+  function isWordLocked(word: Word): boolean {
+    for (const position of word.cells) {
+      const cell = letterCellAt(position.row, position.column)
+      if (cell !== null && !cell.locked) {
+        return false
+      }
+    }
+    return true
+  }
+
+  let isRevealLetterDisabled = $derived(
+    session.solved ||
+      isVoteOpen ||
+      selectedCell === null ||
+      selectedCell.locked ||
+      lettersLeft === 0,
+  )
+  let isRevealWordDisabled = $derived(
+    session.solved ||
+      isVoteOpen ||
+      activeWord === null ||
+      isWordLocked(activeWord) ||
+      wordsLeft === 0,
+  )
+
+  // A spent budget replaces the count with the reason the button is disabled.
+  let revealLetterText = $derived(
+    lettersLeft === 0 ? t('reveal.letter_none') : t('reveal.letter', { count: lettersLeft }),
+  )
+  let revealLetterLabel = $derived(
+    lettersLeft === 0
+      ? t('reveal.letter_none_label')
+      : t('reveal.letter_label', { count: lettersLeft }),
+  )
+  let revealWordText = $derived(
+    wordsLeft === 0 ? t('reveal.word_none') : t('reveal.word', { count: wordsLeft }),
+  )
+  let revealWordLabel = $derived(
+    wordsLeft === 0 ? t('reveal.word_none_label') : t('reveal.word_label', { count: wordsLeft }),
+  )
+
+  // Ask the server to reveal the selected cell. The letter comes back in a
+  // cell_locked event: the page never guesses it.
+  function onRevealLetter(): void {
+    if (isRevealLetterDisabled || selection === null) {
+      return
+    }
+    send({
+      type: 'reveal',
+      target: { scope: 'letter', row: selection.row, column: selection.column },
+    })
+  }
+
+  // Ask the server to reveal the selected word.
+  function onRevealWord(): void {
+    if (isRevealWordDisabled || activeWord === null) {
+      return
+    }
+    send({
+      type: 'reveal',
+      target: {
+        scope: 'word',
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      },
+    })
+  }
+
+  // ---- Votes (spec 025) ----
+
+  let openVote = $derived(session.snapshot === null ? null : session.snapshot.open_vote)
+  // The banner shows the open vote, or for VOTE_RESULT_MS how the last one
+  // ended; never once the grid is solved.
+  let isVoteBannerShown = $derived(
+    !session.solved && (openVote !== null || session.closedVote !== null),
+  )
+  let isMyRequest = $derived(
+    openVote !== null && session.snapshot !== null && openVote.player_id === session.snapshot.you,
+  )
+  let hasVoted = $derived(openVote !== null && session.votedIds.includes(openVote.vote_id))
+  let voteQuestionText = $derived(openVote === null ? '' : voteQuestion(openVote))
+  let voteResultText = $derived(
+    session.closedVote === null ? '' : t(`vote.result.${session.closedVote.outcome}`),
+  )
+  // What a screen reader hears: the question when a vote opens, the result
+  // when it closes.
+  let voteAnnouncement = $derived(openVote !== null ? voteQuestionText : voteResultText)
+
+  // The question of a vote, with the requester's nickname (spec 013's known
+  // names). The page inserts it as text.
+  function voteQuestion(vote: VoteView): string {
+    const name = session.names.get(vote.player_id) ?? t('feed.someone')
+    return t(`vote.question.${vote.kind}`, { name })
+  }
+
+  // The ballot buttons are disabled while the page is not joined: a ballot sent
+  // then would be dropped while the page showed it as cast (decision 18).
+  let isVotingOffline = $derived(session.status !== 'joined')
+
+  // Send my ballot on the open vote, once, then give the focus to the status
+  // that replaces the buttons, so it never falls back to the page (decision 19).
+  function castVote(yes: boolean): void {
+    if (openVote === null || isVotingOffline || session.votedIds.includes(openVote.vote_id)) {
+      return
+    }
+    send({ type: 'vote', vote_id: openVote.vote_id, yes })
+    session.votedIds.push(openVote.vote_id)
+    void focusVoteStatus()
+  }
+
+  // `tick` resolves once the DOM shows `vote-status` instead of the buttons.
+  async function focusVoteStatus(): Promise<void> {
+    await tick()
+    voteStatus?.focus()
+  }
+
+  // ---- Focus when the banner changes (decision 19) ----
+
+  let voteBanner: HTMLElement | null = $state(null)
+  let voteStatus: HTMLElement | null = $state(null)
+
+  // What the banner holds: nothing, the question of one vote, or a result.
+  let bannerContent = $derived(
+    !isVoteBannerShown ? 'none' : openVote !== null ? `vote-${openVote.vote_id}` : 'result',
+  )
+  let lastBannerContent = 'none'
+
+  // Runs before the page changes the banner: when the focus is inside it, the
+  // vote closed or the banner leaves, and the focus goes to the grid instead of
+  // falling back to the page.
+  $effect.pre(() => {
+    const content = bannerContent
+    if (content === lastBannerContent) {
+      return
+    }
+    lastBannerContent = content
+    const focused = document.activeElement
+    if (voteBanner !== null && focused !== null && voteBanner.contains(focused)) {
+      void focusGridAfterUpdate()
+    }
+  })
+
+  async function focusGridAfterUpdate(): Promise<void> {
+    await tick()
+    gridViewport?.focusGrid()
+  }
+
+  // The result of a closed vote shows for VOTE_RESULT_MS. A new vote, or a
+  // newer result, cancels the timer of the old one.
+  $effect(() => {
+    if (session.closedVote === null) {
+      return
+    }
+    const timer = setTimeout(() => {
+      session.closedVote = null
+    }, VOTE_RESULT_MS)
+    return () => clearTimeout(timer)
+  })
 
   function onCellTap(row: number, column: number): void {
     select(selectionAfterCellTap(words, selection, row, column))
@@ -903,7 +1165,15 @@
           >{copied ? t('room.share.copied') : t('room.share.copy')}</button
         >
       </div>
-      <div class="header-actions">
+      <div
+        class="room-toolbar"
+        data-testid="room-toolbar"
+        bind:this={roomToolbar}
+        onscroll={updateRoomToolbarMore}
+        onfocusin={followRoomToolbarFocus}
+        onfocusout={leaveRoomToolbarFocus}
+        class:keyboard-focus={roomToolbarHasKeyboardFocus}
+      >
         <div class="undo-panel">
           <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
             >{t('room.undo')}</button>
@@ -911,29 +1181,70 @@
             <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
           {/if}
         </div>
-        <div class="check-panel" data-testid="check-panel" role="group" aria-label={t('check.label')}>
-          <button
-            type="button"
-            data-testid="check-letter"
-            aria-label={t('check.letter_label')}
-            disabled={isCheckDisabled || selection === null}
-            onclick={onCheckLetter}>{t('check.letter')}</button
+        {#if isHelpShown}
+          <div
+            class="check-panel"
+            data-testid="check-panel"
+            role="group"
+            aria-label={t('check.label')}
           >
-          <button
-            type="button"
-            data-testid="check-word"
-            aria-label={t('check.word_label')}
-            disabled={isCheckDisabled || activeWord === null}
-            onclick={onCheckWord}>{t('check.word')}</button
+            <button
+              type="button"
+              data-testid="check-letter"
+              aria-label={t('check.letter_label')}
+              disabled={session.solved || selection === null}
+              onclick={onCheckLetter}>{t('check.letter')}</button
+            >
+            <button
+              type="button"
+              data-testid="check-word"
+              aria-label={t('check.word_label')}
+              disabled={session.solved || activeWord === null}
+              onclick={onCheckWord}>{t('check.word')}</button
+            >
+            <button
+              type="button"
+              data-testid="check-grid"
+              aria-label={t('check.grid_label')}
+              disabled={session.solved || isVoteOpen}
+              onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
+            >
+          </div>
+          <div
+            class="reveal-panel"
+            data-testid="reveal-panel"
+            role="group"
+            aria-label={t('reveal.label')}
           >
-          <button
-            type="button"
-            data-testid="check-grid"
-            aria-label={t('check.grid_label')}
-            disabled={isCheckDisabled}
-            onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
-          >
-        </div>
+            <button
+              type="button"
+              data-testid="reveal-letter"
+              aria-label={revealLetterLabel}
+              disabled={isRevealLetterDisabled}
+              onclick={onRevealLetter}>{revealLetterText}</button
+            >
+            <button
+              type="button"
+              data-testid="reveal-word"
+              aria-label={revealWordLabel}
+              disabled={isRevealWordDisabled}
+              onclick={onRevealWord}>{revealWordText}</button
+            >
+          </div>
+        {/if}
+        <button
+          type="button"
+          class="authors-switch"
+          data-testid="authors-switch"
+          aria-pressed={isAuthorsViewOn}
+          onclick={toggleAuthorsView}>{t('authors.switch')}</button
+        >
+        <span
+          class="room-toolbar-more"
+          class:shown={roomToolbarHasMore}
+          data-testid="room-toolbar-more"
+          aria-hidden="true"
+        ></span>
       </div>
     {/if}
   </header>
@@ -1081,24 +1392,87 @@
       </div>
     {/if}
     </div>
-    <GridViewport
-      bind:this={gridViewport}
-      grid={session.snapshot.grid}
-      {selection}
-      {activeWord}
-      {onCellTap}
-      {onClueTap}
-      onSelect={select}
-      {onLetter}
-      {onErase}
-      {onUndo}
-      {words}
-      pendingEdits={session.pendingEdits}
-      flashes={session.flashes}
-      {remoteSelections}
-    />
+    <!-- The vote banner is laid over the top of the grid viewport, so showing it
+         changes no layout; it comes before the grid in document order, since
+         nothing focusable follows the grid (spec 025, spec 035). -->
+    <div class="grid-area">
+      <div
+        class="visually-hidden"
+        data-testid="vote-announcement"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{voteAnnouncement}</div>
+      {#if isVoteBannerShown}
+        <div
+          class="vote-banner"
+          data-testid="vote-banner"
+          role="group"
+          aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
+          bind:this={voteBanner}
+        >
+          {#if openVote !== null}
+            <p id="vote-question" class="vote-text" data-testid="vote-question">
+              {voteQuestionText}
+            </p>
+            <div class="vote-actions">
+              {#if isMyRequest || hasVoted}
+                <!-- Not a Tab stop, but it takes the focus after a ballot. -->
+                <span
+                  data-testid="vote-status"
+                  tabindex="-1"
+                  bind:this={voteStatus}>{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
+                >
+              {:else}
+                <button
+                  type="button"
+                  data-testid="vote-yes"
+                  disabled={isVotingOffline}
+                  onclick={() => castVote(true)}>{t('vote.yes')}</button
+                >
+                <button
+                  type="button"
+                  data-testid="vote-no"
+                  disabled={isVotingOffline}
+                  onclick={() => castVote(false)}>{t('vote.no')}</button
+                >
+              {/if}
+            </div>
+          {:else}
+            <p id="vote-result" class="vote-text" data-testid="vote-result">{voteResultText}</p>
+          {/if}
+        </div>
+      {/if}
+      <GridViewport
+        bind:this={gridViewport}
+        grid={session.snapshot.grid}
+        {selection}
+        {activeWord}
+        {onCellTap}
+        {onClueTap}
+        onSelect={select}
+        {onLetter}
+        {onErase}
+        {onUndo}
+        {words}
+        pendingEdits={session.pendingEdits}
+        flashes={session.flashes}
+        {remoteSelections}
+        {isAuthorsViewOn}
+        {playerColours}
+      />
+    </div>
+    <!-- The completion status line. The page shows it in one of two places,
+         never both: see isStatusInClueBar and isStatusUnderClueBar. -->
+    {#snippet gridStatusLine()}
+      <p class="grid-status" data-testid="grid-status" data-state={gridStatus} role="status">
+        {gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
+      </p>
+    {/snippet}
     <div
       class="clue-bar"
+      class:with-status={isStatusInClueBar}
+      class:with-author={selectedAuthorLine !== null}
       data-testid="clue-bar"
       data-word={activeWord === null ? '' : wordKey(activeWord)}
       role="region"
@@ -1107,11 +1481,15 @@
       <span class="clue-bar-text" data-testid="clue-bar-text"
         >{activeWord === null ? t('clue_bar.empty') : activeWord.text}</span
       >
+      {#if selectedAuthorLine !== null}
+        <span class="clue-bar-author" data-testid="clue-bar-author">{selectedAuthorLine}</span>
+      {/if}
+      {#if isStatusInClueBar}
+        {@render gridStatusLine()}
+      {/if}
     </div>
-    {#if gridStatus !== null}
-      <p class="grid-status" data-testid="grid-status" data-state={gridStatus} role="status">
-        {gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
-      </p>
+    {#if isStatusUnderClueBar}
+      {@render gridStatusLine()}
     {/if}
     {#if isTouchScreen}
       <InAppKeyboard
@@ -1154,7 +1532,8 @@
     color: #a4161a;
   }
 
-  /* Title, status, invitation link and undo on one row; it wraps when it must. */
+  /* Title, status, invitation link and the room toolbar on one row; it wraps
+     when it must. */
   .room-header {
     flex: none;
     display: flex;
@@ -1192,16 +1571,52 @@
     flex: none;
   }
 
-  /* On a roomy window the undo and check panels are items of the header row. */
-  .header-actions {
-    display: contents;
+  /* The room toolbar holds the undo, check and reveal controls (spec 024). On a
+     roomy window it is one item of the header row, and it wraps when it must. */
+  .room-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
   }
 
   .undo-panel,
-  .check-panel {
+  .check-panel,
+  .reveal-panel {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  /* A toolbar that scrolls cuts an outline drawn outside a control: draw it
+     inside instead (3px wide, so spec 035 AC-2 still holds). The same on a roomy
+     window, so the outline always stays inside the toolbar. */
+  .room-toolbar :focus-visible {
+    outline-offset: -3px;
+  }
+
+  /* A reveal button disabled by a spent budget says why with its own text
+     ("Plus de lettre"), so the text keeps 4.5:1 against the button instead of
+     the browser's pale grey (spec 024). The dashed border shows it is disabled. */
+  .reveal-panel button:disabled {
+    color: #4a4f5c;
+    background-color: #f2f3f6;
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+
+  /* The authors switch when it is on: its text is underlined, like the band it
+     draws under the letters. A text decoration shows on the engines' own button
+     look and keeps the button's size. */
+  .authors-switch[aria-pressed='true'] {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 2px;
+  }
+
+  .host-panel-more,
+  .room-toolbar-more {
+    display: none;
   }
 
   /* The roster and the feed: stacked on a roomy window. */
@@ -1300,10 +1715,6 @@
     font-size: 0.8rem;
   }
 
-  .host-panel-more {
-    display: none;
-  }
-
   .settings-form {
     display: flex;
     flex-wrap: wrap;
@@ -1342,12 +1753,76 @@
     list-style: none;
   }
 
-  /* The grid state line, kept out of the scrolling area. */
+  /* The grid state line, kept out of the scrolling area: under the clue bar,
+     or in its row on a low window (below). */
   .grid-status {
     flex: none;
     margin: 0;
     padding: 0.25rem 0.75rem;
     font-weight: bold;
+  }
+
+  /* The area of the grid: it takes the height left, as the grid viewport did,
+     and holds the vote banner over the viewport's top edge. */
+  .grid-area {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Over the grid (spec 025 decision 9): absolutely placed, so it takes no
+     height from the grid, and above the cells, some of which are positioned. */
+  .vote-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    /* Room for the focus outline of the buttons (3px, 2px away). */
+    padding: 0.375rem 0.5rem;
+    background: #fff3cd;
+    border-bottom: 1px solid #b38600;
+    font-size: 0.9rem;
+  }
+
+  .vote-text {
+    flex: 1 1 10rem;
+    margin: 0;
+  }
+
+  .vote-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* A disabled ballot button (offline) keeps a readable text. */
+  .vote-actions button:disabled {
+    color: #4a4f5c;
+    background-color: #f2f3f6;
+    border-style: dashed;
+    cursor: not-allowed;
+  }
+
+  /* At least 24 by 24 CSS px, whatever the engine's button style. */
+  .vote-actions button {
+    box-sizing: border-box;
+    min-width: 3rem;
+    min-height: 28px;
+    padding: 0 0.75rem;
+    font: inherit;
+    color: #1f2330;
+    background: #ffffff;
+    border: 1px solid #5b6070;
+    border-radius: 4px;
   }
 
   /* Below the scrolling grid, so it is always inside the window. */
@@ -1363,6 +1838,54 @@
     display: block;
     font-size: 1rem;
     line-height: 1.3;
+  }
+
+  /* On a low window the completion status shares the clue bar's row and adds no
+     height (spec 026 AC-10). It keeps its whole text on one line; the clue text
+     gives up the width and ends with an ellipsis, but keeps its whole text in
+     the page, so a screen reader reads the whole clue. */
+  .clue-bar.with-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .clue-bar.with-status .clue-bar-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The same font size and line height as the clue text, so the row is no
+     higher than the clue text alone. */
+  .clue-bar .grid-status {
+    flex: none;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+
+  /* The author of the selected letter (spec 019) follows the clue text: on its
+     line when there is room, otherwise on a line of its own, where it ends with
+     an ellipsis if that line is too short. */
+  .clue-bar.with-author {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.75rem;
+  }
+
+  .clue-bar-author {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    line-height: 1.3;
+    color: #4a4f5c;
   }
 
   /* A narrow or low window (a phone) keeps its height for the grid: the roster
@@ -1388,21 +1911,36 @@
 
     /* The header takes two rows whatever the width of the system font (a wider
        font made it take three, and the grid lost its room): the title, the
-       status and the invitation link on the first, the undo and check buttons
-       on the second. The link has a basis that is smaller than its text, so the
-       panel stays on the first row and the link shrinks, with its ellipsis, to
-       the room left there. The undo and check panels are one block, too wide to
-       fit beside the link, so they always go to the second row (spec 013 AC-6,
-       spec 014 AC-7). */
+       status and the invitation link on the first, the room toolbar on the
+       second. The link has a basis that is smaller than its text, so the panel
+       stays on the first row and the link shrinks, with its ellipsis, to the
+       room left there. The toolbar has a basis of the whole width, so it always
+       goes to the second row (spec 013 AC-6, spec 014 AC-7). */
     .share-panel {
       flex: 1 1 17rem;
     }
 
-    .header-actions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.25rem 0.75rem;
+    /* The toolbar is one row that never wraps, so new controls cost no height,
+       and it scrolls sideways when its content is wider (spec 024). Its
+       scrollbar is hidden: it would take height, and the edge fade already
+       shows that more content is hidden. */
+    .room-toolbar {
+      flex: 1 1 100%;
+      min-width: 0;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .room-toolbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .undo-panel,
+    .check-panel,
+    .reveal-panel {
+      flex: none;
     }
 
     .presence {
@@ -1472,22 +2010,32 @@
       scroll-padding: 0 2rem 0 8px;
     }
 
-    /* A fade stuck to the right edge of the visible part of the panel. Its
-       negative margin cancels its width and the row gap: no layout change. */
-    .host-panel-more {
+    /* A fade stuck to the right edge of the visible part of the host panel or
+       the toolbar. Its negative margin cancels its width and the gap before
+       it: no layout change. */
+    .host-panel-more,
+    .room-toolbar-more {
       display: block;
       flex: none;
       position: sticky;
       right: 0;
       align-self: stretch;
       width: 1.5rem;
-      margin-left: calc(-1.5rem - 0.5rem);
       background: linear-gradient(to right, transparent, Canvas);
       pointer-events: none;
       visibility: hidden;
     }
 
-    .host-panel-more.shown {
+    .host-panel-more {
+      margin-left: calc(-1.5rem - 0.5rem);
+    }
+
+    .room-toolbar-more {
+      margin-left: calc(-1.5rem - 0.75rem);
+    }
+
+    .host-panel-more.shown,
+    .room-toolbar-more.shown {
       visibility: visible;
     }
 
@@ -1510,7 +2058,8 @@
     /* The fade never covers a control that has the keyboard focus. A mouse click
        or a tap also focuses a control, but it must not hide the fade (spec 014
        AC-7), so this follows a class set only for keyboard focus. */
-    .host-panel.keyboard-focus .host-panel-more {
+    .host-panel.keyboard-focus .host-panel-more,
+    .room-toolbar.keyboard-focus .room-toolbar-more {
       visibility: hidden;
     }
 
@@ -1536,6 +2085,10 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
+
+    .vote-banner {
+      font-size: 0.8rem;
+    }
   }
 
   /* A low window (a phone on its side) also takes the padding down, and puts the
@@ -1547,6 +2100,29 @@
 
     .clue-bar {
       padding: 0.25rem 0.75rem;
+    }
+
+    /* The author shares the clue text's row too and adds no height (spec 019
+       AC-4): the clue text and the author give up the width and end with an
+       ellipsis. The author follows the clue text, and the status keeps the end
+       of the row. Centred like the status: the author's smaller text has a
+       shorter line than the clue text, so the row keeps the clue text's
+       height. */
+    .clue-bar.with-author {
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+
+    .clue-bar.with-author .clue-bar-text {
+      flex: 0 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .clue-bar.with-author .grid-status {
+      margin-left: auto;
     }
 
     /* The grid comes right after this row, so the room under the remove buttons

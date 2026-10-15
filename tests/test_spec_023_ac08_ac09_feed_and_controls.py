@@ -263,30 +263,62 @@ def test_ac9_pressing_a_button_does_not_guess_the_result(
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "5")
 
 
-def test_ac9_a_help_mode_none_in_the_snapshot_disables_all_three_buttons(
+def expect_no_check_panel(page: Page) -> None:
+    expect(page.get_by_test_id("check-panel")).to_have_count(0)
+    for scope in ("letter", "word", "grid"):
+        expect(page.get_by_test_id(f"check-{scope}")).to_have_count(0)
+
+
+def test_ac9_a_help_mode_none_in_the_snapshot_shows_no_check_panel(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_fx01(page, live_server, fx01_grid, help_mode=HelpMode.NONE)
-    cell_at(page, 2, 2).click()
+    expect(page.get_by_test_id("undo-button")).to_be_visible()
 
-    for scope in ("letter", "word", "grid"):
-        expect(page.get_by_test_id(f"check-{scope}")).to_be_disabled()
+    expect_no_check_panel(page)
 
 
-def test_ac9_settings_changed_to_none_disables_all_three_buttons(
+def test_ac9_settings_changed_to_none_removes_the_check_panel(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_fx01(page, live_server, fx01_grid)
     cell_at(page, 2, 2).click()
-    expect(page.get_by_test_id("check-letter")).to_be_enabled()
-    expect(page.get_by_test_id("check-word")).to_be_enabled()
-    expect(page.get_by_test_id("check-grid")).to_be_enabled()
+    cell_at(page, 2, 2).click()
+    expect_selection(page, 2, 2, "down", "0,2,0")
+    for scope in ("letter", "word", "grid"):
+        expect(page.get_by_test_id(f"check-{scope}")).to_be_enabled()
 
     mock.send(settings_frame(6, HelpMode.NONE))
 
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "6")
+    expect_no_check_panel(page)
+
+
+@pytest.mark.parametrize("help_mode", [HelpMode.FREE, HelpMode.VOTE])
+def test_ac9_settings_changed_from_none_to_free_or_vote_shows_the_panel_again(
+    page: Page, live_server: str, fx01_grid: Grid, help_mode: HelpMode
+) -> None:
+    mock = open_fx01(page, live_server, fx01_grid)
+    cell_at(page, 2, 2).click()
+    cell_at(page, 2, 2).click()
+    expect_selection(page, 2, 2, "down", "0,2,0")
+    mock.send(settings_frame(6, HelpMode.NONE))
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "6")
+    expect_no_check_panel(page)
+
+    mock.send(settings_frame(7, help_mode))
+
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "7")
+    panel = page.get_by_test_id("check-panel")
+    expect(panel).to_be_visible()
+    identifiers = panel.evaluate(
+        "el => Array.from(el.querySelectorAll('button'))"
+        ".map(b => b.getAttribute('data-testid'))"
+    )
+    assert identifiers == ["check-letter", "check-word", "check-grid"]
     for scope in ("letter", "word", "grid"):
-        expect(page.get_by_test_id(f"check-{scope}")).to_be_disabled()
+        expect(page.get_by_test_id(f"check-{scope}")).to_be_enabled()
+    expect_selection(page, 2, 2, "down", "0,2,0")
 
 
 @pytest.mark.parametrize(

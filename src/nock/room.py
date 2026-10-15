@@ -59,6 +59,7 @@ from nock.protocol import (
     Pong,
     RemovePlayer,
     ResumeToken,
+    Reveal,
     RevealBudget,
     RevealResult,
     RoomSettings,
@@ -70,8 +71,10 @@ from nock.protocol import (
     SettingsChanged,
     Snapshot,
     Undo,
+    Vote,
     VoteClosed,
     VoteOpened,
+    VoteOutcome,
     WordTarget,
     grid_view,
 )
@@ -135,6 +138,7 @@ class RoomConfig(RoomModel):
     max_outbound_messages: int = Field(default=1000, ge=1)
     # spec 036 AC-6: inputs of a connection that may wait to be applied
     max_inbound_pending: int = Field(default=100, ge=1)
+    vote_timeout_seconds: int = Field(default=20, ge=1)  # spec 025 AC-2
 
 
 DEFAULT_CONFIG: RoomConfig = RoomConfig()
@@ -188,6 +192,17 @@ class PlayerRecord(RoomModel):
     last_edit: UndoEntry | None = None  # spec 018 AC-3
 
 
+class OpenVote(RoomModel):
+    """The vote a room is holding (spec 025). Ballots are not in the log."""
+
+    opened: VoteOpened  # the event that opened it; snapshots send it
+    opened_at: float  # clock time of the step that opened it
+    # players not disconnected at the opening, in players order
+    eligible: tuple[PlayerId, ...]
+    yes: tuple[PlayerId, ...]  # the requester first, then the yes ballots in order
+    no: tuple[PlayerId, ...] = ()  # the no ballots in order
+
+
 class RoomState(RoomModel):
     """The whole state of one room. Replaced, never mutated."""
 
@@ -200,8 +215,14 @@ class RoomState(RoomModel):
     players: tuple[PlayerRecord, ...] = Field(default=(), max_length=8)
     settings: RoomSettings = DEFAULT_SETTINGS
     reveal_budget: RevealBudget = DEFAULT_REVEAL_BUDGET  # what is left
+    # spec 024: the reveals accepted so far, as two counts. A snapshot stored
+    # before spec 024 has no such key and loads with 0 and 0, its exact value.
+    reveals_used: RevealBudget = RevealBudget(letters=0, words=0)
     removed_tokens: tuple[ResumeToken, ...] = ()  # spec 014 AC-1
     solved: StrictBool = False  # spec 026
+    open_vote: OpenVote | None = None  # spec 025
+    # spec 025: vote_id of the last vote opened, 0 for none
+    last_vote_id: int = Field(default=0, ge=0, strict=True)
 
 
 class LogEntry(RoomModel):
@@ -363,11 +384,15 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
         player_id: A player of the room.
 
     Returns:
-        The snapshot, with the player's own resume token.
+        The snapshot, with the player's own resume token. Its `open_vote` is the
+        event that opened the room's open vote, None when no vote is open.
 
     Raises:
         KeyError: no player `player_id` in the room.
     """
+    open_vote: VoteOpened | None = None
+    if state.open_vote is not None:
+        open_vote = state.open_vote.opened
     for player in state.players:
         if player.player_id == player_id:
             return Snapshot(
@@ -380,7 +405,7 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 reveal_budget=state.reveal_budget,
                 flags=(),
                 chat=(),
-                open_vote=None,
+                open_vote=open_vote,
                 timer_elapsed_ms=0,
                 timer_running=False,
                 solved=state.solved,
@@ -683,8 +708,10 @@ def handle_message(
     other message is input: it sets `last_input_at`, and an idle player becomes
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
     `select_cell`, edits (`edit_letter`, `erase`), `undo` and the host actions
-    (`remove_player`, `lock_room`, `change_settings`, `mute_player`) and
-    `check` (input, not rate-limited) have their rules here. `pencil_edit` and
+    (`remove_player`, `lock_room`, `change_settings`, `mute_player`), `check`,
+    `reveal` and `vote` (input, not rate-limited) have their rules here. Before a
+    `check`, a `reveal` or a `vote`, an open vote whose time is over closes, with
+    its entry after the wake-up entry (spec 025). `pencil_edit` and
     `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
     them their meaning. Until the spec that gives another message its meaning
     is built, the message is read and ignored: nothing is sent.
@@ -750,8 +777,8 @@ def _run_message(
         return _count_unhandled_edit(state, player_id, now, config)
     if isinstance(message, Undo):
         return _undo(state, player_id, now)
-    if isinstance(message, Check):
-        return _check(state, message.target, player_id, now)
+    if isinstance(message, Check | Reveal | Vote):
+        return _run_help_message(state, player_id, message, now, config)
     if isinstance(message, SelectCell):
         return _select_cell(state, player_id, message)
     if isinstance(message, RemovePlayer | LockRoom | ChangeSettings | MutePlayer):
@@ -843,16 +870,19 @@ def _lock_room(
     return _announce_settings(state, host, settings, state.reveal_budget, now)
 
 
-def _remaining_count(old_allowance: int, old_remaining: int, new_allowance: int) -> int:
-    """Return the new allowance minus what was used, never below 0."""
-    used = old_allowance - old_remaining
+def _remaining_count(new_allowance: int, used: int) -> int:
+    """Return the new allowance minus the reveals already used, never below 0."""
     return max(0, new_allowance - used)
 
 
 def _change_settings(
     state: RoomState, host: PlayerRecord, message: ChangeSettings, now: float
 ) -> Outcome:
-    """Change the help mode and the reveal allowance, keeping what was used."""
+    """Change the help mode and the reveal allowance, keeping what was used.
+
+    What was used is `state.reveals_used` (spec 024 decision 13), so that a cut
+    of the allowance to 0 forgets no reveal.
+    """
     current = state.settings
     if (
         message.help_mode == current.help_mode
@@ -865,17 +895,10 @@ def _change_settings(
             "reveal_budget": message.reveal_budget,
         }
     )
+    used = state.reveals_used
     remaining = RevealBudget(
-        letters=_remaining_count(
-            current.reveal_budget.letters,
-            state.reveal_budget.letters,
-            message.reveal_budget.letters,
-        ),
-        words=_remaining_count(
-            current.reveal_budget.words,
-            state.reveal_budget.words,
-            message.reveal_budget.words,
-        ),
+        letters=_remaining_count(message.reveal_budget.letters, used.letters),
+        words=_remaining_count(message.reveal_budget.words, used.words),
     )
     return _announce_settings(state, host, settings, remaining, now)
 
@@ -1147,21 +1170,198 @@ def _apply_edit(
     return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
 
 
-def _check(
-    state: RoomState, target: CheckTarget, player_id: str, now: float
+def _run_help_message(
+    state: RoomState,
+    player_id: str,
+    message: Check | Reveal | Vote,
+    now: float,
+    config: RoomConfig,
 ) -> Outcome:
-    """Run a check: one check_result, then one cell_locked per correct cell.
+    """Close an expired vote, then run a check, a reveal or a ballot (spec 025).
 
-    The grid-solved refusal (spec 026) comes first in the order of refusals.
-    The help mode `vote` acts as `free` until spec 025.
+    The closing entry of the expired vote comes before the message's own
+    entries, so a late ballot finds no open vote.
+    """
+    expiry = _expire_vote(state, now)
+    if isinstance(message, Vote):
+        outcome = _vote(expiry.state, player_id, message, now)
+    else:
+        outcome = _run_request(expiry.state, message, player_id, now, config)
+    all_entries = (*expiry.entries, *outcome.entries)
+    return outcome.model_copy(update={"entries": all_entries})
+
+
+def _run_request(
+    state: RoomState,
+    request: Check | Reveal,
+    player_id: str,
+    now: float,
+    config: RoomConfig,
+) -> Outcome:
+    """Run a check or a reveal: refuse it, put it to a vote, or apply it.
+
+    The refusal steps of spec 023 (a check) or spec 024 (a reveal) come first.
+    Then a request that needs a vote is refused while another vote is open,
+    applied at once when its sender is the only connected player, and opens a
+    vote otherwise (spec 025).
+    """
+    refusal = _request_refusal(state, request)
+    if refusal is not None:
+        return refusal
+    if not _needs_vote(state, request):
+        return _apply_request(state, request, player_id, now)
+    if state.open_vote is not None:
+        return _refuse(state, ErrorCode.VOTE_IN_PROGRESS, "A vote is already open.")
+    eligible = _eligible_voters(state)
+    if len(eligible) <= 1:
+        return _apply_request(state, request, player_id, now)
+    return _open_vote(state, request, player_id, len(eligible), now, config)
+
+
+def _request_refusal(state: RoomState, request: Check | Reveal) -> Outcome | None:
+    """Return the refusal of a check (spec 023) or a reveal (spec 024), or None."""
+    if isinstance(request, Check):
+        return _check_refusal(state, request.target)
+    return _reveal_refusal(state, request.target)
+
+
+def _apply_request(
+    state: RoomState, request: Check | Reveal, player_id: str, now: float
+) -> Outcome:
+    """Apply a check or a reveal that no refusal step stopped."""
+    if isinstance(request, Check):
+        return _apply_check(state, request.target, player_id, now)
+    return _apply_reveal(state, request.target, player_id, now)
+
+
+def _needs_vote(state: RoomState, request: Check | Reveal) -> bool:
+    """Tell whether a request needs a vote (spec 025).
+
+    In help mode `vote`, a grid check and every reveal need one. A check of a
+    letter or a word never does.
+    """
+    if state.settings.help_mode != HelpMode.VOTE:
+        return False
+    if isinstance(request, Reveal):
+        return True
+    return isinstance(request.target, GridTarget)
+
+
+def _eligible_voters(state: RoomState) -> tuple[str, ...]:
+    """Return the ids of the players who are not disconnected, in players order."""
+    eligible: list[str] = []
+    for player in state.players:
+        if player.state != PlayerState.DISCONNECTED:
+            eligible.append(player.player_id)
+    return tuple(eligible)
+
+
+def _open_vote(
+    state: RoomState,
+    request: Check | Reveal,
+    player_id: str,
+    voter_count: int,
+    now: float,
+    config: RoomConfig,
+) -> Outcome:
+    """Number the vote_opened of a request; nothing else changes."""
+    opened = VoteOpened(
+        seq=state.seq + 1,
+        vote_id=state.last_vote_id + 1,
+        player_id=player_id,
+        request=request,
+        timeout_seconds=config.vote_timeout_seconds,
+        eligible_voters=voter_count,
+    )
+    entry = LogEntry(at=now, event=opened)
+    return Outcome(state=replay(state, entry), entries=(entry,))
+
+
+def _vote(state: RoomState, player_id: str, ballot: Vote, now: float) -> Outcome:
+    """Count a ballot on the open vote, and close the vote once its outcome is sure.
+
+    A ballot for no open vote is refused with no_open_vote. A ballot of a player
+    who is not eligible, or who already voted, changes nothing.
+    """
+    vote = state.open_vote
+    if vote is None or vote.opened.vote_id != ballot.vote_id:
+        return _refuse(state, ErrorCode.NO_OPEN_VOTE, "No vote with this id is open.")
+    has_voted = player_id in vote.yes or player_id in vote.no
+    if player_id not in vote.eligible or has_voted:
+        return Outcome(state=state)
+    if ballot.yes:
+        counted = vote.model_copy(update={"yes": (*vote.yes, player_id)})
+    else:
+        counted = vote.model_copy(update={"no": (*vote.no, player_id)})
+    counted_state = state.model_copy(update={"open_vote": counted})
+
+    eligible_count = len(counted.eligible)
+    if len(counted.yes) * 2 > eligible_count:
+        return _pass_vote(counted_state, counted, now)
+    yes_still_possible = eligible_count - len(counted.no)
+    if yes_still_possible * 2 <= eligible_count:
+        return _close_vote(counted_state, counted, VoteOutcome.REJECTED, now)
+    return Outcome(state=counted_state)
+
+
+def _pass_vote(state: RoomState, vote: OpenVote, now: float) -> Outcome:
+    """Apply the request of a vote that reached a majority of yes.
+
+    The request is checked again as if its requester sent it now. When a
+    refusal step stops it, the vote closes `rejected` and nothing else happens.
+    """
+    request = vote.opened.request
+    if _request_refusal(state, request) is not None:
+        return _close_vote(state, vote, VoteOutcome.REJECTED, now)
+    closing = _close_vote(state, vote, VoteOutcome.PASSED, now)
+    applied = _apply_request(closing.state, request, vote.opened.player_id, now)
+    all_entries = (*closing.entries, *applied.entries)
+    return applied.model_copy(update={"entries": all_entries})
+
+
+def _close_vote(
+    state: RoomState, vote: OpenVote, result: VoteOutcome, now: float
+) -> Outcome:
+    """Number the vote_closed of the open vote and clear it."""
+    closed = VoteClosed(
+        seq=state.seq + 1,
+        vote_id=vote.opened.vote_id,
+        outcome=result,
+        yes_votes=len(vote.yes),
+        eligible_voters=len(vote.eligible),
+    )
+    entry = LogEntry(at=now, event=closed)
+    return Outcome(state=replay(state, entry), entries=(entry,))
+
+
+def _expire_vote(state: RoomState, now: float) -> Outcome:
+    """Close the open vote `timed_out` once `now` reaches its end time."""
+    vote = state.open_vote
+    if vote is None:
+        return Outcome(state=state)
+    ends_at = vote.opened_at + vote.opened.timeout_seconds
+    if now < ends_at:
+        return Outcome(state=state)
+    return _close_vote(state, vote, VoteOutcome.TIMED_OUT, now)
+
+
+def _check_refusal(state: RoomState, target: CheckTarget) -> Outcome | None:
+    """Return the refusal of a check, or None when it may go on.
+
+    The grid-solved refusal (spec 026) comes first, then help mode `none`, then
+    a target that names nothing (spec 023).
     """
     if state.solved:
         return _refuse_solved(state)
     if state.settings.help_mode == HelpMode.NONE:
         return _refuse(state, ErrorCode.HELP_DISABLED, "Checks are turned off.")
-    refusal = _refuse_bad_target(state, target)
-    if refusal is not None:
-        return refusal
+    return _refuse_bad_target(state, target)
+
+
+def _apply_check(
+    state: RoomState, target: CheckTarget, player_id: str, now: float
+) -> Outcome:
+    """Apply a check: one check_result, then one cell_locked per correct cell."""
     scope = _cells_in_scope(state, target)
 
     correct: list[CellState] = []
@@ -1200,6 +1400,101 @@ def _check(
     return Outcome(state=new_state, entries=tuple(entries))
 
 
+def _reveal_refusal(
+    state: RoomState, target: CellTarget | WordTarget
+) -> Outcome | None:
+    """Return the refusal of a reveal, or None when it may go on.
+
+    The refusals come in this order (spec 024): solved grid, help mode `none`,
+    a target that names nothing, nothing left to reveal, spent budget.
+    """
+    if state.solved:
+        return _refuse_solved(state)
+    if state.settings.help_mode == HelpMode.NONE:
+        return _refuse(state, ErrorCode.HELP_DISABLED, "Reveals are turned off.")
+    refusal = _refuse_bad_target(state, target)
+    if refusal is not None:
+        return refusal
+    cells_to_reveal = _unlocked_cells(_cells_in_scope(state, target))
+    if not cells_to_reveal:
+        return _refuse(
+            state, ErrorCode.INVALID_TARGET, "Nothing is left to reveal there."
+        )
+    if _is_budget_spent(state.reveal_budget, target):
+        return _refuse(state, ErrorCode.BUDGET_EXHAUSTED, "The reveal budget is spent.")
+    return None
+
+
+def _apply_reveal(
+    state: RoomState, target: CellTarget | WordTarget, player_id: str, now: float
+) -> Outcome:
+    """Apply a reveal: one reveal_result, then one cell_locked per revealed cell."""
+    cells_to_reveal = _unlocked_cells(_cells_in_scope(state, target))
+    result = RevealResult(
+        seq=state.seq + 1,
+        player_id=player_id,
+        target=target,
+        reveal_budget=_budget_after_reveal(state.reveal_budget, target),
+    )
+    entries = [LogEntry(at=now, event=result)]
+    seq = result.seq
+    for cell in cells_to_reveal:
+        seq += 1
+        locked = CellLocked(
+            seq=seq,
+            row=cell.row,
+            column=cell.column,
+            letter=_required_solution_letter(state.grid, cell),
+            revealed=True,
+        )
+        entries.append(LogEntry(at=now, event=locked))
+
+    new_state = state
+    for entry in entries:
+        new_state = replay(new_state, entry)
+    return Outcome(state=new_state, entries=tuple(entries))
+
+
+def _unlocked_cells(cells: list[CellState]) -> list[CellState]:
+    """Return the cells that are not locked, in the same order."""
+    unlocked: list[CellState] = []
+    for cell in cells:
+        if not cell.locked:
+            unlocked.append(cell)
+    return unlocked
+
+
+def _is_budget_spent(budget: RevealBudget, target: CellTarget | WordTarget) -> bool:
+    """Tell whether no letter (letter target) or no word (word target) is left."""
+    if isinstance(target, CellTarget):
+        return budget.letters == 0
+    return budget.words == 0
+
+
+def _budget_after_reveal(
+    budget: RevealBudget, target: CellTarget | WordTarget
+) -> RevealBudget:
+    """Return the budget left once a reveal is paid: one letter, or one word."""
+    if isinstance(target, CellTarget):
+        return RevealBudget(letters=budget.letters - 1, words=budget.words)
+    return RevealBudget(letters=budget.letters, words=budget.words - 1)
+
+
+def _required_solution_letter(grid: Grid, cell: CellState) -> str:
+    """Return the solution letter of a letter cell.
+
+    Raises:
+        ValueError: the cell belongs to no word of the grid, so it has no
+            solution letter.
+    """
+    letter = _solution_letter(grid, cell.row, cell.column)
+    if letter is None:
+        raise ValueError(
+            f"The letter cell ({cell.row}, {cell.column}) belongs to no word"
+        )
+    return letter
+
+
 def _refs_of(cells: list[CellState]) -> tuple[CellRef, ...]:
     """Return the positions of the cells, in the same order."""
     references: list[CellRef] = []
@@ -1209,7 +1504,7 @@ def _refs_of(cells: list[CellState]) -> tuple[CellRef, ...]:
 
 
 def _refuse_bad_target(state: RoomState, target: CheckTarget) -> Outcome | None:
-    """Return the refusal when a check names nothing, else None."""
+    """Return the refusal when a check or a reveal names nothing, else None."""
     if isinstance(target, CellTarget):
         cell = _find_cell(state, target.row, target.column)
         if cell is None:
@@ -1345,9 +1640,10 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     For each player, in `players` order: a joined player silent for too long is
     disconnected and their socket is to be closed; a player disconnected for
     more than the resume window leaves the room. Then each active player
-    without input for the idle delay becomes idle. Last, a host disconnected for
+    without input for the idle delay becomes idle. Then a host disconnected for
     more than the hand-over delay hands the host role to the longest-present
-    connected player.
+    connected player. Last, an open vote whose time is over closes `timed_out`
+    (spec 025).
     """
     current = state
     entries: list[LogEntry] = []
@@ -1376,8 +1672,10 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     entries.extend(idle_step.entries)
     handover_step = _handover_step(idle_step.state, now, config)
     entries.extend(handover_step.entries)
+    expiry_step = _expire_vote(handover_step.state, now)
+    entries.extend(expiry_step.entries)
     return Outcome(
-        state=handover_step.state,
+        state=expiry_step.state,
         entries=tuple(entries),
         to_others=tuple(to_others),
         disconnects=tuple(disconnects),
@@ -1457,6 +1755,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_cell_locked(state, event)
     elif isinstance(event, CheckResult):
         replayed = _replay_check_result(state, event)
+    elif isinstance(event, RevealResult):
+        replayed = _replay_reveal_result(state, event)
     elif isinstance(event, SettingsChanged):
         replayed = state.model_copy(
             update={"settings": event.settings, "reveal_budget": event.reveal_budget}
@@ -1467,9 +1767,42 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_player_muted(state, event)
     elif isinstance(event, GridSolved):
         replayed = state.model_copy(update={"solved": True})
+    elif isinstance(event, VoteOpened):
+        replayed = _replay_vote_opened(state, entry, event)
+    elif isinstance(event, VoteClosed):
+        replayed = state.model_copy(update={"open_vote": None})
     else:
         replayed = state
     return replayed.model_copy(update={"seq": event.seq})
+
+
+def _replay_vote_opened(
+    state: RoomState, entry: LogEntry, event: VoteOpened
+) -> RoomState:
+    """Open the vote with the requester's yes as its only ballot (spec 025).
+
+    The eligible voters are the players not disconnected before the entry.
+    Ballots are not logged, so a vote rebuilt from the log holds no other one.
+    """
+    vote = OpenVote(
+        opened=event,
+        opened_at=entry.at,
+        eligible=_eligible_voters(state),
+        yes=(event.player_id,),
+    )
+    return state.model_copy(update={"open_vote": vote, "last_vote_id": event.vote_id})
+
+
+def _replay_reveal_result(state: RoomState, event: RevealResult) -> RoomState:
+    """Take the budget left and count one more reveal of the target's kind."""
+    used = state.reveals_used
+    if isinstance(event.target, CellTarget):
+        new_used = RevealBudget(letters=used.letters + 1, words=used.words)
+    else:
+        new_used = RevealBudget(letters=used.letters, words=used.words + 1)
+    return state.model_copy(
+        update={"reveal_budget": event.reveal_budget, "reveals_used": new_used}
+    )
 
 
 def _replay_player_joined(
@@ -1550,13 +1883,14 @@ def _replay_letter_changed(
 
 
 def _replay_cell_locked(state: RoomState, event: CellLocked) -> RoomState:
-    """Lock a cell with its letter; a reveal also clears the author."""
+    """Lock a cell with its letter, never a pencil one; a reveal clears the author."""
     cell = _find_cell(state, event.row, event.column)
     if cell is None:
         return state
     locked_cell = cell.model_copy(
         update={
             "letter": event.letter,
+            "pencil": False,
             "locked": True,
             "revealed": event.revealed,
             "wrong": False,
@@ -1607,7 +1941,8 @@ def after_restart(state: RoomState, now: float) -> Outcome:
     Returns:
         The outcome: each player not disconnected gets `disconnected_at = now`,
         no selection and no recent edits, with one logged
-        `PlayerStateChanged(disconnected)` each, in players order.
+        `PlayerStateChanged(disconnected)` each, in players order. An open vote
+        keeps the requester's yes only, with no entry (spec 025 decision 16).
     """
     seq = state.seq
     players: list[PlayerRecord] = []
@@ -1630,5 +1965,22 @@ def after_restart(state: RoomState, now: float) -> Outcome:
             seq=seq, player_id=player.player_id, state=PlayerState.DISCONNECTED
         )
         entries.append(LogEntry(at=now, event=event))
-    new_state = state.model_copy(update={"players": tuple(players), "seq": seq})
+    new_state = state.model_copy(
+        update={
+            "players": tuple(players),
+            "seq": seq,
+            "open_vote": _without_ballots(state.open_vote),
+        }
+    )
     return Outcome(state=new_state, entries=tuple(entries))
+
+
+def _without_ballots(vote: OpenVote | None) -> OpenVote | None:
+    """Return the vote with the requester's yes as its only ballot.
+
+    A saved snapshot holds the ballots and the log does not, so this makes a
+    room loaded from a snapshot hold the same vote as one rebuilt from the log.
+    """
+    if vote is None:
+        return None
+    return vote.model_copy(update={"yes": (vote.opened.player_id,), "no": ()})

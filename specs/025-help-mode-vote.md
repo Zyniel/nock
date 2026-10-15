@@ -6,7 +6,10 @@ status: approved
 
 # 025 - Group decision on help
 
-(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 11 to 15 below, and "Open questions" says "None." The one refinement of a `done` spec is the amendment of spec 023, described under "Edge cases and errors".)
+(Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 11 to 15 below, and "Open questions" says "None." The one refinement of a `done` spec is the amendment of spec 023, described under "Edge cases and errors".) (Note from the lead, 2026-10-15: after
+the review, decisions 16 to 19 were folded into the text; the one question the
+review raised, on the focus when a vote closes, was answered (a) and is part of
+decision 19, and "Open questions" says "None." again (review of spec 025))
 
 Epic E6 Help and validation (US-6.3) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -31,8 +34,10 @@ No new protocol message and no new `ErrorCode`. New public names in `nock.room`:
 the model `OpenVote`, two fields of `RoomState` and one of `RoomConfig`, each with
 a default (spec 011's rule for new fields). This spec gives `Vote` its meaning,
 turns grid checks and reveals into votes in help mode `vote`, extends `tick`,
-`replay` and `snapshot_for`, hides the help controls in help mode `none`, and adds
-the vote banner to the room page.
+`replay`, `snapshot_for` and `after_restart`, hides the help controls in help mode
+`none`, and adds the vote banner to the room page. (Note from the lead, 2026-10-15:
+`after_restart` added to the functions this spec extends, decision 16 (review of
+spec 025))
 
 ### Help modes
 
@@ -74,8 +79,9 @@ class RoomState(RoomModel):
     last_vote_id: int = Field(default=0, ge=0, strict=True)   # vote_id of the last vote opened, 0 for none
 ```
 
-`handle_message`, `tick`, `replay` and `snapshot_for` keep their signatures (spec
-011).
+`handle_message`, `tick`, `replay`, `snapshot_for` and `after_restart` keep their
+signatures (spec 011). (Note from the lead, 2026-10-15: `after_restart` added,
+decision 16 (review of spec 025))
 
 ### Server rule: a request that needs a vote
 
@@ -158,9 +164,27 @@ past that time:
   Ballots are not in the log, so `replay` does not restore them, as it does not
   restore selections (spec 018): a vote rebuilt from the log holds the requester's
   yes only.
-- `after_restart` is unchanged. A vote open when the server stopped stays open
-  with the requester's yes, and expires at its time (its `opened_at` comes from
-  the log). The players, once reconnected, can vote again.
+- `after_restart` resets the ballots of an open vote: `open_vote` keeps its
+  `opened` (so its `vote_id` and `request`), `opened_at` and `eligible`, and gets
+  `yes=(opened.player_id,)` and `no=()`; `last_vote_id` is unchanged, and the reset
+  adds no entry. Spec 018's `save_snapshot` stores the whole state, ballots
+  included, while the log holds no ballot; with this reset, a room loaded from a
+  snapshot and one rebuilt from the log alone hold the same vote, whenever the
+  last snapshot was taken (decision 16). (Note from the lead, 2026-10-15: this
+  sentence said "`after_restart` is unchanged"; a restart from a snapshot brought
+  back ballots that a restart from the log lost (review of spec 025)) A vote open
+  when the server stopped stays open with the requester's yes, and expires at its
+  time (its `opened_at` is the time of its `vote_opened` entry, whether it comes
+  from the snapshot or from the log). (Note from the lead, 2026-10-15: "its
+  `opened_at` comes from the log" became "whether it comes from the snapshot or
+  from the log", decision 16 (review of spec 025)) Once reconnected, the players
+  whose page has not recorded a ballot for that vote (for example after a reload
+  of the page, which empties `votedIds`) can vote again. A page that recorded a
+  ballot keeps `vote-status` with `t("vote.cast")` and no button, although the
+  server lost that ballot; this is accepted: the vote is decided by the other
+  ballots, or closes `timed_out` at its usual time (decision 17). (Note from the
+  lead, 2026-10-15: "The players, once reconnected, can vote again" became these
+  two sentences, decision 17 (review of spec 025))
 
 ### Client: help mode on the room page
 
@@ -226,6 +250,14 @@ export const VOTE_RESULT_MS = 3000
   - once the vote has closed, `data-testid="vote-result"` with
     `t("vote.result.<outcome>")`, for `VOTE_RESULT_MS`; a new `vote_opened` in
     that time replaces it at once.
+- While the page's status is not `joined` (spec 017: for example `reconnecting`,
+  while `connection-banner` shows), `vote-yes` and `vote-no` are shown `disabled`,
+  so no ballot is dropped while the page shows it as cast. Once the status is
+  `joined` again (the reconnection's snapshot still holding the vote), they are
+  enabled, unless `votedIds` holds that vote's id, in which case `vote-status` with
+  `t("vote.cast")` shows instead (decision 18). (Note from the lead, 2026-10-15:
+  added; `send` drops a frame while no socket is open, so a ballot cast offline was
+  lost while the page showed `t("vote.cast")` (review of spec 025))
 - `data-testid="vote-announcement"`: an element with the class `visually-hidden`,
   `role="status"`, `aria-live="polite"` and `aria-atomic="true"`, on the page once
   it has a snapshot. Its text becomes the question when a vote opens and the result
@@ -242,6 +274,18 @@ Where the banner goes (spec 024's toolbar note: no spare height at 568 by 320):
 - In document order it comes before the `grid` (spec 035: nothing focusable
   follows the grid), so after `Escape` on the grid, `Shift+Tab` reaches `vote-no`
   first.
+- After `Enter` on, or a click on, `vote-yes` or `vote-no`, the buttons give way
+  to `vote-status`, and the focus moves to `vote-status`, never to
+  `document.body`. `vote-status` has `tabindex="-1"`, so it can take the focus
+  without being a Tab stop. When the banner leaves the page while the focus is
+  inside it (its result's `VOTE_RESULT_MS` is over, the grid is solved, or a new
+  vote replaces it), the focus moves to the `grid` element (spec 035) (decision
+  19). (Note from the lead, 2026-10-15: added (review of spec 025)) When the vote
+  closes while the focus is inside the banner (on `vote-status`), the focus moves
+  to the `grid` element at once, and the result is heard through
+  `vote-announcement`; a banner showing `vote-result` holds nothing focusable
+  (decision 19). (Note from the lead, 2026-10-15: this sentence said the case was
+  open question 1; the lead answered option (a) (review of spec 025))
 - `vote-yes` and `vote-no` are at least 24 by 24 CSS px, and
   `document.elementFromPoint` at the centre of each returns it.
 
@@ -289,10 +333,10 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-6.3.3) (rule unit test; WebSocket with a fake clock; browser with mocked socket) A vote that fails or times out changes nothing and spends no budget. Rule: in `V3`, after `p1`'s reveal of (1, 0) opened vote 1 (seq 5), `p2` and then `p3` send `Vote(vote_id=1, yes=False)`: the first gives no entry, the second gives `VoteClosed(seq=6, vote_id=1, outcome="rejected", yes_votes=1, eligible_voters=3)` only, and the state then equals `V3` except `seq` (6), `last_vote_id` (1) and the players' `last_seen_at` and `last_input_at`: the same cells, `reveal_budget` 5 letters and 1 word, `open_vote` None. In a second run, `tick(state, NOW + 19.9, QUIET)` adds nothing and `tick(state, NOW + 20.0, QUIET)` gives `VoteClosed(seq=6, vote_id=1, outcome="timed_out", yes_votes=1, eligible_voters=3)`, with the same unchanged cells and budget; `p2`'s `Vote(vote_id=1, yes=True)` at `NOW + 20.0` with no tick before closes the vote the same way, then is answered `no_open_vote`. A vote that passes when its request can no longer apply closes `rejected`: after vote 1 opened, the host `p1` sets the budget to 0 letters and 1 word (spec 014, seq 6), then `p2` votes yes: the only entry is `VoteClosed(seq=7, vote_id=1, outcome="rejected", yes_votes=2, eligible_voters=3)`, and (1, 0) stays empty. WebSocket: A, B and C join a FX-01 room in vote mode on a fake clock; A sends a reveal; after `advance(20)` each client receives `vote_closed` with outcome `timed_out` within 1 second of real time, nobody receives a `reveal_result`, and `room_state` keeps `reveal_budget` 5 letters and 1 word. Browser: given a FX-01 snapshot in vote mode with budget 5 letters and 1 word, when the mock sends `vote_opened` (seq 6, by `p2`, a reveal of (1, 0)) then `vote_closed` (seq 7, `rejected`), `vote-result` reads `fr.json["vote.result.rejected"]`, (1, 0) is unchanged, `reveal-letter` still reads `Lettre (5)`, and the banner is gone between 2,500 and 4,500 ms later; the same run with `timed_out` shows `fr.json["vote.result.timed_out"]`.
 - **AC-4** (AC-6.3.4) (browser with mocked socket) In none mode, the check and reveal controls are hidden. Given a FX-01 snapshot whose `help_mode` is `none`: neither `check-panel` nor `reveal-panel` exists, while `room-toolbar` and `undo-button` do; after a `settings_changed` (seq 6) to `free`, both panels show with their buttons; after a `settings_changed` (seq 7) back to `none`, both are gone again; with `vote`, both show. On the server nothing changes: in `none` mode specs 023 and 024 answer any check or reveal with `help_disabled`.
 - **AC-5** (new, from the human's answer of 2026-10-14) (rule unit test; browser with mocked socket) In vote mode, a check of a letter or of a word needs no vote. Rule: in `V3` where `p1` wrote `T` at (1, 0) and `X` at (1, 1), `p2`'s `Check(target=WordTarget(row=0, column=0, clue_index=0))` gives the `check_result` and `cell_locked` of spec 023 at once, with no `vote_opened`, and so does a `Check(target=CellTarget(row=1, column=1))`; while a vote is open (a reveal of (2, 2) by `p1`), both kinds of check are applied the same way and the vote stays open. Browser: given a FX-01 snapshot in vote mode with (1, 1) tapped, while a vote is open (the mock's `vote_opened`, a reveal by `p2`) `check-letter` and `check-word` are enabled and send their checks, while `check-grid`, `reveal-letter` and `reveal-word` are disabled; after the mock's `vote_closed`, all five are enabled again.
-- **AC-6** (new) (rule unit test; WebSocket) One vote at a time, and one ballot per eligible player. In `V3` with vote 1 open (`p1`'s reveal of (1, 0)): `p2`'s `Check(target=GridTarget())` and `p3`'s `Reveal(target=WordTarget(row=0, column=2, clue_index=0))` are answered `vote_in_progress`; `Vote(vote_id=2, yes=True)` is answered `no_open_vote`; `p1`'s own `Vote(vote_id=1, yes=False)` changes nothing (no entry, no reply) and `yes` stays `("p1",)`; after `p2` voted no, a second ballot of `p2` (yes) changes nothing; a player `p4` who joined after the opening is not eligible, and their ballot changes nothing. Once the vote has closed, `Vote(vote_id=1, ...)` is answered `no_open_vote`, and a new request opens vote 2. A requester who is the only connected player (in a FX-01 room in vote mode with `p1` and `p2`, where `p2` is `disconnected`) gets the reveal at once: `reveal_result` and `cell_locked` with no `vote_opened`. Each refusal leaves the state as it was apart from the sender's `last_seen_at` and `last_input_at`. WebSocket: a refusal reaches its sender only; the other clients receive nothing.
-- **AC-7** (new) (browser with mocked socket) The vote banner shows the question to everyone, and the buttons to those who can still vote. Given a FX-01 snapshot in vote mode with players `p1` (`you`, `Ana`), `p2` (`Bob`) and `p3` (`Cy`): when the mock sends `vote_opened` (seq 6, `vote_id` 1, by `p2`, a reveal of the word `0,2,0`), `vote-banner` shows, `vote-question` reads `Bob propose de révéler un mot.` and `vote-announcement` holds the same text; clicking `vote-yes` sends one frame that parses to `Vote(vote_id=1, yes=True)`, and the buttons give way to `vote-status` reading `fr.json["vote.cast"]`; after the mock sends `vote_closed` (seq 7, `passed`), `vote-result` and `vote-announcement` read `fr.json["vote.result.passed"]`, and the banner is gone between 2,500 and 4,500 ms later. A first snapshot whose `open_vote` is a vote by `p1` shows `vote-status` with `fr.json["vote.waiting"]` and no button; one whose `open_vote` is by `p3` shows both buttons, and clicking `vote-no` sends `Vote(vote_id=..., yes=False)`. When the page has voted, the mock closes the socket with code 1011 and answers the next join with a snapshot holding the same `open_vote`: the banner shows `vote-status` with `fr.json["vote.cast"]` and no button. A `grid_solved` while a vote is open hides the banner.
-- **AC-8** (new) (browser with mocked socket) The vote banner never takes the grid's room, and it can be reached from the keyboard. Setup: spec 013 AC-6's (FX-01, `you` host among 8 players, 100 feed items, (3, 1) tapped), in vote mode; the test reads the boxes, then the mock sends `vote_opened` by `p2` (a grid check). At every window size of spec 006 AC-5, in desktop and touch contexts: the boxes of the room header, `grid-viewport`, `clue-bar` and, in the touch context, `keyboard` are the same as before the `vote_opened` (1 px tolerance); spec 013 AC-6's checks pass; `vote-banner` lies inside the box of `grid-viewport` (1 px tolerance); `vote-yes` and `vote-no` are each at least 24 by 24 CSS px, and `document.elementFromPoint` at the centre of each returns it. In a separate run with the same snapshot and `vote_opened` and no tap, at 1280 by 720 and at 568 by 320, keyboard only (spec 035's harness): after `tab_to` `grid`, `Escape` then `Shift+Tab` focuses `vote-no`, and `Shift+Tab` again focuses `vote-yes`, each with spec 035 AC-2's outline; `Enter` on `vote-yes` sends `Vote(vote_id=1, yes=True)`. In this state, at 1280 by 720 and 360 by 740, spec 035's contrast scan and language scan find no offending element.
-- **AC-9** (new) (rule unit test; WebSocket) An open vote survives a reconnection and a reload. Rule: `snapshot_for` of `V3` with vote 1 open gives `open_vote` equal to vote 1's `VoteOpened` event (seq 5); replaying `V3`'s entries and the `vote_opened` from `new_room` gives an `open_vote` with the same `opened`, `opened_at` equal to that entry's `at`, `eligible=("p1", "p2", "p3")`, `yes=("p1",)` and `last_vote_id` 1; replaying a following `vote_closed` gives `open_vote` None; a ballot cast before the reload is not restored. WebSocket: A, B and C join a FX-01 room in vote mode; A sends a reveal, which opens vote 1; B's socket closes and B joins again with its resume token: B's snapshot has `open_vote` with `vote_id` 1; B votes yes: every client receives the `vote_closed` (`passed`), the `reveal_result` and the `cell_locked`.
+- **AC-6** (new) (rule unit test; WebSocket) One vote at a time, and one ballot per eligible player. In `V3` with vote 1 open (`p1`'s reveal of (1, 0)): `p2`'s `Check(target=GridTarget())` and `p3`'s `Reveal(target=WordTarget(row=0, column=2, clue_index=0))` are answered `vote_in_progress`; `Vote(vote_id=2, yes=True)` is answered `no_open_vote`; `p1`'s own `Vote(vote_id=1, yes=False)` changes nothing (no entry, no reply) and `yes` stays `("p1",)`; after `p2` voted no, a second ballot of `p2` (yes) changes nothing; a player `p4` who joined after the opening is not eligible, and their ballot changes nothing. Once the vote has closed, `Vote(vote_id=1, ...)` is answered `no_open_vote`, and a new request opens vote 2. A requester who is the only connected player (in a FX-01 room in vote mode with `p1` and `p2`, where `p2` is `disconnected`) gets the reveal at once: `reveal_result` and `cell_locked` with no `vote_opened`. Each refusal leaves the state as it was apart from the sender's `last_seen_at`, `last_input_at` and, if they were idle, their state and the seq raised by spec 013's wake entry, which a refusal does not undo. (Note from the lead, 2026-10-15: an idle sender is woken even when its message is refused, as spec 013's input rule and the code do.) WebSocket: a refusal reaches its sender only; the other clients receive nothing.
+- **AC-7** (new) (browser with mocked socket) The vote banner shows the question to everyone, and the buttons to those who can still vote. Given a FX-01 snapshot in vote mode with players `p1` (`you`, `Ana`), `p2` (`Bob`) and `p3` (`Cy`): when the mock sends `vote_opened` (seq 6, `vote_id` 1, by `p2`, a reveal of the word `0,2,0`), `vote-banner` shows, `vote-question` reads `Bob propose de révéler un mot.` and `vote-announcement` holds the same text; clicking `vote-yes` sends one frame that parses to `Vote(vote_id=1, yes=True)`, and the buttons give way to `vote-status` reading `fr.json["vote.cast"]`; after the mock sends `vote_closed` (seq 7, `passed`), `vote-result` and `vote-announcement` read `fr.json["vote.result.passed"]`, and the banner is gone between 2,500 and 4,500 ms later. A first snapshot whose `open_vote` is a vote by `p1` shows `vote-status` with `fr.json["vote.waiting"]` and no button; one whose `open_vote` is by `p3` shows both buttons, and clicking `vote-no` sends `Vote(vote_id=..., yes=False)`. When the page has voted, the mock closes the socket with code 1011 and answers the next join with a snapshot holding the same `open_vote`: the banner shows `vote-status` with `fr.json["vote.cast"]` and no button. When the page has not voted (a first snapshot whose `open_vote` is by `p3`), the mock closes the socket with code 1011: before the mock answers the next join, `data-status` is `reconnecting` and `vote-yes` and `vote-no` are shown and `disabled`; once the mock answers it with a snapshot holding the same `open_vote`, both are enabled. (Note from the lead, 2026-10-15: added, decision 18 (review of spec 025)) A `grid_solved` while a vote is open hides the banner.
+- **AC-8** (new) (browser with mocked socket) The vote banner never takes the grid's room, and it can be reached from the keyboard. Setup: spec 013 AC-6's (FX-01, `you` host among 8 players, 100 feed items, (3, 1) tapped), in vote mode; the test reads the boxes, then the mock sends `vote_opened` by `p2` (a grid check). At every window size of spec 006 AC-5, in desktop and touch contexts: the boxes of the room header, `grid-viewport`, `clue-bar` and, in the touch context, `keyboard` are the same as before the `vote_opened` (1 px tolerance); spec 013 AC-6's checks pass; `vote-banner` lies inside the box of `grid-viewport` (1 px tolerance); `vote-yes` and `vote-no` are each at least 24 by 24 CSS px, and `document.elementFromPoint` at the centre of each returns it. In a separate run with the same snapshot and `vote_opened` and no tap, at 1280 by 720 and at 568 by 320, keyboard only (spec 035's harness): after `tab_to` `grid`, `Escape` then `Shift+Tab` focuses `vote-no`, and `Shift+Tab` again focuses `vote-yes`, each with spec 035 AC-2's outline; `Enter` on `vote-yes` sends `Vote(vote_id=1, yes=True)`; then `vote-status` shows, has `tabindex="-1"` and is `document.activeElement` (not `document.body`); the mock then sends `grid_solved` (spec 026, the next seq): `vote-banner` is gone and `document.activeElement` is the `grid` element. At 1280 by 720, with the same snapshot and `vote_opened`, a click on `vote-no` sends `Vote(vote_id=1, yes=False)` and leaves `document.activeElement` on `vote-status`. (Note from the lead, 2026-10-15: added, decision 19 (review of spec 025)) At 1280 by 720 and at 568 by 320, keyboard only, with the same snapshot and `vote_opened`, after `Enter` on `vote-yes` (`vote-status` has the focus) the mock sends `vote_closed` (`passed`, the next seq): `vote-result` shows and `document.activeElement` is the `grid` element. (Note from the lead, 2026-10-15: added, the lead's answer (a) to open question 1, decision 19 (review of spec 025)) In the state before the ballot, at 1280 by 720 and 360 by 740, spec 035's contrast scan and language scan find no offending element. (Note from the lead, 2026-10-15: "In this state" became "In the state before the ballot", so that the scans still see the banner with its buttons, before the steps added above (review of spec 025))
+- **AC-9** (new) (rule unit test; WebSocket) An open vote survives a reconnection and a reload. Rule: `snapshot_for` of `V3` with vote 1 open gives `open_vote` equal to vote 1's `VoteOpened` event (seq 5); replaying `V3`'s entries and the `vote_opened` from `new_room` gives an `open_vote` with the same `opened`, `opened_at` equal to that entry's `at`, `eligible=("p1", "p2", "p3")`, `yes=("p1",)` and `last_vote_id` 1; replaying a following `vote_closed` gives `open_vote` None; a ballot cast before the reload is not restored. Store (spec 018's harness, `RoomStore(tmp_path / "nock.sqlite3")`): the room `new_room` gives is recorded with `create_room`, and each step of `V3` and of vote 1 (`p1`'s reveal of (1, 0), seq 5) appends its entries; `p2`'s `Vote(vote_id=1, yes=False)` at `NOW + 1` adds no entry and leaves `no=("p2",)`, then `save_snapshot` stores that state; `load_room` still gives `no == ("p2",)`, and `after_restart(<that state>, NOW + 5)` gives an `open_vote` with `no == ()`, `yes == ("p1",)` and the same `opened`, `opened_at` and `eligible`, and `last_vote_id` 1, equal to the `open_vote` and `last_vote_id` that `load_room` then `after_restart` at `NOW + 5` give from a store holding the same entries and only the `create_room` snapshot (the log-only load). (Note from the lead, 2026-10-15: added, decision 16 (review of spec 025)) WebSocket: A, B and C join a FX-01 room in vote mode; A sends a reveal, which opens vote 1; B's socket closes and B joins again with its resume token: B's snapshot has `open_vote` with `vote_id` 1; B votes yes: every client receives the `vote_closed` (`passed`), the `reveal_result` and the `cell_locked`.
 
 ## Edge cases and errors
 
@@ -321,7 +365,9 @@ this test-writer works from an amended spec 023.)
   player who joins during the vote is not eligible; their page still shows the
   buttons, since a page cannot tell, and their ballot changes nothing. A player
   who disconnects stays eligible and can vote after reconnecting, within the time.
-  A player who leaves or is removed keeps the ballot they cast.
+  A player who leaves or is removed keeps the ballot they cast, until a restart
+  resets it like every ballot (decision 16). (Note from the lead, 2026-10-15:
+  "until a restart resets it like every ballot" added (review of spec 025))
 - The requester leaves (AC-2): the vote goes on; if it passes, the result carries
   the requester's id, and the feed names them from spec 013's known names.
 - Settings changed during a vote (AC-3): `change_settings` works as spec 014 says.
@@ -341,8 +387,15 @@ this test-writer works from an amended spec 023.)
   after it opened.
 - A room with no connection (AC-3): its task stops (spec 011); the vote expires at
   the first tick of the next task, before any input.
-- Restart (AC-9): ballots cast before a crash are lost; the vote keeps the
-  requester's yes and expires at its time.
+- Restart (AC-7, AC-9): ballots cast before a restart are lost, after a crash or a
+  clean stop alike, and whether the room is loaded from a snapshot or from the log
+  alone: `after_restart` leaves the requester's yes only (decision 16). The vote
+  expires at its time. A page that recorded its ballot still shows
+  `t("vote.cast")`, so its player cannot vote again from that page; the vote is
+  decided by the other ballots, or closes `timed_out` (decision 17). (Note from the
+  lead, 2026-10-15: this item said "ballots cast before a crash are lost; the vote
+  keeps the requester's yes"; a clean stop saves a snapshot holding the ballots,
+  which `after_restart` now resets too (review of spec 025))
 - Votes and the feed (AC-2): spec 013 adds no line for votes; a passed vote's
   `check_result` or `reveal_result` adds its usual line, with the requester's name.
 - Votes, input and rate (AC-6): a ballot is input (it wakes an idle player, spec
@@ -433,6 +486,49 @@ open question. Each one is already part of the spec above.
     no layout; or a row above the grid, which pushes the grid down and breaks spec
     013 AC-6 at 568 by 320. Pick: the banner over the grid (decision 9).
 
+Decided by the lead on 2026-10-15 after the review, under the owner's delegation
+of technical and accessibility choices. Each one is already part of the spec
+above. (Note from the lead, 2026-10-15: this group, items 16 to 19, added (review
+of spec 025))
+
+16. Restart (blocking review finding). `save_snapshot` (spec 018) stores the whole
+    room state, ballots included, so a restart from a snapshot brought back ballots
+    that a restart from the log lost, and the result of a reload depended on when
+    the last snapshot was taken. Rule: `after_restart` resets an open vote's
+    ballots to the requester's yes only (`yes=(requester,)`, `no=()`), keeping its
+    id, request, opening time and eligible voters, so a room loaded from a snapshot
+    and one rebuilt from the log alone give the same vote (AC-9). (Note from the
+    lead, 2026-10-15: added (review of spec 025))
+17. A page that voted keeps `t("vote.cast")` across reconnections (`votedIds` is
+    kept, as before), because a reconnection without a server restart keeps the
+    ballot on the server. After a server restart the ballot is lost while the page
+    still shows it as cast; this is accepted: the vote is decided by the other
+    ballots, or closes `timed_out` at its usual time. The players who can vote
+    again are those whose page has not recorded a ballot for that vote, for
+    example after a reload of the page (AC-7, AC-9). (Note from the lead,
+    2026-10-15: added (review of spec 025))
+18. Ballots offline. While the page's status is not `joined` (for example
+    `reconnecting`, under spec 017's offline banner), `vote-yes` and `vote-no` are
+    disabled, so no ballot is dropped while the page shows it as cast; they are
+    enabled again once the page is joined, unless the page has recorded a ballot
+    for that vote (AC-7). (Note from the lead, 2026-10-15: added (review of spec
+    025))
+19. Focus (spec 035). After `Enter` or a click on `vote-yes` or `vote-no`, the
+    buttons give way to `vote-status`, and the focus moves to `vote-status` (which
+    has `tabindex="-1"`), never to `document.body`. When the banner leaves the page
+    while the focus is inside it (the result's time is over, the grid is solved, or
+    a new vote replaces it), the focus moves to the `grid` element (AC-8). (Note
+    from the lead, 2026-10-15: added (review of spec 025)) When the vote closes
+    while the focus is inside the banner (on `vote-status`), the focus moves to
+    the `grid` element at once, and the result is heard through
+    `vote-announcement` (AC-8). Options were (a) this, or (b) `vote-result` taking
+    the focus until the banner leaves; (a) moves the focus once, never on a timer,
+    and a screen reader does not read the result twice. (Note from the lead,
+    2026-10-15: added, the lead's answer (a) to the former open question 1 (review
+    of spec 025))
+
 ## Open questions
 
-None.
+None. (Note from the lead, 2026-10-15: the open question on the focus when a vote
+closes, raised during the review, was answered (a) and folded into decision 19
+and AC-8 (review of spec 025))

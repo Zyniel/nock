@@ -1,7 +1,7 @@
 ---
 id: "024"
 title: Reveal a letter or a word
-status: approved
+status: done
 ---
 
 # 024 - Reveal a letter or a word
@@ -31,7 +31,10 @@ No new protocol message, no new `ErrorCode` and no new public Python name. This
 spec gives `Reveal` its meaning in `nock.room.handle_message`, extends
 `nock.room.replay`, extends spec 037's traffic rule to revealed letters, and adds
 to the room page the reveal controls, the look of a revealed cell and the room
-toolbar.
+toolbar. It adds one field to `nock.room.RoomState`, `reveals_used` (see "Reveals
+used and allowance changes" below). (Note from the lead, 2026-10-15: added; the
+room now counts the reveals it accepted, so that an allowance change after the
+remaining budget was cut at 0 forgets nothing (review of spec 024).)
 
 (Note from the lead, 2026-10-15: this spec touches three `done` specs, and none of
 the human's answers, decisions 11 and 12, adds another. No criterion or test of them
@@ -42,6 +45,10 @@ exists. Spec 023: `check-panel` moves into `room-toolbar`, which stays "in the r
 header beside the undo control", as its "Client: check controls" says. Spec 037: its
 traffic rule is extended in this spec's own copy of the checker ("Test harness"),
 not in spec 037's tests.)
+Spec 014 (`done`) is touched too: its `ChangeSettings` rule now takes "what was
+used" from `reveals_used` instead of computing it from the old allowance and the
+old remaining budget, and every example of its criteria still holds. (Note from
+the lead, 2026-10-15: added with the lead's decision 13 (review of spec 024).)
 
 ### Server rule: `Reveal` in `nock.room.handle_message`
 
@@ -54,8 +61,12 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState: ...
 `Reveal(target)` from joined player `p` is input (spec 013: it sets
 `last_input_at` and wakes an idle player). It is not an edit: spec 037's rate
 limit does not count it, and the budget is what limits reveals. Its checks run in
-this order; the first that fails refuses the reveal (unchanged state, no entry,
-one `ErrorMessage` in `reply`):
+this order; the first that fails refuses the reveal (state unchanged apart from the
+sender's `last_seen_at`, `last_input_at` and, if they were idle, their state, to
+which spec 013's wake entry adds one to the seq; no entry of its own, an idle
+sender being first woken by spec 013's entry, which a refusal does not undo; one
+`ErrorMessage` in `reply`) (Note from the lead, 2026-10-15: an idle sender is woken
+even when its message is refused, as spec 013's input rule and the code do.):
 
 1. (spec 026) the grid is solved: `grid_solved`.
 2. `state.settings.help_mode` is `none`: `help_disabled`.
@@ -96,21 +107,90 @@ State after the step: `reveal_budget` is what is left, and `settings.reveal_budg
 letter, `pencil = False`, `author = None`, `locked = True`, `revealed = True`,
 `wrong = False`, `changed_seq` = the seq of its `cell_locked` and
 `changed_by = None` (as `replay` of `cell_locked` does); `state.seq` is the last
-seq of the step.
+seq of the step. `reveals_used` has 1 more letter for a letter target, or 1 more
+word for a word target. (Note from the lead, 2026-10-15: added with "Reveals used
+and allowance changes" (review of spec 024).)
 
 Every entry is broadcast to every joined connection, the revealer's included
 (spec 011 delivery). A revealed letter is sent only in its `cell_locked` frame
 and, after it, in snapshots (spec 039 decision 10); `reveal_result` and every
 refusal carry no letter.
 
+### Reveals used and allowance changes
+
+(Note from the lead, 2026-10-15: this section was added; it is the lead's decision
+13 (review of spec 024).)
+
+```python
+# src/nock/room.py (one new field; RevealBudget of spec 039 reused as two counts)
+class RoomState(RoomModel):
+    ...
+    reveal_budget: RevealBudget = DEFAULT_REVEAL_BUDGET  # what is left
+    reveals_used: RevealBudget = RevealBudget(letters=0, words=0)  # accepted reveals
+```
+
+- `reveals_used.letters` is the number of letter reveals the room has accepted
+  so far, and `reveals_used.words` the number of word reveals. A new room has 0
+  and 0. A refused reveal changes neither. (Note from the lead, 2026-10-15: added
+  (review of spec 024).)
+- An accepted reveal adds 1 to `reveals_used.letters` (letter target) or to
+  `reveals_used.words` (word target), in the same step as it lowers
+  `reveal_budget` ("State after the step" above). (Note from the lead, 2026-10-15:
+  added (review of spec 024).)
+- A `ChangeSettings` that changes something (spec 014) sets, for letters and for
+  words separately, `reveal_budget = max(0, new_allowance - reveals_used)`, where
+  `new_allowance` is the message's `reveal_budget`; `reveals_used` does not
+  change, and the `SettingsChanged` entry carries that remaining budget as before.
+  `LockRoom` and an unchanged `ChangeSettings` change neither count (spec 014).
+  (Note from the lead, 2026-10-15: added; it replaces spec 014's
+  `used = old_allowance - old_remaining`, which forgot the reveals once the
+  remaining count was cut at 0 (review of spec 024).)
+- So at every seq, `reveal_budget.letters` equals
+  `max(0, settings.reveal_budget.letters - reveals_used.letters)`, and the same
+  holds for words. Example: after 3 letter reveals with the allowance 5 letters,
+  the host sets 1 letter (remaining 0), then 5 letters again: 2 letters are left,
+  not 4. Words work the same way: after 1 word reveal with the allowance 1 word,
+  the host sets 0 words, then 1 word again: 0 words are left, not 1. (Note from
+  the lead, 2026-10-15: added (review of spec 024).)
+- No protocol change. `reveals_used` stays on the server: `snapshot`,
+  `settings_changed` and `reveal_result` keep carrying only the remaining budget
+  (`reveal_budget`) and the allowance (`settings.reveal_budget`), and the page
+  shows only what is left. (Note from the lead, 2026-10-15: added (review of spec
+  024).)
+- `replay` rebuilds `reveals_used` from the log ("`replay` additions" below): each
+  `reveal_result` adds 1 for the scope of its `target`, and `settings_changed`
+  leaves it as it is. Replaying a room's whole log from `new_room` thus gives the
+  live `reveals_used`. (Note from the lead, 2026-10-15: added (review of spec
+  024).)
+- Reload (spec 018): `save_snapshot` writes the whole `RoomState` with
+  `model_dump_json()`, so a snapshot holds `reveals_used`, and `load_room` reads
+  the snapshot with the highest seq, then replays the later entries with the rule
+  above. A loaded room has the live `reveals_used` whether its last snapshot was
+  taken before or after the reveals. (Note from the lead, 2026-10-15: added
+  (review of spec 024).)
+- A stored snapshot whose JSON has no `reveals_used` key, as in any database
+  written before this spec, is read by `model_validate_json` with 0 letters and 0
+  words. That is its exact value, since no reveal could happen before this spec,
+  and the loaded room then behaves as any other room: for example, from such a
+  snapshot with the allowance and `reveal_budget` 5 letters and 1 word, the host
+  setting 3 letters and 1 word leaves 3 letters and 1 word. (Note from the lead,
+  2026-10-15: added; such snapshots exist, and 0 and 0 is exact, not a guess
+  (review of spec 024).)
+
 ### `replay` additions (spec 018 table)
 
 | Event | Effect on the state |
 | --- | --- |
-| `reveal_result` | `reveal_budget = event.reveal_budget` |
+| `reveal_result` | `reveal_budget = event.reveal_budget`; `reveals_used` gains 1 letter when `event.target` is a `CellTarget` (scope `letter`), or 1 word when it is a `WordTarget` (scope `word`) |
 | `cell_locked` | as specs 018 and 023, and also `pencil = False` |
+| `settings_changed` | as spec 018 (`settings`, `reveal_budget`); `reveals_used` unchanged |
+
+(Note from the lead, 2026-10-15: the `reveals_used` part of the `reveal_result`
+row and the `settings_changed` row were added (review of spec 024).)
 
 Replaying the entries of a reveal gives the same state as the live step.
+Replaying the entries of an allowance change gives the same state too, `reveals_used`
+included. (Note from the lead, 2026-10-15: added (review of spec 024).)
 
 ### What a browser may receive (spec 037, extended)
 
@@ -151,6 +231,32 @@ On the `cell` element of each letter cell (spec 006):
     a quarter of the cell side wide and high. Its colour has a contrast of at
     least 3:1 against the cell's computed `background-color`. Its computed
     `visibility` is `visible`.
+  - That 3:1 holds in every state of the cell: not selected, selected, and while
+    the cell flashes in a player's colour (spec 016: up to 1,000 ms in the colour
+    of another player who replaced my letter), which happens when the cell is
+    revealed within such a flash. (Note from the lead, 2026-10-15: added;
+    the ink-coloured mark had only 2.99:1 and 2.27:1 on the flash colours 2 and 4
+    (review of spec 024).)
+  - The mark may be drawn in more than one colour, for example a fill and a
+    contrasting edge around it, with layers inside `reveal-mark` (element
+    descendants, or its `::before` and `::after` pseudo-elements whose computed
+    `content` is not `none`). Its colours are the computed `background-color` of
+    `reveal-mark` and of each layer at least 6 px and at least a quarter of the
+    cell side wide and high (bounding box for an element, computed `width` and
+    `height` for a pseudo-element). Its contrast against the cell is the highest
+    contrast of its colours against the cell's computed `background-color`. A
+    colour counts only where it shows: a layer under another shows at least 1 px
+    of its colour around it (the reviewer checks this; the tests read the
+    colours). (Note from the lead, 2026-10-15: added, so that both a mark colour
+    that changes with the flash and a contrasting edge can pass (review of spec
+    024).)
+  - How the mark keeps 3:1 on the flash colours is the implementer's choice
+    between changing its colour while the cell flashes and giving it a
+    contrasting edge; neither contradicts spec 016. Ending the flash at the
+    reveal is not allowed: spec 016 keeps `data-flash` and the flash colour for
+    1,000 ms after the `letter_changed` is applied, and no rule there lets a
+    `cell_locked` end it. (Note from the lead, 2026-10-15: added; this is the
+    lead's decision 14 (review of spec 024).)
   - `reveal-label` has the class `visually-hidden` (spec 035) and the text
     `t("a11y.revealed")`, so a screen reader reads the cell as revealed.
 - A revealed cell is locked: spec 016's rules apply (typing and erasing do
@@ -226,7 +332,12 @@ and 025.)
   - a control that gets the focus from the keyboard is scrolled whole into the
     toolbar's visible part, and its focus outline (spec 035 AC-2) is drawn whole
     inside the toolbar; a pointer focus never makes the page scroll the toolbar
-    (as spec 035's "Pointer focus in the host panel").
+    (as spec 035's "Pointer focus in the host panel"). That is, after a click or
+    a tap the page's own code makes no scroll call on the toolbar or on an
+    element inside it; a scroll that the browser makes by itself is allowed
+    (spec 035 decision 13), and AC-8 tests both pointer rules. (Note from the
+    lead, 2026-10-15: added with AC-8's "Pointer focus" check (review of spec
+    024).)
 - On a larger window the toolbar may wrap, and `room-toolbar-more` is not visible.
 - At every window size of spec 006 AC-5, in desktop and touch contexts, spec 013
   AC-6's guarantees keep holding with the toolbar and every control of this spec
@@ -314,9 +425,9 @@ decision 7.
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-6.2.1) (rule unit test; WebSocket; browser with live server) A revealed cell shows the right letter, is locked and has no author, for every player. Rule: given `R1`, when `p1` reveals `CellTarget(row=1, column=1)` (which holds `X`), then the outcome's entries are `RevealResult(seq=6, player_id="p1", target=CellTarget(row=1, column=1), reveal_budget=RevealBudget(letters=4, words=1))` then `CellLocked(seq=7, row=1, column=1, letter="A", revealed=True)`; the new state has seq 7, `reveal_budget` 4 letters and 1 word, `settings.reveal_budget` still 5 letters and 1 word, and (1, 1) with `letter="A"`, `pencil=False`, `author=None`, `locked=True`, `revealed=True`, `wrong=False`, `changed_seq=7`, `changed_by=None`, which `grid_state` shows too. When `p2` then reveals `WordTarget(row=0, column=2, clue_index=0)`, the entries are `RevealResult(seq=8, player_id="p2", target=WordTarget(row=0, column=2, clue_index=0), reveal_budget=RevealBudget(letters=4, words=0))` then `CellLocked` seq 9 at (1, 2) `M`, seq 10 at (2, 2) `I`, seq 11 at (3, 2) `M`, seq 12 at (4, 2) `E`, each with `revealed=True`, and (2, 2), which `p2` had typed, now has `author=None`. In a second run from `R1`, `p1` checks `CellTarget(row=1, column=0)` (seq 6 and 7, spec 023) then reveals `WordTarget(row=0, column=0, clue_index=0)`: the `reveal_result` (seq 8, budget 5 letters and 0 words) is followed by `cell_locked` for (1, 1), (1, 2), (1, 3), (1, 4) only (seq 9 to 12), and (1, 0) keeps `revealed=False` and its author `p1`. WebSocket: A (`Ana`) and B (`Bob`) join a FX-01 room, B types `X` at (1, 1), then A sends `{"type": "reveal", "target": {"scope": "letter", "row": 1, "column": 1}}`: A and B each receive, in seq order, one `reveal_result` then one `cell_locked` for (1, 1) with letter `A` and `revealed` true; a client C joining afterwards gets a snapshot whose (1, 1) has `letter="A"`, `locked=True`, `revealed=True` and `author=None`. Browser: two pages join one FX-01 room as `Ana` and `Bob`; Bob taps (1, 1) and types `X`; Ana taps (1, 1) and clicks `reveal-letter`; then on both pages (1, 1) has `data-letter="A"`, `data-locked="true"`, `data-revealed="true"`, `data-author=""` and one `reveal-mark` that meets the rules of "Client: revealed cells"; Bob then tapping (1, 1) and pressing `B` changes nothing and sends no `edit_letter`.
-- **AC-2** (AC-6.2.2) (rule unit test; WebSocket; browser with mocked socket) Reveals draw on a room budget set by the host; the default is 5 letters and 1 word. Rule: `new_room(...)` has `reveal_budget` and `settings.reveal_budget` both equal to `RevealBudget(letters=5, words=1)`. In a FX-01 room with `p1` (host) and `p2`, five letter reveals by `p1` and `p2` on five different cells leave `RevealBudget(letters=0, words=1)`, and a sixth is answered `budget_exhausted`; one word reveal then leaves `RevealBudget(letters=0, words=0)`, and a second word reveal is answered `budget_exhausted`. From a fresh room, one word reveal leaves 5 letters: a word costs no letter. After 2 letter reveals and 1 word reveal, the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=7, words=2))` leaves `RevealBudget(letters=5, words=1)` (spec 014: new allowance minus what was used), and the next letter reveal's `reveal_result` carries `RevealBudget(letters=4, words=1)`. WebSocket: in a FX-01 room where the host A sent `change_settings` with the budget 1 letter and 1 word, A reveals (1, 0): A and B receive a `reveal_result` whose `reveal_budget` is 0 letters and 1 word; B's reveal of (1, 1) is answered `error` `budget_exhausted` to B only; a client C joining afterwards gets a snapshot whose `reveal_budget` is 0 letters and 1 word and whose `settings.reveal_budget` is 1 letter and 1 word. Browser: given a FX-01 snapshot with `reveal_budget` 5 letters and 1 word and (2, 2) tapped, `reveal-letter` reads `Lettre (5)` and `reveal-word` reads `Mot (1)` (texts built from `fr.json`); after the mock sends a `reveal_result` (seq 6, scope letter) whose `reveal_budget` is 4 letters and 1 word, `reveal-letter` reads `Lettre (4)` and has the `aria-label` built from `fr.json["reveal.letter_label"]` with 4; after a `settings_changed` (seq 7) whose `reveal_budget` is 3 letters and 1 word, it reads `Lettre (3)`.
+- **AC-2** (AC-6.2.2) (rule unit test; WebSocket; browser with mocked socket) Reveals draw on a room budget set by the host; the default is 5 letters and 1 word. Rule: `new_room(...)` has `reveal_budget` and `settings.reveal_budget` both equal to `RevealBudget(letters=5, words=1)`. In a FX-01 room with `p1` (host) and `p2`, five letter reveals by `p1` and `p2` on five different cells leave `RevealBudget(letters=0, words=1)`, and a sixth is answered `budget_exhausted`; one word reveal then leaves `RevealBudget(letters=0, words=0)`, and a second word reveal is answered `budget_exhausted`. From a fresh room, one word reveal leaves 5 letters: a word costs no letter. After 2 letter reveals and 1 word reveal, the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=7, words=2))` leaves `RevealBudget(letters=5, words=1)` (new allowance minus `reveals_used`, which is `RevealBudget(letters=2, words=1)`), and the next letter reveal's `reveal_result` carries `RevealBudget(letters=4, words=1)`. (Note from the lead, 2026-10-15: "spec 014: new allowance minus what was used" became "new allowance minus `reveals_used`" (review of spec 024).) From a fresh room, after letter reveals of (1, 0), (1, 1) and (1, 3) and a reveal of `WordTarget(row=0, column=2, clue_index=0)` (MIME), the state has `reveal_budget` `RevealBudget(letters=2, words=0)` and `reveals_used` `RevealBudget(letters=3, words=1)`; the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=1, words=0))` then gives one `SettingsChanged` whose `reveal_budget` is `RevealBudget(letters=0, words=0)`, and a second `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=5, words=1))` gives one whose `reveal_budget` is `RevealBudget(letters=2, words=0)` (the formula of spec 014 before 2026-10-15 gave 4 letters and 1 word); `reveals_used` is still `RevealBudget(letters=3, words=1)` after each change; a reveal of `WordTarget(row=0, column=0, clue_index=0)` (whose cell (1, 4) is still unlocked) is then answered `budget_exhausted`, and a letter reveal of (1, 4) gives a `reveal_result` carrying `RevealBudget(letters=1, words=0)` and leaves `reveals_used` at `RevealBudget(letters=4, words=1)`. (Note from the lead, 2026-10-15: added, the lead's decision 13 (review of spec 024).) WebSocket: in a FX-01 room where the host A sent `change_settings` with the budget 1 letter and 1 word, A reveals (1, 0): A and B receive a `reveal_result` whose `reveal_budget` is 0 letters and 1 word; B's reveal of (1, 1) is answered `error` `budget_exhausted` to B only; a client C joining afterwards gets a snapshot whose `reveal_budget` is 0 letters and 1 word and whose `settings.reveal_budget` is 1 letter and 1 word. Browser: given a FX-01 snapshot with `reveal_budget` 5 letters and 1 word and (2, 2) tapped, `reveal-letter` reads `Lettre (5)` and `reveal-word` reads `Mot (1)` (texts built from `fr.json`); after the mock sends a `reveal_result` (seq 6, scope letter) whose `reveal_budget` is 4 letters and 1 word, `reveal-letter` reads `Lettre (4)` and has the `aria-label` built from `fr.json["reveal.letter_label"]` with 4; after a `settings_changed` (seq 7) whose `reveal_budget` is 3 letters and 1 word, it reads `Lettre (3)`.
 - **AC-3** (AC-6.2.3) (browser with mocked socket) At zero budget, the reveal controls are disabled and say why. Given a FX-01 snapshot whose `reveal_budget` is 0 letters and 1 word, and (2, 2) tapped: `reveal-letter` is disabled, with the text `fr.json["reveal.letter_none"]` and the `aria-label` `fr.json["reveal.letter_none_label"]`, and `reveal-word` is enabled with the text `Mot (1)`; clicking `reveal-letter` sends nothing (no frame within 300 ms; Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted). When the mock then sends a `reveal_result` (seq 6, scope word) whose `reveal_budget` is 0 letters and 0 words, `reveal-word` becomes disabled, with the text `fr.json["reveal.word_none"]` and the `aria-label` `fr.json["reveal.word_none_label"]`. In both states, the text of each disabled reveal button has a contrast of at least 4.5:1 against its background, computed as spec 035's contrast scan does, on that element although it is disabled. A first snapshot whose allowance (`settings.reveal_budget`) and `reveal_budget` are both 0 letters and 0 words shows the same two disabled buttons.
-- **AC-4** (new) (rule unit test; WebSocket) A reveal that cannot apply is refused and changes nothing. Given `R1`: with `help_mode` `none` (set by a `ChangeSettings` from the host `p1`, seq 6), any reveal is answered `help_disabled`, also one whose target names nothing. With `help_mode` `free`: `CellTarget(row=0, column=0)` (a clue cell) and `CellTarget(row=5, column=0)` are answered `not_a_letter_cell`; `WordTarget(row=1, column=0, clue_index=0)` (a letter cell), `WordTarget(row=0, column=2, clue_index=1)` (one clue only) and `WordTarget(row=9, column=9, clue_index=0)` are answered `invalid_target`; after `p1` revealed (1, 1) (seq 7), `CellTarget(row=1, column=1)` is answered `invalid_target`; after the host raised the allowance to 5 letters and 2 words and `p1` revealed MIME, a second reveal of MIME is answered `invalid_target`. With the allowance set to 0 letters and 1 word, `CellTarget(row=1, column=1)` is answered `budget_exhausted`, while `CellTarget(row=0, column=0)` is still answered `not_a_letter_cell` and, once `p1` checked (1, 0) (which locks it, spec 023), `CellTarget(row=1, column=0)` is answered `invalid_target`: the target is checked before the budget. On the solved grid of `FULL17` plus `T` at (4, 4) by `p2`, any reveal is answered `grid_solved`, also after the host set `none`. Each refusal returns the state it was given apart from the player's `last_seen_at` and `last_input_at`, with the same `seq` and `reveal_budget`, no entry and exactly one `ErrorMessage` in `reply`. WebSocket: a refused reveal reaches its sender only; the other client receives nothing.
+- **AC-4** (new) (rule unit test; WebSocket) A reveal that cannot apply is refused and changes nothing. Given `R1`: with `help_mode` `none` (set by a `ChangeSettings` from the host `p1`, seq 6), any reveal is answered `help_disabled`, also one whose target names nothing. With `help_mode` `free`: `CellTarget(row=0, column=0)` (a clue cell) and `CellTarget(row=5, column=0)` are answered `not_a_letter_cell`; `WordTarget(row=1, column=0, clue_index=0)` (a letter cell), `WordTarget(row=0, column=2, clue_index=1)` (one clue only) and `WordTarget(row=9, column=9, clue_index=0)` are answered `invalid_target`; after `p1` revealed (1, 1) (seq 7), `CellTarget(row=1, column=1)` is answered `invalid_target`; after the host raised the allowance to 5 letters and 2 words and `p1` revealed MIME, a second reveal of MIME is answered `invalid_target`. With the allowance set to 0 letters and 1 word, `CellTarget(row=1, column=1)` is answered `budget_exhausted`, while `CellTarget(row=0, column=0)` is still answered `not_a_letter_cell` and, once `p1` checked (1, 0) (which locks it, spec 023), `CellTarget(row=1, column=0)` is answered `invalid_target`: the target is checked before the budget. On the solved grid of `FULL17` plus `T` at (4, 4) by `p2`, any reveal is answered `grid_solved`, also after the host set `none`. Each refusal returns the state it was given apart from the player's `last_seen_at`, `last_input_at` and, if they were idle, their state, with the same `reveal_budget`, the same `seq` for an active sender (an idle sender is first woken by spec 013's entry, which takes one seq and which a refusal does not undo), no entry of its own and exactly one `ErrorMessage` in `reply`. (Note from the lead, 2026-10-15: an idle sender is woken even when its message is refused, as spec 013's input rule and the code do.) WebSocket: a refused reveal reaches its sender only; the other client receives nothing.
 - **AC-5** (new, from the lead's note of 2026-10-11 on spec 037) (WebSocket; browser with live server) No payload sent to a browser shows a revealed letter before the room revealed it. WebSocket: in the full game with reveals of "Test harness", every recorded frame and HTTP body passes spec 037's three rules with the reveal rule of "What a browser may receive"; Cy's snapshot holds no letter at (4, 4), (1, 2), (3, 2) or (4, 2); Dee's snapshot holds `T` at (4, 4) and `M`, `I`, `M`, `E` from (1, 2) down to (4, 2), each with `revealed=True` and `author=None`; Ana, Bob and Cy each received the five `cell_locked` frames with `revealed` true; the game ends with `grid_solved`. The extended checker reports a snapshot whose `seq` is below the revealing frame's and that shows the revealed letter, a frame received before the revealing frame that shows it, and an HTTP body that shows it, and accepts the same snapshot with a `seq` equal to the revealing frame's. Browser: in the browser game with reveals, every WebSocket frame of the three pages and every response body passes the same rules, and Ana's page received at least one `snapshot`, two `reveal_result` and five `cell_locked` frames with `revealed` true.
 - **AC-6** (new, from the lead's note of 2026-10-12 on spec 026) (rule unit test; WebSocket) A reveal that fills the grid completes it. Rule: given `FULL17`, when `p2` reveals `CellTarget(row=4, column=4)` at `NOW + 754.0`, the entries are `RevealResult(seq=20, player_id="p2", target=CellTarget(row=4, column=4), reveal_budget=RevealBudget(letters=4, words=1))`, `CellLocked(seq=21, row=4, column=4, letter="T", revealed=True)` and `GridSolved(seq=22, elapsed_ms=754000)`, and the new state has `solved=True`. With `FULL17` where `p1` wrote `X` at (1, 1) instead of `A`, the same reveal gives the result, the lock and then `GridFullWrong(seq=22)`, and `solved` stays False. In a FX-01 room where every letter cell except the four of MIME holds its right letter, a reveal of `WordTarget(row=0, column=2, clue_index=0)` gives the result, four `cell_locked` and then one `grid_solved`. On the solved grid of the first case, any reveal is answered `grid_solved` (spec 026 AC-4). WebSocket: in a room where Ana, Bob and Cy joined and Ana and Bob typed the 17 letters other than (4, 4), Bob's reveal of (4, 4) makes each of the three clients receive `reveal_result`, `cell_locked` (4, 4) `T` and then `grid_solved`, with consecutive seqs.
 - **AC-7** (new) (browser with mocked socket) The reveal controls send the right message and are disabled when they cannot apply. Given a FX-01 snapshot (`help_mode` `free`, budget 5 letters and 1 word): `reveal-panel` is inside `room-toolbar` right after `check-panel`, has `role="group"` and the `aria-label` `fr.json["reveal.label"]`, and holds `reveal-letter` then `reveal-word`; with nothing selected both are disabled. After tapping (2, 2) twice (`down`, word `0,2,0`), clicking `reveal-letter` sends one frame that parses to `Reveal(target=CellTarget(row=2, column=2))` and clicking `reveal-word` one that parses to `Reveal(target=WordTarget(row=0, column=2, clue_index=0))`; the selection is still (2, 2) `down`, and no cell changes until the mock answers. With a snapshot where (2, 2) is locked, after selecting it `reveal-letter` is disabled and `reveal-word` enabled; with every cell of MIME locked, `reveal-word` is disabled too. After the mock sends `grid_solved`, both are disabled. A snapshot with `help_mode` `none` shows no `reveal-panel`; a `settings_changed` to `free` shows it, and one back to `none` removes it.
@@ -326,8 +437,9 @@ The words in brackets say how each criterion is tested.
   - One row, at 320 by 568, 568 by 320, 360 by 740 and 740 by 360: the vertical ranges of any two of these six buttons overlap. When the toolbar's `scrollWidth` is more than its `clientWidth` plus 1, its computed `overflow-x` is `auto` or `scroll` and, with `scrollLeft` 0, `room-toolbar-more` is visible. At the four other sizes `room-toolbar-more` is not visible.
   - Keyboard, desktop context: after the test calls `focus()` on `share-link` from `page.evaluate`, it presses `Tab` until each of the six buttons has had the focus (at most 60 presses). While each one has the focus: its box lies inside the toolbar's client area (1 px tolerance); its computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white (spec 035 AC-2); the outline passes the "Not clipped" measure of spec 035's "Focus outline of the feed's scrolling list", with the toolbar among the clipping ancestors; and `room-toolbar-more` is not visible.
   - Pointer: for each of the six buttons, after `scrollIntoView({block: "nearest", inline: "nearest"})`, `document.elementFromPoint` at the centre of its box returns the button or one of its descendants.
-- **AC-9** (new) (browser with mocked socket) A revealed cell is marked by more than its colour, and the reveal controls meet spec 035. Given a FX-01 snapshot (`seq` 10, `you` `p1` and host, players `p1` and `p2`) where (1, 0) holds `T` revealed (`locked`, `revealed`, no author) and (1, 1) holds `A` locked by a check (`revealed` false, author `p2`): (1, 0) has `data-revealed="true"`, one `reveal-mark` and one `reveal-label` whose text is `fr.json["a11y.revealed"]`; (1, 1) has `data-revealed="false"` and neither; the mark's `background-color` has a contrast of at least 3:1 against the `background-color` of (1, 0), both while (1, 0) is not selected and while it is selected. In this state with (2, 2) tapped, at 1280 by 720 and at 360 by 740, spec 035's contrast scan (AC-8) and language scan (AC-9) find no offending element. In a separate run on the same snapshot at 1280 by 720, keyboard only with no tap (spec 035's harness): `tab_to` `grid`, then `Tab` selects the first unfinished word (spec 009), then `tab_to` `reveal-letter` and `tab_to` `reveal-word` each reach an enabled button that shows spec 035 AC-2's outline.
-- **AC-10** (new) (rule unit test) Reveals and the budget survive a reload. Given the entries of `R1`'s play followed by the two reveals of AC-1 (seq 1 to 12), when they are replayed in order with `replay` from `new_room` on the same grid, the result equals the live state for `seq`, `reveal_budget`, `settings` and `cells`; and the same room saved in a `RoomStore` and loaded again (spec 018) has `reveal_budget` 4 letters and 0 words, keeps (1, 1) and the four cells of MIME revealed with no author, and answers a word reveal with `budget_exhausted`.
+  - Pointer focus, at 320 by 568 only, with a mouse click in the desktop context and a tap in the touch context, on each of the six buttons, tested as spec 035 tests the host panel ("Pointer focus in the host panel"). The test sets the toolbar's `scrollLeft` to the value that puts the button's centre on the toolbar's right edge, clamped to the toolbar's scroll range, so that the button is partly hidden past that edge wherever the range allows it. Then it wraps `scrollIntoView`, `scrollIntoViewIfNeeded` (where the engine has it), `scroll`, `scrollTo`, `scrollBy` and the `scrollLeft` setter of `Element.prototype`, so that each call made on `room-toolbar` or on an element inside it is recorded, and presses the centre of the button's visible part (its box cut to the toolbar's client area) at raw coordinates with `page.mouse.click` or `page.touchscreen.tap`, because `locator.click()` would scroll the button into view first. 300 ms after the press, no call has been recorded, and `room-toolbar-more` is visible (computed `visibility` `visible`, `display` not `none`) if toolbar content is still hidden past the right edge (`scrollWidth - clientWidth - scrollLeft > 1`). Both hold whether or not the engine gives the pressed button the focus (spec 014 AC-7: WebKit on Windows and macOS does not). The test does not compare `scrollLeft` before and after the press, since a scroll that the browser makes by itself is allowed (spec 035 decision 13). (Note from the lead, 2026-10-15: added; "Client: room toolbar" had these two pointer rules without a check (review of spec 024).)
+- **AC-9** (new) (browser with mocked socket) A revealed cell is marked by more than its colour, and the reveal controls meet spec 035. Given a FX-01 snapshot (`seq` 10, `you` `p1` and host, players `p1` and `p2`) where (1, 0) holds `T` revealed (`locked`, `revealed`, no author) and (1, 1) holds `A` locked by a check (`revealed` false, author `p2`): (1, 0) has `data-revealed="true"`, one `reveal-mark` and one `reveal-label` whose text is `fr.json["a11y.revealed"]`; (1, 1) has `data-revealed="false"` and neither; the mark's contrast, measured over its colours as "Client: revealed cells" says, is at least 3:1 against the `background-color` of (1, 0), both while (1, 0) is not selected and while it is selected. (Note from the lead, 2026-10-15: "the mark's `background-color` has a contrast" became "the mark's contrast, measured over its colours", so that a contrasting edge can pass (review of spec 024).) In this state with (2, 2) tapped, at 1280 by 720 and at 360 by 740, spec 035's contrast scan (AC-8) and language scan (AC-9) find no offending element. In a separate run on the same snapshot at 1280 by 720, keyboard only with no tap (spec 035's harness): `tab_to` `grid`, then `Tab` selects the first unfinished word (spec 009), then `tab_to` `reveal-letter` and `tab_to` `reveal-word` each reach an enabled button that shows spec 035 AC-2's outline. The mark also keeps 3:1 while the revealed cell flashes in any of the eight player colours (spec 016). Flash run, at 1280 by 720 in the desktop context: a FX-01 snapshot (`seq` 10, `you` `p1` and host with colour 0, players `p2` to `p8` with colours 1 to 7, allowance and `reveal_budget` 8 letters and 1 word) where (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 2) and (2, 3) hold `X` with author `p1`, unlocked. For each colour index c from 0 to 7, on the cell at position c + 1 of that list (solution letters `T`, `A`, `M`, `I`, `S`, `V`, `I`, `D`), the mock sends back to back, with consecutive seqs from 11: a `letter_changed` with letter `Y` from the player whose colour is c (for c = 0, `p9`, a player not in the roster, whom spec 016 flashes in colour 0), then a `reveal_result` (scope letter, that cell, 1 letter fewer than the previous budget), then a `cell_locked` (that cell, its solution letter, `revealed` true). Right after the cell's `data-revealed` becomes `true`, the test reads in one `page.evaluate` the cell's `data-flash`, which is still `c`; its computed `background-color`, which equals the computed background colour of the `roster-colour` of the player with colour c (`p1`'s for c = 0), as in spec 016 AC-2; and the mark's colours, whose contrast against that background is at least 3:1. A second flash run does the same but taps each cell just before the mock sends its three frames, so the cell is also selected while it flashes. Ending the flash at the reveal fails this check, as `data-flash` must still be `c` (decision 14). (Note from the lead, 2026-10-15: added; the ink-coloured mark had 2.99:1 and 2.27:1 on the flash colours 2 and 4 (review of spec 024).)
+- **AC-10** (new) (rule unit test) Reveals and the budget survive a reload. Given the entries of `R1`'s play followed by the two reveals of AC-1 (seq 1 to 12), when they are replayed in order with `replay` from `new_room` on the same grid, the result equals the live state for `seq`, `reveal_budget`, `reveals_used`, `settings` and `cells`; and the same room saved in a `RoomStore` and loaded again (spec 018) has `reveal_budget` 4 letters and 0 words and `reveals_used` 1 letter and 1 word, keeps (1, 1) and the four cells of MIME revealed with no author, and answers a word reveal with `budget_exhausted`. (Note from the lead, 2026-10-15: `reveals_used` was added to the compared fields and to the loaded room (review of spec 024).) Given the entries of AC-2's allowance example up to its first `ChangeSettings` (the joins of `p1` and `p2`, the four reveals, then the allowance set to 1 letter and 0 words), `replay` from `new_room` gives the live `reveal_budget` `RevealBudget(letters=0, words=0)` and `reveals_used` `RevealBudget(letters=3, words=1)`. The same room is loaded from a `RoomStore` in two ways: (a) created with `create_room` on its `new_room` state and every entry appended, with no other snapshot, so that `load_room` replays the whole log; (b) the same plus `save_snapshot` of the live state after the allowance change, so that `load_room` reads `reveals_used` from that snapshot. Each loaded room has those two values, and the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=5, words=1))` on it gives a `SettingsChanged` whose `reveal_budget` is `RevealBudget(letters=2, words=0)`. (Note from the lead, 2026-10-15: added, the lead's decision 13 (review of spec 024).) A stored snapshot without `reveals_used`: a FX-01 room with `p1` (host) and `p2` (seq 2, allowance and `reveal_budget` 5 letters and 1 word) is stored with `create_room` while `RoomState.model_dump_json` is patched to leave the `reveals_used` key out of the JSON (spec 018 writes a stored `RoomState` with `model_dump_json()`); `load_room` then returns a state whose `reveals_used` is `RevealBudget(letters=0, words=0)`, and the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=3, words=1))` on it gives a `SettingsChanged` whose `reveal_budget` is `RevealBudget(letters=3, words=1)`. (Note from the lead, 2026-10-15: added; a database written before this spec holds such snapshots (review of spec 024).)
 
 ## Edge cases and errors
 
@@ -364,9 +476,17 @@ Revealing on a solved grid is refused with `grid_solved` (spec 026 AC-4).
 - A pending edit on a cell being revealed (AC-1): the page shows the revealed
   letter at once (spec 016: a locked cell shows its confirmed letter); the server
   answers the pending edit `cell_locked`, which removes it from the queue (spec 015).
-- Allowance changed after reveals (AC-2): spec 014's rule, new allowance minus what
-  was used, never below 0. The allowance itself is shown only in the host's form;
-  the buttons show what is left.
+- Allowance changed after reveals (AC-2, AC-10): new allowance minus
+  `reveals_used`, never below 0, for letters and words separately; a cut to 0
+  forgets no reveal, so raising the allowance again gives back only what was
+  never used (decision 13). (Note from the lead, 2026-10-15: "spec 014's rule,
+  new allowance minus what was used" became this sentence (review of spec 024).)
+  The allowance itself is shown only in the host's form; the buttons show what is
+  left.
+- Revealed while flashing (AC-9): another player replaces my letter, and the cell
+  is revealed less than 1,000 ms later. The cell keeps its flash colour until the
+  flash ends (spec 016), with the corner mark at 3:1 on it, then shows the look of
+  a revealed cell. (Note from the lead, 2026-10-15: added (review of spec 024).)
 - Undo after a reveal (AC-1): an undo of an edit whose cell was revealed since is
   refused `nothing_to_undo` (spec 018 step 2: the cell is locked).
 - Checks after a reveal (AC-1): a revealed cell is locked, so checks leave it out
@@ -455,6 +575,25 @@ open question. Each one is already part of the spec above.
     one more tap. Pick: the row that scrolls sideways, the pattern the host panel
     already uses (decision 8). The other specs that add controls to the toolbar
     (019, 020, 021, 022, 027) follow it.
+
+Decided by the lead on 2026-10-15, after the review of spec 024. Each one is
+already part of the spec above. (Note from the lead, 2026-10-15: this group was
+added (review of spec 024).)
+
+13. Budget after an allowance change. Spec 014 computed what was used as the old
+    allowance minus the old remaining budget, which loses reveals once the
+    remaining count was cut at 0: 3 letter reveals with the allowance 5, then 1,
+    then 5 again left 4 letters instead of 2. Pick: the room counts the accepted
+    reveals of each kind in `RoomState.reveals_used`, and every allowance change
+    sets the remaining budget to `max(0, new_allowance - reveals_used)`, per kind.
+    No protocol change: the clients keep seeing only the remaining budget. (Note
+    from the lead, 2026-10-15: added (review of spec 024).)
+14. The corner mark on a flashing cell. The ink-coloured mark fell to 2.99:1 and
+    2.27:1 on the flash colours 2 and 4 of spec 016. Pick: the mark keeps 3:1 in
+    every flash colour, by a colour that changes with the flash or by a
+    contrasting edge, at the implementer's choice; the flash itself keeps its
+    1,000 ms, since ending it at the reveal would contradict spec 016. (Note from
+    the lead, 2026-10-15: added (review of spec 024).)
 
 ## Open questions
 

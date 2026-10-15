@@ -52,10 +52,15 @@ as usual.
 current `settings.help_mode` and `settings.reveal_budget`, nothing happens.
 Otherwise `settings.help_mode` and `settings.reveal_budget` take the new values
 (`locked` unchanged); the remaining budget becomes, for letters and for words
-separately, `max(0, new_allowance - used)` where
-`used = old_allowance - old_remaining`; one entry `SettingsChanged(...)` with the
-new settings and remaining budget. What the help mode and budget do is specs 023
-to 025's.
+separately, `max(0, new_allowance - used)` where `used` is the number of reveals
+of that kind the room has accepted so far (`state.reveals_used`, spec 024's
+"Reveals used and allowance changes"). (Note from the lead, 2026-10-15: `used`
+was `old_allowance - old_remaining`, which loses reveals once the remaining count
+was cut at 0: 3 letter reveals with the allowance 5, then 1, then 5 again gave 4
+letters instead of 2. Every example of this spec still holds, since none
+changes the allowance after a reveal (review of spec 024).) One entry
+`SettingsChanged(...)` with the new settings and remaining budget. What the help
+mode and budget do is specs 023 to 025's.
 
 `MutePlayer(player_id=t, muted=x)` from the host: `t` unknown: `INVALID_TARGET`;
 `x` equal to `t.muted`: nothing; otherwise `t.muted = x` and one entry
