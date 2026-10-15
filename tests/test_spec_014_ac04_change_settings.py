@@ -63,7 +63,12 @@ from spec014_harness import fx01_grid as fx01_grid
 def room_with_used_budget(grid: Grid) -> RoomState:
     """Allowance 5 letters and 1 word, 2 letters and 0 words left (3 and 1 used)."""
     room = room_of_players(grid, 2)
-    return room.model_copy(update={"reveal_budget": RevealBudget(letters=2, words=0)})
+    return room.model_copy(
+        update={
+            "reveal_budget": RevealBudget(letters=2, words=0),
+            "reveals_used": RevealBudget(letters=3, words=1),
+        }
+    )
 
 
 def test_ac4_fr_json_holds_the_settings_texts() -> None:
@@ -202,7 +207,7 @@ def test_ac4_letters_and_words_are_computed_separately(fx01_grid: Grid) -> None:
     assert outcome.state.reveal_budget == RevealBudget(letters=6, words=0)
 
 
-def test_ac4_the_used_count_follows_the_allowance_and_remaining_budget_in_force(
+def test_ac4_a_cut_allowance_does_not_make_the_room_forget_the_reveals_used(
     fx01_grid: Grid,
 ) -> None:
     room = room_with_used_budget(fx01_grid)
@@ -211,8 +216,9 @@ def test_ac4_the_used_count_follows_the_allowance_and_remaining_budget_in_force(
 
     raised = host_acts(lowered, change(HelpMode.FREE, 10, 5))
 
-    # used = old allowance - old remaining = (1 - 0, 1 - 0)
-    assert raised.state.reveal_budget == RevealBudget(letters=9, words=4)
+    # remaining = max(0, new allowance - reveals_used) = (10 - 3, 5 - 1)
+    assert raised.state.reveal_budget == RevealBudget(letters=7, words=4)
+    assert raised.state.reveals_used == RevealBudget(letters=3, words=1)
 
 
 def test_ac4_any_count_from_zero_is_accepted_by_the_server(fx01_grid: Grid) -> None:
