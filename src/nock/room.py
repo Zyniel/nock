@@ -774,8 +774,8 @@ def _apply_message(
     The completion rule is spec 026's; its entry comes after the clearing ones.
     """
     outcome = _run_message(state, player_id, message, now, config)
-    cleared = _with_full_flags_cleared(outcome, now)
-    return _with_completion(state, cleared, now)
+    outcome_with_flags_cleared = _with_full_flags_cleared(outcome, now)
+    return _with_completion(state, outcome_with_flags_cleared, now)
 
 
 def _run_message(
@@ -883,10 +883,10 @@ def _with_full_flags_cleared(outcome: Outcome, now: float) -> Outcome:
         word_cells = _word_cells_of_clue(new_state, player.flag)
         if word_cells is None or not _is_word_full(word_cells):
             continue
-        cleared = FlagChanged(
+        flag_removed = FlagChanged(
             seq=new_state.seq + 1, player_id=player.player_id, clue=None
         )
-        entry = LogEntry(at=now, event=cleared)
+        entry = LogEntry(at=now, event=flag_removed)
         new_state = replay(new_state, entry)
         entries.append(entry)
     return outcome.model_copy(update={"state": new_state, "entries": tuple(entries)})

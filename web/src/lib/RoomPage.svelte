@@ -1870,11 +1870,11 @@
     font-size: 0.85rem;
   }
 
-  /* The list keeps the room of one line while it is empty, so its first line
-     (a flag's, for one) does not move the grid (spec 021 AC-9). */
+  /* The list has a fixed height, about three lines, whatever the number of its
+     items: a new line never moves the grid (spec 013 "Client: feed height",
+     spec 021 AC-9). The lines beyond it scroll (spec 013 AC-7). */
   .feed ul {
-    min-height: 1lh;
-    max-height: 3.6rem;
+    height: 3.6rem;
     overflow-y: auto;
     /* The page keeps the reader's place itself when lines come and go (spec
        013 AC-7), the same way in every engine: no scroll anchoring from the
@@ -2123,12 +2123,13 @@
     }
 
     /* The line takes the room that the heading leaves, so a squeezed feed cuts
-       the heading only when the line has no room left (spec 014 AC-10). */
+       the heading only when the line has no room left (spec 014 AC-10). The
+       list is one line high, whatever the number of its items (spec 013 AC-6). */
     .feed ul {
       flex: 1 1 0;
       min-width: 0;
       margin: 0;
-      max-height: 1.3rem;
+      height: 1.3rem;
       line-height: 1.3rem;
     }
 

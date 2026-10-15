@@ -38,8 +38,21 @@ export function flagOf(flags: FlagView[], playerId: string): ClueRefView | null 
   return null
 }
 
+// Compares two player ids as plain strings, for an ascending sort: `p10` comes
+// before `p7`.
+function compareIds(first: string, second: string): number {
+  if (first < second) {
+    return -1
+  }
+  if (first > second) {
+    return 1
+  }
+  return 0
+}
+
 // The flags in roster order: those of the players in `players` order, then the
-// flags of ids that are not in the roster, in the order they are kept.
+// flags of ids that are not in the roster, in the ascending order of their ids
+// as plain strings (spec 021 "Order of the flaggers").
 function flagsInRosterOrder(flags: FlagView[], players: PlayerView[]): FlagView[] {
   const ordered: FlagView[] = []
   const rosterIds = new Set<string>()
@@ -50,10 +63,17 @@ function flagsInRosterOrder(flags: FlagView[], players: PlayerView[]): FlagView[
       ordered.push({ player_id: player.player_id, clue })
     }
   }
+  const flagsOutsideRoster: FlagView[] = []
   for (const flag of flags) {
     if (!rosterIds.has(flag.player_id)) {
-      ordered.push(flag)
+      flagsOutsideRoster.push(flag)
     }
+  }
+  flagsOutsideRoster.sort((first, second) =>
+    compareIds(first.player_id, second.player_id),
+  )
+  for (const flag of flagsOutsideRoster) {
+    ordered.push(flag)
   }
   return ordered
 }
