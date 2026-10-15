@@ -14,18 +14,51 @@ concurrency:
 
 jobs:
   gate:
-    name: Quality gate (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    name: Quality gate (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # One job per browser engine and system, plus one job for the static
+      # checks and the tests without a browser on the oldest Python (human
+      # decision, 2026-10-15). The Chromium jobs also run the tests without a
+      # browser, so those run on both systems and both Pythons.
       matrix:
         include:
-          - os: ubuntu-latest
+          - label: static and non-browser tests, ubuntu-latest, Python 3.13
+            os: ubuntu-latest
             python-version: "3.13"
-          - os: ubuntu-latest
+            gate-options: --tests other
+            engine: ""
+          - label: chromium, ubuntu-latest, Python 3.14
+            os: ubuntu-latest
             python-version: "3.14"
-          - os: windows-latest
+            gate-options: --skip-static --browsers chromium
+            engine: chromium
+          - label: firefox, ubuntu-latest, Python 3.14
+            os: ubuntu-latest
             python-version: "3.14"
+            gate-options: --skip-static --tests browser --browsers firefox
+            engine: firefox
+          - label: webkit, ubuntu-latest, Python 3.14
+            os: ubuntu-latest
+            python-version: "3.14"
+            gate-options: --skip-static --tests browser --browsers webkit
+            engine: webkit
+          - label: chromium, windows-latest, Python 3.14
+            os: windows-latest
+            python-version: "3.14"
+            gate-options: --skip-static --browsers chromium
+            engine: chromium
+          - label: firefox, windows-latest, Python 3.14
+            os: windows-latest
+            python-version: "3.14"
+            gate-options: --skip-static --tests browser --browsers firefox
+            engine: firefox
+          - label: webkit, windows-latest, Python 3.14
+            os: windows-latest
+            python-version: "3.14"
+            gate-options: --skip-static --tests browser --browsers webkit
+            engine: webkit
     steps:
       - uses: actions/checkout@v7
 
@@ -47,12 +80,10 @@ jobs:
       - name: Install the web client
         run: npm --prefix web ci
 
-      - name: Install the browsers for browser tests
-        run: uv run playwright install --with-deps chromium firefox webkit
+      - name: Install the browser for browser tests
+        if: matrix.engine != ''
+        run: uv run playwright install --with-deps ${{ matrix.engine }}
 
       # The same command you run locally and that the Claude Code hooks run.
-      # CI also runs the browser tests in Firefox (see pyproject.toml).
       - name: Run the quality gate
-        run: uv run python scripts/gate.py
-        env:
-          PYTEST_ADDOPTS: --browser firefox
+        run: uv run python scripts/gate.py ${{ matrix.gate-options }}

@@ -6,11 +6,26 @@ in GitHub Actions, so "green locally" means "green in CI".
 Usage:
     uv run python scripts/gate.py                 # full gate
     uv run python scripts/gate.py --stage tests   # red phase: tests exist, code not yet
+    uv run python scripts/gate.py --browsers all  # browser tests in all three engines
 
 Stages:
     tests: ruff + black + spec traceability.
     full:  everything in "tests", then pyrefly, svelte-check and the vite build
            of web/, then pytest (browser tests included).
+
+Options of the full stage (2026-10-15, so CI can run one job per engine):
+    --browsers: the engines of the browser tests, comma-separated, or "all".
+        Default: the NOCK_BROWSERS environment variable, else chromium,webkit
+        (Windows blocks Firefox on the human's machine). Engines that are not
+        installed are left out with a warning, except in CI.
+    --tests: "all" (default), "browser" (only the browser tests) or "other"
+        (only the tests that run without a browser).
+    --skip-static: skip ruff, black, traceability, pyrefly and svelte-check,
+        for CI jobs whose static checks run in another job.
+    --workers: pytest-xdist workers, "auto" (default, one per CPU) or a
+        number; 0 runs everything in one serial pass. The tests marked
+        `serial` (scripts/gate_browsers.py) always run after the parallel
+        pass, on their own.
 
 Exit codes:
     0: every check passed.
@@ -47,15 +62,63 @@ STATIC_STEPS: list[tuple[str, list[str]]] = [
 ]
 WEB_DIR = PROJECT_ROOT / "web"
 
-# pytest comes after the web build: browser tests load the built client.
-RUNTIME_STEPS: list[tuple[str, list[str]]] = [
+RUNTIME_STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("pyrefly (types)", ["pyrefly", "check"]),
     ("svelte-check (web types)", ["npm", "--prefix", "web", "run", "check"]),
-    ("vite build (web)", ["npm", "--prefix", "web", "run", "build"]),
-    # gate_browsers leaves out the browser engines that are not installed, with
-    # a warning; in CI it fails instead (see scripts/gate_browsers.py).
-    ("pytest (tests)", ["pytest", "--quiet", "-p", "gate_browsers"]),
 ]
+# pytest comes after the web build: browser tests load the built client.
+BUILD_STEP: tuple[str, list[str]] = (
+    "vite build (web)",
+    ["npm", "--prefix", "web", "run", "build"],
+)
+
+ENGINE_NAMES: tuple[str, ...] = ("chromium", "firefox", "webkit")
+DEFAULT_ENGINES = "chromium,webkit"
+# The `-m` expression of each --tests choice.
+TEST_SELECTIONS: dict[str, str] = {
+    "all": "",
+    "browser": "browser",
+    "other": "not browser",
+}
+# pytest's exit code when no test was selected.
+NO_TESTS_COLLECTED = 5
+
+
+def run_tool(step_name: str, command: list[str]) -> int | None:
+    """Run one external tool and return its exit code.
+
+    Args:
+        step_name: Label printed before the tool output.
+        command: Executable name followed by its arguments.
+
+    Returns:
+        The exit code, or None when the tool or its dependencies are missing.
+    """
+    print(f"\n=== {step_name} ===", flush=True)
+
+    executable_path = shutil.which(command[0])
+    if executable_path is None:
+        print(
+            f"FAIL: '{command[0]}' is not installed. "
+            "Run: uv sync (Python tools), or install Node.js LTS (npm)."
+        )
+        return None
+
+    if command[0] == "npm" and not (WEB_DIR / "node_modules").is_dir():
+        print("FAIL: the web dependencies are not installed. Run: npm --prefix web ci")
+        return None
+
+    full_command = [executable_path, *command[1:]]
+    # scripts/ on the import path, so that pytest can load the gate_browsers plugin.
+    environment = dict(os.environ)
+    python_path = environment.get("PYTHONPATH", "")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(SCRIPTS_DIR), python_path) if part
+    )
+    completed = subprocess.run(
+        full_command, cwd=PROJECT_ROOT, env=environment, check=False
+    )
+    return completed.returncode
 
 
 def run_step(step_name: str, command: list[str]) -> bool:
@@ -68,36 +131,46 @@ def run_step(step_name: str, command: list[str]) -> bool:
     Returns:
         True when the tool exited with code 0.
     """
-    print(f"\n=== {step_name} ===", flush=True)
-
-    executable_path = shutil.which(command[0])
-    if executable_path is None:
-        print(
-            f"FAIL: '{command[0]}' is not installed. "
-            "Run: uv sync (Python tools), or install Node.js LTS (npm)."
-        )
+    exit_code = run_tool(step_name, command)
+    if exit_code is None:
         return False
-
-    if command[0] == "npm" and not (WEB_DIR / "node_modules").is_dir():
-        print("FAIL: the web dependencies are not installed. Run: npm --prefix web ci")
+    if exit_code != 0:
+        print(f"FAIL: {step_name} exited with code {exit_code}")
         return False
-
-    full_command = [executable_path, *command[1:]]
-    # scripts/ on the import path, so that pytest can load the gate_browsers plugin.
-    environment = dict(os.environ)
-    python_path = environment.get("PYTHONPATH", "")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(SCRIPTS_DIR), python_path) if part
-    )
-    completed = subprocess.run(
-        full_command, cwd=PROJECT_ROOT, env=environment, check=False
-    )
-    if completed.returncode != 0:
-        print(f"FAIL: {step_name} exited with code {completed.returncode}")
-        return False
-
     print(f"OK: {step_name}")
     return True
+
+
+def run_pytest_passes(commands: list[tuple[str, list[str]]]) -> bool:
+    """Run the pytest passes and report whether they all succeeded.
+
+    A pass that selects no test (pytest's exit code 5) is fine, such as the
+    serial pass of a selection without serial tests, as long as one pass ran
+    a test.
+
+    Args:
+        commands: The passes, with their step names.
+
+    Returns:
+        True when every pass passed or selected nothing, and one ran a test.
+    """
+    all_passed = True
+    tests_ran = False
+    for step_name, command in commands:
+        exit_code = run_tool(step_name, command)
+        if exit_code == 0:
+            tests_ran = True
+            print(f"OK: {step_name}")
+        elif exit_code == NO_TESTS_COLLECTED:
+            print(f"OK: {step_name} (no test selected)")
+        else:
+            all_passed = False
+            if exit_code is not None:
+                print(f"FAIL: {step_name} exited with code {exit_code}")
+    if all_passed and not tests_ran:
+        print("FAIL: no pytest pass selected a test")
+        return False
+    return all_passed
 
 
 def find_spec_files() -> list[Path]:
@@ -220,6 +293,42 @@ def check_traceability() -> bool:
     return True
 
 
+def parse_engines(engines_text: str) -> list[str]:
+    """Return the engines named in a comma-separated list, or all for "all".
+
+    Raises:
+        argparse.ArgumentTypeError: When a name is not a browser engine.
+    """
+    if engines_text.strip() == "all":
+        return list(ENGINE_NAMES)
+    engines: list[str] = []
+    for part in engines_text.split(","):
+        engine_name = part.strip()
+        if not engine_name:
+            continue
+        if engine_name not in ENGINE_NAMES:
+            raise argparse.ArgumentTypeError(
+                f"unknown browser engine '{engine_name}' "
+                f"(expected {', '.join(ENGINE_NAMES)} or all)"
+            )
+        if engine_name not in engines:
+            engines.append(engine_name)
+    if not engines:
+        raise argparse.ArgumentTypeError("no browser engine given")
+    return engines
+
+
+def parse_workers(workers_text: str) -> str:
+    """Return the --workers value: "auto" or a number of workers.
+
+    Raises:
+        argparse.ArgumentTypeError: When it is neither "auto" nor a number.
+    """
+    if workers_text == "auto" or workers_text.isdigit():
+        return workers_text
+    raise argparse.ArgumentTypeError("expected 'auto' or a number of workers")
+
+
 def parse_arguments() -> argparse.Namespace:
     """Parse the command line."""
     parser = argparse.ArgumentParser(description="Run the project quality gate.")
@@ -229,7 +338,74 @@ def parse_arguments() -> argparse.Namespace:
         default="full",
         help="'tests' skips pyrefly and pytest (red phase). Default: full.",
     )
+    parser.add_argument(
+        "--browsers",
+        type=parse_engines,
+        default=os.environ.get("NOCK_BROWSERS") or DEFAULT_ENGINES,
+        help="Engines of the browser tests, comma-separated, or 'all'. "
+        f"Default: $NOCK_BROWSERS, else {DEFAULT_ENGINES}.",
+    )
+    parser.add_argument(
+        "--tests",
+        choices=list(TEST_SELECTIONS),
+        default="all",
+        help="'browser' or 'other' runs only the tests with or without a "
+        "browser. Default: all.",
+    )
+    parser.add_argument(
+        "--skip-static",
+        action="store_true",
+        help="Skip ruff, black, traceability, pyrefly and svelte-check.",
+    )
+    parser.add_argument(
+        "--workers",
+        type=parse_workers,
+        default="auto",
+        help="pytest-xdist workers: 'auto' (default) or a number; 0 runs "
+        "the tests in one serial pass.",
+    )
     return parser.parse_args()
+
+
+def join_marks(*expressions: str) -> str:
+    """Return the `-m` expression that requires every non-empty expression."""
+    parts = [f"({expression})" for expression in expressions if expression]
+    return " and ".join(parts)
+
+
+def pytest_commands(
+    engines: list[str], selection: str, workers: str
+) -> list[tuple[str, list[str]]]:
+    """Return the pytest runs of the full stage, with their step names.
+
+    Args:
+        engines: The engines of the browser tests.
+        selection: The `-m` expression of the --tests choice ("" for all).
+        workers: The pytest-xdist workers, "auto" or a number ("0": serial).
+
+    Returns:
+        One run when `workers` is "0", else the parallel run of the tests not
+        marked `serial`, then the serial run of the others.
+    """
+    # gate_browsers marks the tests and leaves out the browser engines that are
+    # not installed, with a warning; in CI it fails instead.
+    base_command = ["pytest", "--quiet", "-p", "gate_browsers"]
+    for engine_name in engines:
+        base_command.extend(["--browser", engine_name])
+
+    if workers == "0":
+        command = list(base_command)
+        if selection:
+            command.extend(["-m", selection])
+        return [("pytest (tests)", command)]
+
+    parallel_command = [*base_command, "-n", workers, "--dist", "worksteal"]
+    parallel_command.extend(["-m", join_marks(selection, "not serial")])
+    serial_command = [*base_command, "-m", join_marks(selection, "serial")]
+    return [
+        ("pytest (tests, parallel)", parallel_command),
+        ("pytest (tests, serial)", serial_command),
+    ]
 
 
 def main() -> int:
@@ -237,13 +413,22 @@ def main() -> int:
     arguments = parse_arguments()
 
     results: list[bool] = []
-    for step_name, command in STATIC_STEPS:
-        results.append(run_step(step_name, command))
-    results.append(check_traceability())
+    run_static = not arguments.skip_static or arguments.stage == "tests"
+    if run_static:
+        for step_name, command in STATIC_STEPS:
+            results.append(run_step(step_name, command))
+        results.append(check_traceability())
 
     if arguments.stage == "full":
-        for step_name, command in RUNTIME_STEPS:
-            results.append(run_step(step_name, command))
+        if run_static:
+            for step_name, command in RUNTIME_STATIC_STEPS:
+                results.append(run_step(step_name, command))
+        build_name, build_command = BUILD_STEP
+        results.append(run_step(build_name, build_command))
+        if results[-1]:
+            selection = TEST_SELECTIONS[arguments.tests]
+            commands = pytest_commands(arguments.browsers, selection, arguments.workers)
+            results.append(run_pytest_passes(commands))
 
     failed_count = results.count(False)
     print()

@@ -17,7 +17,10 @@ Everything runs through uv. Do not use `pip` or a bare `python`.
 | Install or update the environment | `uv sync` |
 | Full quality gate (same as CI) | `uv run python scripts/gate.py` |
 | Gate while the code does not exist yet | `uv run python scripts/gate.py --stage tests` |
-| Tests only | `uv run pytest` |
+| Gate with the browser tests in all three engines | `uv run python scripts/gate.py --browsers all` |
+| Gate, one engine's browser tests only (a CI job) | `uv run python scripts/gate.py --skip-static --tests browser --browsers firefox` |
+| Gate, static checks and tests without a browser | `uv run python scripts/gate.py --tests other` |
+| Tests only (browser tests in Chromium) | `uv run pytest` |
 | Fix formatting | `uv run black .` |
 | Fix lint findings | `uv run ruff check --fix .` |
 | Type check | `uv run pyrefly check` |
@@ -64,7 +67,13 @@ write the implementation before its tests exist.
   contradiction, a missing rule). It keeps the status and adds a dated note next
   to each change; the tests follow before the code. Only a human sets `approved`.
 - The gate leaves out the tests of a browser engine that is not installed, with a
-  warning (`scripts/gate_browsers.py`); CI still runs all three engines.
+  warning (`scripts/gate_browsers.py`); CI still runs all three engines, one job
+  per engine and system.
+- The gate runs the tests in parallel (pytest-xdist), then the timing-sensitive
+  files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) on their own.
+  A test file that measures time or pace goes in that list.
+- The gate's engines come from `--browsers` or the `NOCK_BROWSERS` environment
+  variable (default `chromium,webkit`).
 
 ## Who may write what
 
