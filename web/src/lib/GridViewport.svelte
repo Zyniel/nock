@@ -19,6 +19,7 @@
   import type { Position, Selection, Word } from './wordSelection'
   import type { RemoteSelection } from './remoteSelections'
   import type { ClueFlagMarker } from './clueFlags'
+  import type { ClueReactionMarker } from './chat'
 
   interface Finger {
     clientX: number
@@ -42,6 +43,7 @@
     isAuthorsViewOn,
     playerColours,
     clueFlags,
+    clueReactions,
   }: {
     grid: GridView
     words: Word[]
@@ -65,6 +67,9 @@
     // The marker of each flagged clue, by clue key "row,column,clue_index"
     // (spec 021). A clue nobody flagged has no entry.
     clueFlags: Map<string, ClueFlagMarker>
+    // The reaction each clue shows, by clue key "row,column,clue_index" (spec
+    // 022). A clue that shows no reaction has no entry.
+    clueReactions: Map<string, ClueReactionMarker>
   } = $props()
 
   // The step between two outlines on one cell, and the most the stack may take
@@ -598,6 +603,7 @@
             >
               {#each cell.clues as clue, index (index)}
                 {@const flagMarker = clueFlags.get(`${cell.row},${cell.column},${index}`)}
+                {@const reactionMarker = clueReactions.get(`${cell.row},${cell.column},${index}`)}
                 {#if index === 1}
                   <div class="separator" data-testid="clue-separator"></div>
                 {/if}
@@ -633,6 +639,22 @@
                       >{t('flag.marker_label', { names: flagMarker.names })}</span
                     >
                   {/if}
+                  {#if reactionMarker !== undefined}
+                    <!-- Drawn over the middle of its clue: it takes no room from
+                         the clue text (spec 022). -->
+                    <span
+                      class="clue-reaction"
+                      class:first={cell.clues.length === 2 && index === 0}
+                      class:second={index === 1}
+                      data-testid="clue-reaction"
+                      data-reaction={reactionMarker.reaction}
+                      data-player-id={reactionMarker.playerId}
+                      aria-hidden="true">{reactionMarker.text}</span
+                    >
+                    <span class="visually-hidden" data-testid="clue-reaction-label"
+                      >{reactionMarker.label}</span
+                    >
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -665,11 +687,15 @@
 <div class="visually-hidden" id="grid-hint" data-testid="grid-hint">{t('a11y.grid_hint')}</div>
 
 <style>
+  /* A stacking context of its own (isolation), so the z-index of a reaction
+     below orders it inside the grid only, and never against the rest of the
+     page (the vote banner, the chat panel). */
   .viewport {
     width: 100%;
     flex: 1 1 0;
     min-height: 0;
     overflow: auto;
+    isolation: isolate;
     /* The app handles touch pan and pinch itself. */
     touch-action: none;
     scrollbar-width: none;
@@ -989,6 +1015,36 @@
 
   .clue-flag.second {
     top: calc(var(--cell) * 0.46);
+  }
+
+  /* A shown reaction (spec 022), centred on its clue: the middle of the cell
+     for a lone clue, the middle of its half for one of two. Positioned against
+     the clue cell, so it adds no layout, and above the cells around it, since
+     it may reach past the cell's edges. Its opaque background keeps the emoji
+     readable over the clue text. A tap goes through it to its clue. */
+  .clue-reaction {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0.1em 0.2em;
+    font-size: max(12px, calc(var(--cell) * 0.3));
+    line-height: 1;
+    white-space: nowrap;
+    color: #1f2330;
+    background: #ffffff;
+    border: 1px solid #5b6070;
+    border-radius: 0.3em;
+    pointer-events: none;
+  }
+
+  .clue-reaction.first {
+    top: 25%;
+  }
+
+  .clue-reaction.second {
+    top: 75%;
   }
 
   .separator {

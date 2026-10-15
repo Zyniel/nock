@@ -13,8 +13,9 @@ export interface FeedItem {
   text: string
 }
 
-// The nickname of a player known to the page, even one who left.
-function nameOf(names: Map<string, string>, playerId: unknown): string {
+// The nickname of a player known to the page, even one who left; "Quelqu'un"
+// for a player the page never knew.
+export function nameOf(names: Map<string, string>, playerId: unknown): string {
   const name = typeof playerId === 'string' ? names.get(playerId) : undefined
   return name ?? t('feed.someone')
 }

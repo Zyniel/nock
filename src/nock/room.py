@@ -20,6 +20,7 @@ from nock.protocol import (
     CellTarget,
     CellView,
     ChangeSettings,
+    Chat,
     ChatMessage,
     Check,
     CheckResult,
@@ -60,6 +61,8 @@ from nock.protocol import (
     PlayerStateChanged,
     PlayerView,
     Pong,
+    React,
+    ReactionShown,
     RemovePlayer,
     ResumeToken,
     Reveal,
@@ -142,6 +145,10 @@ class RoomConfig(RoomModel):
     # spec 036 AC-6: inputs of a connection that may wait to be applied
     max_inbound_pending: int = Field(default=100, ge=1)
     vote_timeout_seconds: int = Field(default=20, ge=1)  # spec 025 AC-2
+    chat_limit: int = Field(default=5, ge=1)  # spec 022: chat messages per window
+    chat_window_seconds: float = Field(default=10.0, gt=0)
+    reaction_limit: int = Field(default=5, ge=1)  # spec 022: reactions per window
+    reaction_window_seconds: float = Field(default=10.0, gt=0)
 
 
 DEFAULT_CONFIG: RoomConfig = RoomConfig()
@@ -194,6 +201,10 @@ class PlayerRecord(RoomModel):
     recent_edits: tuple[float, ...] = ()
     last_edit: UndoEntry | None = None  # spec 018 AC-3
     flag: ClueRef | None = None  # spec 021: the clue this player flagged
+    # spec 022: times of the chat messages accepted in the window (not logged)
+    recent_chat: tuple[float, ...] = ()
+    # spec 022: times of the reactions relayed in the window (not logged)
+    recent_reactions: tuple[float, ...] = ()
 
 
 class OpenVote(RoomModel):
@@ -227,6 +238,7 @@ class RoomState(RoomModel):
     open_vote: OpenVote | None = None  # spec 025
     # spec 025: vote_id of the last vote opened, 0 for none
     last_vote_id: int = Field(default=0, ge=0, strict=True)
+    chat: tuple[ChatMessage, ...] = ()  # spec 022: every chat message, in seq order
 
 
 class LogEntry(RoomModel):
@@ -252,8 +264,8 @@ class Outcome(RoomModel):
     state: RoomState
     entries: tuple[LogEntry, ...] = ()  # numbered events, in seq order
     reply: tuple[ServerMessage, ...] = ()  # to the sender's connection only
-    # to every joined connection except the sender's
-    to_others: tuple[SelectionMoved, ...] = ()
+    # to every joined connection except the sender's and the item's own player's
+    to_others: tuple[SelectionMoved | ReactionShown, ...] = ()
     close_sender: StrictBool = False  # close the sender's socket, code 1000
     disconnects: tuple[Disconnect, ...] = ()
 
@@ -389,7 +401,8 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
 
     Returns:
         The snapshot, with the player's own resume token. Its `open_vote` is the
-        event that opened the room's open vote, None when no vote is open.
+        event that opened the room's open vote, None when no vote is open, and
+        its `chat` is the room's whole chat history (spec 022).
 
     Raises:
         KeyError: no player `player_id` in the room.
@@ -408,7 +421,7 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 settings=state.settings,
                 reveal_budget=state.reveal_budget,
                 flags=_flag_views(state),
-                chat=(),
+                chat=state.chat,
                 open_vote=open_vote,
                 timer_elapsed_ms=0,
                 timer_running=False,
@@ -722,8 +735,10 @@ def handle_message(
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
     `select_cell`, edits (`edit_letter`, `erase`, `pencil_edit`,
     `confirm_pencil`), `undo` and the host actions (`remove_player`,
-    `lock_room`, `change_settings`, `mute_player`), `check`, `reveal`, `vote`
-    and `flag` (input, not rate-limited) have their rules here. Before a
+    `lock_room`, `change_settings`, `mute_player`), `check`, `reveal`, `vote`,
+    `flag`, `chat` and `react` (input, not counted by the edit limit) have
+    their rules here. A `chat` or a `react` over its own limit (spec 022) is
+    dropped without an answer; an idle sender is still woken. Before a
     `check`, a `reveal` or a `vote`, an open vote whose time is over closes,
     with its entry after the wake-up entry (spec 025). A step that changes a
     letter or a lock clears every flag whose word is now full (spec 021),
@@ -802,7 +817,77 @@ def _run_message(
         return _host_action(state, player_id, message, now)
     if isinstance(message, Flag):
         return _flag(state, player_id, message.clue, now)
+    if isinstance(message, Chat):
+        return _chat(state, player_id, message.text, now, config)
+    if isinstance(message, React):
+        return _react(state, player_id, message, now, config)
     return Outcome(state=state)
+
+
+def _times_in_window(
+    times: tuple[float, ...], now: float, window_seconds: float
+) -> tuple[float, ...]:
+    """Return the times `t` with `t > now - window_seconds`, in their order."""
+    recent: list[float] = []
+    for past_time in times:
+        if past_time > now - window_seconds:
+            recent.append(past_time)
+    return tuple(recent)
+
+
+def _chat(
+    state: RoomState, player_id: str, text: str, now: float, config: RoomConfig
+) -> Outcome:
+    """Refuse, drop or number a chat message; the first case that applies decides.
+
+    A muted sender is refused with muted. A sender who already sent
+    `config.chat_limit` messages in the window is dropped: nothing changes and
+    nothing is sent. Otherwise one chat_message is numbered and added to the
+    room's chat (spec 022).
+    """
+    player = _find_player(state, player_id)
+    if player is None:
+        return Outcome(state=state)
+    if player.muted:
+        return _refuse(state, ErrorCode.MUTED, "The host muted your chat.")
+    recent = _times_in_window(player.recent_chat, now, config.chat_window_seconds)
+    if len(recent) >= config.chat_limit:
+        return Outcome(state=state)
+    counted = player.model_copy(update={"recent_chat": (*recent, now)})
+    counted_state = _replace_player(state, counted)
+    event = ChatMessage(seq=state.seq + 1, player_id=player_id, text=text)
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=replay(counted_state, entry), entries=(entry,))
+
+
+def _react(
+    state: RoomState, player_id: str, message: React, now: float, config: RoomConfig
+) -> Outcome:
+    """Relay a reaction to every player, or drop it without an answer.
+
+    It is dropped when the sender is muted, when its clue names no word, or
+    when the sender already sent `config.reaction_limit` reactions in the
+    window. A relayed reaction has no seq and is never logged (spec 022).
+    """
+    player = _find_player(state, player_id)
+    if player is None or player.muted:
+        return Outcome(state=state)
+    if _word_cells_of_clue(state, message.clue) is None:
+        return Outcome(state=state)
+    recent = _times_in_window(
+        player.recent_reactions, now, config.reaction_window_seconds
+    )
+    if len(recent) >= config.reaction_limit:
+        return Outcome(state=state)
+    counted = player.model_copy(update={"recent_reactions": (*recent, now)})
+    reaction_shown = ReactionShown(
+        player_id=player_id, clue=message.clue, reaction=message.reaction
+    )
+    return Outcome(
+        state=_replace_player(state, counted),
+        reply=(reaction_shown,),
+        to_others=(reaction_shown,),
+    )
 
 
 def _flag(
@@ -1787,7 +1872,7 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     current = state
     entries: list[LogEntry] = []
     disconnects: list[Disconnect] = []
-    to_others: list[SelectionMoved] = []
+    to_others: list[SelectionMoved | ReactionShown] = []
     for listed in state.players:
         player = _find_player(current, listed.player_id)
         if player is None:
@@ -1912,6 +1997,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = state.model_copy(update={"open_vote": None})
     elif isinstance(event, FlagChanged):
         replayed = _replay_flag_changed(state, event)
+    elif isinstance(event, ChatMessage):
+        replayed = state.model_copy(update={"chat": (*state.chat, event)})
     else:
         replayed = state
     return replayed.model_copy(update={"seq": event.seq})

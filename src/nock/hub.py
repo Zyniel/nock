@@ -614,12 +614,12 @@ class _RoomRunner:
             for message in outcome.reply:
                 sender.deliver_text(message.model_dump_json())
 
-        for moved in outcome.to_others:
-            moved_text = moved.model_dump_json()
+        for item in outcome.to_others:
+            item_text = item.model_dump_json()
             for connection in joined:
-                if connection is sender or connection.player_id == moved.player_id:
-                    continue  # a selection is never sent to its own player
-                connection.deliver_text(moved_text)
+                if connection is sender or connection.player_id == item.player_id:
+                    continue  # never sent to its own player (spec 011 step 4)
+                connection.deliver_text(item_text)
 
         for disconnect in outcome.disconnects:
             targets = []

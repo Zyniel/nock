@@ -136,6 +136,26 @@ export interface FlagView {
   clue: ClueRefView
 }
 
+// One chat message of the room (spec 022).
+export interface ChatLine {
+  seq: number
+  player_id: string
+  text: string
+}
+
+// The five reactions, in the order of spec 039's `Reaction` (spec 022).
+export type ReactionValue = 'thumbs_up' | 'clap' | 'laugh' | 'wow' | 'thinking'
+
+export const REACTION_VALUES: ReactionValue[] = ['thumbs_up', 'clap', 'laugh', 'wow', 'thinking']
+
+// A reaction shown on a clue of the grid, for REACTION_MS from its arrival.
+export interface ShownReaction {
+  id: number
+  player_id: string
+  clue: ClueRefView
+  reaction: ReactionValue
+}
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
@@ -152,6 +172,8 @@ export interface Snapshot {
   open_vote: VoteView | null
   // The flags of the room, one per flagging player (spec 021).
   flags: FlagView[]
+  // The chat history of the room, in seq order (spec 022).
+  chat: ChatLine[]
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -193,6 +215,10 @@ export interface RoomSession {
   votedIds: number[]
   // The vote that closed last, and how, shown for VOTE_RESULT_MS.
   closedVote: { vote_id: number; outcome: VoteOutcome } | null
+  // The reactions shown on clues, at most one per clue (spec 022).
+  reactions: ShownReaction[]
+  // The id given to the next shown reaction.
+  nextReactionId: number
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -204,6 +230,9 @@ export interface CellFlash {
 }
 
 export const FLASH_MS = 1000
+
+// How long a reaction shows on its clue (spec 022).
+export const REACTION_MS = 3000
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
 export const THROTTLED_CLOSE_CODE = 4429
@@ -238,6 +267,8 @@ export function newSession(): RoomSession {
     names: new Map(),
     votedIds: [],
     closedVote: null,
+    reactions: [],
+    nextReactionId: 1,
   }
 }
 
@@ -570,6 +601,51 @@ function applyFlagChanged(snapshot: Snapshot, event: RoomEvent): void {
   }
 }
 
+// The chat lines of a snapshot. A line that is not an object with an integer
+// seq and a string player_id and text is skipped (spec 022).
+function toChat(value: unknown): ChatLine[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const lines: ChatLine[] = []
+  for (const item of value) {
+    const line = toChatLine(item)
+    if (line !== null) {
+      lines.push(line)
+    }
+  }
+  return lines
+}
+
+// Returns null when the value is not a chat line of the protocol.
+function toChatLine(value: unknown): ChatLine | null {
+  const line = value as Record<string, unknown> | null
+  if (typeof line !== 'object' || line === null) {
+    return null
+  }
+  const { seq, player_id, text } = line
+  if (typeof seq !== 'number' || !Number.isInteger(seq)) {
+    return null
+  }
+  if (typeof player_id !== 'string' || typeof text !== 'string') {
+    return null
+  }
+  return { seq, player_id, text }
+}
+
+// A chat_message adds its line at the end of the history, unless a line with
+// its seq is already there (spec 022).
+function applyChatMessage(snapshot: Snapshot, event: RoomEvent): void {
+  const line = toChatLine(event.message)
+  if (line === null) {
+    return
+  }
+  const isKnown = snapshot.chat.some((kept) => kept.seq === line.seq)
+  if (!isKnown) {
+    snapshot.chat.push(line)
+  }
+}
+
 function toPlayers(value: unknown): PlayerView[] | null {
   if (!Array.isArray(value)) {
     return null
@@ -613,6 +689,7 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     solved: message.solved === true,
     open_vote: toVoteView(message.open_vote),
     flags: toFlags(message.flags),
+    chat: toChat(message.chat),
   }
 }
 
@@ -831,6 +908,9 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   if (event.type === 'flag_changed' && session.snapshot !== null) {
     applyFlagChanged(session.snapshot, event)
   }
+  if (event.type === 'chat_message' && session.snapshot !== null) {
+    applyChatMessage(session.snapshot, event)
+  }
   if (event.type === 'grid_solved') {
     session.solved = true
   }
@@ -904,6 +984,10 @@ export function receiveFrame(session: RoomSession, text: string): void {
     receiveSelectionMoved(session, message)
     return
   }
+  if (message.type === 'reaction') {
+    receiveReaction(session, message)
+    return
+  }
   const event = toEvent(message)
   if (event !== null) {
     receiveEvent(session, event)
@@ -921,6 +1005,47 @@ function receiveSelectionMoved(session: RoomSession, message: Record<string, unk
       player.selection = toSelection(message.selection)
     }
   }
+}
+
+// True when the clue reference names a clue of the grid.
+function isClueOfGrid(grid: GridView, clue: ClueRefView): boolean {
+  for (const cell of grid.cells) {
+    if (cell.type === 'clue' && cell.row === clue.row && cell.column === clue.column) {
+      return clue.clue_index >= 0 && clue.clue_index < cell.clues.length
+    }
+  }
+  return false
+}
+
+// A reaction has no seq: it is shown at once, once the page has a snapshot, and
+// only on a clue of the grid. A newer reaction on the same clue replaces the
+// older one, so a clue shows at most one (spec 022).
+function receiveReaction(session: RoomSession, message: Record<string, unknown>): void {
+  if (session.snapshot === null || typeof message.player_id !== 'string') {
+    return
+  }
+  const clue = toClueRef(message.clue)
+  const reaction = REACTION_VALUES.find((value) => value === message.reaction)
+  if (clue === null || reaction === undefined) {
+    return
+  }
+  if (!isClueOfGrid(session.snapshot.grid, clue)) {
+    return
+  }
+  const others = session.reactions.filter(
+    (shown) =>
+      shown.clue.row !== clue.row ||
+      shown.clue.column !== clue.column ||
+      shown.clue.clue_index !== clue.clue_index,
+  )
+  others.push({ id: session.nextReactionId, player_id: message.player_id, clue, reaction })
+  session.nextReactionId += 1
+  session.reactions = others
+}
+
+// Stop showing a reaction: used when its REACTION_MS are over.
+export function endReaction(session: RoomSession, reactionId: number): void {
+  session.reactions = session.reactions.filter((shown) => shown.id !== reactionId)
 }
 
 // The errors that answer one edit (spec 015): each removes the oldest pending edit.

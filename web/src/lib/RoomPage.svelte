@@ -3,7 +3,18 @@
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import { t } from './i18n'
+  import { nameOf } from './activityFeed'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
+  import {
+    chatToggleLabel,
+    clueReactionMarkers,
+    isPaced,
+    msUntilNextExpiry,
+    sendsInWindow,
+    shownChatLines,
+    unreadBadgeText,
+    unreadCount,
+  } from './chat'
   import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
@@ -14,18 +25,28 @@
     keepFeedEndOnResize,
     keepFeedPlace,
     noteFeedPlace,
+    scrollToEnd,
     watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
-  import type { LetterCellView, PendingEdit, Snapshot, VoteView } from './roomSession'
+  import type {
+    LetterCellView,
+    PendingEdit,
+    ReactionValue,
+    Snapshot,
+    VoteView,
+  } from './roomSession'
   import {
     EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
     PING_INTERVAL_MS,
+    REACTION_MS,
+    REACTION_VALUES,
     SILENCE_LIMIT_MS,
     VOTE_RESULT_MS,
     addPendingEdit,
     endFlash,
+    endReaction,
     gridLabel,
     isFinalClose,
     newSession,
@@ -56,6 +77,13 @@
   // The remove buttons are compact in a roster list narrower than this many root
   // font sizes (spec 014 AC-9).
   const COMPACT_REMOVE_BELOW_ROOT_FONTS = 4.5
+  // The space between the header and the chat panel or the reaction picker.
+  const POPOVER_GAP_PX = 4
+  // The reaction picker and the chat panel sit side by side on a page at least
+  // this many root font sizes wide: the picker (10.25rem and its border), the
+  // panel (22rem) and three gaps of 0.5rem. On a narrower page the picker sits
+  // above the panel (spec 022 decision 15).
+  const SIDE_BY_SIDE_MIN_ROOT_FONTS = 34
 
   let { code }: { code: string } = $props()
 
@@ -280,6 +308,7 @@
     return () => {
       clearTimeout(copiedTimer)
       clearTimeout(undoMessageTimer)
+      clearTimeout(pacingTimer)
     }
   })
 
@@ -897,6 +926,319 @@
     })
   }
 
+  // ---- Chat and reactions (spec 022) ----
+
+  // The chat panel and the reaction picker are drawn over the page, just below
+  // the header, so opening them moves nothing. `popoverTop` is that place, from
+  // the top of the page.
+  let roomMain: HTMLElement | null = $state(null)
+  let roomHeader: HTMLElement | null = $state(null)
+  let popoverTop = $state(0)
+  let isPopoverSideBySide = $state(true)
+
+  function updatePopoverPlace(): void {
+    if (roomMain === null || roomHeader === null) {
+      return
+    }
+    const mainBox = roomMain.getBoundingClientRect()
+    const headerBox = roomHeader.getBoundingClientRect()
+    popoverTop = headerBox.bottom - mainBox.top + POPOVER_GAP_PX
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+    isPopoverSideBySide = roomMain.clientWidth >= SIDE_BY_SIDE_MIN_ROOT_FONTS * rootFontSize
+  }
+
+  // Measure again when the window or the header changes size (a resize, a
+  // rotation, a new root font, a toolbar that wraps).
+  $effect(() => {
+    if (roomMain === null || roomHeader === null) {
+      return
+    }
+    const observer = new ResizeObserver(updatePopoverPlace)
+    observer.observe(roomMain)
+    observer.observe(roomHeader)
+    updatePopoverPlace()
+    return () => observer.disconnect()
+  })
+
+  // Call `onEscape` when Escape is pressed while the focus is inside `element`.
+  // Returns a function that stops listening.
+  function listenForEscape(element: HTMLElement, onEscape: () => void): () => void {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onEscape()
+      }
+    }
+    element.addEventListener('keydown', onKeyDown)
+    return () => element.removeEventListener('keydown', onKeyDown)
+  }
+
+  let you = $derived(session.snapshot === null ? '' : session.snapshot.you)
+  // True while the host muted my chat and my reactions.
+  let isMuted = $derived(
+    session.snapshot !== null &&
+      session.snapshot.players.some((player) => player.player_id === you && player.muted),
+  )
+
+  // Pacing: the page sends at most 5 chat messages, and 5 reactions, in any
+  // 12 seconds. `pacingNow` is read again each time a send stops counting.
+  let chatSendTimes: number[] = $state([])
+  let reactionSendTimes: number[] = $state([])
+  let pacingNow = $state(performance.now())
+  let pacingTimer: ReturnType<typeof setTimeout> | undefined
+  let isChatPaced = $derived(isPaced(chatSendTimes, pacingNow))
+  let isReactionPaced = $derived(isPaced(reactionSendTimes, pacingNow))
+
+  // Read the clock, forget the sends that no longer count, and come back when
+  // the next one stops counting.
+  function refreshPacing(): void {
+    const now = performance.now()
+    pacingNow = now
+    chatSendTimes = sendsInWindow(chatSendTimes, now)
+    reactionSendTimes = sendsInWindow(reactionSendTimes, now)
+    clearTimeout(pacingTimer)
+    pacingTimer = undefined
+    const delay = msUntilNextExpiry([...chatSendTimes, ...reactionSendTimes], now)
+    if (delay !== null) {
+      pacingTimer = setTimeout(refreshPacing, delay)
+    }
+  }
+
+  // ---- The chat panel ----
+
+  let isChatOpen = $state(false)
+  let chatText = $state('')
+  let chatToggle: HTMLButtonElement | null = $state(null)
+  let chatPanel: HTMLElement | null = $state(null)
+  let chatInput: HTMLInputElement | null = $state(null)
+  let chatList: HTMLUListElement | null = $state(null)
+  // Lines up to this seq are read: the seq of the page's first snapshot, then
+  // the seq of the newest line while the panel is open. A reconnection keeps it,
+  // so the lines that came meanwhile count as unread. null before the first
+  // snapshot.
+  let lastSeenChatSeq: number | null = $state(null)
+
+  let chatHistory = $derived(session.snapshot === null ? [] : session.snapshot.chat)
+  let chatLines = $derived(shownChatLines(chatHistory))
+  let unreadLines = $derived(
+    isChatOpen || lastSeenChatSeq === null ? 0 : unreadCount(chatHistory, lastSeenChatSeq, you),
+  )
+  // The other players, in roster order: the host's mute buttons.
+  let otherPlayers = $derived(
+    session.snapshot === null
+      ? []
+      : session.snapshot.players.filter((player) => player.player_id !== you),
+  )
+  let isChatSendDisabled = $derived(
+    chatText.trim() === '' || session.status !== 'joined' || isMuted || isChatPaced,
+  )
+
+  // While the panel is open, every line of the history is read.
+  $effect(() => {
+    if (!isChatOpen || chatHistory.length === 0) {
+      return
+    }
+    const newestSeq = chatHistory[chatHistory.length - 1].seq
+    if (lastSeenChatSeq === null || newestSeq > lastSeenChatSeq) {
+      lastSeenChatSeq = newestSeq
+    }
+  })
+
+  function toggleChat(): void {
+    if (isChatOpen) {
+      closeChat()
+      return
+    }
+    isChatOpen = true
+    void focusChatAfterOpening()
+  }
+
+  // `tick` resolves once the panel is on the page. A muted player's input is
+  // disabled: the focus then stays on the toggle.
+  async function focusChatAfterOpening(): Promise<void> {
+    await tick()
+    if (chatInput !== null && !chatInput.disabled) {
+      chatInput.focus()
+    } else {
+      chatToggle?.focus()
+    }
+  }
+
+  function closeChat(): void {
+    isChatOpen = false
+    chatToggle?.focus()
+  }
+
+  $effect(() => {
+    if (chatPanel === null) {
+      return
+    }
+    return listenForEscape(chatPanel, closeChat)
+  })
+
+  // Send the trimmed text and empty the input. The line shows when the
+  // server's chat_message comes back: no local echo.
+  function submitChat(event: SubmitEvent): void {
+    event.preventDefault()
+    if (isChatSendDisabled) {
+      return
+    }
+    send({ type: 'chat', text: chatText.trim() })
+    chatText = ''
+    chatSendTimes = [...chatSendTimes, performance.now()]
+    refreshPacing()
+  }
+
+  // The host mutes or unmutes a player; the button follows the server's
+  // player_muted.
+  function toggleMute(playerId: string, isPlayerMuted: boolean): void {
+    send({ type: 'mute_player', player_id: playerId, muted: !isPlayerMuted })
+  }
+
+  // The chat list keeps the reader's place as the feed list does (spec 013
+  // AC-7): a new line brings the list to its newest line only if the list was
+  // at its end just before. The list starts at its newest line each time the
+  // panel opens. `chatPlaceList` is the list whose place is followed.
+  let newestChatSeq = $derived(chatLines.length === 0 ? null : chatLines[chatLines.length - 1].seq)
+  let chatPlaceList: HTMLUListElement | null = null
+  let chatPlaceBeforeNewLine: FeedPlace | null = null
+
+  // Runs before the new line is on the page: note where the list is.
+  $effect.pre(() => {
+    const newestSeq = newestChatSeq
+    const list = chatList
+    if (list === null || newestSeq === null || list !== chatPlaceList) {
+      return
+    }
+    chatPlaceBeforeNewLine = noteFeedPlace(list)
+  })
+
+  // Runs once the new line is on the page, or once the list is on the page.
+  $effect(() => {
+    const newestSeq = newestChatSeq
+    const list = chatList
+    if (list === null) {
+      chatPlaceList = null
+      return
+    }
+    if (list !== chatPlaceList) {
+      chatPlaceList = list
+      chatPlaceBeforeNewLine = null
+      scrollToEnd(list)
+      return
+    }
+    if (newestSeq === null || chatPlaceBeforeNewLine === null) {
+      return
+    }
+    keepFeedPlace(list, chatPlaceBeforeNewLine)
+    chatPlaceBeforeNewLine = null
+  })
+
+  // The chat list is a Tab stop while it scrolls (spec 035 AC-12), and at its
+  // end it stays at its end through a resize or a new root font (spec 013 AC-8).
+  $effect(() => {
+    if (chatList === null) {
+      return
+    }
+    const stopTabStop = followListTabStop(chatList)
+    const stopEndOnResize = keepFeedEndOnResize(chatList)
+    return () => {
+      stopTabStop()
+      stopEndOnResize()
+    }
+  })
+
+  // ---- The reaction button and picker ----
+
+  let isPickerOpen = $state(false)
+  let reactButton: HTMLButtonElement | null = $state(null)
+  let reactionPicker: HTMLElement | null = $state(null)
+  let isReactDisabled = $derived(activeWord === null || isMuted)
+
+  function toggleReactionPicker(): void {
+    if (isPickerOpen) {
+      closeReactionPicker()
+      return
+    }
+    isPickerOpen = true
+    void focusFirstReactionOption()
+  }
+
+  // `tick` resolves once the picker is on the page. While the reactions are
+  // paced, every option is disabled: the focus then stays on the button.
+  async function focusFirstReactionOption(): Promise<void> {
+    await tick()
+    const firstOption = reactionPicker?.querySelector('button')
+    if (firstOption instanceof HTMLButtonElement && !firstOption.disabled) {
+      firstOption.focus()
+    } else {
+      reactButton?.focus()
+    }
+  }
+
+  function closeReactionPicker(): void {
+    isPickerOpen = false
+    reactButton?.focus()
+  }
+
+  $effect(() => {
+    if (reactionPicker === null) {
+      return
+    }
+    return listenForEscape(reactionPicker, closeReactionPicker)
+  })
+
+  // React on the selected word's clue, then close the picker.
+  function sendReaction(reaction: ReactionValue): void {
+    if (activeWord !== null && !isReactionPaced) {
+      send({
+        type: 'react',
+        clue: {
+          row: activeWord.clueRow,
+          column: activeWord.clueColumn,
+          clue_index: activeWord.clueIndex,
+        },
+        reaction,
+      })
+      reactionSendTimes = [...reactionSendTimes, performance.now()]
+      refreshPacing()
+    }
+    closeReactionPicker()
+  }
+
+  // What each clue shows of the reactions. Each reaction ends REACTION_MS after
+  // it arrived; one that a newer reaction replaced is no longer in the list, so
+  // its timer finds nothing to end.
+  let clueReactions = $derived(clueReactionMarkers(session.reactions, session.names))
+  const scheduledReactions = new Set<number>()
+  const reactionTimers = new Set<ReturnType<typeof setTimeout>>()
+  $effect(() => {
+    for (const shown of session.reactions) {
+      if (scheduledReactions.has(shown.id)) {
+        continue
+      }
+      scheduledReactions.add(shown.id)
+      const timer = setTimeout(() => {
+        reactionTimers.delete(timer)
+        scheduledReactions.delete(shown.id)
+        endReaction(session, shown.id)
+      }, REACTION_MS)
+      reactionTimers.add(timer)
+    }
+  })
+
+  // A separate effect, as for the flashes: the one above re-runs with each new
+  // reaction, and its cleanup would cancel the timers of those still showing.
+  $effect(() => {
+    return () => {
+      for (const timer of reactionTimers) {
+        clearTimeout(timer)
+      }
+      reactionTimers.clear()
+      scheduledReactions.clear()
+    }
+  })
+
   // ---- Votes (spec 025) ----
 
   let openVote = $derived(session.snapshot === null ? null : session.snapshot.open_vote)
@@ -1185,6 +1527,8 @@
       if (snapshotBefore === null) {
         restoreSavedSelection(session.snapshot)
         void markInteractive()
+        // The history of the first snapshot is not unread (spec 022).
+        lastSeenChatSeq = session.snapshot.seq
       }
       reconnectAttempt = 0
       resendPendingEdits()
@@ -1229,6 +1573,8 @@
 </script>
 
 <main
+  bind:this={roomMain}
+  style:--popover-top={`${popoverTop}px`}
   data-testid="room-page"
   data-room-code={code}
   data-status={session.status}
@@ -1238,7 +1584,7 @@
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
-  <header class="room-header">
+  <header class="room-header" bind:this={roomHeader}>
     <h1>{t('room.heading', { code })}</h1>
     <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
     {#if session.snapshot !== null}
@@ -1265,6 +1611,26 @@
         onfocusout={leaveRoomToolbarFocus}
         class:keyboard-focus={roomToolbarHasKeyboardFocus}
       >
+        <!-- First in the toolbar, so its unread count shows before any sideways
+             scroll on a small window (spec 022). The count has a slot of its own
+             width, so the button keeps its size when the count goes. -->
+        <button
+          type="button"
+          class="chat-toggle"
+          data-testid="chat-toggle"
+          aria-expanded={isChatOpen}
+          aria-controls="chat-panel"
+          aria-label={chatToggleLabel(unreadLines)}
+          bind:this={chatToggle}
+          onclick={toggleChat}
+          >{t('chat.toggle')}<span class="chat-unread-slot"
+            >{#if unreadLines > 0}<span
+                class="chat-unread"
+                data-testid="chat-unread"
+                aria-hidden="true">{unreadBadgeText(unreadLines)}</span
+              >{/if}</span
+          ></button
+        >
         <div class="undo-panel">
           <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
             >{t('room.undo')}</button>
@@ -1351,6 +1717,17 @@
         >
         <button
           type="button"
+          class="react-button"
+          data-testid="react-button"
+          aria-label={t('reaction.button_label')}
+          aria-expanded={isPickerOpen}
+          aria-controls="reaction-picker"
+          disabled={isReactDisabled}
+          bind:this={reactButton}
+          onclick={toggleReactionPicker}>{t('reaction.button')}</button
+        >
+        <button
+          type="button"
           class="authors-switch"
           data-testid="authors-switch"
           aria-pressed={isAuthorsViewOn}
@@ -1365,6 +1742,116 @@
       </div>
     {/if}
   </header>
+  <!-- The reaction picker and the chat panel come right after the toolbar in
+       document order, outside it (its sideways scrolling would clip them), and
+       are drawn over the page (spec 022). -->
+  {#if session.snapshot !== null && isPickerOpen}
+    <div
+      class="reaction-picker"
+      id="reaction-picker"
+      data-testid="reaction-picker"
+      role="group"
+      aria-label={t('reaction.picker_label')}
+      bind:this={reactionPicker}
+    >
+      {#each REACTION_VALUES as reaction (reaction)}
+        <button
+          type="button"
+          class="reaction-option"
+          data-testid="reaction-option"
+          data-reaction={reaction}
+          aria-label={t(`reaction.${reaction}_label`)}
+          disabled={isReactionPaced}
+          onclick={() => sendReaction(reaction)}>{t(`reaction.${reaction}`)}</button
+        >
+      {/each}
+    </div>
+  {/if}
+  {#if session.snapshot !== null && isChatOpen}
+    <section
+      class="chat-panel"
+      class:below-picker={!isPopoverSideBySide}
+      id="chat-panel"
+      data-testid="chat-panel"
+      aria-labelledby="chat-heading"
+      bind:this={chatPanel}
+    >
+      <h2 id="chat-heading">{t('chat.heading')}</h2>
+      <!-- The tabindex is set from the script (spec 035 AC-12). -->
+      <ul
+        class="chat-list"
+        data-testid="chat-list"
+        role="list"
+        aria-labelledby="chat-heading"
+        bind:this={chatList}
+      >
+        {#each chatLines as line (line.seq)}
+          <li
+            data-testid="chat-message"
+            data-seq={String(line.seq)}
+            data-player-id={line.player_id}
+            data-you={String(line.player_id === you)}
+          >
+            <span class="chat-author" data-testid="chat-author"
+              >{nameOf(session.names, line.player_id)}</span
+            ><span class="chat-text" data-testid="chat-text">{line.text}</span>
+          </li>
+        {/each}
+      </ul>
+      {#if isHost}
+        <section
+          class="chat-moderation"
+          data-testid="chat-moderation"
+          aria-labelledby="chat-moderation-heading"
+        >
+          <h3 id="chat-moderation-heading">{t('chat.moderation_heading')}</h3>
+          <div class="mute-rows">
+            {#each otherPlayers as player (player.player_id)}
+              <div class="mute-row" data-testid="mute-row" data-player-id={player.player_id}>
+                <span data-testid="mute-name">{player.nickname}</span>
+                <button
+                  type="button"
+                  class="mute-player"
+                  data-testid="mute-player"
+                  data-muted={String(player.muted)}
+                  aria-label={player.muted
+                    ? t('chat.unmute_label', { name: player.nickname })
+                    : t('chat.mute_label', { name: player.nickname })}
+                  onclick={() => toggleMute(player.player_id, player.muted)}
+                  >{player.muted ? t('chat.unmute') : t('chat.mute')}</button
+                >
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
+      <form class="chat-form" onsubmit={submitChat}>
+        <label class="visually-hidden" for="chat-input">{t('chat.input_label')}</label>
+        <input
+          id="chat-input"
+          data-testid="chat-input"
+          type="text"
+          maxlength="280"
+          autocomplete="off"
+          placeholder={t('chat.placeholder')}
+          disabled={isMuted}
+          bind:value={chatText}
+          bind:this={chatInput}
+        />
+        <button
+          type="submit"
+          class="chat-send"
+          data-testid="chat-send"
+          disabled={isChatSendDisabled}>{t('chat.send')}</button
+        >
+      </form>
+      {#if isMuted}
+        <p class="chat-note" data-testid="chat-muted">{t('chat.muted')}</p>
+      {:else if isChatPaced}
+        <p class="chat-note" data-testid="chat-wait">{t('chat.wait')}</p>
+      {/if}
+    </section>
+  {/if}
   {#if session.status === 'reconnecting'}
     <p class="connection-banner" data-testid="connection-banner" role="status">
       {t('room.banner.offline')}
@@ -1578,6 +2065,7 @@
         {isAuthorsViewOn}
         {playerColours}
         {clueFlags}
+        {clueReactions}
       />
     </div>
     <!-- The completion status line. The page shows it in one of two places,
@@ -1621,7 +2109,9 @@
 
 <style>
   /* The page fills the window; the grid viewport takes the height left. */
+  /* Positioned: the chat panel and the reaction picker are placed against it. */
   main {
+    position: relative;
     box-sizing: border-box;
     /* Little padding: the clue bar and the grid need the height. */
     padding: 0.5rem 1rem;
@@ -1743,6 +2233,183 @@
     box-sizing: border-box;
     min-width: 24px;
     min-height: 24px;
+  }
+
+  /* The chat toggle and the reaction button (spec 022): the same target size
+     as the flag button. */
+  .chat-toggle,
+  .react-button {
+    flex: none;
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  /* Room for the unread count, kept whether the count shows or not, so that
+     the button and the toolbar keep their size when the panel opens. */
+  .chat-unread-slot {
+    display: inline-block;
+    width: 2.4em;
+    text-align: center;
+  }
+
+  .chat-unread {
+    display: inline-block;
+    padding: 0.15em 0.3em;
+    border-radius: 1em;
+    font-size: 0.8em;
+    line-height: 1;
+    color: #ffffff;
+    background: #a4161a;
+  }
+
+  /* The reaction picker and the chat panel are drawn over the page below the
+     header, like the vote banner: absolutely placed, so they move nothing. The
+     vote banner comes later in the document with the same z-index, so it is
+     drawn over them and its buttons always stay uncovered. */
+  .reaction-picker,
+  .chat-panel {
+    position: absolute;
+    z-index: 1;
+    box-sizing: border-box;
+    top: var(--popover-top);
+    background: #ffffff;
+    border: 1px solid #5b6070;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+  }
+
+  /* One row of five options at the left: 2.25rem and its border high. */
+  .reaction-picker {
+    left: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+
+  .reaction-picker .reaction-option {
+    box-sizing: border-box;
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  /* At the right, as wide as the room allows up to 22rem, and never past the
+     bottom of the window: the list gives up its height first. */
+  .chat-panel {
+    /* The picker's height and the gap under it. */
+    --picker-row: calc(2.5rem + 2px);
+    right: 0.5rem;
+    width: min(22rem, 100% - 1rem);
+    max-height: calc(100% - var(--popover-top) - 0.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  /* On a narrow page the picker's row stays free above the panel, whether the
+     picker is open or not, so the two never overlap and the panel does not move
+     when the picker opens (spec 022 decision 15). */
+  .chat-panel.below-picker {
+    top: calc(var(--popover-top) + var(--picker-row));
+    max-height: calc(100% - var(--popover-top) - var(--picker-row) - 0.5rem);
+  }
+
+  .chat-panel h2 {
+    flex: none;
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  /* About seven lines; the older ones scroll (spec 022 AC-11). The page keeps
+     the reader's place itself, as for the feed: no scroll anchoring. Room is
+     left around it for its focus outline, drawn outside (spec 035 AC-2). */
+  .chat-list {
+    flex: 0 1 auto;
+    height: 9rem;
+    min-height: 2.75rem;
+    overflow-y: auto;
+    overflow-anchor: none;
+    overflow-wrap: anywhere;
+    margin: 0.25rem 0;
+    padding: 0 0.25rem;
+    list-style: none;
+    line-height: 1.3;
+  }
+
+  .chat-author {
+    margin-right: 0.4em;
+    font-weight: bold;
+  }
+
+  /* The host's mute buttons. On a low window they give up height after the
+     list, and scroll; the focus outline is then drawn inside the buttons. */
+  .chat-moderation {
+    flex: 0 1 auto;
+    min-height: 2rem;
+    overflow-y: auto;
+  }
+
+  .chat-moderation h3 {
+    margin: 0 0 0.25rem;
+    font-size: 0.875rem;
+  }
+
+  .chat-moderation :focus-visible {
+    outline-offset: -3px;
+  }
+
+  .mute-rows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .mute-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .mute-player {
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 0.4rem;
+    font-size: 0.8rem;
+  }
+
+  .chat-form {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .chat-form input {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+    min-height: 28px;
+    font: inherit;
+  }
+
+  .chat-send {
+    flex: none;
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 28px;
+  }
+
+  .chat-note {
+    flex: none;
+    margin: 0;
+    font-size: 0.8rem;
+    color: #4a4f5c;
   }
 
   .host-panel-more,
