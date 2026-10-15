@@ -68,6 +68,21 @@
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
+  // A low window (at most 500 px high, a phone on its side), the same breakpoint
+  // as the styles below. There the completion status sits in the clue bar's row,
+  // so that it takes no height from the grid (spec 026 AC-10). It follows a
+  // resize or a rotation.
+  const lowWindowQuery = window.matchMedia('(max-height: 500px)')
+  let isLowWindow = $state(lowWindowQuery.matches)
+
+  $effect(() => {
+    const onChange = (): void => {
+      isLowWindow = lowWindowQuery.matches
+    }
+    lowWindowQuery.addEventListener('change', onChange)
+    return () => lowWindowQuery.removeEventListener('change', onChange)
+  })
+
   // The host panel scrolls sideways on a small window. An edge fade says so
   // without depending on the scrollbar, which some engines hide. Svelte sets
   // the element back to null when the panel goes (the host role moved away).
@@ -411,6 +426,10 @@
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
   let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
+  // Where the status shows: in the clue bar's row on a low window, under the clue
+  // bar otherwise (spec 026 AC-10).
+  let isStatusInClueBar = $derived(gridStatus !== null && isLowWindow)
+  let isStatusUnderClueBar = $derived(gridStatus !== null && !isLowWindow)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
   // The settings form shows the settings of the room; it follows each change.
@@ -1248,8 +1267,16 @@
       flashes={session.flashes}
       {remoteSelections}
     />
+    <!-- The completion status line. The page shows it in one of two places,
+         never both: see isStatusInClueBar and isStatusUnderClueBar. -->
+    {#snippet gridStatusLine()}
+      <p class="grid-status" data-testid="grid-status" data-state={gridStatus} role="status">
+        {gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
+      </p>
+    {/snippet}
     <div
       class="clue-bar"
+      class:with-status={isStatusInClueBar}
       data-testid="clue-bar"
       data-word={activeWord === null ? '' : wordKey(activeWord)}
       role="region"
@@ -1258,11 +1285,12 @@
       <span class="clue-bar-text" data-testid="clue-bar-text"
         >{activeWord === null ? t('clue_bar.empty') : activeWord.text}</span
       >
+      {#if isStatusInClueBar}
+        {@render gridStatusLine()}
+      {/if}
     </div>
-    {#if gridStatus !== null}
-      <p class="grid-status" data-testid="grid-status" data-state={gridStatus} role="status">
-        {gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
-      </p>
+    {#if isStatusUnderClueBar}
+      {@render gridStatusLine()}
     {/if}
     {#if isTouchScreen}
       <InAppKeyboard
@@ -1517,7 +1545,8 @@
     list-style: none;
   }
 
-  /* The grid state line, kept out of the scrolling area. */
+  /* The grid state line, kept out of the scrolling area: under the clue bar,
+     or in its row on a low window (below). */
   .grid-status {
     flex: none;
     margin: 0;
@@ -1538,6 +1567,34 @@
     display: block;
     font-size: 1rem;
     line-height: 1.3;
+  }
+
+  /* On a low window the completion status shares the clue bar's row and adds no
+     height (spec 026 AC-10). It keeps its whole text on one line; the clue text
+     gives up the width and ends with an ellipsis, but keeps its whole text in
+     the page, so a screen reader reads the whole clue. */
+  .clue-bar.with-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .clue-bar.with-status .clue-bar-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The same font size and line height as the clue text, so the row is no
+     higher than the clue text alone. */
+  .clue-bar .grid-status {
+    flex: none;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1.3;
+    white-space: nowrap;
   }
 
   /* A narrow or low window (a phone) keeps its height for the grid: the roster
