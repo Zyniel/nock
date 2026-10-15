@@ -89,8 +89,10 @@ spec 037's edit limit does not count it. The first case that applies decides:
 
 1. `p.muted`: refused with `ErrorMessage(code=MUTED)`.
 2. Limit: with `recent = [t for t in p.recent_chat if t > now - config.chat_window_seconds]`,
-   when `len(recent) >= config.chat_limit`, the message is dropped: no entry and no
-   reply.
+   when `len(recent) >= config.chat_limit`, the message is dropped: no entry of its
+   own and no reply (an idle sender is first woken by spec 013's entry, which a drop
+   does not undo). (Note from the lead, 2026-10-15: an idle sender is woken even
+   when its message is refused, as spec 013's input rule and the code do.)
 3. Otherwise, with `seq` the next seq: `p.recent_chat = (*recent, now)`,
    `state.chat` gains `ChatMessage(seq=seq, player_id=p, text=text)` at its end,
    and that message is the step's one entry, delivered to every joined connection,
@@ -98,18 +100,23 @@ spec 037's edit limit does not count it. The first case that applies decides:
 
 The text is the protocol's trimmed text (spec 039), stored and sent unchanged: no
 escaping and no filter on the server (spec 037 AC-4 escapes on display). A refused
-or dropped message leaves the state as it was apart from `p`'s `last_seen_at` and
-`last_input_at`, and is not counted by the limit. Chat keeps working on a solved
-grid (spec 026).
+or dropped message leaves the state as it was apart from `p`'s `last_seen_at`,
+`last_input_at` and, if `p` was idle, their state (and the seq, which spec 013's
+wake entry raises by one), and is not counted by the limit. (Note from the lead,
+2026-10-15: an idle sender is woken even when its message is refused, as spec 013's
+input rule and the code do.) Chat keeps working on a solved grid (spec 026).
 
 ### Server rule: `React` in `nock.room.handle_message`
 
 `React(clue, reaction)` from joined player `p` is input (spec 013). A reaction is
-never answered with an error. It is dropped (no entry, no reply, nothing relayed,
-the state unchanged apart from `last_seen_at` and `last_input_at`) when `p.muted`,
-when `clue` names no word, or when, with
+never answered with an error. It is dropped (no entry of its own, no reply, nothing
+relayed, the state unchanged apart from `last_seen_at`, `last_input_at` and, if `p`
+was idle, their state; an idle sender is first woken by spec 013's entry, which a
+drop does not undo) when `p.muted`, when `clue` names no word, or when, with
 `recent = [t for t in p.recent_reactions if t > now - config.reaction_window_seconds]`,
-`len(recent) >= config.reaction_limit`.
+`len(recent) >= config.reaction_limit`. (Note from the lead, 2026-10-15: an idle
+sender is woken even when its message is refused, as spec 013's input rule and the
+code do.)
 
 Otherwise: `p.recent_reactions = (*recent, now)`, no entry (a reaction has no seq
 and is never logged), and with
