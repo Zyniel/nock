@@ -14,6 +14,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Iterator
+
+# `Any` types the readings of the flash run: they come back from the page through
+# `json_value()` as untyped JSON, with text, number, list and null values mixed.
 from typing import Any
 
 import pytest

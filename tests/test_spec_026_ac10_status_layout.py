@@ -10,11 +10,17 @@ AC-10 asks of that page:
 - at every window size of spec 006 AC-5: `grid-status` shows with the snapshot's
   `data-state` and text, and spec 013 AC-6's layout checks pass;
 - at 568 by 320 and 740 by 360 (windows at most 500 px high), also: the status
-  sits in `clue-bar`'s row and adds no height, measured against a page given
-  `FX02_EMPTY` with the same feed, tap, window and context;
+  sits in `clue-bar`'s row, `clue-bar-text` is one line (computed `text-overflow`
+  `ellipsis`, `white-space` `nowrap`, `overflow` `hidden`), and `clue-bar` is as
+  high as on a page given `FX02_EMPTY` with the same feed, tap, window and context
+  (FX-02's 31-character clue fits on one line, so "never higher" is "as high"
+  here);
 - at 568 by 320 in the touch context, also: spec 035's contrast and language
   scans find nothing;
 - at 1280 by 720: the status sits under the clue bar, inside the window.
+
+One more test covers the edge case "Low windows (AC-10)": a page resized across
+500 px moves the status to its other place, with the same text and `data-state`.
 
 The layout problems of a page are collected and reported together, so a failing
 test names every check its page misses. The mocked socket (which answers each
@@ -69,6 +75,7 @@ NewPage = Callable[[int, int, bool], Page]
 
 @pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
+    """FX-02, read from the text of `tests/fixtures/fx02.json` (spec 006)."""
     return grid_from_text(fx02_text)
 
 
@@ -78,6 +85,7 @@ def new_page(browser: Browser, browser_name: str) -> Iterator[NewPage]:
     closers: list[Callable[[], None]] = []
 
     def open_page(width: int, height: int, touch: bool) -> Page:
+        """Open a page in a fresh desktop (`touch` false) or touch context."""
         page, close = make_page(browser, browser_name, width, height, touch)
         closers.append(close)
         return page
@@ -108,6 +116,10 @@ TALL_WINDOW_SIZES = [
 ]
 DESKTOP_WINDOW = (1280, 720)
 SCAN_WINDOW = (568, 320)  # the scans run there, in the touch context
+# The edge case "Low windows (AC-10)": a page opened at 740 by 360, then resized
+# to each of these sizes in turn, across 500 px and back, then to 1 px above it.
+RESIZE_START = (740, 360)
+RESIZE_STEPS = [(740, 720), (740, 500), (740, 501)]
 CONTEXTS = ["desktop", "touch"]
 STATES = ["full_wrong", "solved"]
 STATUS_TEXT_KEYS = {
@@ -151,13 +163,41 @@ WINDOW_SCRIPT = (
 )
 WIDTHS_SCRIPT = "el => [el.scrollWidth, el.clientWidth]"
 FONT_SIZE_SCRIPT = "el => getComputedStyle(el).fontSize"
+ONE_LINE_STYLE_SCRIPT = (
+    "el => { const style = getComputedStyle(el); return {"
+    " 'text-overflow': style.textOverflow,"
+    " 'white-space': style.whiteSpace,"
+    " 'overflow': style.overflow }; }"
+)
+# The computed styles of `clue-bar-text` while the status sits in the row.
+ONE_LINE_STYLES = {
+    "text-overflow": "ellipsis",
+    "white-space": "nowrap",
+    "overflow": "hidden",
+}
 
 
 def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
+    """Name each window size for the ids of a parametrized test.
+
+    Args:
+        sizes: The window sizes, as (width, height) in CSS pixels.
+
+    Returns:
+        One id per size, such as `568x320`, in the same order.
+    """
     return [f"{width}x{height}" for width, height in sizes]
 
 
 def letter_positions_of(grid: Grid) -> set[Cell]:
+    """Find the letter cells of a grid.
+
+    Args:
+        grid: The grid to read.
+
+    Returns:
+        The (row, column) of every letter cell.
+    """
     positions: set[Cell] = set()
     for cell in grid.cells:
         if isinstance(cell, LetterCell):
@@ -201,6 +241,14 @@ def solution_of(grid: Grid) -> dict[Cell, str]:
 
 
 def clue_texts_of(grid: Grid) -> list[str]:
+    """List the clue texts of a grid (data of the test for the language scan).
+
+    Args:
+        grid: The grid to read.
+
+    Returns:
+        The text of every clue of every clue cell.
+    """
     texts: list[str] = []
     for cell in grid.cells:
         if isinstance(cell, ClueCell):
@@ -232,6 +280,15 @@ def solved_view(grid: Grid) -> GridView:
 
 
 def status_view(grid: Grid, state: str) -> GridView:
+    """Build the grid of a status snapshot.
+
+    Args:
+        grid: FX-02.
+        state: `full_wrong` or `solved`, the `data-state` the snapshot shows.
+
+    Returns:
+        The grid of `FX02_FULL_WRONG` or of `FX02_SOLVED`.
+    """
     if state == "full_wrong":
         return full_wrong_view(grid)
     return solved_view(grid)
@@ -248,6 +305,15 @@ def eight_players() -> list[PlayerView]:
 
 
 def status_snapshot_frame(view: GridView, solved: bool) -> str:
+    """Build the snapshot of "Status snapshots (AC-10)" as a frame of the socket.
+
+    Args:
+        view: The grid the snapshot holds.
+        solved: The snapshot's `solved` field.
+
+    Returns:
+        The JSON text of the snapshot: `seq` 5, `you` `p1`, the eight players.
+    """
     snapshot = Snapshot(
         seq=SNAPSHOT_SEQ,
         you="p1",
@@ -327,10 +393,20 @@ class Box(NamedTuple):
 
     @property
     def height(self) -> float:
+        """The height of the box, in CSS pixels."""
         return self.bottom - self.top
 
 
 class WindowMeasures(NamedTuple):
+    """The window's inner size and the page's scroll size, in CSS pixels.
+
+    Attributes:
+        inner_width: `window.innerWidth`.
+        inner_height: `window.innerHeight`.
+        scroll_width: `document.documentElement.scrollWidth`.
+        scroll_height: `document.documentElement.scrollHeight`.
+    """
+
     inner_width: int
     inner_height: int
     scroll_width: int
@@ -338,6 +414,17 @@ class WindowMeasures(NamedTuple):
 
 
 def box_of(page: Page, test_id: str) -> Box:
+    """Read the bounding box of the one element with a `data-testid`.
+
+    The test fails when the element is not shown, since it then has no box.
+
+    Args:
+        page: The room page.
+        test_id: The `data-testid` of the element.
+
+    Returns:
+        Its box, read with `locator.bounding_box()`.
+    """
     rect = page.get_by_test_id(test_id).bounding_box()
     if rect is None:
         pytest.fail(f"{test_id} has no box: it is not shown")
@@ -347,6 +434,14 @@ def box_of(page: Page, test_id: str) -> Box:
 
 
 def window_measures(page: Page) -> WindowMeasures:
+    """Read the window's inner size and the page's scroll size.
+
+    Args:
+        page: The room page.
+
+    Returns:
+        The four measures, in CSS pixels.
+    """
     inner_width, inner_height, scroll_width, scroll_height = page.evaluate(
         WINDOW_SCRIPT
     )
@@ -371,6 +466,15 @@ def overlaps_vertically(first: Box, second: Box) -> bool:
 
 
 def font_size_px(page: Page, test_id: str) -> float:
+    """Read the computed `font-size` of the one element with a `data-testid`.
+
+    Args:
+        page: The room page.
+        test_id: The `data-testid` of the element.
+
+    Returns:
+        The font size, in CSS pixels.
+    """
     font_size = page.get_by_test_id(test_id).evaluate(FONT_SIZE_SCRIPT)
     return float(str(font_size).removesuffix("px"))
 
@@ -407,8 +511,19 @@ def room_layout_problems(page: Page, touch: bool) -> list[str]:
     return problems
 
 
-def clue_bar_row_problems(page: Page, height_without_status: float) -> list[str]:
-    """The checks at 568 by 320 and 740 by 360: the status in the clue bar's row."""
+def in_the_clue_bar_row_problems(page: Page) -> list[str]:
+    """Check that `grid-status` sits in `clue-bar`'s row, after `clue-bar-text`.
+
+    Its box lies inside the box of `clue-bar`, its vertical range overlaps that of
+    `clue-bar-text`, and its left edge is at or right of the right edge of
+    `clue-bar-text`.
+
+    Args:
+        page: The room page, showing `grid-status`.
+
+    Returns:
+        One line per check the page misses; an empty list when it passes them all.
+    """
     problems: list[str] = []
     status = box_of(page, "grid-status")
     bar = box_of(page, "clue-bar")
@@ -424,6 +539,34 @@ def clue_bar_row_problems(page: Page, height_without_status: float) -> list[str]
             f"grid-status {status} starts left of the end of clue-bar-text "
             f"{clue_text}"
         )
+    return problems
+
+
+def one_line_problems(page: Page) -> list[str]:
+    """Check the computed styles that keep `clue-bar-text` on one line.
+
+    While the status sits in the row, `text-overflow` is `ellipsis`, `white-space`
+    is `nowrap` and `overflow` is `hidden`.
+
+    Args:
+        page: The room page, with the status in the clue bar's row.
+
+    Returns:
+        One line per style with another value; an empty list when all three match.
+    """
+    problems: list[str] = []
+    styles = page.get_by_test_id("clue-bar-text").evaluate(ONE_LINE_STYLE_SCRIPT)
+    assert isinstance(styles, dict), styles
+    for name, expected in ONE_LINE_STYLES.items():
+        found = styles.get(name)
+        if found != expected:
+            problems.append(f"clue-bar-text has {name} {found!r}, not {expected!r}")
+    return problems
+
+
+def clue_bar_row_problems(page: Page, height_without_status: float) -> list[str]:
+    """The checks at 568 by 320 and 740 by 360: the status in the clue bar's row."""
+    problems = in_the_clue_bar_row_problems(page)
     scroll_width, client_width = page.get_by_test_id("grid-status").evaluate(
         WIDTHS_SCRIPT
     )
@@ -439,6 +582,8 @@ def clue_bar_row_problems(page: Page, height_without_status: float) -> list[str]
     font_size = font_size_px(page, "clue-bar-text")
     if font_size < MIN_CLUE_FONT_PX:
         problems.append(f"clue-bar-text has a font-size of {font_size} px")
+    problems.extend(one_line_problems(page))
+    bar = box_of(page, "clue-bar")
     if abs(bar.height - height_without_status) > EPSILON:
         problems.append(
             f"clue-bar is {bar.height:.1f} px high with the status and "
@@ -448,7 +593,17 @@ def clue_bar_row_problems(page: Page, height_without_status: float) -> list[str]
 
 
 def under_the_clue_bar_problems(page: Page) -> list[str]:
-    """The checks at 1280 by 720: the status under the clue bar, in the window."""
+    """Check that `grid-status` sits under the clue bar, inside the window.
+
+    These are the checks at 1280 by 720, and those of a window taller than 500 px
+    after a resize.
+
+    Args:
+        page: The room page, showing `grid-status`.
+
+    Returns:
+        One line per check the page misses; an empty list when it passes them all.
+    """
     problems: list[str] = []
     status = box_of(page, "grid-status")
     bar = box_of(page, "clue-bar")
@@ -496,6 +651,46 @@ def clue_bar_height_without_status(
     open_status_page(page, base_url, grid_view(grid), solved=False, touch=touch)
     expect(page.get_by_test_id("grid-status")).to_have_count(0)
     return box_of(page, "clue-bar").height
+
+
+def resize(page: Page, size: tuple[int, int]) -> None:
+    """Give the page a new window size and wait for its layout to settle.
+
+    Args:
+        page: The room page.
+        size: The new size, as (width, height) in CSS pixels.
+    """
+    width, height = size
+    page.set_viewport_size({"width": width, "height": height})
+    page.evaluate(SETTLE_LAYOUT_SCRIPT)
+
+
+def status_place_problems(page: Page, size: tuple[int, int]) -> list[str]:
+    """Check that `grid-status` sits where the window's height puts it.
+
+    In `clue-bar`'s row when `window.innerHeight <= 500`, under the clue bar
+    otherwise. The window must also have the height the page was given last, or
+    the resize did not reach the page.
+
+    Args:
+        page: The room page, showing `grid-status`.
+        size: The window size the page was given last, as (width, height).
+
+    Returns:
+        One line per check the page misses; an empty list when it passes them all.
+    """
+    problems: list[str] = []
+    window = window_measures(page)
+    given_height = size[1]
+    if window.inner_height != given_height:
+        problems.append(
+            f"window.innerHeight is {window.inner_height}, not {given_height}"
+        )
+    if window.inner_height <= LOW_WINDOW_MAX_HEIGHT:
+        problems.extend(in_the_clue_bar_row_problems(page))
+    else:
+        problems.extend(under_the_clue_bar_problems(page))
+    return problems
 
 
 # ---- AC-10: the completion status never takes the grid's room ----
@@ -579,3 +774,32 @@ def test_ac10_at_1280_by_720_the_status_sits_under_the_clue_bar(
     problems = under_the_clue_bar_problems(page)
 
     assert problems == [], f"{width}x{height} {context_kind} {state}: {problems}"
+
+
+# ---- AC-10, edge case "Low windows (AC-10)": a resize across 500 px ----
+
+
+@pytest.mark.parametrize("state", STATES)
+def test_ac10_a_resize_across_500_px_moves_the_status(
+    new_page: NewPage, live_server: str, fx02_grid: Grid, state: str
+) -> None:
+    width, height = RESIZE_START
+    page = new_page(width, height, False)
+    open_status_page(
+        page, live_server, status_view(fx02_grid, state), state == "solved", False
+    )
+    expect_status_shows(page, state)
+    problems: dict[str, list[str]] = {}
+    found = status_place_problems(page, RESIZE_START)
+    if found:
+        problems[f"{width}x{height}"] = found
+
+    for size in RESIZE_STEPS:
+        resize(page, size)
+        # One `grid-status`, with the same text and `data-state` as before.
+        expect_status_shows(page, state)
+        found = status_place_problems(page, size)
+        if found:
+            problems[f"{size[0]}x{size[1]}"] = found
+
+    assert problems == {}, f"{state}: {problems}"
