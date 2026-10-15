@@ -106,6 +106,18 @@ export interface RevealBudgetView {
   words: number
 }
 
+// The open vote as the page keeps it (spec 025).
+export interface VoteView {
+  vote_id: number
+  // The requester, who counts as a yes.
+  player_id: string
+  // What the vote is about, read from its request.
+  kind: 'check_grid' | 'reveal_letter' | 'reveal_word'
+}
+
+// How a vote ended (spec 025).
+type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
@@ -118,6 +130,8 @@ export interface Snapshot {
   // What is left to reveal, in letters and in words (spec 014).
   reveal_budget: RevealBudgetView
   solved: boolean
+  // From the snapshot's open_vote, then from vote_opened and vote_closed.
+  open_vote: VoteView | null
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -154,6 +168,11 @@ export interface RoomSession {
   feed: FeedItem[]
   // The nickname of every player seen so far, by id; those who left stay.
   names: Map<string, string>
+  // The vote ids this page voted on, kept while the page is open
+  // (reconnections included).
+  votedIds: number[]
+  // The vote that closed last, and how, shown for VOTE_RESULT_MS.
+  closedVote: { vote_id: number; outcome: VoteOutcome } | null
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -176,6 +195,9 @@ export const SILENCE_LIMIT_MS = 4000
 export const EDIT_SEND_INTERVAL_MS = 100
 export const RECONNECT_DELAYS_MS: number[] = [1000, 2000, 4000, 8000]
 
+// How long the banner shows the result of a vote that closed.
+export const VOTE_RESULT_MS = 3000
+
 const PLAYER_STATES: string[] = ['active', 'idle', 'disconnected']
 const MAX_COLOUR = 7
 
@@ -194,6 +216,8 @@ export function newSession(): RoomSession {
     isRefused: false,
     feed: [],
     names: new Map(),
+    votedIds: [],
+    closedVote: null,
   }
 }
 
@@ -414,6 +438,65 @@ function toRevealBudget(value: unknown): RevealBudgetView {
   return { letters: Number(budget.letters), words: Number(budget.words) }
 }
 
+// What a vote is about: a grid check, or the reveal of a letter or a word. Any
+// other request gives null: the page shows no banner for it.
+function voteKindOf(value: unknown): VoteView['kind'] | null {
+  const request = value as Record<string, unknown> | null | undefined
+  if (typeof request !== 'object' || request === null) {
+    return null
+  }
+  const target = request.target as Record<string, unknown> | null | undefined
+  if (typeof target !== 'object' || target === null) {
+    return null
+  }
+  if (request.type === 'check' && target.scope === 'grid') {
+    return 'check_grid'
+  }
+  if (request.type === 'reveal' && target.scope === 'letter') {
+    return 'reveal_letter'
+  }
+  if (request.type === 'reveal' && target.scope === 'word') {
+    return 'reveal_word'
+  }
+  return null
+}
+
+// The vote of a vote_opened object (a snapshot's open_vote or the event itself),
+// or null when there is none or it is about another kind of request.
+function toVoteView(value: unknown): VoteView | null {
+  const vote = value as Record<string, unknown> | null | undefined
+  if (typeof vote !== 'object' || vote === null) {
+    return null
+  }
+  const { vote_id, player_id } = vote
+  if (typeof vote_id !== 'number' || !Number.isInteger(vote_id)) {
+    return null
+  }
+  if (typeof player_id !== 'string') {
+    return null
+  }
+  const kind = voteKindOf(vote.request)
+  if (kind === null) {
+    return null
+  }
+  return { vote_id, player_id, kind }
+}
+
+const VOTE_OUTCOMES: string[] = ['passed', 'rejected', 'timed_out']
+
+// A vote_closed clears the open vote and keeps how it ended, for the banner.
+function applyVoteClosed(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
+  snapshot.open_vote = null
+  const { vote_id, outcome } = event.message
+  if (typeof vote_id !== 'number' || typeof outcome !== 'string') {
+    return
+  }
+  if (!VOTE_OUTCOMES.includes(outcome)) {
+    return
+  }
+  session.closedVote = { vote_id, outcome: outcome as VoteOutcome }
+}
+
 function toPlayers(value: unknown): PlayerView[] | null {
   if (!Array.isArray(value)) {
     return null
@@ -455,6 +538,7 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     settings: toSettings(message.settings),
     reveal_budget: toRevealBudget(message.reveal_budget),
     solved: message.solved === true,
+    open_vote: toVoteView(message.open_vote),
   }
 }
 
@@ -652,6 +736,14 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   if (event.type === 'reveal_result' && session.snapshot !== null) {
     // What is left after the reveal; its letters come in the cell_locked events.
     session.snapshot.reveal_budget = toRevealBudget(event.message.reveal_budget)
+  }
+  if (event.type === 'vote_opened' && session.snapshot !== null) {
+    // A new vote replaces the result of the last one at once.
+    session.snapshot.open_vote = toVoteView(event.message)
+    session.closedVote = null
+  }
+  if (event.type === 'vote_closed' && session.snapshot !== null) {
+    applyVoteClosed(session, session.snapshot, event)
   }
   if (event.type === 'grid_solved') {
     session.solved = true

@@ -15,12 +15,13 @@
     watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
-  import type { LetterCellView, Snapshot } from './roomSession'
+  import type { LetterCellView, Snapshot, VoteView } from './roomSession'
   import {
     EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
     PING_INTERVAL_MS,
     SILENCE_LIMIT_MS,
+    VOTE_RESULT_MS,
     addPendingEdit,
     endFlash,
     gridLabel,
@@ -415,10 +416,13 @@
         (player) => player.player_id === session.snapshot?.you && player.is_host,
       ),
   )
-  let isCheckDisabled = $derived(
-    session.solved ||
-      (session.snapshot !== null && session.snapshot.settings.help_mode === 'none'),
+  // The check and reveal panels are absent while the help is off (spec 025).
+  let isHelpShown = $derived(
+    session.snapshot !== null && session.snapshot.settings.help_mode !== 'none',
   )
+  // While a vote is open, the requests that need a vote are disabled; the checks
+  // of a letter or a word are not (spec 025).
+  let isVoteOpen = $derived(session.snapshot !== null && session.snapshot.open_vote !== null)
 
   // True when every letter cell of the confirmed grid holds a letter (spec 026).
   let isGridFull = $derived(
@@ -680,11 +684,6 @@
 
   // ---- Reveal controls (spec 024) ----
 
-  // The panel is shown unless the help is off. Help mode `vote` acts as `free`
-  // until spec 025.
-  let isRevealShown = $derived(
-    session.snapshot !== null && session.snapshot.settings.help_mode !== 'none',
-  )
   // What is left of the room's budget.
   let lettersLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.letters)
   let wordsLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.words)
@@ -704,10 +703,18 @@
   }
 
   let isRevealLetterDisabled = $derived(
-    session.solved || selectedCell === null || selectedCell.locked || lettersLeft === 0,
+    session.solved ||
+      isVoteOpen ||
+      selectedCell === null ||
+      selectedCell.locked ||
+      lettersLeft === 0,
   )
   let isRevealWordDisabled = $derived(
-    session.solved || activeWord === null || isWordLocked(activeWord) || wordsLeft === 0,
+    session.solved ||
+      isVoteOpen ||
+      activeWord === null ||
+      isWordLocked(activeWord) ||
+      wordsLeft === 0,
   )
 
   // A spent budget replaces the count with the reason the button is disabled.
@@ -753,6 +760,54 @@
       },
     })
   }
+
+  // ---- Votes (spec 025) ----
+
+  let openVote = $derived(session.snapshot === null ? null : session.snapshot.open_vote)
+  // The banner shows the open vote, or for VOTE_RESULT_MS how the last one
+  // ended; never once the grid is solved.
+  let isVoteBannerShown = $derived(
+    !session.solved && (openVote !== null || session.closedVote !== null),
+  )
+  let isMyRequest = $derived(
+    openVote !== null && session.snapshot !== null && openVote.player_id === session.snapshot.you,
+  )
+  let hasVoted = $derived(openVote !== null && session.votedIds.includes(openVote.vote_id))
+  let voteQuestionText = $derived(openVote === null ? '' : voteQuestion(openVote))
+  let voteResultText = $derived(
+    session.closedVote === null ? '' : t(`vote.result.${session.closedVote.outcome}`),
+  )
+  // What a screen reader hears: the question when a vote opens, the result
+  // when it closes.
+  let voteAnnouncement = $derived(openVote !== null ? voteQuestionText : voteResultText)
+
+  // The question of a vote, with the requester's nickname (spec 013's known
+  // names). The page inserts it as text.
+  function voteQuestion(vote: VoteView): string {
+    const name = session.names.get(vote.player_id) ?? t('feed.someone')
+    return t(`vote.question.${vote.kind}`, { name })
+  }
+
+  // Send my ballot on the open vote, once.
+  function castVote(yes: boolean): void {
+    if (openVote === null || session.votedIds.includes(openVote.vote_id)) {
+      return
+    }
+    send({ type: 'vote', vote_id: openVote.vote_id, yes })
+    session.votedIds.push(openVote.vote_id)
+  }
+
+  // The result of a closed vote shows for VOTE_RESULT_MS. A new vote, or a
+  // newer result, cancels the timer of the old one.
+  $effect(() => {
+    if (session.closedVote === null) {
+      return
+    }
+    const timer = setTimeout(() => {
+      session.closedVote = null
+    }, VOTE_RESULT_MS)
+    return () => clearTimeout(timer)
+  })
 
   function onCellTap(row: number, column: number): void {
     select(selectionAfterCellTap(words, selection, row, column))
@@ -1052,30 +1107,35 @@
             <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
           {/if}
         </div>
-        <div class="check-panel" data-testid="check-panel" role="group" aria-label={t('check.label')}>
-          <button
-            type="button"
-            data-testid="check-letter"
-            aria-label={t('check.letter_label')}
-            disabled={isCheckDisabled || selection === null}
-            onclick={onCheckLetter}>{t('check.letter')}</button
+        {#if isHelpShown}
+          <div
+            class="check-panel"
+            data-testid="check-panel"
+            role="group"
+            aria-label={t('check.label')}
           >
-          <button
-            type="button"
-            data-testid="check-word"
-            aria-label={t('check.word_label')}
-            disabled={isCheckDisabled || activeWord === null}
-            onclick={onCheckWord}>{t('check.word')}</button
-          >
-          <button
-            type="button"
-            data-testid="check-grid"
-            aria-label={t('check.grid_label')}
-            disabled={isCheckDisabled}
-            onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
-          >
-        </div>
-        {#if isRevealShown}
+            <button
+              type="button"
+              data-testid="check-letter"
+              aria-label={t('check.letter_label')}
+              disabled={session.solved || selection === null}
+              onclick={onCheckLetter}>{t('check.letter')}</button
+            >
+            <button
+              type="button"
+              data-testid="check-word"
+              aria-label={t('check.word_label')}
+              disabled={session.solved || activeWord === null}
+              onclick={onCheckWord}>{t('check.word')}</button
+            >
+            <button
+              type="button"
+              data-testid="check-grid"
+              aria-label={t('check.grid_label')}
+              disabled={session.solved || isVoteOpen}
+              onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
+            >
+          </div>
           <div
             class="reveal-panel"
             data-testid="reveal-panel"
@@ -1251,22 +1311,64 @@
       </div>
     {/if}
     </div>
-    <GridViewport
-      bind:this={gridViewport}
-      grid={session.snapshot.grid}
-      {selection}
-      {activeWord}
-      {onCellTap}
-      {onClueTap}
-      onSelect={select}
-      {onLetter}
-      {onErase}
-      {onUndo}
-      {words}
-      pendingEdits={session.pendingEdits}
-      flashes={session.flashes}
-      {remoteSelections}
-    />
+    <!-- The vote banner is laid over the top of the grid viewport, so showing it
+         changes no layout; it comes before the grid in document order, since
+         nothing focusable follows the grid (spec 025, spec 035). -->
+    <div class="grid-area">
+      <div
+        class="visually-hidden"
+        data-testid="vote-announcement"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >{voteAnnouncement}</div>
+      {#if isVoteBannerShown}
+        <div
+          class="vote-banner"
+          data-testid="vote-banner"
+          role="group"
+          aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
+        >
+          {#if openVote !== null}
+            <p id="vote-question" class="vote-text" data-testid="vote-question">
+              {voteQuestionText}
+            </p>
+            <div class="vote-actions">
+              {#if isMyRequest}
+                <span data-testid="vote-status">{t('vote.waiting')}</span>
+              {:else if hasVoted}
+                <span data-testid="vote-status">{t('vote.cast')}</span>
+              {:else}
+                <button type="button" data-testid="vote-yes" onclick={() => castVote(true)}
+                  >{t('vote.yes')}</button
+                >
+                <button type="button" data-testid="vote-no" onclick={() => castVote(false)}
+                  >{t('vote.no')}</button
+                >
+              {/if}
+            </div>
+          {:else}
+            <p id="vote-result" class="vote-text" data-testid="vote-result">{voteResultText}</p>
+          {/if}
+        </div>
+      {/if}
+      <GridViewport
+        bind:this={gridViewport}
+        grid={session.snapshot.grid}
+        {selection}
+        {activeWord}
+        {onCellTap}
+        {onClueTap}
+        onSelect={select}
+        {onLetter}
+        {onErase}
+        {onUndo}
+        {words}
+        pendingEdits={session.pendingEdits}
+        flashes={session.flashes}
+        {remoteSelections}
+      />
+    </div>
     <!-- The completion status line. The page shows it in one of two places,
          never both: see isStatusInClueBar and isStatusUnderClueBar. -->
     {#snippet gridStatusLine()}
@@ -1554,6 +1656,61 @@
     font-weight: bold;
   }
 
+  /* The area of the grid: it takes the height left, as the grid viewport did,
+     and holds the vote banner over the viewport's top edge. */
+  .grid-area {
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Over the grid (spec 025 decision 9): absolutely placed, so it takes no
+     height from the grid, and above the cells, some of which are positioned. */
+  .vote-banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+    /* Room for the focus outline of the buttons (3px, 2px away). */
+    padding: 0.375rem 0.5rem;
+    background: #fff3cd;
+    border-bottom: 1px solid #b38600;
+    font-size: 0.9rem;
+  }
+
+  .vote-text {
+    flex: 1 1 10rem;
+    margin: 0;
+  }
+
+  .vote-actions {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* At least 24 by 24 CSS px, whatever the engine's button style. */
+  .vote-actions button {
+    box-sizing: border-box;
+    min-width: 3rem;
+    min-height: 28px;
+    padding: 0 0.75rem;
+    font: inherit;
+    color: #1f2330;
+    background: #ffffff;
+    border: 1px solid #5b6070;
+    border-radius: 4px;
+  }
+
   /* Below the scrolling grid, so it is always inside the window. */
   .clue-bar {
     flex: none;
@@ -1793,6 +1950,10 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    .vote-banner {
+      font-size: 0.8rem;
     }
   }
 

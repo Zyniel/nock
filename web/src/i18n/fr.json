@@ -108,5 +108,15 @@
   "a11y.grid_hint": "Flèches pour se déplacer, Tab pour le mot suivant. Échap puis Tab pour quitter la grille.",
   "grid.remote_overflow": "+{count}",
   "a11y.remote_overflow": "{count} autres joueurs",
-  "a11y.revealed": "lettre révélée"
+  "a11y.revealed": "lettre révélée",
+  "vote.question.check_grid": "{name} propose de vérifier la grille.",
+  "vote.question.reveal_letter": "{name} propose de révéler une lettre.",
+  "vote.question.reveal_word": "{name} propose de révéler un mot.",
+  "vote.yes": "Oui",
+  "vote.no": "Non",
+  "vote.waiting": "En attente des autres joueurs…",
+  "vote.cast": "Vote enregistré.",
+  "vote.result.passed": "Vote accepté.",
+  "vote.result.rejected": "Vote refusé.",
+  "vote.result.timed_out": "Temps écoulé, vote annulé."
 }

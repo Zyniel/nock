@@ -226,10 +226,15 @@
     if (element === undefined) {
       return
     }
+    // The exact size, rounded down. clientWidth and clientHeight round to the
+    // nearest pixel, sometimes up, and a grid fitted to them then overflows the
+    // viewport by a fraction of a pixel: Firefox makes such a viewport a Tab
+    // stop between the vote banner and the grid (spec 025 AC-8).
     function measure(): void {
       if (element !== undefined) {
-        areaWidth = element.clientWidth
-        areaHeight = element.clientHeight
+        const box = element.getBoundingClientRect()
+        areaWidth = Math.floor(box.width)
+        areaHeight = Math.floor(box.height)
       }
     }
     measure()
