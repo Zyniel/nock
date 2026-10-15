@@ -1,0 +1,151 @@
+name: Deploy
+
+# Deploys a version to the server (docs/hosting.md section 10,
+# docs/oracle-setup.md). Runs when a version tag such as v1.0.0 is pushed, or
+# by hand from the Actions tab with a tag (to deploy an older version again).
+#
+# Needs, in Settings > Environments > production > Environment secrets:
+#   DEPLOY_HOST         the server's public IP address
+#   DEPLOY_USER         the SSH user (ubuntu)
+#   DEPLOY_SSH_KEY      the private key of the deploy key pair
+#   DEPLOY_KNOWN_HOSTS  the server's host key line (ssh-keyscan output)
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Version tag to deploy, for example v1.0.0"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  gate:
+    name: Quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the tag
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9A-Za-z._-]+$ ]]; then
+            echo "Not a version tag: $TAG" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.14"
+
+      - name: Install the project
+        run: uv sync --locked
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the web client
+        run: npm --prefix web ci
+
+      - name: Install the browsers for browser tests
+        run: uv run playwright install --with-deps chromium firefox webkit
+
+      - name: Run the quality gate
+        run: uv run python scripts/gate.py
+        env:
+          PYTEST_ADDOPTS: --browser firefox
+
+  image:
+    name: Build and push the image
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # arm64 for the Oracle server, amd64 for the sandbox on a PC.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64,linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ env.TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to the server
+    needs: image
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Copy the deploy files
+        env:
+          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            deploy/compose.yaml deploy/Caddyfile deploy/*.sh \
+            deploy/.env.example deploy/backup.env.example deploy/systemd \
+            "$TARGET:/srv/nock/deploy/"
+
+      # The workflow's own short-lived token lets the server pull the image;
+      # the server logs out again at the end, so no credential stays there.
+      - name: Deploy
+        env:
+          TARGET: ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s\n' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key "$TARGET" \
+            "docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null \
+             && /srv/nock/deploy/deploy.sh '$TAG'; status=\$?; \
+             docker logout ghcr.io >/dev/null; exit \$status"

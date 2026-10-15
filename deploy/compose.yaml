@@ -1,0 +1,55 @@
+# Production stack on the server: Caddy (HTTPS) in front of the Nock app.
+# See docs/hosting.md (section 4) and docs/oracle-setup.md.
+#
+# Files next to this one, on the server only (never committed):
+#   .env      settings and secrets, from .env.example
+#   tag.env   NOCK_TAG=<the image version>, written by deploy.sh
+#
+# Data on the server, under /srv/nock (the block volume):
+#   data/   the SQLite database (NOCK_DATABASE)
+#   grids/  the grid files, read-only for the app (spec 005)
+#   caddy/  Caddy's certificates
+
+name: nock
+
+services:
+  nock:
+    image: ghcr.io/zyniel/nock:${NOCK_TAG:?run deploy.sh, which writes tag.env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NOCK_HOST: 0.0.0.0
+      NOCK_PORT: "8000"
+      NOCK_DATABASE: /data/nock.sqlite3
+      # Caddy reaches the app over this Compose network, and the app's port is
+      # published nowhere, so the forwarded client address and scheme can be
+      # trusted from any peer (docs/hosting.md, section 4).
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - /srv/nock/data:/data
+      - /srv/nock/grids:/app/grids:ro
+    # Let the app save a snapshot of each live room on SIGTERM (spec 018).
+    stop_grace_period: 30s
+    logging:
+      driver: journald
+      options:
+        tag: nock
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    depends_on:
+      - nock
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      NOCK_DOMAIN: ${NOCK_DOMAIN:?set NOCK_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/nock/caddy/data:/data
+      - /srv/nock/caddy/config:/config
+    logging:
+      driver: journald
+      options:
+        tag: caddy

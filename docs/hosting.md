@@ -1,9 +1,10 @@
 # Hosting plan
 
-Status: **recommendation made, 2026-10-15.** The owner answered the questions
-(section 0). The choice is Oracle Cloud Always Free (section 4). Nothing here
-changes code or tooling. Section 13 lists the tooling that the owner has to
-approve, and section 14 lists what only the owner can do (accounts and clicks).
+Status: **deployment files ready, 2026-10-15.** The owner answered the questions
+(section 0). The choice is Oracle Cloud Always Free (section 4). The owner
+approved the deployment tooling (section 13, items 1 to 4), which is written and
+tested locally. The step-by-step setup is `docs/oracle-setup.md`. No app code
+changed.
 
 ## 0. The owner's answers (2026-10-15)
 
@@ -257,7 +258,7 @@ progress, then delete the copy.
 | `NOCK_SMTP_HOST`, `NOCK_SMTP_PORT`, `NOCK_SMTP_SECURITY`, `NOCK_SMTP_USER`, `NOCK_SMTP_FROM` | from the mail provider | no (the user name is not secret, but keep it with the password) |
 | `NOCK_SMTP_PASSWORD` | from the mail provider | **yes** |
 
-- Never in the repository. Option D: `deploy/.env` on the VM only, readable by
+- Never in the repository. Option D: `/srv/nock/deploy/.env` on the VM only, readable by
   its owner only (`chmod 600`), read by Compose. Plain VPS without Docker: a file
   `/etc/nock/nock.env` loaded by systemd (`EnvironmentFile=`). Fly: `fly secrets set`. Render: secret
   environment variables.
@@ -282,6 +283,10 @@ progress, then delete the copy.
   it arrives in the inbox.
 
 ## 9. Logs and monitoring within spec 038
+
+Until spec 038 is built, `main` still runs uvicorn at the `info` level with its
+access log, which writes client addresses (seen in the local test of section
+13). So the site goes public only with a release that includes spec 038.
 
 Spec 038 makes the app's own logs clean: no access log, `warning` level, no client
 address, token, address or chat text (spec 038 AC-3, spec 033 AC-10). It leaves
@@ -434,29 +439,40 @@ The game is French-language, open to guests, and (V1) stores e-mail addresses.
 ## 13. Proposed next steps that need your approval
 
 These are tooling, so they are your decision (`CLAUDE.md`, "Who may write what").
-None is done.
+Items 1 to 4, needed for the first deployment, were approved by the owner on
+2026-10-15 ("prepare the deployment files") and are written. Items 5 to 7 wait
+for the owner's approval.
 
-In the order to build them. Items 1 to 4 are needed for the first deployment.
-Say "approved" (all or by number), and a session will write them on a branch for
-you to review.
+Tested on 2026-10-15 in a cloud session (x86, Docker 29): the image builds and
+runs as a non-root user; the Compose stack with Caddy serves HTTPS, redirects
+HTTP, gives `https://` share links (so the forwarded scheme and address are
+trusted), and carries a game over `wss://`; a typed letter and the player's seat
+survive a restart; `backup.sh` makes an encrypted off-site copy (with a local
+folder standing in for the bucket) and `restore-test.sh` restores and starts it;
+`deploy.sh` deploys a good version and puts back the previous one after a
+version that does not start (with a local registry standing in for GHCR); the
+sandbox starts with Mailpit. Not tested: the arm64 build, the Oracle server
+itself, the GitHub workflow (linted with actionlint only), and Object Storage.
 
-1. **Dockerfile**: two stages. Node builds `web/dist`, then Python with uv
+1. **Done: `Dockerfile`** and `.dockerignore`: two stages. Node builds `web/dist`, then Python with uv
    (`uv sync --locked --no-dev`). It copies the repository tree in (section 1,
    files read from the source tree) and runs `python -m nock` as a non-root user,
    with `NOCK_HOST=0.0.0.0` and `NOCK_DATABASE=/data/nock.sqlite3`. It builds for
    arm64 and amd64.
-2. **Compose and Caddy files**: `deploy/compose.yaml` (the `caddy` and `nock`
+2. **Done: Compose and Caddy files**: `deploy/compose.yaml` (the `caddy` and `nock`
    containers of section 4, `FORWARDED_ALLOW_IPS=*`, secrets read from a
-   `deploy/.env` file that stays on the VM), `deploy/Caddyfile` (the domain, no
-   access log, HTTPS redirect), and `compose.sandbox.yaml` with Mailpit (section
-   10).
-3. **Server scripts** in `deploy/`: a one-time VM setup script (Docker, firewall,
+   `/srv/nock/deploy/.env` file that stays on the VM, template
+   `deploy/.env.example`), `deploy/Caddyfile` (the domain, no access log, HTTPS
+   redirect), and `compose.sandbox.yaml` with Mailpit (section 10).
+3. **Done: server scripts** in `deploy/`: a one-time VM setup script (Docker, firewall,
    automatic updates, data volume mount), the deploy script of section 10, and
    the backup script (`VACUUM INTO`, encryption, upload to Object Storage, 14-day
-   rule) with its nightly timer, plus a restore-test script.
-4. **Deploy workflow** `.github/workflows/deploy.yml`: on a `v*` tag, gate, build,
-   push to GHCR, deploy by SSH (section 10). It needs three GitHub secrets: the
-   VM's address, an SSH private key, and the SSH user.
+   rule, `backup.env.example`) with its nightly timer, plus a restore-test
+   script with a monthly timer (`deploy/systemd/`).
+4. **Done: deploy workflow** `.github/workflows/deploy.yml`: on a `v*` tag, gate,
+   build, push to GHCR, deploy by SSH (section 10). It needs four secrets in a
+   GitHub environment `production`: the VM's address, the SSH user, an SSH
+   private key, and the server's host key.
 5. **Load test** (a spec): 20 rooms of 8 simulated players on the VM size, before
    the public launch (spec 036 measures one room only).
 6. **Spec 011 note**: one dated line saying that, in production, uvicorn reads the
@@ -469,8 +485,7 @@ images, outside the project's dependencies.
 
 ## 14. What only you can do
 
-These need your accounts. A session can guide you step by step when you get
-there.
+These need your accounts. `docs/oracle-setup.md` walks through each one.
 
 1. Create the Oracle Cloud account: home region **Paris** or **Marseille**,
    upgrade to Pay As You Go, budget alert at 1 €.
@@ -478,10 +493,10 @@ there.
    capacity", retry later.
 3. Add the DNS record `nock.<your domain>` pointing to the VM's IP, at your
    domain's registrar.
-4. Put the three deploy secrets in the GitHub repository settings (item 4 above).
-5. Create the `deploy/.env` file on the VM with the secrets of section 7 (the
+4. Put the four deploy secrets in the GitHub repository settings (item 4 above).
+5. Create the `/srv/nock/deploy/.env` file on the VM with the secrets of section 7 (the
    operator token can be generated for you).
 6. Later, for V1 accounts: create the Brevo account, add its SPF, DKIM and DMARC
-   records to the domain, and put its SMTP password in `deploy/.env`.
+   records to the domain, and put its SMTP password in `/srv/nock/deploy/.env`.
 7. Write the legal notice and privacy notice from section 11 (a session can
    draft them in French for you to check).

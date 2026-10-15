@@ -1,0 +1,18 @@
+# Only what the Dockerfile copies matters; keep the build context small.
+.git/
+.github/
+.claude/
+.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+web/node_modules/
+web/dist/
+tests/
+specs/
+docs/
+scripts/
+deploy/
+compose.sandbox.yaml
+grids/
+*.sqlite3*

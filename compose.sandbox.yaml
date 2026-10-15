@@ -1,0 +1,42 @@
+# Sandbox on your own computer (docs/hosting.md, section 10): the production
+# image, plain HTTP on http://localhost:8000, and Mailpit, a fake mail server
+# that keeps every e-mail on this computer (read them on http://localhost:8025).
+#
+#   docker compose -f compose.sandbox.yaml up --build     the working copy
+#   NOCK_IMAGE=ghcr.io/zyniel/nock:v1.0.0 docker compose -f compose.sandbox.yaml up --no-build
+#                                                         a released version
+#   docker compose -f compose.sandbox.yaml down           stop (data kept)
+#   docker compose -f compose.sandbox.yaml down -v        stop and delete the data
+#
+# Grid files (spec 005) go in ./grids, which is mounted read-only.
+
+name: nock-sandbox
+
+services:
+  nock:
+    build: .
+    image: ${NOCK_IMAGE:-nock:sandbox}
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      # Not a secret: this token only opens the sandbox's /ops page.
+      NOCK_OPERATOR_TOKEN: sandbox-operator-token-not-a-secret-0000
+      # Accounts (spec 033) send their e-mails to Mailpit.
+      NOCK_PUBLIC_URL: http://localhost:8000
+      NOCK_SMTP_HOST: mailpit
+      NOCK_SMTP_PORT: "1025"
+      NOCK_SMTP_SECURITY: none
+      NOCK_SMTP_FROM: nock@sandbox.example
+    volumes:
+      - sandbox-data:/data
+      - ./grids:/app/grids:ro
+    depends_on:
+      - mailpit
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:8025:8025"
+
+volumes:
+  sandbox-data:

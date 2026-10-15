@@ -1,0 +1,10 @@
+# Caddy in front of Nock: HTTPS with automatic Let's Encrypt certificates, HTTP
+# redirected to HTTPS, WebSockets proxied as they are.
+# No "log" directive: Caddy then writes no access log, so no client address is
+# kept (spec 038, docs/hosting.md section 9).
+
+{$NOCK_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy nock:8000
+}
