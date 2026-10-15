@@ -453,10 +453,16 @@ FINAL_SEQ = 26  # 4 joins, 4 + 10 letters, 2 + 5 reveal entries, grid_solved
 
 
 class WebSocketGame(NamedTuple):
-    """What the WebSocket game recorded."""
+    """What the WebSocket game recorded.
+
+    `last_at_end` is the type and seq of each client's last message once the game
+    reached its final seq, read before the sockets close: closing them makes the
+    room send `player_state_changed` events (spec 017) after the game.
+    """
 
     log: TrafficLog
     peers: dict[str, Peer]
+    last_at_end: dict[str, tuple[str, int]]
 
 
 def type_letters(
@@ -513,9 +519,12 @@ def play_the_websocket_game(client: TestClient) -> WebSocketGame:
         type_letters(bob, log, BOBS_FIVE)
         for peer in everyone:
             peer.wait_for_seq(FINAL_SEQ, f"the end of the game on {peer.name}")
+        last_at_end: dict[str, tuple[str, int]] = {}
+        for peer in everyone:
+            last_at_end[peer.name] = (peer.messages()[-1].type, peer.last_seq())
 
     peers = {"Ana": ana, "Bob": bob, "Cy": cy, "Dee": dee}
-    return WebSocketGame(log=log, peers=peers)
+    return WebSocketGame(log=log, peers=peers, last_at_end=last_at_end)
 
 
 def test_ac5_websocket_every_payload_of_the_game_passes_the_rules(
@@ -565,31 +574,46 @@ def test_ac5_websocket_the_first_three_players_got_the_five_revealing_frames(
 def test_ac5_websocket_the_game_ends_with_grid_solved(client: TestClient) -> None:
     game = play_the_websocket_game(client)
 
-    for peer in game.peers.values():
-        last = peer.messages()[-1]
-        assert last.type == "grid_solved", peer.name
-        assert peer.last_seq() == FINAL_SEQ
+    for name in ("Ana", "Bob", "Cy", "Dee"):
+        assert game.last_at_end[name] == ("grid_solved", FINAL_SEQ), name
 
 
 # ---- AC-5: the browser game with reveals (live server) ----
 
-ANAS_VIDE_KEYS: list[tuple[int, int, str]] = [
-    (2, 1, "v"),
-    (2, 2, "i"),
-    (2, 3, "d"),
-    (2, 4, "e"),
-]
-ANAS_TEN_KEYS: list[tuple[int, int, str]] = [
-    (0, 1, "n"),
-    (1, 0, "t"),
-    (1, 1, "a"),
-    (1, 3, "i"),
-    (1, 4, "s"),
-    (3, 1, "a"),
-    (3, 3, "e"),
-    (3, 4, "n"),
-    (4, 1, "l"),
-    (4, 3, "s"),
+
+class TypedWord(NamedTuple):
+    """One tap, the selection it gives (spec 007), then keys typed (spec 008).
+
+    Each key is given with the cell it lands in: spec 008 moves the selection to
+    the next cell of the word that is not locked, and keeps the direction.
+    """
+
+    tap: Cell
+    direction: str
+    word: str  # the grid's `data-word` after the tap
+    keys: list[tuple[int, int, str]]
+
+
+# "Ana joins and types VIDE from (2, 1)": the first tap of the game is `across`.
+ANAS_VIDE = TypedWord(
+    (2, 1), "across", "2,0,0", [(2, 1, "v"), (2, 2, "i"), (2, 3, "d"), (2, 4, "e")]
+)
+# "Ana types the ten remaining letters (spec 008 skips the locked cells)". Before
+# the first tap the selection is (2, 2) `down` (MIME). Each tap is on a cell that
+# is not selected, so it keeps the current direction when the cell has a word in
+# it (spec 007): (1, 0) has no down word, so `across`; then `down` for the rest.
+# In TAMIS the selection skips (1, 2), revealed and locked.
+ANAS_TEN = [
+    TypedWord(
+        (1, 0),
+        "across",
+        "0,0,0",
+        [(1, 0, "t"), (1, 1, "a"), (1, 3, "i"), (1, 4, "s")],
+    ),
+    TypedWord((0, 1), "down", "0,0,1", [(0, 1, "n")]),
+    TypedWord((3, 1), "down", "0,0,1", [(3, 1, "a"), (4, 1, "l")]),
+    TypedWord((3, 3), "down", "0,3,0", [(3, 3, "e"), (4, 3, "s")]),
+    TypedWord((3, 4), "down", "0,4,0", [(3, 4, "n")]),
 ]
 
 
@@ -649,13 +673,18 @@ class PageRecorder:
         return count
 
 
-def press_keys(page: Page, log: TrafficLog, steps: list[tuple[int, int, str]]) -> None:
-    """Tap each cell and type its letter, 60 ms or more between keys."""
-    for row, column, key in steps:
-        cell_at(page, row, column).click()
-        log.earn(row, column, key.upper())
+def type_word(page: Page, log: TrafficLog, typed: TypedWord) -> None:
+    """Tap once, check the selection, then type the keys 60 ms or more apart."""
+    row, column = typed.tap
+    cell_at(page, row, column).click()
+    expect_selection(page, row, column, typed.direction, typed.word)
+    for key_row, key_column, key in typed.keys:
+        log.earn(key_row, key_column, key.upper())
         page.keyboard.press(key)
         page.wait_for_timeout(KEY_PAUSE_MS)
+    for key_row, key_column, key in typed.keys:
+        cell = cell_at(page, key_row, key_column)
+        expect(cell).to_have_attribute("data-letter", key.upper())
 
 
 def play_the_browser_game(
@@ -679,7 +708,7 @@ def play_the_browser_game(
         ana = recorders["Ana"]
 
         enter_room(page, url, "Ana")
-        press_keys(page, log, ANAS_VIDE_KEYS)
+        type_word(page, log, ANAS_VIDE)
         wait_until_page(page, lambda: ana.count_of("letter_changed") >= 4, "VIDE")
         enter_room(cy_page, url, "Cy")
 
@@ -694,7 +723,8 @@ def play_the_browser_game(
             expect(cell_at(watcher, 4, 2)).to_have_attribute("data-revealed", "true")
 
         enter_room(dee_page, url, "Dee")
-        press_keys(page, log, ANAS_TEN_KEYS)
+        for typed in ANAS_TEN:
+            type_word(page, log, typed)
         for watcher in (page, cy_page, dee_page):
             expect(watcher.get_by_test_id("room-page")).to_have_attribute(
                 "data-solved", "true", timeout=WAIT_TIMEOUT_MS
