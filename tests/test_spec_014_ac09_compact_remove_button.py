@@ -3,7 +3,7 @@
 The browser with spec 040's mocked socket, and the static text of `fr.json`.
 
 The shared setup is in `tests/spec014_harness.py`, whose docstring says how the
-tests are built.
+tests are built, and for the windows in `tests/spec014_windows_harness.py`.
 
 Not tested here, with the reason:
 
@@ -20,31 +20,29 @@ from typing import NamedTuple
 import pytest
 from playwright.sync_api import Page
 
-from spec014_harness import (
+from spec014_harness import NICKNAMES, load_fr, roster_item
+from spec014_harness import fx01_grid as fx01_grid
+from spec014_windows_harness import (
     DEFAULT_ROOT_FONT_PX,
-    HIT_TEST_IN_PLACE_SCRIPT,
+    HIT_TEST_BODY,
     LIVE_CHANGE_MS,
     LIVE_WINDOW,
     MIN_HIT_PIXELS,
     MIN_TARGET_PX,
     NARROW_LOW_WINDOWS,
-    NICKNAMES,
     POLL_MS,
     REMOVE_BUTTON_COUNT,
     TARGET_TOLERANCE_PX,
     WINDOW_SIZES,
     OpenSmallWindow,
     Window,
-    load_fr,
     read_buttons_state,
-    roster_item,
     rule_violation,
     set_root_font,
     tab_to_control,
     window_id,
 )
-from spec014_harness import fx01_grid as fx01_grid
-from spec014_harness import small_window as small_window
+from spec014_windows_harness import small_window as small_window
 
 MIN_OUTLINE_PX = 2.0
 MIN_FOCUS_CONTRAST = 3.0
@@ -250,6 +248,9 @@ element => new Promise(resolve => {
   requestAnimationFrame(look);
 })
 """
+# The hit test of a remove button as it stands, once the page scrolled a focused
+# button by itself (the check of HIT_TEST_BODY).
+HIT_TEST_IN_PLACE_SCRIPT = "button => {" + HIT_TEST_BODY + "}"
 FOCUS_WINDOWS = [
     Window(300, 480, 16),
     Window(300, 480, 20),

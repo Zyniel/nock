@@ -5,7 +5,7 @@ host panel that shows when there is more to scroll to, the layout guarantees of
 the grid, and the fade that hides while a panel control has the keyboard focus.
 
 The shared setup is in `tests/spec014_harness.py`, whose docstring says how the
-tests are built.
+tests are built, and for the windows in `tests/spec014_windows_harness.py`.
 
 `test_ac1_browser_the_host_view_keeps_the_grids_room` is here although its name
 says AC-1: it checks that spec 013 AC-6's layout guarantees still hold with the
@@ -21,20 +21,19 @@ from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import CheckResult, GridTarget
-from spec014_harness import (
+from spec014_harness import fx01_grid as fx01_grid
+from spec014_harness import joined_mock_room, room_page
+from spec014_windows_harness import (
     EPSILON,
     FOCUSED_TEST_ID_SCRIPT,
     MIN_TARGET_PX,
     TARGET_TOLERANCE_PX,
     WINDOW_SIZES,
     eight_players,
-    joined_mock_room,
     make_page,
     panel_shows_a_more_marker,
-    room_page,
     tab_to_control,
 )
-from spec014_harness import fx01_grid as fx01_grid
 
 FEED_LIMIT = 100
 TAP_TIMEOUT_MS = 3000

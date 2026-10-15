@@ -3,7 +3,7 @@
 The browser with spec 040's mocked socket.
 
 The shared setup is in `tests/spec014_harness.py`, whose docstring says how the
-tests are built.
+tests are built, and for the windows in `tests/spec014_windows_harness.py`.
 
 Not tested here, with the reason:
 
@@ -34,7 +34,9 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from nock.protocol import HelpMode, RevealBudget, RoomSettings
-from spec014_harness import (
+from spec014_harness import feed_lines, room_page, settings_frame
+from spec014_harness import fx01_grid as fx01_grid
+from spec014_windows_harness import (
     DEFAULT_ROOT_FONT_PX,
     EPSILON,
     LIVE_CHANGE_MS,
@@ -46,14 +48,10 @@ from spec014_harness import (
     TWO_FRAMES_SCRIPT,
     OpenSmallWindow,
     Window,
-    feed_lines,
     panel_shows_a_more_marker,
-    room_page,
     set_root_font,
-    settings_frame,
 )
-from spec014_harness import fx01_grid as fx01_grid
-from spec014_harness import small_window as small_window
+from spec014_windows_harness import small_window as small_window
 
 LIST_ROOM_PX = 3  # AC-10: the room after the last item
 LOW_LAYOUT_MAX_HEIGHT_PX = 500  # the low layout: window.innerHeight <= 500

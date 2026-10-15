@@ -4,7 +4,7 @@ The browser with spec 040's mocked socket, at the window sizes of spec 006 AC-5 
 then at the narrow and low windows.
 
 The shared setup is in `tests/spec014_harness.py`, whose docstring says how the
-tests are built.
+tests are built, and for the windows in `tests/spec014_windows_harness.py`.
 """
 
 from __future__ import annotations
@@ -13,8 +13,10 @@ import pytest
 from playwright.sync_api import Browser, expect
 
 from nock.grid import Grid
-from spec014_harness import (
-    HIT_TEST_SCRIPT,
+from spec014_harness import fx01_grid as fx01_grid
+from spec014_harness import joined_mock_room
+from spec014_windows_harness import (
+    HIT_TEST_BODY,
     MIN_HIT_PIXELS,
     NARROW_LOW_IDS,
     NARROW_LOW_WINDOWS,
@@ -23,11 +25,17 @@ from spec014_harness import (
     OpenSmallWindow,
     Window,
     eight_players,
-    joined_mock_room,
     make_page,
 )
-from spec014_harness import fx01_grid as fx01_grid
-from spec014_harness import small_window as small_window
+from spec014_windows_harness import small_window as small_window
+
+# The hit test of a remove button: it scrolls the button into view first, then runs
+# the check of HIT_TEST_BODY.
+HIT_TEST_SCRIPT = (
+    "button => { button.scrollIntoView({block: 'nearest', inline: 'nearest'});"
+    + HIT_TEST_BODY
+    + "}"
+)
 
 # ---- AC-8: the whole box of each remove button can be tapped ----------------
 
