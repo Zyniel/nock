@@ -7,12 +7,17 @@ Four parts, all on the page with a mocked socket:
   contexts, with spec 013 AC-6's setup: spec 013 AC-6's layout checks, the
   relative order (`undo-button`, `pencil-toggle`, `confirm-pencil`, then
   spec 024's `check-letter`; the lead's note of 2026-10-15 on spec 024 AC-8),
-  one row on small windows, the keyboard focus of `pencil-toggle` (desktop) and
-  `elementFromPoint` at each button's centre. One page per size and context, so
-  that the suite stays lean;
+  "right after" (nothing stands between what holds `undo-button` and what holds
+  the pencil buttons), one row on small windows, the keyboard focus of
+  `pencil-toggle` (desktop) and `elementFromPoint` at each button's centre. One
+  page per size and context, so that the suite stays lean;
 - the keyboard-only run at 1280 by 720 (spec 035's walker);
 - the contrast states of the spec's "Test harness" (spec 035's contrast scan) and
-  the language scan of the two buttons' texts, with the new `fr.json` keys;
+  the language scan of the two buttons' texts, with the new `fr.json` keys; outside
+  a flash, a pencil letter's colour differs from a normal letter's in the same
+  state (selected, tinted; AC-1 checks the plain cell and my word); in the flash
+  states (decision 12), the flashing pencil cell's `data-flash`, `data-pencil`,
+  italics and 4.5:1 contrast against the flash colour;
 - the edge case "Solved grid" (AC-3, AC-7): both controls disabled, and spec
   026's input lock sends nothing in pencil mode.
 
@@ -41,6 +46,7 @@ from nock.protocol import (
     PlayerView,
     Selection,
 )
+from spec013_harness import swatch_colour
 from spec020_harness import (
     confirm_button,
     edit_messages_after_a_pause,
@@ -49,6 +55,7 @@ from spec020_harness import (
     letter_changed_frame,
     pencil_toggle,
     tap,
+    text_colour,
     turn_pencil_mode_on,
     wait_for_edit_messages,
 )
@@ -74,7 +81,7 @@ from spec024_harness import (
     outline_problems,
     player_view,
 )
-from spec035_harness import LANGUAGE_SCAN_SCRIPT, unknown_texts
+from spec035_harness import LANGUAGE_SCAN_SCRIPT, MIN_TEXT_CONTRAST, unknown_texts
 
 WINDOW_SIZES = [
     (320, 568),
@@ -98,7 +105,8 @@ SPEC024_BUTTONS = [
     "reveal-word",
 ]
 # Relative document order (spec 024's toolbar: the pencil controls come right
-# after the undo control and before `check-panel`).
+# after the undo control and before `check-panel`). RIGHT_AFTER_UNDO_SCRIPT checks
+# that nothing stands between the undo control and the pencil controls.
 TOOLBAR_ORDER = ["undo-button", "pencil-toggle", "confirm-pencil", "check-letter"]
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_ITEMS = 100
@@ -289,6 +297,57 @@ testIds => {
   return {counts: counts, outside: outside, outOfOrder: outOfOrder};
 }
 """
+# "Right after the undo control": take the closest element that holds both
+# `undo-button` and `pencil-toggle`; among its children, the one that holds
+# `pencil-toggle` must be the next element sibling of the one that holds
+# `undo-button` (each child may be the button itself or a group around it), and
+# `confirm-pencil` must be in the same child or in the next one. `between` lists
+# what stands between the two children (null when the pencil child does not come
+# after the undo child); null for the whole result when an element is missing.
+RIGHT_AFTER_UNDO_SCRIPT = """
+() => {
+  const byTestId = (id) => document.querySelector(`[data-testid="${id}"]`);
+  const toolbar = byTestId('room-toolbar');
+  const undo = byTestId('undo-button');
+  const toggle = byTestId('pencil-toggle');
+  const confirm = byTestId('confirm-pencil');
+  if (!toolbar || !undo || !toggle || !confirm) {
+    return null;
+  }
+  let common = undo.parentElement;
+  while (!common.contains(toggle)) {
+    common = common.parentElement;
+  }
+  const childHolding = (element) => {
+    let node = element;
+    while (node !== null && node.parentElement !== common) {
+      node = node.parentElement;
+    }
+    return node;
+  };
+  const undoChild = childHolding(undo);
+  const toggleChild = childHolding(toggle);
+  const confirmChild = childHolding(confirm);
+  let between = [];
+  let node = undoChild.nextElementSibling;
+  while (node !== null && node !== toggleChild) {
+    between.push(node.getAttribute('data-testid') || node.tagName.toLowerCase());
+    node = node.nextElementSibling;
+  }
+  if (node === null) {
+    between = null;
+  }
+  const confirmBesideToggle = confirmChild !== null && (
+    confirmChild === toggleChild || confirmChild === toggleChild.nextElementSibling
+  );
+  return {
+    inToolbar: toolbar.contains(common),
+    between: between,
+    confirmBesideToggle: confirmBesideToggle,
+  };
+}
+"""
+RIGHT_AFTER_UNDO = {"inToolbar": True, "between": [], "confirmBesideToggle": True}
 RANGES_SCRIPT = """
 testIds => {
   const ranges = [];
@@ -475,6 +534,7 @@ def test_ac7_the_pencil_buttons_keep_the_grid_room_and_the_toolbar_rules(
     try:
         layout = spec013_layout_problems(page, touch)
         order = page.evaluate(ORDER_SCRIPT, TOOLBAR_ORDER)
+        right_after_undo = page.evaluate(RIGHT_AFTER_UNDO_SCRIPT)
         row = one_row_problems(page) if small else []
         focus = [] if touch else pencil_toggle_focus_problems(page)
         hits = hit_problems(page)
@@ -487,6 +547,7 @@ def test_ac7_the_pencil_buttons_keep_the_grid_room_and_the_toolbar_rules(
         "outside": [],
         "outOfOrder": [],
     }
+    assert right_after_undo == RIGHT_AFTER_UNDO
     assert row == []
     assert focus == []
     assert hits == []
@@ -553,6 +614,7 @@ def test_ac7_scans_pass_with_pencil_letters_plain_selected_and_in_my_word(
         (1, 0, pencil_letter("T", "p2")),
         (1, 2, pencil_letter("M", "p2")),
         (2, 2, pencil_letter("I", "p2")),
+        (4, 4, {"letter": "T", "author": "p2"}),
     ]
     open_room(page, live_server, fx01_grid, changes=changes)
     tap(page, 1, 0)
@@ -571,8 +633,16 @@ def test_ac7_scans_pass_with_pencil_letters_plain_selected_and_in_my_word(
     confirm_label = confirm_button(page).get_attribute(
         "aria-label", timeout=WAIT_TIMEOUT_MS
     )
+    # Outside a flash, the selected pencil letter and a selected normal letter.
+    selected_pencil_colour = text_colour(cell_at(page, 1, 0))
+    selected_normal = cell_at(page, 4, 4)
+    tap(page, 4, 4)
+    expect(selected_normal).to_have_attribute("data-selected", "true")
+    expect(selected_normal).to_have_attribute("data-pencil", "false")
+    selected_normal_colour = text_colour(selected_normal)
 
     assert offenders == []
+    assert selected_pencil_colour != selected_normal_colour
     assert confirm_label is not None
     button_texts = [toggle_text, confirm_text, confirm_label]
     assert button_texts == list(NEW_KEYS.values())
@@ -598,32 +668,76 @@ def tinting_players(colour: int) -> list[PlayerView]:
     return [player_view("p1", "Ana", my_colour, is_host=True), bob]
 
 
+# The flash state of AC-7, read at once on the flashing `cell`: its `data-flash`,
+# `data-pencil` and computed `font-style`; whether the flash colour (the
+# `roster-colour` of the player who flashed it, as spec 016 AC-2 measures it) is
+# the computed `background-color` of the cell or of an element inside it (its
+# overlay); and the contrast of the cell's computed `color` (its letter is the
+# cell's own text) against that colour, composited over white.
+FLASH_READING_SCRIPT = "(cell, flashColour) => {\n" + COLOUR_CONTRAST_JS + r"""
+  const style = getComputedStyle(cell);
+  let flashShown = false;
+  for (const element of [cell, ...cell.querySelectorAll('*')]) {
+    if (getComputedStyle(element).backgroundColor === flashColour) {
+      flashShown = true;
+    }
+  }
+  const flash = over(parseColour(flashColour), WHITE);
+  const text = over(parseColour(style.color), flash);
+  return {
+    flash: cell.getAttribute('data-flash'),
+    pencil: cell.getAttribute('data-pencil'),
+    fontStyle: style.fontStyle,
+    flashShown: flashShown,
+    ratio: contrast(text, flash),
+  };
+}
+"""
+
+
 @pytest.mark.parametrize("colour", COLOURS)
-def test_ac7_contrast_scan_passes_on_pencil_letters_tinted_and_flashed_by_colour(
+def test_ac7_pencil_letters_tinted_and_flashed_by_colour_keep_their_sign_and_contrast(
     page: Page, live_server: str, fx01_grid: Grid, colour: int
 ) -> None:
+    # (3, 2) and (3, 3) are on W7, the word p2 selected: both tinted by p2.
     changes: ChangeList = [
         (3, 2, pencil_letter("M", "p2")),
+        (3, 3, {"letter": "E", "author": "p2"}),
         (4, 3, {"letter": "S", "author": "p1"}),
     ]
     mock = open_room(
         page, live_server, fx01_grid, changes=changes, players=tinting_players(colour)
     )
-    tinted = cell_at(page, 3, 2)
-    expect(tinted).to_have_attribute("data-tinted-by", "p2")
-    expect(tinted).to_have_attribute("data-pencil", "true")
+    tinted_pencil = cell_at(page, 3, 2)
+    tinted_normal = cell_at(page, 3, 3)
+    for tinted in (tinted_pencil, tinted_normal):
+        expect(tinted).to_have_attribute("data-tinted-by", "p2")
+        expect(tinted).to_have_attribute("data-in-word", "false")
+        expect(tinted).to_have_attribute("data-flash", "")
+    expect(tinted_pencil).to_have_attribute("data-pencil", "true")
+    expect(tinted_normal).to_have_attribute("data-pencil", "false")
+    tinted_pencil_colour = text_colour(tinted_pencil)
+    tinted_normal_colour = text_colour(tinted_normal)
+    flash_colour = swatch_colour(page, "p2")
 
     mock.send(letter_changed_frame(6, 4, 3, "X", "p2", pencil=True))
     flashing = cell_at(page, 4, 3)
     expect(flashing).to_have_attribute("data-flash", str(colour))
-    expect(flashing).to_have_attribute("data-pencil", "true")
-
+    flash_reading = flashing.evaluate(FLASH_READING_SCRIPT, flash_colour)
     offenders = contrast_problems(page)
     flash_after_scan = flashing.get_attribute("data-flash")
 
     assert offenders == [], f"colour {colour}: {offenders}"
-    # The scan ran within the 1-second flash (spec 016).
+    # The reading and the scan ran within the 1-second flash (spec 016).
     assert flash_after_scan == str(colour)
+    # Outside a flash, the grey differs from a normal letter in the same state.
+    assert tinted_pencil_colour != tinted_normal_colour
+    # In the flash, the italics alone mark the pencil letter (decision 12).
+    assert flash_reading["flash"] == str(colour)
+    assert flash_reading["pencil"] == "true"
+    assert flash_reading["fontStyle"] == "italic"
+    assert flash_reading["flashShown"] is True, (flash_colour, flash_reading)
+    assert flash_reading["ratio"] >= MIN_TEXT_CONTRAST, flash_reading
 
 
 # ---- Solved grid (edge case, AC-3 and AC-7) ----

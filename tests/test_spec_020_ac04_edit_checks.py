@@ -2,10 +2,12 @@
 checks of spec 015 in their order, and a refused one is not counted.
 
 The checks (spec 037 rate limit, not a letter cell, locked cell, spec 017's stale
-rule, solved grid) and their order on `handle_message`, the shared rate window
-(spec 037 AC-3), the stale rule's own-change exception for the two messages (spec
-017 left their forms to this spec), and the WebSocket answer to a refused pencil
-edit. The shared setup is in `spec020_harness` and `spec024_harness`.
+rule, solved grid) and their order on `handle_message`, the wake-up of an idle
+sender whose message is refused (spec 013's entry first, then the refusal; the
+lead's note of 2026-10-15), the shared rate window (spec 037 AC-3), the stale
+rule's own-change exception for the two messages (spec 017 left their forms to
+this spec), and the WebSocket answer to a refused pencil edit. The shared setup is
+in `spec020_harness` and `spec024_harness`.
 """
 
 from __future__ import annotations
@@ -25,9 +27,18 @@ from nock.protocol import (
     ErrorCode,
     ErrorMessage,
     LetterChanged,
+    PlayerState,
+    PlayerStateChanged,
     Pong,
 )
-from nock.room import Outcome, RoomConfig, RoomState, handle_message
+from nock.room import (
+    Outcome,
+    PlayerRecord,
+    RoomConfig,
+    RoomState,
+    handle_message,
+    tick,
+)
 from nock.server import create_app
 from spec020_harness import (
     RULE_CONFIG,
@@ -59,6 +70,9 @@ from spec024_harness import (
 KINDS = ["pencil_edit", "confirm_pencil"]
 NOT_LETTER_CELLS = [(0, 0), (5, 0)]
 AFTER_SOLVED = SOLVED_AT + 1.0
+IDLE_AT = NOW + 120.0  # two minutes without input make a player idle (spec 013)
+WOKEN_AT = NOW + 130.0
+QUIET = RoomConfig(silence_timeout_seconds=3600)  # nobody is silent at the tick
 CLUE_CELL_PENCIL_JSON = (
     '{"type": "pencil_edit", "row": 0, "column": 0, "letter": "T", "base_seq": null}'
 )
@@ -152,6 +166,31 @@ def assert_refused(
     assert outcome.state == seen_at(before, player_id, now)
 
 
+def idle_locked_room(grid: Grid) -> RoomState:
+    """`locked_room` after two minutes without input: both players idle (seq 7)."""
+    idle = tick(locked_room(grid), IDLE_AT, QUIET).state
+    assert idle.seq == 7
+    assert player_record(idle, "p1").state is PlayerState.IDLE
+    assert player_record(idle, "p2").state is PlayerState.IDLE
+    return idle
+
+
+def woken(state: RoomState, player_id: str, now: float) -> RoomState:
+    """The state after an idle player's input at `now` that was refused.
+
+    Spec 013 wakes the player before the message's own effect: they become active
+    with `last_seen_at` and `last_input_at` at `now`, and the wake entry raises
+    the seq by one. Nothing else changes, `recent_edits` included.
+    """
+    seen = seen_at(state, player_id, now)
+    players: list[PlayerRecord] = []
+    for player in seen.players:
+        if player.player_id == player_id:
+            player = player.model_copy(update={"state": PlayerState.ACTIVE})
+        players.append(player)
+    return seen.model_copy(update={"players": tuple(players), "seq": state.seq + 1})
+
+
 # ---- AC-4: each check ----
 
 
@@ -240,6 +279,40 @@ def test_ac4_on_a_solved_grid_both_are_refused_grid_solved(
     outcome = send_kind(kind, before, 1, 0, now=AFTER_SOLVED)
 
     assert_refused(before, outcome, ErrorCode.GRID_SOLVED, now=AFTER_SOLVED)
+
+
+# ---- AC-4: a refusal still wakes an idle sender (spec 013) ----
+
+
+def test_ac4_a_refused_pencil_edit_from_an_idle_sender_still_wakes_them(
+    fx01_grid: Grid,
+) -> None:
+    idle = idle_locked_room(fx01_grid)
+
+    outcome = pencil(idle, "p1", 1, 0, "X", now=WOKEN_AT)
+
+    assert events_of(outcome) == [
+        PlayerStateChanged(seq=8, player_id="p1", state=PlayerState.ACTIVE)
+    ]
+    assert refusal_code(outcome) == ErrorCode.CELL_LOCKED
+    assert outcome.state.seq == 8
+    assert outcome.state == woken(idle, "p1", WOKEN_AT)
+
+
+def test_ac4_a_refused_confirmation_from_an_idle_sender_still_wakes_them(
+    fx01_grid: Grid,
+) -> None:
+    # (1, 1) is empty: it holds no pencil letter to confirm.
+    idle = idle_locked_room(fx01_grid)
+
+    outcome = confirm(idle, "p2", 1, 1, now=WOKEN_AT)
+
+    assert events_of(outcome) == [
+        PlayerStateChanged(seq=8, player_id="p2", state=PlayerState.ACTIVE)
+    ]
+    assert refusal_code(outcome) == ErrorCode.STALE_EDIT
+    assert outcome.state.seq == 8
+    assert outcome.state == woken(idle, "p2", WOKEN_AT)
 
 
 # ---- AC-4: the order of the checks ----
