@@ -253,7 +253,11 @@ DRAWING_ORDER_SCRIPT = r"""
       });
       let right = true;
       if (insideLabels.length > 0) {
-        right = found !== null && insideLabels.some(label => label.contains(found));
+        // Inside a label's box, any of the cell's corner labels may be found:
+        // two labels can overlap on a small cell, and the spec lets every
+        // corner label be drawn over the band. The other two branches (the band
+        // outside every label, a ring skipped) are unchanged.
+        right = found !== null && labels.some(label => label.contains(found));
       } else if (outsideAll) {
         right = found !== null && mark.contains(found);
       } else {
