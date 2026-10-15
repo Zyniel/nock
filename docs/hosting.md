@@ -1,27 +1,22 @@
 # Hosting plan
 
-Status: **draft, 2026-10-15.** The sections that do not depend on the owner's
-answers are written. The recommendation (section 4) waits for the answers to the
-questions in section 0. Nothing here changes code or tooling. Section 13 lists the
-tooling that the owner has to approve.
+Status: **recommendation made, 2026-10-15.** The owner answered the questions
+(section 0). The choice is Oracle Cloud Always Free (section 4). Nothing here
+changes code or tooling. Section 13 lists the tooling that the owner has to
+approve, and section 14 lists what only the owner can do (accounts and clicks).
 
-## 0. Questions for the owner
+## 0. The owner's answers (2026-10-15)
 
-1. **Scale.** How many rooms and players at the same time, at launch and in a year?
-   (One room holds at most 8 players: `MAX_PLAYERS`, `src/nock/room.py:83`.)
-2. **Budget.** What monthly amount is acceptable, hosting and mail included?
-3. **Region and GDPR.** Must the data stay with an EU company, or is an EU region
-   of a US company acceptable? Who is the controller (you as an individual, or a
-   company or association)?
-4. **Domain.** Do you already have a domain? Should it be a `.fr`?
-5. **Operations.** Would you rather pay more for a managed platform, or run a small
-   VPS (OS updates, a reverse proxy, backups)?
-6. **Deploying updates.** By hand (one command), or automatically when a tag such
-   as `v1.0.0` is pushed after CI passes?
-7. **Grids.** Where do the licensed grid files live (spec 005): in the repository,
-   or only on the server? There is no `grids/` folder in the repository today, so a
-   deployment would start with an empty catalogue (`GRIDS_DIR`,
-   `src/nock/catalogue.py:32`).
+| Question | Answer |
+| --- | --- |
+| Scale | 10 to 20 rooms at the same time, so at most 160 players (8 per room, `MAX_PLAYERS`, `src/nock/room.py:83`) |
+| Budget | Zero |
+| Region and GDPR | France first, but not required |
+| Domain | An existing domain; a subdomain will point to the server. A free host-provided name is acceptable too |
+| Operations | A VPS-like server on Oracle Always Free is fine |
+| Deploying updates | Fully automatic from CI. A sandbox, possibly with Docker on the owner's machine |
+| Grids | A separate pipeline, later uploaded through the UI or an API. Not part of hosting |
+| Proxy addresses (section 1) | Left to the plan: settled in section 4 |
 
 ## 1. What the app needs at runtime
 
@@ -140,16 +135,56 @@ SQLite); Kubernetes (far more than one process needs).
 
 ## 4. Recommendation
 
-**Waiting for the owner's answers.** Provisional leaning, to confirm:
+**Option D: one Oracle Always Free VM in Paris (or Marseille), running Docker
+Compose.** It is the only option at zero cost, it is a real server (section 2),
+and 20 rooms are far below what it can carry. Option A (a paid EU VPS, about 5 €
+a month) is the fallback, using the same files.
 
-- If you accept a little server work: **option A** with an EU provider. It is the
-  cheapest, keeps the data with an EU company, and the defaults of section 1 work
-  as they are.
-- If cost matters most and you accept a little server work: **option D**
-  (Oracle Always Free, as option A at no cost), on a Pay As You Go account, with
-  option A as the fallback.
-- If you want no server to maintain: **option B** in Paris, with
-  `FORWARDED_ALLOW_IPS` set and the off-site backups of section 6.
+### Why it fits
+
+- **Scale.** 20 rooms of 8 players means 160 sockets, each sending a ping every
+  2 s and a few letters a second. One process handles one room of 8 typing
+  players well within its budget (spec 036 AC-3). Twenty rooms is a small load
+  for one Arm core. A short load test (section 13) will confirm it before launch.
+- **Cost.** 0 €: the VM, its disks and object storage are in the Always Free
+  tier, mail fits a free tier (below), and you already own the domain.
+- **France first.** Oracle has regions in Paris and Marseille. Choose one as the
+  **home region** at sign-up. This cannot be changed later, and free resources
+  exist only there.
+
+### The setup
+
+| Part | Choice |
+| --- | --- |
+| Account | Oracle Cloud, home region Paris (`eu-paris-1`) or Marseille (`eu-marseille-1`). Upgrade it to **Pay As You Go** and set a **budget alert at 1 €**. Always Free resources stay free, and the idle reclamation of section 3 no longer applies. Sign-up asks for a card in any case. |
+| VM | `VM.Standard.A1.Flex` (Arm), 1 OCPU and 6 GB, Ubuntu 24.04 LTS, 50 GB boot volume. This fits even the reduced 2026 allowance and leaves room for a second VM later. |
+| Data disk | A separate 50 GB block volume mounted at `/srv/nock`, holding the SQLite file. It survives if the VM is rebuilt. |
+| Firewall | Allow ports 80 and 443 from anywhere, and port 22 (SSH, key only). Open them in two places: the VCN security list in the console, and the VM's own firewall. Oracle's Ubuntu images block every port except 22 by default. |
+| Software | Docker Engine with Compose, and automatic security updates (`unattended-upgrades`). |
+| Containers | `caddy` (ports 80 and 443, automatic Let's Encrypt certificates, no access log) and `nock` (the app image, port 8000 reachable only by Caddy on Compose's private network, database on `/srv/nock`). |
+| Domain | A record `nock.<your domain>` (for example) pointing to the VM's public IP. It stays the same as long as the VM exists. If the VM is rebuilt, update the record. |
+| Mail (V1) | **Brevo** free plan (French company, 300 e-mails a day, SMTP on port 587). The alternative is OCI Email Delivery, which has a small free allowance. Oracle blocks outgoing port 25, but 587 is open. SPF, DKIM and DMARC as in section 8. |
+| Backups | Nightly online copy (section 6), encrypted, uploaded to OCI Object Storage, with a rule that deletes copies after 14 days. A weekly copy kept elsewhere (your own computer, or another free storage) protects against losing the Oracle account. Weekly block-volume backups (a few are free) add a second layer. |
+| Monitoring | A free external uptime check of `https://nock.<your domain>/` (for example UptimeRobot or Better Stack) that e-mails you. Oracle's console shows CPU and disk. |
+
+### The proxy question, settled
+
+With Caddy in its own container, the app sees Caddy's address on the Compose
+network, not `127.0.0.1`. So the Compose file sets `FORWARDED_ALLOW_IPS=*` on the
+`nock` container. This is safe because the app's port is published nowhere, and
+only Caddy can reach it. The throttles of specs 011, 033 and 038 then see each
+player's real address, and share links start with `https://`. Nothing for you
+to do. Proposed next step 6 (section 13) only asks the lead to record it in spec
+011.
+
+### Risks and fallback
+
+- Oracle may change the free tier again, or refuse an A1 VM for lack of capacity
+  for a while. If so, the same Compose file, Caddy file and backups run on any
+  paid VPS (option A). The move takes about an hour: restore the latest backup
+  and change the DNS record.
+- Oracle is a US company. The data stays in its French region, under its data
+  processing agreement (section 11).
 
 ## 5. TLS and domain
 
@@ -222,8 +257,9 @@ progress, then delete the copy.
 | `NOCK_SMTP_HOST`, `NOCK_SMTP_PORT`, `NOCK_SMTP_SECURITY`, `NOCK_SMTP_USER`, `NOCK_SMTP_FROM` | from the mail provider | no (the user name is not secret, but keep it with the password) |
 | `NOCK_SMTP_PASSWORD` | from the mail provider | **yes** |
 
-- Never in the repository. VPS: a file `/etc/nock/nock.env` readable by root only,
-  loaded by systemd (`EnvironmentFile=`). Fly: `fly secrets set`. Render: secret
+- Never in the repository. Option D: `deploy/.env` on the VM only, readable by
+  its owner only (`chmod 600`), read by Compose. Plain VPS without Docker: a file
+  `/etc/nock/nock.env` loaded by systemd (`EnvironmentFile=`). Fly: `fly secrets set`. Render: secret
   environment variables.
 - Changing the operator token needs a restart (spec 038 "Out of scope").
 - Keep a copy of the secrets in a password manager; the backups do not hold them.
@@ -256,8 +292,9 @@ the hosting's logs out of scope (spec 038 "Out of scope"), so:
 - **Platform proxy** (B, C): the platform's edge may keep its own request logs with
   client addresses. They are outside your control; list them in the privacy notice
   and the platform's data processing agreement covers them.
-- **App logs**: stdout and stderr to journald (A) or the platform's log view.
-  Keep them 14 days (journald `MaxRetentionSec=14day`).
+- **App logs**: stdout and stderr to journald (A and D: Docker's `journald` log
+  driver) or the platform's log view. Keep them 14 days (journald
+  `MaxRetentionSec=14day`). Caddy's own logs follow the same rule.
 - **Uptime**: an external check of `GET /` every minute or five (200 when the
   client is built, 503 when not, `src/nock/server.py:153-162`), alerting you by
   e-mail. The checker only sees its own requests, so it carries no player data.
@@ -295,18 +332,51 @@ resent (spec 017). Keep the downtime well under 5 minutes.
 - Take a backup just before each deploy that changes the database (specs 032 and
   033 add tables and columns).
 
-**Steps, option A** (by hand, or later by a workflow, section 13):
+### The chosen pipeline (option D, automatic)
 
-1. `git fetch --tags && git checkout v1.x.y` in a new release folder.
-2. `uv sync --locked --no-dev`, `npm --prefix web ci`, `npm --prefix web run build`.
-3. Backup (section 6).
-4. Point the `current` link to the new folder and `systemctl restart nock`.
-5. Check `GET /`, open a room, look at `/ops`. To roll back, point `current` back
-   and restart (only while no database change happened in between).
+**When.** On a pushed version tag (`v1.0.0`, `v1.0.1`, ...), as in
+`docs/build-plan.md`. Not on every push to `main`: the agents push many commits
+there, and a tag is a release you decided. You release by asking Claude to "tag
+and release v1.x.y" (or by `git tag` and `git push --tags`).
 
-**Steps, options B and C:** a Dockerfile builds the client and the Python
-environment from a tagged commit; `fly deploy` or a Render deploy replaces the one
-instance; the volume or disk stays.
+**What the workflow does** (a new file in `.github/workflows/`, section 13):
+
+1. Runs the full gate on the tagged commit, as CI does. It stops on a failure.
+2. Builds the Docker image (section 13, item 1), which builds `web/dist` inside
+   it, for `linux/arm64` (the Oracle VM) and `linux/amd64` (the sandbox on your
+   computer). It pushes the image to the GitHub Container Registry
+   (`ghcr.io/zyniel/nock:v1.x.y`), which is free for this use.
+3. Connects to the VM by SSH, with a key stored as a GitHub secret, and runs the
+   deploy script on the VM:
+   1. Backup (section 6).
+   2. `docker compose pull`, then `docker compose up -d`. Compose stops the old
+      container with `SIGTERM`, waits up to 30 s, then starts the new one. Players
+      see "reconnecting" for a few seconds.
+   3. Checks that `GET /` answers 200 within 60 s. Otherwise it puts back the
+      previous image tag, restarts, and the workflow fails, which e-mails you.
+
+Rollback by hand: run the workflow again on the previous tag. This is safe only
+when the release did not change the database's tables. Releases that do say so
+in their notes.
+
+### Sandbox on your computer
+
+The same image runs with Docker Desktop on Windows, through a second Compose file
+kept in the repository (section 13, item 2):
+
+- `docker compose -f compose.sandbox.yaml up` starts Nock at
+  `http://localhost:8000`, with its database in a Docker volume, and an operator
+  token for the sandbox only.
+- It adds **Mailpit**, a fake mail server: sign-in e-mails (spec 033) never leave
+  your computer, and you read them at `http://localhost:8025`.
+- It runs the image of any tag (`NOCK_TAG=v1.2.0`), or one built from your
+  working copy, so you can try a release before tagging it.
+- No TLS, no Caddy: on `http://` the session cookie has no `Secure` flag, which
+  spec 033 allows.
+
+A second free VM as an online staging server is possible later (the Always Free
+allowance has room), but it doubles the server work. Start with the local
+sandbox.
 
 ## 11. GDPR checklist
 
@@ -314,7 +384,9 @@ The game is French-language, open to guests, and (V1) stores e-mail addresses.
 
 - [ ] **Controller** named: you, or your company or association.
 - [ ] **Legal notice** (mentions légales, required by French law for a public
-      site): publisher, director of publication, host's name and address.
+      site): publisher, director of publication, host's name and address (Oracle,
+      for option D). A private individual publishing as a non-professional may
+      leave their name off the site, but must give it to the host.
 - [ ] **Privacy notice** in French, linked from every page, saying:
   - what is kept and for how long, from spec 038's table: nickname, player id and
     resume token, letters and chat of a room, until 30 days after its last edit
@@ -331,9 +403,11 @@ The game is French-language, open to guests, and (V1) stores e-mail addresses.
       the signed-in session, strictly needed (spec 038, spec 033). No tracker, no
       third-party request (spec 038 AC-2, spec 005).
 - [ ] **Data processing agreements** (DPA) signed or accepted with: the host, the
-      mail provider, the backup storage. With a US company (options B, C), check
-      that its DPA covers transfers (standard contractual clauses or the
-      EU-US Data Privacy Framework).
+      mail provider, the backup storage. With a US company (Oracle, Fly.io,
+      Render), check that its DPA covers transfers (standard contractual clauses
+      or the EU-US Data Privacy Framework). For option D: Oracle (host and backup
+      storage; its DPA is part of the cloud services agreement) and Brevo (mail).
+      The uptime checker sees no player data and needs none.
 - [ ] **Record of processing** (registre des traitements): one page listing the
       above.
 - [ ] **Breach procedure**: who decides, notification to the CNIL within 72 hours
@@ -344,12 +418,14 @@ The game is French-language, open to guests, and (V1) stores e-mail addresses.
 
 ## 12. Before the first public test
 
-- [ ] Answers to section 0; option chosen.
-- [ ] Grids with their licences on the server (spec 005).
+- [x] Answers to section 0; option D chosen.
+- [ ] Grids with their licences loaded by their own pipeline (spec 005; outside
+      this plan).
 - [ ] Domain, TLS, HTTP to HTTPS redirect.
 - [ ] `NOCK_DATABASE` on the persistent disk; first backup and a restore test.
-- [ ] Proxy addresses set if needed (section 1); a share link starts with
-      `https://`; two players behind different networks can join one room.
+- [ ] `FORWARDED_ALLOW_IPS=*` on the app container (section 4); a share link
+      starts with `https://`; two players on different networks can join one
+      room.
 - [ ] Operator token set; `/ops` works.
 - [ ] V1: SMTP, SPF, DKIM, DMARC; a sign-in link reaches the inbox.
 - [ ] Legal notice and privacy notice online.
@@ -360,20 +436,52 @@ The game is French-language, open to guests, and (V1) stores e-mail addresses.
 These are tooling, so they are your decision (`CLAUDE.md`, "Who may write what").
 None is done.
 
-1. **Dockerfile** (needed for B and C; optional for A): two stages, Node to build
-   `web/dist`, then Python with uv (`uv sync --locked --no-dev`), running
-   `python -m nock` as a non-root user, the repository tree copied in (section 1,
-   files read from the source tree), `/data` as the volume.
-2. **Deploy files**: for A, a systemd unit, a Caddyfile and a deploy script; for
-   B, `fly.toml`; for C, `render.yaml`.
-3. **Backup script** using `VACUUM INTO`, with encryption, upload, 14-day
-   retention, and a timer; plus the restore-test steps as a script.
-4. **Deploy workflow** in `.github/workflows/`: on a `v*` tag, after the gate
-   passes, build and deploy. Needs a deploy secret in GitHub (an SSH key for A, an
-   API token for B or C).
-5. **Load test** (a spec): many rooms of 8 players on the chosen machine size, to
-   know the capacity before a public launch (spec 036 measures one room only).
-6. **Spec 011 note** on `FORWARDED_ALLOW_IPS` (section 1), if you want the spec to
-   say how the client address is read behind a proxy.
+In the order to build them. Items 1 to 4 are needed for the first deployment.
+Say "approved" (all or by number), and a session will write them on a branch for
+you to review.
+
+1. **Dockerfile**: two stages. Node builds `web/dist`, then Python with uv
+   (`uv sync --locked --no-dev`). It copies the repository tree in (section 1,
+   files read from the source tree) and runs `python -m nock` as a non-root user,
+   with `NOCK_HOST=0.0.0.0` and `NOCK_DATABASE=/data/nock.sqlite3`. It builds for
+   arm64 and amd64.
+2. **Compose and Caddy files**: `deploy/compose.yaml` (the `caddy` and `nock`
+   containers of section 4, `FORWARDED_ALLOW_IPS=*`, secrets read from a
+   `deploy/.env` file that stays on the VM), `deploy/Caddyfile` (the domain, no
+   access log, HTTPS redirect), and `compose.sandbox.yaml` with Mailpit (section
+   10).
+3. **Server scripts** in `deploy/`: a one-time VM setup script (Docker, firewall,
+   automatic updates, data volume mount), the deploy script of section 10, and
+   the backup script (`VACUUM INTO`, encryption, upload to Object Storage, 14-day
+   rule) with its nightly timer, plus a restore-test script.
+4. **Deploy workflow** `.github/workflows/deploy.yml`: on a `v*` tag, gate, build,
+   push to GHCR, deploy by SSH (section 10). It needs three GitHub secrets: the
+   VM's address, an SSH private key, and the SSH user.
+5. **Load test** (a spec): 20 rooms of 8 simulated players on the VM size, before
+   the public launch (spec 036 measures one room only).
+6. **Spec 011 note**: one dated line saying that, in production, uvicorn reads the
+   client address from Caddy's `X-Forwarded-For` (section 4).
 7. **Deletion journal** (a spec), only if you want restores to re-apply account
    deletions on their own (section 6).
+
+No new Python or npm dependency is needed. Docker, Caddy and Mailpit run as
+images, outside the project's dependencies.
+
+## 14. What only you can do
+
+These need your accounts. A session can guide you step by step when you get
+there.
+
+1. Create the Oracle Cloud account: home region **Paris** or **Marseille**,
+   upgrade to Pay As You Go, budget alert at 1 €.
+2. Create the VM and the data volume as in section 4. If Oracle answers "out of
+   capacity", retry later.
+3. Add the DNS record `nock.<your domain>` pointing to the VM's IP, at your
+   domain's registrar.
+4. Put the three deploy secrets in the GitHub repository settings (item 4 above).
+5. Create the `deploy/.env` file on the VM with the secrets of section 7 (the
+   operator token can be generated for you).
+6. Later, for V1 accounts: create the Brevo account, add its SPF, DKIM and DMARC
+   records to the domain, and put its SMTP password in `deploy/.env`.
+7. Write the legal notice and privacy notice from section 11 (a session can
+   draft them in French for you to check).
