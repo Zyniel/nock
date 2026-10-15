@@ -1069,6 +1069,20 @@
     chatToggle?.focus()
   }
 
+  // Runs before the page disables the chat controls at a mute: when the focus
+  // is on the input or the send button, it goes to the toggle instead of being
+  // lost. The panel stays open and the typed text stays in the input.
+  $effect.pre(() => {
+    if (!isMuted) {
+      return
+    }
+    const focused = document.activeElement
+    const chatForm = chatInput?.form
+    if (focused !== null && chatForm?.contains(focused)) {
+      chatToggle?.focus()
+    }
+  })
+
   $effect(() => {
     if (chatPanel === null) {
       return
@@ -1180,6 +1194,20 @@
     isPickerOpen = false
     reactButton?.focus()
   }
+
+  // Runs before the page disables the button (a mute, or no word selected):
+  // the picker closes at once and sends nothing. When the focus was inside it,
+  // the focus goes to the grid instead of falling back to the page.
+  $effect.pre(() => {
+    if (!isReactDisabled || !isPickerOpen) {
+      return
+    }
+    const focused = document.activeElement
+    if (reactionPicker !== null && focused !== null && reactionPicker.contains(focused)) {
+      gridViewport?.focusGrid()
+    }
+    isPickerOpen = false
+  })
 
   $effect(() => {
     if (reactionPicker === null) {
@@ -1845,11 +1873,15 @@
           disabled={isChatSendDisabled}>{t('chat.send')}</button
         >
       </form>
-      {#if isMuted}
-        <p class="chat-note" data-testid="chat-muted">{t('chat.muted')}</p>
-      {:else if isChatPaced}
-        <p class="chat-note" data-testid="chat-wait">{t('chat.wait')}</p>
-      {/if}
+      <!-- Always present, so the panel keeps its height when a note comes or
+           goes (spec 022 AC-18). -->
+      <p class="chat-note">
+        {#if isMuted}
+          <span data-testid="chat-muted">{t('chat.muted')}</span>
+        {:else if isChatPaced}
+          <span data-testid="chat-wait">{t('chat.wait')}</span>
+        {/if}
+      </p>
     </section>
   {/if}
   {#if session.status === 'reconnecting'}
@@ -2408,6 +2440,8 @@
   .chat-note {
     flex: none;
     margin: 0;
+    min-height: 1.2em;
+    line-height: 1.2;
     font-size: 0.8rem;
     color: #4a4f5c;
   }
