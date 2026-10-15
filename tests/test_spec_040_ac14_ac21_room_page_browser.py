@@ -23,8 +23,10 @@ from nock.grid import Grid
 from nock.protocol import (
     Join,
     LetterChanged,
+    Ping,
     PlayerState,
     PlayerView,
+    Pong,
     RevealBudget,
     Snapshot,
     grid_view,
@@ -52,7 +54,14 @@ def fx01_grid(fx01_text: str) -> Grid:
 
 
 class MockRoomSocket:
-    """The server side of the room socket of /r/ABC123, driven by the test."""
+    """The server side of the room socket of /r/ABC123, driven by the test.
+
+    It records every frame the page sends, `ping` frames included. Like the real
+    server (specs 017 and 039), it answers each `ping` with one `pong` on the route
+    that sent it: without the answer, the page takes 4 s without a frame from the
+    server for a lost connection (spec 017, AC-4), so a step that takes longer on a
+    slow engine would find the page `reconnecting`.
+    """
 
     def __init__(self, page: Page) -> None:
         self.page = page
@@ -61,11 +70,17 @@ class MockRoomSocket:
 
     def handle(self, route: WebSocketRoute) -> None:
         self.routes.append(route)
-        route.on_message(self._record)
 
-    def _record(self, message: str | bytes) -> None:
+        def on_message(message: str | bytes) -> None:
+            self._record_and_answer(route, message)
+
+        route.on_message(on_message)
+
+    def _record_and_answer(self, route: WebSocketRoute, message: str | bytes) -> None:
         text = message if isinstance(message, str) else message.decode("utf-8")
         self.received.append(text)
+        if parse_client_message(text) == Ping():
+            route.send(Pong().model_dump_json())
 
     def send(self, frame: str) -> None:
         self.routes[0].send(frame)
