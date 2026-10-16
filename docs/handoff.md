@@ -5,7 +5,7 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, midday)
+## Where things stand (2026-10-16, early afternoon)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -18,12 +18,11 @@ Update it at the end of each session.
   stricter language scan), PR #11 (tooling: the finish hook lets an agent stop
   once it has reported a failure it cannot fix), PR #12 (spec 036's refinement:
   technical variables refuse special characters; spec 033's variables brought in
-  line). Tag `v0.1.0` exists locally on #6's merge commit but could not be pushed
-  from the cloud session (tag pushes are refused): the human pushes it from a
-  clone.
-- Open: spec 028's pull request (end-of-game recap). Its description holds the
-  human's question (team nicknames that differ only in case) and the known burst
-  race of the recap route's throttle, which spec 032's pull request fixes.
+  line), PR #13 (spec 028, end-of-game recap and share link). Tag `v0.1.0`
+  exists locally on #6's merge commit but could not be pushed from the cloud
+  session (tag pushes are refused): the human pushes it from a clone.
+- Open: a tooling pull request, the four test files that measure durations in
+  the serial pass.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only); spec 033's
   open question 2 (players' addresses outside ASCII; (b) recommended).
@@ -34,31 +33,28 @@ Update it at the end of each session.
   merged. CI runs only on pull requests, so a local check comes first.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
-- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028 are `done` (028 in its
-  pull request). Still to build, in this order: 032 (built, in its last fix
-  round), 038 (refines 036), 034 (refines 013), 033 (refines 005 and 018), 029.
+- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028 are `done`. Still to
+  build: 032 (built and simplified, its pull request next), then the nickname
+  rule below. The human was asked on 2026-10-16 whether to park 029, 033, 034
+  and 038 ("the core is the game engine not all the rest") and what engine work
+  comes first; the lead proposed simplifying the room engine.
 
 ## Work in flight (not pushed)
 
 - Spec 032 (room resume): worktree `.claude/worktrees/spec-032`, branch
-  `spec-032`, built on spec 028's commits as they were before the rebase onto
-  #12 (3059df6); rebase it with `git rebase --onto <028's head in its pull
-  request> 3059df6 spec-032` once its implementer is done. Spec d4443b7,
-  d55bd9c, 55b5e97, a7eec1e; tests 5ddef63, df81379, bb8955d, 0fdde99; code
-  cb7e14c (server), d7f5a4b (client), 57d1922 (first review). Two reviews ran;
-  the second found a blocking regression from the first round (the socket
-  route's threaded lookup let a burst of wrong codes past spec 011's throttle),
-  so a last fix round (the throttle checks and records in one step; damaged
-  rooms left out of summaries; bytes that are not UTF-8) is being built, and the
-  lead verifies it with the reviewer's burst script
-  (`scratchpad/throttle_burst.py`) instead of a third review. Lead decisions for
-  the human in its pull request: 13 (a mute survives a time-out and seat back),
-  14 (only lookups check expiry).
-- Tooling fix ready on branch `tooling-serial` (worktree
-  `.claude/worktrees/tooling-serial`, d6ad451): the four files that measure
-  durations join `SERIAL_TEST_FILES`, and CLAUDE.md's rule says which files count
-  (a duration or a pace; a bounded wait stays parallel). Its own pull request
-  after 028's; update this file's `SERIAL_TEST_FILES` paragraph with it.
+  `spec-032`, still on spec 028's commits from before their rebase (3059df6):
+  rebase with `git rebase --onto origin/main 3059df6 spec-032`. Two reviews,
+  then a last fix round the lead verified (the throttle checks and records in
+  one locked step; the reviewer's burst script gives exactly 10 wrong codes
+  through for 40 and 300 sockets) and a simplification under the human's rule
+  (no store upgrade: Nock was never deployed; 126 lines fewer). Lead decisions
+  for the human in its pull request: 13 (a mute survives a time-out and seat
+  back), 14 (only lookups check expiry).
+- Nickname rule (human, 2026-10-16): typed in capitals, stored in capitals
+  (`str.upper()` before the checks), compared exactly (no casefold left), shown
+  with capitalised words (one display function). Worktree
+  `.claude/worktrees/caps-names`, branch `caps-names` on spec 032's head
+  (c8e004a); the spec-writer is at work. Its own pull request after 032's.
 - Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
   values, a spec 035 refinement, after 032).
@@ -80,7 +76,7 @@ Update it at the end of each session.
 
 1. Keep the open pull request green until the human merges it; answer its
    review comments.
-2. Then the tooling fix, then spec 032 (above), each in its own pull request.
+2. Then spec 032, then the nickname rule (above), each in its own pull request.
 3. Then the rest of Phase 6 in the order above, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and
@@ -150,10 +146,12 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   (with 4 the runner once stalled for over 5 s), use ephemeral ports 16384 to
   65535 (the default range ran out once; the range starts above 10080, the
   highest port browsers refuse), and print the TIME_WAIT count when they fail.
-- `SERIAL_TEST_FILES` holds the files that time something in the page or
-  against the real clock: spec 013 AC-7/AC-8 and spec 022 AC-11/AC-12 (list
-  scroll, 300 ms), spec 022 AC-10 (pacing), spec 036 AC-1 (time budgets), and
-  spec 027's live pages once it lands. Add a file when it flakes in parallel.
+- `SERIAL_TEST_FILES` holds the files that measure a duration or a pace: spec
+  013 AC-7/AC-8 and spec 022 AC-11/AC-12 (list scroll, 300 ms), spec 022 AC-10
+  (pacing), spec 036 AC-1 (time budgets), spec 027's live pages, and since
+  2026-10-16 spec 013 AC-2 and spec 015 AC-1 (relay percentiles), spec 025 AC-7
+  (the banner's time window) and spec 026 AC-1/AC-3 (the solve budget). A file
+  that only waits up to a bound for a change stays parallel unless it flakes.
 
 ## Decisions the human made
 
@@ -185,6 +183,13 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   the human (written in `CLAUDE.md`).
 - 2026-10-16: no screenshots in pull requests. No work on the app's visuals
   until the human takes it up ("don't bother yet about visuals").
+- 2026-10-16: "Force player names to be input as caps, stored as caps, and
+  rendered as Camel case. Make things simple from a backend perspective, don't
+  generate edge cases by making things complicated. We are here to work on a
+  core Arrow Crossword game. The core is the game engine not all the rest."
+  "Camel case" read as capitalised words ("Ana"). Applied at once to spec 032
+  (no store upgrade). Prefer the simplest rule that removes edge cases; do not
+  escalate obscure edge cases of peripheral features.
 
 ## Lead decisions of 2026-10-15 worth knowing
 
