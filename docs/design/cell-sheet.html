@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,500;1,700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
 <style>
-/* Layout: a specimen sheet. A recap, a marker switch, labelled rows of cells, then a working phone mock-up.
+/* Layout: a specimen sheet. A recap, labelled rows of cells, then a working phone mock-up.
    Single light theme on purpose: Nock has no dark mode yet, and this page shows its light palette. */
 :root {
   color-scheme: light;
@@ -41,6 +41,7 @@ body {
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 24px 64px;
 }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--page); }
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 40px; }
 header h1 { font: 600 2rem/1.15 var(--f-head); margin: 0 0 8px; text-wrap: balance; color: var(--navy); }
 header p { margin: 0; max-width: 68ch; color: var(--muted); }
@@ -50,8 +51,8 @@ h2 { font: 600 1.35rem/1.2 var(--f-head); margin: 0; color: var(--navy); text-wr
 h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
 .lead { margin: 0; max-width: 72ch; color: var(--muted); }
 .board { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 20px; display: flex; flex-wrap: wrap; gap: 24px 28px; align-items: flex-start; }
-.spec { display: grid; gap: 8px; justify-items: start; min-width: 0; max-width: 210px; }
-.spec .cap { font-size: .86rem; line-height: 1.35; color: var(--ink); }
+.spec { display: grid; gap: 8px; justify-items: start; min-width: 0; max-width: 100%; overflow-x: auto; }
+.spec .cap { font-size: .86rem; line-height: 1.35; color: var(--ink); max-width: 210px; }
 .spec .cap b { font-weight: 600; display: block; }
 .spec .cap span { color: var(--muted); }
 .note { font-size: .9rem; color: var(--muted); max-width: 72ch; margin: 0; }
@@ -66,7 +67,6 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 
 /* ---------- switch ---------- */
 .switch { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--navy); color: #FFFFFF; border-radius: 6px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: .9rem; }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--page); }
 .switch .grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .switch .lbl { font-weight: 600; margin-right: 4px; }
 .switch button { background: transparent; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, .45); border-radius: 14px; padding: 4px 11px; font: 500 .85rem/1.2 var(--f-ui); cursor: pointer; }
@@ -75,34 +75,33 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 /* ---------- cells ---------- */
 .g { display: inline-grid; border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); background: var(--rule); gap: 0; }
-.c { position: relative; width: var(--s); height: var(--s); background: var(--cell); border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: visible; }
+.c { position: relative; width: var(--s); height: var(--s); background: var(--cell); border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; }
 .c.word { background: var(--word); }
 .c.locked { background: var(--locked); }
-.c.sel { background: var(--sel); box-shadow: inset 0 0 0 2px var(--navy); }
+.c.sel { background: var(--sel); }
+.c.sel::before { content: ""; position: absolute; inset: 0; border: 2px solid var(--navy); z-index: 4; pointer-events: none; }
 .ltr { position: absolute; inset: 0; display: grid; place-items: center; font: 500 calc(var(--s) * .56)/1 var(--f-ui); color: var(--ink); padding-bottom: calc(var(--s) * .04); }
 .locked .ltr { font-weight: 700; }
 .pencil .ltr { font-style: italic; color: var(--pencil); }
 .pencil.flash .ltr { color: var(--ink); }
 .wrong .ltr span { text-decoration: line-through; text-decoration-thickness: max(2px, .07em); text-decoration-color: var(--wrong); }
-.rev::after { content: ""; position: absolute; top: 2px; right: 2px; width: max(6px, calc(var(--s) * .27)); height: max(6px, calc(var(--s) * .27)); background: var(--reveal); clip-path: polygon(0 0, 100% 0, 100% 100%); }
-.band { position: absolute; left: 25%; width: 50%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); display: none; }
+/* revealed: a notch at the middle of the top edge (the corners now belong to players) */
+.rev::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: max(8px, calc(var(--s) * .3)); height: max(5px, calc(var(--s) * .15)); background: var(--reveal); clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 3; }
+.band { position: absolute; left: 30%; width: 40%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); display: none; }
 .band.gone { background: repeating-linear-gradient(135deg, #333333 0 2px, #FFFFFF 2px 4px) !important; }
 .static .band, .authors-on .band { display: block; }
-.old-cur { position: absolute; border: 2px dashed; pointer-events: none; }
 
-/* presence markers */
-.mk { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 2px; line-height: 1; }
-.mk.tl { top: 2px; left: 2px; } .mk.tr { top: 2px; right: 2px; } .mk.bl { bottom: 2px; left: 2px; } .mk.br { bottom: 2px; right: 2px; }
-.mk svg { display: block; overflow: visible; }
-.mk svg .f { stroke: #14181F; stroke-width: 1.1; stroke-linejoin: round; }
-.mk.chip { background: rgba(255, 255, 255, .94); border-radius: 3px; padding: 1px 3px 1px 2px; box-shadow: 0 0 0 1px rgba(20, 24, 31, .3); font: 700 max(7px, calc(var(--s) * .17))/1 var(--f-ui); color: var(--ink); letter-spacing: .02em; }
-.mk.more { background: #14181F; color: #FFFFFF; border-radius: 3px; padding: 1px 3px; font: 700 max(7px, calc(var(--s) * .18))/1 var(--f-ui); }
-.mk.nock { filter: drop-shadow(0 0 .7px #14181F) drop-shadow(0 0 .4px #14181F); }
-.mk.nock.tl, .mk.nock.tr { top: -1px; } .mk.nock.bl, .mk.nock.br { bottom: -1px; }
-.mk.nock i { display: grid; place-items: start center; font: 700 max(6px, calc(var(--s) * .15))/1 var(--f-ui); font-style: normal; padding-top: 2px; letter-spacing: .01em; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
-.mk.nock.bl i, .mk.nock.br i { clip-path: polygon(0 0, 50% 28%, 100% 0, 100% 100%, 0 100%); place-items: end center; padding: 0 0 2px; }
+/* players: one coloured triangle per corner */
+.tri { position: absolute; z-index: 2; pointer-events: none; }
+.tri svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.tri polygon { stroke: #14181F; stroke-width: 1; stroke-linejoin: round; }
+.tri b { position: absolute; font: 700 max(7px, calc(var(--s) * .14))/1 var(--f-ui); letter-spacing: .01em; }
+.tri.tl { top: 0; left: 0; } .tri.tl b { top: 2px; left: 2px; }
+.tri.tr { top: 0; right: 0; } .tri.tr b { top: 2px; right: 2px; }
+.tri.br { bottom: 0; right: 0; } .tri.br b { bottom: 2px; right: 2px; }
+.tri.bl { bottom: 0; left: 0; } .tri.bl b { bottom: 2px; left: 2px; }
 
-.c.clue { background: var(--clue-bg); color: var(--clue-ink); display: flex; flex-direction: column; padding: 2px 3px; font: 600 max(6px, calc(var(--s) * .145))/1.12 var(--f-clue); text-transform: uppercase; text-align: center; letter-spacing: .01em; }
+.c.clue { background: var(--clue-bg); color: var(--clue-ink); display: flex; flex-direction: column; padding: 2px 3px; font: 600 max(6px, calc(var(--s) * .145))/1.12 var(--f-clue); text-transform: uppercase; text-align: center; letter-spacing: .01em; overflow: visible; }
 .c.clue .q { flex: 1; display: flex; align-items: center; min-height: 0; }
 .c.clue .q span { display: block; width: 100%; overflow-wrap: break-word; hyphens: manual; }
 .c.clue .sep { height: 1px; background: var(--clue-ink); opacity: .55; margin: 0 14%; flex: none; }
@@ -110,11 +109,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .arw { position: absolute; z-index: 1; width: max(10px, calc(var(--s) * .34)); height: max(10px, calc(var(--s) * .34)); }
 .arw path { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .arw polygon { fill: var(--ink); }
-
-/* identity row */
-.ids { display: flex; flex-wrap: wrap; gap: 14px 22px; }
-.id { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
-.id span { color: var(--muted); font-size: .8rem; }
 
 /* ---------- contrast table ---------- */
 .tbl-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
@@ -173,12 +167,13 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .stream { flex: 1; overflow: auto; padding: 10px 16px; display: grid; gap: 8px; align-content: start; font-size: .92rem; }
 .msg { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; }
 .msg .who { font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.evt { color: var(--muted); font-size: .82rem; padding-left: 18px; }
+.pdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; box-shadow: 0 0 0 1px rgba(20, 24, 31, .55); }
+.evt { color: var(--muted); font-size: .82rem; padding-left: 16px; }
 .compose { display: flex; gap: 8px; padding: 8px 12px 12px; border-top: 1px solid var(--line); flex: none; }
 .compose span { flex: 1; border: 1px solid var(--rule); border-radius: 18px; padding: 7px 12px; color: var(--muted); font-size: .9rem; }
 .players { padding: 10px 16px; display: grid; gap: 10px; font-size: .95rem; align-content: start; overflow: auto; flex: 1; }
 .players .row { display: flex; align-items: center; gap: 10px; }
-.players .st { margin-left: auto; color: var(--muted); font-size: .85rem; }
+.players .st { margin-left: auto; color: var(--muted); font-size: .85rem; text-align: right; }
 .players .idle { font-style: italic; }
 .pill { display: inline-block; background: var(--word); color: var(--navy); border-radius: 14px; padding: 6px 12px; font-weight: 600; font-size: .85rem; border: 0; }
 .linkish { background: none; border: 0; padding: 0; color: var(--navy); text-decoration: underline; font: inherit; cursor: pointer; }
@@ -187,9 +182,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 2 · players shown by a shape</div>
+    <div class="ver">Version 3 · players as corner triangles</div>
     <h1>Nock cell sheet</h1>
-    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette, checked against specs 006, 013, 019 to 024 and 035. Version 2 drops the dashed border around other players' cells: each player is now a colour <em>and</em> a shape, shown as a small marker in a corner. Use the switch below to compare three marker styles everywhere on the page, the phone included.</p>
+    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3 shows each player on a cell as a coloured triangle in one corner, four at most. Initials appear inside the triangle only on large cells. The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
   </header>
 
   <section>
@@ -200,8 +195,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
         <ul>
           <li>« Le Quotidien »: white, navy <code>#1B2F55</code>, blue-grey clue cells, after Le Figaro's phone view.</li>
           <li>Fonts: Source Sans 3 for the interface and letters, IBM Plex Sans Condensed for clues.</li>
-          <li>Bold means locked; pencil is italic grey; wrong is struck through; revealed has a corner triangle.</li>
-          <li class="new"><b>New:</b> each player is a colour plus a shape. No dashed border; a small marker in a corner of the cell.</li>
+          <li>Bold on grey means locked (checked right, or revealed). Pencil is italic grey. Wrong is struck through.</li>
+          <li class="new"><b>New:</b> other players are a coloured triangle in a corner, four per cell at most. No dashed border, no shapes.</li>
+          <li class="new"><b>New:</b> initials inside the triangle only from 44 px cells up.</li>
+          <li class="new"><b>New:</b> a revealed letter has a notch at the top centre, no longer a corner triangle.</li>
         </ul>
       </div>
       <div>
@@ -226,8 +223,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       <div>
         <h3>Still open</h3>
         <ul>
-          <li class="new"><b>Pick:</b> marker style (shape, shape + initials, or notch tab).</li>
-          <li class="new"><b>Pick:</b> keep the light tint on another player's word, or drop it.</li>
+          <li class="new"><b>Pick:</b> keep the light tint on another player's word, or drop it (switch below).</li>
+          <li>Which corner a player gets: arrival order on the cell (shown here), or a fixed corner per player.</li>
           <li>Blue against blue: my selected word vs player 2's colour.</li>
           <li>Does a closed column stay closed next time?</li>
           <li>Long press on ⌫ to erase a word.</li>
@@ -237,23 +234,17 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   </section>
 
   <div class="switch" role="group" aria-label="Variantes">
-    <div class="grp"><span class="lbl">Marker</span>
-      <button type="button" data-mode="shape" aria-pressed="true">Shape</button>
-      <button type="button" data-mode="chip" aria-pressed="false">Shape + initials</button>
-      <button type="button" data-mode="nock" aria-pressed="false">Notch tab</button>
-    </div>
-    <div class="grp"><span class="lbl">Their word</span>
+    <div class="grp"><span class="lbl">Another player's word</span>
       <button type="button" data-tint="on" aria-pressed="true">Light tint</button>
       <button type="button" data-tint="off" aria-pressed="false">Nothing</button>
     </div>
   </div>
 
   <section>
-    <h2><small>1 · Players</small>A colour and a shape for each player</h2>
-    <p class="lead">Players get colour and shape by join order, the way colours are given today. The shape is the sign that is not colour, so a colour-blind player can still tell markers apart. The same shape follows the player everywhere: on the grid, in the player list, in the stream.</p>
-    <div class="board"><div class="ids" id="ids"></div></div>
-    <div class="board static" id="styles"></div>
-    <p class="note"><strong>Why the dark edge:</strong> the green and orange of today's palette are under 3:1 on white on their own, so every shape has a thin dark outline. <strong>Initials</strong> appear only from 44 px cells up; below that they would cover the letter.</p>
+    <h2><small>1 · Players on a cell</small>One corner each, four at most</h2>
+    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. From 44 px the triangle grows a little and carries the player's initials. Below 44 px it is colour only.</p>
+    <div class="board static" id="corners"></div>
+    <p class="note"><strong>Accessibility.</strong> Under 44 px the corner is colour only, which spec 035 (AC-6) does not allow today. Two ways to fill the gap: the clue bar names who else is on my word ("Bo est ici"), and the player list in the Salon says where each player is. Spec 035 would need to accept that.</p>
   </section>
 
   <section>
@@ -264,30 +255,24 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>3 · Letter cells</small>One state at a time, at 56 px</h2>
-    <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a corner triangle.</p>
+    <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. A letter is locked when a check finds it right or when a reveal fills it in. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a notch at the top.</p>
     <div class="board static" id="states"></div>
   </section>
 
   <section>
     <h2><small>4 · Selection and other players</small>Me, my word, and the others</h2>
-    <p class="lead">My cell keeps the filled blue and the solid navy border; it is the only cell with a border. Other players are a marker in a corner, and, if kept, a light tint of their colour on their word.</p>
+    <p class="lead">My cell keeps the filled blue and the solid navy border; it is the only cell with a border. Other players are a corner triangle and, if kept, a light tint of their colour on their word.</p>
     <div class="board static" id="sel"></div>
   </section>
 
   <section>
-    <h2><small>5 · Crowded cells</small>Markers at the three sizes of spec 035</h2>
-    <p class="lead">44 px and up: four corner slots. 20 to 43 px: two, top-left and bottom-right. Under 20 px: one. With more players than slots, the last slot shows « +k ». The top-right slot is used last, and never when the cell carries the revealed triangle.</p>
-    <div class="board static" id="crowd"></div>
-  </section>
-
-  <section>
-    <h2><small>6 · Worst cases</small>Where marks could collide</h2>
+    <h2><small>5 · Worst cases</small>Where marks could collide</h2>
     <div class="board static" id="worst"></div>
     <p class="note"><strong>Blue against blue.</strong> Player colour 2 (<code>#4363d8</code>) tints a word almost like my own selected word. Dropping the tint (switch above) removes the problem; otherwise my word moves to a neutral tint or the palette loses its blue.</p>
   </section>
 
   <section>
-    <h2><small>7 · In context</small>Phone, 360 px, keyboard shown</h2>
+    <h2><small>6 · In context</small>Phone, 360 px, keyboard shown</h2>
     <div class="mock-row">
       <div class="phone" id="phone">
         <div class="topbar">
@@ -318,20 +303,20 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li><b>✎ on the keyboard</b> turns pencil mode on: the key goes navy and every letter key turns italic grey.</li>
           <li><b>Clavier</b> hides the keyboard and the grid takes the space.</li>
           <li><b>Aide</b> opens check and reveal in one menu.</li>
-          <li><b>Salon</b> opens the sheet: progress, then the one stream, or the players. Players carry their shape there too.</li>
+          <li><b>Salon</b> opens the sheet: progress, then the one stream, or the players with where each one is.</li>
           <li><b>Menu</b> holds the Auteurs switch.</li>
           <li><button class="linkish" type="button" id="replay">Show a 3-second note again</button></li>
         </ul>
-        <p class="note">On the grid: Bo (green square) and Dé (orange diamond) are both on the last cell of LEST; Él (purple triangle) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed. O in AMEN is wrong. D in VIDE is Bo's pencil letter. « Flaire » is flagged.</p>
+        <p class="note">On the grid: Bo (green) and Dé (orange) are both on the last cell of LEST, in two corners; Él (purple) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed (notch at the top). O in AMEN is wrong. D in VIDE is Bo's pencil letter. « Flaire » is flagged.</p>
       </div>
     </div>
   </section>
 
   <section>
-    <h2><small>8 · Contrast</small>Measured on this page</h2>
-    <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed triangle, flag, author band, player markers) need 3:1.</p>
+    <h2><small>7 · Contrast</small>Measured on this page</h2>
+    <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed notch, flag, author band, player triangles) need 3:1.</p>
     <div class="tbl-wrap"><table id="contrast"><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Needs</th><th>Result</th></tr></thead><tbody></tbody></table></div>
-    <p class="note"><strong>Player colours.</strong> Green and orange fall under 3:1 on white on their own (last rows), so markers and author bands carry a thin dark edge, which specs 019 and 035 allow.</p>
+    <p class="note"><strong>Player colours.</strong> Green and orange fall under 3:1 on white on their own (last rows), so triangles and author bands carry a thin dark edge, which specs 019 and 035 allow. Initials inside a triangle take black or white, whichever reads better on that colour.</p>
   </section>
 </div>
 
@@ -340,18 +325,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   "use strict";
   var P = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080", "#9a6324", "#808000"];
   var NAMES = ["Ana", "Bo", "Cé", "Dé", "Él", "Fa", "Gus", "Hu"];
-  var SHAPE_NAMES = ["circle", "square", "triangle", "diamond", "triangle down", "plus", "bar", "bow"];
-  var SHAPES = [
-    '<circle class="f" cx="5" cy="5" r="4.2"/>',
-    '<rect class="f" x="1" y="1" width="8" height="8"/>',
-    '<polygon class="f" points="5,0.6 9.6,9.2 0.4,9.2"/>',
-    '<polygon class="f" points="5,0.2 9.8,5 5,9.8 0.2,5"/>',
-    '<polygon class="f" points="0.4,0.8 9.6,0.8 5,9.4"/>',
-    '<polygon class="f" points="3.4,0.4 6.6,0.4 6.6,3.4 9.6,3.4 9.6,6.6 6.6,6.6 6.6,9.6 3.4,9.6 3.4,6.6 0.4,6.6 0.4,3.4 3.4,3.4"/>',
-    '<rect class="f" x="0.3" y="2.8" width="9.4" height="4.4" rx="2.2"/>',
-    '<polygon class="f" points="0.5,0.8 5,4 9.5,0.8 9.5,9.2 5,6 0.5,9.2"/>'
-  ];
-  var MODE = "shape", TINT = true;
+  var TINT = true;
   var css = getComputedStyle(document.documentElement);
   function tok(n) { return css.getPropertyValue("--" + n).trim(); }
 
@@ -371,9 +345,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return out;
   }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
-  function shape(p, size) {
-    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 10 10" aria-hidden="true" style="fill:' + P[p] + '">' + SHAPES[p] + "</svg>";
-  }
+  function dot(p) { return '<i class="pdot" style="background:' + P[p] + '"></i>'; }
 
   var ARROWS = {
     right: '<path d="M2 12H15"/><polygon points="14,7.5 22,12 14,16.5"/>',
@@ -390,7 +362,23 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return arrowSvg(kind, "left:-1px;top:" + s * 0.06 + "px");
   }
 
-  /* o: {type, letter, cls[], tint, flash, author, gone, cursors:[p], clues, flag, arrows, old, mode} */
+  /* corner triangles, in arrival order: top-left, top-right, bottom-right, bottom-left */
+  var CORNERS = ["tl", "tr", "br", "bl"];
+  var POINTS = { tl: "0,0 10,0 0,10", tr: "0,0 10,0 10,10", br: "10,0 10,10 0,10", bl: "0,0 10,10 0,10" };
+  function corners(list, s) {
+    var big = s >= 44;
+    var t = Math.max(6, Math.round(s * (big ? 0.36 : 0.3)));
+    var h = "";
+    for (var i = 0; i < list.length && i < 4; i++) {
+      var p = list[i], k = CORNERS[i];
+      h += '<span class="tri ' + k + '" style="width:' + t + "px;height:" + t + 'px"><svg viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + POINTS[k] + '" style="fill:' + P[p] + '" vector-effect="non-scaling-stroke"/></svg>';
+      if (big) h += '<b style="color:' + onColour(P[p]) + '">' + NAMES[p].slice(0, 2).toUpperCase() + "</b>";
+      h += "</span>";
+    }
+    return h;
+  }
+
+  /* o: {type, letter, cls[], tint, flash, author, gone, cursors:[p], clues, flag, arrows} */
   function cell(o, s) {
     var cls = ["c"].concat(o.cls || []);
     var style = "";
@@ -407,40 +395,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     } else {
       if (o.letter) h += '<div class="ltr"><span>' + esc(o.letter) + "</span></div>";
       if (o.author !== undefined && o.author !== null) h += '<div class="band' + (o.gone ? " gone" : "") + '" style="background:' + P[o.author] + '"></div>';
-      if (o.old) {
-        (o.cursors || []).forEach(function (p, i) { h += '<div class="old-cur" style="inset:' + (3 + i * 3) + "px;border-color:" + P[p] + '"></div>'; });
-      } else {
-        h += markers(o, s, o.mode || MODE);
-      }
+      h += corners(o.cursors || [], s);
     }
     (o.arrows || []).forEach(function (a) { h += a; });
     return '<div class="' + cls.join(" ") + '" style="' + style + '">' + h + "</div>";
-  }
-
-  function marker(p, s, mode, slot) {
-    var size = Math.max(8, Math.round(s * 0.21));
-    var big = s >= 44;
-    if (mode === "chip" && big) {
-      return '<span class="mk chip ' + slot + '">' + shape(p, size) + NAMES[p].slice(0, 2).toUpperCase() + "</span>";
-    }
-    if (mode === "nock") {
-      var w = Math.max(9, Math.round(s * (big ? 0.36 : 0.3))), hgt = Math.max(9, Math.round(s * (big ? 0.3 : 0.28)));
-      var txt = big ? NAMES[p].slice(0, 2).toUpperCase() : "";
-      return '<span class="mk nock ' + slot + '"><i style="width:' + w + "px;height:" + hgt + "px;background:" + P[p] + ";color:" + onColour(P[p]) + '">' + txt + "</i></span>";
-    }
-    return '<span class="mk ' + slot + '">' + shape(p, size) + "</span>";
-  }
-  function markers(o, s, mode) {
-    var cur = o.cursors || [];
-    if (!cur.length) return "";
-    var slots = s >= 44 ? ["tl", "br", "bl", "tr"] : s >= 20 ? ["tl", "br"] : ["tl"];
-    if ((o.cls || []).indexOf("rev") >= 0) slots = slots.filter(function (x) { return x !== "tr"; });
-    var h = "";
-    for (var i = 0; i < slots.length && i < cur.length; i++) {
-      if (i === slots.length - 1 && cur.length > slots.length) h += '<span class="mk more ' + slots[i] + '">+' + (cur.length - i) + "</span>";
-      else h += marker(cur[i], s, mode, slots[i]);
-    }
-    return h;
   }
 
   function grid(rows, s) {
@@ -456,19 +414,15 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   /* ---------- static sections ---------- */
   function renderStatic() {
     var h = "";
-    P.forEach(function (c, i) { h += '<div class="id">' + shape(i, 18) + "<b>" + NAMES[i] + "</b><span>" + SHAPE_NAMES[i] + "</span></div>"; });
-    set("ids", h);
-
-    h = "";
-    var two = [1, 3];
-    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, old: true }]], 60), "Before (dropped)", "dashed borders, version 1");
-    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, mode: "shape" }]], 60), "Shape", "smallest; shape alone at every size");
-    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, mode: "chip" }]], 60), "Shape + initials", "initials from 44 px, shape alone below");
-    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, mode: "nock" }]], 60), "Notch tab", "a tab with an arrow's notch, Nock's name; initials from 44 px");
-    ["shape", "chip", "nock"].forEach(function (m) {
-      h += spec(grid([[{ letter: "T", cursors: two, mode: m }, { letter: "A", cursors: two, mode: m }]], 32), m === "shape" ? "Shape at 32 px" : m === "chip" ? "Shape + initials at 32 px" : "Notch at 32 px", "two slots: top-left, bottom-right");
+    var four = [1, 3, 4, 5];
+    [60, 32, 18].forEach(function (sz) {
+      var row = [1, 2, 3, 4].map(function (n) { return { letter: "A", cursors: four.slice(0, n) }; });
+      h += spec(grid([row], sz), sz + " px", sz >= 44 ? "1 to 4 players, with initials" : "1 to 4 players, colour only");
     });
-    set("styles", h);
+    h += spec(grid([[{ letter: "A", cursors: [1, 3, 4, 5, 6] }]], 60), "Five on one cell", "the fifth is not drawn");
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two top corners");
+    h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "smallest size with initials");
+    set("corners", h);
 
     var s = 64;
     h = "";
@@ -487,10 +441,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     function one(o, t, sub) { h += spec(grid([[o]], s), t, sub); }
     one({}, "Empty", "white");
     one({ letter: "A" }, "Filled", "weight 500");
-    one({ letter: "M", cls: ["locked"] }, "Locked", "bold 700 on grey");
+    one({ letter: "M", cls: ["locked"] }, "Locked", "checked right: bold 700 on grey");
     one({ letter: "D", cls: ["pencil"] }, "Pencil", "italic, pencil grey");
     one({ letter: "O", cls: ["wrong"] }, "Wrong after a check", "struck through in red");
-    one({ letter: "N", cls: ["locked", "rev"] }, "Revealed", "corner triangle; locked, so bold");
+    one({ letter: "N", cls: ["locked", "rev"] }, "Revealed", "notch at the top; locked, so bold");
     one({ letter: "S", author: 1 }, "Authorship on", "band in the author's colour");
     one({ letter: "S", author: 1, gone: true }, "Author has left", "grey hatching, no player colour");
     one({ letter: "E", flash: P[3] }, "Flash", "1 s in the colour of whoever replaced my letter");
@@ -498,22 +452,16 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
     h = "";
     h += spec(grid([[{ letter: "V", cls: ["word"] }, { cls: ["sel"] }, { letter: "D", cls: ["word", "pencil"] }, { letter: "E", cls: ["word"] }]], s), "My word, my cell", "word light blue, cell blue with a solid navy border");
-    h += spec(grid([[{ letter: "L", tint: 1 }, { letter: "E", tint: 1 }, { letter: "S", tint: 1 }, { tint: 1, cursors: [1] }]], s), "Another player", "a marker on their cell, their word tinted (if kept)");
-    h += spec(grid([[{ letter: "T", tint: 1, cursors: [1, 3] }]], s), "Two on one cell", "one marker each, in opposite corners");
-    h += spec(grid([[{ cls: ["sel"], cursors: [1, 3, 4] }]], s), "Three, on my cell", "my border, their markers inside");
+    h += spec(grid([[{ letter: "L", tint: 1 }, { letter: "E", tint: 1 }, { letter: "S", tint: 1 }, { tint: 1, cursors: [1] }]], s), "Another player", "a corner on their cell, their word tinted (if kept)");
+    h += spec(grid([[{ letter: "T", tint: 1, cursors: [1, 3] }]], s), "Two on one cell", "two corners");
+    h += spec(grid([[{ cls: ["sel"], cursors: [1, 3, 4] }]], s), "Three, on my cell", "my border, their corners inside it");
     set("sel", h);
-
-    h = "";
-    var five = [1, 3, 4, 5, 6];
-    [60, 32, 18].forEach(function (sz) { h += spec(grid([[{ letter: "A", cursors: five.slice(0, 2) }, { letter: "A", cursors: five }]], sz), sz + " px", "2 players, then 5"); });
-    h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: five.slice(0, 4) }]], 60), "Revealed + 4 players", "top-right left to the triangle, « +2 » in the last free slot");
-    set("crowd", h);
 
     s = 60; h = "";
     h += spec(grid([[{ letter: "D", cls: ["sel", "pencil"] }]], s), "Pencil, selected", "grey italic still above 4.5:1 on blue");
     h += spec(grid([[{ letter: "D", cls: ["pencil"], flash: P[1] }]], s), "Pencil during a flash", "grey drops, italics stay");
-    h += spec(grid([[{ letter: "N", cls: ["locked", "rev", "sel"], author: 0, cursors: [1] }]], s), "Everything at once", "revealed, selected, author band, a player");
-    h += spec(grid([[{ letter: "O", cls: ["wrong", "pencil"], author: 3, cursors: [4, 5] }]], s), "Wrong pencil + 2 players", "strike, italic, band, two markers");
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev", "sel"], author: 0, cursors: [1, 3, 4, 5] }]], s), "Everything at once", "revealed, selected, author band, four players");
+    h += spec(grid([[{ letter: "O", cls: ["wrong", "pencil"], author: 3, cursors: [4, 5] }]], s), "Wrong pencil + 2 players", "strike, italic, band, two corners");
     h += spec(grid([[{ letter: "I", cls: ["word"] }, { letter: "D", tint: 2 }, { letter: "E", tint: 2, cursors: [2] }]], s), "Blue against blue", "my word, then player 2's word");
     set("worst", h);
   }
@@ -656,7 +604,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     document.getElementById("kdel").addEventListener("click", erase);
   }
 
-  function who(p) { return '<span class="who">' + shape(p, 12) + NAMES[p] + "</span>"; }
+  function who(p) { return '<span class="who">' + dot(p) + NAMES[p] + "</span>"; }
   function closeOverlay() {
     st.open = null;
     document.getElementById("overlay").innerHTML = "";
@@ -689,10 +637,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           '</div><div class="compose"><span>Écrire un message…</span><button type="button" class="pill">Envoyer</button></div>';
       } else {
         h += '<div class="players">' +
-          '<div class="row">' + shape(0, 14) + '<b>Ana</b> (vous)<span class="st">actif</span></div>' +
-          '<div class="row">' + shape(1, 14) + 'Bo<span class="st">actif</span></div>' +
-          '<div class="row idle">' + shape(3, 14) + 'Dé<span class="st">inactif</span></div>' +
-          '<div class="row">' + shape(4, 14) + 'Él<span class="st">actif</span></div>' +
+          '<div class="row">' + dot(0) + '<b>Ana</b> (vous)<span class="st">actif · Sans contenu</span></div>' +
+          '<div class="row">' + dot(1) + 'Bo<span class="st">actif · Alourdit le ballon</span></div>' +
+          '<div class="row idle">' + dot(3) + 'Dé<span class="st">inactif · Flaire</span></div>' +
+          '<div class="row">' + dot(4) + 'Él<span class="st">actif · Artiste muet</span></div>' +
           '<div class="row"><button type="button" class="pill">Inviter</button><button type="button" class="pill" id="p-auth">Auteurs : ' + (st.authors ? "oui" : "non") + "</button></div></div>";
       }
       h += "</div>";
@@ -738,16 +686,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   document.getElementById("replay").addEventListener("click", nextNote);
   document.getElementById("timer").addEventListener("click", nextNote);
 
-  /* variant switch */
   document.querySelectorAll(".switch button").forEach(function (b) {
     b.addEventListener("click", function () {
-      if (b.dataset.mode) {
-        MODE = b.dataset.mode;
-        document.querySelectorAll("[data-mode]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-      } else {
-        TINT = b.dataset.tint === "on";
-        document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-      }
+      TINT = b.dataset.tint === "on";
+      document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
       renderStatic(); renderPhone();
     });
   });
@@ -773,17 +715,18 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["Aa", tok("clue-ink"), tok("clue-bg"), "Clue text on clue cell", 4.5],
       ["⚑", tok("flag"), tok("clue-bg"), "Flag on clue cell", 4.5],
       ["Aa", "#FFFFFF", tok("navy"), "Clue bar text on navy", 4.5],
-      ["◥", tok("reveal"), tok("cell"), "Revealed triangle on white", 3],
-      ["◥", tok("reveal"), tok("sel"), "Revealed triangle on selected", 3],
-      ["◥", tok("reveal"), tok("locked"), "Revealed triangle on locked grey", 3],
+      ["▼", tok("reveal"), tok("cell"), "Revealed notch on white", 3],
+      ["▼", tok("reveal"), tok("sel"), "Revealed notch on selected", 3],
+      ["▼", tok("reveal"), tok("locked"), "Revealed notch on locked grey", 3],
       ["▢", tok("navy"), tok("sel"), "Selected border on selected fill", 3],
       ["▢", tok("navy"), tok("cell"), "Focus outline on white", 3],
-      ["●", "#14181F", tok("sel"), "Marker edge on selected fill", 3],
+      ["◤", "#14181F", tok("sel"), "Triangle edge on selected fill", 3],
       ["A", tok("ink"), tok("key"), "Key letter", 4.5],
       ["A", tok("pencil"), tok("key"), "Key letter, pencil mode", 4.5],
       ["Aa", tok("muted"), tok("cell"), "Event line in the stream", 4.5]
     ];
-    P.forEach(function (c, i) { rows.push(["●", c, tok("cell"), "Player " + i + " (" + SHAPE_NAMES[i] + ") on white, no edge", 3]); });
+    P.forEach(function (c, i) { rows.push(["◤", c, tok("cell"), "Player " + i + " triangle on white, no edge", 3]); });
+    P.forEach(function (c, i) { var fg = onColour(c); rows.push(["BO", fg, c, "Initials on player " + i + "'s triangle", 4.5]); });
     var h = "";
     rows.forEach(function (r) {
       var v = ratio(r[1], r[2]), ok = v >= r[4];
