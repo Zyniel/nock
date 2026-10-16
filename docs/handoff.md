@@ -5,41 +5,46 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, around midnight)
+## Where things stand (2026-10-16, early morning)
 
-- Branch `feat/phase5-mvp-ldddid` (the designated branch; it is restarted from
-  `main` after each merge, keeping unmerged commits).
+- Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
+  `main` after each merge (`git fetch origin main && git checkout -B
+  feat/phase5-mvp-ldddid origin/main`), keeping unmerged commits.
 - Merged: PR #6 (Phase 5, MVP), PR #7 (Phase 6: specs 024, 025, first version of
-  019, the spec 026 AC-10 fix). Tag `v0.1.0` exists locally on #6's merge commit
-  but could not be pushed from the cloud session (tag pushes are refused): the
-  human pushes it from a clone.
-- Open: PR #8 (019 refinements, 020, 021, 022 and its first review round, the
-  CI speed-up). Green on 958442b, all seven jobs and `Quality gate`. Its
-  description is up to date. The human was asked to require the `Quality gate`
-  check in `main`'s ruleset.
+  019, the spec 026 AC-10 fix), PR #8 (019 refinements, 020, 021, 022 with both
+  of its review rounds, the CI speed-up). Tag `v0.1.0` exists locally on #6's
+  merge commit but could not be pushed from the cloud session (tag pushes are
+  refused): the human pushes it from a clone.
+- Pull requests, human decision of 2026-10-16: one pull request per spec (with
+  its refinements of other specs), and tooling changes in a pull request of
+  their own. With one designated branch there is one open pull request at a
+  time: push the next spec and open its pull request once the previous one is
+  merged. CI runs only on pull requests, so the full local check comes first.
+- The human was asked to require the `Quality gate` check in `main`'s ruleset.
 - Phase 6 specs: 019, 020, 021, 022, 024, 025 are `done`. Still to build, in
   this order: 027, 028, 032 (with the 012/017 seat-back refinement), 038
   (refines 036), 034 (refines 013), 033 (refines 005 and 018), 029.
 
 ## Work in flight (not pushed)
 
-- Spec 022 is complete: both review rounds are in (the second one's spec,
-  tests and code pushed together; a spec pushed before its tests fails the
-  gate's traceability, as it did on 595597d). Left for the human: the AC-19
-  "one line" check can be met by truncation (`text-overflow: ellipsis`); the
-  AC-16 key pins the short text, so no "not clipped" clause was added. The
-  AC-18 and AC-20 files have 300 ms bounds but stay in the parallel pass
-  (they passed under a load of 14 on 4 CPUs); move them to
+- Spec 022 is complete (merged in #8). Left for the human, in #8's
+  description: the AC-19 "one line" check can be met by truncation; the AC-16
+  key pins the short text, so no "not clipped" clause was added. The AC-18 and
+  AC-20 files have 300 ms bounds but stay in the parallel pass; move them to
   `SERIAL_TEST_FILES` if they ever flake.
-- Spec 027 (shared timer): assembled in worktree `.claude/worktrees/review-027`
-  (branch `review-027`, on af22af2): tests 27a132a, test fixes b2af773
-  (Playwright for Python reads a numeric `page.clock` time in seconds; AC-4's
-  second page needs another room code), implementation 064fba7 (new
-  `RoomTimer.svelte`, `timer.ts`), the live-pages file in `SERIAL_TEST_FILES`
-  6ba6201. Reviewed: approved with suggestions; first round under way (spec
-  de0fbca; tests, then the implementer: `stopTimerOnSolved` takes only a whole
-  number of at least 0, narrower `:global` rules in `RoomPage.svelte`). Then a
-  second review, then rebase onto the branch and push.
+- Spec 027 (shared timer): in worktree `.claude/worktrees/review-027` (branch
+  `review-027`, rebased onto 01b7c88, which #8 merged): tests e0e034b, test
+  fixes f527969 (Playwright for Python reads a numeric `page.clock` time in
+  seconds; AC-4's second page needs another room code), implementation 970de7f
+  (new `RoomTimer.svelte`, `timer.ts`), the live-pages file in
+  `SERIAL_TEST_FILES` eb5fc6f (it will conflict with 631a032's list: keep both),
+  review refinements f5ab1c0 (spec) and 81a2f82 (tests). The implementer of the
+  review round is at work there (`stopTimerOnSolved` takes only a whole number
+  of at least 0; narrower `:global` rules in `RoomPage.svelte`). Then a second
+  review, a rebase onto `main`, the full local check, and its own pull request.
+  Agents working in a worktree must keep their working directory in it: the
+  write guard checks paths against the project root and refuses the edit
+  otherwise.
 - Spec 028 (recap): tests e563c92 in worktree `agent-a0de19b...`, on 11059de (a
   cherry-pick of spec 027's first test commit; drop it when integrating). They
   use spec 027's `open_timer_room`, whose signature changed in b2af773 (a
@@ -52,13 +57,13 @@ Update it at the end of each session.
 
 ## First tasks for the next session
 
-1. PR #8: subscribe to it and keep it green. If it merged, restart the branch
-   from `main` (keeping the unmerged commits) and open the next pull request
-   once the next batch is green.
-2. Finish the work in flight above, in that order, through the roles.
-3. Then 028, and the rest of Phase 6 in the order above. Pass `model: "opus"`
-   to the implementer and to the test-writer of a whole spec (their definitions
-   default to Sonnet); Sonnet for small spec notes and mechanical test edits.
+1. Finish spec 027 (above) and open its pull request; subscribe to it and keep
+   it green until the human merges it.
+2. Then spec 028 in its own pull request, once 027's is merged.
+3. Then the rest of Phase 6 in the order above, one pull request each. Pass
+   `model: "opus"` to the implementer and to the test-writer of a whole spec
+   (their definitions default to Sonnet); Sonnet for small spec notes and
+   mechanical test edits.
 - Phase 7 (030, 031): untouched.
 
 ## How a feature is built here
@@ -130,10 +135,15 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 - CI runs only on pull requests and pushes to `main`, and cancels a run when a
   new commit is pushed. Seven jobs (static and non-browser tests on Ubuntu
   3.13; each engine on Ubuntu and Windows, Python 3.14), then `Quality gate`,
-  which passes only when all seven passed. About 17 to 19 minutes; Firefox on
-  Windows is the slowest job. The Windows jobs widen the ephemeral port range
-  (the parallel tests once exhausted the default one) and print the TIME_WAIT
-  count when they fail.
+  which passes only when all seven passed. About 20 minutes; Firefox on
+  Windows is the slowest job. The Windows jobs run 3 workers on their 4 CPUs
+  (with 4 the runner once stalled for over 5 s), use ephemeral ports 16384 to
+  65535 (the default range ran out once; the range starts above 10080, the
+  highest port browsers refuse), and print the TIME_WAIT count when they fail.
+- `SERIAL_TEST_FILES` holds the files that time something in the page or
+  against the real clock: spec 013 AC-7/AC-8 and spec 022 AC-11/AC-12 (list
+  scroll, 300 ms), spec 022 AC-10 (pacing), spec 036 AC-1 (time budgets), and
+  spec 027's live pages once it lands. Add a file when it flakes in parallel.
 
 ## Decisions the human made
 
@@ -149,8 +159,11 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   019 small-cell trade-offs and the optional spec 020 test tightenings stand.
 - 2026-10-15: the CI speed-up ("Go with the first 2"): pytest-xdist, engines
   chosen by the gate, one CI job per engine. The human then agreed to one
-  summary check (`Quality gate`) for the branch rule. The browser warm-up and
-  the Windows port range are the lead's follow-up fixes to that change.
+  summary check (`Quality gate`) for the branch rule. The browser warm-up, the
+  Windows port range, the Windows worker count and the scroll files' serial
+  pass are the lead's follow-up fixes to that change, each from a CI failure.
+- 2026-10-16: PR #8 merged; from now on one pull request per spec, tooling
+  changes in their own.
 
 ## Lead decisions of 2026-10-15 worth knowing
 
