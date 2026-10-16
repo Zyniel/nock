@@ -79,7 +79,8 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .c.word { background: var(--word); }
 .c.locked { background: var(--locked); }
 .c.sel { background: var(--sel); }
-.c.sel::before { content: ""; position: absolute; inset: 0; border: 2px solid var(--navy); z-index: 4; pointer-events: none; }
+/* my selection border is the top layer, above the direction arrows */
+.c.sel::before { content: ""; position: absolute; inset: 0; border: 2px solid var(--navy); z-index: 7; pointer-events: none; }
 .ltr { position: absolute; inset: 0; display: grid; place-items: center; font: 500 calc(var(--s) * .56)/1 var(--f-ui); color: var(--ink); }
 /* centre the capital itself, not the font's line box (which keeps room for descenders) */
 .ltr span { text-box: trim-both cap alphabetic; }
@@ -190,7 +191,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.9 · revealed notch at the bottom</div>
+    <div class="ver">Version 3.10 · selection border above the arrows</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
@@ -293,7 +294,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>6b · Arrows against other marks</small>Every overlap, arrow by arrow</h2>
-    <p class="lead">Each row is one arrow, drawn from its clue cell into a 64 px letter cell. Each column adds marks to that letter cell: a player in each corner, four players, the red revealed notch, and the selected cell. Drawing order: direction arrows always on top (with a thin white halo), then the selected border, the red notch, and the player triangles.</p>
+    <p class="lead">Each row is one arrow, drawn from its clue cell into a 64 px letter cell. Each column adds marks to that letter cell: a player in each corner, four players, the red revealed notch, and the selected cell. Drawing order, top first: my selection border, then the direction arrows (with a thin white halo), the red notch, and the player triangles.</p>
     <div id="overlaps" style="display:grid;gap:16px"></div>
   </section>
 
