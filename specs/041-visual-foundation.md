@@ -55,14 +55,14 @@ the client. Jobs and contrast are in `_design.md` section 2.
 | `--nock-green-bg` | #E6F2EA |
 | `--nock-key` | #E9ECF1 |
 | `--nock-keyboard-bg` | #D9DEE6 |
-| `--nock-departed` | #5C616A |
 | `--nock-handle` | #C5CCD8 |
 | `--nock-thumb` | #C9D2E0 |
 
 (Note from the spec writer, 2026-10-16: second round. `--nock-page` is added for
 the pages that are not the room (sheet 4.2, `_design.md` section 2).
-`--nock-departed` follows sheet 4.2's #5C616A, pending the human's approval (Open
-question 2). `--nock-rule` keeps #9AA3B2, decided by the human on 2026-10-16.)
+`--nock-rule` keeps #9AA3B2, decided by the human on 2026-10-16. `--nock-departed`
+is removed: in Auteurs mode a departed player's letters are plain ink, decided by
+the human on 2026-10-16.)
 
 Translucent tokens:
 
@@ -341,7 +341,7 @@ in `.ts` files and `<script>` blocks `//` to the end of the line):
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (new) (browser with live server, probes) Each colour token resolves to its value. On `/`, for each of the 22 tokens of "Colour tokens", a probe `div` with `color: var(<token>)` has the computed colour of the table, as `rgb()`: for example `--nock-navy` gives rgb(27, 47, 85), `--nock-ink` rgb(20, 24, 31), `--nock-selected` rgb(207, 221, 243), `--nock-reveal` rgb(194, 65, 12).
+- **AC-1** (new) (browser with live server, probes) Each colour token resolves to its value. On `/`, for each of the 21 tokens of "Colour tokens", a probe `div` with `color: var(<token>)` has the computed colour of the table, as `rgb()`: for example `--nock-navy` gives rgb(27, 47, 85), `--nock-ink` rgb(20, 24, 31), `--nock-selected` rgb(207, 221, 243), `--nock-reveal` rgb(194, 65, 12).
 - **AC-2** (new) (browser with live server, probes) Each translucent token resolves to its value. On `/`, for each of the 9 translucent tokens, a probe with `color: var(<token>)` parses to the table's channels and alpha: for example `--nock-scrim` gives 20, 24, 31 with alpha 0.35, and `--nock-legend-bg` 255, 255, 255 with alpha 0.96.
 - **AC-3** (new) (browser with live server, probes; browser with mocked socket) The eight imposed player colours and their inks are in place. On `/`, probes give `--player-colour-0` to `--player-colour-7` and `--player-ink-0` to `--player-ink-7` the colours of the table (for example `--player-colour-1` rgb(96, 136, 56) and `--player-ink-1` rgb(75, 106, 44)). On the room page, given a FX-01 snapshot with eight players of colours 0 to 7, the `roster-colour` swatch of the player with `data-colour` N has the computed background of `--player-colour-N`, for each N.
 - **AC-4** (new) (browser with live server; browser with mocked socket) The page base uses the tokens. On `/` and on the room page with a FX-01 snapshot, `body` has the computed `background-color` rgb(255, 255, 255) and `color` rgb(20, 24, 31), and its computed `font-family`, read as a list of family names with quotes removed, is `Source Sans 3`, `Segoe UI`, `system-ui`, `sans-serif`. A probe with `font-family: var(--nock-font-clue)` reads `IBM Plex Sans Condensed`, `Arial Narrow`, `Roboto Condensed`, `sans-serif`.
@@ -474,10 +474,11 @@ Proposed by the spec writer, each already part of the spec above:
 1. Closed. Font files: the npm packages `@fontsource/source-sans-3` and
    `@fontsource/ibm-plex-sans-condensed`, imported per weight used (decided by the
    human on 2026-10-16; see "Fonts").
-2. Departed grey (`_design.md` section 15, "Still open" item 3). This spec uses
-   sheet 4.2's #5C616A (4.53:1 on selected blue), pending the human's approval;
-   nothing draws it yet. If the human keeps #6B7079, only the token's value and
-   AC-1 change.
+2. Closed. Departed grey: no such colour; a departed player's letters are plain
+   ink in Auteurs mode, and `--nock-departed` is removed (decided by the human on
+   2026-10-16).
+
+No question is left open.
 
 (Note from the spec writer, 2026-10-16: second round. Three questions of the
 first round are settled and left this list. Rule grey: #9AA3B2 is kept, decided by

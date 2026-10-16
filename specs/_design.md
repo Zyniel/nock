@@ -3,8 +3,8 @@
 Not a spec: the quality gate ignores files starting with "_". Every spec that puts
 something on screen follows this note, as every "Public interface" follows
 `specs/_architecture.md`. Decided with the human on 2026-10-16, from the design
-session whose result is the page `docs/design/cell-sheet.html` (version 4.3 on
-`feat/design-system`; 4.2 was commit d3382db; first published as
+session whose result is the page `docs/design/cell-sheet.html` (version 4.5,
+commit 32fad92 on `feat/design-system`; 4.2 was commit d3382db; first published as
 https://claude.ai/artifact/VCuP9WSmsdXA7JJEvb9ixV).
 
 (Note from the spec writer, 2026-10-16: second round. The human's decisions of
@@ -73,7 +73,6 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 | `--nock-green-bg` | #E6F2EA | Background of the finished-grid band and of the "Terminée" pill | Anything else | 1.15:1 |
 | `--nock-key` | #E9ECF1 | In-app keyboard keys | - | 1.18:1 |
 | `--nock-keyboard-bg` | #D9DEE6 | In-app keyboard background | - | 1.35:1 |
-| `--nock-departed` | #5C616A | Auteurs mode: letters of a player who has left (OPEN: applied in sheet 4.2, pending approval) | Anything else | 6.23:1 |
 | `--nock-handle` | #C5CCD8 | Grab handle of a bottom sheet | - | 1.62:1 |
 | `--nock-thumb` | #C9D2E0 | Clue cells of a catalogue thumbnail, force notches above the grid's force | - | 1.52:1 |
 
@@ -130,7 +129,6 @@ Measured pairs (WCAG 2.x):
 | Navy on word blue (pressed top-bar button) | 11.27:1 | 4.5 |
 | Revealed notch on white / selected / locked / word | 5.18 / 3.77 / 4.17 / 4.40:1 | 3 |
 | Navy selection border on selected | 9.65:1 | 3 |
-| Departed grey #5C616A on white / word / selected | 6.23 / 5.29 / 4.53:1 | 4.5 |
 
 ## 3. Player colours
 
@@ -537,7 +535,9 @@ by each player, off by default (decided by the human on 2026-10-16).
 - When on, each letter is drawn in its finder's ink `--player-ink-N` (section 3),
   on whatever background the cell has.
 - A revealed letter has no finder: it stays ink.
-- A letter whose finder has left the room is drawn in `--nock-departed`.
+- A letter whose finder has left the room is drawn in plain ink (`--nock-ink`), as
+  a letter with no finder; there is no departed grey (decided by the human on
+  2026-10-16; the earlier `--nock-departed` token, #6B7079 then #5C616A, is gone).
 - A pencil letter keeps its italics, in its finder's ink.
 - The wrong-letter strike turns ink (a red strike would vanish on a red letter).
 - A legend shows while the mode is on: « Auteurs : » then each player's name in
@@ -1020,6 +1020,9 @@ Each step leaves the app working and every test passing.
 - Auteurs mode: kept, toggled from the Menu, off by default (section 7).
 - A closed side column stays closed next time, per browser (section 8).
 - No long press on ⌫ to erase the word (section 8).
+- Auteurs mode: the letters of a player who has left are drawn in plain ink, like
+  letters with no finder. No departed grey and no `--nock-departed` token
+  (section 7). The sheet (version 4.5) draws them in ink too.
 - Fonts come in as npm dependencies: `@fontsource/source-sans-3` and
   `@fontsource/ibm-plex-sans-condensed`, imported per weight and style used (no
   other), self-hosted by the build, never from Google (section 4).
@@ -1065,8 +1068,8 @@ The spec writer's pick comes last in each item.
 2. The revealed notch in ink during a flash (orange-red falls to 2.1:1 to 2.8:1 on
    the Orange, Cramoisi and Magenta flashes, below spec 024's 3:1). Applied in
    sheet 4.2 (`.flash.rev::after`), pending approval. Pick: approve.
-3. Departed grey #5C616A (4.53:1 on selected blue) in place of #6B7079 (3.62:1).
-   Applied in sheet 4.2, pending approval. Pick: approve.
+3. (Settled: departed grey, decided by the human on 2026-10-16; see "Decided"
+   above.)
 4. Catalogue thumbnail: the clue positions must come from the API (a spec 004
    change to `GridSummary` and `GET /api/grids`), or the thumbnail goes. The sheet
    keeps it until decided. Pick: add the positions (a few bytes per grid, no
