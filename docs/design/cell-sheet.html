@@ -88,8 +88,9 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .pencil.flash .ltr { color: var(--ink); }
 .wrong .ltr span { text-decoration: line-through; text-decoration-thickness: max(2px, .07em); text-decoration-color: var(--wrong); }
 .wrong .ltr[style] span { text-decoration-color: var(--ink); } /* Auteurs mode: a red strike would vanish on a red letter */
-/* revealed: a notch at the middle of the top edge (the corners now belong to players) */
-.rev::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: max(8px, calc(var(--s) * .3)); height: max(5px, calc(var(--s) * .15)); background: var(--reveal); clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 3; }
+/* revealed: a notch at the middle of the bottom edge, pointing up (corners belong to players,
+   and no direction arrow ever enters a cell from the bottom) */
+.rev::after { content: ""; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: max(8px, calc(var(--s) * .3)); height: max(5px, calc(var(--s) * .15)); background: var(--reveal); clip-path: polygon(50% 0, 100% 100%, 0 100%); z-index: 3; }
 .band { position: absolute; left: 30%; width: 40%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); display: none; }
 .band.gone { background: repeating-linear-gradient(135deg, #333333 0 2px, #FFFFFF 2px 4px) !important; }
 
@@ -189,9 +190,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.8 · direction arrows always on top</div>
+    <div class="ver">Version 3.9 · revealed notch at the bottom</div>
     <h1>Nock cell sheet</h1>
-    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
+    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
 
   <section>
@@ -206,7 +207,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li class="new"><b>New:</b> other players are a coloured triangle in a corner, four per cell at most. No dashed border, no shapes.</li>
           <li>Other players: plain colour triangles, never any name or initials, no outline, 30 % of the cell side.</li>
           <li class="new"><b>New:</b> no author band. An « Auteurs » mode colours each letter in a darker ink of its finder's colour.</li>
-          <li class="new"><b>New:</b> a revealed letter has a notch at the top centre, no longer a corner triangle.</li>
+          <li class="new"><b>New:</b> a revealed letter has a red notch at the middle of the bottom edge, pointing up.</li>
         </ul>
       </div>
       <div>
@@ -274,7 +275,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>4 · Letter cells</small>One state at a time, at 56 px</h2>
-    <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. A letter is locked when a check finds it right or when a reveal fills it in. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a notch at the top.</p>
+    <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. A letter is locked when a check finds it right or when a reveal fills it in. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a red notch at the bottom.</p>
     <div class="board static" id="states"></div>
   </section>
 
@@ -332,7 +333,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li><b>Salon</b> opens the sheet: progress, then the one stream, or the players with where each one is.</li>
           <li><button class="linkish" type="button" id="replay">Show a 3-second note again</button></li>
         </ul>
-        <p class="note">On the grid: Bruno (green) and Dédé (orange) are both on the last cell of LEST, in two corners; Éloïse (purple) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed (notch at the top). O in AMEN is wrong. D in VIDE is Bruno's pencil letter. « Flaire » is flagged.</p>
+        <p class="note">On the grid: Bruno (green) and Dédé (orange) are both on the last cell of LEST, in two corners; Éloïse (purple) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed (red notch at the bottom). O in AMEN is wrong. D in VIDE is Bruno's pencil letter. « Flaire » is flagged.</p>
       </div>
     </div>
   </section>
@@ -475,7 +476,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       h += spec(grid([row], sz), sz + " px", "1 to 4 players");
     });
     h += spec(grid([[{ letter: "A", cursors: [1, 3, 4, 5, 6] }]], 60), "Five on one cell", "the fifth is not drawn");
-    h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two top corners");
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two bottom corners");
     h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "the corners stay clear of the letter");
     set("corners", h);
 
@@ -511,7 +512,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     one({ letter: "M", cls: ["locked"] }, "Locked", "checked right: bold 700 on grey");
     one({ letter: "D", cls: ["pencil"] }, "Pencil", "italic, pencil grey");
     one({ letter: "O", cls: ["wrong"] }, "Wrong after a check", "struck through in red");
-    one({ letter: "N", cls: ["locked", "rev"] }, "Revealed", "notch at the top; locked, so bold");
+    one({ letter: "N", cls: ["locked", "rev"] }, "Revealed", "red notch at the bottom; locked, so bold");
     one({ letter: "E", flash: P[3] }, "Flash", "1 s in the colour of whoever replaced my letter");
     set("states", h);
 
@@ -824,9 +825,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["Aa", tok("clue-ink"), tok("clue-bg"), "Clue text on clue cell", 4.5],
       ["⚑", tok("flag"), tok("clue-bg"), "Flag on clue cell", 4.5],
       ["Aa", "#FFFFFF", tok("navy"), "Clue bar text on navy", 4.5],
-      ["▼", tok("reveal"), tok("cell"), "Revealed notch on white", 3],
-      ["▼", tok("reveal"), tok("sel"), "Revealed notch on selected", 3],
-      ["▼", tok("reveal"), tok("locked"), "Revealed notch on locked grey", 3],
+      ["▲", tok("reveal"), tok("cell"), "Revealed notch on white", 3],
+      ["▲", tok("reveal"), tok("sel"), "Revealed notch on selected", 3],
+      ["▲", tok("reveal"), tok("locked"), "Revealed notch on locked grey", 3],
       ["▢", tok("navy"), tok("sel"), "Selected border on selected fill", 3],
       ["▢", tok("navy"), tok("cell"), "Focus outline on white", 3],
       ["◤", "#14181F", tok("sel"), "Triangle edge on selected fill", 3],
