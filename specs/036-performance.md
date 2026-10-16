@@ -311,10 +311,11 @@ def main() -> None:
   U+DCE9 as the byte 0xE9 (`surrogateescape`) and gives U+DCE9 back when the
   variable is read. The recorder never starts the app, so no case opens or
   creates the file named by `NOCK_DATABASE`. (Note from the lead, 2026-10-16:
-  added with decisions 11 to 13.) (Note from the lead, 2026-10-16: "or expressions that join or repeat
-  them", with its two examples, and the sentence on `monkeypatch.setenv` added,
-  with decision 16 and the new values of AC-12; the bullet used to call every
-  value a string literal (review of spec 036's refinement).)
+  added with decisions 11 to 13.) (Note from the lead, 2026-10-16: "or
+  expressions that join or repeat them", with its two examples, and the sentence
+  on `monkeypatch.setenv` added, with decision 16 and the new values of AC-12;
+  the bullet used to call every value a string literal (review of spec 036's
+  refinement).)
 - The app's store (AC-12, second part): the test replaces `nock.server.RoomStore`
   (`monkeypatch.setattr`) with a `RoomStore` subclass whose `__init__` appends
   `str(path)` to a list, then calls `RoomStore.__init__`. The app of
