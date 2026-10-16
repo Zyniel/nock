@@ -131,7 +131,7 @@ A room is deleted 30 days after its last edit (a letter written, erased or
 locked), with its log, its snapshots and its share link (spec 032). The server
 looks for such rooms when it starts and then every hour, and deletes a room at
 once when someone opens it after that time. A file written by an older version
-of the server is upgraded when the server opens it.
+of the server is not supported: start with a new file.
 
 ## 4. The quality gate
 

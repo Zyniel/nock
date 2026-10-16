@@ -22,8 +22,6 @@ import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import NamedTuple
 
-from pydantic import ValidationError
-
 from nock.grid import Grid
 from nock.protocol import (
     ClientMessage,
@@ -1046,18 +1044,10 @@ class RoomRegistry:
         """Return the summary of room `code` when one of `tokens` is a member's.
 
         Returns:
-            The summary; None when the room is unknown, expired or damaged (it
-            cannot be loaded, and a warning names it), or when no token is a
-            member's.
+            The summary; None when the room is unknown or expired, or when no
+            token is a member's.
         """
-        try:
-            state = self.peek_room(code)
-        except ValidationError:
-            # A row of the room cannot be read (spec 032's "Damaged rooms"). The
-            # error is not logged: its text quotes the row, which may hold a
-            # resume token (spec 038).
-            logger.warning("Room %s cannot be loaded: its summary is left out", code)
-            return None
+        state = self.peek_room(code)
         if state is None:
             return None
         holds_a_members_token = False
