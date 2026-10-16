@@ -41,6 +41,27 @@ the listing shows a default. The `type` default only helps Python construction:
 - Each message is one JSON object, written with `model_dump_json()` and read with
   `parse_client_message` / `parse_server_message`.
 
+### Nicknames in capitals
+
+(Note from the lead, 2026-10-16: this subsection was added (human's rule of
+2026-10-16: nicknames in capitals).)
+
+Everywhere in these specs, a nickname that the server stores or sends is in
+capitals: spec 012's `normalize_nickname` puts it in capitals before it checks and
+stores it (spec 012 decision 12). That holds for `PlayerView.nickname` in every
+event and snapshot, for the server's records and log, for its HTTP answers (spec
+032's summaries, spec 028's recaps) and for the identity that a page stores from
+its snapshots (spec 012). A criterion or an example that writes such a nickname in
+another case means it in capitals: `PlayerView(nickname="Ana")` means
+`PlayerView(nickname="ANA")`, a summary's `("Bob", "Ana")` means `("BOB", "ANA")`,
+and a state that a test builds by hand holds its nicknames in capitals. On a page,
+a nickname shows with capitalised words, through spec 040's `displayNickname`:
+`ANA` shows as `Ana`, so a criterion that reads `Ana` on a page is unchanged. What
+a player types, and the nickname a client sends in `join`, may be in any case. The
+models of this spec neither change nor check the case (`Nickname` checks length
+only), so its own wire examples and criteria keep their nicknames as written
+(`Bruno`, `Ana`).
+
 ### Sequence numbers
 
 - A sequence number is a strict `int`. It numbers the events of one room: the

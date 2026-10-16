@@ -67,7 +67,7 @@ the specs whose criteria this one mentions.
 | [009](009-keyboard-navigation.md) | US-2.4 Keyboard and navigation | E2 | MVP | 4 | - |
 | [010](010-instant-solo-start.md) | US-2.5 Instant solo start | E2 | MVP | 6 | - |
 | [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 4 | - |
-| [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 7 | - |
+| [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 8 | 019, 022 |
 | [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 8 | 006, 009, 035 |
 | [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 10 | 006, 013, 035 |
 | [015](015-shared-letters.md) | US-4.1 Shared letters | E4 | MVP | 4 | - |
@@ -96,6 +96,10 @@ the specs whose criteria this one mentions.
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 11 | 005, 006, 008, 010, 011, 018, 020, 022, 026, 032, 035, 036, 037 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
 | [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
+
+(Note from the lead, 2026-10-16: spec 012's row read 7 criteria and referred to no
+spec; its AC-8, added for nicknames in capitals, names specs 019 and 022 (human's
+rule of 2026-10-16: nicknames in capitals).)
 
 ## Open decisions
 

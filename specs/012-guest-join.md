@@ -19,6 +19,17 @@ the edge cases "Duplicate check", "Colours", "Full room", "Unknown resume token"
 "Order of refusals". No criterion changes, since none of them joins with the token
 of a player who timed out; the steps marked with spec 032 apply once it is built.)
 
+(Note from the lead, 2026-10-16: refined for the human's rule that nicknames are
+typed and stored in capitals and shown with capitalised words, decision 12.
+`normalize_nickname` returns the capitals, duplicates compare exactly, the nickname
+input holds capitals as it is typed, and pages show a nickname through spec 040's
+`displayNickname`. Changed: `normalize_nickname`, "Duplicate nicknames", the
+`nock.nickname` row, steps 3 and 4 of the room page flow, the player list, AC-1,
+AC-2, AC-6 and AC-7, the edge cases "Length", "Duplicate check" and "Remembered
+nickname", decision 4 and "Out of scope"; added: AC-8 and decision 12. AC-1, AC-2,
+AC-6 and AC-7 changed, so their tests follow (human's rule of 2026-10-16: nicknames
+in capitals).)
+
 ## Goal
 
 As an invited player, I want to join with only a nickname, so that I am playing within seconds.
@@ -35,10 +46,14 @@ A room is one grid shared by up to 8 players and reached by a link.
 NICKNAME_PUNCTUATION: str = " -'’_"     # space, hyphen, apostrophes ' and ’, underscore
 
 
+# (Note from the lead, 2026-10-16: "then in capitals, with str.upper()" and
+# "(the capitals)" were added; the first line read "NFC-normalised, then
+# stripped" (human's rule of 2026-10-16: nicknames in capitals).)
 def normalize_nickname(text: str) -> str:
-    """Return the nickname as stored: NFC-normalised, then stripped.
+    """Return the nickname as stored: NFC-normalised, stripped, then in
+    capitals, with str.upper().
 
-    Rules, checked on the result:
+    Rules, checked on the result (the capitals):
     - 2 to 20 characters (code points);
     - each character is a Unicode letter (category L*), a mark that attaches
       to a letter (category Mn or Mc), an ASCII digit 0-9, or one of
@@ -153,13 +168,18 @@ snapshot and not its own `player_joined` (spec 011 delivery order).
 
 ### Duplicate nicknames
 
-Two nicknames are the same when `a.casefold() == b.casefold()` (accents count:
-`Elodie` and `Élodie` differ). Taken nicknames are those of `state.players`
-(present or disconnected). If the normalised nickname is taken, the stored one is
-`f"{base} {n}"` for the smallest `n >= 2` that is not taken, where `base` is the
-nickname cut to `20 - len(f" {n}")` characters, trailing spaces removed. Examples:
-`Ana`, `ana`, `Ana` join in turn and get `Ana`, `ana 2`, `Ana 3`; a second
-`xxxxxxxxxxxxxxxxxxxx` (20 characters) gets `xxxxxxxxxxxxxxxxxx 2`.
+Two nicknames are the same when they are equal, `a == b`. Every nickname is in
+capitals (`normalize_nickname`), so two that differ only in case are already
+equal, and accents count: `ELODIE` and `ÉLODIE` differ. Taken nicknames are those
+of `state.players` (present or disconnected). If the normalised nickname is taken,
+the stored one is `f"{base} {n}"` for the smallest `n >= 2` that is not taken,
+where `base` is the nickname cut to `20 - len(f" {n}")` characters, trailing
+spaces removed. Examples: `Ana`, `ana`, `Ana` join in turn and get `ANA`, `ANA 2`,
+`ANA 3`; a second `xxxxxxxxxxxxxxxxxxxx` (20 characters) gets
+`XXXXXXXXXXXXXXXXXX 2`. (Note from the lead, 2026-10-16: the rule was
+`a.casefold() == b.casefold()`, with `Elodie` and `Élodie` as the accents example,
+and the examples gave `Ana`, `ana 2`, `Ana 3` and `xxxxxxxxxxxxxxxxxx 2` (human's
+rule of 2026-10-16: nicknames in capitals).)
 
 ### Disconnection
 
@@ -201,7 +221,7 @@ Stored in `localStorage`:
 | Key | Value |
 | --- | --- |
 | `nock.identity.<CODE>` | JSON `{"player_id": "...", "resume_token": "...", "nickname": "..."}`, written after every snapshot from `snapshot.you`, `snapshot.resume_token` and the player's own `nickname` in `snapshot.players` |
-| `nock.nickname` | the nickname of the last join this browser sent from the nickname form, as sent (normalised, without any duplicate suffix the server added), written when the snapshot answering that join arrives; a join sent at once (step 2, cases a and b) never writes it |
+| `nock.nickname` | the nickname of the last join this browser sent from the nickname form, as sent (normalised, so in capitals, without any duplicate suffix the server added), written when the snapshot answering that join arrives; a join sent at once (step 2, cases a and b) never writes it. (Note from the lead, 2026-10-16: "so in capitals" was added (human's rule of 2026-10-16: nicknames in capitals).) |
 
 `nock.identity.<CODE>` is the one identity record of a player in a room, for every
 player, the creator of spec 010 included. Spec 010's `nock.room.<CODE>` holds no
@@ -238,10 +258,17 @@ Room page flow (replaces spec 040 step 2):
    an input `data-testid="nickname-input"` labelled `t("join.nickname_label")`,
    placeholder `t("room.default_nickname")`, prefilled with `nock.nickname` when
    stored, and a submit button `data-testid="nickname-submit"` with text
-   `t("join.submit")`.
+   `t("join.submit")`. The input's value is always in capitals: each change of its
+   text, typed or pasted, sets the value to `toUpperCase()` of that text, and the
+   prefill is `toUpperCase()` of `nock.nickname`. (Note from the lead, 2026-10-16:
+   the sentence before this note was added; the input kept the text as typed
+   (human's rule of 2026-10-16: nicknames in capitals).)
 4. On submit, the page applies the rule of `normalize_nickname` in TypeScript
-   (`String.prototype.normalize("NFC")`, `trim()`, `\p{L}`, `\p{Mn}` and `\p{Mc}`
-   with the `u` flag; `\p{Me}` is not allowed). If it fails, it shows `data-testid="nickname-error"` with
+   (`String.prototype.normalize("NFC")`, `trim()`, `toUpperCase()`, then `\p{L}`,
+   `\p{Mn}` and `\p{Mc}` with the `u` flag; `\p{Me}` is not allowed) to the input's
+   value. (Note from the lead, 2026-10-16: "`toUpperCase()`, then" and "to the
+   input's value" were added (human's rule of 2026-10-16: nicknames in capitals).)
+   If it fails, it shows `data-testid="nickname-error"` with
    `t("join.error.length")` (length rule) or `t("join.error.characters")` (other
    rules) and sends nothing (Note from the lead, 2026-10-15: "sends nothing"
    means no `join` and no other message caused by the player's action; it
@@ -271,7 +298,11 @@ order of the snapshot's `players` with joiners appended. Each item has
 `disconnected`), `data-you` (`true` on the receiving player's item, else
 `false`), a `data-testid="roster-colour"` swatch whose background is that
 player's colour, and a `data-testid="roster-nickname"` element whose text is the
-nickname (plain text, never HTML). The own item also shows `t("roster.you")`.
+nickname as spec 040's `displayNickname` writes it, with capitalised words (`ANA`
+shows as `Ana`), in plain text, never HTML. The own item also shows
+`t("roster.you")`. (Note from the lead, 2026-10-16: "whose text is the nickname
+(plain text, never HTML)" became the text above (human's rule of 2026-10-16:
+nicknames in capitals).)
 
 The kept snapshot is updated by these events (spec 040 "applying an event"):
 `player_joined` appends the player; `player_state_changed` sets the player's
@@ -310,13 +341,14 @@ nickname. Every browser criterion runs in Chromium, Firefox and WebKit
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-3.2.1) (Python; WebSocket; browser with live server) Given a valid link, when I enter a nickname of 2 to 20 characters, then I am in the room. Python: `normalize_nickname` returns `"Ana"` for `"  Ana  "`, `"Élodie"` for `"Élodie"`, and keeps `"Jean-Luc"`, `"O'Neil"`, `"O’Neil"`, `"bob_42"`, `"Anne Marie"`, `"Zoë"`, `"12"`, `"राम"` (`"राम"`, whose `ा` is category Mc) and 20 times `x`; it raises `ValueError` for `"A"`, `""`, `"   "`, 21 times `x`, `"<b>Eve</b>"`, `"Ana!"`, `"a@b"`, `"Ana\tB"`, `"--"` and `"Ana⃝"` (`"Ana⃝"`, whose `⃝` is category Me). WebSocket: on a fresh FX-01 room, the join `{"type": "join", "nickname": " Ana ", "resume_token": null}` is answered by a `Snapshot` with `seq == 1` whose `players` is one `PlayerView` with `player_id == snapshot.you`, `nickname == "Ana"`, `colour == 0`, `state == "active"`, `is_host is True`, `muted is False`, `selection is None`; `registry.room_state(code).players` holds the same player. The join `{"type": "join", "nickname": "<b>Eve</b>", "resume_token": null}` is answered by `ErrorMessage(code="invalid_nickname")`, adds no player, and a following valid join on the same socket gets a `Snapshot`. Browser: opening `/r/<code>` shows `nickname-form`; entering `Ana` and submitting reaches `data-status="joined"`, and `roster` holds one `roster-player` with `data-you="true"` whose `roster-nickname` reads `Ana`; entering `A` instead shows `nickname-error` with `fr.json["join.error.length"]` and the page stays on `data-status="nickname"`.
-- **AC-2** (AC-3.2.2) (Python; WebSocket) Each player gets a colour no other player in the room has. A duplicate nickname gets a numeric suffix. Python: 8 successive `join_room` calls on a fresh room with nicknames `Ana`, `ana`, `Ana`, `Bob`, `Cy`, `Di`, `Ed`, `Flo` give colours `0` to `7` and nicknames `Ana`, `ana 2`, `Ana 3`, `Bob`, `Cy`, `Di`, `Ed`, `Flo`; the first is host and no other is. WebSocket: three clients join a FX-01 room as `Ana`, `Ana`, `Bob`; the third client's snapshot lists `Ana` (colour 0), `Ana 2` (colour 1), `Bob` (colour 2); the first client receives `player_joined` events with seq 2 and 3 holding the views of `Ana 2` and `Bob`.
+- **AC-1** (AC-3.2.1) (Python; WebSocket; browser with live server) Given a valid link, when I enter a nickname of 2 to 20 characters, then I am in the room. Python: `normalize_nickname` returns `"ANA"` for `"  Ana  "`, `"ÉLODIE"` for `"Élodie"`, and returns `text.upper()` for each `text` among `"Jean-Luc"`, `"O'Neil"`, `"O’Neil"`, `"bob_42"`, `"Anne Marie"`, `"Zoë"`, `"12"`, `"राम"` (`"राम"`, whose `ा` is category Mc) and 20 times `x`; it raises `ValueError` for `"A"`, `""`, `"   "`, 21 times `x`, `"<b>Eve</b>"`, `"Ana!"`, `"a@b"`, `"Ana\tB"`, `"--"` and `"Ana⃝"` (`"Ana⃝"`, whose `⃝` is category Me). WebSocket: on a fresh FX-01 room, the join `{"type": "join", "nickname": " Ana ", "resume_token": null}` is answered by a `Snapshot` with `seq == 1` whose `players` is one `PlayerView` with `player_id == snapshot.you`, `nickname == "ANA"`, `colour == 0`, `state == "active"`, `is_host is True`, `muted is False`, `selection is None`; `registry.room_state(code).players` holds the same player. The join `{"type": "join", "nickname": "<b>Eve</b>", "resume_token": null}` is answered by `ErrorMessage(code="invalid_nickname")`, adds no player, and a following valid join on the same socket gets a `Snapshot`. Browser: opening `/r/<code>` shows `nickname-form`; entering `Ana` and submitting reaches `data-status="joined"`, and `roster` holds one `roster-player` with `data-you="true"` whose `roster-nickname` reads `Ana`; entering `A` instead shows `nickname-error` with `fr.json["join.error.length"]` and the page stays on `data-status="nickname"`. (Note from the lead, 2026-10-16: the Python part said that `normalize_nickname` returns `"Ana"` and `"Élodie"` and "keeps" the other accepted values, and the WebSocket part had `nickname == "Ana"`; the roster still reads `Ana`, through `displayNickname` (human's rule of 2026-10-16: nicknames in capitals).)
+- **AC-2** (AC-3.2.2) (Python; WebSocket) Each player gets a colour no other player in the room has. A duplicate nickname gets a numeric suffix. Python: 8 successive `join_room` calls on a fresh room with nicknames `Ana`, `ana`, `Ana`, `Bob`, `Cy`, `Di`, `Ed`, `Flo` give colours `0` to `7` and nicknames `ANA`, `ANA 2`, `ANA 3`, `BOB`, `CY`, `DI`, `ED`, `FLO`; the first is host and no other is. WebSocket: three clients join a FX-01 room as `Ana`, `Ana`, `Bob`; the third client's snapshot lists `ANA` (colour 0), `ANA 2` (colour 1), `BOB` (colour 2); the first client receives `player_joined` events with seq 2 and 3 holding the views of `ANA 2` and `BOB`. (Note from the lead, 2026-10-16: the Python nicknames were `Ana`, `ana 2`, `Ana 3`, `Bob`, `Cy`, `Di`, `Ed`, `Flo`, and the WebSocket ones `Ana`, `Ana 2`, `Bob` (human's rule of 2026-10-16: nicknames in capitals).)
 - **AC-3** (AC-3.2.3) (WebSocket) I see the current letters, timer and hint budget within 1 second of joining. Given a FX-01 room added with `add_room` whose cell (1, 0) holds `T` (author `p9`) and (1, 1) holds `A` (author `p9`), and whose `reveal_budget` is `RevealBudget(letters=3, words=1)`, when a client sends a join, then a `Snapshot` arrives less than 1.0 second (measured with `time.monotonic()`) after the join was sent, its `grid == grid_state(registry.room_state(code))`, its cell (1, 0) has `letter == "T"` and `author == "p9"`, its `reveal_budget == RevealBudget(letters=3, words=1)`, and its `timer_elapsed_ms == 0` with `timer_running is False`.
 - **AC-4** (AC-3.2.4) (Python; WebSocket; browser with live server) Joining a room that already has 8 players shows "room full" and does not add me. Python: `join_room` on a room with 8 players returns `reply == (ErrorMessage(code="room_full", ...),)` (code compared), `close_sender is True`, no entry, and the same state. WebSocket: 8 clients join a FX-01 room; a ninth join is answered by `ErrorMessage(code="room_full")` and then a close with code 1000; the first client receives no event for it; `room_state` still holds 8 players. Browser: for a room added with 8 players (all `disconnected`), opening `/r/<code>` and submitting `Zoé` reaches `data-status="full"` and `room-status` shows `fr.json["room.status.full"]`.
 - **AC-5** (new) (WebSocket; browser with live server) Reloading the page keeps me the same player. WebSocket: client A joins as `Ana` and client B as `Bob`; when A's socket closes, B receives `PlayerStateChanged(player_id=<A>, state="disconnected")`; a new socket that sends `{"type": "join", "nickname": "Autre", "resume_token": <A's token>}` receives a `Snapshot` with `you == <A>`, A's view still `nickname == "Ana"`, `colour == 0`, `is_host is True`, `state == "active"`, and B receives `PlayerStateChanged(player_id=<A>, state="active")`; the room still has 2 players. Browser: after joining as `Ana` and reloading the page, the room page reaches `data-status="joined"` without showing `nickname-form`, with the same `data-you` as before the reload, and `roster` holds one player.
-- **AC-6** (new) (browser with mocked socket) The room page joins at once only with a stored identity or for a room created from the catalogue on this device. On `/r/ABC123`, `localStorage` seeded before `page.goto`: (a) with `nock.identity.ABC123` = `{"player_id": "p1", "resume_token": "r7Kq2mXo9vB4tY1zW8nP", "nickname": "Ana 2"}`, the first frame the page sends parses to `Join(nickname="Ana 2", resume_token="r7Kq2mXo9vB4tY1zW8nP")`, the page shows `data-status="joining"` and no `nickname-form` exists; the same holds when `nock.room.ABC123` = `{"grid": 1, "selection": null}` is also seeded. (b) With no identity, `nock.room.ABC123` = `{"grid": 1, "selection": null}` and `nock.nickname` = `Zoé`, the first frame parses to `Join(nickname="Zoé", resume_token=None)` and no `nickname-form` exists; with `nock.nickname` absent, or set to `A`, it parses to `Join(nickname=fr.json["room.default_nickname"], resume_token=None)`. (c) With no identity and `nock.room.ABC123` = `{"grid": null, "selection": null}`, or no record, or only `nock.identity.ZZZZZZ` stored (another room), the page sends no frame (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted), reaches `data-status="nickname"` and shows `nickname-form`, whose input holds `Zoé` when `nock.nickname` = `Zoé` is seeded and is empty otherwise.
-- **AC-7** (new) (browser with mocked socket) After a join, the identity is always stored and the remembered nickname only for a join from the form. On `/r/ABC123` with nothing seeded, submitting the form with `Ana` and the mock answering with a FX-01 snapshot (`you` = `p1`, `resume_token` = `r7Kq2mXo9vB4tY1zW8nP`, players `p1` named `Ana 2`) makes `localStorage["nock.identity.ABC123"]` parse to `{"player_id": "p1", "resume_token": "r7Kq2mXo9vB4tY1zW8nP", "nickname": "Ana 2"}` and `localStorage["nock.nickname"]` equal `Ana`. In case (b) of AC-6 with `nock.nickname` absent, after the same snapshot with `p1` named `Invité`, `nock.identity.ABC123` holds `p1`, that token and `Invité`, and `nock.nickname` is still absent.
+- **AC-6** (new) (browser with mocked socket) The room page joins at once only with a stored identity or for a room created from the catalogue on this device. On `/r/ABC123`, `localStorage` seeded before `page.goto`: (a) with `nock.identity.ABC123` = `{"player_id": "p1", "resume_token": "r7Kq2mXo9vB4tY1zW8nP", "nickname": "Ana 2"}`, the first frame the page sends parses to `Join(nickname="Ana 2", resume_token="r7Kq2mXo9vB4tY1zW8nP")`, the page shows `data-status="joining"` and no `nickname-form` exists; the same holds when `nock.room.ABC123` = `{"grid": 1, "selection": null}` is also seeded. (b) With no identity, `nock.room.ABC123` = `{"grid": 1, "selection": null}` and `nock.nickname` = `Zoé`, the first frame parses to `Join(nickname="Zoé", resume_token=None)` and no `nickname-form` exists; with `nock.nickname` absent, or set to `A`, it parses to `Join(nickname=fr.json["room.default_nickname"], resume_token=None)`. (c) With no identity and `nock.room.ABC123` = `{"grid": null, "selection": null}`, or no record, or only `nock.identity.ZZZZZZ` stored (another room), the page sends no frame (Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted), reaches `data-status="nickname"` and shows `nickname-form`, whose input holds `ZOÉ` when `nock.nickname` = `Zoé` is seeded (room page flow step 3) and is empty otherwise. (Note from the lead, 2026-10-16: the input held `Zoé`, the stored text as it was (human's rule of 2026-10-16: nicknames in capitals).)
+- **AC-7** (new) (browser with mocked socket) After a join, the identity is always stored and the remembered nickname only for a join from the form. On `/r/ABC123` with nothing seeded, submitting the form with `Ana` typed and the mock answering with a FX-01 snapshot (`you` = `p1`, `resume_token` = `r7Kq2mXo9vB4tY1zW8nP`, players `p1` named `ANA 2`) makes `localStorage["nock.identity.ABC123"]` parse to `{"player_id": "p1", "resume_token": "r7Kq2mXo9vB4tY1zW8nP", "nickname": "ANA 2"}` and `localStorage["nock.nickname"]` equal `ANA`. In case (b) of AC-6 with `nock.nickname` absent, after the same snapshot with `p1` named `INVITÉ`, `nock.identity.ABC123` holds `p1`, that token and `INVITÉ`, and `nock.nickname` is still absent. (Note from the lead, 2026-10-16: `nock.nickname` was to equal `Ana`, as typed; the mock's nicknames `Ana 2` and `Invité`, and the identity's, are now written in capitals, as the server sends them (human's rule of 2026-10-16: nicknames in capitals).)
+- **AC-8** (new, decision 12) (Python; browser with live server; browser with mocked socket) A nickname is typed and stored in capitals, and shown with capitalised words. Python: `normalize_nickname` returns `"ANA"` for `"ana"` and for `"Ana"`, and `"STRASSENBAHNFAHRERIN"` (20 characters) for `"Straßenbahnfahrerin"` (19), whose `ß` gives `SS`; it raises `ValueError` for 11 times `ß`, whose capitals have 22 characters. Live server: on `/r/<code>`, typing `ana` in `nickname-input` makes its value `ANA`; after the submit, the room page reaches `data-status="joined"` and the own `roster-nickname` reads `Ana`. Mocked socket: given a FX-01 snapshot whose players are `p1` (`you`) `JEAN-LUC`, `p2` `D'ARTAGNAN` and `p3` `ANA 2`, whose `chat` holds one line from each, and whose cells (1, 0), (1, 1) and (1, 2) hold letters by `p1`, `p2` and `p3`: the three `roster-nickname` read `Jean-Luc`, `D'Artagnan` and `Ana 2`; with the chat panel open (spec 022), the three `chat-author` read the same; and with `authors-switch` on (spec 019), a tap on each of the three cells shows `clue-bar-author` reading `Lettre de Jean-Luc`, `Lettre de D'Artagnan` and `Lettre de Ana 2`. (Note from the lead, 2026-10-16: added (human's rule of 2026-10-16: nicknames in capitals).)
 
 ## Edge cases and errors
 
@@ -326,20 +358,30 @@ The words in brackets say how each criterion is tested.
   Rejected: `<`, `>`, `&`, `"`, `@`, `!`, `.`, emoji, enclosing marks (category
   Me, such as U+20DD in `Ana⃝`), tabs, newlines, non-ASCII digits (`٣`). A nickname of digits only
   (`"12"`) is accepted; one made only of punctuation (`"--"`, `"_ _"`) is not.
-- Length (AC-1): counted after NFC and trimming, in code points: `"É"` is
+- Length (AC-1, AC-8): counted on the capitals, after NFC and trimming, in code points: `"É"` is
   `É`, one character, so `"É"` alone is too short. Leading and trailing
   spaces are removed; inner spaces are kept as typed (`"Anne  Marie"` keeps two).
+  A letter whose capital is longer counts as its capital: 11 times `ß` passes spec
+  039's length check (11 characters) and gets `invalid_nickname` (22 in capitals).
+  (Note from the lead, 2026-10-16: "AC-8", "on the capitals" and the sentence
+  before this note were added; the item said "counted after NFC and trimming"
+  (human's rule of 2026-10-16: nicknames in capitals).)
 - Protocol length first (AC-1): a nickname of 21 characters after trimming fails
   `parse_client_message` (spec 039) and gets `invalid_message`, not
   `invalid_nickname`; the page never sends one.
-- Duplicate check (AC-2): case-insensitive, accent-sensitive; the suffix is added to
+- Duplicate check (AC-2): exact, so accent-sensitive, and case never tells two
+  nicknames apart since all are in capitals; the suffix is added to
   the joiner only, a newcomer or a past player seated back (step 4a, spec 032),
   never to a player already in the room; a resumed player keeps their nickname. A
-  player called `Ana 2` already in the room pushes a second `Ana` to `Ana 3`, and
-  `Ana`, who timed out, comes back as `Ana 2` when `ana` joined meanwhile. (Note
-  from the lead, 2026-10-16: "the newcomer only" became "the joiner only, a
+  player called `ANA 2` already in the room pushes a second `Ana` to `ANA 3`, and
+  `ANA`, who timed out, comes back as `ANA 2` when `ana` joined meanwhile as `ANA`.
+  (Note from the lead, 2026-10-16: "the newcomer only" became "the joiner only, a
   newcomer or a past player seated back (step 4a, spec 032), never to a player
-  already in the room", and the example of `Ana` who timed out was added.)
+  already in the room", and the example of `Ana` who timed out was added.) (Note
+  from the lead, 2026-10-16: "case-insensitive, accent-sensitive" became the text
+  before the first semicolon, and the examples, which named `Ana 2`, `Ana 3`, `Ana`
+  and `Ana 2`, now write the stored nicknames in capitals (human's rule of
+  2026-10-16: nicknames in capitals).)
 - Colours (AC-2): a freed index (spec 017 time-out, spec 014 removal) is reused by
   the next joiner. Disconnected players keep theirs. A past player seated back
   (step 4a, spec 032) gets their old index again when no player of `players` has
@@ -382,9 +424,10 @@ The words in brackets say how each criterion is tested.
   missing gives case c (the form); only a JSON number gives case b.
 - Creator refused (AC-6): a join sent by case b and answered `invalid_nickname`
   shows the form (step 6); the form's join then follows the usual rules.
-- Remembered nickname (AC-7): the form's nickname is stored as sent (`Ana`), not
-  as the server made it unique (`Ana 2`); the identity holds the server's
-  nickname.
+- Remembered nickname (AC-7): the form's nickname is stored as sent (`ANA`), not
+  as the server made it unique (`ANA 2`); the identity holds the server's
+  nickname. (Note from the lead, 2026-10-16: the examples were `Ana` and `Ana 2`
+  (human's rule of 2026-10-16: nicknames in capitals).)
 - Answers (AC-3): the snapshot is built from `grid_state`, never from `grid`.
 
 ## Out of scope
@@ -394,6 +437,9 @@ The words in brackets say how each criterion is tested.
 - Presence states shown in the roster (idle, text of the state): spec 013.
 - Host controls (remove, lock): spec 014.
 - Changing one's nickname or colour after joining; choosing a colour.
+- Keeping the case a player typed: a nickname is stored in capitals and shown with
+  capitalised words, so `McLean` shows as `Mclean` (decision 12). (Note from the
+  lead, 2026-10-16: added (human's rule of 2026-10-16: nicknames in capitals).)
 - Leaving the room on purpose (spec 039: closing the socket is leaving); the
   `left` leave reason is not produced in the MVP.
 - Showing the timer (spec 027) and the reveal budget (spec 024); the snapshot
@@ -430,7 +476,9 @@ spec 010). Each one is already part of the spec above.
    script; ASCII digits only; both `'` and `’` (phones type `’`); combining marks
    allowed; NFC first; at least one letter or digit.
 4. Duplicate suffix. Options: `Ana2`, `Ana 2`, `Ana (2)`. Pick: `Ana 2`, which
-   stays a valid nickname; comparison by `casefold()`.
+   stays a valid nickname; exact comparison, every nickname being in capitals
+   (decision 12). (Note from the lead, 2026-10-16: this read "comparison by
+   `casefold()`" (human's rule of 2026-10-16: nicknames in capitals).)
 5. Host. Pick: the first joiner (spec 011 decision 6); if the room has no host
    (spec 014, 017), the next joiner becomes host.
 6. Basic resume here. Spec 017 owns reconnection, but without a resume a page
@@ -475,6 +523,28 @@ instruction to take technical decisions. It is part of the spec above.
     (`normalize_nickname`) and the client rule (Room page flow step 4) change
     together; AC-1 gains `राम` as accepted and `Ana⃝` as refused. No criterion
     is renumbered.
+
+Decided by the human on 2026-10-16. It is part of the spec above. (Note from the
+lead, 2026-10-16: this group was added (human's rule of 2026-10-16: nicknames in
+capitals).)
+
+12. Nicknames in capitals. The human's words: "Force player names to be input as
+    caps, stored as caps, and rendered as Camel case. Make things simple from a
+    backend perspective, don't generate edge cases by making things
+    complicated." "Camel case" means capitalised words, `ANA` shown as `Ana`: the
+    lead's reading, which the human was told. So `normalize_nickname` puts the
+    nickname in capitals with `str.upper()` right after NFC and stripping and
+    checks its rules on that form, so a letter whose capital is longer (`ß` gives
+    `SS`) needs no rule of its own; duplicates compare exactly, with no
+    `casefold()`; the nickname input holds capitals as it is typed; and every page
+    shows a nickname through spec 040's `displayNickname`. What it changed here:
+    `normalize_nickname`, "Duplicate nicknames", the `nock.nickname` row, steps 3
+    and 4 of the room page flow, the player list, AC-1, AC-2, AC-6, AC-7, the new
+    AC-8, the edge cases "Length", "Duplicate check" and "Remembered nickname",
+    decision 4 and "Out of scope". Spec 039's "Nicknames in capitals" says how the
+    other specs read a nickname written in another case; spec 040 holds
+    `displayNickname`; specs 022, 028, 029, 032, 033, 035, 037 and 038 were
+    refined where a comparison, a stored value or a shown text changed.
 
 ## Open questions
 
