@@ -21,7 +21,10 @@ jobs:
       # One job per browser engine and system, plus one job for the static
       # checks and the tests without a browser on the oldest Python (human
       # decision, 2026-10-15). The Chromium jobs also run the tests without a
-      # browser, so those run on both systems and both Pythons.
+      # browser, so those run on both systems and both Pythons. The Windows
+      # jobs run 3 workers, one less than the runner's 4 CPUs: with 4, each
+      # driving a browser and a local server, the runner once stalled for over
+      # 5 s and two tests timed out together (2026-10-16).
       matrix:
         include:
           - label: static and non-browser tests, ubuntu-latest, Python 3.13
@@ -47,17 +50,17 @@ jobs:
           - label: chromium, windows-latest, Python 3.14
             os: windows-latest
             python-version: "3.14"
-            gate-options: --skip-static --browsers chromium
+            gate-options: --skip-static --browsers chromium --workers 3
             engine: chromium
           - label: firefox, windows-latest, Python 3.14
             os: windows-latest
             python-version: "3.14"
-            gate-options: --skip-static --tests browser --browsers firefox
+            gate-options: --skip-static --tests browser --browsers firefox --workers 3
             engine: firefox
           - label: webkit, windows-latest, Python 3.14
             os: windows-latest
             python-version: "3.14"
-            gate-options: --skip-static --tests browser --browsers webkit
+            gate-options: --skip-static --tests browser --browsers webkit --workers 3
             engine: webkit
     steps:
       - uses: actions/checkout@v7
@@ -90,7 +93,9 @@ jobs:
       # (net::ERR_NO_BUFFER_SPACE, 2026-10-15); this gives it 55,535.
       - name: Widen the range of ephemeral ports
         if: runner.os == 'Windows'
-        run: netsh int ipv4 set dynamicport tcp start=10000 num=55535
+        run: |
+          netsh int ipv4 set dynamicport tcp start=10000 num=55535
+          "Logical processors: $env:NUMBER_OF_PROCESSORS"
 
       # The same command you run locally and that the Claude Code hooks run.
       - name: Run the quality gate
