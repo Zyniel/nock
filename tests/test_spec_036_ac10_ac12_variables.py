@@ -78,10 +78,11 @@ ARABIC_INDIC_8000 = "\N{ARABIC-INDIC DIGIT EIGHT}" + "\N{ARABIC-INDIC DIGIT ZERO
 SUPERSCRIPT_TWO = "\N{SUPERSCRIPT TWO}"
 
 # The values below are the spec's. The spec writes them as Python string literals;
-# this file writes each invisible character by its name, as in
-# "\N{ZERO WIDTH SPACE}" (U+200B), and each C0 or C1 control with a "\x.." escape
-# as the spec does, so that its source holds none of them raw. A raw literal such
-# as r"C:\temp\nock.sqlite3" holds backslashes, not escapes.
+# this file writes each invisible character and each digit outside ASCII by its
+# name, as in "\N{ZERO WIDTH SPACE}" (U+200B) and "\N{SUPERSCRIPT TWO}" (U+00B2),
+# and each C0 or C1 control with a "\x.." escape as the spec does, so that its
+# source holds none of them raw. A raw literal such as r"C:\temp\nock.sqlite3"
+# holds backslashes, not escapes.
 
 # AC-10: values of NOCK_HOST that main() hands uvicorn as given.
 ACCEPTED_HOSTS = [
@@ -134,6 +135,29 @@ AC11_INVALID_VALUES = [
     pytest.param(HOST_VARIABLE, "fe80::1%eth0", id="host-ipv6-zone"),
     pytest.param(HOST_VARIABLE, "my_host", id="host-underscore"),
     pytest.param(HOST_VARIABLE, "bücher.example", id="host-letter-outside-ascii"),
+    # Digits outside ASCII (decision 11): str.isdigit() is true of all of them, so
+    # a check written with it would let these values through.
+    pytest.param(
+        HOST_VARIABLE,
+        (
+            "\N{ARABIC-INDIC DIGIT ONE}"
+            "\N{ARABIC-INDIC DIGIT TWO}"
+            "\N{ARABIC-INDIC DIGIT SEVEN}.0.0.1"
+        ),
+        id="host-arabic-indic-digits",
+    ),
+    pytest.param(
+        HOST_VARIABLE,
+        (
+            "\N{FULLWIDTH DIGIT ONE}"
+            "\N{FULLWIDTH DIGIT TWO}"
+            "\N{FULLWIDTH DIGIT SEVEN}.0.0.1"
+        ),
+        id="host-fullwidth-digits",
+    ),
+    pytest.param(
+        HOST_VARIABLE, "localhost\N{SUPERSCRIPT TWO}", id="host-superscript-two"
+    ),
     pytest.param(HOST_VARIABLE, "0.0.0.0/0", id="host-slash"),
     # NOCK_DATABASE, as AC-11 lists them.
     pytest.param(DATABASE_VARIABLE, "\n", id="database-only-a-newline"),
