@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import { t } from './i18n'
   import { fetchPublicRecap, type PublicRecap } from './recap'
   import { timerText } from './timer'
@@ -22,7 +23,8 @@
     pageState = 'ready'
   }
 
-  $effect(() => {
+  // Once, when the page shows.
+  onMount(() => {
     void loadRecap()
   })
 </script>

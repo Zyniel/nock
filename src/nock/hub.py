@@ -717,8 +717,11 @@ class RoomRegistry:
     def add_room(self, state: RoomState) -> None:
         """Register a room in a given state (tests, and spec 018's loader).
 
+        The room keeps the share token of `state` (spec 028).
+
         Raises:
-            ValueError: a room with `state.code` already exists.
+            ValueError: a room with `state.code` already exists, or another room
+                already has the share token `state.share_token`.
             RuntimeError: the registry is closed.
         """
         with self._lock:
@@ -751,8 +754,9 @@ class RoomRegistry:
 
         Returns:
             `build_recap` of the room's latest state and its stored log; None when
-            there is no such room, when it is not solved, or when its log does
-            not hold its whole history (a room added in a later state).
+            there is no such room, when it is not solved, or when `build_recap`
+            raises ValueError, for example when its log does not hold its whole
+            history (a room added in a later state).
         """
         state = self.room_state(code)
         if state is None or not state.solved:

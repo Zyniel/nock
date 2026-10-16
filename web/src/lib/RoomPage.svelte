@@ -18,6 +18,7 @@
     unreadCount,
   } from './chat'
   import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
+  import { newLinkCopier } from './copyLink'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
   import { remoteSelectionsOf } from './remoteSelections'
@@ -69,7 +70,6 @@
   } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
-  const COPIED_DISPLAY_MS = 2000
   const UNDO_MESSAGE_MS = 3000
   const MAX_REVEAL_COUNT = 99
   // The performance mark set once the grid takes taps and keys (spec 036).
@@ -283,30 +283,21 @@
   })
 
   let shareLink = $derived(`${location.origin}/r/${code}`)
+  // True while the copy button reads "copied", after a successful copy.
   let copied = $state(false)
-  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+  const linkCopier = newLinkCopier((isCopied) => {
+    copied = isCopied
+  })
 
   // Write the link to the clipboard. Without a usable clipboard nothing changes.
   async function copyLink(): Promise<void> {
-    if (navigator.clipboard === undefined || navigator.clipboard === null) {
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(shareLink)
-    } catch {
-      return
-    }
-    copied = true
-    clearTimeout(copiedTimer)
-    copiedTimer = setTimeout(() => {
-      copied = false
-    }, COPIED_DISPLAY_MS)
+    await linkCopier.copy(shareLink)
   }
 
-  // Leaving the page must not leave the timer to fire on a destroyed page.
+  // Leaving the page must not leave the timers to fire on a destroyed page.
   $effect(() => {
     return () => {
-      clearTimeout(copiedTimer)
+      linkCopier.stop()
       clearTimeout(undoMessageTimer)
       clearTimeout(pacingTimer)
     }

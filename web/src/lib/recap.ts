@@ -131,7 +131,7 @@ export function shownRecapPlayers(players: RecapPlayer[]): RecapPlayer[] {
 }
 
 // The colour of a row's swatch, as spec 019 sets an author mark's: the colour
-// index of a player the page's snapshot lists, else '' (the neutral grey: the
+// index of a player the page's snapshot lists, else '' (a hatched swatch: the
 // colour of a player who left may now be someone else's).
 export function recapColour(playerId: string, playerColours: Map<string, number>): string {
   const colour = playerColours.get(playerId)

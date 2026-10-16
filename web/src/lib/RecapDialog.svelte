@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { newLinkCopier } from './copyLink'
   import { t } from './i18n'
   import { fetchRecap, recapColour, shownRecapPlayers, type Recap } from './recap'
   import { timerText } from './timer'
@@ -23,16 +24,17 @@
     onClose: () => void
   } = $props()
 
-  // How long the copy button reads "copied", as the invitation link's (spec 011).
-  const COPIED_DISPLAY_MS = 2000
-
   type State = 'loading' | 'ready' | 'error'
 
   let dialog: HTMLDialogElement | null = $state(null)
   let dialogState: State = $state('loading')
   let recap = $state<Recap | null>(null)
+  // True while the copy button reads "copied", after a successful copy, as the
+  // invitation link's button does (spec 011).
   let copied = $state(false)
-  let copiedTimer: ReturnType<typeof setTimeout> | undefined
+  const shareLinkCopier = newLinkCopier((isCopied) => {
+    copied = isCopied
+  })
 
   let shownPlayers = $derived(recap === null ? [] : shownRecapPlayers(recap.players))
   let shareUrl = $derived(shareUrlOf(recap))
@@ -58,7 +60,7 @@
   onMount(() => {
     dialog?.showModal()
     void loadRecap()
-    return () => clearTimeout(copiedTimer)
+    return () => shareLinkCopier.stop()
   })
 
   // Write the share link to the clipboard. Without a usable clipboard nothing
@@ -67,19 +69,7 @@
     if (shareUrl === null) {
       return
     }
-    if (navigator.clipboard === undefined || navigator.clipboard === null) {
-      return
-    }
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-    } catch {
-      return
-    }
-    copied = true
-    clearTimeout(copiedTimer)
-    copiedTimer = setTimeout(() => {
-      copied = false
-    }, COPIED_DISPLAY_MS)
+    await shareLinkCopier.copy(shareUrl)
   }
 
   // The controls of the dialog that Tab moves between, in document order.
@@ -254,10 +244,11 @@
     border-radius: 50%;
   }
 
-  /* A player who is no longer in the room: a neutral grey that is none of the
-     eight player colours (spec 019). */
+  /* A player who is no longer in the room, whose colour may now be someone
+     else's: the hatching of a departed author's band (spec 019), a pattern no
+     player's swatch has. A player's swatch is a plain colour, with no pattern. */
   .recap-colour[data-colour=''] {
-    background: #767676;
+    background-image: var(--author-departed-hatching);
   }
 
   .recap-name {

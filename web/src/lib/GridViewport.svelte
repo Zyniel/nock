@@ -850,15 +850,11 @@
   }
 
   /* The band of an author who is no longer in the room (their colour may now
-     be someone else's): diagonal stripes of a dark grey and white, a pattern
-     no player's band has. One of the two greys keeps 3:1 on every background
-     of the cell. */
+     be someone else's): the departed hatching of app.css, diagonal stripes of
+     a dark grey and white, a pattern no player's band has. One of the two
+     greys keeps 3:1 on every background of the cell. */
   .author-mark[data-colour=''] {
-    background-image: repeating-linear-gradient(
-      45deg,
-      var(--author-departed-dark) 0 2px,
-      var(--author-departed-light) 2px 4px
-    );
+    background-image: var(--author-departed-hatching);
   }
 
   /* The cell another player selected: a dashed border in their colour, inset

@@ -103,7 +103,9 @@ def build_recap(state: RoomState, log: Sequence[LogEntry]) -> Recap:
 
     Raises:
         ValueError: `state.solved` is False, or those entries are not exactly
-            seq 1 to state.seq, in order, with one `grid_solved` among them.
+            seq 1 to state.seq, in order, with one `grid_solved` among them, or
+            a clue of the grid does not resolve to a word (an imported grid
+            always resolves, spec 003).
     """
     if not state.solved:
         raise ValueError(f"Room {state.code} is not solved, so it has no recap")
@@ -235,8 +237,9 @@ def _letters_by_player(state: RoomState) -> dict[str, int]:
 def _grid_words(grid: Grid) -> list[list[Position]]:
     """Return the cells of each word of the grid: one word per clue, in grid order.
 
-    A clue whose word does not resolve is left out; a grid of the catalogue has
-    none (spec 003).
+    Raises:
+        ValueError: a clue does not resolve to a word. An imported grid has no
+            such clue (spec 003).
     """
     words: list[list[Position]] = []
     for cell in grid.cells:
@@ -245,8 +248,12 @@ def _grid_words(grid: Grid) -> list[list[Position]]:
         for clue_index in range(len(cell.clues)):
             try:
                 positions = grid.word_cells(cell.row, cell.column, clue_index)
-            except (IndexError, ValueError):
-                continue
+            except ValueError as error:
+                raise ValueError(
+                    f"Clue {clue_index} of the clue cell at ({cell.row}, "
+                    f"{cell.column}) has no word ({error}): the recap expects "
+                    "every clue of the grid to resolve to a word"
+                ) from error
             words.append(positions)
     return words
 
