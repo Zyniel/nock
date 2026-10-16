@@ -85,6 +85,7 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .pencil .ltr { font-style: italic; color: var(--pencil); }
 .pencil.flash .ltr { color: var(--ink); }
 .wrong .ltr span { text-decoration: line-through; text-decoration-thickness: max(2px, .07em); text-decoration-color: var(--wrong); }
+.wrong .ltr[style] span { text-decoration-color: var(--ink); } /* Auteurs mode: a red strike would vanish on a red letter */
 /* revealed: a notch at the middle of the top edge (the corners now belong to players) */
 .rev::after { content: ""; position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: max(8px, calc(var(--s) * .3)); height: max(5px, calc(var(--s) * .15)); background: var(--reveal); clip-path: polygon(0 0, 100% 0, 50% 100%); z-index: 3; }
 .band { position: absolute; left: 30%; width: 40%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); display: none; }
@@ -134,6 +135,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; background: var(--cell); }
 .toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #FFFFFF; font: 500 .85rem/1.2 var(--f-ui); padding: 8px 12px; border-radius: 6px; white-space: nowrap; z-index: 6; transition: opacity .25s; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .5); }
 .toast[data-off] { opacity: 0; pointer-events: none; }
+.legend { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: rgba(255, 255, 255, .96); border: 1px solid var(--line); border-radius: 14px; padding: 4px 12px; font: 500 .8rem/1.2 var(--f-ui); color: var(--muted); white-space: nowrap; display: flex; gap: 8px; z-index: 5; }
+.legend b { font-weight: 700; }
 .cluebar { flex: none; background: var(--navy); color: #FFFFFF; height: 50px; display: flex; align-items: center; }
 .cluebar button { background: none; border: 0; color: #FFFFFF; width: 44px; height: 100%; font: 400 1.4rem/1 var(--f-ui); cursor: pointer; }
 .cluebar button:focus-visible { outline-color: #FFFFFF; outline-offset: -4px; }
@@ -182,9 +185,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.3 · three triangle sizes to choose from</div>
+    <div class="ver">Version 3.4 · triangles at 30 %, Auteurs mode</div>
     <h1>Nock cell sheet</h1>
-    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, in three sizes to choose from (switch below). The author band is gone for now; authorship will be designed later. The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
+    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
   </header>
 
   <section>
@@ -197,8 +200,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li>Fonts: Source Sans 3 for the interface and letters, IBM Plex Sans Condensed for clues.</li>
           <li>Bold on grey means locked (checked right, or revealed). Pencil is italic grey. Wrong is struck through.</li>
           <li class="new"><b>New:</b> other players are a coloured triangle in a corner, four per cell at most. No dashed border, no shapes.</li>
-          <li class="new"><b>New:</b> triangles are plain colour, never any name or initials, no outline. Size to pick: 25, 30 or 35 % of the cell side.</li>
-          <li class="new"><b>New:</b> no author band under letters. Authorship comes later.</li>
+          <li>Other players: plain colour triangles, never any name or initials, no outline, 30 % of the cell side.</li>
+          <li class="new"><b>New:</b> no author band. An « Auteurs » mode colours each letter in a darker ink of its finder's colour.</li>
           <li class="new"><b>New:</b> a revealed letter has a notch at the top centre, no longer a corner triangle.</li>
         </ul>
       </div>
@@ -235,10 +238,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   </section>
 
   <div class="switch" role="group" aria-label="Variantes">
-    <div class="grp"><span class="lbl">Triangle size</span>
-      <button type="button" data-size="0.25" aria-pressed="false">S · 25 %</button>
-      <button type="button" data-size="0.3" aria-pressed="true">M · 30 %</button>
-      <button type="button" data-size="0.35" aria-pressed="false">L · 35 %</button>
+    <div class="grp"><span class="lbl">Auteurs mode</span>
+      <button type="button" data-authors="off" aria-pressed="true">Off</button>
+      <button type="button" data-authors="on" aria-pressed="false">On</button>
     </div>
     <div class="grp"><span class="lbl">Another player's word</span>
       <button type="button" data-tint="on" aria-pressed="true">Light tint</button>
@@ -248,37 +250,44 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>1 · Players on a cell</small>One corner each, four at most</h2>
-    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. Each triangle is plain colour, with no name and no outline; its side is 25, 30 or 35 % of the cell side (6 px at least), chosen with the switch. Who is who is in the player list.</p>
+    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. Each triangle is plain colour, with no name and no outline; its side is 30 % of the cell side (6 px at least). Who is who is in the player list.</p>
     <div class="board static" id="corners"></div>
     <p class="note"><strong>Accessibility.</strong> The corner is colour only, which spec 035 (AC-6) does not allow today. Without an outline, green and orange are also under the 3:1 that marks need (see the contrast table); slightly darker versions of those two colours would fix that. Two ways to fill the gap: the clue bar names who else is on my word (« Bruno est ici »), and the player list in the Salon says where each player is. Spec 035 would need to accept that.</p>
   </section>
 
   <section>
-    <h2><small>2 · Clue cells</small>Clues and their four arrows</h2>
+    <h2><small>2 · Auteurs mode</small>Letters in the colour of whoever found them</h2>
+    <p class="lead">A switch, off by default, in the Menu (and in the bar above for this page). When it is on, each letter takes its finder's colour. Player colours are too light for text, so each one gets a darker « ink », computed until it reads at 4.5:1 on my selected cell, the darkest background a letter can have. Revealed letters have no finder and stay black. A player who has left turns grey. Pencil letters keep their italics, in their finder's colour.</p>
+    <div class="board" id="authors"></div>
+    <p class="note"><strong>Not by colour alone.</strong> With the mode on, the clue bar names the finder of the selected letter (« Lettre de Bruno »), and a small legend sits over the top of the grid. <strong>Watch:</strong> darkened, some colours get close: red and brown, green and olive, teal and blue. That is the spec 019 colour-blindness question again, now on text.</p>
+  </section>
+
+  <section>
+    <h2><small>3 · Clue cells</small>Clues and their four arrows</h2>
     <p class="lead">The arrow sits in the letter cell next to the clue, as in printed grids. Two clues share a cell with a thin rule between them. A flagged clue (« Je bloque ») gets ⚑ in its top-left corner, the one corner no arrow uses.</p>
     <div class="board" id="clues"></div>
   </section>
 
   <section>
-    <h2><small>3 · Letter cells</small>One state at a time, at 56 px</h2>
+    <h2><small>4 · Letter cells</small>One state at a time, at 56 px</h2>
     <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. A letter is locked when a check finds it right or when a reveal fills it in. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a notch at the top.</p>
     <div class="board static" id="states"></div>
   </section>
 
   <section>
-    <h2><small>4 · Selection and other players</small>Me, my word, and the others</h2>
+    <h2><small>5 · Selection and other players</small>Me, my word, and the others</h2>
     <p class="lead">My cell keeps the filled blue and the solid navy border; it is the only cell with a border. Other players are a corner triangle and, if kept, a light tint of their colour on their word.</p>
     <div class="board static" id="sel"></div>
   </section>
 
   <section>
-    <h2><small>5 · Worst cases</small>Where marks could collide</h2>
+    <h2><small>6 · Worst cases</small>Where marks could collide</h2>
     <div class="board static" id="worst"></div>
     <p class="note"><strong>Blue against blue.</strong> Player colour 2 (<code>#4363d8</code>) tints a word almost like my own selected word. Dropping the tint (switch above) removes the problem; otherwise my word moves to a neutral tint or the palette loses its blue.</p>
   </section>
 
   <section>
-    <h2><small>6 · In context</small>Phone, 360 px, keyboard shown</h2>
+    <h2><small>7 · In context</small>Phone, 360 px, keyboard shown</h2>
     <div class="mock-row">
       <div class="phone" id="phone">
         <div class="topbar">
@@ -292,6 +301,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
         <div class="stage" id="stage">
           <div class="toast" id="toast">⚑ Dédé bloque sur « Flaire »</div>
           <div id="pgrid"></div>
+          <div class="legend" id="legend" hidden></div>
         </div>
         <div class="cluebar">
           <button type="button" id="prev" aria-label="Définition précédente">‹</button>
@@ -318,7 +328,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   </section>
 
   <section>
-    <h2><small>7 · Contrast</small>Measured on this page</h2>
+    <h2><small>8 · Contrast</small>Measured on this page</h2>
     <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed notch, flag, player triangles) need 3:1.</p>
     <div class="tbl-wrap"><table id="contrast"><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Needs</th><th>Result</th></tr></thead><tbody></tbody></table></div>
     <p class="note"><strong>Player colours.</strong> Green and orange fall under 3:1 on white on their own (last rows), Corner triangles have no edge, so those two colours would need darker versions to reach 3:1.</p>
@@ -385,8 +395,22 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   var POINTS = { tl: "0,0 10,0 0,10", tr: "0,0 10,0 10,10", br: "10,0 10,10 0,10", bl: "0,0 10,10 0,10" };
   /* label centre on the line parallel to the long edge, and its angle */
   var LABEL_AT = { tl: [0.31, 0.31, -45], tr: [0.69, 0.31, 45], br: [0.69, 0.69, -45], bl: [0.31, 0.69, 45] };
-  /* plain triangles: no text, no edge; side = SIZE of the cell side (6 px at least) */
+  /* plain triangles: no text, no edge; side = 30 % of the cell side (6 px at least) */
   var SIZE = 0.3;
+
+  /* Auteurs mode: each letter in a darker "ink" of its finder's colour, darkened until it
+     reaches 4.5:1 on the darkest background a letter can have (my selected cell). */
+  var AUTHORS = false;
+  var DEPARTED = "#6B7079";
+  function inkOf(hex) {
+    var h = hex.replace("#", ""), rgb = [0, 1, 2].map(function (i) { return parseInt(h.slice(i * 2, i * 2 + 2), 16); });
+    for (var k = 0; k <= 1; k += 0.02) {
+      var out = "#" + rgb.map(function (v) { return ("0" + Math.round(v * (1 - k)).toString(16)).slice(-2); }).join("");
+      if (ratio(out, tok("sel")) >= 4.5) return out;
+    }
+    return "#000000";
+  }
+  var INK = P.map(inkOf);
   function corners(list, s) {
     var t = Math.max(6, Math.round(s * SIZE));
     var h = "";
@@ -412,8 +436,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       });
       if (o.flag) h += '<span class="flag" aria-label="drapeau">⚑</span>';
     } else {
-      if (o.letter) h += '<div class="ltr"><span>' + esc(o.letter) + "</span></div>";
-      if (o.author !== undefined && o.author !== null) h += '<div class="band' + (o.gone ? " gone" : "") + '" style="background:' + P[o.author] + '"></div>';
+      var lc = "";
+      var hasAuthor = o.author !== undefined && o.author !== null && cls.indexOf("rev") < 0;
+      if ((AUTHORS || o.forceAuthors) && hasAuthor) lc = ' style="color:' + (o.gone ? DEPARTED : INK[o.author]) + '"';
+      if (o.letter) h += '<div class="ltr"' + lc + "><span>" + esc(o.letter) + "</span></div>";
       h += corners(o.cursors || [], s);
     }
     (o.arrows || []).forEach(function (a) { h += a; });
@@ -442,6 +468,18 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two top corners");
     h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "the corners stay clear of the letter");
     set("corners", h);
+
+    h = "";
+    P.forEach(function (c, i) {
+      var ch = NAMES[i].charAt(0).toUpperCase();
+      h += spec(grid([[{ letter: ch, author: i, forceAuthors: true }, { letter: ch, author: i, cls: ["word"], forceAuthors: true }, { letter: ch, author: i, cls: ["sel"], forceAuthors: true }]], 48),
+        '<span style="color:' + INK[i] + '">' + NAMES[i] + "</span>", "ink " + INK[i] + " · triangle " + c);
+    });
+    h += spec(grid([[
+      { letter: "T", author: 0, forceAuthors: true }, { letter: "A", author: 1, forceAuthors: true }, { letter: "M", author: 1, cls: ["locked"], forceAuthors: true },
+      { letter: "I", author: 4, cls: ["pencil"], forceAuthors: true }, { letter: "S", author: 6, gone: true, forceAuthors: true }, { letter: "N", author: 3, cls: ["locked", "rev"], forceAuthors: true }
+    ]], 56), "Mixed", "Ana, Bruno, Bruno locked, Éloïse pencil, Gus has left (grey), revealed N stays black");
+    set("authors", h);
 
     var s = 64;
     h = "";
@@ -566,7 +604,13 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       if (!FX.clues[r + "," + c]) el.addEventListener("click", function () { tap(r, c); });
     });
     var w = FX.words[st.w];
-    document.getElementById("cluetxt").innerHTML = esc(w.clue) + "<i>" + (w.dir === "a" ? "→" : "↓") + "</i>" + (st.pencil ? '<span class="pentag">✎ Crayon</span>' : "");
+    var who = "";
+    var here = L[st.r + "," + st.c];
+    if (AUTHORS && here && here.l && here.a !== undefined && !here.rev) who = '<span class="pentag" style="font-style:normal;color:' + INK[here.a] + '">Lettre de ' + NAMES[here.a] + "</span>";
+    document.getElementById("cluetxt").innerHTML = esc(w.clue) + "<i>" + (w.dir === "a" ? "→" : "↓") + "</i>" + (st.pencil ? '<span class="pentag">✎ Crayon</span>' : "") + who;
+    var lg = document.getElementById("legend");
+    lg.hidden = !AUTHORS;
+    lg.innerHTML = "Auteurs : " + [0, 1, 3, 4].map(function (p) { return '<b style="color:' + INK[p] + '">' + NAMES[p] + "</b>"; }).join(" ");
     document.getElementById("flagbtn").style.opacity = st.flagged[st.w] ? "1" : ".7";
   }
 
@@ -636,7 +680,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       h += '<div class="pop" style="left:90px"><h4>Vérifier</h4><button type="button">La lettre</button><button type="button">Le mot</button><button type="button">La grille</button><hr><h4>Révéler</h4><button type="button">La lettre <em>4 restantes</em></button><button type="button">Le mot <em>1 restant</em></button></div>';
       document.getElementById("b-aide").setAttribute("aria-pressed", "true");
     } else if (which === "menu") {
-      h += '<div class="pop" style="right:6px"><button type="button">Inviter <em>lien</em></button><button type="button">Réglages de l’hôte</button><hr><button type="button">Masquer le chrono</button><button type="button">Retour aux grilles</button></div>';
+      h += '<div class="pop" style="right:6px"><button type="button" id="m-auth">Auteurs <em>' + (AUTHORS ? "activé" : "désactivé") + '</em></button><button type="button">Inviter <em>lien</em></button><button type="button">Réglages de l’hôte</button><hr><button type="button">Masquer le chrono</button><button type="button">Retour aux grilles</button></div>';
       document.getElementById("b-menu").setAttribute("aria-pressed", "true");
     } else {
       document.getElementById("b-salon").setAttribute("aria-pressed", "true");
@@ -665,13 +709,19 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     document.getElementById("overlay").innerHTML = h;
     document.getElementById("scrim").addEventListener("click", closeOverlay);
     var ma = document.getElementById("m-auth") || document.getElementById("p-auth");
-    if (ma) ma.addEventListener("click", function () { st.authors = !st.authors; renderPhone(); var o = st.open; st.open = null; openOverlay(o); });
+    if (ma) ma.addEventListener("click", function () { setAuthors(!AUTHORS); var o = st.open; st.open = null; openOverlay(o); });
     var ts = document.getElementById("t-s"), tp = document.getElementById("t-p");
     if (ts) {
       ts.addEventListener("click", function () { st.tab = "stream"; st.open = null; openOverlay("salon"); });
       tp.addEventListener("click", function () { st.tab = "players"; st.open = null; openOverlay("salon"); });
     }
     if (which === "salon") { var b = document.querySelector("#b-salon .badge"); if (b) b.remove(); }
+  }
+
+  function setAuthors(on) {
+    AUTHORS = on;
+    document.querySelectorAll("[data-authors]").forEach(function (x) { x.setAttribute("aria-pressed", String((x.dataset.authors === "on") === on)); });
+    renderStatic(); renderPhone();
   }
 
   var toastTimer;
@@ -705,9 +755,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   document.querySelectorAll(".switch button").forEach(function (b) {
     b.addEventListener("click", function () {
-      if (b.dataset.size) {
-        SIZE = parseFloat(b.dataset.size);
-        document.querySelectorAll("[data-size]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      if (b.dataset.authors) {
+        setAuthors(b.dataset.authors === "on");
+        return;
       } else {
         TINT = b.dataset.tint === "on";
         document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
@@ -748,6 +798,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["Aa", tok("muted"), tok("cell"), "Event line in the stream", 4.5]
     ];
     P.forEach(function (c, i) { rows.push(["◤", c, tok("cell"), "Player " + i + " triangle on white, no edge", 3]); });
+    INK.forEach(function (c, i) { rows.push(["A", c, tok("sel"), "Auteurs mode: player " + i + " ink on my selected cell", 4.5]); });
     var h = "";
     rows.forEach(function (r) {
       var v = ratio(r[1], r[2]), ok = v >= r[4];
