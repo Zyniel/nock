@@ -108,6 +108,12 @@
 
   // Send the trimmed text and empty the input. The line shows when the
   // server's chat_message comes back: no local echo.
+  //
+  // Emptying the input disables the send button, and a focused button that
+  // becomes disabled drops the focus to the page. So the focus goes to the
+  // input first, however the message was sent: Enter, the button from the
+  // keyboard, a click or a tap. Pacing never disables the input (spec 022
+  // AC-20).
   function submit(event: SubmitEvent): void {
     event.preventDefault()
     if (isSendDisabled) {
@@ -115,6 +121,7 @@
     }
     onSend(text.trim())
     text = ''
+    input?.focus()
   }
 
   // The chat list keeps the reader's place as the feed list does (spec 013
@@ -244,8 +251,11 @@
       >{t('chat.send')}</button
     >
   </form>
-  <!-- Always present, so the panel keeps its height when a note comes or goes
-       (spec 022 AC-18). -->
+  <!-- The slot of the chat notes: always present, empty when no note applies
+       and one line high, so a note coming or going leaves the panel's box
+       alone. It shows one note at a time: the mute note wins over the wait
+       note, which shows again after an unmute if the pacing still holds
+       (spec 022 AC-19). -->
   <p class="chat-note">
     {#if isMuted}
       <span data-testid="chat-muted">{t('chat.muted')}</span>
