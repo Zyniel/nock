@@ -104,15 +104,18 @@ T0 = 1_000_000.0  # t0 of the criteria, where conftest's fake clock starts
 
 CODE_A = "AAAAAA"
 CODE_B = "BBBBBB"
+CODE_C = "CCCCCC"  # the damaged room of AC-1 and AC-4
 UNKNOWN_CODE = "ZZZZZZ"
 ANA = "p1"
 BOB = "p2"
 CY = "p3"
 DAN = "p4"
+EVE = "p5"
 TA = "token-of-ana-0001"
 TB = "token-of-bob-0002"
 TC = "token-of-cy-00003"
 TD = "token-of-dan-0004"
+TE = "token-of-eve-0005"
 NEW_PLAYER_ID = "pNEW"  # the `new_player_id` of a join that must not use it
 NEW_TOKEN = "token-never-used-0000"  # the `new_resume_token` of that join
 NOBODYS_TOKEN = "token-nobody-had-000"
@@ -483,6 +486,53 @@ def add_old_room_rows(
                 "INSERT INTO log (code, seq, entry_json) VALUES (?, ?, ?)",
                 (code, seq, entry_json),
             )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def overwrite_entry_json(path: Path, code: str, seq: int, text: str) -> None:
+    """Overwrite the `entry_json` of one row of a store file's `log` table.
+
+    Args:
+        path: The store file, closed by every store meanwhile.
+        code: The room of the row.
+        seq: The seq of the row.
+        text: Its new `entry_json`.
+    """
+    update_one_log_row(
+        path,
+        "UPDATE log SET entry_json = ? WHERE code = ? AND seq = ?",
+        (text, code, seq),
+    )
+
+
+def overwrite_entry_json_with_bytes_not_utf8(path: Path, code: str, seq: int) -> None:
+    """Overwrite the `entry_json` of one log row with bytes that are not UTF-8 text.
+
+    The value is the byte 0xFF, written through `sqlite3` as `CAST(X'FF' AS TEXT)`
+    (AC-1 and AC-4).
+
+    Args:
+        path: The store file, closed by every store meanwhile.
+        code: The room of the row.
+        seq: The seq of the row.
+    """
+    update_one_log_row(
+        path,
+        "UPDATE log SET entry_json = CAST(X'FF' AS TEXT) WHERE code = ? AND seq = ?",
+        (code, seq),
+    )
+
+
+def update_one_log_row(
+    path: Path, statement: str, parameters: tuple[str | int, ...]
+) -> None:
+    """Run an UPDATE of the `log` table that must change exactly one row."""
+    connection = sqlite3.connect(path)
+    try:
+        cursor = connection.execute(statement, parameters)
+        assert cursor.rowcount == 1, f"no single log row for {parameters}"
         connection.commit()
     finally:
         connection.close()

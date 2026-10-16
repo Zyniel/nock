@@ -8,7 +8,8 @@ spec 011's `FakeClock`.
 Reading of the throttle table: "the request is not counted as a failure" is tested
 by sliding window arithmetic. The failures of the first batch are at t0; a refused
 request at t0 + 30 s must not move the end of the window, so the request at
-t0 + 60 s answers 200.
+t0 + 60 s answers 200. A burst of 40 recap requests for a wrong code, sent at once
+from 40 threads, is counted one request after another, as spec 011 says.
 """
 
 from __future__ import annotations
@@ -27,7 +28,14 @@ from nock.hub import RoomRegistry
 from nock.recap import PublicRecap, Recap
 from nock.room import RoomState
 from nock.server import create_app
-from spec011_harness import JOIN_TEXT, FakeClock, receive_text_or_fail
+from spec011_harness import (
+    BURST_SIZE,
+    JOIN_TEXT,
+    FakeClock,
+    SlowLookupRegistry,
+    at_once,
+    receive_text_or_fail,
+)
 from spec024_harness import INDEX_HTML, make_dist_dir
 from spec028_harness import (
     FAKE_CLOCK_CONFIG,
@@ -347,6 +355,38 @@ def test_ac8_nine_wrong_codes_do_not_throttle(
         clock_client.get(recap_url(UNKNOWN_CODE))
 
     assert clock_client.get(recap_url(code)).status_code == 200
+
+
+def recap_answer(client: TestClient, code: str) -> tuple[int, object]:
+    """The status and the JSON body of `GET /api/rooms/<code>/recap`."""
+    response = client.get(recap_url(code))
+    return response.status_code, response.json()
+
+
+def test_ac8_forty_recap_requests_at_once_get_ten_404_and_thirty_429(
+    fake_clock: FakeClock, dist_dir: Path
+) -> None:
+    # The clock does not move. Each lookup answers a little later
+    # (`SlowLookupRegistry`), so that the 40 requests are in flight together.
+    registry = SlowLookupRegistry(clock=fake_clock)
+    try:
+        app = create_app(rooms=registry, dist_dir=dist_dir)
+        with TestClient(app) as client:
+            answers = at_once(BURST_SIZE, lambda: recap_answer(client, UNKNOWN_CODE))
+    finally:
+        registry.close()
+
+    not_found = 0
+    throttled = 0
+    others: list[object] = []
+    for answer in answers:
+        if answer == (404, NOT_FOUND):
+            not_found += 1
+        elif answer == (429, TOO_MANY):
+            throttled += 1
+        else:
+            others.append(answer)
+    assert (not_found, throttled, others) == (10, 30, [])
 
 
 def test_ac8_the_share_routes_answer_404_for_a_token_that_is_not_a_solved_room(

@@ -1,8 +1,9 @@
 """Tests of spec 011, AC-3: random room codes and the wrong-code throttle.
 
 The codes of `register_room`, the throttle on the room socket with a fake clock
-and the real WebSocket, and the throttled page with a mocked socket. The shared
-setup is in `spec011_harness`.
+and the real WebSocket, a burst of 40 wrong codes at once from one address (from
+40 threads), and the throttled page with a mocked socket. The shared setup is in
+`spec011_harness`.
 """
 
 from __future__ import annotations
@@ -30,12 +31,15 @@ from nock.server import (
     create_app,
 )
 from spec011_harness import (
+    BURST_SIZE,
     CODE_PATTERN,
     EXPECTED_FR_VALUES,
     JOIN_TEXT,
     START_TIME,
     UNKNOWN_CODE,
     FakeClock,
+    SlowLookupRegistry,
+    at_once,
     build_catalogue,
     fresh_state,
     grid_from_text,
@@ -401,6 +405,51 @@ def test_ac3_each_app_has_its_own_failures(
 
         assert close_code_on_first_read(first_client, room_code) == 4429
         assert join_and_get_snapshot(second_client, room_code).seq == 1
+
+
+# ---- AC-3: a burst of wrong codes ------------------------------------------
+
+
+def close_code_before_any_message(client: TestClient, code: str) -> int | str:
+    """Open a socket to room `code`, send nothing, and return its close code.
+
+    Returns:
+        The code the socket is closed with; or, when a message comes first, a
+        text that names that message.
+    """
+    try:
+        with client.websocket_connect(socket_url(code)) as websocket:
+            text = websocket.receive_text()
+    except WebSocketDisconnect as closed:
+        return closed.code
+    return f"a message before any close: {text}"
+
+
+def test_ac3_forty_sockets_at_once_get_ten_closes_4404_and_thirty_4429(
+    fake_clock: FakeClock, dist_dir: Path
+) -> None:
+    # The clock does not move. Each lookup answers a little later
+    # (`SlowLookupRegistry`), so that the 40 sockets are in flight together.
+    registry = SlowLookupRegistry(clock=fake_clock)
+    try:
+        app = create_app(rooms=registry, dist_dir=dist_dir)
+        with TestClient(app) as client:
+            outcomes = at_once(
+                BURST_SIZE,
+                lambda: close_code_before_any_message(client, UNKNOWN_CODE),
+            )
+    finally:
+        registry.close()
+
+    closes: list[int] = []
+    not_closes: list[object] = []
+    for outcome in outcomes:
+        if isinstance(outcome, int):
+            closes.append(outcome)
+        else:
+            not_closes.append(outcome)
+    assert not_closes == []
+    assert sorted(closes) == [4404] * 10 + [4429] * 30
 
 
 # ---- AC-3: browser, throttled ----------------------------------------------

@@ -15,13 +15,16 @@ activity is Dan's edit in B's log, not B's creation. Dan's token, `TD` in the
 criterion, is the one his join got; his socket stays open, so that he stays a
 player of B. The registry's fake clock then reads t0 + 400.
 `POST /api/rooms/summaries` answers with the summaries of the rooms that a key's
-token is a member of. The shared setup is in `spec032_harness`.
+token is a member of. A damaged room C beside A, whose one log row (Eve's join,
+TE) cannot be read, is left out with a warning that names it and nothing of the
+row, and A is answered as usual. The shared setup is in `spec032_harness`.
 """
 
 from __future__ import annotations
 
 import contextlib
 import json
+import logging
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -51,10 +54,13 @@ from spec032_harness import (
     BOB,
     CODE_A,
     CODE_B,
+    CODE_C,
     CY,
     DAN,
+    EVE,
     LIFE,
     NOBODYS_TOKEN,
+    NOT_JSON,
     SEAT_BACK_CONFIG,
     SUMMARIES_PATH,
     T0,
@@ -62,11 +68,14 @@ from spec032_harness import (
     TB,
     TC,
     TD,
+    TE,
     UNKNOWN_CODE,
     Run,
     abc_summary,
     grid_from_text,
     make_dist_dir,
+    overwrite_entry_json,
+    overwrite_entry_json_with_bytes_not_utf8,
     player_ids,
     post_summaries,
     summaries_request,
@@ -545,6 +554,127 @@ def test_ac4_http_a_summary_holds_no_answer(rooms: Rooms) -> None:
     text = json.dumps(response.json())
     for answer in ANSWERS:
         assert answer not in text
+
+
+# ---- HTTP: a damaged room ------------------------------------------------------
+
+NOT_JSON_ROW = "not_json"
+NOT_UTF8_ROW = "bytes_not_utf8"
+DAMAGED_ROWS = pytest.mark.parametrize("damage", [NOT_JSON_ROW, NOT_UTF8_ROW])
+
+
+def write_rooms_a_and_damaged_c(path: Path, grid: Grid, damage: str) -> None:
+    """Write room A as above, and room C, whose one log row is then damaged.
+
+    C is created at t0 with `create_room`, Eve's join (TE) at t0 is appended, and
+    that entry's `entry_json` is then overwritten through `sqlite3`, with
+    `not json` or with bytes that are not UTF-8 text.
+    """
+    play_a = room_a_play(grid)
+    play_c = Run(grid, code=CODE_C)
+    play_c.join_new("Eve", EVE, TE, T0)
+    writer = RoomStore(path)
+    try:
+        writer.create_room(play_a.initial)
+        writer.append(CODE_A, play_a.log)
+        writer.create_room(play_c.initial)
+        writer.append(CODE_C, play_c.log)
+    finally:
+        writer.close()
+    if damage == NOT_JSON_ROW:
+        overwrite_entry_json(path, CODE_C, 1, NOT_JSON)
+    else:
+        overwrite_entry_json_with_bytes_not_utf8(path, CODE_C, 1)
+
+
+@contextlib.contextmanager
+def app_with_a_damaged_room(
+    path: Path, grid: Grid, clock: FakeClock, dist_dir: Path, damage: str
+) -> Iterator[TestClient]:
+    """Yield a client of an app on a new store over A and the damaged C.
+
+    The registry's fake clock reads t0 + 400, as in the other HTTP tests.
+    """
+    write_rooms_a_and_damaged_c(path, grid, damage)
+    store = RoomStore(path)
+    registry = RoomRegistry(clock=clock, store=store, config=SEAT_BACK_CONFIG)
+    try:
+        clock.now = T0 + 400
+        with TestClient(create_app(rooms=registry, dist_dir=dist_dir)) as client:
+            yield client
+    finally:
+        registry.close()
+        store.close()
+
+
+def logged_text(record: logging.LogRecord) -> str:
+    """All that a log handler writes of a record: message, exception and stack."""
+    return logging.Formatter().format(record)
+
+
+@DAMAGED_ROWS
+def test_ac4_http_a_damaged_room_is_left_out_and_the_other_keys_are_answered(
+    tmp_path: Path,
+    fx01_grid: Grid,
+    fake_clock: FakeClock,
+    dist_dir: Path,
+    damage: str,
+) -> None:
+    path = tmp_path / "nock.sqlite3"
+    with app_with_a_damaged_room(
+        path, fx01_grid, fake_clock, dist_dir, damage
+    ) as client:
+        response = post_summaries(client, [(CODE_A, TA), (CODE_C, TE)])
+
+    assert response.status_code == 200
+    assert summaries_of(response.json()) == [summary_of_a()]
+
+
+@DAMAGED_ROWS
+def test_ac4_http_a_damaged_room_is_logged_with_a_warning_that_names_it(
+    tmp_path: Path,
+    fx01_grid: Grid,
+    fake_clock: FakeClock,
+    dist_dir: Path,
+    damage: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    path = tmp_path / "nock.sqlite3"
+    with app_with_a_damaged_room(
+        path, fx01_grid, fake_clock, dist_dir, damage
+    ) as client:
+        caplog.clear()
+        caplog.set_level(logging.WARNING)
+        post_summaries(client, [(CODE_A, TA), (CODE_C, TE)])
+
+    naming_c: list[logging.LogRecord] = []
+    for record in caplog.records:
+        if record.levelno >= logging.WARNING and CODE_C in record.getMessage():
+            naming_c.append(record)
+    assert naming_c != [], caplog.records
+
+
+def test_ac4_http_no_record_holds_the_text_of_the_damaged_row(
+    tmp_path: Path,
+    fx01_grid: Grid,
+    fake_clock: FakeClock,
+    dist_dir: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    path = tmp_path / "nock.sqlite3"
+    with app_with_a_damaged_room(
+        path, fx01_grid, fake_clock, dist_dir, NOT_JSON_ROW
+    ) as client:
+        caplog.clear()
+        caplog.set_level(logging.DEBUG)
+        post_summaries(client, [(CODE_A, TA), (CODE_C, TE)])
+
+    holding_the_row: list[str] = []
+    for record in caplog.records:
+        text = logged_text(record)
+        if NOT_JSON in text:
+            holding_the_row.append(text)
+    assert holding_the_row == []
 
 
 # ---- The registry --------------------------------------------------------------

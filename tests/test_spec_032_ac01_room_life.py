@@ -4,10 +4,11 @@
 `letter_changed` or a `cell_locked`), and lists the rooms whose last edit time is
 older than a given time (`expired_codes`). A database file written before this
 spec gets those times when it is opened; a damaged room in it, with no snapshot
-or with a row that cannot be read, gets the time of the upgrade and a warning,
-and the store opens all the same. A registry reads the room life from
-`RoomConfig.room_life_seconds`: exactly 30 days after the last edit a room is still
-open, and any later it is expired. The shared setup is in `spec032_harness`.
+or with a row that cannot be read (`not json`, or bytes that are not UTF-8 text),
+gets the time of the upgrade and a warning, and the store opens all the same. A
+registry reads the room life from `RoomConfig.room_life_seconds`: exactly 30 days
+after the last edit a room is still open, and any later it is expired. The shared
+setup is in `spec032_harness`.
 """
 
 from __future__ import annotations
@@ -63,6 +64,7 @@ from spec032_harness import (
     BOB,
     CODE_A,
     CODE_B,
+    CODE_C,
     INDEX_HTML,
     LIFE,
     NO_TICK_CONFIG,
@@ -72,6 +74,7 @@ from spec032_harness import (
     add_old_room_rows,
     grid_from_text,
     make_dist_dir,
+    overwrite_entry_json_with_bytes_not_utf8,
     registry_on_file,
     write_old_database,
 )
@@ -564,14 +567,16 @@ def test_ac1_an_upgraded_file_opens_again_with_the_same_times(
 
 # ---- A damaged room in a file written before this spec -------------------------
 
-CODE_C = "CCCCCC"
 NO_SNAPSHOT = "no_snapshot"
 UNREADABLE_SNAPSHOT = "unreadable_snapshot"
 UNREADABLE_LOG_ROW = "unreadable_log_row"
+NOT_UTF8_LOG_ROW = "not_utf8_log_row"
 DAMAGES = pytest.mark.parametrize(
-    "damage", [NO_SNAPSHOT, UNREADABLE_SNAPSHOT, UNREADABLE_LOG_ROW]
+    "damage",
+    [NO_SNAPSHOT, UNREADABLE_SNAPSHOT, UNREADABLE_LOG_ROW, NOT_UTF8_LOG_ROW],
 )
-UNREADABLE_DAMAGES = pytest.mark.parametrize(
+# The rows that `model_validate_json` refuses: spec 018 names the exception.
+NOT_JSON_DAMAGES = pytest.mark.parametrize(
     "damage", [UNREADABLE_SNAPSHOT, UNREADABLE_LOG_ROW]
 )
 
@@ -588,7 +593,7 @@ def add_damaged_room_c(path: Path, grid: Grid, damage: str) -> None:
     t0 + 20 (seq 2) and a presence change at t0 + 40 (seq 3) in its log: its last
     edit time would be t0 + 20, decades before what the real clock reads. The
     damage takes its snapshot away, or makes its snapshot or its last log row a
-    row that cannot be read (`not json`).
+    row that cannot be read: `not json`, or bytes that are not UTF-8 text.
     """
     with_ana = join_room(
         new_room(CODE_C, grid, T0 + 2), Join(nickname="Ana"), T0 + 2, ANA, TA
@@ -604,9 +609,11 @@ def add_damaged_room_c(path: Path, grid: Grid, damage: str) -> None:
         snapshot_row = (with_ana.seq, NOT_JSON)
     elif damage == UNREADABLE_LOG_ROW:
         log_rows[1] = (3, NOT_JSON)
-    else:
+    elif damage != NOT_UTF8_LOG_ROW:
         pytest.fail(f"unknown damage: {damage}")
     add_old_room_rows(path, CODE_C, snapshot_row, log_rows)
+    if damage == NOT_UTF8_LOG_ROW:
+        overwrite_entry_json_with_bytes_not_utf8(path, CODE_C, 3)
 
 
 def write_damaged_file(
@@ -704,7 +711,7 @@ def test_ac1_a_room_with_no_snapshot_still_loads_as_none_after_the_upgrade(
     assert loaded is None
 
 
-@UNREADABLE_DAMAGES
+@NOT_JSON_DAMAGES
 @OLD_LAYOUTS
 def test_ac1_a_room_with_an_unreadable_row_still_fails_to_load_after_the_upgrade(
     store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool, damage: str
@@ -717,6 +724,34 @@ def test_ac1_a_room_with_an_unreadable_row_still_fails_to_load_after_the_upgrade
             upgraded.load_room(CODE_C)
     finally:
         upgraded.close()
+
+
+def load_room_raises(store: RoomStore, code: str) -> bool:
+    """Whether `store.load_room(code)` raises.
+
+    For a row whose bytes are not UTF-8 text the spec says that `load_room`
+    raises, and names no exception, so any exception counts.
+    """
+    try:
+        store.load_room(code)
+    except Exception:
+        return True
+    return False
+
+
+@OLD_LAYOUTS
+def test_ac1_a_room_with_bytes_that_are_not_utf8_still_fails_to_load(
+    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
+) -> None:
+    write_damaged_file(store_path, fx01_grid, with_share_tokens_table, NOT_UTF8_LOG_ROW)
+
+    upgraded = RoomStore(store_path)
+    try:
+        raised = load_room_raises(upgraded, CODE_C)
+    finally:
+        upgraded.close()
+
+    assert raised is True
 
 
 @DAMAGES
