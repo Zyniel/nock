@@ -38,10 +38,15 @@ ENGINE_NAMES: tuple[str, ...] = ("chromium", "firefox", "webkit")
 warmed_browser_ids: set[int] = set()
 WARM_UP_TIMEOUT_MS = 60_000
 
-# Test files whose tests measure time or pace, and so run serially.
+# Test files whose tests measure time or pace, and so run serially. The two
+# scroll files time, in the page, how long a layout change takes to bring a
+# list back to its end (300 ms at most); with four workers that once took
+# 341 ms in WebKit on CI (2026-10-16).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
+        "test_spec_013_ac07_ac08_feed_scroll.py",
         "test_spec_022_ac10_pacing.py",
+        "test_spec_022_ac11_ac12_chat_list_scroll.py",
         "test_spec_036_ac01_time_budgets.py",
     }
 )
