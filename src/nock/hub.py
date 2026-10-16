@@ -22,6 +22,8 @@ import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import NamedTuple
 
+from pydantic import ValidationError
+
 from nock.grid import Grid
 from nock.protocol import (
     ClientMessage,
@@ -430,9 +432,27 @@ class _RoomRunner:
         try:
             self._store.delete_room(self.state.code)
         finally:
-            for connection in self._open_connections:
-                connection.deliver_close(ROOM_NOT_FOUND_CLOSE_CODE)
-            self._open_connections = []
+            self._close_open_connections()
+
+    async def stop_for_deletion(self) -> None:
+        """Stop the room for good and close its sockets, leaving the store alone.
+
+        For a room the registry already deleted from the store, where a new room
+        may have its code by now. As in `delete`, the inputs still in the inbox
+        are dropped, and each connection opened to the room is sent a close with
+        ROOM_NOT_FOUND_CLOSE_CODE, also when stopping the task fails.
+        """
+        self._is_deleted = True
+        try:
+            await self.cancel()
+        finally:
+            self._close_open_connections()
+
+    def _close_open_connections(self) -> None:
+        """Close each connection opened to the room with ROOM_NOT_FOUND_CLOSE_CODE."""
+        for connection in self._open_connections:
+            connection.deliver_close(ROOM_NOT_FOUND_CLOSE_CODE)
+        self._open_connections = []
 
     def save_snapshot(self) -> None:
         """Save a snapshot of the room unless the store has one at this seq.
@@ -1026,10 +1046,18 @@ class RoomRegistry:
         """Return the summary of room `code` when one of `tokens` is a member's.
 
         Returns:
-            The summary; None when the room is unknown or expired, or when no
-            token is a member's.
+            The summary; None when the room is unknown, expired or damaged (it
+            cannot be loaded, and a warning names it), or when no token is a
+            member's.
         """
-        state = self.peek_room(code)
+        try:
+            state = self.peek_room(code)
+        except ValidationError:
+            # A row of the room cannot be read (spec 032's "Damaged rooms"). The
+            # error is not logged: its text quotes the row, which may hold a
+            # resume token (spec 038).
+            logger.warning("Room %s cannot be loaded: its summary is left out", code)
+            return None
         if state is None:
             return None
         holds_a_members_token = False
@@ -1080,11 +1108,15 @@ class RoomRegistry:
                 return
             if threading.current_thread() is self._thread:
                 # Waiting for ourselves would block, as in close(): the store
-                # forgets the room now, and its task stops after this step.
-                self._store.delete_room(code)
-                deletion = loop.create_task(runner.delete())
-                self._deletion_tasks.add(deletion)
-                deletion.add_done_callback(self._deletion_tasks.discard)
+                # forgets the room now, under the lock, and the room's task stops
+                # after this step, even when the store fails. The stop leaves the
+                # store alone: a new room may have taken the code by then.
+                try:
+                    self._store.delete_room(code)
+                finally:
+                    stopping = loop.create_task(runner.stop_for_deletion())
+                    self._deletion_tasks.add(stopping)
+                    stopping.add_done_callback(self._deletion_tasks.discard)
                 return
             deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
             deleting.result(timeout=_STOP_TIMEOUT_SECONDS)

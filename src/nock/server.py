@@ -95,7 +95,8 @@ class RoomSummariesRequest(BaseModel):
 class _WrongCodeThrottle:
     """Remembers the wrong room codes of each client address, in memory.
 
-    The sockets run on several threads, so every access takes the lock.
+    The sockets and the HTTP routes run on several threads, so every access
+    takes the lock.
     """
 
     def __init__(self) -> None:
@@ -109,12 +110,30 @@ class _WrongCodeThrottle:
             recent = self._forget_old_failures(address, now)
             return len(recent) >= WRONG_CODE_LIMIT
 
-    def record_failure(self, address: str, now: float) -> None:
-        """Remember one wrong code from `address` at time `now`."""
+    def record_unless_blocked(self, address: str, now: float) -> bool:
+        """Record one wrong code from `address` at time `now`, unless it is blocked.
+
+        The check and the record are one step under the lock, so wrong codes
+        that arrive at once are counted one after another (spec 011): of a
+        burst, exactly the first WRONG_CODE_LIMIT are recorded, however long
+        the lookups before them took.
+
+        Args:
+            address: The client's address.
+            now: Clock time of the wrong code.
+
+        Returns:
+            True when the wrong code is recorded: the client gets the answer of
+            an unknown room. False when the address is blocked: the client gets
+            the throttle's answer, and nothing is recorded.
+        """
         with self._lock:
             recent = self._forget_old_failures(address, now)
+            if len(recent) >= WRONG_CODE_LIMIT:
+                return False
             recent.append(now)
             self._failure_times[address] = recent
+            return True
 
     def _forget_old_failures(self, address: str, now: float) -> list[float]:
         """Drop the failures of `address` outside the window; return the rest.
@@ -436,7 +455,9 @@ def create_app(
         if wrong_codes.is_blocked(address, now):
             raise _too_many_requests()
         if room_registry.room_state(code) is None:
-            wrong_codes.record_failure(address, now)
+            # Checked again as it is recorded: requests run in several threads.
+            if not wrong_codes.record_unless_blocked(address, now):
+                raise _too_many_requests()
             raise _not_found()
         recap = room_registry.room_recap(code)
         if recap is None:
@@ -483,8 +504,12 @@ def create_app(
         # delete it once expired (spec 032), and the event loop must not wait.
         state = await asyncio.to_thread(room_registry.room_state, code)
         if state is None:
-            wrong_codes.record_failure(address, now)
-            await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
+            # Checked again as it is recorded: other sockets of the address may
+            # have been counted while this one waited for its lookup.
+            if wrong_codes.record_unless_blocked(address, now):
+                await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
+            else:
+                await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
         await _serve_socket(websocket, room_registry, code)
 

@@ -143,23 +143,9 @@ async function fetchSummaries(keys: RoomKey[]): Promise<RoomSummary[] | null> {
   }
 }
 
-// True when two summaries name the same room. The server sums up each room once,
-// and the page sends each code once, so no answer of the server does that.
-function hasRepeatedCode(summaries: RoomSummary[]): boolean {
-  const seenCodes = new Set<string>()
-  for (const summary of summaries) {
-    if (seenCodes.has(summary.code)) {
-      return true
-    }
-    seenCodes.add(summary.code)
-  }
-  return false
-}
-
-// The summaries of the rooms of `keys`, or null when one request fails or the
-// answers name a room twice (the page shows each room once, keyed by its code).
-// With one request, they keep the order the server sent; the answers of several
-// requests are sorted together as the server sorts them.
+// The summaries of the rooms of `keys`, or null when one request fails. With one
+// request, they keep the order the server sent; the answers of several requests
+// are sorted together as the server sorts them.
 export async function fetchRoomSummaries(keys: RoomKey[]): Promise<RoomSummary[] | null> {
   const requests = requestsOf(keys)
   const summaries: RoomSummary[] = []
@@ -169,9 +155,6 @@ export async function fetchRoomSummaries(keys: RoomKey[]): Promise<RoomSummary[]
       return null
     }
     summaries.push(...answer)
-  }
-  if (hasRepeatedCode(summaries)) {
-    return null
   }
   if (requests.length > 1) {
     summaries.sort(serverOrder)

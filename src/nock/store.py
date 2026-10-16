@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS room_times (
 );
 """
 
+# _JSON_AS_BYTES: the JSON of a snapshot or a log row is read as bytes, CAST(... AS
+# BLOB), and given as such to `model_validate_json`. SQLite would refuse a row whose
+# bytes are not UTF-8 text with an error of its own that quotes the row; this way
+# such a row, like any row that cannot be read, raises pydantic's ValidationError
+# (spec 032).
+
 # What `delete_room` runs, in one transaction: every row of the room, in every
 # table, the rows that refer to the room before the room itself.
 _ROOM_DELETIONS: tuple[str, ...] = (
@@ -262,10 +268,16 @@ class RoomStore:
 
         Returns:
             The entries in seq order. An unknown room gives [].
+
+        Raises:
+            pydantic.ValidationError: a stored row is damaged, its bytes not
+                being UTF-8 text included.
         """
+        # Read as bytes (_JSON_AS_BYTES).
         with self._lock:
             rows = self._connection.execute(
-                "SELECT entry_json FROM log WHERE code = ? AND seq > ? ORDER BY seq",
+                "SELECT CAST(entry_json AS BLOB) FROM log "
+                "WHERE code = ? AND seq > ? ORDER BY seq",
                 (code, after_seq),
             ).fetchall()
         entries: list[LogEntry] = []
@@ -293,11 +305,13 @@ class RoomStore:
         logged entry after it, in order.
 
         Raises:
-            pydantic.ValidationError: a stored row is damaged.
+            pydantic.ValidationError: a stored row is damaged, its bytes not
+                being UTF-8 text included.
         """
+        # Read as bytes (_JSON_AS_BYTES).
         with self._lock:
             snapshot_row = self._connection.execute(
-                "SELECT state_json FROM snapshots WHERE code = ? "
+                "SELECT CAST(state_json AS BLOB) FROM snapshots WHERE code = ? "
                 "ORDER BY seq DESC LIMIT 1",
                 (code,),
             ).fetchone()
@@ -437,8 +451,10 @@ class RoomStore:
         Raises:
             pydantic.ValidationError: the snapshot cannot be read.
         """
+        # Read as bytes (_JSON_AS_BYTES).
         row = self._connection.execute(
-            "SELECT state_json FROM snapshots WHERE code = ? ORDER BY seq LIMIT 1",
+            "SELECT CAST(state_json AS BLOB) FROM snapshots WHERE code = ? "
+            "ORDER BY seq LIMIT 1",
             (code,),
         ).fetchone()
         if row is None:
