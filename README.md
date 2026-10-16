@@ -109,7 +109,8 @@ digits 0 to 9. A refused value (in these two variables or in `NOCK_DATABASE`,
 below) stops the start with a message that names the variable and shows the
 value. Use this command rather than `uvicorn nock.server:app`: it also sets the
 WebSocket frame limit of spec 036 (8,192 bytes), where uvicorn alone accepts
-frames of 16 MiB.
+frames of 16 MiB, and it logs warnings and errors only, with no access log, so
+that the logs hold no client address (spec 038).
 
 The rooms are stored in the SQLite file named by the `NOCK_DATABASE`
 environment variable. Its path may hold spaces, accents and the separators of
@@ -131,7 +132,29 @@ A room is deleted 30 days after its last edit (a letter written, erased or
 locked), with its log, its snapshots and its share link (spec 032). The server
 looks for such rooms when it starts and then every hour, and deletes a room at
 once when someone opens it after that time. A file written by an older version
-of the server is not supported: start with a new file.
+of the server is not supported: start with a new file. A deleted room leaves no
+copy in the database files: SQLite overwrites its rows with zeros, and the
+write-ahead log is emptied after each deletion (spec 038).
+
+### The operator pages
+
+The `NOCK_OPERATOR_TOKEN` environment variable turns on the operator pages of
+spec 038: `/ops` shows a dashboard of the rooms created in the last 1, 7 or 30
+days (rooms, players, completion, solving time, server latency, dropped
+connections) and replays the edits of a room. Its value is a secret of 32 to 256
+characters, each one an ASCII letter, a digit 0 to 9, `_` or `-`; spec 038
+("Operator access") gives the rule. To make one:
+
+```powershell
+$env:NOCK_OPERATOR_TOKEN = uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
+uv run python -m nock
+```
+
+The page asks for the token and keeps it in the browser tab only; ten wrong
+tokens from one address within a minute block that address for the rest of the
+minute. When the variable is unset or empty, the operator pages are off and
+their paths answer as unknown ones. A refused value stops the start with a
+message that names the variable and the rule broken, but never shows the value.
 
 ## 4. The quality gate
 

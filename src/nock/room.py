@@ -298,12 +298,20 @@ class RoomSummary(RoomModel):
 
 
 class LogEntry(RoomModel):
-    """One numbered event as written to the room's log (spec 018)."""
+    """One numbered event as written to the room's log (spec 018).
+
+    Only `event` reaches the players. The other fields are private to the
+    server, like `resume_token` (spec 018 decision 4).
+    """
 
     at: float  # clock time of the step that made it
     event: SeqEvent  # exactly what the players receive
     resume_token: ResumeToken | None = None  # on player_joined only
     undo: StrictBool = False  # a letter_changed made by an undo (spec 018)
+    # spec 038: the whole milliseconds from reading the client message of the step
+    # to handing its entries to the store; None for a step without one (a tick,
+    # a restart, a closed connection) and for entries logged before spec 038
+    relay_ms: int | None = Field(default=None, ge=0, strict=True)
 
 
 class Disconnect(RoomModel):

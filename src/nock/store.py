@@ -7,6 +7,10 @@ them.
 One connection is shared by all threads and every call takes a lock, so the
 store is safe to call from several threads. Rooms are independent: the lock is
 only held for the duration of one short statement or transaction.
+
+A deleted room leaves no copy behind (spec 038): SQLite overwrites deleted rows
+with zeros (`secure_delete`), and in a file database each deletion ends with a
+checkpoint that empties the write-ahead log.
 """
 
 from __future__ import annotations
@@ -69,17 +73,20 @@ class RoomStore:
 
         Args:
             path: A file path, or ":memory:" for an in-memory database. A file
-                database uses journal_mode WAL and synchronous FULL.
+                database uses journal_mode WAL and synchronous FULL. Both
+                overwrite deleted rows with zeros (secure_delete, spec 038).
         """
         self._lock = threading.Lock()
         self._is_closed = False
+        self._is_file = str(path) != _MEMORY_PATH
         # Autocommit mode: the transactions are written out with BEGIN/COMMIT.
         self._connection = sqlite3.connect(
             str(path), check_same_thread=False, isolation_level=None
         )
-        if str(path) != _MEMORY_PATH:
+        if self._is_file:
             self._connection.execute("PRAGMA journal_mode = WAL")
             self._connection.execute("PRAGMA synchronous = FULL")
+        self._connection.execute("PRAGMA secure_delete = ON")
         self._connection.executescript(_TABLES)
 
     def create_room(
@@ -179,11 +186,37 @@ class RoomStore:
             codes.append(str(code))
         return codes
 
+    def codes_created_since(self, since: float) -> list[tuple[str, float]]:
+        """Return the rooms created at `since` or later, with their creation times.
+
+        The operator's dashboard reads its rooms with it (spec 038): one read
+        gives each room with its creation time, so no room can go between two
+        reads.
+
+        Args:
+            since: A clock time; a room created exactly then is included.
+
+        Returns:
+            A `(code, created_at)` pair per room, in no particular order.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT code, created_at FROM room_times WHERE created_at >= ?",
+                (since,),
+            ).fetchall()
+        pairs: list[tuple[str, float]] = []
+        for code, created_at in rows:
+            pairs.append((str(code), float(created_at)))
+        return pairs
+
     def delete_room(self, code: str) -> bool:
         """Delete the room, its snapshots, its log and its share token, at once.
 
         Everything goes in one transaction (spec 032). This is the one exception
         to the rule that the log is never rewritten or truncated (spec 018).
+        The deleted rows are overwritten with zeros, and in a file database the
+        write-ahead log is then checkpointed and emptied, so no byte of the room
+        stays in the database files (spec 038).
 
         Returns:
             True when the room existed. Its code is then free for a new room, and
@@ -200,6 +233,10 @@ class RoomStore:
                 self._connection.execute("ROLLBACK")
                 raise
             self._connection.execute("COMMIT")
+            if self._is_file:
+                # Copies the log's pages into the database file, then truncates
+                # the log, so the older copies of the room's pages go with it.
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
             return True
 
     def append(self, code: str, entries: Sequence[LogEntry]) -> None:

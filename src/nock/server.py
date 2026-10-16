@@ -2,6 +2,10 @@
 
 While the app runs, it deletes the expired rooms of the registry it serves once
 when it starts, then every `expiry_sweep_seconds` (spec 032).
+
+With an operator token, it also serves the operator pages (spec 038): the page
+`/ops` and the ops API under `/api/ops/`, the dashboard and the replay of a room,
+which only a request carrying the token reaches.
 """
 
 from __future__ import annotations
@@ -11,13 +15,14 @@ import contextlib
 import logging
 import os
 import re
+import secrets
 import threading
-from collections.abc import AsyncGenerator, AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, Request, Response, WebSocket
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -36,8 +41,16 @@ from nock.hub import (
     RoomConnection,
     RoomRegistry,
 )
-from nock.protocol import parse_client_message
+from nock.operations import (
+    DAY_SECONDS,
+    RoomLog,
+    RoomReplay,
+    dashboard_figures,
+    room_edits,
+)
+from nock.protocol import grid_view, parse_client_message
 from nock.room import RoomKey, RoomSummary
+from nock.settings import operator_token_from_env
 from nock.store import RoomStore
 
 __all__ = [
@@ -63,6 +76,12 @@ WRONG_CODE_WINDOW_SECONDS: float = 60.0
 DATABASE_VARIABLE: str = "NOCK_DATABASE"  # path of the SQLite file (spec 018)
 MEMORY_DATABASE: str = ":memory:"
 WS_MAX_SIZE_BYTES: int = 8192  # spec 036: uvicorn refuses larger frames (close 1009)
+OPS_API_PREFIX: str = "/api/ops/"  # spec 038: the paths of the ops API
+BEARER_PREFIX: str = "Bearer "  # spec 038: the operator token's header value
+NO_STORE: str = "no-store"  # spec 038: the Cache-Control of every ops API answer
+
+# The ?days= of the dashboard as written in the URL: exactly 1, 7 or 30 (spec 038).
+DashboardDays = Literal["1", "7", "30"]
 
 _MISSING_BUILD_TEXT = "The web client is not built: run npm --prefix web run build"
 
@@ -93,10 +112,11 @@ class RoomSummariesRequest(BaseModel):
 
 
 class _WrongCodeThrottle:
-    """Remembers the wrong room codes of each client address, in memory.
+    """Remembers the failures of each client address, in memory.
 
-    The sockets and the HTTP routes run on several threads, so every access
-    takes the lock.
+    An app keeps two: one for the wrong room codes (spec 011), one for the
+    refused ops API requests (spec 038), each with its own count. The sockets
+    and the HTTP routes run on several threads, so every access takes the lock.
     """
 
     def __init__(self) -> None:
@@ -105,27 +125,28 @@ class _WrongCodeThrottle:
         self._failure_times: dict[str, list[float]] = {}
 
     def is_blocked(self, address: str, now: float) -> bool:
-        """Tell whether `address` has too many recent wrong codes."""
+        """Tell whether `address` has too many recent failures."""
         with self._lock:
             recent = self._forget_old_failures(address, now)
             return len(recent) >= WRONG_CODE_LIMIT
 
     def record_unless_blocked(self, address: str, now: float) -> bool:
-        """Record one wrong code from `address` at time `now`, unless it is blocked.
+        """Record one failure of `address` at time `now`, unless it is blocked.
 
-        The check and the record are one step under the lock, so wrong codes
-        that arrive at once are counted one after another (spec 011): of a
-        burst, exactly the first WRONG_CODE_LIMIT are recorded, however long
-        the lookups before them took.
+        The check and the record are one step under the lock, so failures that
+        arrive at once are counted one after another (spec 011): of a burst,
+        exactly the first WRONG_CODE_LIMIT are recorded, however long the
+        lookups before them took.
 
         Args:
             address: The client's address.
-            now: Clock time of the wrong code.
+            now: Clock time of the failure: a wrong code, or a wrong token.
 
         Returns:
-            True when the wrong code is recorded: the client gets the answer of
-            an unknown room. False when the address is blocked: the client gets
-            the throttle's answer, and nothing is recorded.
+            True when the failure is recorded: the client gets the answer of an
+            unknown room, or of a missing token. False when the address is
+            blocked: the client gets the throttle's answer, and nothing is
+            recorded.
         """
         with self._lock:
             recent = self._forget_old_failures(address, now)
@@ -184,14 +205,72 @@ class _RoomsHolder:
                 self._is_created_here = False
 
 
+class _OperatorToken:
+    """The operator token an app checks: the one it was given, or its variable.
+
+    Without a token given, NOCK_OPERATOR_TOKEN is read each time the app starts
+    (spec 038). While `token` is None, the operator pages are off.
+    """
+
+    def __init__(self, given: str | None) -> None:
+        """Keep `given`, or None to read NOCK_OPERATOR_TOKEN when the app starts."""
+        self._given = given
+        self.token: str | None = given
+
+    def read_at_start(self) -> None:
+        """Take the token of NOCK_OPERATOR_TOKEN, unless a token was given.
+
+        Raises:
+            SettingsError: the variable breaks the rule of spec 038.
+        """
+        if self._given is None:
+            self.token = operator_token_from_env(os.environ)
+
+
 def _not_found() -> HTTPException:
     """Return the 404 error with FastAPI's usual body."""
     return HTTPException(status_code=404, detail="Not Found")
 
 
 def _too_many_requests() -> HTTPException:
-    """Return the 429 error of an address throttled for wrong room codes."""
+    """Return the 429 error of a throttled address (wrong room codes or tokens)."""
     return HTTPException(status_code=429, detail="Too Many Requests")
+
+
+def _not_authorized() -> HTTPException:
+    """Return the 401 error of an ops API request without the operator token."""
+    return HTTPException(
+        status_code=401,
+        detail="Not authorized",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _carries_token(request: Request, token: str) -> bool:
+    """Tell whether the request carries the header `Authorization: Bearer <token>`.
+
+    The token is read from that header only, never from the URL, the query or a
+    cookie. It is compared with `secrets.compare_digest`, whose time does not
+    tell how much of the token was right.
+    """
+    header = request.headers.get("authorization", "")
+    if not header.startswith(BEARER_PREFIX):
+        return False
+    given_token = header.removeprefix(BEARER_PREFIX)
+    # As bytes: compare_digest refuses a str that is not ASCII.
+    return secrets.compare_digest(given_token.encode("utf-8"), token.encode("utf-8"))
+
+
+def _room_logs_since(store: RoomStore, since: float) -> list[RoomLog]:
+    """Return the log of each room created at `since` or later (spec 038).
+
+    The rooms are read from the store only, so none of them is made live.
+    """
+    room_logs: list[RoomLog] = []
+    for code, created_at in store.codes_created_since(since):
+        entries = tuple(store.read_log(code))
+        room_logs.append(RoomLog(code=code, created_at=created_at, entries=entries))
+    return room_logs
 
 
 def _client_address(connection: Request | WebSocket) -> str:
@@ -356,6 +435,8 @@ def create_app(
     rooms: RoomRegistry | None = None,
     dist_dir: Path | None = None,
     catalogue: Catalogue | None = None,
+    *,
+    operator_token: str | None = None,
 ) -> FastAPI:
     """Build the app.
 
@@ -367,18 +448,27 @@ def create_app(
             A registry given is never closed by the app.
         dist_dir: The built client. None: WEB_DIST_DIR.
         catalogue: The grids served. None: an empty catalogue.
+        operator_token: The token of the operator pages (spec 038). None: the
+            token of NOCK_OPERATOR_TOKEN, read when the app starts; the pages
+            are off when the variable is unset or empty.
 
-    Never raises because `dist_dir` is missing or empty (see AC-6).
+    Never raises because `dist_dir` is missing or empty (see AC-6). The app's
+    startup raises SettingsError when it reads a NOCK_OPERATOR_TOKEN that breaks
+    the rule of spec 038.
     """
     holder = _RoomsHolder(rooms)
+    operator = _OperatorToken(operator_token)
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
     grid_number_regex = re.compile(GRID_NUMBER_PATTERN)
     wrong_codes = _WrongCodeThrottle()
+    # Spec 038: the refused ops API requests, counted apart from the wrong codes.
+    refused_ops_requests = _WrongCodeThrottle()
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        operator.read_at_start()
         room_registry = holder.get()
         try:
             async with _expiry_sweeps(room_registry):
@@ -395,8 +485,55 @@ def create_app(
         openapi_url=None,
     )
 
+    # Spec 038, rule 4: while the operator pages are on, no browser or proxy
+    # keeps an ops API answer, refusals included. While they are off, the ops
+    # paths answer exactly as an unknown path does, without the header.
+    @web_app.middleware("http")
+    async def forbid_storing_ops_answers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        is_ops_path = request.url.path.startswith(OPS_API_PREFIX)
+        if is_ops_path and operator.token is not None:
+            response.headers["Cache-Control"] = NO_STORE
+        return response
+
+    def check_operator(request: Request) -> None:
+        """Let an ops API request through, or refuse it (spec 038, rules 1 to 3).
+
+        Runs before the route reads its parameters, so a wrong token is refused
+        before any validation.
+
+        Raises:
+            HTTPException: 404 while the operator pages are off, as for any
+                unknown path; 429 while the client's address is throttled,
+                whatever its token; 401 without the operator token, which
+                counts as one refusal of the address.
+        """
+        token = operator.token
+        if token is None:
+            raise _not_found()
+        address = _client_address(request)
+        now = holder.get().clock()
+        if refused_ops_requests.is_blocked(address, now):
+            raise _too_many_requests()
+        if _carries_token(request, token):
+            return
+        # Checked again as it is recorded: requests run in several threads.
+        if not refused_ops_requests.record_unless_blocked(address, now):
+            raise _too_many_requests()
+        raise _not_authorized()
+
     @web_app.get("/", include_in_schema=False)
     def serve_catalogue() -> Response:
+        return _index_response(client_dir)
+
+    # The operator's page asks for the token itself, so it is served to anyone
+    # while the operator pages are on (spec 038).
+    @web_app.get("/ops", include_in_schema=False)
+    def serve_ops_page() -> Response:
+        if operator.token is None:
+            raise _not_found()
         return _index_response(client_dir)
 
     @web_app.get("/r/{code}", include_in_schema=False)
@@ -481,6 +618,36 @@ def create_app(
             bodies.append(summary.model_dump(mode="json"))
         return bodies
 
+    # Spec 038: the figures of the rooms created in the last `days` days, read
+    # from the store without making any room live.
+    @web_app.get("/api/ops/dashboard", dependencies=[Depends(check_operator)])
+    def get_dashboard(
+        days: Annotated[DashboardDays, Query()] = "7",
+    ) -> dict[str, object]:
+        room_registry = holder.get()
+        now = room_registry.clock()
+        period_days = int(days)
+        since = now - period_days * DAY_SECONDS
+        room_logs = _room_logs_since(room_registry.store, since)
+        figures = dashboard_figures(room_logs, period_days, now)
+        return figures.model_dump(mode="json")
+
+    # Spec 038: the empty grid and the ordered edits of one room, from its log.
+    # A 404 here is no refusal: only wrong tokens count against the address.
+    @web_app.get("/api/ops/rooms/{code}/edits", dependencies=[Depends(check_operator)])
+    def get_room_edits(code: str) -> dict[str, object]:
+        if room_code_regex.fullmatch(code) is None:
+            raise _not_found()
+        room_registry = holder.get()
+        state = room_registry.peek_room(code)
+        if state is None:
+            raise _not_found()
+        entries = room_registry.store.read_log(code)
+        replay = RoomReplay(
+            code=code, grid=grid_view(state.grid), edits=room_edits(entries)
+        )
+        return replay.model_dump(mode="json")
+
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:
         return _file_in_directory(client_dir / "assets", file_name)
@@ -517,13 +684,15 @@ def create_app(
 
 
 def server_config(
-    app: FastAPI, host: str = "127.0.0.1", port: int = 8000, log_level: str = "info"
+    app: FastAPI, host: str = "127.0.0.1", port: int = 8000, log_level: str = "warning"
 ) -> uvicorn.Config:
     """Return the uvicorn configuration of the server.
 
     `ws_max_size` is WS_MAX_SIZE_BYTES: uvicorn refuses a larger frame before
-    it is buffered whole, and closes the socket with 1009. Every other option
-    is uvicorn's default.
+    it is buffered whole, and closes the socket with 1009. `access_log` is
+    False and the level defaults to "warning": uvicorn writes the client's
+    address in its access log and in its info line for each socket (spec 038).
+    Every other option is uvicorn's default.
 
     Args:
         app: The app to serve.
@@ -535,7 +704,12 @@ def server_config(
         The configuration to give to `uvicorn.Server`.
     """
     return uvicorn.Config(
-        app, host=host, port=port, log_level=log_level, ws_max_size=WS_MAX_SIZE_BYTES
+        app,
+        host=host,
+        port=port,
+        log_level=log_level,
+        access_log=False,
+        ws_max_size=WS_MAX_SIZE_BYTES,
     )
 
 
