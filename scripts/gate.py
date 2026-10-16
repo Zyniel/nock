@@ -26,6 +26,10 @@ Options of the full stage (2026-10-15, so CI can run one job per engine):
         number; 0 runs everything in one serial pass. The tests marked
         `serial` (scripts/gate_browsers.py) always run after the parallel
         pass, on their own.
+    --specs: spec numbers, comma-separated (for example 027,028): the
+        browser tests run only for those specs; the static checks and the
+        tests without a browser run in full. The quick gate of an agent's
+        finish hook (2026-10-16).
 
 Exit codes:
     0: every check passed.
@@ -82,6 +86,8 @@ TEST_SELECTIONS: dict[str, str] = {
 }
 # pytest's exit code when no test was selected.
 NO_TESTS_COLLECTED = 5
+# A spec number as --specs takes it: three digits, for example 027.
+SPEC_NUMBER_PATTERN = re.compile(r"^\d{3}$")
 
 
 def run_tool(step_name: str, command: list[str]) -> int | None:
@@ -329,6 +335,28 @@ def parse_workers(workers_text: str) -> str:
     raise argparse.ArgumentTypeError("expected 'auto' or a number of workers")
 
 
+def parse_specs(specs_text: str) -> list[str]:
+    """Return the spec numbers of a comma-separated list, each three digits.
+
+    Raises:
+        argparse.ArgumentTypeError: When a part is not a three-digit number.
+    """
+    specs: list[str] = []
+    for part in specs_text.split(","):
+        spec_number = part.strip()
+        if not spec_number:
+            continue
+        if not SPEC_NUMBER_PATTERN.match(spec_number):
+            raise argparse.ArgumentTypeError(
+                f"'{spec_number}' is not a spec number (three digits, e.g. 027)"
+            )
+        if spec_number not in specs:
+            specs.append(spec_number)
+    if not specs:
+        raise argparse.ArgumentTypeError("no spec number given")
+    return specs
+
+
 def parse_arguments() -> argparse.Namespace:
     """Parse the command line."""
     parser = argparse.ArgumentParser(description="Run the project quality gate.")
@@ -364,6 +392,13 @@ def parse_arguments() -> argparse.Namespace:
         help="pytest-xdist workers: 'auto' (default) or a number; 0 runs "
         "the tests in one serial pass.",
     )
+    parser.add_argument(
+        "--specs",
+        type=parse_specs,
+        default=None,
+        help="Run the browser tests of these specs only (comma-separated, "
+        "e.g. 027,028); the tests without a browser all run.",
+    )
     return parser.parse_args()
 
 
@@ -374,7 +409,7 @@ def join_marks(*expressions: str) -> str:
 
 
 def pytest_commands(
-    engines: list[str], selection: str, workers: str
+    engines: list[str], selection: str, workers: str, specs: list[str] | None
 ) -> list[tuple[str, list[str]]]:
     """Return the pytest runs of the full stage, with their step names.
 
@@ -382,16 +417,20 @@ def pytest_commands(
         engines: The engines of the browser tests.
         selection: The `-m` expression of the --tests choice ("" for all).
         workers: The pytest-xdist workers, "auto" or a number ("0": serial).
+        specs: The specs whose browser tests run, or None for every spec.
 
     Returns:
         One run when `workers` is "0", else the parallel run of the tests not
         marked `serial`, then the serial run of the others.
     """
     # gate_browsers marks the tests and leaves out the browser engines that are
-    # not installed, with a warning; in CI it fails instead.
+    # not installed, with a warning; in CI it fails instead. It also leaves out
+    # the browser tests of the specs not in --nock-specs.
     base_command = ["pytest", "--quiet", "-p", "gate_browsers"]
     for engine_name in engines:
         base_command.extend(["--browser", engine_name])
+    if specs is not None:
+        base_command.extend(["--nock-specs", ",".join(specs)])
 
     if workers == "0":
         command = list(base_command)
@@ -427,7 +466,9 @@ def main() -> int:
         results.append(run_step(build_name, build_command))
         if results[-1]:
             selection = TEST_SELECTIONS[arguments.tests]
-            commands = pytest_commands(arguments.browsers, selection, arguments.workers)
+            commands = pytest_commands(
+                arguments.browsers, selection, arguments.workers, arguments.specs
+            )
             results.append(run_pytest_passes(commands))
 
     failed_count = results.count(False)

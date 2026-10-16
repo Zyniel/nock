@@ -20,6 +20,7 @@ Everything runs through uv. Do not use `pip` or a bare `python`.
 | Gate with the browser tests in all three engines | `uv run python scripts/gate.py --browsers all` |
 | Gate, one engine's browser tests only (a CI job) | `uv run python scripts/gate.py --skip-static --tests browser --browsers firefox` |
 | Gate, static checks and tests without a browser | `uv run python scripts/gate.py --tests other` |
+| Quick gate: static checks, tests without a browser, browser tests of specs 027 and 028 | `uv run python scripts/gate.py --specs 027,028 --browsers chromium` |
 | Tests only (browser tests in Chromium) | `uv run pytest` |
 | Fix formatting | `uv run black .` |
 | Fix lint findings | `uv run ruff check --fix .` |
@@ -74,6 +75,12 @@ write the implementation before its tests exist.
   A test file that measures time or pace goes in that list.
 - The gate's engines come from `--browsers` or the `NOCK_BROWSERS` environment
   variable (default `chromium,webkit`).
+- When a role finishes, `scripts/hooks/role_gate.py` runs the gate: the
+  test-writer's `--stage tests`, the implementer's quick gate (the specs whose
+  spec, test or harness files the branch changed since `main`, with `--specs`
+  and Chromium). CI runs everything.
+- In a cloud session, the browsers draw text in CI's font, DejaVu Sans
+  (`.claude/hooks/ci-fonts.conf`, installed by the session-start hook).
 
 ## Who may write what
 
