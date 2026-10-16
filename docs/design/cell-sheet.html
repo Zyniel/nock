@@ -326,7 +326,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 4.2 · decisions, fixes and the remaining screens</div>
+    <div class="ver">Version 4.3 · Accessibilité mode</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
@@ -386,6 +386,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     <div class="grp"><span class="lbl">Another player's word</span>
       <button type="button" data-tint="on" aria-pressed="true">Light tint</button>
       <button type="button" data-tint="off" aria-pressed="false">Nothing</button>
+    </div>
+    <div class="grp"><span class="lbl">Accessibilité</span>
+      <button type="button" data-access="off" aria-pressed="true">Off</button>
+      <button type="button" data-access="on" aria-pressed="false">On</button>
     </div>
   </div>
 
@@ -574,7 +578,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return out;
   }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
-  function dot(p) { return '<i class="pdot" style="background:' + P[p] + '"></i>'; }
+  function dot(p) { return ACCESS ? picon(p, 12) : '<i class="pdot" style="background:' + P[p] + '"></i>'; }
   /* pictograms drawn for Nock (no text glyphs: the fonts have no ⚑) */
   var FLAG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4"/><path d="M6 4h12l-3 4.5 3 4.5H6z"/></svg>';
   var FLAG_ICO = '<svg class="ico filled" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4" fill="none"/><path d="M6 4h12l-3 4.5 3 4.5H6z"/></svg>';
@@ -635,6 +639,23 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   var POINTS = { tl: "0,0 10,0 0,10", tr: "0,0 10,0 10,10", br: "10,0 10,10 0,10", bl: "0,0 10,10 0,10" };
   /* plain triangles: no text, no edge; side = 30 % of the cell side (6 px at least) */
   var SIZE = 0.3;
+  /* Accessibilité mode (off by default): one distinct icon per player, by join index, in the
+     player's colour, in the same corners and order as the triangles. 10 x 10 drawing box. */
+  var ACCESS = false;
+  var ICON_NAMES = ["Rond", "Carré", "Triangle", "Losange", "Étoile", "Croix", "Cœur", "Sablier"];
+  var PICONS = [
+    '<circle cx="5" cy="5" r="4.4"/>',
+    '<rect x="0.9" y="0.9" width="8.2" height="8.2"/>',
+    '<polygon points="5,0.4 9.7,9.3 0.3,9.3"/>',
+    '<polygon points="5,0.1 9.9,5 5,9.9 0.1,5"/>',
+    '<polygon points="5,0.2 6.3,3.6 9.9,3.7 7.1,6 8.1,9.6 5,7.5 1.9,9.6 2.9,6 0.1,3.7 3.7,3.6"/>',
+    '<polygon points="3.3,0.4 6.7,0.4 6.7,3.3 9.6,3.3 9.6,6.7 6.7,6.7 6.7,9.6 3.3,9.6 3.3,6.7 0.4,6.7 0.4,3.3 3.3,3.3"/>',
+    '<path d="M5 9.4L1.1 5.5A2.45 2.45 0 0 1 5 2.3A2.45 2.45 0 0 1 8.9 5.5Z"/>',
+    '<polygon points="0.6,0.6 9.4,0.6 5.6,5 9.4,9.4 0.6,9.4 4.4,5"/>'
+  ];
+  function picon(p, size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 10 10" aria-hidden="true" style="fill:' + P[p] + ';display:inline-block;vertical-align:middle">' + PICONS[p] + "</svg>";
+  }
 
   /* Auteurs mode: each letter in a darker "ink" of its finder's colour, darkened until it
      reaches 4.5:1 on the darkest background a letter can have (my selected cell). */
@@ -649,11 +670,17 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return "#000000";
   }
   var INK = P.map(inkOf);
-  function corners(list, s) {
+  function corners(list, s, access) {
     var t = Math.max(6, Math.round(s * SIZE));
     var h = "";
     for (var i = 0; i < list.length && i < 4; i++) {
       var p = list[i], k = CORNERS[i];
+      if (access) {
+        var is = Math.max(6, Math.round(s * 0.24)), off = Math.max(1, Math.round(s * 0.04));
+        var pos = (k.charAt(0) === "t" ? "top:" : "bottom:") + off + "px;" + (k.charAt(1) === "l" ? "left:" : "right:") + off + "px;";
+        h += '<span class="tri" style="' + pos + "width:" + is + "px;height:" + is + 'px"><svg viewBox="0 0 10 10" aria-hidden="true" style="fill:' + P[p] + '">' + PICONS[p] + "</svg></span>";
+        continue;
+      }
       h += '<span class="tri ' + k + '" style="width:' + t + "px;height:" + t + 'px"><svg viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + POINTS[k] + '" style="fill:' + P[p] + '"/></svg></span>';
     }
     return h;
@@ -681,7 +708,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       if ((AUTHORS || o.forceAuthors) && hasAuthor) lc = ' style="color:' + (o.gone ? DEPARTED : INK[o.author]) + '"';
       if (o.letter) h += '<div class="ltr"' + lc + "><span>" + esc(o.letter) + "</span></div>";
       if (o.caught) h += '<span class="ring" aria-hidden="true"></span>';
-      h += corners(o.cursors || [], s);
+      h += corners(o.cursors || [], s, o.access !== undefined ? o.access : ACCESS);
     }
     (o.arrows || []).forEach(function (a) { h += a; });
     return '<div class="' + cls.join(" ") + '" style="' + style + '">' + h + "</div>";
@@ -761,6 +788,14 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     h += spec(grid([[{ letter: "A", cursors: [1, 3, 4, 5, 6] }]], 60), "Five on one cell", "the fifth is not drawn");
     h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two bottom corners");
     h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "the corners stay clear of the letter");
+    h += '<div style="flex-basis:100%;height:0"></div>';
+    h += '<div class="spec" style="max-width:100%"><div class="cap"><b>Accessibilité mode: one icon per player</b><span>Off by default, in the Menu. Same corners, same order, same colours; the shape makes each player recognisable without colour.</span></div><div style="display:flex;flex-wrap:wrap;gap:12px 20px">' +
+      P.map(function (c, i) { return '<span style="display:inline-flex;align-items:center;gap:6px;font-size:.9rem">' + picon(i, 18) + "<b>" + (i + 1) + "</b> " + ICON_NAMES[i] + ' <span style="color:var(--muted)">(' + PNAMES[i] + ")</span></span>"; }).join("") + "</div></div>";
+    [60, 32, 18].forEach(function (sz) {
+      var row = [1, 2, 3, 4].map(function (n) { return { letter: "A", cursors: four.slice(0, n), access: true }; });
+      h += spec(grid([row], sz), sz + " px, icons", "1 to 4 players");
+    });
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev", "sel"], cursors: four, access: true }]], 60), "Icons + revealed + selected", "the notch sits between the bottom icons");
     set("corners", h);
 
     h = "";
@@ -1011,7 +1046,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       h += '<div class="pop" style="left:90px"><h4>Vérifier</h4><button type="button">La lettre</button><button type="button">Le mot</button><button type="button">La grille</button><hr><h4>Révéler</h4><button type="button">La lettre <em>4 restantes</em></button><button type="button">Le mot <em>1 restant</em></button></div>';
       document.getElementById("b-aide").setAttribute("aria-pressed", "true");
     } else if (which === "menu") {
-      h += '<div class="pop" style="right:6px"><button type="button" id="m-auth">Auteurs <em>' + (AUTHORS ? "activé" : "désactivé") + '</em></button><button type="button" id="m-tint">Mots des autres <em>' + (TINT ? "teintés" : "sans teinte") + '</em></button><button type="button">Inviter <em>lien</em></button><button type="button">Réglages de l’hôte</button><hr><button type="button">Masquer le chrono</button><button type="button">Retour aux grilles</button></div>';
+      h += '<div class="pop" style="right:6px"><button type="button" id="m-auth">Auteurs <em>' + (AUTHORS ? "activé" : "désactivé") + '</em></button><button type="button" id="m-tint">Mots des autres <em>' + (TINT ? "teintés" : "sans teinte") + '</em></button><button type="button" id="m-access">Accessibilité <em>' + (ACCESS ? "activée" : "désactivée") + '</em></button><button type="button">Inviter <em>lien</em></button><button type="button">Réglages de l’hôte</button><hr><button type="button">Masquer le chrono</button><button type="button">Retour aux grilles</button></div>';
       document.getElementById("b-menu").setAttribute("aria-pressed", "true");
     } else {
       document.getElementById("b-salon").setAttribute("aria-pressed", "true");
@@ -1038,6 +1073,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     }
     document.getElementById("overlay").innerHTML = h;
     document.getElementById("scrim").addEventListener("click", closeOverlay);
+    var mx = document.getElementById("m-access");
+    if (mx) mx.addEventListener("click", function () { setAccess(!ACCESS); var o = st.open; st.open = null; openOverlay(o); });
     var mt = document.getElementById("m-tint");
     if (mt) mt.addEventListener("click", function () { setTint(!TINT); var o = st.open; st.open = null; openOverlay(o); });
     var ma = document.getElementById("m-auth") || document.getElementById("p-auth");
@@ -1050,6 +1087,11 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     if (which === "salon") { var b = document.querySelector("#b-salon .badge"); if (b) b.remove(); }
   }
 
+  function setAccess(on) {
+    ACCESS = on;
+    document.querySelectorAll("[data-access]").forEach(function (x) { x.setAttribute("aria-pressed", String((x.dataset.access === "on") === on)); });
+    renderStatic(); renderPhone(); renderScreens();
+  }
   function setTint(on) {
     TINT = on;
     document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String((x.dataset.tint === "on") === on)); });
@@ -1101,6 +1143,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   document.querySelectorAll(".switch button").forEach(function (b) {
     b.addEventListener("click", function () {
+      if (b.dataset.access) {
+        setAccess(b.dataset.access === "on");
+        return;
+      }
       if (b.dataset.authors) {
         setAuthors(b.dataset.authors === "on");
         return;
