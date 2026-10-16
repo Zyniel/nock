@@ -29,6 +29,8 @@
   --paper: #FFFFFF;
   --line: #DDE2EA;
   --ok: #1E7B45;
+  --done: #1E7B45;
+  --disabled-bg: #EEF2F8;
   --bad: #B42318;
   --f-ui: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --f-clue: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
@@ -47,6 +49,7 @@ header h1 { font: 600 2rem/1.15 var(--f-head); margin: 0 0 8px; text-wrap: balan
 header p { margin: 0; max-width: 68ch; color: var(--muted); }
 header .ver { font: 600 .75rem/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--reveal); margin-bottom: 8px; }
 section { display: grid; gap: 16px; }
+.wrap > *, section > *, #overlaps > * { min-width: 0; }
 h2 { font: 600 1.35rem/1.2 var(--f-head); margin: 0; color: var(--navy); text-wrap: balance; }
 h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
 .lead { margin: 0; max-width: 72ch; color: var(--muted); }
@@ -124,6 +127,23 @@ th { font-weight: 600; font-size: .75rem; letter-spacing: .06em; text-transform:
 td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
 .sw { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 28px; border-radius: 3px; border: 1px solid var(--line); font-weight: 700; font-size: .95rem; }
 .pass { color: var(--ok); font-weight: 600; } .fail { color: var(--bad); font-weight: 600; }
+.chip { display: inline-block; width: 36px; height: 24px; border-radius: 4px; border: 1px solid var(--line); vertical-align: middle; }
+.comp { display: grid; gap: 8px; justify-items: start; }
+.comp .cap { font-size: .8rem; color: var(--muted); }
+.btn { font: 600 .95rem/1 var(--f-ui); border-radius: 6px; padding: 10px 16px; border: 1px solid transparent; cursor: pointer; }
+.btn.primary { background: var(--navy); color: #FFFFFF; }
+.btn.secondary { background: #FFFFFF; color: var(--navy); border-color: var(--navy); }
+.btn.quiet { background: var(--word); color: var(--navy); }
+.btn[disabled] { background: var(--disabled-bg); color: var(--muted); border-color: var(--line); cursor: not-allowed; }
+.btn.focus { outline: 2px solid var(--navy); outline-offset: 2px; }
+.menu-demo { background: #FFFFFF; border-radius: 8px; box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .35); border: 1px solid var(--line); min-width: 200px; padding: 6px 0; }
+.menu-demo div { padding: 9px 14px; color: var(--navy); font-weight: 500; display: flex; justify-content: space-between; gap: 12px; }
+.menu-demo div.hover { background: var(--word); }
+.menu-demo div em { font-style: normal; color: var(--muted); }
+.menu-demo hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.status { display: inline-flex; gap: 8px; align-items: center; border-radius: 6px; padding: 8px 12px; font-weight: 600; font-size: .9rem; }
+.status.done { background: #E6F2EA; color: var(--done); }
+.status.notyet { background: var(--clue-bg); color: var(--navy); }
 
 /* ---------- phone mock ---------- */
 .mock-row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
@@ -191,7 +211,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.12 · grid letters A to Z only</div>
+    <div class="ver">Version 3.13 · colour standards for the whole app</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
@@ -253,6 +273,34 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       <button type="button" data-tint="off" aria-pressed="false">Nothing</button>
     </div>
   </div>
+
+  <section>
+    <h2><small>0 · Colour standards</small>One palette for the whole app</h2>
+    <p class="lead">The grid's colours are the app's colours. Menus, buttons, sheets, the catalogue and every later screen take their colours from this list and from nowhere else. Each colour has one job; a colour is never borrowed for another job.</p>
+    <div class="tbl-wrap"><table id="palette"><thead><tr><th>Colour</th><th>Name</th><th>Job</th><th>Never for</th><th>On white</th></tr></thead><tbody></tbody></table></div>
+    <div class="board" id="components"></div>
+    <div class="recap">
+      <div>
+        <h3>Rules</h3>
+        <ul>
+          <li><b>Navy</b> is the app's own colour: bars, icons, primary buttons, my selection, focus.</li>
+          <li><b>Red</b> means « look here »: wrong letters, the ⚑ flag, unread badges, errors.</li>
+          <li><b>Orange-red</b> means « revealed », and nothing else.</li>
+          <li><b>Green</b> means « done »: the finished grid, a passed check in the stream.</li>
+          <li><b>Player colours</b> only mean a player: triangles, word tints, dots, Auteurs ink. Never a button or a state.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Contrast</h3>
+        <ul>
+          <li>Text and icons: 4.5:1 at least, disabled buttons included.</li>
+          <li>Marks, borders that carry meaning, focus: 3:1 at least.</li>
+          <li>Pure black and pure grey are not used: neutrals lean slightly blue, toward the navy.</li>
+          <li>No dark mode for now; every colour is defined once, as a named colour, so one can be added later.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <section>
     <h2><small>1 · Players on a cell</small>One corner each, four at most</h2>
@@ -467,6 +515,47 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return '<div class="spec">' + gridHtml + '<div class="cap"><b>' + title + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div></div>";
   }
   function set(id, html) { document.getElementById(id).innerHTML = html; }
+
+  /* ---------- 0. colour standards (rendered once) ---------- */
+  (function () {
+    var rows = [
+      ["navy", "Navy", "Top bar icons, clue bar, primary buttons, my selection border, focus ring, links", "Player marks"],
+      ["ink", "Ink", "All text and letters, direction arrows", "Backgrounds"],
+      ["muted", "Muted", "Secondary text: captions, event lines in the stream, disabled labels", "Letters in the grid"],
+      ["pencil", "Pencil grey", "Pencil letters (italic), pencil-mode keys", "Any other text"],
+      ["cell", "White", "Page, letter cells, menus, sheets", "–"],
+      ["clue-bg", "Clue blue-grey", "Clue cells, disabled buttons, « not yet » status", "Selection"],
+      ["word", "Word blue", "My selected word, hovered menu item, pressed top-bar button, quiet buttons", "Player tints"],
+      ["sel", "Selected blue", "My selected cell only", "Anything else"],
+      ["locked", "Locked grey", "Locked letters (with bold)", "Disabled states"],
+      ["rule", "Rule grey", "Grid lines, input borders", "Text"],
+      ["line", "Line grey", "Dividers in menus, panels, cards", "Grid lines"],
+      ["wrong", "Red", "Wrong letters (strike), ⚑ flag, unread badge, errors", "Decoration"],
+      ["reveal", "Orange-red", "The revealed notch, the reveal line in the stream", "Anything else"],
+      ["done", "Green", "Finished grid, passed check in the stream", "Player marks"],
+      ["key", "Key grey", "Keyboard keys", "–"]
+    ];
+    var h = "";
+    rows.forEach(function (r) {
+      var v = tok(r[0]), rr = ratio(v, "#FFFFFF");
+      h += '<tr><td><span class="chip" style="background:' + v + '"></span> <code>' + v + "</code></td><td><b>" + r[1] + "</b></td><td>" + r[2] + '</td><td style="color:var(--muted)">' + r[3] + '</td><td class="num">' + rr.toFixed(2) + ":1</td></tr>";
+    });
+    document.querySelector("#palette tbody").innerHTML = h;
+
+    function comp(inner, cap) { return '<div class="comp">' + inner + '<span class="cap">' + cap + "</span></div>"; }
+    var c = "";
+    c += comp('<button type="button" class="btn primary">Créer la partie</button>', "Primary button: navy");
+    c += comp('<button type="button" class="btn secondary">Inviter</button>', "Secondary: navy outline");
+    c += comp('<button type="button" class="btn quiet">Force 2</button>', "Quiet / pressed filter: word blue");
+    c += comp('<button type="button" class="btn" disabled>Plus de lettre</button>', "Disabled: still 4.5:1");
+    c += comp('<button type="button" class="btn primary focus">Vérifier</button>', "Keyboard focus: navy ring");
+    c += comp('<div class="menu-demo"><div>Vérifier la lettre</div><div class="hover">Vérifier le mot</div><hr><div>Révéler la lettre <em>4 restantes</em></div></div>', "Menu: white, navy items, word-blue hover");
+    c += comp('<span class="tb" style="position:relative;display:inline-grid;width:64px;height:48px;background:var(--word)"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>Salon<span class="badge">2</span></span>', "Top-bar button: pressed, red badge");
+    c += comp('<span class="toast" style="position:static;transform:none">⚑ Dédé bloque sur « Flaire »</span>', "3-second note: ink");
+    c += comp('<span class="status done">✓ Grille terminée, bravo !</span>', "Finished: green");
+    c += comp('<span class="status notyet">Grille complète, mais pas encore juste.</span>', "Full but wrong: neutral, no red");
+    document.getElementById("components").innerHTML = c;
+  })();
 
   /* ---------- static sections ---------- */
   function renderStatic() {
