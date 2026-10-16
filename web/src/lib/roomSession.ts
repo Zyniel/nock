@@ -174,6 +174,10 @@ export interface Snapshot {
   flags: FlagView[]
   // The chat history of the room, in seq order (spec 022).
   chat: ChatLine[]
+  // The shared timer (spec 027): the time counted so far, in milliseconds, and
+  // whether it counts now.
+  timer_elapsed_ms: number
+  timer_running: boolean
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -219,6 +223,13 @@ export interface RoomSession {
   reactions: ShownReaction[]
   // The id given to the next shown reaction.
   nextReactionId: number
+  // The shared timer (spec 027): the time counted when `timerAnchor` was read, in
+  // milliseconds; whether it counts now; and the performance.now() reading of the
+  // moment the first two were set. While it counts, the time is
+  // `timerBaseMs + performance.now() - timerAnchor`.
+  timerBaseMs: number
+  timerRunning: boolean
+  timerAnchor: number
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -269,6 +280,9 @@ export function newSession(): RoomSession {
     closedVote: null,
     reactions: [],
     nextReactionId: 1,
+    timerBaseMs: 0,
+    timerRunning: false,
+    timerAnchor: 0,
   }
 }
 
@@ -661,6 +675,14 @@ function toPlayers(value: unknown): PlayerView[] | null {
   return players
 }
 
+// A time in whole milliseconds; 0 when the value is not a whole number of at least 0.
+function toWholeMs(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+    return 0
+  }
+  return value
+}
+
 function toSnapshot(message: Record<string, unknown>): Snapshot | null {
   const grid = toGrid(message.grid)
   if (grid === null) {
@@ -690,6 +712,8 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     open_vote: toVoteView(message.open_vote),
     flags: toFlags(message.flags),
     chat: toChat(message.chat),
+    timer_elapsed_ms: toWholeMs(message.timer_elapsed_ms),
+    timer_running: message.timer_running === true,
   }
 }
 
@@ -911,11 +935,36 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   if (event.type === 'chat_message' && session.snapshot !== null) {
     applyChatMessage(session.snapshot, event)
   }
+  if (event.type === 'letter_changed') {
+    startTimerOnLetter(session, event)
+  }
   if (event.type === 'grid_solved') {
     session.solved = true
+    stopTimerOnSolved(session, event)
   }
   if (session.snapshot !== null) {
     applyToPlayers(session.snapshot, event)
+  }
+}
+
+// The protocol has no timer event (spec 027): a page learns the shared timer from
+// its snapshot, from the first letter typed, and from the solve. A letter starts
+// the timer when the page knows of no time counted yet and the grid is not solved.
+function startTimerOnLetter(session: RoomSession, event: RoomEvent): void {
+  const isLetter = typeof event.message.letter === 'string'
+  const isNotStarted = !session.timerRunning && session.timerBaseMs === 0 && !session.solved
+  if (isLetter && isNotStarted) {
+    session.timerRunning = true
+    session.timerAnchor = performance.now()
+  }
+}
+
+// The solve stops the timer on the time it carries, whatever the page counted.
+function stopTimerOnSolved(session: RoomSession, event: RoomEvent): void {
+  const elapsedMs = event.message.elapsed_ms
+  if (typeof elapsedMs === 'number' && Number.isInteger(elapsedMs)) {
+    session.timerBaseMs = elapsedMs
+    session.timerRunning = false
   }
 }
 
@@ -941,6 +990,10 @@ function receiveSnapshot(session: RoomSession, snapshot: Snapshot): void {
   session.status = 'joined'
   session.nicknameRefused = false
   session.solved = snapshot.solved
+  // The page counts from the moment it applies the snapshot.
+  session.timerBaseMs = snapshot.timer_elapsed_ms
+  session.timerRunning = snapshot.timer_running
+  session.timerAnchor = performance.now()
   session.pending = session.pending.filter((event) => event.seq > snapshot.seq)
   drainPending(session)
 }

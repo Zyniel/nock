@@ -155,5 +155,10 @@
   "reaction.laugh_label": "Rire",
   "reaction.wow_label": "Waouh",
   "reaction.thinking_label": "Je réfléchis",
-  "reaction.shown_label": "{name} : {reaction}"
+  "reaction.shown_label": "{name} : {reaction}",
+  "timer.label": "Chrono",
+  "timer.minutes_seconds": "{minutes}:{seconds}",
+  "timer.hours_minutes_seconds": "{hours}:{minutes}:{seconds}",
+  "timer.toggle": "⏱",
+  "timer.toggle_label": "Afficher le chrono"
 }
