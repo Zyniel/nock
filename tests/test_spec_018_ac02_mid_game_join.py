@@ -217,6 +217,7 @@ def test_ac2_websocket_the_joiner_does_not_receive_its_own_player_joined(
         ana.send(EditLetter(row=1, column=0, letter="T"))
         cy.wait_for_seq(4, "the letter after the join")
         ana.wait_for_seq(4, "the letter after the join")
+        bob.wait_for_seq(4, "the letter after the join")
 
         assert cy.snapshot().seq == 3
         assert [player.nickname for player in cy.snapshot().players] == [
@@ -225,7 +226,7 @@ def test_ac2_websocket_the_joiner_does_not_receive_its_own_player_joined(
             "Cy",
         ]
         assert [type(message).__name__ for message in cy.events()] == ["LetterChanged"]
-        # The two others did receive Cy's join, as event 3.
+        # Bob, who was in the room already, did receive Cy's join, as event 3.
         joins = [m for m in bob.events() if isinstance(m, PlayerJoined)]
         assert [event.seq for event in joins] == [3]
 
