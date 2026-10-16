@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import threading
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from pathlib import Path
 from typing import Annotated
 
@@ -318,7 +318,7 @@ async def _sweep_expired_rooms(rooms: RoomRegistry, stop: asyncio.Event) -> None
 
 
 @contextlib.asynccontextmanager
-async def _expiry_sweeps(rooms: RoomRegistry) -> AsyncIterator[None]:
+async def _expiry_sweeps(rooms: RoomRegistry) -> AsyncGenerator[None]:
     """Run the expiry sweeps of `rooms` in the background while the block runs.
 
     On the way out, a sweep under way is waited for, so that it never meets a
@@ -479,7 +479,10 @@ def create_app(
         if wrong_codes.is_blocked(address, now):
             await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        if room_registry.room_state(code) is None:
+        # In a worker thread: the lookup may load the room from the store, or
+        # delete it once expired (spec 032), and the event loop must not wait.
+        state = await asyncio.to_thread(room_registry.room_state, code)
+        if state is None:
             wrong_codes.record_failure(address, now)
             await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
             return

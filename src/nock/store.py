@@ -11,12 +11,18 @@ only held for the duration of one short statement or transaction.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from nock.room import LogEntry, RoomState, is_edit, replay
+
+logger = logging.getLogger(__name__)
 
 _MEMORY_PATH = ":memory:"
 
@@ -70,15 +76,12 @@ class RoomStore:
         """Open or create the SQLite database at `path` and create its tables.
 
         A file written before spec 032 is upgraded: each of its rooms gets its
-        creation time and its last edit time.
+        creation time and its last edit time. A damaged room of it gets the time
+        of the upgrade instead, with a warning, and the store opens all the same.
 
         Args:
             path: A file path, or ":memory:" for an in-memory database. A file
                 database uses journal_mode WAL and synchronous FULL.
-
-        Raises:
-            ValueError: a room of the file has no snapshot.
-            pydantic.ValidationError: a stored row is damaged.
         """
         self._lock = threading.Lock()
         self._is_closed = False
@@ -147,9 +150,15 @@ class RoomStore:
             return self._code_of_token(token)
 
     def last_edit_at(self, code: str) -> float | None:
-        """Return the room's last edit time, or None for an unknown room.
+        """Return the room's last edit time, which its 30-day life runs from.
 
         It starts when the room is created and only edits move it (spec 032).
+
+        Args:
+            code: The room.
+
+        Returns:
+            The time in seconds since the epoch, or None for an unknown room.
         """
         with self._lock:
             row = self._connection.execute(
@@ -359,15 +368,10 @@ class RoomStore:
     def _add_missing_room_times(self) -> None:
         """Give each room that has no times its creation and last edit times.
 
-        Only the rooms of a file written before spec 032 have none. A room's
-        creation time is the `created_at` of its first snapshot, and its last
-        edit time the largest `at` of its logged edits, or its creation time
-        when it has none. Called while the store opens, so no other thread
-        uses the store yet.
-
-        Raises:
-            ValueError: a room has no snapshot.
-            pydantic.ValidationError: a stored row is damaged.
+        Only the rooms of a file written before spec 032 have none. They are
+        handled one by one (`_times_of_old_room`), so that a damaged room keeps
+        its damage to itself and the store still opens. Called while the store
+        opens, so no other thread uses the store yet.
         """
         rows = self._connection.execute(
             "SELECT code FROM rooms WHERE code NOT IN (SELECT code FROM room_times) "
@@ -375,31 +379,70 @@ class RoomStore:
         ).fetchall()
         if len(rows) == 0:
             return
+        upgrade_time = time.time()
         self._connection.execute("BEGIN IMMEDIATE")
         try:
             for (code,) in rows:
-                created_at = self._first_snapshot_time(code)
-                latest_edit_at = _latest_edit_time(self.read_log(code))
-                if latest_edit_at is None:
-                    latest_edit_at = created_at
-                self._insert_room_times(code, created_at, latest_edit_at)
+                created_at, last_edit_at = self._times_of_old_room(code, upgrade_time)
+                self._insert_room_times(code, created_at, last_edit_at)
         except BaseException:
             self._connection.execute("ROLLBACK")
             raise
         self._connection.execute("COMMIT")
 
-    def _first_snapshot_time(self, code: str) -> float:
-        """Return the `created_at` of the room's first snapshot.
+    def _times_of_old_room(self, code: str, upgrade_time: float) -> tuple[float, float]:
+        """Return the creation and last edit times of a room written before spec 032.
+
+        The creation time is the `created_at` of the room's first snapshot, and
+        the last edit time the largest `at` of its logged edits, or its creation
+        time when it has none.
+
+        A room whose times cannot be computed, since it has no snapshot or one of
+        its rows cannot be read, gets `upgrade_time` as both, so that it expires
+        30 days later, and a warning names it. Its rows are left as they are.
+
+        Args:
+            code: The room.
+            upgrade_time: The clock time of the upgrade.
+
+        Returns:
+            The creation time, then the last edit time.
+        """
+        try:
+            created_at = self._first_snapshot_time(code)
+            log = self.read_log(code)
+        except ValidationError:
+            # The row's text is not logged: it may hold a resume token (spec 038).
+            logger.warning(
+                "Room %s has a row that cannot be read: its creation and last "
+                "edit times are the time of the upgrade",
+                code,
+            )
+            return upgrade_time, upgrade_time
+        if created_at is None:
+            logger.warning(
+                "Room %s has no snapshot: its creation and last edit times are "
+                "the time of the upgrade",
+                code,
+            )
+            return upgrade_time, upgrade_time
+        last_edit_at = _latest_edit_time(log)
+        if last_edit_at is None:
+            last_edit_at = created_at
+        return created_at, last_edit_at
+
+    def _first_snapshot_time(self, code: str) -> float | None:
+        """Return the `created_at` of the room's first snapshot, None without one.
 
         Raises:
-            ValueError: the room has no snapshot.
+            pydantic.ValidationError: the snapshot cannot be read.
         """
         row = self._connection.execute(
             "SELECT state_json FROM snapshots WHERE code = ? ORDER BY seq LIMIT 1",
             (code,),
         ).fetchone()
         if row is None:
-            raise ValueError(f"Room {code} has no snapshot")
+            return None
         first_snapshot = RoomState.model_validate_json(row[0])
         return first_snapshot.created_at
 

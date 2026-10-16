@@ -29,7 +29,9 @@ export interface RoomSummary {
 export const MAX_KEYS_PER_REQUEST = 100
 
 const SUMMARIES_URL = '/api/rooms/summaries'
+// The patterns of the server's RoomCode (spec 011) and ResumeToken (spec 039).
 const ROOM_CODE = /^[A-Z0-9]{6}$/
+const RESUME_TOKEN = /^[A-Za-z0-9_-]{16,128}$/
 const IDENTITY_KEY = /^nock\.identity\.([A-Z0-9]{6})$/
 
 // Both in the browser's time zone (spec 032).
@@ -40,8 +42,9 @@ const dateFormat = new Intl.DateTimeFormat('fr-FR', {
 })
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
-// One key per valid identity stored under `nock.identity.<CODE>` (spec 012),
-// for the codes that have the shape of a room code, in code order.
+// One key per valid identity stored under `nock.identity.<CODE>` (spec 012), in
+// code order. Only the codes and tokens that match the server's patterns are
+// sent: one key that breaks them would make the server refuse the whole request.
 export function storedRoomKeys(): RoomKey[] {
   const keys: RoomKey[] = []
   for (const storageKey of storedKeys()) {
@@ -51,7 +54,7 @@ export function storedRoomKeys(): RoomKey[] {
     }
     const code = match[1]
     const identity = readIdentity(code)
-    if (identity !== null) {
+    if (identity !== null && RESUME_TOKEN.test(identity.resume_token)) {
       keys.push({ code, resume_token: identity.resume_token })
     }
   }
@@ -140,9 +143,23 @@ async function fetchSummaries(keys: RoomKey[]): Promise<RoomSummary[] | null> {
   }
 }
 
-// The summaries of the rooms of `keys`, or null when one request fails. With one
-// request, they keep the order the server sent; the answers of several requests
-// are sorted together as the server sorts them.
+// True when two summaries name the same room. The server sums up each room once,
+// and the page sends each code once, so no answer of the server does that.
+function hasRepeatedCode(summaries: RoomSummary[]): boolean {
+  const seenCodes = new Set<string>()
+  for (const summary of summaries) {
+    if (seenCodes.has(summary.code)) {
+      return true
+    }
+    seenCodes.add(summary.code)
+  }
+  return false
+}
+
+// The summaries of the rooms of `keys`, or null when one request fails or the
+// answers name a room twice (the page shows each room once, keyed by its code).
+// With one request, they keep the order the server sent; the answers of several
+// requests are sorted together as the server sorts them.
 export async function fetchRoomSummaries(keys: RoomKey[]): Promise<RoomSummary[] | null> {
   const requests = requestsOf(keys)
   const summaries: RoomSummary[] = []
@@ -152,6 +169,9 @@ export async function fetchRoomSummaries(keys: RoomKey[]): Promise<RoomSummary[]
       return null
     }
     summaries.push(...answer)
+  }
+  if (hasRepeatedCode(summaries)) {
+    return null
   }
   if (requests.length > 1) {
     summaries.sort(serverOrder)

@@ -52,7 +52,7 @@
   {:else}
     <!-- The explicit role: WebKit does not expose a list without bullets as a list. -->
     <ul class="my-rooms-list" role="list">
-      {#each summaries as summary}
+      {#each summaries as summary (summary.code)}
         <li
           data-testid="my-room"
           data-code={summary.code}

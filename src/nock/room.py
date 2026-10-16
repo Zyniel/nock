@@ -408,6 +408,13 @@ def is_edit(entry: LogEntry) -> bool:
     """Tell whether a logged entry is an edit: a letter_changed or a cell_locked.
 
     Only edits move a room's last edit time, which its 30-day life runs from.
+
+    Args:
+        entry: A logged entry of a room.
+
+    Returns:
+        True for a letter written, erased, confirmed or undone, and for a cell
+        locked by a check or a reveal; False for any other event.
     """
     return isinstance(entry.event, LetterChanged | CellLocked)
 
@@ -437,9 +444,13 @@ def member_id(state: RoomState, resume_token: str) -> str | None:
 def team_nicknames(state: RoomState) -> tuple[str, ...]:
     """Return the nicknames of the room's members, each once.
 
-    First those of `past_players` in the order they left, then those of `players`
-    in `players` order. A nickname equal to an earlier one under `casefold()` is
-    left out.
+    Args:
+        state: The room.
+
+    Returns:
+        First the nicknames of `past_players` in the order they left, then those
+        of `players` in `players` order. A nickname equal to an earlier one under
+        `casefold()` is left out.
     """
     member_nicknames: list[str] = []
     for past_player in state.past_players:

@@ -385,8 +385,12 @@ class _RoomRunner:
     def keep_connection(self, connection: RoomConnection) -> None:
         """Keep a connection just opened to the room, so a deletion can close it.
 
-        A connection opened once the room is deleted is closed at once with
-        ROOM_NOT_FOUND_CLOSE_CODE.
+        Called on the engine's loop, before any input of the connection.
+
+        Args:
+            connection: The new connection, joined or not. When the room is
+                already deleted, it is closed at once with
+                ROOM_NOT_FOUND_CLOSE_CODE instead.
         """
         if self._is_deleted:
             connection.deliver_close(ROOM_NOT_FOUND_CLOSE_CODE)
@@ -722,6 +726,9 @@ class RoomRegistry:
         self._thread: threading.Thread | None = None
         self._closed = False
         self._stop_task: asyncio.Task[None] | None = None
+        # Deletions started on the engine's own thread, kept until they end: an
+        # event loop keeps only weak references to its tasks.
+        self._deletion_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def config(self) -> RoomConfig:
@@ -1025,7 +1032,11 @@ class RoomRegistry:
         state = self.peek_room(code)
         if state is None:
             return None
-        if not any(room_member_id(state, token) is not None for token in tokens):
+        holds_a_members_token = False
+        for token in tokens:
+            if room_member_id(state, token) is not None:
+                holds_a_members_token = True
+        if not holds_a_members_token:
             return None
         last_edit_at = self._store.last_edit_at(code)
         if last_edit_at is None:
@@ -1057,7 +1068,7 @@ class RoomRegistry:
         The lock is held throughout, so that no lookup loads the room again while
         it goes. A live room is stopped on the engine's loop, which then deletes
         it from the store and closes its sockets (`_RoomRunner.delete`); this
-        waits until that is done.
+        waits until that is done, except on the engine's own thread.
         """
         with self._lock:
             runner = self._runners.pop(code, None)
@@ -1066,6 +1077,14 @@ class RoomRegistry:
                 # No task or socket to stop: none ever connected, or close()
                 # stopped them all.
                 self._store.delete_room(code)
+                return
+            if threading.current_thread() is self._thread:
+                # Waiting for ourselves would block, as in close(): the store
+                # forgets the room now, and its task stops after this step.
+                self._store.delete_room(code)
+                deletion = loop.create_task(runner.delete())
+                self._deletion_tasks.add(deletion)
+                deletion.add_done_callback(self._deletion_tasks.discard)
                 return
             deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
             deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
