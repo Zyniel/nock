@@ -205,7 +205,11 @@ controls; `timer` is text, not a control, and is never a Tab stop.
 
 `⏱` is U+23F1 (STOPWATCH). Spec 035 AC-9's checker reads every `fr.json` value
 as a pattern and must still flag `Loading…`, `Salon` and `Check word`: the two
-time patterns need a `:`, which none of those holds.
+time patterns need a `:`, which none of those holds. (Note from the lead,
+2026-10-16: spec 035's checker now reads `{hours}`, `{minutes}` and `{seconds}`
+as ASCII digits only, so the two time patterns need digits on both sides of each
+`:`, not a `:` alone, which `Error: connection lost` also holds; see "Language
+scan" in spec 035's "Test harness" (second review of spec 027).)
 
 ### Changes to spec 026
 
@@ -321,9 +325,23 @@ The words in brackets say how each criterion is tested.
   recap (spec 028) or for `elapsed_ms`.
 - Background tabs (AC-2): browsers slow timers in hidden tabs; the shown value is
   computed from `performance.now()`, so it is right again at the next refresh.
-- Old logs (AC-7): a room whose log was written before this spec gets its timer
-  from the replayed entries, and its `grid_solved` keeps the `elapsed_ms` it was
-  logged with.
+- Old logs and snapshots (AC-7): a room is loaded from its newest stored
+  snapshot, then the entries logged after it are replayed (spec 018). Those
+  entries, also when they were logged before this spec, go through the timer
+  rules, and a `grid_solved` entry keeps the `elapsed_ms` it was logged with. A
+  snapshot stored before this spec holds no timer field, so the three fields take
+  their defaults (`timer_started` False, `timer_elapsed_ms` 0, `timer_resumed_at`
+  None) and the room loads as never started, whatever was typed before that
+  snapshot: its timer starts at the first letter typed after it, and a room that
+  was already solved when the snapshot was stored gives a joining player
+  `timer_elapsed_ms` 0 and `timer_running` False, so the page shows `0:00`, while
+  its `grid_solved` entry keeps the old time. Accepted: Nock has never been
+  deployed and no store from before this release is kept, so there is nothing to
+  migrate and no criterion tests it. (Note from the lead, 2026-10-16: this edge
+  case used to say that a room whose log was written before this spec "gets its
+  timer from the replayed entries", which holds for the entries after the newest
+  snapshot and not for the play before it. The lead accepts that loss, for the
+  reason above (second review of spec 027).)
 - Rounding (AC-1, AC-6): every pause and every value rounds to whole milliseconds,
   `max(0, ...)` keeps a clock that went back from giving a negative time.
 - Small windows (AC-8): the timer is first in the toolbar, so it shows until the
