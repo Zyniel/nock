@@ -4,7 +4,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,500;1,700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
 <style>
-/* Layout: a specimen sheet. Labelled rows of cells, then a working phone mock-up.
+/* Layout: a specimen sheet. A recap, a marker switch, labelled rows of cells, then a working phone mock-up.
    Single light theme on purpose: Nock has no dark mode yet, and this page shows its light palette. */
 :root {
   color-scheme: light;
@@ -44,17 +44,34 @@ body {
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 40px; }
 header h1 { font: 600 2rem/1.15 var(--f-head); margin: 0 0 8px; text-wrap: balance; color: var(--navy); }
 header p { margin: 0; max-width: 68ch; color: var(--muted); }
+header .ver { font: 600 .75rem/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--reveal); margin-bottom: 8px; }
 section { display: grid; gap: 16px; }
 h2 { font: 600 1.35rem/1.2 var(--f-head); margin: 0; color: var(--navy); text-wrap: balance; }
 h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
 .lead { margin: 0; max-width: 72ch; color: var(--muted); }
 .board { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 20px; display: flex; flex-wrap: wrap; gap: 24px 28px; align-items: flex-start; }
-.spec { display: grid; gap: 8px; justify-items: start; min-width: 0; max-width: 200px; }
+.spec { display: grid; gap: 8px; justify-items: start; min-width: 0; max-width: 210px; }
 .spec .cap { font-size: .86rem; line-height: 1.35; color: var(--ink); }
 .spec .cap b { font-weight: 600; display: block; }
 .spec .cap span { color: var(--muted); }
 .note { font-size: .9rem; color: var(--muted); max-width: 72ch; margin: 0; }
 .note strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- recap ---------- */
+.recap { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 20px; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px 32px; }
+.recap h3 { margin: 0 0 8px; font: 600 .78rem/1.2 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--navy); }
+.recap ul { margin: 0; padding-left: 1.1em; display: grid; gap: 5px; font-size: .92rem; }
+.recap li.new::marker { color: var(--reveal); }
+.recap li.new b { color: var(--reveal); }
+
+/* ---------- switch ---------- */
+.switch { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--navy); color: #FFFFFF; border-radius: 6px; padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: .9rem; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--page); }
+.switch .grp { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.switch .lbl { font-weight: 600; margin-right: 4px; }
+.switch button { background: transparent; color: #FFFFFF; border: 1px solid rgba(255, 255, 255, .45); border-radius: 14px; padding: 4px 11px; font: 500 .85rem/1.2 var(--f-ui); cursor: pointer; }
+.switch button[aria-pressed="true"] { background: #FFFFFF; color: var(--navy); border-color: #FFFFFF; font-weight: 600; }
+.switch button:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
 
 /* ---------- cells ---------- */
 .g { display: inline-grid; border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); background: var(--rule); gap: 0; }
@@ -68,19 +85,36 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .pencil.flash .ltr { color: var(--ink); }
 .wrong .ltr span { text-decoration: line-through; text-decoration-thickness: max(2px, .07em); text-decoration-color: var(--wrong); }
 .rev::after { content: ""; position: absolute; top: 2px; right: 2px; width: max(6px, calc(var(--s) * .27)); height: max(6px, calc(var(--s) * .27)); background: var(--reveal); clip-path: polygon(0 0, 100% 0, 100% 100%); }
-.band { position: absolute; left: 25%; width: 50%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); }
+.band { position: absolute; left: 25%; width: 50%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); display: none; }
 .band.gone { background: repeating-linear-gradient(135deg, #333333 0 2px, #FFFFFF 2px 4px) !important; }
-.cur { position: absolute; border: 2px dashed; pointer-events: none; }
-.ini { position: absolute; font: 700 max(7px, calc(var(--s) * .2))/1 var(--f-ui); padding: 1px 2px; border-radius: 2px; z-index: 2; letter-spacing: .02em; }
-.ini.tl { top: 1px; left: 1px; } .ini.tr { top: 1px; right: 1px; } .ini.bl { bottom: 1px; left: 1px; } .ini.br { bottom: 1px; right: 1px; }
+.static .band, .authors-on .band { display: block; }
+.old-cur { position: absolute; border: 2px dashed; pointer-events: none; }
+
+/* presence markers */
+.mk { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 2px; line-height: 1; }
+.mk.tl { top: 2px; left: 2px; } .mk.tr { top: 2px; right: 2px; } .mk.bl { bottom: 2px; left: 2px; } .mk.br { bottom: 2px; right: 2px; }
+.mk svg { display: block; overflow: visible; }
+.mk svg .f { stroke: #14181F; stroke-width: 1.1; stroke-linejoin: round; }
+.mk.chip { background: rgba(255, 255, 255, .94); border-radius: 3px; padding: 1px 3px 1px 2px; box-shadow: 0 0 0 1px rgba(20, 24, 31, .3); font: 700 max(7px, calc(var(--s) * .17))/1 var(--f-ui); color: var(--ink); letter-spacing: .02em; }
+.mk.more { background: #14181F; color: #FFFFFF; border-radius: 3px; padding: 1px 3px; font: 700 max(7px, calc(var(--s) * .18))/1 var(--f-ui); }
+.mk.nock { filter: drop-shadow(0 0 .7px #14181F) drop-shadow(0 0 .4px #14181F); }
+.mk.nock.tl, .mk.nock.tr { top: -1px; } .mk.nock.bl, .mk.nock.br { bottom: -1px; }
+.mk.nock i { display: grid; place-items: start center; font: 700 max(6px, calc(var(--s) * .15))/1 var(--f-ui); font-style: normal; padding-top: 2px; letter-spacing: .01em; clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%); }
+.mk.nock.bl i, .mk.nock.br i { clip-path: polygon(0 0, 50% 28%, 100% 0, 100% 100%, 0 100%); place-items: end center; padding: 0 0 2px; }
 
 .c.clue { background: var(--clue-bg); color: var(--clue-ink); display: flex; flex-direction: column; padding: 2px 3px; font: 600 max(6px, calc(var(--s) * .145))/1.12 var(--f-clue); text-transform: uppercase; text-align: center; letter-spacing: .01em; }
-.c.clue .q { flex: 1; display: grid; place-items: center; overflow-wrap: anywhere; hyphens: auto; }
+.c.clue .q { flex: 1; display: flex; align-items: center; min-height: 0; }
+.c.clue .q span { display: block; width: 100%; overflow-wrap: break-word; hyphens: manual; }
 .c.clue .sep { height: 1px; background: var(--clue-ink); opacity: .55; margin: 0 14%; flex: none; }
 .flag { position: absolute; top: 1px; left: 1px; font: 700 max(7px, calc(var(--s) * .22))/1 var(--f-ui); color: var(--flag); background: var(--clue-bg); padding: 0 2px 1px 1px; border-radius: 0 0 3px 0; z-index: 2; }
 .arw { position: absolute; z-index: 1; width: max(10px, calc(var(--s) * .34)); height: max(10px, calc(var(--s) * .34)); }
 .arw path { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .arw polygon { fill: var(--ink); }
+
+/* identity row */
+.ids { display: flex; flex-wrap: wrap; gap: 14px 22px; }
+.id { display: flex; align-items: center; gap: 8px; font-size: .9rem; }
+.id span { color: var(--muted); font-size: .8rem; }
 
 /* ---------- contrast table ---------- */
 .tbl-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
@@ -101,11 +135,9 @@ td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
 .tb { width: 56px; display: grid; justify-items: center; align-content: center; gap: 2px; background: none; border: 0; color: var(--navy); font: 500 .68rem/1 var(--f-ui); cursor: pointer; position: relative; padding: 0; border-radius: 6px; }
 .tb svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tb[aria-pressed="true"] { background: var(--word); }
-.tb .dot { position: absolute; top: 8px; right: 13px; min-width: 8px; height: 8px; border-radius: 4px; background: var(--wrong); }
 .tb .badge { position: absolute; top: 5px; right: 8px; background: var(--wrong); color: #FFFFFF; font: 700 .62rem/1 var(--f-ui); padding: 2px 4px; border-radius: 8px; }
 button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; background: var(--cell); }
-.stage .g { touch-action: manipulation; }
 .toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #FFFFFF; font: 500 .85rem/1.2 var(--f-ui); padding: 8px 12px; border-radius: 6px; white-space: nowrap; z-index: 6; transition: opacity .25s; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .5); }
 .toast[data-off] { opacity: 0; pointer-events: none; }
 .cluebar { flex: none; background: var(--navy); color: #FFFFFF; height: 50px; display: flex; align-items: center; }
@@ -116,7 +148,6 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .cluebar .pin { font-size: 1rem; width: 40px; }
 .pentag { font: italic 600 .72rem/1 var(--f-ui); background: #FFFFFF; color: var(--navy); border-radius: 3px; padding: 2px 5px; margin-left: 6px; vertical-align: 2px; }
 .kbd { flex: none; background: #D9DEE6; padding: 6px 3px 8px; display: grid; gap: 6px; }
-.kbd[hidden] { display: none !important; }
 .krow { display: flex; gap: 4px; justify-content: center; }
 .k { flex: 1 1 0; max-width: 33px; height: 44px; border: 0; border-radius: 5px; background: var(--key); color: var(--ink); font: 500 1.3rem/1 var(--f-ui); box-shadow: 0 1px 0 rgba(20, 24, 31, .25); cursor: pointer; padding: 0; }
 .k.wide { max-width: 48px; flex-basis: 48px; flex-grow: 1.5; font-size: 1.1rem; }
@@ -142,59 +173,121 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 .stream { flex: 1; overflow: auto; padding: 10px 16px; display: grid; gap: 8px; align-content: start; font-size: .92rem; }
 .msg { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; }
 .msg .who { font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.pdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; box-shadow: 0 0 0 1px rgba(20, 24, 31, .55); }
-.evt { color: var(--muted); font-size: .82rem; padding-left: 16px; }
+.evt { color: var(--muted); font-size: .82rem; padding-left: 18px; }
 .compose { display: flex; gap: 8px; padding: 8px 12px 12px; border-top: 1px solid var(--line); flex: none; }
 .compose span { flex: 1; border: 1px solid var(--rule); border-radius: 18px; padding: 7px 12px; color: var(--muted); font-size: .9rem; }
 .players { padding: 10px 16px; display: grid; gap: 10px; font-size: .95rem; align-content: start; overflow: auto; flex: 1; }
 .players .row { display: flex; align-items: center; gap: 10px; }
 .players .st { margin-left: auto; color: var(--muted); font-size: .85rem; }
 .players .idle { font-style: italic; }
-.players .row button { margin-top: 4px; }
 .pill { display: inline-block; background: var(--word); color: var(--navy); border-radius: 14px; padding: 6px 12px; font-weight: 600; font-size: .85rem; border: 0; }
-.authors-on .band { display: block; } .band { display: none; } .board .band, .static .band { display: block; }
 .linkish { background: none; border: 0; padding: 0; color: var(--navy); text-decoration: underline; font: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
 </style>
 
 <div class="wrap">
   <header>
+    <div class="ver">Version 2 · players shown by a shape</div>
     <h1>Nock cell sheet</h1>
-    <p>Every mark a letter or clue cell can carry, drawn in the « Le Quotidien » palette and checked against the rules of specs 006, 013, 019 to 024 and 035. The phone mock-up at the end works: tap cells, type, switch the pencil key, open « Aide » and « Salon ». The grid is FX-01, Nock's own reference grid.</p>
+    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette, checked against specs 006, 013, 019 to 024 and 035. Version 2 drops the dashed border around other players' cells: each player is now a colour <em>and</em> a shape, shown as a small marker in a corner. Use the switch below to compare three marker styles everywhere on the page, the phone included.</p>
   </header>
 
   <section>
-    <h2><small>1 · Clue cells</small>Clues and their four arrows</h2>
+    <h2><small>Recap</small>Where the design stands</h2>
+    <div class="recap">
+      <div>
+        <h3>Look</h3>
+        <ul>
+          <li>« Le Quotidien »: white, navy <code>#1B2F55</code>, blue-grey clue cells, after Le Figaro's phone view.</li>
+          <li>Fonts: Source Sans 3 for the interface and letters, IBM Plex Sans Condensed for clues.</li>
+          <li>Bold means locked; pencil is italic grey; wrong is struck through; revealed has a corner triangle.</li>
+          <li class="new"><b>New:</b> each player is a colour plus a shape. No dashed border; a small marker in a corner of the cell.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Screen</h3>
+        <ul>
+          <li>The grid comes first. Chat, players, progress and settings open on demand.</li>
+          <li>Phone and upright tablet: top bar, grid, navy clue bar with ⚑, keyboard. Panels as a bottom sheet.</li>
+          <li>Computer and landscape tablet: a side column, open by default; the grid fits what is left.</li>
+          <li>Phone held sideways: column only while the keyboard is hidden.</li>
+          <li>Top bar: timer, Annuler, Aide, Salon, Clavier, Menu.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Behaviour</h3>
+        <ul>
+          <li>Keyboard: ✎ where Shift would be (keys go italic grey when on), ⇄, ⌫. « Clavier » hides it.</li>
+          <li>« Aide » groups check and reveal in one menu.</li>
+          <li>One stream for chat and activity, in the Salon.</li>
+          <li>3-second notes over the grid for messages, flags, reveals, checks, arrivals.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Still open</h3>
+        <ul>
+          <li class="new"><b>Pick:</b> marker style (shape, shape + initials, or notch tab).</li>
+          <li class="new"><b>Pick:</b> keep the light tint on another player's word, or drop it.</li>
+          <li>Blue against blue: my selected word vs player 2's colour.</li>
+          <li>Does a closed column stay closed next time?</li>
+          <li>Long press on ⌫ to erase a word.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <div class="switch" role="group" aria-label="Variantes">
+    <div class="grp"><span class="lbl">Marker</span>
+      <button type="button" data-mode="shape" aria-pressed="true">Shape</button>
+      <button type="button" data-mode="chip" aria-pressed="false">Shape + initials</button>
+      <button type="button" data-mode="nock" aria-pressed="false">Notch tab</button>
+    </div>
+    <div class="grp"><span class="lbl">Their word</span>
+      <button type="button" data-tint="on" aria-pressed="true">Light tint</button>
+      <button type="button" data-tint="off" aria-pressed="false">Nothing</button>
+    </div>
+  </div>
+
+  <section>
+    <h2><small>1 · Players</small>A colour and a shape for each player</h2>
+    <p class="lead">Players get colour and shape by join order, the way colours are given today. The shape is the sign that is not colour, so a colour-blind player can still tell markers apart. The same shape follows the player everywhere: on the grid, in the player list, in the stream.</p>
+    <div class="board"><div class="ids" id="ids"></div></div>
+    <div class="board static" id="styles"></div>
+    <p class="note"><strong>Why the dark edge:</strong> the green and orange of today's palette are under 3:1 on white on their own, so every shape has a thin dark outline. <strong>Initials</strong> appear only from 44 px cells up; below that they would cover the letter.</p>
+  </section>
+
+  <section>
+    <h2><small>2 · Clue cells</small>Clues and their four arrows</h2>
     <p class="lead">The arrow sits in the letter cell next to the clue, as in printed grids. Two clues share a cell with a thin rule between them. A flagged clue (« Je bloque ») gets ⚑ in its top-left corner, the one corner no arrow uses.</p>
     <div class="board" id="clues"></div>
   </section>
 
   <section>
-    <h2><small>2 · Letter cells</small>One state at a time, at 56 px</h2>
+    <h2><small>3 · Letter cells</small>One state at a time, at 56 px</h2>
     <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a corner triangle.</p>
     <div class="board static" id="states"></div>
   </section>
 
   <section>
-    <h2><small>3 · Selection and other players</small>Me, my word, and the others</h2>
-    <p class="lead">My cell is a filled blue with a solid navy border. Other players get a dashed border in their colour, set further in for each extra player, and their initials in a corner. Their word gets a light tint of their colour.</p>
+    <h2><small>4 · Selection and other players</small>Me, my word, and the others</h2>
+    <p class="lead">My cell keeps the filled blue and the solid navy border; it is the only cell with a border. Other players are a marker in a corner, and, if kept, a light tint of their colour on their word.</p>
     <div class="board static" id="sel"></div>
   </section>
 
   <section>
-    <h2><small>4 · Crowded cells</small>Initials at the three sizes of spec 035</h2>
-    <p class="lead">44 px and up: four corner slots. 20 to 43 px: two, top-left and bottom-right. Under 20 px: one. When there are more players than slots, the last slot shows « +k ». Proposal: the top-right slot is filled last, and is skipped when the cell carries the revealed triangle.</p>
+    <h2><small>5 · Crowded cells</small>Markers at the three sizes of spec 035</h2>
+    <p class="lead">44 px and up: four corner slots. 20 to 43 px: two, top-left and bottom-right. Under 20 px: one. With more players than slots, the last slot shows « +k ». The top-right slot is used last, and never when the cell carries the revealed triangle.</p>
     <div class="board static" id="crowd"></div>
   </section>
 
   <section>
-    <h2><small>5 · Worst cases</small>Where marks could collide</h2>
+    <h2><small>6 · Worst cases</small>Where marks could collide</h2>
     <div class="board static" id="worst"></div>
-    <p class="note"><strong>Blue against blue.</strong> Player colour 2 (<code>#4363d8</code>) tints a word almost like my own selected word. Either my word moves to a neutral tint, or the player palette loses its blue. Either way, spec 019's colour-blindness checks run again.</p>
+    <p class="note"><strong>Blue against blue.</strong> Player colour 2 (<code>#4363d8</code>) tints a word almost like my own selected word. Dropping the tint (switch above) removes the problem; otherwise my word moves to a neutral tint or the palette loses its blue.</p>
   </section>
 
   <section>
-    <h2><small>6 · In context</small>Phone, 360 px, keyboard shown</h2>
+    <h2><small>7 · In context</small>Phone, 360 px, keyboard shown</h2>
     <div class="mock-row">
       <div class="phone" id="phone">
         <div class="topbar">
@@ -206,7 +299,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <button class="tb" type="button" id="b-menu" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
         </div>
         <div class="stage" id="stage">
-          <div class="toast" id="toast">⚑ Cé bloque sur « Flaire »</div>
+          <div class="toast" id="toast">⚑ Dé bloque sur « Flaire »</div>
           <div id="pgrid"></div>
         </div>
         <div class="cluebar">
@@ -222,23 +315,23 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
         <h2 style="font-size:1.1rem">Try it</h2>
         <ul>
           <li><b>Tap a cell</b> to select it; tap it again, or press ⇄, to switch between across and down.</li>
-          <li><b>✎ on the keyboard</b> turns pencil mode on: the key goes navy and every letter key turns italic grey. The clue bar shows a small « ✎ Crayon » tag.</li>
+          <li><b>✎ on the keyboard</b> turns pencil mode on: the key goes navy and every letter key turns italic grey.</li>
           <li><b>Clavier</b> hides the keyboard and the grid takes the space.</li>
-          <li><b>Aide</b> opens check and reveal in one menu, with what is left of the budget.</li>
-          <li><b>Salon</b> opens the sheet: progress, then the one stream of messages and events, or the players.</li>
-          <li><b>Menu</b> holds the Auteurs switch: try it to see the author bands.</li>
+          <li><b>Aide</b> opens check and reveal in one menu.</li>
+          <li><b>Salon</b> opens the sheet: progress, then the one stream, or the players. Players carry their shape there too.</li>
+          <li><b>Menu</b> holds the Auteurs switch.</li>
           <li><button class="linkish" type="button" id="replay">Show a 3-second note again</button></li>
         </ul>
-        <p class="note">On the grid: Bo (green) and Dé (orange) are both on the last cell of LEST; Bo's word is tinted. M of TAMIS is locked after a check. N of AMEN was revealed. O in AMEN is wrong. D in VIDE is Bo's pencil letter. « Flaire » is flagged.</p>
+        <p class="note">On the grid: Bo (green square) and Dé (orange diamond) are both on the last cell of LEST; Él (purple triangle) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed. O in AMEN is wrong. D in VIDE is Bo's pencil letter. « Flaire » is flagged.</p>
       </div>
     </div>
   </section>
 
   <section>
-    <h2><small>7 · Contrast</small>Measured on this page</h2>
-    <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed triangle, flag shape, author band) need 3:1.</p>
+    <h2><small>8 · Contrast</small>Measured on this page</h2>
+    <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed triangle, flag, author band, player markers) need 3:1.</p>
     <div class="tbl-wrap"><table id="contrast"><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Needs</th><th>Result</th></tr></thead><tbody></tbody></table></div>
-    <p class="note"><strong>Author bands.</strong> Several current player colours fall under 3:1 on white on their own (see the last rows), so each band has a thin dark edge, which specs 019 and 035 allow.</p>
+    <p class="note"><strong>Player colours.</strong> Green and orange fall under 3:1 on white on their own (last rows), so markers and author bands carry a thin dark edge, which specs 019 and 035 allow.</p>
   </section>
 </div>
 
@@ -246,6 +339,19 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 (function () {
   "use strict";
   var P = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080", "#9a6324", "#808000"];
+  var NAMES = ["Ana", "Bo", "Cé", "Dé", "Él", "Fa", "Gus", "Hu"];
+  var SHAPE_NAMES = ["circle", "square", "triangle", "diamond", "triangle down", "plus", "bar", "bow"];
+  var SHAPES = [
+    '<circle class="f" cx="5" cy="5" r="4.2"/>',
+    '<rect class="f" x="1" y="1" width="8" height="8"/>',
+    '<polygon class="f" points="5,0.6 9.6,9.2 0.4,9.2"/>',
+    '<polygon class="f" points="5,0.2 9.8,5 5,9.8 0.2,5"/>',
+    '<polygon class="f" points="0.4,0.8 9.6,0.8 5,9.4"/>',
+    '<polygon class="f" points="3.4,0.4 6.6,0.4 6.6,3.4 9.6,3.4 9.6,6.6 6.6,6.6 6.6,9.6 3.4,9.6 3.4,6.6 0.4,6.6 0.4,3.4 3.4,3.4"/>',
+    '<rect class="f" x="0.3" y="2.8" width="9.4" height="4.4" rx="2.2"/>',
+    '<polygon class="f" points="0.5,0.8 5,4 9.5,0.8 9.5,9.2 5,6 0.5,9.2"/>'
+  ];
+  var MODE = "shape", TINT = true;
   var css = getComputedStyle(document.documentElement);
   function tok(n) { return css.getPropertyValue("--" + n).trim(); }
 
@@ -260,12 +366,14 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     var h = hex.replace("#", ""), out = "#";
     for (var i = 0; i < 3; i++) {
       var v = parseInt(h.slice(i * 2, i * 2 + 2), 16);
-      var m = Math.round(v * pct + 255 * (1 - pct));
-      out += ("0" + m.toString(16)).slice(-2);
+      out += ("0" + Math.round(v * pct + 255 * (1 - pct)).toString(16)).slice(-2);
     }
     return out;
   }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+  function shape(p, size) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 10 10" aria-hidden="true" style="fill:' + P[p] + '">' + SHAPES[p] + "</svg>";
+  }
 
   var ARROWS = {
     right: '<path d="M2 12H15"/><polygon points="14,7.5 22,12 14,16.5"/>',
@@ -273,65 +381,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     down_then_right: '<path d="M5 2V10Q5 15 10 15H15"/><polygon points="14,10.5 22,15 14,19.5"/>',
     right_then_down: '<path d="M2 5H10Q15 5 15 10V15"/><polygon points="10.5,14 15,22 19.5,14"/>'
   };
-  function arrowSvg(kind, style) {
-    return '<svg class="arw" viewBox="0 0 24 24" style="' + style + '" aria-hidden="true">' + ARROWS[kind] + "</svg>";
-  }
-
-  /* One cell. o: {type, letter, cls[], tint, flash, author, gone, cursors:[{p, ini}], clues:[{text}], flag, arrows:[html]} */
-  function cell(o, s) {
-    var cls = ["c"].concat(o.cls || []);
-    var style = "";
-    if (o.tint && cls.indexOf("sel") < 0 && cls.indexOf("locked") < 0) style += "background:" + mix(o.tint, 0.18) + ";";
-    if (o.flash) { cls.push("flash"); style += "background:" + mix(o.flash, 0.38) + ";"; }
-    var h = "";
-    if (o.type === "clue") {
-      cls.push("clue");
-      o.clues.forEach(function (q, i) {
-        if (i) h += '<div class="sep"></div>';
-        h += '<div class="q">' + esc(q.text) + "</div>";
-      });
-      if (o.flag) h += '<span class="flag" aria-label="drapeau">⚑</span>';
-    } else {
-      if (o.letter) h += '<div class="ltr"><span>' + esc(o.letter) + "</span></div>";
-      if (o.author !== undefined && o.author !== null) {
-        h += '<div class="band' + (o.gone ? " gone" : "") + '" style="background:' + P[o.author] + '"></div>';
-      }
-      (o.cursors || []).forEach(function (c, i) {
-        var inset = 3 + i * 3;
-        h += '<div class="cur" style="inset:' + inset + "px;border-color:" + P[c.p] + '"></div>';
-      });
-      h += labels(o, s);
-    }
-    (o.arrows || []).forEach(function (a) { h += a; });
-    return '<div class="' + cls.join(" ") + '" style="' + style + '">' + h + "</div>";
-  }
-
-  function labels(o, s) {
-    var cur = o.cursors || [];
-    if (!cur.length) return "";
-    var slots = s >= 44 ? ["tl", "br", "bl", "tr"] : s >= 20 ? ["tl", "br"] : ["tl"];
-    if ((o.cls || []).indexOf("rev") >= 0) slots = slots.filter(function (x) { return x !== "tr"; });
-    var h = "";
-    for (var i = 0; i < slots.length && i < cur.length; i++) {
-      var last = i === slots.length - 1 && cur.length > slots.length;
-      var bg = last ? "#14181F" : P[cur[i].p];
-      var txt = last ? "+" + (cur.length - i) : cur[i].ini;
-      h += '<span class="ini ' + slots[i] + '" style="background:' + bg + ";color:" + onColour(bg) + '">' + txt + "</span>";
-    }
-    return h;
-  }
-
-  function grid(rows, s) {
-    var w = rows[0].length;
-    var h = '<div class="g" style="--s:' + s + "px;grid-template-columns:repeat(" + w + "," + s + 'px)">';
-    rows.forEach(function (r) { r.forEach(function (o) { h += cell(o, s); }); });
-    return h + "</div>";
-  }
-  function spec(gridHtml, title, sub) {
-    return '<div class="spec">' + gridHtml + '<div class="cap"><b>' + title + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div></div>";
-  }
-
-  /* arrow placement inside the target letter cell */
+  function arrowSvg(kind, style) { return '<svg class="arw" viewBox="0 0 24 24" style="' + style + '" aria-hidden="true">' + ARROWS[kind] + "</svg>"; }
   function arrowFor(kind, s, slot) {
     var a = Math.max(10, s * 0.34);
     if (kind === "right") return arrowSvg(kind, "left:-1px;top:" + (slot === 0 ? s * 0.25 - a / 2 : slot === 1 ? s * 0.72 - a / 2 : s / 2 - a / 2) + "px");
@@ -340,34 +390,100 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return arrowSvg(kind, "left:-1px;top:" + s * 0.06 + "px");
   }
 
-  /* ---------- 1. clues ---------- */
-  (function () {
-    var s = 64, el = document.getElementById("clues"), h = "";
-    function pairRight(text, kind, flag) {
-      return grid([[{ type: "clue", clues: [{ text: text }], flag: flag }, { arrows: [arrowFor(kind, s)] }]], s);
+  /* o: {type, letter, cls[], tint, flash, author, gone, cursors:[p], clues, flag, arrows, old, mode} */
+  function cell(o, s) {
+    var cls = ["c"].concat(o.cls || []);
+    var style = "";
+    if (o.tint !== undefined && TINT && cls.indexOf("sel") < 0 && cls.indexOf("locked") < 0 && cls.indexOf("word") < 0) style += "background:" + mix(P[o.tint], 0.16) + ";";
+    if (o.flash) { cls.push("flash"); style += "background:" + mix(o.flash, 0.38) + ";"; }
+    var h = "";
+    if (o.type === "clue") {
+      cls.push("clue");
+      o.clues.forEach(function (q, i) {
+        if (i) h += '<div class="sep"></div>';
+        h += '<div class="q"><span>' + esc(q.text) + "</span></div>";
+      });
+      if (o.flag) h += '<span class="flag" aria-label="drapeau">⚑</span>';
+    } else {
+      if (o.letter) h += '<div class="ltr"><span>' + esc(o.letter) + "</span></div>";
+      if (o.author !== undefined && o.author !== null) h += '<div class="band' + (o.gone ? " gone" : "") + '" style="background:' + P[o.author] + '"></div>';
+      if (o.old) {
+        (o.cursors || []).forEach(function (p, i) { h += '<div class="old-cur" style="inset:' + (3 + i * 3) + "px;border-color:" + P[p] + '"></div>'; });
+      } else {
+        h += markers(o, s, o.mode || MODE);
+      }
     }
-    function pairDown(text, kind) {
-      return grid([[{ type: "clue", clues: [{ text: text }] }], [{ arrows: [arrowFor(kind, s)] }]], s);
+    (o.arrows || []).forEach(function (a) { h += a; });
+    return '<div class="' + cls.join(" ") + '" style="' + style + '">' + h + "</div>";
+  }
+
+  function marker(p, s, mode, slot) {
+    var size = Math.max(8, Math.round(s * 0.21));
+    var big = s >= 44;
+    if (mode === "chip" && big) {
+      return '<span class="mk chip ' + slot + '">' + shape(p, size) + NAMES[p].slice(0, 2).toUpperCase() + "</span>";
     }
+    if (mode === "nock") {
+      var w = Math.max(9, Math.round(s * (big ? 0.36 : 0.3))), hgt = Math.max(9, Math.round(s * (big ? 0.3 : 0.28)));
+      var txt = big ? NAMES[p].slice(0, 2).toUpperCase() : "";
+      return '<span class="mk nock ' + slot + '"><i style="width:' + w + "px;height:" + hgt + "px;background:" + P[p] + ";color:" + onColour(P[p]) + '">' + txt + "</i></span>";
+    }
+    return '<span class="mk ' + slot + '">' + shape(p, size) + "</span>";
+  }
+  function markers(o, s, mode) {
+    var cur = o.cursors || [];
+    if (!cur.length) return "";
+    var slots = s >= 44 ? ["tl", "br", "bl", "tr"] : s >= 20 ? ["tl", "br"] : ["tl"];
+    if ((o.cls || []).indexOf("rev") >= 0) slots = slots.filter(function (x) { return x !== "tr"; });
+    var h = "";
+    for (var i = 0; i < slots.length && i < cur.length; i++) {
+      if (i === slots.length - 1 && cur.length > slots.length) h += '<span class="mk more ' + slots[i] + '">+' + (cur.length - i) + "</span>";
+      else h += marker(cur[i], s, mode, slots[i]);
+    }
+    return h;
+  }
+
+  function grid(rows, s) {
+    var h = '<div class="g" style="--s:' + s + "px;grid-template-columns:repeat(" + rows[0].length + "," + s + 'px)">';
+    rows.forEach(function (r) { r.forEach(function (o) { h += cell(o, s); }); });
+    return h + "</div>";
+  }
+  function spec(gridHtml, title, sub) {
+    return '<div class="spec">' + gridHtml + '<div class="cap"><b>' + title + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div></div>";
+  }
+  function set(id, html) { document.getElementById(id).innerHTML = html; }
+
+  /* ---------- static sections ---------- */
+  function renderStatic() {
+    var h = "";
+    P.forEach(function (c, i) { h += '<div class="id">' + shape(i, 18) + "<b>" + NAMES[i] + "</b><span>" + SHAPE_NAMES[i] + "</span></div>"; });
+    set("ids", h);
+
+    h = "";
+    var two = [1, 3];
+    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, old: true }]], 60), "Before (dropped)", "dashed borders, version 1");
+    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, mode: "shape" }]], 60), "Shape", "smallest; shape alone at every size");
+    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, mode: "chip" }]], 60), "Shape + initials", "initials from 44 px, shape alone below");
+    h += spec(grid([[{ letter: "T", cursors: two, tint: 1, mode: "nock" }]], 60), "Notch tab", "a tab with an arrow's notch, Nock's name; initials from 44 px");
+    ["shape", "chip", "nock"].forEach(function (m) {
+      h += spec(grid([[{ letter: "T", cursors: two, mode: m }, { letter: "A", cursors: two, mode: m }]], 32), m === "shape" ? "Shape at 32 px" : m === "chip" ? "Shape + initials at 32 px" : "Notch at 32 px", "two slots: top-left, bottom-right");
+    });
+    set("styles", h);
+
+    var s = 64;
+    h = "";
+    function pairRight(text, kind, flag) { return grid([[{ type: "clue", clues: [{ text: text }], flag: flag }, { arrows: [arrowFor(kind, s)] }]], s); }
+    function pairDown(text, kind) { return grid([[{ type: "clue", clues: [{ text: text }] }], [{ arrows: [arrowFor(kind, s)] }]], s); }
     h += spec(pairRight("Sans contenu", "right"), "→ right", "word starts to the right, goes across");
     h += spec(pairDown("Artiste muet", "down"), "↓ down", "word starts below, goes down");
     h += spec(pairDown("Passoire fine", "down_then_right"), "↳ down then right", "starts below, goes across");
     h += spec(pairRight("De la marine", "right_then_down"), "↴ right then down", "starts to the right, goes down");
-    h += spec(grid([
-      [{ type: "clue", clues: [{ text: "Passoire fine" }, { text: "De la marine" }] }, { arrows: [arrowFor("right_then_down", s)] }],
-      [{ arrows: [arrowFor("down_then_right", s)] }, {}]
-    ], s), "Two clues", "clue 0 on top, a thin rule between");
+    h += spec(grid([[{ type: "clue", clues: [{ text: "Passoire fine" }, { text: "De la marine" }] }, { arrows: [arrowFor("right_then_down", s)] }], [{ arrows: [arrowFor("down_then_right", s)] }, {}]], s), "Two clues", "clue 0 on top, a thin rule between");
     h += spec(grid([[{ type: "clue", clues: [{ text: "Flaire" }], flag: true }], [{ arrows: [arrowFor("down", s)] }]], s), "Flagged « Je bloque »", "⚑ in the free corner, text does not move");
-    h += spec(grid([
-      [{ type: "clue", clues: [{ text: "Extraterrestre de cinéma" }, { text: "Donner un fusil" }] }, { arrows: [arrowFor("right", s, 1)] }],
-      [{ arrows: [arrowFor("down", s)] }, {}]
-    ], s), "Long text", "wraps, never cut; smaller type in two-clue cells");
-    el.innerHTML = h;
-  })();
+    h += spec(grid([[{ type: "clue", clues: [{ text: "Extraterrestre de cinéma" }, { text: "Donner un fusil" }] }, { arrows: [arrowFor("right", s, 1)] }], [{ arrows: [arrowFor("down", s)] }, {}]], s), "Long text", "wraps, never cut; smaller type in two-clue cells");
+    set("clues", h);
 
-  /* ---------- 2. states ---------- */
-  (function () {
-    var s = 56, el = document.getElementById("states"), h = "";
+    s = 56; h = "";
     function one(o, t, sub) { h += spec(grid([[o]], s), t, sub); }
     one({}, "Empty", "white");
     one({ letter: "A" }, "Filled", "weight 500");
@@ -378,42 +494,31 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     one({ letter: "S", author: 1 }, "Authorship on", "band in the author's colour");
     one({ letter: "S", author: 1, gone: true }, "Author has left", "grey hatching, no player colour");
     one({ letter: "E", flash: P[3] }, "Flash", "1 s in the colour of whoever replaced my letter");
-    el.innerHTML = h;
-  })();
+    set("states", h);
 
-  /* ---------- 3. selection ---------- */
-  (function () {
-    var s = 56, el = document.getElementById("sel"), h = "";
+    h = "";
     h += spec(grid([[{ letter: "V", cls: ["word"] }, { cls: ["sel"] }, { letter: "D", cls: ["word", "pencil"] }, { letter: "E", cls: ["word"] }]], s), "My word, my cell", "word light blue, cell blue with a solid navy border");
-    h += spec(grid([[{ letter: "L", tint: P[1] }, { letter: "E", tint: P[1] }, { letter: "S", tint: P[1] }, { tint: P[1], cursors: [{ p: 1, ini: "BO" }] }]], s), "Another player", "dashed border, initials, word tint");
-    h += spec(grid([[{ letter: "T", tint: P[1], cursors: [{ p: 1, ini: "BO" }, { p: 3, ini: "DÉ" }] }]], s), "Two on one cell", "borders set 3 px further in each");
-    h += spec(grid([[{ cls: ["sel"], cursors: [{ p: 1, ini: "BO" }, { p: 3, ini: "DÉ" }, { p: 4, ini: "EL" }] }]], s), "Three, on my cell", "my solid border outside, theirs inside");
-    el.innerHTML = h;
-  })();
+    h += spec(grid([[{ letter: "L", tint: 1 }, { letter: "E", tint: 1 }, { letter: "S", tint: 1 }, { tint: 1, cursors: [1] }]], s), "Another player", "a marker on their cell, their word tinted (if kept)");
+    h += spec(grid([[{ letter: "T", tint: 1, cursors: [1, 3] }]], s), "Two on one cell", "one marker each, in opposite corners");
+    h += spec(grid([[{ cls: ["sel"], cursors: [1, 3, 4] }]], s), "Three, on my cell", "my border, their markers inside");
+    set("sel", h);
 
-  /* ---------- 4. crowd ---------- */
-  (function () {
-    var el = document.getElementById("crowd"), h = "";
-    var five = [{ p: 1, ini: "BO" }, { p: 3, ini: "DÉ" }, { p: 4, ini: "EL" }, { p: 5, ini: "FA" }, { p: 6, ini: "GU" }];
-    [60, 32, 18].forEach(function (s) {
-      h += spec(grid([[{ letter: "A", cursors: five.slice(0, 2) }, { letter: "A", cursors: five }]], s), s + " px", "2 players, then 5");
-    });
+    h = "";
+    var five = [1, 3, 4, 5, 6];
+    [60, 32, 18].forEach(function (sz) { h += spec(grid([[{ letter: "A", cursors: five.slice(0, 2) }, { letter: "A", cursors: five }]], sz), sz + " px", "2 players, then 5"); });
     h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: five.slice(0, 4) }]], 60), "Revealed + 4 players", "top-right left to the triangle, « +2 » in the last free slot");
-    el.innerHTML = h;
-  })();
+    set("crowd", h);
 
-  /* ---------- 5. worst ---------- */
-  (function () {
-    var s = 60, el = document.getElementById("worst"), h = "";
+    s = 60; h = "";
     h += spec(grid([[{ letter: "D", cls: ["sel", "pencil"] }]], s), "Pencil, selected", "grey italic still above 4.5:1 on blue");
     h += spec(grid([[{ letter: "D", cls: ["pencil"], flash: P[1] }]], s), "Pencil during a flash", "grey drops, italics stay");
-    h += spec(grid([[{ letter: "N", cls: ["locked", "rev", "sel"], author: 0, cursors: [{ p: 1, ini: "BO" }] }]], s), "Everything at once", "revealed, selected, author band, a player");
-    h += spec(grid([[{ letter: "O", cls: ["wrong", "pencil"], author: 3 }]], s), "Wrong pencil letter", "strike, italic and band together");
-    h += spec(grid([[{ letter: "I", cls: ["word"] }, { letter: "D", tint: P[2] }, { letter: "E", tint: P[2], cursors: [{ p: 2, ini: "CÉ" }] }]], s), "Blue against blue", "my word, then player 2's word");
-    el.innerHTML = h;
-  })();
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev", "sel"], author: 0, cursors: [1] }]], s), "Everything at once", "revealed, selected, author band, a player");
+    h += spec(grid([[{ letter: "O", cls: ["wrong", "pencil"], author: 3, cursors: [4, 5] }]], s), "Wrong pencil + 2 players", "strike, italic, band, two markers");
+    h += spec(grid([[{ letter: "I", cls: ["word"] }, { letter: "D", tint: 2 }, { letter: "E", tint: 2, cursors: [2] }]], s), "Blue against blue", "my word, then player 2's word");
+    set("worst", h);
+  }
 
-  /* ---------- 6. phone ---------- */
+  /* ---------- phone ---------- */
   var FX = {
     clues: {
       "0,0": [{ text: "Passoire fine", arrow: "down_then_right", word: 0 }, { text: "De la marine", arrow: "right_then_down", word: 1 }],
@@ -442,7 +547,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     "3,1": { l: "A", a: 1 }, "3,2": { l: "M", a: 1 }, "3,3": { l: "O", a: 0, wrong: true }, "3,4": { l: "N", a: 3, locked: true, rev: true },
     "4,1": { l: "L", a: 1 }, "4,2": { l: "E", a: 1 }, "4,3": { l: "S", a: 1 }
   };
-  var OTHERS = [{ p: 1, ini: "BO", at: "4,4", word: 7 }, { p: 3, ini: "DÉ", at: "4,4", word: 4 }];
+  var OTHERS = [{ p: 1, at: "4,4", word: 7 }, { p: 3, at: "4,4", word: 4 }, { p: 4, at: "3,2", word: 2 }];
   var st = { r: 2, c: 2, w: 5, pencil: false, kbd: true, authors: false, flagged: { 4: true }, open: null, tab: "stream" };
 
   function wordsAt(r, c) {
@@ -455,6 +560,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   function renderPhone() {
     var stage = document.getElementById("stage");
     var s = Math.floor(Math.min((stage.clientWidth - 16) / 5, (stage.clientHeight - 16) / 5));
+    if (!(s > 0)) return;
     var arrowsAt = {};
     Object.keys(FX.clues).forEach(function (k) {
       var rc = k.split(",").map(Number);
@@ -469,12 +575,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       var row = [];
       for (var c = 0; c < 5; c++) {
         var key = r + "," + c;
-        if (FX.clues[key]) {
-          row.push({ type: "clue", clues: FX.clues[key], flag: FX.clues[key].some(function (q) { return st.flagged[q.word]; }) });
-          continue;
-        }
+        if (FX.clues[key]) { row.push({ type: "clue", clues: FX.clues[key], flag: FX.clues[key].some(function (q) { return st.flagged[q.word]; }) }); continue; }
         var d = L[key] || {};
-        var o = { letter: d.l, cls: [], arrows: arrowsAt[key] };
+        var o = { letter: d.l, cls: [], arrows: arrowsAt[key], cursors: [] };
         if (inWord(st.w, r, c)) o.cls.push("word");
         if (r === st.r && c === st.c) o.cls.push("sel");
         if (d.locked) o.cls.push("locked");
@@ -482,13 +585,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
         if (d.wrong) o.cls.push("wrong");
         if (d.rev) o.cls.push("rev");
         if (d.l && d.a !== undefined) o.author = d.a;
-        var tint = null, curs = [];
         OTHERS.forEach(function (p) {
-          if (!tint && inWord(p.word, r, c)) tint = P[p.p];
-          if (p.at === key) curs.push({ p: p.p, ini: p.ini });
+          if (o.tint === undefined && inWord(p.word, r, c)) o.tint = p.p;
+          if (p.at === key) o.cursors.push(p.p);
         });
-        if (tint && o.cls.indexOf("word") < 0) o.tint = tint;
-        o.cursors = curs;
         row.push(o);
       }
       rows.push(row);
@@ -496,15 +596,12 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     var host = document.getElementById("pgrid");
     host.innerHTML = grid(rows, s);
     host.classList.toggle("authors-on", st.authors);
-    var cells = host.querySelectorAll(".c");
-    cells.forEach(function (el, i) {
+    host.querySelectorAll(".c").forEach(function (el, i) {
       var r = Math.floor(i / 5), c = i % 5;
-      if (FX.clues[r + "," + c]) return;
-      el.addEventListener("click", function () { tap(r, c); });
+      if (!FX.clues[r + "," + c]) el.addEventListener("click", function () { tap(r, c); });
     });
     var w = FX.words[st.w];
-    var arrow = w.dir === "a" ? "→" : "↓";
-    document.getElementById("cluetxt").innerHTML = esc(w.clue) + "<i>" + arrow + "</i>" + (st.pencil ? '<span class="pentag">✎ Crayon</span>' : "");
+    document.getElementById("cluetxt").innerHTML = esc(w.clue) + "<i>" + (w.dir === "a" ? "→" : "↓") + "</i>" + (st.pencil ? '<span class="pentag">✎ Crayon</span>' : "");
     document.getElementById("flagbtn").style.opacity = st.flagged[st.w] ? "1" : ".7";
   }
 
@@ -546,17 +643,12 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   var ICON_PEN = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
   var ICON_SWAP = '<svg viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>';
   var ICON_DEL = '<svg viewBox="0 0 24 24"><path d="M9 5h11v14H9l-6-7 6-7z"/><path d="M13 9l4 6M17 9l-4 6"/></svg>';
+  function keys(str) { return str.split("").map(function (ch) { return '<button type="button" class="k l" data-ch="' + ch + '">' + ch + "</button>"; }).join(""); }
   function renderKbd() {
     var k = document.getElementById("kbd");
-    var rows = ["AZERTYUIOP", "QSDFGHJKLM"];
-    var h = "";
-    rows.forEach(function (r) {
-      h += '<div class="krow">' + r.split("").map(function (ch) { return '<button type="button" class="k l" data-ch="' + ch + '">' + ch + "</button>"; }).join("") + "</div>";
-    });
-    h += '<div class="krow"><button type="button" class="k wide pen" id="kpen" aria-label="Crayon" aria-pressed="' + st.pencil + '">' + ICON_PEN + "</button>" +
-      "WXCVBN".split("").map(function (ch) { return '<button type="button" class="k l" data-ch="' + ch + '">' + ch + "</button>"; }).join("") +
+    k.innerHTML = '<div class="krow">' + keys("AZERTYUIOP") + '</div><div class="krow">' + keys("QSDFGHJKLM") + "</div>" +
+      '<div class="krow"><button type="button" class="k wide pen" id="kpen" aria-label="Crayon" aria-pressed="' + st.pencil + '">' + ICON_PEN + "</button>" + keys("WXCVBN") +
       '<button type="button" class="k" id="kswap" aria-label="Changer de sens">' + ICON_SWAP + '</button><button type="button" class="k wide" id="kdel" aria-label="Effacer">' + ICON_DEL + "</button></div>";
-    k.innerHTML = h;
     k.classList.toggle("pencil", st.pencil);
     k.querySelectorAll("[data-ch]").forEach(function (b) { b.addEventListener("click", function () { type(b.getAttribute("data-ch")); }); });
     document.getElementById("kpen").addEventListener("click", function () { st.pencil = !st.pencil; renderKbd(); renderPhone(); });
@@ -564,6 +656,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     document.getElementById("kdel").addEventListener("click", erase);
   }
 
+  function who(p) { return '<span class="who">' + shape(p, 12) + NAMES[p] + "</span>"; }
   function closeOverlay() {
     st.open = null;
     document.getElementById("overlay").innerHTML = "";
@@ -573,7 +666,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     if (st.open === which) { closeOverlay(); return; }
     closeOverlay();
     st.open = which;
-    var ov = document.getElementById("overlay"), h = '<div class="scrim" id="scrim"></div>';
+    var h = '<div class="scrim" id="scrim"></div>';
     if (which === "aide") {
       h += '<div class="pop" style="left:90px"><h4>Vérifier</h4><button type="button">La lettre</button><button type="button">Le mot</button><button type="button">La grille</button><hr><h4>Révéler</h4><button type="button">La lettre <em>4 restantes</em></button><button type="button">Le mot <em>1 restant</em></button></div>';
       document.getElementById("b-aide").setAttribute("aria-pressed", "true");
@@ -583,33 +676,36 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     } else {
       document.getElementById("b-salon").setAttribute("aria-pressed", "true");
       h += '<div class="sheet"><div class="grab"></div><div class="prog"><span>31 / 48 mots</span><div class="bar"><i></i></div></div>' +
-        '<div class="tabs" role="tablist"><button type="button" role="tab" id="t-s" aria-selected="' + (st.tab === "stream") + '">Discussion</button><button type="button" role="tab" id="t-p" aria-selected="' + (st.tab === "players") + '">Joueurs (3)</button></div>';
+        '<div class="tabs" role="tablist"><button type="button" role="tab" id="t-s" aria-selected="' + (st.tab === "stream") + '">Discussion</button><button type="button" role="tab" id="t-p" aria-selected="' + (st.tab === "players") + '">Joueurs (4)</button></div>';
       if (st.tab === "stream") {
         h += '<div class="stream">' +
           '<div class="evt">→ Bo a rejoint la partie</div>' +
           '<div class="evt">✎ Bo a rempli MIME · LEST</div>' +
-          '<div class="msg"><span class="who"><i class="pdot" style="background:' + P[0] + '"></i>Ana</span><span>Quelqu’un a une idée pour Flaire ?</span></div>' +
+          '<div class="msg">' + who(0) + "<span>Quelqu’un a une idée pour Flaire ?</span></div>" +
           '<div class="evt">⚑ Dé bloque sur « Flaire »</div>' +
           '<div class="evt">👁 Dé a révélé une lettre · 4 restantes</div>' +
-          '<div class="msg"><span class="who"><i class="pdot" style="background:' + P[1] + '"></i>Bo</span><span>SENT, je pense 👍</span></div>' +
+          '<div class="msg">' + who(1) + "<span>SENT, je pense 👍</span></div>" +
           '<div class="evt">✓ Ana a vérifié le mot AMEN · 1 erreur</div>' +
           '</div><div class="compose"><span>Écrire un message…</span><button type="button" class="pill">Envoyer</button></div>';
       } else {
         h += '<div class="players">' +
-          '<div class="row"><i class="pdot" style="background:' + P[0] + '"></i><b>Ana</b> (vous)<span class="st">actif</span></div>' +
-          '<div class="row"><i class="pdot" style="background:' + P[1] + '"></i>Bo<span class="st">actif</span></div>' +
-          '<div class="row idle"><i class="pdot" style="background:' + P[3] + '"></i>Dé<span class="st">inactif</span></div>' +
+          '<div class="row">' + shape(0, 14) + '<b>Ana</b> (vous)<span class="st">actif</span></div>' +
+          '<div class="row">' + shape(1, 14) + 'Bo<span class="st">actif</span></div>' +
+          '<div class="row idle">' + shape(3, 14) + 'Dé<span class="st">inactif</span></div>' +
+          '<div class="row">' + shape(4, 14) + 'Él<span class="st">actif</span></div>' +
           '<div class="row"><button type="button" class="pill">Inviter</button><button type="button" class="pill" id="p-auth">Auteurs : ' + (st.authors ? "oui" : "non") + "</button></div></div>";
       }
       h += "</div>";
     }
-    ov.innerHTML = h;
+    document.getElementById("overlay").innerHTML = h;
     document.getElementById("scrim").addEventListener("click", closeOverlay);
     var ma = document.getElementById("m-auth") || document.getElementById("p-auth");
     if (ma) ma.addEventListener("click", function () { st.authors = !st.authors; renderPhone(); var o = st.open; st.open = null; openOverlay(o); });
     var ts = document.getElementById("t-s"), tp = document.getElementById("t-p");
-    if (ts) { ts.addEventListener("click", function () { st.tab = "stream"; st.open = null; openOverlay("salon"); });
-      tp.addEventListener("click", function () { st.tab = "players"; st.open = null; openOverlay("salon"); }); }
+    if (ts) {
+      ts.addEventListener("click", function () { st.tab = "stream"; st.open = null; openOverlay("salon"); });
+      tp.addEventListener("click", function () { st.tab = "players"; st.open = null; openOverlay("salon"); });
+    }
     if (which === "salon") { var b = document.querySelector("#b-salon .badge"); if (b) b.remove(); }
   }
 
@@ -642,15 +738,30 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   document.getElementById("replay").addEventListener("click", nextNote);
   document.getElementById("timer").addEventListener("click", nextNote);
 
+  /* variant switch */
+  document.querySelectorAll(".switch button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      if (b.dataset.mode) {
+        MODE = b.dataset.mode;
+        document.querySelectorAll("[data-mode]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      } else {
+        TINT = b.dataset.tint === "on";
+        document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      }
+      renderStatic(); renderPhone();
+    });
+  });
+
   var secs = 4 * 60 + 12;
   setInterval(function () { secs++; document.getElementById("timer").textContent = Math.floor(secs / 60) + ":" + ("0" + (secs % 60)).slice(-2); }, 1000);
 
+  renderStatic();
   renderKbd();
   renderPhone();
   showToast(notes[0]);
   if (window.ResizeObserver) new ResizeObserver(function () { renderPhone(); }).observe(document.getElementById("stage"));
 
-  /* ---------- 7. contrast ---------- */
+  /* ---------- contrast ---------- */
   (function () {
     var rows = [
       ["A", tok("ink"), tok("cell"), "Letter on white", 4.5],
@@ -667,17 +778,18 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["◥", tok("reveal"), tok("locked"), "Revealed triangle on locked grey", 3],
       ["▢", tok("navy"), tok("sel"), "Selected border on selected fill", 3],
       ["▢", tok("navy"), tok("cell"), "Focus outline on white", 3],
+      ["●", "#14181F", tok("sel"), "Marker edge on selected fill", 3],
       ["A", tok("ink"), tok("key"), "Key letter", 4.5],
       ["A", tok("pencil"), tok("key"), "Key letter, pencil mode", 4.5],
       ["Aa", tok("muted"), tok("cell"), "Event line in the stream", 4.5]
     ];
-    P.forEach(function (c, i) { rows.push(["▬", c, tok("cell"), "Author band " + i + " on white, no edge", 3]); });
-    var tb = document.querySelector("#contrast tbody"), h = "";
+    P.forEach(function (c, i) { rows.push(["●", c, tok("cell"), "Player " + i + " (" + SHAPE_NAMES[i] + ") on white, no edge", 3]); });
+    var h = "";
     rows.forEach(function (r) {
       var v = ratio(r[1], r[2]), ok = v >= r[4];
-      h += '<tr><td><span class="sw" style="color:' + r[1] + ";background:" + r[2] + '">' + r[0] + "</span></td><td>" + r[3] + ' <span style="color:var(--muted)">' + r[1] + " / " + r[2] + '</span></td><td class="num">' + v.toFixed(2) + ':1</td><td>' + r[4] + ':1</td><td class="' + (ok ? "pass" : "fail") + '">' + (ok ? "Pass" : "Below") + "</td></tr>";
+      h += '<tr><td><span class="sw" style="color:' + r[1] + ";background:" + r[2] + '">' + r[0] + "</span></td><td>" + r[3] + ' <span style="color:var(--muted)">' + r[1] + " / " + r[2] + '</span></td><td class="num">' + v.toFixed(2) + ":1</td><td>" + r[4] + ':1</td><td class="' + (ok ? "pass" : "fail") + '">' + (ok ? "Pass" : "Below") + "</td></tr>";
     });
-    tb.innerHTML = h;
+    document.querySelector("#contrast tbody").innerHTML = h;
   })();
 })();
 </script>
