@@ -32,10 +32,12 @@ HOST_DIGITS: str = string.digits  # 0 to 9 only, not the digits of other scripts
 HOST_NAME_MARKS: str = ".-"  # the dot between the labels of a name, the dash in one
 IPV6_MARK: str = ":"  # only an IPv6 address holds it, written without brackets
 HOST_CHARACTERS: str = HOST_LETTERS + HOST_DIGITS + HOST_NAME_MARKS + IPV6_MARK
+# The idna codec's limit on a label: uvicorn would end with a traceback past it.
+MAX_LABEL_LENGTH: int = 63
 
 # NOCK_DATABASE refuses the characters of these Unicode general categories (as
-# unicodedata.category gives them): nobody sees them, or they end a line, so the
-# path could name another file than the one the operator reads.
+# unicodedata.category gives them): most are invisible, or they end a line, so
+# the path could name another file than the one the operator reads.
 REFUSED_DATABASE_CATEGORIES: frozenset[str] = frozenset(
     {
         "Cc",  # control characters: newline, tab, escape, DEL, U+0080 to U+009F
@@ -64,8 +66,11 @@ def main() -> None:
     - NOCK_HOST: a host name or an IP address. Each character is an ASCII
       letter, an ASCII digit, a dot, a dash or a colon, and a value that holds
       a colon is an IPv6 address that `ipaddress.IPv6Address` accepts, so it is
-      written without brackets (::1, not [::1]). It is passed to uvicorn as
-      given.
+      written without brackets (::1, not [::1]). A value without a colon is a
+      name, cut at each dot into labels: each label holds 1 to 63 characters,
+      and only the last label may be empty, so that a name ending with a dot
+      passes (example.org.), while a..b, .example and a label of 64 characters
+      are refused. It is passed to uvicorn as given.
     - NOCK_PORT: ASCII digits only, with a value from 1 to 65535.
     - NOCK_DATABASE: a file path without a refused character. A character is
       refused when its Unicode general category is Cc (control characters), Cf
@@ -99,7 +104,9 @@ def _read_host() -> str:
             HOST_VARIABLE,
             "a host name or an IP address, written with the letters A to Z and "
             "a to z, the digits 0 to 9, dots and dashes only (an IPv6 address "
-            "also has colons, and no brackets)",
+            "also has colons, and no brackets); the dots of a name cut it into "
+            f"labels of 1 to {MAX_LABEL_LENGTH} characters, and only the last "
+            "label may be empty (example.org.)",
             host,
         )
     return host
@@ -108,15 +115,31 @@ def _read_host() -> str:
 def _is_host(text: str) -> bool:
     """Tell whether `text` is a host name or an IP address that NOCK_HOST takes.
 
-    Every character is in HOST_CHARACTERS, and a text that holds a colon is an
-    IPv6 address. Whether a name resolves is not checked: uvicorn reports it.
+    Every character is in HOST_CHARACTERS. A text that holds a colon is an IPv6
+    address, and any other text is a name whose labels are valid. Whether a name
+    resolves is not checked: uvicorn reports it.
     """
     for character in text:
         if character not in HOST_CHARACTERS:
             return False
     if IPV6_MARK in text:
         return _is_ipv6_address(text)
-    return True
+    return _has_valid_labels(text)
+
+
+def _has_valid_labels(name: str) -> bool:
+    """Tell whether the dots of the host name `name` cut it into valid labels.
+
+    A label holds 1 to MAX_LABEL_LENGTH characters. Only the last label may be
+    empty, so that a name ending with a dot passes (example.org.).
+    """
+    labels = name.split(".")
+    last_label = labels[-1]
+    other_labels = labels[:-1]
+    for label in other_labels:
+        if label == "" or len(label) > MAX_LABEL_LENGTH:
+            return False
+    return len(last_label) <= MAX_LABEL_LENGTH
 
 
 def _is_ipv6_address(text: str) -> bool:
@@ -181,7 +204,9 @@ def _check_database() -> None:
     if _holds_refused_character(database):
         raise _refusal(
             DATABASE_VARIABLE,
-            "a file path without control or invisible characters",
+            "a file path without control characters, line or paragraph "
+            "separators, or format characters other than the zero width joiner "
+            "and non-joiner",
             database,
         )
 
