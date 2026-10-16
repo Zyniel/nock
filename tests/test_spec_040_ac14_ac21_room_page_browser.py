@@ -257,7 +257,8 @@ def test_ac18_page_shows_the_form_then_sends_the_join_of_the_form(
 
     mock.wait_for_join()
     first_message = parse_client_message(mock.frames_without_pings()[0])
-    assert first_message == Join(nickname="Ana", resume_token=None)
+    # The nickname input holds capitals (spec 012's room page flow, step 3).
+    assert first_message == Join(nickname="ANA", resume_token=None)
     assert len(mock.routes) == 1
 
 

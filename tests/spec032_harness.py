@@ -344,7 +344,7 @@ def past(
 
 
 def anas_past_record() -> object:
-    return past(ANA, TA, "Ana", 0)
+    return past(ANA, TA, "ANA", 0)
 
 
 def ana_wrote_t(grid: Grid) -> Run:
@@ -453,8 +453,11 @@ FORM_WATCHER = (
 NewPage = Callable[[int, int], Page]
 
 
-def identity_value(token: str, player_id: str = ANA, nickname: str = "Ana") -> str:
-    """A valid stored identity `nock.identity.<CODE>` (spec 012)."""
+def identity_value(token: str, player_id: str = ANA, nickname: str = "ANA") -> str:
+    """A valid stored identity `nock.identity.<CODE>` (spec 012).
+
+    Its nickname is in capitals, as the server sends it (spec 039).
+    """
     return json.dumps(
         {"player_id": player_id, "resume_token": token, "nickname": nickname}
     )

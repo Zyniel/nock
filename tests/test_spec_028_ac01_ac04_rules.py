@@ -114,10 +114,10 @@ def test_ac1_the_whole_recap_of_play_r(fx01_grid: Grid) -> None:
         word_count=8,
         players=(
             RecapPlayer(
-                player_id="p1", nickname="Ana", letters=8, words=4, removed=False
+                player_id="p1", nickname="ANA", letters=8, words=4, removed=False
             ),
             RecapPlayer(
-                player_id="p2", nickname="Bob", letters=5, words=3, removed=False
+                player_id="p2", nickname="BOB", letters=5, words=3, removed=False
             ),
         ),
         share_path="/recap/" + SHARE_TOKEN,
@@ -170,8 +170,8 @@ def test_ac2_players_and_letters_after_play_r(fx01_grid: Grid) -> None:
     recap = recap_of(play_r(fx01_grid))
 
     assert recap.players == (
-        RecapPlayer(player_id="p1", nickname="Ana", letters=8, words=4, removed=False),
-        RecapPlayer(player_id="p2", nickname="Bob", letters=5, words=3, removed=False),
+        RecapPlayer(player_id="p1", nickname="ANA", letters=8, words=4, removed=False),
+        RecapPlayer(player_id="p2", nickname="BOB", letters=5, words=3, removed=False),
     )
 
 
@@ -179,8 +179,8 @@ def test_ac2_players_and_letters_after_play_w(fx01_grid: Grid) -> None:
     recap = recap_of(play_w(fx01_grid))
 
     assert recap.players == (
-        RecapPlayer(player_id="p1", nickname="Ana", letters=10, words=3, removed=False),
-        RecapPlayer(player_id="p2", nickname="Bob", letters=8, words=5, removed=False),
+        RecapPlayer(player_id="p1", nickname="ANA", letters=10, words=3, removed=False),
+        RecapPlayer(player_id="p2", nickname="BOB", letters=8, words=5, removed=False),
     )
 
 
@@ -221,9 +221,9 @@ def test_ac2_a_departed_player_keeps_a_row_and_the_removed_flag(
     recap = recap_of(game)
 
     assert recap.players == (
-        RecapPlayer(player_id="p1", nickname="Ana", letters=17, words=8, removed=False),
-        RecapPlayer(player_id="p2", nickname="Bob", letters=0, words=0, removed=False),
-        RecapPlayer(player_id="p3", nickname="Cy", letters=1, words=0, removed=True),
+        RecapPlayer(player_id="p1", nickname="ANA", letters=17, words=8, removed=False),
+        RecapPlayer(player_id="p2", nickname="BOB", letters=0, words=0, removed=False),
+        RecapPlayer(player_id="p3", nickname="CY", letters=1, words=0, removed=True),
     )
 
 
@@ -235,8 +235,8 @@ def test_ac2_a_player_joined_twice_keeps_the_first_join_place_and_the_last_nickn
     assert isinstance(first_join.event, PlayerJoined)
     assert first_join.event.player.player_id == "p1"
     # Spec 032's seat back is built by hand: p1 (Ana), who joined before p2, times
-    # out after seq 9 and joins again with the same id as Anna, then writes on.
-    renamed = first_join.event.player.model_copy(update={"nickname": "Anna"})
+    # out after seq 9 and joins again with the same id as ANNA, then writes on.
+    renamed = first_join.event.player.model_copy(update={"nickname": "ANNA"})
     second_join_event = PlayerJoined(seq=1, player=renamed)
     left = LogEntry(
         at=NOW,
@@ -250,11 +250,11 @@ def test_ac2_a_player_joined_twice_keeps_the_first_join_place_and_the_last_nickn
 
     assert recap.players == (
         RecapPlayer(
-            player_id="p1", nickname="Anna", letters=10, words=3, removed=False
+            player_id="p1", nickname="ANNA", letters=10, words=3, removed=False
         ),
-        RecapPlayer(player_id="p2", nickname="Bob", letters=8, words=5, removed=False),
+        RecapPlayer(player_id="p2", nickname="BOB", letters=8, words=5, removed=False),
     )
-    assert public_recap(recap).team == ("Anna", "Bob")
+    assert public_recap(recap).team == ("ANNA", "BOB")
 
 
 def test_ac2_a_player_back_under_a_new_id_has_a_row_but_one_name_in_the_team(
@@ -273,11 +273,11 @@ def test_ac2_a_player_back_under_a_new_id_has_a_row_but_one_name_in_the_team(
     recap = recap_of(game)
 
     assert recap.players == (
-        RecapPlayer(player_id="p1", nickname="Ana", letters=16, words=8, removed=False),
-        RecapPlayer(player_id="p2", nickname="Bob", letters=1, words=0, removed=False),
-        RecapPlayer(player_id="p3", nickname="Bob", letters=1, words=0, removed=False),
+        RecapPlayer(player_id="p1", nickname="ANA", letters=16, words=8, removed=False),
+        RecapPlayer(player_id="p2", nickname="BOB", letters=1, words=0, removed=False),
+        RecapPlayer(player_id="p3", nickname="BOB", letters=1, words=0, removed=False),
     )
-    assert public_recap(recap).team == ("Ana", "Bob")
+    assert public_recap(recap).team == ("ANA", "BOB")
 
 
 def test_ac2_an_author_with_no_player_joined_is_listed_last_with_no_nickname(
@@ -290,10 +290,10 @@ def test_ac2_an_author_with_no_player_joined_is_listed_last_with_no_nickname(
     recap = build_recap(state, log)
 
     assert recap.players == (
-        RecapPlayer(player_id="p1", nickname="Ana", letters=10, words=3, removed=False),
+        RecapPlayer(player_id="p1", nickname="ANA", letters=10, words=3, removed=False),
         RecapPlayer(player_id="p2", nickname=None, letters=8, words=5, removed=False),
     )
-    assert public_recap(recap).team == ("Ana",)
+    assert public_recap(recap).team == ("ANA",)
 
 
 # ---- AC-3: words completed by each player ----
@@ -414,7 +414,7 @@ def test_ac7_a_late_joiner_gets_the_same_recap_and_a_row_with_nothing(
     game.join("Cy", "p3", THIRD_TOKEN, AFTER_THE_SOLVE)
 
     late_joiner = RecapPlayer(
-        player_id="p3", nickname="Cy", letters=0, words=0, removed=False
+        player_id="p3", nickname="CY", letters=0, words=0, removed=False
     )
     expected = before.model_copy(update={"players": (*before.players, late_joiner)})
     assert recap_of(game) == expected
@@ -425,7 +425,7 @@ def test_ac7_a_late_joiner_is_in_the_team(fx01_grid: Grid) -> None:
 
     game.join("Cy", "p3", THIRD_TOKEN, AFTER_THE_SOLVE)
 
-    assert public_recap(recap_of(game)).team == ("Ana", "Bob", "Cy")
+    assert public_recap(recap_of(game)).team == ("ANA", "BOB", "CY")
 
 
 # ---- AC-8: only a solved room, public recap ----
@@ -499,7 +499,7 @@ def test_ac8_public_recap_holds_the_grid_number_the_time_and_the_team(
 ) -> None:
     public = public_recap(recap_of(play_r(fx01_grid)))
 
-    assert public == PublicRecap(grid_number=1, elapsed_ms=754000, team=("Ana", "Bob"))
+    assert public == PublicRecap(grid_number=1, elapsed_ms=754000, team=("ANA", "BOB"))
 
 
 def test_ac8_the_team_leaves_out_a_removed_player(fx01_grid: Grid) -> None:
@@ -508,4 +508,4 @@ def test_ac8_the_team_leaves_out_a_removed_player(fx01_grid: Grid) -> None:
     game.send("p1", remove_message("p3"))
     game.finish("p1")
 
-    assert public_recap(recap_of(game)).team == ("Ana", "Bob")
+    assert public_recap(recap_of(game)).team == ("ANA", "BOB")

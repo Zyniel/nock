@@ -110,33 +110,50 @@ RAW_JOIN_TOO_LONG = (
 
 
 GREEK_NAME = "\u1f08\u03bb\u03ad\u03be\u03b7\u03c2"
+GREEK_NAME_IN_CAPITALS = "\u1f08\u039b\u0388\u039e\u0397\u03a3"
 POLISH_NAME = "\u0141ukasz"
+POLISH_NAME_IN_CAPITALS = "\u0141UKASZ"
 DECOMPOSED_E = "E\u0301"
 COMPOSED_E = "\u00c9"
-RAM_NAME = "\u0930\u093e\u092e"  # \u093e is a spacing mark (Mc)
+RAM_NAME = "\u0930\u093e\u092e"  # \u093e is a spacing mark (Mc); no case
 ENCLOSED_NAME = "Ana\u20dd"  # \u20dd is an enclosing mark (Me)
 
+# What is typed, and the nickname as stored: NFC, stripped, then in capitals
+# (spec 012 decision 12).
 VALID_NICKNAMES = [
-    ("Ana", "Ana"),
-    ("  Ana  ", "Ana"),
-    ("\u00c9lodie", "\u00c9lodie"),
-    (DECOMPOSED_E + "lodie", COMPOSED_E + "lodie"),
-    ("Jean-Luc", "Jean-Luc"),
-    ("O'Neil", "O'Neil"),
-    ("O\u2019Neil", "O\u2019Neil"),
-    ("bob_42", "bob_42"),
-    ("Anne Marie", "Anne Marie"),
-    ("Anne  Marie", "Anne  Marie"),
-    ("Zo\u00eb", "Zo\u00eb"),
-    (POLISH_NAME, POLISH_NAME),
-    (GREEK_NAME, GREEK_NAME),
+    ("Ana", "ANA"),
+    ("  Ana  ", "ANA"),
+    ("\u00c9lodie", "\u00c9LODIE"),
+    (DECOMPOSED_E + "lodie", COMPOSED_E + "LODIE"),
+    ("Jean-Luc", "JEAN-LUC"),
+    ("O'Neil", "O'NEIL"),
+    ("O\u2019Neil", "O\u2019NEIL"),
+    ("bob_42", "BOB_42"),
+    ("Anne Marie", "ANNE MARIE"),
+    ("Anne  Marie", "ANNE  MARIE"),
+    ("Zo\u00eb", "ZO\u00cb"),
+    (POLISH_NAME, POLISH_NAME_IN_CAPITALS),
+    (GREEK_NAME, GREEK_NAME_IN_CAPITALS),
     ("12", "12"),
     ("_1", "_1"),
-    ("a-", "a-"),
-    ("x" * 20, "x" * 20),
-    ("q\u0323", "q\u0323"),
+    ("a-", "A-"),
+    ("x" * 20, "X" * 20),
+    ("q\u0323", "Q\u0323"),
     (RAM_NAME, RAM_NAME),
-    (DECOMPOSED_E + "x" * 19, COMPOSED_E + "x" * 19),
+    (DECOMPOSED_E + "x" * 19, COMPOSED_E + "X" * 19),
+]
+
+# AC-1: for each of these, `normalize_nickname` returns `text.upper()`.
+UPPER_CASED_AS_TYPED = [
+    "Jean-Luc",
+    "O'Neil",
+    "O\u2019Neil",
+    "bob_42",
+    "Anne Marie",
+    "Zo\u00eb",
+    "12",
+    RAM_NAME,
+    "x" * 20,
 ]
 
 INVALID_NICKNAMES = [
@@ -179,6 +196,11 @@ def test_ac1_normalize_nickname_accepts_and_returns_the_stored_form(
     assert normalize_nickname(typed) == stored
 
 
+@pytest.mark.parametrize("text", UPPER_CASED_AS_TYPED)
+def test_ac1_normalize_nickname_returns_the_text_in_capitals(text: str) -> None:
+    assert normalize_nickname(text) == text.upper()
+
+
 @pytest.mark.parametrize("typed", INVALID_NICKNAMES)
 def test_ac1_normalize_nickname_rejects_a_broken_rule(typed: str) -> None:
     with pytest.raises(ValueError, match=NON_EMPTY_MESSAGE):
@@ -188,7 +210,7 @@ def test_ac1_normalize_nickname_rejects_a_broken_rule(typed: str) -> None:
 def test_ac1_normalize_nickname_counts_code_points_after_nfc() -> None:
     # 21 code points typed, 20 once composed: accepted.
     assert len(DECOMPOSED_E + "x" * 19) == 21
-    assert normalize_nickname(DECOMPOSED_E + "x" * 19) == COMPOSED_E + "x" * 19
+    assert normalize_nickname(DECOMPOSED_E + "x" * 19) == COMPOSED_E + "X" * 19
     # 22 characters after NFC: refused.
     with pytest.raises(ValueError, match=NON_EMPTY_MESSAGE):
         normalize_nickname(COMPOSED_E + "x" * 21)
@@ -202,7 +224,7 @@ def test_ac1_join_room_adds_the_first_player(fx01_grid: Grid) -> None:
     expected_player = PlayerRecord(
         player_id="joiner1",
         resume_token="joiner-token-number-1",
-        nickname="Ana",
+        nickname="ANA",
         colour=0,
         is_host=True,
         muted=False,
@@ -217,7 +239,7 @@ def test_ac1_join_room_adds_the_first_player(fx01_grid: Grid) -> None:
     assert outcome.state.seq == 1
     expected_entry = LogEntry(
         at=NOW,
-        event=PlayerJoined(seq=1, player=active_view("joiner1", "Ana", 0, True)),
+        event=PlayerJoined(seq=1, player=active_view("joiner1", "ANA", 0, True)),
         resume_token="joiner-token-number-1",
     )
     assert outcome.entries == (expected_entry,)
@@ -228,13 +250,13 @@ def test_ac1_join_room_adds_the_first_player(fx01_grid: Grid) -> None:
     assert snapshot.seq == 1
     assert snapshot.you == "joiner1"
     assert snapshot.resume_token == "joiner-token-number-1"
-    assert snapshot.players == (active_view("joiner1", "Ana", 0, True),)
+    assert snapshot.players == (active_view("joiner1", "ANA", 0, True),)
 
 
 def test_ac1_join_room_numbers_the_join_after_the_last_event(
     fx01_grid: Grid,
 ) -> None:
-    existing = [make_player(0, "Ana", is_host=True)]
+    existing = [make_player(0, "ANA", is_host=True)]
     state = make_state(fx01_grid, existing).model_copy(update={"seq": 5})
 
     outcome = run_join(state, "Bob")
@@ -250,14 +272,14 @@ def test_ac1_join_room_numbers_the_join_after_the_last_event(
     snapshot = outcome.reply[0]
     assert isinstance(snapshot, Snapshot)
     assert snapshot.seq == 6
-    assert [view.nickname for view in snapshot.players] == ["Ana", "Bob"]
+    assert [view.nickname for view in snapshot.players] == ["ANA", "BOB"]
 
 
 @pytest.mark.parametrize("typed", ["<b>Eve</b>", "Ana!", "--", "a@b", DECOMPOSED_E])
 def test_ac1_join_room_refuses_a_bad_nickname_and_changes_nothing(
     fx01_grid: Grid, typed: str
 ) -> None:
-    state = make_state(fx01_grid, [make_player(0, "Ana", is_host=True)])
+    state = make_state(fx01_grid, [make_player(0, "ANA", is_host=True)])
 
     outcome = run_join(state, typed)
 
@@ -272,7 +294,7 @@ def test_ac1_join_room_stores_the_normalised_nickname(fx01_grid: Grid) -> None:
 
     outcome = run_join(state, DECOMPOSED_E + "lodie")
 
-    assert outcome.state.players[0].nickname == COMPOSED_E + "lodie"
+    assert outcome.state.players[0].nickname == COMPOSED_E + "LODIE"
 
 
 def test_ac1_websocket_join_answers_a_snapshot_with_the_player(
@@ -287,7 +309,7 @@ def test_ac1_websocket_join_answers_a_snapshot_with_the_player(
         assert snapshot.players == (
             PlayerView(
                 player_id=snapshot.you,
-                nickname="Ana",
+                nickname="ANA",
                 colour=0,
                 state=PlayerState.ACTIVE,
                 is_host=True,
@@ -302,7 +324,7 @@ def test_ac1_websocket_join_answers_a_snapshot_with_the_player(
         stored = state.players[0]
         assert stored.player_id == snapshot.you
         assert stored.resume_token == snapshot.resume_token
-        assert stored.nickname == "Ana"
+        assert stored.nickname == "ANA"
         assert stored.colour == 0
         assert stored.is_host is True
         assert player_views(state) == snapshot.players
@@ -324,7 +346,7 @@ def test_ac1_websocket_bad_nickname_is_refused_and_the_socket_stays_open(
         websocket.send_text(join_text("Ana"))
         snapshot = receive_snapshot(websocket)
     assert snapshot.seq == 1
-    assert [view.nickname for view in snapshot.players] == ["Ana"]
+    assert [view.nickname for view in snapshot.players] == ["ANA"]
 
 
 def test_ac1_websocket_nickname_of_21_characters_is_an_invalid_message(
@@ -351,11 +373,11 @@ def test_ac1_websocket_second_join_on_a_joined_socket_is_ignored(
 
         message = receive_message(first)
         assert message == PlayerJoined(
-            seq=2, player=active_view(other_snapshot.you, "Cy", 1)
+            seq=2, player=active_view(other_snapshot.you, "CY", 1)
         )
     state = registry.room_state(room_code)
     assert state is not None
-    assert [player.nickname for player in state.players] == ["Ana", "Cy"]
+    assert [player.nickname for player in state.players] == ["ANA", "CY"]
 
 
 def test_ac1_websocket_joiner_never_receives_its_own_player_joined(
@@ -369,10 +391,10 @@ def test_ac1_websocket_joiner_never_receives_its_own_player_joined(
 
         assert first_snapshot.seq == 6
         assert first_snapshot.players == (
-            active_view(first_snapshot.you, "Ana", 0, True),
+            active_view(first_snapshot.you, "ANA", 0, True),
         )
         assert receive_message(first) == PlayerJoined(
-            seq=7, player=active_view(second_snapshot.you, "Bob", 1)
+            seq=7, player=active_view(second_snapshot.you, "BOB", 1)
         )
         assert second_snapshot.seq == 7
 
@@ -404,7 +426,7 @@ def test_ac1_browser_the_form_joins_the_room(
     expect(items.get_by_test_id("roster-nickname")).to_have_text("Ana")
     state = room_registry.room_state(code)
     assert state is not None
-    assert [player.nickname for player in state.players] == ["Ana"]
+    assert [player.nickname for player in state.players] == ["ANA"]
 
 
 def test_ac1_browser_the_form_shows_heading_label_placeholder_and_button(
@@ -434,7 +456,7 @@ def test_ac1_browser_a_valid_nickname_is_sent_normalised(
 
     mock.wait_for_frames(1)
 
-    assert mock.joins() == [Join(nickname="Ana", resume_token=None)]
+    assert mock.joins() == [Join(nickname="ANA", resume_token=None)]
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-status", "joining")
     expect(page.get_by_test_id("room-status")).to_have_text(
@@ -446,15 +468,15 @@ def test_ac1_browser_a_valid_nickname_is_sent_normalised(
 @pytest.mark.parametrize(
     ("typed", "sent"),
     [
-        (DECOMPOSED_E + "lodie", COMPOSED_E + "lodie"),
-        ("Zo\u00eb", "Zo\u00eb"),
-        (POLISH_NAME, POLISH_NAME),
-        (GREEK_NAME, GREEK_NAME),
-        ("O\u2019Neil", "O\u2019Neil"),
-        ("Jean-Luc", "Jean-Luc"),
-        ("bob_42", "bob_42"),
+        (DECOMPOSED_E + "lodie", COMPOSED_E + "LODIE"),
+        ("Zo\u00eb", "ZO\u00cb"),
+        (POLISH_NAME, POLISH_NAME_IN_CAPITALS),
+        (GREEK_NAME, GREEK_NAME_IN_CAPITALS),
+        ("O\u2019Neil", "O\u2019NEIL"),
+        ("Jean-Luc", "JEAN-LUC"),
+        ("bob_42", "BOB_42"),
         ("12", "12"),
-        ("Anne Marie", "Anne Marie"),
+        ("Anne Marie", "ANNE MARIE"),
         (RAM_NAME, RAM_NAME),
     ],
 )
@@ -520,8 +542,8 @@ def test_ac1_browser_the_server_refusing_a_nickname_brings_the_form_back(
     submit_form(page, "Bob")
     mock.wait_for_frames(2)
     assert mock.joins() == [
-        Join(nickname="Ana", resume_token=None),
-        Join(nickname="Bob", resume_token=None),
+        Join(nickname="ANA", resume_token=None),
+        Join(nickname="BOB", resume_token=None),
     ]
     assert len(mock.routes) == 1
 

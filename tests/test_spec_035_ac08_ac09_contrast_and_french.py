@@ -361,6 +361,31 @@ def test_ac9_the_checker_accepts_the_data_of_the_test() -> None:
     assert unknown_texts(["Bobby"], data) == ["Bobby"]
 
 
+# Spec 040's examples of `displayNickname`: a nickname of the test's data, and the
+# text a page shows for it.
+DISPLAYED_NICKNAMES = [
+    ("ANA", "Ana"),
+    ("JEAN-LUC", "Jean-Luc"),
+    ("D'ARTAGNAN", "D'Artagnan"),
+    ("ANA 2", "Ana 2"),
+    ("ÉLODIE", "Élodie"),
+    ("BOB_42", "Bob_42"),
+    ("<b>Eve</b>", "<b>eve</b>"),
+    ("<img src=x>", "<img Src=x>"),
+]
+
+
+@pytest.mark.parametrize(("nickname", "shown"), DISPLAYED_NICKNAMES)
+def test_ac9_the_checker_accepts_a_nickname_as_display_nickname_writes_it(
+    nickname: str, shown: str
+) -> None:
+    assert unknown_texts([shown], {nickname}) == []
+
+
+def test_ac9_the_checker_flags_a_nickname_written_another_way() -> None:
+    assert unknown_texts(["Anna", "ANa"], {"ANA"}) == ["Anna", "ANa"]
+
+
 def test_ac9_the_new_keys_exist_with_their_values() -> None:
     fr_json = load_fr()
 

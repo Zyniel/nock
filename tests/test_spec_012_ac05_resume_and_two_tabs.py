@@ -108,8 +108,8 @@ class EnterRoom(Protocol):
 def test_ac5_disconnect_player_keeps_the_seat_and_tells_the_others(
     fx01_grid: Grid,
 ) -> None:
-    host = make_player(0, "Ana", is_host=True)
-    other = make_player(1, "Bob")
+    host = make_player(0, "ANA", is_host=True)
+    other = make_player(1, "BOB")
     state = make_state(fx01_grid, [host, other])
 
     outcome = disconnect_player(state, "player0", NOW)
@@ -132,8 +132,8 @@ def test_ac5_disconnect_player_keeps_the_seat_and_tells_the_others(
 def test_ac5_disconnecting_an_idle_player_marks_them_disconnected(
     fx01_grid: Grid,
 ) -> None:
-    idle = make_player(1, "Bob", state=PlayerState.IDLE)
-    state = make_state(fx01_grid, [make_player(0, "Ana", is_host=True), idle])
+    idle = make_player(1, "BOB", state=PlayerState.IDLE)
+    state = make_state(fx01_grid, [make_player(0, "ANA", is_host=True), idle])
 
     outcome = disconnect_player(state, "player1", NOW)
 
@@ -145,8 +145,8 @@ def test_ac5_disconnecting_an_idle_player_marks_them_disconnected(
 def test_ac5_disconnecting_twice_or_an_unknown_player_changes_nothing(
     fx01_grid: Grid,
 ) -> None:
-    away = make_player(1, "Bob", state=PlayerState.DISCONNECTED)
-    state = make_state(fx01_grid, [make_player(0, "Ana", is_host=True), away])
+    away = make_player(1, "BOB", state=PlayerState.DISCONNECTED)
+    state = make_state(fx01_grid, [make_player(0, "ANA", is_host=True), away])
 
     again = disconnect_player(state, "player1", NOW)
     unknown = disconnect_player(state, "nobody", NOW)
@@ -159,8 +159,8 @@ def test_ac5_disconnecting_twice_or_an_unknown_player_changes_nothing(
 def test_ac5_resume_of_a_disconnected_player_brings_them_back(
     fx01_grid: Grid,
 ) -> None:
-    host = make_player(0, "Ana", is_host=True)
-    away = make_player(1, "Bob", state=PlayerState.DISCONNECTED)
+    host = make_player(0, "ANA", is_host=True)
+    away = make_player(1, "BOB", state=PlayerState.DISCONNECTED)
     state = make_state(fx01_grid, [host, away])
 
     outcome = run_join(state, "Autre", 9, token="resume-token-number-1")
@@ -190,12 +190,12 @@ def test_ac5_resume_of_a_disconnected_player_brings_them_back(
     assert snapshot.seq == 3
     assert snapshot.you == "player1"
     assert snapshot.resume_token == "resume-token-number-1"
-    assert [view.nickname for view in snapshot.players] == ["Ana", "Bob"]
+    assert [view.nickname for view in snapshot.players] == ["ANA", "BOB"]
 
 
 def test_ac5_resume_of_a_connected_player_makes_no_event(fx01_grid: Grid) -> None:
-    host = make_player(0, "Ana", is_host=True)
-    still_open = make_player(1, "Bob")
+    host = make_player(0, "ANA", is_host=True)
+    still_open = make_player(1, "BOB")
     state = make_state(fx01_grid, [host, still_open])
 
     outcome = run_join(state, "Autre", 9, token="resume-token-number-1")
@@ -211,7 +211,7 @@ def test_ac5_resume_of_a_connected_player_makes_no_event(fx01_grid: Grid) -> Non
 
 
 def test_ac5_resume_ignores_the_nickname_of_the_join(fx01_grid: Grid) -> None:
-    away = make_player(0, "Ana", is_host=True, state=PlayerState.DISCONNECTED)
+    away = make_player(0, "ANA", is_host=True, state=PlayerState.DISCONNECTED)
     state = make_state(fx01_grid, [away])
 
     outcome = run_join(state, "!!", 9, token="resume-token-number-0")
@@ -219,7 +219,7 @@ def test_ac5_resume_ignores_the_nickname_of_the_join(fx01_grid: Grid) -> None:
     snapshot = outcome.reply[0]
     assert isinstance(snapshot, Snapshot)
     assert snapshot.you == "player0"
-    assert snapshot.players[0].nickname == "Ana"
+    assert snapshot.players[0].nickname == "ANA"
     assert snapshot.players[0].is_host is True
     assert snapshot.players[0].colour == 0
     assert outcome.state.players[0].joined_seq == away.joined_seq
@@ -228,14 +228,14 @@ def test_ac5_resume_ignores_the_nickname_of_the_join(fx01_grid: Grid) -> None:
 def test_ac5_an_unknown_token_is_ignored_and_the_join_is_a_new_player(
     fx01_grid: Grid,
 ) -> None:
-    state = make_state(fx01_grid, [make_player(0, "Ana", is_host=True)])
+    state = make_state(fx01_grid, [make_player(0, "ANA", is_host=True)])
 
     outcome = run_join(state, "Cy", 9, token=OTHER_TOKEN)
 
     assert len(outcome.state.players) == 2
     newcomer = outcome.state.players[1]
     assert newcomer.player_id == "joiner9"
-    assert newcomer.nickname == "Cy"
+    assert newcomer.nickname == "CY"
     assert newcomer.resume_token == "joiner-token-number-9"
     assert len(outcome.entries) == 1
 
@@ -266,8 +266,8 @@ def test_ac5_websocket_a_closed_player_resumes_with_the_token(
         assert resumed.resume_token == snapshot_a.resume_token
         assert resumed.seq == 4
         assert resumed.players == (
-            active_view(snapshot_a.you, "Ana", 0, True),
-            active_view(snapshot_b.you, "Bob", 1),
+            active_view(snapshot_a.you, "ANA", 0, True),
+            active_view(snapshot_b.you, "BOB", 1),
         )
         assert receive_message(socket_b) == PlayerStateChanged(
             seq=4, player_id=snapshot_a.you, state=PlayerState.ACTIVE
@@ -286,7 +286,7 @@ def test_ac5_websocket_an_unknown_token_makes_a_new_player(
         )
 
     assert snapshot.resume_token != OTHER_TOKEN
-    assert [view.nickname for view in snapshot.players] == ["Cy"]
+    assert [view.nickname for view in snapshot.players] == ["CY"]
     assert snapshot.players[0].is_host is True
 
 
@@ -315,7 +315,7 @@ def test_ac5_websocket_a_second_tab_takes_over_and_the_first_is_closed(
         assert state.seq == 2
         assert state.players[0].state is PlayerState.ACTIVE
         _, third_snapshot = join_as(stack, ws_client, room_code, "Cy")
-        third_view = active_view(third_snapshot.you, "Cy", 2)
+        third_view = active_view(third_snapshot.you, "CY", 2)
         assert receive_message(other) == PlayerJoined(seq=3, player=third_view)
         assert receive_message(second_tab) == PlayerJoined(seq=3, player=third_view)
 

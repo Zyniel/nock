@@ -213,7 +213,9 @@ def test_ac7_the_requesters_nickname_is_inserted_as_text(
     mock.send(opened(6, 1, "p2", WORD_REVEAL, 3).model_dump_json())
 
     question = page.get_by_test_id("vote-question")
-    expect(question).to_have_text(fr_text("vote.question.reveal_word", name=nickname))
+    # Spec 040's displayNickname writes `<b>Bo</b>` as `<b>bo</b>`.
+    shown_name = "<b>bo</b>"
+    expect(question).to_have_text(fr_text("vote.question.reveal_word", name=shown_name))
     expect(page.get_by_test_id("vote-banner").locator("b")).to_have_count(0)
 
 

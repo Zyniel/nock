@@ -190,7 +190,7 @@ def test_ac5_the_share_path_and_the_public_recap_after_a_removal(
     assert recap.share_path == f"/recap/{token}"
     assert shared.status_code == 200
     assert PublicRecap.model_validate(shared.json()) == PublicRecap(
-        grid_number=1, elapsed_ms=recap.elapsed_ms, team=("Ana", "Bob")
+        grid_number=1, elapsed_ms=recap.elapsed_ms, team=("ANA", "BOB")
     )
 
 
@@ -202,7 +202,7 @@ def test_ac5_the_removed_player_keeps_a_row_with_nothing_in_it(
     recap = Recap.model_validate(client.get(recap_url(code)).json())
 
     names = [player.nickname for player in recap.players]
-    assert names == ["Ana", "Bob", "Cy"]
+    assert names == ["ANA", "BOB", "CY"]
     cy = recap.players[2]
     assert (cy.removed, cy.letters, cy.words) == (True, 0, 0)
     assert recap.players[0].removed is False
@@ -271,7 +271,7 @@ def test_ac6_both_recap_bodies_pass_the_three_rules_of_spec_037(
 
     assert traffic_problems(room_body) == []
     assert traffic_problems(share_body) == []
-    assert json.loads(room_body)["players"][0]["nickname"] == "Ana"
+    assert json.loads(room_body)["players"][0]["nickname"] == "ANA"
 
 
 # ---- AC-8 ----

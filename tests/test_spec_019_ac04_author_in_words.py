@@ -297,7 +297,8 @@ def test_ac4_the_name_is_inserted_as_text(
 
     cell_at(page, 1, 1).click()
 
-    expect(author_line(page)).to_have_text("Lettre de <b>Bo</b>")
+    # Spec 040's displayNickname writes `<b>Bo</b>` as `<b>bo</b>`.
+    expect(author_line(page)).to_have_text("Lettre de <b>bo</b>")
     expect(author_line(page).locator("b")).to_have_count(0)
 
 

@@ -232,7 +232,7 @@ def test_ac2_on_the_reused_code_the_old_token_joins_as_a_new_player(
             seq=1,
             player=PlayerView(
                 player_id=NEW_PLAYER_ID,
-                nickname="Ana",
+                nickname="ANA",
                 colour=0,
                 state=PlayerState.ACTIVE,
                 is_host=True,
@@ -488,7 +488,7 @@ def test_ac2_http_the_share_link_works_until_the_room_expires(
     assert page.text == INDEX_HTML
     assert recap.status_code == 200
     assert PublicRecap.model_validate(recap.json()) == PublicRecap(
-        grid_number=1, elapsed_ms=754000, team=("Ana", "Bob")
+        grid_number=1, elapsed_ms=754000, team=("ANA", "BOB")
     )
 
 

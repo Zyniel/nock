@@ -137,15 +137,17 @@ def test_ac13_browser_chat_texts_and_names_show_as_plain_text(
 
     mock.send(reaction_frame("p3", IDES, Reaction.CLAP))
     label = clue_at(page, IDES).get_by_test_id("clue-reaction-label")
-    expect(label).to_have_text("<img src=x> : Bravo")
+    # Spec 040's displayNickname writes `<b>Eve</b>` as `<b>eve</b>` and
+    # `<img src=x>` as `<img Src=x>`.
+    expect(label).to_have_text("<img Src=x> : Bravo")
     page.wait_for_timeout(SETTLE_MS)
     bold_count = page.locator("b").count()
     image_count = page.locator("img").count()
 
     shown = [(line.author, line.text) for line in lines]
     assert shown == [
-        ("<b>Eve</b>", "<b>salut</b>"),
-        ("<img src=x>", "<img src=x onerror=alert(1)>"),
+        ("<b>eve</b>", "<b>salut</b>"),
+        ("<img Src=x>", "<img src=x onerror=alert(1)>"),
     ]
     assert bold_count == 0
     assert image_count == 0

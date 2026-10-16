@@ -128,7 +128,7 @@ def test_ac7_a_past_player_dropped_by_the_cap_joins_as_a_new_player(
     run = ana_timed_out(fx01_grid)
     others: list[object] = []
     for number in range(nock.room.MAX_PAST_PLAYERS - 1):
-        others.append(past(f"past{number}", f"token-of-past-{number:04d}", "Old", 7))
+        others.append(past(f"past{number}", f"token-of-past-{number:04d}", "OLD", 7))
     full = run.state.model_copy(update={"past_players": (anas_past_record(), *others)})
     run.state = full
     run.disconnect(BOB, T0 + 320)
@@ -138,7 +138,7 @@ def test_ac7_a_past_player_dropped_by_the_cap_joins_as_a_new_player(
 
     snapshot = snapshot_of(outcome)
     assert snapshot.you == NEW_PLAYER_ID
-    assert player_of(outcome.state, NEW_PLAYER_ID).nickname == "Autre"
+    assert player_of(outcome.state, NEW_PLAYER_ID).nickname == "AUTRE"
 
 
 # ---- The join's nickname -------------------------------------------------------
@@ -154,7 +154,7 @@ def test_ac7_a_seat_back_ignores_a_nickname_that_spec_012_refuses(
     outcome = seat_back(run, nickname=nickname)
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=8, player=view(ANA, "Ana", 0, is_host=False))
+        PlayerJoined(seq=8, player=view(ANA, "ANA", 0, is_host=False))
     ]
     snapshot = snapshot_of(outcome)
     assert (snapshot.you, snapshot.resume_token) == (ANA, TA)
@@ -174,6 +174,6 @@ def test_ac7_a_join_that_times_the_player_out_ignores_a_refused_nickname_too(
     assert events_of(outcome) == [
         PlayerLeft(seq=6, player_id=ANA, reason=LeaveReason.TIMED_OUT),
         HostChanged(seq=7, player_id=BOB),
-        PlayerJoined(seq=8, player=view(ANA, "Ana", 0, is_host=False)),
+        PlayerJoined(seq=8, player=view(ANA, "ANA", 0, is_host=False)),
     ]
     assert snapshot_of(outcome).you == ANA
