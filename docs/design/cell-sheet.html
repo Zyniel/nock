@@ -326,7 +326,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 4.4 · aligned with specs/_design.md</div>
+    <div class="ver">Version 4.5 · fonts decided, leavers' letters in ink</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
@@ -371,7 +371,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
         <ul>
           <li><b>Decided 2026-10-16:</b> tint on other players' words kept, switchable (« Mots des autres »); Auteurs switchable, off by default; Accessibilité mode (icons) switchable, off by default; corners by arrival; a closed column stays closed; no long press on ⌫; grid lines #9AA3B2.</li>
           <li class="new"><b>Deferred, high:</b> the revealed notch is smaller than spec 024 allows.</li>
-          <li><b>Open:</b> font files (dependency); notch in ink during a flash and departed grey #5C616A (applied here, to approve); catalogue thumbnails need clue positions from the API, or go.</li>
+          <li><b>Decided:</b> fonts as npm dependencies (@fontsource, self-hosted); letters of a player who has left are drawn in ink.</li>
+          <li><b>Open:</b> notch in ink during a flash (applied here, to approve); catalogue thumbnails need clue positions from the API, or go.</li>
         </ul>
       </div>
     </div>
@@ -433,7 +434,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>2 · Auteurs mode</small>Letters in the colour of whoever found them</h2>
-    <p class="lead">A switch, off by default, in the Menu (and in the bar above for this page). When it is on, each letter takes its finder's colour. Some player colours are too light for text, so each one gets an « ink », darkened only as far as needed to read at 4.5:1 on my selected cell, the darkest background a letter can have. Revealed letters have no finder and stay ink. A player who has left turns grey. Pencil letters keep their italics, in their finder's colour.</p>
+    <p class="lead">A switch, off by default, in the Menu (and in the bar above for this page). When it is on, each letter takes its finder's colour. Some player colours are too light for text, so each one gets an « ink », darkened only as far as needed to read at 4.5:1 on my selected cell, the darkest background a letter can have. Revealed letters have no finder and stay ink. A player who has left: their letters go back to ink. Pencil letters keep their italics, in their finder's colour.</p>
     <div class="board" id="authors"></div>
     <p class="note"><strong>Not by colour alone.</strong> With the mode on, a small legend under the grid names each colour. The clue bar stays for the clue only. The inks come from the imposed player colours (section 0) and were part of the same colour-blindness check.</p>
   </section>
@@ -659,7 +660,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   /* Auteurs mode: each letter in a darker "ink" of its finder's colour, darkened until it
      reaches 4.5:1 on the darkest background a letter can have (my selected cell). */
   var AUTHORS = false;
-  var DEPARTED = "#5C616A";
+  /* letters of a player who has left: plain ink, like letters with no finder (human, 2026-10-16) */
+  var DEPARTED = "#14181F";
   function inkOf(hex) {
     var h = hex.replace("#", ""), rgb = [0, 1, 2].map(function (i) { return parseInt(h.slice(i * 2, i * 2 + 2), 16); });
     for (var k = 0; k <= 1; k += 0.02) {
@@ -808,7 +810,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     h += spec(grid([[
       { letter: "T", author: 0, forceAuthors: true }, { letter: "A", author: 1, forceAuthors: true }, { letter: "M", author: 1, cls: ["locked"], forceAuthors: true },
       { letter: "I", author: 4, cls: ["pencil"], forceAuthors: true }, { letter: "S", author: 6, gone: true, forceAuthors: true }, { letter: "N", author: 3, cls: ["locked", "rev"], forceAuthors: true }
-    ]], 56), "Mixed", "Ana, Bruno, Bruno locked, Éloïse pencil, Gus has left (grey), revealed N stays ink");
+    ]], 56), "Mixed", "Ana, Bruno, Bruno locked, Éloïse pencil, Gus has left (ink), revealed N stays ink");
     set("authors", h);
 
     var s = 64;
