@@ -50,6 +50,7 @@ from nock.room import (
     RoomConfig,
     RoomState,
     after_restart,
+    disconnect_player,
     handle_message,
     join_room,
     new_room,
@@ -656,23 +657,30 @@ def test_ac9_python_a_restart_gives_every_player_fresh_windows(
     for number in range(1, CHAT_LIMIT + 1):
         state = send_chat(state, "p1", f"m{number}").state
         state = send_react(state, "p1", IDES, Reaction.CLAP).state
-    assert len(player_record(state, "p1").recent_chat) == CHAT_LIMIT
-    assert len(player_record(state, "p1").recent_reactions) == CHAT_LIMIT
+    state = send_chat(state, "p2", "salut").state
+    state = send_react(state, "p2", IDES, Reaction.WOW).state
+    state = disconnect_player(state, "p2", NOW).state
+
+    # Beforehand: five times in each of p1's windows, one in each of p2's, and p2
+    # is already disconnected when the restart comes.
+    before_p1 = player_record(state, "p1")
+    before_p2 = player_record(state, "p2")
+    assert before_p1.recent_chat == (NOW,) * CHAT_LIMIT
+    assert before_p1.recent_reactions == (NOW,) * CHAT_LIMIT
+    assert before_p2.recent_chat == (NOW,)
+    assert before_p2.recent_reactions == (NOW,)
+    assert before_p1.state != PlayerState.DISCONNECTED
+    assert before_p2.state == PlayerState.DISCONNECTED
 
     outcome = after_restart(state, NOW + 1)
 
-    events = [entry.event for entry in outcome.entries]
-    expected_events: list[object] = []
-    for index, player in enumerate(state.players, start=1):
-        expected_events.append(
-            PlayerStateChanged(
-                seq=state.seq + index,
-                player_id=player.player_id,
-                state=PlayerState.DISCONNECTED,
-            )
-        )
-    assert events == expected_events
-    assert len(outcome.state.players) == len(state.players)
+    # The restart writes an entry for each player who was not disconnected: p1.
+    only_entry = PlayerStateChanged(
+        seq=state.seq + 1, player_id="p1", state=PlayerState.DISCONNECTED
+    )
+    assert events_of(outcome) == [only_entry]
+    player_ids = [player.player_id for player in outcome.state.players]
+    assert player_ids == ["p1", "p2"]
     for player in outcome.state.players:
         assert player.recent_chat == (), player.player_id
         assert player.recent_reactions == (), player.player_id

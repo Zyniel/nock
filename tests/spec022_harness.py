@@ -17,7 +17,12 @@ are in `tests/test_spec_022_*.py`, one file per criterion group:
 - `test_spec_022_ac13_ac14_escaping_and_traffic.py`: AC-13 (page) and AC-14
   (WebSocket traffic);
 - `test_spec_022_ac15_layout.py`: AC-15 (page, every window, desktop and touch);
-- `test_spec_022_ac16_keyboard_and_french.py`: AC-16 (`fr.json`, keyboard, scans).
+- `test_spec_022_ac16_keyboard_and_french.py`: AC-16 (`fr.json`, keyboard, scans);
+- `test_spec_022_ac17_banner_over_panel.py`: AC-17 (page, every window);
+- `test_spec_022_ac18_mute_closes_picker.py`: AC-18 (page, one 300 ms deadline from
+  the mute);
+- `test_spec_022_ac19_chat_notes.py`: AC-19 (page, the chat notes at every window);
+- `test_spec_022_ac20_focus_after_send.py`: AC-20 (page, the focus after a send).
 
 It holds what more than one of those files uses: the chat and reaction steps on
 `handle_message`, the room on the real WebSocket, the snapshot with chat lines

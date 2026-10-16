@@ -53,7 +53,7 @@ NEW_FR_KEYS = {
     "chat.input_label": "Message",
     "chat.placeholder": "Écrire au salon",
     "chat.send": "Envoyer",
-    "chat.wait": "Patientez un instant avant le prochain message.",
+    "chat.wait": "Patientez avant d'envoyer.",
     "chat.muted": "L'hôte a coupé votre discussion.",
     "chat.moderation_heading": "Sourdine",
     "chat.mute": "Couper",

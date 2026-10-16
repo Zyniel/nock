@@ -3,25 +3,34 @@ off the disabled chat controls.
 
 Browser with spec 025's mocked socket, on a FX-01 snapshot with `seq` 5 in which
 `p2` is host (so `you`, `p1`, is not), at 1280 by 720 and at 360 by 740. "The mute"
-is the mock's `player_muted` with seq 6 for `p1`, `muted` true. Every reading
-after the mute is made within 300 ms.
+is the mock's `player_muted` with seq 6 for `p1`, `muted` true.
+
+"Within 300 ms" is one deadline for all the checks of a case, counted from the
+moment the mock sends the mute (second review of spec 022): `send_mute` notes it
+just before the frame is sent, and every check then gets the time left to it
+(`remaining_ms`), not 300 ms of its own. A check that is already true when its turn
+comes passes at once, even after the deadline.
 
 In the second picker run the clue cell (2, 0) is tapped before the panel is
 opened (the state is the one the criterion describes: panel open, VIDE selected,
 picker open, its first option focused), so that the tap cannot depend on where the
 panel is drawn on a narrow window.
 
+Timing: the 300 ms are the criterion's and are counted on the test's side. The
+checks of a case pass within about 10 to 100 ms of the mute on a busy machine, but a
+heavier load can break the bound: the file is a candidate for the gate's serial
+pass.
+
 The shared setup is in `spec022_harness`.
 """
 
 from __future__ import annotations
 
-import contextlib
+import time
 from collections.abc import Callable
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
-from playwright.sync_api import Error as PlaywrightError
 
 from nock.grid import Grid
 from nock.protocol import PlayerMuted
@@ -30,7 +39,9 @@ from spec022_harness import (
     frames_of_type,
     open_chat_room,
     open_panel,
+    remaining_ms,
     three_players,
+    wait_for_reading,
 )
 from spec024_harness import grid_from_text, open_context_page
 from spec025_harness import MockRoomSocket
@@ -90,29 +101,45 @@ def open_room_where_you_are_not_host(
     return page, mock, close
 
 
-def send_mute(mock: MockRoomSocket) -> None:
-    """The mock tells the page that `you` (`p1`) is muted."""
+def send_mute(mock: MockRoomSocket) -> float:
+    """The mock tells the page that `you` (`p1`) is muted.
+
+    Returns:
+        The case's deadline, a `time.monotonic` value: 300 ms after the moment
+        just before the frame is sent.
+    """
+    deadline = time.monotonic() + WITHIN_MS / 1000
     event = PlayerMuted(seq=MUTE_SEQ, player_id="p1", muted=True)
     mock.send(event.model_dump_json())
+    return deadline
 
 
-def focus_reaches(page: Page, test_id: str) -> str | None:
-    """Wait up to 300 ms for the focus to be on `test_id`; what has it then."""
-    script = f"""() => {{
-      const active = document.activeElement;
-      return active !== null && active.getAttribute('data-testid') === '{test_id}';
-    }}"""
-    with contextlib.suppress(PlaywrightError):
-        page.wait_for_function(script, timeout=WITHIN_MS)
-    return page.evaluate(ACTIVE_SCRIPT)
+def active_element(page: Page) -> str | None:
+    """What has the focus now: its `data-testid`, else its tag name."""
+    found = page.evaluate(ACTIVE_SCRIPT)
+    assert found is None or isinstance(found, str), found
+    return found
 
 
-def expect_picker_closed_by_the_mute(page: Page, mock: MockRoomSocket) -> None:
-    """The checks of the first two cases after the mute, but the panel's box."""
-    expect(page.get_by_test_id("reaction-picker")).to_have_count(0, timeout=WITHIN_MS)
+def expect_focus_on(page: Page, test_id: str, deadline: float) -> None:
+    """Wait until the deadline for the focus to be on `test_id`, else fail.
+
+    The focus is read every few milliseconds, and once more at the deadline.
+    """
+    wait_for_reading(page, lambda: active_element(page), test_id, deadline)
+
+
+def expect_picker_closed_by_the_mute(
+    page: Page, mock: MockRoomSocket, deadline: float
+) -> None:
+    """The checks of the first two cases after the mute, but the focus and the box."""
+    picker = page.get_by_test_id("reaction-picker")
+    expect(picker).to_have_count(0, timeout=remaining_ms(deadline))
     react_button = page.get_by_test_id("react-button")
-    expect(react_button).to_be_disabled(timeout=WITHIN_MS)
-    expect(react_button).to_have_attribute("aria-expanded", "false", timeout=WITHIN_MS)
+    expect(react_button).to_be_disabled(timeout=remaining_ms(deadline))
+    expect(react_button).to_have_attribute(
+        "aria-expanded", "false", timeout=remaining_ms(deadline)
+    )
     assert frames_of_type(mock, "react") == []
 
 
@@ -135,13 +162,11 @@ def test_ac18_browser_a_mute_closes_the_picker_and_focuses_the_grid(
         first_option = page.get_by_test_id("reaction-option").first
         expect(first_option).to_be_focused()
 
-        send_mute(mock)
-        expect_picker_closed_by_the_mute(page, mock)
-        active = focus_reaches(page, "grid")
+        deadline = send_mute(mock)
+        expect_picker_closed_by_the_mute(page, mock, deadline)
+        expect_focus_on(page, "grid", deadline)
     finally:
         close()
-
-    assert active == "grid"
 
 
 @pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids())
@@ -166,14 +191,15 @@ def test_ac18_browser_a_mute_closes_the_picker_and_keeps_the_open_panel(
         page.wait_for_timeout(300)
         panel_before = page.evaluate(PANEL_BOX_SCRIPT)
 
-        send_mute(mock)
-        expect_picker_closed_by_the_mute(page, mock)
-        active = focus_reaches(page, "grid")
+        deadline = send_mute(mock)
+        expect_picker_closed_by_the_mute(page, mock, deadline)
+        expect_focus_on(page, "grid", deadline)
+        panel = page.get_by_test_id("chat-panel")
+        expect(panel).to_have_count(1, timeout=remaining_ms(deadline))
         panel_after = page.evaluate(PANEL_BOX_SCRIPT)
     finally:
         close()
 
-    assert active == "grid"
     assert panel_before is not None
     assert panel_after is not None
     for before, after in zip(panel_before, panel_after, strict=True):
@@ -198,19 +224,18 @@ def test_ac18_browser_a_mute_moves_the_focus_from_chat_input_to_the_toggle(
         expect(chat_input).to_be_focused()
         page.keyboard.type("salut")
 
-        send_mute(mock)
-        expect(chat_input).to_be_disabled(timeout=WITHIN_MS)
-        expect(page.get_by_test_id("chat-send")).to_be_disabled(timeout=WITHIN_MS)
-        expect(page.get_by_test_id("chat-muted")).to_be_visible(timeout=WITHIN_MS)
-        active = focus_reaches(page, "chat-toggle")
-        panel_count = page.get_by_test_id("chat-panel").count()
-        typed = chat_input.input_value()
+        deadline = send_mute(mock)
+        expect(chat_input).to_be_disabled(timeout=remaining_ms(deadline))
+        send = page.get_by_test_id("chat-send")
+        expect(send).to_be_disabled(timeout=remaining_ms(deadline))
+        muted_note = page.get_by_test_id("chat-muted")
+        expect(muted_note).to_be_visible(timeout=remaining_ms(deadline))
+        panel = page.get_by_test_id("chat-panel")
+        expect(panel).to_have_count(1, timeout=remaining_ms(deadline))
+        expect(chat_input).to_have_value("salut", timeout=remaining_ms(deadline))
+        expect_focus_on(page, "chat-toggle", deadline)
     finally:
         close()
-
-    assert active == "chat-toggle"
-    assert panel_count == 1
-    assert typed == "salut"
 
 
 @pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids())
@@ -235,16 +260,14 @@ def test_ac18_browser_a_mute_moves_the_focus_from_chat_send_to_the_toggle(
         expect(send).to_be_focused()
         expect(send).to_be_enabled()
 
-        send_mute(mock)
-        expect(send).to_be_disabled(timeout=WITHIN_MS)
-        expect(chat_input).to_be_disabled(timeout=WITHIN_MS)
-        expect(page.get_by_test_id("chat-muted")).to_be_visible(timeout=WITHIN_MS)
-        active = focus_reaches(page, "chat-toggle")
-        panel_count = page.get_by_test_id("chat-panel").count()
-        typed = chat_input.input_value()
+        deadline = send_mute(mock)
+        expect(send).to_be_disabled(timeout=remaining_ms(deadline))
+        expect(chat_input).to_be_disabled(timeout=remaining_ms(deadline))
+        muted_note = page.get_by_test_id("chat-muted")
+        expect(muted_note).to_be_visible(timeout=remaining_ms(deadline))
+        panel = page.get_by_test_id("chat-panel")
+        expect(panel).to_have_count(1, timeout=remaining_ms(deadline))
+        expect(chat_input).to_have_value("salut", timeout=remaining_ms(deadline))
+        expect_focus_on(page, "chat-toggle", deadline)
     finally:
         close()
-
-    assert active == "chat-toggle"
-    assert panel_count == 1
-    assert typed == "salut"
