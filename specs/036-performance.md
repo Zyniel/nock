@@ -143,10 +143,15 @@ def main() -> None:
   (`127.0.0.1`, `8000`), so an empty host never makes uvicorn listen on every
   interface; an unset or empty `NOCK_DATABASE` is not checked, and the app then
   keeps its rooms in memory (spec 018). The values each variable takes:
-  - `NOCK_HOST`: a host name or an IP address. Each character is an ASCII letter,
-    a digit, `.`, `-` or `:`, and a value that holds `:` is an IPv6 address that
-    `ipaddress.IPv6Address` accepts, so it is written without brackets (`::1`,
-    not `[::1]`). `main()` passes it on to uvicorn as given.
+  - `NOCK_HOST`: a host name or an IP address. Each character is an ASCII letter
+    (`A` to `Z`, `a` to `z`), an ASCII digit (`0` to `9`), `.`, `-` or `:`, and a
+    value that holds `:` is an IPv6 address that `ipaddress.IPv6Address` accepts,
+    so it is written without brackets (`::1`, not `[::1]`). `main()` passes it on
+    to uvicorn as given. (Note from the lead, 2026-10-16, after the test-writer's
+    question: "an ASCII letter, a digit" became "an ASCII letter (`A` to `Z`,
+    `a` to `z`), an ASCII digit (`0` to `9`)". The rule did not say whether the
+    digits are ASCII; a check written with `str.isdigit()` would accept a
+    superscript two (U+00B2) or Arabic-Indic digits, which no host name holds.)
   - `NOCK_PORT`: ASCII digits only, with a value from 1 to 65535.
   - `NOCK_DATABASE`: a file path without a refused character. A character is
     refused when its Unicode general category, as `unicodedata.category` gives
@@ -161,8 +166,8 @@ def main() -> None:
     starts (spec 018).
 
   `NOCK_HOST` and `NOCK_PORT` already refuse every character that `NOCK_DATABASE`
-  refuses, since they take only ASCII letters, digits, `.`, `-` and `:`. Any
-  other value makes `main()` raise `SystemExit` whose `code` is a `str`
+  refuses, since they take only ASCII letters, ASCII digits, `.`, `-` and `:`.
+  Any other value makes `main()` raise `SystemExit` whose `code` is a `str`
   naming the variable and showing the value escaped (next bullet), before it
   builds a server, so `python -m nock` prints that message on stderr and exits
   with status 1. (Note from the lead, 2026-10-14: added with AC-10 and AC-11. The
@@ -178,7 +183,9 @@ def main() -> None:
   refuses the characters of categories Cf, Zl and Zp other than U+200C and U+200D
   (decision 14), and the sentence on `NOCK_HOST` and `NOCK_PORT` was added. "The
   app treats it as spec 018 says" became "the app then keeps its rooms in memory"
-  (decision 15).)
+  (decision 15).) (Note from the lead, 2026-10-16, after the test-writer's
+  question: in the sentence on `NOCK_HOST` and `NOCK_PORT`, "ASCII letters,
+  digits" became "ASCII letters, ASCII digits", as in the `NOCK_HOST` bullet.)
 - The message shows the refused value as Python's `repr()` writes it
   (`repr(value)`): between quotes, each control character as an escape (`\n`,
   `\t`, `\r`, `\x1b`, `\x85` ...), each backslash doubled, the other characters
@@ -298,8 +305,8 @@ The words in brackets say how each criterion is tested.
 - **AC-7** (new, from spec 037's review) (Python; WebSocket with live server) Oversized frames are refused at the socket. Python: `server_config(app).ws_max_size == WS_MAX_SIZE_BYTES == 8192`. Live server built with `server_config` (see "Test harness"), from a Playwright page with `page.evaluate` opening a `WebSocket` to a FX-01 room: a text frame of 9,000 bytes makes the server close the socket with code 1009; on a second socket, after a join, a text frame of 8,000 bytes is answered with an `error` whose `code` is `invalid_message` and the socket stays open (a following `ping` gets a `pong`). This criterion runs in every engine. (Note from the lead, 2026-10-14: "the fixture built with `server_config`" became "built with `server_config` (see "Test harness")": until the shared fixture is switched, the test starts its own server.)
 - **AC-8** (new, from the review of this spec's tests) (subprocess; WebSocket from a Playwright page, every engine) `python -m nock` serves the app on the port of `NOCK_PORT`. Given a SQLite file holding a FX-01 room (see "Test harness"), when the test runs `python -m nock` with `NOCK_DATABASE` set to that file, `NOCK_PORT` set to a free port and `NOCK_HOST` unset, then within 10 seconds `GET http://127.0.0.1:<port>/` answers 200 with the built client, and a socket to the room's `/api/rooms/<code>/ws` that sends a `join` receives a `snapshot` as its first message (the room is loaded from the file as after spec 018 AC-1's restart; an unknown code would be closed with 4404). (Note from the lead, 2026-10-14: added; see decision 10.)
 - **AC-9** (new, from the review of this spec's tests) (subprocess; WebSocket from a Playwright page, every engine) `python -m nock` refuses oversized frames at the socket, which shows that it runs `server_config`. On a server started as in AC-8, a socket to the room that sends a text frame of 9,000 bytes is closed with code 1009 and receives no message; with uvicorn's default `ws_max_size` the frame would reach the app and get spec 037's `invalid_message`. (Note from the lead, 2026-10-14: added; see decision 10.)
-- **AC-10** (new, from the review of this spec's tests) (Python, `uvicorn.Server.run` replaced) `main()` hands uvicorn the address of `NOCK_HOST` and `NOCK_PORT`, 127.0.0.1 and 8000 by default. With the recorder of the "Test harness", `main()` returns after one call of `run`, whose server's `config` has `app` `nock.server.app` (the same object), `ws_max_size` 8192, and: `host` `"127.0.0.1"` and `port` 8000 with neither variable set; the same with both set to `""`; `host` `"0.0.0.0"` and `port` 9123 with `NOCK_HOST="0.0.0.0"` and `NOCK_PORT="9123"`; `host` `"127.0.0.1"` and `port` 8000 with `NOCK_HOST` unset and `NOCK_PORT` set to 5,000 `"0"` characters followed by `"8000"` (`"0" * 5000 + "8000"`, 5,004 characters). (Note from the lead, 2026-10-14: added; see decision 10.) (Note from the lead, 2026-10-15: the last case added. The final review found `main()` raising an uncaught `ValueError` for such a value; see "Edge cases and errors", empty and invalid variables.) With `NOCK_PORT` unset, the `config` has `port` 8000 and `host` equal to `NOCK_HOST` as given for each `NOCK_HOST` of `"localhost"`, `"Nock-1.example.org"`, `"::"`, `"::1"`, `"fe80::1"`, `"2001:DB8::1"` and `"::ffff:192.0.2.1"` (ASCII letters of both cases, digits, `.`, `-`, and `:` in IPv6 addresses written without brackets). (Note from the lead, 2026-10-16: this sentence added with decisions 11 and 13, so that the new checks of AC-11 refuse none of the values `NOCK_HOST` takes.)
-- **AC-11** (new, from the review of this spec's tests) (Python, `uvicorn.Server.run` replaced) An invalid `NOCK_PORT`, `NOCK_HOST` or `NOCK_DATABASE` stops `main()` before any server runs, with a one-line message that names the variable and shows the value escaped. With the recorder of the "Test harness" and the two other variables unset, for each value below, `main()` raises `SystemExit` whose `code` is a `str` containing the variable's name and `repr(value)`, with no character of Unicode general category Cc, Cf, Zl or Zp and one item in its `splitlines()`, and `run` is never called. `NOCK_PORT`: `"abc"`, `"0"`, `"65536"`, `"-1"`, `"8000.0"`, `" 8000"`, `"8000\n"`, `"\t8000"`, `"80\x1b[2J00"`, `"8000\x7f"`, `"8000\x85"` and `"8000\x9b"`. `NOCK_HOST`: `"localhost\n"`, `"\t127.0.0.1"`, `"local\x1b[2Jhost"`, `"127.0.0.1\x7f"`, `"::1\x85"`, `"localhost\u2028"`, `" "`, `"local host"`, `"[::1]"`, `"localhost:8000"`, `"127.0.0.1:8000"`, `"fe80::1%eth0"`, `"my_host"`, `"bücher.example"` and `"0.0.0.0/0"`. `NOCK_DATABASE`: `"\n"`, `"data/nock.sqlite3\n"`, `"\tdata/nock.sqlite3"`, `r"C:\Users\François\nock.sqlite3" + "\r\n"`, `"nock\x01.sqlite3"`, `"nock\x1b[2J.sqlite3"`, `"nock\x1f.sqlite3"`, `"nock\x7f.sqlite3"`, `"nock\x85.sqlite3"`, `"nock\x9f.sqlite3"`, `"nock\u200b.sqlite3"`, `"\ufeffdata/nock.sqlite3"`, `"nock\u202e.sqlite3"`, `"nock\u2028.sqlite3"`, `"nock\u2029.sqlite3"`, `"nock\xad.sqlite3"` and `"nock\U000e0001.sqlite3"`. (Note from the lead, 2026-10-14: added; see decision 10.) (Note from the lead, 2026-10-16: `NOCK_HOST`, `NOCK_DATABASE` and the `NOCK_PORT` values from `"8000\n"` on added with decisions 11 to 13. The message used to contain `NOCK_PORT` and "the value as given"; it now contains `repr(value)` (decision 12), which for the first six `NOCK_PORT` values holds the value as given, between quotes.) (Note from the lead, 2026-10-16, after the spec-writer's report: the `NOCK_DATABASE` values from `"nock\u200b.sqlite3"` on added with decision 14; U+00AD SOFT HYPHEN and U+E0001 LANGUAGE TAG are format characters too, the second outside the first 65,536 code points, so the rule is the category, not a list. "No character of Unicode category Cc" in the message became "of Unicode general category Cc, Cf, Zl or Zp", which `repr()` never leaves raw.)
+- **AC-10** (new, from the review of this spec's tests) (Python, `uvicorn.Server.run` replaced) `main()` hands uvicorn the address of `NOCK_HOST` and `NOCK_PORT`, 127.0.0.1 and 8000 by default. With the recorder of the "Test harness", `main()` returns after one call of `run`, whose server's `config` has `app` `nock.server.app` (the same object), `ws_max_size` 8192, and: `host` `"127.0.0.1"` and `port` 8000 with neither variable set; the same with both set to `""`; `host` `"0.0.0.0"` and `port` 9123 with `NOCK_HOST="0.0.0.0"` and `NOCK_PORT="9123"`; `host` `"127.0.0.1"` and `port` 8000 with `NOCK_HOST` unset and `NOCK_PORT` set to 5,000 `"0"` characters followed by `"8000"` (`"0" * 5000 + "8000"`, 5,004 characters). (Note from the lead, 2026-10-14: added; see decision 10.) (Note from the lead, 2026-10-15: the last case added. The final review found `main()` raising an uncaught `ValueError` for such a value; see "Edge cases and errors", empty and invalid variables.) With `NOCK_PORT` unset, the `config` has `port` 8000 and `host` equal to `NOCK_HOST` as given for each `NOCK_HOST` of `"localhost"`, `"Nock-1.example.org"`, `"::"`, `"::1"`, `"fe80::1"`, `"2001:DB8::1"` and `"::ffff:192.0.2.1"` (ASCII letters of both cases, ASCII digits, `.`, `-`, and `:` in IPv6 addresses written without brackets). (Note from the lead, 2026-10-16: this sentence added with decisions 11 and 13, so that the new checks of AC-11 refuse none of the values `NOCK_HOST` takes.) (Note from the lead, 2026-10-16, after the test-writer's question: "digits" became "ASCII digits" in the brackets. The values are unchanged: all of them are ASCII.)
+- **AC-11** (new, from the review of this spec's tests) (Python, `uvicorn.Server.run` replaced) An invalid `NOCK_PORT`, `NOCK_HOST` or `NOCK_DATABASE` stops `main()` before any server runs, with a one-line message that names the variable and shows the value escaped. With the recorder of the "Test harness" and the two other variables unset, for each value below, `main()` raises `SystemExit` whose `code` is a `str` containing the variable's name and `repr(value)`, with no character of Unicode general category Cc, Cf, Zl or Zp and one item in its `splitlines()`, and `run` is never called. `NOCK_PORT`: `"abc"`, `"0"`, `"65536"`, `"-1"`, `"8000.0"`, `" 8000"`, `"8000\n"`, `"\t8000"`, `"80\x1b[2J00"`, `"8000\x7f"`, `"8000\x85"` and `"8000\x9b"`. `NOCK_HOST`: `"localhost\n"`, `"\t127.0.0.1"`, `"local\x1b[2Jhost"`, `"127.0.0.1\x7f"`, `"::1\x85"`, `"localhost\u2028"`, `" "`, `"local host"`, `"[::1]"`, `"localhost:8000"`, `"127.0.0.1:8000"`, `"fe80::1%eth0"`, `"my_host"`, `"bücher.example"`, `"\u0661\u0662\u0667.0.0.1"`, `"\uff11\uff12\uff17.0.0.1"`, `"localhost\u00b2"` and `"0.0.0.0/0"`. `NOCK_DATABASE`: `"\n"`, `"data/nock.sqlite3\n"`, `"\tdata/nock.sqlite3"`, `r"C:\Users\François\nock.sqlite3" + "\r\n"`, `"nock\x01.sqlite3"`, `"nock\x1b[2J.sqlite3"`, `"nock\x1f.sqlite3"`, `"nock\x7f.sqlite3"`, `"nock\x85.sqlite3"`, `"nock\x9f.sqlite3"`, `"nock\u200b.sqlite3"`, `"\ufeffdata/nock.sqlite3"`, `"nock\u202e.sqlite3"`, `"nock\u2028.sqlite3"`, `"nock\u2029.sqlite3"`, `"nock\xad.sqlite3"` and `"nock\U000e0001.sqlite3"`. (Note from the lead, 2026-10-14: added; see decision 10.) (Note from the lead, 2026-10-16: `NOCK_HOST`, `NOCK_DATABASE` and the `NOCK_PORT` values from `"8000\n"` on added with decisions 11 to 13. The message used to contain `NOCK_PORT` and "the value as given"; it now contains `repr(value)` (decision 12), which for the first six `NOCK_PORT` values holds the value as given, between quotes.) (Note from the lead, 2026-10-16, after the spec-writer's report: the `NOCK_DATABASE` values from `"nock\u200b.sqlite3"` on added with decision 14; U+00AD SOFT HYPHEN and U+E0001 LANGUAGE TAG are format characters too, the second outside the first 65,536 code points, so the rule is the category, not a list. "No character of Unicode category Cc" in the message became "of Unicode general category Cc, Cf, Zl or Zp", which `repr()` never leaves raw.) (Note from the lead, 2026-10-16, after the test-writer's question: the three `NOCK_HOST` values after `"bücher.example"` added, since the digits of `NOCK_HOST` are ASCII digits (decision 11): `127` written with ARABIC-INDIC DIGIT ONE, TWO and SEVEN (U+0661, U+0662, U+0667), `127` written with FULLWIDTH DIGIT ONE, TWO and SEVEN (U+FF11, U+FF12, U+FF17), each followed by `.0.0.1`, and `localhost` followed by SUPERSCRIPT TWO (U+00B2). `str.isdigit()` is true of all of these characters, so a check written with it would let them through. The list used to go from `"bücher.example"` straight to `"0.0.0.0/0"`.)
 - **AC-12** (new, from the human's rule of 2026-10-16) (Python, `uvicorn.Server.run` replaced; app started with `TestClient`) A `NOCK_DATABASE` without a refused character never stops `main()`, whatever spaces, accents, joiners and path separators it holds, and an empty one keeps the rooms in memory. With the recorder of the "Test harness" and `NOCK_HOST` and `NOCK_PORT` unset, for `NOCK_DATABASE` unset and for each of `""`, `"data/nock.sqlite3"`, `"~/nock.sqlite3"`, `"/srv/jeu de mots/données/nock.sqlite3"`, `"/srv/nock\u00a0data/nock.sqlite3"`, `"/srv/nock\u200cdata/nock.sqlite3"`, `"/srv/nock\u200ddata/nock.sqlite3"`, `r"C:\Users\François\nock.sqlite3"`, `r"C:\temp\nock.sqlite3"` and `":memory:"`, `main()` returns after one call of `run`, whose server's `config` has `host` `"127.0.0.1"` and `port` 8000, and `NOCK_DATABASE` in `os.environ` is afterwards what it was before the call (still unset when it was unset). App: with `NOCK_DATABASE` unset, and with it set to `""`, the app of `create_app(dist_dir=tmp_path)`, started and stopped by `with TestClient(app):` while `nock.server.RoomStore` is the recording subclass of the "Test harness", builds at least one store, every one with the path `":memory:"` and none with `""` (spec 018). (Note from the lead, 2026-10-16: added with decision 11. The two Windows paths hold a backslash followed by `n` or `t`, two characters each, not a newline or a tab; U+00A0 NO-BREAK SPACE, just above the control characters, is a space.) (Note from the lead, 2026-10-16, after the spec-writer's report: the U+200C and U+200D cases added with decision 14, and the app part with decision 15; the first sentence used to say "without a control character" and said nothing of an empty value. Today the app hands `""` to `RoomStore`, so the app part fails until the implementer changes it.)
 
 ## Edge cases and errors
@@ -378,7 +385,11 @@ client), AC-6 (per-connection inbound cap) and AC-7 (`ws_max_size` 8,192 bytes).
   - `NOCK_HOST`: `%` is refused, so an IPv6 zone (`fe80::1%eth0`) cannot be
     given; `_` is refused, as host names (RFC 1123) do not use it; a name with
     letters outside ASCII is given in its ASCII form (`xn--bcher-kva.example`
-    for `bücher.example`).
+    for `bücher.example`). Digits outside ASCII are refused, as letters outside
+    ASCII are: a superscript two (U+00B2) or an Arabic-Indic digit is not a
+    digit of a host name. (Note from the lead, 2026-10-16, after the
+    test-writer's question: this sentence added, with the ASCII digits of the
+    `NOCK_HOST` bullet of "Frame size at the socket".)
   - `NOCK_DATABASE`: every character outside the refused set passes `main()`'s
     check: U+200C and U+200D, the other spaces (category Zs, such as U+00A0
     NO-BREAK SPACE), and the characters that Windows refuses in a file name
@@ -486,8 +497,8 @@ too, not only `NOCK_PORT`. Each one is already part of the spec above.
     `main()` checks the three variables it reads before it builds a server; an
     unset or empty one is not checked and takes its default (decision 15 for
     `NOCK_DATABASE`). `NOCK_PORT` keeps its rule. `NOCK_HOST` takes ASCII
-    letters, digits, `.`, `-` and, in an IPv6 address, `:`, and nothing else;
-    whether a name resolves stays uvicorn's report (decision 10).
+    letters, ASCII digits, `.`, `-` and, in an IPv6 address, `:`, and nothing
+    else; whether a name resolves stays uvicorn's report (decision 10).
     `NOCK_DATABASE` is a path, and a path may hold almost any character: spaces,
     accents and the separators of both systems are allowed
     (`C:\Users\François\nock.sqlite3` is valid), and a control character
@@ -498,7 +509,9 @@ too, not only `NOCK_PORT`. Each one is already part of the spec above.
     meaning" became "takes its default (decision 15 for `NOCK_DATABASE`)", and
     "only a control character (Unicode category Cc) anywhere in it is refused"
     became "a control character ... is refused, as are the invisible characters
-    of decision 14".)
+    of decision 14".) (Note from the lead, 2026-10-16, after the test-writer's
+    question: "ASCII letters, digits" became "ASCII letters, ASCII digits", as
+    in the `NOCK_HOST` bullet of "Frame size at the socket".)
 12. Refused values show escaped (AC-11). This answers the question that the
     tests of AC-11 left open in their case of a port ending with a newline:
     should the message show a control character raw or escaped? (It was listed
@@ -537,7 +550,9 @@ above.
     NON-JOINER and U+200D ZERO WIDTH JOINER, which some scripts need inside
     words (Persian, for example) and emoji sequences use. `NOCK_HOST` and
     `NOCK_PORT` refuse all of these already, since they take only ASCII letters,
-    digits, `.`, `-` and `:`.
+    ASCII digits, `.`, `-` and `:`. (Note from the lead, 2026-10-16, after the
+    test-writer's question: "ASCII letters, digits" became "ASCII letters, ASCII
+    digits", as in decision 11.)
 15. An empty `NOCK_DATABASE` counts as unset (AC-12), like the other technical
     variables: the app keeps its rooms in memory (`":memory:"`). The app used to
     hand `""` to `RoomStore`, which SQLite opens as a private temporary file,
