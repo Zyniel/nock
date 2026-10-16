@@ -146,7 +146,9 @@ The same script runs in three places:
   implementer tries to finish, and sends the failures back until it is green.
   The test-writer passes `--stage tests`; the implementer passes the quick gate
   of the specs its branch changed (`--specs`, Chromium only), which fits in the
-  hook's time. CI runs everything.
+  hook's time. CI runs everything. An agent held by a failure it may not fix
+  (a test only the test-writer changes) reports it and finishes again without
+  changing anything; the hook then lets it stop.
 - **GitHub:** `.github/workflows/ci.yml` on every pull request and push to `main`.
 
 A second hook, `scripts/hooks/guard_paths.py`, blocks an agent that tries to edit
