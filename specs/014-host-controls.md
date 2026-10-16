@@ -45,8 +45,12 @@ entry, no reply). Otherwise `settings.locked = x` and one entry
 `SettingsChanged(seq, player_id=h, settings=<new settings>, reveal_budget=state.reveal_budget)`.
 
 Join step 3 of spec 012 is built here: while `settings.locked`, a join that is not
-a resume (step 2) is refused with `ROOM_LOCKED` and `close_sender`. Members resume
-as usual.
+a resume (step 2) is refused with `ROOM_LOCKED` and `close_sender`. Players of the
+room resume as usual; a past player of spec 032, though a member of the room there,
+is refused like a newcomer, since a seat back is not a resume. (Note from the lead,
+2026-10-16: the sentence after `close_sender` used to read "Members resume as
+usual." Spec 032 counts past players among a room's members, and they do not
+resume; the rule is unchanged.)
 
 `ChangeSettings(help_mode, reveal_budget)` from the host: if both equal the
 current `settings.help_mode` and `settings.reveal_budget`, nothing happens.
@@ -253,8 +257,15 @@ their final status and text, and hide the banner.
 - Removal and letters (AC-1): the removed player's letters stay, with their author
   id; nothing is erased.
 - Removing during a vote or with flags (AC-1): their effects are specs 021 and 025's.
-- Locked room and members (AC-2): disconnected members within the 5-minute window
-  resume; a member who timed out (spec 017) is no longer a member and is refused.
+- Locked room and members (AC-2): a player of the room who is disconnected within
+  spec 017's 5-minute window resumes. A player who timed out is a past player of
+  spec 032, still a member of the room in that spec's sense, but their join is not
+  a resume: a locked room refuses it with `room_locked`, as it refuses a newcomer,
+  and the same token seats them back once the room is unlocked (spec 012 step 4a).
+  (Note from the lead, 2026-10-16: this item used to read "disconnected members
+  within the 5-minute window resume; a member who timed out (spec 017) is no longer
+  a member and is refused". Spec 032 counts past players among a room's members;
+  the refusal is unchanged.)
 - Locked and full (AC-2): `room_locked` is answered before `room_full` (spec 012
   order).
 - Unlock (AC-2): `lock_room` `false` announces `settings_changed` with

@@ -12,6 +12,13 @@ joining, resume tokens, the stored identity and the roster in spec 012; edits an
 the page's pending queue in spec 015; the log in spec 018. The messages are those
 of spec 039.
 
+(Note from the lead, 2026-10-16: refined for spec 032's seat back (its decisions 11
+and 12): a player who timed out and joins again with their token is seated back
+with the same id, no longer joined as a new player. Changed: the time-out step of
+`tick`, the window of `join_room`, AC-3 and its edge case "After a time-out". AC-3
+changed, so the test-writer of spec 032 updates its tests before the implementer
+runs.)
+
 ## Goal
 
 As a player on a train, I want to keep my place when my connection drops, so that I rejoin without starting over.
@@ -63,12 +70,20 @@ Rules (`nock.room`):
      colour and nickname are free again; their letters keep their author id). If
      they were host, spec 014's hand-over rule picks the next host at once
      (`host_changed` after the `player_left`); if nobody is left, the room has no
-     host until the next joiner (spec 012).
+     host until the next joiner (spec 012). (Spec 032 adds: the player who leaves
+     becomes a past player, whom a later join with their token seats back, spec 012
+     step 4a.) (Note from the lead, 2026-10-16: the sentence before this note was
+     added for spec 032's seat back.)
 - `join_room`, resume step (spec 012 step 2), gains the window: a token whose
   player is `disconnected` with `now - disconnected_at > resume_window_seconds`
   does not resume: that player times out in this same step (entry
-  `PlayerLeft(timed_out)`, as in the tick) and the join goes on as a new player with
-  the join's nickname.
+  `PlayerLeft(timed_out)`, as in the tick, so they become a past player of spec
+  032) and the join goes on with spec 012's steps 3 and 4; then spec 012's step 4a
+  seats that player back with the same id and token (spec 032's "Seat back"), and
+  the join's nickname is ignored. A step 3 that refuses the join after the time-out
+  (a locked room) keeps the time-out's entries and state. (Note from the lead,
+  2026-10-16: "and the join goes on as a new player with the join's nickname"
+  became the text from "so they become a past player", for spec 032's seat back.)
 
 ### Client
 
@@ -137,7 +152,7 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-4.3.1) (browser with mocked socket) A banner shows within 5 seconds of a lost connection, and I can keep typing. Given the page joined (FX-01 snapshot, `seq` 5) with a mock that answers each `ping` with `pong`: (a) when the mock closes the socket with code 1011, `connection-banner` is visible with `fr.json["room.banner.offline"]` and `data-status="reconnecting"` within 5,000 ms; tapping (1, 0) and pressing `t` then shows `T` at (1, 0) and no frame is sent while no socket is open. (b) In a second run, when the mock stops answering pings and sends nothing more, the banner is visible within 5,000 ms of the last frame the mock sent. (c) In both runs, when the mock accepts the next socket and answers its join with a snapshot, the banner is hidden and `data-status="joined"`.
 - **AC-2** (AC-4.3.2) (Python; WebSocket; browser with mocked socket) On reconnection, my offline letters are sent. Where the server's cell changed in the meantime, the server's letter is kept. Python: in a FX-01 room at seq 10 where `p2` wrote `B` at (1, 0) with seq 8, `handle_message` from `p1` with `EditLetter(row=1, column=0, letter="T", base_seq=7)` is refused with `stale_edit` and the cell keeps `B`; with `base_seq=8` it is applied; `EditLetter(row=1, column=1, letter="A", base_seq=7)` on a cell unchanged since seq 7 is applied; an edit with `base_seq=7` on a cell last changed by `p1` itself at seq 9 is applied. WebSocket: clients A and B join (seq 2); A closes its socket; B writes `B` at (1, 0); A reconnects with its token, then sends `edit_letter` (1, 0) `T` with `base_seq` 2 and (1, 1) `A` with `base_seq` 2: the first gets `error` `stale_edit` and nobody receives a `letter_changed` for it, the second is applied and both clients receive it. Browser: given the page joined with `you` = `p1`, its stored identity, a snapshot at `seq` 5, and the mock closing the socket, typing `T` at (1, 0) and `A` at (1, 1) while offline, then the mock accepting the new socket: the page's first message is `Join` with the stored nickname and `resume_token`; after the mock sends a snapshot at `seq` 9 whose (1, 0) holds `B` from `p2`, the page sends `EditLetter(row=1, column=0, letter="T", base_seq=5)` then `EditLetter(row=1, column=1, letter="A", base_seq=5)`; when the mock answers the first with `error` `stale_edit`, (1, 0) shows `B`, and when it answers the second with `letter_changed` seq 10 from `p1`, (1, 1) shows `A` with `data-unconfirmed="false"`.
-- **AC-3** (AC-4.3.3) (Python; WebSocket with a fake clock; browser with live server) Reconnecting within 5 minutes restores my nickname, colour and authorship with nothing to re-enter. Python: `p1` (`Ana`, colour 0, author of `T` at (1, 0)) disconnected at `t`; `join_room` with `p1`'s token at `t + 300` resumes `p1` (same id, nickname, colour; (1, 0) still authored by `p1`); at `t + 300.5` the same join gives `PlayerLeft(p1, reason="timed_out")` then `PlayerJoined` of a new id; `tick` at `t + 300` leaves `p1` in the room and at `t + 300.5` removes them with `PlayerLeft(timed_out)`. WebSocket: A (`Ana`) and B join; A's socket closes; after `advance(299)` and one tick, B has received no `player_left`; A's token joins again and gets `you` equal to its old id with `Ana` and colour 0. In a second run, after `advance(301)`, B receives `PlayerLeft(<A>, reason="timed_out")` within one second of real time, and A's token then joins as a new player id. Browser: on the live server, page 1 joins as `Ana` and page 2 (another context) as `Bob`; page 1 is reloaded (decision 7); it reaches `data-status="joined"` again with the same `data-you`, its roster entry `Ana` keeps the same `data-colour`, `nickname-form` is never shown, and page 2's roster still holds exactly 2 players, with `Ana` back to `data-state="active"`.
+- **AC-3** (AC-4.3.3) (Python; WebSocket with a fake clock; browser with live server) Reconnecting within 5 minutes restores my nickname, colour and authorship with nothing to re-enter. Python: `p1` (`Ana`, colour 0, author of `T` at (1, 0)) disconnected at `t`; `join_room` with `p1`'s token at `t + 300` resumes `p1` (same id, nickname, colour; (1, 0) still authored by `p1`); at `t + 300.5` the same join gives `PlayerLeft(p1, reason="timed_out")`, then (after spec 014's `HostChanged` when `p1` was host and another player remains) a `PlayerJoined` of `p1` itself, with the same token, nickname and colour, since spec 032 seats a past player back (its AC-7) and the join's nickname is ignored; `tick` at `t + 300` leaves `p1` in the room and at `t + 300.5` removes them with `PlayerLeft(timed_out)`. WebSocket: A (`Ana`) and B join; A's socket closes; after `advance(299)` and one tick, B has received no `player_left`; A's token joins again and gets `you` equal to its old id with `Ana` and colour 0. In a second run, after `advance(301)`, B receives `PlayerLeft(<A>, reason="timed_out")` within one second of real time; A's token then joins again and is seated back (spec 032 AC-7): A's snapshot has `you` equal to its old id, with `Ana` and colour 0, and B receives a `player_joined` of that id, where a resume within the window gives B a `player_state_changed`. (Note from the lead, 2026-10-16: "then `PlayerJoined` of a new id" and "and A's token then joins as a new player id" became the text above, for spec 032's seat back: a player who timed out and joins again with their token keeps their id. The test-writer updates this criterion's tests before the implementer runs.) Browser: on the live server, page 1 joins as `Ana` and page 2 (another context) as `Bob`; page 1 is reloaded (decision 7); it reaches `data-status="joined"` again with the same `data-you`, its roster entry `Ana` keeps the same `data-colour`, `nickname-form` is never shown, and page 2's roster still holds exactly 2 players, with `Ana` back to `data-state="active"`.
 - **AC-4** (AC-4.3.4) (Python; WebSocket with a fake clock; browser with mocked socket) Other players see my state change in the roster within 10 seconds. Python: `tick` at `last_seen_at + 5.9` leaves an active player active; at `last_seen_at + 6.0` it gives `PlayerStateChanged(disconnected)` and a `Disconnect` with close code 4408. WebSocket: A and B join; A stops sending anything; after `advance(6)`, B receives `PlayerStateChanged(<A>, state="disconnected")` within one second of real time and A's socket is closed with 4408; when A's socket is closed by the client instead, B receives it without any clock change. Browser: given the page joined with players `p1` (`you`) and `p2`, when the mock sends `player_state_changed` for `p2` `disconnected`, `p2`'s `roster-player` gets `data-state="disconnected"` within 300 ms, and `active` again on the next such event.
 - **AC-5** (new) (browser with mocked socket, page clock) Offline edits survive a long absence. (a) When 4 s of silence are detected, the page treats the connection as lost at once: the silent socket is detached and closed, and the next try is scheduled 1 s after the loss, without waiting for the socket's `close` event; the browser's `online` event forces a try at once, also while a new socket is still connecting. (b) After the reconnect snapshot, pending edits are resent oldest first at most 10 per second (one every 100 ms), so that more than 20 letters typed offline are all applied under spec 037's rate limit of 20 per second: with 30 edits typed offline, the 30 are sent over about 3 seconds and the mock sees no burst of more than 10 within any 1-second window. (c) No edit, live or resent, is sent between the new socket opening and the reconnect snapshot.
 
@@ -164,10 +179,19 @@ The words in brackets say how each criterion is tested.
   exist); applied.
 - Resume window edge (AC-3): exactly 300 seconds after the disconnection still
   resumes; time-out needs more than 300.
-- After a time-out (AC-3): the page's stored token no longer resumes; the page's
-  join (stored nickname, no form) makes a new player; spec 012 stores the new
-  identity. The old letters keep the old author id. A locked room (spec 014)
-  refuses that join with `room_locked`.
+- After a time-out (AC-3): the page's stored token no longer resumes, but the page's
+  join (stored token and nickname, no form) seats the player back (spec 032 AC-7):
+  the same id and token, so the old letters keep that author id; the nickname gets
+  spec 012's suffix only when another player took it meanwhile, and the colour is
+  the old one unless another player has it; spec 012 stores the identity of the
+  snapshot, as after any join. A locked room (spec 014) refuses that join with
+  `room_locked`, and a full room with `room_full`, both final on the page ("Client"
+  above); the player stays a past player, whom the same token seats back once the
+  room is unlocked or has a free seat. (Note from the lead, 2026-10-16: this item
+  used to read "the page's stored token no longer resumes; the page's join (stored
+  nickname, no form) makes a new player; spec 012 stores the new identity. The old
+  letters keep the old author id. A locked room (spec 014) refuses that join with
+  `room_locked`.", for spec 032's seat back.)
 - Full room (AC-3): a disconnected player keeps the seat for the whole window, so a
   ninth player is refused meanwhile; after the time-out the seat is free.
 - Host (AC-3): spec 014 hands the host role over after 60 seconds of

@@ -10,6 +10,10 @@ status: approved
 
 (Note from the lead, 2026-10-15: folded in. The answer is decision 11 (seat back, AC-7). Specs 012 and 017 are refined by the lead before this spec's tests are written. "Open questions" holds one new question that the seat back raised.)
 
+(Note from the lead, 2026-10-16: the human answered that question on 2026-10-16 with option (b), "Join as Ana 2": it is decision 12, and "Open questions" says "None." Specs 012 (join step 4a and its edge cases) and 017 (its rule for a time-out in the join, AC-3 and the edge case "After a time-out") are refined for the seat back, with dated notes; spec 017 AC-3 changed, so the test-writer updates its tests before the implementer runs. From a check against specs 019 to 028, 035 and 036, "Seat back" now says what a seat back keeps and what starts afresh, and what a refusal after a time-out in the join gives; AC-7 gained the runs "Fresh record" and "Locked, time-out in the join"; the edge cases gained "Nothing logged at deletion" and "Team names and spec 028"; "New `fr.json` keys" and "Out of scope" gained a paragraph and an item.)
+
+(Note from the lead, 2026-10-16: the lead decided that a mute survives a time-out and a seat back, decision 13, which the human may override: `PastPlayer` keeps `muted`, the seat back restores it, and AC-7 gained the run "Muted". Spec 038's table of what the server keeps lists the flag. Specs 014, 022 and 040 were reworded where they disagreed with this spec's members, seat back or criterion numbers.)
+
 Epic E9 Accounts and resume (US-9.1) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine, `RoomConfig`
 and the fake-clock harness are defined in spec 011; joining, the stored identity and
@@ -68,6 +72,7 @@ class PastPlayer(RoomModel):
     resume_token: ResumeToken  # secret, like PlayerRecord.resume_token
     nickname: Nickname
     colour: Colour
+    muted: StrictBool = False  # the record's mute (specs 014, 022), kept for a seat back (decision 13)
 
 
 class RoomState(RoomModel):
@@ -131,10 +136,14 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
 | Event | Effect on the state |
 | --- | --- |
 | `player_joined` | the player is appended to `players`, as before (spec 012). When `past_players` holds a `PastPlayer` with the same `player_id`, that record is removed from `past_players` (seat back, AC-7) |
-| `player_left` | the player is removed from `players`, as before. Reason `removed`: their token is added to `removed_tokens` (spec 014). Reason `timed_out` or `left`: `PastPlayer(player_id, resume_token, nickname, colour)` of their record is appended to `past_players`, after dropping the oldest one when it already holds `MAX_PAST_PLAYERS` |
+| `player_left` | the player is removed from `players`, as before. Reason `removed`: their token is added to `removed_tokens` (spec 014). Reason `timed_out` or `left`: `PastPlayer(player_id, resume_token, nickname, colour, muted)` of their record is appended to `past_players`, after dropping the oldest one when it already holds `MAX_PAST_PLAYERS` |
 
 (Note from the lead, 2026-10-15: the `player_joined` row was added with AC-7,
-decision 11.)
+decision 11.) (Note from the lead, 2026-10-16: `PastPlayer` gained its `muted`
+field, and the `player_left` row copies the record's `muted` into it; the row used
+to build `PastPlayer(player_id, resume_token, nickname, colour)`, decision 13. The
+`player_joined` row needs no change for it: spec 018 builds the record from the
+event's view, `muted` included.)
 
 The live time-out (spec 017, in `tick` and in `join_room`) builds its state with
 `replay`, so a live room and a replayed one agree. A past player's token does not
@@ -148,19 +157,26 @@ unchanged, and pointed to open question 1; decision 11 settles it.)
 (Note from the lead, 2026-10-15: this section was added with AC-7, decision 11.
 Specs 012 (join steps) and 017 (AC-3 and its edge case "After a time-out") are
 refined by the lead to match, with dated notes, before this spec's tests are
-written.)
+written.) (Note from the lead, 2026-10-16: done. Spec 017's rule for a time-out in
+the join, which said that the join then goes on as a new player, was refined too.)
 
 A join whose `resume_token` belongs to a past player of the room brings that player
-back. Spec 012's join steps gain one step, after step 4 (room full) and before
-step 5 (nickname):
+back. Spec 012's join steps gain one step, step 4a, after step 4 (room full) and
+before step 5 (nickname). (Note from the lead, 2026-10-16: "step 4a" was added:
+spec 012 now holds the step under that number, so that its steps 5 and 6, which
+other specs cite, keep theirs.) The rules:
 
 - Steps before it, unchanged: step 1 (removed token, spec 014), step 2 (resume of a
   player of `players`, within spec 017's window), step 3 (room locked, spec 014) and
   step 4 (room full). So in a locked room the join gets
   `ErrorMessage(code=ROOM_LOCKED)` and in a full room
-  `ErrorMessage(code=ROOM_FULL)`, each with `close_sender`, no entry and the state
-  unchanged. The past player stays in `past_players`, and their token stays a
-  member's (AC-4).
+  `ErrorMessage(code=ROOM_FULL)`, each with `close_sender`, and with no entry and
+  the state unchanged when the player was a past player before the join (for a
+  time-out in the join itself, see "Time-out in the same step" below). The past
+  player stays in `past_players`, and their token stays a member's (AC-4). (Note
+  from the lead, 2026-10-16: "and with no entry and the state unchanged when the
+  player was a past player before the join" used to read "no entry and the state
+  unchanged", which does not hold when the join itself times the player out.)
 - Seat back: `message.resume_token` equals, compared with `secrets.compare_digest`,
   the `resume_token` of a `PastPlayer` of `state.past_players`. With
   `seq = state.seq + 1`, a `PlayerRecord` is appended at the end of `players`, built
@@ -169,17 +185,25 @@ step 5 (nickname):
     `new_resume_token` are not used.
   - `nickname`: the past player's, made unique by spec 012's "Duplicate nicknames"
     rule against the nicknames of `players`. So it is kept unless a player of
-    `players` has it under `casefold()` (new open question 1).
+    `players` has it under `casefold()` (decision 12). (Note from the lead,
+    2026-10-16: "new open question 1" became "decision 12", the human's answer.)
   - `colour`: the past player's when no player of `players` (connected or
     disconnected) has it, else the lowest index 0 to 7 that no player of `players`
     has, as spec 012 step 6 assigns it.
+  - `muted`: the past player's (decision 13), so a player muted before their
+    time-out comes back muted, and their view in the `player_joined` and in their
+    snapshot says so. (Note from the lead, 2026-10-16: added, decision 13.)
   - `message.nickname` is ignored and not checked, as in a resume, so step 5 does not
     apply.
 
   The other fields are those of a new player: `is_host` is True only when no player
-  of the room is host, `muted` is False, `state = active`, `joined_seq = seq` and
-  `last_input_at = last_seen_at = now`. The `PastPlayer` is removed from
-  `past_players`. There is one entry,
+  of the room is host, `state = active`, `joined_seq = seq` and
+  `last_input_at = last_seen_at = now`, and every other field of `PlayerRecord`
+  takes its default ("What a seat back keeps, and what starts afresh" below). (Note
+  from the lead, 2026-10-16: the clause from "and every other field" was added.)
+  (Note from the lead, 2026-10-16: "`muted` is False" was taken out of this list,
+  since the past player's `muted` is kept, decision 13.)
+  The `PastPlayer` is removed from `past_players`. There is one entry,
   `LogEntry(at=now, event=PlayerJoined(seq, player=<its view>), resume_token=<the past player's token>)`,
   and `reply = (snapshot_for(new_state, player_id),)`. The other players receive the
   `player_joined`, as for any joiner. The hub binds the socket to the snapshot's
@@ -192,9 +216,78 @@ step 5 (nickname):
   `host_changed` when they were host and another player remains), and the join goes
   on with steps 3 and 4, then
   seats them back. So whether a player gets their seat back does not depend on
-  whether a tick saw the time-out first.
+  whether a tick saw the time-out first. When step 3 then refuses the join (a
+  locked room), the outcome keeps the time-out: its entries, its state, where the
+  player is a past player whose token stays a member's (AC-4), and then the
+  refusal's `ErrorMessage` and `close_sender`. A refusal undoes nothing that the
+  step did before it, as a refusal keeps spec 013's wake entry. Step 4 never
+  refuses after such a time-out, since the player who timed out held one of the
+  seats. (Note from the lead, 2026-10-16: the last three sentences were added. The
+  text did not say what a refusal after a time-out in the join gives; the code
+  built for spec 017 already keeps the time-out then.)
 - Removed players are never past players (the `player_left` row above), and step 1
   refuses their token (spec 014), so a removed player is never seated back.
+
+What a seat back keeps, and what starts afresh, in the state that other specs
+define. (Note from the lead, 2026-10-16: added from the check of this spec against
+specs 019 to 028.)
+
+- Letters (specs 019 and 028): every cell keeps its `author` and `changed_by`, so
+  the player's letters are theirs again. Once the page applies the seat back's
+  `player_joined`, the player is a player of its kept snapshot again, so spec 019
+  gives their bands their colour index of now in place of the hatching, within
+  300 ms as for the other events it follows (another index than before when a
+  newcomer took theirs, "Seat back, colour taken"), and its clue bar names them by
+  the nickname of that event. The recap gives them one row (spec 028's "Players").
+- Chat (spec 022): the snapshot holds the whole history (`state.chat`), with the
+  player's earlier lines under their id, so their page marks those lines as their
+  own (`data-you`). Which lines count as unread is spec 022's rule: a page that
+  stayed open counts the lines since its `lastSeenChatSeq`, and a page loaded anew
+  counts none.
+- Votes (spec 025): a vote's `eligible` and its ballots hold player ids, and the
+  seat back keeps the id, so spec 025's rules apply as they are: the player is
+  eligible only when their id is in `eligible`, and a ballot they cast before their
+  time-out still counts, so a second one changes nothing. With the default
+  thresholds, a player seated back while a vote is open was a past player when it
+  opened, since a vote lasts 20 seconds and a time-out needs more than 300 seconds
+  of disconnection (spec 017): they are not eligible, their page shows the buttons,
+  and their ballot changes nothing, as for any player who joins during a vote
+  (spec 025).
+- Timer (spec 027): the seat back's `player_joined` is a join like any other for
+  the timer rules: a started, paused timer of an unsolved room resumes at `now`
+  (its rule 4), and the snapshot is built after it (its "The join step"). A
+  time-out in the join changes no timer field, since the player who leaves was
+  already disconnected.
+- Offline edits (specs 017 and 020): a page that comes back after the time-out
+  resends its pending edits, pencil edits and confirmations after the snapshot, as
+  after a resume. Spec 017's stale rule compares `changed_by` with the same id, so
+  the player's own earlier changes do not make them stale.
+- Flag (spec 021): a player's flag goes with their record at the time-out (spec
+  021's "departures"), and the seat back does not bring it back: `flag` is None, no
+  `flag_changed` entry is written, and the snapshot's `flags` hold none of theirs.
+- Undo (specs 018 and 020): `last_edit` is None, so an undo, of a pencil edit or a
+  confirmation as of any other edit, answers `nothing_to_undo` until the player's
+  next edit. Pencil mode belongs to the page (spec 020), and the server keeps
+  nothing of it.
+- Limits (specs 037 and 022): `recent_edits`, `recent_chat` and `recent_reactions`
+  start empty. A time-out needs more than 300 seconds of disconnection, far longer
+  than those windows (1, 10 and 10 seconds), so nothing they held still counted.
+- Mute (specs 014 and 022): kept. `muted` is the past player's (decision 13), and
+  it reaches the pages as any player's flag does: the player's own view in their
+  snapshot (`snapshot_for` copies `muted` through `player_views`, spec 012) and in
+  the others' `player_joined`. A muted player's page then disables the chat and
+  the reactions, as spec 022 says of a page whose own `muted` is true in a
+  snapshot, and the host's `mute-player` for them reads `t("chat.unmute")`; their
+  `Chat` is refused `muted` and their `React` dropped (spec 022). (Note from the
+  lead, 2026-10-16: added; this block first put `muted` among the fields that start
+  afresh, decision 13.)
+- Presence and host role (specs 013 and 014): `state` is `active`, `selection` and
+  `disconnected_at` are None, and `is_host` follows spec 012's step 6 ("Host role
+  and mute after a seat back"). (Note from the lead, 2026-10-16: this item read
+  "Presence, mute and host role (specs 013, 022 and 014)" and said "`muted` is
+  False"; the mute is the item above, decision 13.)
+- The room's own state does not change: the reveal budget and `reveals_used`
+  (spec 024), the settings, `removed_tokens` and the other players' records.
 
 ### `nock.store`
 
@@ -392,6 +485,15 @@ one valid identity (spec 012's rule: a JSON object with `player_id`,
 | `my_rooms.open` | `Reprendre` |
 | `my_rooms.open_label` | `Reprendre le salon {code}` |
 
+Spec 035 AC-9's checker reads every `fr.json` value as a pattern and must still
+flag its samples; none of these values matches them. None of their placeholders
+stands for a number: `{names}`, `{date}`, `{time}` and `{code}` are in the list of
+placeholders that match one or more characters (spec 035's "Language scan": a date
+reads `14 octobre 2026`, a time `10:30`), so spec 035's list of number placeholders
+does not change. The keys reused from spec 004 keep their number placeholders
+(`{number}`, `{width}`, `{height}`). (Note from the lead, 2026-10-16: added from
+the check of this spec against spec 035.)
+
 ### Test harness
 
 - Times: `DAY = 86_400.0`, `LIFE = 30 * DAY`. Python criteria call `nock.room` and
@@ -435,13 +537,16 @@ The words in brackets say how each criterion is tested.
 - **AC-4** (AC-9.1.3) (Python; HTTP) The server gives a room's summary only to a member of the room. Python: a `player_left` with reason `timed_out` replayed on a state holding `Bob` (token `TB`, colour 1) removes him from `players` and appends `PastPlayer(player_id=<Bob>, resume_token=TB, nickname="Bob", colour=1)` to `past_players`; with reason `removed` nothing is appended and `TB` goes to `removed_tokens`; on a state with `MAX_PAST_PLAYERS` past players, one more time-out drops the oldest and keeps 100. `member_id` gives Bob's id for `TB` after his time-out, `None` after his removal, and `None` for an unknown token. With past players `Bob`, `ana` and players `Ana`, `Cy`, `team_nicknames` is `("Bob", "ana", "Cy")`. HTTP: on room A (FX-01, grid number 1) where `Ana` (token `TA`), `Bob` (`TB`) and `Cy` (`TC`) joined, Ana wrote `T` at (1, 0) at `t0 + 10`, Ana removed Cy and Bob timed out, and room B (FX-01 added with `grid_number` None) where `Dan` (`TD`) wrote a letter at `t0 + 50`: `POST /api/rooms/summaries` with A's code and `TA` answers 200 with a JSON array of one item, which `RoomSummary.model_validate` turns into `RoomSummary(code=A, grid_number=1, width=5, height=5, players=("Bob", "Ana"), last_activity_at=<t0 + 10 as a UTC datetime>, solved=False)` (compared as models, so that fields a later spec adds with a default, such as spec 029's, keep it passing); with `TB` the same; with `TC`, with a token no player ever had, or with the code `ZZZZZZ`, `[]`; with A by `TA`, B by `TD` and A again by `TB`, two summaries, B then A. A body with 101 keys, a code `abc`, a token of 15 characters or an extra key answers 422. A room that only the store holds keeps the same log after the request. An expired room is left out and deleted.
 - **AC-5** (AC-9.1.3) (browser with mocked routes; browser with live server) "My rooms" lists my open rooms with their grid, players and last activity. Mocked: with valid identities stored for `XYZ789` and `ABC234` and a corrupt `nock.identity.QQQQQQ` (`not json`), the page sends one `POST /api/rooms/summaries` whose body holds exactly the keys of `XYZ789` and `ABC234` with their stored tokens. When the answer is the summary of `XYZ789` (grid 2, 5 by 5, players `Ana`, `Bob`, last activity `2026-10-14T08:30:00Z`, not solved) then that of `ABC234` (grid null, 13 by 17, players `Ana`, last activity `2026-10-13T20:05:00Z`, solved), `my-rooms` reaches `data-state="ready"` with two `my-room` items in that order. The first has `data-code="XYZ789"`, `data-grid="2"`, `data-solved="false"`, the texts `Grille n° 2`, `5 × 5`, `Joueurs : Ana, Bob` and `Dernière activité : 14 octobre 2026 à 10:30`, no `my-room-solved`, and a `my-room-link` with `href="/r/XYZ789"`, text `Reprendre` and `aria-label` `Reprendre le salon XYZ789`. The second has `data-grid=""`, the texts `Grille hors catalogue`, `13 × 17`, `Joueurs : Ana` and `Dernière activité : 13 octobre 2026 à 22:05`, and a `my-room-solved` reading `Terminée`. An answer `[]` shows `fr.json["my_rooms.empty"]`; an answer with status 500 gives `data-state="error"` and `fr.json["my_rooms.error"]`, while the catalogue list still reaches `data-state="ready"`. With no identity stored, the page has no `my-rooms` element and sends no summaries request. Live: Ana (context 1) starts FX-01 from the catalogue (spec 010) and types `T` at (1, 0); Bob (context 2) joins her room; Ana's context then opens `/`: `my-rooms` holds one `my-room` with her room's code, `data-grid="1"` and the text `Joueurs : Ana, Bob`; clicking its `my-room-link` opens `/r/<code>`, whose room page reaches `data-status="joined"` with the same `data-you` as before, without showing `nickname-form`.
 - **AC-6** (new) (browser with mocked routes; keyboard only for the walk) "My rooms" meets spec 035 and the window sizes of spec 006 AC-5. With the two summaries of AC-5, at 1280 by 720 and at 360 by 740: spec 035's contrast scan and language scan find no offending element on `/`; keyboard only, `tab_to` (spec 035 "Test harness") reaches each `my-room-link`, which then shows spec 035 AC-2's outline (style neither `none` nor `auto`, width at least 2 px, colour of contrast at least 3:1 against white), and `Enter` on the first loads `/r/XYZ789`. At each window size of spec 006 AC-5, `document.documentElement.scrollWidth <= window.innerWidth`, also when the first summary lists 8 players whose nicknames have 20 characters each.
-- **AC-7** (new, decision 11) (Python; WebSocket and HTTP with a fake clock) A player who comes back after spec 017's time-out with their stored token gets their seat back: the same player id, nickname and letters, and the same colour while no player of the room has it. The rules are those of "Seat back". Python, on a FX-01 room with the `RoomConfig` of "no tick changes anything" (see "Test harness") except `resume_window_seconds`, left at its default of 300: `Ana` (token `TA`), `Bob` (`TB`) and `Cy` (`TC`) join at `t0` (seq 1 to 3, colours 0 to 2, Ana host); Ana writes `T` at (1, 0) (seq 4); her connection closes at `t0 + 10` (`disconnect_player`, seq 5); `tick` at `t0 + 311` gives `PlayerLeft(player_id=<Ana>, reason="timed_out")` (seq 6) then `HostChanged(player_id=<Bob>)` (seq 7), and `past_players` holds Ana. Then:
+- **AC-7** (new, decision 11) (Python; WebSocket and HTTP with a fake clock) A player who comes back after spec 017's time-out with their stored token gets their seat back: the same player id, letters and mute flag, and the same nickname and colour while no player of the room has them (else spec 012's suffix and the lowest free colour). The rules are those of "Seat back". (Note from the lead, 2026-10-16: "the same player id, nickname and letters, and the same colour while no player of the room has it" became the text above, which says decision 12's suffix.) (Note from the lead, 2026-10-16: "and mute flag" was added, decision 13.) Python, on a FX-01 room with the `RoomConfig` of "no tick changes anything" (see "Test harness") except `resume_window_seconds`, left at its default of 300: `Ana` (token `TA`), `Bob` (`TB`) and `Cy` (`TC`) join at `t0` (seq 1 to 3, colours 0 to 2, Ana host); Ana writes `T` at (1, 0) (seq 4); her connection closes at `t0 + 10` (`disconnect_player`, seq 5); `tick` at `t0 + 311` gives `PlayerLeft(player_id=<Ana>, reason="timed_out")` (seq 6) then `HostChanged(player_id=<Bob>)` (seq 7), and `past_players` holds Ana. Then:
   - Seat back: `join_room` with `Join(nickname="Autre", resume_token=TA)` at `t0 + 400`, `new_player_id="pNEW"` and a fresh `new_resume_token`, gives exactly one entry, a `PlayerJoined` with seq 8 whose `player` is `PlayerView(player_id=<Ana>, nickname="Ana", colour=0, state="active", is_host=False, muted=False, selection=None)`, logged with `resume_token == TA`. Its reply is one `Snapshot` with `you == <Ana>` and `resume_token == TA`, and `close_sender` is False. In the new state Ana is last in `players` with `joined_seq == 8`, `past_players` is empty, (1, 0) has `author == <Ana>`, `member_id(state, TA) == <Ana>`, and no player has the id `pNEW`. Replaying every entry from `new_room` gives the same `past_players` and the same player ids, nicknames, colours and `is_host` in `players`.
+  - Fresh record: in a run where Ana flags IDES (`Flag(clue=ClueRef(row=0, column=3, clue_index=0))`) before her disconnection, the seat back gives exactly one entry, its `PlayerJoined`, with no `FlagChanged`; in the new state Ana's `flag` is None, and the snapshot's `flags` is empty. An `Undo` from Ana right after it is answered `nothing_to_undo`, although her `T` at (1, 0) has not changed since she wrote it. (Note from the lead, 2026-10-16: added with "What a seat back keeps, and what starts afresh".)
+  - Muted: in a run where Ana, host, sends `MutePlayer(player_id=<Cy>, muted=True)` at `t0 + 5` (seq 5) and it is Cy whose connection closes at `t0 + 10` (seq 6), the `tick` at `t0 + 311` gives `PlayerLeft(player_id=<Cy>, reason="timed_out")` (seq 7) alone, and `past_players` is `(PastPlayer(player_id=<Cy>, resume_token=TC, nickname="Cy", colour=2, muted=True),)`. Cy's join with `TC` at `t0 + 400` then gives exactly one entry, a `PlayerJoined` with seq 8 whose `player` is `PlayerView(player_id=<Cy>, nickname="Cy", colour=2, state="active", is_host=False, muted=True, selection=None)`, and a reply whose `Snapshot` has `you == <Cy>` and, in its `players`, Cy's view with `muted` True. A `Chat(text="salut")` from Cy right after is answered with one `ErrorMessage(code="muted")` and gives no entry (spec 022). Ana's `MutePlayer(player_id=<Cy>, muted=False)` then gives one `PlayerMuted(player_id=<Cy>, muted=False)`, and Cy's next `Chat(text="salut")` gives its `ChatMessage`. Replaying every entry from `new_room` gives, after the time-out, the same `past_players`, and after the seat back, Cy in `players` with `muted` True and an empty `past_players`. (Note from the lead, 2026-10-16: added, decision 13.)
   - Colour taken: in a second run, after the time-out, `Dan` joins and gets colour 0 (spec 012). Ana's join with `TA` then gives her old id, the nickname `Ana` and colour 3, the lowest index that no player has.
-  - Nickname taken: in a third run, after the time-out, `ana` joins and keeps the nickname `ana`, since no player has it, with colour 0. Ana's join with `TA` then gives her old id, the nickname `Ana 2` (spec 012's duplicate rule; new open question 1) and colour 3.
+  - Nickname taken: in a third run, after the time-out, `ana` joins and keeps the nickname `ana`, since no player has it, with colour 0. Ana's join with `TA` then gives her old id, the nickname `Ana 2` (spec 012's duplicate rule; decision 12) and colour 3. (Note from the lead, 2026-10-16: "new open question 1" became "decision 12", the human's answer.)
   - Full: in a run where six more players join after the time-out, so that `players` holds 8, Ana's join with `TA` gives `reply == (ErrorMessage(code="room_full", ...),)` (code compared), `close_sender` True, no entry and the same state. Ana stays in `past_players`, and `member_id(state, TA)` is still her id.
   - Locked: in a run where Bob, host since the time-out, sends `LockRoom(locked=True)`, Ana's join with `TA` gives `ErrorMessage(code="room_locked")` with the same checks as a full room. After Bob sends `LockRoom(locked=False)`, the same join seats her back.
   - Time-out in the join: in a run with no tick after the disconnection, Ana's join with `TA` at `t0 + 310.5` (300.5 seconds after her disconnection) gives three entries: `PlayerLeft(player_id=<Ana>, reason="timed_out")`, `HostChanged(player_id=<Bob>)`, then a `PlayerJoined` of `<Ana>` with nickname `Ana`, colour 0 and `is_host` False. Its snapshot has `you == <Ana>`.
+  - Locked, time-out in the join: in a run where Ana, still host, sends `LockRoom(locked=True)` before her disconnection and no tick follows the disconnection, Ana's join with `TA` at `t0 + 310.5` gives two entries, `PlayerLeft(player_id=<Ana>, reason="timed_out")` then `HostChanged(player_id=<Bob>)`, `reply == (ErrorMessage(code="room_locked", ...),)` (code compared) and `close_sender` True; in its state Ana is in `past_players`, Bob is host, and `member_id(state, TA)` is Ana's id. After Bob sends `LockRoom(locked=False)`, the same join seats her back. (Note from the lead, 2026-10-16: added with the refusal rule of "Time-out in the same step".)
   - Removed: in a run where Ana removes Cy (spec 014) at `t0 + 5`, before her disconnection, a join with `TC` at `t0 + 400` gets `ErrorMessage(code="removed")` with `close_sender` True and no entry, and `past_players` holds Ana only.
 
   WebSocket and HTTP: on a registry with a fake clock, a store file and the same `RoomConfig` with `tick_seconds=0.05`, clients A (`Ana`) and B (`Bob`) join a FX-01 room and A writes `T` at (1, 0); A's socket closes; after `advance(301)`, B receives `PlayerLeft(player_id=<A>, reason="timed_out")` within 1 second of real time. A new socket that sends `{"type": "join", "nickname": "Autre", "resume_token": <A's token>}` receives a `Snapshot` with `you == <A>`, `resume_token` equal to A's token, A's view with the nickname `Ana` and colour 0, and (1, 0) with `author == <A>`; B receives a `player_joined` whose `player.player_id` is `<A>`. Then `POST /api/rooms/summaries` with the room's code and A's token answers one summary whose `players` is `("Bob", "Ana")`, each name once. (Note from the lead, 2026-10-15: added, decision 11.)
@@ -463,6 +568,13 @@ The words in brackets say how each criterion is tested.
   `fr.json["room.status.not_found"]` (spec 040). A page reloaded later gets 4404 too.
 - Step in flight at deletion (AC-2): its `append` fails (unknown room) and the step is
   dropped (spec 018 AC-4); nothing re-creates the room.
+- Nothing logged at deletion (AC-2): a deletion runs no rule step. The closes of its
+  sockets run no `disconnect_player`, so no entry is written, and no player, vote
+  or timer changes before the room goes (no `player_state_changed`, no time-out, no
+  pause of spec 027's timer). The room's whole state goes with it: its chat (spec
+  022), flags (spec 021), open vote (spec 025), timer (spec 027) and share token
+  (spec 028). (Note from the lead, 2026-10-16: added from the check of this spec
+  against specs 021 to 028.)
 - Code reused (AC-2): after deletion the code can be drawn again (spec 011). A device
   that still stores an identity for the old room joins the new one as a new player:
   its token is unknown there (spec 012, "Unknown resume token").
@@ -490,8 +602,9 @@ The words in brackets say how each criterion is tested.
 - Seat back, nickname taken (AC-7): a newcomer may take the nickname of a past
   player, since spec 012 only compares with `players`. The past player then comes
   back with spec 012's suffix (`Ana 2`), and their stored identity takes the new
-  nickname from the next snapshot (spec 012). See new open question 1. (Note from
-  the lead, 2026-10-15: added, decision 11.)
+  nickname from the next snapshot (spec 012). See decision 12. (Note from the lead,
+  2026-10-15: added, decision 11.) (Note from the lead, 2026-10-16: "See new open
+  question 1" became "See decision 12", the human's answer.)
 - Seat back in a full or locked room (AC-7): refused as a newcomer would be, with
   `room_full` or `room_locked`, which is final on the page (spec 017), so it shows
   `data-status="full"` (spec 012) or `data-status="locked"` (spec 014). The player stays
@@ -499,14 +612,29 @@ The words in brackets say how each criterion is tested.
   seats them back once a seat is free or the room is unlocked. (Note from the lead,
   2026-10-15: added, decision 11.)
 - Host role and mute after a seat back (AC-7): the host role is not given back
-  (spec 014: a host who comes back after the hand-over is an ordinary player), and
-  `muted` starts False, as for a new player, since `PastPlayer` keeps no flag. The
-  host can mute the player again (spec 022). (Note from the lead, 2026-10-15:
-  added, decision 11.)
-- Removing a past player (AC-7): not possible, since spec 014's `remove_player`
-  targets players of `players` (`invalid_target` otherwise). Once seated back, the
-  player can be removed like any other, and their token is then refused (spec 014).
-  (Note from the lead, 2026-10-15: added, decision 11.)
+  (spec 014: a host who comes back after the hand-over is an ordinary player): the
+  player is host only when no player of the room is host, which spec 014 allows
+  only in a room that nobody else is in, as for any joiner (spec 012 step 6).
+  The mute is given back: `PastPlayer` keeps `muted`, so a player muted before
+  their time-out comes back muted, until a host unmutes them (spec 022). A muted
+  player who comes back to a room nobody else is in is host, and stays muted until
+  another host unmutes them, since spec 014 refuses a mute on one's own id (spec
+  022's "Muted host"). (Note from the lead, 2026-10-15: added, decision 11.)
+  (Note from the lead, 2026-10-16: the clause from "the player is host only" was
+  added; the item said only that the role is not given back, while a player who
+  comes back to a room nobody else is in becomes host as any joiner.) (Note from
+  the lead, 2026-10-16: the mute sentences used to read "`muted` starts False, as
+  for a new player, since `PastPlayer` keeps no flag. The host can mute the player
+  again (spec 022).", decision 13.)
+- Removing or muting a past player (AC-7): not possible, since spec 014's
+  `remove_player` and `mute_player` target players of `players` (`invalid_target`
+  otherwise). Once seated back, the player can be removed or muted like any other,
+  and a removed player's token is then refused (spec 014). (Note from the lead,
+  2026-10-15: added, decision 11.) (Note from the lead, 2026-10-16: muting was
+  added; the item spoke of removing only.) A past player's mute thus stays as it
+  was when they left, and a host changes it once they are seated back (decision
+  13). (Note from the lead, 2026-10-16: the sentence before this note was added,
+  decision 13.)
 - Past record dropped by the cap (AC-4, AC-7): a past player dropped by the cap of
   100 is no longer known. Their token then matches nobody, and the join makes a new
   player (spec 012, "Unknown resume token"). (Note from the lead, 2026-10-15: added,
@@ -519,6 +647,13 @@ The words in brackets say how each criterion is tested.
   longer gets the summary, so the room leaves its "My rooms".
 - Duplicate keys (AC-4): several keys for one room give one summary; it is enough that
   one of them is a member's.
+- Team names and spec 028 (AC-4): `team_nicknames` compares nicknames under
+  `casefold()`, so of `Ana` and `ana` it keeps the one that comes first in its
+  order and leaves out the other. Spec 028's team (its share page) keeps each
+  nickname once as an exact string, in join order, so the share page of the same
+  room names both. The two lists serve two pages and may differ in their names and
+  their order; spec 028 is not changed. (Note from the lead, 2026-10-16: added from
+  the check of this spec against spec 028.)
 - Former players (AC-4): spec 033 may give an erased player the nickname `--`; it is
   kept in `players` of the summary like any nickname, and the page shows it as spec
   033 says.
@@ -543,10 +678,20 @@ The words in brackets say how each criterion is tested.
   spec 038.
 - A warning before expiry, extending a room by hand, restoring a deleted room,
   backups.
-- Giving back the host role or the `muted` flag after a time-out: AC-7 seats a
-  player back as an ordinary, unmuted player. (Note from the lead, 2026-10-15: this
-  line used to read "Getting back one's old player id, colour and authorship after
-  a time-out (open question 1)", which AC-7 now does; decision 11.)
+- Giving back the host role after a time-out: AC-7 seats a player back as an
+  ordinary player, who is host only in a room that nobody else is in, as any
+  joiner. Their `muted` flag, though, is kept (decision 13). (Note from the lead,
+  2026-10-15: this line used to read "Getting back one's old player id, colour and
+  authorship after a time-out (open question 1)", which AC-7 now does; decision
+  11.) (Note from the lead, 2026-10-16: the clause from "who is host only" was
+  added.) (Note from the lead, 2026-10-16: "or the `muted` flag" and "unmuted"
+  were taken out, and the sentence on the kept flag was added, decision 13.)
+- Setting the room life or the sweep interval from the environment. This spec reads
+  no environment variable: `room_life_seconds` and `expiry_sweep_seconds` are
+  `RoomConfig` fields, whose defaults the app uses, and the sweep deletes from the
+  store that spec 018 opens from `NOCK_DATABASE`. Spec 036's rules for the
+  variables of `python -m nock` thus add nothing here. (Note from the lead,
+  2026-10-16: added from the check of this spec against spec 036.)
 - Leaving a room for good, or removing a room from "My rooms".
 - Clearing the device's stored identities of deleted rooms.
 - Sorting or filtering "My rooms".
@@ -607,8 +752,10 @@ open question.
     the `player_joined` row of `replay`, AC-7 (new), AC-3's join with Ana's token,
     the edge cases on past players and seat backs, and "Out of scope". The player
     comes back with the same id and nickname (spec 012's suffix when a player took
-    the nickname meanwhile, open question 1), and the same colour when no player of
-    `players` has it, connected or disconnected, since spec 012 keeps a disconnected
+    the nickname meanwhile, decision 12; note from the lead, 2026-10-16: this
+    parenthesis used to end with "open question 1", which the human answered), and
+    the same colour when no player of `players` has it, connected or disconnected,
+    since spec 012 keeps a disconnected
     player's colour (else the lowest free index, as spec 012 assigns it), as long as
     the room is neither full nor locked. A full or locked room refuses the join with
     spec 012's and 014's refusals (`room_full`, `room_locked`). A removed player is
@@ -619,14 +766,46 @@ open question.
     with dated notes, before this spec's tests are written; the test-writer then
     updates their tests before the implementer runs.
 
+Decided by the human on 2026-10-16. It is already part of the spec above. (Note
+from the lead, 2026-10-16: this group was added; its item was open question 1.)
+
+12. Nickname taken while a player was away (AC-7, former open question 1, raised on
+    2026-10-15). Spec 012 makes nicknames unique only among `players`, so a
+    newcomer may take the nickname of a past player (`ana` after `Ana` timed out).
+    When the past player is seated back, options: (a) keep their nickname as it
+    was, so two players of `players` have the same nickname under `casefold()`,
+    against spec 012's rule; (b) apply spec 012's duplicate rule, as for a
+    newcomer, so they come back as `Ana 2`, with the same id, colour rule and
+    letters. Pick: (b), the human's answer ("Join as Ana 2"). "Seat back", AC-7's
+    "Nickname taken" and the edge case "Seat back, nickname taken" follow it, and
+    spec 012's step 4a and its edge case "Duplicate check" say the same.
+
+Decided by the lead on 2026-10-16, after the check of this spec against spec 022.
+The human may override it. It is already part of the spec above. (Note from the
+lead, 2026-10-16: this group was added.)
+
+13. The mute after a time-out and a seat back (AC-7). Since decision 11, a player
+    who times out and comes back with their token is the same player, with the
+    same id, letters and nickname. Options: (a) `muted` starts False at the seat
+    back, as for a new player, since `PastPlayer` keeps no flag, and a host mutes
+    the player again; (b) `PastPlayer` keeps the record's `muted`, and the seat
+    back restores it. Pick: (b). The mute is the host's tool against abuse (spec
+    022, its decisions 1 and 3), and it already survives a restart (spec 014
+    AC-6); with (a), a muted player could lift their own mute by closing the tab
+    for five minutes. Another browser still joins as a new player, unmuted, the
+    limit of "the same browser" that spec 014 accepts for a removal (its decision
+    2). What it changed: `PastPlayer` (its `muted` field), the `player_left` row
+    of `replay`, the `muted` field of "Seat back", the mute in "What a seat back
+    keeps, and what starts afresh", AC-7 (its opening sentence and the run
+    "Muted"), the edge cases "Host role and mute after a seat back" and "Removing
+    or muting a past player", "Out of scope", and the `PastPlayer` fields in spec
+    038's table of what the server keeps. Nothing else is needed: `snapshot_for`
+    copies `muted` into each view (spec 012's `player_views`), spec 018's `replay`
+    of `player_joined` takes `muted` from the view, and spec 022's page reads its
+    own mute from its snapshot or a `player_muted`.
+
 ## Open questions
 
-1. Nickname taken while a player was away (AC-7, new on 2026-10-15). Spec 012 makes
-   nicknames unique only among `players`, so a newcomer may take the nickname of a
-   past player (`ana` after `Ana` timed out). When the past player is seated back,
-   options: (a) keep their nickname as it was, so two players of `players` have the
-   same nickname under `casefold()`, against spec 012's rule; (b) apply spec 012's
-   duplicate rule, as for a newcomer, so they come back as `Ana 2`, with the same
-   id, colour rule and letters. Pick: (b). The spec above follows (b) ("Seat back",
-   AC-7's "Nickname taken", and the edge case "Seat back, nickname taken"); with
-   (a), those three places change and nothing else does.
+None. (Note from the lead, 2026-10-16: this section held open question 1, on a
+nickname taken while a player was away. The human answered it on 2026-10-16 with
+option (b), and it is now decision 12.)

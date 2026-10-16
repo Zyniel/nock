@@ -11,6 +11,14 @@ The FX-01 reference grid is in `specs/_reference.md`. The rooms engine (`nock.ro
 `nock.hub`, runtime, test harness) is defined in spec 011; the messages are those of
 spec 039; the room page those of specs 040 and 006.
 
+(Note from the lead, 2026-10-16: refined for spec 032's seat back (its decisions 11
+and 12): a join whose token belongs to a past player of the room, one who left by a
+time-out, seats that player back with their id and token. Changed: "Join" (step 2's
+time-out and the new step 4a), the socket binding, case a of the room page flow, and
+the edge cases "Duplicate check", "Colours", "Full room", "Unknown resume token" and
+"Order of refusals". No criterion changes, since none of them joins with the token
+of a player who timed out; the steps marked with spec 032 apply once it is built.)
+
 ## Goal
 
 As an invited player, I want to join with only a nickname, so that I am playing within seconds.
@@ -88,7 +96,10 @@ steps marked with another spec are built by that spec; until then they never app
    `reply = (ErrorMessage(code=REMOVED),)`, `close_sender = True`.
 2. Resume: `message.resume_token` is the token of a player of `state.players`
    (spec 017 adds: and that player has been disconnected for at most
-   `resume_window_seconds`). That player is joined again on this connection:
+   `resume_window_seconds`; a player disconnected for longer times out in this
+   step, becomes a past player of spec 032, and the join goes on with step 3).
+   (Note from the lead, 2026-10-16: the clause after the semicolon was added for
+   spec 032's seat back.) That player is joined again on this connection:
    - if their state is `disconnected`: state becomes `active`,
      `disconnected_at = None`, and one entry
      `PlayerStateChanged(player_id, state=active)`;
@@ -101,6 +112,23 @@ steps marked with another spec are built by that spec; until then they never app
 3. (spec 014) `state.settings.locked`: refused, `ROOM_LOCKED`, `close_sender`.
 4. `len(state.players) == MAX_PLAYERS`: refused,
    `reply = (ErrorMessage(code=ROOM_FULL),)`, `close_sender = True`.
+
+4a. (spec 032) Seat back: `message.resume_token` equals, compared with
+`secrets.compare_digest`, the `resume_token` of a past player of the room (a
+`PastPlayer` of `state.past_players`: a player who left the room by a time-out, or
+on purpose, never one the host removed). That player is appended to
+`state.players` as step 6 builds a new player, except that they keep their
+`player_id` and `resume_token` (`new_player_id` and `new_resume_token` are not
+used); their nickname is the past player's, made unique as "Duplicate nicknames"
+says; their colour is the past player's when no player of `state.players` has it,
+else the lowest index 0 to 7 that none has; and `message.nickname` is ignored, as
+in a resume, so step 5 does not apply. The `PastPlayer` leaves `past_players`. The
+one entry is step 6's `PlayerJoined`, logged with the player's token, and
+`reply = (snapshot_for(new_state, player_id),)`. Spec 032's "Seat back" gives the
+whole rule. (Note from the lead, 2026-10-16: this step was added for spec 032's
+seat back, its decision 11. It is numbered 4a so that steps 5 and 6, which other
+specs cite, keep their numbers.)
+
 5. `normalize_nickname(message.nickname)` raises: refused,
    `reply = (ErrorMessage(code=INVALID_NICKNAME),)`, socket left open (the page may
    send another join).
@@ -146,9 +174,12 @@ frees the seat.)
   `new_resume_token = secrets.token_urlsafe(24)`, replacing spec 040's fixed
   snapshot. A refused join (`INVALID_NICKNAME`) leaves the socket waiting for
   another `Join`, as before the first join.
-- After a successful join the socket is bound to that player: every later parsed
-  message goes to `handle_message` (a second `Join` is ignored, no reply); the
-  socket's close runs `disconnect_player`.
+- After a successful join the socket is bound to that player, the snapshot's `you`
+  (the new player, the resumed one, or, with spec 032, the one seated back): every
+  later parsed message goes to `handle_message` (a second `Join` is ignored, no
+  reply); the socket's close runs `disconnect_player`. (Note from the lead,
+  2026-10-16: "the snapshot's `you`" and its parenthesis were added for spec 032's
+  seat back, whose player keeps their id.)
 - A close of a bound socket that the server itself made (4001, a refusal) does not
   run `disconnect_player` for the player that took it over.
 - New constant in `nock.server` (re-exported from `nock.hub`):
@@ -182,7 +213,10 @@ Room page flow (replaces spec 040 step 2):
    - a. `nock.identity.<CODE>` is stored (valid): send
      `{"type": "join", "nickname": <stored nickname>, "resume_token": <stored token>}`,
      no form, and set `data-status="joining"`. This resumes the same player
-     (join step 2), whether the identity came from the form or from case b.
+     (join step 2), or seats the same player back after spec 017's time-out (join
+     step 4a, spec 032), whether the identity came from the form or from case b.
+     (Note from the lead, 2026-10-16: "or seats the same player back after spec
+     017's time-out" and its reference were added for spec 032's seat back.)
    - b. No identity, and spec 010's `nock.room.<CODE>` holds a record (a JSON
      object) whose `grid` is a number, which means the room was created from the
      catalogue on this device: send
@@ -296,23 +330,44 @@ The words in brackets say how each criterion is tested.
   `parse_client_message` (spec 039) and gets `invalid_message`, not
   `invalid_nickname`; the page never sends one.
 - Duplicate check (AC-2): case-insensitive, accent-sensitive; the suffix is added to
-  the newcomer only; a resumed player keeps their nickname. A player called
-  `Ana 2` already in the room pushes a second `Ana` to `Ana 3`.
+  the joiner only, a newcomer or a past player seated back (step 4a, spec 032),
+  never to a player already in the room; a resumed player keeps their nickname. A
+  player called `Ana 2` already in the room pushes a second `Ana` to `Ana 3`, and
+  `Ana`, who timed out, comes back as `Ana 2` when `ana` joined meanwhile. (Note
+  from the lead, 2026-10-16: "the newcomer only" became "the joiner only, a
+  newcomer or a past player seated back (step 4a, spec 032), never to a player
+  already in the room", and the example of `Ana` who timed out was added.)
 - Colours (AC-2): a freed index (spec 017 time-out, spec 014 removal) is reused by
-  the next joiner. Disconnected players keep theirs.
+  the next joiner. Disconnected players keep theirs. A past player seated back
+  (step 4a, spec 032) gets their old index again when no player of `players` has
+  it, else the lowest free one, so they may come back in another colour. (Note from
+  the lead, 2026-10-16: the last sentence was added for spec 032's seat back.)
 - Full room (AC-4): disconnected players hold their seat until they leave (spec 017
   time-out). A resume (step 2) is accepted in a full room, since the player is
-  already counted.
-- Unknown resume token (AC-5): a token that matches no player (an old room, a
-  forged value) is ignored and the join is a new player with the join's nickname.
+  already counted. A seat back (step 4a) is not: a past player holds no seat, so a
+  full room refuses them with `room_full`, and they stay a past player, whom the
+  same token seats back once a seat is free (spec 032). (Note from the lead,
+  2026-10-16: the last sentence was added for spec 032's seat back.)
+- Unknown resume token (AC-5): a token that matches no player and no past player
+  (an old room, a forged value, a past player dropped by spec 032's cap of 100) is
+  ignored and the join is a new player with the join's nickname. A past player's
+  token is not unknown: step 4a seats that player back (spec 032). (Note from the
+  lead, 2026-10-16: "and no past player", the dropped past player and the last
+  sentence were added for spec 032's seat back; the item said "a token that
+  matches no player (an old room, a forged value)".)
 - Two tabs (AC-5): the same identity opened in a second tab takes over; the first
   tab's socket closes with 4001 and shows `replaced`, with no event to the others.
 - Host (AC-1, AC-2): the first player is host; the host's disconnection does not
   move the role (spec 014 AC-3 does, after 60 seconds).
 - Snapshot of the joiner (AC-1, AC-3): its `seq` is that of its own
   `player_joined`; the joiner never receives that event.
-- Order of refusals (AC-4): removed, then resume, then locked, then full, then
-  nickname. A full room answers `room_full` even to an invalid nickname.
+- Order of refusals (AC-4): removed, then resume, then locked, then full, then seat
+  back (step 4a, spec 032), then nickname. A full room answers `room_full` even to
+  an invalid nickname, and a locked or full room refuses a past player's token as
+  it refuses a newcomer. A seat back is never refused for its nickname, which it
+  ignores. (Note from the lead, 2026-10-16: "then seat back (step 4a, spec 032)",
+  the clause on a past player's token and the last sentence were added for spec
+  032's seat back; the order went from full straight to nickname.)
 - Socket after a refusal (AC-4): `room_full` closes the socket (code 1000);
   `invalid_nickname` does not.
 - Form (AC-1): the submit button is disabled while `joining`; pressing Enter in the
