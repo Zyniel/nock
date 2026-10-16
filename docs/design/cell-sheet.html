@@ -100,6 +100,7 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .tri.tr { top: 0; right: 0; } .tri.tr b { top: 2px; right: 2px; }
 .tri.br { bottom: 0; right: 0; } .tri.br b { bottom: 2px; right: 2px; }
 .tri.bl { bottom: 0; left: 0; } .tri.bl b { bottom: 2px; left: 2px; }
+.tri b.rot { right: auto; bottom: auto; white-space: nowrap; font-family: var(--f-clue); font-weight: 600; line-height: 1; letter-spacing: .02em; }
 
 .c.clue { background: var(--clue-bg); color: var(--clue-ink); display: flex; flex-direction: column; padding: 2px 3px; font: 600 max(6px, calc(var(--s) * .145))/1.12 var(--f-clue); text-transform: uppercase; text-align: center; letter-spacing: .01em; overflow: visible; }
 .c.clue .q { flex: 1; display: flex; align-items: center; min-height: 0; }
@@ -182,7 +183,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3 · players as corner triangles</div>
+    <div class="ver">Version 3.1 · names at 45° in the corner triangles</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3 shows each player on a cell as a coloured triangle in one corner, four at most. Initials appear inside the triangle only on large cells. The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
   </header>
@@ -197,7 +198,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li>Fonts: Source Sans 3 for the interface and letters, IBM Plex Sans Condensed for clues.</li>
           <li>Bold on grey means locked (checked right, or revealed). Pencil is italic grey. Wrong is struck through.</li>
           <li class="new"><b>New:</b> other players are a coloured triangle in a corner, four per cell at most. No dashed border, no shapes.</li>
-          <li class="new"><b>New:</b> initials inside the triangle only from 44 px cells up.</li>
+          <li class="new"><b>New:</b> the player's name at 45° inside the triangle, only from 44 px cells up.</li>
           <li class="new"><b>New:</b> a revealed letter has a notch at the top centre, no longer a corner triangle.</li>
         </ul>
       </div>
@@ -234,6 +235,10 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   </section>
 
   <div class="switch" role="group" aria-label="Variantes">
+    <div class="grp"><span class="lbl">In the triangle (44 px +)</span>
+      <button type="button" data-label="name" aria-pressed="true">Name at 45°</button>
+      <button type="button" data-label="init" aria-pressed="false">Initials at 45°</button>
+    </div>
     <div class="grp"><span class="lbl">Another player's word</span>
       <button type="button" data-tint="on" aria-pressed="true">Light tint</button>
       <button type="button" data-tint="off" aria-pressed="false">Nothing</button>
@@ -242,9 +247,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>1 · Players on a cell</small>One corner each, four at most</h2>
-    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. From 44 px the triangle grows a little and carries the player's initials. Below 44 px it is colour only.</p>
+    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. From 44 px the triangle grows and carries the player's name along its long edge, at 45°, in the narrow clue font: the name shrinks to fit, down to 7 px, then is cut with a dot. Below 44 px it is colour only.</p>
     <div class="board static" id="corners"></div>
-    <p class="note"><strong>Accessibility.</strong> Under 44 px the corner is colour only, which spec 035 (AC-6) does not allow today. Two ways to fill the gap: the clue bar names who else is on my word ("Bo est ici"), and the player list in the Salon says where each player is. Spec 035 would need to accept that.</p>
+    <p class="note"><strong>Accessibility.</strong> Under 44 px the corner is colour only, which spec 035 (AC-6) does not allow today. Two ways to fill the gap: the clue bar names who else is on my word (« Bruno est ici »), and the player list in the Salon says where each player is. Spec 035 would need to accept that.</p>
   </section>
 
   <section>
@@ -284,7 +289,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <button class="tb" type="button" id="b-menu" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
         </div>
         <div class="stage" id="stage">
-          <div class="toast" id="toast">⚑ Dé bloque sur « Flaire »</div>
+          <div class="toast" id="toast">⚑ Dédé bloque sur « Flaire »</div>
           <div id="pgrid"></div>
         </div>
         <div class="cluebar">
@@ -307,7 +312,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li><b>Menu</b> holds the Auteurs switch.</li>
           <li><button class="linkish" type="button" id="replay">Show a 3-second note again</button></li>
         </ul>
-        <p class="note">On the grid: Bo (green) and Dé (orange) are both on the last cell of LEST, in two corners; Él (purple) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed (notch at the top). O in AMEN is wrong. D in VIDE is Bo's pencil letter. « Flaire » is flagged.</p>
+        <p class="note">On the grid: Bruno (green) and Dédé (orange) are both on the last cell of LEST, in two corners; Éloïse (purple) is on the M of AMEN. M of TAMIS is locked after a check. N of AMEN was revealed (notch at the top). O in AMEN is wrong. D in VIDE is Bruno's pencil letter. « Flaire » is flagged.</p>
       </div>
     </div>
   </section>
@@ -324,8 +329,21 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 (function () {
   "use strict";
   var P = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080", "#9a6324", "#808000"];
-  var NAMES = ["Ana", "Bo", "Cé", "Dé", "Él", "Fa", "Gus", "Hu"];
-  var TINT = true;
+  var NAMES = ["Ana", "Bruno", "Céline", "Dédé", "Éloïse", "Farid", "Gus", "Hugo"];
+  var TINT = true, LABEL = "name";
+  var ctx = document.createElement("canvas").getContext("2d");
+  /* fit a name along the long edge: shrink to 7 px, then cut with a dot */
+  function fitName(name, room, size) {
+    var txt = name.toUpperCase(), fs = size;
+    function w(t, f) { ctx.font = "600 " + f + "px 'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif"; return ctx.measureText(t).width; }
+    while (fs > 7 && w(txt, fs) > room) fs -= 0.5;
+    if (w(txt, fs) > room) {
+      var cut = txt;
+      while (cut.length > 2 && w(cut + ".", fs) > room) cut = cut.slice(0, -1);
+      txt = cut + ".";
+    }
+    return { txt: txt, fs: fs };
+  }
   var css = getComputedStyle(document.documentElement);
   function tok(n) { return css.getPropertyValue("--" + n).trim(); }
 
@@ -365,14 +383,21 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   /* corner triangles, in arrival order: top-left, top-right, bottom-right, bottom-left */
   var CORNERS = ["tl", "tr", "br", "bl"];
   var POINTS = { tl: "0,0 10,0 0,10", tr: "0,0 10,0 10,10", br: "10,0 10,10 0,10", bl: "0,0 10,10 0,10" };
+  /* label centre on the line parallel to the long edge, and its angle */
+  var LABEL_AT = { tl: [0.31, 0.31, -45], tr: [0.69, 0.31, 45], br: [0.69, 0.69, -45], bl: [0.31, 0.69, 45] };
   function corners(list, s) {
     var big = s >= 44;
-    var t = Math.max(6, Math.round(s * (big ? 0.36 : 0.3)));
+    var t = Math.max(6, Math.round(s * (big ? 0.44 : 0.3)));
     var h = "";
     for (var i = 0; i < list.length && i < 4; i++) {
       var p = list[i], k = CORNERS[i];
       h += '<span class="tri ' + k + '" style="width:' + t + "px;height:" + t + 'px"><svg viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + POINTS[k] + '" style="fill:' + P[p] + '" vector-effect="non-scaling-stroke"/></svg>';
-      if (big) h += '<b style="color:' + onColour(P[p]) + '">' + NAMES[p].slice(0, 2).toUpperCase() + "</b>";
+      if (big) {
+        var at = LABEL_AT[k];
+        var room = 0.62 * t * Math.SQRT2 - 6;
+        var f = LABEL === "name" ? fitName(NAMES[p], room, Math.round(s * 0.16)) : { txt: NAMES[p].slice(0, 2).toUpperCase(), fs: Math.max(7, Math.round(s * 0.16)) };
+        h += '<b class="rot" style="left:' + (at[0] * t) + "px;top:" + (at[1] * t) + "px;font-size:" + f.fs + "px;color:" + onColour(P[p]) + ";transform:translate(-50%,-50%) rotate(" + at[2] + 'deg)">' + esc(f.txt) + "</b>";
+      }
       h += "</span>";
     }
     return h;
@@ -417,11 +442,14 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     var four = [1, 3, 4, 5];
     [60, 32, 18].forEach(function (sz) {
       var row = [1, 2, 3, 4].map(function (n) { return { letter: "A", cursors: four.slice(0, n) }; });
-      h += spec(grid([row], sz), sz + " px", sz >= 44 ? "1 to 4 players, with initials" : "1 to 4 players, colour only");
+      h += spec(grid([row], sz), sz + " px", sz >= 44 ? "1 to 4 players, with names" : "1 to 4 players, colour only");
+    });
+    [72, 88].forEach(function (sz) {
+      h += spec(grid([[{ letter: "A", cursors: four }]], sz), sz + " px", "where names start to fit whole");
     });
     h += spec(grid([[{ letter: "A", cursors: [1, 3, 4, 5, 6] }]], 60), "Five on one cell", "the fifth is not drawn");
     h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two top corners");
-    h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "smallest size with initials");
+    h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "smallest size with a label");
     set("corners", h);
 
     var s = 64;
@@ -627,20 +655,20 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
         '<div class="tabs" role="tablist"><button type="button" role="tab" id="t-s" aria-selected="' + (st.tab === "stream") + '">Discussion</button><button type="button" role="tab" id="t-p" aria-selected="' + (st.tab === "players") + '">Joueurs (4)</button></div>';
       if (st.tab === "stream") {
         h += '<div class="stream">' +
-          '<div class="evt">→ Bo a rejoint la partie</div>' +
-          '<div class="evt">✎ Bo a rempli MIME · LEST</div>' +
+          '<div class="evt">→ Bruno a rejoint la partie</div>' +
+          '<div class="evt">✎ Bruno a rempli MIME · LEST</div>' +
           '<div class="msg">' + who(0) + "<span>Quelqu’un a une idée pour Flaire ?</span></div>" +
-          '<div class="evt">⚑ Dé bloque sur « Flaire »</div>' +
-          '<div class="evt">👁 Dé a révélé une lettre · 4 restantes</div>' +
+          '<div class="evt">⚑ Dédé bloque sur « Flaire »</div>' +
+          '<div class="evt">👁 Dédé a révélé une lettre · 4 restantes</div>' +
           '<div class="msg">' + who(1) + "<span>SENT, je pense 👍</span></div>" +
           '<div class="evt">✓ Ana a vérifié le mot AMEN · 1 erreur</div>' +
           '</div><div class="compose"><span>Écrire un message…</span><button type="button" class="pill">Envoyer</button></div>';
       } else {
         h += '<div class="players">' +
           '<div class="row">' + dot(0) + '<b>Ana</b> (vous)<span class="st">actif · Sans contenu</span></div>' +
-          '<div class="row">' + dot(1) + 'Bo<span class="st">actif · Alourdit le ballon</span></div>' +
-          '<div class="row idle">' + dot(3) + 'Dé<span class="st">inactif · Flaire</span></div>' +
-          '<div class="row">' + dot(4) + 'Él<span class="st">actif · Artiste muet</span></div>' +
+          '<div class="row">' + dot(1) + 'Bruno<span class="st">actif · Alourdit le ballon</span></div>' +
+          '<div class="row idle">' + dot(3) + 'Dédé<span class="st">inactif · Flaire</span></div>' +
+          '<div class="row">' + dot(4) + 'Éloïse<span class="st">actif · Artiste muet</span></div>' +
           '<div class="row"><button type="button" class="pill">Inviter</button><button type="button" class="pill" id="p-auth">Auteurs : ' + (st.authors ? "oui" : "non") + "</button></div></div>";
       }
       h += "</div>";
@@ -681,15 +709,20 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     st.flagged[st.w] = !st.flagged[st.w]; renderPhone();
     if (st.flagged[st.w]) showToast("⚑ Vous bloquez sur « " + FX.words[st.w].clue + " »");
   });
-  var notes = ["⚑ Dé bloque sur « Flaire »", "Bo : SENT, je pense 👍", "👁 Dé a révélé une lettre", "→ Él a rejoint la partie"], ni = 0;
+  var notes = ["⚑ Dédé bloque sur « Flaire »", "Bruno : SENT, je pense 👍", "👁 Dédé a révélé une lettre", "→ Éloïse a rejoint la partie"], ni = 0;
   function nextNote() { ni = (ni + 1) % notes.length; showToast(notes[ni]); }
   document.getElementById("replay").addEventListener("click", nextNote);
   document.getElementById("timer").addEventListener("click", nextNote);
 
   document.querySelectorAll(".switch button").forEach(function (b) {
     b.addEventListener("click", function () {
-      TINT = b.dataset.tint === "on";
-      document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      if (b.dataset.label) {
+        LABEL = b.dataset.label;
+        document.querySelectorAll("[data-label]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      } else {
+        TINT = b.dataset.tint === "on";
+        document.querySelectorAll("[data-tint]").forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+      }
       renderStatic(); renderPhone();
     });
   });
