@@ -9,7 +9,11 @@ fail them, so the gate should run this file alone (`SERIAL_TEST_FILES`).
 
 Every player enters through spec 011's `enter_room` in a context of its own; a page
 reopened in the same context resumes the same player (spec 012's stored identity).
-The shared setup is in `spec027_harness`.
+
+The last section is the exception: the two tests of a page that loses its socket
+(AC-3, "Browser with mocked socket") run on spec 025's mocked socket and
+Playwright's page clock, as the tests of AC-5 do, so no machine load can shift what
+they read. The shared setup is in `spec027_harness`.
 """
 
 from __future__ import annotations
@@ -24,13 +28,33 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from spec022_harness import new_player_page
 from spec024_harness import EnterRoom, cell_at, grid_from_text
+from spec025_harness import MockRoomSocket
 from spec027_harness import (
     PAGE_TIMEOUT_MS,
+    advance_clock,
+    advance_until_join,
+    advance_until_text,
     clock_seconds,
     elapsed_ms_of,
+    new_context_page,
+    open_timer_room,
+    send_reconnect_snapshot,
     text_of,
     timer_of,
 )
+
+# Spec 017: a close with any code but a final one is a lost connection.
+LOSS_CLOSE_CODE = 1011
+RUNNING_AT_65_S = 65_000
+RECONNECT_SNAPSHOT_MS = 62_000
+# From the first snapshot (65,000 ms) to `1:10` takes 5 s of the page's clock.
+TO_1_10_LIMIT_MS = 6000
+# The first reconnection comes 1 s after the loss (spec 017); the test lets the
+# page count 500 ms offline first.
+OFFLINE_MS = 500
+RECONNECT_LIMIT_MS = 3000
+# "Within 300 ms" of the reconnect snapshot, on the page's clock.
+SNAPSHOT_WINDOW_MS = 300
 
 # ---- Fixtures ----
 
@@ -231,3 +255,70 @@ def test_ac3_a_room_whose_players_all_left_without_a_letter_stays_at_zero(
         expect(timer_of(second)).to_have_attribute("data-running", "false")
     finally:
         context.close()
+
+
+# ---- AC-3: a page that loses its socket (mocked socket, page clock) ----
+
+
+def lose_the_socket_at_1_10(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
+    """Show 65,000 ms running; close the socket with 1011 once the timer reads 1:10.
+
+    Returns:
+        The mocked socket, once the page shows `data-status="reconnecting"`.
+    """
+    mock = open_timer_room(
+        page,
+        live_server,
+        grid,
+        elapsed_ms=RUNNING_AT_65_S,
+        running=True,
+        frozen=True,
+    )
+    advance_until_text(page, "1:10", TO_1_10_LIMIT_MS)
+    mock.close(LOSS_CLOSE_CODE)
+    expect(page.get_by_test_id("room-page")).to_have_attribute(
+        "data-status", "reconnecting"
+    )
+    return mock
+
+
+def test_ac3_a_page_that_lost_its_socket_keeps_counting_while_it_is_offline(
+    browser: Browser, live_server: str, fx01_grid: Grid
+) -> None:
+    page, close = new_context_page(browser)
+    try:
+        lose_the_socket_at_1_10(page, live_server, fx01_grid)
+        counted_at_loss = elapsed_ms_of(page)
+        assert counted_at_loss >= 70_000, counted_at_loss
+
+        advance_clock(page, OFFLINE_MS)
+
+        expect(timer_of(page)).to_have_attribute("data-running", "true")
+        assert elapsed_ms_of(page) > counted_at_loss
+    finally:
+        close()
+
+
+def test_ac3_a_page_that_reconnects_shows_the_snapshot_value_although_it_is_lower(
+    browser: Browser, live_server: str, fx01_grid: Grid
+) -> None:
+    page, close = new_context_page(browser)
+    try:
+        mock = lose_the_socket_at_1_10(page, live_server, fx01_grid)
+        advance_clock(page, OFFLINE_MS)
+        counted_offline = elapsed_ms_of(page)
+        assert counted_offline >= 70_000, counted_offline
+        advance_until_join(page, mock, 1, RECONNECT_LIMIT_MS)
+
+        send_reconnect_snapshot(mock, fx01_grid, 1, elapsed_ms=RECONNECT_SNAPSHOT_MS)
+        expect(page.get_by_test_id("room-page")).to_have_attribute(
+            "data-status", "joined"
+        )
+        advance_clock(page, SNAPSHOT_WINDOW_MS)
+
+        expect(timer_of(page)).to_have_text("1:02")
+        expect(timer_of(page)).to_have_attribute("data-running", "true")
+        shown = elapsed_ms_of(page)
+        assert RECONNECT_SNAPSHOT_MS <= shown <= 63_500, shown
+    finally:
+        close()

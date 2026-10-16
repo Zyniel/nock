@@ -103,14 +103,16 @@ def test_ac8_the_timer_and_its_toggle_open_the_toolbar_before_the_chat_toggle(
         open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
         )
+        # The toolbar's direct children: three elements inside a wrapper, or a
+        # wrapper first, would not be "the first three elements of room-toolbar".
         script = """
         () => {
           const toolbar = document.querySelector('[data-testid="room-toolbar"]');
           const found = [];
-          for (const element of toolbar.querySelectorAll('[data-testid]')) {
-            found.push(element.getAttribute('data-testid'));
+          for (const child of Array.from(toolbar.children).slice(0, 3)) {
+            found.push(child.getAttribute('data-testid'));
           }
-          return found.slice(0, 3);
+          return found;
         }
         """
 

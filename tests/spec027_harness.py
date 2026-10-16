@@ -6,28 +6,35 @@ are in `tests/test_spec_027_*.py`, one file per criterion group:
 - `test_spec_027_ac01_ac03_rules_and_websocket.py`: AC-1 and AC-3 (rule, WebSocket
   with a fake clock);
 - `test_spec_027_ac02_ac03_live_pages.py`: AC-2 and AC-3 (browsers on the live
-  server, real time: the file is timing-sensitive);
+  server, real time: the file is timing-sensitive; the two tests of a page that
+  loses its socket are the exception, they use a mocked socket and the page's clock);
 - `test_spec_027_ac04_hide.py`: AC-4 (page with a mocked socket);
 - `test_spec_027_ac05_display.py`: AC-5 (page with a mocked socket and Playwright's
-  page clock);
+  page clock), the malformed values of a snapshot and of `grid_solved` included;
 - `test_spec_027_ac06_ac07_solve_and_restart.py`: AC-6 and AC-7 (rule, `replay`,
   `RoomStore`);
 - `test_spec_027_ac08_a11y_and_french.py`: AC-8, the semantics, the keyboard, the
   scans and `fr.json`;
 - `test_spec_027_ac08_layout.py`: AC-8, the layout at every window size.
 
-The page's clock. Where a test needs an exact reading of a running timer (AC-5),
-the page is opened with Playwright's page clock: `page.clock.install` before the
-page loads, then `freeze_clock` (`page.clock.pause_at`) once the page has sent its
-join and before the snapshot arrives, so that `performance.now()` is the same when
-the page anchors the timer and when the test reads it: no real delay can shift a
-value. `advance_clock` then moves the clock by hand, in small steps with a real
-pause between them, so that the pong the mocked socket sends back to each of the
-page's `ping` frames (spec 017) reaches the page before its next 4 s check.
-Nothing in those tests depends on how fast the machine is. Units: Playwright for
-Python reads a number given to `install`, `pause_at`, `set_fixed_time` and
-`set_system_time` as SECONDS (it multiplies it by 1000), and a number given to
-`run_for` and `fast_forward` as milliseconds.
+The page's clock. Where a test needs an exact reading of a running timer (AC-3's
+page that loses its socket, AC-5), the page is opened with Playwright's page clock:
+`page.clock.install` before the page loads, then `freeze_clock`
+(`page.clock.pause_at`) once the page has sent its join and before the snapshot
+arrives, so that `performance.now()` is the same when the page anchors the timer and
+when the test reads it: no real delay can shift a value. `advance_clock` then moves
+the clock by hand, in small steps with a real pause between them, so that the pong
+the mocked socket sends back to each of the page's `ping` frames (spec 017) reaches
+the page before its next 4 s check. Nothing in those tests depends on how fast the
+machine is. Units: Playwright for Python reads a number given to `install`,
+`pause_at`, `set_fixed_time` and `set_system_time` as SECONDS (it multiplies it by
+1000), and a number given to `run_for` and `fast_forward` as milliseconds.
+
+Malformed values. The protocol models refuse a timer value that is not a whole
+number of at least 0, and a `timer_running` that is not a boolean (spec 039), so the
+page's defensive rules (AC-5) cannot be tested with a frame that the models build.
+The test takes a valid frame as a JSON object, changes or removes one field and sends
+the text: `frame_with_field`, with `ABSENT` for a field that the frame must not hold.
 
 The fixtures (`fx01_grid`, `dist_dir`, `registry`...) are defined in each test file
 that needs them, as thin wrappers: a fixture imported from here would be an unused
@@ -40,10 +47,11 @@ import json
 import re
 import time
 from collections.abc import Callable
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
+from playwright.sync_api import Error as PlaywrightError
 
 from nock.grid import Grid
 from nock.hub import RoomRegistry
@@ -79,14 +87,14 @@ from spec024_harness import (
     default_players,
     expect_seq,
 )
-from spec025_harness import MockRoomSocket
+from spec025_harness import MockRoomSocket, without_pings
 
 THIRD_TOKEN = "third-token-number-0003"
 PAGE_TIMEOUT_MS = 10_000
 QUIET_MS = 300
 CLOCK_STEP_MS = 100
 CLOCK_PAUSE_JUMP_MS = 50
-POLL_MS = 25
+FREEZE_ATTEMPTS = 5
 DEFAULT_BUDGET = RevealBudget(letters=5, words=1)
 
 # The WebSocket tests' room (spec 027, "Test harness"): the clock only moves when the
@@ -343,6 +351,43 @@ def local_storage_value(page: Page, key: str) -> str | None:
     return value
 
 
+# ---- Malformed frames ----
+
+
+class Absent:
+    """The value of a field that a frame must not hold at all."""
+
+
+ABSENT = Absent()
+
+
+def frame_with_field(frame: str, field: str, value: object) -> str:
+    """Change one field of a valid frame, or remove it, and give the new text.
+
+    The protocol models refuse a malformed timer value (spec 039), so a test of the
+    page's defensive rules takes a valid frame as a JSON object, changes the field
+    and sends the text.
+
+    Args:
+        frame: A valid frame, as the protocol models write it.
+        field: The name of a field the frame holds.
+        value: The new value (a JSON value, `None` for `null`), or `ABSENT` to
+            remove the field.
+
+    Returns:
+        The JSON text of the frame with the change.
+    """
+    parsed = json.loads(frame)
+    assert isinstance(parsed, dict), frame
+    fields: dict[str, object] = dict(parsed)
+    assert field in fields, f"the frame has no field {field!r}: {frame}"
+    if value is ABSENT:
+        del fields[field]
+    else:
+        fields[field] = value
+    return json.dumps(fields)
+
+
 # ---- The page with a mocked socket ----
 
 
@@ -388,6 +433,58 @@ def timer_snapshot(
     )
 
 
+def join_room_page(
+    page: Page,
+    base_url: str,
+    *,
+    frozen: bool = False,
+    room_code: str = ROOM_CODE,
+) -> MockRoomSocket:
+    """Open a room on a mocked socket and join as Ana; the snapshot is for the test.
+
+    Args:
+        page: A fresh page.
+        base_url: The live server, which serves the built client.
+        frozen: Whether the page's clock is frozen when the snapshot arrives (see
+            the module docstring); `advance_clock` then moves it.
+        room_code: The room's code, for the page's URL and the socket route. A
+            code the browser has not opened before shows the nickname form (spec
+            012's stored identity is per room).
+
+    Returns:
+        Spec 025's mocked socket, which has received the page's join and answers
+        each ping with a pong.
+    """
+    page.set_default_timeout(PAGE_TIMEOUT_MS)
+    if frozen:
+        page.clock.install(time=0)
+    mock = MockRoomSocket(page)
+    route = re.compile(rf".*/api/rooms/{room_code}/ws$")
+    page.route_web_socket(route, mock.handle)
+    page.goto(f"{base_url}/r/{room_code}")
+    nickname_input = page.get_by_test_id("nickname-input")
+    nickname_input.fill("Ana")
+    nickname_input.press("Enter")
+    mock.wait_for_join_on_socket(0)
+    if frozen:
+        freeze_clock(page)
+    return mock
+
+
+def show_snapshot(page: Page, mock: MockRoomSocket, frame: str, seq: int) -> None:
+    """Send a snapshot frame and wait until the page shows its grid.
+
+    Args:
+        page: The page, joined on `mock`.
+        mock: The page's mocked socket.
+        frame: The JSON text of a FX-01 snapshot, valid or not.
+        seq: The `seq` the frame holds, which the page then shows.
+    """
+    mock.send(frame)
+    expect_seq(page, seq)
+    expect(page.get_by_test_id("cell")).to_have_count(25)
+
+
 def open_timer_room(
     page: Page,
     base_url: str,
@@ -421,19 +518,7 @@ def open_timer_room(
     Returns:
         Spec 025's mocked socket: it answers each ping with a pong.
     """
-    page.set_default_timeout(PAGE_TIMEOUT_MS)
-    if frozen:
-        page.clock.install(time=0)
-    mock = MockRoomSocket(page)
-    route = re.compile(rf".*/api/rooms/{room_code}/ws$")
-    page.route_web_socket(route, mock.handle)
-    page.goto(f"{base_url}/r/{room_code}")
-    nickname_input = page.get_by_test_id("nickname-input")
-    nickname_input.fill("Ana")
-    nickname_input.press("Enter")
-    mock.wait_for_join_on_socket(0)
-    if frozen:
-        freeze_clock(page)
+    mock = join_room_page(page, base_url, frozen=frozen, room_code=room_code)
     snapshot = timer_snapshot(
         grid,
         elapsed_ms=elapsed_ms,
@@ -442,9 +527,7 @@ def open_timer_room(
         seq=seq,
         players=players,
     )
-    mock.send(snapshot.model_dump_json())
-    expect_seq(page, seq)
-    expect(page.get_by_test_id("cell")).to_have_count(25)
+    show_snapshot(page, mock, snapshot.model_dump_json(), seq)
     return mock
 
 
@@ -454,9 +537,25 @@ def freeze_clock(page: Page) -> None:
     `Date.now()` gives milliseconds, but Playwright for Python reads a number given
     to `pause_at` as seconds (it multiplies it by 1000): the jump is divided by
     1000. `run_for` and `fast_forward` take milliseconds as they are.
+
+    The clock still runs between reading `Date.now()` and pausing. On a loaded
+    machine it can pass the target first, and Playwright then refuses to pause "in
+    the past": the jump doubles and the read starts again, at most
+    `FREEZE_ATTEMPTS` times in all (the longest jump, 800 ms, is far below the
+    page's 2 s ping and 4 s silence timers, so no timer is due).
     """
-    now_ms = page.evaluate("() => Date.now()")
-    page.clock.pause_at((now_ms + CLOCK_PAUSE_JUMP_MS) / 1000)
+    jump_ms = CLOCK_PAUSE_JUMP_MS
+    for attempt in range(FREEZE_ATTEMPTS):
+        now_ms = page.evaluate("() => Date.now()")
+        try:
+            page.clock.pause_at((now_ms + jump_ms) / 1000)
+            return
+        except PlaywrightError as error:
+            is_target_in_the_past = "fast-forward to the past" in str(error)
+            is_last_attempt = attempt == FREEZE_ATTEMPTS - 1
+            if not is_target_in_the_past or is_last_attempt:
+                raise
+            jump_ms *= 2
 
 
 def send_reconnect_snapshot(
@@ -506,19 +605,47 @@ def advance_until_text(page: Page, expected: str, limit_ms: int) -> int:
     return moved
 
 
+def has_sent_a_join(mock: MockRoomSocket, socket_index: int) -> bool:
+    """Whether the page's socket number `socket_index` sent a frame, pings aside."""
+    if len(mock.route_frames) <= socket_index:
+        return False
+    return len(without_pings(mock.route_frames[socket_index])) > 0
+
+
+def advance_until_join(
+    page: Page, mock: MockRoomSocket, socket_index: int, limit_ms: int
+) -> int:
+    """Advance a frozen clock until the page's next socket has sent its join.
+
+    A page that lost its connection opens a new socket after the delay of spec 017
+    (1 s for the first try), counted on the page's clock.
+
+    Args:
+        page: The page, with a frozen clock, whose connection was lost.
+        mock: The page's mocked socket.
+        socket_index: The index of the socket the page opens next: 1 for the first
+            reconnection.
+        limit_ms: The most the clock may move.
+
+    Returns:
+        How far the clock moved, in milliseconds. The test fails when the page sent
+        no join on that socket after `limit_ms`.
+    """
+    moved = 0
+    while not has_sent_a_join(mock, socket_index):
+        if moved >= limit_ms:
+            pytest.fail(
+                f"the page sent no join on its socket {socket_index} "
+                f"after {moved} ms of the page's clock"
+            )
+        advance_clock(page, CLOCK_STEP_MS)
+        moved += CLOCK_STEP_MS
+    return moved
+
+
 def new_context_page(browser: Browser) -> tuple[Page, Callable[[], None]]:
     """A 1280 by 720 page in a context of its own, and the function that closes it."""
     context = browser.new_context(viewport={"width": 1280, "height": 720})
     page = context.new_page()
     page.set_default_timeout(PAGE_TIMEOUT_MS)
     return page, context.close
-
-
-def sent_frames(mock: MockRoomSocket) -> list[dict[str, Any]]:
-    """Every frame the page sent, `ping` frames left out, as JSON objects."""
-    found: list[dict[str, Any]] = []
-    for frame in mock.frames_without_pings():
-        parsed = json.loads(frame)
-        assert isinstance(parsed, dict), frame
-        found.append(parsed)
-    return found

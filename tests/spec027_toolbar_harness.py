@@ -229,10 +229,8 @@ TOOLBAR_SCRIPT = """
     revealButtons.push(button.getAttribute('data-testid'));
   }
   const firstThree = [];
-  for (const element of toolbar.querySelectorAll('[data-testid]')) {
-    if (firstThree.length < 3) {
-      firstThree.push(element.getAttribute('data-testid'));
-    }
+  for (const child of Array.from(toolbar.children).slice(0, 3)) {
+    firstThree.push(child.getAttribute('data-testid'));
   }
   const ranges = [];
   for (const id of sevenIds) {
@@ -357,7 +355,7 @@ def structure_problems(page: Page, small: bool) -> list[str]:
     if reading["revealButtons"] != ["reveal-letter", "reveal-word"]:
         problems.append(f"reveal buttons: {reading['revealButtons']}")
     if reading["firstThree"] != FIRST_THREE:
-        problems.append(f"first three elements: {reading['firstThree']}")
+        problems.append(f"first three children of the toolbar: {reading['firstThree']}")
     if small:
         apart = pairs_that_do_not_overlap(reading["ranges"])
         if apart != []:

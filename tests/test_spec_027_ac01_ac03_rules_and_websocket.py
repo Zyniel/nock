@@ -85,6 +85,16 @@ def room_with_p1_typing_alone(grid: Grid) -> RoomState:
     return type_letter(state, "p1", 1, 0, "T", NOW).state
 
 
+def room_where_p1_left_and_p2_stayed(grid: Grid) -> RoomState:
+    """AC-3's running room after `p1` left.
+
+    `p1` and `p2` joined at NOW, `p1` typed `T` at (1, 0) at NOW and left at
+    NOW + 30.0, while `p2` stayed connected.
+    """
+    state = type_letter(room_with_players(grid, 2), "p1", 1, 0, "T", NOW).state
+    return disconnect_player(state, "p1", NOW + 30.0).state
+
+
 # ---- AC-1: the first letter starts the timer (rule) ----
 
 
@@ -452,6 +462,35 @@ def test_ac3_a_player_leaving_while_another_is_connected_keeps_the_timer_running
 
     assert timer_fields(outcome.state) == (True, 0, NOW)
     assert snapshot_for(outcome.state, "p2", NOW + 45.0).timer_elapsed_ms == 45000
+
+
+def test_ac3_a_player_coming_back_to_a_running_room_gets_the_running_time(
+    fx01_grid: Grid,
+) -> None:
+    left = room_where_p1_left_and_p2_stayed(fx01_grid)
+
+    outcome = rejoin(left, "Ana", FIRST_TOKEN, NOW + 45.0)
+
+    snapshot = snapshot_in(outcome)
+    assert snapshot.you == "p1"
+    assert snapshot.timer_elapsed_ms == 45000
+    assert snapshot.timer_running is True
+
+
+def test_ac3_a_player_coming_back_to_a_running_room_changes_no_timer_field(
+    fx01_grid: Grid,
+) -> None:
+    left = room_where_p1_left_and_p2_stayed(fx01_grid)
+    assert left.timer_resumed_at == NOW
+    assert left.timer_elapsed_ms == 0
+
+    outcome = rejoin(left, "Ana", FIRST_TOKEN, NOW + 45.0)
+
+    assert snapshot_in(outcome).you == "p1"
+    assert outcome.state.players[0].state == PlayerState.ACTIVE
+    assert outcome.state.timer_resumed_at == NOW
+    assert outcome.state.timer_elapsed_ms == 0
+    assert timer_fields(outcome.state) == (True, 0, NOW)
 
 
 def test_ac3_the_second_player_leaving_pauses_the_timer(fx01_grid: Grid) -> None:
