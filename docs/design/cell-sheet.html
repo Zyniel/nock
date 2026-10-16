@@ -191,7 +191,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.11 · smaller red notch</div>
+    <div class="ver">Version 3.12 · grid letters A to Z only</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
@@ -483,7 +483,8 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
     h = "";
     P.forEach(function (c, i) {
-      var ch = NAMES[i].charAt(0).toUpperCase();
+      /* grid letters are A to Z only: drop the accent (É of Éloïse becomes E) */
+      var ch = NAMES[i].charAt(0).normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
       h += spec(grid([[{ letter: ch, author: i, forceAuthors: true }, { letter: ch, author: i, cls: ["word"], forceAuthors: true }, { letter: ch, author: i, cls: ["sel"], forceAuthors: true }]], 48),
         '<span style="color:' + INK[i] + '">' + NAMES[i] + "</span>", "ink " + INK[i] + " · triangle " + c);
     });
