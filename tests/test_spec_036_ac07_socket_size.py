@@ -117,12 +117,17 @@ def test_ac7_server_config_limits_frames_to_ws_max_size_bytes(tmp_path: Path) ->
     assert config.ws_max_size == nock.server.WS_MAX_SIZE_BYTES == MAX_WS_FRAME_BYTES
 
 
-def test_ac7_server_config_defaults_to_127_0_0_1_port_8000_and_info(
+def test_ac7_server_config_defaults_to_127_0_0_1_port_8000_and_warning(
     tmp_path: Path,
 ) -> None:
     config = nock.server.server_config(create_app(dist_dir=tmp_path))
 
-    assert (config.host, config.port, config.log_level) == ("127.0.0.1", 8000, "info")
+    # `warning` since spec 038 decision 9 (spec 036's note of 2026-10-16).
+    assert (config.host, config.port, config.log_level) == (
+        "127.0.0.1",
+        8000,
+        "warning",
+    )
 
 
 def test_ac7_server_config_uses_the_host_port_and_log_level_it_is_given(
@@ -130,11 +135,13 @@ def test_ac7_server_config_uses_the_host_port_and_log_level_it_is_given(
 ) -> None:
     app = create_app(dist_dir=tmp_path)
 
+    # A level other than the default `warning`, so that the test shows the level
+    # given is the one used.
     config = nock.server.server_config(
-        app, host="0.0.0.0", port=9123, log_level="warning"
+        app, host="0.0.0.0", port=9123, log_level="error"
     )
 
-    assert (config.host, config.port, config.log_level) == ("0.0.0.0", 9123, "warning")
+    assert (config.host, config.port, config.log_level) == ("0.0.0.0", 9123, "error")
     assert config.ws_max_size == MAX_WS_FRAME_BYTES
 
 

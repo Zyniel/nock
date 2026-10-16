@@ -13,7 +13,8 @@ Notes:
 - AC-8 and AC-9 release their free port before `python -m nock` binds it, as the
   harness says; the process is terminated, then killed, at the end of the test.
 - The process gets the test's own environment with NOCK_DATABASE and NOCK_PORT
-  set and NOCK_HOST deleted, as the harness says.
+  set and NOCK_HOST and NOCK_OPERATOR_TOKEN deleted, as the harness says (spec
+  038 refined it: `main()` checks NOCK_OPERATOR_TOKEN first).
 """
 
 from __future__ import annotations
@@ -44,7 +45,12 @@ from spec036_frames_harness import (
     padded_frame,
     socket_url,
 )
-from spec036_harness import DATABASE_VARIABLE, HOST_VARIABLE, PORT_VARIABLE
+from spec036_harness import (
+    DATABASE_VARIABLE,
+    HOST_VARIABLE,
+    OPERATOR_TOKEN_VARIABLE,
+    PORT_VARIABLE,
+)
 
 # The fixtures of the harness. pytest looks for a test's fixtures among the names of
 # its module, so they are imported by name. `x as x` is the explicit re-export
@@ -95,9 +101,13 @@ def free_local_port() -> int:
 
 
 def nock_environment(database: Path, port: int) -> dict[str, str]:
-    """The test's own environment plus NOCK_DATABASE and NOCK_PORT, no NOCK_HOST."""
+    """The test's own environment plus NOCK_DATABASE and NOCK_PORT.
+
+    NOCK_HOST and NOCK_OPERATOR_TOKEN are deleted.
+    """
     environment = dict(os.environ)
     environment.pop(HOST_VARIABLE, None)
+    environment.pop(OPERATOR_TOKEN_VARIABLE, None)
     environment[DATABASE_VARIABLE] = str(database)
     environment[PORT_VARIABLE] = str(port)
     return environment

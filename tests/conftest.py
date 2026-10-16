@@ -29,6 +29,21 @@ pytest.register_assert_rewrite(*HARNESS_MODULES)
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
+# Spec 038: the operator token. `create_app` reads it when the app starts, and
+# `main()` checks it first.
+OPERATOR_TOKEN_VARIABLE = "NOCK_OPERATOR_TOKEN"
+
+
+@pytest.fixture(autouse=True)
+def no_operator_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Delete NOCK_OPERATOR_TOKEN from the environment for every test (spec 038).
+
+    A value left in the shell that runs the tests would otherwise switch the
+    operator pages on in every app, or, when it is invalid, stop every app's
+    startup and every `main()`. A test that needs the variable sets it itself.
+    """
+    monkeypatch.delenv(OPERATOR_TOKEN_VARIABLE, raising=False)
+
 
 class FakeClock:
     """A clock a test moves by hand: a callable returning `now`.

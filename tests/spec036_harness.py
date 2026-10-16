@@ -34,10 +34,14 @@ from nock.protocol import EditLetter, LetterChanged
 # ---- Values of the spec --------------------------------------------------------------
 
 # The variables that `python -m nock` reads (AC-8 to AC-12); NOCK_DATABASE is spec
-# 018's.
+# 018's. `main()` also reads spec 038's NOCK_OPERATOR_TOKEN, first: no case of this
+# spec sets it, and each one deletes it, so that a value left in the environment
+# that runs the tests cannot stop a case (spec 036's "Test harness", refined for
+# spec 038).
 HOST_VARIABLE = "NOCK_HOST"
 PORT_VARIABLE = "NOCK_PORT"
 DATABASE_VARIABLE = "NOCK_DATABASE"
+OPERATOR_TOKEN_VARIABLE = "NOCK_OPERATOR_TOKEN"
 
 
 # ---- Values of the test harness ------------------------------------------------------
