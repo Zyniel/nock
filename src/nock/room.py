@@ -87,6 +87,8 @@ from nock.protocol import (
 
 Clock = Callable[[], float]  # seconds since the epoch; the default is time.time
 RoomCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{6}$")]
+# spec 028: names a room's public recap; never sent in a snapshot or an event
+ShareToken = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{16,64}$")]
 
 RATE_WINDOW_SECONDS: float = 1.0  # spec 037 AC-3
 MAX_PLAYERS: int = 8  # spec 012 AC-4
@@ -246,6 +248,9 @@ class RoomState(RoomModel):
     timer_elapsed_ms: int = Field(default=0, ge=0, strict=True)
     # clock time the current run began; None when the timer is not running
     timer_resumed_at: float | None = None
+    # spec 028: names the public recap. A room stored before this spec has no
+    # such key and loads with None: it has no share link.
+    share_token: ShareToken | None = None
 
 
 class LogEntry(RoomModel):
@@ -278,7 +283,11 @@ class Outcome(RoomModel):
 
 
 def new_room(
-    code: str, grid: Grid, now: float, grid_number: int | None = None
+    code: str,
+    grid: Grid,
+    now: float,
+    grid_number: int | None = None,
+    share_token: str | None = None,
 ) -> RoomState:
     """Return a fresh room: seq 0, no player, every letter cell empty.
 
@@ -287,13 +296,16 @@ def new_room(
         grid: The grid to solve.
         now: Clock time of the creation.
         grid_number: Catalogue number of the grid, None for a bare grid.
+        share_token: The token of the room's public recap (spec 028), 16 to 64
+            characters of A-Z, a-z, 0-9, "_" and "-"; None for no share link.
 
     Returns:
         The new state. `cells` holds one empty cell per letter cell of `grid`,
         in the order of `grid.cells`.
 
     Raises:
-        pydantic.ValidationError: `code` breaks the room code pattern.
+        pydantic.ValidationError: `code` breaks the room code pattern, or
+            `share_token` breaks the share token pattern.
     """
     cells: list[CellState] = []
     for grid_cell in grid.cells:
@@ -305,6 +317,7 @@ def new_room(
         grid_number=grid_number,
         created_at=now,
         cells=tuple(cells),
+        share_token=share_token,
     )
 
 

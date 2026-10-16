@@ -29,6 +29,7 @@ from nock.protocol import (
     Pong,
     Snapshot,
 )
+from nock.recap import PublicRecap, Recap, build_recap, public_recap
 from nock.room import (
     DEFAULT_CONFIG,
     SILENCE_CLOSE_CODE,
@@ -60,6 +61,7 @@ logger = logging.getLogger(__name__)
 
 ROOM_CODE_ALPHABET: str = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0, O, 1, I
 ROOM_CODE_LENGTH: int = 6
+SHARE_TOKEN_BYTES: int = 16  # spec 028: secrets.token_urlsafe(16), 22 characters
 
 MAX_FRAME_BYTES: int = 4096  # spec 037: larger frames are not parsed
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
@@ -695,7 +697,8 @@ class RoomRegistry:
 
         Returns:
             A code of ROOM_CODE_LENGTH characters of ROOM_CODE_ALPHABET, drawn
-            at random and different from every code in use.
+            at random and different from every code in use. The room also gets
+            a random share token (spec 028), which is not its code.
 
         Raises:
             RuntimeError: the registry is closed.
@@ -705,7 +708,8 @@ class RoomRegistry:
             code = _draw_code()
             while self._is_taken(code):
                 code = _draw_code()
-            state = new_room(code, grid, self._clock(), grid_number)
+            share_token = secrets.token_urlsafe(SHARE_TOKEN_BYTES)
+            state = new_room(code, grid, self._clock(), grid_number, share_token)
             self._store.create_room(state)
             self._runners[code] = self._new_runner(state, state.seq)
             return code
@@ -741,6 +745,42 @@ class RoomRegistry:
         if runner is None:
             return None
         return runner.state
+
+    def room_recap(self, code: str) -> Recap | None:
+        """Return the recap of room `code` (spec 028), from its state and its log.
+
+        Returns:
+            `build_recap` of the room's latest state and its stored log; None when
+            there is no such room, when it is not solved, or when its log does
+            not hold its whole history (a room added in a later state).
+        """
+        state = self.room_state(code)
+        if state is None or not state.solved:
+            return None
+        # The log is read after the state: the store holds every entry of the
+        # state, and build_recap leaves out the ones that came after it.
+        log = self._store.read_log(code)
+        try:
+            return build_recap(state, log)
+        except ValueError:
+            return None
+
+    def shared_recap(self, token: str) -> PublicRecap | None:
+        """Return the public recap of the room whose share token is `token`.
+
+        A room that is only in the store is loaded first (see `room_state`).
+
+        Returns:
+            `public_recap` of the room's recap; None when no room has this token
+            (a malformed token included) or `room_recap` gives None.
+        """
+        code = self._store.code_for_share_token(token)
+        if code is None:
+            return None
+        recap = self.room_recap(code)
+        if recap is None:
+            return None
+        return public_recap(recap)
 
     def connect(self, code: str) -> RoomConnection | None:
         """Open a connection to room `code` for a socket that has not joined.
