@@ -14,6 +14,23 @@ export function readItem(key: string): string | null {
   }
 }
 
+// The key of every stored value, in the browser's order; a browser that refuses
+// storage has none.
+export function storedKeys(): string[] {
+  const keys: string[] = []
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index)
+      if (key !== null) {
+        keys.push(key)
+      }
+    }
+  } catch {
+    return []
+  }
+  return keys
+}
+
 export function writeItem(key: string, value: string): void {
   try {
     localStorage.setItem(key, value)
