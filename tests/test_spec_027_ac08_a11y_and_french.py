@@ -67,7 +67,9 @@ def test_ac8_the_time_patterns_do_not_hide_the_untranslated_samples() -> None:
     fr = load_fr()
     assert "timer.minutes_seconds" in fr
     assert "timer.hours_minutes_seconds" in fr
-    samples = ["Loading…", "Salon", "Check word"]
+    # The time patterns need digits on both sides of each `:`, not a `:` alone
+    # (spec 027, "New `fr.json` keys"): `Error: connection lost` holds a `:` too.
+    samples = ["Loading…", "Salon", "Check word", "Error: connection lost", "Score: 3"]
 
     assert unknown_texts(samples, set()) == samples
     assert unknown_texts(["1:05", "1:02:05", "10:00:00", "0:00"], set()) == []

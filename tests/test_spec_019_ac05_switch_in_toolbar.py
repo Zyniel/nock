@@ -24,7 +24,6 @@ Choices where the spec leaves room:
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -49,7 +48,6 @@ from spec019_harness import (
     expect_seq,
     grid_from_text,
     layout_problems,
-    load_fr,
     open_room,
     player_view,
     press,
@@ -58,6 +56,7 @@ from spec019_harness import (
     window_opener,
     with_letter_cells,
 )
+from spec035_harness import unknown_texts
 
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_LIMIT = 100
@@ -372,34 +371,6 @@ def tab_to(page: Page, test_id: str) -> None:
             page.keyboard.press("Escape")
         page.keyboard.press("Shift+Tab" if state["targetIsBefore"] else "Tab")
         presses += 1
-
-
-def template_pattern(template: str) -> re.Pattern[str]:
-    """A `fr.json` value as a pattern: each `{name}` matches one or more characters."""
-    literal_parts = re.split(r"\{[A-Za-z_]+\}", template)
-    escaped_parts = [re.escape(part) for part in literal_parts]
-    return re.compile(".+".join(escaped_parts), re.DOTALL)
-
-
-def normalised(text: str) -> str:
-    return " ".join(text.split())
-
-
-def unknown_texts(texts: list[str], data: set[str]) -> list[str]:
-    """The texts that are neither a `fr.json` value, nor test data, nor trivial."""
-    patterns = [template_pattern(normalised(value)) for value in load_fr().values()]
-    normalised_data = {normalised(item) for item in data}
-    unknown: list[str] = []
-    for text in texts:
-        shown = normalised(text)
-        if shown in normalised_data:
-            continue
-        if re.fullmatch(r"[0-9]+", shown) or re.fullmatch(r"[A-Z]", shown):
-            continue
-        if any(pattern.fullmatch(shown) for pattern in patterns):
-            continue
-        unknown.append(text)
-    return unknown
 
 
 # ---- AC-5: at every window size, desktop and touch --------------------------

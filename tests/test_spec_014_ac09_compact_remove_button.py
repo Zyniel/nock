@@ -13,7 +13,6 @@ Not tested here, with the reason:
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import NamedTuple
 
@@ -43,6 +42,7 @@ from spec014_windows_harness import (
     window_id,
 )
 from spec014_windows_harness import small_window as small_window
+from spec035_harness import unknown_texts
 
 MIN_OUTLINE_PX = 2.0
 MIN_FOCUS_CONTRAST = 3.0
@@ -352,31 +352,6 @@ def remove_button_contrasts(page: Page) -> list[Contrast]:
     return found
 
 
-def template_pattern(template: str) -> re.Pattern[str]:
-    """A `fr.json` value as a pattern: each `{name}` matches one or more characters."""
-    literal_parts = re.split(r"\{[A-Za-z_]+\}", template)
-    escaped_parts = [re.escape(part) for part in literal_parts]
-    return re.compile(".+".join(escaped_parts), re.DOTALL)
-
-
-def normalised(text: str) -> str:
-    return " ".join(text.split())
-
-
-def unknown_texts(texts: list[str]) -> list[str]:
-    """The texts that are no `fr.json` value, nor one letter, nor digits only."""
-    patterns = [template_pattern(normalised(value)) for value in load_fr().values()]
-    unknown: list[str] = []
-    for text in texts:
-        shown = normalised(text)
-        if re.fullmatch(r"[0-9]+", shown) or re.fullmatch(r"[A-Z]", shown):
-            continue
-        if any(pattern.fullmatch(shown) for pattern in patterns):
-            continue
-        unknown.append(text)
-    return unknown
-
-
 SCAN_WINDOW = Window(300, 480, DEFAULT_ROOT_FONT_PX)
 
 
@@ -410,4 +385,4 @@ def test_ac9_browser_the_compact_buttons_pass_the_language_scan(
     for number in range(2, 9):
         label = label_template.replace("{name}", NICKNAMES[number - 1])
         assert texts.count(label) == 1, (label, texts)
-    assert unknown_texts(texts) == []
+    assert unknown_texts(texts, set()) == []

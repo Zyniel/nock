@@ -7,12 +7,15 @@ timer at `10:00:00`, and spec 024 AC-8's readings of the toolbar, run on seven
 buttons: the six of spec 024 and `timer-toggle`. The scripts are spec 024's, copied
 so that this spec does not depend on the test file of another spec. The layout
 matrix uses a stopped timer (36,000,000 ms, not running), so that the text stays
-`10:00:00`; the timer's semantics are checked in `test_spec_027_ac05_display.py`.
+`10:00:00`; the timer's semantics (its role, its label, no live region) are checked
+in `test_spec_027_ac08_a11y_and_french.py`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
+
+# `Any`: the readings come from `page.evaluate`, which returns JSON of any shape.
 from typing import Any
 
 from playwright.sync_api import Browser, Page, expect

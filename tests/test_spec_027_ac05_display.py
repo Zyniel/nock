@@ -294,6 +294,15 @@ def test_ac5_grid_solved_stops_the_timer_on_the_logged_time(
 
 # ---- Letters that must not move the timer ----
 
+# The run of a letter that arrives while the timer runs: the page's clock moves
+# BEFORE_LETTER_MS before the letter and AFTER_LETTER_MS after it. The value is
+# refreshed at least every 250 ms, so with AFTER_LETTER_MS of at least 250 the last
+# refresh was made after the first BEFORE_LETTER_MS, and the value is at least
+# 65,000 + BEFORE_LETTER_MS. The two times together stay under 1,000 ms, so the
+# text still reads `1:05`.
+BEFORE_LETTER_MS = 600
+AFTER_LETTER_MS = 300
+
 
 def test_ac5_a_letter_while_the_timer_runs_does_not_restart_it(
     browser: Browser, live_server: str, fx01_grid: Grid
@@ -308,13 +317,17 @@ def test_ac5_a_letter_while_the_timer_runs_does_not_restart_it(
             running=True,
             frozen=True,
         )
+        # The page's clock moves before the letter arrives. A page that reset the
+        # start of its count on the letter would then count the 65,000 ms of the
+        # snapshot plus only the time that passes after the letter.
+        advance_clock(page, BEFORE_LETTER_MS)
 
         mock.send(letter_frame(6, "T"))
         expect_seq(page, 6)
-        advance_clock(page, 100)
+        advance_clock(page, AFTER_LETTER_MS)
 
         expect(timer_of(page)).to_have_text("1:05")
-        assert elapsed_ms_of(page) >= 65_000
+        assert elapsed_ms_of(page) >= 65_000 + BEFORE_LETTER_MS
     finally:
         close()
 
