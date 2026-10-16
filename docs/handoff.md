@@ -5,7 +5,7 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, afternoon)
+## Where things stand (2026-10-16, night)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -19,15 +19,24 @@ Update it at the end of each session.
   once it has reported a failure it cannot fix), PR #12 (spec 036's refinement:
   technical variables refuse special characters; spec 033's variables brought in
   line), PR #13 (spec 028, end-of-game recap and share link), PR #14 (tooling:
-  the four test files that measure durations in the serial pass). Tag `v0.1.0`
-  exists locally on #6's merge commit but could not be pushed from the cloud
-  session (tag pushes are refused): the human pushes it from a clone.
-- Open: spec 032's pull request (room resume). Its description holds two lead
-  decisions the human may override (13: a mute survives a time-out; 14: only
-  lookups check expiry).
+  the four test files that measure durations in the serial pass), PR #15 (spec
+  032, room resume, seat back and "My rooms"; its two lead decisions stand
+  unless the human overrides them: a mute survives a time-out, only lookups
+  check expiry). Tag `v0.1.0` exists locally on #6's merge commit but could not
+  be pushed from the cloud session (tag pushes are refused): the human pushes
+  it from a clone.
+- Open: the robustness pull request. It has three fixes and changes nothing in
+  the app:
+  - page loads in the tests keep Playwright's 30 s, which ends the Firefox-Windows
+    `Page.goto` timeouts that `main` had after #10, #12 and #14;
+  - the finish hook gives the gate 1,140 s instead of 540 s, since a timed-out
+    gate does not block;
+  - a spec 018 AC-2 race.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only); spec 033's
-  open question 2 (players' addresses outside ASCII; (b) recommended).
+  open question 2 (players' addresses outside ASCII). When 033's turn comes the
+  lead takes (b) under the human's simplicity rule and says so in its pull
+  request.
 - Pull requests, human decision of 2026-10-16: one pull request per spec (with
   its refinements of other specs), and tooling changes in a pull request of
   their own. With one designated branch there is one open pull request at a
@@ -35,21 +44,48 @@ Update it at the end of each session.
   merged. CI runs only on pull requests, so a local check comes first.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
-- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032 are `done` (032
-  in its pull request). Next: the nickname rule below. The human was asked on 2026-10-16 whether to park 029, 033, 034
-  and 038 ("the core is the game engine not all the rest") and what engine work
-  comes first; the lead proposed simplifying the room engine.
+- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032 are `done` and
+  merged. The human chose on 2026-10-16 to build the other four now, in the
+  build plan's order, one pull request each: 038, then 034 ("Then catchup"),
+  033, 029. Before them, the nickname rule's pull request.
 
 ## Work in flight (not pushed)
 
-- Nickname rule (human, 2026-10-16): typed in capitals, stored in capitals
-  (`str.upper()` before the checks), compared exactly (no casefold left), shown
-  with capitalised words (one display function). Worktree
-  `.claude/worktrees/caps-names`, branch `caps-names`, built on spec 032's
-  commits before their last rebase (c0f1be5): spec 2802053, tests 9548b18 (121
-  red without a browser, 34 in Chromium), and the implementer at work. Rebase
-  with `git rebase --onto origin/main c0f1be5 caps-names` once spec 032 is
-  merged; its own pull request then.
+- Nickname rule (human, 2026-10-16): typed in capitals, stored in capitals,
+  compared exactly (no casefold left), shown with capitalised words (one display
+  function).
+  - **Branch:** worktree `.claude/worktrees/caps-names`, branch `caps-names`.
+    Its commits, in order: spec 2802053, tests 9548b18, code 1b6224f; the fix
+    round 94de7ce, f4d2daa, 76e7e31; the second review's suggestions 5006c99,
+    9b31f31, 38e27f4.
+  - **Review:** the second review returned APPROVE. Its pull request text is
+    drafted in the lead's scratchpad (`pr_caps.md`): the verification still has
+    to be filled in, and it lists the reviewer's manual checks of input methods.
+  - **The fix round decided:** NFC before and after the capitals; the field
+    shows capitals through CSS `text-transform: uppercase` and keeps its value
+    as typed (rewriting the value broke input methods and the caret);
+    `displayNickname` lowercases the whole text once, so Greek's final sigma
+    shows.
+  - **Next:** it is built on spec 032's commits before their last rebase
+    (c0f1be5). Once the robustness pull request is merged, rebase it with
+    `git rebase --onto origin/main c0f1be5 caps-names` and give it its own pull
+    request.
+- Spec 038 (privacy and operations).
+  - **Branch:** worktree `.claude/worktrees/spec-038`, branch `spec-038`, built
+    on `caps-names` (38e27f4). Its commits, in order: the spec preparation
+    51482ca, the tests 6a0cfc2, AC-11 in the serial list 62395ff, the spec's
+    gap-fills f66c0d9, the code 515e026, three test fixes 44b1536.
+  - **State:** the first review is running, and the gate passes for spec 038 in
+    all three engines.
+  - **The preparation:** spec 036 was refined after 038's decision 9 (logs at
+    `warning`, no access log, `main()` checks `NOCK_OPERATOR_TOKEN` first). 038
+    was aligned with the code and simplified: the ops API reuses spec 011's
+    throttle, and one store read gives each room's code and creation time.
+  - **The gap-fills:** after a 429 the page acts as after a 401; the token is
+    checked before anything else; only token refusals count.
+  - **Next:** after the nickname rule is merged, rebase with
+    `git rebase --onto origin/main 38e27f4 spec-038`.
+- Then specs 034, 033 and 029, each built on the previous branch.
 - Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
   values, a spec 035 refinement, after 032).
@@ -71,8 +107,8 @@ Update it at the end of each session.
 
 1. Keep the open pull request green until the human merges it; answer its
    review comments.
-2. Then the nickname rule (above) in its own pull request.
-3. Then the rest of Phase 6 in the order above, one pull request each. Pass
+2. Then the nickname rule (above) in its own pull request, then spec 038's.
+3. Then 034, 033 and 029, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and
    mechanical test edits.
@@ -132,7 +168,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   says DejaVu Sans). Layout files no longer need a second run with another
   font.
 - The implementer's finish hook runs the quick gate (`--specs` of the specs
-  the branch changed, Chromium); about 2 to 4 minutes.
+  the branch changed, Chromium). It takes 2 to 4 minutes for one spec, and
+  about 8.5 minutes for a branch built on unmerged work that changes 19 specs.
+  The hook allows 1,140 s since 2026-10-16, because a gate that times out does
+  not block.
 - CI runs only on pull requests and pushes to `main`, and cancels a run when a
   new commit is pushed. Seven jobs (static and non-browser tests on Ubuntu
   3.13; each engine on Ubuntu and Windows, Python 3.14), then `Quality gate`,
@@ -185,6 +224,9 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   "Camel case" read as capitalised words ("Ana"). Applied at once to spec 032
   (no store upgrade). Prefer the simplest rule that removes edge cases; do not
   escalate obscure edge cases of peripheral features.
+- 2026-10-16, night: build the four remaining Phase 6 specs now ("The four extras
+  now"), in the build plan's order, one pull request each: 038, then 034
+  ("Then catchup"), then 033 and 029. PR #15 merged.
 
 ## Lead decisions of 2026-10-15 worth knowing
 
