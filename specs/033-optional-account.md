@@ -12,6 +12,17 @@ status: approved
 and "Open questions" is empty. Spec 005 is refined by the lead before this spec's
 tests are written.)
 
+(Note from the lead, 2026-10-16: refined under the human's rule of the same day,
+"Technical variables should not contain special characters", which covers the
+variables of this spec. Each variable takes the rule of its kind in spec 036, a
+refused value shows as `repr(value)` on one line, and the account store is in
+memory when `NOCK_DATABASE` is empty (decision 13). The SMTP user, password and
+sender then take printable ASCII only, the answer to open question 1 (decision
+14). Changed: "Configuration", the comment of `account_store` in `create_app`,
+"Test harness", AC-6, "Edge cases and errors", the new decisions 13 and 14 and
+"Open questions", which now holds open question 2, on players' addresses outside
+ASCII. No test of this spec exists yet (review of spec 036's refinement).)
+
 Epic E9 Accounts and resume (US-9.2) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; joining, the stored identity and the room page flow
@@ -56,27 +67,89 @@ The MVP ships with guests only: a guest can do everything needed to finish a gri
 
 | Variable | Default | Valid values | Any other value |
 | --- | --- | --- | --- |
-| `NOCK_PUBLIC_URL` | unset or empty: accounts off | `http://` or `https://`, a host, and optionally `:` and a port; nothing else (no user, no path other than one trailing `/`, which is dropped, no query, no fragment). The links of the e-mails start with it; it is never taken from a request's `Host` header | `SettingsError` naming `NOCK_PUBLIC_URL` and the value |
-| `NOCK_SMTP_HOST` | unset or empty: accounts off | a host name or address, without spaces | `SettingsError` naming the variable and the value |
-| `NOCK_SMTP_PORT` | `587` with `starttls`, `465` with `tls`, `25` with `none` | ASCII digits only, 1 to 65535 (as spec 036's `NOCK_PORT`) | `SettingsError` naming the variable and the value |
-| `NOCK_SMTP_SECURITY` | `starttls` | exactly `starttls`, `tls` or `none` | `SettingsError` naming the variable and the value |
-| `NOCK_SMTP_USER` | unset: no login | any non-empty text | — |
-| `NOCK_SMTP_PASSWORD` | unset: no login | any non-empty text; a secret | `SettingsError` naming the variable, never the value, when it is set without `NOCK_SMTP_USER`, or with `NOCK_SMTP_SECURITY=none` |
-| `NOCK_SMTP_FROM` | none | an address that `normalize_email` accepts; required when accounts are on | `SettingsError` naming the variable and the value |
+| `NOCK_PUBLIC_URL` | unset or empty: accounts off | `http://` or `https://`, a host, and optionally `:` and a port; nothing else (no user, no path other than one trailing `/`, which is dropped, no query, no fragment). The host is either a value that `NOCK_SMTP_HOST` takes and that holds no `:`, or an IPv6 address that `NOCK_SMTP_HOST` takes, between `[` and `]`, as URLs write it (`http://[::1]:8000`); the port is a value that `NOCK_SMTP_PORT` takes. The links of the e-mails start with it; it is never taken from a request's `Host` header | `SettingsError` naming `NOCK_PUBLIC_URL` and showing the value |
+| `NOCK_SMTP_HOST` | unset or empty: accounts off | a host name or an IP address, under the rule of spec 036's `NOCK_HOST`: each character is an ASCII letter, an ASCII digit, `.`, `-` or `:`; a value that holds `:` is an IPv6 address that `ipaddress.IPv6Address` accepts, written without brackets (`::1`); a value that holds no `:` is cut at each `.` into labels, each label holds 1 to 63 characters, and only the last label may be empty (`smtp.example.`) | `SettingsError` naming the variable and showing the value |
+| `NOCK_SMTP_PORT` | `587` with `starttls`, `465` with `tls`, `25` with `none` | ASCII digits only, for a number from 1 to 65535, leading zeros accepted however many (spec 036's `NOCK_PORT`) | `SettingsError` naming the variable and showing the value |
+| `NOCK_SMTP_SECURITY` | `starttls` | exactly `starttls`, `tls` or `none` | `SettingsError` naming the variable and showing the value |
+| `NOCK_SMTP_USER` | unset or empty: no login | text in printable ASCII only, U+0020 SPACE to U+007E TILDE (see "Refused characters" below) | `SettingsError` naming the variable and showing the value |
+| `NOCK_SMTP_PASSWORD` | unset or empty: no login | text in printable ASCII only, as `NOCK_SMTP_USER`; a secret | `SettingsError` naming the variable, never the value, when it holds a refused character, is set without `NOCK_SMTP_USER`, or is set with `NOCK_SMTP_SECURITY=none` |
+| `NOCK_SMTP_FROM` | none | an address that `normalize_email` accepts, in printable ASCII only, as `NOCK_SMTP_USER`; required when accounts are on | `SettingsError` naming the variable and showing the value |
+
+(Note from the lead, 2026-10-16: the table refined with decisions 13 and 14. The
+host and the port of `NOCK_PUBLIC_URL` had no rule of their own;
+`NOCK_SMTP_HOST` was "a host name or address, without spaces"; `NOCK_SMTP_PORT`
+did not say that leading zeros pass; `NOCK_SMTP_USER` and `NOCK_SMTP_PASSWORD`
+were "any non-empty text", whose default said "unset", and the user could not
+be refused (its last cell was "—"); `NOCK_SMTP_FROM` had no refused character;
+the last column said "the value" where it now says "showing the value", as
+`repr(value)` (see "Messages") (review of spec 036's refinement).)
 
 - An empty value counts as unset, as in spec 036. `NOCK_SMTP_USER` set without
   `NOCK_SMTP_PASSWORD` is a `SettingsError` naming the missing one.
+- Refused characters (`NOCK_SMTP_USER`, `NOCK_SMTP_PASSWORD`, `NOCK_SMTP_FROM`):
+  every character outside the printable ASCII characters, U+0020 SPACE to U+007E
+  TILDE. That is the set that spec 036 refuses in `NOCK_DATABASE` (spec 036's
+  decision 14: Unicode general categories Cc, Cf, Zl and Zp, as
+  `unicodedata.category` gives them, except U+200C and U+200D), plus every
+  character outside ASCII, the two joiners included (this spec's decision 14).
+  Spaces are allowed, meaning U+0020 SPACE only, which printable ASCII holds. No
+  other space character passes: a tab (`"\t"`, U+0009) is a control character,
+  and a no-break space (`"\u00a0"`, U+00A0) or an em space (`"\u2003"`, U+2003)
+  is outside ASCII. The other variables take only ASCII letters, ASCII digits
+  and a few marks, so they refuse all of these already. Each check reads the
+  value as given, before anything strips it: `"\tnock@nock.example"` is refused,
+  although `normalize_email` would strip the tab. (Note from the lead,
+  2026-10-16: added with decisions 13 and 14 (review of spec 036's
+  refinement).) (Note from the lead, 2026-10-16: "Spaces are allowed" did not
+  say which spaces, and could be read as every space character, a tab or a
+  no-break space included; it now means U+0020 SPACE only (second review of
+  spec 036's refinement).)
+- Messages: every `SettingsError` message about a variable of the table above
+  is one line (one item in `str.splitlines()`) and holds no character of
+  categories Cc, Cf, Zl or Zp. A message that refuses the value of one of those
+  variables other than `NOCK_SMTP_PASSWORD` shows it as `repr(value)` (spec 036
+  decision 12), so that `\n` in it always stands for a newline. A message about
+  `NOCK_SMTP_PASSWORD` names it and never shows its value, whole or in part, as
+  spec 038 does for the operator token. A message that names a missing variable
+  instead of refusing a value (only one of `NOCK_PUBLIC_URL` and
+  `NOCK_SMTP_HOST` set, `NOCK_SMTP_USER` set without `NOCK_SMTP_PASSWORD`, a
+  missing `NOCK_SMTP_FROM`) names that variable and shows no value. Should the
+  value of a variable that is set appear in such a message all the same, it
+  follows the two rules above: `repr(value)`, and never the password. These
+  rules cover the variables of the table only: `SettingsError` is also spec
+  038's class, and its message about `NOCK_OPERATOR_TOKEN` follows spec 038 (the
+  variable and the rule broken, never the value). The rest of the wording is
+  free. (Note from the lead, 2026-10-16: added with decision 13; the messages
+  used to name the variable and "the value", with no rule for escaping it
+  (review of spec 036's refinement).) (Note from the lead, 2026-10-16: the rules
+  are limited to the variables of the table: read literally, "a variable other
+  than `NOCK_SMTP_PASSWORD`" also covered spec 038's `NOCK_OPERATOR_TOKEN`,
+  whose message never shows the value (spec 038); and the rule for a message
+  that names a missing variable was added, since the bullet did not say what
+  such a message shows (second review of spec 036's refinement).)
 - Exactly one of `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` set is a `SettingsError`
   naming the missing one. With accounts off, the other `NOCK_SMTP_*` variables are
-  not read.
+  not read, so none of them is checked, whatever it holds. (Note from the lead,
+  2026-10-16: ", so none of them is checked, whatever it holds" added with
+  decision 13 (review of spec 036's refinement).)
 - `main()` (spec 036, as spec 038 extends it) also calls
   `account_settings_from_env(os.environ)` before it builds a server; a
   `SettingsError` becomes `SystemExit(str(error))`, so `python -m nock` prints it and
   exits with status 1. An app built otherwise reads the same variables when it
-  starts and fails its startup with the same error.
+  starts and fails its startup with the same error. The checks run at these two
+  moments only, and the app makes them only when it is given no `accounts`
+  (`create_app(accounts=...)` reads none of these variables). When several
+  variables are invalid, which one the message is about is not specified, as in
+  spec 036. (Note from the lead, 2026-10-16: the last two sentences added with
+  decision 13 (review of spec 036's refinement).)
 - Secrets: the SMTP password, the link tokens, the session tokens and the resume
-  tokens are never written to a log, an error message or a `repr`; nor are e-mail
-  addresses.
+  tokens are never written to a log, an error message or a `repr`; nor are the
+  e-mail addresses of players. The other values of "Configuration", the sender
+  address and the SMTP user included, are not secrets: a message that refuses one
+  shows it (see "Messages"). (Note from the lead, 2026-10-16: "nor are e-mail
+  addresses" became "nor are the e-mail addresses of players", and the last
+  sentence was added with decision 13; the table already showed a refused
+  `NOCK_SMTP_FROM` in its message (review of spec 036's refinement).)
 
 ```python
 # src/nock/settings.py (additions to spec 038)
@@ -413,10 +486,15 @@ def create_app(
     *,
     operator_token: str | None = None,  # spec 038
     accounts: AccountSettings | None = None,  # None: account_settings_from_env(os.environ) at startup
-    account_store: AccountStore | None = None,  # None: AccountStore(NOCK_DATABASE, ":memory:" when unset), opened at startup, closed at stop
+    account_store: AccountStore | None = None,  # None: AccountStore(NOCK_DATABASE, ":memory:" when unset or empty), opened at startup, closed at stop
     mailer: Mailer | None = None,  # None: SmtpMailer(accounts.smtp)
 ) -> FastAPI: ...
 ```
+
+(Note from the lead, 2026-10-16: in the comment of `account_store`, "when unset"
+became "when unset or empty", as for the rooms' store (spec 018, spec 036
+decision 15), with decision 13. `AccountStore("")` would have opened a private
+temporary file (review of spec 036's refinement).)
 
 A store or mailer given is never closed by the app. Times come from `rooms.clock`.
 
@@ -553,6 +631,23 @@ spec 006 AC-5.
   `smtplib.SMTP_SSL` with recorders that keep their arguments and calls.
 - Configuration (AC-6): `account_settings_from_env` on plain dicts; `main()` with
   spec 036's recorder of `uvicorn.Server.run` and `monkeypatch` on the variables.
+  Each case of `main()` sets or deletes every variable that `main()` reads (those
+  of specs 036 and 038 and of "Configuration"), so that a variable left in the
+  environment cannot change a case. Values are Python string literals, or
+  expressions that join or repeat them, as in spec 036's harness: `"\n"` is a
+  newline (U+000A), `"\t"` a tab (U+0009), `"\u200b"` U+200B ZERO WIDTH SPACE,
+  `"\u202e"` U+202E RIGHT-TO-LEFT OVERRIDE, `"\u2028"` U+2028 LINE SEPARATOR,
+  `"\u00e7"` U+00E7 LATIN SMALL LETTER C WITH CEDILLA, `"\u00e9"` U+00E9 LATIN
+  SMALL LETTER E WITH ACUTE, and `"a" * 64 + ".example"` is 64 `a` followed by
+  `.example`. (Note from the lead, 2026-10-16: the last two sentences added with
+  decisions 13 and 14 (review of spec 036's refinement).)
+- The app's account store (AC-6): the test replaces `nock.server.AccountStore`
+  (`monkeypatch.setattr`) with an `AccountStore` subclass whose `__init__` appends
+  `str(path)` to a list, then calls `AccountStore.__init__`. The app of
+  `create_app` builds its account store with that name when it starts, so
+  `with TestClient(app):` makes the subclass record the path, as spec 036's
+  harness does for `RoomStore`. (Note from the lead, 2026-10-16: added with
+  decision 13 (review of spec 036's refinement).)
 - Browser with live server: the test module starts its own server as spec 040's
   `live_server` does (built client, free port of 127.0.0.1), with
   `create_app(rooms=room_registry, dist_dir=WEB_DIST_DIR, catalogue=..., accounts=AccountSettings(public_url=<its base URL>, smtp=SETTINGS.smtp), account_store=AccountStore(path), mailer=recorder)`.
@@ -577,7 +672,7 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-9.2.2) (browser with live server) No action needed to finish a grid requires an account. With accounts on, a page in a fresh context (no cookie, no storage) opens the room link of a FX-01 room, enters as `Ana`, types the 18 letters word by word with `X` in place of `I` at (2, 2), 60 ms or more between keys (spec 037's harness), selects the word `MIME` and presses `check-word` (spec 023), types `I` at (2, 2), and reaches `data-solved="true"` with `grid-status` `solved` (spec 026). No response of the page had status 401 or 403, none had a `set-cookie` header, `context.cookies()` is empty, `account-dialog` never had the `open` attribute, and every frame the page sent parses with `parse_client_message` (spec 039 has no account field).
 - **AC-4** (AC-9.2.3) (HTTP) Deleting my account removes my personal data at once. `Bob` then `Zélie-Probe` (token `TZ`) join room R, so Bob is host; Zélie writes `T` at (1, 0), asks a link from R with `zelie.probe@example.org` and signs in; she also joined room S, linked it with `PUT /api/account/rooms`, and timed out there (a past player of S, spec 032); she asks one more link and leaves it unused. `DELETE /api/account` answers 204 and clears `nock_session` (`Max-Age=0`). Then `GET /api/account` with the old cookie answers `{"signed_in": false, "email": null}`, `GET /api/account/rooms` answers 401, and the unused link answers 404. In R, Zélie's record keeps its player id and colour with the nickname `--`, (1, 0) keeps `T` authored by her id, the log holds her `player_joined` with nickname `--` at the same seq, and a new client joining R gets a snapshot whose view of her has the nickname `--`; in S her past record has the nickname `--`. The database files then hold neither `zelie.probe@example.org` nor `Zélie-Probe` (UTF-8), and still hold `Bob`.
 - **AC-5** (AC-9.2.3) (browser with live server) Other players then see "former player". In the play of AC-4 on the live server, Zélie deletes her account from `/account`: `account-delete` shows `account-delete-warning`, `account-delete-confirm` sends the deletion, and the page reaches `data-state="deleted"` with `fr.json["account.deleted"]`; `account-delete-cancel` instead keeps the account (a `GET /api/account` still says signed in). Bob's page in R (he is host), reloaded, shows Zélie's `roster-nickname` as `Ancien joueur` and her `remove-player` with the `aria-label` `Retirer Ancien joueur du salon`, and, after Zélie (still in the room as a guest) checks a word, the feed line `Ancien joueur a vérifié un mot`; on `/`, Bob's "My rooms" item of R reads `Joueurs : Bob, Ancien joueur`; and once R is solved, spec 028's recap names her `Ancien joueur`. No page shows `--`.
-- **AC-6** (new) (Python, `uvicorn.Server.run` replaced) Accounts are configured by environment variables, and an invalid value stops the start. `account_settings_from_env` gives None for `{}` and when `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` are both empty; with `NOCK_PUBLIC_URL="https://nock.example/"`, `NOCK_SMTP_HOST="smtp.example"` and `NOCK_SMTP_FROM="nock@nock.example"` it gives `AccountSettings(public_url="https://nock.example", smtp=SmtpSettings(host="smtp.example", port=587, security="starttls", user=None, password=None, sender="nock@nock.example"))`; `NOCK_SMTP_SECURITY` `tls` and `none` give the ports 465 and 25, and `NOCK_SMTP_PORT="2525"` gives 2525. Each of these raises `SettingsError` whose message names the variable: `NOCK_PUBLIC_URL` of `nock.example`, `ftp://nock.example`, `https://nock.example/app`, `https://nock.example?x=1`, `https://u@nock.example` or `https://`; only one of `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` set (the message names the missing one); `NOCK_SMTP_SECURITY="STARTTLS"`; `NOCK_SMTP_PORT` of `abc`, `0`, `65536` or ` 587`; a missing or invalid `NOCK_SMTP_FROM`; `NOCK_SMTP_USER` without `NOCK_SMTP_PASSWORD`, and the reverse; `NOCK_SMTP_PASSWORD="pw-SECRET-9"` with `NOCK_SMTP_SECURITY=none`. No message holds `pw-SECRET-9`, nor does `repr` of the settings when the password is valid. `main()` with an invalid variable raises `SystemExit` whose `code` is a `str` naming it and never calls `run`.
+- **AC-6** (new) (Python, `uvicorn.Server.run` replaced; app started with `TestClient`) Accounts are configured by environment variables, and an invalid value stops the start. `account_settings_from_env` gives None for `{}` and when `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` are both empty; with `NOCK_PUBLIC_URL="https://nock.example/"`, `NOCK_SMTP_HOST="smtp.example"` and `NOCK_SMTP_FROM="nock@nock.example"` it gives `AccountSettings(public_url="https://nock.example", smtp=SmtpSettings(host="smtp.example", port=587, security="starttls", user=None, password=None, sender="nock@nock.example"))`; `NOCK_SMTP_SECURITY` `tls` and `none` give the ports 465 and 25, and `NOCK_SMTP_PORT="2525"` gives 2525. Each of these raises `SettingsError` whose message names the variable: `NOCK_PUBLIC_URL` of `nock.example`, `ftp://nock.example`, `https://nock.example/app`, `https://nock.example?x=1`, `https://u@nock.example` or `https://`; only one of `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` set (the message names the missing one); `NOCK_SMTP_SECURITY="STARTTLS"`; `NOCK_SMTP_PORT` of `abc`, `0`, `65536` or ` 587`; a missing or invalid `NOCK_SMTP_FROM`; `NOCK_SMTP_USER` without `NOCK_SMTP_PASSWORD`, and the reverse; `NOCK_SMTP_PASSWORD="pw-SECRET-9"` with `NOCK_SMTP_SECURITY=none`. No message holds `pw-SECRET-9`, nor does `repr` of the settings when the password is valid. `main()` with an invalid variable raises `SystemExit` whose `code` is a `str` naming it and never calls `run`. Special characters (decisions 13 and 14), each case changing the valid settings above only by the variables it names: `account_settings_from_env` gives None when `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` are both empty and `NOCK_SMTP_PORT` is `"abc"` (accounts off, so it is not read); `NOCK_SMTP_HOST` of `"smtp.example."`, `"::1"` and `"a" * 63 + ".example"` gives that `host`; `NOCK_PUBLIC_URL="http://[::1]:8000"` gives that `public_url`; `NOCK_SMTP_PORT="0" * 5000 + "2525"` gives the port 2525; `NOCK_SMTP_USER="nock team"` with `NOCK_SMTP_PASSWORD="pw SECRET 9"` gives that `user` and a `password` whose `get_secret_value()` is `"pw SECRET 9"`. Each of these raises `SettingsError` whose message names the variable: `NOCK_PUBLIC_URL` of `"https://nock.example\n"`, `"https://nock..example"`, `"https://nock.example:0"` and `"https://::1"`; `NOCK_SMTP_HOST` of `"smtp.example\n"`, `"smtp\u200b.example"`, `"smtp..example"`, `"a" * 64 + ".example"`, `"[::1]"` and `"smtp.example:25"`; `NOCK_SMTP_PORT="587\n"`; `NOCK_SMTP_SECURITY="tls\n"`; `NOCK_SMTP_USER` of `"nock\n"`, `"nock\u2028"` and `"fran\u00e7ois"`, with `NOCK_SMTP_PASSWORD="pw SECRET 9"`; `NOCK_SMTP_FROM` of `"\tnock@nock.example"`, which `normalize_email` would strip, `"nock\u200b@nock.example"`, and `"fran\u00e7ois@nock.example"`, which `normalize_email` accepts; `NOCK_SMTP_PASSWORD` of `"pw-SECRET-9\n"`, `"pw-SECRET\u202e-9"` and `"mot-de-pass\u00e9"`, with `NOCK_SMTP_USER="nock"`; the message for `"mot-de-pass\u00e9"` holds neither that value nor `mot-de-pass`. In the whole criterion, a message that refuses the value of a variable of the table of "Configuration" other than `NOCK_SMTP_PASSWORD` contains `repr(value)`; a message that names a missing variable rather than refusing a value (only one of `NOCK_PUBLIC_URL` and `NOCK_SMTP_HOST` set, `NOCK_SMTP_USER` without `NOCK_SMTP_PASSWORD`, a missing `NOCK_SMTP_FROM`) holds none of the values that its case sets; every message has one item in its `splitlines()` and holds no character of Unicode general category Cc, Cf, Zl or Zp; and `SECRET` (capital letters), which both passwords of this criterion, `pw-SECRET-9` and `pw SECRET 9`, contain, appears in no message and in no `repr` of valid settings. `main()` with `NOCK_SMTP_HOST="smtp.example\n"` and the other variables of the valid settings raises `SystemExit` whose `code` contains `repr("smtp.example\n")` and has one item in its `splitlines()`. App: with `NOCK_DATABASE` unset, and with it set to `""`, the app of `create_app(dist_dir=tmp_path, accounts=SETTINGS, mailer=recorder)`, started and stopped by `with TestClient(app):` while `nock.server.AccountStore` is the recording subclass of "Test harness", builds at least one account store, every one with the path `":memory:"` and none with `""`. (Note from the lead, 2026-10-16: "app started with `TestClient`" added to the brackets, and the text from "Special characters" on added, with decisions 13 and 14. The criterion used to end with "never calls `run`": it had no value with a special character, and said of the messages only that they name the variable and never hold `pw-SECRET-9` (review of spec 036's refinement).) (Note from the lead, 2026-10-16: the last check of "In the whole criterion" was "no message holds `pw-SECRET`", but the cases of `NOCK_SMTP_USER` use the password `"pw SECRET 9"`, which does not hold it, so a message that showed that password passed every check; the check is now on `SECRET`, which both passwords hold, and covers `repr` of valid settings too. The check on a refused value is limited to the variables of the table, and a message that names a missing variable holds none of its case's values (see "Messages") (second review of spec 036's refinement).)
 - **AC-7** (new) (Python with a test SMTP server; Python with smtplib replaced; HTTP) The sign-in link is sent with the standard library, over a checked TLS connection. With the test SMTP server and `security="none"`, `SmtpMailer(...).send(sign_in_message(SETTINGS, "ana.probe@example.org", <43-character token>))` delivers one message: envelope from `nock@example.org` to `ana.probe@example.org`; parsed with `email.message_from_bytes(data, policy=email.policy.default)`, its subject is `fr.json["email.sign_in.subject"]`, its content type `text/plain` with charset `utf-8`, and its body holds `http://testserver/account#<token>`. With smtplib replaced: `starttls` makes `SMTP("smtp.example", 587, timeout=10)`, then `starttls(context=c)` with `c.verify_mode == ssl.CERT_REQUIRED` and `c.check_hostname is True`, then `login("nock", <password>)` when a user is set, `send_message` and `quit`; `tls` makes `SMTP_SSL("smtp.example", 465, context=c, timeout=10)` with the same checks. A server answering `550` to `RCPT` makes `send` raise `MailError`; through the app, the link request then answers 503 with `{"detail": "Mail not sent"}`.
 - **AC-8** (new) (HTTP) Link requests reveal nothing and cannot flood a mailbox. The answer to a link request is the same 202 `{}` for an address that has an account and one that has none. `POST /api/account/link` with `email` `""`, `ana`, `ana@`, `@example.org`, `ana@example`, `ana @example.org` or 255 characters answers 422, sends nothing, and its body does not hold the address sent. With a `room` whose token is no member's, it answers 404 and sends nothing. Three requests for one address within an hour of the fake clock are sent; the fourth answers 429 and sends nothing; after `advance(3600)` one is sent again. From one client address, ten requests for ten addresses are sent and the eleventh answers 429. With accounts off, `GET /account`, `GET /api/account`, `POST /api/account/link` and `DELETE /api/account` answer 404.
 - **AC-9** (new) (browser with mocked socket and routes; keyboard only for the walk) The account controls meet spec 035 and keep the room page's layout. With accounts on (mocked `GET /api/account`) and a FX-01 snapshot, at each window size of spec 006 AC-5, in desktop and touch contexts: `account-open` is the last control inside `room-toolbar`; at 320 by 568, 568 by 320, 360 by 740 and 740 by 360 its vertical range overlaps those of the toolbar's other buttons (spec 024's one-row rule), and after `account-open` is scrolled into view (as a keyboard focus does) it is visible whole inside the toolbar; and spec 013 AC-6's checks pass (after a tap on a cell, `grid-viewport` at least 100 px high, no page scroll, the grid fits at zoom 1, the clue bar inside the window above the keyboard). Keyboard only: `tab_to` reaches `account-open`, which shows spec 035 AC-2's outline; `Enter` opens `account-dialog` with the focus on `account-email-input`; during 10 presses of `Tab`, then 10 of `Shift+Tab`, no element outside `account-dialog` gets the focus (the rest of the page is inert while it is open; the browser may move the focus to its own interface, as spec 035 "Nothing focusable after the grid" describes); `Escape` closes it and the focus is back on `account-open`. Spec 035's contrast and language scans find no offending element at 1280 by 720 and 360 by 740 on the room page with the dialog open, then showing `account-sent`, then showing `account-error`, and on `/account` in the states `signed_out`, `signed_in`, `link_invalid` and `deleted` (mocked answers); `/account` has no horizontal scroll at the sizes of spec 006 AC-5.
@@ -629,6 +724,12 @@ The words in brackets say how each criterion is tested.
   until the account is deleted or accounts are turned on again; cookies are ignored.
 - Former nickname on the server (AC-4): `--` passes spec 039's length check and fails
   spec 012's character rule, so no player can join with it.
+- An app started without `main()` (AC-6), such as `uvicorn nock.server:app`,
+  checks the variables of "Configuration" when it starts, as `main()` does, but
+  not the characters of `NOCK_DATABASE`, which only `main()` checks (spec 036
+  AC-11); the account store opens the file of the rooms' store, or `":memory:"`
+  when the variable is unset or empty. (Note from the lead, 2026-10-16: added
+  with decision 13 (review of spec 036's refinement).)
 
 ## Out of scope
 
@@ -704,6 +805,86 @@ open question.
     written, and the test-writer updates spec 005's scan tests before the
     implementer runs.
 
+Decided by the lead on 2026-10-16, after the review of spec 036's refinement,
+under the human's rule of the same day, "Technical variables should not contain
+special characters". Already part of the spec above.
+
+13. The rules of spec 036 for the variables of this spec (AC-6). Spec 036's
+    decision 15 counts an empty `NOCK_DATABASE` as unset, like the other technical
+    variables, and cites this spec for that rule, but this spec still opened
+    `AccountStore` on an empty `NOCK_DATABASE`; `NOCK_SMTP_HOST` refused only
+    spaces, `NOCK_SMTP_USER` and `NOCK_SMTP_PASSWORD` took any non-empty text, and
+    the messages showed the value with no rule for escaping it. Options: (a) keep
+    this spec's rules; (b) give each variable the rule of its kind in spec 036.
+    Pick: (b). A host (`NOCK_SMTP_HOST`, and the host of `NOCK_PUBLIC_URL`) takes
+    the characters of `NOCK_HOST` (spec 036 decision 11) and its labels (spec 036
+    decision 16); inside the URL an IPv6 address is written between `[` and `]`,
+    as every URL writes it, since there `:` introduces the port. A port
+    (`NOCK_SMTP_PORT`, and the port of `NOCK_PUBLIC_URL`) takes the rule of
+    `NOCK_PORT`. Free text (`NOCK_SMTP_USER`, `NOCK_SMTP_FROM`) refuses the set of
+    `NOCK_DATABASE` (spec 036 decision 14), and so does the secret,
+    `NOCK_SMTP_PASSWORD`, whose message names the variable and never shows the
+    value, as spec 038 does for the operator token; this spec's decision 14
+    then narrows these three to printable ASCII. `NOCK_SMTP_SECURITY` takes
+    three exact words, so it holds no special character already. An unset or
+    empty variable takes the default of "Configuration", and the account store is
+    `":memory:"` when `NOCK_DATABASE` is unset or empty (spec 036 decision 15). A
+    message shows a refused value as `repr(value)`, on one line (spec 036
+    decision 12). The checks stay where this spec already reads the variables:
+    `main()` before it builds a server, and the app's start when it is given no
+    `accounts`; while accounts are off, the other `NOCK_SMTP_*` variables are
+    neither read nor checked. (a) was rejected: it leaves these variables outside
+    the human's rule, and an empty `NOCK_DATABASE` would put the accounts in a
+    private temporary file while the rooms stay in memory.
+
+Decided by the lead on 2026-10-16, answering open question 1 of the same day
+(raised with decision 13), after a check of `smtplib`. Already part of the spec
+above.
+
+14. SMTP login and sender in ASCII (former open question 1 of 2026-10-16; AC-6).
+    Python's `smtplib` encodes the user and the password of `login` as ASCII: the
+    lead checked that, with Python 3.14.6,
+    `smtplib.SMTP.login("fran\u00e7ois", "mot-de-pass\u00e9")` raises
+    `UnicodeEncodeError` (`'ascii' codec can't encode character '\xe7'`), and
+    that an ASCII login passes. Its `send_message` also needs the server's
+    SMTPUTF8 extension when the sender or a recipient is not in ASCII (line 970
+    of CPython 3.14's `smtplib.py`), and `normalize_email` accepts a local part
+    outside ASCII. Under decision 13 alone, such a `NOCK_SMTP_USER`,
+    `NOCK_SMTP_PASSWORD` or `NOCK_SMTP_FROM` passed the start, and then every
+    sign-in link could fail with `MailError` (503, `account.error.send`).
+    Options: (a) keep the rules of decision 13, and let the operator learn of the
+    problem from the logged failure of the first link; (b) these variables also
+    refuse every character outside ASCII, with their usual messages (the
+    password's naming the variable only), so that the start stops on them. Pick:
+    (b), since `SettingsError` is for a value the server cannot use (spec 038).
+    The open question named the user and the password; the sender gets the same
+    rule for the same reason. With the set of decision 13, the three take only
+    the printable ASCII characters, U+0020 SPACE to U+007E TILDE; U+200C and
+    U+200D, outside ASCII, are refused too.
+
 ## Open questions
 
-None.
+(Note from the lead, 2026-10-16: open question 1, on SMTP logins outside ASCII,
+was answered with option (b); it is decision 14. Before it was added with
+decision 13, this section said "None." (review of spec 036's refinement).)
+
+2. Players' addresses outside ASCII (AC-1, AC-7, AC-8). `normalize_email`
+   accepts a local part with characters outside ASCII, such as
+   `"fran\u00e7ois@example.org"` (its domain is ASCII only). Sending a link to
+   such an address needs the SMTP server's SMTPUTF8 extension (`send_message`,
+   line 970 of CPython 3.14's `smtplib.py`); without it, `send_message` raises
+   `SMTPNotSupportedError`, the mailer raises `MailError`, and the player gets
+   503 and `account.error.send`, which asks them to try again later, at every
+   try. This is this spec's design for what players type, not a technical
+   variable. Options: (a) keep `normalize_email` as it is: such an address works
+   when the server offers SMTPUTF8, and fails at each request otherwise; (b)
+   `normalize_email` also refuses a local part outside ASCII: 422 and
+   `account.error.email`, and AC-8 gains `"fran\u00e7ois@example.org"` among its
+   refused addresses; (c) keep accepting it, and answer a request that the server
+   cannot send for lack of SMTPUTF8 with its own status and text (a new `fr.json`
+   key) saying that this address cannot receive the link. Recommended: (b),
+   because the answer is the same on every server and can be tested without one,
+   the domain is already ASCII only, and such addresses are rare; (c) serves
+   those few players better, but adds a mailer error, an answer and a text to
+   this spec. (Note from the lead, 2026-10-16: added with decision 14 (review of
+   spec 036's refinement).)

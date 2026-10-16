@@ -91,7 +91,7 @@ the specs whose criteria this one mentions.
 | [033](033-optional-account.md) | US-9.2 Optional account | E9 | V1 | 11 | 005, 006, 009, 012, 013, 014, 017, 023, 024, 026, 028, 032, 035, 036, 037, 038, 039 |
 | [034](034-catch-up.md) | US-9.3 Catching up after an absence | E9 | V1 | 5 | 007, 010, 013, 017, 018, 020, 023, 024, 026, 032, 035, 037, 040 |
 | [035](035-accessibility.md) | US-10.1 Accessibility | E10 | MVP | 12 | 006, 009, 013, 014, 023, 026, 040 |
-| [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 11 | 015, 018, 037 |
+| [036](036-performance.md) | US-10.2 Performance | E10 | MVP | 12 | 015, 018, 037 |
 | [037](037-integrity.md) | US-10.3 Integrity | E10 | MVP | 4 | - |
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 11 | 005, 006, 008, 010, 011, 018, 020, 022, 026, 032, 035, 036, 037 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
