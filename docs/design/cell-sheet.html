@@ -109,7 +109,7 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .c.clue .q span { display: block; width: 100%; overflow-wrap: break-word; hyphens: manual; }
 .c.clue .sep { height: 1px; background: var(--clue-ink); opacity: .55; margin: 0 14%; flex: none; }
 .flag { position: absolute; top: 1px; left: 1px; font: 700 max(7px, calc(var(--s) * .22))/1 var(--f-ui); color: var(--flag); background: var(--clue-bg); padding: 0 2px 1px 1px; border-radius: 0 0 3px 0; z-index: 2; }
-.arw { position: absolute; z-index: 1; width: max(10px, calc(var(--s) * .34)); height: max(10px, calc(var(--s) * .34)); }
+.arw { position: absolute; z-index: 1; width: max(9px, calc(var(--s) * .26)); height: max(9px, calc(var(--s) * .26)); }
 .arw path { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .arw polygon { fill: var(--ink); }
 
@@ -188,7 +188,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.6 · letters centred on their capitals</div>
+    <div class="ver">Version 3.7 · shorter arrows</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
   </header>
@@ -386,7 +386,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   };
   function arrowSvg(kind, style) { return '<svg class="arw" viewBox="0 0 24 24" style="' + style + '" aria-hidden="true">' + ARROWS[kind] + "</svg>"; }
   function arrowFor(kind, s, slot) {
-    var a = Math.max(10, s * 0.34);
+    var a = Math.max(9, s * 0.26);
     if (kind === "right") return arrowSvg(kind, "left:-1px;top:" + (slot === 0 ? s * 0.25 - a / 2 : slot === 1 ? s * 0.72 - a / 2 : s / 2 - a / 2) + "px");
     if (kind === "down") return arrowSvg(kind, "top:-1px;left:" + (s / 2 - a / 2) + "px");
     if (kind === "down_then_right") return arrowSvg(kind, "top:-1px;left:" + s * 0.06 + "px");
