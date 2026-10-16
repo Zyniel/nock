@@ -388,8 +388,11 @@ def test_ac8_browser_a_pasted_nickname_keeps_its_value_and_is_sent_in_capitals(
     [
         (PAISIOS_SMALL, PAISIOS_CAPITALS),
         (IOTA_THEN_18_ALPHAS, IOTA_THEN_18_ALPHAS_STORED),
+        # This case pins the page's first NFC: without it, the parts would give
+        # U+0391 U+1F38 U+039D U+0391 where the server's rule gives ALPHA_NAME_STORED.
+        (ALPHA_NAME_IN_PARTS, ALPHA_NAME_STORED),
     ],
-    ids=["paisios-in-small-letters", "iota-then-18-alphas"],
+    ids=["paisios-in-small-letters", "iota-then-18-alphas", "alpha-name-in-parts"],
 )
 def test_ac8_browser_the_form_sends_the_capitals_after_the_second_nfc(
     page: Page, live_server: str, typed: str, sent: str
