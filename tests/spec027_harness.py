@@ -18,13 +18,16 @@ are in `tests/test_spec_027_*.py`, one file per criterion group:
 
 The page's clock. Where a test needs an exact reading of a running timer (AC-5),
 the page is opened with Playwright's page clock: `page.clock.install` before the
-page loads, then `page.clock.pause_at` once the snapshot is shown (a page whose
-clock is paused before its snapshot never leaves `connecting`), so that
-`performance.now()` stops a few ms after the page anchored the timer.
-`advance_clock` then moves it by hand, in small steps with a real pause between
-them, so that the pong the mocked socket sends back to each of the page's
-`ping` frames (spec 017) reaches the page before its next 4 s check. Nothing in
-those tests depends on how fast the machine is.
+page loads, then `freeze_clock` (`page.clock.pause_at`) once the page has sent its
+join and before the snapshot arrives, so that `performance.now()` is the same when
+the page anchors the timer and when the test reads it: no real delay can shift a
+value. `advance_clock` then moves the clock by hand, in small steps with a real
+pause between them, so that the pong the mocked socket sends back to each of the
+page's `ping` frames (spec 017) reaches the page before its next 4 s check.
+Nothing in those tests depends on how fast the machine is. Units: Playwright for
+Python reads a number given to `install`, `pause_at`, `set_fixed_time` and
+`set_system_time` as SECONDS (it multiplies it by 1000), and a number given to
+`run_for` and `fast_forward` as milliseconds.
 
 The fixtures (`fx01_grid`, `dist_dir`, `registry`...) are defined in each test file
 that needs them, as thin wrappers: a fixture imported from here would be an unused
@@ -396,8 +399,9 @@ def open_timer_room(
     seq: int = 5,
     players: list[PlayerView] | None = None,
     frozen: bool = False,
+    room_code: str = ROOM_CODE,
 ) -> MockRoomSocket:
-    """Open /r/ABC123 on a mocked socket, join as Ana and show a timer snapshot.
+    """Open a room on a mocked socket, join as Ana and show a timer snapshot.
 
     Args:
         page: A fresh page.
@@ -410,6 +414,9 @@ def open_timer_room(
         players: The roster.
         frozen: Whether the page's clock is frozen when the snapshot arrives (see
             the module docstring); `advance_clock` then moves it.
+        room_code: The room's code, for the page's URL and the socket route. A
+            code the browser has not opened before shows the nickname form (spec
+            012's stored identity is per room).
 
     Returns:
         Spec 025's mocked socket: it answers each ping with a pong.
@@ -418,12 +425,15 @@ def open_timer_room(
     if frozen:
         page.clock.install(time=0)
     mock = MockRoomSocket(page)
-    page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
-    page.goto(f"{base_url}/r/{ROOM_CODE}")
+    route = re.compile(rf".*/api/rooms/{room_code}/ws$")
+    page.route_web_socket(route, mock.handle)
+    page.goto(f"{base_url}/r/{room_code}")
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana")
     nickname_input.press("Enter")
     mock.wait_for_join_on_socket(0)
+    if frozen:
+        freeze_clock(page)
     snapshot = timer_snapshot(
         grid,
         elapsed_ms=elapsed_ms,
@@ -435,10 +445,18 @@ def open_timer_room(
     mock.send(snapshot.model_dump_json())
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(25)
-    if frozen:
-        now_ms = page.evaluate("() => Date.now()")
-        page.clock.pause_at(now_ms + CLOCK_PAUSE_JUMP_MS)
     return mock
+
+
+def freeze_clock(page: Page) -> None:
+    """Pause the page's clock a few milliseconds after its present time.
+
+    `Date.now()` gives milliseconds, but Playwright for Python reads a number given
+    to `pause_at` as seconds (it multiplies it by 1000): the jump is divided by
+    1000. `run_for` and `fast_forward` take milliseconds as they are.
+    """
+    now_ms = page.evaluate("() => Date.now()")
+    page.clock.pause_at((now_ms + CLOCK_PAUSE_JUMP_MS) / 1000)
 
 
 def send_reconnect_snapshot(

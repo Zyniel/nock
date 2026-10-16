@@ -28,6 +28,9 @@ from spec027_harness import (
 )
 
 KEY = "nock.timer_hidden"
+# Another room of the same browser: its code is one the context never opened, so the
+# page shows the nickname form (spec 012's stored identity is per room).
+OTHER_ROOM_CODE = "DEF456"
 RUNNING_AT_65_S = 65_000
 
 # ---- Fixtures ----
@@ -180,7 +183,12 @@ def test_ac4_the_choice_holds_for_every_room_opened_in_this_browser(
 
         other = context.new_page()
         open_timer_room(
-            other, live_server, fx01_grid, elapsed_ms=RUNNING_AT_65_S, running=True
+            other,
+            live_server,
+            fx01_grid,
+            elapsed_ms=RUNNING_AT_65_S,
+            running=True,
+            room_code=OTHER_ROOM_CODE,
         )
 
         expect(other.get_by_test_id("timer")).to_have_count(0)

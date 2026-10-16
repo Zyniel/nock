@@ -27,6 +27,13 @@ from spec027_harness import (
     timer_of,
 )
 
+# The refresh test moves the clock by 50 ms and accepts a value that stays the same
+# for 250 ms at most ("refreshed at least every 250 ms"), plus one step because a
+# refresh is seen at the end of the step that holds it.
+REFRESH_STEP_MS = 50
+WATCH_MS = 1500
+MAX_WAIT_MS = 250 + REFRESH_STEP_MS
+
 # ---- Fixtures ----
 
 
@@ -152,15 +159,28 @@ def test_ac5_the_elapsed_value_is_refreshed_at_least_every_250_ms_while_running(
             running=True,
             frozen=True,
         )
-        advance_clock(page, 100)
-        first = elapsed_ms_of(page)
+        # The clock moves by hand in steps of 50 ms. The test never compares a
+        # reading with the instant of the snapshot (a real delay before the clock
+        # froze would shift every value); it reads the value at the freeze, then
+        # watches how it follows the clock.
+        value_at_freeze = elapsed_ms_of(page)
+        last_value = value_at_freeze
+        last_change_at = 0
+        longest_wait = 0
+        for moved in range(REFRESH_STEP_MS, WATCH_MS + 1, REFRESH_STEP_MS):
+            advance_clock(page, REFRESH_STEP_MS)
+            value = elapsed_ms_of(page)
+            assert value >= last_value, (moved, last_value, value)
+            if value != last_value:
+                longest_wait = max(longest_wait, moved - last_change_at)
+                last_change_at = moved
+                last_value = value
+        longest_wait = max(longest_wait, WATCH_MS - last_change_at)
 
-        advance_clock(page, 500)
-        second = elapsed_ms_of(page)
-
-        assert 65_000 <= first <= 65_100, first
-        assert second - first >= 250, (first, second)
-        assert second - first <= 500, (first, second)
+        assert value_at_freeze >= 65_000, value_at_freeze
+        assert longest_wait <= MAX_WAIT_MS, longest_wait
+        grown = last_value - value_at_freeze
+        assert WATCH_MS - 300 <= grown <= WATCH_MS + 300, grown
     finally:
         close()
 
