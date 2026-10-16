@@ -64,6 +64,7 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_spec_026_ac01_ac03_grid_solved.py",
         "test_spec_027_ac02_ac03_live_pages.py",
         "test_spec_036_ac01_time_budgets.py",
+        "test_spec_038_ac11_relay_time.py",
     }
 )
 
