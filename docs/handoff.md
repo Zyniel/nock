@@ -14,11 +14,12 @@ Update it at the end of each session.
   019, the spec 026 AC-10 fix), PR #8 (019 refinements, 020, 021, 022 with both
   of its review rounds, the CI speed-up), PR #9 (tooling: the implementer's quick
   gate, CI's fonts in cloud sessions, a write guard that judges an edit against
-  the checkout holding it). Tag `v0.1.0` exists locally on #6's merge commit but
+  the checkout holding it), PR #10 (spec 027, the shared timer, and spec 035's
+  stricter language scan). Tag `v0.1.0` exists locally on #6's merge commit but
   could not be pushed from the cloud session (tag pushes are refused): the human
   pushes it from a clone.
-- Open: spec 027's pull request (shared timer, and spec 035's stricter language
-  scan). Its description lists what is left for the human.
+- Open: a tooling pull request, the finish hook that lets an agent stop once it
+  has reported a failure it cannot fix (`scripts/hooks/role_gate.py`).
 - Pull requests, human decision of 2026-10-16: one pull request per spec (with
   its refinements of other specs), and tooling changes in a pull request of
   their own. With one designated branch there is one open pull request at a
@@ -27,30 +28,30 @@ Update it at the end of each session.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
 - Phase 6 specs: 019, 020, 021, 022, 024, 025, 027 are `done`. Still to build,
-  in this order: 028, 032 (with the 012/017 seat-back refinement), 038 (refines
-  036), 034 (refines 013), 033 (refines 005 and 018), 029. Spec 036's
-  technical-variables refinement goes in its own pull request after 028.
+  in this order: 028 (built, in review), 032 (with the 012/017 seat-back
+  refinement), 038 (refines 036), 034 (refines 013), 033 (refines 005 and 018),
+  029. Spec 036's technical-variables refinement goes in its own pull request
+  after 028.
 
 ## Work in flight (not pushed)
 
 - Spec 028 (recap): worktree `.claude/worktrees/agent-a0e07b15eba7a1ec0`, branch
-  `feat/028-end-of-game-recap`, built on spec 027's commits as they were before
-  the rebase (be2af0b): tests e9ab665, server 27382a4 (`nock.recap`, share
-  token, routes), client 69269ff (recap dialog, public share page). Its
-  Chromium browser gate passed. One stale test: spec 018's
-  `test_ac1_register_room_records_the_room_in_the_store` compares the stored
-  room with a `new_room(...)` that has no share token, while spec 028 gives
-  every registered room one; a test-writer updates it. Then the review, and a
-  rebase onto `main` once 027 is merged (`git rebase --onto origin/main be2af0b`,
-  so that 027's old commits are dropped).
+  `feat/028-end-of-game-recap`, on 4c0893a (PR #10's head, merged as a788056):
+  tests b20a506, server bb654af (`nock.recap`, share token, routes), client
+  a515887 (recap dialog, public share page), and 0e476fd, spec 018's
+  `test_ac1_register_room_records_the_room_in_the_store` updated for spec 028's
+  share token. Static checks and every test without a browser pass; its
+  Chromium browser gate passed before the rebase. The reviewer is at work. Then
+  `git rebase --onto origin/main 4c0893a` (a no-op in content) and its own pull
+  request.
 - Spec 036 refinement ("technical variables should not contain special
   characters"): worktree `.claude/worktrees/spec-036`, branch `spec-036`, on
-  `main`: spec 37561cc (`NOCK_HOST` takes ASCII letters, digits, `.`, `-` and
-  `:` in an IPv6 address; `NOCK_DATABASE` refuses categories Cc, Cf, Zl and Zp
-  except U+200C and U+200D; the message shows `repr(value)`; an empty
-  `NOCK_DATABASE` counts as unset, refining spec 018). Its test-writer is at
-  work; then the implementer (`src/nock/__main__.py`, `server.py:134`, README)
-  and the review.
+  20f7fed: spec 37561cc and a31544b (`NOCK_HOST` takes ASCII letters, ASCII
+  digits, `.`, `-` and `:` in an IPv6 address; `NOCK_DATABASE` refuses
+  categories Cc, Cf, Zl and Zp except U+200C and U+200D; the message shows
+  `repr(value)`; an empty `NOCK_DATABASE` counts as unset, refining spec 018),
+  tests 2de5d91 and 22f9951 (AC-10 to AC-12 in their own file). The implementer
+  is at work (`src/nock/__main__.py`, `server.py:134`, README); then the review.
 - A tool call can turn a typed `\uXXXX` into the character itself: the first
   draft of spec 036 held six raw invisible characters, U+202E among them. Write
   such characters as `\N{NAME}` in code and as typed escapes in specs, and scan
@@ -65,7 +66,7 @@ Update it at the end of each session.
 
 ## First tasks for the next session
 
-1. Keep spec 027's pull request green until the human merges it; answer its
+1. Keep the open pull request green until the human merges it; answer its
    review comments.
 2. Then spec 028 in its own pull request (above), then spec 036's refinement.
 3. Then the rest of Phase 6 in the order above, one pull request each. Pass
