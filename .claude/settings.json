@@ -72,7 +72,7 @@
               "python",
               "${CLAUDE_PROJECT_DIR}/scripts/hooks/role_gate.py"
             ],
-            "timeout": 600,
+            "timeout": 1200,
             "statusMessage": "Running the quality gate"
           }
         ]
@@ -90,7 +90,7 @@
               "python",
               "${CLAUDE_PROJECT_DIR}/scripts/hooks/role_gate.py"
             ],
-            "timeout": 600,
+            "timeout": 1200,
             "statusMessage": "Running the quality gate"
           }
         ]

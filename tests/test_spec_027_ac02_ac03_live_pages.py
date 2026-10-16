@@ -30,7 +30,6 @@ from spec022_harness import new_player_page
 from spec024_harness import EnterRoom, cell_at, grid_from_text
 from spec025_harness import MockRoomSocket
 from spec027_harness import (
-    PAGE_TIMEOUT_MS,
     advance_clock,
     advance_until_join,
     advance_until_text,
@@ -203,7 +202,6 @@ def test_ac3_the_four_seconds_a_player_was_away_are_not_counted(
     context = browser.new_context(viewport={"width": 1280, "height": 720})
     try:
         first = context.new_page()
-        first.set_default_timeout(PAGE_TIMEOUT_MS)
         enter_room(first, url, "Ana")
         type_t_at_1_0(first)
         expect(timer_of(first)).to_have_attribute("data-running", "true", timeout=1000)
@@ -216,7 +214,6 @@ def test_ac3_the_four_seconds_a_player_was_away_are_not_counted(
 
         time.sleep(4.0)
         second = context.new_page()
-        second.set_default_timeout(PAGE_TIMEOUT_MS)
         enter_room(second, url, "Ana")
         expect(second.get_by_test_id("room-page")).to_have_attribute(
             "data-status", "joined"
@@ -241,14 +238,12 @@ def test_ac3_a_room_whose_players_all_left_without_a_letter_stays_at_zero(
     context = browser.new_context(viewport={"width": 1280, "height": 720})
     try:
         first = context.new_page()
-        first.set_default_timeout(PAGE_TIMEOUT_MS)
         enter_room(first, url, "Ana")
         expect(timer_of(first)).to_have_text("0:00")
         first.close()
 
         time.sleep(2.0)
         second = context.new_page()
-        second.set_default_timeout(PAGE_TIMEOUT_MS)
         enter_room(second, url, "Ana")
 
         expect(timer_of(second)).to_have_text("0:00")

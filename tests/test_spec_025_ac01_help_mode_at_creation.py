@@ -21,6 +21,7 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import ChangeSettings, HelpMode
 from nock.server import create_app
+from spec010_harness import ROOM_URL_PATTERN
 from spec025_harness import (
     FIVE_AND_ONE,
     WAIT_TIMEOUT_MS,
@@ -36,7 +37,7 @@ from spec025_harness import (
     seed_nickname,
 )
 
-ROOM_URL_TIMEOUT_MS = 10_000
+JOIN_TIMEOUT_MS = 10_000
 
 # ---- Fixtures ----
 
@@ -128,8 +129,9 @@ def start_from_catalogue(page: Page, base_url: str) -> None:
     page.goto(f"{base_url}/")
     item = page.locator('[data-testid="catalogue-item"][data-number="1"]')
     item.get_by_test_id("catalogue-play").click(timeout=WAIT_TIMEOUT_MS)
+    page.wait_for_url(ROOM_URL_PATTERN)
     expect(page.get_by_test_id("room-page")).to_have_attribute(
-        "data-status", "joined", timeout=ROOM_URL_TIMEOUT_MS
+        "data-status", "joined", timeout=JOIN_TIMEOUT_MS
     )
 
 

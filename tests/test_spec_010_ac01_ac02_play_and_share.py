@@ -121,7 +121,7 @@ def test_ac1_one_click_on_the_grid_page_leads_to_a_joined_room(
 ) -> None:
     page.goto(f"{live_server}/g/1")
     page.get_by_test_id("catalogue-play").click()
-    page.wait_for_url(ROOM_URL_PATTERN, timeout=URL_TIMEOUT_MS)
+    page.wait_for_url(ROOM_URL_PATTERN)
 
     room = expect_joined(page)
     expect(room).to_have_attribute("data-grid", "5x5")
@@ -192,7 +192,7 @@ def test_ac1_after_a_failure_the_next_tap_works(page: Page, live_server: str) ->
     page.unroute("**/api/rooms")
     item_play_button(page).click()
 
-    page.wait_for_url(ROOM_URL_PATTERN, timeout=URL_TIMEOUT_MS)
+    page.wait_for_url(ROOM_URL_PATTERN)
     expect_joined(page)
 
 
@@ -204,7 +204,7 @@ def test_ac1_a_double_tap_sends_one_creation_request(
 
     item_play_button(page).dblclick()
 
-    page.wait_for_url(ROOM_URL_PATTERN, timeout=URL_TIMEOUT_MS)
+    page.wait_for_url(ROOM_URL_PATTERN)
     expect_joined(page)
     assert counter.count == 1
 

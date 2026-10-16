@@ -19,7 +19,6 @@ from spec010_harness import (
     PROGRESS_KEY,
     ROOM_RECORD_KEY,
     ROOM_URL_PATTERN,
-    URL_TIMEOUT_MS,
     MockRoomSocket,
     catalogue_from_grid,
     code_from_url,
@@ -100,7 +99,7 @@ def test_ac4_the_room_record_is_written_before_the_page_loads(
 ) -> None:
     page.goto(f"{live_server}/")
     item_play_button(page).click()
-    page.wait_for_url(ROOM_URL_PATTERN, timeout=URL_TIMEOUT_MS)
+    page.wait_for_url(ROOM_URL_PATTERN)
     code = code_from_url(page.url)
 
     record = json.loads(wait_for_storage(page, f"nock.room.{code}"))
