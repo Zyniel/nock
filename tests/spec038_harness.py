@@ -45,7 +45,7 @@ import time
 from collections.abc import Generator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import pytest
 import uvicorn
@@ -564,7 +564,7 @@ def seven_day_figures(now: float) -> DashboardFigures:
     )
 
 
-def no_room_figures(now: float, days: int = 7) -> DashboardFigures:
+def no_room_figures(now: float, days: Literal[1, 7, 30] = 7) -> DashboardFigures:
     """AC-5's result with no room: 0 rooms and every other figure None."""
     from nock.operations import DashboardFigures
 

@@ -23,6 +23,7 @@ duration, the percentage and the latency.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -55,6 +56,7 @@ from spec038_harness import (
     DASHBOARD_PATH,
     NOT_AUTHORIZED,
     OPS_PAGE_PATH,
+    OPS_TIMEOUT_MS,
     OPS_TOKEN,
     OPS_TOKEN_KEY,
     PARIS,
@@ -111,6 +113,7 @@ NO_ROOM_TEXTS = [
 
 NOW = 1_800_000_000.0
 DASHBOARD_ROUTE = "**/api/ops/dashboard*"
+HELD_POLL_MS = 20
 WRONG_TOKEN = "wrong"
 FORM_WATCHER = (
     "window.__opsFormSeen = false;"
@@ -191,6 +194,20 @@ def mocked_dashboard(page: Page, base_url: str, route: DashboardRoute) -> None:
     """Answer the page's dashboard requests with `route`, then open the dashboard."""
     page.route(DASHBOARD_ROUTE, route.handle)
     open_dashboard(page, base_url)
+
+
+def wait_for_held_route(page: Page, held: list[Route]) -> None:
+    """Wait up to 10 seconds until `held` holds the page's dashboard request.
+
+    The page can show `loading` before Playwright has handed its request to the
+    route handler, so a test that answers the requests held so far first waits
+    for one.
+    """
+    deadline = time.monotonic() + OPS_TIMEOUT_MS / 1000
+    while len(held) == 0:
+        if time.monotonic() >= deadline:
+            pytest.fail("the dashboard request never reached the route handler")
+        page.wait_for_timeout(HELD_POLL_MS)
 
 
 def metric_values(page: Page, attribute: str) -> list[str | None]:
@@ -549,10 +566,15 @@ def test_ac7_mocked_the_page_is_loading_until_the_answer_comes(
 ) -> None:
     page = new_page(1280, 720)
     held: list[Route] = []
-    page.route(DASHBOARD_ROUTE, held.append)
+
+    def hold(route: Route) -> None:
+        held.append(route)
+
+    page.route(DASHBOARD_ROUTE, hold)
     open_ops_page(page, server.base_url)
 
     give_token(page, OPS_TOKEN)
+    wait_for_held_route(page, held)
     expect_ops_state(page, "loading")
     status, body = dashboard_answer(seven_day_figures(NOW))
     for route in held:

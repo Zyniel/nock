@@ -28,7 +28,14 @@ from pathlib import Path
 from typing import NamedTuple, Protocol
 
 import pytest
-from playwright.sync_api import Browser, BrowserContext, Locator, Page, expect
+from playwright.sync_api import (
+    Browser,
+    BrowserContext,
+    Locator,
+    Page,
+    Response,
+    expect,
+)
 
 from nock.grid import Grid, LetterCell
 from nock.protocol import LetterChanged
@@ -148,13 +155,14 @@ def cell_in_replay(page: Page, row: int, column: int) -> Locator:
     return page.locator(selector)
 
 
-def ask_for_replay(
-    page: Page, typed_code: str, sent_code: str
-) -> list[dict[str, object]]:
-    """Type a code in the replay form, submit it, and return the edits received.
+def submit_replay(page: Page, typed_code: str, sent_code: str) -> Response:
+    """Type a code in the replay form, submit it, and return the answer it gets.
 
-    Waits for the page's request of `/api/ops/rooms/<sent_code>/edits`, and
-    returns the `edits` of its JSON answer.
+    Waits for the page's request of `/api/ops/rooms/<sent_code>/edits` and returns
+    its response as soon as its headers arrive, with its status. The body is not
+    read here: Chromium never resolves the body of a response that the page itself
+    does not read, and the page need not read a 404's. Only `ask_for_replay` reads
+    it, for the 200 that the page needs.
     """
     page.get_by_test_id("ops-replay-code").fill(typed_code)
     with page.expect_response(
@@ -162,7 +170,20 @@ def ask_for_replay(
         timeout=REPLAY_TIMEOUT_MS,
     ) as caught:
         page.get_by_test_id("ops-replay-submit").click()
-    body = caught.value.json()
+    return caught.value
+
+
+def ask_for_replay(
+    page: Page, typed_code: str, sent_code: str
+) -> list[dict[str, object]]:
+    """Submit a code in the replay form and return the edits received.
+
+    Only for a room that exists: the answer is a 200, which the page reads, and the
+    `edits` of its JSON are returned.
+    """
+    response = submit_replay(page, typed_code, sent_code)
+    assert response.status == 200, response.status
+    body = response.json()
     assert isinstance(body, dict), body
     edits = body["edits"]
     assert isinstance(edits, list), body
@@ -362,8 +383,9 @@ def test_ac9_a_code_with_no_room_shows_not_found(
     ops = new_ops_page()
     open_dashboard(ops, server.base_url)
 
-    ask_for_replay(ops, UNKNOWN_ROOM, UNKNOWN_ROOM)
+    answer = submit_replay(ops, UNKNOWN_ROOM, UNKNOWN_ROOM)
 
+    assert answer.status == 404
     expect_replay_state(ops, "not_found")
     expect(ops.get_by_test_id("ops-replay")).to_contain_text(
         load_fr()["ops.replay_not_found"]
@@ -377,8 +399,9 @@ def test_ac9_a_code_breaking_the_pattern_shows_not_found(
     ops = new_ops_page()
     open_dashboard(ops, server.base_url)
 
-    ask_for_replay(ops, "abc", "ABC")
+    answer = submit_replay(ops, "abc", "ABC")
 
+    assert answer.status == 404
     expect_replay_state(ops, "not_found")
     expect(ops.get_by_test_id("ops-replay")).to_contain_text(
         load_fr()["ops.replay_not_found"]
