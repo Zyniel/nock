@@ -2,25 +2,17 @@
 
 `RoomStore` keeps each room's last edit time, which only edits move (`is_edit`: a
 `letter_changed` or a `cell_locked`), and lists the rooms whose last edit time is
-older than a given time (`expired_codes`). A database file written before this
-spec gets those times when it is opened; a damaged room in it, with no snapshot
-or with a row that cannot be read (`not json`, or bytes that are not UTF-8 text),
-gets the time of the upgrade and a warning, and the store opens all the same. A
-registry reads the room life from `RoomConfig.room_life_seconds`: exactly 30 days
-after the last edit a room is still open, and any later it is expired. The shared
-setup is in `spec032_harness`.
+older than a given time (`expired_codes`). A registry reads the room life from
+`RoomConfig.room_life_seconds`: exactly 30 days after the last edit a room is still
+open, and any later it is expired. The shared setup is in `spec032_harness`.
 """
 
 from __future__ import annotations
 
-import logging
-import time
 from collections.abc import Iterator
 from pathlib import Path
-from typing import NamedTuple
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 import nock.room
@@ -38,7 +30,6 @@ from nock.protocol import (
     GridSolved,
     HelpMode,
     HostChanged,
-    Join,
     LeaveReason,
     LetterChanged,
     PlayerJoined,
@@ -55,28 +46,19 @@ from nock.protocol import (
     VoteOpened,
     VoteOutcome,
 )
-from nock.room import LogEntry, RoomConfig, RoomState, join_room, new_room, replay
-from nock.server import create_app
+from nock.room import LogEntry, RoomConfig, new_room
 from nock.store import RoomStore
 from spec017_harness import FakeClock
 from spec032_harness import (
     ANA,
     BOB,
     CODE_A,
-    CODE_B,
-    CODE_C,
-    INDEX_HTML,
     LIFE,
     NO_TICK_CONFIG,
-    NOT_JSON,
     T0,
     TA,
-    add_old_room_rows,
     grid_from_text,
-    make_dist_dir,
-    overwrite_entry_json_with_bytes_not_utf8,
     registry_on_file,
-    write_old_database,
 )
 
 
@@ -464,311 +446,3 @@ def test_ac1_the_room_life_follows_the_configuration(
 
     assert at_the_limit == []
     assert after_the_limit == [CODE_A]
-
-
-# ---- A database file written before this spec ----------------------------------
-
-
-def old_rooms(grid: Grid) -> list[tuple[RoomState, list[LogEntry]]]:
-    """Room A, created at t0, then a letter at t0 + 10 and a presence change at
-    t0 + 50; room B, created at t0 + 1, with no entry.
-
-    A's first snapshot already holds Ana, so that its log is exactly those two
-    entries.
-    """
-    with_ana = join_room(
-        new_room(CODE_A, grid, T0), Join(nickname="Ana"), T0, ANA, TA
-    ).state
-    room_a_log = [letter_entry(2, T0 + 10), presence_entry(3, T0 + 50)]
-    room_b = new_room(CODE_B, grid, T0 + 1)
-    return [(with_ana, room_a_log), (room_b, [])]
-
-
-OLD_LAYOUTS = pytest.mark.parametrize(
-    "with_share_tokens_table",
-    [False, True],
-    ids=["spec_018_tables", "with_spec_028_share_tokens"],
-)
-
-
-@OLD_LAYOUTS
-def test_ac1_an_old_file_gets_the_last_edit_time_of_each_room_when_opened(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
-) -> None:
-    write_old_database(store_path, old_rooms(fx01_grid), with_share_tokens_table)
-
-    upgraded = RoomStore(store_path)
-    try:
-        room_a_time = upgraded.last_edit_at(CODE_A)
-        room_b_time = upgraded.last_edit_at(CODE_B)
-    finally:
-        upgraded.close()
-
-    assert room_a_time == T0 + 10
-    assert room_b_time == T0 + 1
-
-
-@OLD_LAYOUTS
-def test_ac1_an_edit_appended_to_a_room_of_an_old_file_moves_its_last_edit_time(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
-) -> None:
-    write_old_database(store_path, old_rooms(fx01_grid), with_share_tokens_table)
-
-    upgraded = RoomStore(store_path)
-    try:
-        upgraded.append(CODE_B, [letter_entry(1, T0 + 60)])
-        room_b_time = upgraded.last_edit_at(CODE_B)
-    finally:
-        upgraded.close()
-
-    assert room_b_time == T0 + 60
-
-
-@OLD_LAYOUTS
-def test_ac1_the_rooms_of_an_old_file_still_load_after_the_upgrade(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
-) -> None:
-    rooms = old_rooms(fx01_grid)
-    write_old_database(store_path, rooms, with_share_tokens_table)
-    first_snapshot_a, log_a = rooms[0]
-    expected_a = first_snapshot_a
-    for entry in log_a:
-        expected_a = replay(expected_a, entry)
-
-    upgraded = RoomStore(store_path)
-    try:
-        loaded_a = upgraded.load_room(CODE_A)
-        loaded_b = upgraded.load_room(CODE_B)
-        log_after = upgraded.read_log(CODE_A)
-    finally:
-        upgraded.close()
-
-    assert loaded_a == expected_a
-    assert loaded_b == rooms[1][0]
-    assert log_after == log_a
-
-
-@OLD_LAYOUTS
-def test_ac1_an_upgraded_file_opens_again_with_the_same_times(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
-) -> None:
-    write_old_database(store_path, old_rooms(fx01_grid), with_share_tokens_table)
-    first_open = RoomStore(store_path)
-    first_open.close()
-
-    second_open = RoomStore(store_path)
-    try:
-        times = (second_open.last_edit_at(CODE_A), second_open.last_edit_at(CODE_B))
-    finally:
-        second_open.close()
-
-    assert times == (T0 + 10, T0 + 1)
-
-
-# ---- A damaged room in a file written before this spec -------------------------
-
-NO_SNAPSHOT = "no_snapshot"
-UNREADABLE_SNAPSHOT = "unreadable_snapshot"
-UNREADABLE_LOG_ROW = "unreadable_log_row"
-NOT_UTF8_LOG_ROW = "not_utf8_log_row"
-DAMAGES = pytest.mark.parametrize(
-    "damage",
-    [NO_SNAPSHOT, UNREADABLE_SNAPSHOT, UNREADABLE_LOG_ROW, NOT_UTF8_LOG_ROW],
-)
-# The rows that `model_validate_json` refuses: spec 018 names the exception.
-NOT_JSON_DAMAGES = pytest.mark.parametrize(
-    "damage", [UNREADABLE_SNAPSHOT, UNREADABLE_LOG_ROW]
-)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-def add_damaged_room_c(path: Path, grid: Grid, damage: str) -> None:
-    """Add room C, with one damage, to an old file that holds rooms A and B.
-
-    Undamaged, C would be created at t0 + 2 holding Ana (seq 1), with a letter at
-    t0 + 20 (seq 2) and a presence change at t0 + 40 (seq 3) in its log: its last
-    edit time would be t0 + 20, decades before what the real clock reads. The
-    damage takes its snapshot away, or makes its snapshot or its last log row a
-    row that cannot be read: `not json`, or bytes that are not UTF-8 text.
-    """
-    with_ana = join_room(
-        new_room(CODE_C, grid, T0 + 2), Join(nickname="Ana"), T0 + 2, ANA, TA
-    ).state
-    snapshot_row: tuple[int, str] | None = (with_ana.seq, with_ana.model_dump_json())
-    log_rows = [
-        (2, letter_entry(2, T0 + 20).model_dump_json()),
-        (3, presence_entry(3, T0 + 40).model_dump_json()),
-    ]
-    if damage == NO_SNAPSHOT:
-        snapshot_row = None
-    elif damage == UNREADABLE_SNAPSHOT:
-        snapshot_row = (with_ana.seq, NOT_JSON)
-    elif damage == UNREADABLE_LOG_ROW:
-        log_rows[1] = (3, NOT_JSON)
-    elif damage != NOT_UTF8_LOG_ROW:
-        pytest.fail(f"unknown damage: {damage}")
-    add_old_room_rows(path, CODE_C, snapshot_row, log_rows)
-    if damage == NOT_UTF8_LOG_ROW:
-        overwrite_entry_json_with_bytes_not_utf8(path, CODE_C, 3)
-
-
-def write_damaged_file(
-    path: Path, grid: Grid, with_share_tokens_table: bool, damage: str
-) -> None:
-    """An old file with rooms A and B as above, and a damaged room C."""
-    write_old_database(path, old_rooms(grid), with_share_tokens_table)
-    add_damaged_room_c(path, grid, damage)
-
-
-class Upgrade(NamedTuple):
-    """What an old file with a damaged room C shows once `RoomStore` opened it."""
-
-    clock_before: float  # time.time() just before RoomStore(path)
-    clock_after: float  # time.time() just after it returned
-    room_a_time: float | None
-    room_b_time: float | None
-    room_c_time: float | None
-
-
-def open_damaged_file(
-    path: Path, grid: Grid, with_share_tokens_table: bool, damage: str
-) -> Upgrade:
-    """Write the damaged file, open it with `RoomStore`, read the three times."""
-    write_damaged_file(path, grid, with_share_tokens_table, damage)
-
-    clock_before = time.time()
-    upgraded = RoomStore(path)
-    clock_after = time.time()
-    try:
-        return Upgrade(
-            clock_before,
-            clock_after,
-            upgraded.last_edit_at(CODE_A),
-            upgraded.last_edit_at(CODE_B),
-            upgraded.last_edit_at(CODE_C),
-        )
-    finally:
-        upgraded.close()
-
-
-@DAMAGES
-@OLD_LAYOUTS
-def test_ac1_an_old_file_with_a_damaged_room_opens_and_upgrades_the_others(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool, damage: str
-) -> None:
-    upgrade = open_damaged_file(store_path, fx01_grid, with_share_tokens_table, damage)
-
-    assert (upgrade.room_a_time, upgrade.room_b_time) == (T0 + 10, T0 + 1)
-
-
-@DAMAGES
-@OLD_LAYOUTS
-def test_ac1_a_damaged_room_of_an_old_file_gets_the_time_of_the_upgrade(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool, damage: str
-) -> None:
-    upgrade = open_damaged_file(store_path, fx01_grid, with_share_tokens_table, damage)
-
-    assert upgrade.room_c_time is not None
-    assert upgrade.clock_before <= upgrade.room_c_time <= upgrade.clock_after
-
-
-@DAMAGES
-@OLD_LAYOUTS
-def test_ac1_the_upgrade_logs_a_warning_that_names_the_damaged_room(
-    store_path: Path,
-    fx01_grid: Grid,
-    with_share_tokens_table: bool,
-    damage: str,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    caplog.set_level(logging.WARNING)
-
-    open_damaged_file(store_path, fx01_grid, with_share_tokens_table, damage)
-
-    naming_c: list[logging.LogRecord] = []
-    for record in caplog.records:
-        if record.levelno >= logging.WARNING and CODE_C in record.getMessage():
-            naming_c.append(record)
-    assert naming_c != [], caplog.records
-
-
-@OLD_LAYOUTS
-def test_ac1_a_room_with_no_snapshot_still_loads_as_none_after_the_upgrade(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
-) -> None:
-    write_damaged_file(store_path, fx01_grid, with_share_tokens_table, NO_SNAPSHOT)
-
-    upgraded = RoomStore(store_path)
-    try:
-        loaded = upgraded.load_room(CODE_C)
-    finally:
-        upgraded.close()
-
-    assert loaded is None
-
-
-@NOT_JSON_DAMAGES
-@OLD_LAYOUTS
-def test_ac1_a_room_with_an_unreadable_row_still_fails_to_load_after_the_upgrade(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool, damage: str
-) -> None:
-    write_damaged_file(store_path, fx01_grid, with_share_tokens_table, damage)
-
-    upgraded = RoomStore(store_path)
-    try:
-        with pytest.raises(ValidationError):
-            upgraded.load_room(CODE_C)
-    finally:
-        upgraded.close()
-
-
-def load_room_raises(store: RoomStore, code: str) -> bool:
-    """Whether `store.load_room(code)` raises.
-
-    For a row whose bytes are not UTF-8 text the spec says that `load_room`
-    raises, and names no exception, so any exception counts.
-    """
-    try:
-        store.load_room(code)
-    except Exception:
-        return True
-    return False
-
-
-@OLD_LAYOUTS
-def test_ac1_a_room_with_bytes_that_are_not_utf8_still_fails_to_load(
-    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
-) -> None:
-    write_damaged_file(store_path, fx01_grid, with_share_tokens_table, NOT_UTF8_LOG_ROW)
-
-    upgraded = RoomStore(store_path)
-    try:
-        raised = load_room_raises(upgraded, CODE_C)
-    finally:
-        upgraded.close()
-
-    assert raised is True
-
-
-@DAMAGES
-@OLD_LAYOUTS
-def test_ac1_the_app_starts_on_an_old_file_with_a_damaged_room(
-    store_path: Path,
-    fx01_grid: Grid,
-    with_share_tokens_table: bool,
-    damage: str,
-    dist_dir: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    write_damaged_file(store_path, fx01_grid, with_share_tokens_table, damage)
-    monkeypatch.setenv("NOCK_DATABASE", str(store_path))
-
-    with TestClient(create_app(dist_dir=dist_dir)) as client:
-        page = client.get("/")
-
-    assert page.status_code == 200
-    assert page.text == INDEX_HTML

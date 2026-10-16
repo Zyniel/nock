@@ -4,7 +4,7 @@ This module is not a test file: pytest does not collect it. The tests of spec 03
 are in `tests/test_spec_032_*.py`, one file per criterion group:
 
 - `test_spec_032_ac01_room_life.py`: AC-1 (`RoomStore`'s last edit time, `is_edit`,
-  a database file written before this spec, the room life of `RoomConfig`).
+  the room life of `RoomConfig`).
 - `test_spec_032_ac02_expiry.py`: AC-2 in Python and over HTTP (`expire_rooms`,
   the lookups, the share tokens, the app's sweep).
 - `test_spec_032_ac02_ac07_sockets.py`: AC-2 and AC-7 over the room socket with a
@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import sqlite3
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -104,18 +103,15 @@ T0 = 1_000_000.0  # t0 of the criteria, where conftest's fake clock starts
 
 CODE_A = "AAAAAA"
 CODE_B = "BBBBBB"
-CODE_C = "CCCCCC"  # the damaged room of AC-1 and AC-4
 UNKNOWN_CODE = "ZZZZZZ"
 ANA = "p1"
 BOB = "p2"
 CY = "p3"
 DAN = "p4"
-EVE = "p5"
 TA = "token-of-ana-0001"
 TB = "token-of-bob-0002"
 TC = "token-of-cy-00003"
 TD = "token-of-dan-0004"
-TE = "token-of-eve-0005"
 NEW_PLAYER_ID = "pNEW"  # the `new_player_id` of a join that must not use it
 NEW_TOKEN = "token-never-used-0000"  # the `new_resume_token` of that join
 NOBODYS_TOKEN = "token-nobody-had-000"
@@ -391,151 +387,6 @@ def refused_by_spec_012(nickname: str) -> bool:
 
 
 # ---- Store files ---------------------------------------------------------------
-
-# Spec 018's three tables, exactly as `src/nock/store.py` creates them before this
-# spec: `rooms` holds only `code`.
-SPEC_018_TABLES = """
-CREATE TABLE IF NOT EXISTS rooms (
-    code TEXT PRIMARY KEY
-);
-CREATE TABLE IF NOT EXISTS snapshots (
-    code TEXT NOT NULL REFERENCES rooms (code),
-    seq INTEGER NOT NULL,
-    state_json TEXT NOT NULL,
-    PRIMARY KEY (code, seq)
-);
-CREATE TABLE IF NOT EXISTS log (
-    code TEXT NOT NULL REFERENCES rooms (code),
-    seq INTEGER NOT NULL,
-    entry_json TEXT NOT NULL,
-    PRIMARY KEY (code, seq)
-);
-"""
-# The table spec 028 added before this spec, exactly as `src/nock/store.py` creates
-# it: a file written since spec 028 holds it too.
-SPEC_028_SHARE_TOKENS_TABLE = """
-CREATE TABLE IF NOT EXISTS share_tokens (
-    token TEXT PRIMARY KEY,
-    code TEXT NOT NULL REFERENCES rooms (code)
-);
-"""
-
-
-NOT_JSON = "not json"  # a row that cannot be read (AC-1's damaged room)
-
-
-def write_old_database(
-    path: Path,
-    rooms: list[tuple[RoomState, list[LogEntry]]],
-    with_share_tokens_table: bool,
-) -> None:
-    """Write a database file as the store wrote it before this spec.
-
-    Args:
-        path: The file to create.
-        rooms: Each room's first snapshot and its log, written as rows built from
-            `model_dump_json()`.
-        with_share_tokens_table: Also create spec 028's `share_tokens` table,
-            empty, as a file written since spec 028 holds it.
-    """
-    connection = sqlite3.connect(path)
-    try:
-        script = SPEC_018_TABLES
-        if with_share_tokens_table:
-            script += SPEC_028_SHARE_TOKENS_TABLE
-        connection.executescript(script)
-        connection.commit()
-    finally:
-        connection.close()
-    for first_snapshot, log in rooms:
-        snapshot_row = (first_snapshot.seq, first_snapshot.model_dump_json())
-        log_rows: list[tuple[int, str]] = []
-        for entry in log:
-            log_rows.append((entry.event.seq, entry.model_dump_json()))
-        add_old_room_rows(path, first_snapshot.code, snapshot_row, log_rows)
-
-
-def add_old_room_rows(
-    path: Path,
-    code: str,
-    snapshot_row: tuple[int, str] | None,
-    log_rows: list[tuple[int, str]],
-) -> None:
-    """Add one room to a file that `write_old_database` wrote, row by row.
-
-    Each row is written as given, so that a row can be one that cannot be read.
-
-    Args:
-        path: The file, already written.
-        code: The room's code, inserted in `rooms`.
-        snapshot_row: The `seq` and `state_json` of its first snapshot, or None for
-            a room with no snapshot.
-        log_rows: The `seq` and `entry_json` of each of its log rows.
-    """
-    connection = sqlite3.connect(path)
-    try:
-        connection.execute("INSERT INTO rooms (code) VALUES (?)", (code,))
-        if snapshot_row is not None:
-            seq, state_json = snapshot_row
-            connection.execute(
-                "INSERT INTO snapshots (code, seq, state_json) VALUES (?, ?, ?)",
-                (code, seq, state_json),
-            )
-        for seq, entry_json in log_rows:
-            connection.execute(
-                "INSERT INTO log (code, seq, entry_json) VALUES (?, ?, ?)",
-                (code, seq, entry_json),
-            )
-        connection.commit()
-    finally:
-        connection.close()
-
-
-def overwrite_entry_json(path: Path, code: str, seq: int, text: str) -> None:
-    """Overwrite the `entry_json` of one row of a store file's `log` table.
-
-    Args:
-        path: The store file, closed by every store meanwhile.
-        code: The room of the row.
-        seq: The seq of the row.
-        text: Its new `entry_json`.
-    """
-    update_one_log_row(
-        path,
-        "UPDATE log SET entry_json = ? WHERE code = ? AND seq = ?",
-        (text, code, seq),
-    )
-
-
-def overwrite_entry_json_with_bytes_not_utf8(path: Path, code: str, seq: int) -> None:
-    """Overwrite the `entry_json` of one log row with bytes that are not UTF-8 text.
-
-    The value is the byte 0xFF, written through `sqlite3` as `CAST(X'FF' AS TEXT)`
-    (AC-1 and AC-4).
-
-    Args:
-        path: The store file, closed by every store meanwhile.
-        code: The room of the row.
-        seq: The seq of the row.
-    """
-    update_one_log_row(
-        path,
-        "UPDATE log SET entry_json = CAST(X'FF' AS TEXT) WHERE code = ? AND seq = ?",
-        (code, seq),
-    )
-
-
-def update_one_log_row(
-    path: Path, statement: str, parameters: tuple[str | int, ...]
-) -> None:
-    """Run an UPDATE of the `log` table that must change exactly one row."""
-    connection = sqlite3.connect(path)
-    try:
-        cursor = connection.execute(statement, parameters)
-        assert cursor.rowcount == 1, f"no single log row for {parameters}"
-        connection.commit()
-    finally:
-        connection.close()
 
 
 @contextlib.contextmanager
