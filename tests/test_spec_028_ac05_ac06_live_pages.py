@@ -39,6 +39,7 @@ from spec026_harness import EnterRoom, play_live_game
 from spec028_harness import (
     QUIET_MS,
     SHARE_TOKEN,
+    RunningAfterPlayR,
     format_time,
     share_route,
     stored_play_r,
@@ -56,11 +57,15 @@ def fx01_grid(fx01_text: str) -> Grid:
 
 @pytest.fixture
 def room_registry(tmp_path: Path, fx01_grid: Grid) -> Iterator[RoomRegistry]:
-    """The registry the live server serves: it loads `PLAY_R`'s room from a file."""
+    """The registry the live server serves: it loads `PLAY_R`'s room from a file.
+
+    Its clock runs as the real one from just after the stored play, so the stored
+    room is not expired (spec 032) and live games keep their timer.
+    """
     path = tmp_path / "rooms.db"
     stored_play_r(path, fx01_grid)
     store = RoomStore(path)
-    registry = RoomRegistry(store=store)
+    registry = RoomRegistry(store=store, clock=RunningAfterPlayR())
     yield registry
     registry.close()
     store.close()

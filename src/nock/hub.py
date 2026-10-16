@@ -7,6 +7,9 @@ one task per room that applies the room's inputs one at a time.
 Each connection bounds what waits for it in both directions (spec 036): a client
 that never reads its socket is closed as stalled, and a client that sends faster
 than its room applies is closed as flooding.
+
+A room lives 30 days from its last edit (spec 032). An expired room is deleted by
+`expire_rooms`, which the app runs every hour, and by any lookup that meets it.
 """
 
 from __future__ import annotations
@@ -16,7 +19,7 @@ import logging
 import secrets
 import threading
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import NamedTuple
 
 from nock.grid import Grid
@@ -36,20 +39,25 @@ from nock.room import (
     Clock,
     Outcome,
     RoomConfig,
+    RoomKey,
     RoomState,
+    RoomSummary,
     after_restart,
     disconnect_player,
     handle_message,
     join_room,
     new_room,
+    room_summary,
     tick,
     with_last_seen,
 )
+from nock.room import member_id as room_member_id
 from nock.store import RoomStore
 
 __all__ = [
     "FLOOD_CLOSE_CODE",
     "MAX_FRAME_BYTES",
+    "ROOM_NOT_FOUND_CLOSE_CODE",
     "SESSION_REPLACED_CLOSE_CODE",
     "SILENCE_CLOSE_CODE",
     "STALLED_CLOSE_CODE",
@@ -64,6 +72,7 @@ ROOM_CODE_LENGTH: int = 6
 SHARE_TOKEN_BYTES: int = 16  # spec 028: secrets.token_urlsafe(16), 22 characters
 
 MAX_FRAME_BYTES: int = 4096  # spec 037: larger frames are not parsed
+ROOM_NOT_FOUND_CLOSE_CODE: int = 4404  # unknown room, or deleted (spec 032)
 SESSION_REPLACED_CLOSE_CODE: int = 4001  # the same player opened another socket
 STALLED_CLOSE_CODE: int = 4507  # spec 036: the client did not read its messages
 FLOOD_CLOSE_CODE: int = 1008  # spec 036: the client sent faster than the room applies
@@ -360,13 +369,33 @@ class _RoomRunner:
         self.state = state
         self._config = config
         self._clock = clock
+        # The joined connections, which the room's messages go to.
         self._connections: list[RoomConnection] = []
+        # Every connection opened to the room whose socket has not closed yet,
+        # joined or not: a deletion closes them all (spec 032).
+        self._open_connections: list[RoomConnection] = []
         self._inbox: asyncio.Queue[_Input] = asyncio.Queue()
         self._task: asyncio.Task[None] | None = None
         self._is_closed = False
+        self._is_deleted = False
         self._store = store
         self._snapshot_seq = snapshot_seq
         self._events_since_snapshot = 0
+
+    def keep_connection(self, connection: RoomConnection) -> None:
+        """Keep a connection just opened to the room, so a deletion can close it.
+
+        Called on the engine's loop, before any input of the connection.
+
+        Args:
+            connection: The new connection, joined or not. When the room is
+                already deleted, it is closed at once with
+                ROOM_NOT_FOUND_CLOSE_CODE instead.
+        """
+        if self._is_deleted:
+            connection.deliver_close(ROOM_NOT_FOUND_CLOSE_CODE)
+            return
+        self._open_connections.append(connection)
 
     def post(self, item: _Input) -> None:
         """Add an input to the inbox, starting the task if it is not running.
@@ -388,12 +417,48 @@ class _RoomRunner:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
+    async def delete(self) -> None:
+        """Stop the room for good, delete it from the store, then close its sockets.
+
+        The inputs still in the inbox are dropped, and no step, snapshot or log
+        entry is made. Then each connection opened to the room is sent a close
+        with ROOM_NOT_FOUND_CLOSE_CODE and no other message (spec 032), also
+        when the store fails.
+        """
+        self._is_deleted = True
+        await self.cancel()
+        try:
+            self._store.delete_room(self.state.code)
+        finally:
+            self._close_open_connections()
+
+    async def stop_for_deletion(self) -> None:
+        """Stop the room for good and close its sockets, leaving the store alone.
+
+        For a room the registry already deleted from the store, where a new room
+        may have its code by now. As in `delete`, the inputs still in the inbox
+        are dropped, and each connection opened to the room is sent a close with
+        ROOM_NOT_FOUND_CLOSE_CODE, also when stopping the task fails.
+        """
+        self._is_deleted = True
+        try:
+            await self.cancel()
+        finally:
+            self._close_open_connections()
+
+    def _close_open_connections(self) -> None:
+        """Close each connection opened to the room with ROOM_NOT_FOUND_CLOSE_CODE."""
+        for connection in self._open_connections:
+            connection.deliver_close(ROOM_NOT_FOUND_CLOSE_CODE)
+        self._open_connections = []
+
     def save_snapshot(self) -> None:
         """Save a snapshot of the room unless the store has one at this seq.
 
-        A failure is logged: the log alone is enough to rebuild the room.
+        A failure is logged: the log alone is enough to rebuild the room. A
+        deleted room saves nothing.
         """
-        if self._snapshot_seq == self.state.seq:
+        if self._is_deleted or self._snapshot_seq == self.state.seq:
             return
         try:
             self._store.save_snapshot(self.state)
@@ -557,6 +622,8 @@ class _RoomRunner:
         stays registered: the room still shows the player as active, so it
         still has a connection for them (a resume of the player replaces it).
         """
+        if leaving in self._open_connections:
+            self._open_connections.remove(leaving)
         if leaving not in self._connections:
             return
         others = [other for other in self._connections if other is not leaving]
@@ -677,6 +744,9 @@ class RoomRegistry:
         self._thread: threading.Thread | None = None
         self._closed = False
         self._stop_task: asyncio.Task[None] | None = None
+        # Deletions started on the engine's own thread, kept until they end: an
+        # event loop keeps only weak references to its tasks.
+        self._deletion_tasks: set[asyncio.Task[None]] = set()
 
     @property
     def config(self) -> RoomConfig:
@@ -687,6 +757,11 @@ class RoomRegistry:
     def clock(self) -> Clock:
         """The clock of the rooms."""
         return self._clock
+
+    @property
+    def store(self) -> RoomStore:
+        """The store of the rooms. The server's routes read logs through it."""
+        return self._store
 
     def register_room(self, grid: Grid, grid_number: int | None = None) -> str:
         """Create a room on `grid` and return its code.
@@ -717,7 +792,8 @@ class RoomRegistry:
     def add_room(self, state: RoomState) -> None:
         """Register a room in a given state (tests, and spec 018's loader).
 
-        The room keeps the share token of `state` (spec 028).
+        The room keeps the share token of `state` (spec 028). Its life starts at
+        `clock()`, whatever its `created_at` (spec 032).
 
         Raises:
             ValueError: a room with `state.code` already exists, or another room
@@ -728,11 +804,14 @@ class RoomRegistry:
             self._check_open()
             if self._is_taken(state.code):
                 raise ValueError(f"A room with code {state.code} already exists")
-            self._store.create_room(state)
+            self._store.create_room(state, last_edit_at=self._clock())
             self._runners[state.code] = self._new_runner(state, state.seq)
 
     def find_room(self, code: str) -> Grid | None:
-        """Return the grid of room `code`, or None when there is no such room."""
+        """Return the grid of room `code`, or None when there is no such room.
+
+        An expired room is deleted first, and so gives None (see `room_state`).
+        """
         state = self.room_state(code)
         if state is None:
             return None
@@ -743,11 +822,82 @@ class RoomRegistry:
 
         Read-only: the returned model is the one the room task last stored.
         A room that is only in the store is loaded first (see `_find_runner`).
+        An expired room is deleted first, and so gives None (spec 032).
         """
         runner = self._find_runner(code)
         if runner is None:
             return None
         return runner.state
+
+    def peek_room(self, code: str) -> RoomState | None:
+        """Return the room's latest state without making it live.
+
+        A live room gives its live state; a room only in the store gives
+        `store.load_room(code)`, with no `after_restart` step and nothing logged.
+
+        Returns:
+            The state; None when the room is unknown or expired. An expired room
+            is deleted first, as by `expire_rooms`.
+        """
+        if self._delete_if_expired(code):
+            return None
+        runner = self._runners.get(code)
+        if runner is not None:
+            return runner.state
+        return self._store.load_room(code)
+
+    def member_id(self, code: str, resume_token: str) -> str | None:
+        """Return the id of the room's member whose resume token is `resume_token`.
+
+        Returns:
+            `nock.room.member_id` of the room's latest state, as `peek_room`
+            reads it; None when the room is unknown or expired, or when no
+            member holds the token.
+        """
+        state = self.peek_room(code)
+        if state is None:
+            return None
+        return room_member_id(state, resume_token)
+
+    def room_summaries(self, keys: Sequence[RoomKey]) -> list[RoomSummary]:
+        """Return the summaries of the rooms that a key's token is a member of.
+
+        One summary per code, whatever the number of keys naming it: one key
+        holding a member's token is enough. A room that is unknown or expired,
+        or whose keys hold no member's token, is left out, and nothing tells
+        why. No room is made live and nothing is logged.
+
+        Returns:
+            The summaries, the newest `last_activity_at` first, then by code in
+            code-point order.
+        """
+        tokens_by_code: dict[str, list[str]] = {}
+        for key in keys:
+            if key.code not in tokens_by_code:
+                tokens_by_code[key.code] = []
+            tokens_by_code[key.code].append(key.resume_token)
+        summaries: list[RoomSummary] = []
+        for code, tokens in tokens_by_code.items():
+            summary = self._summary_for_members(code, tokens)
+            if summary is not None:
+                summaries.append(summary)
+        summaries.sort(key=_newest_first)
+        return summaries
+
+    def expire_rooms(self) -> list[str]:
+        """Delete every room that is expired at `clock()` (spec 032).
+
+        A room is expired once more than `config.room_life_seconds` passed since
+        its last edit. A live room's task stops first, and each of its sockets is
+        closed with ROOM_NOT_FOUND_CLOSE_CODE.
+
+        Returns:
+            The codes of the rooms deleted, in code-point order.
+        """
+        expired_codes = self._store.expired_codes(self._expiry_limit())
+        for code in expired_codes:
+            self._delete_room(code)
+        return expired_codes
 
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.
@@ -796,7 +946,8 @@ class RoomRegistry:
         Must be called from the event loop that serves the socket.
 
         Returns:
-            The connection, or None when there is no such room.
+            The connection, or None when there is no such room. An expired room
+            is deleted first, and so gives None (spec 032).
 
         Raises:
             RuntimeError: the registry is closed.
@@ -813,12 +964,16 @@ class RoomRegistry:
                 # The registry was closed: the room no longer runs.
                 return
 
-        return RoomConnection(
+        connection = RoomConnection(
             asyncio.get_running_loop(),
             post,
             max_outbound=self._config.max_outbound_messages,
             max_inbound=self._config.max_inbound_pending,
         )
+        # Scheduled before any input of the connection, so the room knows it
+        # before its first frame.
+        engine_loop.call_soon_threadsafe(runner.keep_connection, connection)
+        return connection
 
     def close(self) -> None:
         """Stop the room tasks and the engine thread. Idempotent.
@@ -861,10 +1016,13 @@ class RoomRegistry:
     def _find_runner(self, code: str) -> _RoomRunner | None:
         """Return the live runner of room `code`, loading it from the store.
 
-        A room that is only in the store is loaded, made live, and goes through
-        one `after_restart` step, which is logged, before anything else. Two
-        threads asking for the same code load it once.
+        An expired room is deleted first, and gives None (spec 032). A room that
+        is only in the store is loaded, made live, and goes through one
+        `after_restart` step, which is logged, before anything else. Two threads
+        asking for the same code load it once.
         """
+        if self._delete_if_expired(code):
+            return None
         runner = self._runners.get(code)
         if runner is not None:
             return runner
@@ -881,6 +1039,77 @@ class RoomRegistry:
             runner = self._new_runner(outcome.state, None)
             self._runners[code] = runner
             return runner
+
+    def _summary_for_members(self, code: str, tokens: list[str]) -> RoomSummary | None:
+        """Return the summary of room `code` when one of `tokens` is a member's.
+
+        Returns:
+            The summary; None when the room is unknown or expired, or when no
+            token is a member's.
+        """
+        state = self.peek_room(code)
+        if state is None:
+            return None
+        holds_a_members_token = False
+        for token in tokens:
+            if room_member_id(state, token) is not None:
+                holds_a_members_token = True
+        if not holds_a_members_token:
+            return None
+        last_edit_at = self._store.last_edit_at(code)
+        if last_edit_at is None:
+            return None  # deleted since `peek_room` read it
+        return room_summary(state, last_edit_at)
+
+    def _expiry_limit(self) -> float:
+        """Return the oldest last edit time a room may have at `clock()`.
+
+        A room whose last edit time is strictly less is expired (spec 032).
+        """
+        return self._clock() - self._config.room_life_seconds
+
+    def _delete_if_expired(self, code: str) -> bool:
+        """Delete room `code` when it is expired at `clock()`.
+
+        Returns:
+            True when the room was expired, and so is deleted now.
+        """
+        last_edit_at = self._store.last_edit_at(code)
+        if last_edit_at is None or last_edit_at >= self._expiry_limit():
+            return False
+        self._delete_room(code)
+        return True
+
+    def _delete_room(self, code: str) -> None:
+        """Delete a room: stop it when it is live, then remove it from the store.
+
+        The lock is held throughout, so that no lookup loads the room again while
+        it goes. A live room is stopped on the engine's loop, which then deletes
+        it from the store and closes its sockets (`_RoomRunner.delete`); this
+        waits until that is done, except on the engine's own thread.
+        """
+        with self._lock:
+            runner = self._runners.pop(code, None)
+            loop = self._loop
+            if runner is None or loop is None or self._closed:
+                # No task or socket to stop: none ever connected, or close()
+                # stopped them all.
+                self._store.delete_room(code)
+                return
+            if threading.current_thread() is self._thread:
+                # Waiting for ourselves would block, as in close(): the store
+                # forgets the room now, under the lock, and the room's task stops
+                # after this step, even when the store fails. The stop leaves the
+                # store alone: a new room may have taken the code by then.
+                try:
+                    self._store.delete_room(code)
+                finally:
+                    stopping = loop.create_task(runner.stop_for_deletion())
+                    self._deletion_tasks.add(stopping)
+                    stopping.add_done_callback(self._deletion_tasks.discard)
+                return
+            deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
+            deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _finish(self) -> None:
         """Save a snapshot of each live room, then close the store if owned."""
@@ -918,6 +1147,11 @@ class RoomRegistry:
         await self._cancel_runners()
         self._finish()
         asyncio.get_running_loop().stop()
+
+
+def _newest_first(summary: RoomSummary) -> tuple[float, str]:
+    """Sort key of the summaries: the newest last activity first, then the code."""
+    return (-summary.last_activity_at.timestamp(), summary.code)
 
 
 def _run_loop(loop: asyncio.AbstractEventLoop) -> None:

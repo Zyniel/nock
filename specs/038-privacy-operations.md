@@ -32,7 +32,7 @@ These criteria apply to every story above and belong in each agent's definition 
 
 | Where | What | How long |
 | --- | --- | --- |
-| SQLite `NOCK_DATABASE`, rooms (spec 018) | per room: its code, creation and last edit times (spec 032); snapshots of `RoomState`: the grid with its answers, the cells (letters, authors, locks), the players (`PlayerRecord`: player id, resume token, nickname, colour, host and mute flags, presence state and the times of their last input, frame and disconnection, selection, recent edit times, last edit), the past players (`PastPlayer`: player id, resume token, nickname, colour), the removed tokens, the settings and what later specs add | until the room expires, 30 days after its last edit (spec 032 AC-1); then deleted at the next sweep (within an hour) or at once by any lookup |
+| SQLite `NOCK_DATABASE`, rooms (spec 018) | per room: its code, creation and last edit times (spec 032); snapshots of `RoomState`: the grid with its answers, the cells (letters, authors, locks), the players (`PlayerRecord`: player id, resume token, nickname, colour, host and mute flags, presence state and the times of their last input, frame and disconnection, selection, recent edit times, last edit), the past players (`PastPlayer`: player id, resume token, nickname, colour, mute flag), the removed tokens, the settings and what later specs add | until the room expires, 30 days after its last edit (spec 032 AC-1); then deleted at the next sweep (within an hour) or at once by any lookup |
 | SQLite, log of each room (spec 018) | every numbered event exactly as the players received it (letters, checks, reveals, votes, flags, chat texts, joins with the player's view, presence, settings, completion), each with its time `at`, plus the private fields `resume_token` (on a join), `undo` and `relay_ms` (this spec) | the same: deleted with the room |
 | Process memory | live rooms; the wrong room codes of each client address (spec 011) and the wrong operator tokens of each address (this spec), for 60 seconds | until the window passes, or the process stops |
 | Process logs (stdout, stderr) | warnings and errors of the server and of the app, with room codes and error descriptions | the operator's choice; they hold no client address, no resume token, no operator token and no chat text |
@@ -44,6 +44,13 @@ These criteria apply to every story above and belong in each agent's definition 
 spec 029's decision 6, approved by the human on 2026-10-14: an account's history
 keeps the team-mates' nicknames after the room is gone. Without it, this spec said
 that a deleted room leaves no byte behind, which spec 029 contradicts.)
+
+(Note from the lead, 2026-10-16: in the first row, the fields of `PastPlayer` gained
+"mute flag", after spec 032's decision 13: a past player keeps the mute of their
+record, so that a seat back restores it. The list used to read "player id, resume
+token, nickname, colour". The flag is game state, kept and deleted with the room,
+like every field of `PastPlayer` other than the nickname and the two identifiers.
+No criterion changes.)
 
 - Personal data about a guest is their nickname and two random identifiers, the
   player id and the resume token (AC-1). Every other field of `PlayerRecord` and

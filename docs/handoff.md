@@ -5,7 +5,7 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, early afternoon)
+## Where things stand (2026-10-16, afternoon)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -18,11 +18,13 @@ Update it at the end of each session.
   stricter language scan), PR #11 (tooling: the finish hook lets an agent stop
   once it has reported a failure it cannot fix), PR #12 (spec 036's refinement:
   technical variables refuse special characters; spec 033's variables brought in
-  line), PR #13 (spec 028, end-of-game recap and share link). Tag `v0.1.0`
+  line), PR #13 (spec 028, end-of-game recap and share link), PR #14 (tooling:
+  the four test files that measure durations in the serial pass). Tag `v0.1.0`
   exists locally on #6's merge commit but could not be pushed from the cloud
   session (tag pushes are refused): the human pushes it from a clone.
-- Open: a tooling pull request, the four test files that measure durations in
-  the serial pass.
+- Open: spec 032's pull request (room resume). Its description holds two lead
+  decisions the human may override (13: a mute survives a time-out; 14: only
+  lookups check expiry).
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only); spec 033's
   open question 2 (players' addresses outside ASCII; (b) recommended).
@@ -33,28 +35,21 @@ Update it at the end of each session.
   merged. CI runs only on pull requests, so a local check comes first.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
-- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028 are `done`. Still to
-  build: 032 (built and simplified, its pull request next), then the nickname
-  rule below. The human was asked on 2026-10-16 whether to park 029, 033, 034
+- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032 are `done` (032
+  in its pull request). Next: the nickname rule below. The human was asked on 2026-10-16 whether to park 029, 033, 034
   and 038 ("the core is the game engine not all the rest") and what engine work
   comes first; the lead proposed simplifying the room engine.
 
 ## Work in flight (not pushed)
 
-- Spec 032 (room resume): worktree `.claude/worktrees/spec-032`, branch
-  `spec-032`, still on spec 028's commits from before their rebase (3059df6):
-  rebase with `git rebase --onto origin/main 3059df6 spec-032`. Two reviews,
-  then a last fix round the lead verified (the throttle checks and records in
-  one locked step; the reviewer's burst script gives exactly 10 wrong codes
-  through for 40 and 300 sockets) and a simplification under the human's rule
-  (no store upgrade: Nock was never deployed; 126 lines fewer). Lead decisions
-  for the human in its pull request: 13 (a mute survives a time-out and seat
-  back), 14 (only lookups check expiry).
 - Nickname rule (human, 2026-10-16): typed in capitals, stored in capitals
   (`str.upper()` before the checks), compared exactly (no casefold left), shown
   with capitalised words (one display function). Worktree
-  `.claude/worktrees/caps-names`, branch `caps-names` on spec 032's head
-  (c8e004a); the spec-writer is at work. Its own pull request after 032's.
+  `.claude/worktrees/caps-names`, branch `caps-names`, built on spec 032's
+  commits before their last rebase (c0f1be5): spec 2802053, tests 9548b18 (121
+  red without a browser, 34 in Chromium), and the implementer at work. Rebase
+  with `git rebase --onto origin/main c0f1be5 caps-names` once spec 032 is
+  merged; its own pull request then.
 - Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
   values, a spec 035 refinement, after 032).
@@ -76,7 +71,7 @@ Update it at the end of each session.
 
 1. Keep the open pull request green until the human merges it; answer its
    review comments.
-2. Then spec 032, then the nickname rule (above), each in its own pull request.
+2. Then the nickname rule (above) in its own pull request.
 3. Then the rest of Phase 6 in the order above, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and

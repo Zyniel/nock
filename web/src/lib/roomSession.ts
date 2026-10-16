@@ -1,6 +1,7 @@
 // The state of one room page and the rules that keep it in `seq` order.
 // Plain functions: no socket and no DOM, so the rules are easy to read.
 
+import { SvelteMap } from 'svelte/reactivity'
 import { FEED_LIMIT, feedItemFor } from './activityFeed'
 import type { FeedItem } from './activityFeed'
 import { timerValueMs } from './timer'
@@ -213,7 +214,9 @@ export interface RoomSession {
   isRefused: boolean
   // The activity feed, oldest first (spec 013).
   feed: FeedItem[]
-  // The nickname of every player seen so far, by id; those who left stay.
+  // The nickname of every player seen so far, by id; those who left stay. A
+  // reactive map: what the page shows of a name follows when the name arrives,
+  // as for a player seated back (spec 032) whose letter is selected (spec 019).
   names: Map<string, string>
   // The vote ids this page voted on, kept while the page is open
   // (reconnections included).
@@ -276,7 +279,7 @@ export function newSession(): RoomSession {
     undoRefusals: 0,
     isRefused: false,
     feed: [],
-    names: new Map(),
+    names: new SvelteMap<string, string>(),
     votedIds: [],
     closedVote: null,
     reactions: [],

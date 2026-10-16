@@ -177,5 +177,14 @@
   "share.heading": "Grille terminée",
   "share.team": "Équipe : {names}",
   "share.home": "Voir les grilles",
-  "share.error": "Ce bilan n'est pas disponible."
+  "share.error": "Ce bilan n'est pas disponible.",
+  "my_rooms.heading": "Mes salons",
+  "my_rooms.loading": "Chargement de vos salons…",
+  "my_rooms.empty": "Aucun salon ouvert.",
+  "my_rooms.error": "Impossible de charger vos salons.",
+  "my_rooms.unnumbered": "Grille hors catalogue",
+  "my_rooms.players": "Joueurs : {names}",
+  "my_rooms.last_activity": "Dernière activité : {date} à {time}",
+  "my_rooms.open": "Reprendre",
+  "my_rooms.open_label": "Reprendre le salon {code}"
 }

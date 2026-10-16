@@ -330,8 +330,12 @@
   // Off at each page load, and for this page only: the switch sends nothing.
   let isAuthorsViewOn = $state(false)
   let playerColours = $derived(colourByPlayer(session.snapshot?.players ?? []))
-  // The clue bar's line naming the author of the selected letter, or null.
-  let selectedAuthorLine = $derived(selectedAuthorLineOf(isAuthorsViewOn, selection))
+  // The clue bar's line naming the author of the selected letter, or null. It
+  // follows the known names too: a name that arrives while the cell stays
+  // selected (a player seated back, spec 032) shows at once (spec 019).
+  let selectedAuthorLine = $derived(
+    selectedAuthorLineOf(isAuthorsViewOn, selection, session.names),
+  )
 
   function toggleAuthorsView(): void {
     isAuthorsViewOn = !isAuthorsViewOn
@@ -340,7 +344,11 @@
   // The line naming the author of the selected cell's confirmed letter, while
   // the view is on; null when it is off, when nothing is selected, or when the
   // selected cell is empty or revealed.
-  function selectedAuthorLineOf(isViewOn: boolean, current: Selection | null): string | null {
+  function selectedAuthorLineOf(
+    isViewOn: boolean,
+    current: Selection | null,
+    names: Map<string, string>,
+  ): string | null {
     if (!isViewOn || current === null) {
       return null
     }
@@ -352,7 +360,7 @@
     if (author === null) {
       return null
     }
-    return authorLine(author, session.names)
+    return authorLine(author, names)
   }
 
   // True while the page retries after a loss that happened with the form shown:

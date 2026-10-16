@@ -16,6 +16,8 @@ import json
 import queue
 import re
 import threading
+import time
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from typing import Protocol
@@ -157,3 +159,60 @@ def open_fx01_room(
     link = f"{live_server}/r/{code}"
     enter_room(page, link)
     return link
+
+
+# ---- Bursts of wrong codes (AC-3; spec 028 AC-8 uses them too) ---------------
+
+BURST_SIZE = 40  # sent at once from one address
+LOOKUP_DELAY_SECONDS = 0.02
+BURST_TIMEOUT_SECONDS = 10.0
+
+
+class SlowLookupRegistry(RoomRegistry):
+    """A registry whose `room_state` answers `LOOKUP_DELAY_SECONDS` later.
+
+    A lookup that loads a room from the disk can take that long. In a burst the
+    delay keeps the requests in flight at the same time, whatever the order in
+    which their threads run, so a burst that is not counted one request after
+    another shows on every run. The throttle's rule holds whatever a lookup costs.
+    """
+
+    def room_state(self, code: str) -> RoomState | None:
+        """Wait `LOOKUP_DELAY_SECONDS`, then look the room up as usual."""
+        time.sleep(LOOKUP_DELAY_SECONDS)
+        return super().room_state(code)
+
+
+def at_once(count: int, action: Callable[[], object]) -> list[object]:
+    """Run `action` in `count` threads that start together; what each returned.
+
+    The threads wait on one barrier, then each runs `action` once. An exception
+    that an action raises is its thread's result. A thread still running after
+    `BURST_TIMEOUT_SECONDS` gives no result, so the list is then shorter.
+
+    Returns:
+        The results, in the order in which the threads finished.
+    """
+    barrier = threading.Barrier(count)
+    results: list[object] = []
+    lock = threading.Lock()
+
+    def run_once() -> None:
+        try:
+            barrier.wait(BURST_TIMEOUT_SECONDS)
+            result = action()
+        except Exception as error:  # the test reports it as this thread's result
+            result = error
+        with lock:
+            results.append(result)
+
+    threads: list[threading.Thread] = []
+    for _ in range(count):
+        thread = threading.Thread(target=run_once, daemon=True)
+        thread.start()
+        threads.append(thread)
+    deadline = time.monotonic() + BURST_TIMEOUT_SECONDS
+    for thread in threads:
+        thread.join(max(deadline - time.monotonic(), 0.0))
+    with lock:
+        return list(results)

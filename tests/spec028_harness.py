@@ -35,6 +35,7 @@ from __future__ import annotations
 import contextlib
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any, NamedTuple
 
@@ -565,7 +566,8 @@ def stored_play_r(path: Path, grid: Grid) -> Game:
     """Write a room and `PLAY_R`'s entries to a file store, then close the store.
 
     The room is created with `SHARE_TOKEN`; a `RoomRegistry` on a new `RoomStore`
-    of the same file then loads it, solved, as after a restart.
+    of the same file then loads it, solved, as after a restart. That registry
+    reads `after_play_r` or `RunningAfterPlayR` as its clock (spec 032).
     """
     game = play_r(grid)
     store = RoomStore(path)
@@ -574,3 +576,28 @@ def stored_play_r(path: Path, grid: Grid) -> Game:
     store.append(ROOM_CODE, game.log)
     store.close()
     return game
+
+
+# Spec 032 deletes a room 30 days after its last edit, on its registry's clock.
+# `stored_play_r` writes its room at NOW (spec 024's harness), decades before the
+# real time, so a registry that loads that room reads one of these clocks.
+AFTER_PLAY_R = NOW + 1_000.0
+
+
+def after_play_r() -> float:
+    """A clock that stays just after the stored play (spec 032)."""
+    return AFTER_PLAY_R
+
+
+class RunningAfterPlayR:
+    """The real clock, moved back to just after the stored play (spec 032).
+
+    Time passes as on the real clock, so the timers of live games run, and the
+    stored room, written at NOW, is not expired.
+    """
+
+    def __init__(self) -> None:
+        self._offset = time.time() - AFTER_PLAY_R
+
+    def __call__(self) -> float:
+        return time.time() - self._offset

@@ -1,12 +1,17 @@
 <script lang="ts">
   import CatalogueItem from './CatalogueItem.svelte'
+  import MyRooms from './MyRooms.svelte'
   import { isGridSummary, type GridSummary } from './catalogue'
   import { t } from './i18n'
+  import { storedRoomKeys } from './myRooms'
 
   type State = 'loading' | 'ready' | 'error'
   type ForceFilter = 'all' | 1 | 2 | 3 | 4
 
   const FILTERS: ForceFilter[] = ['all', 1, 2, 3, 4]
+
+  // The rooms this device keeps an identity for (spec 032), read once at load.
+  const myRoomKeys = storedRoomKeys()
 
   let pageState: State = $state('loading')
   let grids: GridSummary[] = $state([])
@@ -42,6 +47,9 @@
 
 <main data-testid="catalogue-page" data-state={pageState}>
   <h1>{t('catalogue.heading')}</h1>
+  {#if myRoomKeys.length > 0}
+    <MyRooms keys={myRoomKeys} />
+  {/if}
   <div role="group" aria-label={t('catalogue.filter.label')}>
     {#each FILTERS as filter (filter)}
       <button

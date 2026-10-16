@@ -32,6 +32,7 @@ from spec018_harness import (
     SERVER_CONFIG,
     SHORT_PAUSE_SECONDS,
     WAIT_SECONDS,
+    FakeClock,
     Process,
     corrupt_log_entry,
     drive_room,
@@ -203,14 +204,18 @@ def test_ac1_websocket_players_reconnect_after_a_restart_to_the_same_grid(
 
 
 def test_ac1_websocket_a_new_player_can_join_a_room_that_only_the_store_knows(
-    tmp_path: Path, dist_dir: Path, fx01_grid: Grid
+    tmp_path: Path, dist_dir: Path, fx01_grid: Grid, fake_clock: FakeClock
 ) -> None:
     path = tmp_path / "nock.sqlite3"
     with contextlib.ExitStack() as cleanup:
         seed_store = RoomStore(path)
         cleanup.callback(seed_store.close)
         live = drive_room(seed_store, fx01_grid)
-        two = Process(path, dist_dir, SERVER_CONFIG)
+        # Spec 032 deletes a room 30 days after its last edit, on the registry's
+        # clock. The drive is played at START_TIME, decades before the real time,
+        # so process two reads a clock a minute after the drive's last entry.
+        fake_clock.now = seed_store.read_log(ROOM_CODE)[-1].at + 60.0
+        two = Process(path, dist_dir, SERVER_CONFIG, clock=fake_clock)
         cleanup.callback(two.shutdown)
         run = cleanup.enter_context(contextlib.ExitStack())
         http_client = run.enter_context(TestClient(two.app))

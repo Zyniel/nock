@@ -354,8 +354,12 @@ Applied to the text of one `.svelte` file, in this order:
 - A second `join` after the snapshot (AC-8): no reply (spec 012). What other later
   messages get belongs to specs 011 onwards.
 - `resume_token` in the join (AC-8): an unknown token (one that matches no player
-  of the room) is ignored and the snapshot carries a new token; a known token
-  resumes that player (spec 012 join step 2, its AC-5).
+  of the room and no past player (spec 032)) is ignored and the snapshot carries a
+  new token; a known token resumes that player (spec 012 join step 2, its AC-5),
+  or seats a past player back (spec 012 step 4a). (Note from the lead, 2026-10-16:
+  "and no past player (spec 032)" and "or seats a past player back (spec 012 step
+  4a)" were added for spec 032's seat back. Wording only: AC-8 joins a room just
+  registered, which has no past player, so no criterion changes.)
 - Player ids (AC-10): any value matching the `PlayerId` pattern; the shell keeps
   no list of them.
 - Registry codes (AC-7): `register_room` draws codes with `secrets` and retries
