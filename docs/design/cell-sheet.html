@@ -94,7 +94,7 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 /* players: one coloured triangle per corner */
 .tri { position: absolute; z-index: 2; pointer-events: none; }
 .tri svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.tri polygon { stroke: #14181F; stroke-width: 1; stroke-linejoin: round; }
+.tri polygon { stroke: none; }
 .tri b { position: absolute; font: 700 max(7px, calc(var(--s) * .14))/1 var(--f-ui); letter-spacing: .01em; }
 .tri.tl { top: 0; left: 0; } .tri.tl b { top: 2px; left: 2px; }
 .tri.tr { top: 0; right: 0; } .tri.tr b { top: 2px; right: 2px; }
@@ -183,9 +183,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.1 · names at 45° in the corner triangles</div>
+    <div class="ver">Version 3.2 · small plain corner triangles</div>
     <h1>Nock cell sheet</h1>
-    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3 shows each player on a cell as a coloured triangle in one corner, four at most. Initials appear inside the triangle only on large cells. The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
+    <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.2 shows each player on a cell as a small coloured triangle in one corner, four at most, with no text and no outline. The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
   </header>
 
   <section>
@@ -198,7 +198,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li>Fonts: Source Sans 3 for the interface and letters, IBM Plex Sans Condensed for clues.</li>
           <li>Bold on grey means locked (checked right, or revealed). Pencil is italic grey. Wrong is struck through.</li>
           <li class="new"><b>New:</b> other players are a coloured triangle in a corner, four per cell at most. No dashed border, no shapes.</li>
-          <li class="new"><b>New:</b> the player's name at 45° inside the triangle, only from 44 px cells up.</li>
+          <li class="new"><b>New:</b> triangles are small (20 % of the cell side), plain colour, never any name or initials, no outline.</li>
           <li class="new"><b>New:</b> a revealed letter has a notch at the top centre, no longer a corner triangle.</li>
         </ul>
       </div>
@@ -235,10 +235,6 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   </section>
 
   <div class="switch" role="group" aria-label="Variantes">
-    <div class="grp"><span class="lbl">In the triangle (44 px +)</span>
-      <button type="button" data-label="name" aria-pressed="true">Name at 45°</button>
-      <button type="button" data-label="init" aria-pressed="false">Initials at 45°</button>
-    </div>
     <div class="grp"><span class="lbl">Another player's word</span>
       <button type="button" data-tint="on" aria-pressed="true">Light tint</button>
       <button type="button" data-tint="off" aria-pressed="false">Nothing</button>
@@ -247,9 +243,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
   <section>
     <h2><small>1 · Players on a cell</small>One corner each, four at most</h2>
-    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. From 44 px the triangle grows and carries the player's name along its long edge, at 45°, in the narrow clue font: the name shrinks to fit, down to 7 px, then is cut with a dot. Below 44 px it is colour only.</p>
+    <p class="lead">Players take the corners in the order they arrive on the cell: top-left, top-right, bottom-right, bottom-left. A fifth player on the same cell is not drawn; the player list still says where everyone is. Each triangle is a fifth of the cell side (5 px at least), plain colour, with no name and no outline. Who is who is in the player list.</p>
     <div class="board static" id="corners"></div>
-    <p class="note"><strong>Accessibility.</strong> Under 44 px the corner is colour only, which spec 035 (AC-6) does not allow today. Two ways to fill the gap: the clue bar names who else is on my word (« Bruno est ici »), and the player list in the Salon says where each player is. Spec 035 would need to accept that.</p>
+    <p class="note"><strong>Accessibility.</strong> The corner is colour only, which spec 035 (AC-6) does not allow today. Without an outline, green and orange are also under the 3:1 that marks need (see the contrast table); slightly darker versions of those two colours would fix that. Two ways to fill the gap: the clue bar names who else is on my word (« Bruno est ici »), and the player list in the Salon says where each player is. Spec 035 would need to accept that.</p>
   </section>
 
   <section>
@@ -321,7 +317,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     <h2><small>7 · Contrast</small>Measured on this page</h2>
     <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed notch, flag, author band, player triangles) need 3:1.</p>
     <div class="tbl-wrap"><table id="contrast"><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Needs</th><th>Result</th></tr></thead><tbody></tbody></table></div>
-    <p class="note"><strong>Player colours.</strong> Green and orange fall under 3:1 on white on their own (last rows), so triangles and author bands carry a thin dark edge, which specs 019 and 035 allow. Initials inside a triangle take black or white, whichever reads better on that colour.</p>
+    <p class="note"><strong>Player colours.</strong> Green and orange fall under 3:1 on white on their own (last rows), Author bands keep a thin dark edge. Corner triangles have none, so those two colours would need darker versions to reach 3:1.</p>
   </section>
 </div>
 
@@ -385,20 +381,13 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   var POINTS = { tl: "0,0 10,0 0,10", tr: "0,0 10,0 10,10", br: "10,0 10,10 0,10", bl: "0,0 10,10 0,10" };
   /* label centre on the line parallel to the long edge, and its angle */
   var LABEL_AT = { tl: [0.31, 0.31, -45], tr: [0.69, 0.31, 45], br: [0.69, 0.69, -45], bl: [0.31, 0.69, 45] };
+  /* small plain triangles: no text, no edge, 20 % of the cell side (5 px at least) */
   function corners(list, s) {
-    var big = s >= 44;
-    var t = Math.max(6, Math.round(s * (big ? 0.44 : 0.3)));
+    var t = Math.max(5, Math.round(s * 0.2));
     var h = "";
     for (var i = 0; i < list.length && i < 4; i++) {
       var p = list[i], k = CORNERS[i];
-      h += '<span class="tri ' + k + '" style="width:' + t + "px;height:" + t + 'px"><svg viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + POINTS[k] + '" style="fill:' + P[p] + '" vector-effect="non-scaling-stroke"/></svg>';
-      if (big) {
-        var at = LABEL_AT[k];
-        var room = 0.62 * t * Math.SQRT2 - 6;
-        var f = LABEL === "name" ? fitName(NAMES[p], room, Math.round(s * 0.16)) : { txt: NAMES[p].slice(0, 2).toUpperCase(), fs: Math.max(7, Math.round(s * 0.16)) };
-        h += '<b class="rot" style="left:' + (at[0] * t) + "px;top:" + (at[1] * t) + "px;font-size:" + f.fs + "px;color:" + onColour(P[p]) + ";transform:translate(-50%,-50%) rotate(" + at[2] + 'deg)">' + esc(f.txt) + "</b>";
-      }
-      h += "</span>";
+      h += '<span class="tri ' + k + '" style="width:' + t + "px;height:" + t + 'px"><svg viewBox="0 0 10 10" preserveAspectRatio="none" aria-hidden="true"><polygon points="' + POINTS[k] + '" style="fill:' + P[p] + '"/></svg></span>';
     }
     return h;
   }
@@ -442,14 +431,11 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     var four = [1, 3, 4, 5];
     [60, 32, 18].forEach(function (sz) {
       var row = [1, 2, 3, 4].map(function (n) { return { letter: "A", cursors: four.slice(0, n) }; });
-      h += spec(grid([row], sz), sz + " px", sz >= 44 ? "1 to 4 players, with names" : "1 to 4 players, colour only");
-    });
-    [72, 88].forEach(function (sz) {
-      h += spec(grid([[{ letter: "A", cursors: four }]], sz), sz + " px", "where names start to fit whole");
+      h += spec(grid([row], sz), sz + " px", "1 to 4 players");
     });
     h += spec(grid([[{ letter: "A", cursors: [1, 3, 4, 5, 6] }]], 60), "Five on one cell", "the fifth is not drawn");
     h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: four }]], 60), "Revealed + 4 players", "the notch sits between the two top corners");
-    h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "smallest size with a label");
+    h += spec(grid([[{ letter: "W", cursors: four }, { letter: "M", cursors: four }]], 44), "44 px, wide letters", "the corners stay clear of the letter");
     set("corners", h);
 
     var s = 64;
@@ -759,7 +745,6 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["Aa", tok("muted"), tok("cell"), "Event line in the stream", 4.5]
     ];
     P.forEach(function (c, i) { rows.push(["◤", c, tok("cell"), "Player " + i + " triangle on white, no edge", 3]); });
-    P.forEach(function (c, i) { var fg = onColour(c); rows.push(["BO", fg, c, "Initials on player " + i + "'s triangle", 4.5]); });
     var h = "";
     rows.forEach(function (r) {
       var v = ratio(r[1], r[2]), ok = v >= r[4];
