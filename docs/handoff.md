@@ -23,23 +23,27 @@ Update it at the end of each session.
 
 ## Work in flight (not pushed)
 
-- Spec 022, second review round: the spec is committed locally (a97f860,
-  decisions 20 to 22, new AC-19 and AC-20); its tests are being written in the
-  main tree; then the implementer: `chat.wait` becomes "Patientez avant
-  d'envoyer.", the focus goes back to `chat-input` after a send, a shared Escape
-  helper for `ChatPanel.svelte` and `ReactionPicker.svelte`, `isConnected`
-  renamed `isJoined`, `after_restart`'s rebound loop variable. Push the spec,
-  tests and code together: a spec pushed before its tests fails the gate's
-  traceability (it happened on 595597d).
-- Spec 027 (shared timer): tests 854ee70 in worktree `agent-abc0fc6...`, with a
-  fix commit coming for two test defects (Playwright for Python reads a numeric
-  `page.clock` time in seconds, not milliseconds; AC-4's second page needs
-  another room code) and a load-proof AC-5 refresh test. Implementation 0329ee5
-  in worktree `agent-ac73bc7...` (on c0c0ebb, a cherry-pick of 854ee70): new
-  `RoomTimer.svelte` and `timer.ts`. When it lands: add
-  `test_spec_027_ac02_ac03_live_pages.py` to `SERIAL_TEST_FILES`, then review.
+- Spec 022 is complete: both review rounds are in (the second one's spec,
+  tests and code pushed together; a spec pushed before its tests fails the
+  gate's traceability, as it did on 595597d). Left for the human: the AC-19
+  "one line" check can be met by truncation (`text-overflow: ellipsis`); the
+  AC-16 key pins the short text, so no "not clipped" clause was added. The
+  AC-18 and AC-20 files have 300 ms bounds but stay in the parallel pass
+  (they passed under a load of 14 on 4 CPUs); move them to
+  `SERIAL_TEST_FILES` if they ever flake.
+- Spec 027 (shared timer): assembled in worktree `.claude/worktrees/review-027`
+  (branch `review-027`, on af22af2): tests 27a132a, test fixes b2af773
+  (Playwright for Python reads a numeric `page.clock` time in seconds; AC-4's
+  second page needs another room code), implementation 064fba7 (new
+  `RoomTimer.svelte`, `timer.ts`), the live-pages file in `SERIAL_TEST_FILES`
+  6ba6201. Reviewed: approved with suggestions; first round under way (spec
+  de0fbca; tests, then the implementer: `stopTimerOnSolved` takes only a whole
+  number of at least 0, narrower `:global` rules in `RoomPage.svelte`). Then a
+  second review, then rebase onto the branch and push.
 - Spec 028 (recap): tests e563c92 in worktree `agent-a0de19b...`, on 11059de (a
-  cherry-pick of 854ee70; drop it when integrating). Build after 027 is reviewed.
+  cherry-pick of spec 027's first test commit; drop it when integrating). They
+  use spec 027's `open_timer_room`, whose signature changed in b2af773 (a
+  `room_code` parameter): check them against it. Build after 027 is reviewed.
 - Commit trailers: the implementer and test-writer roles run on Sonnet
   (`model: sonnet` in `.claude/agents/`), but until 2026-10-15 the lead's prompts
   gave them the Opus trailer. Pushed history keeps it (the PR description says
