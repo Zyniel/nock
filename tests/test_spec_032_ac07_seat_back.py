@@ -10,11 +10,11 @@ This base run is `spec032_harness.ana_timed_out`. Each run then does what the
 criterion names: a seat back at t0 + 400 with the nickname `Autre`, a fresh record,
 a mute, a colour or a nickname taken meanwhile, a full or a locked room, a time-out
 in the join itself, a removed player, a vote opened while Ana is away. The rules of
-"What a seat back keeps, and what starts afresh" and the edge cases on seat backs
-are checked on the same runs.
+"What a seat back keeps, and what starts afresh" are checked on the same runs.
 
-The WebSocket and HTTP part of AC-7 is in `test_spec_032_ac02_ac07_sockets.py`, its
-page run in `test_spec_032_ac07_page_after_the_seat_back.py`.
+The edge cases on seat backs are in `test_spec_032_ac07_seat_back_edge_cases.py`,
+the WebSocket and HTTP part of AC-7 in `test_spec_032_ac02_ac07_sockets.py`, and
+its page run in `test_spec_032_ac07_page_after_the_seat_back.py`.
 """
 
 from __future__ import annotations
@@ -59,6 +59,7 @@ from spec032_harness import (
     BOB,
     CY,
     DAN,
+    IN_THE_WINDOW_LIMIT,
     LEFT_AT,
     NEW_PLAYER_ID,
     NEW_TOKEN,
@@ -85,7 +86,6 @@ from spec032_harness import (
     view,
 )
 
-IN_THE_WINDOW_LIMIT = T0 + 310.5  # 300.5 s after she left: the join times her out
 IDES = ClueRef(row=0, column=3, clue_index=0)
 MORE_PLAYERS = ["Dan", "Eve", "Fay", "Gus", "Hal", "Ivy"]
 
@@ -726,77 +726,3 @@ def test_ac7_the_vote_passes_on_its_two_eligible_voters(fx01_grid: Grid) -> None
         ),
         CellLocked(seq=13, row=1, column=1, letter="A", revealed=True),
     ]
-
-
-# ---- Edge cases ----------------------------------------------------------------
-
-
-def test_ac7_a_past_player_can_be_neither_removed_nor_muted(fx01_grid: Grid) -> None:
-    run = ana_timed_out(fx01_grid)
-
-    removal = run.send(BOB, RemovePlayer(player_id=ANA), T0 + 320)
-    mute = run.send(BOB, MutePlayer(player_id=ANA, muted=True), T0 + 321)
-
-    assert error_code_of(removal.reply) is ErrorCode.INVALID_TARGET
-    assert error_code_of(mute.reply) is ErrorCode.INVALID_TARGET
-    assert run.state.past_players == (anas_past_record(),)
-
-
-def test_ac7_a_player_seated_back_can_be_removed_and_is_then_refused(
-    fx01_grid: Grid,
-) -> None:
-    run = ana_timed_out(fx01_grid)
-    seat_back(run)
-
-    removal = run.send(BOB, RemovePlayer(player_id=ANA), SEAT_BACK_AT + 1)
-    again = seat_back(run, now=SEAT_BACK_AT + 2)
-
-    assert events_of(removal) == [
-        PlayerLeft(seq=9, player_id=ANA, reason=LeaveReason.REMOVED)
-    ]
-    assert error_code_of(again.reply) is ErrorCode.REMOVED
-    assert again.state.past_players == ()
-
-
-def test_ac7_a_second_join_with_the_same_token_resumes_the_player(
-    fx01_grid: Grid,
-) -> None:
-    run = ana_timed_out(fx01_grid)
-    seat_back(run)
-
-    second_device = seat_back(run, now=SEAT_BACK_AT + 1)
-
-    assert snapshot_of(second_device).you == ANA
-    assert second_device.entries == ()
-    assert player_ids(second_device.state) == [BOB, CY, ANA]
-
-
-def test_ac7_a_player_who_times_out_again_has_one_past_record(
-    fx01_grid: Grid,
-) -> None:
-    run = ana_timed_out(fx01_grid)
-    seat_back(run)
-    run.disconnect(ANA, SEAT_BACK_AT + 10)
-
-    run.tick(SEAT_BACK_AT + 311)
-
-    assert run.state.past_players == (anas_past_record(),)
-
-
-def test_ac7_a_past_player_dropped_by_the_cap_joins_as_a_new_player(
-    fx01_grid: Grid,
-) -> None:
-    run = ana_timed_out(fx01_grid)
-    others: list[object] = []
-    for number in range(nock.room.MAX_PAST_PLAYERS - 1):
-        others.append(past(f"past{number}", f"token-of-past-{number:04d}", "Old", 7))
-    full = run.state.model_copy(update={"past_players": (anas_past_record(), *others)})
-    run.state = full
-    run.disconnect(BOB, T0 + 320)
-    run.tick(T0 + 621)
-
-    outcome = seat_back(run, now=T0 + 630)
-
-    snapshot = snapshot_of(outcome)
-    assert snapshot.you == NEW_PLAYER_ID
-    assert player_of(outcome.state, NEW_PLAYER_ID).nickname == "Autre"

@@ -5,8 +5,10 @@ The live server serves the client and an empty catalogue; `page.route` answers
 `POST /api/rooms/summaries` with plain JSON (`summary_json`, the form that AC-4
 checks against `RoomSummary`) and records each request. Identities are seeded
 before `page.goto`, and every context has `timezone_id="Europe/Paris"`, so
-`2026-10-14T08:30:00Z` reads `14 octobre 2026 à 10:30`. The live part of AC-5 is
-in `test_spec_032_ac03_ac05_live_pages.py`.
+`2026-10-14T08:30:00Z` reads `14 octobre 2026 à 10:30`. The page sends only the
+identities whose code and token match their patterns, so an odd stored token
+neither shows the section nor spoils the request. The live part of AC-5 is in
+`test_spec_032_ac03_ac05_live_pages.py`.
 """
 
 from __future__ import annotations
@@ -59,6 +61,15 @@ NEW_KEYS = {
 }
 HOSTILE_NAMES = ["<b>Eve</b>", "<img src=x>"]
 MANY_ROOMS = 101
+# An identity valid by spec 012's rule whose token breaks `ResumeToken`'s pattern
+# `^[A-Za-z0-9_-]{16,128}$` (spec 039): 15 characters, as in AC-5, or a character
+# outside the pattern, as in the edge case "Odd token".
+DEF = "DEF567"
+ODD_TOKENS = pytest.mark.parametrize(
+    "odd_token",
+    ["abcdefghijklmno", "abcdefghij+klmnopqrs"],
+    ids=["15_characters", "a_character_outside_the_pattern"],
+)
 
 
 @pytest.fixture
@@ -138,6 +149,42 @@ def test_ac5_corrupt_or_misnamed_identities_alone_show_no_section(
             "nock.identity.abc": identity_value(XYZ_TOKEN),
         },
     )
+
+    open_catalogue(page_1280, live_server, route)
+    page_1280.wait_for_timeout(QUIET_MS)
+
+    expect(my_rooms(page_1280)).to_have_count(0)
+    assert route.methods == []
+
+
+@ODD_TOKENS
+def test_ac5_an_identity_with_an_odd_token_is_left_out_of_the_one_request(
+    page_1280: Page, live_server: str, odd_token: str
+) -> None:
+    identities = two_identities()
+    identities[f"nock.identity.{DEF}"] = identity_value(odd_token)
+    route = SummariesRoute(body=[xyz_summary(), abc_summary()])
+    seed_storage(page_1280, identities)
+
+    open_catalogue(page_1280, live_server, route)
+    expect_my_rooms_ready(page_1280, 2)
+    page_1280.wait_for_timeout(QUIET_MS)
+
+    assert route.methods == ["POST"]
+    assert sorted(sent_keys(route.bodies[0])) == sorted(
+        [(XYZ, XYZ_TOKEN), (ABC, ABC_TOKEN)]
+    )
+    items = my_room_items(page_1280)
+    expect(items.nth(0)).to_have_attribute("data-code", XYZ)
+    expect(items.nth(1)).to_have_attribute("data-code", ABC)
+
+
+@ODD_TOKENS
+def test_ac5_an_identity_with_an_odd_token_alone_shows_no_section_and_no_request(
+    page_1280: Page, live_server: str, odd_token: str
+) -> None:
+    route = SummariesRoute(body=[])
+    seed_storage(page_1280, {f"nock.identity.{DEF}": identity_value(odd_token)})
 
     open_catalogue(page_1280, live_server, route)
     page_1280.wait_for_timeout(QUIET_MS)

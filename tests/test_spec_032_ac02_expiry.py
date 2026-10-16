@@ -403,17 +403,32 @@ def test_ac2_the_app_sweeps_the_registry_it_creates(
 
 
 class FirstSweepFails(RoomRegistry):
-    """A registry whose first `expire_rooms` raises, then works as usual."""
+    """A registry whose first `expire_rooms` raises `failure`, then works as usual."""
 
     def __init__(self, clock: FakeClock, config: RoomConfig) -> None:
         super().__init__(clock=clock, config=config)
         self.sweep_count = 0
+        self.failure = RuntimeError("the first sweep fails")
 
     def expire_rooms(self) -> list[str]:
         self.sweep_count += 1
         if self.sweep_count == 1:
-            raise RuntimeError("the first sweep fails")
+            raise self.failure
         return super().expire_rooms()
+
+
+def logs_the_failure(record: logging.LogRecord, failure: BaseException) -> bool:
+    """Whether a record at WARNING or above is the log of `failure`.
+
+    The spec names no logger and no wording, so the record is known by the
+    failure it carries: the exception itself (`exc_info`, as `logger.exception`
+    or `exc_info=` give it), or the exception's text in its message.
+    """
+    if record.levelno < logging.WARNING:
+        return False
+    if record.exc_info is not None and record.exc_info[1] is failure:
+        return True
+    return str(failure) in record.getMessage()
 
 
 def test_ac2_a_sweep_that_raises_is_logged_and_the_next_one_runs(
@@ -427,10 +442,9 @@ def test_ac2_a_sweep_that_raises_is_logged_and_the_next_one_runs(
     finally:
         registry.close()
 
-    warnings = [
-        record for record in caplog.records if record.levelno >= logging.WARNING
-    ]
-    assert warnings != []
+    assert any(
+        logs_the_failure(record, registry.failure) for record in caplog.records
+    ), caplog.records
 
 
 # ---- HTTP: the share link of a solved room -------------------------------------

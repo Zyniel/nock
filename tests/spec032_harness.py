@@ -20,6 +20,8 @@ are in `tests/test_spec_032_*.py`, one file per criterion group:
 - `test_spec_032_ac06_my_rooms_a11y_and_layout.py`: AC-6.
 - `test_spec_032_ac07_seat_back.py`: AC-7's runs on the rules, the base run of
   which (`ana_wrote_t`, `ana_timed_out`, `seat_back`) is here.
+- `test_spec_032_ac07_seat_back_edge_cases.py`: AC-7's edge cases on the same
+  runs, and a seat back whose join carries a nickname that spec 012 refuses.
 - `test_spec_032_ac07_page_after_the_seat_back.py`: AC-7's page run (a mocked
   socket, spec 019's authors view).
 
@@ -82,6 +84,7 @@ from nock.room import (
     handle_message,
     join_room,
     new_room,
+    normalize_nickname,
     replay,
     tick,
 )
@@ -310,6 +313,7 @@ def snapshot_cell(snapshot: Snapshot, row: int, column: int) -> LetterCellView:
 LEFT_AT = T0 + 10  # Ana's connection closes
 TIMED_OUT_AT = T0 + 311  # the tick that times her out
 SEAT_BACK_AT = T0 + 400  # her join with TA
+IN_THE_WINDOW_LIMIT = T0 + 310.5  # 300.5 s after she left: the join times her out
 
 
 def view(
@@ -367,9 +371,20 @@ def ana_timed_out(grid: Grid) -> Run:
     return run
 
 
-def seat_back(run: Run, token: str = TA, now: float = SEAT_BACK_AT) -> Outcome:
-    """A join with a past player's token and another nickname, `Autre`."""
-    return run.join("Autre", token, now)
+def seat_back(
+    run: Run, token: str = TA, now: float = SEAT_BACK_AT, nickname: str = "Autre"
+) -> Outcome:
+    """A join with a past player's token and another nickname, `Autre` by default."""
+    return run.join(nickname, token, now)
+
+
+def refused_by_spec_012(nickname: str) -> bool:
+    """Whether spec 012's `normalize_nickname` refuses a nickname (its step 5)."""
+    try:
+        normalize_nickname(nickname)
+    except ValueError:
+        return True
+    return False
 
 
 # ---- Store files ---------------------------------------------------------------
@@ -403,6 +418,9 @@ CREATE TABLE IF NOT EXISTS share_tokens (
 """
 
 
+NOT_JSON = "not json"  # a row that cannot be read (AC-1's damaged room)
+
+
 def write_old_database(
     path: Path,
     rooms: list[tuple[RoomState, list[LogEntry]]],
@@ -423,18 +441,48 @@ def write_old_database(
         if with_share_tokens_table:
             script += SPEC_028_SHARE_TOKENS_TABLE
         connection.executescript(script)
-        for first_snapshot, log in rooms:
-            code = first_snapshot.code
-            connection.execute("INSERT INTO rooms (code) VALUES (?)", (code,))
+        connection.commit()
+    finally:
+        connection.close()
+    for first_snapshot, log in rooms:
+        snapshot_row = (first_snapshot.seq, first_snapshot.model_dump_json())
+        log_rows: list[tuple[int, str]] = []
+        for entry in log:
+            log_rows.append((entry.event.seq, entry.model_dump_json()))
+        add_old_room_rows(path, first_snapshot.code, snapshot_row, log_rows)
+
+
+def add_old_room_rows(
+    path: Path,
+    code: str,
+    snapshot_row: tuple[int, str] | None,
+    log_rows: list[tuple[int, str]],
+) -> None:
+    """Add one room to a file that `write_old_database` wrote, row by row.
+
+    Each row is written as given, so that a row can be one that cannot be read.
+
+    Args:
+        path: The file, already written.
+        code: The room's code, inserted in `rooms`.
+        snapshot_row: The `seq` and `state_json` of its first snapshot, or None for
+            a room with no snapshot.
+        log_rows: The `seq` and `entry_json` of each of its log rows.
+    """
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute("INSERT INTO rooms (code) VALUES (?)", (code,))
+        if snapshot_row is not None:
+            seq, state_json = snapshot_row
             connection.execute(
                 "INSERT INTO snapshots (code, seq, state_json) VALUES (?, ?, ?)",
-                (code, first_snapshot.seq, first_snapshot.model_dump_json()),
+                (code, seq, state_json),
             )
-            for entry in log:
-                connection.execute(
-                    "INSERT INTO log (code, seq, entry_json) VALUES (?, ?, ?)",
-                    (code, entry.event.seq, entry.model_dump_json()),
-                )
+        for seq, entry_json in log_rows:
+            connection.execute(
+                "INSERT INTO log (code, seq, entry_json) VALUES (?, ?, ?)",
+                (code, seq, entry_json),
+            )
         connection.commit()
     finally:
         connection.close()
