@@ -3,16 +3,20 @@
   import GridPage from './lib/GridPage.svelte'
   import NotFoundPage from './lib/NotFoundPage.svelte'
   import RoomPage from './lib/RoomPage.svelte'
+  import SharePage from './lib/SharePage.svelte'
   import { t } from './lib/i18n'
 
   const ROOM_PATH = /^\/r\/([A-Z0-9]{6})$/
   const GRID_PATH = /^\/g\/([1-9][0-9]{0,8})$/
+  // The public recap of spec 028: the token is the share token of a room.
+  const RECAP_PATH = /^\/recap\/([A-Za-z0-9_-]{16,64})$/
 
   document.title = t('app.title')
 
   const path = location.pathname
   const roomMatch = ROOM_PATH.exec(path)
   const gridMatch = GRID_PATH.exec(path)
+  const recapMatch = RECAP_PATH.exec(path)
 </script>
 
 {#if path === '/'}
@@ -21,6 +25,8 @@
   <RoomPage code={roomMatch[1]} />
 {:else if gridMatch !== null}
   <GridPage number={gridMatch[1]} />
+{:else if recapMatch !== null}
+  <SharePage token={recapMatch[1]} />
 {:else}
   <NotFoundPage />
 {/if}

@@ -4,6 +4,7 @@
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
+  import RecapDialog from './RecapDialog.svelte'
   import RoomTimer from './RoomTimer.svelte'
   import { t } from './i18n'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
@@ -990,6 +991,19 @@
     }
   }
 
+  // ---- The end-of-game recap (spec 028) ----
+
+  // The dialog is on the page only while it is open, so each opening fetches it.
+  let isRecapOpen = $state(false)
+  let recapOpenButton: HTMLButtonElement | null = $state(null)
+
+  // Escape or the close button closed the dialog: the focus goes back to the
+  // button that opens it.
+  function closeRecap(): void {
+    isRecapOpen = false
+    recapOpenButton?.focus()
+  }
+
   // ---- The chat panel ----
 
   let isChatOpen = $state(false)
@@ -1517,6 +1531,15 @@
               >{/if}</span
           ></button
         >
+        {#if session.solved}
+          <button
+            type="button"
+            class="recap-open"
+            data-testid="recap-open"
+            bind:this={recapOpenButton}
+            onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
+          >
+        {/if}
         <div class="undo-panel">
           <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
             >{t('room.undo')}</button>
@@ -1660,6 +1683,9 @@
       onFocusToggle={() => chatToggle?.focus()}
     />
   {/if}
+  {#if isRecapOpen}
+    <RecapDialog {code} {you} {playerColours} onClose={closeRecap} />
+  {/if}
   {#if session.status === 'reconnecting'}
     <p class="connection-banner" data-testid="connection-banner" role="status">
       {t('room.banner.offline')}
@@ -1712,6 +1738,7 @@
             <span
               class="roster-colour"
               data-testid="roster-colour"
+              data-colour={String(player.colour)}
               style:background={`var(--player-colour-${player.colour})`}
             ></span>
             <span class="roster-nickname" data-testid="roster-nickname">{player.nickname}</span>
@@ -1988,8 +2015,9 @@
   }
 
   /* The room toolbar holds the shared timer and its toggle, the chat toggle, the
-     undo, pencil, check and reveal controls, the flag button and the authors
-     switch (specs 027, 022, 024, 020, 021 and 019). On a roomy window it is one
+     recap button of a solved room, the undo, pencil, check and reveal controls,
+     the flag button and the authors switch (specs 027, 022, 028, 024, 020, 021
+     and 019). On a roomy window it is one
      item of the header row, and it wraps when it must. */
   .room-toolbar {
     display: flex;
@@ -2047,9 +2075,10 @@
     min-height: 24px;
   }
 
-  /* The chat toggle and the reaction button (spec 022): the same target size
-     as the flag button. */
+  /* The chat toggle, the reaction button (spec 022) and the recap button (spec
+     028): the same target size as the flag button. */
   .chat-toggle,
+  .recap-open,
   .react-button {
     flex: none;
     box-sizing: border-box;
