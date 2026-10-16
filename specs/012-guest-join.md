@@ -119,15 +119,18 @@ steps marked with another spec are built by that spec; until then they never app
 on purpose, never one the host removed). That player is appended to
 `state.players` as step 6 builds a new player, except that they keep their
 `player_id` and `resume_token` (`new_player_id` and `new_resume_token` are not
-used); their nickname is the past player's, made unique as "Duplicate nicknames"
-says; their colour is the past player's when no player of `state.players` has it,
-else the lowest index 0 to 7 that none has; and `message.nickname` is ignored, as
-in a resume, so step 5 does not apply. The `PastPlayer` leaves `past_players`. The
+used) and their `muted` flag (spec 032 decision 13); their nickname is the past
+player's, made unique as "Duplicate nicknames" says; their colour is the past
+player's when no player of `state.players` has it, else the lowest index 0 to 7
+that none has; and `message.nickname` is ignored, as in a resume, so step 5 does
+not apply. The `PastPlayer` leaves `past_players`. The
 one entry is step 6's `PlayerJoined`, logged with the player's token, and
 `reply = (snapshot_for(new_state, player_id),)`. Spec 032's "Seat back" gives the
 whole rule. (Note from the lead, 2026-10-16: this step was added for spec 032's
 seat back, its decision 11. It is numbered 4a so that steps 5 and 6, which other
-specs cite, keep their numbers.)
+specs cite, keep their numbers.) (Note from the lead, 2026-10-16: "and their
+`muted` flag (spec 032 decision 13)" was added to the exceptions; without it,
+building the player as step 6 does would unmute them (first review of spec 032).)
 
 5. `normalize_nickname(message.nickname)` raises: refused,
    `reply = (ErrorMessage(code=INVALID_NICKNAME),)`, socket left open (the page may
