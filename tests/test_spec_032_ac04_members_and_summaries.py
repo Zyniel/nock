@@ -6,11 +6,14 @@ dropping the oldest; `member_id` finds the member who holds a token; and
 `team_nicknames` names each member once. `room_summary` and its JSON form, which
 the browser tests of AC-5 answer with, are checked against the spec's example.
 
-HTTP: room A (FX-01, grid number 1), written to a store file, where Ana (TA), Bob
-(TB) and Cy (TC) joined at t0, Ana wrote `T` at (1, 0) at t0 + 10, Ana removed Cy
-and Bob timed out; room B (FX-01 with no grid number), where Dan (TD) joined and
-wrote a letter, added with `add_room` when the clock read t0 + 50, so that its last
-edit time is t0 + 50. The registry's fake clock then reads t0 + 400.
+HTTP: room A (FX-01, grid number 1), written to a store file with its log, so that
+only the store holds it, where Ana (TA), Bob (TB) and Cy (TC) joined at t0, Ana
+wrote `T` at (1, 0) at t0 + 10, Ana removed Cy and Bob timed out; room B (FX-01
+with no grid number), added with `add_room` while the clock reads t0, in which Dan
+then joins over the room socket and writes a letter at t0 + 50, so that B's last
+activity is Dan's edit in B's log, not B's creation. Dan's token, `TD` in the
+criterion, is the one his join got; his socket stays open, so that he stays a
+player of B. The registry's fake clock then reads t0 + 400.
 `POST /api/rooms/summaries` answers with the summaries of the rooms that a key's
 token is a member of. The shared setup is in `spec032_harness`.
 """
@@ -31,12 +34,18 @@ from pydantic import ValidationError
 import nock.room
 from nock.grid import Grid
 from nock.hub import RoomRegistry
-from nock.protocol import EditLetter, LeaveReason, PlayerLeft, RemovePlayer
-from nock.room import LogEntry, RoomState, replay
+from nock.protocol import (
+    EditLetter,
+    LeaveReason,
+    LetterChanged,
+    PlayerLeft,
+    RemovePlayer,
+)
+from nock.room import LogEntry, RoomState, new_room, replay
 from nock.server import create_app
 from nock.store import RoomStore
 from spec012_harness import join_as
-from spec017_harness import FakeClock
+from spec017_harness import FakeClock, Peer, open_peer
 from spec032_harness import (
     ANA,
     BOB,
@@ -291,12 +300,14 @@ def test_ac4_a_summary_holds_no_letter_clue_or_answer(fx01_grid: Grid) -> None:
 
 
 class Rooms(NamedTuple):
-    """The app of the HTTP part, its registry, its store and its clock."""
+    """The app of the HTTP part, its registry, its store, its clock, and Dan."""
 
     client: TestClient
     registry: RoomRegistry
     store: RoomStore
     clock: FakeClock
+    dan_id: str
+    dan_token: str  # the criterion's TD: the token Dan's join got
 
 
 def room_a_play(grid: Grid) -> Run:
@@ -313,12 +324,19 @@ def room_a_play(grid: Grid) -> Run:
     return run
 
 
-def room_b_state(grid: Grid) -> RoomState:
-    """Room B, with no grid number: Dan joins and writes a letter."""
-    run = Run(grid, code=CODE_B, grid_number=None)
-    run.join_new("Dan", DAN, TD, T0)
-    run.send(DAN, EditLetter(row=1, column=1, letter="A"), T0 + 50)
-    return run.state
+def has_letter_changed(peer: Peer) -> bool:
+    return any(isinstance(message, LetterChanged) for message in peer.events())
+
+
+def dan_writes_in_room_b(
+    stack: contextlib.ExitStack, client: TestClient, clock: FakeClock
+) -> Peer:
+    """At t0 + 50, Dan joins room B and writes `A` at (1, 1), over the socket."""
+    clock.now = T0 + 50
+    dan = open_peer(stack, client, CODE_B, "Dan")
+    dan.send(EditLetter(row=1, column=1, letter="A"))
+    dan.wait_until(lambda: has_letter_changed(dan), "Dan's letter")
+    return dan
 
 
 @pytest.fixture
@@ -331,11 +349,21 @@ def rooms(
     store.append(CODE_A, play_a.log)
     registry = RoomRegistry(clock=fake_clock, store=store, config=SEAT_BACK_CONFIG)
     try:
-        fake_clock.now = T0 + 50
-        registry.add_room(room_b_state(fx01_grid))
-        fake_clock.now = T0 + 400
-        with TestClient(create_app(rooms=registry, dist_dir=dist_dir)) as client:
-            yield Rooms(client, registry, store, fake_clock)
+        fake_clock.now = T0
+        registry.add_room(new_room(CODE_B, fx01_grid, T0))
+        app = create_app(rooms=registry, dist_dir=dist_dir)
+        with TestClient(app) as client, contextlib.ExitStack() as dan_stack:
+            dan = dan_writes_in_room_b(dan_stack, client, fake_clock)
+            fake_clock.now = T0 + 400
+            snapshot = dan.snapshot()
+            yield Rooms(
+                client,
+                registry,
+                store,
+                fake_clock,
+                snapshot.you,
+                snapshot.resume_token,
+            )
     finally:
         registry.close()
         store.close()
@@ -402,8 +430,19 @@ def test_ac4_http_a_key_with_no_members_token_gets_no_summary(
     assert response.json() == []
 
 
+def test_ac4_http_the_summary_of_b_takes_its_last_activity_from_dans_edit(
+    rooms: Rooms,
+) -> None:
+    response = post_summaries(rooms.client, [(CODE_B, rooms.dan_token)])
+
+    assert response.status_code == 200
+    assert summaries_of(response.json()) == [summary_of_b()]
+
+
 def test_ac4_http_several_rooms_come_newest_first_and_each_once(rooms: Rooms) -> None:
-    response = post_summaries(rooms.client, [(CODE_A, TA), (CODE_B, TD), (CODE_A, TB)])
+    keys = [(CODE_A, TA), (CODE_B, rooms.dan_token), (CODE_A, TB)]
+
+    response = post_summaries(rooms.client, keys)
 
     assert response.status_code == 200
     assert summaries_of(response.json()) == [summary_of_b(), summary_of_a()]
@@ -478,7 +517,7 @@ def test_ac4_http_a_room_only_the_store_holds_keeps_the_same_log(
 def test_ac4_http_an_expired_room_is_left_out_and_deleted(rooms: Rooms) -> None:
     rooms.clock.now = T0 + 11 + LIFE
 
-    response = post_summaries(rooms.client, [(CODE_A, TA), (CODE_B, TD)])
+    response = post_summaries(rooms.client, [(CODE_A, TA), (CODE_B, rooms.dan_token)])
 
     assert response.status_code == 200
     assert summary_codes(response.json()) == [CODE_B]
@@ -499,7 +538,7 @@ def test_ac4_http_the_route_is_not_counted_by_the_wrong_code_throttle(
 
 
 def test_ac4_http_a_summary_holds_no_answer(rooms: Rooms) -> None:
-    response = post_summaries(rooms.client, [(CODE_A, TA), (CODE_B, TD)])
+    response = post_summaries(rooms.client, [(CODE_A, TA), (CODE_B, rooms.dan_token)])
 
     assert response.status_code == 200
     assert summary_codes(response.json()) == [CODE_B, CODE_A]
@@ -534,7 +573,7 @@ def test_ac4_the_registrys_member_id_reads_the_rooms_latest_state(
     assert registry.member_id(CODE_A, TB) == BOB
     assert registry.member_id(CODE_A, TA) == ANA
     assert registry.member_id(CODE_A, TC) is None
-    assert registry.member_id(CODE_B, TD) == DAN
+    assert registry.member_id(CODE_B, rooms.dan_token) == rooms.dan_id
     assert registry.member_id(UNKNOWN_CODE, TA) is None
 
 

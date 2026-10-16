@@ -6,11 +6,14 @@ registered with `register_room` when the clock reads t0 + 20, so that its last
 edit time is t0 + 20; its share token is read from `room_state` before any
 expiry. `expire_rooms` deletes A at t0 + 11 + LIFE, not at t0 + 10 + LIFE, and
 every lookup then answers as for an unknown room; a lookup alone deletes a room
-once it is expired. HTTP: the share link of a solved room, written to a store file
-as spec 028 AC-9 writes it (`stored_play_r`, whose `NOW` is the t0 of that part),
-works until the room expires, then answers 404 as an unknown token does. The app's
-sweep runs when it starts, for a registry given or created, and keeps running
-after a sweep that raises.
+once it is expired. On a fresh room that reuses A's code, A's old token `TA` makes
+a new player (spec 012's unknown token) and belongs to no member.
+
+HTTP: the share link of a solved room, written to a store file as spec 028 AC-9
+writes it (`stored_play_r`, whose `NOW` is the t0 of that part), works until the
+room expires, then answers 404 as an unknown token does. The app's sweep runs when
+it starts, for a registry given or created, and keeps running after a sweep that
+raises, which is logged at WARNING or above.
 
 The WebSocket part of AC-2 is in `test_spec_032_ac02_ac07_sockets.py`.
 
@@ -35,7 +38,7 @@ import nock.room
 import nock.server
 from nock.grid import Grid
 from nock.hub import RoomRegistry
-from nock.protocol import EditLetter, Join
+from nock.protocol import EditLetter, Join, PlayerJoined, PlayerState, PlayerView
 from nock.recap import PublicRecap
 from nock.room import RoomConfig, RoomState, handle_message, join_room, new_room
 from nock.server import create_app
@@ -48,15 +51,19 @@ from spec032_harness import (
     CODE_A,
     INDEX_HTML,
     LIFE,
+    NEW_PLAYER_ID,
     NO_TICK_CONFIG,
     T0,
     TA,
+    events_of,
     grid_from_text,
     make_dist_dir,
+    snapshot_of,
     sweeping_config,
 )
 
 SHARE_TOKEN_A = "share-token-of-room-a"
+FRESH_TOKEN = "token-of-the-fresh-room"  # the `new_resume_token` of the join
 PLAY_R_T0 = NOW  # the t0 of the HTTP part: spec 028's NOW
 NOT_FOUND = {"detail": "Not Found"}
 WAIT_SECONDS = 5.0
@@ -196,6 +203,55 @@ def test_ac2_the_code_of_a_deleted_room_can_be_used_again(
     two_rooms.registry.add_room(fresh)
 
     assert two_rooms.registry.room_state(CODE_A) == fresh
+
+
+def fresh_room_on_the_code_of_a(rooms: TwoRooms, grid: Grid) -> RoomState:
+    """Expire A at t0 + 11 + LIFE, add a fresh room with its code; its state."""
+    expire_room_a(rooms)
+    rooms.registry.add_room(new_room(CODE_A, grid, T0 + 11 + LIFE))
+    fresh = rooms.registry.room_state(CODE_A)
+    assert fresh is not None
+    return fresh
+
+
+def test_ac2_on_the_reused_code_the_old_token_joins_as_a_new_player(
+    two_rooms: TwoRooms, fx01_grid: Grid
+) -> None:
+    fresh = fresh_room_on_the_code_of_a(two_rooms, fx01_grid)
+
+    outcome = join_room(
+        fresh,
+        Join(nickname="Ana", resume_token=TA),
+        T0 + 11 + LIFE,
+        NEW_PLAYER_ID,
+        FRESH_TOKEN,
+    )
+
+    assert events_of(outcome) == [
+        PlayerJoined(
+            seq=1,
+            player=PlayerView(
+                player_id=NEW_PLAYER_ID,
+                nickname="Ana",
+                colour=0,
+                state=PlayerState.ACTIVE,
+                is_host=True,
+                muted=False,
+                selection=None,
+            ),
+        )
+    ]
+    assert outcome.entries[0].resume_token == FRESH_TOKEN
+    snapshot = snapshot_of(outcome)
+    assert (snapshot.you, snapshot.resume_token) == (NEW_PLAYER_ID, FRESH_TOKEN)
+
+
+def test_ac2_on_the_reused_code_the_old_token_is_no_members_token(
+    two_rooms: TwoRooms, fx01_grid: Grid
+) -> None:
+    fresh_room_on_the_code_of_a(two_rooms, fx01_grid)
+
+    assert two_rooms.registry.member_id(CODE_A, TA) is None
 
 
 def test_ac2_a_lookup_alone_deletes_a_room_once_it_is_expired(

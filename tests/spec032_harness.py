@@ -8,8 +8,8 @@ are in `tests/test_spec_032_*.py`, one file per criterion group:
 - `test_spec_032_ac02_expiry.py`: AC-2 in Python and over HTTP (`expire_rooms`,
   the lookups, the share tokens, the app's sweep).
 - `test_spec_032_ac02_ac07_sockets.py`: AC-2 and AC-7 over the room socket with a
-  fake clock. Their "within 1 second of real time" bounds make it the timing
-  sensitive file of this spec.
+  fake clock. Its "within 1 second of real time" checks wait up to that bound
+  for a change; they measure no duration, so the file runs in the parallel pass.
 - `test_spec_032_ac03_restart.py`: AC-3 over the room socket, with spec 018's
   simulated restart.
 - `test_spec_032_ac03_ac05_live_pages.py`: AC-3 and AC-5 in browsers on the live
@@ -18,7 +18,10 @@ are in `tests/test_spec_032_*.py`, one file per criterion group:
   names, summaries, `POST /api/rooms/summaries`).
 - `test_spec_032_ac05_my_rooms.py`: AC-5 with the summaries route mocked.
 - `test_spec_032_ac06_my_rooms_a11y_and_layout.py`: AC-6.
-- `test_spec_032_ac07_seat_back.py`: AC-7's runs on the rules.
+- `test_spec_032_ac07_seat_back.py`: AC-7's runs on the rules, the base run of
+  which (`ana_wrote_t`, `ana_timed_out`, `seat_back`) is here.
+- `test_spec_032_ac07_page_after_the_seat_back.py`: AC-7's page run (a mocked
+  socket, spec 019's authors view).
 
 The names that spec 032 adds to `nock.room` (`PastPlayer`, `RoomKey`,
 `RoomSummary`, `MAX_PAST_PLAYERS`, `is_edit`, `member_id`, `team_nicknames`,
@@ -53,14 +56,18 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from playwright.sync_api import Browser, BrowserContext, Locator, Page, Route, expect
 
+import nock.room
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
     ClientMessage,
+    EditLetter,
     ErrorCode,
     ErrorMessage,
     Join,
     LetterCellView,
+    PlayerState,
+    PlayerView,
     ServerMessage,
     Snapshot,
 )
@@ -296,6 +303,73 @@ def snapshot_cell(snapshot: Snapshot, row: int, column: int) -> LetterCellView:
         ):
             return cell
     pytest.fail(f"no letter cell at ({row}, {column}) in the snapshot")
+
+
+# ---- AC-7's base run -----------------------------------------------------------
+
+LEFT_AT = T0 + 10  # Ana's connection closes
+TIMED_OUT_AT = T0 + 311  # the tick that times her out
+SEAT_BACK_AT = T0 + 400  # her join with TA
+
+
+def view(
+    player_id: str, nickname: str, colour: int, *, is_host: bool, muted: bool = False
+) -> PlayerView:
+    """The view of an active player with no selection."""
+    return PlayerView(
+        player_id=player_id,
+        nickname=nickname,
+        colour=colour,
+        state=PlayerState.ACTIVE,
+        is_host=is_host,
+        muted=muted,
+        selection=None,
+    )
+
+
+def past(
+    player_id: str, token: str, nickname: str, colour: int, muted: bool = False
+) -> object:
+    """A `PastPlayer` record."""
+    return nock.room.PastPlayer(
+        player_id=player_id,
+        resume_token=token,
+        nickname=nickname,
+        colour=colour,
+        muted=muted,
+    )
+
+
+def anas_past_record() -> object:
+    return past(ANA, TA, "Ana", 0)
+
+
+def ana_wrote_t(grid: Grid) -> Run:
+    """Ana, Bob and Cy join at t0, then Ana writes `T` at (1, 0): seq 4."""
+    run = Run(grid)
+    run.join_new("Ana", ANA, TA, T0)
+    run.join_new("Bob", BOB, TB, T0)
+    run.join_new("Cy", CY, TC, T0)
+    run.send(ANA, EditLetter(row=1, column=0, letter="T"), T0)
+    assert run.state.seq == 4
+    return run
+
+
+def ana_timed_out(grid: Grid) -> Run:
+    """AC-7's base run: Ana leaves at t0 + 10, the tick of t0 + 311 times her out.
+
+    The tick gives her `player_left` (seq 6) and Bob's `host_changed` (seq 7).
+    """
+    run = ana_wrote_t(grid)
+    run.disconnect(ANA, LEFT_AT)
+    run.tick(TIMED_OUT_AT)
+    assert player_ids(run.state) == [BOB, CY]
+    return run
+
+
+def seat_back(run: Run, token: str = TA, now: float = SEAT_BACK_AT) -> Outcome:
+    """A join with a past player's token and another nickname, `Autre`."""
+    return run.join("Autre", token, now)
 
 
 # ---- Store files ---------------------------------------------------------------

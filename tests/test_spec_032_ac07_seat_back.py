@@ -6,13 +6,15 @@ The runs play a FX-01 room with the rules (`spec032_harness.Run`) and the
 300: Ana (TA), Bob (TB) and Cy (TC) join at t0 (seq 1 to 3, colours 0 to 2, Ana
 host); Ana writes `T` at (1, 0) (seq 4); her connection closes at t0 + 10 (seq 5);
 the tick of t0 + 311 times her out (seq 6) and hands the host role to Bob (seq 7).
-Each run then does what the criterion names: a seat back at t0 + 400 with the
-nickname `Autre`, a fresh record, a mute, a colour or a nickname taken meanwhile,
-a full or a locked room, a time-out in the join itself, a removed player. The
-rules of "What a seat back keeps, and what starts afresh" and the edge cases on
-seat backs are checked on the same runs.
+This base run is `spec032_harness.ana_timed_out`. Each run then does what the
+criterion names: a seat back at t0 + 400 with the nickname `Autre`, a fresh record,
+a mute, a colour or a nickname taken meanwhile, a full or a locked room, a time-out
+in the join itself, a removed player, a vote opened while Ana is away. The rules of
+"What a seat back keeps, and what starts afresh" and the edge cases on seat backs
+are checked on the same runs.
 
-The WebSocket and HTTP part of AC-7 is in `test_spec_032_ac02_ac07_sockets.py`.
+The WebSocket and HTTP part of AC-7 is in `test_spec_032_ac02_ac07_sockets.py`, its
+page run in `test_spec_032_ac07_page_after_the_seat_back.py`.
 """
 
 from __future__ import annotations
@@ -22,6 +24,9 @@ import pytest
 import nock.room
 from nock.grid import Grid
 from nock.protocol import (
+    CellLocked,
+    CellTarget,
+    ChangeSettings,
     Chat,
     ChatMessage,
     ClueRef,
@@ -29,6 +34,7 @@ from nock.protocol import (
     ErrorCode,
     Flag,
     FlagChanged,
+    HelpMode,
     HostChanged,
     LeaveReason,
     LetterChanged,
@@ -37,10 +43,15 @@ from nock.protocol import (
     PlayerJoined,
     PlayerLeft,
     PlayerMuted,
-    PlayerState,
-    PlayerView,
     RemovePlayer,
+    Reveal,
+    RevealBudget,
+    RevealResult,
     Undo,
+    Vote,
+    VoteClosed,
+    VoteOpened,
+    VoteOutcome,
 )
 from nock.room import Outcome, PlayerRecord, RoomState
 from spec032_harness import (
@@ -48,26 +59,32 @@ from spec032_harness import (
     BOB,
     CY,
     DAN,
+    LEFT_AT,
     NEW_PLAYER_ID,
     NEW_TOKEN,
+    SEAT_BACK_AT,
     T0,
     TA,
     TB,
     TC,
     TD,
+    TIMED_OUT_AT,
     Run,
+    ana_timed_out,
+    ana_wrote_t,
+    anas_past_record,
     cell_of,
     error_code_of,
     events_of,
     grid_from_text,
+    past,
     player_ids,
     player_of,
+    seat_back,
     snapshot_of,
+    view,
 )
 
-LEFT_AT = T0 + 10  # Ana's connection closes
-TIMED_OUT_AT = T0 + 311  # the tick that times her out
-SEAT_BACK_AT = T0 + 400  # her join with TA
 IN_THE_WINDOW_LIMIT = T0 + 310.5  # 300.5 s after she left: the join times her out
 IDES = ClueRef(row=0, column=3, clue_index=0)
 MORE_PLAYERS = ["Dan", "Eve", "Fay", "Gus", "Hal", "Ivy"]
@@ -76,63 +93,6 @@ MORE_PLAYERS = ["Dan", "Eve", "Fay", "Gus", "Hal", "Ivy"]
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
-
-
-def view(
-    player_id: str, nickname: str, colour: int, *, is_host: bool, muted: bool = False
-) -> PlayerView:
-    """The view of an active player with no selection."""
-    return PlayerView(
-        player_id=player_id,
-        nickname=nickname,
-        colour=colour,
-        state=PlayerState.ACTIVE,
-        is_host=is_host,
-        muted=muted,
-        selection=None,
-    )
-
-
-def past(
-    player_id: str, token: str, nickname: str, colour: int, muted: bool = False
-) -> object:
-    """A `PastPlayer` record."""
-    return nock.room.PastPlayer(
-        player_id=player_id,
-        resume_token=token,
-        nickname=nickname,
-        colour=colour,
-        muted=muted,
-    )
-
-
-def anas_past_record() -> object:
-    return past(ANA, TA, "Ana", 0)
-
-
-def ana_wrote_t(grid: Grid) -> Run:
-    """Ana, Bob and Cy join at t0, then Ana writes `T` at (1, 0): seq 4."""
-    run = Run(grid)
-    run.join_new("Ana", ANA, TA, T0)
-    run.join_new("Bob", BOB, TB, T0)
-    run.join_new("Cy", CY, TC, T0)
-    run.send(ANA, EditLetter(row=1, column=0, letter="T"), T0)
-    assert run.state.seq == 4
-    return run
-
-
-def ana_timed_out(grid: Grid) -> Run:
-    """The base run: Ana leaves at t0 + 10 and the tick of t0 + 311 times her out."""
-    run = ana_wrote_t(grid)
-    run.disconnect(ANA, LEFT_AT)
-    run.tick(TIMED_OUT_AT)
-    assert player_ids(run.state) == [BOB, CY]
-    return run
-
-
-def seat_back(run: Run, token: str = TA, now: float = SEAT_BACK_AT) -> Outcome:
-    """A join with a past player's token and another nickname."""
-    return run.join("Autre", token, now)
 
 
 def players_summary(state: RoomState) -> list[tuple[str, str, int, bool]]:
@@ -664,6 +624,108 @@ def test_ac7_a_removed_player_is_never_seated_back(fx01_grid: Grid) -> None:
     assert outcome.close_sender is True
     assert outcome.entries == ()
     assert outcome.state.past_players == (anas_past_record(),)
+
+
+# ---- Vote during the seat back -------------------------------------------------
+
+LETTER_1_1 = CellTarget(row=1, column=1)
+VOTE_MODE = ChangeSettings(
+    help_mode=HelpMode.VOTE, reveal_budget=RevealBudget(letters=5, words=1)
+)
+
+
+def vote_opened_while_ana_is_away(grid: Grid) -> tuple[Run, Outcome]:
+    """Bob, host since the time-out, sets the help mode `vote` at t0 + 380 (seq 8),
+    then asks for the reveal of (1, 1) at t0 + 390, which opens vote 1 (seq 9).
+
+    Returns:
+        The run and the step of the reveal request.
+    """
+    run = ana_timed_out(grid)
+    changed = run.send(BOB, VOTE_MODE, T0 + 380)
+    assert changed.reply == ()
+    assert run.state.seq == 8
+    requested = run.send(BOB, Reveal(target=LETTER_1_1), T0 + 390)
+    return run, requested
+
+
+def vote_one() -> VoteOpened:
+    return VoteOpened(
+        seq=9,
+        vote_id=1,
+        player_id=BOB,
+        request=Reveal(target=LETTER_1_1),
+        timeout_seconds=20,
+        eligible_voters=2,
+    )
+
+
+def ana_seated_back_during_the_vote(grid: Grid) -> Run:
+    """The vote run until Ana's seat back at t0 + 395, which must succeed."""
+    run, _ = vote_opened_while_ana_is_away(grid)
+    assert snapshot_of(seat_back(run, now=T0 + 395)).you == ANA
+    return run
+
+
+def test_ac7_a_vote_opened_while_the_player_is_away_counts_only_the_players(
+    fx01_grid: Grid,
+) -> None:
+    run, requested = vote_opened_while_ana_is_away(fx01_grid)
+
+    assert events_of(requested) == [vote_one()]
+    vote = run.state.open_vote
+    assert vote is not None
+    assert vote.eligible == (BOB, CY)
+
+
+def test_ac7_a_player_seated_back_during_a_vote_gets_it_in_the_snapshot(
+    fx01_grid: Grid,
+) -> None:
+    run, _ = vote_opened_while_ana_is_away(fx01_grid)
+
+    outcome = seat_back(run, now=T0 + 395)
+
+    assert events_of(outcome) == [
+        PlayerJoined(seq=10, player=view(ANA, "Ana", 0, is_host=False))
+    ]
+    assert snapshot_of(outcome).open_vote == vote_one()
+
+
+def test_ac7_the_ballot_of_a_player_seated_back_during_a_vote_changes_nothing(
+    fx01_grid: Grid,
+) -> None:
+    run = ana_seated_back_during_the_vote(fx01_grid)
+
+    ballot = run.send(ANA, Vote(vote_id=1, yes=True), T0 + 396)
+
+    assert (ballot.entries, ballot.reply) == ((), ())
+    vote = run.state.open_vote
+    assert vote is not None
+    assert (vote.eligible, vote.yes, vote.no) == ((BOB, CY), (BOB,), ())
+
+
+def test_ac7_the_vote_passes_on_its_two_eligible_voters(fx01_grid: Grid) -> None:
+    run = ana_seated_back_during_the_vote(fx01_grid)
+    run.send(ANA, Vote(vote_id=1, yes=True), T0 + 396)
+
+    passed = run.send(CY, Vote(vote_id=1, yes=True), T0 + 397)
+
+    assert events_of(passed) == [
+        VoteClosed(
+            seq=11,
+            vote_id=1,
+            outcome=VoteOutcome.PASSED,
+            yes_votes=2,
+            eligible_voters=2,
+        ),
+        RevealResult(
+            seq=12,
+            player_id=BOB,
+            target=LETTER_1_1,
+            reveal_budget=RevealBudget(letters=4, words=1),
+        ),
+        CellLocked(seq=13, row=1, column=1, letter="A", revealed=True),
+    ]
 
 
 # ---- Edge cases ----------------------------------------------------------------

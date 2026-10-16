@@ -534,10 +534,11 @@ def test_ac1_the_rooms_of_an_old_file_still_load_after_the_upgrade(
     assert log_after == log_a
 
 
+@OLD_LAYOUTS
 def test_ac1_an_upgraded_file_opens_again_with_the_same_times(
-    store_path: Path, fx01_grid: Grid
+    store_path: Path, fx01_grid: Grid, with_share_tokens_table: bool
 ) -> None:
-    write_old_database(store_path, old_rooms(fx01_grid), with_share_tokens_table=False)
+    write_old_database(store_path, old_rooms(fx01_grid), with_share_tokens_table)
     first_open = RoomStore(store_path)
     first_open.close()
 
