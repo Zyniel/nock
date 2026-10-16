@@ -98,14 +98,20 @@ commands above).
 
 Start the server with `uv run python -m nock`. It listens on
 `http://127.0.0.1:8000`; the `NOCK_HOST` and `NOCK_PORT` environment variables
-change the address and the port. An empty variable counts as unset. `NOCK_PORT`
-must be a whole number from 1 to 65535, written with the digits 0 to 9; any
-other value stops the start with a message. Use this command rather than
+change the address and the port. An empty variable counts as unset. `NOCK_HOST`
+is a host name or an IP address, written with ASCII letters, the digits 0 to 9,
+`.` and `-` only; `:` is allowed in an IPv6 address, which is written without
+brackets (`::1`, not `[::1]`). `NOCK_PORT` must be a whole number from 1 to
+65535, written with the digits 0 to 9. A refused value (in these two variables
+or in `NOCK_DATABASE`, below) stops the start with a message that names the
+variable and shows the value. Use this command rather than
 `uvicorn nock.server:app`: it also sets the WebSocket frame limit of spec 036
 (8,192 bytes), where uvicorn alone accepts frames of 16 MiB.
 
 The rooms are stored in the SQLite file named by the `NOCK_DATABASE`
-environment variable. When it is unset, rooms live in memory and are lost when
+environment variable. Its path may hold spaces, accents and the separators of
+both systems, but not a control or an invisible character (a newline, a zero
+width space). When it is unset or empty, rooms live in memory and are lost when
 the server stops. The folder of the file must exist:
 
 ```powershell

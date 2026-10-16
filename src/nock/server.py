@@ -131,7 +131,9 @@ class _RoomsHolder:
         """Return the registry, creating it from NOCK_DATABASE the first time."""
         with self._lock:
             if self._registry is None:
-                database = os.environ.get(DATABASE_VARIABLE, MEMORY_DATABASE)
+                database = os.environ.get(DATABASE_VARIABLE, "")
+                if database == "":
+                    database = MEMORY_DATABASE  # an empty variable counts as unset
                 self._registry = RoomRegistry(store=RoomStore(database))
                 self._is_created_here = True
             return self._registry
@@ -277,7 +279,8 @@ def create_app(
     Args:
         rooms: The rooms the WebSocket serves. None: a new registry on the
             database of the environment variable NOCK_DATABASE (in memory when
-            it is unset), opened when the app starts and closed when it stops.
+            it is unset or empty), opened when the app starts and closed when
+            it stops.
             A registry given is never closed by the app.
         dist_dir: The built client. None: WEB_DIST_DIR.
         catalogue: The grids served. None: an empty catalogue.
