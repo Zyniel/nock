@@ -790,11 +790,53 @@ def contrast_offenders(page: Page) -> list[dict[str, Any]]:
     return offenders
 
 
+# The number placeholders of the language scan, as the names between the braces, in
+# the order of the list in the "Number placeholders" bullet of "Language scan" in
+# spec 035's "Test harness". A placeholder with one of these names stands for a
+# whole number written in digits and matches ASCII digits only; any other
+# placeholder matches one or more characters. A spec that adds a key with a
+# placeholder that stands for a number adds its name to that list, and so here.
+NUMBER_PLACEHOLDERS = (
+    "count",
+    "number",
+    "force",
+    "width",
+    "height",
+    "length",
+    "position",
+    "letters",
+    "words",
+    "hours",
+    "minutes",
+    "seconds",
+)
+PLACEHOLDER = re.compile(r"\{([A-Za-z_]+)\}")
+
+
 def template_pattern(template: str) -> re.Pattern[str]:
-    """A `fr.json` value as a pattern: each `{name}` matches one or more characters."""
-    literal_parts = re.split(r"\{[A-Za-z_]+\}", template)
-    escaped_parts = [re.escape(part) for part in literal_parts]
-    return re.compile(".+".join(escaped_parts), re.DOTALL)
+    """Read a `fr.json` value as a pattern (spec 035, "Language scan").
+
+    Args:
+        template: A value of `fr.json`, such as `Grille n° {number}`.
+
+    Returns:
+        A pattern for `fullmatch`. The text around the placeholders matches
+        itself. A number placeholder (`NUMBER_PLACEHOLDERS`) matches one or more
+        ASCII digits `0` to `9` and nothing else. Any other placeholder matches
+        one or more characters.
+    """
+    pattern = ""
+    literal_start = 0
+    for placeholder in PLACEHOLDER.finditer(template):
+        literal = template[literal_start : placeholder.start()]
+        pattern += re.escape(literal)
+        if placeholder.group(1) in NUMBER_PLACEHOLDERS:
+            pattern += "[0-9]+"
+        else:
+            pattern += ".+"
+        literal_start = placeholder.end()
+    pattern += re.escape(template[literal_start:])
+    return re.compile(pattern, re.DOTALL)
 
 
 def normalised(text: str) -> str:

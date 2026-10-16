@@ -239,6 +239,13 @@ class RoomState(RoomModel):
     # spec 025: vote_id of the last vote opened, 0 for none
     last_vote_id: int = Field(default=0, ge=0, strict=True)
     chat: tuple[ChatMessage, ...] = ()  # spec 022: every chat message, in seq order
+    # spec 027: the shared timer. A room stored before this spec has no such keys
+    # and loads as a timer that was never started.
+    timer_started: StrictBool = False  # a letter was typed
+    # time counted before the current run, in milliseconds
+    timer_elapsed_ms: int = Field(default=0, ge=0, strict=True)
+    # clock time the current run began; None when the timer is not running
+    timer_resumed_at: float | None = None
 
 
 class LogEntry(RoomModel):
@@ -392,17 +399,92 @@ def player_views(state: RoomState) -> tuple[PlayerView, ...]:
     return tuple(views)
 
 
-def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
+# ---- The shared timer (spec 027) -----------------------------------------------
+
+
+def timer_value_ms(state: RoomState, now: float) -> int:
+    """Return the shared timer at `now`, in whole milliseconds.
+
+    Args:
+        state: The room.
+        now: Clock time of the reading.
+
+    Returns:
+        The time counted before the current run, plus the current run up to
+        `now` while the timer runs. A clock that went back adds nothing.
+    """
+    value = state.timer_elapsed_ms
+    if state.timer_resumed_at is not None:
+        current_run_ms = round((now - state.timer_resumed_at) * 1000)
+        value += max(0, current_run_ms)
+    return value
+
+
+def _has_connected_player(state: RoomState) -> bool:
+    """Tell whether a player is connected: their state is not `disconnected`."""
+    return any(player.state != PlayerState.DISCONNECTED for player in state.players)
+
+
+def _is_first_letter(state: RoomState, entry: LogEntry) -> bool:
+    """Tell whether the entry types the first letter of a room that is not solved.
+
+    A pencil letter is typed, so it counts. An erase and a reveal do not.
+    """
+    if state.timer_started or state.solved:
+        return False
+    event = entry.event
+    return isinstance(event, LetterChanged) and event.letter is not None
+
+
+def _with_timer_rules(state: RoomState, entry: LogEntry) -> RoomState:
+    """Apply the timer rules of spec 027 to the room `state` that `entry` just made.
+
+    The first rule that applies is used: start at the first letter, stop at the
+    solve, pause when no player is connected, resume when one is. The time of
+    the rules is `entry.at`, which is the step's `now` in a live step, so that
+    `replay` gives the timer of the live step.
+    """
+    if _is_first_letter(state, entry):
+        return state.model_copy(
+            update={"timer_started": True, "timer_resumed_at": entry.at}
+        )
+    event = entry.event
+    if isinstance(event, GridSolved):
+        return state.model_copy(
+            update={"timer_elapsed_ms": event.elapsed_ms, "timer_resumed_at": None}
+        )
+    is_running = state.timer_resumed_at is not None
+    has_connected = _has_connected_player(state)
+    if is_running and not has_connected:
+        return state.model_copy(
+            update={
+                "timer_elapsed_ms": timer_value_ms(state, entry.at),
+                "timer_resumed_at": None,
+            }
+        )
+    can_resume = state.timer_started and not is_running and not state.solved
+    if can_resume and has_connected:
+        return state.model_copy(update={"timer_resumed_at": entry.at})
+    return state
+
+
+def snapshot_for(
+    state: RoomState, player_id: str, now: float | None = None
+) -> Snapshot:
     """Return the snapshot that player `player_id` receives.
 
     Args:
         state: The room.
         player_id: A player of the room.
+        now: Clock time of the step, to read the shared timer at. The rules
+            always pass it. Without it (a state built by hand) the snapshot
+            holds the time counted before the current run.
 
     Returns:
         The snapshot, with the player's own resume token. Its `open_vote` is the
-        event that opened the room's open vote, None when no vote is open, and
-        its `chat` is the room's whole chat history (spec 022).
+        event that opened the room's open vote, None when no vote is open, its
+        `chat` is the room's whole chat history (spec 022), and its timer is the
+        shared timer of spec 027.
 
     Raises:
         KeyError: no player `player_id` in the room.
@@ -410,6 +492,9 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
     open_vote: VoteOpened | None = None
     if state.open_vote is not None:
         open_vote = state.open_vote.opened
+    timer_elapsed_ms = state.timer_elapsed_ms
+    if now is not None:
+        timer_elapsed_ms = timer_value_ms(state, now)
     for player in state.players:
         if player.player_id == player_id:
             return Snapshot(
@@ -423,8 +508,8 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 flags=_flag_views(state),
                 chat=state.chat,
                 open_vote=open_vote,
-                timer_elapsed_ms=0,
-                timer_running=False,
+                timer_elapsed_ms=timer_elapsed_ms,
+                timer_running=state.timer_resumed_at is not None,
                 solved=state.solved,
             )
     raise KeyError(player_id)
@@ -632,13 +717,18 @@ def _replace_player(state: RoomState, changed: PlayerRecord) -> RoomState:
 
 
 def _with_state_change(state: RoomState, changed: PlayerRecord, now: float) -> Outcome:
-    """Store `changed` and number one player_state_changed event for it."""
+    """Store `changed` and number one player_state_changed event for it.
+
+    The timer rules of spec 027 run after the entry: a player who leaves or
+    returns can pause or resume the timer.
+    """
     seq = state.seq + 1
     event = PlayerStateChanged(
         seq=seq, player_id=changed.player_id, state=changed.state
     )
+    entry = LogEntry(at=now, event=event)
     new_state = _replace_player(state, changed).model_copy(update={"seq": seq})
-    return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
+    return Outcome(state=_with_timer_rules(new_state, entry), entries=(entry,))
 
 
 def _resume_player(state: RoomState, player: PlayerRecord, now: float) -> Outcome:
@@ -654,7 +744,7 @@ def _resume_player(state: RoomState, player: PlayerRecord, now: float) -> Outcom
         outcome = _with_state_change(state, resumed, now)
     else:
         outcome = Outcome(state=_replace_player(state, resumed))
-    reply = (snapshot_for(outcome.state, player.player_id),)
+    reply = (snapshot_for(outcome.state, player.player_id, now),)
     return outcome.model_copy(update={"reply": reply})
 
 
@@ -693,7 +783,11 @@ def _add_player(
     player_id: str,
     resume_token: str,
 ) -> Outcome:
-    """Add a new player at the end of the room and number their player_joined."""
+    """Add a new player at the end of the room and number their player_joined.
+
+    The timer rules of spec 027 run after the entry, so the snapshot of the
+    new player holds a timer that their join resumed.
+    """
     seq = state.seq + 1
     has_host = False
     for existing in state.players:
@@ -709,12 +803,13 @@ def _add_player(
         last_input_at=now,
         last_seen_at=now,
     )
-    new_state = state.model_copy(
+    added_state = state.model_copy(
         update={"players": (*state.players, player), "seq": seq}
     )
     event = PlayerJoined(seq=seq, player=_view_of(player))
     entry = LogEntry(at=now, event=event, resume_token=resume_token)
-    reply = (snapshot_for(new_state, player_id),)
+    new_state = _with_timer_rules(added_state, entry)
+    reply = (snapshot_for(new_state, player_id, now),)
     return Outcome(state=new_state, entries=(entry,), reply=reply)
 
 
@@ -1208,7 +1303,8 @@ def _with_completion(before: RoomState, outcome: Outcome, now: float) -> Outcome
     """Add the `grid_solved` or `grid_full_wrong` entry a step calls for.
 
     Only a step that changed a letter or a lock on a grid that is not yet solved
-    can complete it.
+    can complete it. The solving time is the shared timer of spec 027 as the
+    step's earlier entries left it; the `grid_solved` entry then stops the timer.
     """
     if before.solved or not outcome.entries:
         return outcome
@@ -1218,7 +1314,7 @@ def _with_completion(before: RoomState, outcome: Outcome, now: float) -> Outcome
     next_seq = outcome.entries[-1].event.seq + 1
     event: GridSolved | GridFullWrong
     if _is_right(outcome.state):
-        elapsed_ms = max(0, round((now - before.created_at) * 1000))
+        elapsed_ms = timer_value_ms(outcome.state, now)
         event = GridSolved(seq=next_seq, elapsed_ms=elapsed_ms)
     elif _is_full(outcome.state) and not _is_full(before):
         event = GridFullWrong(seq=next_seq)
@@ -1364,7 +1460,8 @@ def _write_cell(
     """Write an accepted edit in its cell, count it and number its event.
 
     The player becomes the author of the letter (an empty cell has none) and
-    their `last_edit` records the cell as it was (spec 018).
+    their `last_edit` records the cell as it was (spec 018). The first letter
+    typed starts the shared timer (spec 027).
     """
     seq = state.seq + 1
     author = player_id if letter is not None else None
@@ -1391,7 +1488,8 @@ def _write_cell(
         pencil=is_pencil,
         player_id=player_id,
     )
-    return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=_with_timer_rules(new_state, entry), entries=(entry,))
 
 
 def _run_help_message(
@@ -1855,7 +1953,7 @@ def _undo(state: RoomState, player_id: str, now: float) -> Outcome:
         player_id=player_id,
     )
     entry = LogEntry(at=now, event=event, undo=True)
-    return Outcome(state=new_state, entries=(entry,))
+    return Outcome(state=_with_timer_rules(new_state, entry), entries=(entry,))
 
 
 def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> Outcome:
@@ -1961,7 +2059,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
 
     Returns:
         The room after it, for every field the log carries. Events of later
-        specs only move `seq` until those specs extend this function.
+        specs only move `seq` until those specs extend this function. The timer
+        rules of spec 027 run after the entry, with the time `entry.at`.
 
     Raises:
         ValueError: a `player_joined` entry has no resume token.
@@ -2001,7 +2100,8 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = state.model_copy(update={"chat": (*state.chat, event)})
     else:
         replayed = state
-    return replayed.model_copy(update={"seq": event.seq})
+    numbered = replayed.model_copy(update={"seq": event.seq})
+    return _with_timer_rules(numbered, entry)
 
 
 def _replay_vote_opened(
@@ -2180,7 +2280,9 @@ def after_restart(state: RoomState, now: float) -> Outcome:
         `PlayerStateChanged(disconnected)` each, in players order. Every
         player, connected or disconnected, gets empty chat and reaction
         windows, with no entry (spec 022 decision 17). An open vote keeps the
-        requester's yes only, with no entry (spec 025 decision 16).
+        requester's yes only, with no entry (spec 025 decision 16). A running
+        shared timer pauses at `now`, which counts the time since the crash
+        (spec 027 decision 7).
     """
     seq = state.seq
     players: list[PlayerRecord] = []
@@ -2208,13 +2310,19 @@ def after_restart(state: RoomState, now: float) -> Outcome:
             seq=seq, player_id=player.player_id, state=PlayerState.DISCONNECTED
         )
         entries.append(LogEntry(at=now, event=event))
-    new_state = state.model_copy(
+    restarted_state = state.model_copy(
         update={
             "players": tuple(players),
             "seq": seq,
             "open_vote": _without_ballots(state.open_vote),
         }
     )
+    # The timer rules of spec 027 (a running timer pauses once nobody is
+    # connected). The entries are all at `now` and only disconnect players, so
+    # the rules give the same timer on the final room as after each entry.
+    new_state = restarted_state
+    for entry in entries:
+        new_state = _with_timer_rules(new_state, entry)
     return Outcome(state=new_state, entries=tuple(entries))
 
 

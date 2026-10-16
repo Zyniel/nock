@@ -314,6 +314,45 @@ def test_ac9_the_checker_accepts_templates_filled_in() -> None:
     assert unknown_texts(samples, set()) == []
 
 
+# A number placeholder ("Language scan" in the spec's "Test harness") matches ASCII
+# digits only. Before that rule, the two time patterns of spec 027
+# (`{minutes}:{seconds}` and `{hours}:{minutes}:{seconds}`) accepted any text with a
+# colon in the middle, and `Grille n° {number}` accepted `Grille n° deux`.
+@pytest.mark.parametrize(
+    "sample", ["Error: connection lost", "Score: 3", "Grille n° deux"]
+)
+def test_ac9_the_checker_flags_a_number_placeholder_filled_with_other_than_digits(
+    sample: str,
+) -> None:
+    assert unknown_texts([sample], set()) == [sample]
+
+
+@pytest.mark.parametrize("sample", ["0:00", "1:02:05"])
+def test_ac9_the_checker_accepts_a_time_made_of_digits(sample: str) -> None:
+    assert unknown_texts([sample], set()) == []
+
+
+# Digits to a reader, but not the ASCII digits `0` to `9` that a number placeholder
+# matches: U+0663 ARABIC-INDIC DIGIT THREE and U+FF12 FULLWIDTH DIGIT TWO.
+NON_ASCII_DIGITS = [chr(0x0663), chr(0xFF12)]
+
+
+@pytest.mark.parametrize("digit", NON_ASCII_DIGITS, ids=["arabic-indic", "fullwidth"])
+def test_ac9_the_checker_reads_a_number_placeholder_as_ascii_digits_only(
+    digit: str,
+) -> None:
+    sample = f"Grille n° {digit}"
+
+    assert unknown_texts([sample], set()) == [sample]
+
+
+def test_ac9_the_checker_accepts_any_characters_in_the_other_placeholders() -> None:
+    # `{date}` is not a number placeholder: a date reads `12 octobre 2026`.
+    samples = ["Publiée le 12 octobre 2026"]
+
+    assert unknown_texts(samples, set()) == []
+
+
 def test_ac9_the_checker_accepts_the_data_of_the_test() -> None:
     samples = ["Bob", "BO", "Artiste muet", "Z", "42", "ABC123"]
     data = {"Bob", "BO", "Artiste muet", "ABC123"}

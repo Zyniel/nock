@@ -22,6 +22,14 @@ export function writeItem(key: string, value: string): void {
   }
 }
 
+export function removeItem(key: string): void {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // Nothing was remembered: the page still works.
+  }
+}
+
 // Parse a stored text as a JSON object; anything else is null.
 export function parseObject(raw: string | null): Record<string, unknown> | null {
   if (raw === null) {

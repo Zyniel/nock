@@ -5,61 +5,69 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, early morning)
+## Where things stand (2026-10-16, morning)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
   feat/phase5-mvp-ldddid origin/main`), keeping unmerged commits.
 - Merged: PR #6 (Phase 5, MVP), PR #7 (Phase 6: specs 024, 025, first version of
   019, the spec 026 AC-10 fix), PR #8 (019 refinements, 020, 021, 022 with both
-  of its review rounds, the CI speed-up). Tag `v0.1.0` exists locally on #6's
-  merge commit but could not be pushed from the cloud session (tag pushes are
-  refused): the human pushes it from a clone.
+  of its review rounds, the CI speed-up), PR #9 (tooling: the implementer's quick
+  gate, CI's fonts in cloud sessions, a write guard that judges an edit against
+  the checkout holding it). Tag `v0.1.0` exists locally on #6's merge commit but
+  could not be pushed from the cloud session (tag pushes are refused): the human
+  pushes it from a clone.
+- Open: spec 027's pull request (shared timer, and spec 035's stricter language
+  scan). Its description lists what is left for the human.
 - Pull requests, human decision of 2026-10-16: one pull request per spec (with
   its refinements of other specs), and tooling changes in a pull request of
   their own. With one designated branch there is one open pull request at a
   time: push the next spec and open its pull request once the previous one is
-  merged. CI runs only on pull requests, so the full local check comes first.
-- The human was asked to require the `Quality gate` check in `main`'s ruleset.
-- Phase 6 specs: 019, 020, 021, 022, 024, 025 are `done`. Still to build, in
-  this order: 027, 028, 032 (with the 012/017 seat-back refinement), 038
-  (refines 036), 034 (refines 013), 033 (refines 005 and 018), 029.
+  merged. CI runs only on pull requests, so a local check comes first.
+- The human was asked to require the `Quality gate` check in `main`'s ruleset;
+  a pull request whose CI runs should then show as "blocked", not "unstable".
+- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027 are `done`. Still to build,
+  in this order: 028, 032 (with the 012/017 seat-back refinement), 038 (refines
+  036), 034 (refines 013), 033 (refines 005 and 018), 029. Spec 036's
+  technical-variables refinement goes in its own pull request after 028.
 
 ## Work in flight (not pushed)
 
-- Spec 022 is complete (merged in #8). Left for the human, in #8's
-  description: the AC-19 "one line" check can be met by truncation; the AC-16
-  key pins the short text, so no "not clipped" clause was added. The AC-18 and
-  AC-20 files have 300 ms bounds but stay in the parallel pass; move them to
-  `SERIAL_TEST_FILES` if they ever flake.
-- Spec 027 (shared timer): in worktree `.claude/worktrees/review-027` (branch
-  `review-027`, rebased onto 01b7c88, which #8 merged): tests e0e034b, test
-  fixes f527969 (Playwright for Python reads a numeric `page.clock` time in
-  seconds; AC-4's second page needs another room code), implementation 970de7f
-  (new `RoomTimer.svelte`, `timer.ts`), the live-pages file in
-  `SERIAL_TEST_FILES` eb5fc6f (it will conflict with 631a032's list: keep both),
-  review refinements f5ab1c0 (spec) and 81a2f82 (tests). The implementer of the
-  review round is at work there (`stopTimerOnSolved` takes only a whole number
-  of at least 0; narrower `:global` rules in `RoomPage.svelte`). Then a second
-  review, a rebase onto `main`, the full local check, and its own pull request.
-  Agents working in a worktree must keep their working directory in it: the
-  write guard checks paths against the project root and refuses the edit
-  otherwise.
-- Spec 028 (recap): tests e563c92 in worktree `agent-a0de19b...`, on 11059de (a
-  cherry-pick of spec 027's first test commit; drop it when integrating). They
-  use spec 027's `open_timer_room`, whose signature changed in b2af773 (a
-  `room_code` parameter): check them against it. Build after 027 is reviewed.
-- Commit trailers: the implementer and test-writer roles run on Sonnet
-  (`model: sonnet` in `.claude/agents/`), but until 2026-10-15 the lead's prompts
-  gave them the Opus trailer. Pushed history keeps it (the PR description says
-  so); fix the trailer of their unpushed commits when integrating them, and tell
-  agents to use the trailer of their own environment.
+- Spec 028 (recap): worktree `.claude/worktrees/agent-a0e07b15eba7a1ec0`, branch
+  `feat/028-end-of-game-recap`, built on spec 027's commits as they were before
+  the rebase (be2af0b): tests e9ab665, server 27382a4 (`nock.recap`, share
+  token, routes), client 69269ff (recap dialog, public share page). Its
+  Chromium browser gate passed. One stale test: spec 018's
+  `test_ac1_register_room_records_the_room_in_the_store` compares the stored
+  room with a `new_room(...)` that has no share token, while spec 028 gives
+  every registered room one; a test-writer updates it. Then the review, and a
+  rebase onto `main` once 027 is merged (`git rebase --onto origin/main be2af0b`,
+  so that 027's old commits are dropped).
+- Spec 036 refinement ("technical variables should not contain special
+  characters"): worktree `.claude/worktrees/spec-036`, branch `spec-036`, on
+  `main`: spec 37561cc (`NOCK_HOST` takes ASCII letters, digits, `.`, `-` and
+  `:` in an IPv6 address; `NOCK_DATABASE` refuses categories Cc, Cf, Zl and Zp
+  except U+200C and U+200D; the message shows `repr(value)`; an empty
+  `NOCK_DATABASE` counts as unset, refining spec 018). Its test-writer is at
+  work; then the implementer (`src/nock/__main__.py`, `server.py:134`, README)
+  and the review.
+- A tool call can turn a typed `\uXXXX` into the character itself: the first
+  draft of spec 036 held six raw invisible characters, U+202E among them. Write
+  such characters as `\N{NAME}` in code and as typed escapes in specs, and scan
+  the files for categories Cc, Cf, Zl and Zp after writing.
+- Commit trailers: the implementer and test-writer roles run on Sonnet unless the
+  lead passes `model: "opus"`. Each agent signs with its own model's trailer;
+  some pushed commits of 2026-10-15 carry the Opus line by mistake, and pushed
+  history is not rewritten.
+- The lead works in the main tree and reaches worktrees with `git -C` and
+  absolute paths: a `cd` into a worktree makes it the session's working
+  directory, and the stop hook then checks that worktree.
 
 ## First tasks for the next session
 
-1. Finish spec 027 (above) and open its pull request; subscribe to it and keep
-   it green until the human merges it.
-2. Then spec 028 in its own pull request, once 027's is merged.
+1. Keep spec 027's pull request green until the human merges it; answer its
+   review comments.
+2. Then spec 028 in its own pull request (above), then spec 036's refinement.
 3. Then the rest of Phase 6 in the order above, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and
@@ -162,6 +170,8 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   flaky setup, a hook blocking the wrong thing) without asking, in a pull
   request of their own; new tooling behaviour and new dependencies still need
   the human (written in `CLAUDE.md`).
+- 2026-10-16: no screenshots in pull requests. No work on the app's visuals
+  until the human takes it up ("don't bother yet about visuals").
 
 ## Lead decisions of 2026-10-15 worth knowing
 
@@ -183,6 +193,28 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 - A separate cloud session ("Nock hosting plan (document only)") drafts
   `docs/hosting.md` on branch `docs/hosting-plan`.
+- Visual design, for the human to take up later (2026-10-16, after seeing the
+  app for the first time, from screenshots): the app works but has no visual
+  design (browser-default buttons, everything stacked above the grid, a narrow
+  column on a computer, the chat panel over the grid). The human thought the Le
+  Parisien reverse engineering covered the visual side. It never happened: the
+  backlog of 2026-10-10 could not open Le Parisien's page, so its baseline is
+  assumed, and `specs/_reference.md` keeps "Le Parisien baseline" as an open
+  decision, to confirm from screenshots of the listing, an open grid and its
+  help menu. Those screenshots would let a spec-writer draft a visual spec.
+- The README does not say how to add grids: the repository has no `grids/`
+  folder, so a fresh server lists none. For the implementer's next README
+  change (the folder, the file format of `nock.catalogue`).
+
+## Showing the app
+
+The repository has no grids, so a demo serves
+`create_app(catalogue=Catalogue(entries=...))` with FX-02 and FX-01 from
+`tests/fixtures/` (credits from `credits.json`) and drives it with Playwright.
+A room's creator joins at once under `localStorage["nock.nickname"]` (else
+"Invité"); a player who opens the link gets the nickname form; another player
+can be a raw WebSocket opened from a page of the same origin (`join`, then
+`edit_letter`, `flag`, `react`, `chat`, `select_cell`).
 
 ## Keeping the cost down
 

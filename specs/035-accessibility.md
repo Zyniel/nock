@@ -402,10 +402,32 @@ AC-11.)
     404 of spec 004 AC-4 and serves no page, so there is nothing to scan.)
 - Language scan, run on K1 to K7: each visible direct text node (trimmed) and each
   `aria-label`, `title`, `placeholder` and `alt` value must either fully match a
-  `fr.json` value read as a pattern (each `{name}` matches one or more
-  characters, everything else literally), or be data of the test: a nickname of
-  the snapshot or its initials, a clue text of FX-01, one letter `A` to `Z`, the
-  room code, the share URL, or digits only.
+  `fr.json` value read as a pattern (each placeholder, such as `{name}`, matches
+  one or more characters, except a number placeholder, which matches one or more
+  ASCII digits `0` to `9` and nothing else; everything else literally), or be data
+  of the test: a nickname of the snapshot or its initials, a clue text of FX-01,
+  one letter `A` to `Z`, the room code, the share URL, or digits only.
+  - Number placeholders: a placeholder is a number placeholder when the client
+    fills it with a whole number of at least 0 written in digits: a count, a
+    size, a position, or one part of a time, padded with a zero or not. The test
+    goes by the name, in every key, and these are the number placeholders:
+    `{count}`, `{number}`, `{force}`, `{width}`, `{height}`, `{length}`,
+    `{position}`, `{letters}`, `{words}`, `{hours}`, `{minutes}` and `{seconds}`.
+    Every other placeholder matches one or more characters; in `fr.json` today
+    these are `{name}`, `{names}`, `{clue}`, `{date}`, `{direction}`,
+    `{help_mode}`, `{reaction}` and `{code}` (a date reads `12 octobre 2026`, and
+    a room code holds letters, as in `Salon ABC123`). A spec that adds a key with
+    a placeholder that stands for a number adds its name to the list above, with
+    a dated note; until then that placeholder matches one or more characters.
+    (Note from the lead, 2026-10-16: added. Spec 027 added `timer.minutes_seconds`
+    (`{minutes}:{seconds}`) and `timer.hours_minutes_seconds`
+    (`{hours}:{minutes}:{seconds}`). While every placeholder matched one or more
+    characters, those two patterns accepted any text with a colon in the middle,
+    such as `Error: connection lost` or `Score: 3`, in every spec that runs this
+    scan. With digits only they accept `0:00` and `1:02:05`, and not those texts.
+    The three samples that spec 027 names, `Loading…`, `Salon` and `Check word`,
+    are still flagged, and the samples that AC-9 accepts are still accepted. Every
+    test that runs the scan applies this rule (second review of spec 027).)
 - Touch context (AC-10): as spec 009's "Test harness": 360 by 740,
   `has_touch=True`, `is_mobile=True` (left out under Firefox). In Firefox and
   WebKit, the same init script as spec 009 makes `(pointer: coarse)` match. Keys
@@ -473,7 +495,7 @@ The words in brackets say how each criterion is tested.
 - **AC-6** (AC-10.1.3) (browser with mocked socket) Colour is never the only signal: each player's cursor also carries their initials. Given a FX-01 snapshot with `p1` (`you`), `p2` `Jean-Luc` selecting (2, 2) `down`, `p3` `Ana` selecting (2, 2) `across` and `p4` `zoé` selecting (1, 0): the cell (2, 2) holds two `remote-selection` elements whose `remote-initials` read `JL` and `AN`, each inside the cell's bounding box (1 px tolerance) with computed `visibility` `visible`; (1, 0) holds one reading `ZO`; after `selection_moved` of `p2` to (3, 1), (3, 1) holds `JL` and (2, 2) only `AN`.
 - **AC-7** (AC-10.1.3) (browser with mocked socket) Locked letters and roster states differ by more than colour. In state K2, (1, 0) (locked) has a computed `font-weight` of 700 or more and (1, 2) (not locked) below 700. In the same state, at 1280 by 720 and at 360 by 740, the roster items behave as follows. The `roster-player` items of `p2` (active), `p3` (idle) and `p4` (disconnected), each of their descendants and each of their ancestors have a computed `opacity` of `1`. The `roster-nickname` of `p3` has `font-style` `italic` and a `text-decoration-line` without `line-through`, and its `roster-state` reads `inactif`. The `roster-nickname` of `p4` has `font-style` `italic` and a `text-decoration-line` containing `line-through`, and its `roster-state` reads `déconnecté`. The `roster-nickname` of `p2` has `font-style` `normal` and no `line-through`, and its `roster-state` reads `actif`. (Note from the lead, 2026-10-13: the roster part was added. It settles the "Translucent styles" edge case.)
 - **AC-8** (AC-10.1.3) (browser with live server and mocked socket) Text contrast is at least 4.5:1. The contrast scan of the test harness finds no offending element in each of the states K1 to K7, at both window sizes.
-- **AC-9** (AC-10.1.4) (browser with live server and mocked socket; static) The interface is in French by default, with every string in a translation file. In each state K1 to K7, `document.documentElement.lang` is `fr` and the language scan of the test harness finds no text outside `fr.json` and the test's data; the scan's checker flags the samples `Loading…`, `Salon` (alone, no template is exactly `Salon`) and `Check word`, and accepts `Salon ABC123`, `Grille n° 2` and `Ana a rejoint le salon`. The seven keys of "New `fr.json` keys" exist with those values. (Note from the lead, 2026-10-13: five keys became seven, with `grid.remote_overflow` and `a11y.remote_overflow`.)
+- **AC-9** (AC-10.1.4) (browser with live server and mocked socket; static) The interface is in French by default, with every string in a translation file. In each state K1 to K7, `document.documentElement.lang` is `fr` and the language scan of the test harness finds no text outside `fr.json` and the test's data; the scan's checker flags the samples `Loading…`, `Salon` (alone, no template is exactly `Salon`) and `Check word`, and accepts `Salon ABC123`, `Grille n° 2` and `Ana a rejoint le salon`. (Note from the lead, 2026-10-16: the checker also flags the samples `Error: connection lost`, `Score: 3` and `Grille n° deux`, and accepts `0:00` and `1:02:05`, as the number placeholders of "Language scan" in "Test harness" require (second review of spec 027).) The seven keys of "New `fr.json` keys" exist with those values. (Note from the lead, 2026-10-13: five keys became seven, with `grid.remote_overflow` and `a11y.remote_overflow`.)
 - **AC-10** (new, from the spec 009 and 035 contradiction) (browser with mocked socket, touch context, in Chromium, Firefox and WebKit) The in-app keyboard keys stay out of the Tab order but stay in the accessibility tree. Given a FX-01 snapshot in the touch context:
   - Markup: each of the 26 `key` elements and the `key-delete` is a `BUTTON` element with `type="button"` and the attribute `tabindex="-1"` (its `tabIndex` property is `-1`). For each letter `L` from `A` to `Z`, `page.get_by_role("button", name=L, exact=True)` inside `keyboard` resolves to exactly the `key` with `data-key=L`. `page.get_by_role("button", name="Effacer", exact=True)` resolves to exactly `key-delete`. No key and no ancestor of a key has `aria-hidden="true"`, the `inert` attribute, or `role` `presentation` or `none`.
   - Focus after a tap: after tapping (1, 0), then the key `T`, then `key-delete`, `document.activeElement` is the `grid` after each tap.

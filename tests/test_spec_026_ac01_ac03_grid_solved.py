@@ -119,7 +119,7 @@ def test_ac1_the_entries_are_logged_entries_of_the_step(fx01_grid: Grid) -> None
     ("seconds", "elapsed_ms"),
     [(0.0, 0), (1.2346, 1235), (1.2344, 1234), (3600.0, 3_600_000)],
 )
-def test_ac1_elapsed_ms_is_the_rounded_time_since_the_creation(
+def test_ac1_elapsed_ms_is_the_timer_value_since_the_first_letter_rounded_to_whole_ms(
     fx01_grid: Grid, seconds: float, elapsed_ms: int
 ) -> None:
     outcome = write(full17(fx01_grid), "p2", LAST_CELL, "T", NOW + seconds)

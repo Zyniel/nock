@@ -4,6 +4,7 @@
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
+  import RoomTimer from './RoomTimer.svelte'
   import { t } from './i18n'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import {
@@ -1489,9 +1490,16 @@
         onfocusout={leaveRoomToolbarFocus}
         class:keyboard-focus={roomToolbarHasKeyboardFocus}
       >
-        <!-- First in the toolbar, so its unread count shows before any sideways
-             scroll on a small window (spec 022). The count has a slot of its own
-             width, so the button keeps its size when the count goes. -->
+        <!-- The shared timer and its toggle come first, so that the time shows
+             before any sideways scroll on a small window (spec 027). -->
+        <RoomTimer
+          baseMs={session.timerBaseMs}
+          isRunning={session.timerRunning}
+          anchor={session.timerAnchor}
+        />
+        <!-- Next, so its unread count shows before any sideways scroll on a small
+             window (spec 022). The count has a slot of its own width, so the button
+             keeps its size when the count goes. -->
         <button
           type="button"
           class="chat-toggle"
@@ -1979,9 +1987,10 @@
     flex: none;
   }
 
-  /* The room toolbar holds the undo, pencil, check and reveal controls, the flag
-     button and the authors switch (specs 024, 020, 021 and 019). On a roomy
-     window it is one item of the header row, and it wraps when it must. */
+  /* The room toolbar holds the shared timer and its toggle, the chat toggle, the
+     undo, pencil, check and reveal controls, the flag button and the authors
+     switch (specs 027, 022, 024, 020, 021 and 019). On a roomy window it is one
+     item of the header row, and it wraps when it must. */
   .room-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -2000,8 +2009,11 @@
 
   /* A toolbar that scrolls cuts an outline drawn outside a control: draw it
      inside instead (3px wide, so spec 035 AC-2 still holds). The same on a roomy
-     window, so the outline always stays inside the toolbar. */
-  .room-toolbar :focus-visible {
+     window, so the outline always stays inside the toolbar. The second selector
+     reaches the toggle of the timer, which is drawn by a component of its own
+     (RoomTimer), and nothing else that a child component puts in the toolbar. */
+  .room-toolbar :focus-visible,
+  .room-toolbar :global(.timer-toggle:focus-visible) {
     outline-offset: -3px;
   }
 
@@ -2355,8 +2367,11 @@
     /* The header buttons get the same size in every engine. WebKit on a touch
        screen gives a button a 16px font and a taller padding than Chromium and
        Firefox, and then the header needs a third row, on a low window and on a
-       narrow tall one alike (spec 013 AC-6). */
-    .room-header button {
+       narrow tall one alike (spec 013 AC-6). The second selector reaches the
+       toggle of the timer, which is drawn by a component of its own (RoomTimer),
+       and nothing else that a child component puts in the header. */
+    .room-header button,
+    .room-header :global(.timer-toggle) {
       padding-block: 1px;
       font-size: 0.8rem;
     }

@@ -52,6 +52,7 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_spec_013_ac07_ac08_feed_scroll.py",
         "test_spec_022_ac10_pacing.py",
         "test_spec_022_ac11_ac12_chat_list_scroll.py",
+        "test_spec_027_ac02_ac03_live_pages.py",
         "test_spec_036_ac01_time_budgets.py",
     }
 )
