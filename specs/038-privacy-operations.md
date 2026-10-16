@@ -18,6 +18,38 @@ Changed: AC-1 and AC-4, whose searches of the database files now look for the
 nicknames as stored. This spec has no tests yet (human's rule of 2026-10-16:
 nicknames in capitals).)
 
+(Note from the lead, 2026-10-16: checked, before this spec's tests are written,
+against the code that is now built for specs 027, 028, 032 and 036 and for the
+nickname rule. Spec 036 is refined as decision 9 asks, with dated notes there.
+Changed here, each with a dated note: the first row of "What the server keeps"
+lists the fields that `PlayerRecord` holds; the dashboard and the replay read the
+store as `rooms.store` (spec 032); "Operator access" says that rules 2 and 3 are
+spec 011's throttle as spec 032 left it, in an instance of its own; a `RoomEdit`'s
+nickname is that of the latest `player_joined` of its player before the edit, in
+capitals, since a player seated back (spec 032) has a second `player_joined` (also
+in the edge case "Edits of a removed or timed-out player"); a drop of
+`disconnection_rate` ends at the player's `player_left`, since a seat back keeps
+the player id; `median_solving_ms` names spec 027's timer; the ops page shows a
+nickname through spec 040's `displayNickname`; the live server of "Test harness"
+uses `server_config`. Criteria: AC-4's WebSocket part names the strings it searches
+for, AC-8's nicknames are `ANA` and `BOB`, from the `player_joined` entries, and
+AC-9 says that its `Ana` is how `displayNickname` shows `ANA`. This spec has no
+tests yet (preparation of spec 038).)
+
+(Note from the lead, 2026-10-16: decided after the spec-writer's report, each with
+a dated note. The ops API's throttle is a second instance of spec 011's, with spec
+011's `WRONG_CODE_LIMIT` and `WRONG_CODE_WINDOW_SECONDS`, so this spec's
+`WRONG_TOKEN_LIMIT` and `WRONG_TOKEN_WINDOW_SECONDS` are gone (rule 2).
+`RoomStore.codes_created_since` returns `(code, created_at)` pairs in no particular
+order, and `RoomStore.created_at` is gone ("`nock.store`", the dashboard's reads).
+While the operator pages are off, the ops paths answer exactly as an unknown path
+does, with no `Cache-Control` header; `no-store` applies while they are on (rules 1
+and 4). The three choices of the note above are confirmed: the latest
+`player_joined` before an edit, a drop that ends at `player_left`, and the strings
+of AC-4's WebSocket part. Criteria: AC-6 changed, for the store's pairs, which it
+checks in Python, and for the answers while the pages are off. This spec has no
+tests yet (preparation of spec 038).)
+
 Epic E10 Quality bar (US-10.4) · Release: MVP · Epic depends on: All
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; guests and the stored identity in spec 012; the
@@ -38,7 +70,7 @@ These criteria apply to every story above and belong in each agent's definition 
 
 | Where | What | How long |
 | --- | --- | --- |
-| SQLite `NOCK_DATABASE`, rooms (spec 018) | per room: its code, creation and last edit times (spec 032); snapshots of `RoomState`: the grid with its answers, the cells (letters, authors, locks), the players (`PlayerRecord`: player id, resume token, nickname, colour, host and mute flags, presence state and the times of their last input, frame and disconnection, selection, recent edit times, last edit), the past players (`PastPlayer`: player id, resume token, nickname, colour, mute flag), the removed tokens, the settings and what later specs add | until the room expires, 30 days after its last edit (spec 032 AC-1); then deleted at the next sweep (within an hour) or at once by any lookup |
+| SQLite `NOCK_DATABASE`, rooms (spec 018) | per room: its code, creation and last edit times (spec 032); snapshots of `RoomState`: the grid with its answers, the cells (letters, authors, locks), the players (`PlayerRecord`: player id, resume token, nickname, colour, host and mute flags, presence state, the seq of their join, the times of their last input, frame and disconnection, selection, the times of their recent edits, chat messages and reactions, last edit, clue flag), the past players (`PastPlayer`: player id, resume token, nickname, colour, mute flag), the removed tokens, the settings and what later specs add | until the room expires, 30 days after its last edit (spec 032 AC-1); then deleted at the next sweep (within an hour) or at once by any lookup |
 | SQLite, log of each room (spec 018) | every numbered event exactly as the players received it (letters, checks, reveals, votes, flags, chat texts, joins with the player's view, presence, settings, completion), each with its time `at`, plus the private fields `resume_token` (on a join), `undo` and `relay_ms` (this spec) | the same: deleted with the room |
 | Process memory | live rooms; the wrong room codes of each client address (spec 011) and the wrong operator tokens of each address (this spec), for 60 seconds | until the window passes, or the process stops |
 | Process logs (stdout, stderr) | warnings and errors of the server and of the app, with room codes and error descriptions | the operator's choice; they hold no client address, no resume token, no operator token and no chat text |
@@ -57,6 +89,14 @@ record, so that a seat back restores it. The list used to read "player id, resum
 token, nickname, colour". The flag is game state, kept and deleted with the room,
 like every field of `PastPlayer` other than the nickname and the two identifiers.
 No criterion changes.)
+
+(Note from the lead, 2026-10-16: in the first row, the fields of `PlayerRecord`
+gained the seq of their join (`joined_seq`, spec 011), the times of their recent
+chat messages and reactions (`recent_chat` and `recent_reactions`, spec 022) and
+their clue flag (`flag`, spec 021), which the code holds. The list read "presence
+state and the times of their last input, frame and disconnection, selection,
+recent edit times, last edit". These fields are game state, kept and deleted with
+the room. No criterion changes (preparation of spec 038).)
 
 - Personal data about a guest is their nickname and two random identifiers, the
   player id and the resume token (AC-1). Every other field of `PlayerRecord` and
@@ -124,15 +164,21 @@ class LogEntry(RoomModel):
 ```python
 # src/nock/store.py (additions)
 class RoomStore:
-    def created_at(self, code: str) -> float | None:
-        """Return the room's creation time (spec 032), or None for an unknown room."""
-
-    def codes_created_since(self, since: float) -> list[str]:
-        """Return the codes of the rooms whose creation time is at least `since`,
-        by creation time, then code."""
+    def codes_created_since(self, since: float) -> list[tuple[str, float]]:
+        """Return a `(code, created_at)` pair for each room whose creation time
+        (spec 032) is at least `since`, in no particular order."""
 ```
 
 `secure_delete` and the checkpoint of `delete_room`: see above.
+
+(Note from the lead, 2026-10-16: decided after the spec-writer's report, one store
+read gives each room of the period with its creation time, so that no room can go
+between two reads. The block read
+`created_at(self, code: str) -> float | None`, "Return the room's creation time
+(spec 032), or None for an unknown room.", and
+`codes_created_since(self, since: float) -> list[str]`, "Return the codes of the
+rooms whose creation time is at least `since`, by creation time, then code." The
+figures do not depend on the order of the rooms (preparation of spec 038).)
 
 ### Operator access (dashboard and replay)
 
@@ -179,21 +225,45 @@ def create_app(
 Rules, for every path under `/api/ops/` (the ops API):
 
 1. Operator pages off (no token given, and the variable unset or empty when the app
-   started): `GET /ops` and every ops API path answer 404 with `{"detail": "Not Found"}`,
-   as any unknown path (spec 040).
+   started): `GET /ops` and every ops API path answer exactly as any unknown path
+   does (spec 040): 404 with `{"detail": "Not Found"}` and no `Cache-Control`
+   header. None of the rules below applies to them. (Note from the lead,
+   2026-10-16: decided after the spec-writer's report; this read "answer 404 with
+   `{"detail": "Not Found"}`, as any unknown path (spec 040)", which left open
+   whether rule 4 applies while the pages are off (preparation of spec 038).)
 2. Throttle: when the client address (as spec 011 reads it) has at least
-   `WRONG_TOKEN_LIMIT = 10` refused ops requests whose time `t` satisfies
-   `t > now - WRONG_TOKEN_WINDOW_SECONDS` (60.0, `now = rooms.clock()`), the request
-   answers 429 with `{"detail": "Too Many Requests"}`, whatever its token. This
-   refusal is not counted.
+   `WRONG_CODE_LIMIT` (10) refused ops requests whose time `t` satisfies
+   `t > now - WRONG_CODE_WINDOW_SECONDS` (60.0, `now = rooms.clock()`), spec 011's
+   constants, the request answers 429 with `{"detail": "Too Many Requests"}`,
+   whatever its token. This refusal is not counted. (Note from the lead,
+   2026-10-16: decided after the spec-writer's report, the throttle uses spec 011's
+   constants; this read "`WRONG_TOKEN_LIMIT = 10`" and "`WRONG_TOKEN_WINDOW_SECONDS`
+   (60.0, ...)", two names of this spec with the same values (preparation of spec
+   038).)
 3. The request must carry the header `Authorization: Bearer <token>`, compared with
    the operator token by `secrets.compare_digest`. A missing or different token
    answers 401 with `{"detail": "Not authorized"}` and the header
    `WWW-Authenticate: Bearer`, and counts as one refusal for its address.
-4. Every ops API answer, refusals included, has `Cache-Control: no-store`.
+4. While the operator pages are on, every ops API answer, refusals included, has
+   `Cache-Control: no-store`. (Note from the lead, 2026-10-16: decided after the
+   spec-writer's report; this read "Every ops API answer, refusals included, has
+   `Cache-Control: no-store`." (preparation of spec 038).)
 
 The token is never read from a URL, a query or a cookie, and never written to a log.
 The failures are kept per app, in memory, like spec 011's.
+
+Rules 2 and 3 are spec 011's wrong-code throttle as spec 032 left it, applied to
+refused ops requests: the ops API keeps a second instance of that throttle
+(`_WrongCodeThrottle` in `nock.server`, with spec 011's constants), checks rule 2
+with its `is_blocked`, and counts a refusal of rule 3 with its
+`record_unless_blocked`, which checks and records in one step under its lock, as
+spec 028's recap route does. A wrong token that this record finds blocked answers
+429 instead of 401, so wrong tokens that arrive at once from one address are
+counted one after another, as wrong codes are (spec 011). The two instances keep
+separate counts. (Note from the lead, 2026-10-16: added from the code of spec 011's
+throttle, whose check and record became one locked step in the second review of
+spec 032; decided after the spec-writer's report, the ops API's throttle is a
+second instance of it, with spec 011's constants (preparation of spec 038).)
 
 ### Ops API
 
@@ -204,10 +274,19 @@ The failures are kept per app, in memory, like spec 011's.
 | `GET /api/ops/rooms/{code}/edits`, a room that `rooms.peek_room(code)` finds | 200, `RoomReplay` JSON |
 | `GET /api/ops/rooms/{code}/edits`, unknown or expired room, or a code breaking `ROOM_CODE_PATTERN` | 404, `{"detail": "Not Found"}` |
 
-The dashboard reads, for each code of `store.codes_created_since(now - days * 86_400)`
+The dashboard reads the `(code, created_at)` pairs of
+`rooms.store.codes_created_since(now - days * 86_400)` (`now = rooms.clock()`;
+`rooms.store` is the registry's store, spec 032), then the whole log of each of
+those rooms (`rooms.store.read_log(code)`), without making the room live, and
+passes a `RoomLog(code=code, created_at=created_at, entries=<its log>)` per room to
+`dashboard_figures`; the replay reads the log of its room the same way. With at
+most 30 days, no room of the period can have expired, since its last edit is not
+older than its creation (spec 032). (Note from the lead, 2026-10-16: this read "The
+dashboard reads, for each code of `store.codes_created_since(now - days * 86_400)`
 (`now = rooms.clock()`), its creation time and its whole log, without making the
-room live. With at most 30 days, no room of the period can have expired, since its
-last edit is not older than its creation (spec 032).
+room live." `store` became `rooms.store`, the registry's store in the code, and,
+decided after the spec-writer's report, one read gives the codes with their
+creation times (preparation of spec 038).)
 
 ```python
 # src/nock/operations.py (new): pure functions over logs, no I/O
@@ -265,7 +344,7 @@ class RoomEdit(BaseModel):
     letter: Letter | None  # the cell's letter after the edit, None when it is empty
     pencil: StrictBool  # the letter_changed's pencil flag; False for a lock
     player_id: PlayerId | None  # who made it; None for "locked" and "revealed"
-    nickname: Nickname | None  # from that player's player_joined in the log; None when unknown
+    nickname: Nickname | None  # from that player's player_joined, see below; None when unknown
 
 
 class RoomReplay(BaseModel):
@@ -287,6 +366,17 @@ be a letter or None); otherwise one with a letter is `typed` and one with no let
 is `erased`; a `cell_locked` with `revealed` False is `locked` (a check), with
 `revealed` True `revealed`. `letter` is the event's letter.
 
+`nickname` is that of the latest `player_joined` of the edit's player before the
+edit, in seq order, as the server stores it, in capitals (spec 012). A player seated
+back (spec 032) has a second `player_joined` with the same player id, whose
+nickname may carry spec 012's suffix (`ANA 2`, spec 032 decision 12); their edits
+after it take that nickname. It is None for a `locked` or `revealed` edit, and for
+a player with no `player_joined` before the edit in the entries given. (Note from
+the lead, 2026-10-16: this paragraph was added, and the comment of
+`RoomEdit.nickname` read "from that player's player_joined in the log; None when
+unknown", written when a player had one `player_joined` only (preparation of spec
+038).)
+
 ### Dashboard figures
 
 The rooms of the period are those passed to `dashboard_figures` whose `created_at` is
@@ -297,12 +387,21 @@ at least `now - days * 86_400`.
 | `rooms_created` | the number of rooms of the period | `0` |
 | `players_per_room` | the mean number of `player_joined` entries per room of the period | None when there is no room |
 | `completion_rate` | the share of the rooms of the period whose log holds a `grid_solved` entry | None when there is no room |
-| `median_solving_ms` | `statistics.median` of the `elapsed_ms` of those `grid_solved` entries (spec 026, as spec 027 may redefine it) | None when no room is solved |
+| `median_solving_ms` | `statistics.median` of the `elapsed_ms` of those `grid_solved` entries (spec 026; spec 027 made it the shared timer's value when the grid is solved) | None when no room is solved |
 | `latency_median_ms`, `latency_p95_ms` | over the `relay_ms` values that are not None of the `letter_changed` entries of the rooms of the period: their `statistics.median`, and the `ceil(0.95 × n)`-th smallest (spec 036's p95) | None when there is no such value |
-| `disconnection_rate` | the number of drops divided by the number of `player_joined` entries; a drop is a `player_state_changed` to `disconnected` that is followed, later in the same room's log, by a `player_state_changed` to `active` of the same player, before that player's next `disconnected` entry | None when there is no join |
+| `disconnection_rate` | the number of drops divided by the number of `player_joined` entries; a drop is a `player_state_changed` to `disconnected` that is followed, later in the same room's log, by a `player_state_changed` to `active` of the same player, before that player's next `disconnected` entry and before any `player_left` of that player | None when there is no join |
 
 A drop is a lost connection that came back within spec 017's window, the sign of a
-bad network. A player who closes the tab and does not come back is not a drop.
+bad network. A player who closes the tab and does not come back is not a drop. Nor
+is a player who times out (spec 017's `player_left`) and is seated back later (spec
+032), although the seat back keeps their player id. (Note from the lead,
+2026-10-16: in the row `disconnection_rate`, "and before any `player_left` of that
+player" was added, with the sentence before this note. Since spec 032's seat back,
+a player who timed out comes back with the same id, so a later `active` of theirs,
+after an `idle` for example, made their disconnection before the time-out count
+as a drop. In the row `median_solving_ms`, "(spec 026, as spec 027 may redefine
+it)" became "(spec 026; spec 027 made it the shared timer's value when the grid is
+solved)", since spec 027 is built (preparation of spec 038).)
 
 ### Client: the ops page `/ops`
 
@@ -364,8 +463,12 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
     `t("ops.edit.<kind>", {time, name, letter, row, column})`, where the kind
     `typed` with `pencil` true uses `ops.edit.typed_pencil`, `time` is
     `new Intl.DateTimeFormat("fr-FR", {hour: "2-digit", minute: "2-digit", second: "2-digit"})`
-    of `at` in the browser's time zone, and `name` is the nickname, or
-    `t("feed.someone")` when it is None. A room with no edit shows
+    of `at` in the browser's time zone, and `name` is the nickname as spec 040's
+    `displayNickname` writes it (`ANA` shows as `Ana`), or `t("feed.someone")`
+    when it is None. (Note from the lead, 2026-10-16: "the nickname as spec 040's
+    `displayNickname` writes it (`ANA` shows as `Ana`)" read "the nickname"; spec
+    040 lists the ops replay among the places that show a nickname that way
+    (preparation of spec 038).) A room with no edit shows
     `t("ops.replay_empty")`;
   - a range input `data-testid="ops-replay-position"` (minimum 0, maximum the number
     of edits, step 1, labelled `t("ops.replay_position_label")`), at the maximum when
@@ -437,8 +540,12 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
   `nock.sqlite3-wal` from `tmp_path` as bytes and searches them for UTF-8 strings.
 - Browser with live server and a file database (AC-1, AC-2, AC-7, AC-9): the test
   module starts its own server the way spec 040's `live_server` does (built client,
-  free port of 127.0.0.1, `uvicorn.Server`), with
+  free port of 127.0.0.1, `uvicorn.Server` with `server_config`, as spec 036 left
+  it), with
   `create_app(rooms=RoomRegistry(store=RoomStore(tmp_path / "nock.sqlite3")), dist_dir=WEB_DIST_DIR, catalogue=..., operator_token=OPS_TOKEN)`.
+  (Note from the lead, 2026-10-16: "with `server_config`, as spec 036 left it" was
+  added: `live_server` builds its server with `server_config` since spec 036
+  (preparation of spec 038).)
 - Probe browser context (AC-1, AC-2): `user_agent="NockPrivacyProbe/7.3"`,
   `extra_http_headers={"X-Nock-Probe": "probe-header-91"}`, `locale="fr-FR"`; the
   test records every request URL and response of the page (`page.on("request")`,
@@ -463,12 +570,12 @@ The words in brackets say how each criterion is tested.
 - **AC-1** (AC-10.4.1) (browser with live server and a file database) A guest is stored as a nickname and a random identifier, nothing else. In the probe context, a page enters a FX-01 room as `Ana` (spec 011's `enter_room`) and types `T`, `A`, `M` from (1, 0) across; the test then closes the registry (which saves a snapshot) and the store. The bytes of the database files hold `ANA`, her nickname as the server stores it (spec 012), and her `data-you` player id, and hold none of `NockPrivacyProbe`, `probe-header-91`, `fr-FR` and `127.0.0.1`. (Note from the lead, 2026-10-16: the nickname searched was `Ana`, which the store never holds once nicknames are in capitals (human's rule of 2026-10-16: nicknames in capitals).)
 - **AC-2** (AC-10.4.1) (browser with live server) Playing needs no advertising cookie, nor any cookie. In the probe context, a page opens `/`, starts FX-01 from the catalogue (spec 010), types the 18 letters of FX-01 word by word, 60 ms or more between keys (spec 037's harness), and reaches `data-solved="true"` (spec 026). Then no recorded response has a `set-cookie` header, `context.cookies()` is empty, `document.cookie` is `""`, and every recorded request URL starts with the server's origin (`http://127.0.0.1:<port>` or `ws://127.0.0.1:<port>`).
 - **AC-3** (AC-10.4.1) (subprocess; WebSocket from a Playwright page) The production server writes no client address and no secret to its logs. With the subprocess of "Test harness", a page on the server's origin loads `/`, opens a socket to the stored room, joins as `Ana`, sends three `edit_letter` messages and a `chat` (spec 022) with the text `chat-probe-5521`, then requests `GET /api/ops/dashboard` once with a wrong token and once with `OPS_TOKEN`, and `GET /nothing-here`; the test stops the process. Its stdout and stderr together hold none of `127.0.0.1`, `GET /`, `WebSocket /`, the resume token of Ana's snapshot, `chat-probe-5521` and `OPS_TOKEN`. `server_config(app).access_log is False` and its default `log_level` is `"warning"`.
-- **AC-4** (AC-10.4.2) (Python; WebSocket with a fake clock) Room data, chat included, is deleted at room expiry, with no copy left in the database files. Python: with a store file, room A (a code that occurs nowhere else in the file, see "Edge cases") holds the joins of `Zélie` and `Bob`, a `chat_message` of Zélie with the text `chat-secret-4711`, letters and a check; room B holds `Yann` and the chat text `chat-kept-8203`. After room A expires and `expire_rooms()` returns it, while the store is still open, the database files hold none of `chat-secret-4711`, `ZÉLIE` (UTF-8, her nickname as the server stores it, spec 012), A's code and A's resume tokens, and still hold `chat-kept-8203` and `YANN`. (Note from the lead, 2026-10-16: the nicknames searched were `Zélie` and `Yann`, which the store never holds once nicknames are in capitals (human's rule of 2026-10-16: nicknames in capitals).) The same holds once the store is closed. WebSocket: with spec 032 AC-2's setup (`expiry_sweep_seconds=0.05`), after a chat in the room and `advance(LIFE + 1)`, the sweep alone deletes the room and the same bytes are gone within 2 seconds of real time.
+- **AC-4** (AC-10.4.2) (Python; WebSocket with a fake clock) Room data, chat included, is deleted at room expiry, with no copy left in the database files. Python: with a store file, room A (a code that occurs nowhere else in the file, see "Edge cases") holds the joins of `Zélie` and `Bob`, a `chat_message` of Zélie with the text `chat-secret-4711`, letters and a check; room B holds `Yann` and the chat text `chat-kept-8203`. After room A expires and `expire_rooms()` returns it, while the store is still open, the database files hold none of `chat-secret-4711`, `ZÉLIE` (UTF-8, her nickname as the server stores it, spec 012), A's code and A's resume tokens, and still hold `chat-kept-8203` and `YANN`. (Note from the lead, 2026-10-16: the nicknames searched were `Zélie` and `Yann`, which the store never holds once nicknames are in capitals (human's rule of 2026-10-16: nicknames in capitals).) The same holds once the store is closed. WebSocket: with spec 032 AC-2's setup (`expiry_sweep_seconds=0.05`), after a chat in the room and `advance(LIFE + 1)`, the sweep alone deletes the room, and within 2 seconds of real time the database files hold none of the chat's text, `ANA` and `BOB` (the nicknames of that setup as the server stores them, spec 012), the room's code and its resume tokens. (Note from the lead, 2026-10-16: this read "the sweep alone deletes the room and the same bytes are gone within 2 seconds of real time", which named no string for a room whose players are not those of the Python part (preparation of spec 038).)
 - **AC-5** (AC-10.4.3) (Python) The dashboard's figures come from the room logs. With `now = T` and these `RoomLog` values: R1 created at `T - 2 DAY` with 3 `player_joined`, five `letter_changed` with `relay_ms` 10, 20, 30, 40 and None, one drop of `p2` (`disconnected` then `active`), `p3` `disconnected` and never back, and a `grid_solved` with `elapsed_ms` 600,000; R2 created at `T - 1 DAY` with 1 `player_joined`, one `letter_changed` with `relay_ms` 50 and a `grid_solved` with `elapsed_ms` 900,000; R3 created at `T - 3 DAY` with 2 `player_joined`, no edit, and `p1` `disconnected`, `active`, `disconnected`, `active` (two drops); R4 created at `T - 8 DAY` with 5 joins and a `grid_solved`. `dashboard_figures(rooms, 7, T)` gives `rooms_created=3`, `players_per_room=2.0`, `completion_rate` 2/3, `median_solving_ms=750000.0`, `latency_median_ms=30.0`, `latency_p95_ms=50`, `disconnection_rate=0.5` and `since` = `T - 7 DAY` in UTC; with `days=1` it gives `rooms_created=1` (R2, created exactly at the start of the period), `players_per_room=1.0`, `completion_rate=1.0`, `median_solving_ms=900000.0`, `latency_median_ms=50.0`, `latency_p95_ms=50` and `disconnection_rate=0.0`; with no room, `rooms_created=0` and every other figure None; `days=2` raises `ValueError`.
-- **AC-6** (AC-10.4.3) (HTTP) Only the operator reaches the dashboard. With `OPS_TOKEN`: `GET /api/ops/dashboard` with `Authorization: Bearer <OPS_TOKEN>` answers 200 with `DashboardFigures` JSON whose `days` is 7 and whose figures are those of `dashboard_figures` over the store's rooms; `?days=30` gives `days` 30; `?days=2` answers 422. Without the header, with `Bearer wrong`, with `Basic <OPS_TOKEN>` or with the token in the query `?token=<OPS_TOKEN>`, it answers 401 with `{"detail": "Not authorized"}` and `WWW-Authenticate: Bearer`; every ops answer has `Cache-Control: no-store`. After 10 refused requests from one address within 60 seconds of the fake clock, the next request answers 429, also with the right token; after `advance(60)` the right token gets 200 again. With the operator pages off, `GET /api/ops/dashboard` with the right token, `GET /api/ops/rooms/<code>/edits` and `GET /ops` answer 404 with `{"detail": "Not Found"}`; with them on, `GET /ops` answers 200 with `index.html`.
+- **AC-6** (AC-10.4.3) (HTTP; Python) Only the operator reaches the dashboard. With `OPS_TOKEN`: `GET /api/ops/dashboard` with `Authorization: Bearer <OPS_TOKEN>` answers 200 with `DashboardFigures` JSON whose `days` is 7 and whose figures are those of `dashboard_figures` over one `RoomLog` per pair of `rooms.store.codes_created_since(now - 7 * DAY)`, with that room's log; `?days=30` gives `days` 30; `?days=2` answers 422. On a store holding rooms created at `now - 8 * DAY`, `now - 7 * DAY` and `now - DAY`, `codes_created_since(now - 7 * DAY)` returns the `(code, created_at)` pairs of the last two and no other, in any order. Without the header, with `Bearer wrong`, with `Basic <OPS_TOKEN>` or with the token in the query `?token=<OPS_TOKEN>`, it answers 401 with `{"detail": "Not authorized"}` and `WWW-Authenticate: Bearer`; while the operator pages are on, every ops answer has `Cache-Control: no-store`. After 10 refused requests from one address within 60 seconds of the fake clock, the next request answers 429, also with the right token; after `advance(60)` the right token gets 200 again. With the operator pages off, `GET /api/ops/dashboard` with the right token, `GET /api/ops/rooms/<code>/edits` and `GET /ops` answer exactly as an unknown path does: 404 with `{"detail": "Not Found"}` and no `Cache-Control` header; with them on, `GET /ops` answers 200 with `index.html`. (Note from the lead, 2026-10-16: decided after the spec-writer's report. "over the store's rooms" became the reads of "Ops API", and the check of `codes_created_since` was added, with "Python" in the brackets, since the figures alone cannot show which rooms the store returns; "every ops answer has `Cache-Control: no-store`" gained "while the operator pages are on"; the answers with the pages off read "answer 404 with `{"detail": "Not Found"}`" (preparation of spec 038).)
 - **AC-7** (AC-10.4.3) (browser with live server; browser with mocked ops API) The ops page shows the dashboard once the operator gives the token. Live: `/ops` shows `ops-page` with `data-state="locked"` and the token form; submitting `wrong` shows `ops-token-error` with `fr.json["ops.token_refused"]`; submitting `OPS_TOKEN` reaches `data-state="ready"` with six `ops-metric` elements in the order of "Client", the period `7` pressed, and every ops request carrying `Authorization: Bearer <OPS_TOKEN>`; afterwards `sessionStorage["nock.ops_token"]` is `OPS_TOKEN`, no `localStorage` value and no cookie holds it, and the page's URL is still `<base>/ops`; clicking the period `30` sends `days=30` and presses it; a reload shows the dashboard without the form. Mocked, with the figures of AC-5's 7-day result: the six texts are `Salons créés : 3`, `Joueurs par salon : 2,0`, `Grilles terminées : 67 %`, `Temps médian de résolution : 12 min 30 s`, `Latence du serveur : 30 ms (médiane), 50 ms (95e centile)` and `Coupures par joueur : 0,50`; with the result of no room, they are `Salons créés : 0`, `Joueurs par salon : aucune donnée`, `Grilles terminées : aucune donnée`, `Temps médian de résolution : aucune donnée`, `Latence du serveur : aucune donnée` and `Coupures par joueur : aucune donnée`, and each `data-value` other than that of `rooms_created` is `""`. Keyboard only, `tab_to` reaches the token input, typing the token and `Enter` loads the dashboard, and `tab_to` reaches each `ops-period` with spec 035 AC-2's outline. Spec 035's contrast and language scans find no offending element on the ready page at 1280 by 720 and 360 by 740, and at each window size of spec 006 AC-5 the page has no horizontal scroll.
-- **AC-8** (AC-10.4.4) (Python; HTTP) An operator gets the ordered edits of a room from its log. Python: for the entries of a FX-01 room where `Ana` (`p1`) typed `T` at (1, 0), `Bob` (`p2`) typed `A` at (1, 1) and then `M` at (1, 2) in pencil (spec 020), Ana erased (1, 0), Ana undid her erase, a check locked (1, 1), a reveal locked `M` at (1, 2), and joins, chat and presence entries came in between, `room_edits` returns exactly seven `RoomEdit` values in seq order, of kinds `typed` (`T`), `typed` (`A`), `typed` (`M`, `pencil=True`), `erased`, `undone` (letter `T`), `locked` (letter `A`, no player) and `revealed` (letter `M`, no player), with the `seq`, `at` (UTC), `row`, `column`, `player_id` and `nickname` (`Ana`, `Bob`) of their entries. HTTP: `GET /api/ops/rooms/<code>/edits` with the token answers 200 with `RoomReplay` JSON whose `grid` equals `grid_view` of the room's grid and whose `edits` equal `room_edits` of its log; its body holds none of the eight FX-01 answers and no key `answer` (spec 037); an unknown code, an expired room and `abc` answer 404.
-- **AC-9** (AC-10.4.4) (browser with live server) The ops page replays a room's edits in order. After a page entered a FX-01 room as `Ana` and typed `T`, `A`, `M`, `I`, `S` from (1, 0) across, then clicked (1, 4) and pressed `Backspace`, which erases it (spec 008), the ops page (another context, `timezone_id="Europe/Paris"`, token given) with the room's code in `ops-replay-code` reaches `ops-replay` `data-state="ready"` with six `ops-edit` items in seq order: five `typed` with letters `T`, `A`, `M`, `I`, `S` and one `erased` at (1, 4), each text built from `fr.json` with `Ana`; `ops-replay-position` is at 6 and `ops-replay-step` reads `Étape 6 sur 6`; the 18 `ops-replay-cell` elements show `T`, `A`, `M`, `I` on row 1 and nothing else. Setting the position to 5 makes (1, 4) show `S`; to 0, every cell is empty and the step reads `Étape 0 sur 6`. A code with no room shows `fr.json["ops.replay_not_found"]`.
+- **AC-8** (AC-10.4.4) (Python; HTTP) An operator gets the ordered edits of a room from its log. Python: for the entries of a FX-01 room where `Ana` (`p1`) typed `T` at (1, 0), `Bob` (`p2`) typed `A` at (1, 1) and then `M` at (1, 2) in pencil (spec 020), Ana erased (1, 0), Ana undid her erase, a check locked (1, 1), a reveal locked `M` at (1, 2), and joins, chat and presence entries came in between, `room_edits` returns exactly seven `RoomEdit` values in seq order, of kinds `typed` (`T`), `typed` (`A`), `typed` (`M`, `pencil=True`), `erased`, `undone` (letter `T`), `locked` (letter `A`, no player) and `revealed` (letter `M`, no player), with the `seq`, `at` (UTC), `row`, `column` and `player_id` of their entries, and for the first five the `nickname` of their player's `player_joined`: `ANA` or `BOB`, as the server stores them (spec 012). (Note from the lead, 2026-10-16: this read "with the `seq`, `at` (UTC), `row`, `column`, `player_id` and `nickname` (`Ana`, `Bob`) of their entries"; the nicknames come from the `player_joined` entries, which hold them in capitals, spec 039's "Nicknames in capitals" (preparation of spec 038).) HTTP: `GET /api/ops/rooms/<code>/edits` with the token answers 200 with `RoomReplay` JSON whose `grid` equals `grid_view` of the room's grid and whose `edits` equal `room_edits` of its log; its body holds none of the eight FX-01 answers and no key `answer` (spec 037); an unknown code, an expired room and `abc` answer 404.
+- **AC-9** (AC-10.4.4) (browser with live server) The ops page replays a room's edits in order. After a page entered a FX-01 room as `Ana` and typed `T`, `A`, `M`, `I`, `S` from (1, 0) across, then clicked (1, 4) and pressed `Backspace`, which erases it (spec 008), the ops page (another context, `timezone_id="Europe/Paris"`, token given) with the room's code in `ops-replay-code` reaches `ops-replay` `data-state="ready"` with six `ops-edit` items in seq order: five `typed` with letters `T`, `A`, `M`, `I`, `S` and one `erased` at (1, 4), each text built from `fr.json` with `Ana`, which is how spec 040's `displayNickname` shows the stored `ANA`; `ops-replay-position` is at 6 and `ops-replay-step` reads `Étape 6 sur 6`; the 18 `ops-replay-cell` elements show `T`, `A`, `M`, `I` on row 1 and nothing else. Setting the position to 5 makes (1, 4) show `S`; to 0, every cell is empty and the step reads `Étape 0 sur 6`. A code with no room shows `fr.json["ops.replay_not_found"]`. (Note from the lead, 2026-10-16: ", which is how spec 040's `displayNickname` shows the stored `ANA`" was added after "with `Ana`"; the texts are unchanged, as spec 039's "Nicknames in capitals" says of a nickname read on a page (preparation of spec 038).)
 - **AC-10** (new) (Python, `uvicorn.Server.run` replaced) The operator token is configured by `NOCK_OPERATOR_TOKEN` and its value never shows. `operator_token_from_env` returns None for `{}` and for an empty value, and returns the value for 32 and for 256 characters of the allowed set; it raises `SettingsError` for 31 characters, 257 characters, and a value holding `$`, a space or `é`, and no message holds the value. With spec 036's recorder, `main()` with `NOCK_OPERATOR_TOKEN="Zq9Zq9"` or `"Zq9" * 11 + "$"` raises `SystemExit` whose `code` is a `str` containing `NOCK_OPERATOR_TOKEN` and not the value, and `run` is never called; with `OPS_TOKEN` it calls `run` once.
 - **AC-11** (new) (hub test; Python) The log records the server's relay time of each client step, which the dashboard's latency reads. With the blocking store and `RoomConfig(max_edits_per_second=1000)`: connection A joins a FX-01 room; the store starts blocking; A submits `EditLetter(row=1, column=0, letter="T")` (its step waits in `append`), then `EditLetter(row=1, column=1, letter="A")`; after 300 ms the store is released. Then the first edit's entry has `relay_ms` below 250 and the second's at least 250. The entry of A's join has an integer `relay_ms`, and the `player_state_changed` entry logged when A's socket then closes has `relay_ms` None. Python: the entries returned by `tick` (an idle change) and by `after_restart` have `relay_ms` None. No message the clients receive holds the key `relay_ms`, and a `LogEntry` with `relay_ms=-1` or `"5"` is refused by validation.
 
@@ -513,8 +620,13 @@ The words in brackets say how each criterion is tested.
 - Lowercase code (AC-9): the page sends the code in upper case; a code that breaks
   `^[A-Z0-9]{6}$` gets 404 and shows `ops.replay_not_found`.
 - Long replays (AC-9): every edit is listed; the page scrolls vertically.
-- Edits of a removed or timed-out player (AC-8): their nickname comes from their
-  `player_joined`, which stays in the log.
+- Edits of a removed or timed-out player (AC-8): their nickname comes from the
+  latest `player_joined` of their player id before the edit, which stays in the
+  log. A player seated back (spec 032) keeps their id, and their edits after the
+  seat back take the nickname of its `player_joined`. (Note from the lead,
+  2026-10-16: this read "their nickname comes from their `player_joined`, which
+  stays in the log"; the sentence on a seat back was added (preparation of spec
+  038).)
 - Pencil letters (AC-8): no pencil letter exists before spec 020 is built; spec 020
   comes before this spec in the build plan.
 - Invalid variable at app start (AC-10): `main()` checks it first; an app built by
@@ -592,7 +704,11 @@ open question.
    gets `access_log=False` and the default `log_level` `"warning"`; `main()` first
    checks `NOCK_OPERATOR_TOKEN` (`operator_token_from_env`); `python -m nock` also
    reads `NOCK_OPERATOR_TOKEN`. The test-writer then updates spec 036's tests that
-   expect the `info` level before the implementer runs.
+   expect the `info` level before the implementer runs. (Note from the lead,
+   2026-10-16: done: spec 036 holds these changes, each with a dated note, and its
+   top note names the tests of its AC-7 and AC-10 that expect `info` and the setup
+   of its AC-8 to AC-12, which now runs without `NOCK_OPERATOR_TOKEN` (preparation
+   of spec 038).)
 10. End-to-end sync latency (former open question 2). Options: (a) only the
     server's share, from the log; (b) also the browsers' measure, reported to the
     server, which needs a new client message (a change to spec 039) and storage.
