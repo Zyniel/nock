@@ -12,6 +12,11 @@ are in `specs/_architecture.md`. The messages are those of spec 039
 (`nock.protocol`), the server, routes and client shell those of spec 040, the
 catalogue that of spec 004.
 
+(Note from the lead, 2026-10-16: wrong codes that arrive at once from one address
+are now counted one after another, under "Room WebSocket" below, for every route
+that uses the throttle, and AC-3 gained a burst of 40 sockets. AC-3 changed, so
+its test is added before the implementer runs (second review of spec 032).)
+
 ## Goal
 
 As a host, I want a link to send to my friends, so that they land directly on our grid.
@@ -387,6 +392,17 @@ Room WebSocket `/api/rooms/{code}/ws`, step 2 of spec 040 becomes:
 
 The failures are kept per app (each `create_app` call has its own), in memory.
 
+Wrong codes that arrive at once from one address are counted one after another, as
+if steps 2 and 3 were one step for each connection: each is checked against the
+failures that the ones counted before it recorded. So, from an address with no
+failure in the window, of the sockets opened at once to codes with no room, the
+first `WRONG_CODE_LIMIT` (10) get their usual answer, a close with 4404, and the
+others the throttle's, a close with `THROTTLED_CLOSE_CODE` (4429). The same holds for every other route that uses this
+throttle (spec 028's recap route). (Note from the lead, 2026-10-16: added. Once the
+socket route looked the room up in a worker thread, an `await` lay between the
+throttle's check and its record, and a burst of 40 sockets from one address all
+got 4404 (second review of spec 032).)
+
 ### Client: `web/`
 
 Room page additions (shown once `data-status="joined"`):
@@ -457,7 +473,7 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-3.1.1) (HTTP; browser with live server) Creating a room gives a share link and a 6-character room code. HTTP: with a catalogue holding FX-01 as published entry 2, `POST /api/rooms` with `{"grid_number": 2}` answers 201 with a JSON body that parses to `CreateRoomResponse`, whose `code` matches `^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$` and whose `share_url` is `http://testserver/r/<code>`; then `registry.find_room(code)` equals the FX-01 grid and `registry.room_state(code).grid_number == 2`. Browser (all three engines): for a room registered on FX-01, after `enter_room`, `share-link` has `href` and text `<base_url>/r/<code>`. Browser (Chromium only, clipboard, see "Test harness"): clicking `copy-link` puts that same text in the clipboard and shows `fr.json["room.share.copied"]` on the button.
 - **AC-2** (AC-3.1.2) (browser with live server, phone and desktop contexts) The link opens the room on the grid, on phone and desktop, with no install. For a room registered on FX-01, opening its `share_url` path `/r/<code>` with `enter_room` in the phone context and, separately, in the desktop context reaches `data-status="joined"` and `data-grid="5x5"`, and the `grid` element of spec 006 is visible with 25 `cell` elements.
-- **AC-3** (AC-3.1.3) (Python; WebSocket with a fake clock; browser with mocked socket) Room codes are random, not sequential. Ten wrong codes from one address within a minute are throttled. Python: 1,000 calls to `register_room` on one registry give 1,000 distinct codes, all matching the alphabet pattern of AC-1; at each of the 6 positions at least 20 different characters occur; and no code, read as a base-32 number over `ROOM_CODE_ALPHABET`, is exactly 1 more than the code returned just before it. WebSocket: with a registry holding one room `<code>` and a `FakeClock`, ten connections to `/api/rooms/ZZZZZZ/ws` each close with 4404; the eleventh connection, to `/api/rooms/<code>/ws`, closes with 4429 before any message; after `advance(60)` a connection to `<code>` is accepted and its join receives a `Snapshot`. Browser: when the mock closes the socket with 4429, the room page reaches `data-status="throttled"` and `room-status` shows `fr.json["room.status.throttled"]`.
+- **AC-3** (AC-3.1.3) (Python; WebSocket with a fake clock; browser with mocked socket) Room codes are random, not sequential. Ten wrong codes from one address within a minute are throttled. Python: 1,000 calls to `register_room` on one registry give 1,000 distinct codes, all matching the alphabet pattern of AC-1; at each of the 6 positions at least 20 different characters occur; and no code, read as a base-32 number over `ROOM_CODE_ALPHABET`, is exactly 1 more than the code returned just before it. WebSocket: with a registry holding one room `<code>` and a `FakeClock`, ten connections to `/api/rooms/ZZZZZZ/ws` each close with 4404; the eleventh connection, to `/api/rooms/<code>/ws`, closes with 4429 before any message; after `advance(60)` a connection to `<code>` is accepted and its join receives a `Snapshot`. Burst: on a fresh app whose `FakeClock` does not move, 40 sockets opened at once from one address to `/api/rooms/ZZZZZZ/ws` (for example from 40 threads) are closed, each before any message, exactly 10 with 4404 and 30 with 4429. (Note from the lead, 2026-10-16: the burst was added, for the rule on wrong codes that arrive at once (second review of spec 032).) Browser: when the mock closes the socket with 4429, the room page reaches `data-status="throttled"` and `room-status` shows `fr.json["room.status.throttled"]`.
 - **AC-4** (new) (Python with monkeypatched rule functions; WebSocket via TestClient) The room engine keeps its runtime guarantees, so later specs can rely on them. With `tick_seconds` small (for example 0.05) and the rule functions of `nock.room` replaced in the test by recording fakes: (a) `tick` runs repeatedly while at least one connection is attached to a room, and no longer once every connection has left; (b) for one input, the events of the outcome reach every joined connection before the `reply` reaches the sender, and `to_others` reach every joined connection except the sender, in that order; (c) when the last connection leaves, the room's task stops; the next connection starts a new task, which runs one `tick` before any input; (d) when a rule function raises, the error is logged, the room's state is unchanged, and the next input to that room is processed normally; (e) connections are tracked per connection, not per player: two connections attached under one player id are delivered to and detached independently, and detaching one never detaches the other; (f) `close()` stops the engine thread (no `nock-rooms` thread is left alive), a second `close()` does nothing, and any input posted after `close()` is refused without starting a task. Tests close every registry they create, so no engine thread outlives its test.
 
 ## Edge cases and errors
