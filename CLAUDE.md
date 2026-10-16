@@ -94,7 +94,10 @@ write the implementation before its tests exist.
 Tooling means `pyproject.toml`, `scripts/`, `.claude/`, `.github/` and, in `web/`,
 `package.json`, `package-lock.json` and the Vite, Svelte and TypeScript config
 files. Changing it, or adding a dependency (Python or npm), is a decision for the
-human: ask first.
+human: ask first. Exception (human decision, 2026-10-16): the lead fixes an
+incoherence or a weakness of the tooling (a timeout, a flaky setup, a hook that
+blocks the wrong thing) without asking, in a pull request of its own; new
+tooling behaviour and new dependencies still need the human.
 
 ## Code standards
 

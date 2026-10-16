@@ -174,9 +174,26 @@ def gate_arguments(stage: str, project_root: Path) -> list[str]:
     if stage == "tests":
         return ["--stage", "tests"]
     specs = changed_specs(project_root)
-    if not specs:
+    if not specs or not gate_takes_specs(project_root):
         return ["--tests", "other"]
     return ["--specs", ",".join(specs), "--browsers", "chromium"]
+
+
+def gate_takes_specs(project_root: Path) -> bool:
+    """Tell whether the checkout's gate has --specs (added on 2026-10-16).
+
+    A worktree branched before then has an older gate; it gets the static
+    checks and the tests without a browser rather than an error.
+
+    Args:
+        project_root: The checkout the gate checks.
+    """
+    gate_script = project_root / "scripts" / "gate.py"
+    try:
+        gate_text = gate_script.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return '"--specs"' in gate_text
 
 
 def main() -> int:

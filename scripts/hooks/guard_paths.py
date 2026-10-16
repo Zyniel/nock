@@ -9,6 +9,13 @@ sent back to the agent.
 
 The main session has no "agent_type", so the lead and you are never limited.
 
+The edited file is judged against the checkout that holds it: the main tree
+or a git worktree (a folder with both pyproject.toml and .git). An agent that
+works in a worktree is thus held to its folders there, whatever the session's
+working directory (2026-10-16: after a container restart, an implementer's
+working directory came back as the main tree and every edit in its worktree
+was refused).
+
 This is a guardrail, not a sandbox: it covers the file-editing tools, not
 shell commands. The reviewer and the per-phase git commits are the backstop.
 """
@@ -44,20 +51,20 @@ ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
 }
 
 
-def find_project_root(start_directory: Path) -> Path:
-    """Walk up from a directory until the folder holding pyproject.toml.
+def find_checkout_root(path: Path) -> Path | None:
+    """Return the checkout that holds a path, or None outside any checkout.
+
+    A checkout is the main tree or a git worktree: a folder with both
+    pyproject.toml and .git (a folder in the main tree, a file in a worktree).
 
     Args:
-        start_directory: Directory to start the search from.
-
-    Returns:
-        The project root. Falls back to the checkout that contains this script.
+        path: An absolute path; it need not exist yet.
     """
-    candidates = [start_directory, *start_directory.parents]
-    for candidate in candidates:
-        if (candidate / "pyproject.toml").is_file():
+    for candidate in [path, *path.parents]:
+        has_project = (candidate / "pyproject.toml").is_file()
+        if has_project and (candidate / ".git").exists():
             return candidate
-    return Path(__file__).resolve().parents[2]
+    return None
 
 
 def resolve_allowed_paths(role_name: str) -> list[str] | None:
@@ -142,18 +149,16 @@ def main() -> int:
         return 0
 
     working_directory = Path(str(hook_input.get("cwd") or Path.cwd()))
-    project_root = find_project_root(working_directory).resolve()
-
     target_path = Path(str(raw_path))
     if not target_path.is_absolute():
         target_path = working_directory / target_path
     target_path = target_path.resolve()
 
-    try:
-        relative_path = target_path.relative_to(project_root).as_posix()
-    except ValueError:
-        # Outside the project (scratch files, temp folders): not this hook's job.
+    project_root = find_checkout_root(target_path.parent)
+    if project_root is None:
+        # Outside any checkout (scratch files, temp folders): not this hook's job.
         return 0
+    relative_path = target_path.relative_to(project_root).as_posix()
 
     denied_pattern = find_denied_pattern(
         relative_path, resolve_denied_patterns(role_name)
