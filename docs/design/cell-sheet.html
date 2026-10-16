@@ -1,0 +1,683 @@
+<title>Nock Cell Sheet</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,500;1,700&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Layout: a specimen sheet. Labelled rows of cells, then a working phone mock-up.
+   Single light theme on purpose: Nock has no dark mode yet, and this page shows its light palette. */
+:root {
+  color-scheme: light;
+  /* « Le Quotidien » palette (the app's own proposal) */
+  --navy: #1B2F55;
+  --ink: #14181F;
+  --cell: #FFFFFF;
+  --rule: #9AA3B2;
+  --clue-bg: #EEF2F8;
+  --clue-ink: #1B2230;
+  --word: #E6EDF9;
+  --sel: #CFDDF3;
+  --locked: #E3E7EE;
+  --pencil: #555B67;
+  --wrong: #B42318;
+  --reveal: #C2410C;
+  --flag: #B42318;
+  --key: #E9ECF1;
+  --muted: #5E6573;
+  /* page chrome */
+  --page: #F6F7F9;
+  --paper: #FFFFFF;
+  --line: #DDE2EA;
+  --ok: #1E7B45;
+  --bad: #B42318;
+  --f-ui: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --f-clue: "IBM Plex Sans Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-head: "Source Serif 4", Georgia, serif;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--page); color: var(--ink); font: 400 16px/1.5 var(--f-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 64px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 40px; }
+header h1 { font: 600 2rem/1.15 var(--f-head); margin: 0 0 8px; text-wrap: balance; color: var(--navy); }
+header p { margin: 0; max-width: 68ch; color: var(--muted); }
+section { display: grid; gap: 16px; }
+h2 { font: 600 1.35rem/1.2 var(--f-head); margin: 0; color: var(--navy); text-wrap: balance; }
+h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 6px; }
+.lead { margin: 0; max-width: 72ch; color: var(--muted); }
+.board { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 20px; display: flex; flex-wrap: wrap; gap: 24px 28px; align-items: flex-start; }
+.spec { display: grid; gap: 8px; justify-items: start; min-width: 0; max-width: 200px; }
+.spec .cap { font-size: .86rem; line-height: 1.35; color: var(--ink); }
+.spec .cap b { font-weight: 600; display: block; }
+.spec .cap span { color: var(--muted); }
+.note { font-size: .9rem; color: var(--muted); max-width: 72ch; margin: 0; }
+.note strong { color: var(--ink); font-weight: 600; }
+
+/* ---------- cells ---------- */
+.g { display: inline-grid; border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); background: var(--rule); gap: 0; }
+.c { position: relative; width: var(--s); height: var(--s); background: var(--cell); border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: visible; }
+.c.word { background: var(--word); }
+.c.locked { background: var(--locked); }
+.c.sel { background: var(--sel); box-shadow: inset 0 0 0 2px var(--navy); }
+.ltr { position: absolute; inset: 0; display: grid; place-items: center; font: 500 calc(var(--s) * .56)/1 var(--f-ui); color: var(--ink); padding-bottom: calc(var(--s) * .04); }
+.locked .ltr { font-weight: 700; }
+.pencil .ltr { font-style: italic; color: var(--pencil); }
+.pencil.flash .ltr { color: var(--ink); }
+.wrong .ltr span { text-decoration: line-through; text-decoration-thickness: max(2px, .07em); text-decoration-color: var(--wrong); }
+.rev::after { content: ""; position: absolute; top: 2px; right: 2px; width: max(6px, calc(var(--s) * .27)); height: max(6px, calc(var(--s) * .27)); background: var(--reveal); clip-path: polygon(0 0, 100% 0, 100% 100%); }
+.band { position: absolute; left: 25%; width: 50%; bottom: 4px; height: max(3px, calc(var(--s) * .1)); box-shadow: 0 0 0 1px rgba(20, 24, 31, .75); }
+.band.gone { background: repeating-linear-gradient(135deg, #333333 0 2px, #FFFFFF 2px 4px) !important; }
+.cur { position: absolute; border: 2px dashed; pointer-events: none; }
+.ini { position: absolute; font: 700 max(7px, calc(var(--s) * .2))/1 var(--f-ui); padding: 1px 2px; border-radius: 2px; z-index: 2; letter-spacing: .02em; }
+.ini.tl { top: 1px; left: 1px; } .ini.tr { top: 1px; right: 1px; } .ini.bl { bottom: 1px; left: 1px; } .ini.br { bottom: 1px; right: 1px; }
+
+.c.clue { background: var(--clue-bg); color: var(--clue-ink); display: flex; flex-direction: column; padding: 2px 3px; font: 600 max(6px, calc(var(--s) * .145))/1.12 var(--f-clue); text-transform: uppercase; text-align: center; letter-spacing: .01em; }
+.c.clue .q { flex: 1; display: grid; place-items: center; overflow-wrap: anywhere; hyphens: auto; }
+.c.clue .sep { height: 1px; background: var(--clue-ink); opacity: .55; margin: 0 14%; flex: none; }
+.flag { position: absolute; top: 1px; left: 1px; font: 700 max(7px, calc(var(--s) * .22))/1 var(--f-ui); color: var(--flag); background: var(--clue-bg); padding: 0 2px 1px 1px; border-radius: 0 0 3px 0; z-index: 2; }
+.arw { position: absolute; z-index: 1; width: max(10px, calc(var(--s) * .34)); height: max(10px, calc(var(--s) * .34)); }
+.arw path { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.arw polygon { fill: var(--ink); }
+
+/* ---------- contrast table ---------- */
+.tbl-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; min-width: 560px; }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-weight: 600; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
+.sw { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 28px; border-radius: 3px; border: 1px solid var(--line); font-weight: 700; font-size: .95rem; }
+.pass { color: var(--ok); font-weight: 600; } .fail { color: var(--bad); font-weight: 600; }
+
+/* ---------- phone mock ---------- */
+.mock-row { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+.mock-side { flex: 1 1 280px; min-width: 0; display: grid; gap: 12px; align-content: start; }
+.mock-side ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: .92rem; }
+.phone { width: min(360px, 100%); height: 720px; border: 1px solid #C5CCD8; border-radius: 22px; overflow: hidden; background: var(--cell); display: flex; flex-direction: column; position: relative; box-shadow: 0 12px 32px -18px rgba(27, 47, 85, .45); font-family: var(--f-ui); }
+.topbar { display: flex; align-items: stretch; height: 54px; border-bottom: 1px solid var(--line); padding: 0 4px 0 10px; flex: none; background: var(--cell); }
+.timer { display: flex; align-items: center; gap: 4px; font: 600 1.15rem/1 var(--f-ui); color: var(--navy); font-variant-numeric: tabular-nums; margin-right: auto; background: none; border: 0; padding: 0 4px; cursor: pointer; }
+.tb { width: 56px; display: grid; justify-items: center; align-content: center; gap: 2px; background: none; border: 0; color: var(--navy); font: 500 .68rem/1 var(--f-ui); cursor: pointer; position: relative; padding: 0; border-radius: 6px; }
+.tb svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tb[aria-pressed="true"] { background: var(--word); }
+.tb .dot { position: absolute; top: 8px; right: 13px; min-width: 8px; height: 8px; border-radius: 4px; background: var(--wrong); }
+.tb .badge { position: absolute; top: 5px; right: 8px; background: var(--wrong); color: #FFFFFF; font: 700 .62rem/1 var(--f-ui); padding: 2px 4px; border-radius: 8px; }
+button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; background: var(--cell); }
+.stage .g { touch-action: manipulation; }
+.toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #FFFFFF; font: 500 .85rem/1.2 var(--f-ui); padding: 8px 12px; border-radius: 6px; white-space: nowrap; z-index: 6; transition: opacity .25s; box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .5); }
+.toast[data-off] { opacity: 0; pointer-events: none; }
+.cluebar { flex: none; background: var(--navy); color: #FFFFFF; height: 50px; display: flex; align-items: center; }
+.cluebar button { background: none; border: 0; color: #FFFFFF; width: 44px; height: 100%; font: 400 1.4rem/1 var(--f-ui); cursor: pointer; }
+.cluebar button:focus-visible { outline-color: #FFFFFF; outline-offset: -4px; }
+.cluebar .txt { flex: 1; min-width: 0; text-align: center; font: 500 1.05rem/1.2 var(--f-ui); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cluebar .txt i { font-style: normal; opacity: .8; margin-left: 6px; }
+.cluebar .pin { font-size: 1rem; width: 40px; }
+.pentag { font: italic 600 .72rem/1 var(--f-ui); background: #FFFFFF; color: var(--navy); border-radius: 3px; padding: 2px 5px; margin-left: 6px; vertical-align: 2px; }
+.kbd { flex: none; background: #D9DEE6; padding: 6px 3px 8px; display: grid; gap: 6px; }
+.kbd[hidden] { display: none !important; }
+.krow { display: flex; gap: 4px; justify-content: center; }
+.k { flex: 1 1 0; max-width: 33px; height: 44px; border: 0; border-radius: 5px; background: var(--key); color: var(--ink); font: 500 1.3rem/1 var(--f-ui); box-shadow: 0 1px 0 rgba(20, 24, 31, .25); cursor: pointer; padding: 0; }
+.k.wide { max-width: 48px; flex-basis: 48px; flex-grow: 1.5; font-size: 1.1rem; }
+.k svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+.k.pen[aria-pressed="true"] { background: var(--navy); color: #FFFFFF; }
+.k.pen[aria-pressed="true"] svg { fill: rgba(255, 255, 255, .35); }
+.kbd.pencil .k.l { font-style: italic; color: var(--pencil); }
+.scrim { position: absolute; inset: 54px 0 0; background: rgba(20, 24, 31, .35); z-index: 7; }
+.pop { position: absolute; top: 58px; z-index: 8; background: var(--cell); border-radius: 8px; box-shadow: 0 12px 30px -10px rgba(0, 0, 0, .45); min-width: 220px; padding: 6px 0; }
+.pop h4 { margin: 6px 16px 2px; font: 600 .7rem/1.2 var(--f-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.pop button { display: flex; width: 100%; justify-content: space-between; gap: 12px; background: none; border: 0; text-align: left; padding: 10px 16px; font: 500 1rem/1.2 var(--f-ui); color: var(--navy); cursor: pointer; }
+.pop button:hover { background: var(--word); }
+.pop button em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+.pop hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; height: 62%; z-index: 8; background: var(--cell); border-radius: 14px 14px 0 0; box-shadow: 0 -10px 30px -12px rgba(0, 0, 0, .45); display: flex; flex-direction: column; }
+.grab { width: 40px; height: 4px; border-radius: 2px; background: #C5CCD8; margin: 8px auto 4px; flex: none; }
+.prog { padding: 4px 16px 8px; display: flex; align-items: center; gap: 10px; font: 600 .85rem/1 var(--f-ui); color: var(--navy); font-variant-numeric: tabular-nums; flex: none; }
+.prog .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--word); overflow: hidden; }
+.prog .bar i { display: block; height: 100%; width: 62%; background: var(--navy); }
+.tabs { display: flex; border-bottom: 1px solid var(--line); flex: none; }
+.tabs button { flex: 1; background: none; border: 0; padding: 10px; font: 600 .95rem/1 var(--f-ui); color: var(--muted); border-bottom: 2px solid transparent; cursor: pointer; }
+.tabs button[aria-selected="true"] { color: var(--navy); border-bottom-color: var(--navy); }
+.stream { flex: 1; overflow: auto; padding: 10px 16px; display: grid; gap: 8px; align-content: start; font-size: .92rem; }
+.msg { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline; }
+.msg .who { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.pdot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; box-shadow: 0 0 0 1px rgba(20, 24, 31, .55); }
+.evt { color: var(--muted); font-size: .82rem; padding-left: 16px; }
+.compose { display: flex; gap: 8px; padding: 8px 12px 12px; border-top: 1px solid var(--line); flex: none; }
+.compose span { flex: 1; border: 1px solid var(--rule); border-radius: 18px; padding: 7px 12px; color: var(--muted); font-size: .9rem; }
+.players { padding: 10px 16px; display: grid; gap: 10px; font-size: .95rem; align-content: start; overflow: auto; flex: 1; }
+.players .row { display: flex; align-items: center; gap: 10px; }
+.players .st { margin-left: auto; color: var(--muted); font-size: .85rem; }
+.players .idle { font-style: italic; }
+.players .row button { margin-top: 4px; }
+.pill { display: inline-block; background: var(--word); color: var(--navy); border-radius: 14px; padding: 6px 12px; font-weight: 600; font-size: .85rem; border: 0; }
+.authors-on .band { display: block; } .band { display: none; } .board .band, .static .band { display: block; }
+.linkish { background: none; border: 0; padding: 0; color: var(--navy); text-decoration: underline; font: inherit; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Nock cell sheet</h1>
+    <p>Every mark a letter or clue cell can carry, drawn in the « Le Quotidien » palette and checked against the rules of specs 006, 013, 019 to 024 and 035. The phone mock-up at the end works: tap cells, type, switch the pencil key, open « Aide » and « Salon ». The grid is FX-01, Nock's own reference grid.</p>
+  </header>
+
+  <section>
+    <h2><small>1 · Clue cells</small>Clues and their four arrows</h2>
+    <p class="lead">The arrow sits in the letter cell next to the clue, as in printed grids. Two clues share a cell with a thin rule between them. A flagged clue (« Je bloque ») gets ⚑ in its top-left corner, the one corner no arrow uses.</p>
+    <div class="board" id="clues"></div>
+  </section>
+
+  <section>
+    <h2><small>2 · Letter cells</small>One state at a time, at 56 px</h2>
+    <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has a corner triangle.</p>
+    <div class="board static" id="states"></div>
+  </section>
+
+  <section>
+    <h2><small>3 · Selection and other players</small>Me, my word, and the others</h2>
+    <p class="lead">My cell is a filled blue with a solid navy border. Other players get a dashed border in their colour, set further in for each extra player, and their initials in a corner. Their word gets a light tint of their colour.</p>
+    <div class="board static" id="sel"></div>
+  </section>
+
+  <section>
+    <h2><small>4 · Crowded cells</small>Initials at the three sizes of spec 035</h2>
+    <p class="lead">44 px and up: four corner slots. 20 to 43 px: two, top-left and bottom-right. Under 20 px: one. When there are more players than slots, the last slot shows « +k ». Proposal: the top-right slot is filled last, and is skipped when the cell carries the revealed triangle.</p>
+    <div class="board static" id="crowd"></div>
+  </section>
+
+  <section>
+    <h2><small>5 · Worst cases</small>Where marks could collide</h2>
+    <div class="board static" id="worst"></div>
+    <p class="note"><strong>Blue against blue.</strong> Player colour 2 (<code>#4363d8</code>) tints a word almost like my own selected word. Either my word moves to a neutral tint, or the player palette loses its blue. Either way, spec 019's colour-blindness checks run again.</p>
+  </section>
+
+  <section>
+    <h2><small>6 · In context</small>Phone, 360 px, keyboard shown</h2>
+    <div class="mock-row">
+      <div class="phone" id="phone">
+        <div class="topbar">
+          <button class="timer" id="timer" type="button" title="Afficher une note">4:12</button>
+          <button class="tb" type="button" id="b-undo"><svg viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Annuler</button>
+          <button class="tb" type="button" id="b-aide" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/></svg>Aide</button>
+          <button class="tb" type="button" id="b-salon" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg>Salon<span class="badge">2</span></button>
+          <button class="tb" type="button" id="b-kbd" aria-pressed="true"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg>Clavier</button>
+          <button class="tb" type="button" id="b-menu" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
+        </div>
+        <div class="stage" id="stage">
+          <div class="toast" id="toast">⚑ Cé bloque sur « Flaire »</div>
+          <div id="pgrid"></div>
+        </div>
+        <div class="cluebar">
+          <button type="button" id="prev" aria-label="Définition précédente">‹</button>
+          <div class="txt" id="cluetxt"></div>
+          <button type="button" class="pin" id="flagbtn" aria-label="Je bloque">⚑</button>
+          <button type="button" id="next" aria-label="Définition suivante">›</button>
+        </div>
+        <div class="kbd" id="kbd"></div>
+        <div id="overlay"></div>
+      </div>
+      <div class="mock-side">
+        <h2 style="font-size:1.1rem">Try it</h2>
+        <ul>
+          <li><b>Tap a cell</b> to select it; tap it again, or press ⇄, to switch between across and down.</li>
+          <li><b>✎ on the keyboard</b> turns pencil mode on: the key goes navy and every letter key turns italic grey. The clue bar shows a small « ✎ Crayon » tag.</li>
+          <li><b>Clavier</b> hides the keyboard and the grid takes the space.</li>
+          <li><b>Aide</b> opens check and reveal in one menu, with what is left of the budget.</li>
+          <li><b>Salon</b> opens the sheet: progress, then the one stream of messages and events, or the players.</li>
+          <li><b>Menu</b> holds the Auteurs switch: try it to see the author bands.</li>
+          <li><button class="linkish" type="button" id="replay">Show a 3-second note again</button></li>
+        </ul>
+        <p class="note">On the grid: Bo (green) and Dé (orange) are both on the last cell of LEST; Bo's word is tinted. M of TAMIS is locked after a check. N of AMEN was revealed. O in AMEN is wrong. D in VIDE is Bo's pencil letter. « Flaire » is flagged.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><small>7 · Contrast</small>Measured on this page</h2>
+    <p class="lead">Computed live from the colours above. Text needs 4.5:1; focus outlines and marks (revealed triangle, flag shape, author band) need 3:1.</p>
+    <div class="tbl-wrap"><table id="contrast"><thead><tr><th>Sample</th><th>Pair</th><th>Ratio</th><th>Needs</th><th>Result</th></tr></thead><tbody></tbody></table></div>
+    <p class="note"><strong>Author bands.</strong> Several current player colours fall under 3:1 on white on their own (see the last rows), so each band has a thin dark edge, which specs 019 and 035 allow.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var P = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080", "#9a6324", "#808000"];
+  var css = getComputedStyle(document.documentElement);
+  function tok(n) { return css.getPropertyValue("--" + n).trim(); }
+
+  function lin(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+  function lum(hex) {
+    var h = hex.replace("#", "");
+    return 0.2126 * lin(parseInt(h.slice(0, 2), 16)) + 0.7152 * lin(parseInt(h.slice(2, 4), 16)) + 0.0722 * lin(parseInt(h.slice(4, 6), 16));
+  }
+  function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+  function onColour(bg) { return ratio(bg, "#FFFFFF") >= ratio(bg, "#14181F") ? "#FFFFFF" : "#14181F"; }
+  function mix(hex, pct) {
+    var h = hex.replace("#", ""), out = "#";
+    for (var i = 0; i < 3; i++) {
+      var v = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+      var m = Math.round(v * pct + 255 * (1 - pct));
+      out += ("0" + m.toString(16)).slice(-2);
+    }
+    return out;
+  }
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+  var ARROWS = {
+    right: '<path d="M2 12H15"/><polygon points="14,7.5 22,12 14,16.5"/>',
+    down: '<path d="M12 2V15"/><polygon points="7.5,14 12,22 16.5,14"/>',
+    down_then_right: '<path d="M5 2V10Q5 15 10 15H15"/><polygon points="14,10.5 22,15 14,19.5"/>',
+    right_then_down: '<path d="M2 5H10Q15 5 15 10V15"/><polygon points="10.5,14 15,22 19.5,14"/>'
+  };
+  function arrowSvg(kind, style) {
+    return '<svg class="arw" viewBox="0 0 24 24" style="' + style + '" aria-hidden="true">' + ARROWS[kind] + "</svg>";
+  }
+
+  /* One cell. o: {type, letter, cls[], tint, flash, author, gone, cursors:[{p, ini}], clues:[{text}], flag, arrows:[html]} */
+  function cell(o, s) {
+    var cls = ["c"].concat(o.cls || []);
+    var style = "";
+    if (o.tint && cls.indexOf("sel") < 0 && cls.indexOf("locked") < 0) style += "background:" + mix(o.tint, 0.18) + ";";
+    if (o.flash) { cls.push("flash"); style += "background:" + mix(o.flash, 0.38) + ";"; }
+    var h = "";
+    if (o.type === "clue") {
+      cls.push("clue");
+      o.clues.forEach(function (q, i) {
+        if (i) h += '<div class="sep"></div>';
+        h += '<div class="q">' + esc(q.text) + "</div>";
+      });
+      if (o.flag) h += '<span class="flag" aria-label="drapeau">⚑</span>';
+    } else {
+      if (o.letter) h += '<div class="ltr"><span>' + esc(o.letter) + "</span></div>";
+      if (o.author !== undefined && o.author !== null) {
+        h += '<div class="band' + (o.gone ? " gone" : "") + '" style="background:' + P[o.author] + '"></div>';
+      }
+      (o.cursors || []).forEach(function (c, i) {
+        var inset = 3 + i * 3;
+        h += '<div class="cur" style="inset:' + inset + "px;border-color:" + P[c.p] + '"></div>';
+      });
+      h += labels(o, s);
+    }
+    (o.arrows || []).forEach(function (a) { h += a; });
+    return '<div class="' + cls.join(" ") + '" style="' + style + '">' + h + "</div>";
+  }
+
+  function labels(o, s) {
+    var cur = o.cursors || [];
+    if (!cur.length) return "";
+    var slots = s >= 44 ? ["tl", "br", "bl", "tr"] : s >= 20 ? ["tl", "br"] : ["tl"];
+    if ((o.cls || []).indexOf("rev") >= 0) slots = slots.filter(function (x) { return x !== "tr"; });
+    var h = "";
+    for (var i = 0; i < slots.length && i < cur.length; i++) {
+      var last = i === slots.length - 1 && cur.length > slots.length;
+      var bg = last ? "#14181F" : P[cur[i].p];
+      var txt = last ? "+" + (cur.length - i) : cur[i].ini;
+      h += '<span class="ini ' + slots[i] + '" style="background:' + bg + ";color:" + onColour(bg) + '">' + txt + "</span>";
+    }
+    return h;
+  }
+
+  function grid(rows, s) {
+    var w = rows[0].length;
+    var h = '<div class="g" style="--s:' + s + "px;grid-template-columns:repeat(" + w + "," + s + 'px)">';
+    rows.forEach(function (r) { r.forEach(function (o) { h += cell(o, s); }); });
+    return h + "</div>";
+  }
+  function spec(gridHtml, title, sub) {
+    return '<div class="spec">' + gridHtml + '<div class="cap"><b>' + title + "</b>" + (sub ? "<span>" + sub + "</span>" : "") + "</div></div>";
+  }
+
+  /* arrow placement inside the target letter cell */
+  function arrowFor(kind, s, slot) {
+    var a = Math.max(10, s * 0.34);
+    if (kind === "right") return arrowSvg(kind, "left:-1px;top:" + (slot === 0 ? s * 0.25 - a / 2 : slot === 1 ? s * 0.72 - a / 2 : s / 2 - a / 2) + "px");
+    if (kind === "down") return arrowSvg(kind, "top:-1px;left:" + (s / 2 - a / 2) + "px");
+    if (kind === "down_then_right") return arrowSvg(kind, "top:-1px;left:" + s * 0.06 + "px");
+    return arrowSvg(kind, "left:-1px;top:" + s * 0.06 + "px");
+  }
+
+  /* ---------- 1. clues ---------- */
+  (function () {
+    var s = 64, el = document.getElementById("clues"), h = "";
+    function pairRight(text, kind, flag) {
+      return grid([[{ type: "clue", clues: [{ text: text }], flag: flag }, { arrows: [arrowFor(kind, s)] }]], s);
+    }
+    function pairDown(text, kind) {
+      return grid([[{ type: "clue", clues: [{ text: text }] }], [{ arrows: [arrowFor(kind, s)] }]], s);
+    }
+    h += spec(pairRight("Sans contenu", "right"), "→ right", "word starts to the right, goes across");
+    h += spec(pairDown("Artiste muet", "down"), "↓ down", "word starts below, goes down");
+    h += spec(pairDown("Passoire fine", "down_then_right"), "↳ down then right", "starts below, goes across");
+    h += spec(pairRight("De la marine", "right_then_down"), "↴ right then down", "starts to the right, goes down");
+    h += spec(grid([
+      [{ type: "clue", clues: [{ text: "Passoire fine" }, { text: "De la marine" }] }, { arrows: [arrowFor("right_then_down", s)] }],
+      [{ arrows: [arrowFor("down_then_right", s)] }, {}]
+    ], s), "Two clues", "clue 0 on top, a thin rule between");
+    h += spec(grid([[{ type: "clue", clues: [{ text: "Flaire" }], flag: true }], [{ arrows: [arrowFor("down", s)] }]], s), "Flagged « Je bloque »", "⚑ in the free corner, text does not move");
+    h += spec(grid([
+      [{ type: "clue", clues: [{ text: "Extraterrestre de cinéma" }, { text: "Donner un fusil" }] }, { arrows: [arrowFor("right", s, 1)] }],
+      [{ arrows: [arrowFor("down", s)] }, {}]
+    ], s), "Long text", "wraps, never cut; smaller type in two-clue cells");
+    el.innerHTML = h;
+  })();
+
+  /* ---------- 2. states ---------- */
+  (function () {
+    var s = 56, el = document.getElementById("states"), h = "";
+    function one(o, t, sub) { h += spec(grid([[o]], s), t, sub); }
+    one({}, "Empty", "white");
+    one({ letter: "A" }, "Filled", "weight 500");
+    one({ letter: "M", cls: ["locked"] }, "Locked", "bold 700 on grey");
+    one({ letter: "D", cls: ["pencil"] }, "Pencil", "italic, pencil grey");
+    one({ letter: "O", cls: ["wrong"] }, "Wrong after a check", "struck through in red");
+    one({ letter: "N", cls: ["locked", "rev"] }, "Revealed", "corner triangle; locked, so bold");
+    one({ letter: "S", author: 1 }, "Authorship on", "band in the author's colour");
+    one({ letter: "S", author: 1, gone: true }, "Author has left", "grey hatching, no player colour");
+    one({ letter: "E", flash: P[3] }, "Flash", "1 s in the colour of whoever replaced my letter");
+    el.innerHTML = h;
+  })();
+
+  /* ---------- 3. selection ---------- */
+  (function () {
+    var s = 56, el = document.getElementById("sel"), h = "";
+    h += spec(grid([[{ letter: "V", cls: ["word"] }, { cls: ["sel"] }, { letter: "D", cls: ["word", "pencil"] }, { letter: "E", cls: ["word"] }]], s), "My word, my cell", "word light blue, cell blue with a solid navy border");
+    h += spec(grid([[{ letter: "L", tint: P[1] }, { letter: "E", tint: P[1] }, { letter: "S", tint: P[1] }, { tint: P[1], cursors: [{ p: 1, ini: "BO" }] }]], s), "Another player", "dashed border, initials, word tint");
+    h += spec(grid([[{ letter: "T", tint: P[1], cursors: [{ p: 1, ini: "BO" }, { p: 3, ini: "DÉ" }] }]], s), "Two on one cell", "borders set 3 px further in each");
+    h += spec(grid([[{ cls: ["sel"], cursors: [{ p: 1, ini: "BO" }, { p: 3, ini: "DÉ" }, { p: 4, ini: "EL" }] }]], s), "Three, on my cell", "my solid border outside, theirs inside");
+    el.innerHTML = h;
+  })();
+
+  /* ---------- 4. crowd ---------- */
+  (function () {
+    var el = document.getElementById("crowd"), h = "";
+    var five = [{ p: 1, ini: "BO" }, { p: 3, ini: "DÉ" }, { p: 4, ini: "EL" }, { p: 5, ini: "FA" }, { p: 6, ini: "GU" }];
+    [60, 32, 18].forEach(function (s) {
+      h += spec(grid([[{ letter: "A", cursors: five.slice(0, 2) }, { letter: "A", cursors: five }]], s), s + " px", "2 players, then 5");
+    });
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev"], cursors: five.slice(0, 4) }]], 60), "Revealed + 4 players", "top-right left to the triangle, « +2 » in the last free slot");
+    el.innerHTML = h;
+  })();
+
+  /* ---------- 5. worst ---------- */
+  (function () {
+    var s = 60, el = document.getElementById("worst"), h = "";
+    h += spec(grid([[{ letter: "D", cls: ["sel", "pencil"] }]], s), "Pencil, selected", "grey italic still above 4.5:1 on blue");
+    h += spec(grid([[{ letter: "D", cls: ["pencil"], flash: P[1] }]], s), "Pencil during a flash", "grey drops, italics stay");
+    h += spec(grid([[{ letter: "N", cls: ["locked", "rev", "sel"], author: 0, cursors: [{ p: 1, ini: "BO" }] }]], s), "Everything at once", "revealed, selected, author band, a player");
+    h += spec(grid([[{ letter: "O", cls: ["wrong", "pencil"], author: 3 }]], s), "Wrong pencil letter", "strike, italic and band together");
+    h += spec(grid([[{ letter: "I", cls: ["word"] }, { letter: "D", tint: P[2] }, { letter: "E", tint: P[2], cursors: [{ p: 2, ini: "CÉ" }] }]], s), "Blue against blue", "my word, then player 2's word");
+    el.innerHTML = h;
+  })();
+
+  /* ---------- 6. phone ---------- */
+  var FX = {
+    clues: {
+      "0,0": [{ text: "Passoire fine", arrow: "down_then_right", word: 0 }, { text: "De la marine", arrow: "right_then_down", word: 1 }],
+      "0,2": [{ text: "Artiste muet", arrow: "down", word: 2 }],
+      "0,3": [{ text: "Fatales à César", arrow: "down", word: 3 }],
+      "0,4": [{ text: "Flaire", arrow: "down", word: 4 }],
+      "2,0": [{ text: "Sans contenu", arrow: "right", word: 5 }],
+      "3,0": [{ text: "Fin de prière", arrow: "right", word: 6 }],
+      "4,0": [{ text: "Alourdit le ballon", arrow: "right", word: 7 }]
+    },
+    words: [
+      { clue: "Passoire fine", dir: "a", cells: [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4]] },
+      { clue: "De la marine", dir: "d", cells: [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]] },
+      { clue: "Artiste muet", dir: "d", cells: [[1, 2], [2, 2], [3, 2], [4, 2]] },
+      { clue: "Fatales à César", dir: "d", cells: [[1, 3], [2, 3], [3, 3], [4, 3]] },
+      { clue: "Flaire", dir: "d", cells: [[1, 4], [2, 4], [3, 4], [4, 4]] },
+      { clue: "Sans contenu", dir: "a", cells: [[2, 1], [2, 2], [2, 3], [2, 4]] },
+      { clue: "Fin de prière", dir: "a", cells: [[3, 1], [3, 2], [3, 3], [3, 4]] },
+      { clue: "Alourdit le ballon", dir: "a", cells: [[4, 1], [4, 2], [4, 3], [4, 4]] }
+    ]
+  };
+  var L = {
+    "0,1": { l: "N", a: 0 },
+    "1,0": { l: "T", a: 0 }, "1,1": { l: "A", a: 0 }, "1,2": { l: "M", a: 1, locked: true }, "1,3": { l: "I", a: 1 }, "1,4": { l: "S", a: 3 },
+    "2,1": { l: "V", a: 0 }, "2,3": { l: "D", a: 1, pencil: true }, "2,4": { l: "E", a: 3 },
+    "3,1": { l: "A", a: 1 }, "3,2": { l: "M", a: 1 }, "3,3": { l: "O", a: 0, wrong: true }, "3,4": { l: "N", a: 3, locked: true, rev: true },
+    "4,1": { l: "L", a: 1 }, "4,2": { l: "E", a: 1 }, "4,3": { l: "S", a: 1 }
+  };
+  var OTHERS = [{ p: 1, ini: "BO", at: "4,4", word: 7 }, { p: 3, ini: "DÉ", at: "4,4", word: 4 }];
+  var st = { r: 2, c: 2, w: 5, pencil: false, kbd: true, authors: false, flagged: { 4: true }, open: null, tab: "stream" };
+
+  function wordsAt(r, c) {
+    var out = [];
+    FX.words.forEach(function (w, i) { w.cells.forEach(function (x) { if (x[0] === r && x[1] === c) out.push(i); }); });
+    return out;
+  }
+  function inWord(i, r, c) { return FX.words[i].cells.some(function (x) { return x[0] === r && x[1] === c; }); }
+
+  function renderPhone() {
+    var stage = document.getElementById("stage");
+    var s = Math.floor(Math.min((stage.clientWidth - 16) / 5, (stage.clientHeight - 16) / 5));
+    var arrowsAt = {};
+    Object.keys(FX.clues).forEach(function (k) {
+      var rc = k.split(",").map(Number);
+      FX.clues[k].forEach(function (q, i) {
+        var t = q.arrow === "right" || q.arrow === "right_then_down" ? [rc[0], rc[1] + 1] : [rc[0] + 1, rc[1]];
+        var key = t.join(",");
+        (arrowsAt[key] = arrowsAt[key] || []).push(arrowFor(q.arrow, s, FX.clues[k].length > 1 && q.arrow === "right" ? i : undefined));
+      });
+    });
+    var rows = [];
+    for (var r = 0; r < 5; r++) {
+      var row = [];
+      for (var c = 0; c < 5; c++) {
+        var key = r + "," + c;
+        if (FX.clues[key]) {
+          row.push({ type: "clue", clues: FX.clues[key], flag: FX.clues[key].some(function (q) { return st.flagged[q.word]; }) });
+          continue;
+        }
+        var d = L[key] || {};
+        var o = { letter: d.l, cls: [], arrows: arrowsAt[key] };
+        if (inWord(st.w, r, c)) o.cls.push("word");
+        if (r === st.r && c === st.c) o.cls.push("sel");
+        if (d.locked) o.cls.push("locked");
+        if (d.pencil) o.cls.push("pencil");
+        if (d.wrong) o.cls.push("wrong");
+        if (d.rev) o.cls.push("rev");
+        if (d.l && d.a !== undefined) o.author = d.a;
+        var tint = null, curs = [];
+        OTHERS.forEach(function (p) {
+          if (!tint && inWord(p.word, r, c)) tint = P[p.p];
+          if (p.at === key) curs.push({ p: p.p, ini: p.ini });
+        });
+        if (tint && o.cls.indexOf("word") < 0) o.tint = tint;
+        o.cursors = curs;
+        row.push(o);
+      }
+      rows.push(row);
+    }
+    var host = document.getElementById("pgrid");
+    host.innerHTML = grid(rows, s);
+    host.classList.toggle("authors-on", st.authors);
+    var cells = host.querySelectorAll(".c");
+    cells.forEach(function (el, i) {
+      var r = Math.floor(i / 5), c = i % 5;
+      if (FX.clues[r + "," + c]) return;
+      el.addEventListener("click", function () { tap(r, c); });
+    });
+    var w = FX.words[st.w];
+    var arrow = w.dir === "a" ? "→" : "↓";
+    document.getElementById("cluetxt").innerHTML = esc(w.clue) + "<i>" + arrow + "</i>" + (st.pencil ? '<span class="pentag">✎ Crayon</span>' : "");
+    document.getElementById("flagbtn").style.opacity = st.flagged[st.w] ? "1" : ".7";
+  }
+
+  function tap(r, c) {
+    var ws = wordsAt(r, c);
+    if (!ws.length) return;
+    if (r === st.r && c === st.c && ws.length > 1) st.w = ws[0] === st.w ? ws[1] : ws[0];
+    else if (ws.indexOf(st.w) < 0) {
+      var cur = FX.words[st.w].dir;
+      st.w = ws.filter(function (i) { return FX.words[i].dir === cur; })[0];
+      if (st.w === undefined) st.w = ws[0];
+    }
+    st.r = r; st.c = c;
+    renderPhone();
+  }
+  function step(delta) {
+    var cells = FX.words[st.w].cells;
+    var idx = cells.findIndex(function (x) { return x[0] === st.r && x[1] === st.c; });
+    var n = idx + delta;
+    if (n >= 0 && n < cells.length) { st.r = cells[n][0]; st.c = cells[n][1]; }
+  }
+  function type(ch) {
+    var key = st.r + "," + st.c, d = L[key];
+    if (!(d && d.locked)) L[key] = { l: ch, a: 0, pencil: st.pencil };
+    step(1); renderPhone();
+  }
+  function erase() {
+    var key = st.r + "," + st.c, d = L[key];
+    if (d && d.l && !d.locked) delete L[key];
+    else { step(-1); var k2 = st.r + "," + st.c; if (L[k2] && !L[k2].locked) delete L[k2]; }
+    renderPhone();
+  }
+  function moveWord(delta) {
+    st.w = (st.w + delta + FX.words.length) % FX.words.length;
+    st.r = FX.words[st.w].cells[0][0]; st.c = FX.words[st.w].cells[0][1];
+    renderPhone();
+  }
+
+  var ICON_PEN = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
+  var ICON_SWAP = '<svg viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>';
+  var ICON_DEL = '<svg viewBox="0 0 24 24"><path d="M9 5h11v14H9l-6-7 6-7z"/><path d="M13 9l4 6M17 9l-4 6"/></svg>';
+  function renderKbd() {
+    var k = document.getElementById("kbd");
+    var rows = ["AZERTYUIOP", "QSDFGHJKLM"];
+    var h = "";
+    rows.forEach(function (r) {
+      h += '<div class="krow">' + r.split("").map(function (ch) { return '<button type="button" class="k l" data-ch="' + ch + '">' + ch + "</button>"; }).join("") + "</div>";
+    });
+    h += '<div class="krow"><button type="button" class="k wide pen" id="kpen" aria-label="Crayon" aria-pressed="' + st.pencil + '">' + ICON_PEN + "</button>" +
+      "WXCVBN".split("").map(function (ch) { return '<button type="button" class="k l" data-ch="' + ch + '">' + ch + "</button>"; }).join("") +
+      '<button type="button" class="k" id="kswap" aria-label="Changer de sens">' + ICON_SWAP + '</button><button type="button" class="k wide" id="kdel" aria-label="Effacer">' + ICON_DEL + "</button></div>";
+    k.innerHTML = h;
+    k.classList.toggle("pencil", st.pencil);
+    k.querySelectorAll("[data-ch]").forEach(function (b) { b.addEventListener("click", function () { type(b.getAttribute("data-ch")); }); });
+    document.getElementById("kpen").addEventListener("click", function () { st.pencil = !st.pencil; renderKbd(); renderPhone(); });
+    document.getElementById("kswap").addEventListener("click", function () { tap(st.r, st.c); });
+    document.getElementById("kdel").addEventListener("click", erase);
+  }
+
+  function closeOverlay() {
+    st.open = null;
+    document.getElementById("overlay").innerHTML = "";
+    ["b-aide", "b-salon", "b-menu"].forEach(function (id) { document.getElementById(id).setAttribute("aria-pressed", "false"); });
+  }
+  function openOverlay(which) {
+    if (st.open === which) { closeOverlay(); return; }
+    closeOverlay();
+    st.open = which;
+    var ov = document.getElementById("overlay"), h = '<div class="scrim" id="scrim"></div>';
+    if (which === "aide") {
+      h += '<div class="pop" style="left:90px"><h4>Vérifier</h4><button type="button">La lettre</button><button type="button">Le mot</button><button type="button">La grille</button><hr><h4>Révéler</h4><button type="button">La lettre <em>4 restantes</em></button><button type="button">Le mot <em>1 restant</em></button></div>';
+      document.getElementById("b-aide").setAttribute("aria-pressed", "true");
+    } else if (which === "menu") {
+      h += '<div class="pop" style="right:6px"><button type="button" id="m-auth">Auteurs <em>' + (st.authors ? "affichés" : "masqués") + '</em></button><button type="button">Inviter <em>lien</em></button><button type="button">Réglages de l’hôte</button><hr><button type="button">Masquer le chrono</button><button type="button">Retour aux grilles</button></div>';
+      document.getElementById("b-menu").setAttribute("aria-pressed", "true");
+    } else {
+      document.getElementById("b-salon").setAttribute("aria-pressed", "true");
+      h += '<div class="sheet"><div class="grab"></div><div class="prog"><span>31 / 48 mots</span><div class="bar"><i></i></div></div>' +
+        '<div class="tabs" role="tablist"><button type="button" role="tab" id="t-s" aria-selected="' + (st.tab === "stream") + '">Discussion</button><button type="button" role="tab" id="t-p" aria-selected="' + (st.tab === "players") + '">Joueurs (3)</button></div>';
+      if (st.tab === "stream") {
+        h += '<div class="stream">' +
+          '<div class="evt">→ Bo a rejoint la partie</div>' +
+          '<div class="evt">✎ Bo a rempli MIME · LEST</div>' +
+          '<div class="msg"><span class="who"><i class="pdot" style="background:' + P[0] + '"></i>Ana</span><span>Quelqu’un a une idée pour Flaire ?</span></div>' +
+          '<div class="evt">⚑ Dé bloque sur « Flaire »</div>' +
+          '<div class="evt">👁 Dé a révélé une lettre · 4 restantes</div>' +
+          '<div class="msg"><span class="who"><i class="pdot" style="background:' + P[1] + '"></i>Bo</span><span>SENT, je pense 👍</span></div>' +
+          '<div class="evt">✓ Ana a vérifié le mot AMEN · 1 erreur</div>' +
+          '</div><div class="compose"><span>Écrire un message…</span><button type="button" class="pill">Envoyer</button></div>';
+      } else {
+        h += '<div class="players">' +
+          '<div class="row"><i class="pdot" style="background:' + P[0] + '"></i><b>Ana</b> (vous)<span class="st">actif</span></div>' +
+          '<div class="row"><i class="pdot" style="background:' + P[1] + '"></i>Bo<span class="st">actif</span></div>' +
+          '<div class="row idle"><i class="pdot" style="background:' + P[3] + '"></i>Dé<span class="st">inactif</span></div>' +
+          '<div class="row"><button type="button" class="pill">Inviter</button><button type="button" class="pill" id="p-auth">Auteurs : ' + (st.authors ? "oui" : "non") + "</button></div></div>";
+      }
+      h += "</div>";
+    }
+    ov.innerHTML = h;
+    document.getElementById("scrim").addEventListener("click", closeOverlay);
+    var ma = document.getElementById("m-auth") || document.getElementById("p-auth");
+    if (ma) ma.addEventListener("click", function () { st.authors = !st.authors; renderPhone(); var o = st.open; st.open = null; openOverlay(o); });
+    var ts = document.getElementById("t-s"), tp = document.getElementById("t-p");
+    if (ts) { ts.addEventListener("click", function () { st.tab = "stream"; st.open = null; openOverlay("salon"); });
+      tp.addEventListener("click", function () { st.tab = "players"; st.open = null; openOverlay("salon"); }); }
+    if (which === "salon") { var b = document.querySelector("#b-salon .badge"); if (b) b.remove(); }
+  }
+
+  var toastTimer;
+  function showToast(text) {
+    var t = document.getElementById("toast");
+    if (text) t.textContent = text;
+    t.removeAttribute("data-off");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.setAttribute("data-off", ""); }, 3000);
+  }
+
+  document.getElementById("b-kbd").addEventListener("click", function () {
+    st.kbd = !st.kbd;
+    document.getElementById("kbd").hidden = !st.kbd;
+    this.setAttribute("aria-pressed", String(st.kbd));
+    renderPhone();
+  });
+  document.getElementById("b-aide").addEventListener("click", function () { openOverlay("aide"); });
+  document.getElementById("b-salon").addEventListener("click", function () { openOverlay("salon"); });
+  document.getElementById("b-menu").addEventListener("click", function () { openOverlay("menu"); });
+  document.getElementById("prev").addEventListener("click", function () { moveWord(-1); });
+  document.getElementById("next").addEventListener("click", function () { moveWord(1); });
+  document.getElementById("flagbtn").addEventListener("click", function () {
+    st.flagged[st.w] = !st.flagged[st.w]; renderPhone();
+    if (st.flagged[st.w]) showToast("⚑ Vous bloquez sur « " + FX.words[st.w].clue + " »");
+  });
+  var notes = ["⚑ Dé bloque sur « Flaire »", "Bo : SENT, je pense 👍", "👁 Dé a révélé une lettre", "→ Él a rejoint la partie"], ni = 0;
+  function nextNote() { ni = (ni + 1) % notes.length; showToast(notes[ni]); }
+  document.getElementById("replay").addEventListener("click", nextNote);
+  document.getElementById("timer").addEventListener("click", nextNote);
+
+  var secs = 4 * 60 + 12;
+  setInterval(function () { secs++; document.getElementById("timer").textContent = Math.floor(secs / 60) + ":" + ("0" + (secs % 60)).slice(-2); }, 1000);
+
+  renderKbd();
+  renderPhone();
+  showToast(notes[0]);
+  if (window.ResizeObserver) new ResizeObserver(function () { renderPhone(); }).observe(document.getElementById("stage"));
+
+  /* ---------- 7. contrast ---------- */
+  (function () {
+    var rows = [
+      ["A", tok("ink"), tok("cell"), "Letter on white", 4.5],
+      ["A", tok("ink"), tok("sel"), "Letter on my selected cell", 4.5],
+      ["M", tok("ink"), tok("locked"), "Locked letter on grey", 4.5],
+      ["D", tok("pencil"), tok("cell"), "Pencil on white", 4.5],
+      ["D", tok("pencil"), tok("word"), "Pencil on my word", 4.5],
+      ["D", tok("pencil"), tok("sel"), "Pencil on my selected cell", 4.5],
+      ["Aa", tok("clue-ink"), tok("clue-bg"), "Clue text on clue cell", 4.5],
+      ["⚑", tok("flag"), tok("clue-bg"), "Flag on clue cell", 4.5],
+      ["Aa", "#FFFFFF", tok("navy"), "Clue bar text on navy", 4.5],
+      ["◥", tok("reveal"), tok("cell"), "Revealed triangle on white", 3],
+      ["◥", tok("reveal"), tok("sel"), "Revealed triangle on selected", 3],
+      ["◥", tok("reveal"), tok("locked"), "Revealed triangle on locked grey", 3],
+      ["▢", tok("navy"), tok("sel"), "Selected border on selected fill", 3],
+      ["▢", tok("navy"), tok("cell"), "Focus outline on white", 3],
+      ["A", tok("ink"), tok("key"), "Key letter", 4.5],
+      ["A", tok("pencil"), tok("key"), "Key letter, pencil mode", 4.5],
+      ["Aa", tok("muted"), tok("cell"), "Event line in the stream", 4.5]
+    ];
+    P.forEach(function (c, i) { rows.push(["▬", c, tok("cell"), "Author band " + i + " on white, no edge", 3]); });
+    var tb = document.querySelector("#contrast tbody"), h = "";
+    rows.forEach(function (r) {
+      var v = ratio(r[1], r[2]), ok = v >= r[4];
+      h += '<tr><td><span class="sw" style="color:' + r[1] + ";background:" + r[2] + '">' + r[0] + "</span></td><td>" + r[3] + ' <span style="color:var(--muted)">' + r[1] + " / " + r[2] + '</span></td><td class="num">' + v.toFixed(2) + ':1</td><td>' + r[4] + ':1</td><td class="' + (ok ? "pass" : "fail") + '">' + (ok ? "Pass" : "Below") + "</td></tr>";
+    });
+    tb.innerHTML = h;
+  })();
+})();
+</script>
