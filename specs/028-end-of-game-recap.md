@@ -135,13 +135,25 @@ def build_recap(state: RoomState, log: Sequence[LogEntry]) -> Recap:
 
     Raises:
         ValueError: `state.solved` is False, or those entries are not exactly
-            seq 1 to state.seq, in order, with one `grid_solved` among them.
+            seq 1 to state.seq, in order, with one `grid_solved` among them, or
+            a clue of the grid has no word (`Grid.word_cells` raises ValueError
+            for it). An imported grid has no such clue (spec 003).
     """
 
 
 def public_recap(recap: Recap) -> PublicRecap:
     """Return what the share page shows: grid number, time and team."""
 ```
+
+(Note from the lead, 2026-10-16: the `ValueError` list of `build_recap` gained its
+third reason. Since the first review the code raises when a clue of the grid has no
+word (its arrow points outside the grid or to a cell that is not a letter cell),
+where it used to skip that clue without a sign; the list had stopped at two reasons.
+An imported grid has no such clue, because `import_grid` refuses those arrows (spec
+003 AC-1), so a room made from an imported grid never raises for this reason.
+`room_recap` then gives None, as for the other two reasons: its docstring below
+already says "or when build_recap raises ValueError", so it does not change. Wording
+only: no behaviour and no criterion changes (second review of spec 028).)
 
 `sum(player.letters for player in recap.players) + recap.revealed_letters ==
 recap.letter_cells` holds for every recap (AC-4), and so does
