@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { t } from './i18n'
   import { fetchRoomSummaries, lastActivityText, type RoomKey, type RoomSummary } from './myRooms'
+  import { displayNickname } from './nickname'
 
   // "My rooms" of the catalogue page (spec 032): the open rooms this device
   // keeps an identity for, as the server sums them up. The catalogue page shows
@@ -63,7 +64,7 @@
           <h3>{gridLabel(summary)}</h3>
           <p>{t('catalogue.item.size', { width: summary.width, height: summary.height })}</p>
           <p data-testid="my-room-players">
-            {t('my_rooms.players', { names: summary.players.join(', ') })}
+            {t('my_rooms.players', { names: summary.players.map(displayNickname).join(', ') })}
           </p>
           <p data-testid="my-room-activity">{lastActivityText(summary.last_activity_at)}</p>
           {#if summary.solved}

@@ -29,9 +29,9 @@ export function identityKey(code: string): string {
   return `nock.identity.${code}`
 }
 
-// The same rule as `normalize_nickname` on the server.
+// The same rule as `normalize_nickname` on the server, checked on the capitals.
 export function checkNickname(text: string): NicknameCheck {
-  const nickname = text.normalize('NFC').trim()
+  const nickname = text.normalize('NFC').trim().toUpperCase()
   const characters = Array.from(nickname)
   if (characters.length < NICKNAME_MIN_LENGTH || characters.length > NICKNAME_MAX_LENGTH) {
     return { ok: false, reason: 'length' }

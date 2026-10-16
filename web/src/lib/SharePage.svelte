@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { t } from './i18n'
+  import { displayNickname } from './nickname'
   import { fetchPublicRecap, type PublicRecap } from './recap'
   import { timerText } from './timer'
 
@@ -36,7 +37,9 @@
       <p data-testid="share-grid">{t('catalogue.item.number', { number: recap.grid_number })}</p>
     {/if}
     <p data-testid="share-time">{t('recap.time', { time: timerText(recap.elapsed_ms) })}</p>
-    <p data-testid="share-team">{t('share.team', { names: recap.team.join(', ') })}</p>
+    <p data-testid="share-team">
+      {t('share.team', { names: recap.team.map(displayNickname).join(', ') })}
+    </p>
     <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
     <a data-testid="share-home" href="/" tabindex="0">{t('share.home')}</a>
   {:else if pageState === 'error'}

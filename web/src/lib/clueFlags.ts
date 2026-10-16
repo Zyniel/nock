@@ -3,6 +3,7 @@
 // Plain functions: no DOM and no socket.
 
 import { t } from './i18n'
+import { displayNickname } from './nickname'
 import type { ClueRefView, FlagView, PlayerView } from './roomSession'
 import type { Word } from './wordSelection'
 
@@ -10,7 +11,7 @@ import type { Word } from './wordSelection'
 export interface ClueFlagMarker {
   // The ids of the flagging players, separated by one space, in roster order.
   flaggedBy: string
-  // Their nicknames in the same order, joined by ", ".
+  // Their nicknames in the same order, as a page shows them, joined by ", ".
   names: string
 }
 
@@ -78,11 +79,11 @@ function flagsInRosterOrder(flags: FlagView[], players: PlayerView[]): FlagView[
   return ordered
 }
 
-// The nickname of a player of the roster; an unknown id gives "Quelqu'un".
+// The shown nickname of a player of the roster; an unknown id gives "Quelqu'un".
 function nicknameOf(players: PlayerView[], playerId: string): string {
   for (const player of players) {
     if (player.player_id === playerId) {
-      return player.nickname
+      return displayNickname(player.nickname)
     }
   }
   return t('feed.someone')

@@ -2,6 +2,7 @@
 // colour on the cell and as a name in the clue bar.
 // Plain functions: no DOM and no socket.
 
+import { nameOf } from './activityFeed'
 import { t } from './i18n'
 import type { LetterCellView, PlayerView } from './roomSession'
 
@@ -45,6 +46,5 @@ export function authorMarkColour(
 // nickname known to the page (a player who left is still named), or "Quelqu'un"
 // for a player the page never knew.
 export function authorLine(authorId: string, names: Map<string, string>): string {
-  const name = names.get(authorId) ?? t('feed.someone')
-  return t('authors.selected', { name })
+  return t('authors.selected', { name: nameOf(names, authorId) })
 }
