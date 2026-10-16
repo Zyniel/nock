@@ -3,6 +3,7 @@
 
 import { FEED_LIMIT, feedItemFor } from './activityFeed'
 import type { FeedItem } from './activityFeed'
+import { timerValueMs } from './timer'
 
 export type RoomStatus =
   | 'connecting'
@@ -675,9 +676,14 @@ function toPlayers(value: unknown): PlayerView[] | null {
   return players
 }
 
+// True when the value is a time in whole milliseconds: a whole number of at least 0.
+function isWholeMs(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+}
+
 // A time in whole milliseconds; 0 when the value is not a whole number of at least 0.
 function toWholeMs(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) {
+  if (!isWholeMs(value)) {
     return 0
   }
   return value
@@ -959,13 +965,28 @@ function startTimerOnLetter(session: RoomSession, event: RoomEvent): void {
   }
 }
 
-// The solve stops the timer on the time it carries, whatever the page counted.
+// The value the page shows now, in whole milliseconds.
+function shownTimerMs(session: RoomSession): number {
+  return timerValueMs(
+    session.timerBaseMs,
+    session.timerRunning,
+    session.timerAnchor,
+    performance.now(),
+  )
+}
+
+// The solve stops the timer on the time it carries, whatever the page counted. A
+// time that is not a whole number of at least 0 (the server never sends one) still
+// stops the timer, on the value the page shows: nothing is taken from the event
+// (spec 027, decision 10).
 function stopTimerOnSolved(session: RoomSession, event: RoomEvent): void {
   const elapsedMs = event.message.elapsed_ms
-  if (typeof elapsedMs === 'number' && Number.isInteger(elapsedMs)) {
+  if (isWholeMs(elapsedMs)) {
     session.timerBaseMs = elapsedMs
-    session.timerRunning = false
+  } else {
+    session.timerBaseMs = shownTimerMs(session)
   }
+  session.timerRunning = false
 }
 
 // Apply every buffered event that follows `seq`, one after the other.

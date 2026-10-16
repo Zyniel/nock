@@ -2009,9 +2009,11 @@
 
   /* A toolbar that scrolls cuts an outline drawn outside a control: draw it
      inside instead (3px wide, so spec 035 AC-2 still holds). The same on a roomy
-     window, so the outline always stays inside the toolbar. It reaches the
-     toggle of the timer too, which is drawn by a component of its own. */
-  .room-toolbar :global(:focus-visible) {
+     window, so the outline always stays inside the toolbar. The second selector
+     reaches the toggle of the timer, which is drawn by a component of its own
+     (RoomTimer), and nothing else that a child component puts in the toolbar. */
+  .room-toolbar :focus-visible,
+  .room-toolbar :global(.timer-toggle:focus-visible) {
     outline-offset: -3px;
   }
 
@@ -2365,9 +2367,11 @@
     /* The header buttons get the same size in every engine. WebKit on a touch
        screen gives a button a 16px font and a taller padding than Chromium and
        Firefox, and then the header needs a third row, on a low window and on a
-       narrow tall one alike (spec 013 AC-6). It reaches the toggle of the timer
-       too, which is drawn by a component of its own. */
-    .room-header :global(button) {
+       narrow tall one alike (spec 013 AC-6). The second selector reaches the
+       toggle of the timer, which is drawn by a component of its own (RoomTimer),
+       and nothing else that a child component puts in the header. */
+    .room-header button,
+    .room-header :global(.timer-toggle) {
       padding-block: 1px;
       font-size: 0.8rem;
     }
