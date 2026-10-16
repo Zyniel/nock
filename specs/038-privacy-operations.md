@@ -243,7 +243,13 @@ Rules, for every path under `/api/ops/` (the ops API):
 3. The request must carry the header `Authorization: Bearer <token>`, compared with
    the operator token by `secrets.compare_digest`. A missing or different token
    answers 401 with `{"detail": "Not authorized"}` and the header
-   `WWW-Authenticate: Bearer`, and counts as one refusal for its address.
+   `WWW-Authenticate: Bearer`, and counts as one refusal for its address. This check
+   comes right after rules 1 and 2, before anything else of the request (its query,
+   its code, its room) is looked at: a request with a missing or wrong token answers
+   401 whatever else it holds. For example, `?days=2` with a wrong token answers 401,
+   and only a right token with a wrong `days` gets 422. (Note from the lead,
+   2026-10-16: added: the spec did not say whether the token check or the validation
+   of the request comes first (questions from spec 038's tests).)
 4. While the operator pages are on, every ops API answer, refusals included, has
    `Cache-Control: no-store`. (Note from the lead, 2026-10-16: decided after the
    spec-writer's report; this read "Every ops API answer, refusals included, has
@@ -264,6 +270,13 @@ separate counts. (Note from the lead, 2026-10-16: added from the code of spec 01
 throttle, whose check and record became one locked step in the second review of
 spec 032; decided after the spec-writer's report, the ops API's throttle is a
 second instance of it, with spec 011's constants (preparation of spec 038).)
+
+The "refused ops requests" of rule 2 are the refusals of rule 3 (a missing or wrong
+token), and nothing else: no other answer is counted, and a 404 of
+`GET /api/ops/rooms/{code}/edits` for an unknown or expired room, or for a code
+breaking `ROOM_CODE_PATTERN`, is not. (Note from the lead, 2026-10-16: added: the
+spec did not say whether other answers of the ops API count as refused requests,
+such as that 404 (questions from spec 038's tests).)
 
 ### Ops API
 
@@ -410,8 +423,12 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
 `/`), and 404 otherwise.
 
 - Root `data-testid="ops-page"`, heading `t("ops.heading")`, `data-state`: `locked`
-  (the token form shows), `loading`, `ready`, or `error` (an answer other than 200,
-  401 or 429, or a network failure; shows `t("ops.error")`).
+  (the token form shows), `loading` (shows `t("ops.loading")` in an element with
+  `role="status"`), `ready`, or `error` (an answer other than 200, 401 or 429, or a
+  network failure; shows `t("ops.error")`). (Note from the lead, 2026-10-16: added:
+  the spec did not say what the page shows while `data-state` is `loading`; the key
+  `ops.loading` was listed in "New `fr.json` keys" and used nowhere
+  (questions from spec 038's tests).)
 - Token form `data-testid="ops-token-form"`: a password input
   `data-testid="ops-token-input"` labelled `t("ops.token_label")`, and a submit
   button `data-testid="ops-token-submit"` with `t("ops.token_submit")`. Submitting
@@ -420,7 +437,11 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
 - Every ops API request of the page carries `Authorization: Bearer <token>`. A 401
   removes `nock.ops_token`, goes back to `locked` and shows
   `data-testid="ops-token-error"` (`role="alert"`) with `t("ops.token_refused")`;
-  a 429 shows it with `t("ops.throttled")`.
+  a 429 does the same: it removes `nock.ops_token`, goes back to `locked` and shows
+  `ops-token-error`, with `t("ops.throttled")` instead of `t("ops.token_refused")`.
+  (Note from the lead, 2026-10-16: added: the spec did not say whether a 429 also
+  removes `nock.ops_token` and goes back to `locked`, as a 401 does; it read "a 429
+  shows it with `t("ops.throttled")`" (questions from spec 038's tests).)
 - On load, when `sessionStorage` holds `nock.ops_token`, the page loads the
   dashboard without showing the form.
 - Dashboard `data-testid="ops-dashboard"` (heading `t("ops.dashboard_heading")`):
@@ -430,8 +451,9 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
   shown period has `aria-pressed="true"`, the others `"false"`; `7` on load. Then
   six `data-testid="ops-metric"` elements with `data-metric` `rooms_created`,
   `players_per_room`, `completion_rate`, `median_solving_time`, `latency` and
-  `disconnection_rate`, in that order, each with `data-value` (the figure as
-  received, `""` for None; for `latency` the median, plus `data-p95`) and the text
+  `disconnection_rate`, in that order, each with `data-value` (`String(figure)`,
+  `figure` being the number the page received, so a figure `2.0` reads `2`; `""` for
+  None; for `latency` the median, plus `data-p95`) and the text
   `t("ops.metric.<data-metric>", {value})`, where `value` is:
 
   | Metric | `value` |
@@ -443,7 +465,10 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
   | `latency` | `t("ops.latency_value", {median, p95})`, both rounded to whole milliseconds |
   | `disconnection_rate` | `new Intl.NumberFormat("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2})`, for example `0,50` |
 
-  A figure that is None shows `t("ops.no_data")` as its `value`.
+  A figure that is None shows `t("ops.no_data")` as its `value`. (Note from the lead,
+  2026-10-16: added: the spec did not say how a number is written in `data-value`;
+  `String(figure)` replaces "the figure as received"
+  (questions from spec 038's tests).)
 - Duration text (shared with spec 029): with `s` the whole seconds of the
   milliseconds (rounded down), `h = floor(s / 3600)`, `m = floor(s % 3600 / 60)`,
   `sec = s % 60`: `t("duration.minutes", {minutes: m, seconds: <sec on 2 digits>})`
