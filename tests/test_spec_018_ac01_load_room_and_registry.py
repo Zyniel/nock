@@ -204,8 +204,10 @@ def test_ac1_register_room_records_the_room_in_the_store(
         assert state is not None
         assert state.created_at == fake_clock.now
         assert memory_store.load_room(code) == state
+        # Spec 028: register_room gives every room a share token.
+        assert state.share_token is not None
         assert memory_store.load_room(code) == new_room(
-            code, fx01_grid, fake_clock.now, 7
+            code, fx01_grid, fake_clock.now, 7, share_token=state.share_token
         )
     finally:
         room_registry.close()
