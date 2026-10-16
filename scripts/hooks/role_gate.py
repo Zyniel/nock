@@ -16,16 +16,27 @@ Exit codes understood by Claude Code:
     2: the agent may not stop. Whatever was written to stderr is sent back to
        it, so it keeps working until the gate is green.
     1: the hook itself could not run (shown to the user, never blocks).
+
+A failure the agent cannot fix, such as a stale test that only the test-writer
+may change, must not hold it for ever (2026-10-16: an implementer was blocked at
+every stop by a spec 018 test that spec 028 had made stale). When the hook
+blocks, it keeps a fingerprint of the checkout. When the same agent then stops
+again ("stop_hook_active") without having changed anything, it has reported
+what it could not fix, as the message asks, and it may stop; the gate is not run
+again. Any change to the checkout means a new attempt, which the gate judges.
 """
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # Which gate stage each role must pass before it is allowed to stop.
@@ -47,6 +58,9 @@ SPEC_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^tests/test_spec_(\d{3})_"),
     re.compile(r"^tests/spec(\d{3})_"),
 )
+# Where the hook keeps, per agent, the fingerprint of the checkout it last
+# blocked (one small file per agent, removed when the gate passes).
+BLOCK_STATE_DIRECTORY = Path(tempfile.gettempdir()) / "nock-role-gate"
 
 
 def find_project_root(start_directory: Path) -> Path:
@@ -179,6 +193,79 @@ def gate_arguments(stage: str, project_root: Path) -> list[str]:
     return ["--specs", ",".join(specs), "--browsers", "chromium"]
 
 
+def checkout_fingerprint(project_root: Path) -> str | None:
+    """Return a digest of the checkout: its commit, its changes, its new files.
+
+    Args:
+        project_root: The checkout to describe.
+
+    Returns:
+        A hex digest that changes when a commit, an edit of a tracked file, or
+        a new or edited untracked file changes the checkout; None when git
+        cannot tell.
+    """
+    head = run_git(project_root, ["rev-parse", "HEAD"])
+    changes = run_git(project_root, ["diff", "HEAD", "--binary"])
+    untracked = run_git(project_root, ["ls-files", "--others", "--exclude-standard"])
+    if head is None or changes is None or untracked is None:
+        return None
+    digest = hashlib.sha256()
+    for part in (head, changes, untracked):
+        digest.update(part.encode("utf-8", errors="replace"))
+        digest.update(b"\0")
+    for relative_path in untracked.splitlines():
+        try:
+            digest.update((project_root / relative_path).read_bytes())
+        except OSError:
+            digest.update(b"unreadable")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def block_state_path(hook_input: dict[str, object], role_name: str) -> Path:
+    """Return the file that keeps the fingerprint of an agent's last block.
+
+    Args:
+        hook_input: The hook input; its agent id (or, failing that, its
+            session id) names the agent.
+        role_name: The agent's role, part of the name too.
+
+    Returns:
+        A path in BLOCK_STATE_DIRECTORY, named by a digest of those ids.
+    """
+    agent_key = str(hook_input.get("agent_id") or hook_input.get("session_id") or "")
+    name = hashlib.sha256(f"{role_name}\0{agent_key}".encode()).hexdigest()[:32]
+    return BLOCK_STATE_DIRECTORY / f"{name}.txt"
+
+
+def read_block_state(state_path: Path) -> str | None:
+    """Return the fingerprint kept in a block state file, or None."""
+    try:
+        return state_path.read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def write_block_state(state_path: Path, fingerprint: str | None) -> None:
+    """Keep the fingerprint of the checkout the hook is blocking.
+
+    With no fingerprint, the file is removed, so the next stop runs the gate.
+    """
+    if fingerprint is None:
+        clear_block_state(state_path)
+        return
+    # Without the file, the agent's next stop runs the gate: that is all.
+    with contextlib.suppress(OSError):
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        state_path.write_text(fingerprint, encoding="utf-8")
+
+
+def clear_block_state(state_path: Path) -> None:
+    """Forget an agent's last block."""
+    with contextlib.suppress(OSError):
+        state_path.unlink(missing_ok=True)
+
+
 def gate_takes_specs(project_root: Path) -> bool:
     """Tell whether the checkout's gate has --specs (added on 2026-10-16).
 
@@ -220,6 +307,15 @@ def main() -> int:
         print("role_gate: uv or scripts/gate.py is missing.", file=sys.stderr)
         return 1
 
+    # Blocked before and nothing changed since: the agent has reported what it
+    # cannot fix, as the message below asks, so it may stop.
+    state_path = block_state_path(hook_input, role_name)
+    if hook_input.get("stop_hook_active") is True:
+        fingerprint = checkout_fingerprint(project_root)
+        if fingerprint is not None and fingerprint == read_block_state(state_path):
+            clear_block_state(state_path)
+            return 0
+
     # Let uv pick the environment of the project being checked.
     environment = dict(os.environ)
     environment.pop("VIRTUAL_ENV", None)
@@ -253,6 +349,7 @@ def main() -> int:
         return 1
 
     if completed.returncode == 0:
+        clear_block_state(state_path)
         return 0
 
     if completed.returncode != 1:
@@ -261,6 +358,9 @@ def main() -> int:
         print(completed.stderr[-2000:], file=sys.stderr)
         return 1
 
+    # Taken after the gate ran, so that files the run itself leaves behind do
+    # not count as the agent's change at its next stop.
+    write_block_state(state_path, checkout_fingerprint(project_root))
     output_lines = completed.stdout.splitlines()
     shown_lines = output_lines[-MAX_OUTPUT_LINES:]
     gate_description = " ".join(arguments)
@@ -268,8 +368,10 @@ def main() -> int:
         f"The quality gate ({gate_description}) is failing, so {role_name} is "
         "not done yet.\n"
         "Fix the problems below, then finish again. Do not silence a check "
-        "(noqa, type: ignore, skip, xfail) and do not edit files you do not own; "
-        "if a failure is outside your files, say so in your report instead.\n",
+        "(noqa, type: ignore, skip, xfail) and do not edit files you do not own.\n"
+        "If a failure is outside your files (a test that only the test-writer may "
+        "change, a tooling file), say so in your report and finish again without "
+        "changing anything: the hook then lets you stop.\n",
         file=sys.stderr,
     )
     print("\n".join(shown_lines), file=sys.stderr)

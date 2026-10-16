@@ -78,7 +78,9 @@ write the implementation before its tests exist.
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: the
   test-writer's `--stage tests`, the implementer's quick gate (the specs whose
   spec, test or harness files the branch changed since `main`, with `--specs`
-  and Chromium). CI runs everything.
+  and Chromium). CI runs everything. A role held by a failure outside its
+  files (a stale test, for the implementer) says so in its report and finishes
+  again without changing anything; the hook then lets it stop.
 - In a cloud session, the browsers draw text in CI's font, DejaVu Sans
   (`.claude/hooks/ci-fonts.conf`, installed by the session-start hook).
 
