@@ -147,11 +147,18 @@ class RoomRegistry:
 ### `nock.server`
 
 - `create_app(rooms=None)` builds `RoomRegistry(store=RoomStore(path))` with
-  `path` from the environment variable `NOCK_DATABASE`; when it is unset, the store
-  is `":memory:"` (nothing is written to disk, so tests never create files). The
-  store is opened when the app starts (lifespan), not at import, and the registry
-  is closed when the app stops. A registry passed as `rooms` is never closed by the
-  app.
+  `path` from the environment variable `NOCK_DATABASE`; when it is unset or empty,
+  the store is `":memory:"` (nothing is written to disk, so tests never create
+  files). The store is opened when the app starts (lifespan), not at import, and
+  the registry is closed when the app stops. A registry passed as `rooms` is never
+  closed by the app. (Note from the lead, 2026-10-16: "or empty" added: an empty
+  `NOCK_DATABASE` counts as unset, like the other technical variables (spec 036
+  decision 15). The app used to hand `""` to `RoomStore`, which SQLite opens as a
+  private temporary file. Spec 036 AC-12 tests it: it replaces
+  `nock.server.RoomStore`, the class the app calls when it starts, with a
+  subclass that records the path. `python -m nock` also refuses, before the app
+  starts, a `NOCK_DATABASE` that holds a control character or another invisible
+  character (spec 036 AC-11).)
 - The production run command sets it, for example
   `NOCK_DATABASE=data/nock.sqlite3 uv run python -m nock` (the
   implementer documents it in `README.md`). (Note from the lead, 2026-10-15: the
@@ -313,8 +320,9 @@ Each one is already part of the spec above.
 6. Undo refused when the cell changed. Pick: `nothing_to_undo`, and the entry is
    dropped, since that edit can never be undone afterwards.
 7. Database location. Pick: `NOCK_DATABASE` environment variable, in-memory when
-   unset, so imports and tests never write files; the README documents the
-   production setting.
+   unset or empty, so imports and tests never write files; the README documents
+   the production setting. (Note from the lead, 2026-10-16: "or empty" added; see
+   "`nock.server`" and spec 036 decision 15.)
 8. Pending queue and undo. An undo's `letter_changed` comes from `you` but answers
    no pending edit, which spec 015's plain FIFO would mismatch. Pick: an own
    `letter_changed` removes the oldest pending edit only when cell and letter match
