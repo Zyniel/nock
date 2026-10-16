@@ -80,7 +80,9 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .c.locked { background: var(--locked); }
 .c.sel { background: var(--sel); }
 .c.sel::before { content: ""; position: absolute; inset: 0; border: 2px solid var(--navy); z-index: 4; pointer-events: none; }
-.ltr { position: absolute; inset: 0; display: grid; place-items: center; font: 500 calc(var(--s) * .56)/1 var(--f-ui); color: var(--ink); padding-bottom: calc(var(--s) * .04); }
+.ltr { position: absolute; inset: 0; display: grid; place-items: center; font: 500 calc(var(--s) * .56)/1 var(--f-ui); color: var(--ink); }
+/* centre the capital itself, not the font's line box (which keeps room for descenders) */
+.ltr span { text-box: trim-both cap alphabetic; }
 .locked .ltr { font-weight: 700; }
 .pencil .ltr { font-style: italic; color: var(--pencil); }
 .pencil.flash .ltr { color: var(--ink); }
@@ -186,7 +188,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 3.5 · thinner clue bar, clue only</div>
+    <div class="ver">Version 3.6 · letters centred on their capitals</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the top edge, so all four corners stay free for players.</p>
   </header>
