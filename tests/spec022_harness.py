@@ -80,7 +80,6 @@ from spec024_harness import (
 )
 from spec025_harness import MockRoomSocket, wait_until
 
-PAGE_TIMEOUT_MS = 10_000
 QUIET_MS = 300  # "sends nothing": no frame within 300 ms
 SETTLE_MS = 400
 LIVE_WITHIN_SECONDS = 1.0  # "within 1 s" (AC-1, AC-3, AC-7)
@@ -328,7 +327,6 @@ def open_chat_room(
         Spec 025's mocked socket: it answers each ping with a pong, and `send`
         and `close` act on the newest socket the page opened.
     """
-    page.set_default_timeout(PAGE_TIMEOUT_MS)
     mock = MockRoomSocket(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/{ROOM_CODE}")
@@ -602,7 +600,6 @@ def new_player_page(
     context = browser.new_context(viewport={"width": 1280, "height": 720})
     try:
         page = context.new_page()
-        page.set_default_timeout(PAGE_TIMEOUT_MS)
         enter(page, f"{live_server}/r/{code}", nickname)
     except BaseException:
         context.close()

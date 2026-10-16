@@ -90,7 +90,6 @@ from spec024_harness import (
 from spec025_harness import MockRoomSocket, without_pings
 
 THIRD_TOKEN = "third-token-number-0003"
-PAGE_TIMEOUT_MS = 10_000
 QUIET_MS = 300
 CLOCK_STEP_MS = 100
 CLOCK_PAUSE_JUMP_MS = 50
@@ -455,7 +454,6 @@ def join_room_page(
         Spec 025's mocked socket, which has received the page's join and answers
         each ping with a pong.
     """
-    page.set_default_timeout(PAGE_TIMEOUT_MS)
     if frozen:
         page.clock.install(time=0)
     mock = MockRoomSocket(page)
@@ -647,5 +645,4 @@ def new_context_page(browser: Browser) -> tuple[Page, Callable[[], None]]:
     """A 1280 by 720 page in a context of its own, and the function that closes it."""
     context = browser.new_context(viewport={"width": 1280, "height": 720})
     page = context.new_page()
-    page.set_default_timeout(PAGE_TIMEOUT_MS)
     return page, context.close

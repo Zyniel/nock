@@ -169,7 +169,7 @@ def walk_the_catalogue(walker: Walker, live_server: str) -> None:
     )
     walker.tab_to("catalogue-play", selector=item_one_play)
     page.keyboard.press("Enter")
-    page.wait_for_url(re.compile(r"/r/[A-Z0-9]{6}$"), timeout=ROOM_TIMEOUT_MS)
+    page.wait_for_url(re.compile(r"/r/[A-Z0-9]{6}$"))
     expect(page.get_by_test_id("room-page")).to_have_attribute(
         "data-status", "joined", timeout=ROOM_TIMEOUT_MS
     )

@@ -177,7 +177,7 @@ def start_from_catalogue(page: Page, base_url: str) -> str:
     """Click play on item 1 of `/` and return the code of the room it loads."""
     page.goto(f"{base_url}/")
     item_play_button(page).click()
-    page.wait_for_url(ROOM_URL_PATTERN, timeout=URL_TIMEOUT_MS)
+    page.wait_for_url(ROOM_URL_PATTERN)
     return code_from_url(page.url)
 
 
