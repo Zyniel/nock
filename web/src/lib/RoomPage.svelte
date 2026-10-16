@@ -91,15 +91,12 @@
 
   let session = $state(newSession())
   let rawSelection: Selection | null = $state(null)
-  // The nickname form: what is typed, in capitals (spec 012 decision 12), the
-  // error shown, and the nickname of a join sent from the form that no snapshot
-  // has answered yet.
-  let nicknameText = $state((readNickname() ?? '').toUpperCase())
+  // The nickname form: the text as typed (CSS shows it in capitals), the error
+  // shown, and the nickname of a join sent from the form that no snapshot has
+  // answered yet.
+  let nicknameText = $state(readNickname() ?? '')
   let formError: 'length' | 'characters' | null = $state(null)
   let formJoinNickname: string | null = $state(null)
-  // True while an input method (pinyin, kana) composes text in the nickname
-  // input: changing the input's text then would break the composition.
-  let isComposingNickname = false
   let socket: WebSocket | null = null
   let gridViewport: GridViewport | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
@@ -541,25 +538,8 @@
     })
   }
 
-  // The nickname input holds capitals: each change of its text, typed or pasted,
-  // is put in capitals (spec 012, room page flow step 3). Text that an input
-  // method composes is put in capitals when the composition ends.
-  function setNicknameText(text: string): void {
-    nicknameText = isComposingNickname ? text : text.toUpperCase()
-  }
-
-  function startNicknameComposition(): void {
-    isComposingNickname = true
-  }
-
-  // Read from the input itself: some browsers send the composition's last input
-  // event after compositionend.
-  function endNicknameComposition(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
-    isComposingNickname = false
-    setNicknameText(event.currentTarget.value)
-  }
-
-  // Check the nickname typed in the form, and join with it when it is valid.
+  // Check the nickname typed in the form, and join with it, in capitals, when it
+  // is valid.
   function submitNickname(event: SubmitEvent): void {
     event.preventDefault()
     if (session.status !== 'nickname') {
@@ -1723,9 +1703,7 @@
         type="text"
         autocomplete="nickname"
         placeholder={t('room.default_nickname')}
-        bind:value={() => nicknameText, setNicknameText}
-        oncompositionstart={startNicknameComposition}
-        oncompositionend={endNicknameComposition}
+        bind:value={nicknameText}
       />
       {#if shownError !== null}
         <p class="nickname-error" data-testid="nickname-error" role="alert">
@@ -1987,6 +1965,13 @@
     flex-direction: column;
     gap: 0.5rem;
     max-width: 24rem;
+  }
+
+  /* The nickname shows in capitals, the placeholder too, while the value keeps
+     the text as typed, so input methods and the caret work as usual (spec 012,
+     room page flow step 3). */
+  .nickname-form input {
+    text-transform: uppercase;
   }
 
   .connection-banner {

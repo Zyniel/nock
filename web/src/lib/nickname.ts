@@ -7,14 +7,17 @@
 const WORD_SEPARATORS = " -'’"
 
 // The nickname with capitalised words: `ANA` shows as `Ana`, `JEAN-LUC` as
-// `Jean-Luc` and `D'ARTAGNAN` as `D'Artagnan`. The first character, and each one
-// right after a space, a hyphen or an apostrophe, goes through toUpperCase();
-// every other character goes through toLowerCase(). Characters are code points.
+// `Jean-Luc` and `D'ARTAGNAN` as `D'Artagnan`. The whole nickname first goes
+// through one toLowerCase(), which ends a Greek word with the final sigma, `ς`
+// (`ΝΊΚΟΣ` shows as `Νίκος`); lowering one character at a time would give `σ`.
+// Then the first character, and each one right after a space, a hyphen or an
+// apostrophe, goes through toUpperCase(). Characters are code points.
 export function displayNickname(nickname: string): string {
+  const lowered = nickname.toLowerCase()
   let shown = ''
   let startsWord = true
-  for (const character of nickname) {
-    shown += startsWord ? character.toUpperCase() : character.toLowerCase()
+  for (const character of lowered) {
+    shown += startsWord ? character.toUpperCase() : character
     startsWord = WORD_SEPARATORS.includes(character)
   }
   return shown

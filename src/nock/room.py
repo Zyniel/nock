@@ -493,21 +493,25 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
 
 
 def normalize_nickname(text: str) -> str:
-    """Return the nickname as stored: NFC-normalised, stripped, then in capitals.
+    """Return the nickname as stored: NFC, stripped, in capitals, then NFC again.
 
     Args:
         text: The nickname as typed, in any case.
 
     Returns:
-        The nickname in capitals (`str.upper()`), 2 to 20 characters, made of
-        letters, combining marks, ASCII digits and NICKNAME_PUNCTUATION, with at
-        least one letter or digit. The rules are checked on the capitals: `ß`
-        gives `SS`, two characters.
+        The nickname in capitals (`str.upper()`) and in NFC, 2 to 20 characters,
+        made of letters, combining marks, ASCII digits and NICKNAME_PUNCTUATION,
+        with at least one letter or digit. The rules are checked on this result:
+        `ß` gives `SS`, two characters. A name typed in small letters and the
+        same name typed in capitals give the same result.
 
     Raises:
         ValueError: a rule is broken; the message names the rule.
     """
-    nickname = unicodedata.normalize("NFC", text).strip().upper()
+    capitals = unicodedata.normalize("NFC", text).strip().upper()
+    # The capitals of a few Greek letters are not in NFC: U+0390 gives U+0399
+    # U+0308 U+0301, which NFC writes U+03AA U+0301.
+    nickname = unicodedata.normalize("NFC", capitals)
     if len(nickname) < NICKNAME_MIN_LENGTH or len(nickname) > NICKNAME_MAX_LENGTH:
         raise ValueError(
             f"The nickname must have {NICKNAME_MIN_LENGTH} to "
