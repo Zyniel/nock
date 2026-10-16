@@ -182,8 +182,10 @@ Families:
 Faces served: Source Sans 3 at weights 400, 500, 600, 700 upright and 500, 700
 italic; IBM Plex Sans Condensed at 500 and 600 upright. Nock serves the font files
 itself from its own origin (privacy, spec 038; spec 005's rule against
-third-party URLs); never from Google Fonts or another host. Adding the font files
-is a dependency, so the human decides how (OPEN). The sheet's third family,
+third-party URLs); never from Google Fonts or another host. The files come from
+the npm packages `@fontsource/source-sans-3` and
+`@fontsource/ibm-plex-sans-condensed`, imported per weight and style used and no
+other, and built into `web/dist` (decided by the human on 2026-10-16). The sheet's third family,
 Source Serif 4, styles the sheet's own headings only and is not part of the app.
 
 Grid:
@@ -1018,6 +1020,9 @@ Each step leaves the app working and every test passing.
 - Auteurs mode: kept, toggled from the Menu, off by default (section 7).
 - A closed side column stays closed next time, per browser (section 8).
 - No long press on ⌫ to erase the word (section 8).
+- Fonts come in as npm dependencies: `@fontsource/source-sans-3` and
+  `@fontsource/ibm-plex-sans-condensed`, imported per weight and style used (no
+  other), self-hosted by the build, never from Google (section 4).
 - A player's corner is given by the order of arrival on the cell (section 6).
 - An « Accessibilité » mode in the Menu, off by default, per browser: while on,
   each corner triangle becomes that player's own icon in their colour, same
@@ -1055,10 +1060,8 @@ same day by the Accessibilité mode; see "Decided" above.)
 
 The spec writer's pick comes last in each item.
 
-1. Font files are a dependency. Options: the npm packages
-   `@fontsource/source-sans-3` and `@fontsource/ibm-plex-sans-condensed`, imported
-   per weight; or the WOFF2 files committed under `web/public/fonts/` with their
-   SIL OFL 1.1 licence. Pick: the npm packages.
+1. (Settled: font files, decided by the human on 2026-10-16; see "Decided"
+   above. The numbering of this list is kept.)
 2. The revealed notch in ink during a flash (orange-red falls to 2.1:1 to 2.8:1 on
    the Orange, Cramoisi and Magenta flashes, below spec 024's 3:1). Applied in
    sheet 4.2 (`.flash.rev::after`), pending approval. Pick: approve.

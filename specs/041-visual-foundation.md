@@ -116,7 +116,21 @@ The two families of `_design.md` section 4 are declared with `@font-face` under
 the exact family names `Source Sans 3` (weights 400, 500, 600, 700 normal; 500
 and 700 italic) and `IBM Plex Sans Condensed` (500 and 600 normal), as WOFF2 files
 built into `web/dist` and served by Nock from its own origin, with
-`font-display: swap`. How the files enter the repository is Open question 1.
+`font-display: swap`.
+
+The files come from two npm packages, added to `web/package.json` (decided by the
+human on 2026-10-16): `@fontsource/source-sans-3` and
+`@fontsource/ibm-plex-sans-condensed`. `web/src/main.ts` imports exactly these
+per-weight files and no other weight or style of either package:
+
+- `@fontsource/source-sans-3/400.css`, `500.css`, `600.css`, `700.css`,
+  `500-italic.css`, `700-italic.css`;
+- `@fontsource/ibm-plex-sans-condensed/500.css`, `600.css`.
+
+Vite builds the WOFF2 files into `web/dist/assets`, served by Nock from its own
+origin; nothing is fetched from Google or another host. `README.md` credits both
+families under the SIL Open Font License 1.1. (Note from the spec writer,
+2026-10-16: added when the human decided the fonts; Open question 1 is closed.)
 
 ### Focus ring
 
@@ -331,8 +345,8 @@ The words in brackets say how each criterion is tested.
 - **AC-2** (new) (browser with live server, probes) Each translucent token resolves to its value. On `/`, for each of the 9 translucent tokens, a probe with `color: var(<token>)` parses to the table's channels and alpha: for example `--nock-scrim` gives 20, 24, 31 with alpha 0.35, and `--nock-legend-bg` 255, 255, 255 with alpha 0.96.
 - **AC-3** (new) (browser with live server, probes; browser with mocked socket) The eight imposed player colours and their inks are in place. On `/`, probes give `--player-colour-0` to `--player-colour-7` and `--player-ink-0` to `--player-ink-7` the colours of the table (for example `--player-colour-1` rgb(96, 136, 56) and `--player-ink-1` rgb(75, 106, 44)). On the room page, given a FX-01 snapshot with eight players of colours 0 to 7, the `roster-colour` swatch of the player with `data-colour` N has the computed background of `--player-colour-N`, for each N.
 - **AC-4** (new) (browser with live server; browser with mocked socket) The page base uses the tokens. On `/` and on the room page with a FX-01 snapshot, `body` has the computed `background-color` rgb(255, 255, 255) and `color` rgb(20, 24, 31), and its computed `font-family`, read as a list of family names with quotes removed, is `Source Sans 3`, `Segoe UI`, `system-ui`, `sans-serif`. A probe with `font-family: var(--nock-font-clue)` reads `IBM Plex Sans Condensed`, `Arial Narrow`, `Roboto Condensed`, `sans-serif`.
-- **AC-5** (new; applies once the human settles Open question 1) (browser with live server) Nock serves its fonts itself. The test records every request the page makes from `page.goto("/")` on. After `document.fonts.ready`, `document.fonts.load(f)` resolves to a non-empty list of `FontFace` objects, each with `status` `loaded`, for each `f` of: `400 16px "Source Sans 3"`, `500 16px "Source Sans 3"`, `600 16px "Source Sans 3"`, `700 16px "Source Sans 3"`, `italic 500 16px "Source Sans 3"`, `italic 700 16px "Source Sans 3"`, `500 16px "IBM Plex Sans Condensed"`, `600 16px "IBM Plex Sans Condensed"`. Every recorded request of resource type `font` has a URL on the live server's origin and a response with status 200, and no recorded request goes to another host.
-- **AC-6** (new; applies once the human settles Open question 1) (static) The font licences are credited. `README.md` contains `Source Sans 3`, `IBM Plex Sans Condensed` and `SIL Open Font License`.
+- **AC-5** (new) (browser with live server) Nock serves its fonts itself. The test records every request the page makes from `page.goto("/")` on. After `document.fonts.ready`, `document.fonts.load(f)` resolves to a non-empty list of `FontFace` objects, each with `status` `loaded`, for each `f` of: `400 16px "Source Sans 3"`, `500 16px "Source Sans 3"`, `600 16px "Source Sans 3"`, `700 16px "Source Sans 3"`, `italic 500 16px "Source Sans 3"`, `italic 700 16px "Source Sans 3"`, `500 16px "IBM Plex Sans Condensed"`, `600 16px "IBM Plex Sans Condensed"`. Every recorded request of resource type `font` has a URL on the live server's origin and a response with status 200, and no recorded request goes to another host.
+- **AC-6** (new) (static) The font packages are the decided ones and are credited. `web/package.json` lists `@fontsource/source-sans-3` and `@fontsource/ibm-plex-sans-condensed`; the `@fontsource/` imports in `web/src/**/*.ts` and `web/src/**/*.svelte` are exactly the eight files of "Fonts" (each once, no other `@fontsource` import); `README.md` contains `Source Sans 3`, `IBM Plex Sans Condensed` and `SIL Open Font License 1.1`. (Note from the spec writer, 2026-10-16: AC-5 and AC-6 now apply unconditionally, the human having decided the fonts; AC-6 gained the package and import checks.)
 - **AC-7** (new) (browser with live server, keyboard only; browser with mocked socket) The focus ring is 2 px navy. On `/`, after `tab_to(page, "force-filter", '[data-force="1"]')`, that button's computed `outline-style` is `solid`, `outline-width` `2px`, `outline-color` rgb(27, 47, 85) and `outline-offset` `2px`. On the room page with a FX-01 snapshot, after the grid gets the keyboard focus (`tab_to(page, "grid")`), the `grid` has `outline-style` `solid`, `outline-width` `2px` and `outline-color` rgb(27, 47, 85). In the touch context of spec 035 AC-10, after a key press and `focus()` on the key `A`, the key has the same three values.
 - **AC-8** (new) (browser with live server, probes) A navy surface has a white focus ring. On `/`, a probe `<div class="nock-on-navy"><button type="button" class="nock-button">Test</button></div>` has a `div` with computed `background-color` rgb(27, 47, 85) and `color` rgb(255, 255, 255). After a key press and `focus()` on the button, the button's computed `outline-style` is `solid`, `outline-width` `2px`, `outline-color` rgb(255, 255, 255) and `outline-offset` `-4px`.
 - **AC-9** (new) (browser with live server, probes) Every button variant has the same shape. On `/`, four probe buttons with the classes `nock-button nock-button-primary`, `nock-button nock-button-secondary`, `nock-button nock-button-quiet` and `nock-button nock-button-primary` with `disabled` each have the computed values: border radius `6px` on each corner, padding `10px 16px` (top and bottom 10px, left and right 16px), border width `1px` and style `solid` on each side, `font-weight` 600, `font-size` `15.2px` and `line-height` `15.2px`.
