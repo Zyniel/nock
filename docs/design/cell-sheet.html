@@ -290,6 +290,12 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   </section>
 
   <section>
+    <h2><small>6b · Arrows against other marks</small>Every overlap, arrow by arrow</h2>
+    <p class="lead">Each row is one arrow, drawn from its clue cell into a 64 px letter cell. Each column adds marks to that letter cell: a player in each corner, four players, the red revealed notch, and the selected cell. Drawing order today: arrow under the player triangles, triangles under the notch.</p>
+    <div id="overlaps" style="display:grid;gap:16px"></div>
+  </section>
+
+  <section>
     <h2><small>7 · In context</small>Phone, 360 px, keyboard shown</h2>
     <div class="mock-row">
       <div class="phone" id="phone">
@@ -522,6 +528,36 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     h += spec(grid([[{ letter: "O", cls: ["wrong", "pencil"], cursors: [4, 5] }]], s), "Wrong pencil + 2 players", "strike, italic, two corners");
     h += spec(grid([[{ letter: "I", cls: ["word"] }, { letter: "D", tint: 2 }, { letter: "E", tint: 2, cursors: [2] }]], s), "Blue against blue", "my word, then player 2's word");
     set("worst", h);
+
+    /* overlaps: every arrow with every mark that can share its cell */
+    var os = 64;
+    var ARROW_ROWS = [
+      ["right", "→ right", "V"], ["down", "↓ down", "M"],
+      ["down_then_right", "↳ down then right", "T"], ["right_then_down", "↴ right then down", "N"]
+    ];
+    var CASES = [
+      ["Alone", {}],
+      ["Player top-left", { cursors: [1] }],
+      ["Players top-left + top-right", { cursors: [1, 3] }],
+      ["Four players", { cursors: [1, 3, 4, 5] }],
+      ["Revealed (red notch)", { cls: ["locked", "rev"] }],
+      ["Revealed + four players", { cls: ["locked", "rev"], cursors: [1, 3, 4, 5] }],
+      ["Selected + four players", { cls: ["sel"], cursors: [1, 3, 4, 5] }],
+      ["Selected, revealed, four players", { cls: ["sel", "locked", "rev"], cursors: [1, 3, 4, 5] }]
+    ];
+    h = "";
+    ARROW_ROWS.forEach(function (row) {
+      var kind = row[0], horizontal = kind === "right" || kind === "right_then_down";
+      var cells = "";
+      CASES.forEach(function (c) {
+        var o = { letter: row[2], cls: (c[1].cls || []).slice(), cursors: c[1].cursors || [], arrows: [arrowFor(kind, os)] };
+        var clue = { type: "clue", clues: [{ text: "Définition" }] };
+        var g = horizontal ? grid([[clue, o]], os) : grid([[clue], [o]], os);
+        cells += spec(g, c[0], "");
+      });
+      h += '<div><h3 style="margin:0 0 8px;font:600 1rem/1.2 var(--f-ui);color:var(--navy)">' + row[1] + '</h3><div class="board static">' + cells + "</div></div>";
+    });
+    set("overlaps", h);
   }
 
   /* ---------- phone ---------- */
