@@ -8,7 +8,8 @@ status: draft
 
 Epic E10 Quality bar · Release: MVP · No backlog story: this is build step 1 of
 `specs/_design.md` (section 14). It applies `_design.md` sections 2 (colour
-tokens), 3 (player colours), 4 (typography: families and faces), 5 (icons) and 11
+tokens), 3 (player colours), 4 (typography: families and faces), 5 (icons), 6 (only the shapes of the
+player icons) and 11
 (components: buttons, focus ring, menus, badge, 3-second note). The FX-01
 reference grid is in `specs/_reference.md`; the stack in `specs/_architecture.md`.
 
@@ -40,6 +41,7 @@ the client. Jobs and contrast are in `_design.md` section 2.
 | `--nock-muted` | #5E6573 |
 | `--nock-pencil` | #555B67 |
 | `--nock-white` | #FFFFFF |
+| `--nock-page` | #F6F7F9 |
 | `--nock-clue-bg` | #EEF2F8 |
 | `--nock-clue-ink` | #1B2230 |
 | `--nock-word` | #E6EDF9 |
@@ -53,9 +55,14 @@ the client. Jobs and contrast are in `_design.md` section 2.
 | `--nock-green-bg` | #E6F2EA |
 | `--nock-key` | #E9ECF1 |
 | `--nock-keyboard-bg` | #D9DEE6 |
-| `--nock-departed` | #6B7079 |
+| `--nock-departed` | #5C616A |
 | `--nock-handle` | #C5CCD8 |
 | `--nock-thumb` | #C9D2E0 |
+
+(Note from the spec writer, 2026-10-16: second round. `--nock-page` is added for
+the pages that are not the room (sheet 4.2, `_design.md` section 2).
+`--nock-departed` follows sheet 4.2's #5C616A, pending the human's approval (Open
+question 2). `--nock-rule` keeps #9AA3B2, decided by the human on 2026-10-16.)
 
 Translucent tokens:
 
@@ -65,6 +72,7 @@ Translucent tokens:
 | `--nock-scrim-dialog` | rgb(20 24 31 / 38%) |
 | `--nock-dot-ring` | rgb(20 24 31 / 55%) |
 | `--nock-key-shadow` | rgb(20 24 31 / 25%) |
+| `--nock-shadow-soft` | rgb(20 24 31 / 35%) |
 | `--nock-shadow` | rgb(20 24 31 / 45%) |
 | `--nock-shadow-strong` | rgb(20 24 31 / 50%) |
 | `--nock-legend-bg` | rgb(255 255 255 / 96%) |
@@ -145,19 +153,26 @@ This spec only defines these classes. Later specs put them on controls.
 // web/src/lib/icons.ts
 export type IconName =
   | 'undo' | 'aide' | 'salon' | 'clavier' | 'menu' | 'crayon' | 'swap' | 'effacer'
+  | 'chrono' | 'flag' | 'chevron-left' | 'chevron-right' | 'smile'
 
 export type IconShape =
   | { kind: 'path'; d: string }
   | { kind: 'rect'; x: number; y: number; width: number; height: number; rx: number }
+  | { kind: 'circle'; cx: number; cy: number; r: number }
+  | { kind: 'polygon'; points: string }
 
 // The shapes of _design.md section 5, in its order, in a 24 by 24 box.
 export const ICONS: Record<IconName, readonly IconShape[]>
+
+// The player icons of the Accessibilité mode (_design.md section 6), by join
+// index 0 to 7, in a 10 by 10 box. A rect here has rx 0.
+export const PLAYER_ICONS: readonly (readonly IconShape[])[]
 
 // The Nock mark, in a 10 by 14 box.
 export const NOCK_MARK_POINTS: string // '0,0 10,0 10,14 5,10 0,14'
 ```
 
-The `d` strings and the rectangle are exactly those of `_design.md` section 5:
+The shapes are exactly those of `_design.md` sections 5 and 6:
 
 | Name | Shapes |
 | --- | --- |
@@ -169,6 +184,27 @@ The `d` strings and the rectangle are exactly those of `_design.md` section 5:
 | `crayon` | path `M4 20h4L19 9l-4-4L4 16v4z`; path `M13.5 6.5l4 4` |
 | `swap` | path `M4 8h14l-3-3M20 16H6l3 3` |
 | `effacer` | path `M9 5h11v14H9l-6-7 6-7z`; path `M13 9l4 6M17 9l-4 6` |
+| `chrono` | circle cx 12, cy 13.5, r 7.5; path `M12 10v3.5l2.5 2M9.5 3h5M12 3v3` |
+| `flag` | path `M6 21V4`; path `M6 4h12l-3 4.5 3 4.5H6z` |
+| `chevron-left` | path `M15 5l-7 7 7 7` |
+| `chevron-right` | path `M9 5l7 7-7 7` |
+| `smile` | circle cx 12, cy 12, r 9; path `M8.5 14.5c1.8 2 5.2 2 7 0`; path `M9 9.5h.01M15 9.5h.01` |
+
+| `PLAYER_ICONS` index | Shape |
+| --- | --- |
+| 0 (Rond) | circle cx 5, cy 5, r 4.4 |
+| 1 (Carré) | rect x 0.9, y 0.9, width 8.2, height 8.2, rx 0 |
+| 2 (Triangle) | polygon `5,0.4 9.7,9.3 0.3,9.3` |
+| 3 (Losange) | polygon `5,0.1 9.9,5 5,9.9 0.1,5` |
+| 4 (Étoile) | polygon `5,0.2 6.3,3.6 9.9,3.7 7.1,6 8.1,9.6 5,7.5 1.9,9.6 2.9,6 0.1,3.7 3.7,3.6` |
+| 5 (Croix) | polygon `3.3,0.4 6.7,0.4 6.7,3.3 9.6,3.3 9.6,6.7 6.7,6.7 6.7,9.6 3.3,9.6 3.3,6.7 0.4,6.7 0.4,3.3 3.3,3.3` |
+| 6 (Cœur) | path `M5 9.4L1.1 5.5A2.45 2.45 0 0 1 5 2.3A2.45 2.45 0 0 1 8.9 5.5Z` |
+| 7 (Sablier) | polygon `0.6,0.6 9.4,0.6 5.6,5 9.4,9.4 0.6,9.4 4.4,5` |
+
+(Note from the spec writer, 2026-10-16: second round. `chrono`, `flag`,
+`chevron-left`, `chevron-right` and `smile` come from sheet 4.2, and
+`PLAYER_ICONS` from sheet 4.3's Accessibilité mode, decided by the human on
+2026-10-16. Only the shapes are pinned here; no screen draws them in this spec.)
 
 How a component draws them (for example an `Icon.svelte` with the stroke
 attributes of `_design.md` section 5) is the implementer's choice; no screen uses
@@ -184,7 +220,8 @@ border width, padding, position or element changes, except the flash overlay.
 | --- | --- | --- |
 | `body` text, `.letter` text, `remote-label`, `clue-reaction` text, keys, vote buttons | `color` | `--nock-ink` |
 | Page, letter cells, menus and panels, `remote-label`, `clue-reaction`, vote banner, keys | `background` | `--nock-white` (keys: `--nock-key`) |
-| Grid cell borders, key borders, vote button borders, clue bar top border, connection banner border | border colour | `--nock-rule` |
+| Grid cell borders, key borders, vote button borders, clue bar top border | border colour | `--nock-rule` |
+| `connection-banner` border | border colour | `--nock-line` (the band of `_design.md` section 8 has a line-grey bottom border) |
 | Chat panel, reaction picker and `clue-reaction` borders | border colour | `--nock-line` |
 | Selected letter cell (`data-selected="true"`) | background; outline | `--nock-selected`; `2px solid var(--nock-navy)`, `outline-offset: -2px` (was 3px, -3px) |
 | Letter cell in my word (`data-in-word="true"`) | background | `--nock-word` |
@@ -193,8 +230,8 @@ border width, padding, position or element changes, except the flash overlay.
 | Pencil letter outside a flash | `color` | `--nock-pencil` |
 | Wrong letter (`data-wrong="true"`) | `text-decoration-color` | `--nock-red` |
 | Clue cell; its text; `clue-separator` | background; `color`; background | `--nock-clue-bg`; `--nock-clue-ink`; `--nock-clue-ink` |
-| Clue of the selected word (`.clue.active`) | background | `--nock-selected` (`_design.md` section 15, item 11) |
-| Empty cell (`data-type="empty"`) | background | `--nock-rule` (`_design.md` section 15, item 12) |
+| Clue of the selected word (`.clue.active`) | background | `--nock-selected` (decided by the human on 2026-10-16, `_design.md` section 6) |
+| Empty cell (`data-type="empty"`) | background | `--nock-rule` (decided by the human on 2026-10-16, `_design.md` section 6) |
 | `clue-arrow` | border colour | `--nock-ink` |
 | `clue-flag`, `nickname-error` text | `color` | `--nock-red` |
 | `chat-unread` | background; `color` | `--nock-red`; `--nock-white` |
@@ -203,7 +240,7 @@ border width, padding, position or element changes, except the flash overlay.
 | `keyboard` | background | `--nock-keyboard-bg` |
 | `clue-bar` | background | `--nock-clue-bg` (the navy bar comes with the room layout) |
 | `vote-banner` | background; bottom border colour | `--nock-white`; `--nock-navy` |
-| `connection-banner` | background | `--nock-clue-bg` |
+| `connection-banner` | background; text | `--nock-clue-bg`; `--nock-ink` (the band's colours; its place and dot come with the room layout) |
 | Chat panel and reaction picker shadows | shadow colour | `--nock-shadow` (offsets and blur unchanged) |
 | Author band of a departed author (spec 019) | the two hatch colours | `--nock-ink` and `--nock-white` |
 
@@ -290,8 +327,8 @@ in `.ts` files and `<script>` blocks `//` to the end of the line):
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (new) (browser with live server, probes) Each colour token resolves to its value. On `/`, for each of the 21 tokens of "Colour tokens", a probe `div` with `color: var(<token>)` has the computed colour of the table, as `rgb()`: for example `--nock-navy` gives rgb(27, 47, 85), `--nock-ink` rgb(20, 24, 31), `--nock-selected` rgb(207, 221, 243), `--nock-reveal` rgb(194, 65, 12).
-- **AC-2** (new) (browser with live server, probes) Each translucent token resolves to its value. On `/`, for each of the 8 translucent tokens, a probe with `color: var(<token>)` parses to the table's channels and alpha: for example `--nock-scrim` gives 20, 24, 31 with alpha 0.35, and `--nock-legend-bg` 255, 255, 255 with alpha 0.96.
+- **AC-1** (new) (browser with live server, probes) Each colour token resolves to its value. On `/`, for each of the 22 tokens of "Colour tokens", a probe `div` with `color: var(<token>)` has the computed colour of the table, as `rgb()`: for example `--nock-navy` gives rgb(27, 47, 85), `--nock-ink` rgb(20, 24, 31), `--nock-selected` rgb(207, 221, 243), `--nock-reveal` rgb(194, 65, 12).
+- **AC-2** (new) (browser with live server, probes) Each translucent token resolves to its value. On `/`, for each of the 9 translucent tokens, a probe with `color: var(<token>)` parses to the table's channels and alpha: for example `--nock-scrim` gives 20, 24, 31 with alpha 0.35, and `--nock-legend-bg` 255, 255, 255 with alpha 0.96.
 - **AC-3** (new) (browser with live server, probes; browser with mocked socket) The eight imposed player colours and their inks are in place. On `/`, probes give `--player-colour-0` to `--player-colour-7` and `--player-ink-0` to `--player-ink-7` the colours of the table (for example `--player-colour-1` rgb(96, 136, 56) and `--player-ink-1` rgb(75, 106, 44)). On the room page, given a FX-01 snapshot with eight players of colours 0 to 7, the `roster-colour` swatch of the player with `data-colour` N has the computed background of `--player-colour-N`, for each N.
 - **AC-4** (new) (browser with live server; browser with mocked socket) The page base uses the tokens. On `/` and on the room page with a FX-01 snapshot, `body` has the computed `background-color` rgb(255, 255, 255) and `color` rgb(20, 24, 31), and its computed `font-family`, read as a list of family names with quotes removed, is `Source Sans 3`, `Segoe UI`, `system-ui`, `sans-serif`. A probe with `font-family: var(--nock-font-clue)` reads `IBM Plex Sans Condensed`, `Arial Narrow`, `Roboto Condensed`, `sans-serif`.
 - **AC-5** (new; applies once the human settles Open question 1) (browser with live server) Nock serves its fonts itself. The test records every request the page makes from `page.goto("/")` on. After `document.fonts.ready`, `document.fonts.load(f)` resolves to a non-empty list of `FontFace` objects, each with `status` `loaded`, for each `f` of: `400 16px "Source Sans 3"`, `500 16px "Source Sans 3"`, `600 16px "Source Sans 3"`, `700 16px "Source Sans 3"`, `italic 500 16px "Source Sans 3"`, `italic 700 16px "Source Sans 3"`, `500 16px "IBM Plex Sans Condensed"`, `600 16px "IBM Plex Sans Condensed"`. Every recorded request of resource type `font` has a URL on the live server's origin and a response with status 200, and no recorded request goes to another host.
@@ -307,7 +344,7 @@ The words in brackets say how each criterion is tested.
 - **AC-15** (new) (browser with mocked socket) Today's room elements take the token colours. Given a FX-01 snapshot with `you` `p1` (colour 0) and `p2` (colour 3) where (1, 0) holds `T` locked, (1, 1) holds `X` with `wrong` true, (2, 3) holds `D` as a pencil letter of `p1`, and `p2` selects (3, 1) `across`, after the player taps (2, 2) (`across`, VIDE): (2, 2) has background rgb(207, 221, 243) and outline `2px` `solid` rgb(27, 47, 85) with `outline-offset` `-2px`; (2, 1) has background rgb(230, 237, 249); (1, 0) has background rgb(227, 231, 238); (1, 1) has `text-decoration-color` rgb(180, 35, 24); (2, 3), in my word, has `color` rgb(85, 91, 103); (3, 2), in `p2`'s word, has a background within 1 per channel of rgb(231, 223, 250) (`--player-colour-3` at 16 % over white); every `cell` has a right border colour rgb(154, 163, 178); the clue cell (0, 2) has background rgb(238, 242, 248) and its `clue-text` colour rgb(27, 34, 48); its `clue-arrow` (a down arrow, `data-side="bottom"`) has the computed `border-top-color` rgb(20, 24, 31).
 - **AC-16** (new) (browser with mocked socket) A flash is the replacer's colour at 38 % over white, under an ink letter. Given a FX-01 snapshot with `you` `p1` (colour 0) and `p2` (colour 1), where (1, 0) holds `T` by `p1` and (1, 1) holds `A` as a pencil letter of `p1`, after the player taps (1, 0): when the mock sends `letter_changed` by `p2` setting (1, 0) to `B`, then within 300 ms (1, 0) has `data-flash="1"`, its computed `background-color` is rgb(255, 255, 255), its `color` is rgb(20, 24, 31), and it holds exactly one `cell-flash` element with `aria-hidden="true"`, computed `position` `absolute`, `z-index` `-1`, `pointer-events` `none`, `opacity` `0.38`, `background-color` equal to `p2`'s `roster-colour` background (rgb(96, 136, 56)), and a bounding box within 1 px of the cell's padding box; the cell's computed `isolation` is `isolate`. When the mock then sends `letter_changed` by `p2` setting (1, 1) to the pencil letter `C`, (1, 1) shows `C` with `font-style` `italic` and `color` rgb(20, 24, 31) while `data-flash` is `1`. Once `data-flash` is `""` again (spec 016's 1,000 ms), the cell holds no `cell-flash`.
 - **AC-17** (new) (browser with mocked socket) The flash keeps the letter readable for every player colour. For each N from 0 to 7, given a FX-01 snapshot with `you` `p1` and a player of colour N who replaces `p1`'s `T` at (1, 0) (as AC-16), the letter's contrast against the composite of `--player-colour-N` at 38 % over white is at least 4.5:1, and spec 035's contrast scan run during the flash finds no offending element.
-- **AC-18** (new) (static) The icon module holds the design's shapes. `web/src/lib/icons.ts` exports `ICONS` and `NOCK_MARK_POINTS`; its text contains each `d` string of the table of "Icons" exactly once inside quotes, the numbers `x: 2`, `y: 6`, `width: 20`, `height: 12`, `rx: 2` for `clavier`'s rectangle, the eight names `undo`, `aide`, `salon`, `clavier`, `menu`, `crayon`, `swap`, `effacer` as keys, and the string `'0,0 10,0 10,14 5,10 0,14'`.
+- **AC-18** (new) (static) The icon module holds the design's shapes. `web/src/lib/icons.ts` exports `ICONS`, `PLAYER_ICONS` and `NOCK_MARK_POINTS`; its text contains each `d` string and each `points` string of the two tables of "Icons" exactly once inside quotes, the numbers `x: 2`, `y: 6`, `width: 20`, `height: 12`, `rx: 2` for `clavier`'s rectangle, the circles `cx: 12, cy: 13.5, r: 7.5`, `cx: 12, cy: 12, r: 9` and `cx: 5, cy: 5, r: 4.4`, the rectangle `x: 0.9, y: 0.9, width: 8.2, height: 8.2`, the thirteen names `undo`, `aide`, `salon`, `clavier`, `menu`, `crayon`, `swap`, `effacer`, `chrono`, `flag`, `chevron-left`, `chevron-right`, `smile` as keys, and the string `'0,0 10,0 10,14 5,10 0,14'`. (Note from the spec writer, 2026-10-16: second round, the five icons of sheet 4.2 and the player icons of sheet 4.3 were added.)
 - **AC-19** (new) (static) The built CSS holds no colour outside the token block. With the rules of "Colour scans": the CSS under `web/dist/assets/` declares each custom property of "Colour tokens", the translucent tokens and the player table exactly once; and its built CSS scan finds no colour literal. The scan's checker flags the samples `a{color:#1b2f55}`, `a{color:#FFF}`, `a{background:rgb(0 0 0/20%)}`, `a{border-color:White}`, `a{box-shadow:0 1px 0 hsl(0 0% 0%)}`, `a{outline-color:Highlight}`, and accepts `:root{--nock-navy:#1b2f55}`, `:root{--player-ink-1:#4b6a2c}`, `a{color:var(--nock-navy)}`, `a{background:transparent}`, `a{border-color:currentColor}`, `a{background:#0000}`, `a{background:color-mix(in srgb,var(--player-colour-1) 16%,var(--nock-white))}`, `a{font-family:"White Rabbit"}`, `a{background:url(red.svg)}` and `a{grid-area:sidebar}`.
 - **AC-20** (new) (static) The client sources hold no colour outside the token block. With the rules of "Colour scans", the source scan of `web/src` finds nothing. The scan's checker flags the samples `<style>a{color:#1b2f55}</style>`, `<rect fill="#1B2F55"/>`, `<rect fill="white"/>`, `<div style="color: rgb(0 0 0)">`, and in a `.ts` file `const c = '#14181f'`; and accepts `<rect fill="currentColor"/>`, `<rect fill="none"/>`, `/* #1B2F55 */`, `// #1B2F55`, `const id = '#cell-1-2'` and `<p>white</p>`.
 
@@ -376,6 +413,10 @@ checks each test against it.
 - Putting the primitives on today's controls (they change sizes); later specs do
   it control by control.
 - Auteurs mode and its inks on screen (the ink tokens exist; nothing uses them).
+- The Menu switches decided by the human on 2026-10-16: « Mots des autres » (the
+  tint stays on, as today), « Auteurs » and « Accessibilité » with its player
+  icons (the shapes exist in `icons.ts`; nothing draws them). (Note from the spec
+  writer, 2026-10-16: second round, added.)
 - Font Awesome: no icon is missing yet.
 - Line heights and the type scale of `_design.md` section 4 beyond the primitives.
 - A dark mode, forced-colours (high contrast) styles, print styles.
@@ -421,15 +462,14 @@ Proposed by the spec writer, each already part of the spec above:
    `@font-face` rules in `app.css`. Pick: the npm packages. Approving this spec
    would approve that choice; if the human declines both, AC-5 and AC-6 go and
    the stacks fall back to the system fonts.
-2. Rule grey (`_design.md` section 15, item 6). This spec uses the sheet's
-   #9AA3B2 (2.54:1). If the human picks #8A93A3 (3.10:1), only the token's value
-   and AC-1 and AC-15 change.
-3. Departed grey (`_design.md` section 15, item 7). This spec uses #6B7079, which
-   nothing draws yet. If the human picks #5C616A, only the token's value and AC-1
-   change.
-4. Empty cells and the selected word's clue (`_design.md` section 15, items 11 and
-   12) have no look in the sheet. This spec maps them to rule grey and selected
-   blue for now. Other picks change AC-15's table only.
-5. The connection banner (spec 017) has no look in the sheet. This spec gives it
-   clue blue-grey with a rule-grey border, the neutral of "not yet". Pick: keep
-   until the room layout spec draws it.
+2. Departed grey (`_design.md` section 15, "Still open" item 3). This spec uses
+   sheet 4.2's #5C616A (4.53:1 on selected blue), pending the human's approval;
+   nothing draws it yet. If the human keeps #6B7079, only the token's value and
+   AC-1 change.
+
+(Note from the spec writer, 2026-10-16: second round. Three questions of the
+first round are settled and left this list. Rule grey: #9AA3B2 is kept, decided by
+the human on 2026-10-16. Empty cells (rule grey) and the selected word's clue
+(selected blue): decided by the human on 2026-10-16 and drawn in sheet 4.2. The
+connection banner: drawn in sheet 4.2 as a clue blue-grey band with ink text and a
+line-grey border, which the mapping table now follows.)

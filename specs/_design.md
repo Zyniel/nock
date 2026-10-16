@@ -3,15 +3,16 @@
 Not a spec: the quality gate ignores files starting with "_". Every spec that puts
 something on screen follows this note, as every "Public interface" follows
 `specs/_architecture.md`. Decided with the human on 2026-10-16, from the design
-session whose result is the page `docs/design/cell-sheet.html` (version 4.2,
-commit d3382db; first published as
+session whose result is the page `docs/design/cell-sheet.html` (version 4.3 on
+`feat/design-system`; 4.2 was commit d3382db; first published as
 https://claude.ai/artifact/VCuP9WSmsdXA7JJEvb9ixV).
 
 (Note from the spec writer, 2026-10-16: second round. The human's decisions of
 2026-10-16 and sheet version 4.2 are folded in: the remaining screens of the
 sheet's section 12, the arrow collision rules, the drawn pictograms, empty cells,
 the active clue, the catch-up ring, the connection band and the full-but-wrong
-band. Each decision carries the note "decided by the human on 2026-10-16".)
+band. Each decision carries the note "decided by the human on 2026-10-16". The
+Accessibilité mode and its player icons come from sheet 4.3.)
 
 Values are CSS values. `s` is the side of a grid cell in CSS px, its right and
 bottom grid line included (the cell is `box-sizing: border-box`). "max(7px, 0.22 s)"
@@ -387,7 +388,7 @@ triangle. This replaces the dashed borders of spec 013 and the initials and "+k"
 labels of spec 035 (section 12).
 
 Accessibilité mode (decided by the human on 2026-10-16): a switch in the Menu,
-« Accessibilité », off by default, remembered per browser like the other Menu
+« Accessibilité » (« activée » / « désactivée »), off by default, remembered per browser like the other Menu
 switches. While it is off, the triangles carry colour only, by the human's choice;
 the Joueurs list of the Salon (name, state, current clue) says in words where each
 player is. While it is on, each triangle is replaced by a small icon, one distinct
@@ -396,14 +397,35 @@ icon per player by join index (as the colours), drawn in that player's
 Colour is then no longer the only sign. Spec 035 AC-6 and AC-11 are refined
 accordingly (section 12).
 
-#### Player icons (placeholder)
+#### Player icons
 
-PLACEHOLDER, waiting for the coordinator's drawing in
-`docs/design/cell-sheet.html` (section 1 and the phone mock-up). To fill in from
-the sheet: for each join index 0 to 7, the icon's name and SVG shapes; its box
-size as a fraction of `s` with a px minimum; its position in each corner; its
-stroke or fill; its contrast on white and on selected blue; and its clearance from
-the letter and the arrows. No spec may use the mode until this table is filled.
+Drawn in sheet 4.3 (`PICONS`, `ICON_NAMES`, `picon()` and the access branch of
+`corners()`). Each icon is filled with its player's `--player-colour-N`, with no
+outline, in an SVG `viewBox="0 0 10 10"`:
+
+| Index | Name | Shape |
+| --- | --- | --- |
+| 0 | Rond | `<circle cx="5" cy="5" r="4.4"/>` |
+| 1 | Carré | `<rect x="0.9" y="0.9" width="8.2" height="8.2"/>` |
+| 2 | Triangle | `<polygon points="5,0.4 9.7,9.3 0.3,9.3"/>` |
+| 3 | Losange | `<polygon points="5,0.1 9.9,5 5,9.9 0.1,5"/>` |
+| 4 | Étoile | `<polygon points="5,0.2 6.3,3.6 9.9,3.7 7.1,6 8.1,9.6 5,7.5 1.9,9.6 2.9,6 0.1,3.7 3.7,3.6"/>` |
+| 5 | Croix | `<polygon points="3.3,0.4 6.7,0.4 6.7,3.3 9.6,3.3 9.6,6.7 6.7,6.7 6.7,9.6 3.3,9.6 3.3,6.7 0.4,6.7 0.4,3.3 3.3,3.3"/>` |
+| 6 | Cœur | `<path d="M5 9.4L1.1 5.5A2.45 2.45 0 0 1 5 2.3A2.45 2.45 0 0 1 8.9 5.5Z"/>` |
+| 7 | Sablier | `<polygon points="0.6,0.6 9.4,0.6 5.6,5 9.4,9.4 0.6,9.4 4.4,5"/>` |
+
+Geometry in a letter cell: the icon's box has side max(6px, 0.24 s) and sits
+inset from its corner by max(1px, 0.04 s) on both axes; same corners and arrival
+order as the triangles (top-left, top-right, bottom-right, bottom-left), at most
+4; same layer as the triangles (2), so under the notch, the arrows and my
+selection border. The colours are the triangles', so each icon keeps at least
+3:1 on my selected cell (section 3). At 18 px cells four icons fit but touch the
+letter; this is accepted, as players zoom (spec 006).
+
+Elsewhere: wherever a player dot appears (stream messages, the Joueurs list, the
+recap's « Qui a fait quoi », the roster swatch until it moves into the Salon), the
+mode shows that player's icon at 12 px instead of the dot. The Auteurs legend
+names players in their ink with no dot; it does not change.
 
 ### Clue cells
 
@@ -629,9 +651,9 @@ button on a computer.
 
 A popover anchored to the right (6 px from the right edge on a phone), in this
 order: « Auteurs » (detail « activé » / « désactivé »); « Mots des autres »
-(detail « teintés » / « sans teinte »); « Accessibilité » (detail « activé » /
-« désactivé », section 6; its place in the list is the spec writer's until the
-sheet draws it); « Inviter » (detail « lien »); « Réglages
+(detail « teintés » / « sans teinte »); « Accessibilité » (detail « activée » /
+« désactivée », off by default, per browser, section 6; its place in the list is
+the spec writer's pick); « Inviter » (detail « lien »); « Réglages
 de l'hôte » (host only); « Compte » (spec 033; not drawn in the sheet's Menu, the
 spec writer's place for it); separator; « Masquer le chrono » (« Afficher le
 chrono » while hidden); « Retour aux grilles ».
@@ -977,8 +999,7 @@ Each step leaves the app working and every test passing.
    badges, notes (spec 041). Today's screens take the token colours with no layout
    change.
 2. Grid cells: section 6 (with specs 006, 007, 013, 016, 021, 023, 024, 034, 035
-   refined), with the Accessibilité mode's icons once their table is filled.
-   Needs the DEFERRED, high notch item settled first.
+   refined), with the Accessibilité mode's icons. Needs the DEFERRED, high notch item settled first.
 3. Room layout: top bar, sheet and column, Salon, 3-second notes, Aide and Menu,
    connection band, reactions, room sheets (specs 010, 011, 013, 014, 017, 018,
    020, 022, 023, 024, 027, 033, 035, 040 refined). Needs the DEFERRED, high notch
@@ -1000,7 +1021,8 @@ Each step leaves the app working and every test passing.
 - A player's corner is given by the order of arrival on the cell (section 6).
 - An « Accessibilité » mode in the Menu, off by default, per browser: while on,
   each corner triangle becomes that player's own icon in their colour, same
-  corners, same order, at most 4 (section 6; icon table pending). This settles
+  corners, same order, at most 4, and replaces the player dot elsewhere (section
+  6, icons drawn in sheet 4.3). This settles
   the former deferred item "corner triangles carry colour only": with the mode
   off, triangles stay colour-only by the human's choice, and spec 035 AC-6 is
   refined so that its non-colour sign is the mode plus the Joueurs list.
@@ -1009,19 +1031,13 @@ Each step leaves the app working and every test passing.
 
 ### Deferred, high importance
 
-Skipped by the human on 2026-10-16: neither accepted nor refused. Both must be
+Skipped by the human on 2026-10-16: neither accepted nor refused. It must be
 settled before the grid-cell and room-layout specs are approved (section 14),
-because each one decides how a spec of the accessibility bar is refined.
+because it decides how a spec of the accessibility bar is refined. (The other
+item first deferred here, "corner triangles carry colour only", was settled the
+same day by the Accessibilité mode; see "Decided" above.)
 
-1. Corner triangles carry colour only. Spec 035 AC-6 requires that colour is never
-   the only signal of a player's cursor (initials today), and AC-11 places those
-   initials and the "+k" label. With triangles, the only non-colour sign of where
-   a player is would be the Joueurs list in the Salon (name, state, current clue).
-   Why it matters: it is an accessibility rule (WCAG 1.4.1, use of colour) of a
-   `done` spec; colour-blind players and players with five or more team-mates rely
-   on it (section 3's weakest pairs reach only 7.1). Until settled, spec 035 AC-6
-   and AC-11 stand, and the grid-cell spec cannot remove the initials.
-2. The revealed notch is 0.22 s by 0.11 s (min 7 by 4 px), smaller than spec 024
+1. The revealed notch is 0.22 s by 0.11 s (min 7 by 4 px), smaller than spec 024
    AC-9's minimum (at least 6 px and a quarter of the side, wide and high). At a
    29 px cell it is 7 by 4 px, against 8 by 8 px. Why it matters: the notch is the
    non-colour sign of a revealed letter (with bold), and spec 024 sized it so it
