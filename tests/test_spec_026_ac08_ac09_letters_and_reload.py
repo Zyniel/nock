@@ -226,4 +226,6 @@ def test_ac9_a_stored_full_wrong_room_loads_unsolved_and_can_still_be_solved(
         loaded, "p1", EditLetter(row=4, column=4, letter="T"), NOW + 754.0
     )
     assert fixed.reply == ()
-    assert events_of(fixed)[-1] == GridSolved(seq=state.seq + 2, elapsed_ms=754000)
+    # The shared timer (spec 027) started with the first letter at NOW + 100.0 and
+    # ran while a player was connected: 654 s up to NOW + 754.0, not 754 s.
+    assert events_of(fixed)[-1] == GridSolved(seq=state.seq + 2, elapsed_ms=654000)
