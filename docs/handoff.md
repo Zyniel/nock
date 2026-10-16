@@ -155,7 +155,13 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   changes in their own. Spec 032: a returning player whose nickname was taken
   comes back as "Ana 2" (fold it into the spec's decisions when 032 starts).
   The finish hook runs a quick gate, and cloud sessions use CI's fonts.
-  Technical variables should not contain special characters (spec 036).
+  Technical variables should not contain special characters: `NOCK_PORT`,
+  `NOCK_HOST` and `NOCK_DATABASE` refuse control characters, the error showing
+  the value escaped (a spec 036 refinement, in its own pull request).
+- 2026-10-16: the lead fixes tooling incoherences and weaknesses (a timeout, a
+  flaky setup, a hook blocking the wrong thing) without asking, in a pull
+  request of their own; new tooling behaviour and new dependencies still need
+  the human (written in `CLAUDE.md`).
 
 ## Lead decisions of 2026-10-15 worth knowing
 
@@ -175,10 +181,6 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 ## Pending questions for the human
 
-- Spec 036 and the human's rule "technical variables should not contain
-  special characters" (2026-10-16): `NOCK_PORT` refuses them and its message
-  will show the value escaped; asked whether `NOCK_HOST` and `NOCK_DATABASE`
-  should refuse control characters too.
 - A separate cloud session ("Nock hosting plan (document only)") drafts
   `docs/hosting.md` on branch `docs/hosting-plan`.
 
