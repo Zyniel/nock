@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import { listenForEscape } from './escapeKey'
   import { t } from './i18n'
   import { REACTION_VALUES } from './roomSession'
   import type { ReactionValue } from './roomSession'
@@ -45,19 +46,12 @@
 
   void focusFirstOption()
 
+  // Escape while the focus is inside the picker closes it.
   $effect(() => {
     if (picker === null) {
       return
     }
-    const element = picker
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-      }
-    }
-    element.addEventListener('keydown', onKeyDown)
-    return () => element.removeEventListener('keydown', onKeyDown)
+    return listenForEscape(picker, onClose)
   })
 
   // Runs before the page disables the button (a mute, or no word selected): the

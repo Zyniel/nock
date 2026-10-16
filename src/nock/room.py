@@ -2178,17 +2178,19 @@ def after_restart(state: RoomState, now: float) -> Outcome:
         The outcome: each player not disconnected gets `disconnected_at = now`,
         no selection and no recent edits, with one logged
         `PlayerStateChanged(disconnected)` each, in players order. Every
-        player, disconnected or not, gets empty chat and reaction windows, with
-        no entry (spec 022 decision 17). An open vote keeps the requester's yes
-        only, with no entry (spec 025 decision 16).
+        player, connected or disconnected, gets empty chat and reaction
+        windows, with no entry (spec 022 decision 17). An open vote keeps the
+        requester's yes only, with no entry (spec 025 decision 16).
     """
     seq = state.seq
     players: list[PlayerRecord] = []
     entries: list[LogEntry] = []
     for player in state.players:
-        player = player.model_copy(update={"recent_chat": (), "recent_reactions": ()})
         if player.state == PlayerState.DISCONNECTED:
-            players.append(player)
+            already_disconnected = player.model_copy(
+                update={"recent_chat": (), "recent_reactions": ()}
+            )
+            players.append(already_disconnected)
             continue
         seq += 1
         disconnected = player.model_copy(
@@ -2197,6 +2199,8 @@ def after_restart(state: RoomState, now: float) -> Outcome:
                 "disconnected_at": now,
                 "selection": None,
                 "recent_edits": (),
+                "recent_chat": (),
+                "recent_reactions": (),
             }
         )
         players.append(disconnected)

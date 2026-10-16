@@ -1643,7 +1643,7 @@
       {isHost}
       {isMuted}
       isPaced={isChatPaced}
-      isConnected={session.status === 'joined'}
+      isJoined={session.status === 'joined'}
       isBelowPicker={!isPopoverSideBySide}
       bind:text={chatText}
       onSend={sendChat}

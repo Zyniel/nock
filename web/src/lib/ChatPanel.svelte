@@ -3,6 +3,7 @@
   import { t } from './i18n'
   import { nameOf } from './activityFeed'
   import { shownChatLines } from './chat'
+  import { listenForEscape } from './escapeKey'
   import {
     followListTabStop,
     keepFeedEndOnResize,
@@ -23,7 +24,7 @@
     isHost,
     isMuted,
     isPaced,
-    isConnected,
+    isJoined,
     isBelowPicker,
     text = $bindable(),
     onSend,
@@ -42,7 +43,7 @@
     // True while the page holds back my own chat messages.
     isPaced: boolean
     // True while the page is joined to the room.
-    isConnected: boolean
+    isJoined: boolean
     // True when the room is too narrow to put the panel beside the picker.
     isBelowPicker: boolean
     // What is typed in the input. The page keeps it while the panel is closed.
@@ -62,7 +63,7 @@
   let lines = $derived(shownChatLines(history))
   // The other players, in roster order: the host's mute buttons.
   let otherPlayers = $derived(players.filter((player) => player.player_id !== you))
-  let isSendDisabled = $derived(text.trim() === '' || !isConnected || isMuted || isPaced)
+  let isSendDisabled = $derived(text.trim() === '' || !isJoined || isMuted || isPaced)
 
   // `tick` resolves once the panel is on the page. A muted player's input is
   // disabled: the focus then stays on the toggle.
@@ -77,19 +78,12 @@
 
   void focusInputAfterOpening()
 
+  // Escape while the focus is inside the panel closes it.
   $effect(() => {
     if (panel === null) {
       return
     }
-    const element = panel
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        onClose()
-      }
-    }
-    element.addEventListener('keydown', onKeyDown)
-    return () => element.removeEventListener('keydown', onKeyDown)
+    return listenForEscape(panel, onClose)
   })
 
   // Runs before the page disables the chat controls at a mute: when the focus
