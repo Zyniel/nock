@@ -18,13 +18,15 @@ It also marks every test, so the gate can pick them with `-m` (2026-10-15):
   its own, because the load of parallel workers makes it flaky. The files are
   listed in SERIAL_TEST_FILES.
 
-And it warms each browser up once, before the first test that uses it (see
-`warm_up_browser`).
+It warms each browser up once, before the first test that uses it (see
+`warm_up_browser`). And with `--nock-specs 027,028` (the gate's `--specs`) it
+leaves out the browser tests of every other spec (2026-10-16).
 """
 
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Generator
 from pathlib import Path
 
@@ -32,6 +34,9 @@ import pytest
 from playwright.sync_api import Browser, sync_playwright
 
 ENGINE_NAMES: tuple[str, ...] = ("chromium", "firefox", "webkit")
+
+# The spec number in a test file's name: tests/test_spec_027_ac05_display.py.
+TEST_FILE_SPEC_PATTERN = re.compile(r"^test_spec_(\d{3})_")
 
 # The browsers of this process already warmed up, by id (a session's browsers
 # live until its end, so an id is never reused meanwhile).
@@ -65,6 +70,15 @@ def find_missing_engines() -> set[str]:
             if not Path(browser_type.executable_path).exists():
                 missing.add(engine_name)
     return missing
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """Add --nock-specs, the gate's --specs."""
+    parser.addoption(
+        "--nock-specs",
+        default="",
+        help="Comma-separated spec numbers: run only their browser tests.",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -123,9 +137,10 @@ def warm_up_browser(request: pytest.FixtureRequest) -> None:
 def pytest_collection_modifyitems(
     config: pytest.Config, items: list[pytest.Item]
 ) -> Generator[None]:
-    """Mark the browser and serial tests, then leave out missing engines."""
+    """Mark the browser and serial tests, then leave out what is not run."""
     mark_items(items)
     yield
+    deselect_other_specs(config, items)
     deselect_missing_engines(config, items)
 
 
@@ -136,6 +151,32 @@ def mark_items(items: list[pytest.Item]) -> None:
             item.add_marker(pytest.mark.browser)
         if item.path.name in SERIAL_TEST_FILES:
             item.add_marker(pytest.mark.serial)
+
+
+def spec_of(item: pytest.Item) -> str | None:
+    """Return the spec number of a test's file, or None for other files."""
+    match = TEST_FILE_SPEC_PATTERN.match(item.path.name)
+    if match is None:
+        return None
+    return match.group(1)
+
+
+def deselect_other_specs(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Leave out the browser tests of the specs not named in --nock-specs."""
+    specs_text = str(config.getoption("--nock-specs"))
+    if not specs_text:
+        return
+    wanted_specs = {part.strip() for part in specs_text.split(",") if part.strip()}
+    kept: list[pytest.Item] = []
+    deselected: list[pytest.Item] = []
+    for item in items:
+        if engine_of(item) is not None and spec_of(item) not in wanted_specs:
+            deselected.append(item)
+        else:
+            kept.append(item)
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept
 
 
 def deselect_missing_engines(config: pytest.Config, items: list[pytest.Item]) -> None:

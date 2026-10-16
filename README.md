@@ -136,12 +136,17 @@ The browser tests run in Chromium and WebKit by default; `--browsers all` (or
 `NOCK_BROWSERS=all`) adds Firefox. `--tests browser` or `--tests other` runs only
 the tests with or without a browser, and `--skip-static` skips steps 1 to 4
 except the build. CI uses them to run one job per engine and system.
+`--specs 027,028` keeps the browser tests of those specs only (the tests without
+a browser all run): the quick gate an implementer passes before it finishes.
 
 The same script runs in three places:
 
 - **You:** `uv run python scripts/gate.py`
 - **The agents:** `scripts/hooks/role_gate.py` runs it when the test-writer or the
   implementer tries to finish, and sends the failures back until it is green.
+  The test-writer passes `--stage tests`; the implementer passes the quick gate
+  of the specs its branch changed (`--specs`, Chromium only), which fits in the
+  hook's time. CI runs everything.
 - **GitHub:** `.github/workflows/ci.yml` on every pull request and push to `main`.
 
 A second hook, `scripts/hooks/guard_paths.py`, blocks an agent that tries to edit
@@ -157,7 +162,7 @@ play both sides from PowerShell:
 '{"agent_type":"implementer","cwd":".","tool_input":{"file_path":"tests/test_x.py"}}' |
   uv run --no-project python scripts/hooks/guard_paths.py; $LASTEXITCODE
 
-# The implementer tries to finish: runs the full gate, expect exit code 0
+# The implementer tries to finish: runs the quick gate, expect exit code 0
 '{"agent_type":"implementer","cwd":"."}' |
   uv run --no-project python scripts/hooks/role_gate.py; $LASTEXITCODE
 ```
@@ -170,7 +175,8 @@ gh repo create nock --private --source . --push
 ```
 
 CI needs no secret and no configuration. To make it binding, protect `main` in the
-repository settings and require the three "Quality gate" checks before merging.
+repository settings and require the `Quality gate` check before merging: it
+passes only when every job of CI passed.
 
 ## 6. From subagents to an agent team
 

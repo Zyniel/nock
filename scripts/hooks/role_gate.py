@@ -5,6 +5,12 @@ Wired in .claude/settings.json to two events:
     TeammateIdle: an agent team teammate is about to go idle (the role is
         "teammate_name").
 
+The test-writer must pass the gate's "tests" stage. The implementer must pass
+a quick gate that fits the hook's time (human decision, 2026-10-16): the static
+checks, every test without a browser, and the browser tests in Chromium of the
+specs the branch changed since `main` (found from the names of the changed
+spec, test and harness files). CI runs everything else.
+
 Exit codes understood by Claude Code:
     0: the agent may stop.
     2: the agent may not stop. Whatever was written to stderr is sent back to
@@ -16,6 +22,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -30,6 +37,16 @@ ROLE_STAGES: dict[str, str] = {
 
 MAX_OUTPUT_LINES = 80
 GATE_TIMEOUT_SECONDS = 540
+GIT_TIMEOUT_SECONDS = 30
+# The branch the changes are measured from, first the remote one.
+BASE_REFS: tuple[str, ...] = ("origin/main", "main")
+# The paths that name a spec: specs/027-shared-timer.md,
+# tests/test_spec_027_ac05_display.py, tests/spec027_harness.py.
+SPEC_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^specs/(\d{3})-"),
+    re.compile(r"^tests/test_spec_(\d{3})_"),
+    re.compile(r"^tests/spec(\d{3})_"),
+)
 
 
 def find_project_root(start_directory: Path) -> Path:
@@ -67,6 +84,118 @@ def resolve_stage(role_name: str) -> str | None:
     return None
 
 
+def run_git(project_root: Path, arguments: list[str]) -> str | None:
+    """Run one git command in the project and return its output.
+
+    Args:
+        project_root: The checkout to run it in.
+        arguments: The git arguments, without "git".
+
+    Returns:
+        The standard output, or None when git is missing or the command fails.
+    """
+    git_path = shutil.which("git")
+    if git_path is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [git_path, *arguments],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GIT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout
+
+
+def changed_paths(project_root: Path) -> list[str]:
+    """Return the paths changed since the branch left `main`, committed or not.
+
+    Args:
+        project_root: The checkout whose changes are wanted.
+
+    Returns:
+        Repository-relative paths; empty when git cannot tell.
+    """
+    base_commit = None
+    for base_ref in BASE_REFS:
+        output = run_git(project_root, ["merge-base", "HEAD", base_ref])
+        if output is not None and output.strip():
+            base_commit = output.strip()
+            break
+    if base_commit is None:
+        return []
+    paths: list[str] = []
+    changed = run_git(project_root, ["diff", "--name-only", base_commit])
+    untracked = run_git(project_root, ["ls-files", "--others", "--exclude-standard"])
+    for output in (changed, untracked):
+        if output is not None:
+            paths.extend(line for line in output.splitlines() if line)
+    return paths
+
+
+def changed_specs(project_root: Path) -> list[str]:
+    """Return the numbers of the specs whose spec, tests or harness changed.
+
+    Args:
+        project_root: The checkout whose changes are wanted.
+
+    Returns:
+        Three-digit spec numbers, sorted; empty when none changed.
+    """
+    specs: set[str] = set()
+    for path in changed_paths(project_root):
+        for pattern in SPEC_PATH_PATTERNS:
+            match = pattern.match(path)
+            if match is not None:
+                specs.add(match.group(1))
+    return sorted(specs)
+
+
+def gate_arguments(stage: str, project_root: Path) -> list[str]:
+    """Return the gate's arguments for a role's stage.
+
+    Args:
+        stage: The role's stage, "tests" or "full".
+        project_root: The checkout the gate checks.
+
+    Returns:
+        "--stage tests" for the test-writer. For the implementer, the quick
+        gate: the changed specs' browser tests in Chromium, or no browser test
+        when no spec changed.
+    """
+    if stage == "tests":
+        return ["--stage", "tests"]
+    specs = changed_specs(project_root)
+    if not specs or not gate_takes_specs(project_root):
+        return ["--tests", "other"]
+    return ["--specs", ",".join(specs), "--browsers", "chromium"]
+
+
+def gate_takes_specs(project_root: Path) -> bool:
+    """Tell whether the checkout's gate has --specs (added on 2026-10-16).
+
+    A worktree branched before then has an older gate; it gets the static
+    checks and the tests without a browser rather than an error.
+
+    Args:
+        project_root: The checkout the gate checks.
+    """
+    gate_script = project_root / "scripts" / "gate.py"
+    try:
+        gate_text = gate_script.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return '"--specs"' in gate_text
+
+
 def main() -> int:
     """Read the hook input from stdin, run the gate and decide."""
     try:
@@ -97,6 +226,7 @@ def main() -> int:
     # Same text encoding on Windows, macOS and Linux.
     environment["PYTHONIOENCODING"] = "utf-8"
 
+    arguments = gate_arguments(stage, project_root)
     command = [
         uv_path,
         "run",
@@ -104,8 +234,7 @@ def main() -> int:
         str(project_root),
         "python",
         str(gate_script),
-        "--stage",
-        stage,
+        *arguments,
     ]
     try:
         completed = subprocess.run(
@@ -134,8 +263,10 @@ def main() -> int:
 
     output_lines = completed.stdout.splitlines()
     shown_lines = output_lines[-MAX_OUTPUT_LINES:]
+    gate_description = " ".join(arguments)
     print(
-        f"The '{stage}' quality gate is failing, so {role_name} is not done yet.\n"
+        f"The quality gate ({gate_description}) is failing, so {role_name} is "
+        "not done yet.\n"
         "Fix the problems below, then finish again. Do not silence a check "
         "(noqa, type: ignore, skip, xfail) and do not edit files you do not own; "
         "if a failure is outside your files, say so in your report instead.\n",
