@@ -3,13 +3,20 @@
 Not a spec: the quality gate ignores files starting with "_". Every spec that puts
 something on screen follows this note, as every "Public interface" follows
 `specs/_architecture.md`. Decided with the human on 2026-10-16, from the design
-session whose result is the page `docs/design/cell-sheet.html` (version 4.1,
-published as https://claude.ai/artifact/VCuP9WSmsdXA7JJEvb9ixV).
+session whose result is the page `docs/design/cell-sheet.html` (version 4.2,
+commit d3382db; first published as
+https://claude.ai/artifact/VCuP9WSmsdXA7JJEvb9ixV).
+
+(Note from the spec writer, 2026-10-16: second round. The human's decisions of
+2026-10-16 and sheet version 4.2 are folded in: the remaining screens of the
+sheet's section 12, the arrow collision rules, the drawn pictograms, empty cells,
+the active clue, the catch-up ring, the connection band and the full-but-wrong
+band. Each decision carries the note "decided by the human on 2026-10-16".)
 
 Values are CSS values. `s` is the side of a grid cell in CSS px, its right and
 bottom grid line included (the cell is `box-sizing: border-box`). "max(7px, 0.22 s)"
 means the larger of 7 px and 22 % of `s`. `rem` is the root font size (16 px by
-default). Items marked OPEN wait for the human (section 15).
+default). Items marked OPEN or DEFERRED are in section 15.
 
 ## 1. Purpose and authority
 
@@ -34,6 +41,9 @@ Rules:
    Until a spec is refined, it wins for its own tests, and the code keeps passing
    them.
 5. Grid letters are the 26 capitals `A` to `Z`, never accented, in examples too.
+6. Strings are the app's own: `fr.json` and the key tables of the specs. Where the
+   sheet's sample text differs from a spec's string (for example « a rejoint la
+   partie » against spec 013's « a rejoint le salon »), the spec's string wins.
 
 ## 2. Colour tokens
 
@@ -43,38 +53,40 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 
 | Token | Value | Its one job | Never for | On white |
 | --- | --- | --- | --- | --- |
-| `--nock-navy` | #1B2F55 | The app's colour: top bar, top-bar icons and labels, clue bar, primary buttons, my selection border, focus ring, links, headings | Player marks | 13.26:1 |
-| `--nock-ink` | #14181F | All text and grid letters, direction arrows, 3-second notes (background), scrim and shadow base | Backgrounds of cells | 17.79:1 |
-| `--nock-muted` | #5E6573 | Secondary text: captions, event lines in the stream, disabled labels, menu details, inactive tabs | Grid letters | 5.86:1 |
+| `--nock-navy` | #1B2F55 | The app's colour: top bar, top-bar icons and labels, clue bar, primary buttons, my selection border, focus ring, links, headings, segmented control and switch when on | Player marks | 13.26:1 |
+| `--nock-ink` | #14181F | All text and grid letters, direction arrows, the catch-up ring, 3-second notes (background), the revealed notch during a flash, scrim and shadow base | Backgrounds of cells | 17.79:1 |
+| `--nock-muted` | #5E6573 | Secondary text: captions, event lines in the stream, disabled labels, menu details, inactive tabs, the room code above an entry card | Grid letters | 5.86:1 |
 | `--nock-pencil` | #555B67 | Pencil letters (italic), letter keys in pencil mode | Any other text | 6.82:1 |
-| `--nock-white` | #FFFFFF | Page, letter cells, menus, sheets, dialogs; text and icons on navy, ink and red | - | 1:1 |
-| `--nock-clue-bg` | #EEF2F8 | Clue cells, disabled buttons, the "not yet" status band | Selection | 1.12:1 |
+| `--nock-white` | #FFFFFF | Room page, letter cells, menus, sheets, dialogs, cards; text and icons on navy, ink and red | - | 1:1 |
+| `--nock-page` | #F6F7F9 | Background of the pages that are not the room (nickname, entry statuses, not found) behind their white card | Room page, cells | 1.07:1 |
+| `--nock-clue-bg` | #EEF2F8 | Clue cells, disabled buttons, the "not yet" status band, the connection band, the « hôte » tag | Selection | 1.12:1 |
 | `--nock-clue-ink` | #1B2230 | Clue text in clue cells, the separator between two clues | Any other text | 15.97:1 |
-| `--nock-word` | #E6EDF9 | My selected word, hovered menu item, pressed top-bar button, quiet buttons, pressed filter chips, progress bar track | Player tints | 1.18:1 |
-| `--nock-selected` | #CFDDF3 | My selected cell, and nothing else | Anything else | 1.37:1 |
+| `--nock-word` | #E6EDF9 | My selected word, hovered menu item, pressed top-bar button, quiet buttons, pressed filter chips, progress bar track, hovered reaction | Player tints | 1.18:1 |
+| `--nock-selected` | #CFDDF3 | My selected cell, and the half of the clue cell that holds my selected word's clue (decided by the human on 2026-10-16, drawn in sheet 4.2) | Anything else | 1.37:1 |
 | `--nock-locked` | #E3E7EE | Locked letter cells (with bold letters) | Disabled states | 1.24:1 |
-| `--nock-rule` | #9AA3B2 | Grid lines, input borders, catalogue thumbnail border | Text | 2.54:1 (OPEN: 3:1) |
-| `--nock-line` | #DDE2EA | Dividers in menus, panels and cards; card borders; filter chip borders; disabled button border | Grid lines | 1.30:1 |
-| `--nock-red` | #B42318 | "Look here": wrong-letter strike, ⚑ flag, unread badges, error text | Decoration | 6.57:1 |
+| `--nock-rule` | #9AA3B2 | Grid lines, empty cells, input borders, catalogue thumbnail border, switch track when off | Text | 2.54:1 (DEFERRED, low) |
+| `--nock-line` | #DDE2EA | Dividers in menus, panels and cards; card and list-row borders; filter chip borders; disabled button border; reaction pill and picker borders | Grid lines | 1.30:1 |
+| `--nock-red` | #B42318 | "Look here": wrong-letter strike, flag, unread badge, new-events dot, the connection band's dot, error text and the border of a field in error | Decoration | 6.57:1 |
 | `--nock-reveal` | #C2410C | "Revealed", and nothing else: the revealed notch, the reveal line in the stream | Anything else | 5.18:1 |
-| `--nock-green` | #1E7B45 | "Done": finished-grid band text, passed-check line in the stream, "Terminée" pill text | Player marks | 5.28:1 |
+| `--nock-green` | #1E7B45 | "Done": finished-grid band text, passed-check line in the stream, "Terminée" pill text, confirmation lines (« Lien copié », « Lien envoyé … ») | Player marks | 5.28:1 |
 | `--nock-green-bg` | #E6F2EA | Background of the finished-grid band and of the "Terminée" pill | Anything else | 1.15:1 |
 | `--nock-key` | #E9ECF1 | In-app keyboard keys | - | 1.18:1 |
 | `--nock-keyboard-bg` | #D9DEE6 | In-app keyboard background | - | 1.35:1 |
-| `--nock-departed` | #6B7079 | Auteurs mode: letters of a player who has left (OPEN: fails 4.5:1 on blue) | Anything else | 4.98:1 |
+| `--nock-departed` | #5C616A | Auteurs mode: letters of a player who has left (OPEN: applied in sheet 4.2, pending approval) | Anything else | 6.23:1 |
 | `--nock-handle` | #C5CCD8 | Grab handle of a bottom sheet | - | 1.62:1 |
 | `--nock-thumb` | #C9D2E0 | Clue cells of a catalogue thumbnail, force notches above the grid's force | - | 1.52:1 |
 
-Translucent tokens, all built on ink or white (the sheet's `rgba(0, 0, 0, ...)`
-shadows become ink, see section 15):
+Translucent tokens, all built on ink or white (the sheet's remaining
+`rgba(0, 0, 0, ...)` shadows become ink, see section 15):
 
 | Token | Value | Job |
 | --- | --- | --- |
-| `--nock-scrim` | rgb(20 24 31 / 35%) | Scrim under a menu, a popover or the Salon sheet |
+| `--nock-scrim` | rgb(20 24 31 / 35%) | Scrim under a menu, a popover, the Salon sheet and the other room sheets |
 | `--nock-scrim-dialog` | rgb(20 24 31 / 38%) | Scrim under the recap |
 | `--nock-dot-ring` | rgb(20 24 31 / 55%) | 1 px ring around a player dot |
 | `--nock-key-shadow` | rgb(20 24 31 / 25%) | 1 px shadow under a key |
-| `--nock-shadow` | rgb(20 24 31 / 45%) | Shadow colour of menus, popovers, sheets and the vote banner |
+| `--nock-shadow-soft` | rgb(20 24 31 / 35%) | Shadow colour of a shown reaction |
+| `--nock-shadow` | rgb(20 24 31 / 45%) | Shadow colour of menus, popovers, sheets, the vote banner and the reaction picker |
 | `--nock-shadow-strong` | rgb(20 24 31 / 50%) | Shadow colour of dialogs and 3-second notes |
 | `--nock-legend-bg` | rgb(255 255 255 / 96%) | Background of the Auteurs legend |
 | `--nock-pen-fill` | rgb(255 255 255 / 35%) | Fill of the ✎ icon on the pressed pencil key |
@@ -86,14 +98,14 @@ Rules:
   only ever means a player: triangles, word tints, flashes, dots, Auteurs ink;
   never a button, a state or a decoration.
 - Text and icons reach 4.5:1 against their background, disabled buttons included.
-  Marks, borders that carry meaning and the focus ring reach 3:1.
+  Marks, borders that carry meaning and the focus ring reach 3:1 (except the
+  DEFERRED rule grey, section 15).
 - No pure black (#000000) and no neutral grey: the neutrals lean toward the navy.
 - No dark mode for now. Every colour is a named token, so one can be added later
   by redefining the tokens.
 - Two colours may be mixed only with `color-mix(in srgb, ...)` over tokens, or by
   `opacity`, at the percentages this file gives: 16 % (word tint), 38 % (flash),
-  55 % (clue separator), 80 % (direction glyph in the clue bar), 70 % (Je bloque
-  not pressed, OPEN).
+  55 % (clue separator), 80 % (direction glyph in the clue bar).
 - `transparent` and `currentColor` are allowed everywhere.
 
 Measured pairs (WCAG 2.x):
@@ -102,19 +114,22 @@ Measured pairs (WCAG 2.x):
 | --- | --- | --- |
 | Ink on selected | 12.95:1 | 4.5 |
 | Ink on locked | 14.34:1 | 4.5 |
+| Ink on clue blue-grey (connection band) | 15.84:1 | 4.5 |
 | Pencil on word / on selected | 5.80:1 / 4.97:1 | 4.5 |
 | Pencil on key | 5.76:1 | 4.5 |
-| Clue ink on clue blue-grey | 14.18:1 | 4.5 |
-| Red ⚑ on clue blue-grey | 5.85:1 | 4.5 |
+| Clue ink on clue blue-grey / on selected (active clue) | 14.18:1 / 11.6:1 | 4.5 |
+| Red flag on clue blue-grey | 5.85:1 | 3 (icon), 4.5 met |
 | White on navy | 13.26:1 | 4.5 |
 | White on red (badge) | 6.57:1 | 4.5 |
 | Muted on clue blue-grey (disabled button) | 5.22:1 | 4.5 |
 | Muted on word blue (menu detail on hover) | 4.98:1 | 4.5 |
+| Muted on page grey (room code line) | 5.47:1 | 4.5 |
+| Navy on clue blue-grey (« hôte » tag) | 11.8:1 | 4.5 |
 | Green on green background | 4.59:1 | 4.5 |
 | Navy on word blue (pressed top-bar button) | 11.27:1 | 4.5 |
 | Revealed notch on white / selected / locked / word | 5.18 / 3.77 / 4.17 / 4.40:1 | 3 |
 | Navy selection border on selected | 9.65:1 | 3 |
-| Departed grey on white / word / selected | 4.98 / 4.23 / 3.62:1 | 4.5 (OPEN) |
+| Departed grey #5C616A on white / word / selected | 6.23 / 5.29 / 4.53:1 | 4.5 |
 
 ## 3. Player colours
 
@@ -181,7 +196,7 @@ Grid:
   1.12, letter spacing 0.01em, uppercase (`text-transform`), centred. It wraps at
   word breaks (`overflow-wrap: break-word`, `hyphens: manual`) and is never cut and
   never ends with an ellipsis at full zoom (spec 006 AC-1). One size for one-clue
-  and two-clue cells (see section 15 on the sheet's caption).
+  and two-clue cells (section 15 on the sheet's caption).
 
 Interface sizes (all `--nock-font-ui`; `tabular` means
 `font-variant-numeric: tabular-nums`):
@@ -195,16 +210,16 @@ Interface sizes (all `--nock-font-ui`; `tabular` means
 | Brand "Nock" | 700 | 1.3rem / 1 | navy, letter spacing 0.01em |
 | Grid name (computer top bar) | 500 | 0.95rem / 1 | muted |
 | Clue bar text | 500 | 0.95rem (15.2 px) / 1.2 | white; at least 14 px (specs 007 AC-4, 026) |
-| Clue bar ‹ › | 400 | 1.2rem / 1 | white |
-| Clue bar ⚑ | as text | 1rem | white |
 | Key letter | 500 | 1.3rem / 1 | ink |
 | Wide key | 500 | 1.1rem / 1 | ink |
 | Button | 600 | 0.95rem / 1 | |
-| Menu item | 500 | 1rem / 1.2 | navy |
+| Small button (« Retirer ») | 600 | 0.8rem / 1 | padding 6 px 10 px |
+| Menu item | 500 | 1rem / 1.2 | navy; the pencil confirm item 600 |
 | Menu group heading | 600 | 0.7rem / 1.2 | muted, uppercase, letter spacing 0.08em |
 | Badge | 700 | 0.62rem / 1 | white on red |
 | 3-second note | 500 | 0.85rem / 1.2 | white on ink |
 | Auteurs legend | 500 (names 700) | 0.8rem / 1.2 | muted (names in inks) |
+| Connection band | 500 | 0.85rem / 1.3 | ink |
 | Progress label | 600 | 0.85rem / 1 | navy, tabular |
 | Salon tab | 600 | 0.95rem / 1 | muted, navy when selected |
 | Stream message | 400 (name 700) | 0.92rem | ink |
@@ -212,27 +227,39 @@ Interface sizes (all `--nock-font-ui`; `tabular` means
 | Message box | 400 | 0.9rem | placeholder muted |
 | Send pill | 600 | 0.85rem | navy on word blue |
 | Player row | 400 (own name 700) | 0.95rem | state 0.85rem muted |
+| « hôte » tag | 600 | 0.72rem / 1.3 | navy on clue blue-grey |
 | Vote question | 600 | 0.95rem / 1.3 | ink |
 | Vote seconds | 500 | 0.85rem / 1 | muted, tabular |
 | Status band | 600 | 0.95rem / 1.2 | |
-| Dialog title | 700 | 1.2rem / 1.2 | navy |
+| Dialog and sheet title | 700 | 1.2rem / 1.2 | navy |
 | Dialog section heading | 600 | 0.78rem / 1.2 | muted, uppercase, letter spacing 0.07em |
+| Card title | 700 | 1.25rem / 1.2 | navy |
+| Card text | 400 | 0.95rem | ink; secondary 0.85rem muted |
+| Room code above a card | 600 | 0.85rem / 1 | muted |
+| Field label | 600 | 0.85rem / 1.2 | ink |
+| Field input | 400 | 1rem / 1.2 | ink |
+| Error and confirmation lines | 500 | 0.85rem / 1.3 | red / green |
+| Switch row label | 500 | 0.95rem / 1.2 | ink |
+| Segmented control | 600 | 0.85rem / 1 | navy, white when chosen |
+| Text link | 600 | inherited | navy |
 | Recap time | 700 | 2.1rem / 1 | navy, tabular |
 | Recap lines and rows | 400 (names 600) | 0.95rem | values 0.85rem muted, tabular |
 | Share URL box | 400 | 0.85rem | one line, ellipsis |
 | Catalogue heading | 700 | 1.7rem / 1.1 | navy |
+| Catalogue section heading (« Mes salons », « Grilles terminées ») | 700 | 1.15rem / 1.2 | navy |
 | Filter label | 600 | 0.85rem / 1 | muted |
 | Filter chip | 600 | 0.9rem / 1 | navy |
-| Card number | 700 | 1.05rem / 1.2 | ink |
-| Card meta | 400 | 0.85rem | muted |
+| Card number, list row title | 700 | 1.05rem / 1.2 (row title: inherited size) | ink |
+| Card meta, list row lines | 400 | 0.85rem | muted |
 | Status pill | 600 | 0.75rem / 1.2 | |
+| Reaction pill | - | emoji 16 px / 1.2 | |
+| Reaction picker | - | emoji 22 px | |
 
 ## 5. Icons
 
 Thin outline icons drawn for Nock: SVG `viewBox="0 0 24 24"`, `fill="none"`,
-`stroke="currentColor"`, `stroke-width="1.8"`, `stroke-linecap="round"`,
-`stroke-linejoin="round"`, `aria-hidden="true"` (the button carries the name).
-Shown at 22 px in the phone top bar and on keys, 20 px in the computer top bar.
+`stroke="currentColor"`, round caps and joins, `aria-hidden="true"` (the button
+carries the name).
 
 | Name | Used for | Shapes |
 | --- | --- | --- |
@@ -244,6 +271,25 @@ Shown at 22 px in the phone top bar and on keys, 20 px in the computer top bar.
 | crayon | Crayon, ✎ key | `<path d="M4 20h4L19 9l-4-4L4 16v4z"/>` `<path d="M13.5 6.5l4 4"/>` |
 | swap | ⇄ key (change direction) | `<path d="M4 8h14l-3-3M20 16H6l3 3"/>` |
 | effacer | ⌫ key (erase) | `<path d="M9 5h11v14H9l-6-7 6-7z"/>` `<path d="M13 9l4 6M17 9l-4 6"/>` |
+| chrono | « Chrono » (timer hidden), the sheet's STOPWATCH | `<circle cx="12" cy="13.5" r="7.5"/>` `<path d="M12 10v3.5l2.5 2M9.5 3h5M12 3v3"/>` |
+| flag | Je bloque, the flag on a clue, stream and note lines (the sheet's FLAG and FLAG_ICO) | `<path d="M6 21V4"/>` `<path d="M6 4h12l-3 4.5 3 4.5H6z"/>` |
+| chevron-left | ‹ previous clue (CHEV_L) | `<path d="M15 5l-7 7 7 7"/>` |
+| chevron-right | › next clue (CHEV_R) | `<path d="M9 5l7 7-7 7"/>` |
+| smile | Réagir (SMILE) | `<circle cx="12" cy="12" r="9"/>` `<path d="M8.5 14.5c1.8 2 5.2 2 7 0"/>` `<path d="M9 9.5h.01M15 9.5h.01"/>` |
+
+Sizes and strokes:
+
+| Where | Size | Stroke width |
+| --- | --- | --- |
+| Phone top bar, keys | 22 px | 1.8 |
+| Computer top bar | 20 px | 1.8 |
+| Clue bar (chevrons, Réagir, Je bloque) | 20 px | 2 |
+| Inline in text (stream, notes): class of the sheet `.ico` | 1em, `vertical-align: -0.15em` | 2 |
+
+Filled variants: the flag is filled (`fill: currentColor`) when it marks a state:
+on a flagged clue (red), on the pressed Je bloque button (navy), and inline in
+stream and note lines (the sheet's FLAG_ICO: the pole path stays unfilled). On the
+not-pressed Je bloque button it is an outline.
 
 When an icon is missing: Font Awesome Free (approved by the human on 2026-10-16),
 in its outline "regular" style first. Only the icons used are bundled, served by
@@ -261,19 +307,23 @@ Nock's own marks, never Font Awesome:
   with `<polygon points="0,0 10,0 10,14 5,10 0,14"/>`, filled. Brand: 12 by 18 px,
   navy. Force notch in the catalogue: 8 by 11 px.
 
-Text glyphs used as pictograms, in the current font: ‹ › (clue bar), ⚑ (flag),
-✓ (done, passed check), → (join), ▲ (reveal line), ✎ (pencil line), ▾ (Aide
-menu on a computer). No emoji in the interface (reactions and chat text are user
-content).
+Text glyphs used as pictograms, in the current font: ✓ (done, check line), → (joined
+line), ← (left line; not in the sheet, the spec writer's pick), ▲ (reveal line, in
+orange-red), ✎ (detail of the pencil confirm item), ▾ (Aide menu on a computer).
+The flag and the clue bar's ‹ › are drawn icons, never text glyphs (the fonts have
+no ⚑). No emoji in the interface; reactions and chat text are user content.
 
 ## 6. Grid cells
 
-### Grid lines
+### Grid lines and empty cells
 
 The grid container has a 1 px rule-grey left and top border; each cell has a
 1 px rule-grey right and bottom border, inside its side `s`. No gap between cells.
 Cells clip their content (`overflow: hidden`), except clue cells (see "Clue
 cells").
+
+An empty cell (spec 002's `empty` type) is filled with `--nock-rule` (decided by
+the human on 2026-10-16, drawn in sheet 4.2).
 
 ### Letter cell backgrounds
 
@@ -285,16 +335,19 @@ Exactly one background applies, the first that matches in this list:
 | My selected cell | `--nock-selected` |
 | Locked (checked right, or revealed) | `--nock-locked` |
 | In my selected word | `--nock-word` |
-| In another player's selected word (OPEN: keep or drop) | `color-mix(in srgb, var(--player-colour-N) 16%, var(--nock-white))` |
+| In another player's selected word, while « Mots des autres » is « teintés » | `color-mix(in srgb, var(--player-colour-N) 16%, var(--nock-white))` |
 | Otherwise | `--nock-white` |
 
-When a cell is in the words of two other players, the tint is that of the one who
-comes first in join order (the sheet does not say; section 15).
+Another player's word tint: kept, and each player can turn it on or off from the
+Menu item « Mots des autres » (« teintés » / « sans teinte »), remembered per
+browser, on by default (decided by the human on 2026-10-16). When a cell is in the
+words of two other players, the tint is that of the one who comes first in join
+order (the sheet does not say; the spec writer's pick).
 
 My selection border: 2 px solid navy drawn inside the cell, over every other mark
 of the cell. It is the cell's own outline (`outline: 2px solid var(--nock-navy)`,
 `outline-offset: -2px`), which spec 035 AC-2 reads. It is the only cell border
-besides the grid lines.
+besides the grid lines and the catch-up ring.
 
 ### Letter marks
 
@@ -309,20 +362,48 @@ besides the grid lines.
 Revealed notch: an isosceles triangle in `--nock-reveal`, pointing up, centred on
 the middle of the bottom edge and flush with it. Base max(7px, 0.22 s), height
 max(4px, 0.11 s). Corners belong to players, and no arrow ever enters a cell from
-the bottom, so nothing else uses that spot. During a flash its contrast can drop
-below 3:1 (section 15).
+the bottom, so nothing else uses that spot. During a flash the notch is drawn in
+`--nock-ink`, so it keeps 3:1 on every player colour (OPEN: applied in sheet 4.2
+as `.flash.rev::after`, pending approval). Its size is DEFERRED (section 15).
+
+### Catch-up ring (spec 034)
+
+A cell that changed while I was away gets a 3 px solid `--nock-ink` ring on its
+edge (`inset: 0`, inside the cell), for 5 s, `pointer-events: none`. It is drawn
+over the letter and its background and under the player triangles, the notch and
+the arrows (the sheet's z-index 1). The matching lines go in the stream (section
+8).
 
 ### Other players on a cell
 
 A plain right triangle in one corner of the cell, legs along the two edges, each
 leg t = max(6, round(0.3 s)) px, filled with the player's `--player-colour-N`, no
 outline, no text, ever. Corners are given in the order players arrive on the cell:
-top-left, top-right, bottom-right, bottom-left. When a player leaves the cell, the
-others keep their corners (OPEN: arrival order versus a fixed corner per player).
-At most 4 are drawn; a fifth or later player is not drawn and nothing says "+k".
-A disconnected player is not drawn (spec 013). My own selection is never a
+top-left, top-right, bottom-right, bottom-left (decided by the human on
+2026-10-16). When a player leaves the cell, the others keep their corners. At most
+4 are drawn; a fifth or later player is not drawn and nothing says "+k". A
+disconnected player is not drawn (spec 013). My own selection is never a
 triangle. This replaces the dashed borders of spec 013 and the initials and "+k"
 labels of spec 035 (section 12).
+
+Accessibilité mode (decided by the human on 2026-10-16): a switch in the Menu,
+« Accessibilité », off by default, remembered per browser like the other Menu
+switches. While it is off, the triangles carry colour only, by the human's choice;
+the Joueurs list of the Salon (name, state, current clue) says in words where each
+player is. While it is on, each triangle is replaced by a small icon, one distinct
+icon per player by join index (as the colours), drawn in that player's
+`--player-colour-N`, in the same corners and the same arrival order, at most 4.
+Colour is then no longer the only sign. Spec 035 AC-6 and AC-11 are refined
+accordingly (section 12).
+
+#### Player icons (placeholder)
+
+PLACEHOLDER, waiting for the coordinator's drawing in
+`docs/design/cell-sheet.html` (section 1 and the phone mock-up). To fill in from
+the sheet: for each join index 0 to 7, the icon's name and SVG shapes; its box
+size as a fraction of `s` with a px minimum; its position in each corner; its
+stroke or fill; its contrast on white and on selected blue; and its clearance from
+the letter and the arrows. No spec may use the mode until this table is filled.
 
 ### Clue cells
 
@@ -331,12 +412,17 @@ labels of spec 035 (section 12).
 - One clue fills the cell, centred vertically. Two clues share it in two equal
   halves, clue 0 on top, with a 1 px separator between them in clue ink at 55 %
   opacity, inset 14 % of the cell width on each side.
-- Flag ⚑ (spec 021): in the clue cell's top-left corner, 1 px from the top and
-  left edges, `--nock-red`, weight 700, size max(7px, 0.22 s), line height 1, on a
-  clue blue-grey backing (padding 0 2 px 1 px 1 px, bottom-right radius 3 px). The
-  flag never moves the text. Top-left is the one corner of a clue cell no arrow
-  uses.
-- The selected word's clue: the sheet gives it no look (OPEN, section 15).
+- Active clue: the half (or the whole cell for a lone clue) that holds my selected
+  word's clue takes `--nock-selected`, radius 2 px (decided by the human on
+  2026-10-16, drawn in sheet 4.2; spec 007 AC-1).
+- Flag (spec 021): the filled red flag icon (section 5), in a square of side
+  max(8px, 0.22 s) at the top-left of its own clue's half (top 0 of the half, left
+  −2 px, so 1 px from the cell's left edge), on a clue blue-grey backing with a
+  3 px bottom-right radius, the icon at 86 % of the square, fill and stroke
+  `--nock-red`, stroke width 2, layer 2. A flagged second clue has its flag at the
+  top-left of the lower half. The flag never moves the text. Top-left is the one
+  corner of a clue no arrow uses.
+- Shown reaction (spec 022): see "Reactions" in section 8.
 
 ### Direction arrows
 
@@ -354,21 +440,31 @@ drop-shadow(0 0 0.8px #FFFFFF)` (white is `--nock-white`).
 | ↳ | down then right | `M5 2V10Q5 15 10 15H15` | `14,10.5 22,15 14,19.5` |
 | ↴ | right then down | `M2 5H10Q15 5 15 10V15` | `10.5,14 15,22 19.5,14` |
 
-Position of the box in the letter cell (as `arrowFor()` in the sheet):
+Position of the box in the letter cell (as `arrowFor()` and `arrowMap()` in the
+sheet). An arrow's target cell is the cell right of its clue cell for → and ↴,
+the cell below for ↓ and ↳; an arrow whose target is outside the grid or a clue
+cell is not drawn.
 
-| Arrow | Enters from | Box position |
-| --- | --- | --- |
-| → | the clue on the left | left −1 px; vertical centre at 0.5 s |
-| → of clue 0 of a two-clue cell | the clue on the left | left −1 px; vertical centre at 0.25 s |
-| → of clue 1 of a two-clue cell | the clue on the left | left −1 px; vertical centre at 0.72 s |
-| ↓ | the clue above | top −1 px; horizontal centre at 0.5 s |
-| ↳ | the clue above | top −1 px; left 0.06 s |
-| ↴ | the clue on the left | left −1 px; top 0.06 s |
+| Arrow | Box position |
+| --- | --- |
+| → (default) | left −1 px; vertical centre at 0.5 s |
+| ↓ | top −1 px; horizontal centre at 0.5 s |
+| ↳ (default) | top −1 px; left 0.06 s |
+| ↴ | left −1 px; top 0.06 s |
+
+Collision rules, applied per target cell (drawn in the sheet's « Two arrows in one
+cell »):
+
+1. A → whose target cell also receives a ↴: the → takes the low slot, vertical
+   centre at 0.72 s; the ↴ keeps the top.
+2. Otherwise, when two → share a target cell (only possible from one two-clue
+   cell), the → of clue 0 is centred at 0.25 s and the → of clue 1 at 0.72 s.
+3. A ↳ whose target cell also receives a ↴: the ↳ moves right, to left 0.4 s (top
+   −1 px); the ↴ keeps the top-left corner.
 
 The −1 px puts the box's edge on the grid line; the clipped column holds no
 stroke (strokes start at 2 units). Measured during the design session on 68 px
-cells: every arrow keeps at least 2.7 px from every letter A to Z. Two arrows in
-one letter cell can collide in two cases the sheet never draws (section 15).
+cells: every arrow keeps at least 2.7 px from every letter A to Z.
 
 ### Drawing order
 
@@ -378,8 +474,11 @@ Top first, inside one cell (the sheet's z-index in brackets):
 2. Direction arrows (6).
 3. Revealed notch (3).
 4. Player triangles (2), and in clue cells the flag (2).
-5. The letter, or the clue text.
-6. The flash overlay, then the background.
+5. Catch-up ring (1).
+6. The letter, or the clue text.
+7. The flash overlay, then the background.
+
+A shown reaction (8) sits over its clue cell and the cells around it (section 8).
 
 ### One cell with every mark
 
@@ -406,11 +505,11 @@ Background: selected blue (selected beats locked). Paint order as above.
 
 ## 7. Auteurs mode
 
-Replaces the author band of spec 019, which is removed.
+Replaces the author band of spec 019, which is removed. Kept, toggled on and off
+by each player, off by default (decided by the human on 2026-10-16).
 
-- A switch, off by default, in the Menu (section 8): « Auteurs » with the detail
-  « activé » or « désactivé ». It is each player's own view; spec 019 does not
-  remember it across reloads, and the sheet does not say otherwise.
+- A switch in the Menu (section 8): « Auteurs » with the detail « activé » or
+  « désactivé ». Whether it is remembered across reloads is OPEN (section 15).
 - When on, each letter is drawn in its finder's ink `--player-ink-N` (section 3),
   on whatever background the cell has.
 - A revealed letter has no finder: it stays ink.
@@ -418,11 +517,11 @@ Replaces the author band of spec 019, which is removed.
 - A pencil letter keeps its italics, in its finder's ink.
 - The wrong-letter strike turns ink (a red strike would vanish on a red letter).
 - A legend shows while the mode is on: « Auteurs : » then each player's name in
-  their ink, weight 700, in join order, one space apart. It sits centred at the
-  bottom of the grid area, 8 px above its bottom edge, over the grid (no layout
-  shift): background `--nock-legend-bg`, 1 px line-grey border, radius 14 px,
-  padding 4 px 12 px, gap 8 px, one line. (The brief said "under the grid"; the
-  sheet draws it over the bottom of the grid area. Section 15.)
+  their ink, weight 700, in join order, one space apart. It sits in the flow under
+  the grid, centred, 8 px below it (the grid and legend form one column with an
+  8 px gap); the grid shrinks by 38 px of height while the mode is on, so nothing
+  else moves. Background `--nock-legend-bg`, 1 px line-grey border, radius 14 px,
+  padding 4 px 12 px, gap 8 px, one line.
 - The clue bar shows only the clue; the « Lettre de … » of spec 019 AC-4 goes.
 - During a flash the letter colours keep their inks; their contrast on the flash
   is not guaranteed (section 15).
@@ -440,8 +539,8 @@ on the right).
   its in-app keyboard is hidden.
 - Otherwise, sheet.
 
-The sheet states the phone rule without saying how it combines with the 900 px
-rule for phones narrower than 900 px held sideways (section 15).
+How the two rules combine for phones narrower than 900 px held sideways is OPEN
+(section 15).
 
 ### Phone and upright tablet (sheet layout)
 
@@ -452,15 +551,29 @@ Top to bottom, filling the window, nothing scrolls:
    `margin-right: auto`, then five buttons 56 px wide and the bar's full height:
    Annuler, Aide, Salon, Clavier, Menu. Each holds its 22 px icon over its label
    (gap 2 px), navy, radius 6 px. Pressed (Aide, Salon, Menu while open; Clavier
-   while the keyboard shows): word-blue background. Unread badge on Salon: top
-   5 px, right 8 px (section 11).
-2. The grid area: all the height left, white, the grid centred, cells as large as
-   fit with 8 px around (the sheet uses 16 px of margin in total on each axis).
-3. Clue bar, 34 px high, navy, white text: ‹ button 36 px wide, then the clue text
-   centred with its direction glyph (→ or ↓, 80 % opacity, 6 px left margin), on
-   one line with an ellipsis when too long, then ⚑ « Je bloque » 40 px wide, then
-   › 36 px wide. Text only: no author name, no pencil tag.
-4. In-app keyboard (touch screens, spec 009): background `--nock-keyboard-bg`,
+   while the keyboard shows): word-blue background.
+   - Unread badge on Salon (messages): top 5 px, right 8 px (section 11).
+   - New events and no unread message: an 8 px red dot on Salon, top 8 px, right
+     15 px.
+   - Timer hidden (« Masquer le chrono », spec 027): the left slot holds a
+     top-bar button « Chrono » with the chrono icon, `aria-label` « Afficher le
+     chrono », which shows the timer again.
+2. Connection band (spec 017), only while the connection is lost: see "Connection
+   lost" below.
+3. The grid area: all the height left, white, the grid centred, cells as large as
+   fit with 8 px around (the sheet keeps 16 px in total on each axis), and the
+   Auteurs legend under the grid while that mode is on.
+4. Clue bar, 34 px high, navy, white text, in this order: ‹ button (36 px wide,
+   chevron-left icon), the clue text centred with its direction glyph (→ or ↓, 80 %
+   opacity, 6 px left margin), on one line with an ellipsis when too long; then
+   « Réagir » (40 px wide, smile icon, `aria-label` spec 022's
+   `reaction.button_label`); then « Je bloque » (40 px wide, flag icon); then ›
+   (36 px wide, chevron-right icon). The two 40 px buttons have radius 6 px. Je
+   bloque not pressed: white outline flag; pressed (`aria-pressed="true"`): white
+   button background, navy filled flag. Text only: no author name, no pencil tag.
+   Focus inside the bar: white ring, offset −4 px (section 11).
+5. End-of-grid band (section 9), when the grid is full.
+6. In-app keyboard (touch screens, spec 009): background `--nock-keyboard-bg`,
    padding 6 px 3 px 8 px, rows 6 px apart, keys 4 px apart and centred.
    - Rows: `A Z E R T Y U I O P`; `Q S D F G H J K L M`; `✎ W X C V B N ⇄ ⌫`.
    - Keys: 44 px high, flexible width up to 33 px, radius 5 px, `--nock-key`, ink,
@@ -469,7 +582,8 @@ Top to bottom, filling the window, nothing scrolls:
    - ✎ pressed: navy key, white icon with `--nock-pen-fill` fill; every letter key
      then shows its letter italic in `--nock-pencil`.
    - ⇄ switches the selected cell between its across and down word (as a second
-     tap on the cell, spec 007). ⌫ erases (spec 008).
+     tap on the cell, spec 007). ⌫ erases one letter (spec 008). No long press on
+     ⌫ (decided by the human on 2026-10-16).
    - « Clavier » hides and shows the keyboard; the choice is remembered per
      browser. The grid takes the space back.
 
@@ -478,38 +592,53 @@ Top to bottom, filling the window, nothing scrolls:
 1. Top bar, 56 px high, white, 1 px line-grey bottom border, padding 0 16 px, gap
    4 px, items centred vertically, in this order: the Nock mark and « Nock »
    (gap 8 px); the grid name « Grille n° N · Force F » (14 px left margin, then
-   `margin-right: auto`); the timer (10 px right margin); then buttons 38 px high,
-   padding 0 12 px, radius 6 px, gap 6 px, icon 20 px beside its label: Annuler,
-   Crayon, « Aide ▾ », Salon, Clavier (touch screens only), Menu. Pressed:
-   word-blue background. Unread badge on Salon: top 2 px, left 24 px.
-2. Body: the main area and, on its right, the side column.
+   `margin-right: auto`); the timer (10 px right margin), or « Chrono » while the
+   timer is hidden; then buttons 38 px high, padding 0 12 px, radius 6 px, gap
+   6 px, icon 20 px beside its label: Annuler, Crayon, « Aide ▾ », Salon, Clavier
+   (touch screens only), Menu. Pressed: word-blue background. Unread badge on
+   Salon: top 2 px, left 24 px.
+2. Connection band under the top bar while the connection is lost.
+3. Body: the main area and, on its right, the side column.
    - Main area: padding 12 px, the grid centred and as large as fits in all the
      space left; under it the clue bar, as wide as the grid (grid width + 1 px);
-     on touch tablets the in-app keyboard under the clue bar, full width of the
-     main area (margins −12 px, top 10 px).
+     then the end-of-grid band at the same width; on touch tablets the in-app
+     keyboard under them, full width of the main area (margins −12 px, top 10 px).
    - Side column: 340 px wide, white, 1 px line-grey left border; the Salon
      (below). It is open by default in this layout, with « Salon » pressed.
-     « Salon » closes and opens it; the grid refits each time.
-3. Nothing else is permanently on screen. Chat, players, progress, invitation and
-   host settings open on demand.
+     « Salon » closes and opens it; the grid refits each time. A column the player
+     closed stays closed next time, per browser (decided by the human on
+     2026-10-16).
+4. Nothing else is permanently on screen. Chat, players, progress, invitation,
+   host settings and the account open on demand.
 
 ### Aide menu (« Aide »)
 
 A popover (section 11) under the button, min width 220 px:
 
+- when the selected cell holds a pencil letter (spec 020), first the item
+  « Confirmer la lettre au crayon » (weight 600, detail ✎), then a separator;
 - heading « Vérifier »; items « La lettre », « Le mot », « La grille » (spec 023);
 - separator;
 - heading « Révéler »; items « La lettre » with the detail « n restantes », « Le
   mot » with « n restant » or « n restants » (spec 024's budget).
 
+The pencil toggle itself is the ✎ key on touch screens and the « Crayon » top-bar
+button on a computer.
+
 ### Menu (« Menu »)
 
-A popover anchored to the right (6 px from the right edge on a phone): « Auteurs »
-(detail « activé » / « désactivé »), « Inviter » (detail « lien »), « Réglages de
-l'hôte » (host only), separator, « Masquer le chrono », « Retour aux grilles ».
+A popover anchored to the right (6 px from the right edge on a phone), in this
+order: « Auteurs » (detail « activé » / « désactivé »); « Mots des autres »
+(detail « teintés » / « sans teinte »); « Accessibilité » (detail « activé » /
+« désactivé », section 6; its place in the list is the spec writer's until the
+sheet draws it); « Inviter » (detail « lien »); « Réglages
+de l'hôte » (host only); « Compte » (spec 033; not drawn in the sheet's Menu, the
+spec writer's place for it); separator; « Masquer le chrono » (« Afficher le
+chrono » while hidden); « Retour aux grilles ».
 
-On a phone, a scrim covers everything below the top bar (top 54 px) while a menu or
-the Salon sheet is open; a tap on it closes them. Menus sit 58 px from the top.
+On a phone, a scrim (`--nock-scrim`) covers everything below the top bar (top
+54 px) while a menu or a sheet is open; a tap on it closes them. Menus sit 58 px
+from the top.
 
 ### Salon
 
@@ -526,56 +655,134 @@ Content, top to bottom:
 2. Tabs « Discussion » | « Joueurs (n) »: two equal tabs, padding 10 px, 2 px
    bottom border (transparent, navy when selected), muted text (navy when
    selected); a 1 px line-grey border under the row.
-3. Discussion: one stream, oldest first, padding 10 px 16 px, items 8 px apart.
-   - A message: a 10 px player dot (`--player-colour-N`, ring
-     `0 0 0 1px var(--nock-dot-ring)`) and the name in weight 700 ink, gap 6 px,
-     then the text.
-   - An event: one line, muted, 0.82rem, 16 px left padding, starting with its
-     pictogram: → joined, ← left (not in the sheet), ⚑ flag, ▲ reveal, ✓ check.
-     Consecutive events of one player are grouped on one line, joined by « · »
-     (« ✎ Bruno a rempli MIME · LEST » in the sheet; section 15). A reveal line is
-     orange-red. A check line where everything was right is green.
-   - Then the message box: padding 8 px 12 px 12 px, 1 px line-grey top border,
-     gap 8 px; the input with a 1 px rule-grey border, radius 18 px, padding
-     7 px 12 px; the « Envoyer » pill (word blue, navy, radius 14 px, padding
-     6 px 12 px).
-4. Joueurs: padding 10 px 16 px, rows 10 px apart, each row: dot, name (« (vous) »
-   after my own), and on the right the state word « actif », « inactif » or
-   « déconnecté » with spec 035 AC-7's styling (italic name for inactive, italic
-   and struck through for disconnected), « · » and the player's current clue; then
-   an « Inviter » pill.
+3. Discussion: one stream, oldest first, padding 10 px 16 px, items 8 px apart,
+   then the message box.
+   - A message: a player dot (section 11) and the name in weight 700 ink, gap
+     6 px, then the text.
+   - An event: one line, 0.82rem, 16 px left padding, one line per event of spec
+     013 (no grouping):
 
-Badges on « Salon »: the red badge counts unread messages; a dot (not drawn in
-the sheet; section 15) means new events.
+     | `data-kind` (spec 013) | Pictogram | Colour |
+     | --- | --- | --- |
+     | `player_joined` | → | muted |
+     | `player_left`, `player_removed`, `player_timed_out` | ← | muted |
+     | `check` | ✓ | muted; green when the check found no wrong letter |
+     | `reveal` | ▲ | orange-red |
+     | `flag` | inline filled flag icon | muted |
+     | `room_locked`, `room_unlocked`, `settings_changed`, `host_changed` | none | muted |
+
+     Catch-up lines (spec 034) take the same look. There is no line for typed
+     letters or filled words (the sheet's « a rempli » line is dropped).
+   - Message box: padding 8 px 12 px 12 px, 1 px line-grey top border, gap 8 px;
+     the input with a 1 px rule-grey border, radius 18 px, padding 7 px 12 px; the
+     « Envoyer » pill (section 11).
+4. Joueurs (specs 011, 013, 014): padding 10 px 16 px, rows 8 px apart, 0.95rem.
+   Each row: player dot; name, « (vous) » after my own (my name weight 700); the
+   « hôte » tag after the host's name (section 11); then on the right the state
+   word « actif », « inactif » or « déconnecté » with spec 035 AC-7's styling
+   (italic name for inactive, italic and struck through for disconnected), « · »
+   and the player's current clue; for the host, a small secondary « Retirer »
+   button on each other player's row. Under the rows, « Lien d'invitation » (dialog
+   section heading), the URL box (1 px rule-grey border, radius 6 px, padding
+   8 px 10 px, one line, full width), the primary « Copier le lien », and after a
+   copy the green confirmation line « Lien copié ». « Inviter » in the Menu opens
+   the Salon on this tab.
 
 ### 3-second notes
 
 - One line, ink background, white text (section 4), padding 8 px 12 px, radius
   6 px, shadow `0 6px 18px -8px var(--nock-shadow-strong)`, centred over the top
   edge of the grid area, 8 px down, layer 6 of the grid area. No layout shift.
+- A line may start with its pictogram (the inline flag icon for a flag, ▲, →).
 - One at a time; a new note replaces the current one. It shows for 3 s, then fades
   out in 0.25 s (opacity only, no slide). With `prefers-reduced-motion: reduce` it
   appears and goes without transition.
 - A tap opens the Salon on that line.
-- Not shown while the stream is visible (Salon open on Discussion).
-- Which events: others' messages (« Bruno : … »), « Je bloque » (« ⚑ Dédé bloque
-  sur « Flaire » »), reveals, others' checks, joins and departures. Never typed
-  letters.
+- Not shown while the stream is visible (Salon open on Discussion), and held back
+  while the vote banner shows; they come after it goes.
+- Which events: others' messages (« Bruno : … »), « Je bloque », reveals, others'
+  checks, joins and departures, and my own reaction. Never typed letters.
+
+### Reactions (spec 022)
+
+- « Réagir » in the clue bar (above) opens the picker; a second press closes it.
+- Picker: `role="group"`, `aria-label` spec 022's `reaction.picker_label`
+  (« Réactions » in the sheet), the five reactions 👍 👏 😂 😮 🤔 with spec 022's
+  names. Over the bottom of the grid area, centred, 8 px above its bottom edge
+  (so above the clue bar), layer 9: white, 1 px line-grey border, radius 24 px,
+  padding 5 px, gap 2 px, shadow `0 10px 24px -10px var(--nock-shadow)`. Each
+  reaction a 40 by 40 px round button (radius 20 px), no background (word blue on
+  hover), emoji 22 px.
+- A shown reaction: a white pill centred over its clue cell, 1 px line-grey
+  border, radius 12 px, padding 2 px 6 px, emoji 16 px, line height 1.2, shadow
+  `0 4px 10px -4px var(--nock-shadow-soft)`, layer 8, for 3 s (spec 022). For a
+  two-clue cell the sheet draws none (section 15).
+
+### Connection lost (spec 017)
+
+A band under the top bar, full width, while the room is reconnecting: background
+`--nock-clue-bg`, 1 px line-grey bottom border, padding 8 px 12 px, gap 10 px,
+items aligned to the top; an 8 px red dot (`--nock-red`, 5 px from the top), then
+the ink text (500 0.85rem/1.3) « Connexion perdue. Vous pouvez continuer : vos
+lettres seront envoyées au retour du réseau. ». The grid stays usable. The band
+goes when the room is back. The band pushes the grid area down; nothing covers the
+grid. `room-status` (« Reconnexion… », spec 040) may then be visually hidden
+(class `visually-hidden`), read by screen readers only.
+
+### Room sheets: host settings and account
+
+On a phone these open as a bottom sheet from under the top bar (scrim from 54 px),
+white, radius 16 px on the top corners, padding 14 px 18 px 18 px, gap 14 px; on a
+computer as the recap's dialog (440 px, section 9).
+
+- Host settings (spec 014), from Menu « Réglages de l'hôte »: title « Réglages de
+  l'hôte »; a switch row « Verrouiller le salon » (switch, section 11); the field
+  « Aide » with a three-way segmented control « libre » | « par vote » |
+  « désactivée » (section 11); two number fields side by side, 16 px apart,
+  « Lettres à révéler » and « Mots à révéler » (inputs 64 px wide, text centred);
+  primary « Enregistrer », right-aligned.
+- Account (spec 033), from Menu « Compte » or the catalogue's « Compte ». Signed
+  out: title `account.dialog_heading`, text `account.dialog_intro` (muted 0.9rem),
+  field « Adresse e-mail », primary « Recevoir le lien », after sending the green
+  line (« Lien envoyé à … Il est valable 30 minutes. »), secondary « Fermer »
+  right-aligned. Signed in: title « Votre compte », « Connecté avec {email} », the
+  text link « Gérer mon compte », secondary « Fermer » right-aligned.
+
+### Entry and not-found pages (specs 012, 040)
+
+Pages shown instead of the room: a top bar 54 px with the Nock mark and « Nock »
+only (padding 0 14 px), then the page on `--nock-page`, padding 20 px 16 px, gap
+14 px, holding:
+
+- the room code line « Salon {code} » (muted, 600 0.85rem), above the card, on
+  room pages;
+- one card (section 11).
+
+Cards:
+
+- Nickname (spec 012): title « Choisissez un pseudo »; field « Pseudo »; when
+  refused, the input's border turns red and the error text shows in red under the
+  field; primary « Entrer dans le salon ».
+- Entry statuses (specs 011, 012, 040: full, locked, not found, removed, replaced,
+  throttled): the status text as the card title, a muted line when the spec gives
+  one, secondary « Voir les grilles ».
+- Not found (spec 040): title « Page introuvable », primary « Voir les grilles »
+  (an addition to spec 040), no room code line.
 
 ### Focus and keyboard
 
-The sheet, the column and each menu are labelled regions. Opening one moves the
-focus into it; Échap closes it and puts the focus back on the button that opened
-it.
+The sheets, the column, each menu and the picker are labelled regions. Opening
+one moves the focus into it; Échap closes it and puts the focus back on the button
+that opened it.
 
 ### Layers of the room page
 
 | Layer | z-index |
 | --- | --- |
-| Auteurs legend | 5 |
 | 3-second note | 6 |
 | Phone scrim | 7 |
-| Menus, popovers, Salon sheet, vote banner | 8 |
+| Menus, popovers, sheets, vote banner, shown reaction | 8 |
+| Reaction picker | 9 |
 | Recap overlay (dialog or sheet with its scrim) | 20 |
 
 ## 9. Overlays
@@ -588,27 +795,27 @@ white, 2 px navy border, radius 10 px, padding 10 px 12 px, gap 8 px, shadow
 (`vote.question.*`); a row with « Oui » (primary) and « Non » (secondary), both with
 padding 7 px 16 px, and on the right the seconds left (« 18 s »); then a progress
 bar 4 px high, radius 2 px, word-blue track, navy fill for the time left. No
-layout shift.
+layout shift. Notes wait while it shows.
 
 ### End of grid (spec 026)
 
-A band under the clue bar, padding 8 px 12 px, gap 10 px, text 600 0.95rem:
+A band under the clue bar, padding 8 px 12 px, gap 10 px, text 600 0.95rem/1.2:
 
 - Finished: background `--nock-green-bg`, green text « ✓ Grille terminée, bravo ! »
   and, pushed right, the primary button « Voir le bilan » (padding 7 px 12 px,
   0.85rem). The recap-open control moves here (spec 028 AC-7 change). The in-app
   keyboard goes away once the grid is solved.
 - Full but wrong: background `--nock-clue-bg`, navy text « Grille complète, mais
-  pas encore juste. ». No red. Its place relative to the keyboard is not drawn
-  (section 15).
+  pas encore juste. ». No red, no cell changes look. It sits between the clue bar
+  and the keyboard, which stays.
 
 ### Recap (spec 028)
 
 Opens only when asked.
 
 - Phone: a bottom sheet over a `--nock-scrim-dialog` scrim covering the whole
-  window, radius 16 px on the top corners (section 15), padding 14 px 18 px
-  18 px, no grab handle.
+  window, radius 16 px on the top corners, padding 14 px 18 px 18 px, no grab
+  handle.
 - Computer: a dialog 440 px wide, centred, over a `--nock-scrim-dialog` scrim
   covering the whole window, white, radius 12 px, padding 20 px 22 px, gap 14 px,
   shadow `0 20px 40px -16px var(--nock-shadow-strong)`.
@@ -618,24 +825,37 @@ m:ss » (recap time style); the lines « Vérifications : n », « Révélations
 « Lettres révélées : n » (gap 4 px); heading « Qui a fait quoi »; one row per player
 (dot, name, « (vous) » in muted after mine, and on the right « n lettres · n mots
 complétés »), rows 8 px apart (on the phone the value wraps under the name, 18 px
-in); heading « Lien à partager »; the URL in a box (1 px rule-grey border, radius
-6 px, padding 8 px 10 px) and « Copier le lien » (secondary, padding 8 px 12 px);
-« Fermer » (primary), right-aligned. Échap closes it.
+in); heading « Lien à partager »; the URL box and « Copier le lien » (secondary,
+padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
 
-## 10. Catalogue (spec 004)
+## 10. Catalogue (spec 004, with 029, 032, 033)
 
-- Top bar 56 px as the computer room's, with the Nock mark and « Nock » only.
+- Top bar 56 px as the computer room's, with the Nock mark and « Nock », and on the
+  right « Compte » (spec 033): a computer top-bar button with no icon, pressed
+  while its sheet is open (34 px high on a phone).
 - Main column: max width 920 px, centred, padding 24 px (16 px on a phone), gap
-  16 px. Heading « Grilles » (section 4).
-- Filter row, gap 8 px: label « Force », then chips « Toutes », « Force 1 » to
-  « Force 4 »: radius 16 px, padding 7 px 14 px, 1 px line-grey border, white,
-  navy text. Pressed: word-blue background, navy border.
+  16 px, in this order:
+  1. heading « Grilles » (section 4);
+  2. « Mes salons » (spec 032), when the player has open rooms on this device or
+     account: section heading, then list rows (section 11), 10 px apart. Each row:
+     title « Grille n° N · W × H » (and the « Terminée » pill when solved), « Joueurs
+     : … », « Dernière activité : {date} à {time} », and « Reprendre » (primary;
+     secondary when the room is solved);
+  3. the filter row: label « Force », then chips « Toutes », « Force 1 » to
+     « Force 4 »: radius 16 px, padding 7 px 14 px, 1 px line-grey border, white,
+     navy text. Pressed: word-blue background, navy border;
+  4. the grid cards;
+  5. « Grilles terminées » (spec 029), when the history holds finished grids:
+     section heading, then list rows: title « Grille n° N · W × H », « Terminée le
+     {date} · en {time} · Avec {names} » or « … · En solo », and secondary
+     « Rejouer ».
 - Cards in a grid: `repeat(auto-fill, minmax(min(100%, 400px), 1fr))`, gap 12 px,
   so one per row on a phone. A card: 1 px line-grey border, radius 8 px, padding
   12 px 14 px, gap 14 px, white:
   - a thumbnail of the grid's shape: white with its clue cells in `--nock-thumb`,
     1 px rule-grey border, 51 px high (44 px on a phone), width in proportion to
-    the grid (39 by 51 for 13 by 17);
+    the grid (39 by 51 for 13 by 17). It needs the clue positions, which the
+    catalogue summary of spec 004 does not carry (OPEN);
   - « Grille n° N » and, after it, the status pill: « Commencée » (word blue,
     navy) or « Terminée » (green background, green text), radius 12 px, padding
     3 px 9 px;
@@ -645,9 +865,6 @@ in); heading « Lien à partager »; the URL in a box (1 px rule-grey border, ra
     it never relies on the drawing alone;
   - the primary button « Jouer » on the right (padding 9 px 16 px).
 
-The thumbnail needs the clue cells of each grid, which the catalogue summary of
-spec 004 does not carry today (section 12).
-
 ## 11. Components
 
 | Component | Look |
@@ -656,6 +873,7 @@ spec 004 does not carry today (section 12).
 | Primary | navy background, white text, transparent border |
 | Secondary | white background, navy text, navy border |
 | Quiet | word-blue background, navy text, transparent border |
+| Small button | any variant, padding 6 px 10 px, 0.8rem |
 | Disabled (any) | clue blue-grey background, muted text, line-grey border, `cursor: not-allowed`; text still 4.5:1 |
 | Focus ring | `outline: 2px solid var(--nock-navy)`, `outline-offset: 2px`, on `:focus-visible`. On a navy surface (the clue bar): white, offset −4 px |
 | Menu / popover | white, radius 8 px, padding 6 px 0, min width 220 px, shadow `0 12px 30px -10px var(--nock-shadow)`, no border |
@@ -664,53 +882,64 @@ spec 004 does not carry today (section 12).
 | Menu separator | 1 px line-grey top border, margin 4 px 0 |
 | Top-bar button | navy icon and label, transparent background; pressed: word blue |
 | Badge | red background, white 700 0.62rem/1 text, padding 2 px 4 px, radius 8 px |
+| New-events dot | 8 px red circle |
 | 3-second note | section 8 |
-| Status band | sections 9 (in the room) |
-| Status pill | section 10 |
-| Bottom sheet | white, radius 14 px top, grab handle, section 8 |
-| Scrim | `--nock-scrim` (menus, sheet) or `--nock-scrim-dialog` (recap) |
-| Text input | 1 px rule-grey border; radius 18 px (message box) or 6 px (URL box) |
-| Pill button | word blue, navy, 600 0.85rem, radius 14 px, padding 6 px 12 px, no border |
+| Bottom sheet | white, radius 14 px top with grab handle (Salon) or 16 px top without (other room sheets, recap), section 8 |
+| Scrim | `--nock-scrim` (menus, sheets) or `--nock-scrim-dialog` (recap) |
+| Card | white, 1 px line-grey border, radius 10 px, padding 18 px 16 px, gap 12 px |
+| List row | white, 1 px line-grey border, radius 8 px, padding 12 px 14 px, gap 12 px, items centred; text column gap 3 px (title 700, lines 0.85rem muted); its button on the right |
+| Field | label above its input, gap 6 px, label 600 0.85rem/1.2 ink |
+| Text input | 1 px rule-grey border, radius 6 px, padding 10 px 12 px, 400 1rem/1.2, ink on white; in error: red border. Message box: radius 18 px, padding 7 px 12 px. URL box: padding 8 px 10 px, 0.85rem, one line with ellipsis |
+| Number input | a text input 64 px wide, text centred |
+| Error line | red, 500 0.85rem/1.3, under its field |
+| Confirmation line | green, 500 0.85rem/1.3 |
+| Switch | track 42 by 24 px, radius 12 px, rule grey when off, navy when on; knob 18 px white circle, 3 px from the top, left 3 px (off) or 21 px (on). In a switch row: label left (500 0.95rem/1.2), switch right, gap 10 px |
+| Segmented control | inline row with a 1 px navy border, radius 6 px, clipped; options padding 8 px 10 px, 600 0.85rem/1, navy, 1 px navy dividers; the chosen one navy background, white text |
+| Tag (« hôte ») | clue blue-grey background, navy 600 0.72rem/1.3, radius 10 px, padding 2 px 8 px |
+| Pill button (« Envoyer ») | word blue, navy, 600 0.85rem, radius 14 px, padding 6 px 12 px, no border |
+| Text link | navy, weight 600 |
 | Player dot | 10 px circle, player colour, ring `0 0 0 1px var(--nock-dot-ring)` |
+| Reaction picker, shown reaction | section 8 |
 
 ## 12. Spec impact
 
 Refinements to make, each with dated notes, before the matching build step
-(section 14). "Gap" means the sheet draws nothing for it yet; the spec writer
-proposes a look here first (rule 3).
+(section 14).
 
 | Spec | Status | What contradicts or is missing | Change |
 | --- | --- | --- | --- |
-| 004 | done | Catalogue look (AC-1, AC-3 show the fields and progress, no look); the summary has no cell layout for a thumbnail | Section 10 criteria; add the clue-cell positions to `GridSummary` and `GET /api/grids`, or drop the thumbnail (OPEN) |
-| 005 | done | Credits on the catalogue and grid page are not drawn | Gap |
-| 006 | done | AC-2: arrows drawn in the clue cell on its side; AC-3: separator look; letter 0.55 s and clue 0.11 s / 0.09 s today; empty cells have no look; AC-5 and AC-7 fit a page without top bar or clue bar of this design | Arrows into the letter cell (section 6); separator 55 %, 14 % insets; letter 0.56 s; clue max(6px, 0.145 s); empty cells (OPEN); fit rules with the new layout |
-| 007 | done | AC-1: the selected word's clue is highlighted (yellow today); selected cell yellow with a 3 px ink outline; AC-4: clue bar look | Selected blue and 2 px navy outline; clue highlight (OPEN); clue bar of section 8 |
+| 004 | done | Catalogue look (AC-1, AC-3 show the fields and progress, no look); the summary has no clue positions for a thumbnail | Section 10 criteria; add the clue positions to `GridSummary` and `GET /api/grids`, or drop the thumbnail (OPEN) |
+| 005 | done | Credits on the catalogue and grid page are not drawn | Gap: the spec writer proposes a card line here first |
+| 006 | done | AC-2: arrows drawn in the clue cell on its side; AC-3: separator look; letter 0.55 s and clue 0.11 s / 0.09 s today; empty cells grey #C9CDD8; AC-5 and AC-7 fit a page without top bar or clue bar of this design | Arrows into the letter cell with the collision rules (section 6); separator 55 %, 14 % insets; letter 0.56 s; clue max(6px, 0.145 s); empty cells rule grey; fit rules with the new layout |
+| 007 | done | AC-1: the selected word's clue is highlighted (yellow today); selected cell yellow with a 3 px ink outline; AC-4: clue bar look | Selected blue and 2 px navy outline; active clue half in selected blue; clue bar of section 8 |
 | 009 | done | AC-3: third row `WXCVBN` plus `key-delete` only; key size and colours; no Clavier control | ✎ and ⇄ keys, key geometry (section 8), « Clavier » hides the keyboard |
-| 010, 011 | done | The share link and copy button sit on the room page | Move into Menu « Inviter » and the Salon's « Inviter » (also changes spec 035 AC-12's Tab walk, which starts at `share-link`) |
-| 012 | done | Palette values; nickname form and roster look | Section 3 values (done by spec 041); roster moves into the Salon; nickname form is a gap |
-| 013 | done | AC-2, AC-3: dashed border in the player's colour on the cell; tint at 28 % today; AC-5, AC-7, AC-8 and "Client: feed height": the feed is stacked above the grid and "never beside the grid"; AC-6: roster and feed on the page | Corner triangles (section 6); tint 16 % (OPEN keep or drop); feed becomes events in the Salon stream, in the sheet or the column; the roster becomes the Salon's Joueurs list |
-| 014 | done | Host panel and roster remove buttons on the page; AC-7 to AC-10 measure their small-window layouts | Host settings open from Menu « Réglages de l'hôte »; remove buttons in the Joueurs list; AC-7 to AC-10 rewritten for the new places |
+| 010, 011 | done | The share link and copy button sit on the room page | Into the Joueurs tab's « Lien d'invitation » (Menu « Inviter » opens it); also changes spec 035 AC-12's Tab walk, which starts at `share-link` |
+| 012 | done | Palette values; nickname form and entry statuses look; roster on the page | Section 3 values (spec 041); nickname card and status cards (section 8); roster into the Joueurs tab |
+| 013 | done | AC-2, AC-3: dashed border in the player's colour on the cell; tint 28 % today, always on; AC-5, AC-7, AC-8 and "Client: feed height": the feed is stacked above the grid and "never beside the grid"; AC-6: roster and feed on the page | Corner triangles (section 6); tint 16 % with the « Mots des autres » toggle; feed lines become stream events (section 8 table), in the sheet or the column; roster becomes the Joueurs tab |
+| 014 | done | Host panel and roster remove buttons on the page; AC-7 to AC-10 measure their small-window layouts | Host settings sheet from Menu « Réglages de l'hôte » (switch, segmented control, number fields); « Retirer » in the Joueurs rows; AC-7 to AC-10 rewritten for the new places |
 | 016 | done | Flash basis: the cell takes the replacer's full colour, with a text colour per player | Replacer's colour at 38 % over white, ink letters (spec 041 draws it as an overlay so AC-2's swatch check still holds) |
-| 017 | done | Connection banner look | Gap |
+| 017 | done | Connection banner look and place | Connection band under the top bar (section 8); `room-status` may be visually hidden |
 | 018 | done | Undo button look and place | « Annuler » in the top bar (section 8) |
-| 019 | done | The whole author band (AC-1, AC-2, AC-5); AC-4 « Lettre de … » in the clue bar; switch in the toolbar | Auteurs mode of section 7; switch in the Menu; legend instead of the clue bar line |
-| 020 | done | `pencil-toggle` in the toolbar; the confirm control; AC-7 layout | ✎ key on touch screens, « Crayon » in the computer top bar; confirm control is a gap |
-| 021 | done | `flag-button` in the toolbar; marker position and size (AC-9), the second clue's flag sits under the separator | ⚑ « Je bloque » in the clue bar; flag of section 6; second-clue position (OPEN) |
-| 022 | done | Chat panel drawn over the page (decision 6, AC-17); `chat-toggle` and `react-button` in the toolbar (AC-5); chat notes (AC-19); reactions shown on clue cells | Discussion tab of the Salon; « Salon » button with the red unread badge; 3-second notes; reactions are a gap (OPEN) |
-| 023 | done | `check-panel` in the toolbar (AC-9); strike look | Aide menu « Vérifier »; strike of section 6; passed check line green |
-| 024 | done | `reveal-panel` in the toolbar (AC-7, AC-8); `reveal-mark` in the top-right corner, at least 6 px and a quarter of the side (AC-9), 3:1 during a flash | Aide menu « Révéler »; bottom-centre notch of section 6, which is smaller than the quarter (OPEN) and below 3:1 on some flashes (OPEN) |
+| 019 | done | The whole author band (AC-1, AC-2, AC-5); AC-4 « Lettre de … » in the clue bar; switch in the toolbar | Auteurs mode of section 7; switch in the Menu; legend under the grid instead of the clue bar line |
+| 020 | done | `pencil-toggle` and `confirm-pencil` in the toolbar; AC-7 layout | ✎ key on touch screens, « Crayon » in the computer top bar; confirm as the first Aide item while a pencil letter is selected |
+| 021 | done | `flag-button` in the toolbar; marker position and size (AC-9), the second clue's flag under the separator today | Je bloque in the clue bar with its pressed state; flag icon of section 6 at the top-left of its own half |
+| 022 | done | Chat panel drawn over the page (decision 6, AC-17); `chat-toggle` and `react-button` in the toolbar (AC-5); chat notes (AC-19); reaction look (AC-4) | Discussion tab of the Salon; « Salon » with the red unread badge and the new-events dot; « Réagir » in the clue bar between the clue text and Je bloque; picker over the bottom of the grid area; reaction pill over the clue cell; 3-second notes |
+| 023 | done | `check-panel` in the toolbar (AC-9); strike look | Aide menu « Vérifier »; strike of section 6; check lines in the stream |
+| 024 | done | `reveal-panel` in the toolbar (AC-7, AC-8); `reveal-mark` in the top-right corner, at least 6 px and a quarter of the side (AC-9), 3:1 during a flash | Aide menu « Révéler »; bottom-centre notch of section 6, ink during a flash (OPEN), its size DEFERRED |
 | 025 | done | Vote banner look; AC-4 hides `check-panel` and `reveal-panel` in none mode | Section 9 banner; in none mode « Aide » is hidden (to confirm in the refinement) |
-| 026 | done | `grid-status` look; AC-10 puts the status in the clue bar's row on windows at most 500 px high | Band under the clue bar (section 9); AC-10 rewritten; keyboard goes away once solved |
-| 027 | done | `timer`, `timer-toggle`, `chat-toggle` are the first three toolbar elements (AC-8); « ⏱ » toggle | Timer in the top bar; « Masquer le chrono » in the Menu |
+| 026 | done | `grid-status` look; AC-10 puts the status in the clue bar's row on windows at most 500 px high | Band under the clue bar (section 9): finished replaces the keyboard, full-but-wrong sits above the keyboard; AC-10 rewritten |
+| 027 | done | `timer`, `timer-toggle`, `chat-toggle` are the first three toolbar elements (AC-8); « ⏱ » toggle | Timer in the top bar; « Masquer le chrono » in the Menu; « Chrono » in the timer's slot while hidden |
 | 028 | approved | AC-7: `recap-open` in the toolbar right after `chat-toggle`; AC-10 dialog sizes | « Voir le bilan » in the end band; sheet on a phone, 440 px dialog on a computer (section 9) |
-| 029, 032, 033 | approved | History, « My rooms » and account screens are not drawn | Gaps; use section 10's cards and section 11's components |
-| 034 | approved | AC-2: changed cells highlighted for 5 s; no look | Gap |
-| 035 | done | AC-2: focus outline 3 px blue today, and "3:1 against the page background" fails for a white ring on navy; AC-6 initials; AC-11 slots and "+k"; AC-7 roster states; AC-12 lists named `roster` and `activity-feed`; "Reduced motion" out of scope | 2 px navy ring (spec 041); measure against the surface behind the ring; triangles are colour only, with the Joueurs list as the non-colour sign (OPEN); AC-11 replaced by section 6's corners; AC-7 and AC-12 follow the Salon lists; notes respect reduced motion |
-| 040 | done | `room-heading` (« Salon {code} ») and `room-status` shown on the page; styles were "not binding" | Their place in the top bar is a gap; styles now follow this file |
+| 029 | approved | History list not drawn before | « Grilles terminées » section of the catalogue (section 10) |
+| 032 | approved | « My rooms » list not drawn before | « Mes salons » section of the catalogue (section 10) |
+| 033 | approved | `account-open` is the last control of `room-toolbar` | « Compte » in the room Menu and in the catalogue's top bar; account sheet or dialog (section 8) |
+| 034 | approved | AC-2: changed cells highlighted for 5 s, no look | Catch-up ring (section 6); lines in the stream |
+| 035 | done | AC-2: focus outline 3 px blue today, and "3:1 against the page background" fails for a white ring on navy; AC-6 initials; AC-11 slots and "+k"; AC-7 roster states; AC-12 lists named `roster` and `activity-feed`; "Reduced motion" out of scope | 2 px navy ring (spec 041); measure against the surface behind the ring; AC-6 and AC-11 refined: the non-colour sign of a player's cursor is the Accessibilité mode's icons (section 6) plus the Joueurs list, and triangles stay colour-only while the mode is off (decided by the human on 2026-10-16); AC-7 and AC-12 follow the Salon lists; notes respect reduced motion |
+| 040 | done | `room-heading` (« Salon {code} ») and `room-status` shown on the page; not-found page has no way back; styles were "not binding" | « Salon {code} » above the entry cards; `room-status` visually hidden while the connection band shows; « Voir les grilles » on the not-found card (an addition); styles now follow this file |
 
 New specs, numbers proposed in build order (section 14): 041 visual foundation
 (written); then grid cells, room layout, keyboard, Auteurs mode, catalogue,
-overlays.
+overlays, remaining screens.
 
 ## 13. How conformance is secured
 
@@ -729,7 +958,8 @@ overlays.
 5. The reviewer checks each change against this file:
    - every colour comes from a token, and the token is used for its job;
    - no new font, size, radius, shadow or icon outside this file;
-   - the cell geometry and drawing order of section 6;
+   - the cell geometry, the arrow collision rules and the drawing order of
+     section 6;
    - contrast of section 2 holds in every state the spec covers, flashes
      included;
    - the layout rules of section 8, and that nothing extra is permanently on
@@ -746,100 +976,133 @@ Each step leaves the app working and every test passing.
 1. Foundation: tokens, player colours, fonts, icons, buttons, focus ring, menus,
    badges, notes (spec 041). Today's screens take the token colours with no layout
    change.
-2. Grid cells: section 6 (with specs 006, 007, 013, 016, 021, 023, 024, 035
-   refined).
-3. Room layout: top bar, sheet and column, Salon, 3-second notes, Aide and Menu
-   (specs 010, 011, 013, 014, 018, 022, 023, 024, 027, 035, 040 refined).
+2. Grid cells: section 6 (with specs 006, 007, 013, 016, 021, 023, 024, 034, 035
+   refined), with the Accessibilité mode's icons once their table is filled.
+   Needs the DEFERRED, high notch item settled first.
+3. Room layout: top bar, sheet and column, Salon, 3-second notes, Aide and Menu,
+   connection band, reactions, room sheets (specs 010, 011, 013, 014, 017, 018,
+   020, 022, 023, 024, 027, 033, 035, 040 refined). Needs the DEFERRED, high notch
+   item settled first, as the grid-cell step does.
 4. Keyboard: ✎, ⇄, « Clavier » (specs 009, 020 refined).
-5. Auteurs mode, catalogue, overlays (specs 019, 004, 025, 026, 028 refined).
+5. Auteurs mode, catalogue and its sections, entry pages, overlays (specs 019,
+   004, 012, 025, 026, 028, 029, 032, 040 refined).
 
 ## 15. Open decisions
 
-For the human. The spec writer's pick comes last in each item.
+### Decided by the human on 2026-10-16
 
-1. Another player's word: keep the 16 % tint, or drop it. Pick: keep, it shows
-   where a team-mate works; the sheet has a switch for both.
-2. Corner triangles carry colour only, which spec 035 AC-6 forbids today. The
-   Joueurs list in the Salon says where each player is. Accept the list as the
-   non-colour sign? Pick: yes, and refine spec 035.
-3. The revealed notch is smaller than spec 024's minimum (at least 6 px and a
-   quarter of the side, in both directions): 0.22 s by 0.11 s. Accept? Pick:
-   yes, refine spec 024.
-4. The notch drops below 3:1 on some flashes (orange-red on Magenta 38 %: 2.6:1,
-   Cramoisi 2.8:1, Orange 2.1:1), which spec 024 forbids. Options: draw the notch
-   in ink during the 1 s flash; give it a white edge; accept. Pick: ink during the
-   flash.
-5. Font files are a dependency. Options: the npm packages
+- Another player's word: tinted at 16 %, and each player can turn it off from the
+  Menu (« Mots des autres » : « teintés » / « sans teinte »), per browser, on by
+  default (section 6).
+- Auteurs mode: kept, toggled from the Menu, off by default (section 7).
+- A closed side column stays closed next time, per browser (section 8).
+- No long press on ⌫ to erase the word (section 8).
+- A player's corner is given by the order of arrival on the cell (section 6).
+- An « Accessibilité » mode in the Menu, off by default, per browser: while on,
+  each corner triangle becomes that player's own icon in their colour, same
+  corners, same order, at most 4 (section 6; icon table pending). This settles
+  the former deferred item "corner triangles carry colour only": with the mode
+  off, triangles stay colour-only by the human's choice, and spec 035 AC-6 is
+  refined so that its non-colour sign is the mode plus the Joueurs list.
+- Grid lines and input borders keep the sheet's rule grey #9AA3B2 ("use the one
+  from the style"); its contrast is tracked below as low importance.
+
+### Deferred, high importance
+
+Skipped by the human on 2026-10-16: neither accepted nor refused. Both must be
+settled before the grid-cell and room-layout specs are approved (section 14),
+because each one decides how a spec of the accessibility bar is refined.
+
+1. Corner triangles carry colour only. Spec 035 AC-6 requires that colour is never
+   the only signal of a player's cursor (initials today), and AC-11 places those
+   initials and the "+k" label. With triangles, the only non-colour sign of where
+   a player is would be the Joueurs list in the Salon (name, state, current clue).
+   Why it matters: it is an accessibility rule (WCAG 1.4.1, use of colour) of a
+   `done` spec; colour-blind players and players with five or more team-mates rely
+   on it (section 3's weakest pairs reach only 7.1). Until settled, spec 035 AC-6
+   and AC-11 stand, and the grid-cell spec cannot remove the initials.
+2. The revealed notch is 0.22 s by 0.11 s (min 7 by 4 px), smaller than spec 024
+   AC-9's minimum (at least 6 px and a quarter of the side, wide and high). At a
+   29 px cell it is 7 by 4 px, against 8 by 8 px. Why it matters: the notch is the
+   non-colour sign of a revealed letter (with bold), and spec 024 sized it so it
+   stays visible on small cells. Until settled, spec 024 AC-9 stands, and the
+   grid-cell spec cannot move the mark.
+
+### Deferred, low importance
+
+- Rule grey #9AA3B2 is 2.54:1 on white. WCAG 1.4.11 asks 3:1 for the boundary of an
+  input and for the parts of a control, such as the switch track when off. Kept by
+  the human's decision above; a darker value (#8A93A3, 3.10:1) remains possible
+  later.
+
+### Still open
+
+The spec writer's pick comes last in each item.
+
+1. Font files are a dependency. Options: the npm packages
    `@fontsource/source-sans-3` and `@fontsource/ibm-plex-sans-condensed`, imported
    per weight; or the WOFF2 files committed under `web/public/fonts/` with their
    SIL OFL 1.1 licence. Pick: the npm packages.
-6. Grid lines and input borders: rule grey #9AA3B2 is 2.54:1 on white; WCAG 1.4.11
-   asks 3:1 for an input's border. Options: keep; darken to #8A93A3 (3.10:1).
-   Pick: #8A93A3.
-7. Departed grey #6B7079 is below 4.5:1 on word blue (4.23:1) and selected blue
-   (3.62:1). Options: #5C616A (4.53:1 on selected); accept. Pick: #5C616A.
-8. Does a closed side column stay closed next time (per browser)? Pick: yes.
-9. A long press on ⌫ erases the word? Pick: not now.
-10. Which corner a player gets: arrival order on the cell (the sheet), or a fixed
-    corner per player. Pick: arrival order.
-11. The selected word's clue in the grid: the sheet gives it no look, and spec 007
-    AC-1 highlights it. Options: no highlight (the clue bar names it); the clue's
-    half in selected blue. Pick: the clue's half in selected blue, which widens
-    that token's job to "my selected cell and my selected clue".
-12. Empty cells (spec 002's `empty` type) have no look. Options: rule grey; ink.
-    Pick: rule grey.
-13. Reactions (spec 022) are not drawn: no react button in the top bar, no badge
-    on clue cells. Options: keep them (where?); drop them. Pick: keep the badge
-    over the clue as today, react from the Aide menu; needs a drawing first.
-14. Pencil confirm (spec 020) is not drawn. Pick: an item in the Aide menu.
-15. Two arrows can collide in one letter cell: a → of clue 0 (centre 0.25 s) with a
-    ↴ (top 0.06 s) from the same two-clue cell, and a ↴ from the left with a ↳
-    from above (both near the top-left corner). Pick: → always at 0.72 s when the
-    cell also has a ↴; for ↴ with ↳, a drawing first.
-16. Phone held sideways and the 900 px rule (section 8). Pick: column when
-    landscape and either at least 900 px wide and more than 500 px high, or at
-    most 500 px high with the keyboard hidden.
-17. The stream line « ✎ Bruno a rempli MIME · LEST » needs an event the protocol
-    does not have (a word filled). Options: add it (protocol change); drop the
-    line. Pick: drop it for now.
-18. Where a 3-second note goes while the vote banner shows (both sit 8 px from the
-    top of the grid area). Pick: notes wait until the banner goes.
-19. The « Je bloque » button shows pressed only by opacity (100 % against 70 %).
-    Pick: pressed is a white button with a navy ⚑, as the sheet's own switch
-    buttons.
-20. The new-events dot on « Salon » is not drawn. Pick: an 8 px red dot at the
-    badge's place.
+2. The revealed notch in ink during a flash (orange-red falls to 2.1:1 to 2.8:1 on
+   the Orange, Cramoisi and Magenta flashes, below spec 024's 3:1). Applied in
+   sheet 4.2 (`.flash.rev::after`), pending approval. Pick: approve.
+3. Departed grey #5C616A (4.53:1 on selected blue) in place of #6B7079 (3.62:1).
+   Applied in sheet 4.2, pending approval. Pick: approve.
+4. Catalogue thumbnail: the clue positions must come from the API (a spec 004
+   change to `GridSummary` and `GET /api/grids`), or the thumbnail goes. The sheet
+   keeps it until decided. Pick: add the positions (a few bytes per grid, no
+   answer letters).
+5. Phone held sideways and the 900 px rule (section 8). Pick: column when
+   landscape and either at least 900 px wide and more than 500 px high, or at most
+   500 px high with the keyboard hidden.
+6. Whether Auteurs mode is remembered across reloads. Pick: per browser, as the
+   tint toggle.
+7. Place of « Compte » in the room Menu (not drawn there). Pick: after « Réglages
+   de l'hôte », before the separator.
+8. A shown reaction on a two-clue cell (the sheet centres the pill on the whole
+   cell). Pick: centred on its own clue's half, as spec 022 does today.
+9. Place of the new-events dot on the computer top bar (drawn on the phone only).
+   Pick: at the unread badge's place (top 2 px, left 24 px).
+10. `room-heading` inside the room (not drawn; the grid name is in the computer
+    top bar, nothing on the phone). Pick: visually hidden.
+11. The « ← » pictogram for departures (not in the sheet). Pick: ←.
 
-Inconsistencies of the sheet, settled here unless the human says otherwise:
+### The sheet, version 4.2
 
-- `--clue-ink` (#1B2230) is a token in the sheet but missing from the brief's
-  list: kept as `--nock-clue-ink`.
-- Shadows use `rgba(0, 0, 0, ...)`, against "no pure black"; the demo menu has a
-  0.35 shadow and a border, the phone popover 0.45 and no border: ink-based
-  shadows, the popover's values.
-- Recap sheet radius 16 px with no handle, Salon sheet 14 px with a handle: kept
-  as drawn.
-- The reveal line's pictogram is 👁 (an emoji) on the phone and ▲ on the computer:
-  ▲.
-- Texts say "red notch" and "revealed letters stay black": the notch is orange-red
-  and the letters ink.
+Settled in 4.2 (no longer open): the leftovers of earlier versions are removed
+(`fitName`, `LABEL_AT`, `.tri b`, `.band`, `.pentag`, the triangle-edge contrast
+row); ⚑ ‹ › are drawn icons; the legend sits under the grid in the flow; 👁 is
+replaced by ▲; the wording says orange-red and ink; the hidden timer's slot holds
+« Chrono »; the new-events dot is drawn; a flagged second clue has its own flag;
+Je bloque has a drawn pressed state; the full-but-wrong band sits between the clue
+bar and the keyboard; the arrow collisions have rules; the « a rempli » line is
+gone; empty cells and the active clue are drawn.
+
+Still in 4.2, settled here unless the human says otherwise:
+
+- `--clue-ink` (#1B2230) is kept as `--nock-clue-ink`.
+- The menu, popover, sheet, dialog, vote and note shadows still use
+  `rgba(0, 0, 0, ...)`, against "no pure black"; the demo menu has a 0.35 shadow
+  and a border, the phone popover 0.45 and no border: ink-based shadows, the
+  popover's values (the reaction pill and picker already use ink).
+- Recap sheet and room sheets: radius 16 px, no handle; Salon sheet 14 px with a
+  handle: kept as drawn.
 - The caption "smaller type in two-clue cells" disagrees with the CSS, which has
   one clue size: one size.
+- The palette table's jobs are not updated (selected blue "my selected cell only",
+  rule grey without empty cells): section 2 of this file is the reference.
+- The sheet's "Still open" recap block still lists the tint, the corner, the
+  column and the long press, which the human decided: this file is the reference.
+- Two captions still say "red notch" (section 6b's lead, the phone's note): the
+  notch is orange-red.
 - Clue cells have `overflow: visible`, so a long clue could spill over its
   neighbours; spec 006 AC-1 still requires no cut at full zoom. At about 29 px
-  (tablet with the keyboard) two-clue cells do not hold their text, as the sheet
-  notes: players zoom or hide the keyboard.
-- The flag of a flagged second clue has no place of its own.
-- The ⚑, ‹, › glyphs come from the text font; Source Sans 3 has no ⚑, so it is
-  drawn by a fallback font and looks different per system.
-- The legend is drawn over the bottom of the grid area, not under the grid; it can
-  cover the last row.
-- The sheet shows « 31 / 48 mots » on the phone and « 31 / 54 mots » on the
-  computer for sample grids: sample data only.
-- Leftovers of earlier versions, not part of the design: `fitName`, `LABEL_AT`,
-  `.tri b`, `.band`, `.pentag`, and the contrast row "Triangle edge on selected
-  fill".
-- When the timer is hidden, the sheet does not say what holds the top bar's left
-  slot.
-- A flash replaces my selected cell's blue for 1 s (the sheet's inline style
-  wins); the navy border stays.
+  (tablet with the keyboard) two-clue cells do not hold their text: players zoom
+  or hide the keyboard.
+- The players-and-invite drawing shows only the state word, while the Salon's
+  Joueurs tab shows « state · current clue »: both kept (the current clue is the
+  list's job as the sign of where each player is).
+- Sample texts differ from spec strings (« a rejoint la partie »; « 31 / 48 mots »
+  on a FX-01-sized grid): rule 6 of section 1.
+- The legend's 38 px reservation is more than its drawn height (about 25 px plus
+  the 8 px gap): 38 px kept, as drawn.
