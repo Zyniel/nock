@@ -113,25 +113,14 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 - The gate builds `web/dist` at its start: do not rebuild the client while it
   runs, and expect load flakes when agents run browsers at the same time
   (rerun a single failure before trusting it).
-- Fonts: CI's Ubuntu runner uses DejaVu Sans, this machine Inter. Layout files
-  run a second time with `FONTCONFIG_FILE=<scratchpad>/fonts/fonts.conf` (a
-  session scratchpad file: recreate it in a new session's scratchpad;
-  `fc-match sans-serif` must then say DejaVu Sans). Its content:
-
-  ```xml
-  <?xml version="1.0"?>
-  <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-  <fontconfig>
-    <include ignore_missing="yes">/etc/fonts/fonts.conf</include>
-    <selectfont>
-      <rejectfont>
-        <glob>*/Inter*</glob>
-        <pattern><patelt name="family"><string>Inter</string></patelt></pattern>
-        <pattern><patelt name="family"><string>Inter Display</string></patelt></pattern>
-      </rejectfont>
-    </selectfont>
-  </fontconfig>
-  ```
+- Fonts: CI's Ubuntu runner draws the app's text in DejaVu Sans; this image
+  prefers Inter. Since 2026-10-16 the session-start hook installs
+  `.claude/hooks/ci-fonts.conf` in `~/.config/fontconfig/conf.d/`, so the
+  browsers of a cloud session use DejaVu Sans as CI does (`fc-match sans-serif`
+  says DejaVu Sans). Layout files no longer need a second run with another
+  font.
+- The implementer's finish hook runs the quick gate (`--specs` of the specs
+  the branch changed, Chromium); about 2 to 4 minutes.
 - CI runs only on pull requests and pushes to `main`, and cancels a run when a
   new commit is pushed. Seven jobs (static and non-browser tests on Ubuntu
   3.13; each engine on Ubuntu and Windows, Python 3.14), then `Quality gate`,
@@ -163,7 +152,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   Windows port range, the Windows worker count and the scroll files' serial
   pass are the lead's follow-up fixes to that change, each from a CI failure.
 - 2026-10-16: PR #8 merged; from now on one pull request per spec, tooling
-  changes in their own.
+  changes in their own. Spec 032: a returning player whose nickname was taken
+  comes back as "Ana 2" (fold it into the spec's decisions when 032 starts).
+  The finish hook runs a quick gate, and cloud sessions use CI's fonts.
+  Technical variables should not contain special characters (spec 036).
 
 ## Lead decisions of 2026-10-15 worth knowing
 
@@ -183,14 +175,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 ## Pending questions for the human
 
-- `scripts/hooks/role_gate.py` gives the gate 540 s, but the gate takes over an
-  hour, so the hook always times out. Proposal: run the changed spec's tests
-  and the static checks in the hook.
-- Proposal: make local browser tests use CI's fonts by default (the
-  session-start hook could write the fontconfig file and export
-  `FONTCONFIG_FILE`). A tooling change.
-- Spec 036 AC-11: should a `NOCK_PORT` value with a control character appear
-  raw or escaped in the error message? The tests accept both.
+- Spec 036 and the human's rule "technical variables should not contain
+  special characters" (2026-10-16): `NOCK_PORT` refuses them and its message
+  will show the value escaped; asked whether `NOCK_HOST` and `NOCK_DATABASE`
+  should refuse control characters too.
 - A separate cloud session ("Nock hosting plan (document only)") drafts
   `docs/hosting.md` on branch `docs/hosting-plan`.
 
