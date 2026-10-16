@@ -28,6 +28,7 @@ from spec028_harness import (
     TOKEN_PATTERN,
     UNKNOWN_TOKEN,
     Game,
+    after_play_r,
     make_http_registry,
     play_r,
     stored_play_r,
@@ -68,7 +69,7 @@ def test_ac9_a_new_registry_gives_the_recap_of_the_stored_room(
     restarted_store: RoomStore, fx01_grid: Grid
 ) -> None:
     game = play_r(fx01_grid)
-    registry = RoomRegistry(store=restarted_store)
+    registry = RoomRegistry(store=restarted_store, clock=after_play_r)
     try:
         recap = registry.room_recap(ROOM_CODE)
     finally:
@@ -83,7 +84,7 @@ def test_ac9_a_new_registry_gives_the_public_recap_of_the_stored_room(
     restarted_store: RoomStore, fx01_grid: Grid
 ) -> None:
     game = play_r(fx01_grid)
-    registry = RoomRegistry(store=restarted_store)
+    registry = RoomRegistry(store=restarted_store, clock=after_play_r)
     try:
         shared = registry.shared_recap(SHARE_TOKEN)
     finally:
@@ -95,7 +96,7 @@ def test_ac9_a_new_registry_gives_the_public_recap_of_the_stored_room(
 def test_ac9_shared_recap_is_none_for_an_unknown_or_malformed_token(
     restarted_store: RoomStore,
 ) -> None:
-    registry = RoomRegistry(store=restarted_store)
+    registry = RoomRegistry(store=restarted_store, clock=after_play_r)
     try:
         assert registry.shared_recap(UNKNOWN_TOKEN) is None
         assert registry.shared_recap("a b") is None
@@ -106,7 +107,7 @@ def test_ac9_shared_recap_is_none_for_an_unknown_or_malformed_token(
 def test_ac9_the_stored_room_is_solved_after_the_restart(
     restarted_store: RoomStore,
 ) -> None:
-    registry = RoomRegistry(store=restarted_store)
+    registry = RoomRegistry(store=restarted_store, clock=after_play_r)
     try:
         state = registry.room_state(ROOM_CODE)
     finally:

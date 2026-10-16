@@ -40,6 +40,7 @@ import time
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from fastapi import FastAPI
@@ -65,6 +66,7 @@ from nock.protocol import (
 )
 from nock.room import (
     CellState,
+    Clock,
     Outcome,
     PlayerRecord,
     RoomConfig,
@@ -110,6 +112,16 @@ SERVER_CONFIG = RoomConfig(
 
 
 # ---- Fixture bodies ----
+
+
+class FakeClock(Protocol):
+    """The `fake_clock` fixture of conftest: a clock moved by hand."""
+
+    now: float
+
+    def __call__(self) -> float: ...
+
+    def advance(self, seconds: float) -> None: ...
 
 
 def grid_from_text(text: str) -> Grid:
@@ -563,11 +575,22 @@ def server_grid(server: RoomRegistry, code: str) -> dict[tuple[int, int], CellVa
 
 
 class Process:
-    """One server process: a store, a registry and an app on one SQLite file."""
+    """One server process: a store, a registry and an app on one SQLite file.
 
-    def __init__(self, path: Path, dist_dir: Path, config: RoomConfig) -> None:
+    The registry reads `clock`, or the real time when it is None. Spec 032 deletes
+    a room 30 days after its last edit on that clock, so a process that loads a
+    room written at `START_TIME` needs a clock near that time.
+    """
+
+    def __init__(
+        self,
+        path: Path,
+        dist_dir: Path,
+        config: RoomConfig,
+        clock: Clock | None = None,
+    ) -> None:
         self.store = RoomStore(path)
-        self.registry = RoomRegistry(config=config, store=self.store)
+        self.registry = RoomRegistry(config=config, store=self.store, clock=clock)
         self.app = create_app(rooms=self.registry, dist_dir=dist_dir)
 
     def shutdown(self) -> None:

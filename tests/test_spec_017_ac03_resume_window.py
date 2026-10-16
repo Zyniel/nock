@@ -1,8 +1,10 @@
 """Tests of spec 017, AC-3: reconnecting within 5 minutes restores the player.
 
 The 300-second window is tested on the rules (`join_room`, `tick`), through the
-real WebSocket with a fake clock, and with a page reloading on the live server. The
-shared setup is in `spec017_harness`.
+real WebSocket with a fake clock, and with a page reloading on the live server.
+After the time-out, a join with the token seats the player back with the same id,
+token, nickname and colour, and the join's nickname is ignored (spec 032's seat
+back; AC-3 refined on 2026-10-16). The shared setup is in `spec017_harness`.
 """
 
 from __future__ import annotations
@@ -47,6 +49,7 @@ from spec017_harness import (
     events_of,
     expect_cell,
     grid_from_text,
+    has_player_joined,
     has_state_change,
     join_two,
     keep_seen,
@@ -148,7 +151,7 @@ def test_ac3_a_join_with_the_token_exactly_300_seconds_later_resumes_the_player(
     assert cell_state(outcome.state, 1, 0).author == "p2"
 
 
-def test_ac3_a_join_with_the_token_after_300_seconds_times_the_player_out(
+def test_ac3_a_join_after_300_seconds_times_the_player_out_and_seats_them_back(
     fx01_grid: Grid,
 ) -> None:
     room = room_with_bob_disconnected(fx01_grid)
@@ -158,21 +161,22 @@ def test_ac3_a_join_with_the_token_after_300_seconds_times_the_player_out(
 
     assert events_of(outcome.entries) == [
         PlayerLeft(seq=4, player_id="p2", reason=LeaveReason.TIMED_OUT),
-        PlayerJoined(seq=5, player=player_view(NEW_PLAYER_ID, "Bob", 1)),
+        PlayerJoined(seq=5, player=player_view("p2", "Bob", 1)),
     ]
+    assert outcome.entries[1].resume_token == token_of(2)
     assert len(outcome.reply) == 1
     snapshot = outcome.reply[0]
     assert isinstance(snapshot, Snapshot)
-    assert snapshot.you == NEW_PLAYER_ID
-    assert player_ids(outcome.state) == ["p1", NEW_PLAYER_ID]
-    new_player = player_of(outcome.state, NEW_PLAYER_ID)
-    assert new_player.resume_token == NEW_TOKEN
-    assert new_player.is_host is False
+    assert (snapshot.you, snapshot.resume_token) == ("p2", token_of(2))
+    assert player_ids(outcome.state) == ["p1", "p2"]
+    seated_back = player_of(outcome.state, "p2")
+    assert seated_back.resume_token == token_of(2)
+    assert seated_back.is_host is False
     old_cell = cell_state(outcome.state, 1, 0)
     assert (old_cell.letter, old_cell.author) == ("B", "p2")
 
 
-def test_ac3_the_new_player_after_a_time_out_takes_the_nickname_of_the_join(
+def test_ac3_a_player_seated_back_after_a_time_out_keeps_their_nickname(
     fx01_grid: Grid,
 ) -> None:
     room = room_with_bob_disconnected(fx01_grid)
@@ -180,7 +184,9 @@ def test_ac3_the_new_player_after_a_time_out_takes_the_nickname_of_the_join(
 
     outcome = join_room(room, join, DISCONNECTED_AT + 300.5, NEW_PLAYER_ID, NEW_TOKEN)
 
-    assert player_of(outcome.state, NEW_PLAYER_ID).nickname == "Zoe"
+    assert player_of(outcome.state, "p2").nickname == "Bob"
+    nicknames = [player.nickname for player in outcome.state.players]
+    assert nicknames == ["Ana", "Bob"]
 
 
 def test_ac3_a_tick_exactly_300_seconds_after_the_disconnection_keeps_the_player(
@@ -364,11 +370,12 @@ def test_ac3_after_the_time_out_the_seat_is_free_again(fx01_grid: Grid) -> None:
     assert len(outcome.state.players) == 8
 
 
-def test_ac3_a_timed_out_token_no_longer_resumes_after_the_tick(
+def test_ac3_after_the_tick_a_timed_out_token_seats_the_player_back(
     fx01_grid: Grid,
 ) -> None:
     room = keep_seen(room_with_bob_disconnected(fx01_grid), DISCONNECTED_AT + 301)
     ticked = tick(room, DISCONNECTED_AT + 301)
+    assert player_ids(ticked.state) == ["p1"]
 
     outcome = join_room(
         ticked.state,
@@ -380,7 +387,11 @@ def test_ac3_a_timed_out_token_no_longer_resumes_after_the_tick(
 
     snapshot = outcome.reply[0]
     assert isinstance(snapshot, Snapshot)
-    assert snapshot.you == NEW_PLAYER_ID
+    assert snapshot.you == "p2"
+    # Not a resume, which gives a player_state_changed: a player_joined.
+    assert events_of(outcome.entries) == [
+        PlayerJoined(seq=5, player=player_view("p2", "Bob", 1))
+    ]
 
 
 # ---- AC-3: the 300 s window through the real WebSocket -----------------------
@@ -454,7 +465,7 @@ def test_ac3_websocket_a_return_exactly_300_seconds_later_still_resumes(
             assert second_a.snapshot().you == a_id
 
 
-def test_ac3_websocket_after_301_seconds_the_player_times_out_and_the_token_is_new(
+def test_ac3_websocket_after_301_seconds_the_player_times_out_and_is_seated_back(
     fx01_grid: Grid, dist_dir: Path, fake_clock: FakeClock
 ) -> None:
     with (
@@ -488,12 +499,15 @@ def test_ac3_websocket_after_301_seconds_the_player_times_out_and_the_token_is_n
         with contextlib.ExitStack() as second_stack:
             second_a = open_peer(second_stack, client, code, "Ana", a_token)
             snapshot = second_a.snapshot()
-            assert snapshot.you != a_id
-            ids = [view.player_id for view in snapshot.players]
-            assert a_id not in ids
-            assert len(ids) == 2
-            new_view = next(v for v in snapshot.players if v.player_id == snapshot.you)
-            assert (new_view.nickname, new_view.colour) == ("Ana", 0)
+            assert snapshot.you == a_id
+            views = {view.player_id: view for view in snapshot.players}
+            assert sorted(views) == sorted([a_id, peer_b.snapshot().you])
+            assert (views[a_id].nickname, views[a_id].colour) == ("Ana", 0)
+            peer_b.wait_until(
+                lambda: has_player_joined(peer_b, a_id), "A's player_joined on B"
+            )
+            # A seat back, not a resume, which gives B a player_state_changed.
+            assert not has_state_change(peer_b, a_id, PlayerState.ACTIVE)
 
 
 def test_ac3_websocket_the_hub_gives_its_resume_window_to_the_join(
@@ -529,7 +543,7 @@ def test_ac3_websocket_the_hub_gives_its_resume_window_to_the_join(
 
         with contextlib.ExitStack() as second_stack:
             second_a = open_peer(second_stack, client, code, "Ana", a_token)
-            assert second_a.snapshot().you != a_id
+            assert second_a.snapshot().you == a_id
             peer_b.wait_until(
                 lambda: len(player_left_events(peer_b)) == 1,
                 "A's time-out on B",
@@ -537,6 +551,9 @@ def test_ac3_websocket_the_hub_gives_its_resume_window_to_the_join(
             assert player_left_events(peer_b) == [
                 PlayerLeft(seq=4, player_id=a_id, reason=LeaveReason.TIMED_OUT)
             ]
+            peer_b.wait_until(
+                lambda: has_player_joined(peer_b, a_id), "A's player_joined on B"
+            )
 
 
 # ---- AC-3: a reload on the live server ---------------------------------------
