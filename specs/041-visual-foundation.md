@@ -448,6 +448,9 @@ Decided with the human on 2026-10-16 (the design session):
 1. The palette, the eight player colours and their inks, the two font families,
    the icon style and Font Awesome Free as the fallback icon set are those of
    `_design.md`, which the human validated.
+1b. The fonts come in as the npm packages `@fontsource/source-sans-3` and
+   `@fontsource/ibm-plex-sans-condensed`, imported per weight used, self-hosted by
+   the build (decided by the human on 2026-10-16).
 
 Proposed by the spec writer, each already part of the spec above:
 
@@ -468,14 +471,9 @@ Proposed by the spec writer, each already part of the spec above:
 
 ## Open questions
 
-1. Font files (`_design.md` section 15, item 5). Adding them is a dependency.
-   Options: the npm packages `@fontsource/source-sans-3` and
-   `@fontsource/ibm-plex-sans-condensed`, imported per weight in `web/src/main.ts`
-   (Vite then builds the WOFF2 files into `web/dist/assets`); or the WOFF2 files
-   committed under `web/public/fonts/` with the SIL OFL 1.1 licence text and
-   `@font-face` rules in `app.css`. Pick: the npm packages. Approving this spec
-   would approve that choice; if the human declines both, AC-5 and AC-6 go and
-   the stacks fall back to the system fonts.
+1. Closed. Font files: the npm packages `@fontsource/source-sans-3` and
+   `@fontsource/ibm-plex-sans-condensed`, imported per weight used (decided by the
+   human on 2026-10-16; see "Fonts").
 2. Departed grey (`_design.md` section 15, "Still open" item 3). This spec uses
    sheet 4.2's #5C616A (4.53:1 on selected blue), pending the human's approval;
    nothing draws it yet. If the human keeps #6B7079, only the token's value and
