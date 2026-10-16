@@ -47,7 +47,11 @@ ROLE_STAGES: dict[str, str] = {
 }
 
 MAX_OUTPUT_LINES = 80
-GATE_TIMEOUT_SECONDS = 540
+# Below the hook's 1,200 s in .claude/settings.json, which leaves time for uv and
+# git. A gate that runs out of time does not block (exit 1), so the limit must
+# fit the slowest quick gate: on 2026-10-16 the quick gate of a branch that
+# changed 19 specs took about 510 s, close to the 540 s of then.
+GATE_TIMEOUT_SECONDS = 1140
 GIT_TIMEOUT_SECONDS = 30
 # The branch the changes are measured from, first the remote one.
 BASE_REFS: tuple[str, ...] = ("origin/main", "main")
