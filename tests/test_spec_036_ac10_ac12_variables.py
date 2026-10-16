@@ -27,12 +27,13 @@ Notes:
 - Edge cases checked as well: for `main()`, each of NOCK_HOST and NOCK_PORT empty
   or unset on its own, leading zeros and the bounds of NOCK_PORT, the variables
   read and checked at each call, an import that runs nothing; an address of no
-  interface of this machine, host names that do not resolve and the ASCII form of
-  a name, passed on as given; a newline alone, refused in each variable; signs,
-  spaces, underscores, digits outside ASCII and 5,000 zeros before 70000 in
-  NOCK_PORT; several invalid variables at once; the characters that Windows
-  refuses in a file name, which NOCK_DATABASE takes; and the message and status 1
-  of `python -m nock` with an invalid port.
+  interface of this machine, host names whose labels are fine but that do not
+  resolve, a name of 320 characters and the ASCII form of a name, passed on as
+  given; a newline alone, refused in each variable; a last label of 64 characters
+  in NOCK_HOST; signs, spaces, underscores, digits outside ASCII and 5,000 zeros
+  before 70000 in NOCK_PORT; several invalid variables at once; the characters
+  that Windows refuses in a file name, which NOCK_DATABASE takes; and the message
+  and status 1 of `python -m nock` with an invalid port.
 """
 
 from __future__ import annotations
@@ -77,30 +78,44 @@ FULLWIDTH_8000 = "\N{FULLWIDTH DIGIT EIGHT}" + "\N{FULLWIDTH DIGIT ZERO}" * 3
 ARABIC_INDIC_8000 = "\N{ARABIC-INDIC DIGIT EIGHT}" + "\N{ARABIC-INDIC DIGIT ZERO}" * 3
 SUPERSCRIPT_TWO = "\N{SUPERSCRIPT TWO}"
 
-# The values below are the spec's. The spec writes them as Python string literals;
-# this file writes each invisible character and each digit outside ASCII by its
+# The values below are the spec's. The spec writes them as Python string literals,
+# or as expressions that join or repeat them ("a" * 63 + ".example"); this file
+# writes each invisible character and each digit outside ASCII by its
 # name, as in "\N{ZERO WIDTH SPACE}" (U+200B) and "\N{SUPERSCRIPT TWO}" (U+00B2),
 # and each C0 or C1 control with a "\x.." escape as the spec does, so that its
 # source holds none of them raw. A raw literal such as r"C:\temp\nock.sqlite3"
 # holds backslashes, not escapes.
+#
+# Three characters of AC-12 have no Unicode name that "\N{...}" could use, and a
+# lone surrogate cannot be written to a UTF-8 file at all. They are built with
+# chr(), so that this file holds neither the raw characters nor an escape for them.
+PRIVATE_USE_CHARACTER = chr(0xE000)  # U+E000, category Co: private use
+UNASSIGNED_CHARACTER = chr(0x0378)  # U+0378, category Cn: unassigned
+LONE_SURROGATE = chr(0xDCE9)  # U+DCE9, category Cs: os.environ's form of byte 0xE9
 
 # AC-10: values of NOCK_HOST that main() hands uvicorn as given.
 ACCEPTED_HOSTS = [
     # As AC-10 lists them.
     pytest.param("localhost", id="localhost"),
     pytest.param("Nock-1.example.org", id="name-with-capital-digit-and-dash"),
+    pytest.param("example.org.", id="fully-qualified-name-ending-with-a-dot"),
+    pytest.param("a" * 63 + ".example", id="label-of-63-characters"),
     pytest.param("::", id="ipv6-unspecified"),
     pytest.param("::1", id="ipv6-loopback"),
     pytest.param("fe80::1", id="ipv6-link-local"),
     pytest.param("2001:DB8::1", id="ipv6-with-capitals"),
     pytest.param("::ffff:192.0.2.1", id="ipv6-mapped-ipv4"),
-    # Edge cases: an address of no interface of this machine, and names that do
-    # not resolve, are uvicorn's error, not main()'s; a name with letters outside
-    # ASCII is given in its ASCII form.
+    # Edge cases: an address of no interface of this machine, and names whose
+    # labels are fine but that do not resolve, are uvicorn's error, not main()'s;
+    # a name with letters outside ASCII is given in its ASCII form; the whole name
+    # has no length limit of its own (decision 16).
     pytest.param("192.0.2.1", id="no-address-of-this-machine"),
-    pytest.param("a..b", id="name-with-an-empty-label"),
     pytest.param("-", id="only-a-dash"),
+    pytest.param("a-.b", id="label-ending-with-a-dash"),
+    pytest.param("1.2.3", id="digits-that-are-no-address"),
     pytest.param("xn--bcher-kva.example", id="ascii-form-of-a-name"),
+    # Five labels of 63 characters, each followed by a dot: 320 characters.
+    pytest.param(("a" * 63 + ".") * 5, id="name-of-320-characters"),
 ]
 
 # AC-11: the variable and the value of each case; the two other variables are unset.
@@ -159,6 +174,15 @@ AC11_INVALID_VALUES = [
         HOST_VARIABLE, "localhost\N{SUPERSCRIPT TWO}", id="host-superscript-two"
     ),
     pytest.param(HOST_VARIABLE, "0.0.0.0/0", id="host-slash"),
+    # The labels of a name (decision 16): an empty label other than the last, and a
+    # label of 64 characters (64 "a" followed by ".example").
+    pytest.param(HOST_VARIABLE, "a..b", id="host-empty-label-between-dots"),
+    pytest.param(HOST_VARIABLE, ".", id="host-only-a-dot"),
+    pytest.param(HOST_VARIABLE, ".example", id="host-empty-first-label"),
+    pytest.param(HOST_VARIABLE, "example..", id="host-two-trailing-dots"),
+    pytest.param(
+        HOST_VARIABLE, "a" * 64 + ".example", id="host-label-of-64-characters"
+    ),
     # NOCK_DATABASE, as AC-11 lists them.
     pytest.param(DATABASE_VARIABLE, "\n", id="database-only-a-newline"),
     pytest.param(
@@ -221,6 +245,11 @@ OTHER_INVALID_VALUES = [
     # refused for all three (NOCK_DATABASE's case is in AC-11's list).
     pytest.param(PORT_VARIABLE, "\n", id="port-only-a-newline"),
     pytest.param(HOST_VARIABLE, "\n", id="host-only-a-newline"),
+    # Each label of a name holds 1 to 63 characters, the last one included
+    # (decision 16); AC-11 lists a label of 64 characters as the first label only.
+    pytest.param(
+        HOST_VARIABLE, "example." + "a" * 64, id="host-last-label-of-64-characters"
+    ),
     # NOCK_PORT takes ASCII digits only, for a number from 1 to 65535.
     pytest.param(PORT_VARIABLE, "+8000", id="port-plus-sign"),
     pytest.param(PORT_VARIABLE, "8000 ", id="port-trailing-space"),
@@ -259,6 +288,18 @@ ACCEPTED_DATABASES = [
     ),
     pytest.param(
         "/srv/nock\N{ZERO WIDTH JOINER}data/nock.sqlite3", id="zero-width-joiner"
+    ),
+    pytest.param(
+        "/srv/nock" + PRIVATE_USE_CHARACTER + "data/nock.sqlite3",
+        id="private-use-character",
+    ),
+    pytest.param(
+        "/srv/nock" + UNASSIGNED_CHARACTER + "data/nock.sqlite3",
+        id="unassigned-character",
+    ),
+    pytest.param(
+        "/srv/donn" + LONE_SURROGATE + "es/nock.sqlite3",
+        id="lone-surrogate-of-a-non-utf-8-byte",
     ),
     pytest.param(r"C:\Users\François\nock.sqlite3", id="windows-path-with-accent"),
     pytest.param(r"C:\temp\nock.sqlite3", id="windows-path-backslash-t-backslash-n"),
@@ -700,7 +741,9 @@ def test_ac12_main_leaves_nock_database_as_it_was(
 
     main()
 
-    assert os.environ.get(DATABASE_VARIABLE) == database_before
+    # Compared as ascii() text: pytest's report of two different strings shows them
+    # raw, and pytest-xdist cannot send a report that holds a lone surrogate.
+    assert ascii(os.environ.get(DATABASE_VARIABLE)) == ascii(database_before)
 
 
 @pytest.mark.parametrize("nock_database", MEMORY_DATABASES)
