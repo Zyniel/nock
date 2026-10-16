@@ -229,6 +229,30 @@ def test_ac4_team_nicknames_names_past_then_present_members_once(
     assert nock.room.team_nicknames(state) == ("BOB", "ANA", "CY")
 
 
+# U+1E9E, the capital sharp s: compared exactly, it differs from SS.
+STRASSE_WITH_CAPITAL_SHARP_S = "STRA\N{LATIN CAPITAL LETTER SHARP S}E"
+
+
+def test_ac4_team_nicknames_keeps_a_capital_sharp_s_and_ss_as_two_names(
+    fx01_grid: Grid,
+) -> None:
+    run = Run(fx01_grid)
+    run.join_new("STRASSE", CY, TC, T0)
+    past = (
+        nock.room.PastPlayer(
+            player_id=BOB,
+            resume_token=TB,
+            nickname=STRASSE_WITH_CAPITAL_SHARP_S,
+            colour=1,
+        ),
+    )
+    state = run.state.model_copy(update={"past_players": past})
+
+    names = nock.room.team_nicknames(state)
+
+    assert names == (STRASSE_WITH_CAPITAL_SHARP_S, "STRASSE")
+
+
 # ---- Python: summaries ---------------------------------------------------------
 
 

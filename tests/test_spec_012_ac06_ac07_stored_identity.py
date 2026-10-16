@@ -185,9 +185,12 @@ def test_ac6_the_form_is_prefilled_with_the_remembered_nickname(
     expect(page.get_by_test_id("room-page")).to_have_attribute(
         "data-status", "nickname"
     )
-    # Step 3 of the room page flow: the prefill is in capitals.
-    expect(page.get_by_test_id("nickname-input")).to_have_value("ZO\u00c9")
+    # Step 3 of the room page flow: the prefill is the stored text as it is, which
+    # CSS shows in capitals.
+    nickname_input = page.get_by_test_id("nickname-input")
+    expect(nickname_input).to_have_value("Zo\u00e9")
     settle(page)
+    assert nickname_input.input_value() == "Zo\u00e9"
     assert mock.frames_without_pings() == []
 
 

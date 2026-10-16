@@ -843,29 +843,34 @@ def normalised(text: str) -> str:
     return " ".join(text.split())
 
 
-# Spec 040's `displayNickname`: the first character of a nickname, and each one
-# right after a space, a hyphen or an apostrophe (' or U+2019), goes through
-# `toUpperCase()`; every other character goes through `toLowerCase()`.
-WORD_SEPARATORS = (" ", "-", "'", "\u2019")
+# Spec 040's `displayNickname`: the whole nickname goes through one
+# `toLowerCase()`, which applies Unicode's final-sigma rule; then, in that text,
+# the first character, and each one right after a space, a hyphen or an
+# apostrophe (' or U+2019), goes through `toUpperCase()`.
+WORD_SEPARATORS = (" ", "-", "'", "\N{RIGHT SINGLE QUOTATION MARK}")
 
 
 def display_nickname(nickname: str) -> str:
     """Write a nickname as spec 040's `displayNickname` shows it on a page.
 
     Args:
-        nickname: A nickname, read one character (code point) at a time.
+        nickname: A nickname.
 
     Returns:
         The nickname with capitalised words: `ANA` gives `Ana`, `JEAN-LUC` gives
-        `Jean-Luc` and `<img src=x>` gives `<img Src=x>`.
+        `Jean-Luc` and `<img src=x>` gives `<img Src=x>`. A Greek word that ends
+        with a capital sigma (U+03A3) ends with the final sigma (U+03C2).
     """
+    # One str.lower() of the whole text applies the final-sigma rule, as
+    # toLowerCase() does; lowering one character at a time would not.
+    lowered = nickname.lower()
     shown: list[str] = []
     previous = ""
-    for character in nickname:
+    for character in lowered:
         if previous == "" or previous in WORD_SEPARATORS:
             shown.append(character.upper())
         else:
-            shown.append(character.lower())
+            shown.append(character)
         previous = character
     return "".join(shown)
 

@@ -165,6 +165,20 @@ def test_ac2_the_duplicate_check_compares_the_capitals(fx01_grid: Grid) -> None:
     assert outcome.state.players[-1].nickname == "STRASSE 2"
 
 
+# U+1E9E, the capital sharp s, which `str.upper()` keeps.
+STRASSE_WITH_CAPITAL_SHARP_S = "STRA\N{LATIN CAPITAL LETTER SHARP S}E"
+
+
+def test_ac2_a_capital_sharp_s_and_ss_are_two_nicknames(fx01_grid: Grid) -> None:
+    existing = make_player(0, STRASSE_WITH_CAPITAL_SHARP_S, is_host=True)
+    state = make_state(fx01_grid, [existing])
+
+    outcome = run_join(state, "Strasse", 5)
+
+    nicknames = [player.nickname for player in outcome.state.players]
+    assert nicknames == [STRASSE_WITH_CAPITAL_SHARP_S, "STRASSE"]
+
+
 def test_ac2_the_duplicate_check_is_accent_sensitive(fx01_grid: Grid) -> None:
     state = make_state(fx01_grid, [make_player(0, "ELODIE", is_host=True)])
 
