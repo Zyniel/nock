@@ -124,12 +124,18 @@ uv run python -m nock
 2. `black --check .` (formatting)
 3. spec traceability: every `- **AC-n**` in a spec has a `test_acn_...` test, and
    no test points to a criterion that does not exist
-4. `pyrefly check` (types)
-5. `pytest`
+4. `pyrefly check` (types), `svelte-check` and the vite build of `web/`
+5. `pytest`, in parallel (pytest-xdist), then the timing-sensitive test files
+   on their own
 
 `--stage tests` stops after step 3. That is the stage the test-writer has to
 pass, because at that point the code does not exist yet and the tests are
 supposed to fail.
+
+The browser tests run in Chromium and WebKit by default; `--browsers all` (or
+`NOCK_BROWSERS=all`) adds Firefox. `--tests browser` or `--tests other` runs only
+the tests with or without a browser, and `--skip-static` skips steps 1 to 4
+except the build. CI uses them to run one job per engine and system.
 
 The same script runs in three places:
 

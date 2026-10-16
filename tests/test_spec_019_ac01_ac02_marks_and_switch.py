@@ -1,9 +1,11 @@
 """Tests of spec 019, AC-1 and AC-2: the authors switch and the marks.
 
 AC-1: with the switch on, each letter cell with an author holds one `author-mark`
-in that author's colour (mocked socket and live server). AC-2: with the switch
-off, no mark exists and a letter's look does not depend on its author (mocked
-socket). The shared setup is in `spec019_harness`.
+in that author's colour, and a departed author's band is hatched in greys while
+no player's band has a pattern (mocked socket and live server). AC-2: with the
+switch off, no mark exists and a letter's look does not depend on its author
+(mocked socket). The shared setup is in `spec019_harness`. AC-1's contrast run
+and box run have files of their own.
 
 Besides the criteria's own steps, the tests cover the edge cases the spec files
 under AC-1 and AC-2: pending edits, a newcomer who takes a departed player's
@@ -14,8 +16,6 @@ reload).
 """
 
 from __future__ import annotations
-
-import re
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
@@ -32,11 +32,13 @@ from spec019_harness import (
     ac1_view,
     ana_types_t_and_bob_types_a,
     authors_switch,
+    band_readings,
     box_of,
     cell_at,
     cell_locked_frame,
     expect_seq,
     grid_from_text,
+    hatched_problems,
     letter_changed_frame,
     load_fr,
     mark_box_problems,
@@ -45,6 +47,7 @@ from spec019_harness import (
     only_mark_of,
     open_ac1,
     open_room,
+    pattern_problems,
     player_joined_frame,
     player_left_frame,
     player_view,
@@ -81,20 +84,6 @@ FX01_SOLUTION = {
 # What each of the 25 cells shows in `data-author-colour` once the switch is on,
 # for the snapshot of AC-1: p1 has colour 0, p2 colour 3, p9 is not in the room.
 AC1_AUTHOR_COLOURS = {(1, 0): "0", (1, 1): "3", (1, 2): "", (1, 3): "3"}
-
-PLAYER_COLOURS_SCRIPT = """
-() => {
-  const colours = [];
-  for (let index = 0; index < 8; index += 1) {
-    const probe = document.createElement('div');
-    probe.style.backgroundColor = `var(--player-colour-${index})`;
-    document.body.appendChild(probe);
-    colours.push(getComputedStyle(probe).backgroundColor);
-    probe.remove();
-  }
-  return colours;
-}
-"""
 
 AUTHOR_COLOURS_SCRIPT = """
 () => Array.from(document.querySelectorAll('[data-testid="cell"]')).map(cell => [
@@ -143,8 +132,6 @@ AUTHOR_ATTRIBUTES_SCRIPT = """
 ])
 """
 
-RGB_PATTERN = re.compile(r"^rgba?\(([^)]*)\)$")
-
 
 # ---- Fixtures ---------------------------------------------------------------
 
@@ -155,30 +142,6 @@ def fx01_grid(fx01_text: str) -> Grid:
 
 
 # ---- Helpers of these tests -------------------------------------------------
-
-
-def player_colours(page: Page) -> list[str]:
-    """The computed colours of `--player-colour-0` to `--player-colour-7`."""
-    colours = page.evaluate(PLAYER_COLOURS_SCRIPT)
-    assert (
-        len(set(colours)) == 8
-    ), f"the eight player colours are not all different: {colours}"
-    return colours
-
-
-def alpha_of(colour: str) -> float:
-    """The alpha of a computed `rgb()` or `rgba()` colour."""
-    if colour == "transparent":
-        return 0.0
-    match = RGB_PATTERN.match(colour)
-    assert match is not None, f"unexpected colour format {colour!r}"
-    parts = [part for part in re.split(r"[\s,/]+", match.group(1)) if part != ""]
-    if len(parts) < 4:
-        return 1.0
-    alpha_text = parts[3]
-    if alpha_text.endswith("%"):
-        return float(alpha_text.removesuffix("%")) / 100
-    return float(alpha_text)
 
 
 def author_colours(page: Page) -> dict[tuple[int, int], str | None]:
@@ -258,18 +221,26 @@ def test_ac1_the_switch_on_marks_each_letter_in_its_authors_colour(
         assert by_p2.background == swatch_colour(page, "p2")
 
 
-def test_ac1_the_mark_of_an_author_not_in_the_room_is_none_of_the_player_colours(
+def test_ac1_only_the_band_of_an_author_not_in_the_room_is_hatched_in_greys(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_ac1(page, live_server, fx01_grid)
 
     turn_switch_on(page)
 
-    expect(marks_in(page, 1, 2)).to_have_count(1)
-    by_p9 = only_mark_of(page, 1, 2)
-    assert by_p9.colour == ""
-    assert alpha_of(by_p9.background) > 0, "the neutral mark has no colour at all"
-    assert by_p9.background not in player_colours(page)
+    expect(page.get_by_test_id("author-mark")).to_have_count(4)
+    assert only_mark_of(page, 1, 2).colour == ""
+    cells = [(1, 0), (1, 1), (1, 2), (1, 3)]
+    readings = band_readings(page, cells)
+    problems: dict[tuple[int, int], list[str]] = {}
+    for cell, reading in zip(cells, readings, strict=True):
+        if cell == (1, 2):
+            found = hatched_problems(reading)
+        else:
+            found = pattern_problems(reading)
+        if found:
+            problems[cell] = found
+    assert problems == {}
 
 
 def test_ac1_revealed_empty_and_clue_cells_hold_no_mark(
@@ -339,6 +310,7 @@ def test_ac1_marks_follow_each_event_within_300_ms(
     mock.send(player_left_frame(9, "p2"))
     expect_seq(page, 9)
     expect(marks_in(page, 1, 3)).to_have_attribute("data-colour", "", timeout=FOLLOW_MS)
+    assert hatched_problems(band_readings(page, [(1, 3)])[0]) == []
 
 
 def test_ac1_a_newcomer_with_the_departed_players_colour_changes_no_mark(

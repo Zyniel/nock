@@ -18,6 +18,8 @@
   import { positionKey, wordKey } from './wordSelection'
   import type { Position, Selection, Word } from './wordSelection'
   import type { RemoteSelection } from './remoteSelections'
+  import type { ClueFlagMarker } from './clueFlags'
+  import type { ClueReactionMarker } from './chat'
 
   interface Finger {
     clientX: number
@@ -40,6 +42,8 @@
     remoteSelections,
     isAuthorsViewOn,
     playerColours,
+    clueFlags,
+    clueReactions,
   }: {
     grid: GridView
     words: Word[]
@@ -60,6 +64,12 @@
     isAuthorsViewOn: boolean
     // The colour index of each player now in the room, by player id.
     playerColours: Map<string, number>
+    // The marker of each flagged clue, by clue key "row,column,clue_index"
+    // (spec 021). A clue nobody flagged has no entry.
+    clueFlags: Map<string, ClueFlagMarker>
+    // The reaction each clue shows, by clue key "row,column,clue_index" (spec
+    // 022). A clue that shows no reaction has no entry.
+    clueReactions: Map<string, ClueReactionMarker>
   } = $props()
 
   // The step between two outlines on one cell, and the most the stack may take
@@ -296,6 +306,19 @@
     isReleased = false
   }
 
+  // The browser's Tab or Shift+Tab that leaves the grid starts from the grid.
+  // WebKit starts it from the node last clicked, a cell or a clue inside the
+  // grid, so Shift+Tab found the grid itself and the focus stayed there (spec
+  // 021 AC-10 selects a word with a tap first). Focusing the grid anew makes
+  // the grid the starting point in every engine.
+  function startTabNavigationFromGrid(): void {
+    if (gridElement === undefined) {
+      return
+    }
+    gridElement.blur()
+    gridElement.focus({ preventScroll: true })
+  }
+
   // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
     if (isModifierKey(event.key)) {
@@ -310,6 +333,7 @@
     }
     const isPlainTab = event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey
     if (isPlainTab && wasReleased) {
+      startTabNavigationFromGrid()
       return
     }
     const isUndo =
@@ -510,6 +534,7 @@
               aria-selected={isSelected(cell.row, cell.column)}
               data-letter={shown.letter ?? ''}
               data-unconfirmed={String(shown.unconfirmed)}
+              data-pencil={String(shown.pencil)}
               data-author={cell.author ?? ''}
               data-author-colour={authorMark ?? ''}
               data-locked={String(cell.locked)}
@@ -577,6 +602,8 @@
               style:grid-column={cell.column + 1}
             >
               {#each cell.clues as clue, index (index)}
+                {@const flagMarker = clueFlags.get(`${cell.row},${cell.column},${index}`)}
+                {@const reactionMarker = clueReactions.get(`${cell.row},${cell.column},${index}`)}
                 {#if index === 1}
                   <div class="separator" data-testid="clue-separator"></div>
                 {/if}
@@ -586,6 +613,7 @@
                   data-clue-index={index}
                   data-arrow={clue.arrow}
                   data-active={String(activeKey === `${cell.row},${cell.column},${index}`)}
+                  data-flagged={String(flagMarker !== undefined)}
                   class:active={activeKey === `${cell.row},${cell.column},${index}`}
                 >
                   <span class="clue-text" data-testid="clue-text">{clue.text}</span>
@@ -597,6 +625,36 @@
                     aria-hidden="true"
                     style:--along={arrowPosition(cell.clues, index)}
                   ></span>
+                  {#if flagMarker !== undefined}
+                    <!-- Over the top left corner of the clue: it takes no room
+                         from the clue text (spec 021). -->
+                    <span
+                      class="clue-flag"
+                      class:second={index === 1}
+                      data-testid="clue-flag"
+                      data-flagged-by={flagMarker.flaggedBy}
+                      aria-hidden="true">{t('flag.marker')}</span
+                    >
+                    <span class="visually-hidden" data-testid="clue-flag-label"
+                      >{t('flag.marker_label', { names: flagMarker.names })}</span
+                    >
+                  {/if}
+                  {#if reactionMarker !== undefined}
+                    <!-- Drawn over the middle of its clue: it takes no room from
+                         the clue text (spec 022). -->
+                    <span
+                      class="clue-reaction"
+                      class:first={cell.clues.length === 2 && index === 0}
+                      class:second={index === 1}
+                      data-testid="clue-reaction"
+                      data-reaction={reactionMarker.reaction}
+                      data-player-id={reactionMarker.playerId}
+                      aria-hidden="true">{reactionMarker.text}</span
+                    >
+                    <span class="visually-hidden" data-testid="clue-reaction-label"
+                      >{reactionMarker.label}</span
+                    >
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -629,11 +687,15 @@
 <div class="visually-hidden" id="grid-hint" data-testid="grid-hint">{t('a11y.grid_hint')}</div>
 
 <style>
+  /* A stacking context of its own (isolation), so the z-index of a reaction
+     below orders it inside the grid only, and never against the rest of the
+     page (the vote banner, the chat panel). */
   .viewport {
     width: 100%;
     flex: 1 1 0;
     min-height: 0;
     overflow: auto;
+    isolation: isolate;
     /* The app handles touch pan and pinch itself. */
     touch-action: none;
     scrollbar-width: none;
@@ -662,8 +724,12 @@
     background: #ffffff;
   }
 
+  /* A letter cell is a stacking context of its own (isolation), so the z-index
+     of the author band and of the corner labels below orders them inside the
+     cell only, and never against the rest of the page (the vote banner). */
   .letter {
     position: relative;
+    isolation: isolate;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -675,6 +741,17 @@
   /* A letter found wrong by a check: the line is on the cell itself. */
   .letter[data-wrong='true'] {
     text-decoration-line: line-through;
+  }
+
+  /* A pencil letter (spec 020): in italics, the sign that does not rely on
+     colour, and in a grey that keeps at least 4.5:1 on the plain, word,
+     selected and tinted backgrounds. While the cell flashes, a pencil letter
+     takes the flash's text colour like a normal letter (the data-flash rules
+     below) and its italics alone mark it (spec 020 decision 12): on flashes 0,
+     5 and 7, no colour that keeps 4.5:1 differs visibly from the normal text. */
+  .letter[data-pencil='true'] {
+    font-style: italic;
+    color: #505050;
   }
 
   .letter.locked {
@@ -716,30 +793,72 @@
     background: color-mix(in srgb, var(--tint) 28%, #ffffff);
   }
 
-  /* The authors view (spec 019): a band along the bottom of the cell, in the
-     author's colour (set on the element), or in a neutral grey that is none of
-     the eight player colours for an author who is no longer in the room. It is
-     drawn over the cell's background and replaces none of it. It keeps 3px
-     inside the cell's padding box, 4px inside its edge, so the selected cell's
-     outline (3px, drawn inside the cell) never covers it. It comes before the
-     other players' outlines and labels, which are drawn over its ends. */
+  /* The authors view (spec 019): a band along the bottom of the cell. It is
+     drawn over the cell's background and replaces none of it. Its sides keep
+     3px inside the cell's padding box (4px inside its edge) and its bottom 2px
+     (3px inside its edge), so the selected cell's outline (3px, drawn inside
+     the cell) never covers it. Its z-index draws it above the other players'
+     outlines, so no outline crosses it; only their corner labels (z-index 2,
+     below) are drawn over its ends.
+     Its height is 11% of the cell side and at least 4px, but at most a quarter
+     of the side less 2px. That cap only acts on cells of 20 to 24px, where the
+     letter's baseline can be as little as 6px above the cell's bottom: it keeps
+     the band's top at or below the baseline, within the spec's 1px tolerance
+     (spec 019 decision 13), and the band still at least 3px high (the box
+     rules of spec 019). */
   .author-mark {
     position: absolute;
+    z-index: 1;
     left: 3px;
     right: 3px;
-    bottom: 3px;
-    height: max(4px, calc(var(--cell) * 0.11));
-    background-color: #737885;
+    bottom: 2px;
+    height: min(max(4px, calc(var(--cell) * 0.11)), calc(var(--cell) * 0.25 - 2px));
     pointer-events: none;
   }
 
   /* A small cell (a large grid on a small window) has no room for those gaps:
-     the band only stays inside the cell. */
+     the band only stays inside the cell, on its bottom edge, and below the
+     letter's baseline. */
   .small-cells .author-mark {
     left: 1px;
     right: 1px;
-    bottom: 1px;
-    height: calc(var(--cell) * 0.2);
+    bottom: 0;
+    height: calc(var(--cell) * 0.25);
+  }
+
+  /* A player's band is in the author's colour (set on the element), between
+     two 1px edges in the cell's text colour, one along its top and one along
+     its bottom. The text colour keeps at least 4.5:1 on every background of the
+     cell, the flash included (the data-flash rules below), so the band always
+     keeps 3:1 thanks to its edges while its main colour stays the author's. */
+  .author-mark:not([data-colour=''])::before,
+  .author-mark:not([data-colour=''])::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background-color: currentColor;
+  }
+
+  .author-mark:not([data-colour=''])::before {
+    top: 0;
+  }
+
+  .author-mark:not([data-colour=''])::after {
+    bottom: 0;
+  }
+
+  /* The band of an author who is no longer in the room (their colour may now
+     be someone else's): diagonal stripes of a dark grey and white, a pattern
+     no player's band has. One of the two greys keeps 3:1 on every background
+     of the cell. */
+  .author-mark[data-colour=''] {
+    background-image: repeating-linear-gradient(
+      45deg,
+      var(--author-departed-dark) 0 2px,
+      var(--author-departed-light) 2px 4px
+    );
   }
 
   /* The cell another player selected: a dashed border in their colour, inset
@@ -757,10 +876,13 @@
      of the cell. The "+k" label is a child of the cell, so --shift is 0.
      No padding above or below: a label is then 1.1 times its font high, and two
      labels in diagonal corners fit one above the other from a 20px cell, the
-     size where a cell gets its second slot (spec 035 AC-11). */
+     size where a cell gets its second slot (spec 035 AC-11). A label is drawn
+     over the author band (z-index 1) where they meet, from the band's ends
+     inward (spec 019). */
   .remote-label {
     --corner-offset: calc(var(--shift, 0px) * -1);
     position: absolute;
+    z-index: 2;
     padding: 0 1px;
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;
@@ -790,8 +912,9 @@
   }
 
   /* After the other states, so a flash shows over them. Each text colour keeps
-     at least 4.5:1 on its flash colour; the corner mark of a revealed cell is
-     drawn in it too. */
+     at least 4.5:1 on its flash colour. A pencil letter takes it too, and keeps
+     only its italics during the flash (spec 020 decision 12); the corner mark of
+     a revealed cell is drawn in it too. */
   .letter[data-flash='0'] {
     background: var(--player-colour-0);
     color: #000000;
@@ -799,6 +922,7 @@
 
   .letter[data-flash='1'] {
     background: var(--player-colour-1);
+    color: #1f2330;
   }
 
   .letter[data-flash='2'] {
@@ -808,6 +932,7 @@
 
   .letter[data-flash='3'] {
     background: var(--player-colour-3);
+    color: #1f2330;
   }
 
   .letter[data-flash='4'] {
@@ -872,6 +997,54 @@
 
   .two .clue-text {
     font-size: calc(var(--cell) * 0.09);
+  }
+
+  /* The flag marker of spec 021, laid over the top left corner of its clue: the
+     clue cell's corner for the first clue, just under the separator for the
+     second one. Positioned against the clue cell, like the arrows, so it adds no
+     layout; a tap on it is a tap on its clue. Dark red keeps 4.5:1 on the cell
+     and on the selected clue. */
+  .clue-flag {
+    position: absolute;
+    top: 0;
+    left: 0;
+    font-size: max(7px, calc(var(--cell) * 0.15));
+    line-height: 1;
+    color: #a4161a;
+  }
+
+  .clue-flag.second {
+    top: calc(var(--cell) * 0.46);
+  }
+
+  /* A shown reaction (spec 022), centred on its clue: the middle of the cell
+     for a lone clue, the middle of its half for one of two. Positioned against
+     the clue cell, so it adds no layout, and above the cells around it, since
+     it may reach past the cell's edges. Its opaque background keeps the emoji
+     readable over the clue text. A tap goes through it to its clue. */
+  .clue-reaction {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 0.1em 0.2em;
+    font-size: max(12px, calc(var(--cell) * 0.3));
+    line-height: 1;
+    white-space: nowrap;
+    color: #1f2330;
+    background: #ffffff;
+    border: 1px solid #5b6070;
+    border-radius: 0.3em;
+    pointer-events: none;
+  }
+
+  .clue-reaction.first {
+    top: 25%;
+  }
+
+  .clue-reaction.second {
+    top: 75%;
   }
 
   .separator {

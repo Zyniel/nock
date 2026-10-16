@@ -1,13 +1,14 @@
-// The parts of the room page that scroll: the roster list, the feed list and
-// the room toolbar.
+// The parts of the room page that scroll: the roster list, the feed list, the
+// chat list and the room toolbar.
 //
 // - Any of them can follow its changes of size and content (watchListChanges).
 //   The room toolbar, a row that scrolls sideways, uses only this (spec 024).
 // - A list that scrolls with nothing focusable inside is a Tab stop in every
 //   engine, so that a keyboard player can scroll it with the arrow keys (spec
-//   035 AC-12). This is for the roster list and the feed list.
+//   035 AC-12). This is for the roster list, the feed list and the chat list.
 // - The feed list keeps the reader's place when a new line comes in, and a feed
-//   list at its end stays at its end (spec 013 AC-7, AC-8).
+//   list at its end stays at its end (spec 013 AC-7, AC-8). The chat list
+//   follows the same rules (spec 022 AC-11).
 
 // ---- Changes of a list ----
 
@@ -130,7 +131,8 @@ function isAtEnd(list: HTMLElement): boolean {
   return hiddenBelow <= AT_END_TOLERANCE_PX
 }
 
-function scrollToEnd(list: HTMLElement): void {
+// Show the last line of the list.
+export function scrollToEnd(list: HTMLElement): void {
   // The browser stops scrollTop at the end of the list.
   list.scrollTop = list.scrollHeight
 }

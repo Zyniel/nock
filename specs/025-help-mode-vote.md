@@ -1,7 +1,7 @@
 ---
 id: "025"
 title: Group decision on help
-status: approved
+status: done
 ---
 
 # 025 - Group decision on help

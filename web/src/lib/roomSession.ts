@@ -40,16 +40,21 @@ export interface LetterCellView {
   author: string | null
   // True while the letter in place was found wrong by the last check of it.
   wrong: boolean
+  // True while the letter in place is a pencil letter (spec 020).
+  pencil: boolean
 }
 
 // An edit this page sent and that has no answer yet (spec 015).
 export interface PendingEdit {
   row: number
   column: number
-  // `null` for an erase.
+  // `null` for an erase. For a confirmation, the letter it confirms.
   letter: string | null
   // The page's `seq` when the edit was made (spec 017 uses it).
   baseSeq: number | null
+  // The message that made it: 'edit' (edit_letter or erase), 'pencil'
+  // (pencil_edit) or 'confirm' (confirm_pencil).
+  kind: 'edit' | 'pencil' | 'confirm'
 }
 
 export interface ClueCellView {
@@ -118,6 +123,39 @@ export interface VoteView {
 // How a vote ended (spec 025).
 type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
 
+// A word, named by its clue: the clue cell and the clue's index in it.
+export interface ClueRefView {
+  row: number
+  column: number
+  clue_index: number
+}
+
+// A clue flagged by a player (spec 021).
+export interface FlagView {
+  player_id: string
+  clue: ClueRefView
+}
+
+// One chat message of the room (spec 022).
+export interface ChatLine {
+  seq: number
+  player_id: string
+  text: string
+}
+
+// The five reactions, in the order of spec 039's `Reaction` (spec 022).
+export type ReactionValue = 'thumbs_up' | 'clap' | 'laugh' | 'wow' | 'thinking'
+
+export const REACTION_VALUES: ReactionValue[] = ['thumbs_up', 'clap', 'laugh', 'wow', 'thinking']
+
+// A reaction shown on a clue of the grid, for REACTION_MS from its arrival.
+export interface ShownReaction {
+  id: number
+  player_id: string
+  clue: ClueRefView
+  reaction: ReactionValue
+}
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
@@ -132,6 +170,10 @@ export interface Snapshot {
   solved: boolean
   // From the snapshot's open_vote, then from vote_opened and vote_closed.
   open_vote: VoteView | null
+  // The flags of the room, one per flagging player (spec 021).
+  flags: FlagView[]
+  // The chat history of the room, in seq order (spec 022).
+  chat: ChatLine[]
 }
 
 // A message with an integer `seq` that is not a snapshot.
@@ -173,6 +215,10 @@ export interface RoomSession {
   votedIds: number[]
   // The vote that closed last, and how, shown for VOTE_RESULT_MS.
   closedVote: { vote_id: number; outcome: VoteOutcome } | null
+  // The reactions shown on clues, at most one per clue (spec 022).
+  reactions: ShownReaction[]
+  // The id given to the next shown reaction.
+  nextReactionId: number
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -184,6 +230,9 @@ export interface CellFlash {
 }
 
 export const FLASH_MS = 1000
+
+// How long a reaction shows on its clue (spec 022).
+export const REACTION_MS = 3000
 
 export const ROOM_NOT_FOUND_CLOSE_CODE = 4404
 export const THROTTLED_CLOSE_CODE = 4429
@@ -218,6 +267,8 @@ export function newSession(): RoomSession {
     names: new Map(),
     votedIds: [],
     closedVote: null,
+    reactions: [],
+    nextReactionId: 1,
   }
 }
 
@@ -298,7 +349,8 @@ function toCell(value: unknown): CellView | null {
     const author = typeof cell.author === 'string' ? cell.author : null
     const revealed = cell.revealed === true
     const wrong = cell.wrong === true
-    return { type: 'letter', row, column, letter, locked, revealed, author, wrong }
+    const pencil = cell.pencil === true
+    return { type: 'letter', row, column, letter, locked, revealed, author, wrong, pencil }
   }
   return null
 }
@@ -497,6 +549,103 @@ function applyVoteClosed(session: RoomSession, snapshot: Snapshot, event: RoomEv
   session.closedVote = { vote_id, outcome: outcome as VoteOutcome }
 }
 
+// Returns null when the value is not a clue reference of three integers.
+function toClueRef(value: unknown): ClueRefView | null {
+  const clue = value as Record<string, unknown> | null | undefined
+  if (typeof clue !== 'object' || clue === null) {
+    return null
+  }
+  const { row, column, clue_index } = clue
+  if (!Number.isInteger(row) || !Number.isInteger(column) || !Number.isInteger(clue_index)) {
+    return null
+  }
+  return { row: row as number, column: column as number, clue_index: clue_index as number }
+}
+
+// The flags of a snapshot. An entry that is not an object with a string
+// player_id and a clue of three integers is skipped.
+function toFlags(value: unknown): FlagView[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const flags: FlagView[] = []
+  for (const item of value) {
+    const entry = item as Record<string, unknown> | null
+    if (typeof entry !== 'object' || entry === null || typeof entry.player_id !== 'string') {
+      continue
+    }
+    const clue = toClueRef(entry.clue)
+    if (clue !== null) {
+      flags.push({ player_id: entry.player_id, clue })
+    }
+  }
+  return flags
+}
+
+// A flag_changed sets the player's flag, replacing their previous one; with
+// `clue: null` it removes it (spec 021).
+function applyFlagChanged(snapshot: Snapshot, event: RoomEvent): void {
+  const { player_id, clue } = event.message
+  if (typeof player_id !== 'string') {
+    return
+  }
+  const others = snapshot.flags.filter((flag) => flag.player_id !== player_id)
+  if (clue === null) {
+    snapshot.flags = others
+    return
+  }
+  const newClue = toClueRef(clue)
+  if (newClue !== null) {
+    others.push({ player_id, clue: newClue })
+    snapshot.flags = others
+  }
+}
+
+// The chat lines of a snapshot. A line that is not an object with an integer
+// seq and a string player_id and text is skipped (spec 022).
+function toChat(value: unknown): ChatLine[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const lines: ChatLine[] = []
+  for (const item of value) {
+    const line = toChatLine(item)
+    if (line !== null) {
+      lines.push(line)
+    }
+  }
+  return lines
+}
+
+// Returns null when the value is not a chat line of the protocol.
+function toChatLine(value: unknown): ChatLine | null {
+  const line = value as Record<string, unknown> | null
+  if (typeof line !== 'object' || line === null) {
+    return null
+  }
+  const { seq, player_id, text } = line
+  if (typeof seq !== 'number' || !Number.isInteger(seq)) {
+    return null
+  }
+  if (typeof player_id !== 'string' || typeof text !== 'string') {
+    return null
+  }
+  return { seq, player_id, text }
+}
+
+// A chat_message adds its line at the end of the history, unless a line with
+// its seq is already there (spec 022).
+function applyChatMessage(snapshot: Snapshot, event: RoomEvent): void {
+  const line = toChatLine(event.message)
+  if (line === null) {
+    return
+  }
+  const isKnown = snapshot.chat.some((kept) => kept.seq === line.seq)
+  if (!isKnown) {
+    snapshot.chat.push(line)
+  }
+}
+
 function toPlayers(value: unknown): PlayerView[] | null {
   if (!Array.isArray(value)) {
     return null
@@ -539,6 +688,8 @@ function toSnapshot(message: Record<string, unknown>): Snapshot | null {
     reveal_budget: toRevealBudget(message.reveal_budget),
     solved: message.solved === true,
     open_vote: toVoteView(message.open_vote),
+    flags: toFlags(message.flags),
+    chat: toChat(message.chat),
   }
 }
 
@@ -562,7 +713,9 @@ function applyToPlayers(snapshot: Snapshot, event: RoomEvent): void {
   }
   const playerId = message.player_id
   if (event.type === 'player_left') {
+    // The player leaves with their flag (spec 021).
     snapshot.players = snapshot.players.filter((player) => player.player_id !== playerId)
+    snapshot.flags = snapshot.flags.filter((flag) => flag.player_id !== playerId)
     return
   }
   if (event.type === 'host_changed') {
@@ -636,7 +789,8 @@ export function endFlash(session: RoomSession, flashId: number): void {
   session.flashes = session.flashes.filter((flash) => flash.id !== flashId)
 }
 
-// A cell_locked locks the cell with its letter; a reveal also clears the author.
+// A cell_locked locks the cell with its letter, never a pencil one; a reveal
+// also clears the author.
 function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   const { message } = event
   const cell = letterCellAt(snapshot, message.row, message.column)
@@ -646,6 +800,7 @@ function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   cell.letter = typeof message.letter === 'string' ? message.letter : null
   cell.locked = true
   cell.wrong = false
+  cell.pencil = false
   cell.revealed = message.revealed === true
   if (cell.revealed) {
     cell.author = null
@@ -666,7 +821,8 @@ function applyCheckResult(snapshot: Snapshot, event: RoomEvent): void {
 }
 
 // True when my letter_changed is the answer to my oldest pending edit: the same
-// cell and the same letter. Otherwise it is the result of an undo (spec 018).
+// cell, the same letter and the same pencil flag (true for a pencil edit only).
+// Otherwise it is the result of an undo (spec 018, spec 020).
 function answersOldestPendingEdit(session: RoomSession, event: RoomEvent): boolean {
   const oldest = session.pendingEdits[0]
   if (oldest === undefined) {
@@ -674,7 +830,10 @@ function answersOldestPendingEdit(session: RoomSession, event: RoomEvent): boole
   }
   const { message } = event
   const letter = typeof message.letter === 'string' ? message.letter : null
-  return oldest.row === message.row && oldest.column === message.column && oldest.letter === letter
+  const pencil = message.pencil === true
+  const isPencilEdit = oldest.kind === 'pencil'
+  const isSameCell = oldest.row === message.row && oldest.column === message.column
+  return isSameCell && oldest.letter === letter && isPencilEdit === pencil
 }
 
 // A letter_changed updates the confirmed grid; one from me answers my oldest
@@ -688,6 +847,7 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
       startFlash(session, snapshot, cell, message.player_id)
     }
     cell.letter = letter
+    cell.pencil = message.pencil === true
     cell.wrong = false
     cell.author = letter === null || typeof message.player_id !== 'string' ? null : message.player_id
   }
@@ -744,6 +904,12 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
   }
   if (event.type === 'vote_closed' && session.snapshot !== null) {
     applyVoteClosed(session, session.snapshot, event)
+  }
+  if (event.type === 'flag_changed' && session.snapshot !== null) {
+    applyFlagChanged(session.snapshot, event)
+  }
+  if (event.type === 'chat_message' && session.snapshot !== null) {
+    applyChatMessage(session.snapshot, event)
   }
   if (event.type === 'grid_solved') {
     session.solved = true
@@ -818,6 +984,10 @@ export function receiveFrame(session: RoomSession, text: string): void {
     receiveSelectionMoved(session, message)
     return
   }
+  if (message.type === 'reaction') {
+    receiveReaction(session, message)
+    return
+  }
   const event = toEvent(message)
   if (event !== null) {
     receiveEvent(session, event)
@@ -835,6 +1005,47 @@ function receiveSelectionMoved(session: RoomSession, message: Record<string, unk
       player.selection = toSelection(message.selection)
     }
   }
+}
+
+// True when the clue reference names a clue of the grid.
+function isClueOfGrid(grid: GridView, clue: ClueRefView): boolean {
+  for (const cell of grid.cells) {
+    if (cell.type === 'clue' && cell.row === clue.row && cell.column === clue.column) {
+      return clue.clue_index >= 0 && clue.clue_index < cell.clues.length
+    }
+  }
+  return false
+}
+
+// A reaction has no seq: it is shown at once, once the page has a snapshot, and
+// only on a clue of the grid. A newer reaction on the same clue replaces the
+// older one, so a clue shows at most one (spec 022).
+function receiveReaction(session: RoomSession, message: Record<string, unknown>): void {
+  if (session.snapshot === null || typeof message.player_id !== 'string') {
+    return
+  }
+  const clue = toClueRef(message.clue)
+  const reaction = REACTION_VALUES.find((value) => value === message.reaction)
+  if (clue === null || reaction === undefined) {
+    return
+  }
+  if (!isClueOfGrid(session.snapshot.grid, clue)) {
+    return
+  }
+  const others = session.reactions.filter(
+    (shown) =>
+      shown.clue.row !== clue.row ||
+      shown.clue.column !== clue.column ||
+      shown.clue.clue_index !== clue.clue_index,
+  )
+  others.push({ id: session.nextReactionId, player_id: message.player_id, clue, reaction })
+  session.nextReactionId += 1
+  session.reactions = others
+}
+
+// Stop showing a reaction: used when its REACTION_MS are over.
+export function endReaction(session: RoomSession, reactionId: number): void {
+  session.reactions = session.reactions.filter((shown) => shown.id !== reactionId)
 }
 
 // The errors that answer one edit (spec 015): each removes the oldest pending edit.
@@ -935,25 +1146,27 @@ export function addPendingEdit(
   row: number,
   column: number,
   letter: string | null,
+  kind: PendingEdit['kind'],
 ): void {
-  session.pendingEdits.push({ row, column, letter, baseSeq: session.seq })
+  session.pendingEdits.push({ row, column, letter, baseSeq: session.seq, kind })
 }
 
-// What a cell shows: the newest pending edit of the cell, else its confirmed
-// letter. A locked cell always shows its confirmed letter.
+// What a cell shows: the newest pending edit of the cell, else the confirmed
+// letter; a locked cell always shows its confirmed letter (specs 015, 016). The
+// pencil flag of a pending edit is true for a pencil edit only (spec 020).
 export function shownCell(
   cell: LetterCellView,
   pendingEdits: PendingEdit[],
-): { letter: string | null; unconfirmed: boolean } {
+): { letter: string | null; pencil: boolean; unconfirmed: boolean } {
   if (!cell.locked) {
     for (let index = pendingEdits.length - 1; index >= 0; index--) {
       const edit = pendingEdits[index]
       if (edit.row === cell.row && edit.column === cell.column) {
-        return { letter: edit.letter, unconfirmed: true }
+        return { letter: edit.letter, pencil: edit.kind === 'pencil', unconfirmed: true }
       }
     }
   }
-  return { letter: cell.letter, unconfirmed: false }
+  return { letter: cell.letter, pencil: cell.pencil, unconfirmed: false }
 }
 
 // The grid as the player sees it: every letter cell holds its shown letter, so
@@ -962,7 +1175,8 @@ export function shownGrid(grid: GridView, pendingEdits: PendingEdit[]): GridView
   const cells: CellView[] = []
   for (const cell of grid.cells) {
     if (cell.type === 'letter') {
-      cells.push({ ...cell, letter: shownCell(cell, pendingEdits).letter })
+      const shown = shownCell(cell, pendingEdits)
+      cells.push({ ...cell, letter: shown.letter, pencil: shown.pencil })
     } else {
       cells.push(cell)
     }

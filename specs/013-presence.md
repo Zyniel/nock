@@ -132,6 +132,30 @@ New `fr.json` keys:
 | `settings.help_mode.vote` | `par vote` |
 | `settings.help_mode.none` | `désactivée` |
 
+### Client: feed height
+
+(Note from the lead, 2026-10-15: this section is added. The review of spec 021
+measured at 1280 by 720 that, with 1 or 2 lines shown, each new line made the feed
+list about 15 px taller and moved the grid, and the clue text of its cells, down by
+as much, because the list was as tall as its lines (review of spec 021).)
+
+The feed list (the `ul` of "Client: feed scroll position") has a fixed height,
+equal to its maximum, wherever its growth would move the grid. That height does not
+depend on the number of items: it is the same with 0, 1, 2, 3 or 100 items. Items
+beyond what it holds scroll (AC-7). The maximum is:
+
+- on a roomy window (`window.innerHeight > 500` and `window.innerWidth > 480`),
+  where the roster, the feed and the host panel are stacked above the grid: 3.6rem,
+  about three lines of the feed's text, so that a fourth line makes the list scroll;
+- on a small window (`window.innerHeight <= 500` or `window.innerWidth <= 480`):
+  one line, 1.3rem (AC-6), in a row with the feed's heading, or on a low window
+  beside the roster and the host panel.
+
+The feed is never beside the grid: it is always above it. An empty or short feed
+thus leaves empty room under its heading, on purpose: the grid does not move when a
+line comes. (Note from the lead, 2026-10-15: added with this section (review of
+spec 021).)
+
 ### Client: feed scroll position
 
 (Note from the lead, 2026-10-14: added with AC-7 and AC-8. A new line used to
@@ -146,6 +170,8 @@ Terms:
 - The feed list is the `ul` element inside `activity-feed` that holds the
   `feed-item` elements (`[data-testid="activity-feed"] ul`). It scrolls vertically
   once its items do not fit, and on a small window it shows one line (AC-6).
+  (Note from the lead, 2026-10-15: its height is fixed, whatever the number of
+  items; see "Client: feed height" (review of spec 021).)
 - Its distance to the end is `scrollHeight - clientHeight - scrollTop`, read from
   those properties of the list. The list is at its end while that distance is at
   most 1 px. A list that does not scroll is at its end. So the list starts at its
@@ -221,7 +247,7 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-3.3.3) (browser with mocked socket) When two players select the same cell, both outlines are visible. Given `p1` (`you`), `p2` (colour 1) and `p3` (colour 2), when the mock sends `selection_moved` for `p2` and for `p3`, both on (1, 1) (`p2` across, `p3` down), then (1, 1) holds two `remote-selection` elements with `data-player-id` `p2` and `p3`, both visible, with different bounding boxes and different border colours; (1, 1) has `data-tinted-by="p2 p3"`. When `p1` also taps (1, 1), the two outlines stay visible and the cell also shows `p1`'s own selection (spec 007 `data-selected="true"`).
 - **AC-4** (AC-3.3.4) (browser with mocked socket) My own selection is styled differently from every other player's. Given `p1` (`you`) and `p2`, after `p1` taps (3, 1) and the mock sends `p2`'s selection on (2, 2): (3, 1) has `data-selected="true"` and no `remote-selection` child; no cell has a `remote-selection` with `data-player-id="p1"`; the computed `border-style` of (3, 1) and of its children is never `dashed`; and the background colour of (3, 1) differs from the background colour of (2, 2) and of the tinted (2, 3).
 - **AC-5** (AC-3.3.5) (browser with mocked socket) An activity feed lists joins, departures, checks, reveals, flags and setting changes in the order they happened. Given the page joined at `seq` 5 with players `p1` (`you`, `Ana`) and `p2` (`Bob`), when the mock sends, with seqs 6 to 12: `player_joined` (`p3`, `Cy`), `check_result` (`p2`, scope word), `reveal_result` (`p3`, scope letter), `flag_changed` (`p2`, clue (0, 3, 0)), `settings_changed` (`p1`, help mode `vote`, budget 5 letters and 1 word, unlocked), `settings_changed` (`p1`, same values but `locked` true), `player_left` (`p3`, reason `removed`), then `activity-feed` holds 7 `feed-item` elements with `data-seq` 6 to 12 in that order and `data-kind` `player_joined`, `check`, `reveal`, `flag`, `settings_changed`, `room_locked`, `player_removed`, whose texts are, in order, `Cy a rejoint le salon`, `Bob a vérifié un mot`, `Cy a révélé une lettre`, `Bob bloque sur « Fatales à César »`, `Ana a modifié les réglages : aide par vote, 5 lettres et 1 mots à révéler`, `Ana a verrouillé le salon` and `Cy a été retiré du salon` (each built from `fr.json`). Sending those events out of order (seq 8 before 7) still lists them by seq.
-- **AC-6** (new) (browser with mocked socket) The roster and the feed never take the grid's room. With a snapshot of 8 players and 100 feed items, at every window size of spec 006 AC-5, in desktop and touch contexts (touch with spec 009's on-screen keyboard), and after a tap on a cell: the `grid-viewport` is at least 100 px high, the page has no vertical or horizontal scroll, the grid fits the viewport at zoom 1, and the clue bar is fully inside the window above the keyboard (specs 006 AC-5 and AC-7, 009 AC-4). On small windows the roster and the feed may be compact (for example one line each, the feed showing its newest item) as long as their content stays reachable.
+- **AC-6** (new) (browser with mocked socket) The roster and the feed never take the grid's room. With a snapshot of 8 players and 100 feed items, at every window size of spec 006 AC-5, in desktop and touch contexts (touch with spec 009's on-screen keyboard), and after a tap on a cell: the `grid-viewport` is at least 100 px high, the page has no vertical or horizontal scroll, the grid fits the viewport at zoom 1, and the clue bar is fully inside the window above the keyboard (specs 006 AC-5 and AC-7, 009 AC-4). On small windows the roster and the feed may be compact (for example one line each, the feed showing its newest item) as long as their content stays reachable. Feed height: with the same snapshot of 8 players and no feed item, at 1280 by 720 and at each window size of spec 006 AC-5, in desktop and touch contexts and without a tap on a cell, the mock sends the line event of "Feed scroll states" (sent by a player of the snapshot) three times, one at a time with the next seq; with 0, 1, 2 and 3 items (once `room-page` has the `data-seq` of each), the bounding box of `grid-viewport` (x, y, width, height) is the same, with 1 px of tolerance; and the height of the feed list with 3 items is the one it has after 100 items (1 px tolerance). (Note from the lead, 2026-10-15: the feed height check is added to AC-6, keeping its other checks, for "Client: feed height" (review of spec 021).)
 - **AC-7** (AC-3.3.5; new, from the lead's review of 2026-10-14) (browser with mocked socket) A new feed line brings the feed list to the newest line only when the list was already at its end; otherwise the player keeps their place. The rules are those of "Client: feed scroll position". The setup, "settled", the scroll probe and "items in view" are in "Feed scroll states" in "Test harness". The cases below run in this order on one page, at 1280 by 720 and again at 360 by 740, each from the state the case before it left. Wherever a case says that the list scrolls, or that it is or is not at its end before an event, the test first checks it from the list's measures and fails if it does not hold. (Note from the lead, 2026-10-14: added.)
   - Filling: the mock sends ten line events, `seq` 6 to 15, one right after another without waiting. Once `room-page` has `data-seq` 15, the list scrolls, and within 300 ms it is at its end.
   - At the end: the mock sends the line event with `seq` 16. Within 300 ms after `room-page` has `data-seq` 16, the list is at its end.
@@ -260,6 +286,9 @@ The words in brackets say how each criterion is tested.
   (snapshot or previous `settings_changed`); a `settings_changed` that changes
   nothing (the server does not send one, spec 014) would read as `settings_changed`.
 - Feed length (AC-5): the 101st item removes the oldest.
+- Empty or short feed (AC-6): the list keeps the height of its maximum, so the
+  first lines do not move the grid; the room under the heading stays empty until
+  lines fill it. (Note from the lead, 2026-10-15: added (review of spec 021).)
 - Plural (AC-5): the text uses the numbers as they are (`1 mots`); proper plural
   forms are left to a later wording pass.
 - Text injection (AC-5): names and clue texts are inserted as text (spec 037 AC-4).
@@ -376,6 +405,20 @@ approved and done specs:
   arrow keys, because that needs the list to be a Tab stop in WebKit, which spec
   035 gives. AC-7 clicks spec 014's `lock-room`, which exists since spec 014 is
   done; decision 7's build order was for the first build of this spec.
+
+Decided by the lead on 2026-10-15 after the review of spec 021, under the owner's
+delegation of layout choices:
+- Feed height (AC-6, "Client: feed height"). The feed list was as tall as its
+  lines, so with 1 or 2 lines each new line moved the grid down by about 15 px,
+  measured at 1280 by 720, and spec 021's rule on the clue text failed. Options:
+  keep that and loosen spec 021's rule; reserve room for the first lines only;
+  take the feed out of the flow (over the grid, with no height); or give the list
+  a fixed height equal to its maximum. Pick: the fixed height, so that the grid
+  never moves when a line comes, in any window, and the list still scrolls beyond
+  its maximum (AC-7). Cost: on a roomy window the grid is about 40 px lower than
+  before while the feed is empty or short. It was already that low with a full
+  feed, which AC-6 measures, so its existing checks do not change. The small
+  windows do not change, their list is already one line.
 
 ## Open questions
 

@@ -11,6 +11,7 @@ from typing import Annotated, Literal
 
 from pydantic import (
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StrictBool,
@@ -42,8 +43,28 @@ ResumeToken = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{16,128}$")]
 Nickname = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=2, max_length=20)
 ]
+
+
+# A chat text is stripped as Python's str.strip() does, then must hold 1 to 280
+# characters (spec 039 AC-8). Pydantic's strip_whitespace keeps the separators
+# U+001C to U+001F, so it is not used here.
+def _strip_text(value: object) -> object:
+    """Return a str stripped as str.strip() does; any other value unchanged.
+
+    Args:
+        value: The raw value of a chat text field.
+
+    Returns:
+        The stripped text when `value` is a str, else `value` itself, which the
+        str validation that follows then refuses.
+    """
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
 ChatText = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=280)
+    str, Field(min_length=1, max_length=280), BeforeValidator(_strip_text)
 ]
 
 

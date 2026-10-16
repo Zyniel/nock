@@ -88,7 +88,14 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, StringConstraints
+from pydantic import (
+    BaseModel,
+    BeforeValidator,   # (Note from the lead, 2026-10-15: added for ChatText (spec 022's tests).)
+    ConfigDict,
+    Field,
+    StrictBool,
+    StringConstraints,
+)
 
 from nock.grid import Arrow, Grid
 
@@ -114,8 +121,20 @@ ResumeToken = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{16,128}$")]
 Nickname = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=2, max_length=20)
 ]
+
+
+# A chat text is stripped as Python's str.strip() does, then must hold 1 to 280
+# characters (AC-8). Pydantic's strip_whitespace keeps U+001C to U+001F, so it is
+# not used here; this construction is one way, any with the same result will do.
+# (Note from the lead, 2026-10-15: ChatText was StringConstraints(
+# strip_whitespace=True, min_length=1, max_length=280); it now strips as
+# str.strip() does, to agree with spec 022 AC-2's edge case (spec 022's tests).)
+def _strip_text(value: object) -> object:
+    """Return a str stripped as str.strip() does; any other value unchanged."""
+
+
 ChatText = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=280)
+    str, Field(min_length=1, max_length=280), BeforeValidator(_strip_text)
 ]
 
 
@@ -717,7 +736,7 @@ Server (with `PLAYER_P2` and `SETTINGS` substituted):
 - **AC-5** Given a message with a malformed field, when it is parsed, then `pydantic.ValidationError` is raised. Each line below is one case, all with `parse_client_message` unless marked: the text `not json`; `edit_letter` without `column`; `edit_letter` with `"row": -1`; with `"row": "1"`; with `"row": 1.0`; with `"row": true`; `vote` with `"yes": 1`; `vote` with `"vote_id": 0`; `undo` with an extra `"player_id": "p1"`; `flag` with `"clue_index": 2`; `remove_player` with `"player_id": ""` and with `"player_id": "p 2"`; `change_settings` with `"letters": -1`; `check` with a target that has no `scope`; and (`parse_server_message`) `player_joined` with `"colour": 8`.
 - **AC-6** Given an `edit_letter` or `pencil_edit` message, when its `letter` is exactly one character from `A` to `Z`, then it parses; when it is `"a"`, `"É"`, `"AB"`, `""`, `"1"`, `" "` or `null`, then `pydantic.ValidationError` is raised. Each of `"A"` and `"Z"` parses.
 - **AC-7** Given a `join` message, when its nickname has 2 to 20 characters after leading and trailing whitespace are removed, then it parses and `nickname` holds the trimmed text (`"  Ana  "` gives `"Ana"`; 20 times `x` parses); when it has fewer than 2 or more than 20 after trimming, then `pydantic.ValidationError` is raised (`"A"`, `"  A  "`, `""`, 21 times `x`).
-- **AC-8** Given a `chat` message, when its text has 1 to 280 characters after trimming, then it parses with the trimmed text (280 times `a` parses, `" salut "` gives `"salut"`); when it is empty, whitespace only, or 281 characters after trimming, then `pydantic.ValidationError` is raised.
+- **AC-8** Given a `chat` message, when its text has 1 to 280 characters after trimming, then it parses with the trimmed text (280 times `a` parses, `" salut "` gives `"salut"`); when it is empty, whitespace only, or 281 characters after trimming, then `pydantic.ValidationError` is raised. Trimming is Python's `str.strip()`, and whitespace is every character it removes (those for which `str.isspace()` is true, U+001C to U+001F included): `"\u001fsalut\u001c"` gives `"salut"`, and `"\u001c\u001d"` raises `pydantic.ValidationError`. (Note from the lead, 2026-10-15: added; pydantic's whitespace stripping kept U+001C to U+001F, so `"\u001c\u001d"` parsed as a valid chat, against spec 022 AC-2's edge case (spec 022's tests).)
 - **AC-9** Given an enumerated field, when it holds one of its listed values, then the message parses; when it holds any other string, then `pydantic.ValidationError` is raised. Listed values: `direction` across, down; `state` active, idle, disconnected; `help_mode` free, vote, none; `reaction` thumbs_up, clap, laugh, wow, thinking; `reason` left, removed, timed_out; `outcome` passed, rejected, timed_out; `scope` letter, word, grid; `code` the 19 values of `ErrorCode` (the 16 of the first version plus `invalid_nickname`, `invalid_target`, `stale_edit`). Rejected examples: `"help_mode": "auto"`, `"help_mode": "FREE"`, `"reaction": "heart"`, `"direction": "diagonal"`.
 - **AC-10** Given a `reveal` message, when its target has `"scope": "grid"`, then `pydantic.ValidationError` is raised; the same target in a `check` message parses to `GridTarget()`.
 - **AC-11** Given each of the 16 server types marked "yes" in the seq column, when its wire example is parsed with `seq` removed, or with `"seq": 0`, or with `"seq": -1`, then `pydantic.ValidationError` is raised; with `"seq": 1` it parses and `message.seq == 1`.
@@ -742,6 +761,12 @@ Server (with `PLAYER_P2` and `SETTINGS` substituted):
   made of several code points counts as several.
 - Chat content (AC-8): `"<b>salut</b>"` parses and round-trips unchanged.
   Escaping is the client's job (spec 037 AC-4).
+- Chat trimming (AC-8): the separators U+001C to U+001F are invisible and never
+  meant as chat text, so a chat text is stripped of them as of any other
+  whitespace, as Python's `str.strip()` does; spec 022 AC-2's edge case relies on
+  it. `ChatMessage.text` has the same type, so the rule holds in `chat_message`
+  and `Snapshot.chat` too. (Note from the lead, 2026-10-15: added with the
+  refined `ChatText` (spec 022's tests).)
 - Nickname characters (AC-7): this spec checks length only; which characters are
   allowed belongs to spec 012.
 - `base_seq` (AC-5): `-1` is rejected, `0` and `null` are accepted, and it may be

@@ -1,9 +1,21 @@
 <script lang="ts">
   import { tick } from 'svelte'
+  import ChatPanel from './ChatPanel.svelte'
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
+  import ReactionPicker from './ReactionPicker.svelte'
   import { t } from './i18n'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
+  import {
+    chatToggleLabel,
+    clueReactionMarkers,
+    isPaced,
+    msUntilNextExpiry,
+    sendsInWindow,
+    unreadBadgeText,
+    unreadCount,
+  } from './chat'
+  import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
   import { remoteSelectionsOf } from './remoteSelections'
@@ -16,15 +28,23 @@
     watchListChanges,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
-  import type { LetterCellView, Snapshot, VoteView } from './roomSession'
+  import type {
+    LetterCellView,
+    PendingEdit,
+    ReactionValue,
+    Snapshot,
+    VoteView,
+  } from './roomSession'
   import {
     EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
     PING_INTERVAL_MS,
+    REACTION_MS,
     SILENCE_LIMIT_MS,
     VOTE_RESULT_MS,
     addPendingEdit,
     endFlash,
+    endReaction,
     gridLabel,
     isFinalClose,
     newSession,
@@ -55,6 +75,13 @@
   // The remove buttons are compact in a roster list narrower than this many root
   // font sizes (spec 014 AC-9).
   const COMPACT_REMOVE_BELOW_ROOT_FONTS = 4.5
+  // The space between the header and the chat panel or the reaction picker.
+  const POPOVER_GAP_PX = 4
+  // The reaction picker and the chat panel sit side by side on a page at least
+  // this many root font sizes wide: the picker (10.25rem and its border), the
+  // panel (22rem) and three gaps of 0.5rem. On a narrower page the picker sits
+  // above the panel (spec 022 decision 15).
+  const SIDE_BY_SIDE_MIN_ROOT_FONTS = 34
 
   let { code }: { code: string } = $props()
 
@@ -279,6 +306,7 @@
     return () => {
       clearTimeout(copiedTimer)
       clearTimeout(undoMessageTimer)
+      clearTimeout(pacingTimer)
     }
   })
 
@@ -619,7 +647,74 @@
     )
   }
 
+  // The letter cell of the selection, which the pencil and reveal controls act on.
+  let selectedCell = $derived(
+    selection === null ? null : letterCellAt(selection.row, selection.column),
+  )
+
+  // ---- Pencil letters (spec 020) ----
+
+  // Off at each page load; each click of the toggle flips it.
+  let isPencilMode = $state(false)
+
+  function togglePencilMode(): void {
+    isPencilMode = !isPencilMode
+  }
+
+  // The message of an edit by its kind: edit_letter or erase for 'edit',
+  // pencil_edit for 'pencil', confirm_pencil for 'confirm'.
+  function editMessage(
+    edit: Pick<PendingEdit, 'row' | 'column' | 'letter' | 'kind'>,
+    baseSeq: number | null,
+  ): object {
+    const { row, column, letter } = edit
+    if (edit.kind === 'confirm') {
+      return { type: 'confirm_pencil', row, column, base_seq: baseSeq }
+    }
+    if (edit.kind === 'pencil') {
+      return { type: 'pencil_edit', row, column, letter, base_seq: baseSeq }
+    }
+    if (letter === null) {
+      return { type: 'erase', row, column, base_seq: baseSeq }
+    }
+    return { type: 'edit_letter', row, column, letter, base_seq: baseSeq }
+  }
+
+  // Show an edit of a cell at once, keep it pending until the server answers,
+  // and send it with `baseSeq`.
+  function startEdit(
+    cell: LetterCellView,
+    letter: string | null,
+    kind: PendingEdit['kind'],
+    baseSeq: number | null,
+  ): void {
+    addPendingEdit(session, cell.row, cell.column, letter, kind)
+    sendEdit(editMessage({ row: cell.row, column: cell.column, letter, kind }, baseSeq))
+  }
+
+  // The confirm control works on the selected cell when it shows a pencil
+  // letter (confirmed or pending), is not locked, and the grid is not solved.
+  let isConfirmPencilDisabled = $derived(
+    session.solved ||
+      selectedCell === null ||
+      selectedCell.locked ||
+      !shownCell(selectedCell, session.pendingEdits).pencil,
+  )
+
+  // Confirm the selected cell's pencil letter. The page's seq goes in base_seq,
+  // so that a letter another player changed meanwhile is refused (decision 3).
+  // The selection does not move.
+  function onConfirmPencil(): void {
+    if (isConfirmPencilDisabled || selectedCell === null) {
+      return
+    }
+    const shown = shownCell(selectedCell, session.pendingEdits)
+    startEdit(selectedCell, shown.letter, 'confirm', session.seq)
+  }
+
   // Type a letter on the selected cell, then move to the next unlocked cell.
+  // With pencil mode on it is a pencil letter. A cell that already shows the
+  // letter with the mode's pencil flag sends nothing.
   function onLetter(letter: string): void {
     if (session.solved || selection === null || activeWord === null) {
       return
@@ -628,15 +723,10 @@
     if (cell === null || cell.locked) {
       return
     }
-    if (shownCell(cell, session.pendingEdits).letter !== letter) {
-      addPendingEdit(session, cell.row, cell.column, letter)
-      sendEdit({
-        type: 'edit_letter',
-        row: cell.row,
-        column: cell.column,
-        letter,
-        base_seq: null,
-      })
+    const shown = shownCell(cell, session.pendingEdits)
+    const isAlreadyShown = shown.letter === letter && shown.pencil === isPencilMode
+    if (!isAlreadyShown) {
+      startEdit(cell, letter, isPencilMode ? 'pencil' : 'edit', null)
     }
     const here = indexInWord(activeWord, cell)
     for (let index = here + 1; index < activeWord.cells.length; index++) {
@@ -654,8 +744,7 @@
     if (cell.locked || shownCell(cell, session.pendingEdits).letter === null) {
       return false
     }
-    addPendingEdit(session, cell.row, cell.column, null)
-    sendEdit({ type: 'erase', row: cell.row, column: cell.column, base_seq: null })
+    startEdit(cell, null, 'edit', null)
     return true
   }
 
@@ -718,9 +807,6 @@
   // What is left of the room's budget.
   let lettersLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.letters)
   let wordsLeft = $derived(session.snapshot === null ? 0 : session.snapshot.reveal_budget.words)
-  let selectedCell = $derived(
-    selection === null ? null : letterCellAt(selection.row, selection.column),
-  )
 
   // True when every cell of the word is locked: nothing is left to reveal there.
   function isWordLocked(word: Word): boolean {
@@ -791,6 +877,245 @@
       },
     })
   }
+
+  // ---- The clue flag (spec 021) ----
+
+  // The kept flags, and what the marker of each flagged clue shows.
+  let keptFlags = $derived(session.snapshot === null ? [] : session.snapshot.flags)
+  let clueFlags = $derived(clueFlagMarkers(keptFlags, session.snapshot?.players ?? []))
+  // My kept flag: the flag whose player_id is `you`.
+  let myFlag = $derived(session.snapshot === null ? null : flagOf(keptFlags, session.snapshot.you))
+  // Pressed while my flag is on the selected word's clue.
+  let isFlagPressed = $derived(
+    activeWord !== null && myFlag !== null && isClueOfWord(myFlag, activeWord),
+  )
+  let isFlagDisabled = $derived(
+    activeWord === null || (isWordFullShown(activeWord) && !isFlagPressed),
+  )
+
+  // True when every cell of the word shows a letter, pending edits included.
+  function isWordFullShown(word: Word): boolean {
+    for (const position of word.cells) {
+      const cell = letterCellAt(position.row, position.column)
+      if (cell === null || shownCell(cell, session.pendingEdits).letter === null) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Flag the selected word's clue, or remove my flag from it. The page makes no
+  // guess: the button and the marker follow the server's flag_changed.
+  function onFlag(): void {
+    if (isFlagDisabled || activeWord === null) {
+      return
+    }
+    if (isFlagPressed) {
+      send({ type: 'flag', clue: null })
+      return
+    }
+    send({
+      type: 'flag',
+      clue: {
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      },
+    })
+  }
+
+  // ---- Chat and reactions (spec 022) ----
+
+  // The chat panel and the reaction picker are drawn over the page, just below
+  // the header, so opening them moves nothing. `popoverTop` is that place, from
+  // the top of the page.
+  let roomMain: HTMLElement | null = $state(null)
+  let roomHeader: HTMLElement | null = $state(null)
+  let popoverTop = $state(0)
+  let isPopoverSideBySide = $state(true)
+
+  function updatePopoverPlace(): void {
+    if (roomMain === null || roomHeader === null) {
+      return
+    }
+    const mainBox = roomMain.getBoundingClientRect()
+    const headerBox = roomHeader.getBoundingClientRect()
+    popoverTop = headerBox.bottom - mainBox.top + POPOVER_GAP_PX
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
+    isPopoverSideBySide = roomMain.clientWidth >= SIDE_BY_SIDE_MIN_ROOT_FONTS * rootFontSize
+  }
+
+  // Measure again when the window or the header changes size (a resize, a
+  // rotation, a new root font, a toolbar that wraps).
+  $effect(() => {
+    if (roomMain === null || roomHeader === null) {
+      return
+    }
+    const observer = new ResizeObserver(updatePopoverPlace)
+    observer.observe(roomMain)
+    observer.observe(roomHeader)
+    updatePopoverPlace()
+    return () => observer.disconnect()
+  })
+
+  let you = $derived(session.snapshot === null ? '' : session.snapshot.you)
+  // True while the host muted my chat and my reactions.
+  let isMuted = $derived(
+    session.snapshot !== null &&
+      session.snapshot.players.some((player) => player.player_id === you && player.muted),
+  )
+
+  // Pacing: the page sends at most 5 chat messages, and 5 reactions, in any
+  // 12 seconds. `pacingNow` is read again each time a send stops counting.
+  let chatSendTimes: number[] = $state([])
+  let reactionSendTimes: number[] = $state([])
+  let pacingNow = $state(performance.now())
+  let pacingTimer: ReturnType<typeof setTimeout> | undefined
+  let isChatPaced = $derived(isPaced(chatSendTimes, pacingNow))
+  let isReactionPaced = $derived(isPaced(reactionSendTimes, pacingNow))
+
+  // Read the clock, forget the sends that no longer count, and come back when
+  // the next one stops counting.
+  function refreshPacing(): void {
+    const now = performance.now()
+    pacingNow = now
+    chatSendTimes = sendsInWindow(chatSendTimes, now)
+    reactionSendTimes = sendsInWindow(reactionSendTimes, now)
+    clearTimeout(pacingTimer)
+    pacingTimer = undefined
+    const delay = msUntilNextExpiry([...chatSendTimes, ...reactionSendTimes], now)
+    if (delay !== null) {
+      pacingTimer = setTimeout(refreshPacing, delay)
+    }
+  }
+
+  // ---- The chat panel ----
+
+  let isChatOpen = $state(false)
+  let chatText = $state('')
+  let chatToggle: HTMLButtonElement | null = $state(null)
+  // Lines up to this seq are read: the seq of the page's first snapshot, then
+  // the seq of the newest line while the panel is open. A reconnection keeps it,
+  // so the lines that came meanwhile count as unread. null before the first
+  // snapshot.
+  let lastSeenChatSeq: number | null = $state(null)
+
+  let chatHistory = $derived(session.snapshot === null ? [] : session.snapshot.chat)
+  let unreadLines = $derived(
+    isChatOpen || lastSeenChatSeq === null ? 0 : unreadCount(chatHistory, lastSeenChatSeq, you),
+  )
+  // While the panel is open, every line of the history is read.
+  $effect(() => {
+    if (!isChatOpen || chatHistory.length === 0) {
+      return
+    }
+    const newestSeq = chatHistory[chatHistory.length - 1].seq
+    if (lastSeenChatSeq === null || newestSeq > lastSeenChatSeq) {
+      lastSeenChatSeq = newestSeq
+    }
+  })
+
+  function toggleChat(): void {
+    if (isChatOpen) {
+      closeChat()
+      return
+    }
+    isChatOpen = true
+  }
+
+  function closeChat(): void {
+    isChatOpen = false
+    chatToggle?.focus()
+  }
+
+  // Send a message; the line shows when the server's chat_message comes back:
+  // no local echo.
+  function sendChat(text: string): void {
+    send({ type: 'chat', text })
+    chatSendTimes = [...chatSendTimes, performance.now()]
+    refreshPacing()
+  }
+
+  // The host mutes or unmutes a player; the button follows the server's
+  // player_muted.
+  function toggleMute(playerId: string, isPlayerMuted: boolean): void {
+    send({ type: 'mute_player', player_id: playerId, muted: !isPlayerMuted })
+  }
+
+  // ---- The reaction button and picker ----
+
+  let isPickerOpen = $state(false)
+  let reactButton: HTMLButtonElement | null = $state(null)
+  let isReactDisabled = $derived(activeWord === null || isMuted)
+
+  function toggleReactionPicker(): void {
+    if (isPickerOpen) {
+      closeReactionPicker()
+      return
+    }
+    isPickerOpen = true
+  }
+
+  function closeReactionPicker(): void {
+    isPickerOpen = false
+    reactButton?.focus()
+  }
+
+  // Close the picker and leave the focus where it is.
+  function dismissReactionPicker(): void {
+    isPickerOpen = false
+  }
+
+  // React on the selected word's clue.
+  function sendReaction(reaction: ReactionValue): void {
+    if (activeWord === null || isReactionPaced) {
+      return
+    }
+    send({
+      type: 'react',
+      clue: {
+        row: activeWord.clueRow,
+        column: activeWord.clueColumn,
+        clue_index: activeWord.clueIndex,
+      },
+      reaction,
+    })
+    reactionSendTimes = [...reactionSendTimes, performance.now()]
+    refreshPacing()
+  }
+
+  // What each clue shows of the reactions. Each reaction ends REACTION_MS after
+  // it arrived; one that a newer reaction replaced is no longer in the list, so
+  // its timer finds nothing to end.
+  let clueReactions = $derived(clueReactionMarkers(session.reactions, session.names))
+  const scheduledReactions = new Set<number>()
+  const reactionTimers = new Set<ReturnType<typeof setTimeout>>()
+  $effect(() => {
+    for (const shown of session.reactions) {
+      if (scheduledReactions.has(shown.id)) {
+        continue
+      }
+      scheduledReactions.add(shown.id)
+      const timer = setTimeout(() => {
+        reactionTimers.delete(timer)
+        scheduledReactions.delete(shown.id)
+        endReaction(session, shown.id)
+      }, REACTION_MS)
+      reactionTimers.add(timer)
+    }
+  })
+
+  // A separate effect, as for the flashes: the one above re-runs with each new
+  // reaction, and its cleanup would cancel the timers of those still showing.
+  $effect(() => {
+    return () => {
+      for (const timer of reactionTimers) {
+        clearTimeout(timer)
+      }
+      reactionTimers.clear()
+      scheduledReactions.clear()
+    }
+  })
 
   // ---- Votes (spec 025) ----
 
@@ -1039,28 +1364,14 @@
     }
   }
 
-  // Send my pending edits again, oldest first, each with the base_seq it had.
-  // They are paced, the first one at once, then one every EDIT_SEND_INTERVAL_MS.
+  // Send my pending edits again, oldest first, each as the message of its kind
+  // and with the base_seq it had. They are paced, the first one at once, then
+  // one every EDIT_SEND_INTERVAL_MS.
   function resendPendingEdits(): void {
     stopEditQueue()
     isSynced = true
     for (const edit of session.pendingEdits) {
-      if (edit.letter === null) {
-        editQueue.push({
-          type: 'erase',
-          row: edit.row,
-          column: edit.column,
-          base_seq: edit.baseSeq,
-        })
-      } else {
-        editQueue.push({
-          type: 'edit_letter',
-          row: edit.row,
-          column: edit.column,
-          letter: edit.letter,
-          base_seq: edit.baseSeq,
-        })
-      }
+      editQueue.push(editMessage(edit, edit.baseSeq))
     }
     editTimer = setInterval(sendNextQueuedEdit, EDIT_SEND_INTERVAL_MS)
     sendNextQueuedEdit()
@@ -1094,6 +1405,8 @@
       if (snapshotBefore === null) {
         restoreSavedSelection(session.snapshot)
         void markInteractive()
+        // The history of the first snapshot is not unread (spec 022).
+        lastSeenChatSeq = session.snapshot.seq
       }
       reconnectAttempt = 0
       resendPendingEdits()
@@ -1138,6 +1451,8 @@
 </script>
 
 <main
+  bind:this={roomMain}
+  style:--popover-top={`${popoverTop}px`}
   data-testid="room-page"
   data-room-code={code}
   data-status={session.status}
@@ -1147,7 +1462,7 @@
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
-  <header class="room-header">
+  <header class="room-header" bind:this={roomHeader}>
     <h1>{t('room.heading', { code })}</h1>
     <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
     {#if session.snapshot !== null}
@@ -1174,12 +1489,49 @@
         onfocusout={leaveRoomToolbarFocus}
         class:keyboard-focus={roomToolbarHasKeyboardFocus}
       >
+        <!-- First in the toolbar, so its unread count shows before any sideways
+             scroll on a small window (spec 022). The count has a slot of its own
+             width, so the button keeps its size when the count goes. -->
+        <button
+          type="button"
+          class="chat-toggle"
+          data-testid="chat-toggle"
+          aria-expanded={isChatOpen}
+          aria-controls="chat-panel"
+          aria-label={chatToggleLabel(unreadLines)}
+          bind:this={chatToggle}
+          onclick={toggleChat}
+          >{t('chat.toggle')}<span class="chat-unread-slot"
+            >{#if unreadLines > 0}<span
+                class="chat-unread"
+                data-testid="chat-unread"
+                aria-hidden="true">{unreadBadgeText(unreadLines)}</span
+              >{/if}</span
+          ></button
+        >
         <div class="undo-panel">
           <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
             >{t('room.undo')}</button>
           {#if isUndoMessageShown}
             <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
           {/if}
+        </div>
+        <div class="pencil-panel">
+          <button
+            type="button"
+            class="pencil-toggle"
+            data-testid="pencil-toggle"
+            aria-pressed={isPencilMode}
+            disabled={session.solved}
+            onclick={togglePencilMode}>{t('pencil.toggle')}</button
+          >
+          <button
+            type="button"
+            data-testid="confirm-pencil"
+            aria-label={t('pencil.confirm_label')}
+            disabled={isConfirmPencilDisabled}
+            onclick={onConfirmPencil}>{t('pencil.confirm')}</button
+          >
         </div>
         {#if isHelpShown}
           <div
@@ -1234,6 +1586,26 @@
         {/if}
         <button
           type="button"
+          class="flag-button"
+          data-testid="flag-button"
+          aria-label={t('flag.button_label')}
+          aria-pressed={isFlagPressed}
+          disabled={isFlagDisabled}
+          onclick={onFlag}>{t('flag.button')}</button
+        >
+        <button
+          type="button"
+          class="react-button"
+          data-testid="react-button"
+          aria-label={t('reaction.button_label')}
+          aria-expanded={isPickerOpen}
+          aria-controls="reaction-picker"
+          disabled={isReactDisabled}
+          bind:this={reactButton}
+          onclick={toggleReactionPicker}>{t('reaction.button')}</button
+        >
+        <button
+          type="button"
           class="authors-switch"
           data-testid="authors-switch"
           aria-pressed={isAuthorsViewOn}
@@ -1248,6 +1620,38 @@
       </div>
     {/if}
   </header>
+  <!-- The reaction picker and the chat panel come right after the toolbar in
+       document order, outside it (its sideways scrolling would clip them), and
+       are drawn over the page (spec 022). -->
+  {#if session.snapshot !== null && isPickerOpen}
+    <ReactionPicker
+      isPaced={isReactionPaced}
+      isButtonDisabled={isReactDisabled}
+      onPick={sendReaction}
+      onClose={closeReactionPicker}
+      onDismiss={dismissReactionPicker}
+      onFocusButton={() => reactButton?.focus()}
+      onFocusGrid={() => gridViewport?.focusGrid()}
+    />
+  {/if}
+  {#if session.snapshot !== null && isChatOpen}
+    <ChatPanel
+      history={chatHistory}
+      players={session.snapshot.players}
+      names={session.names}
+      {you}
+      {isHost}
+      {isMuted}
+      isPaced={isChatPaced}
+      isJoined={session.status === 'joined'}
+      isBelowPicker={!isPopoverSideBySide}
+      bind:text={chatText}
+      onSend={sendChat}
+      onMute={toggleMute}
+      onClose={closeChat}
+      onFocusToggle={() => chatToggle?.focus()}
+    />
+  {/if}
   {#if session.status === 'reconnecting'}
     <p class="connection-banner" data-testid="connection-banner" role="status">
       {t('room.banner.offline')}
@@ -1460,6 +1864,8 @@
         {remoteSelections}
         {isAuthorsViewOn}
         {playerColours}
+        {clueFlags}
+        {clueReactions}
       />
     </div>
     <!-- The completion status line. The page shows it in one of two places,
@@ -1503,7 +1909,9 @@
 
 <style>
   /* The page fills the window; the grid viewport takes the height left. */
+  /* Positioned: the chat panel and the reaction picker are placed against it. */
   main {
+    position: relative;
     box-sizing: border-box;
     /* Little padding: the clue bar and the grid need the height. */
     padding: 0.5rem 1rem;
@@ -1571,8 +1979,9 @@
     flex: none;
   }
 
-  /* The room toolbar holds the undo, check and reveal controls (spec 024). On a
-     roomy window it is one item of the header row, and it wraps when it must. */
+  /* The room toolbar holds the undo, pencil, check and reveal controls, the flag
+     button and the authors switch (specs 024, 020, 021 and 019). On a roomy
+     window it is one item of the header row, and it wraps when it must. */
   .room-toolbar {
     display: flex;
     flex-wrap: wrap;
@@ -1581,6 +1990,7 @@
   }
 
   .undo-panel,
+  .pencil-panel,
   .check-panel,
   .reveal-panel {
     display: flex;
@@ -1607,11 +2017,50 @@
 
   /* The authors switch when it is on: its text is underlined, like the band it
      draws under the letters. A text decoration shows on the engines' own button
-     look and keeps the button's size. */
-  .authors-switch[aria-pressed='true'] {
+     look and keeps the button's size. The pencil toggle shows that it is on the
+     same way. */
+  .authors-switch[aria-pressed='true'],
+  .pencil-toggle[aria-pressed='true'] {
     text-decoration: underline;
     text-decoration-thickness: 2px;
     text-underline-offset: 2px;
+  }
+
+  /* A target of 24 by 24 CSS px at least, whatever the engine's button style
+     (spec 021, spec 014 AC-7). It never shrinks in the toolbar's row. */
+  .flag-button {
+    flex: none;
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  /* The chat toggle and the reaction button (spec 022): the same target size
+     as the flag button. */
+  .chat-toggle,
+  .react-button {
+    flex: none;
+    box-sizing: border-box;
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  /* Room for the unread count, kept whether the count shows or not, so that
+     the button and the toolbar keep their size when the panel opens. */
+  .chat-unread-slot {
+    display: inline-block;
+    width: 2.4em;
+    text-align: center;
+  }
+
+  .chat-unread {
+    display: inline-block;
+    padding: 0.15em 0.3em;
+    border-radius: 1em;
+    font-size: 0.8em;
+    line-height: 1;
+    color: #ffffff;
+    background: #a4161a;
   }
 
   .host-panel-more,
@@ -1739,8 +2188,11 @@
     font-size: 0.85rem;
   }
 
+  /* The list has a fixed height, about three lines, whatever the number of its
+     items: a new line never moves the grid (spec 013 "Client: feed height",
+     spec 021 AC-9). The lines beyond it scroll (spec 013 AC-7). */
   .feed ul {
-    max-height: 3.6rem;
+    height: 3.6rem;
     overflow-y: auto;
     /* The page keeps the reader's place itself when lines come and go (spec
        013 AC-7), the same way in every engine: no scroll anchoring from the
@@ -1938,6 +2390,7 @@
     }
 
     .undo-panel,
+    .pencil-panel,
     .check-panel,
     .reveal-panel {
       flex: none;
@@ -1988,12 +2441,13 @@
     }
 
     /* The line takes the room that the heading leaves, so a squeezed feed cuts
-       the heading only when the line has no room left (spec 014 AC-10). */
+       the heading only when the line has no room left (spec 014 AC-10). The
+       list is one line high, whatever the number of its items (spec 013 AC-6). */
     .feed ul {
       flex: 1 1 0;
       min-width: 0;
       margin: 0;
-      max-height: 1.3rem;
+      height: 1.3rem;
       line-height: 1.3rem;
     }
 
@@ -2098,6 +2552,13 @@
       padding: 0.25rem 0.5rem;
     }
 
+    /* The header's two rows sit 1px apart: the room toolbar's row is 24px high
+       for the flag button's target (spec 021 AC-11), and the grid keeps the
+       height it had before. */
+    .room-header {
+      row-gap: 1px;
+    }
+
     .clue-bar {
       padding: 0.25rem 0.75rem;
     }
@@ -2119,6 +2580,17 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    /* The clue text has priority over the author (spec 019 decision 11). The
+       author's flex basis is 0, so it never takes width from the clue text: it
+       grows into the room the clue text leaves, up to its whole text
+       (max-content), and never goes under 6 times its font size. When the row
+       is too short for that minimum, the clue text is the one that shrinks. */
+    .clue-bar.with-author .clue-bar-author {
+      flex: 1 1 0;
+      min-width: 6em;
+      max-width: max-content;
     }
 
     .clue-bar.with-author .grid-status {

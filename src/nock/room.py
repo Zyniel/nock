@@ -20,11 +20,13 @@ from nock.protocol import (
     CellTarget,
     CellView,
     ChangeSettings,
+    Chat,
     ChatMessage,
     Check,
     CheckResult,
     CheckTarget,
     ClientMessage,
+    ClueRef,
     Colour,
     ConfirmPencil,
     Coordinate,
@@ -32,7 +34,9 @@ from nock.protocol import (
     Erase,
     ErrorCode,
     ErrorMessage,
+    Flag,
     FlagChanged,
+    FlagView,
     GridFullWrong,
     GridSolved,
     GridTarget,
@@ -57,6 +61,8 @@ from nock.protocol import (
     PlayerStateChanged,
     PlayerView,
     Pong,
+    React,
+    ReactionShown,
     RemovePlayer,
     ResumeToken,
     Reveal,
@@ -139,6 +145,10 @@ class RoomConfig(RoomModel):
     # spec 036 AC-6: inputs of a connection that may wait to be applied
     max_inbound_pending: int = Field(default=100, ge=1)
     vote_timeout_seconds: int = Field(default=20, ge=1)  # spec 025 AC-2
+    chat_limit: int = Field(default=5, ge=1)  # spec 022: chat messages per window
+    chat_window_seconds: float = Field(default=10.0, gt=0)
+    reaction_limit: int = Field(default=5, ge=1)  # spec 022: reactions per window
+    reaction_window_seconds: float = Field(default=10.0, gt=0)
 
 
 DEFAULT_CONFIG: RoomConfig = RoomConfig()
@@ -190,6 +200,11 @@ class PlayerRecord(RoomModel):
     # spec 037 AC-3: times of the edits accepted in the last second
     recent_edits: tuple[float, ...] = ()
     last_edit: UndoEntry | None = None  # spec 018 AC-3
+    flag: ClueRef | None = None  # spec 021: the clue this player flagged
+    # spec 022: times of the chat messages accepted in the window (not logged)
+    recent_chat: tuple[float, ...] = ()
+    # spec 022: times of the reactions relayed in the window (not logged)
+    recent_reactions: tuple[float, ...] = ()
 
 
 class OpenVote(RoomModel):
@@ -223,6 +238,7 @@ class RoomState(RoomModel):
     open_vote: OpenVote | None = None  # spec 025
     # spec 025: vote_id of the last vote opened, 0 for none
     last_vote_id: int = Field(default=0, ge=0, strict=True)
+    chat: tuple[ChatMessage, ...] = ()  # spec 022: every chat message, in seq order
 
 
 class LogEntry(RoomModel):
@@ -248,8 +264,8 @@ class Outcome(RoomModel):
     state: RoomState
     entries: tuple[LogEntry, ...] = ()  # numbered events, in seq order
     reply: tuple[ServerMessage, ...] = ()  # to the sender's connection only
-    # to every joined connection except the sender's
-    to_others: tuple[SelectionMoved, ...] = ()
+    # to every joined connection except the sender's and the item's own player's
+    to_others: tuple[SelectionMoved | ReactionShown, ...] = ()
     close_sender: StrictBool = False  # close the sender's socket, code 1000
     disconnects: tuple[Disconnect, ...] = ()
 
@@ -385,7 +401,8 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
 
     Returns:
         The snapshot, with the player's own resume token. Its `open_vote` is the
-        event that opened the room's open vote, None when no vote is open.
+        event that opened the room's open vote, None when no vote is open, and
+        its `chat` is the room's whole chat history (spec 022).
 
     Raises:
         KeyError: no player `player_id` in the room.
@@ -403,14 +420,23 @@ def snapshot_for(state: RoomState, player_id: str) -> Snapshot:
                 players=player_views(state),
                 settings=state.settings,
                 reveal_budget=state.reveal_budget,
-                flags=(),
-                chat=(),
+                flags=_flag_views(state),
+                chat=state.chat,
                 open_vote=open_vote,
                 timer_elapsed_ms=0,
                 timer_running=False,
                 solved=state.solved,
             )
     raise KeyError(player_id)
+
+
+def _flag_views(state: RoomState) -> tuple[FlagView, ...]:
+    """Return one view per player who holds a flag, in players order (spec 021)."""
+    views: list[FlagView] = []
+    for player in state.players:
+        if player.flag is not None:
+            views.append(FlagView(player_id=player.player_id, clue=player.flag))
+    return tuple(views)
 
 
 def join_room(
@@ -707,14 +733,18 @@ def handle_message(
     A ping is answered with a pong and is not input; neither is a join. Any
     other message is input: it sets `last_input_at`, and an idle player becomes
     active with a `PlayerStateChanged` entry ahead of the message's own entries.
-    `select_cell`, edits (`edit_letter`, `erase`), `undo` and the host actions
-    (`remove_player`, `lock_room`, `change_settings`, `mute_player`), `check`,
-    `reveal` and `vote` (input, not rate-limited) have their rules here. Before a
-    `check`, a `reveal` or a `vote`, an open vote whose time is over closes, with
-    its entry after the wake-up entry (spec 025). `pencil_edit` and
-    `confirm_pencil` only go through the rate limit (spec 037); spec 020 gives
-    them their meaning. Until the spec that gives another message its meaning
-    is built, the message is read and ignored: nothing is sent.
+    `select_cell`, edits (`edit_letter`, `erase`, `pencil_edit`,
+    `confirm_pencil`), `undo` and the host actions (`remove_player`,
+    `lock_room`, `change_settings`, `mute_player`), `check`, `reveal`, `vote`,
+    `flag`, `chat` and `react` (input, not counted by the edit limit) have
+    their rules here. A `chat` or a `react` over its own limit (spec 022) is
+    dropped without an answer; an idle sender is still woken. Before a
+    `check`, a `reveal` or a `vote`, an open vote whose time is over closes,
+    with its entry after the wake-up entry (spec 025). A step that changes a
+    letter or a lock clears every flag whose word is now full (spec 021),
+    before the completion entry of spec 026. Until the spec that gives another
+    message its meaning is built, the message is read and ignored: nothing is
+    sent.
     """
     if _find_player(state, player_id) is None:
         return _refuse(state, ErrorCode.NOT_JOINED, "Join the room first.")
@@ -754,9 +784,13 @@ def _apply_message(
     now: float,
     config: RoomConfig,
 ) -> Outcome:
-    """Run the rule of one message, then the completion rule (spec 026)."""
+    """Run the rule of one message, the flag clearing (spec 021), then completion.
+
+    The completion rule is spec 026's; its entry comes after the clearing ones.
+    """
     outcome = _run_message(state, player_id, message, now, config)
-    return _with_completion(state, outcome, now)
+    outcome_with_flags_cleared = _with_full_flags_cleared(outcome, now)
+    return _with_completion(state, outcome_with_flags_cleared, now)
 
 
 def _run_message(
@@ -769,12 +803,10 @@ def _run_message(
     """Run the rule of one message."""
     if isinstance(message, Ping):
         return Outcome(state=state, reply=(Pong(),))
-    if isinstance(message, EditLetter):
+    if isinstance(message, EditLetter | Erase | PencilEdit):
         return _apply_edit(state, player_id, message, now, config)
-    if isinstance(message, Erase):
-        return _apply_edit(state, player_id, message, now, config)
-    if isinstance(message, PencilEdit | ConfirmPencil):
-        return _count_unhandled_edit(state, player_id, now, config)
+    if isinstance(message, ConfirmPencil):
+        return _confirm_pencil(state, player_id, message, now, config)
     if isinstance(message, Undo):
         return _undo(state, player_id, now)
     if isinstance(message, Check | Reveal | Vote):
@@ -783,7 +815,166 @@ def _run_message(
         return _select_cell(state, player_id, message)
     if isinstance(message, RemovePlayer | LockRoom | ChangeSettings | MutePlayer):
         return _host_action(state, player_id, message, now)
+    if isinstance(message, Flag):
+        return _flag(state, player_id, message.clue, now)
+    if isinstance(message, Chat):
+        return _chat(state, player_id, message.text, now, config)
+    if isinstance(message, React):
+        return _react(state, player_id, message, now, config)
     return Outcome(state=state)
+
+
+def _times_in_window(
+    times: tuple[float, ...], now: float, window_seconds: float
+) -> tuple[float, ...]:
+    """Return the times `t` with `t > now - window_seconds`, in their order."""
+    recent: list[float] = []
+    for past_time in times:
+        if past_time > now - window_seconds:
+            recent.append(past_time)
+    return tuple(recent)
+
+
+def _chat(
+    state: RoomState, player_id: str, text: str, now: float, config: RoomConfig
+) -> Outcome:
+    """Refuse, drop or number a chat message; the first case that applies decides.
+
+    A muted sender is refused with muted. A sender who already sent
+    `config.chat_limit` messages in the window is dropped: nothing changes and
+    nothing is sent. Otherwise one chat_message is numbered and added to the
+    room's chat (spec 022).
+    """
+    player = _find_player(state, player_id)
+    if player is None:
+        return Outcome(state=state)
+    if player.muted:
+        return _refuse(state, ErrorCode.MUTED, "The host muted your chat.")
+    recent = _times_in_window(player.recent_chat, now, config.chat_window_seconds)
+    if len(recent) >= config.chat_limit:
+        return Outcome(state=state)
+    counted = player.model_copy(update={"recent_chat": (*recent, now)})
+    counted_state = _replace_player(state, counted)
+    event = ChatMessage(seq=state.seq + 1, player_id=player_id, text=text)
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=replay(counted_state, entry), entries=(entry,))
+
+
+def _react(
+    state: RoomState, player_id: str, message: React, now: float, config: RoomConfig
+) -> Outcome:
+    """Relay a reaction to every player, or drop it without an answer.
+
+    It is dropped when the sender is muted, when its clue names no word, or
+    when the sender already sent `config.reaction_limit` reactions in the
+    window. A relayed reaction has no seq and is never logged (spec 022).
+    """
+    player = _find_player(state, player_id)
+    if player is None or player.muted:
+        return Outcome(state=state)
+    if _word_cells_of_clue(state, message.clue) is None:
+        return Outcome(state=state)
+    recent = _times_in_window(
+        player.recent_reactions, now, config.reaction_window_seconds
+    )
+    if len(recent) >= config.reaction_limit:
+        return Outcome(state=state)
+    counted = player.model_copy(update={"recent_reactions": (*recent, now)})
+    reaction_shown = ReactionShown(
+        player_id=player_id, clue=message.clue, reaction=message.reaction
+    )
+    return Outcome(
+        state=_replace_player(state, counted),
+        reply=(reaction_shown,),
+        to_others=(reaction_shown,),
+    )
+
+
+def _flag(
+    state: RoomState, player_id: str, clue: ClueRef | None, now: float
+) -> Outcome:
+    """Set or remove the sender's flag; the first case that applies decides.
+
+    Removing a flag one does not hold, or flagging the clue one already flagged,
+    changes nothing. A clue that names no word, or whose word is full, is refused
+    with invalid_target. Otherwise one flag_changed is numbered (spec 021).
+    """
+    player = _find_player(state, player_id)
+    if player is None:
+        return Outcome(state=state)
+    if clue is None:
+        if player.flag is None:
+            return Outcome(state=state)
+        return _announce_flag(state, player_id, None, now)
+    word_cells = _word_cells_of_clue(state, clue)
+    if word_cells is None:
+        return _refuse(state, ErrorCode.INVALID_TARGET, "That clue names no word.")
+    if _is_word_full(word_cells):
+        return _refuse(state, ErrorCode.INVALID_TARGET, "That word is already full.")
+    if clue == player.flag:
+        return Outcome(state=state)
+    return _announce_flag(state, player_id, clue, now)
+
+
+def _announce_flag(
+    state: RoomState, player_id: str, clue: ClueRef | None, now: float
+) -> Outcome:
+    """Number one flag_changed for a player and apply it."""
+    event = FlagChanged(seq=state.seq + 1, player_id=player_id, clue=clue)
+    entry = LogEntry(at=now, event=event)
+    return Outcome(state=replay(state, entry), entries=(entry,))
+
+
+def _word_cells_of_clue(state: RoomState, clue: ClueRef) -> list[CellState] | None:
+    """Return the cells of the word a clue names, or None when it names none."""
+    try:
+        positions = state.grid.word_cells(clue.row, clue.column, clue.clue_index)
+    except (IndexError, ValueError):
+        return None
+    cells: list[CellState] = []
+    for row, column in positions:
+        cell = _find_cell(state, row, column)
+        if cell is not None:
+            cells.append(cell)
+    return cells
+
+
+def _is_word_full(cells: list[CellState]) -> bool:
+    """Tell whether every cell of a word holds a letter, a pencil letter included."""
+    return all(_is_filled(cell) for cell in cells)
+
+
+def _changes_cells(outcome: Outcome) -> bool:
+    """Tell whether a step's entries hold a letter_changed or a cell_locked."""
+    for entry in outcome.entries:
+        if isinstance(entry.event, LetterChanged | CellLocked):
+            return True
+    return False
+
+
+def _with_full_flags_cleared(outcome: Outcome, now: float) -> Outcome:
+    """Clear, in players order, every flag whose word a step made full (spec 021).
+
+    Only a step that changed a letter or a lock can fill a word. Each cleared
+    flag gets one flag_changed with no clue, numbered after the step's entries.
+    """
+    if not _changes_cells(outcome):
+        return outcome
+    new_state = outcome.state
+    entries = list(outcome.entries)
+    for player in outcome.state.players:
+        if player.flag is None:
+            continue
+        word_cells = _word_cells_of_clue(new_state, player.flag)
+        if word_cells is None or not _is_word_full(word_cells):
+            continue
+        flag_removed = FlagChanged(
+            seq=new_state.seq + 1, player_id=player.player_id, clue=None
+        )
+        entry = LogEntry(at=now, event=flag_removed)
+        new_state = replay(new_state, entry)
+        entries.append(entry)
+    return outcome.model_copy(update={"state": new_state, "entries": tuple(entries)})
 
 
 def _host_action(
@@ -988,29 +1179,14 @@ def _with_edit_counted(state: RoomState, player_id: str, now: float) -> RoomStat
     return _replace_player(state, changed)
 
 
-def _count_unhandled_edit(
-    state: RoomState, player_id: str, now: float, config: RoomConfig
-) -> Outcome:
-    """Count a pencil edit or a confirmation, which spec 020 will give a meaning.
-
-    Once the grid is solved, the edit is refused with grid_solved instead.
-    """
-    refusal = _rate_limit_refusal(state, player_id, now, config)
-    if refusal is not None:
-        return refusal
-    if state.solved:
-        return _refuse_solved(state)
-    return Outcome(state=_with_edit_counted(state, player_id, now))
-
-
 def _refuse_solved(state: RoomState) -> Outcome:
     """Refuse an input because the grid is already solved."""
     return _refuse(state, ErrorCode.GRID_SOLVED, "The grid is already solved.")
 
 
 def _is_filled(cell: CellState) -> bool:
-    """Tell whether a letter cell holds a letter that is not a pencil letter."""
-    return cell.letter is not None and not cell.pencil
+    """Tell whether a letter cell holds a letter, a pencil letter included."""
+    return cell.letter is not None
 
 
 def _is_full(state: RoomState) -> bool:
@@ -1036,11 +1212,7 @@ def _with_completion(before: RoomState, outcome: Outcome, now: float) -> Outcome
     """
     if before.solved or not outcome.entries:
         return outcome
-    changes_cells = False
-    for entry in outcome.entries:
-        if isinstance(entry.event, LetterChanged | CellLocked):
-            changes_cells = True
-    if not changes_cells:
+    if not _changes_cells(outcome):
         return outcome
 
     next_seq = outcome.entries[-1].event.seq + 1
@@ -1072,16 +1244,21 @@ def _find_cell(state: RoomState, row: int, column: int) -> CellState | None:
     return None
 
 
-def _edit_refusal(
+def _check_edit(
     state: RoomState,
     player_id: str,
-    edit: EditLetter | Erase,
+    edit: EditLetter | Erase | PencilEdit | ConfirmPencil,
     now: float,
     config: RoomConfig,
-) -> Outcome | None:
-    """Run the edit checks in their fixed order; return the first refusal.
+) -> CellState | Outcome:
+    """Run the edit checks in their fixed order.
 
-    Check 5 refuses every edit once the grid is solved (spec 026).
+    Check 5 refuses every edit once the grid is solved (spec 026). A
+    confirmation has one more check of its own, after these five (spec 020).
+
+    Returns:
+        The edited cell as it is now when every check passes, or else the
+        outcome of the first refusal.
     """
     rate_refusal = _rate_limit_refusal(state, player_id, now, config)
     if rate_refusal is not None:
@@ -1107,10 +1284,14 @@ def _edit_refusal(
         )
     if state.solved:
         return _refuse_solved(state)
-    return None
+    return cell
 
 
-def _is_stale(cell: CellState, player_id: str, edit: EditLetter | Erase) -> bool:
+def _is_stale(
+    cell: CellState,
+    player_id: str,
+    edit: EditLetter | Erase | PencilEdit | ConfirmPencil,
+) -> bool:
     """Tell whether someone else changed the cell after the edit's `base_seq`."""
     if edit.base_seq is None:
         return False
@@ -1119,9 +1300,9 @@ def _is_stale(cell: CellState, player_id: str, edit: EditLetter | Erase) -> bool
     return cell.changed_by != player_id
 
 
-def _letter_of(edit: EditLetter | Erase) -> str | None:
+def _letter_of(edit: EditLetter | Erase | PencilEdit) -> str | None:
     """Return the letter an edit writes: the typed letter, None for an erase."""
-    if isinstance(edit, EditLetter):
+    if isinstance(edit, EditLetter | PencilEdit):
         return edit.letter
     return None
 
@@ -1129,25 +1310,68 @@ def _letter_of(edit: EditLetter | Erase) -> str | None:
 def _apply_edit(
     state: RoomState,
     player_id: str,
-    edit: EditLetter | Erase,
+    edit: EditLetter | Erase | PencilEdit,
     now: float,
     config: RoomConfig,
 ) -> Outcome:
-    """Check one edit, then write it in the cell and number its event."""
-    refusal = _edit_refusal(state, player_id, edit, now, config)
-    if refusal is not None:
-        return refusal
+    """Check one edit, then write it in the cell and number its event.
 
+    A `pencil_edit` writes a pencil letter (spec 020); the other two write a
+    normal letter or empty the cell.
+    """
+    cell_or_refusal = _check_edit(state, player_id, edit, now, config)
+    if isinstance(cell_or_refusal, Outcome):
+        return cell_or_refusal
+    old_cell = cell_or_refusal
     letter = _letter_of(edit)
+    is_pencil = isinstance(edit, PencilEdit)
+    return _write_cell(state, player_id, old_cell, letter, is_pencil, now)
+
+
+def _confirm_pencil(
+    state: RoomState,
+    player_id: str,
+    confirmation: ConfirmPencil,
+    now: float,
+    config: RoomConfig,
+) -> Outcome:
+    """Check a confirmation, then make the cell's pencil letter a normal letter.
+
+    After the five edit checks, a cell that holds no pencil letter is refused
+    with stale_edit (spec 020 decision 2). The confirmer becomes the author.
+    """
+    cell_or_refusal = _check_edit(state, player_id, confirmation, now, config)
+    if isinstance(cell_or_refusal, Outcome):
+        return cell_or_refusal
+    old_cell = cell_or_refusal
+    if old_cell.letter is None or not old_cell.pencil:
+        return _refuse(
+            state,
+            ErrorCode.STALE_EDIT,
+            f"({confirmation.row}, {confirmation.column}) holds no pencil letter.",
+        )
+    return _write_cell(state, player_id, old_cell, old_cell.letter, False, now)
+
+
+def _write_cell(
+    state: RoomState,
+    player_id: str,
+    old_cell: CellState,
+    letter: str | None,
+    is_pencil: bool,
+    now: float,
+) -> Outcome:
+    """Write an accepted edit in its cell, count it and number its event.
+
+    The player becomes the author of the letter (an empty cell has none) and
+    their `last_edit` records the cell as it was (spec 018).
+    """
     seq = state.seq + 1
     author = player_id if letter is not None else None
-    old_cell = _find_cell(state, edit.row, edit.column)
-    if old_cell is None:
-        return _refuse(state, ErrorCode.NOT_A_LETTER_CELL, "Not a letter cell.")
     edited_cell = old_cell.model_copy(
         update={
             "letter": letter,
-            "pencil": False,
+            "pencil": is_pencil,
             "author": author,
             "wrong": False,
             "changed_seq": seq,
@@ -1161,10 +1385,10 @@ def _apply_edit(
     new_state = new_state.model_copy(update={"seq": seq})
     event = LetterChanged(
         seq=seq,
-        row=edit.row,
-        column=edit.column,
+        row=old_cell.row,
+        column=old_cell.column,
         letter=letter,
-        pencil=False,
+        pencil=is_pencil,
         player_id=player_id,
     )
     return Outcome(state=new_state, entries=(LogEntry(at=now, event=event),))
@@ -1648,7 +1872,7 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     current = state
     entries: list[LogEntry] = []
     disconnects: list[Disconnect] = []
-    to_others: list[SelectionMoved] = []
+    to_others: list[SelectionMoved | ReactionShown] = []
     for listed in state.players:
         player = _find_player(current, listed.player_id)
         if player is None:
@@ -1771,6 +1995,10 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
         replayed = _replay_vote_opened(state, entry, event)
     elif isinstance(event, VoteClosed):
         replayed = state.model_copy(update={"open_vote": None})
+    elif isinstance(event, FlagChanged):
+        replayed = _replay_flag_changed(state, event)
+    elif isinstance(event, ChatMessage):
+        replayed = state.model_copy(update={"chat": (*state.chat, event)})
     else:
         replayed = state
     return replayed.model_copy(update={"seq": event.seq})
@@ -1923,6 +2151,14 @@ def _replay_host_changed(state: RoomState, event: HostChanged) -> RoomState:
     return state.model_copy(update={"players": tuple(players)})
 
 
+def _replay_flag_changed(state: RoomState, event: FlagChanged) -> RoomState:
+    """Set or clear a player's flag; nothing when the player is not in the room."""
+    player = _find_player(state, event.player_id)
+    if player is None:
+        return state
+    return _replace_player(state, player.model_copy(update={"flag": event.clue}))
+
+
 def _replay_player_muted(state: RoomState, event: PlayerMuted) -> RoomState:
     """Set the muted flag of a player."""
     player = _find_player(state, event.player_id)
@@ -1941,15 +2177,20 @@ def after_restart(state: RoomState, now: float) -> Outcome:
     Returns:
         The outcome: each player not disconnected gets `disconnected_at = now`,
         no selection and no recent edits, with one logged
-        `PlayerStateChanged(disconnected)` each, in players order. An open vote
-        keeps the requester's yes only, with no entry (spec 025 decision 16).
+        `PlayerStateChanged(disconnected)` each, in players order. Every
+        player, connected or disconnected, gets empty chat and reaction
+        windows, with no entry (spec 022 decision 17). An open vote keeps the
+        requester's yes only, with no entry (spec 025 decision 16).
     """
     seq = state.seq
     players: list[PlayerRecord] = []
     entries: list[LogEntry] = []
     for player in state.players:
         if player.state == PlayerState.DISCONNECTED:
-            players.append(player)
+            already_disconnected = player.model_copy(
+                update={"recent_chat": (), "recent_reactions": ()}
+            )
+            players.append(already_disconnected)
             continue
         seq += 1
         disconnected = player.model_copy(
@@ -1958,6 +2199,8 @@ def after_restart(state: RoomState, now: float) -> Outcome:
                 "disconnected_at": now,
                 "selection": None,
                 "recent_edits": (),
+                "recent_chat": (),
+                "recent_reactions": (),
             }
         )
         players.append(disconnected)

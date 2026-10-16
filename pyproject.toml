@@ -21,6 +21,7 @@ dev = [
     "pyrefly>=1.3.2",
     "pytest>=9.1.1",
     "pytest-playwright>=0.10.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.17.0",
 ]
 
@@ -79,11 +80,8 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    # Browser tests run in Chromium and WebKit here; CI adds Firefox through
-    # PYTEST_ADDOPTS (human decision, 2026-10-10: all three engines). Firefox is
-    # left out locally because Windows blocks its executable on this machine.
-    "--browser",
-    "chromium",
-    "--browser",
-    "webkit",
 ]
+# The browser engines are chosen by scripts/gate.py (--browsers, or the
+# NOCK_BROWSERS environment variable), so CI can run one job per engine
+# (2026-10-15). A bare `uv run pytest` runs the browser tests in Chromium, the
+# pytest-playwright default; add `--browser webkit` and so on for the others.
