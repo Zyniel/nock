@@ -1,7 +1,7 @@
 ---
 id: "028"
 title: End-of-game recap
-status: approved
+status: done
 ---
 
 # 028 - End-of-game recap

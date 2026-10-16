@@ -5,7 +5,7 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, mid-morning)
+## Where things stand (2026-10-16, midday)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -16,14 +16,17 @@ Update it at the end of each session.
   gate, CI's fonts in cloud sessions, a write guard that judges an edit against
   the checkout holding it), PR #10 (spec 027, the shared timer, and spec 035's
   stricter language scan), PR #11 (tooling: the finish hook lets an agent stop
-  once it has reported a failure it cannot fix). Tag `v0.1.0` exists locally on #6's merge commit but
-  could not be pushed from the cloud session (tag pushes are refused): the human
-  pushes it from a clone.
-- Open: spec 036's refinement ("technical variables should not contain
-  special characters"), with spec 033's technical variables brought in line.
-  Its description holds the human's questions (the reading of the rule for
-  `NOCK_DATABASE`; spec 033's open question 2, players' addresses outside
-  ASCII).
+  once it has reported a failure it cannot fix), PR #12 (spec 036's refinement:
+  technical variables refuse special characters; spec 033's variables brought in
+  line). Tag `v0.1.0` exists locally on #6's merge commit but could not be pushed
+  from the cloud session (tag pushes are refused): the human pushes it from a
+  clone.
+- Open: spec 028's pull request (end-of-game recap). Its description holds the
+  human's question (team nicknames that differ only in case) and the known burst
+  race of the recap route's throttle, which spec 032's pull request fixes.
+- Questions left to the human from PR #12: the reading of the rule for
+  `NOCK_DATABASE` (control, separator and format characters only); spec 033's
+  open question 2 (players' addresses outside ASCII; (b) recommended).
 - Pull requests, human decision of 2026-10-16: one pull request per spec (with
   its refinements of other specs), and tooling changes in a pull request of
   their own. With one designated branch there is one open pull request at a
@@ -31,28 +34,36 @@ Update it at the end of each session.
   merged. CI runs only on pull requests, so a local check comes first.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
-- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027 are `done`. Still to build,
-  in this order: 028 (built, in its second review), 032 (with the 012/017
-  seat-back refinement), 038 (refines 036), 034 (refines 013), 033 (refines 005
-  and 018), 029.
+- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028 are `done` (028 in its
+  pull request). Still to build, in this order: 032 (built, in its last fix
+  round), 038 (refines 036), 034 (refines 013), 033 (refines 005 and 018), 029.
 
 ## Work in flight (not pushed)
 
-- Spec 028 (recap): worktree `.claude/worktrees/agent-a0e07b15eba7a1ec0`, branch
-  `feat/028-end-of-game-recap`, on fa0ad39. First review: REQUEST CHANGES, four
-  test gaps (a rejoin's place, one name per team member, spec 024's fade rule in
-  the toolbar checks, checks before the dialog loads), all fixed, with the
-  suggestions: a departed player's swatch hatched as spec 019's band (decision
-  13), one copy helper, `{time}` in spec 035's list, spec 032 deleting share
-  tokens. Commits: spec efe1b28 and 7bcdd0c, tests 4f68a41, code e553852. The
-  second (last) review is at work; its leftovers go to the human in the pull
-  request description.
-- Follow-ups noted from spec 028's first review: spec 035's scan accepts any
+- Spec 032 (room resume): worktree `.claude/worktrees/spec-032`, branch
+  `spec-032`, built on spec 028's commits as they were before the rebase onto
+  #12 (3059df6); rebase it with `git rebase --onto <028's head in its pull
+  request> 3059df6 spec-032` once its implementer is done. Spec d4443b7,
+  d55bd9c, 55b5e97, a7eec1e; tests 5ddef63, df81379, bb8955d, 0fdde99; code
+  cb7e14c (server), d7f5a4b (client), 57d1922 (first review). Two reviews ran;
+  the second found a blocking regression from the first round (the socket
+  route's threaded lookup let a burst of wrong codes past spec 011's throttle),
+  so a last fix round (the throttle checks and records in one step; damaged
+  rooms left out of summaries; bytes that are not UTF-8) is being built, and the
+  lead verifies it with the reviewer's burst script
+  (`scratchpad/throttle_burst.py`) instead of a third review. Lead decisions for
+  the human in its pull request: 13 (a mute survives a time-out and seat back),
+  14 (only lookups check expiry).
+- Tooling fix ready on branch `tooling-serial` (worktree
+  `.claude/worktrees/tooling-serial`, d6ad451): the four files that measure
+  durations join `SERIAL_TEST_FILES`, and CLAUDE.md's rule says which files count
+  (a duration or a pace; a bounded wait stays parallel). Its own pull request
+  after 028's; update this file's `SERIAL_TEST_FILES` paragraph with it.
+- Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
-  values, a spec 035 refinement); four files time something in the parallel pass
-  (`test_spec_013_ac02_selections.py`, `test_spec_015_ac01_relay_to_the_others.py`,
-  `test_spec_025_ac07_vote_banner.py`, `test_spec_026_ac01_ac03_grid_solved.py`)
-  while CLAUDE.md says such files go in `SERIAL_TEST_FILES` (a tooling fix).
+  values, a spec 035 refinement, after 032).
+- For spec 033's turn: a seated-back player whose nickname spec 033 erased to
+  `--` keeps it, exempt from spec 012's suffix rule (from spec 032's pass).
 - A tool call can turn a typed `\uXXXX` into the character itself: the first
   draft of spec 036 held six raw invisible characters, U+202E among them. Write
   such characters as `\N{NAME}` in code and as typed escapes in specs, and scan
@@ -69,7 +80,7 @@ Update it at the end of each session.
 
 1. Keep the open pull request green until the human merges it; answer its
    review comments.
-2. Then spec 028 in its own pull request (above), then the two follow-ups.
+2. Then the tooling fix, then spec 032 (above), each in its own pull request.
 3. Then the rest of Phase 6 in the order above, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and
