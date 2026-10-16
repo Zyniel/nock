@@ -2,7 +2,8 @@
 
 The close code and the size limit of the spec, the URL of a room socket, a frame
 padded to a given size, and the page script that sends one frame and reports how
-the socket was closed. Used by the tests of AC-7 and of AC-9.
+the socket was closed. Used by the tests of AC-7 and of AC-9; the tests of AC-10
+check the size limit too.
 
 The shared setup of the other themes is in `spec036_harness`.
 """
