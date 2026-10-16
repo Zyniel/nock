@@ -46,6 +46,12 @@ fi
 run_step "playwright install" \
   uv run playwright install chromium firefox webkit
 
+# CI's fonts: the browsers fall back to DejaVu Sans as on CI's Ubuntu runner,
+# not to the image's Inter (human decision, 2026-10-16; see ci-fonts.conf).
+fontconfig_dir="${XDG_CONFIG_HOME:-$HOME/.config}/fontconfig/conf.d"
+run_step "CI fonts" install -D -m 644 .claude/hooks/ci-fonts.conf \
+  "$fontconfig_dir/90-nock-ci-fonts.conf"
+
 # Their system libraries, once per Playwright version (apt is slow).
 browsers_dir="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
 playwright_version="$(uv run playwright --version 2>/dev/null | awk '{print $2}')"
@@ -62,4 +68,4 @@ if [ "${#failed_steps[@]}" -gt 0 ]; then
   exit 0
 fi
 echo "Session setup done: Python and web dependencies, Playwright" \
-  "${playwright_version:-?} browsers (chromium, firefox, webkit)."
+  "${playwright_version:-?} browsers (chromium, firefox, webkit), CI's fonts."
