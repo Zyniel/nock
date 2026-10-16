@@ -5,7 +5,7 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, morning)
+## Where things stand (2026-10-16, mid-morning)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -15,11 +15,15 @@ Update it at the end of each session.
   of its review rounds, the CI speed-up), PR #9 (tooling: the implementer's quick
   gate, CI's fonts in cloud sessions, a write guard that judges an edit against
   the checkout holding it), PR #10 (spec 027, the shared timer, and spec 035's
-  stricter language scan). Tag `v0.1.0` exists locally on #6's merge commit but
+  stricter language scan), PR #11 (tooling: the finish hook lets an agent stop
+  once it has reported a failure it cannot fix). Tag `v0.1.0` exists locally on #6's merge commit but
   could not be pushed from the cloud session (tag pushes are refused): the human
   pushes it from a clone.
-- Open: a tooling pull request, the finish hook that lets an agent stop once it
-  has reported a failure it cannot fix (`scripts/hooks/role_gate.py`).
+- Open: spec 036's refinement ("technical variables should not contain
+  special characters"), with spec 033's technical variables brought in line.
+  Its description holds the human's questions (the reading of the rule for
+  `NOCK_DATABASE`; spec 033's open question 2, players' addresses outside
+  ASCII).
 - Pull requests, human decision of 2026-10-16: one pull request per spec (with
   its refinements of other specs), and tooling changes in a pull request of
   their own. With one designated branch there is one open pull request at a
@@ -28,30 +32,27 @@ Update it at the end of each session.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
 - Phase 6 specs: 019, 020, 021, 022, 024, 025, 027 are `done`. Still to build,
-  in this order: 028 (built, in review), 032 (with the 012/017 seat-back
-  refinement), 038 (refines 036), 034 (refines 013), 033 (refines 005 and 018),
-  029. Spec 036's technical-variables refinement goes in its own pull request
-  after 028.
+  in this order: 028 (built, in its second review), 032 (with the 012/017
+  seat-back refinement), 038 (refines 036), 034 (refines 013), 033 (refines 005
+  and 018), 029.
 
 ## Work in flight (not pushed)
 
 - Spec 028 (recap): worktree `.claude/worktrees/agent-a0e07b15eba7a1ec0`, branch
-  `feat/028-end-of-game-recap`, on 4c0893a (PR #10's head, merged as a788056):
-  tests b20a506, server bb654af (`nock.recap`, share token, routes), client
-  a515887 (recap dialog, public share page), and 0e476fd, spec 018's
-  `test_ac1_register_room_records_the_room_in_the_store` updated for spec 028's
-  share token. Static checks and every test without a browser pass; its
-  Chromium browser gate passed before the rebase. The reviewer is at work. Then
-  `git rebase --onto origin/main 4c0893a` (a no-op in content) and its own pull
-  request.
-- Spec 036 refinement ("technical variables should not contain special
-  characters"): worktree `.claude/worktrees/spec-036`, branch `spec-036`, on
-  20f7fed: spec 37561cc and a31544b (`NOCK_HOST` takes ASCII letters, ASCII
-  digits, `.`, `-` and `:` in an IPv6 address; `NOCK_DATABASE` refuses
-  categories Cc, Cf, Zl and Zp except U+200C and U+200D; the message shows
-  `repr(value)`; an empty `NOCK_DATABASE` counts as unset, refining spec 018),
-  tests 2de5d91 and 22f9951 (AC-10 to AC-12 in their own file). The implementer
-  is at work (`src/nock/__main__.py`, `server.py:134`, README); then the review.
+  `feat/028-end-of-game-recap`, on fa0ad39. First review: REQUEST CHANGES, four
+  test gaps (a rejoin's place, one name per team member, spec 024's fade rule in
+  the toolbar checks, checks before the dialog loads), all fixed, with the
+  suggestions: a departed player's swatch hatched as spec 019's band (decision
+  13), one copy helper, `{time}` in spec 035's list, spec 032 deleting share
+  tokens. Commits: spec efe1b28 and 7bcdd0c, tests 4f68a41, code e553852. The
+  second (last) review is at work; its leftovers go to the human in the pull
+  request description.
+- Follow-ups noted from spec 028's first review: spec 035's scan accepts any
+  "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
+  values, a spec 035 refinement); four files time something in the parallel pass
+  (`test_spec_013_ac02_selections.py`, `test_spec_015_ac01_relay_to_the_others.py`,
+  `test_spec_025_ac07_vote_banner.py`, `test_spec_026_ac01_ac03_grid_solved.py`)
+  while CLAUDE.md says such files go in `SERIAL_TEST_FILES` (a tooling fix).
 - A tool call can turn a typed `\uXXXX` into the character itself: the first
   draft of spec 036 held six raw invisible characters, U+202E among them. Write
   such characters as `\N{NAME}` in code and as typed escapes in specs, and scan
@@ -68,7 +69,7 @@ Update it at the end of each session.
 
 1. Keep the open pull request green until the human merges it; answer its
    review comments.
-2. Then spec 028 in its own pull request (above), then spec 036's refinement.
+2. Then spec 028 in its own pull request (above), then the two follow-ups.
 3. Then the rest of Phase 6 in the order above, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and
@@ -194,6 +195,9 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 - A separate cloud session ("Nock hosting plan (document only)") drafts
   `docs/hosting.md` on branch `docs/hosting-plan`.
+- Another cloud session, "Nock graphical design ideas (no code)"
+  (session_011p3hVBtTSdr7LXMomuHkez, opened 2026-10-16 at the human's request),
+  brews design directions with the human: ideas only, no file, no code.
 - Visual design, for the human to take up later (2026-10-16, after seeing the
   app for the first time, from screenshots): the app works but has no visual
   design (browser-default buttons, everything stacked above the grid, a narrow
