@@ -1,7 +1,7 @@
 ---
 id: "028"
 title: End-of-game recap
-status: approved
+status: done
 ---
 
 # 028 - End-of-game recap
@@ -10,6 +10,11 @@ status: approved
 
 (Note from the lead, 2026-10-15: folded in. The answers are decisions 8 to 12, and
 "Open questions" is empty.)
+
+(Note from the lead, 2026-10-16: refined after the first review of spec 028 with
+decision 13 below. AC-2 changed (a departed player's swatch is hatched, as in spec
+019), so the test-writer updates its test before the implementer runs (first review
+of spec 028).)
 
 Epic E7 Completion and recap (US-7.2) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
@@ -130,13 +135,25 @@ def build_recap(state: RoomState, log: Sequence[LogEntry]) -> Recap:
 
     Raises:
         ValueError: `state.solved` is False, or those entries are not exactly
-            seq 1 to state.seq, in order, with one `grid_solved` among them.
+            seq 1 to state.seq, in order, with one `grid_solved` among them, or
+            a clue of the grid has no word (`Grid.word_cells` raises ValueError
+            for it). An imported grid has no such clue (spec 003).
     """
 
 
 def public_recap(recap: Recap) -> PublicRecap:
     """Return what the share page shows: grid number, time and team."""
 ```
+
+(Note from the lead, 2026-10-16: the `ValueError` list of `build_recap` gained its
+third reason. Since the first review the code raises when a clue of the grid has no
+word (its arrow points outside the grid or to a cell that is not a letter cell),
+where it used to skip that clue without a sign; the list had stopped at two reasons.
+An imported grid has no such clue, because `import_grid` refuses those arrows (spec
+003 AC-1), so a room made from an imported grid never raises for this reason.
+`room_recap` then gives None, as for the other two reasons: its docstring below
+already says "or when build_recap raises ValueError", so it does not change. Wording
+only: no behaviour and no criterion changes (second review of spec 028).)
 
 `sum(player.letters for player in recap.players) + recap.revealed_letters ==
 recap.letter_cells` holds for every recap (AC-4), and so does
@@ -241,8 +258,8 @@ with the room socket, and reads `rooms.clock`.
     `data-player-id`, `data-letters`, `data-words`, `data-you` (`true` for the
     page's `you`), and holds `data-testid="recap-colour"`, a swatch with
     `data-colour` set as spec 019 sets an author mark's (the player's colour index
-    when the kept snapshot lists the player, else `""`, a neutral grey that is none
-    of the eight player colours); `data-testid="recap-name"`, the nickname as text
+    when the kept snapshot lists the player, else `""`) and drawn as "The swatch of
+    a recap player" below says; `data-testid="recap-name"`, the nickname as text
     (`t("feed.someone")` when it is null); `t("roster.you")` in its own element on
     my row; `data-testid="recap-letters"` with `t("recap.player_letters", { count })`;
     and `data-testid="recap-words"` with `t("recap.player_words", { count })`;
@@ -254,6 +271,22 @@ with the room socket, and reads `rooms.clock`.
     `t("room.share.copied")` for 2 seconds after a successful copy; nothing changes
     without a usable clipboard);
   - `data-testid="recap-close"`: a button with `t("recap.close")`.
+- The swatch of a recap player (`recap-colour`). With a colour index (`0` to `7`)
+  its computed `background-image` is `none`. With `data-colour=""` it is hatched,
+  never a plain colour, as spec 019 hatches a departed author's band ("The view,
+  switch on"): its computed `background-image` is a `repeating-linear-gradient`
+  whose line is diagonal (an angle that is not a whole multiple of 90 degrees, or
+  a corner keyword such as `to top right`) and whose colour stops hold at least
+  two different colours, and each colour of the swatch (its computed
+  `background-color` and those stops; a colour with alpha 0 does not count) is a
+  grey, its red, green and blue channels within 8 of each other, so none is a
+  player colour. So a departed player's swatch differs from every player's by its
+  pattern, not by its colour. (Note from the lead, 2026-10-16: added. The "Contents"
+  item above used to say "else `""`, a neutral grey that is none of the eight
+  player colours". A plain grey has almost the lightness of red, teal and olive,
+  so colour-blind players read it as a player colour; spec 019 stopped using one
+  on 2026-10-15 (its decision 10), and the swatch follows it, decision 13 (first
+  review of spec 028).)
 - The dialog lies inside the window at every window size; when its content is
   taller, the dialog scrolls, and every control in it stays reachable with `Tab`.
   Every text is inserted as text (spec 037 AC-4).
@@ -350,7 +383,7 @@ checker reads every `fr.json` value as a pattern and must still flag `Loading…
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-7.2.1) (Python; HTTP; browser with mocked socket) The recap shows the total time, the checks used and the reveals used. Python: `build_recap(state, log)` after `PLAY_R` gives `elapsed_ms == 754000`, `checks == 2`, `letter_reveals == 1`, `word_reveals == 1`, `grid_number == 1`, `letter_cells == 18` and `word_count == 8`. HTTP: two clients, Ana and Bob, solve a FX-01 room over the room socket, Ana having sent one grid check after five letters; `GET /api/rooms/<code>/recap` answers 200 with a body that parses to `Recap` with `checks == 1`, `letter_reveals == 0`, `word_reveals == 0`, and `elapsed_ms` equal to that of the `grid_solved` both clients received. Browser: on the solved page, the route answering a `Recap` with `elapsed_ms` 754,000, `checks` 2, `letter_reveals` 1 and `word_reveals` 1, a click on `recap-open` opens `recap`, where `recap-time` reads `Temps : 12:34`, `recap-checks` reads `Vérifications : 2` and `recap-reveals` reads `Révélations : 1 lettres et 1 mots`.
-- **AC-2** (AC-7.2.2) (Python; browser with mocked socket) For each player, the recap shows the final letters they authored. Python: after `PLAY_R`, `players` is `p1` (`Ana`, 8 letters) then `p2` (`Bob`, 5 letters), neither removed; after `PLAY_W`, `p1` has 10 letters and `p2` 8. In a variant of `PLAY_W` where, right after `p1`'s first four letters, `p2` writes `X` at (1, 1) and then undoes it (spec 018: the cell gets back `A`, authored by the undoer), `p1` has 9 letters and `p2` 9: (1, 1) counts for `p2`, as spec 019 says. Browser: with the route answering `players` `p1` (`Ana`, 8 letters, 4 words) and `p2` (`Bob`, 5 letters, 3 words), `recap-players` holds two `recap-player` in that order; `p1`'s row has `data-you="true"`, `recap-name` `Ana`, an element reading `fr.json["roster.you"]`, `recap-letters` `8 lettres` and `recap-words` `4 mots complétés`; `p2`'s row reads `Bob`, `5 lettres` and `3 mots complétés`; each `recap-colour` has the `data-colour` of the player's `roster-colour` (`0` and `1`), and after a `player_left` of `p2` (reason `timed_out`) applied before opening, `p2`'s swatch has `data-colour=""`.
+- **AC-2** (AC-7.2.2) (Python; browser with mocked socket) For each player, the recap shows the final letters they authored. Python: after `PLAY_R`, `players` is `p1` (`Ana`, 8 letters) then `p2` (`Bob`, 5 letters), neither removed; after `PLAY_W`, `p1` has 10 letters and `p2` 8. In a variant of `PLAY_W` where, right after `p1`'s first four letters, `p2` writes `X` at (1, 1) and then undoes it (spec 018: the cell gets back `A`, authored by the undoer), `p1` has 9 letters and `p2` 9: (1, 1) counts for `p2`, as spec 019 says. Browser: with the route answering `players` `p1` (`Ana`, 8 letters, 4 words) and `p2` (`Bob`, 5 letters, 3 words), `recap-players` holds two `recap-player` in that order; `p1`'s row has `data-you="true"`, `recap-name` `Ana`, an element reading `fr.json["roster.you"]`, `recap-letters` `8 lettres` and `recap-words` `4 mots complétés`; `p2`'s row reads `Bob`, `5 lettres` and `3 mots complétés`; each `recap-colour` has the `data-colour` of the player's `roster-colour` (`0` and `1`); and after a `player_left` of `p2` (reason `timed_out`) applied before opening, `p2`'s swatch has `data-colour=""` and is hatched: its computed `background-image` is a diagonal `repeating-linear-gradient` whose colours, like all the swatch's colours, are greys ("The swatch of a recap player"). In both states (`p2` in the room, and after the `player_left`), the computed `background-image` of a swatch with a colour index is `none`. (Note from the lead, 2026-10-16: the browser part used to end at "`p2`'s swatch has `data-colour=""`", with no check of how a swatch looks. A departed player's swatch is now hatched as spec 019's band is, and the others have no pattern; decision 13 (first review of spec 028).)
 - **AC-3** (AC-7.2.2) (Python) For each player, the recap counts the words they completed by writing the last missing letter. After `PLAY_W`: `p2` has 5 words (TAMIS and SENT with one letter at (1, 4), VIDE, AMEN after `p1`'s erase, MIME) and `p1` has 3 (NAVAL, then IDES and LEST with one letter at (4, 3)). After `PLAY_R`: `p1` has 4 words (TAMIS, NAVAL, MIME, IDES), `p2` has 3 (VIDE, AMEN, SENT), and LEST, filled by the word reveal, counts for nobody.
 - **AC-4** (AC-7.2.3) (Python; HTTP) Revealed letters are credited to nobody, and the players' letters plus the revealed letters equal the grid's letter cells: 18 on FX-01. Python: after `PLAY_R`, `revealed_letters == 5`, no player's letters include a cell of (0, 1), (4, 1), (4, 2), (4, 3) or (4, 4), and `8 + 5 + 5 == 18 == letter_cells`; after `PLAY_W`, `revealed_letters == 0` and `10 + 8 == 18`. HTTP: in a game over the room socket where Bob reveals (0, 1) and Ana and Bob type the 17 other letters, the recap's player letters sum to 17 and `revealed_letters` is 1.
 - **AC-5** (AC-7.2.4) (HTTP; browser with live server, its copy check Chromium only) A share link shows the time and the team. HTTP: in a FX-01 room where Ana (host), Bob and Cy join, Ana removes Cy (spec 014), and Ana and Bob solve the grid, the recap's `share_path` is `/recap/<token>` with the room's share token; `GET /api/recaps/<token>` answers 200 with a body that parses to `PublicRecap(grid_number=1, elapsed_ms=<the recap's>, team=("Ana", "Bob"))`, while the recap's `players` lists Cy with `removed` True, 0 letters and 0 words; `GET /recap/<token>` answers 200 with `index.html`. Browser: Ana and Bob solve a FX-01 room on the live server; on Ana's page `recap-open` opens the recap, whose `recap-share-link` has `href` and text `<base_url>/recap/<token>`; a third browser context opens that URL: `recap-page` shows `share-team` reading `Équipe : Ana, Bob` and `share-time` reading `fr.json["recap.time"]` with the time of `GET /api/recaps/<token>` written as spec 027 writes it; the page shows no `room-page` and no `nickname-form`, and opens no WebSocket (Playwright's `page.on("websocket")` records none). Chromium only: a click on `recap-copy` puts that URL in the clipboard and the button then reads `fr.json["room.share.copied"]`.
@@ -358,7 +391,7 @@ The words in brackets say how each criterion is tested.
 - **AC-7** (new) (browser with mocked socket) The recap opens only on request and never blocks the grid. On an unsolved FX-01 page there is no `recap-open`. After the mock sends `grid_solved` (seq 6), `recap-open` shows in `room-toolbar` right after `chat-toggle`, no `recap` dialog is open, a click on the cell (1, 0) still selects it (`data-selected-row="1"`, spec 026 AC-5) and no request to `/api/rooms/ABC123/recap` was made. A click on `recap-open` makes one such request and opens `recap` with the focus inside it; `Escape` closes it and the focus is on `recap-open`; opened again, a click on `recap-close` closes it the same way. With the route answering 404, the dialog shows `recap-error` with `fr.json["recap.error"]`. A page whose first snapshot is already solved shows `recap-open` too.
 - **AC-8** (new) (Python; HTTP with a fake clock) The recap exists only for a solved room, and wrong room codes count against spec 011's throttle. Python: `build_recap` raises `ValueError` for the room of `PLAY_R` one step before the solve, and for `PLAY_R`'s solved state with the entry of seq 12 left out of `log`; `public_recap(build_recap(...))` after `PLAY_R` has `team == ("Ana", "Bob")`. HTTP: `GET /api/rooms/<code>/recap` of a room that is not solved answers 404 and records no failure; `GET /api/rooms/ZZZZZZ/recap` answers 404 ten times; the eleventh recap request, for an existing solved room, answers 429 with `{"detail": "Too Many Requests"}`, and a socket to that room is then closed with 4429 (spec 011); after `advance(60)` the recap request answers 200. `GET /api/recaps/<token>` of an unsolved room's token, of `tok_unknown_0123456789` and of `a b` answers 404 with `{"detail": "Not Found"}`, and so does `GET /recap/<token>` of each; none of these is counted by the throttle.
 - **AC-9** (new) (Python with a `RoomStore`) The share token and the recap survive a server restart. A `RoomStore` on a file holds a FX-01 room created with `create_room(new_room(..., share_token="tok_ABCDEFGHIJKLMNOP"))` and `PLAY_R`'s entries appended; `code_for_share_token("tok_ABCDEFGHIJKLMNOP")` returns its code and `code_for_share_token("tok_unknown_0123456789")` returns None. A new `RoomRegistry` on that store gives `room_recap(code) == build_recap(live_state, log)` of `PLAY_R`, and `shared_recap("tok_ABCDEFGHIJKLMNOP")` gives its `public_recap`, the room being loaded from the store. Rooms from `register_room` get distinct share tokens matching `^[A-Za-z0-9_-]{16,64}$`, different from their codes, and no `Snapshot` sent to a client holds the token.
-- **AC-10** (new) (browser with mocked socket) The recap dialog and the share page are accessible and fit every window. With the route answering the recap of AC-2 plus a `share_path`: at each window size of spec 006 AC-5, in desktop and touch contexts, the open `recap` lies inside the window (1 px tolerance), and `recap-close`, `recap-copy` and `recap-share-link` can each get the focus with `Tab` inside it; on the solved page, every check of spec 013 AC-6 holds and spec 024 AC-8's toolbar checks hold with `recap-open` among the toolbar's buttons, and on the four small windows, with the toolbar's `scrollLeft` at 0, the left edge of `recap-open` lies inside the toolbar's client area, so the button shows at least in part before any sideways scroll. At 1280 by 720, `tab_to` reaches `recap-open` with spec 035 AC-2's outline, and `Enter` opens the dialog. At 1280 by 720 and 360 by 740, with the dialog open, and on the share page (its API route answered by `page.route`), spec 035's contrast scan finds no offending element and its language scan finds no text outside `fr.json` and the test's data (it accepts `Temps : 12:34`, `8 lettres`, `Équipe : Ana, Bob` and the share URL). Nicknames `<b>Eve</b>` and `<img src=x>` in the recap and the team show as text, with no `b` or `img` element.
+- **AC-10** (new) (browser with mocked socket) The recap dialog and the share page are accessible and fit every window. With the route answering the recap of AC-2 plus a `share_path`: at each window size of spec 006 AC-5, in desktop and touch contexts, the open `recap` lies inside the window (1 px tolerance), and `recap-close`, `recap-copy` and `recap-share-link` can each get the focus with `Tab` inside it; on the solved page, every check of spec 013 AC-6 holds and spec 024 AC-8's toolbar checks hold with `recap-open` among the toolbar's buttons, and on the four small windows, with the toolbar's `scrollLeft` at 0, the left edge of `recap-open` lies inside the toolbar's client area, so the button shows at least in part before any sideways scroll. At 1280 by 720, `tab_to` reaches `recap-open` with spec 035 AC-2's outline, and `Enter` opens the dialog. At 1280 by 720 and 360 by 740, with the dialog open, and on the share page (its API route answered by `page.route`), spec 035's contrast scan finds no offending element and its language scan finds no text outside `fr.json` and the test's data (it accepts `Temps : 12:34`, `8 lettres` and `Équipe : Ana, Bob` because each matches a `fr.json` value read as a pattern, `Temps : {time}`, `{count} lettres` and `Équipe : {names}`; the share URL and the nicknames are the test's data). (Note from the lead, 2026-10-16: the parenthesis used to read "(it accepts `Temps : 12:34`, `8 lettres`, `Équipe : Ana, Bob` and the share URL)", which looked like a list of test data. Only the share URL and the nicknames are test data ("Test harness"); the three texts pass because they match `fr.json` values (first review of spec 028).) Nicknames `<b>Eve</b>` and `<img src=x>` in the recap and the team show as text, with no `b` or `img` element.
 
 ## Edge cases and errors
 
@@ -379,9 +412,13 @@ The words in brackets say how each criterion is tested.
 - Pencil letters (AC-2, AC-3): a pencil letter fills its cell and has an author;
   a confirmation makes the confirmer the author (spec 019, spec 020).
 - Departed players (AC-2, AC-5): a player who timed out or was removed keeps their
-  row and their letters; on the page their swatch is the neutral grey of spec 019,
-  since their colour may now be someone else's. A removed player with no letter and
-  no word gets no row, and the share page never names a removed player.
+  row and their letters; on the page their swatch is hatched, as spec 019 hatches a
+  departed author's band, never a plain colour, since their colour may now be
+  someone else's. A removed player with no letter and no word gets no row, and the
+  share page never names a removed player. (Note from the lead, 2026-10-16: "their
+  swatch is hatched, as spec 019 hatches a departed author's band, never a plain
+  colour" used to read "their swatch is the neutral grey of spec 019"; spec 019
+  hatches that band since 2026-10-15, decision 13 (first review of spec 028).)
 - Rejoined players (AC-2): a player who timed out and came back with their stored
   token is seated back with the same id (spec 032 AC-7), so the recap has one row
   for them, and their letters and words count once. For example, in a log where
@@ -476,7 +513,27 @@ open question.
     decision 11), a player who times out and comes back with their token keeps one
     id, so their letters and words count once. "Players" now lists a player id with
     several `player_joined` entries once, "Team" follows that order, and the edge
-    case "Rejoined players" says so.
+    case "Rejoined players" says so. (Note from the lead, 2026-10-16: "the neutral
+    band" is a hatched band since 2026-10-15 (spec 019's decision 10), no longer a
+    plain one. The swatch follows it, and AC-2 gained a check for it; decision 13
+    (first review of spec 028).)
+
+Decided by the lead on 2026-10-16, after the first review of spec 028, under the
+human's delegation of accessibility choices. Each one is already part of the spec
+above. (Note from the lead, 2026-10-16: this group was added (first review of spec
+028).)
+
+13. A departed player's swatch (AC-2). Options: (a) a plain grey, as this spec
+    first said ("a neutral grey that is none of the eight player colours"; the
+    first build drew `#767676`); (b) spec 019's hatching, the diagonal stripes of
+    greys that its decision 10 gave a departed author's band on 2026-10-15. Pick:
+    (b). A plain mid-grey has almost the lightness of red, teal and olive, so
+    colour-blind players read it as a player colour, which is the finding that made
+    spec 019 hatch its band. The recap thus shows a player who is no longer in the
+    room the way the authors view does, and the swatch differs from every
+    player's by its pattern, not by its colour (a player's swatch has a
+    `background-image` of `none`). It is one hatching shared by every departed
+    player; their nicknames, always written (decision 7), tell them apart.
 
 ## Open questions
 

@@ -160,5 +160,22 @@
   "timer.minutes_seconds": "{minutes}:{seconds}",
   "timer.hours_minutes_seconds": "{hours}:{minutes}:{seconds}",
   "timer.toggle": "⏱",
-  "timer.toggle_label": "Afficher le chrono"
+  "timer.toggle_label": "Afficher le chrono",
+  "recap.open": "Voir le bilan",
+  "recap.heading": "Bilan de la partie",
+  "recap.loading": "Chargement du bilan…",
+  "recap.error": "Le bilan n'est pas disponible.",
+  "recap.time": "Temps : {time}",
+  "recap.checks": "Vérifications : {count}",
+  "recap.reveals": "Révélations : {letters} lettres et {words} mots",
+  "recap.players_heading": "Qui a fait quoi",
+  "recap.player_letters": "{count} lettres",
+  "recap.player_words": "{count} mots complétés",
+  "recap.revealed_letters": "Lettres révélées : {count}",
+  "recap.share_label": "Lien à partager",
+  "recap.close": "Fermer",
+  "share.heading": "Grille terminée",
+  "share.team": "Équipe : {names}",
+  "share.home": "Voir les grilles",
+  "share.error": "Ce bilan n'est pas disponible."
 }

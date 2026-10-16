@@ -15,6 +15,15 @@
      background a letter cell can have. */
   --author-departed-dark: #333333;
   --author-departed-light: #ffffff;
+
+  /* The hatching of a player who is no longer in the room: diagonal stripes of
+     those two greys, 2px each, a pattern no player colour has. The band of the
+     authors view (spec 019) and the swatch of the recap (spec 028) both use it. */
+  --author-departed-hatching: repeating-linear-gradient(
+    45deg,
+    var(--author-departed-dark) 0 2px,
+    var(--author-departed-light) 2px 4px
+  );
 }
 
 body {

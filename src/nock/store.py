@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS log (
     entry_json TEXT NOT NULL,
     PRIMARY KEY (code, seq)
 );
+CREATE TABLE IF NOT EXISTS share_tokens (
+    token TEXT PRIMARY KEY,
+    code TEXT NOT NULL REFERENCES rooms (code)
+);
 """
 
 
@@ -60,19 +64,31 @@ class RoomStore:
         self._connection.executescript(_TABLES)
 
     def create_room(self, state: RoomState) -> None:
-        """Record a new room and `state` as its first snapshot.
+        """Record a new room, its share token and `state` as its first snapshot.
+
+        The share token (spec 028) is kept apart, so that `code_for_share_token`
+        finds the room.
 
         Raises:
-            ValueError: a room with `state.code` already exists.
+            ValueError: a room with `state.code` already exists, or another room
+                has the share token `state.share_token`.
         """
         with self._lock:
             if self._room_exists(state.code):
                 raise ValueError(f"A room with code {state.code} already exists")
+            token = state.share_token
+            if token is not None and self._code_of_token(token) is not None:
+                raise ValueError(f"A room with share token {token} already exists")
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 self._connection.execute(
                     "INSERT INTO rooms (code) VALUES (?)", (state.code,)
                 )
+                if token is not None:
+                    self._connection.execute(
+                        "INSERT INTO share_tokens (token, code) VALUES (?, ?)",
+                        (token, state.code),
+                    )
                 self._insert_snapshot(state)
             except BaseException:
                 self._connection.execute("ROLLBACK")
@@ -83,6 +99,14 @@ class RoomStore:
         """Tell whether room `code` exists in the store."""
         with self._lock:
             return self._room_exists(code)
+
+    def code_for_share_token(self, token: str) -> str | None:
+        """Return the code of the room created with this share token, or None.
+
+        A room created before spec 028 has no share token, so no token finds it.
+        """
+        with self._lock:
+            return self._code_of_token(token)
 
     def append(self, code: str, entries: Sequence[LogEntry]) -> None:
         """Append `entries` to the log of room `code`, committed before returning.
@@ -183,6 +207,15 @@ class RoomStore:
             "SELECT 1 FROM rooms WHERE code = ?", (code,)
         ).fetchone()
         return row is not None
+
+    def _code_of_token(self, token: str) -> str | None:
+        """Return the code of the room with this share token. The caller locks."""
+        row = self._connection.execute(
+            "SELECT code FROM share_tokens WHERE token = ?", (token,)
+        ).fetchone()
+        if row is None:
+            return None
+        return str(row[0])
 
     def _last_seq(self, code: str) -> int:
         """Return the highest logged seq, or the first snapshot's seq.

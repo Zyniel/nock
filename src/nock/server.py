@@ -1,4 +1,4 @@
-"""FastAPI app: serves the built web client and the room WebSocket."""
+"""FastAPI app: serves the built web client, the room WebSocket and the recaps."""
 
 from __future__ import annotations
 
@@ -150,6 +150,18 @@ class _RoomsHolder:
 def _not_found() -> HTTPException:
     """Return the 404 error with FastAPI's usual body."""
     return HTTPException(status_code=404, detail="Not Found")
+
+
+def _too_many_requests() -> HTTPException:
+    """Return the 429 error of an address throttled for wrong room codes."""
+    return HTTPException(status_code=429, detail="Too Many Requests")
+
+
+def _client_address(connection: Request | WebSocket) -> str:
+    """Return the address of the client of a request or a socket."""
+    if connection.client is None:
+        return "unknown"
+    return connection.client.host
 
 
 def _index_response(dist_dir: Path) -> Response:
@@ -326,6 +338,12 @@ def create_app(
         _published_entry(grid_catalogue, grid_number_regex, number)
         return _index_response(client_dir)
 
+    @web_app.get("/recap/{token}", include_in_schema=False)
+    def serve_shared_recap(token: str) -> Response:
+        if holder.get().shared_recap(token) is None:
+            raise _not_found()
+        return _index_response(client_dir)
+
     @web_app.get("/api/grids")
     def list_grids(
         force: Annotated[str | None, Query(pattern=FORCE_PATTERN)] = None,
@@ -355,6 +373,30 @@ def create_app(
         base_url = str(request.base_url).rstrip("/")
         return CreateRoomResponse(code=code, share_url=f"{base_url}/r/{code}")
 
+    # Spec 028. A wrong code counts against the throttle of the room socket, so
+    # this route cannot be used to test room codes at full speed.
+    @web_app.get("/api/rooms/{code}/recap")
+    def get_room_recap(code: str, request: Request) -> dict[str, object]:
+        room_registry = holder.get()
+        address = _client_address(request)
+        now = room_registry.clock()
+        if wrong_codes.is_blocked(address, now):
+            raise _too_many_requests()
+        if room_registry.room_state(code) is None:
+            wrong_codes.record_failure(address, now)
+            raise _not_found()
+        recap = room_registry.room_recap(code)
+        if recap is None:
+            raise _not_found()
+        return recap.model_dump(mode="json")
+
+    @web_app.get("/api/recaps/{token}")
+    def get_shared_recap(token: str) -> dict[str, object]:
+        shared = holder.get().shared_recap(token)
+        if shared is None:
+            raise _not_found()
+        return shared.model_dump(mode="json")
+
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:
         return _file_in_directory(client_dir / "assets", file_name)
@@ -369,7 +411,7 @@ def create_app(
     async def room_socket(websocket: WebSocket, code: str) -> None:
         room_registry = holder.get()
         await websocket.accept()
-        address = websocket.client.host if websocket.client is not None else "unknown"
+        address = _client_address(websocket)
         now = room_registry.clock()
         if wrong_codes.is_blocked(address, now):
             await websocket.close(code=THROTTLED_CLOSE_CODE)
