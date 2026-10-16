@@ -1,7 +1,7 @@
 // How a page shows a nickname (spec 040). The server stores and sends every
 // nickname in capitals (spec 012 decision 12); a page shows it with capitalised
-// words. Only for what a page shows: what it keeps, stores or sends is the
-// nickname as the server sent it.
+// words. displayNickname is only for what a page shows: a page never rewrites
+// with it what it keeps, stores or sends.
 
 // A character right after one of these starts a word.
 const WORD_SEPARATORS = " -'’"

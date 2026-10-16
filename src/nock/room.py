@@ -503,7 +503,8 @@ def normalize_nickname(text: str) -> str:
         made of letters, combining marks, ASCII digits and NICKNAME_PUNCTUATION,
         with at least one letter or digit. The rules are checked on this result:
         `ß` gives `SS`, two characters. A name typed in small letters and the
-        same name typed in capitals give the same result.
+        same name typed in the capitals that `str.upper()` gives have the same
+        result.
 
     Raises:
         ValueError: a rule is broken; the message names the rule.
