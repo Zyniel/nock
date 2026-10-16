@@ -11,6 +11,11 @@ status: approved
 (Note from the lead, 2026-10-15: folded in. The answers are decisions 8 to 12, and
 "Open questions" is empty.)
 
+(Note from the lead, 2026-10-16: refined after the first review of spec 028 with
+decision 13 below. AC-2 changed (a departed player's swatch is hatched, as in spec
+019), so the test-writer updates its test before the implementer runs (first review
+of spec 028).)
+
 Epic E7 Completion and recap (US-7.2) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
 engine (`nock.room`, `nock.hub`, `new_room`, `register_room`, the wrong-code
@@ -241,8 +246,8 @@ with the room socket, and reads `rooms.clock`.
     `data-player-id`, `data-letters`, `data-words`, `data-you` (`true` for the
     page's `you`), and holds `data-testid="recap-colour"`, a swatch with
     `data-colour` set as spec 019 sets an author mark's (the player's colour index
-    when the kept snapshot lists the player, else `""`, a neutral grey that is none
-    of the eight player colours); `data-testid="recap-name"`, the nickname as text
+    when the kept snapshot lists the player, else `""`) and drawn as "The swatch of
+    a recap player" below says; `data-testid="recap-name"`, the nickname as text
     (`t("feed.someone")` when it is null); `t("roster.you")` in its own element on
     my row; `data-testid="recap-letters"` with `t("recap.player_letters", { count })`;
     and `data-testid="recap-words"` with `t("recap.player_words", { count })`;
@@ -254,6 +259,22 @@ with the room socket, and reads `rooms.clock`.
     `t("room.share.copied")` for 2 seconds after a successful copy; nothing changes
     without a usable clipboard);
   - `data-testid="recap-close"`: a button with `t("recap.close")`.
+- The swatch of a recap player (`recap-colour`). With a colour index (`0` to `7`)
+  its computed `background-image` is `none`. With `data-colour=""` it is hatched,
+  never a plain colour, as spec 019 hatches a departed author's band ("The view,
+  switch on"): its computed `background-image` is a `repeating-linear-gradient`
+  whose line is diagonal (an angle that is not a whole multiple of 90 degrees, or
+  a corner keyword such as `to top right`) and whose colour stops hold at least
+  two different colours, and each colour of the swatch (its computed
+  `background-color` and those stops; a colour with alpha 0 does not count) is a
+  grey, its red, green and blue channels within 8 of each other, so none is a
+  player colour. So a departed player's swatch differs from every player's by its
+  pattern, not by its colour. (Note from the lead, 2026-10-16: added. The "Contents"
+  item above used to say "else `""`, a neutral grey that is none of the eight
+  player colours". A plain grey has almost the lightness of red, teal and olive,
+  so colour-blind players read it as a player colour; spec 019 stopped using one
+  on 2026-10-15 (its decision 10), and the swatch follows it, decision 13 (first
+  review of spec 028).)
 - The dialog lies inside the window at every window size; when its content is
   taller, the dialog scrolls, and every control in it stays reachable with `Tab`.
   Every text is inserted as text (spec 037 AC-4).
@@ -350,7 +371,7 @@ checker reads every `fr.json` value as a pattern and must still flag `Loading…
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-7.2.1) (Python; HTTP; browser with mocked socket) The recap shows the total time, the checks used and the reveals used. Python: `build_recap(state, log)` after `PLAY_R` gives `elapsed_ms == 754000`, `checks == 2`, `letter_reveals == 1`, `word_reveals == 1`, `grid_number == 1`, `letter_cells == 18` and `word_count == 8`. HTTP: two clients, Ana and Bob, solve a FX-01 room over the room socket, Ana having sent one grid check after five letters; `GET /api/rooms/<code>/recap` answers 200 with a body that parses to `Recap` with `checks == 1`, `letter_reveals == 0`, `word_reveals == 0`, and `elapsed_ms` equal to that of the `grid_solved` both clients received. Browser: on the solved page, the route answering a `Recap` with `elapsed_ms` 754,000, `checks` 2, `letter_reveals` 1 and `word_reveals` 1, a click on `recap-open` opens `recap`, where `recap-time` reads `Temps : 12:34`, `recap-checks` reads `Vérifications : 2` and `recap-reveals` reads `Révélations : 1 lettres et 1 mots`.
-- **AC-2** (AC-7.2.2) (Python; browser with mocked socket) For each player, the recap shows the final letters they authored. Python: after `PLAY_R`, `players` is `p1` (`Ana`, 8 letters) then `p2` (`Bob`, 5 letters), neither removed; after `PLAY_W`, `p1` has 10 letters and `p2` 8. In a variant of `PLAY_W` where, right after `p1`'s first four letters, `p2` writes `X` at (1, 1) and then undoes it (spec 018: the cell gets back `A`, authored by the undoer), `p1` has 9 letters and `p2` 9: (1, 1) counts for `p2`, as spec 019 says. Browser: with the route answering `players` `p1` (`Ana`, 8 letters, 4 words) and `p2` (`Bob`, 5 letters, 3 words), `recap-players` holds two `recap-player` in that order; `p1`'s row has `data-you="true"`, `recap-name` `Ana`, an element reading `fr.json["roster.you"]`, `recap-letters` `8 lettres` and `recap-words` `4 mots complétés`; `p2`'s row reads `Bob`, `5 lettres` and `3 mots complétés`; each `recap-colour` has the `data-colour` of the player's `roster-colour` (`0` and `1`), and after a `player_left` of `p2` (reason `timed_out`) applied before opening, `p2`'s swatch has `data-colour=""`.
+- **AC-2** (AC-7.2.2) (Python; browser with mocked socket) For each player, the recap shows the final letters they authored. Python: after `PLAY_R`, `players` is `p1` (`Ana`, 8 letters) then `p2` (`Bob`, 5 letters), neither removed; after `PLAY_W`, `p1` has 10 letters and `p2` 8. In a variant of `PLAY_W` where, right after `p1`'s first four letters, `p2` writes `X` at (1, 1) and then undoes it (spec 018: the cell gets back `A`, authored by the undoer), `p1` has 9 letters and `p2` 9: (1, 1) counts for `p2`, as spec 019 says. Browser: with the route answering `players` `p1` (`Ana`, 8 letters, 4 words) and `p2` (`Bob`, 5 letters, 3 words), `recap-players` holds two `recap-player` in that order; `p1`'s row has `data-you="true"`, `recap-name` `Ana`, an element reading `fr.json["roster.you"]`, `recap-letters` `8 lettres` and `recap-words` `4 mots complétés`; `p2`'s row reads `Bob`, `5 lettres` and `3 mots complétés`; each `recap-colour` has the `data-colour` of the player's `roster-colour` (`0` and `1`); and after a `player_left` of `p2` (reason `timed_out`) applied before opening, `p2`'s swatch has `data-colour=""` and is hatched: its computed `background-image` is a diagonal `repeating-linear-gradient` whose colours, like all the swatch's colours, are greys ("The swatch of a recap player"). In both states (`p2` in the room, and after the `player_left`), the computed `background-image` of a swatch with a colour index is `none`. (Note from the lead, 2026-10-16: the browser part used to end at "`p2`'s swatch has `data-colour=""`", with no check of how a swatch looks. A departed player's swatch is now hatched as spec 019's band is, and the others have no pattern; decision 13 (first review of spec 028).)
 - **AC-3** (AC-7.2.2) (Python) For each player, the recap counts the words they completed by writing the last missing letter. After `PLAY_W`: `p2` has 5 words (TAMIS and SENT with one letter at (1, 4), VIDE, AMEN after `p1`'s erase, MIME) and `p1` has 3 (NAVAL, then IDES and LEST with one letter at (4, 3)). After `PLAY_R`: `p1` has 4 words (TAMIS, NAVAL, MIME, IDES), `p2` has 3 (VIDE, AMEN, SENT), and LEST, filled by the word reveal, counts for nobody.
 - **AC-4** (AC-7.2.3) (Python; HTTP) Revealed letters are credited to nobody, and the players' letters plus the revealed letters equal the grid's letter cells: 18 on FX-01. Python: after `PLAY_R`, `revealed_letters == 5`, no player's letters include a cell of (0, 1), (4, 1), (4, 2), (4, 3) or (4, 4), and `8 + 5 + 5 == 18 == letter_cells`; after `PLAY_W`, `revealed_letters == 0` and `10 + 8 == 18`. HTTP: in a game over the room socket where Bob reveals (0, 1) and Ana and Bob type the 17 other letters, the recap's player letters sum to 17 and `revealed_letters` is 1.
 - **AC-5** (AC-7.2.4) (HTTP; browser with live server, its copy check Chromium only) A share link shows the time and the team. HTTP: in a FX-01 room where Ana (host), Bob and Cy join, Ana removes Cy (spec 014), and Ana and Bob solve the grid, the recap's `share_path` is `/recap/<token>` with the room's share token; `GET /api/recaps/<token>` answers 200 with a body that parses to `PublicRecap(grid_number=1, elapsed_ms=<the recap's>, team=("Ana", "Bob"))`, while the recap's `players` lists Cy with `removed` True, 0 letters and 0 words; `GET /recap/<token>` answers 200 with `index.html`. Browser: Ana and Bob solve a FX-01 room on the live server; on Ana's page `recap-open` opens the recap, whose `recap-share-link` has `href` and text `<base_url>/recap/<token>`; a third browser context opens that URL: `recap-page` shows `share-team` reading `Équipe : Ana, Bob` and `share-time` reading `fr.json["recap.time"]` with the time of `GET /api/recaps/<token>` written as spec 027 writes it; the page shows no `room-page` and no `nickname-form`, and opens no WebSocket (Playwright's `page.on("websocket")` records none). Chromium only: a click on `recap-copy` puts that URL in the clipboard and the button then reads `fr.json["room.share.copied"]`.
@@ -379,9 +400,13 @@ The words in brackets say how each criterion is tested.
 - Pencil letters (AC-2, AC-3): a pencil letter fills its cell and has an author;
   a confirmation makes the confirmer the author (spec 019, spec 020).
 - Departed players (AC-2, AC-5): a player who timed out or was removed keeps their
-  row and their letters; on the page their swatch is the neutral grey of spec 019,
-  since their colour may now be someone else's. A removed player with no letter and
-  no word gets no row, and the share page never names a removed player.
+  row and their letters; on the page their swatch is hatched, as spec 019 hatches a
+  departed author's band, never a plain colour, since their colour may now be
+  someone else's. A removed player with no letter and no word gets no row, and the
+  share page never names a removed player. (Note from the lead, 2026-10-16: "their
+  swatch is hatched, as spec 019 hatches a departed author's band, never a plain
+  colour" used to read "their swatch is the neutral grey of spec 019"; spec 019
+  hatches that band since 2026-10-15, decision 13 (first review of spec 028).)
 - Rejoined players (AC-2): a player who timed out and came back with their stored
   token is seated back with the same id (spec 032 AC-7), so the recap has one row
   for them, and their letters and words count once. For example, in a log where
@@ -476,7 +501,27 @@ open question.
     decision 11), a player who times out and comes back with their token keeps one
     id, so their letters and words count once. "Players" now lists a player id with
     several `player_joined` entries once, "Team" follows that order, and the edge
-    case "Rejoined players" says so.
+    case "Rejoined players" says so. (Note from the lead, 2026-10-16: "the neutral
+    band" is a hatched band since 2026-10-15 (spec 019's decision 10), no longer a
+    plain one. The swatch follows it, and AC-2 gained a check for it; decision 13
+    (first review of spec 028).)
+
+Decided by the lead on 2026-10-16, after the first review of spec 028, under the
+human's delegation of accessibility choices. Each one is already part of the spec
+above. (Note from the lead, 2026-10-16: this group was added (first review of spec
+028).)
+
+13. A departed player's swatch (AC-2). Options: (a) a plain grey, as this spec
+    first said ("a neutral grey that is none of the eight player colours"; the
+    first build drew `#767676`); (b) spec 019's hatching, the diagonal stripes of
+    greys that its decision 10 gave a departed author's band on 2026-10-15. Pick:
+    (b). A plain mid-grey has almost the lightness of red, teal and olive, so
+    colour-blind players read it as a player colour, which is the finding that made
+    spec 019 hatch its band. The recap thus shows a player who is no longer in the
+    room the way the authors view does, and the swatch differs from every
+    player's by its pattern, not by its colour (a player's swatch has a
+    `background-image` of `none`). It is one hatching shared by every departed
+    player; their nicknames, always written (decision 7), tell them apart.
 
 ## Open questions
 

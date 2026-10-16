@@ -415,10 +415,16 @@ AC-11.)
     `{position}`, `{letters}`, `{words}`, `{hours}`, `{minutes}` and `{seconds}`.
     Every other placeholder matches one or more characters; in `fr.json` today
     these are `{name}`, `{names}`, `{clue}`, `{date}`, `{direction}`,
-    `{help_mode}`, `{reaction}` and `{code}` (a date reads `12 octobre 2026`, and
-    a room code holds letters, as in `Salon ABC123`). A spec that adds a key with
-    a placeholder that stands for a number adds its name to the list above, with
-    a dated note; until then that placeholder matches one or more characters.
+    `{help_mode}`, `{reaction}`, `{code}` and `{time}` (a date reads
+    `12 octobre 2026`, a room code holds letters, as in `Salon ABC123`, and a
+    time is filled whole, colons included, as in `Temps : 12:34`). (Note from the
+    lead, 2026-10-16: `{time}` was added to this list. Spec 028 added
+    `recap.time` (`Temps : {time}`), and spec 032 has `{time}` in
+    `my_rooms.last_activity`. It stands for a whole formatted time, `12:34`,
+    `1:02:05` or `10:30`, with colons, so it is not a number placeholder (first
+    review of spec 028).) A spec that adds a key with a placeholder that stands
+    for a number adds its name to the list above, with a dated note; until then
+    that placeholder matches one or more characters.
     (Note from the lead, 2026-10-16: added. Spec 027 added `timer.minutes_seconds`
     (`{minutes}:{seconds}`) and `timer.hours_minutes_seconds`
     (`{hours}:{minutes}:{seconds}`). While every placeholder matched one or more
