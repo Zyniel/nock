@@ -157,8 +157,14 @@ class RoomRegistry:
   private temporary file. Spec 036 AC-12 tests it: it replaces
   `nock.server.RoomStore`, the class the app calls when it starts, with a
   subclass that records the path. `python -m nock` also refuses, before the app
-  starts, a `NOCK_DATABASE` that holds a control character or another invisible
-  character (spec 036 AC-11).)
+  starts, a `NOCK_DATABASE` that holds a control character, a line or paragraph
+  separator, or a format character other than the zero width joiner and
+  non-joiner (Unicode categories Cc, Zl, Zp and Cf; spec 036 AC-11).) (Note from
+  the lead, 2026-10-16: "a control character or another invisible character"
+  became "a control character, a line or paragraph separator, or a format
+  character other than the zero width joiner and non-joiner", since spec 036
+  allows those two, which are invisible too, and refuses every other format
+  character, visible or not (review of spec 036's refinement).)
 - The production run command sets it, for example
   `NOCK_DATABASE=data/nock.sqlite3 uv run python -m nock` (the
   implementer documents it in `README.md`). (Note from the lead, 2026-10-15: the
