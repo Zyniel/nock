@@ -43,15 +43,25 @@ TEST_FILE_SPEC_PATTERN = re.compile(r"^test_spec_(\d{3})_")
 warmed_browser_ids: set[int] = set()
 WARM_UP_TIMEOUT_MS = 60_000
 
-# Test files whose tests measure time or pace, and so run serially. The two
-# scroll files time, in the page, how long a layout change takes to bring a
-# list back to its end (300 ms at most); with four workers that once took
-# 341 ms in WebKit on CI (2026-10-16).
+# Test files whose tests measure a duration or a pace (a latency percentile, a
+# time budget, a time window, a pacing), and so run serially. A check that only
+# waits up to a bound for a change (an `expect` within 300 ms) stays in the
+# parallel pass unless it flakes there. The two scroll files time, in the page,
+# how long a layout change takes to bring a list back to its end (300 ms at
+# most); with four workers that once took 341 ms in WebKit on CI (2026-10-16).
+# The relay of spec 015 (95 % within 100 ms) once failed in the parallel pass
+# while another agent's browsers loaded the machine (2026-10-16); spec 013's
+# relay, spec 025's banner window (2.5 to 4.5 s) and spec 026's solve budget
+# measure durations too.
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
+        "test_spec_013_ac02_selections.py",
         "test_spec_013_ac07_ac08_feed_scroll.py",
+        "test_spec_015_ac01_relay_to_the_others.py",
         "test_spec_022_ac10_pacing.py",
         "test_spec_022_ac11_ac12_chat_list_scroll.py",
+        "test_spec_025_ac07_vote_banner.py",
+        "test_spec_026_ac01_ac03_grid_solved.py",
         "test_spec_027_ac02_ac03_live_pages.py",
         "test_spec_036_ac01_time_budgets.py",
     }

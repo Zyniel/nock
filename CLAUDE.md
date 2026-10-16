@@ -72,7 +72,9 @@ write the implementation before its tests exist.
   per engine and system.
 - The gate runs the tests in parallel (pytest-xdist), then the timing-sensitive
   files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) on their own.
-  A test file that measures time or pace goes in that list.
+  A test file that measures a duration or a pace (a latency percentile, a time
+  budget, a time window) goes in that list; a check that only waits up to a
+  bound for a change stays in the parallel pass unless it flakes there.
 - The gate's engines come from `--browsers` or the `NOCK_BROWSERS` environment
   variable (default `chromium,webkit`).
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: the
