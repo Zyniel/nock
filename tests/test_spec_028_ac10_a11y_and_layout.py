@@ -8,13 +8,19 @@ toolbar readings; the button lists below add `recap-open`.
 
 Readings the spec leaves open:
 
-- On a solved page the three check buttons and `undo-button` are disabled (spec
-  026 AC-5), so they cannot take the keyboard focus. The keyboard test therefore
-  walks to `recap-open` only, and checks its box, its outline and its clipping with
-  spec 024 AC-8's readings; the "edge fade is not visible" rule of those readings
-  is left out, since `recap-open` is not the last button of the toolbar.
-- "Spec 024 AC-8's toolbar checks" for the other buttons (order, one row, hit at the
-  centre, pointer focus) run on the buttons of spec 027's list plus `recap-open`.
+- On a solved page `undo-button`, the three check buttons and the two reveal
+  buttons are disabled (spec 026 AC-5, spec 024 AC-7), so they cannot take the
+  keyboard focus. The keyboard test therefore walks to `recap-open` only and runs
+  every keyboard check of spec 024 AC-8 on it: its box inside the toolbar's client
+  area, its outline, the outline not clipped, and `room-toolbar-more` not visible,
+  since spec 024 hides the edge fade while any toolbar control has the focus from
+  the keyboard.
+- "Spec 024 AC-8's toolbar checks" for the other buttons (header, order, the reveal
+  buttons, one row, the edge fade, hit at the centre, pointer focus) run on the
+  buttons of spec 027's list plus `recap-open`.
+- Every measure and scan of the open dialog waits for `recap-time`, so that it
+  reads the loaded recap and not `recap-loading` (the spec names no other ready
+  state).
 - The share page of the scans is the stored room's page (`PLAY_R`, loaded from a
   `RoomStore`), with its API route answered by `page.route`.
 """
@@ -42,6 +48,7 @@ from spec024_harness import (
 from spec027_harness import open_timer_room
 from spec027_toolbar_harness import (
     CONTEXTS,
+    FADE_VISIBLE_SCRIPT,
     FIRST_THREE,
     FOCUS_IN_TOOLBAR_SCRIPT,
     FOCUS_SHARE_LINK_SCRIPT,
@@ -158,7 +165,11 @@ def open_dialog_room(
     touch: bool,
     players: list[dict[str, Any]] | None = None,
 ) -> tuple[Page, Callable[[], None]]:
-    """The mocked solved room at a window size with the recap dialog open."""
+    """The mocked solved room at a window size with the recap dialog open and loaded.
+
+    Returns once `recap-time` shows: `recap-close` already shows while the dialog
+    is loading.
+    """
     page, close = open_context_page(browser, browser_name, width, height, touch)
     try:
         body = recap_body(players=players, share_path=SHARE_PATH)
@@ -167,7 +178,7 @@ def open_dialog_room(
             page, live_server, grid, elapsed_ms=754_000, running=False, solved=True
         )
         page.get_by_test_id("recap-open").click()
-        expect(page.get_by_test_id("recap-close")).to_be_visible()
+        expect(page.get_by_test_id("recap-time")).to_be_visible()
     except BaseException:
         close()
         raise
@@ -334,16 +345,26 @@ def test_ac10_the_toolbar_holds_recap_open_in_order_on_one_row(
         ids = page.evaluate("""() => Array.from(
               document.querySelectorAll('[data-testid="room-toolbar"] [data-testid]')
             ).map(element => element.getAttribute('data-testid'))""")
+        page.evaluate(SCROLL_TO_START_SCRIPT)
+        page.wait_for_timeout(SETTLE_MS)
+        fade_visible = page.evaluate(FADE_VISIBLE_SCRIPT)
     finally:
         close()
 
+    assert reading["inHeader"] is True, reading
     assert reading["counts"] == dict.fromkeys(EIGHT_BUTTONS, 1), reading
     assert reading["outside"] == [], reading
     assert reading["outOfOrder"] == [], reading
+    assert reading["revealButtons"] == ["reveal-letter", "reveal-word"], reading
     assert reading["firstThree"] == FIRST_THREE, reading
     assert ids.index("recap-open") == ids.index("chat-toggle") + 1, ids
     if small:
         assert pairs_that_do_not_overlap(reading["ranges"]) == [], reading
+        if reading["scrollWidth"] > reading["clientWidth"] + 1:
+            assert reading["overflowX"] in ("auto", "scroll"), reading
+            assert fade_visible is True, reading
+    else:
+        assert fade_visible is False, reading
 
 
 @pytest.mark.parametrize("context_kind", CONTEXTS)
@@ -447,9 +468,8 @@ def test_ac10_a_keyboard_focus_keeps_recap_open_and_its_outline_in_the_toolbar(
         close()
 
     assert reading is not None, f"recap-open not focused in {MAX_TABS} presses of Tab"
-    problems = keyboard_focus_problems(reading)
-    other_problems = [text for text in problems if "room-toolbar-more" not in text]
-    assert other_problems == []
+    assert reading["testId"] == "recap-open", reading
+    assert keyboard_focus_problems(reading) == []
 
 
 @pytest.mark.parametrize("context_kind", CONTEXTS)
@@ -584,7 +604,7 @@ def test_ac10_the_open_dialog_has_no_text_outside_fr_json_and_the_test_data(
         close()
 
     data = language_data(live_server, ["Ana", "Bob"])
-    data |= {"Temps : 12:34", "8 lettres", f"{live_server}{SHARE_PATH}"}
+    data.add(f"{live_server}{SHARE_PATH}")
     assert len(texts) > 0
     assert unknown_texts(texts, data) == []
 

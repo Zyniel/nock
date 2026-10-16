@@ -6,6 +6,9 @@ there) and open the share link in a third context. The "stored room" tests serve
 `PLAY_R`'s room (Ana and Bob, 754 s, grid 1) from a `RoomStore` through the
 `room_registry` fixture overridden below, which is the load-from-the-store path of
 spec 018: its recap is known, so the share page's texts can be compared exactly.
+Where a test needs a public recap that the stored room does not give (no grid
+number, nicknames with markup), the stored room's share page is opened with its API
+route answered by `page.route`.
 
 The clipboard check is Chromium only (`only_browser("chromium")`).
 """
@@ -262,6 +265,19 @@ def test_ac5_a_failed_request_shows_the_share_error(
     expect(page.get_by_test_id("share-team")).to_have_count(0)
 
 
+def test_ac5_without_a_grid_number_the_share_page_shows_no_grid(
+    page: Page, live_server: str
+) -> None:
+    body = {"grid_number": None, "elapsed_ms": 754_000, "team": ["Ana", "Bob"]}
+    share_route(page, SHARE_TOKEN, body)
+
+    page.goto(f"{live_server}/recap/{SHARE_TOKEN}")
+
+    expect(page.get_by_test_id("share-team")).to_have_text("Équipe : Ana, Bob")
+    expect(page.get_by_test_id("share-time")).to_have_text("Temps : 12:34")
+    expect(page.get_by_test_id("share-grid")).to_have_count(0)
+
+
 def test_ac5_a_link_to_a_room_that_does_not_exist_is_a_404(
     page: Page, live_server: str
 ) -> None:
@@ -391,8 +407,7 @@ def test_ac10_the_share_page_has_no_text_outside_fr_json_and_the_test_data(
     finally:
         context.close()
 
-    data = {"Équipe : Ana, Bob", "Ana", "Bob", "Temps : 12:34", "Grille n° 1"}
-    data.add(f"{live_server}/recap/{SHARE_TOKEN}")
+    data = {"Ana", "Bob", f"{live_server}/recap/{SHARE_TOKEN}"}
     assert len(texts) > 0
     assert unknown_texts(texts, data) == []
 

@@ -3,8 +3,8 @@
 This module is not a test file: pytest does not collect it. The tests of spec 028
 are in `tests/test_spec_028_*.py`, one file per criterion group:
 
-- `test_spec_028_ac01_ac04_rules.py`: AC-1 to AC-4 and AC-8 (`build_recap` and
-  `public_recap` on plays of the rules);
+- `test_spec_028_ac01_ac04_rules.py`: AC-1 to AC-4, AC-7 (a late joiner) and AC-8
+  (`build_recap` and `public_recap` on plays of the rules);
 - `test_spec_028_ac01_ac08_http.py`: AC-1, AC-4, AC-5, AC-6 and AC-8 (the routes,
   games played over the room socket, the fake clock);
 - `test_spec_028_ac09_share_token_and_store.py`: AC-9 (`RoomStore`, `RoomRegistry`,
@@ -12,7 +12,7 @@ are in `tests/test_spec_028_*.py`, one file per criterion group:
 - `test_spec_028_ac01_ac02_ac07_dialog.py`: AC-1, AC-2, AC-5 (copy button) and AC-7
   (the dialog, page with a mocked socket);
 - `test_spec_028_ac05_ac06_live_pages.py`: AC-5 and AC-6 (browsers on the live
-  server);
+  server; the share page's parts with its API route answered by the test);
 - `test_spec_028_ac10_a11y_and_layout.py`: AC-10 (accessibility, the eight window
   sizes, the scans, `fr.json`).
 
@@ -53,6 +53,7 @@ from nock.protocol import (
     Erase,
     GridSolved,
     GridTarget,
+    GridView,
     HelpMode,
     Join,
     PencilEdit,
@@ -61,6 +62,7 @@ from nock.protocol import (
     RevealBudget,
     Undo,
     WordTarget,
+    grid_view,
 )
 from nock.room import (
     LogEntry,
@@ -81,9 +83,11 @@ from spec024_harness import (
     ROW_MAJOR,
     SECOND_TOKEN,
     SOLUTION,
+    ChangeList,
     Peer,
     join_peers,
     ping_and_wait,
+    with_letter_cells,
 )
 
 SHARE_TOKEN = "tok_ABCDEFGHIJKLMNOP"
@@ -143,10 +147,10 @@ class Game:
         self.log.extend(outcome.entries)
         self.states_by_seq[outcome.state.seq] = outcome.state
 
-    def join(self, nickname: str, player_id: str, token: str) -> None:
-        """Join a new player at NOW."""
+    def join(self, nickname: str, player_id: str, token: str, now: float = NOW) -> None:
+        """Join a new player, with no resume token."""
         join = Join(nickname=nickname, resume_token=None)
-        self.keep(join_room(self.state, join, NOW, player_id, token))
+        self.keep(join_room(self.state, join, now, player_id, token))
 
     def send(self, player_id: str, message: ClientMessage, now: float = NOW) -> None:
         """Send a message with `handle_message`; the step must not be refused."""
@@ -512,6 +516,15 @@ class OpenedPage(NamedTuple):
     route: RecapRoute
 
 
+def solved_view(grid: Grid) -> GridView:
+    """FX-01's view with every letter cell holding its right letter, typed by `p1`."""
+    changes: ChangeList = []
+    for row, column in ROW_MAJOR:
+        typed: dict[str, object] = {"letter": SOLUTION[(row, column)], "author": "p1"}
+        changes.append((row, column, typed))
+    return with_letter_cells(grid_view(grid), changes)
+
+
 def open_solved_page(
     page: Page,
     base_url: str,
@@ -522,24 +535,29 @@ def open_solved_page(
 ) -> OpenedPage:
     """Open /r/ABC123 as Ana on a mocked socket, the recap route answering `body`.
 
+    The first snapshot (seq 5, timer 754,000 ms and stopped, players `p1` and
+    `p2`) holds `solved_view`: every letter right, as the spec's "solved FX-01
+    snapshot" says.
+
     Args:
         page: A fresh page.
         base_url: The live server.
         grid: FX-01.
         body: What the recap route answers, as JSON.
         status: The status of the answer.
-        solved: Whether the first snapshot is solved. The grid is always full and
-            right, as the spec's "solved FX-01 snapshot" says.
+        solved: The snapshot's `solved`. When it is False, the grid is still full
+            and right, so that the `grid_solved` the test sends next fits it.
 
     Returns:
         The mocked socket and the recap route.
     """
-    from spec027_harness import open_timer_room
+    from spec027_harness import join_room_page, show_snapshot, timer_snapshot
 
     route = serve_recap(page, body, status)
-    mock = open_timer_room(
-        page, base_url, grid, elapsed_ms=754_000, running=False, solved=solved
-    )
+    mock = join_room_page(page, base_url)
+    snapshot = timer_snapshot(grid, elapsed_ms=754_000, running=False, solved=solved)
+    full_snapshot = snapshot.model_copy(update={"grid": solved_view(grid)})
+    show_snapshot(page, mock, full_snapshot.model_dump_json(), full_snapshot.seq)
     return OpenedPage(mock, route)
 
 

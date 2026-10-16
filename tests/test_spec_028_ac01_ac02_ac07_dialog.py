@@ -3,8 +3,9 @@ dialog's share link and copy button) and AC-7.
 
 The page is spec 040's mocked room on `/r/ABC123` with a FX-01 snapshot for `p1`
 (`you`, Ana, colour 0) and `p2` (Bob, colour 1), `solved` true unless a test says
-otherwise (the cells are empty: the recap does not read them). The recap route is
-answered by `page.route` with plain JSON (see `spec028_harness`).
+otherwise, where every letter cell holds its right letter (`solved_view` of
+`spec028_harness`). The recap route is answered by `page.route` with plain JSON
+(see `spec028_harness`).
 
 Readings that the spec leaves open:
 
@@ -12,21 +13,33 @@ Readings that the spec leaves open:
   `true`.
 - "described by a `t("recap.share_label")` label": the link's `aria-describedby`
   names an element whose text is that label.
-- The swatch of a departed player is "a neutral grey" (spec 019): its red, green
-  and blue channels are within 8 of each other, the rule of spec 019's tests.
+- "The swatch of a recap player" is read on the `recap-colour` element's own
+  computed `background-color` and `background-image`. The colours of the image
+  are its colour stops as spec 019's band reader finds them (`BAND_COLOURS_JS`), and
+  the gradient's line and the greys are judged with spec 019's
+  `first_gradient_argument`, `is_diagonal` and `is_grey`, as for its departed
+  author's band.
 """
 
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Iterator
+from typing import NamedTuple
 
 import pytest
 from playwright.sync_api import Browser, Locator, Page, Route, expect
 
 from nock.grid import Grid
 from nock.protocol import GridSolved, LeaveReason, PlayerLeft
+from spec019_harness import (
+    BAND_COLOURS_JS,
+    Rgba,
+    first_gradient_argument,
+    is_diagonal,
+    is_grey,
+    rgba_from,
+)
 from spec024_harness import (
     cell_at,
     expect_seq,
@@ -43,7 +56,6 @@ from spec028_harness import (
 )
 
 SHARE_PATH = "/recap/tok_ABCDEFGHIJKLMNOP"
-GREY_CHANNEL_SPREAD = 8.0
 PART_IDS = [
     "recap-time",
     "recap-checks",
@@ -251,7 +263,79 @@ def test_ac2_each_swatch_has_the_colour_of_the_roster_swatch(
         expect(swatch).to_have_attribute("data-colour", colour)
 
 
-def test_ac2_a_player_who_left_gets_the_neutral_grey_swatch(
+# The computed background of a `recap-colour` swatch: its colour, its image and the
+# colours of that image's stops, each colour as [red, green, blue, alpha]. The
+# helpers are spec 019's band reader's (`parseColour`, `imageColours`).
+SWATCH_SCRIPT = "swatch => {\n" + BAND_COLOURS_JS + r"""
+  const style = getComputedStyle(swatch);
+  const stops = [];
+  for (const text of imageColours(style.backgroundImage, style)) {
+    stops.push(parseColour(text));
+  }
+  return {
+    colour: parseColour(style.backgroundColor),
+    image: style.backgroundImage,
+    stops: stops,
+  };
+}
+"""
+
+
+class SwatchLook(NamedTuple):
+    """How a `recap-colour` swatch is drawn: its computed background."""
+
+    colour: Rgba
+    image: str
+    stops: list[Rgba]
+
+
+def swatch_look(swatch: Locator) -> SwatchLook:
+    """Read the computed background of one `recap-colour` swatch."""
+    raw = swatch.evaluate(SWATCH_SCRIPT)
+    stops: list[Rgba] = []
+    for stop in raw["stops"]:
+        stops.append(rgba_from(stop))
+    return SwatchLook(colour=rgba_from(raw["colour"]), image=raw["image"], stops=stops)
+
+
+def hatched_swatch_problems(look: SwatchLook) -> list[str]:
+    """How a swatch fails to be hatched in greys (empty: none).
+
+    "The swatch of a recap player": its computed `background-image` is a
+    `repeating-linear-gradient` whose line is diagonal and whose colour stops hold
+    at least two different colours, and each colour of the swatch (its
+    `background-color` and those stops) whose alpha is not 0 is a grey.
+    """
+    problems: list[str] = []
+    image = look.image
+    if not image.startswith("repeating-linear-gradient("):
+        problems.append(f"background-image {image!r} is no repeating-linear-gradient")
+    else:
+        direction = first_gradient_argument(image)
+        if not is_diagonal(direction):
+            problems.append(f"the gradient's line {direction!r} is not diagonal")
+    if len(set(look.stops)) < 2:
+        problems.append(f"the colour stops of {image!r} hold under two colours")
+    for colour in [look.colour, *look.stops]:
+        if colour[3] > 0 and not is_grey(colour):
+            problems.append(f"the colour {colour} is not a grey")
+    return problems
+
+
+def test_ac2_the_swatches_of_the_players_in_the_room_have_no_pattern(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_solved_page(page, live_server, fx01_grid, recap_body())
+
+    open_recap(page)
+
+    for player_id, colour in [("p1", "0"), ("p2", "1")]:
+        swatch = row_of(page, player_id).get_by_test_id("recap-colour")
+        expect(swatch).to_have_attribute("data-colour", colour)
+        assert swatch_look(swatch).image == "none", player_id
+
+
+def test_ac2_a_player_who_left_gets_a_hatched_grey_swatch(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_solved_page(page, live_server, fx01_grid, recap_body()).mock
@@ -261,18 +345,15 @@ def test_ac2_a_player_who_left_gets_the_neutral_grey_swatch(
 
     open_recap(page)
 
-    swatch = row_of(page, "p2").get_by_test_id("recap-colour")
-    expect(swatch).to_have_attribute("data-colour", "")
-    expect(row_of(page, "p1").get_by_test_id("recap-colour")).to_have_attribute(
-        "data-colour", "0"
-    )
-    background = swatch.evaluate("el => getComputedStyle(el).backgroundColor")
-    channels = [float(value) for value in re.findall(r"\d+(?:\.\d+)?", background)[:3]]
-    assert len(channels) == 3, background
-    assert max(channels) - min(channels) <= GREY_CHANNEL_SPREAD, background
+    departed = row_of(page, "p2").get_by_test_id("recap-colour")
+    expect(departed).to_have_attribute("data-colour", "")
+    mine = row_of(page, "p1").get_by_test_id("recap-colour")
+    expect(mine).to_have_attribute("data-colour", "0")
+    assert swatch_look(mine).image == "none"
+    assert hatched_swatch_problems(swatch_look(departed)) == []
 
 
-def test_ac2_a_player_unknown_to_the_page_gets_the_neutral_swatch(
+def test_ac2_a_player_unknown_to_the_page_gets_the_hatched_grey_swatch(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     players = [recap_player("p1", "Ana", 8, 4), recap_player("p9", "Zoe", 2, 1)]
@@ -282,6 +363,7 @@ def test_ac2_a_player_unknown_to_the_page_gets_the_neutral_swatch(
 
     swatch = row_of(page, "p9").get_by_test_id("recap-colour")
     expect(swatch).to_have_attribute("data-colour", "")
+    assert hatched_swatch_problems(swatch_look(swatch)) == []
 
 
 def test_ac2_a_player_without_nickname_is_written_as_someone(
@@ -577,6 +659,29 @@ def test_ac7_a_page_whose_first_snapshot_is_solved_has_the_button(
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-solved", "true")
     expect(page.get_by_test_id("recap-open")).to_be_visible()
     expect(page.get_by_test_id("recap")).not_to_be_visible()
+
+
+def test_ac7_a_late_joiner_s_own_row_shows_no_letter_and_no_word(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    # Ana (`you`) joined the room once Bob had solved it alone: she comes last.
+    players = [recap_player("p2", "Bob", 18, 8), recap_player("p1", "Ana", 0, 0)]
+    body = recap_body(
+        players=players, letter_reveals=0, word_reveals=0, revealed_letters=0
+    )
+    open_solved_page(page, live_server, fx01_grid, body)
+
+    open_recap(page)
+
+    rows = page.get_by_test_id("recap-players").get_by_test_id("recap-player")
+    expect(rows).to_have_count(2)
+    expect(rows.nth(1)).to_have_attribute("data-player-id", "p1")
+    mine = row_of(page, "p1")
+    expect(mine).to_have_attribute("data-you", "true")
+    expect(mine).to_have_attribute("data-letters", "0")
+    expect(mine).to_have_attribute("data-words", "0")
+    expect(mine.get_by_test_id("recap-letters")).to_have_text("0 lettres")
+    expect(mine.get_by_test_id("recap-words")).to_have_text("0 mots complétés")
 
 
 def test_ac7_the_dialog_comes_after_the_toolbar_in_document_order(

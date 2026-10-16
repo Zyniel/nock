@@ -1,14 +1,20 @@
-"""Tests of spec 028, AC-1 to AC-4 and AC-8 (Python part): `build_recap` and
+"""Tests of spec 028, AC-1 to AC-4, AC-7 and AC-8 (Python part): `build_recap` and
 `public_recap` on plays of the rules.
 
 The plays are the spec's `PLAY_R` (checks and reveals) and `PLAY_W` (word
 completions), played with `handle_message` (see `spec028_harness`). Every expected
 number is the spec's, or follows from the spec's rules for the small plays added
-here for the edge cases (erase, undo, pencil, wrong letters, departed players).
+here for the edge cases (erase, undo, pencil, wrong letters, departed, rejoined
+and late players, a second `grid_solved`).
 
 Reading of "Players" for a hand-built log: an author with no `player_joined` has a
 `None` nickname and is left out of the team (a `PublicRecap` team holds only
 nicknames).
+
+A player seated back with the same id (spec 032 AC-7) is a hand-built log here, as
+`join_room` does not seat a player back yet. A player who comes back without their
+token is played with the rules: a time-out (`disconnect_player`, then `tick` past the
+resume window), then a join under a new id.
 """
 
 from __future__ import annotations
@@ -20,6 +26,7 @@ from nock.protocol import (
     CellTarget,
     Check,
     ConfirmPencil,
+    GridSolved,
     GridTarget,
     LeaveReason,
     PlayerJoined,
@@ -28,7 +35,7 @@ from nock.protocol import (
     Vote,
 )
 from nock.recap import PublicRecap, Recap, RecapPlayer, build_recap, public_recap
-from nock.room import LogEntry
+from nock.room import LogEntry, RoomConfig, disconnect_player, tick
 from spec028_harness import (
     NOW,
     SHARE_TOKEN,
@@ -43,6 +50,17 @@ from spec028_harness import (
     undo_message,
     vote_mode_message,
 )
+
+# A player disconnected at NOW times out at the first tick past the resume window
+# (spec 017); the other delays are long, so that this tick does nothing else.
+RESUME_WINDOW_SECONDS = 300.0
+TIME_OUT_ONLY_CONFIG = RoomConfig(
+    resume_window_seconds=RESUME_WINDOW_SECONDS,
+    silence_timeout_seconds=600.0,
+    idle_after_seconds=600.0,
+)
+BACK_AT = NOW + RESUME_WINDOW_SECONDS + 1.0
+AFTER_THE_SOLVE = NOW + 800.0
 
 
 @pytest.fixture
@@ -209,32 +227,57 @@ def test_ac2_a_departed_player_keeps_a_row_and_the_removed_flag(
     )
 
 
-def test_ac2_a_player_joined_twice_has_one_row_with_the_last_nickname(
+def test_ac2_a_player_joined_twice_keeps_the_first_join_place_and_the_last_nickname(
     fx01_grid: Grid,
 ) -> None:
     game = play_w(fx01_grid)
-    before = game.log[:9]
-    after = game.log[9:]
-    first_join = game.log[1]
+    first_join = game.log[0]
     assert isinstance(first_join.event, PlayerJoined)
-    renamed = first_join.event.player.model_copy(update={"nickname": "Bobby"})
+    assert first_join.event.player.player_id == "p1"
+    # Spec 032's seat back is built by hand: p1 (Ana), who joined before p2, times
+    # out after seq 9 and joins again with the same id as Anna, then writes on.
+    renamed = first_join.event.player.model_copy(update={"nickname": "Anna"})
     second_join_event = PlayerJoined(seq=1, player=renamed)
     left = LogEntry(
         at=NOW,
-        event=PlayerLeft(seq=1, player_id="p2", reason=LeaveReason.TIMED_OUT),
+        event=PlayerLeft(seq=1, player_id="p1", reason=LeaveReason.TIMED_OUT),
     )
     second_join = first_join.model_copy(update={"event": second_join_event})
-    log = renumbered([*before, left, second_join, *after])
+    log = renumbered([*game.log[:9], left, second_join, *game.log[9:]])
     state = game.state.model_copy(update={"seq": len(log)})
 
     recap = build_recap(state, log)
 
     assert recap.players == (
-        RecapPlayer(player_id="p1", nickname="Ana", letters=10, words=3, removed=False),
         RecapPlayer(
-            player_id="p2", nickname="Bobby", letters=8, words=5, removed=False
+            player_id="p1", nickname="Anna", letters=10, words=3, removed=False
         ),
+        RecapPlayer(player_id="p2", nickname="Bob", letters=8, words=5, removed=False),
     )
+    assert public_recap(recap).team == ("Anna", "Bob")
+
+
+def test_ac2_a_player_back_under_a_new_id_has_a_row_but_one_name_in_the_team(
+    fx01_grid: Grid,
+) -> None:
+    game = Game(fx01_grid)
+    game.write("p2", (1, 0), "T")
+    game.keep(disconnect_player(game.state, "p2", NOW))
+    game.keep(tick(game.state, BACK_AT, TIME_OUT_ONLY_CONFIG))
+    assert [player.player_id for player in game.state.players] == ["p1"]
+    # Bob comes back without his token (another device): a new id, the same name.
+    game.join("Bob", "p3", THIRD_TOKEN, BACK_AT)
+    game.write("p3", (1, 1), "A", BACK_AT)
+    game.finish("p1")
+
+    recap = recap_of(game)
+
+    assert recap.players == (
+        RecapPlayer(player_id="p1", nickname="Ana", letters=16, words=8, removed=False),
+        RecapPlayer(player_id="p2", nickname="Bob", letters=1, words=0, removed=False),
+        RecapPlayer(player_id="p3", nickname="Bob", letters=1, words=0, removed=False),
+    )
+    assert public_recap(recap).team == ("Ana", "Bob")
 
 
 def test_ac2_an_author_with_no_player_joined_is_listed_last_with_no_nickname(
@@ -359,6 +402,32 @@ def test_ac4_a_reveal_over_a_typed_letter_is_credited_to_nobody(
     assert total == recap.letter_cells
 
 
+# ---- AC-7: a player who joins a solved room ----
+
+
+def test_ac7_a_late_joiner_gets_the_same_recap_and_a_row_with_nothing(
+    fx01_grid: Grid,
+) -> None:
+    game = play_r(fx01_grid)
+    before = recap_of(game)
+
+    game.join("Cy", "p3", THIRD_TOKEN, AFTER_THE_SOLVE)
+
+    late_joiner = RecapPlayer(
+        player_id="p3", nickname="Cy", letters=0, words=0, removed=False
+    )
+    expected = before.model_copy(update={"players": (*before.players, late_joiner)})
+    assert recap_of(game) == expected
+
+
+def test_ac7_a_late_joiner_is_in_the_team(fx01_grid: Grid) -> None:
+    game = play_r(fx01_grid)
+
+    game.join("Cy", "p3", THIRD_TOKEN, AFTER_THE_SOLVE)
+
+    assert public_recap(recap_of(game)).team == ("Ana", "Bob", "Cy")
+
+
 # ---- AC-8: only a solved room, public recap ----
 
 
@@ -401,6 +470,17 @@ def test_ac8_build_recap_refuses_a_log_without_grid_solved(fx01_grid: Grid) -> N
 
     with pytest.raises(ValueError, match=r".+"):
         build_recap(state, game.log[:33])
+
+
+def test_ac8_build_recap_refuses_a_log_with_two_grid_solved(fx01_grid: Grid) -> None:
+    game = play_r(fx01_grid)
+    second_solve = LogEntry(
+        at=AFTER_THE_SOLVE, event=GridSolved(seq=35, elapsed_ms=800_000)
+    )
+    state = game.state.model_copy(update={"seq": 35})
+
+    with pytest.raises(ValueError, match=r".+"):
+        build_recap(state, [*game.log, second_solve])
 
 
 def test_ac8_build_recap_ignores_the_entries_after_the_state(fx01_grid: Grid) -> None:
