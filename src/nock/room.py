@@ -9,9 +9,10 @@ from __future__ import annotations
 import secrets
 import unicodedata
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
 
 from nock.grid import ClueCell, Grid, LetterCell
 from nock.protocol import (
@@ -92,6 +93,7 @@ ShareToken = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{16,64}$")]
 
 RATE_WINDOW_SECONDS: float = 1.0  # spec 037 AC-3
 MAX_PLAYERS: int = 8  # spec 012 AC-4
+MAX_PAST_PLAYERS: int = 100  # spec 032 AC-4: past players a room keeps
 # Space, hyphen, apostrophe, right single quotation mark (U+2019), underscore.
 NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
 NICKNAME_MIN_LENGTH: int = 2
@@ -151,6 +153,10 @@ class RoomConfig(RoomModel):
     chat_window_seconds: float = Field(default=10.0, gt=0)
     reaction_limit: int = Field(default=5, ge=1)  # spec 022: reactions per window
     reaction_window_seconds: float = Field(default=10.0, gt=0)
+    # spec 032 AC-1: a room expires this long after its last edit (30 days)
+    room_life_seconds: float = Field(default=2_592_000.0, gt=0)
+    # spec 032 AC-2: how often the app deletes the expired rooms
+    expiry_sweep_seconds: float = Field(default=3_600.0, gt=0)
 
 
 DEFAULT_CONFIG: RoomConfig = RoomConfig()
@@ -209,6 +215,20 @@ class PlayerRecord(RoomModel):
     recent_reactions: tuple[float, ...] = ()
 
 
+class PastPlayer(RoomModel):
+    """A player who left the room by time-out or on purpose. Never sent as is.
+
+    A join with their resume token seats them back (spec 032).
+    """
+
+    player_id: PlayerId
+    resume_token: ResumeToken  # secret, like PlayerRecord.resume_token
+    nickname: Nickname
+    colour: Colour
+    # the record's mute (specs 014, 022), kept for a seat back (spec 032 decision 13)
+    muted: StrictBool = False
+
+
 class OpenVote(RoomModel):
     """The vote a room is holding (spec 025). Ballots are not in the log."""
 
@@ -251,6 +271,30 @@ class RoomState(RoomModel):
     # spec 028: names the public recap. A room stored before this spec has no
     # such key and loads with None: it has no share link.
     share_token: ShareToken | None = None
+    # spec 032: the players who left by time-out or on purpose, in the order they
+    # left, oldest first. A room stored before this spec loads with none.
+    past_players: tuple[PastPlayer, ...] = Field(
+        default=(), max_length=MAX_PAST_PLAYERS
+    )
+
+
+class RoomKey(RoomModel):
+    """A room and the resume token of one of its members, as a device keeps them."""
+
+    code: RoomCode
+    resume_token: ResumeToken
+
+
+class RoomSummary(RoomModel):
+    """What "My rooms" shows of one room (spec 032). It holds no letter of the grid."""
+
+    code: RoomCode
+    grid_number: int | None  # catalogue number (spec 004); None for a bare grid
+    width: int = Field(gt=0, strict=True)
+    height: int = Field(gt=0, strict=True)
+    players: tuple[Nickname, ...]  # team_nicknames(state)
+    last_activity_at: AwareDatetime  # the last edit time, in UTC
+    solved: StrictBool
 
 
 class LogEntry(RoomModel):
@@ -354,6 +398,85 @@ def grid_state(state: RoomState) -> GridView:
         cell_views.append(cell_view)
     return GridView(
         width=fresh_view.width, height=fresh_view.height, cells=tuple(cell_views)
+    )
+
+
+# ---- Room life and members (spec 032) -----------------------------------------
+
+
+def is_edit(entry: LogEntry) -> bool:
+    """Tell whether a logged entry is an edit: a letter_changed or a cell_locked.
+
+    Only edits move a room's last edit time, which its 30-day life runs from.
+    """
+    return isinstance(entry.event, LetterChanged | CellLocked)
+
+
+def member_id(state: RoomState, resume_token: str) -> str | None:
+    """Return the id of the member whose resume token is `resume_token`.
+
+    The players of `players`, then those of `past_players`, are compared with
+    `secrets.compare_digest`. A removed player is no member.
+
+    Args:
+        state: The room.
+        resume_token: The token a device keeps for the room.
+
+    Returns:
+        The member's player id, or None when no member holds that token.
+    """
+    for player in state.players:
+        if secrets.compare_digest(player.resume_token, resume_token):
+            return player.player_id
+    for past_player in state.past_players:
+        if secrets.compare_digest(past_player.resume_token, resume_token):
+            return past_player.player_id
+    return None
+
+
+def team_nicknames(state: RoomState) -> tuple[str, ...]:
+    """Return the nicknames of the room's members, each once.
+
+    First those of `past_players` in the order they left, then those of `players`
+    in `players` order. A nickname equal to an earlier one under `casefold()` is
+    left out.
+    """
+    member_nicknames: list[str] = []
+    for past_player in state.past_players:
+        member_nicknames.append(past_player.nickname)
+    for player in state.players:
+        member_nicknames.append(player.nickname)
+
+    nicknames: list[str] = []
+    seen_folded: set[str] = set()
+    for nickname in member_nicknames:
+        folded = nickname.casefold()
+        if folded in seen_folded:
+            continue
+        seen_folded.add(folded)
+        nicknames.append(nickname)
+    return tuple(nicknames)
+
+
+def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
+    """Return the summary of a room, as "My rooms" shows it.
+
+    Args:
+        state: The room.
+        last_edit_at: The room's last edit time, in seconds since the epoch.
+
+    Returns:
+        The grid number, the grid's width and height, `team_nicknames(state)`,
+        `last_edit_at` as a UTC datetime, and whether the grid is solved.
+    """
+    return RoomSummary(
+        code=state.code,
+        grid_number=state.grid_number,
+        width=state.grid.width,
+        height=state.grid.height,
+        players=team_nicknames(state),
+        last_activity_at=datetime.fromtimestamp(last_edit_at, UTC),
+        solved=state.solved,
     )
 
 
@@ -548,10 +671,12 @@ def join_room(
     """Apply a join on a connection that has not joined yet.
 
     The steps run in this order and the first that applies ends the join:
-    removed token, resume of a known player, room locked, room full, invalid
-    nickname, new player. A token whose player has been disconnected
-    for more than the resume window does not resume: that player times out in
-    this same step and the join goes on as a new player.
+    removed token, resume of a player of the room, room locked, room full, seat
+    back of a past player (spec 032), invalid nickname, new player. A token whose
+    player has been disconnected for more than the resume window does not
+    resume: that player times out in this same step and becomes a past player,
+    and the join goes on with the steps after the resume, so that the same token
+    seats them back. A refusal after such a time-out keeps the time-out.
 
     Args:
         state: The room.
@@ -576,19 +701,22 @@ def join_room(
         resumed = None
     if resumed is not None:
         return _resume_player(state, resumed, now)
-    outcome = _join_as_new_player(state, message, now, new_player_id, new_resume_token)
+    outcome = _join_without_resume(state, message, now, new_player_id, new_resume_token)
     all_entries = (*timeout_entries, *outcome.entries)
     return outcome.model_copy(update={"entries": all_entries})
 
 
-def _join_as_new_player(
+def _join_without_resume(
     state: RoomState,
     message: Join,
     now: float,
     new_player_id: str,
     new_resume_token: str,
 ) -> Outcome:
-    """Run the steps of a join that does not resume: locked, full, nickname, add."""
+    """Run the steps of a join that does not resume.
+
+    Locked, full, seat back (spec 012 step 4a, spec 032), nickname, new player.
+    """
     if state.settings.locked:
         refusal = ErrorMessage(
             code=ErrorCode.ROOM_LOCKED, message="The room is locked."
@@ -597,6 +725,9 @@ def _join_as_new_player(
     if len(state.players) >= MAX_PLAYERS:
         refusal = ErrorMessage(code=ErrorCode.ROOM_FULL, message="The room is full.")
         return Outcome(state=state, reply=(refusal,), close_sender=True)
+    past_player = _find_past_player(state, message.resume_token)
+    if past_player is not None:
+        return _seat_back(state, past_player, now)
     try:
         nickname = normalize_nickname(message.nickname)
     except ValueError as error:
@@ -718,6 +849,16 @@ def _find_by_token(state: RoomState, token: str | None) -> PlayerRecord | None:
     return None
 
 
+def _find_past_player(state: RoomState, token: str | None) -> PastPlayer | None:
+    """Return the past player who owns `token`, or None (spec 032)."""
+    if token is None:
+        return None
+    for past_player in state.past_players:
+        if secrets.compare_digest(past_player.resume_token, token):
+            return past_player
+    return None
+
+
 def _replace_player(state: RoomState, changed: PlayerRecord) -> RoomState:
     """Return the state with `changed` in place of the player of the same id."""
     players: list[PlayerRecord] = []
@@ -789,6 +930,22 @@ def _lowest_free_colour(state: RoomState) -> int:
     raise ValueError("Every colour is taken")
 
 
+def _seat_back_colour(state: RoomState, colour: int) -> int:
+    """Return `colour` when no player of the room has it, else the lowest free one.
+
+    The players of the room count, connected or disconnected (spec 032).
+    """
+    for player in state.players:
+        if player.colour == colour:
+            return _lowest_free_colour(state)
+    return colour
+
+
+def _has_host(state: RoomState) -> bool:
+    """Tell whether a player of the room is host."""
+    return any(player.is_host for player in state.players)
+
+
 def _add_player(
     state: RoomState,
     nickname: str,
@@ -798,31 +955,58 @@ def _add_player(
 ) -> Outcome:
     """Add a new player at the end of the room and number their player_joined.
 
-    The timer rules of spec 027 run after the entry, so the snapshot of the
-    new player holds a timer that their join resumed.
+    The nickname gets spec 012's suffix when a player has it, the colour is the
+    lowest free one, and the player is host when nobody is.
     """
-    seq = state.seq + 1
-    has_host = False
-    for existing in state.players:
-        if existing.is_host:
-            has_host = True
-    player = PlayerRecord(
+    view = PlayerView(
         player_id=player_id,
-        resume_token=resume_token,
         nickname=_unique_nickname(state, nickname),
         colour=_lowest_free_colour(state),
-        is_host=not has_host,
-        joined_seq=seq,
-        last_input_at=now,
-        last_seen_at=now,
+        state=PlayerState.ACTIVE,
+        is_host=not _has_host(state),
+        muted=False,
+        selection=None,
     )
-    added_state = state.model_copy(
-        update={"players": (*state.players, player), "seq": seq}
+    return _seat_player(state, view, resume_token, now)
+
+
+def _seat_back(state: RoomState, past_player: PastPlayer, now: float) -> Outcome:
+    """Bring a past player back into the room, with their id and token (spec 032).
+
+    Their nickname gets spec 012's suffix when a player has it, and their colour
+    is theirs again unless a player has it. Their mute is kept (spec 032
+    decision 13). The rest is a new player's: the host role only when nobody is
+    host, no flag, no last edit. The join's nickname is not used.
+    """
+    view = PlayerView(
+        player_id=past_player.player_id,
+        nickname=_unique_nickname(state, past_player.nickname),
+        colour=_seat_back_colour(state, past_player.colour),
+        state=PlayerState.ACTIVE,
+        is_host=not _has_host(state),
+        muted=past_player.muted,
+        selection=None,
     )
-    event = PlayerJoined(seq=seq, player=_view_of(player))
+    return _seat_player(state, view, past_player.resume_token, now)
+
+
+def _seat_player(
+    state: RoomState, view: PlayerView, resume_token: str, now: float
+) -> Outcome:
+    """Number the player_joined of a joiner who takes a seat, and apply it.
+
+    `replay` appends the player at the end of the room, takes them out of the
+    past players, and runs the timer rules of spec 027, so the joiner's snapshot
+    holds a timer that their join resumed.
+
+    Returns:
+        The outcome: one entry, logged with `resume_token`, and the joiner's
+        snapshot as the reply.
+    """
+    event = PlayerJoined(seq=state.seq + 1, player=view)
     entry = LogEntry(at=now, event=event, resume_token=resume_token)
-    new_state = _with_timer_rules(added_state, entry)
-    reply = (snapshot_for(new_state, player_id, now),)
+    new_state = replay(state, entry)
+    reply = (snapshot_for(new_state, view.player_id, now),)
     return Outcome(state=new_state, entries=(entry,), reply=reply)
 
 
@@ -1053,11 +1237,8 @@ def _is_word_full(cells: list[CellState]) -> bool:
 
 
 def _changes_cells(outcome: Outcome) -> bool:
-    """Tell whether a step's entries hold a letter_changed or a cell_locked."""
-    for entry in outcome.entries:
-        if isinstance(entry.event, LetterChanged | CellLocked):
-            return True
-    return False
+    """Tell whether a step's entries hold an edit: a change of a letter or a lock."""
+    return any(is_edit(entry) for entry in outcome.entries)
 
 
 def _with_full_flags_cleared(outcome: Outcome, now: float) -> Outcome:
@@ -2149,7 +2330,11 @@ def _replay_reveal_result(state: RoomState, event: RevealResult) -> RoomState:
 def _replay_player_joined(
     state: RoomState, entry: LogEntry, event: PlayerJoined
 ) -> RoomState:
-    """Append the player of a logged join."""
+    """Append the player of a logged join.
+
+    A past player with the same id is one no more: the join seated them back
+    (spec 032).
+    """
     if entry.resume_token is None:
         raise ValueError(f"The player_joined entry {event.seq} has no resume token")
     view = event.player
@@ -2165,7 +2350,13 @@ def _replay_player_joined(
         last_input_at=entry.at,
         last_seen_at=entry.at,
     )
-    return state.model_copy(update={"players": (*state.players, player)})
+    still_past: list[PastPlayer] = []
+    for past_player in state.past_players:
+        if past_player.player_id != view.player_id:
+            still_past.append(past_player)
+    return state.model_copy(
+        update={"players": (*state.players, player), "past_players": tuple(still_past)}
+    )
 
 
 def _replay_state_changed(
@@ -2185,17 +2376,49 @@ def _replay_state_changed(
 
 
 def _replay_player_left(state: RoomState, event: PlayerLeft) -> RoomState:
-    """Remove a player, and ban their token when they were removed."""
+    """Remove a player from the room.
+
+    A removed player's token is banned (spec 014). A player who timed out or
+    left becomes a past player, whom their token seats back (spec 032).
+    """
     remaining: list[PlayerRecord] = []
     removed_tokens = state.removed_tokens
+    past_players = state.past_players
     for player in state.players:
         if player.player_id != event.player_id:
             remaining.append(player)
         elif event.reason == LeaveReason.REMOVED:
             removed_tokens = (*removed_tokens, player.resume_token)
+        else:
+            past_players = _with_past_player(past_players, _past_record_of(player))
     return state.model_copy(
-        update={"players": tuple(remaining), "removed_tokens": removed_tokens}
+        update={
+            "players": tuple(remaining),
+            "removed_tokens": removed_tokens,
+            "past_players": past_players,
+        }
     )
+
+
+def _past_record_of(player: PlayerRecord) -> PastPlayer:
+    """Return what the room keeps of a player who leaves (spec 032)."""
+    return PastPlayer(
+        player_id=player.player_id,
+        resume_token=player.resume_token,
+        nickname=player.nickname,
+        colour=player.colour,
+        muted=player.muted,
+    )
+
+
+def _with_past_player(
+    past_players: tuple[PastPlayer, ...], record: PastPlayer
+) -> tuple[PastPlayer, ...]:
+    """Append `record`; the oldest past player goes when MAX_PAST_PLAYERS are kept."""
+    kept = past_players
+    if len(kept) >= MAX_PAST_PLAYERS:
+        kept = kept[1:]
+    return (*kept, record)
 
 
 def _replay_letter_changed(

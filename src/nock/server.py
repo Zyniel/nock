@@ -1,9 +1,14 @@
-"""FastAPI app: serves the built web client, the room WebSocket and the recaps."""
+"""FastAPI app: serves the built web client, the room WebSocket and the recaps.
+
+While the app runs, it deletes the expired rooms of the registry it serves once
+when it starts, then every `expiry_sweep_seconds` (spec 032).
+"""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import re
 import threading
@@ -25,15 +30,18 @@ from nock.catalogue import (
 )
 from nock.hub import (
     MAX_FRAME_BYTES,
+    ROOM_NOT_FOUND_CLOSE_CODE,
     SESSION_REPLACED_CLOSE_CODE,
     SILENCE_CLOSE_CODE,
     RoomConnection,
     RoomRegistry,
 )
 from nock.protocol import parse_client_message
+from nock.room import RoomKey, RoomSummary
 from nock.store import RoomStore
 
 __all__ = [
+    "ROOM_NOT_FOUND_CLOSE_CODE",
     "SESSION_REPLACED_CLOSE_CODE",
     "SILENCE_CLOSE_CODE",
     "WS_MAX_SIZE_BYTES",
@@ -42,11 +50,13 @@ __all__ = [
     "server_config",
 ]
 
+logger = logging.getLogger(__name__)
+
 WEB_DIST_DIR: Path = Path(__file__).resolve().parents[2] / "web" / "dist"
 ROOM_CODE_PATTERN: str = r"^[A-Z0-9]{6}$"
 GRID_NUMBER_PATTERN: str = r"^[1-9][0-9]{0,8}$"
 FORCE_PATTERN: str = r"^[1-4]$"
-ROOM_NOT_FOUND_CLOSE_CODE: int = 4404  # WebSocket close code, unknown room
+MAX_SUMMARY_KEYS: int = 100  # spec 032: keys in one POST /api/rooms/summaries
 THROTTLED_CLOSE_CODE: int = 4429  # WebSocket close code, too many wrong codes
 WRONG_CODE_LIMIT: int = 10
 WRONG_CODE_WINDOW_SECONDS: float = 60.0
@@ -72,6 +82,14 @@ class CreateRoomResponse(BaseModel):
 
     code: str  # matches ROOM_CODE_PATTERN
     share_url: str  # absolute: <scheme>://<host>/r/<code>
+
+
+class RoomSummariesRequest(BaseModel):
+    """The body of POST /api/rooms/summaries."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    rooms: tuple[RoomKey, ...] = Field(max_length=MAX_SUMMARY_KEYS)
 
 
 class _WrongCodeThrottle:
@@ -264,6 +282,8 @@ async def _serve_socket(
     """
     connection = room_registry.connect(code)
     if connection is None:
+        # The room expired since the route looked it up (spec 032).
+        await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
         return
     writer = asyncio.create_task(
         connection.run_writer(
@@ -279,6 +299,38 @@ async def _serve_socket(
         # cancel this handler while it shuts down: neither is an error here.
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await writer
+
+
+async def _sweep_expired_rooms(rooms: RoomRegistry, stop: asyncio.Event) -> None:
+    """Delete the expired rooms now, then every `expiry_sweep_seconds`, until `stop`.
+
+    Each sweep runs in a worker thread, since it waits for the disk. A sweep that
+    raises is logged, and the next one runs as planned (spec 032).
+    """
+    while not stop.is_set():
+        try:
+            await asyncio.to_thread(rooms.expire_rooms)
+        except Exception:
+            logger.exception("The sweep of the expired rooms failed")
+        # The interval, or less when the app stops meanwhile.
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), rooms.config.expiry_sweep_seconds)
+
+
+@contextlib.asynccontextmanager
+async def _expiry_sweeps(rooms: RoomRegistry) -> AsyncIterator[None]:
+    """Run the expiry sweeps of `rooms` in the background while the block runs.
+
+    On the way out, a sweep under way is waited for, so that it never meets a
+    closed registry.
+    """
+    stop = asyncio.Event()
+    sweeping = asyncio.create_task(_sweep_expired_rooms(rooms, stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        await sweeping
 
 
 def create_app(
@@ -308,9 +360,10 @@ def create_app(
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        holder.get()
+        room_registry = holder.get()
         try:
-            yield
+            async with _expiry_sweeps(room_registry):
+                yield
         finally:
             holder.close_if_created()
 
@@ -396,6 +449,16 @@ def create_app(
         if shared is None:
             raise _not_found()
         return shared.model_dump(mode="json")
+
+    # Spec 032: the rooms a device keeps a member's token of. A room left out is
+    # never said why, so this route tests no room code and is not throttled.
+    @web_app.post("/api/rooms/summaries")
+    def list_room_summaries(body: RoomSummariesRequest) -> list[dict[str, object]]:
+        summaries: list[RoomSummary] = holder.get().room_summaries(body.rooms)
+        bodies: list[dict[str, object]] = []
+        for summary in summaries:
+            bodies.append(summary.model_dump(mode="json"))
+        return bodies
 
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:

@@ -1,5 +1,9 @@
 """SQLite storage of the rooms: an append-only event log and state snapshots.
 
+Each room also has its creation time and its last edit time (spec 032), which
+its 30-day life runs from, so that the expired rooms are found without loading
+them.
+
 One connection is shared by all threads and every call takes a lock, so the
 store is safe to call from several threads. Rooms are independent: the lock is
 only held for the duration of one short statement or transaction.
@@ -12,10 +16,12 @@ import threading
 from collections.abc import Sequence
 from pathlib import Path
 
-from nock.room import LogEntry, RoomState, replay
+from nock.room import LogEntry, RoomState, is_edit, replay
 
 _MEMORY_PATH = ":memory:"
 
+# A file written before spec 032 holds the first four tables only; opening it
+# adds `room_times` and fills it (see `_add_missing_room_times`).
 _TABLES = """
 CREATE TABLE IF NOT EXISTS rooms (
     code TEXT PRIMARY KEY
@@ -36,7 +42,22 @@ CREATE TABLE IF NOT EXISTS share_tokens (
     token TEXT PRIMARY KEY,
     code TEXT NOT NULL REFERENCES rooms (code)
 );
+CREATE TABLE IF NOT EXISTS room_times (
+    code TEXT PRIMARY KEY REFERENCES rooms (code),
+    created_at REAL NOT NULL,
+    last_edit_at REAL NOT NULL
+);
 """
+
+# What `delete_room` runs, in one transaction: every row of the room, in every
+# table, the rows that refer to the room before the room itself.
+_ROOM_DELETIONS: tuple[str, ...] = (
+    "DELETE FROM log WHERE code = ?",
+    "DELETE FROM snapshots WHERE code = ?",
+    "DELETE FROM share_tokens WHERE code = ?",
+    "DELETE FROM room_times WHERE code = ?",
+    "DELETE FROM rooms WHERE code = ?",
+)
 
 
 class RoomStore:
@@ -48,9 +69,16 @@ class RoomStore:
     def __init__(self, path: str | Path) -> None:
         """Open or create the SQLite database at `path` and create its tables.
 
+        A file written before spec 032 is upgraded: each of its rooms gets its
+        creation time and its last edit time.
+
         Args:
             path: A file path, or ":memory:" for an in-memory database. A file
                 database uses journal_mode WAL and synchronous FULL.
+
+        Raises:
+            ValueError: a room of the file has no snapshot.
+            pydantic.ValidationError: a stored row is damaged.
         """
         self._lock = threading.Lock()
         self._is_closed = False
@@ -62,17 +90,26 @@ class RoomStore:
             self._connection.execute("PRAGMA journal_mode = WAL")
             self._connection.execute("PRAGMA synchronous = FULL")
         self._connection.executescript(_TABLES)
+        self._add_missing_room_times()
 
-    def create_room(self, state: RoomState) -> None:
+    def create_room(
+        self, state: RoomState, *, last_edit_at: float | None = None
+    ) -> None:
         """Record a new room, its share token and `state` as its first snapshot.
 
         The share token (spec 028) is kept apart, so that `code_for_share_token`
-        finds the room.
+        finds the room. The room's creation time is `state.created_at`.
+
+        Args:
+            state: The room's first state.
+            last_edit_at: Where the room's last edit time starts (spec 032).
+                None: at `state.created_at`.
 
         Raises:
             ValueError: a room with `state.code` already exists, or another room
                 has the share token `state.share_token`.
         """
+        start = state.created_at if last_edit_at is None else last_edit_at
         with self._lock:
             if self._room_exists(state.code):
                 raise ValueError(f"A room with code {state.code} already exists")
@@ -84,6 +121,7 @@ class RoomStore:
                 self._connection.execute(
                     "INSERT INTO rooms (code) VALUES (?)", (state.code,)
                 )
+                self._insert_room_times(state.code, state.created_at, start)
                 if token is not None:
                     self._connection.execute(
                         "INSERT INTO share_tokens (token, code) VALUES (?, ?)",
@@ -108,8 +146,68 @@ class RoomStore:
         with self._lock:
             return self._code_of_token(token)
 
+    def last_edit_at(self, code: str) -> float | None:
+        """Return the room's last edit time, or None for an unknown room.
+
+        It starts when the room is created and only edits move it (spec 032).
+        """
+        with self._lock:
+            row = self._connection.execute(
+                "SELECT last_edit_at FROM room_times WHERE code = ?", (code,)
+            ).fetchone()
+        if row is None:
+            return None
+        return float(row[0])
+
+    def expired_codes(self, before: float) -> list[str]:
+        """Return the codes of the rooms whose last edit time is less than `before`.
+
+        Args:
+            before: A clock time; a room whose last edit time equals it is left
+                out.
+
+        Returns:
+            The codes, in code-point order.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT code FROM room_times WHERE last_edit_at < ? ORDER BY code",
+                (before,),
+            ).fetchall()
+        codes: list[str] = []
+        for (code,) in rows:
+            codes.append(str(code))
+        return codes
+
+    def delete_room(self, code: str) -> bool:
+        """Delete the room, its snapshots, its log and its share token, at once.
+
+        Everything goes in one transaction (spec 032). This is the one exception
+        to the rule that the log is never rewritten or truncated (spec 018).
+
+        Returns:
+            True when the room existed. Its code is then free for a new room, and
+            `code_for_share_token` of its share token returns None (spec 028).
+        """
+        with self._lock:
+            if not self._room_exists(code):
+                return False
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                for statement in _ROOM_DELETIONS:
+                    self._connection.execute(statement, (code,))
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
+            return True
+
     def append(self, code: str, entries: Sequence[LogEntry]) -> None:
         """Append `entries` to the log of room `code`, committed before returning.
+
+        In the same transaction, the room's last edit time becomes the largest of
+        its current value and the time `at` of each edit among the entries
+        (`is_edit`, spec 032): it never goes down.
 
         Raises:
             ValueError: unknown room, or the entries' seqs are not exactly
@@ -119,6 +217,7 @@ class RoomStore:
         """
         if len(entries) == 0:
             return
+        latest_edit_at = _latest_edit_time(entries)
         with self._lock:
             if not self._room_exists(code):
                 raise ValueError(f"Unknown room {code}")
@@ -136,6 +235,13 @@ class RoomStore:
                     self._connection.execute(
                         "INSERT INTO log (code, seq, entry_json) VALUES (?, ?, ?)",
                         (code, entry.event.seq, entry.model_dump_json()),
+                    )
+                if latest_edit_at is not None:
+                    # SQLite's MAX of two values: the time never goes down.
+                    self._connection.execute(
+                        "UPDATE room_times SET last_edit_at = MAX(last_edit_at, ?) "
+                        "WHERE code = ?",
+                        (latest_edit_at, code),
                     )
             except BaseException:
                 self._connection.execute("ROLLBACK")
@@ -239,3 +345,71 @@ class RoomStore:
             "VALUES (?, ?, ?)",
             (state.code, state.seq, state.model_dump_json()),
         )
+
+    def _insert_room_times(
+        self, code: str, created_at: float, last_edit_at: float
+    ) -> None:
+        """Record a room's creation and last edit times. The caller locks."""
+        self._connection.execute(
+            "INSERT INTO room_times (code, created_at, last_edit_at) "
+            "VALUES (?, ?, ?)",
+            (code, created_at, last_edit_at),
+        )
+
+    def _add_missing_room_times(self) -> None:
+        """Give each room that has no times its creation and last edit times.
+
+        Only the rooms of a file written before spec 032 have none. A room's
+        creation time is the `created_at` of its first snapshot, and its last
+        edit time the largest `at` of its logged edits, or its creation time
+        when it has none. Called while the store opens, so no other thread
+        uses the store yet.
+
+        Raises:
+            ValueError: a room has no snapshot.
+            pydantic.ValidationError: a stored row is damaged.
+        """
+        rows = self._connection.execute(
+            "SELECT code FROM rooms WHERE code NOT IN (SELECT code FROM room_times) "
+            "ORDER BY code"
+        ).fetchall()
+        if len(rows) == 0:
+            return
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            for (code,) in rows:
+                created_at = self._first_snapshot_time(code)
+                latest_edit_at = _latest_edit_time(self.read_log(code))
+                if latest_edit_at is None:
+                    latest_edit_at = created_at
+                self._insert_room_times(code, created_at, latest_edit_at)
+        except BaseException:
+            self._connection.execute("ROLLBACK")
+            raise
+        self._connection.execute("COMMIT")
+
+    def _first_snapshot_time(self, code: str) -> float:
+        """Return the `created_at` of the room's first snapshot.
+
+        Raises:
+            ValueError: the room has no snapshot.
+        """
+        row = self._connection.execute(
+            "SELECT state_json FROM snapshots WHERE code = ? ORDER BY seq LIMIT 1",
+            (code,),
+        ).fetchone()
+        if row is None:
+            raise ValueError(f"Room {code} has no snapshot")
+        first_snapshot = RoomState.model_validate_json(row[0])
+        return first_snapshot.created_at
+
+
+def _latest_edit_time(entries: Sequence[LogEntry]) -> float | None:
+    """Return the largest `at` of the edits among `entries`, None when none is one."""
+    latest: float | None = None
+    for entry in entries:
+        if not is_edit(entry):
+            continue
+        if latest is None or entry.at > latest:
+            latest = entry.at
+    return latest
