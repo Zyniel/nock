@@ -2,10 +2,10 @@
 
 Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 `docs/build-plan.md`. It replaces the long conversations of the sessions that
-wrote it (2026-10-12 to 2026-10-16), so a fresh session can continue cheaply.
+wrote it (2026-10-12 to 2026-10-17), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-16, night)
+## Where things stand (2026-10-17, morning)
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -24,14 +24,18 @@ Update it at the end of each session.
   unless the human overrides them: a mute survives a time-out, only lookups
   check expiry), PR #16 (tooling: page loads in the tests keep Playwright's
   30 s, which ended the Firefox-Windows `Page.goto` timeouts; the finish hook
-  gives the gate 1,140 s; a spec 018 AC-2 race). Tag `v0.1.0` exists locally on
-  #6's merge commit but could not be pushed from the cloud session (tag pushes
-  are refused): the human pushes it from a clone.
-- Open: the nickname rule's pull request.
-  - **The rule:** typed in capitals, stored in capitals, compared exactly, shown
-    with capitalised words.
-  - **Review:** two review rounds; the second returned APPROVE.
-  - **For the human:** its description lists the manual input-method checks.
+  gives the gate 1,140 s; a spec 018 AC-2 race), PR #17 (the nickname rule:
+  typed and stored in capitals, compared exactly, shown with capitalised words;
+  NFC before and after the capitals; the field shows capitals through CSS and
+  keeps its value as typed), PR #18 (from the design session: `specs/_design.md`,
+  `docs/design/cell-sheet.html` and the draft spec 041, the visual foundation).
+  Tag `v0.1.0` exists locally on #6's merge commit but could not be pushed from
+  the cloud session (tag pushes are refused): the human pushes it from a clone.
+- Open: the tooling pull request of 2026-10-17, for a faster pipeline:
+  - CI drops Firefox's Windows job (human decision);
+  - the test-writer and implementer run at high effort (human decision) and get
+    250 turns instead of 60 and 80;
+  - the finish hook gates the checkout the agent edited, not the session's.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only); spec 033's
   open question 2 (players' addresses outside ASCII). When 033's turn comes the
@@ -48,13 +52,6 @@ Update it at the end of each session.
   merged. The human chose on 2026-10-16 to build the other four now, in the
   build plan's order, one pull request each: 038, then 034 ("Then catchup"),
   033, 029.
-- The nickname rule's fix round decided:
-  - NFC before and after the capitals;
-  - the field shows capitals through CSS `text-transform: uppercase` and keeps
-    its value as typed, since rewriting the value broke input methods and the
-    caret;
-  - `displayNickname` lowercases the whole text once, so Greek's final sigma
-    shows.
 
 ## Work in flight (not pushed)
 
@@ -63,9 +60,10 @@ Update it at the end of each session.
     built on the nickname branch before that branch's rebases (38e27f4). Its
     commits, in order: the spec preparation 51482ca, the tests 6a0cfc2, AC-11 in
     the serial list 62395ff, the spec's gap-fills f66c0d9, the code 515e026,
-    three test fixes 44b1536.
+    three test fixes 44b1536; then the fix round: spec 77e2c3e, tests 5865cda,
+    code 1d95eb8.
   - **State:** the first review returned REQUEST CHANGES; its fix round is
-    running.
+    done, and the second (last) review is running.
   - **The blocking findings:**
     - the throttle kept an address until that address failed again;
     - the gap-fills had no tests;
@@ -74,17 +72,29 @@ Update it at the end of each session.
     - a token given to `create_app` follows the variable's rule;
     - every method on the ops paths answers 404 while the pages are off;
     - a period change keeps the dashboard and an open replay on screen.
+  - **Added by the implementer, not in the spec:** the page ignores an answer
+    that arrives after it has left `ready`.
   - **The preparation:** spec 036 was refined after 038's decision 9 (logs at
     `warning`, no access log, `main()` checks `NOCK_OPERATOR_TOKEN` first). 038
     was aligned with the code and simplified: the ops API reuses spec 011's
     throttle, and one store read gives each room's code and creation time.
   - **The gap-fills:** after a 429 the page acts as after a 401; the token is
     checked before anything else; only token refusals count.
-  - **Next:** after the nickname rule is merged, rebase with
+  - **Next:** after the tooling pull request is merged, rebase with
     `git rebase --onto origin/main 38e27f4 spec-038`. The nickname branch's
-    commits come back in `main` under other hashes, which that command leaves
+    commits came back in `main` under other hashes, which that command leaves
     out.
-- Then specs 034, 033 and 029, each built on the previous branch.
+- Spec 034 (catching up after an absence).
+  - **Branch:** worktree `.claude/worktrees/spec-034`, branch `spec-034`, built
+    on `spec-038` at 5865cda. Its preparation is 7b2d491 (the nickname rule,
+    stale references, three simplifications, testable criteria).
+  - **State:** its tests are being written. The files that measure time (AC-2's
+    highlight window, AC-4's scroll) go in `SERIAL_TEST_FILES`, a lead commit
+    on the branch.
+  - **Accepted, under the simplicity rule:** a line from a vote that passes
+    after the player who asked for it has left gets no name.
+  - **Next:** rebase onto `spec-038`'s last commit, later onto `main`.
+- Then specs 033 and 029, each built on the previous branch.
 - Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
   values, a spec 035 refinement, after 032).
@@ -97,7 +107,8 @@ Update it at the end of each session.
 - Commit trailers: the implementer and test-writer roles run on Sonnet unless the
   lead passes `model: "opus"`. Each agent signs with its own model's trailer;
   some pushed commits of 2026-10-15 carry the Opus line by mistake, and pushed
-  history is not rewritten.
+  history is not rewritten. Since 2026-10-17 those two roles run at high effort
+  (their definitions); the spec-writer and the reviewer keep the session's.
 - The lead works in the main tree and reaches worktrees with `git -C` and
   absolute paths: a `cd` into a worktree makes it the session's working
   directory, and the stop hook then checks that worktree.
@@ -109,21 +120,27 @@ Update it at the end of each session.
 2. Then spec 038's pull request.
 3. Then 034, 033 and 029, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
-   (their definitions default to Sonnet); Sonnet for small spec notes and
-   mechanical test edits.
+   (their definitions default to Sonnet, at high effort); Sonnet for small spec
+   notes and mechanical test edits.
 - Phase 7 (030, 031): untouched.
 
 ## How a feature is built here
 
 1. Spec answers and refinements first (spec-writer), then tests (test-writer),
    then code (implementer), then review (reviewer). One commit per phase.
-2. Test-writers can run ahead in worktrees (`isolation: worktree`, first
-   `git merge --ff-only feat/phase5-mvp-ldddid`); the lead cherry-picks their
-   commits when the feature's turn comes. Implementers run one at a time per
-   shared file set (they all touch `room.py` and `RoomPage.svelte`), in the main
-   tree or a worktree.
+2. Each spec is built in a worktree of its own (`git worktree add -b spec-NNN
+   .claude/worktrees/spec-NNN <base>`), based on the previous spec's branch.
+   Agents work there with `git -C` and absolute paths. A phase that runs no
+   tests (spec-writer) overlaps another spec's phases. Two test runs at once
+   slow each other down, so a test-writer waits while another gate runs
+   (`pgrep -f scripts/gate.py`). Implementers run one at a time per shared file
+   set (they all touch `room.py` and `RoomPage.svelte`).
 3. Review findings go back through the roles, two rounds at most; what is left
-   goes to the human in the pull request description.
+   goes to the human in the pull request description. Since 2026-10-17, to save
+   time: a fix round takes the blocking findings and the small, certain
+   suggestions; the second review reads only the fix round; agents run only
+   their spec's tests while they work, and the lead runs the gate once more on
+   the rebased head before the pull request.
 4. Red test commits stay local until their code lands; when a red commit sits
    under a commit that must be pushed, the lead rebuilds the chain with
    `git commit-tree -S` (`-S` signs it: plain `commit-tree` ignores
@@ -131,8 +148,9 @@ Update it at the end of each session.
    pushed commits of 2026-10-15 are unsigned for that reason) and pushes up to
    the green commit with `git push origin <sha>:refs/heads/feat/phase5-mvp-ldddid`.
    Never rewrite pushed history.
-5. Agents hit their turn limits (60 for test-writers, 80 for implementers):
-   resume them with SendMessage, they keep their context.
+5. Turn limits: 250 for test-writers and implementers since 2026-10-17 (60 and
+   80 before, which stopped them 19 times in two days). A stopped agent resumes
+   with SendMessage and keeps its context.
 
 ## Test layout
 
@@ -168,17 +186,22 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   font.
 - The implementer's finish hook runs the quick gate (`--specs` of the specs
   the branch changed, Chromium). It takes 2 to 4 minutes for one spec, and
-  about 8.5 minutes for a branch built on unmerged work that changes 19 specs.
+  about 9 minutes for a branch built on unmerged work that changes 19 specs.
   The hook allows 1,140 s since 2026-10-16, because a gate that times out does
-  not block.
+  not block. Since 2026-10-17 it gates the checkout of the last file the agent
+  edited, read from the agent's transcript. Before, it ran in the session's
+  directory, the main checkout, and checked none of a worktree agent's changes.
 - CI runs only on pull requests and pushes to `main`, and cancels a run when a
-  new commit is pushed. Seven jobs (static and non-browser tests on Ubuntu
-  3.13; each engine on Ubuntu and Windows, Python 3.14), then `Quality gate`,
-  which passes only when all seven passed. About 20 minutes; Firefox on
-  Windows is the slowest job. The Windows jobs run 3 workers on their 4 CPUs
-  (with 4 the runner once stalled for over 5 s), use ephemeral ports 16384 to
-  65535 (the default range ran out once; the range starts above 10080, the
-  highest port browsers refuse), and print the TIME_WAIT count when they fail.
+  new commit is pushed. Six jobs (static and non-browser tests on Ubuntu 3.13;
+  each engine on Ubuntu, and Chromium and WebKit on Windows, Python 3.14), then
+  `Quality gate`, which passes only when all six passed. About 20 minutes; the
+  Windows jobs are the slowest. Firefox's Windows job was dropped on 2026-10-17
+  (human decision): it took about 26 minutes and failed in 5 of 10 runs, each
+  time a timeout that passed on re-run. The Windows jobs run 3 workers on their
+  4 CPUs (with 4 the runner once stalled for over 5 s), use ephemeral ports
+  16384 to 65535 (the default range ran out once; the range starts above 10080,
+  the highest port browsers refuse), and print the TIME_WAIT count when they
+  fail.
 - `SERIAL_TEST_FILES` holds the files that measure a duration or a pace: spec
   013 AC-7/AC-8 and spec 022 AC-11/AC-12 (list scroll, 300 ms), spec 022 AC-10
   (pacing), spec 036 AC-1 (time budgets), spec 027's live pages, and since
@@ -226,6 +249,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 - 2026-10-16, night: build the four remaining Phase 6 specs now ("The four extras
   now"), in the build plan's order, one pull request each: 038, then 034
   ("Then catchup"), then 033 and 029. PR #15 merged.
+- 2026-10-17: the pipeline is too slow ("I'm really upset by the time
+  everything now takes"). The test-writer and implementer run at high effort,
+  the spec-writer and reviewer keep the session's max; CI drops Firefox's
+  Windows job. PRs #17 and #18 merged.
 
 ## Lead decisions of 2026-10-15 worth knowing
 
@@ -247,9 +274,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 
 - A separate cloud session ("Nock hosting plan (document only)") drafts
   `docs/hosting.md` on branch `docs/hosting-plan`.
-- Another cloud session, "Nock graphical design ideas (no code)"
+- Another cloud session, "Nock graphical design ideas"
   (session_011p3hVBtTSdr7LXMomuHkez, opened 2026-10-16 at the human's request),
-  brews design directions with the human: ideas only, no file, no code.
+  works on design directions with the human. Its PR #18 (merged 2026-10-17)
+  added the design reference, a cell sheet and the draft spec 041.
 - Visual design, for the human to take up later (2026-10-16, after seeing the
   app for the first time, from screenshots): the app works but has no visual
   design (browser-default buttons, everything stacked above the grid, a narrow
@@ -278,6 +306,7 @@ can be a raw WebSocket opened from a page of the same origin (`join`, then
 - Start a fresh session when the lead's context grows large.
 - Cheaper models (Sonnet) for small spec notes and mechanical test edits; Opus
   for building, test-writing of whole specs and reviews (pass `model: "opus"`:
-  the implementer and test-writer definitions default to Sonnet).
+  the implementer and test-writer definitions default to Sonnet, at high
+  effort).
 - Do not run the local full gate while agents run browsers; CI is the full
   check once a pull request is open.

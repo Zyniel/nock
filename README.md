@@ -152,7 +152,8 @@ supposed to fail.
 The browser tests run in Chromium and WebKit by default; `--browsers all` (or
 `NOCK_BROWSERS=all`) adds Firefox. `--tests browser` or `--tests other` runs only
 the tests with or without a browser, and `--skip-static` skips steps 1 to 4
-except the build. CI uses them to run one job per engine and system.
+except the build. CI uses them to run one job per engine on Ubuntu, plus
+Chromium and WebKit on Windows.
 `--specs 027,028` keeps the browser tests of those specs only (the tests without
 a browser all run): the quick gate an implementer passes before it finishes.
 
