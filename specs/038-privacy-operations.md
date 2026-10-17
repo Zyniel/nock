@@ -50,6 +50,30 @@ of AC-4's WebSocket part. Criteria: AC-6 changed, for the store's pairs, which i
 checks in Python, and for the answers while the pages are off. This spec has no
 tests yet (preparation of spec 038).)
 
+(Note from the lead, 2026-10-16: refined after the first review of spec 038, each
+change with a dated note. Spec 011's wrong-code throttle now forgets, each time it
+records a failure, every address whose failures are all outside the window, and
+gains a read-only `held_addresses()` (spec 011, with a dated note); here the row
+"Process memory" of "What the server keeps" says exactly what the two throttles
+keep and for how long, and "Operator access" says that the ops throttle forgets the
+same way. A token given to `create_app` follows the rule of `NOCK_OPERATOR_TOKEN`:
+`""` turns the pages off, and an invalid token raises `SettingsError` at once. While
+the pages are off, a request of any method to `/api/ops` or under `/api/ops/`
+answers as an unknown path under `/api/` does. Rules 2 and 3 name the two ops
+routes, and an unknown path under `/api/ops/` while the pages are on gets FastAPI's
+plain 404, with `Cache-Control: no-store` and no token check. On the ops page,
+`loading` is the first load only: a period change keeps the dashboard, the replay
+and the focus. The app's own logs hold none of AC-3's strings, whatever their level.
+Criteria whose tests follow: AC-3 (an in-process check with the `nock` loggers at
+`DEBUG`), AC-6 (the throttle's memory, `POST` and `DELETE` with the pages off, and
+new edge cases), AC-7 (no request URL holds the token; after a press of the period
+`30`, the focus is on it and a replay shown before keeps its edits) and AC-10
+(`create_app(operator_token="")` and `create_app(operator_token="a")`). "Open
+questions" held one question, on an error answer to a period change, which no
+criterion depends on (first review of spec 038). The lead answered it on 2026-10-17
+with option (a): `error`, as for the first load, now written in "Period change" of
+"Client: the ops page `/ops`"; "Open questions" reads "None." again.)
+
 Epic E10 Quality bar (US-10.4) · Release: MVP · Epic depends on: All
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; guests and the stored identity in spec 012; the
@@ -72,7 +96,7 @@ These criteria apply to every story above and belong in each agent's definition 
 | --- | --- | --- |
 | SQLite `NOCK_DATABASE`, rooms (spec 018) | per room: its code, creation and last edit times (spec 032); snapshots of `RoomState`: the grid with its answers, the cells (letters, authors, locks), the players (`PlayerRecord`: player id, resume token, nickname, colour, host and mute flags, presence state, the seq of their join, the times of their last input, frame and disconnection, selection, the times of their recent edits, chat messages and reactions, last edit, clue flag), the past players (`PastPlayer`: player id, resume token, nickname, colour, mute flag), the removed tokens, the settings and what later specs add | until the room expires, 30 days after its last edit (spec 032 AC-1); then deleted at the next sweep (within an hour) or at once by any lookup |
 | SQLite, log of each room (spec 018) | every numbered event exactly as the players received it (letters, checks, reveals, votes, flags, chat texts, joins with the player's view, presence, settings, completion), each with its time `at`, plus the private fields `resume_token` (on a join), `undo` and `relay_ms` (this spec) | the same: deleted with the room |
-| Process memory | live rooms; the wrong room codes of each client address (spec 011) and the wrong operator tokens of each address (this spec), for 60 seconds | until the window passes, or the process stops |
+| Process memory | live rooms; in each of an app's two throttles, the client addresses with failures and the times of those failures, never the codes or the tokens that failed: the wrong room codes in spec 011's throttle (which spec 028's recap route shares), the refused ops requests in this spec's (rule 2) | at most until the process stops; a live room until it is deleted (spec 032); an address until 60 seconds after its last failure in that throttle, and at most until the next failure that throttle records after that (spec 011) |
 | Process logs (stdout, stderr) | warnings and errors of the server and of the app, with room codes and error descriptions | the operator's choice; they hold no client address, no resume token, no operator token and no chat text |
 | The player's device | `localStorage` (specs 004, 010, 012, 032 to 034, 029); the ops page's token in `sessionStorage` (this spec) | until the player clears the site's data, or the tab is closed for `sessionStorage` |
 | Accounts (spec 033) | defined there | defined there |
@@ -97,6 +121,15 @@ their clue flag (`flag`, spec 021), which the code holds. The list read "presenc
 state and the times of their last input, frame and disconnection, selection,
 recent edit times, last edit". These fields are game state, kept and deleted with
 the room. No criterion changes (preparation of spec 038).)
+
+(Note from the lead, 2026-10-16: the row "Process memory" read "live rooms; the wrong
+room codes of each client address (spec 011) and the wrong operator tokens of each
+address (this spec), for 60 seconds", kept "until the window passes, or the process
+stops". Spec 011's throttle forgot the old failures only of the address it was asked
+about, so an address that failed once and never came back stayed until the process
+stopped, and expired or mistyped room codes made ordinary visitors' addresses pile
+up. Spec 011's throttle now forgets them, and the row says what the throttles keep
+and for how long; AC-6 checks it (first review of spec 038).)
 
 - Personal data about a guest is their nickname and two random identifiers, the
   player id and the resume token (AC-1). Every other field of `PlayerRecord` and
@@ -136,8 +169,11 @@ def server_config(
   a line for each accepted WebSocket. With `access_log=False` and the `warning` level,
   `python -m nock` (spec 036 `main()`, which uses `server_config`'s default level)
   writes neither (AC-3).
-- The app's own log records (`nock.*` loggers) never hold a client address, a resume
-  token, the operator token or a chat text.
+- The app's own log records (`nock.*` loggers), at every level, never hold a client
+  address, a resume token, the operator token or a chat text (AC-3 checks them at
+  `DEBUG`). (Note from the lead, 2026-10-16: "at every level" and the check at
+  `DEBUG` were added; AC-3 tested the subprocess at the `warning` level only (first
+  review of spec 038).)
 
 ### `nock.room` and `nock.hub`: server relay time
 
@@ -219,44 +255,93 @@ def create_app(
     catalogue: Catalogue | None = None,
     *,
     operator_token: str | None = None,  # None: NOCK_OPERATOR_TOKEN, read when the app starts
-) -> FastAPI: ...
+) -> FastAPI:
+    """Build the app.
+
+    A token given goes through the rule of `operator_token_from_env` when
+    `create_app` is called: `""` turns the operator pages off, as an unset
+    variable does, and NOCK_OPERATOR_TOKEN is not read; a token that keeps the
+    rule turns them on. None still means: read NOCK_OPERATOR_TOKEN when the app
+    starts.
+
+    Raises:
+        SettingsError: `operator_token` breaks the rule, raised at once; its
+            message never holds the value.
+    """
 ```
 
-Rules, for every path under `/api/ops/` (the ops API):
+(Note from the lead, 2026-10-16: the docstring was added; the block ended with
+`-> FastAPI: ...`, and a token given to `create_app` was used as it was, without the
+rule of the variable (first review of spec 038).)
 
-1. Operator pages off (no token given, and the variable unset or empty when the app
-   started): `GET /ops` and every ops API path answer exactly as any unknown path
-   does (spec 040): 404 with `{"detail": "Not Found"}` and no `Cache-Control`
-   header. None of the rules below applies to them. (Note from the lead,
-   2026-10-16: decided after the spec-writer's report; this read "answer 404 with
-   `{"detail": "Not Found"}`, as any unknown path (spec 040)", which left open
-   whether rule 4 applies while the pages are off (preparation of spec 038).)
-2. Throttle: when the client address (as spec 011 reads it) has at least
-   `WRONG_CODE_LIMIT` (10) refused ops requests whose time `t` satisfies
-   `t > now - WRONG_CODE_WINDOW_SECONDS` (60.0, `now = rooms.clock()`), spec 011's
-   constants, the request answers 429 with `{"detail": "Too Many Requests"}`,
-   whatever its token. This refusal is not counted. (Note from the lead,
-   2026-10-16: decided after the spec-writer's report, the throttle uses spec 011's
-   constants; this read "`WRONG_TOKEN_LIMIT = 10`" and "`WRONG_TOKEN_WINDOW_SECONDS`
-   (60.0, ...)", two names of this spec with the same values (preparation of spec
-   038).)
-3. The request must carry the header `Authorization: Bearer <token>`, compared with
-   the operator token by `secrets.compare_digest`. A missing or different token
-   answers 401 with `{"detail": "Not authorized"}` and the header
-   `WWW-Authenticate: Bearer`, and counts as one refusal for its address. This check
-   comes right after rules 1 and 2, before anything else of the request (its query,
-   its code, its room) is looked at: a request with a missing or wrong token answers
-   401 whatever else it holds. For example, `?days=2` with a wrong token answers 401,
-   and only a right token with a wrong `days` gets 422. (Note from the lead,
-   2026-10-16: added: the spec did not say whether the token check or the validation
-   of the request comes first (questions from spec 038's tests).)
+Rules, for every path under `/api/ops/` (the ops API). Rules 2 and 3 apply to its
+two routes only, `GET /api/ops/dashboard` and `GET /api/ops/rooms/{code}/edits`
+(see the paragraph after rule 4). (Note from the lead, 2026-10-16: the sentence on
+rules 2 and 3 was added, and the first sentence ended with a colon; the rules named
+no route (first review of spec 038).)
+
+1. Operator pages off (`operator_token=""` given, or no token given and the variable
+   unset or empty when the app started): `GET /ops` answers exactly as any unknown
+   path does (spec 040), and a request of any method to `/api/ops` or to a path
+   under `/api/ops/` answers exactly as a request of the same method to an unknown
+   path under `/api/` does (for example `/api/xyz/dashboard`): 404 with
+   `{"detail": "Not Found"}` and no `Cache-Control` header. None of the rules below
+   applies to them. (Note from the lead, 2026-10-16: decided after the
+   spec-writer's report; this read "answer 404 with `{"detail": "Not Found"}`, as
+   any unknown path (spec 040)", which left open whether rule 4 applies while the
+   pages are off (preparation of spec 038).) (Note from the lead, 2026-10-16: this
+   read "Operator pages off (no token given, and the variable unset or empty when
+   the app started): `GET /ops` and every ops API path answer exactly as any
+   unknown path does (spec 040)". `operator_token=""` now turns the pages off, and
+   every method answers as on an unknown path under `/api/`, since
+   `POST /api/ops/dashboard` answered 405 while `POST /api/xyz/dashboard` answers
+   404 (first review of spec 038).)
+2. Throttle: when the client address (as spec 011 reads it) of a request to one of
+   the two ops routes has at least `WRONG_CODE_LIMIT` (10) refused ops requests
+   whose time `t` satisfies `t > now - WRONG_CODE_WINDOW_SECONDS` (60.0,
+   `now = rooms.clock()`), spec 011's constants, the request answers 429 with
+   `{"detail": "Too Many Requests"}`, whatever its token. This refusal is not
+   counted. (Note from the lead, 2026-10-16: decided after the spec-writer's report,
+   the throttle uses spec 011's constants; this read "`WRONG_TOKEN_LIMIT = 10`" and
+   "`WRONG_TOKEN_WINDOW_SECONDS` (60.0, ...)", two names of this spec with the same
+   values (preparation of spec 038).) (Note from the lead, 2026-10-16: "of a request
+   to one of the two ops routes" was added; this read "when the client address (as
+   spec 011 reads it) has at least" (first review of spec 038).)
+3. A request to one of the two ops routes must carry the header
+   `Authorization: Bearer <token>`, compared with the operator token by
+   `secrets.compare_digest`. A missing or different token answers 401 with
+   `{"detail": "Not authorized"}` and the header `WWW-Authenticate: Bearer`, and
+   counts as one refusal for its address. This check comes right after rules 1 and
+   2, before anything else of the request (its query, its code, its room) is looked
+   at: a request with a missing or wrong token answers 401 whatever else it holds.
+   For example, `?days=2` with a wrong token answers 401, and only a right token with
+   a wrong `days` gets 422. (Note from the lead, 2026-10-16: added: the spec did not
+   say whether the token check or the validation of the request comes first
+   (questions from spec 038's tests).) (Note from the lead, 2026-10-16: this rule
+   began "The request must carry the header" (first review of spec 038).)
 4. While the operator pages are on, every ops API answer, refusals included, has
    `Cache-Control: no-store`. (Note from the lead, 2026-10-16: decided after the
    spec-writer's report; this read "Every ops API answer, refusals included, has
    `Cache-Control: no-store`." (preparation of spec 038).)
 
+Any other request under `/api/ops/` while the operator pages are on is not one of
+the two routes, so rules 2 and 3 do not apply to it: no token check, and nothing
+counted. An unknown path, such as `GET /api/ops/xyz` or `GET /api/ops/dashboard/`,
+gets FastAPI's plain 404, `{"detail": "Not Found"}`, with `Cache-Control: no-store`
+(rule 4); another method on the path of one of the two routes, such as
+`POST /api/ops/dashboard`, gets FastAPI's 405, with `Cache-Control: no-store`.
+(Note from the lead, 2026-10-16: added. The rules applied "for every path under
+`/api/ops/`" and named no route, while the code checks the token on the two routes
+only. In the code, an unknown path under `/api/ops/` gets that 404, and another
+method on the path of a route gets that 405 (first review of spec 038).)
+
 The token is never read from a URL, a query or a cookie, and never written to a log.
-The failures are kept per app, in memory, like spec 011's.
+The failures are kept per app, in memory, and forgotten, like spec 011's: each time
+the ops throttle records a refusal, it first forgets every address whose refusals
+are all outside the window (spec 011; AC-6 checks `held_addresses()`). (Note from the
+lead, 2026-10-16: "and forgotten, like spec 011's: ..." was added; this read "The
+failures are kept per app, in memory, like spec 011's." (first review of spec
+038).)
 
 Rules 2 and 3 are spec 011's wrong-code throttle as spec 032 left it, applied to
 refused ops requests: the ops API keeps a second instance of that throttle
@@ -423,12 +508,16 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
 `/`), and 404 otherwise.
 
 - Root `data-testid="ops-page"`, heading `t("ops.heading")`, `data-state`: `locked`
-  (the token form shows), `loading` (shows `t("ops.loading")` in an element with
-  `role="status"`), `ready`, or `error` (an answer other than 200, 401 or 429, or a
-  network failure; shows `t("ops.error")`). (Note from the lead, 2026-10-16: added:
-  the spec did not say what the page shows while `data-state` is `loading`; the key
-  `ops.loading` was listed in "New `fr.json` keys" and used nowhere
-  (questions from spec 038's tests).)
+  (the token form shows), `loading` (only while the dashboard loads after the token
+  is given or found in `sessionStorage`, never for a period change; shows
+  `t("ops.loading")` in an element with `role="status"`), `ready`, or `error` (an
+  answer other than 200, 401 or 429, or a network failure; shows `t("ops.error")`).
+  (Note from the lead, 2026-10-16: added: the spec did not say what the page shows
+  while `data-state` is `loading`; the key `ops.loading` was listed in "New
+  `fr.json` keys" and used nowhere (questions from spec 038's tests).) (Note from the
+  lead, 2026-10-16: "only while the dashboard loads after the token is given or
+  found in `sessionStorage`, never for a period change" was added, see "Period
+  change" below (first review of spec 038).)
 - Token form `data-testid="ops-token-form"`: a password input
   `data-testid="ops-token-input"` labelled `t("ops.token_label")`, and a submit
   button `data-testid="ops-token-submit"` with `t("ops.token_submit")`. Submitting
@@ -469,6 +558,18 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
   2026-10-16: added: the spec did not say how a number is written in `data-value`;
   `String(figure)` replaces "the figure as received"
   (questions from spec 038's tests).)
+- Period change: a press of an `ops-period` button keeps `data-state="ready"`: the
+  dashboard and the replay stay on screen, the focus stays on the pressed
+  `ops-period` button, and the six metrics change when the answer arrives. A 401 or
+  429 to that request still locks the page, as above. An answer to that request
+  other than 200, 401 or 429, or a network failure, sends the page to
+  `data-state="error"` and shows `t("ops.error")`, as for the first load. (Note
+  from the lead, 2026-10-16: added. A period change sent the page to `loading`,
+  which took the dashboard and the replay off the screen, dropped the focus and
+  emptied an open replay (first review of spec 038).) (Note from the lead,
+  2026-10-17: added: the spec did not say what a period change does on another
+  answer; the lead chose option (a) of the open question (first review of spec
+  038).)
 - Duration text (shared with spec 029): with `s` the whole seconds of the
   milliseconds (rounded down), `h = floor(s / 3600)`, `m = floor(s % 3600 / 60)`,
   `sec = s % 60`: `t("duration.minutes", {minutes: m, seconds: <sec on 2 digits>})`
@@ -561,6 +662,11 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
   sequences; HTTP checks (AC-6) seed a registry with a fake clock whose store holds
   rooms with chosen creation times (`new_room(code, grid, <creation time>)`, then
   `add_room`, then `store.append` of their entries).
+- Throttle memory (AC-6): the test builds the throttle itself, `_WrongCodeThrottle()`
+  imported from `nock.server` (spec 011), and passes the time of each failure to
+  `record_unless_blocked` (`t`, `t + 61`, ...); no app, clock or request is needed. An app does not
+  expose its two throttles; both are instances of that class (rule 2). (Note from
+  the lead, 2026-10-16: added (first review of spec 038).)
 - Database bytes (AC-1, AC-4): the test reads `nock.sqlite3` and, when it exists,
   `nock.sqlite3-wal` from `tmp_path` as bytes and searches them for UTF-8 strings.
 - Browser with live server and a file database (AC-1, AC-2, AC-7, AC-9): the test
@@ -580,11 +686,28 @@ on `GET /ops` while the operator pages are on (503 when the client is not built,
   `NOCK_OPERATOR_TOKEN=OPS_TOKEN`; the test captures the process's stdout and stderr.
   `main()` in the test process with `uvicorn.Server.run` replaced is spec 036's
   recorder.
+- In-process logs (AC-3): `TestClient(app, client=("127.0.0.1", 50000))`, opened as
+  a context manager, on
+  `app = create_app(rooms=registry, dist_dir=tmp_path, operator_token=OPS_TOKEN)`,
+  `registry` holding a FX-01 room, so that the client's address is the `127.0.0.1`
+  searched for; the `nock` loggers are at `DEBUG`
+  (`caplog.set_level(logging.DEBUG, logger="nock")`). A record holds a string when
+  the text of `logging.Formatter().format(record)`, which adds its traceback, holds
+  it. (Note from the lead, 2026-10-16: added (first review of spec 038).)
 - Relay time (AC-11): spec 036's blocking store (a `RoomStore(":memory:")` subclass
   whose `append` waits on a `threading.Event` while a flag is set) and hub tests on
   their own event loop, as spec 036's AC-6.
 - Mocked ops API (AC-7): `page.route("**/api/ops/dashboard*", handler)` answering
   JSON built from `DashboardFigures`; the context has `timezone_id="Europe/Paris"`.
+- Ops page requests (AC-7): the test records the URL of every request of the page
+  with `page.on("request")`, set before the page opens `/ops`. (Note from the lead,
+  2026-10-16: added (first review of spec 038).)
+- Replay before a period change (AC-7, live): a room with edits that the test seeds
+  in the live server's store as AC-6 seeds its rooms (`new_room`, `add_room`, then
+  `store.append` of its entries), and whose code it submits in `ops-replay-code`.
+  The period is pressed from the keyboard, since WebKit on Windows and macOS does
+  not focus a clicked button (spec 014). (Note from the lead, 2026-10-16: added
+  (first review of spec 038).)
 - Engines: every browser criterion runs in Chromium, Firefox and WebKit. No check of
   this spec is Chromium-only.
 
@@ -594,14 +717,14 @@ The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-10.4.1) (browser with live server and a file database) A guest is stored as a nickname and a random identifier, nothing else. In the probe context, a page enters a FX-01 room as `Ana` (spec 011's `enter_room`) and types `T`, `A`, `M` from (1, 0) across; the test then closes the registry (which saves a snapshot) and the store. The bytes of the database files hold `ANA`, her nickname as the server stores it (spec 012), and her `data-you` player id, and hold none of `NockPrivacyProbe`, `probe-header-91`, `fr-FR` and `127.0.0.1`. (Note from the lead, 2026-10-16: the nickname searched was `Ana`, which the store never holds once nicknames are in capitals (human's rule of 2026-10-16: nicknames in capitals).)
 - **AC-2** (AC-10.4.1) (browser with live server) Playing needs no advertising cookie, nor any cookie. In the probe context, a page opens `/`, starts FX-01 from the catalogue (spec 010), types the 18 letters of FX-01 word by word, 60 ms or more between keys (spec 037's harness), and reaches `data-solved="true"` (spec 026). Then no recorded response has a `set-cookie` header, `context.cookies()` is empty, `document.cookie` is `""`, and every recorded request URL starts with the server's origin (`http://127.0.0.1:<port>` or `ws://127.0.0.1:<port>`).
-- **AC-3** (AC-10.4.1) (subprocess; WebSocket from a Playwright page) The production server writes no client address and no secret to its logs. With the subprocess of "Test harness", a page on the server's origin loads `/`, opens a socket to the stored room, joins as `Ana`, sends three `edit_letter` messages and a `chat` (spec 022) with the text `chat-probe-5521`, then requests `GET /api/ops/dashboard` once with a wrong token and once with `OPS_TOKEN`, and `GET /nothing-here`; the test stops the process. Its stdout and stderr together hold none of `127.0.0.1`, `GET /`, `WebSocket /`, the resume token of Ana's snapshot, `chat-probe-5521` and `OPS_TOKEN`. `server_config(app).access_log is False` and its default `log_level` is `"warning"`.
+- **AC-3** (AC-10.4.1) (subprocess; WebSocket from a Playwright page; in process, `TestClient`) The production server writes no client address and no secret to its logs. With the subprocess of "Test harness", a page on the server's origin loads `/`, opens a socket to the stored room, joins as `Ana`, sends three `edit_letter` messages and a `chat` (spec 022) with the text `chat-probe-5521`, then requests `GET /api/ops/dashboard` once with a wrong token and once with `OPS_TOKEN`, and `GET /nothing-here`; the test stops the process. Its stdout and stderr together hold none of `127.0.0.1`, `GET /`, `WebSocket /`, the resume token of Ana's snapshot, `chat-probe-5521` and `OPS_TOKEN`. `server_config(app).access_log is False` and its default `log_level` is `"warning"`. In process, with the `nock` loggers at `DEBUG` ("In-process logs" of "Test harness"), a session of the same steps (`GET /`, a socket to a FX-01 room joined as `Ana`, three `edit_letter` messages and a `chat` with the text `chat-probe-5521`, then `GET /api/ops/dashboard` once with a wrong token and once with `OPS_TOKEN`, and `GET /nothing-here`) logs no `nock.*` record holding any of those strings, the resume token being that of Ana's snapshot in this session. (Note from the lead, 2026-10-16: the in-process check was added, with "in process, `TestClient`" in the brackets; AC-3 tested the subprocess at the `warning` level only, so a `nock.*` record below that level went unchecked (first review of spec 038).)
 - **AC-4** (AC-10.4.2) (Python; WebSocket with a fake clock) Room data, chat included, is deleted at room expiry, with no copy left in the database files. Python: with a store file, room A (a code that occurs nowhere else in the file, see "Edge cases") holds the joins of `Zélie` and `Bob`, a `chat_message` of Zélie with the text `chat-secret-4711`, letters and a check; room B holds `Yann` and the chat text `chat-kept-8203`. After room A expires and `expire_rooms()` returns it, while the store is still open, the database files hold none of `chat-secret-4711`, `ZÉLIE` (UTF-8, her nickname as the server stores it, spec 012), A's code and A's resume tokens, and still hold `chat-kept-8203` and `YANN`. (Note from the lead, 2026-10-16: the nicknames searched were `Zélie` and `Yann`, which the store never holds once nicknames are in capitals (human's rule of 2026-10-16: nicknames in capitals).) The same holds once the store is closed. WebSocket: with spec 032 AC-2's setup (`expiry_sweep_seconds=0.05`), after a chat in the room and `advance(LIFE + 1)`, the sweep alone deletes the room, and within 2 seconds of real time the database files hold none of the chat's text, `ANA` and `BOB` (the nicknames of that setup as the server stores them, spec 012), the room's code and its resume tokens. (Note from the lead, 2026-10-16: this read "the sweep alone deletes the room and the same bytes are gone within 2 seconds of real time", which named no string for a room whose players are not those of the Python part (preparation of spec 038).)
 - **AC-5** (AC-10.4.3) (Python) The dashboard's figures come from the room logs. With `now = T` and these `RoomLog` values: R1 created at `T - 2 DAY` with 3 `player_joined`, five `letter_changed` with `relay_ms` 10, 20, 30, 40 and None, one drop of `p2` (`disconnected` then `active`), `p3` `disconnected` and never back, and a `grid_solved` with `elapsed_ms` 600,000; R2 created at `T - 1 DAY` with 1 `player_joined`, one `letter_changed` with `relay_ms` 50 and a `grid_solved` with `elapsed_ms` 900,000; R3 created at `T - 3 DAY` with 2 `player_joined`, no edit, and `p1` `disconnected`, `active`, `disconnected`, `active` (two drops); R4 created at `T - 8 DAY` with 5 joins and a `grid_solved`. `dashboard_figures(rooms, 7, T)` gives `rooms_created=3`, `players_per_room=2.0`, `completion_rate` 2/3, `median_solving_ms=750000.0`, `latency_median_ms=30.0`, `latency_p95_ms=50`, `disconnection_rate=0.5` and `since` = `T - 7 DAY` in UTC; with `days=1` it gives `rooms_created=1` (R2, created exactly at the start of the period), `players_per_room=1.0`, `completion_rate=1.0`, `median_solving_ms=900000.0`, `latency_median_ms=50.0`, `latency_p95_ms=50` and `disconnection_rate=0.0`; with no room, `rooms_created=0` and every other figure None; `days=2` raises `ValueError`.
-- **AC-6** (AC-10.4.3) (HTTP; Python) Only the operator reaches the dashboard. With `OPS_TOKEN`: `GET /api/ops/dashboard` with `Authorization: Bearer <OPS_TOKEN>` answers 200 with `DashboardFigures` JSON whose `days` is 7 and whose figures are those of `dashboard_figures` over one `RoomLog` per pair of `rooms.store.codes_created_since(now - 7 * DAY)`, with that room's log; `?days=30` gives `days` 30; `?days=2` answers 422. On a store holding rooms created at `now - 8 * DAY`, `now - 7 * DAY` and `now - DAY`, `codes_created_since(now - 7 * DAY)` returns the `(code, created_at)` pairs of the last two and no other, in any order. Without the header, with `Bearer wrong`, with `Basic <OPS_TOKEN>` or with the token in the query `?token=<OPS_TOKEN>`, it answers 401 with `{"detail": "Not authorized"}` and `WWW-Authenticate: Bearer`; while the operator pages are on, every ops answer has `Cache-Control: no-store`. After 10 refused requests from one address within 60 seconds of the fake clock, the next request answers 429, also with the right token; after `advance(60)` the right token gets 200 again. With the operator pages off, `GET /api/ops/dashboard` with the right token, `GET /api/ops/rooms/<code>/edits` and `GET /ops` answer exactly as an unknown path does: 404 with `{"detail": "Not Found"}` and no `Cache-Control` header; with them on, `GET /ops` answers 200 with `index.html`. (Note from the lead, 2026-10-16: decided after the spec-writer's report. "over the store's rooms" became the reads of "Ops API", and the check of `codes_created_since` was added, with "Python" in the brackets, since the figures alone cannot show which rooms the store returns; "every ops answer has `Cache-Control: no-store`" gained "while the operator pages are on"; the answers with the pages off read "answer 404 with `{"detail": "Not Found"}`" (preparation of spec 038).)
-- **AC-7** (AC-10.4.3) (browser with live server; browser with mocked ops API) The ops page shows the dashboard once the operator gives the token. Live: `/ops` shows `ops-page` with `data-state="locked"` and the token form; submitting `wrong` shows `ops-token-error` with `fr.json["ops.token_refused"]`; submitting `OPS_TOKEN` reaches `data-state="ready"` with six `ops-metric` elements in the order of "Client", the period `7` pressed, and every ops request carrying `Authorization: Bearer <OPS_TOKEN>`; afterwards `sessionStorage["nock.ops_token"]` is `OPS_TOKEN`, no `localStorage` value and no cookie holds it, and the page's URL is still `<base>/ops`; clicking the period `30` sends `days=30` and presses it; a reload shows the dashboard without the form. Mocked, with the figures of AC-5's 7-day result: the six texts are `Salons créés : 3`, `Joueurs par salon : 2,0`, `Grilles terminées : 67 %`, `Temps médian de résolution : 12 min 30 s`, `Latence du serveur : 30 ms (médiane), 50 ms (95e centile)` and `Coupures par joueur : 0,50`; with the result of no room, they are `Salons créés : 0`, `Joueurs par salon : aucune donnée`, `Grilles terminées : aucune donnée`, `Temps médian de résolution : aucune donnée`, `Latence du serveur : aucune donnée` and `Coupures par joueur : aucune donnée`, and each `data-value` other than that of `rooms_created` is `""`. Keyboard only, `tab_to` reaches the token input, typing the token and `Enter` loads the dashboard, and `tab_to` reaches each `ops-period` with spec 035 AC-2's outline. Spec 035's contrast and language scans find no offending element on the ready page at 1280 by 720 and 360 by 740, and at each window size of spec 006 AC-5 the page has no horizontal scroll.
+- **AC-6** (AC-10.4.3) (HTTP; Python) Only the operator reaches the dashboard. With `OPS_TOKEN`: `GET /api/ops/dashboard` with `Authorization: Bearer <OPS_TOKEN>` answers 200 with `DashboardFigures` JSON whose `days` is 7 and whose figures are those of `dashboard_figures` over one `RoomLog` per pair of `rooms.store.codes_created_since(now - 7 * DAY)`, with that room's log; `?days=30` gives `days` 30; `?days=2` answers 422. On a store holding rooms created at `now - 8 * DAY`, `now - 7 * DAY` and `now - DAY`, `codes_created_since(now - 7 * DAY)` returns the `(code, created_at)` pairs of the last two and no other, in any order. Without the header, with `Bearer wrong`, with `Basic <OPS_TOKEN>` or with the token in the query `?token=<OPS_TOKEN>`, it answers 401 with `{"detail": "Not authorized"}` and `WWW-Authenticate: Bearer`; while the operator pages are on, every ops answer has `Cache-Control: no-store`. After 10 refused requests from one address within 60 seconds of the fake clock, the next request answers 429, also with the right token; after `advance(60)` the right token gets 200 again. Throttle memory (Python): a `_WrongCodeThrottle()` (spec 011) that records a failure of each of `10.0.0.1` to `10.0.0.5` at `t` (`record_unless_blocked(<address>, t)`), then one of `10.0.0.6` at `t + 61`, has `held_addresses() == frozenset({"10.0.0.6"})`; the same holds for the ops throttle, which is an instance of that class too (rule 2). With the operator pages off, `GET /ops` answers exactly as an unknown path does, and `GET`, `POST` and `DELETE` requests to `/api/ops/dashboard` and to `/api/ops/rooms/<code>/edits`, each with the right token, answer exactly as the same method on an unknown path under `/api/` (for example `/api/xyz/dashboard`): 404 with `{"detail": "Not Found"}` and no `Cache-Control` header; with them on, `GET /ops` answers 200 with `index.html`. (Note from the lead, 2026-10-16: decided after the spec-writer's report. "over the store's rooms" became the reads of "Ops API", and the check of `codes_created_since` was added, with "Python" in the brackets, since the figures alone cannot show which rooms the store returns; "every ops answer has `Cache-Control: no-store`" gained "while the operator pages are on"; the answers with the pages off read "answer 404 with `{"detail": "Not Found"}`" (preparation of spec 038).) (Note from the lead, 2026-10-16: the throttle-memory check was added, for spec 011's throttle, which now forgets addresses. The answers with the pages off read "`GET /api/ops/dashboard` with the right token, `GET /api/ops/rooms/<code>/edits` and `GET /ops` answer exactly as an unknown path does", with no `POST` or `DELETE`, which answered 405 (first review of spec 038).)
+- **AC-7** (AC-10.4.3) (browser with live server; browser with mocked ops API) The ops page shows the dashboard once the operator gives the token. Live: `/ops` shows `ops-page` with `data-state="locked"` and the token form; submitting `wrong` shows `ops-token-error` with `fr.json["ops.token_refused"]`; submitting `OPS_TOKEN` reaches `data-state="ready"` with six `ops-metric` elements in the order of "Client", the period `7` pressed, and every ops request carrying `Authorization: Bearer <OPS_TOKEN>`; afterwards `sessionStorage["nock.ops_token"]` is `OPS_TOKEN`, no `localStorage` value and no cookie holds it, and the page's URL is still `<base>/ops`; clicking the period `30` sends `days=30` and presses it; a reload shows the dashboard without the form; and no URL of a request the page made in these steps, the period change and the reload included, holds `OPS_TOKEN`. With a replay shown (`ops-replay` with `data-state="ready"` and its `ops-edit` items) and the period `7` pressed, a press of the period `30` from the keyboard (`tab_to` it, then `Enter`) leaves the focus on that button once it is pressed (`aria-pressed="true"`), and the replay keeps its `ops-edit` items. Mocked, with the figures of AC-5's 7-day result: the six texts are `Salons créés : 3`, `Joueurs par salon : 2,0`, `Grilles terminées : 67 %`, `Temps médian de résolution : 12 min 30 s`, `Latence du serveur : 30 ms (médiane), 50 ms (95e centile)` and `Coupures par joueur : 0,50`; with the result of no room, they are `Salons créés : 0`, `Joueurs par salon : aucune donnée`, `Grilles terminées : aucune donnée`, `Temps médian de résolution : aucune donnée`, `Latence du serveur : aucune donnée` and `Coupures par joueur : aucune donnée`, and each `data-value` other than that of `rooms_created` is `""`. Keyboard only, `tab_to` reaches the token input, typing the token and `Enter` loads the dashboard, and `tab_to` reaches each `ops-period` with spec 035 AC-2's outline. Spec 035's contrast and language scans find no offending element on the ready page at 1280 by 720 and 360 by 740, and at each window size of spec 006 AC-5 the page has no horizontal scroll. (Note from the lead, 2026-10-16: "and no URL of a request the page made in these steps, the period change and the reload included, holds `OPS_TOKEN`" was added: only `localStorage`, the cookies and the page's own URL were checked. The press of the period `30` with a replay shown was added, for the rule that a period change keeps the page as it is ("Period change" of "Client"); it is made from the keyboard, since WebKit on Windows and macOS does not focus a clicked button (spec 014) (first review of spec 038).)
 - **AC-8** (AC-10.4.4) (Python; HTTP) An operator gets the ordered edits of a room from its log. Python: for the entries of a FX-01 room where `Ana` (`p1`) typed `T` at (1, 0), `Bob` (`p2`) typed `A` at (1, 1) and then `M` at (1, 2) in pencil (spec 020), Ana erased (1, 0), Ana undid her erase, a check locked (1, 1), a reveal locked `M` at (1, 2), and joins, chat and presence entries came in between, `room_edits` returns exactly seven `RoomEdit` values in seq order, of kinds `typed` (`T`), `typed` (`A`), `typed` (`M`, `pencil=True`), `erased`, `undone` (letter `T`), `locked` (letter `A`, no player) and `revealed` (letter `M`, no player), with the `seq`, `at` (UTC), `row`, `column` and `player_id` of their entries, and for the first five the `nickname` of their player's `player_joined`: `ANA` or `BOB`, as the server stores them (spec 012). (Note from the lead, 2026-10-16: this read "with the `seq`, `at` (UTC), `row`, `column`, `player_id` and `nickname` (`Ana`, `Bob`) of their entries"; the nicknames come from the `player_joined` entries, which hold them in capitals, spec 039's "Nicknames in capitals" (preparation of spec 038).) HTTP: `GET /api/ops/rooms/<code>/edits` with the token answers 200 with `RoomReplay` JSON whose `grid` equals `grid_view` of the room's grid and whose `edits` equal `room_edits` of its log; its body holds none of the eight FX-01 answers and no key `answer` (spec 037); an unknown code, an expired room and `abc` answer 404.
 - **AC-9** (AC-10.4.4) (browser with live server) The ops page replays a room's edits in order. After a page entered a FX-01 room as `Ana` and typed `T`, `A`, `M`, `I`, `S` from (1, 0) across, then clicked (1, 4) and pressed `Backspace`, which erases it (spec 008), the ops page (another context, `timezone_id="Europe/Paris"`, token given) with the room's code in `ops-replay-code` reaches `ops-replay` `data-state="ready"` with six `ops-edit` items in seq order: five `typed` with letters `T`, `A`, `M`, `I`, `S` and one `erased` at (1, 4), each text built from `fr.json` with `Ana`, which is how spec 040's `displayNickname` shows the stored `ANA`; `ops-replay-position` is at 6 and `ops-replay-step` reads `Étape 6 sur 6`; the 18 `ops-replay-cell` elements show `T`, `A`, `M`, `I` on row 1 and nothing else. Setting the position to 5 makes (1, 4) show `S`; to 0, every cell is empty and the step reads `Étape 0 sur 6`. A code with no room shows `fr.json["ops.replay_not_found"]`. (Note from the lead, 2026-10-16: ", which is how spec 040's `displayNickname` shows the stored `ANA`" was added after "with `Ana`"; the texts are unchanged, as spec 039's "Nicknames in capitals" says of a nickname read on a page (preparation of spec 038).)
-- **AC-10** (new) (Python, `uvicorn.Server.run` replaced) The operator token is configured by `NOCK_OPERATOR_TOKEN` and its value never shows. `operator_token_from_env` returns None for `{}` and for an empty value, and returns the value for 32 and for 256 characters of the allowed set; it raises `SettingsError` for 31 characters, 257 characters, and a value holding `$`, a space or `é`, and no message holds the value. With spec 036's recorder, `main()` with `NOCK_OPERATOR_TOKEN="Zq9Zq9"` or `"Zq9" * 11 + "$"` raises `SystemExit` whose `code` is a `str` containing `NOCK_OPERATOR_TOKEN` and not the value, and `run` is never called; with `OPS_TOKEN` it calls `run` once.
+- **AC-10** (new) (Python, `uvicorn.Server.run` replaced) The operator token is configured by `NOCK_OPERATOR_TOKEN` and its value never shows. `operator_token_from_env` returns None for `{}` and for an empty value, and returns the value for 32 and for 256 characters of the allowed set; it raises `SettingsError` for 31 characters, 257 characters, and a value holding `$`, a space or `é`, and no message holds the value. With spec 036's recorder, `main()` with `NOCK_OPERATOR_TOKEN="Zq9Zq9"` or `"Zq9" * 11 + "$"` raises `SystemExit` whose `code` is a `str` containing `NOCK_OPERATOR_TOKEN` and not the value, and `run` is never called; with `OPS_TOKEN` it calls `run` once. A token given to `create_app` follows the same rule: with `NOCK_OPERATOR_TOKEN=OPS_TOKEN` set, `create_app(operator_token="")` has the operator pages off (its ops paths answer as rule 1 says), and `create_app(operator_token="a")` raises `SettingsError` when it is called. (Note from the lead, 2026-10-16: the checks of `create_app` were added; a token given to `create_app` was used as it was, without the rule of the variable (first review of spec 038).)
 - **AC-11** (new) (hub test; Python) The log records the server's relay time of each client step, which the dashboard's latency reads. With the blocking store and `RoomConfig(max_edits_per_second=1000)`: connection A joins a FX-01 room; the store starts blocking; A submits `EditLetter(row=1, column=0, letter="T")` (its step waits in `append`), then `EditLetter(row=1, column=1, letter="A")`; after 300 ms the store is released. Then the first edit's entry has `relay_ms` below 250 and the second's at least 250. The entry of A's join has an integer `relay_ms`, and the `player_state_changed` entry logged when A's socket then closes has `relay_ms` None. Python: the entries returned by `tick` (an idle change) and by `after_restart` have `relay_ms` None. No message the clients receive holds the key `relay_ms`, and a `LogEntry` with `relay_ms=-1` or `"5"` is refused by validation.
 
 ## Edge cases and errors
@@ -638,10 +761,29 @@ The words in brackets say how each criterion is tested.
 - Throttle scope (AC-6): only ops requests count; room sockets keep spec 011's
   separate wrong-code count.
 - Several apps (AC-6): each `create_app` keeps its own failures.
+- Throttle memory (AC-6): after the five failures at `t`, `held_addresses()` is those
+  five addresses. A failure of a sixth address at `t + 59.9` keeps them, since their
+  failures are still in the window; one at `t + 60.0` forgets them, since
+  `t > now - 60` no longer holds. An address with one failure still in the window
+  stays, whatever its older failures. `is_blocked` and `held_addresses()` record
+  nothing. (Note from the lead, 2026-10-16: added (first review of spec 038).)
+- Paths while the pages are off (AC-6): `/api/ops`, `/api/ops/` and `/api/ops/xyz`,
+  with any method, answer as the same method on an unknown path under `/api/`. (Note
+  from the lead, 2026-10-16: added (first review of spec 038).)
+- Other requests under `/api/ops/` while the pages are on (AC-6): `GET /api/ops/xyz`
+  and `GET /api/ops/dashboard/`, with or without the token, answer FastAPI's plain
+  404 with `Cache-Control: no-store` and no `WWW-Authenticate` header;
+  `POST /api/ops/dashboard` answers FastAPI's 405 with `Cache-Control: no-store`;
+  none of them is counted (the paragraph after rule 4). (Note from the lead,
+  2026-10-16: added (first review of spec 038).)
 - Token in the page (AC-7): `sessionStorage` is per tab, so a new tab asks again; the
   input has `autocomplete="off"`.
 - A 401 while the dashboard is shown (AC-7): the token was changed on the server;
   the page goes back to `locked` with `ops.token_refused`.
+- Period change (AC-7): `data-state` stays `ready` while the request of a period
+  change is pending; `loading` shows only while the dashboard loads after the token
+  is given or found. (Note from the lead, 2026-10-16: added (first review of spec
+  038).)
 - Lowercase code (AC-9): the page sends the code in upper case; a code that breaks
   `^[A-Z0-9]{6}$` gets 404 and shows `ops.replay_not_found`.
 - Long replays (AC-9): every edit is listed; the page scrolls vertically.
@@ -657,6 +799,13 @@ The words in brackets say how each criterion is tested.
 - Invalid variable at app start (AC-10): `main()` checks it first; an app built by
   other means (`uvicorn nock.server:app`) fails its startup with the same
   `SettingsError`.
+- A token given to `create_app` (AC-10): checked when `create_app` is called, not
+  when the app starts. `""` turns the pages off whatever `NOCK_OPERATOR_TOKEN`
+  holds, since the variable is read only when no token is given (None). The message
+  of its `SettingsError` never holds the value; a check of that uses a distinctive
+  value, such as `"Zq9" * 11 + "$"`, since a one-letter value like `a` is found in
+  almost any message. (Note from the lead, 2026-10-16: added (first review of spec
+  038).)
 - Slow commit (AC-11): `relay_ms` stops before the commit, so a slow disk shows in
   the next steps' waits, not in the step's own value.
 
@@ -742,4 +891,8 @@ open question.
 
 ## Open questions
 
-None.
+None. (Note from the lead, 2026-10-17: this section held open question 1, on an
+error answer to a period change (AC-7). The lead answered it with option (a): the
+page goes to `error` and shows `t("ops.error")`, as for the first load. It is
+written in "Period change" of "Client: the ops page `/ops`" (first review of spec
+038).)

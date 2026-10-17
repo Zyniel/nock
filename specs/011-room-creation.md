@@ -17,6 +17,13 @@ are now counted one after another, under "Room WebSocket" below, for every route
 that uses the throttle, and AC-3 gained a burst of 40 sockets. AC-3 changed, so
 its test is added before the implementer runs (second review of spec 032).)
 
+(Note from the lead, 2026-10-16: the wrong-code throttle now forgets, each time it
+records a failure, every address whose failures are all outside the window, and
+gains a read-only `held_addresses()` for tests, under "`nock.server`: changes to
+spec 040", where its class `_WrongCodeThrottle` is now written out. Spec 038 AC-6
+checks it, for this throttle and for spec 038's instance of it; no criterion of
+this spec changes (first review of spec 038).)
+
 ## Goal
 
 As a host, I want a link to send to my friends, so that they land directly on our grid.
@@ -358,7 +365,39 @@ class CreateRoomResponse(BaseModel):
 
     code: str                  # matches ROOM_CODE_PATTERN
     share_url: str             # absolute: <scheme>://<host>/r/<code>
+
+
+class _WrongCodeThrottle:
+    """The failures of each client address, kept in memory by one app.
+
+    An app has one for its wrong room codes (this spec; spec 028's recap route
+    shares it) and one for its refused ops requests (spec 038). A plain class,
+    not a Pydantic model: a mutable service. Every method may be called from any
+    thread.
+    """
+
+    def __init__(self) -> None:
+        """Create a throttle that holds no failure."""
+
+    def is_blocked(self, address: str, now: float) -> bool:
+        """Tell whether `address` has at least WRONG_CODE_LIMIT failures whose
+        time `t` satisfies `t > now - WRONG_CODE_WINDOW_SECONDS`. Records nothing."""
+
+    def record_unless_blocked(self, address: str, now: float) -> bool:
+        """Record one failure of `address` at `now`, unless is_blocked(address,
+        now); the check and the record are one step. When it records, it first
+        forgets every address whose failures are all outside the window at `now`.
+        Return True when the failure is recorded, False when nothing is."""
+
+    def held_addresses(self) -> frozenset[str]:
+        """Return the addresses whose failures it keeps. Read-only: it records
+        and forgets nothing."""
 ```
+
+(Note from the lead, 2026-10-16: `_WrongCodeThrottle` was added to this block, with
+`is_blocked` and `record_unless_blocked` as spec 038 names them and the code has
+them, and with `held_addresses`, which is new. The block named no class for the
+throttle (first review of spec 038).)
 
 `create_app` keeps the signature of spec 040 plus the `catalogue` argument of
 spec 004; this spec adds no argument. The throttle reads the time from
@@ -391,6 +430,19 @@ Room WebSocket `/api/rooms/{code}/ws`, step 2 of spec 040 becomes:
 4. Otherwise the socket goes on as before.
 
 The failures are kept per app (each `create_app` call has its own), in memory.
+Each time the throttle records a failure, for any address, it first forgets every
+address whose failures are all outside the window: none of their times `t`
+satisfies `t > now - WRONG_CODE_WINDOW_SECONDS`, `now` being the time of the failure
+it records. So an address is kept until 60 seconds after its last failure, and at
+most until the next failure the throttle records after that. `held_addresses()`
+gives the addresses it keeps failures of; spec 038 AC-6 checks it. (Note from the
+lead, 2026-10-16: the sentences after the first were added; the paragraph read
+"The failures are kept per app (each `create_app` call has its own), in memory."
+The throttle forgot the old failures only of the address it was asked about, so an
+address that failed once and never came back stayed in memory until the process
+stopped. Expired and mistyped room codes record failures too, so ordinary
+visitors' addresses piled up, against spec 038's "What the server keeps", which
+keeps them for 60 seconds (first review of spec 038).)
 
 Wrong codes that arrive at once from one address are counted one after another, as
 if steps 2 and 3 were one step for each connection: each is checked against the
