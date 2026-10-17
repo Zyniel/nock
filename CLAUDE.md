@@ -69,7 +69,7 @@ write the implementation before its tests exist.
   to each change; the tests follow before the code. Only a human sets `approved`.
 - The gate leaves out the tests of a browser engine that is not installed, with a
   warning (`scripts/gate_browsers.py`); CI still runs all three engines, one job
-  per engine and system.
+  per engine on Ubuntu, plus Chromium and WebKit on Windows.
 - The gate runs the tests in parallel (pytest-xdist), then the timing-sensitive
   files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) on their own.
   A test file that measures a duration or a pace (a latency percentile, a time
