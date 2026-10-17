@@ -1,7 +1,7 @@
 ---
 id: "041"
 title: Visual foundation
-status: draft
+status: approved
 ---
 
 # 041 - Visual foundation
