@@ -4,6 +4,7 @@ description: Writes the implementation that makes the existing tests of an appro
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 maxTurns: 250
+effort: high
 skills:
   - python-standards
 ---

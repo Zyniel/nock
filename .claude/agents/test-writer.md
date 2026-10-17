@@ -4,6 +4,7 @@ description: Writes the tests for an approved spec in specs/, before any impleme
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 maxTurns: 250
+effort: high
 skills:
   - python-standards
 ---
