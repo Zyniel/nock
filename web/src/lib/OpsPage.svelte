@@ -12,6 +12,7 @@
     writeOpsToken,
     type DashboardFigures,
     type LockReason,
+    type OpsAnswer,
     type Period,
   } from './ops'
 
@@ -48,13 +49,9 @@
     pageState = 'locked'
   }
 
-  async function loadDashboard(days: Period): Promise<void> {
-    if (token === null) {
-      pageState = 'locked'
-      return
-    }
-    pageState = 'loading'
-    const answer = await fetchDashboard(token, days)
+  // The answer to a dashboard request of `days` days: its figures, the token
+  // form again after a 401 or a 429, or the error for any other answer.
+  function showDashboardAnswer(days: Period, answer: OpsAnswer<DashboardFigures>): void {
     if (answer.kind === 'ok') {
       figures = answer.body
       shownPeriod = days
@@ -64,6 +61,32 @@
     } else {
       pageState = 'error'
     }
+  }
+
+  // The first load, once the token is given or found in sessionStorage: the
+  // page shows `loading` until the answer comes.
+  async function loadDashboard(days: Period): Promise<void> {
+    if (token === null) {
+      pageState = 'locked'
+      return
+    }
+    pageState = 'loading'
+    const answer = await fetchDashboard(token, days)
+    showDashboardAnswer(days, answer)
+  }
+
+  // A press of a period button. The page stays `ready` while the request is
+  // pending, so the dashboard, the replay and the focus on the button stay.
+  async function changePeriod(days: Period): Promise<void> {
+    if (token === null) {
+      return
+    }
+    const answer = await fetchDashboard(token, days)
+    // A 401 or a 429 to the replay's request may have locked the page meanwhile.
+    if (pageState !== 'ready') {
+      return
+    }
+    showDashboardAnswer(days, answer)
   }
 
   function submitToken(event: SubmitEvent): void {
@@ -117,7 +140,7 @@
             data-testid="ops-period"
             data-days={String(days)}
             aria-pressed={days === shownPeriod ? 'true' : 'false'}
-            onclick={() => void loadDashboard(days)}
+            onclick={() => void changePeriod(days)}
           >
             {t(PERIOD_KEYS[days])}
           </button>

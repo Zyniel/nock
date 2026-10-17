@@ -150,6 +150,9 @@ $env:NOCK_OPERATOR_TOKEN = uv run python -c "import secrets; print(secrets.token
 uv run python -m nock
 ```
 
+(bash: `export NOCK_OPERATOR_TOKEN="$(uv run python -c 'import secrets; print(secrets.token_urlsafe(32))')"`,
+then `uv run python -m nock`)
+
 The page asks for the token and keeps it in the browser tab only; ten wrong
 tokens from one address within a minute block that address for the rest of the
 minute. When the variable is unset or empty, the operator pages are off and

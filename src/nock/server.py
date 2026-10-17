@@ -23,6 +23,7 @@ from typing import Annotated, Literal
 
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -50,7 +51,7 @@ from nock.operations import (
 )
 from nock.protocol import grid_view, parse_client_message
 from nock.room import RoomKey, RoomSummary
-from nock.settings import operator_token_from_env
+from nock.settings import OPERATOR_TOKEN_VARIABLE, operator_token_from_env
 from nock.store import RoomStore
 
 __all__ = [
@@ -76,6 +77,7 @@ WRONG_CODE_WINDOW_SECONDS: float = 60.0
 DATABASE_VARIABLE: str = "NOCK_DATABASE"  # path of the SQLite file (spec 018)
 MEMORY_DATABASE: str = ":memory:"
 WS_MAX_SIZE_BYTES: int = 8192  # spec 036: uvicorn refuses larger frames (close 1009)
+OPS_API_ROOT: str = "/api/ops"  # spec 038: hidden too while the pages are off
 OPS_API_PREFIX: str = "/api/ops/"  # spec 038: the paths of the ops API
 BEARER_PREFIX: str = "Bearer "  # spec 038: the operator token's header value
 NO_STORE: str = "no-store"  # spec 038: the Cache-Control of every ops API answer
@@ -112,22 +114,35 @@ class RoomSummariesRequest(BaseModel):
 
 
 class _WrongCodeThrottle:
-    """Remembers the failures of each client address, in memory.
+    """The failures of each client address, kept in memory by one app.
 
-    An app keeps two: one for the wrong room codes (spec 011), one for the
-    refused ops API requests (spec 038), each with its own count. The sockets
-    and the HTTP routes run on several threads, so every access takes the lock.
+    An app has two: one for the wrong room codes (spec 011; spec 028's recap
+    route shares it), one for the refused ops API requests (spec 038), each with
+    its own count. An address is kept until WRONG_CODE_WINDOW_SECONDS after its
+    last failure, and at most until the next failure recorded after that. Every
+    method may be called from any thread: each one takes the lock.
     """
 
     def __init__(self) -> None:
-        """Create a throttle with no failure."""
+        """Create a throttle that holds no failure."""
         self._lock = threading.Lock()
         self._failure_times: dict[str, list[float]] = {}
 
     def is_blocked(self, address: str, now: float) -> bool:
-        """Tell whether `address` has too many recent failures."""
+        """Tell whether `address` has too many failures in the window at `now`.
+
+        Records and forgets nothing.
+
+        Args:
+            address: The client's address.
+            now: Clock time of the request.
+
+        Returns:
+            True when `address` has at least WRONG_CODE_LIMIT failures whose
+            time `t` satisfies `t > now - WRONG_CODE_WINDOW_SECONDS`.
+        """
         with self._lock:
-            recent = self._forget_old_failures(address, now)
+            recent = self._recent_failures(address, now)
             return len(recent) >= WRONG_CODE_LIMIT
 
     def record_unless_blocked(self, address: str, now: float) -> bool:
@@ -136,7 +151,9 @@ class _WrongCodeThrottle:
         The check and the record are one step under the lock, so failures that
         arrive at once are counted one after another (spec 011): of a burst,
         exactly the first WRONG_CODE_LIMIT are recorded, however long the
-        lookups before them took.
+        lookups before them took. Before it records, the throttle forgets every
+        address whose failures are all outside the window at `now`, so that an
+        address that never comes back is not kept until the process stops.
 
         Args:
             address: The client's address.
@@ -146,30 +163,47 @@ class _WrongCodeThrottle:
             True when the failure is recorded: the client gets the answer of an
             unknown room, or of a missing token. False when the address is
             blocked: the client gets the throttle's answer, and nothing is
-            recorded.
+            recorded or forgotten.
         """
         with self._lock:
-            recent = self._forget_old_failures(address, now)
+            recent = self._recent_failures(address, now)
             if len(recent) >= WRONG_CODE_LIMIT:
                 return False
+            self._forget_old_failures(now)
             recent.append(now)
             self._failure_times[address] = recent
             return True
 
-    def _forget_old_failures(self, address: str, now: float) -> list[float]:
-        """Drop the failures of `address` outside the window; return the rest.
+    def held_addresses(self) -> frozenset[str]:
+        """Return the addresses whose failures the throttle keeps.
 
-        An address with no failure left has no entry. The caller holds the lock.
+        Records and forgets nothing.
+        """
+        with self._lock:
+            return frozenset(self._failure_times)
+
+    def _recent_failures(self, address: str, now: float) -> list[float]:
+        """Return the failure times of `address` inside the window at `now`.
+
+        The caller holds the lock.
         """
         recent: list[float] = []
         for failure_time in self._failure_times.get(address, []):
             if failure_time > now - WRONG_CODE_WINDOW_SECONDS:
                 recent.append(failure_time)
-        if recent:
-            self._failure_times[address] = recent
-        else:
-            self._failure_times.pop(address, None)
         return recent
+
+    def _forget_old_failures(self, now: float) -> None:
+        """Keep, for every address, only its failures inside the window at `now`.
+
+        An address left with no failure is forgotten. The caller holds the lock.
+        """
+        kept: dict[str, list[float]] = {}
+        for address in self._failure_times:
+            recent = self._recent_failures(address, now)
+            if len(recent) > 0:
+                kept[address] = recent
+        self._failure_times = kept
 
 
 class _RoomsHolder:
@@ -208,14 +242,29 @@ class _RoomsHolder:
 class _OperatorToken:
     """The operator token an app checks: the one it was given, or its variable.
 
-    Without a token given, NOCK_OPERATOR_TOKEN is read each time the app starts
-    (spec 038). While `token` is None, the operator pages are off.
+    A token given follows the rule of NOCK_OPERATOR_TOKEN and is checked when
+    the app is built. Without one, the variable is read each time the app
+    starts (spec 038). While `token` is None, the operator pages are off.
     """
 
     def __init__(self, given: str | None) -> None:
-        """Keep `given`, or None to read NOCK_OPERATOR_TOKEN when the app starts."""
-        self._given = given
-        self.token: str | None = given
+        """Check the token given, or wait for the app's start to read the variable.
+
+        Args:
+            given: The `operator_token` of `create_app`. "" turns the operator
+                pages off, as an empty variable does. None: read
+                NOCK_OPERATOR_TOKEN when the app starts.
+
+        Raises:
+            SettingsError: `given` breaks the rule of NOCK_OPERATOR_TOKEN. The
+                message never holds it.
+        """
+        self._reads_variable = given is None
+        self.token: str | None = None
+        if given is not None:
+            # The token given goes through the variable's rule, as if it were
+            # the variable's value: "" gives None, so the pages are off.
+            self.token = operator_token_from_env({OPERATOR_TOKEN_VARIABLE: given})
 
     def read_at_start(self) -> None:
         """Take the token of NOCK_OPERATOR_TOKEN, unless a token was given.
@@ -223,7 +272,7 @@ class _OperatorToken:
         Raises:
             SettingsError: the variable breaks the rule of spec 038.
         """
-        if self._given is None:
+        if self._reads_variable:
             self.token = operator_token_from_env(os.environ)
 
 
@@ -244,6 +293,11 @@ def _not_authorized() -> HTTPException:
         detail="Not authorized",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+def _is_ops_path(path: str) -> bool:
+    """Tell whether `path` is `/api/ops` or a path under `/api/ops/` (spec 038)."""
+    return path == OPS_API_ROOT or path.startswith(OPS_API_PREFIX)
 
 
 def _carries_token(request: Request, token: str) -> bool:
@@ -448,13 +502,20 @@ def create_app(
             A registry given is never closed by the app.
         dist_dir: The built client. None: WEB_DIST_DIR.
         catalogue: The grids served. None: an empty catalogue.
-        operator_token: The token of the operator pages (spec 038). None: the
-            token of NOCK_OPERATOR_TOKEN, read when the app starts; the pages
-            are off when the variable is unset or empty.
+        operator_token: The token of the operator pages (spec 038), checked
+            by the rule of NOCK_OPERATOR_TOKEN when `create_app` is called:
+            "" turns the pages off, as an unset variable does, and the
+            variable is not read. None: the token of NOCK_OPERATOR_TOKEN, read
+            when the app starts; the pages are off when the variable is unset
+            or empty.
 
     Never raises because `dist_dir` is missing or empty (see AC-6). The app's
     startup raises SettingsError when it reads a NOCK_OPERATOR_TOKEN that breaks
     the rule of spec 038.
+
+    Raises:
+        SettingsError: `operator_token` breaks the rule of NOCK_OPERATOR_TOKEN.
+            The message never holds it.
     """
     holder = _RoomsHolder(rooms)
     operator = _OperatorToken(operator_token)
@@ -485,16 +546,23 @@ def create_app(
         openapi_url=None,
     )
 
-    # Spec 038, rule 4: while the operator pages are on, no browser or proxy
-    # keeps an ops API answer, refusals included. While they are off, the ops
-    # paths answer exactly as an unknown path does, without the header.
+    # Spec 038, rule 1: while the operator pages are off, a request of any
+    # method to an ops path answers as the same method on an unknown path under
+    # /api/ does. The routes cannot answer it: another method than GET on the
+    # path of an ops route would get FastAPI's 405. Rule 4: while the pages are
+    # on, no browser or proxy keeps an ops API answer, refusals included.
     @web_app.middleware("http")
-    async def forbid_storing_ops_answers(
+    async def guard_ops_paths(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        path = request.url.path
+        if operator.token is None:
+            if _is_ops_path(path):
+                # FastAPI's own answer to a path that no route matches.
+                return await http_exception_handler(request, _not_found())
+            return await call_next(request)
         response = await call_next(request)
-        is_ops_path = request.url.path.startswith(OPS_API_PREFIX)
-        if is_ops_path and operator.token is not None:
+        if path.startswith(OPS_API_PREFIX):
             response.headers["Cache-Control"] = NO_STORE
         return response
 
@@ -512,6 +580,7 @@ def create_app(
         """
         token = operator.token
         if token is None:
+            # Rule 1. `guard_ops_paths` already answers so while the pages are off.
             raise _not_found()
         address = _client_address(request)
         now = holder.get().clock()
