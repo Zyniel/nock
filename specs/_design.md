@@ -3,8 +3,8 @@
 Not a spec: the quality gate ignores files starting with "_". Every spec that puts
 something on screen follows this note, as every "Public interface" follows
 `specs/_architecture.md`. Decided with the human on 2026-10-16, from the design
-session whose result is the page `docs/design/cell-sheet.html` (version 4.5,
-commit 32fad92 on `feat/design-system`; 4.2 was commit d3382db; first published as
+session whose result is the page `docs/design/cell-sheet.html` (version 4.6
+on `feat/design-system`; 4.5 was commit 32fad92; 4.2 was commit d3382db; first published as
 https://claude.ai/artifact/VCuP9WSmsdXA7JJEvb9ixV).
 
 (Note from the spec writer, 2026-10-16: second round. The human's decisions of
@@ -65,8 +65,8 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 | `--nock-word` | #E6EDF9 | My selected word, hovered menu item, pressed top-bar button, quiet buttons, pressed filter chips, progress bar track, hovered reaction | Player tints | 1.18:1 |
 | `--nock-selected` | #CFDDF3 | My selected cell, and the half of the clue cell that holds my selected word's clue (decided by the human on 2026-10-16, drawn in sheet 4.2) | Anything else | 1.37:1 |
 | `--nock-locked` | #E3E7EE | Locked letter cells (with bold letters) | Disabled states | 1.24:1 |
-| `--nock-rule` | #9AA3B2 | Grid lines, empty cells, input borders, catalogue thumbnail border, switch track when off | Text | 2.54:1 (DEFERRED, low) |
-| `--nock-line` | #DDE2EA | Dividers in menus, panels and cards; card and list-row borders; filter chip borders; disabled button border; reaction pill and picker borders | Grid lines | 1.30:1 |
+| `--nock-rule` | #9AA3B2 | Grid lines, empty cells, input borders, border of the catalogue's grid drawing, switch track when off | Text | 2.54:1 (DEFERRED, low) |
+| `--nock-line` | #DDE2EA | Dividers in menus, panels and cards; card and list-row borders; filter chip borders; disabled button border; reaction pill and picker borders; inner lines of the catalogue's generic grid drawing (2026-10-17) | Grid lines of the playing grid | 1.30:1 |
 | `--nock-red` | #B42318 | "Look here": wrong-letter strike, flag, unread badge, new-events dot, the connection band's dot, error text and the border of a field in error | Decoration | 6.57:1 |
 | `--nock-reveal` | #C2410C | "Revealed", and nothing else: the revealed notch, the reveal line in the stream | Anything else | 5.18:1 |
 | `--nock-green` | #1E7B45 | "Done": finished-grid band text, passed-check line in the stream, "Terminée" pill text, confirmation lines (« Lien copié », « Lien envoyé … ») | Player marks | 5.28:1 |
@@ -74,7 +74,7 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 | `--nock-key` | #E9ECF1 | In-app keyboard keys | - | 1.18:1 |
 | `--nock-keyboard-bg` | #D9DEE6 | In-app keyboard background | - | 1.35:1 |
 | `--nock-handle` | #C5CCD8 | Grab handle of a bottom sheet | - | 1.62:1 |
-| `--nock-thumb` | #C9D2E0 | Clue cells of a catalogue thumbnail, force notches above the grid's force | - | 1.52:1 |
+| `--nock-thumb` | #C9D2E0 | Clue cells of the catalogue's generic grid drawing, force notches above the grid's force | - | 1.52:1 |
 
 Translucent tokens, all built on ink or white (the sheet's remaining
 `rgba(0, 0, 0, ...)` shadows become ink, see section 15):
@@ -876,10 +876,17 @@ padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
 - Cards in a grid: `repeat(auto-fill, minmax(min(100%, 400px), 1fr))`, gap 12 px,
   so one per row on a phone. A card: 1 px line-grey border, radius 8 px, padding
   12 px 14 px, gap 14 px, white:
-  - a thumbnail of the grid's shape: white with its clue cells in `--nock-thumb`,
-    1 px rule-grey border, 51 px high (44 px on a phone), width in proportion to
-    the grid (39 by 51 for 13 by 17). It needs the clue positions, which the
-    catalogue summary of spec 004 does not carry (OPEN);
+  - a generic grid drawing, built from the grid's width W and height H only
+    (spec 004's `GridSummary` is unchanged): it shows the proportions, not the
+    real layout. An SVG 51 px high and round(51 × W / H) px wide (39 by 51 for 13
+    by 17), viewBox W × 10 by H × 10 (10 units per cell): white cells; clue cells
+    in `--nock-thumb` in row 0 at the even columns (0, 2, 4, …) and in column 0 at
+    the even rows from 2 (2, 4, …); inner grid lines in `--nock-line`, 1 unit
+    wide; a 1 px rule-grey border. Shown only while the cards sit more than one
+    per row (wide windows); with one card per row (phones) the card has no
+    drawing and keeps its text only. (Decided by the human on 2026-10-17, sheet
+    4.6 `genericThumb()`; it replaces the real-shape thumbnail, which needed clue
+    positions from the API.);
   - « Grille n° N » and, after it, the status pill: « Commencée » (word blue,
     navy) or « Terminée » (green background, green text), radius 12 px, padding
     3 px 9 px;
@@ -932,7 +939,7 @@ Refinements to make, each with dated notes, before the matching build step
 
 | Spec | Status | What contradicts or is missing | Change |
 | --- | --- | --- | --- |
-| 004 | done | Catalogue look (AC-1, AC-3 show the fields and progress, no look); the summary has no clue positions for a thumbnail | Section 10 criteria; add the clue positions to `GridSummary` and `GET /api/grids`, or drop the thumbnail (OPEN) |
+| 004 | done | Catalogue look (AC-1, AC-3 show the fields and progress, no look) | Section 10 criteria, with the generic grid drawing from width and height; no HTTP or `GridSummary` change (decided by the human on 2026-10-17) |
 | 005 | done | Credits on the catalogue and grid page are not drawn | Gap: the spec writer proposes a card line here first |
 | 006 | done | AC-2: arrows drawn in the clue cell on its side; AC-3: separator look; letter 0.55 s and clue 0.11 s / 0.09 s today; empty cells grey #C9CDD8; AC-5 and AC-7 fit a page without top bar or clue bar of this design | Arrows into the letter cell with the collision rules (section 6); separator 55 %, 14 % insets; letter 0.56 s; clue max(6px, 0.145 s); empty cells rule grey; fit rules with the new layout |
 | 007 | done | AC-1: the selected word's clue is highlighted (yellow today); selected cell yellow with a 3 px ink outline; AC-4: clue bar look | Selected blue and 2 px navy outline; active clue half in selected blue; clue bar of section 8 |
@@ -1023,6 +1030,10 @@ Each step leaves the app working and every test passing.
 - Auteurs mode: the letters of a player who has left are drawn in plain ink, like
   letters with no finder. No departed grey and no `--nock-departed` token
   (section 7). The sheet (version 4.5) draws them in ink too.
+- Catalogue cards show a generic grid drawing built from width and height only,
+  on wide windows, and no drawing with one card per row; no API change, spec
+  004's `GridSummary` stays as it is (section 10; decided by the human on
+  2026-10-17, sheet 4.6).
 - Fonts come in as npm dependencies: `@fontsource/source-sans-3` and
   `@fontsource/ibm-plex-sans-condensed`, imported per weight and style used (no
   other), self-hosted by the build, never from Google (section 4).
@@ -1070,10 +1081,8 @@ The spec writer's pick comes last in each item.
    sheet 4.2 (`.flash.rev::after`), pending approval. Pick: approve.
 3. (Settled: departed grey, decided by the human on 2026-10-16; see "Decided"
    above.)
-4. Catalogue thumbnail: the clue positions must come from the API (a spec 004
-   change to `GridSummary` and `GET /api/grids`), or the thumbnail goes. The sheet
-   keeps it until decided. Pick: add the positions (a few bytes per grid, no
-   answer letters).
+4. (Settled: catalogue thumbnail, decided by the human on 2026-10-17; see
+   "Decided" above.)
 5. Phone held sideways and the 900 px rule (section 8). Pick: column when
    landscape and either at least 900 px wide and more than 500 px high, or at most
    500 px high with the keyboard hidden.
