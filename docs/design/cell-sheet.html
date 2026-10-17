@@ -326,7 +326,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
 
 <div class="wrap">
   <header>
-    <div class="ver">Version 4.5 · fonts decided, leavers' letters in ink</div>
+    <div class="ver">Version 4.6 · generic grid drawing on catalogue cards</div>
     <h1>Nock cell sheet</h1>
     <p>Every mark a letter or clue cell can carry, in the « Le Quotidien » palette. Version 3.3 shows each player on a cell as a coloured triangle in one corner, four at most, with no text and no outline, at 30 % of the cell side. Who found a letter is shown by an « Auteurs » mode that colours each letter in its finder's colour (switch below, or Menu on the phone). The revealed-letter mark moves to a small notch at the middle of the bottom edge, so all four corners stay free for players and no arrow ever meets it.</p>
   </header>
@@ -540,7 +540,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     <div class="board" style="background:transparent;border:0;padding:0" id="rest-phones"></div>
     <h3 style="margin:8px 0 0;font:600 1.05rem/1.2 var(--f-ui);color:var(--navy)">Catalogue for a returning player (specs 029, 032, 033)</h3>
     <div class="frame-wrap" data-w="1280" data-h="1180"><div class="frame" id="cat-return"></div></div>
-    <p class="note"><strong>Grid thumbnails need data.</strong> The catalogue summary (spec 004) has no clue positions, so the drawing of a grid's shape needs the API to send them (a spec 004 change), or the thumbnail goes. Until decided, the cards keep it.</p>
+    <p class="note"><strong>Grid drawing on cards (decided 2026-10-17).</strong> A generic grid drawn only from the size the catalogue already sends (width × height): the usual frame of clue cells along the top row and the first column. It shows the grid's proportions, not its real layout, so the API (spec 004) does not change. Shown on wide windows (two cards per row); no drawing on phones, where the card keeps its text only.</p>
   </section>
 
   <section>
@@ -1228,9 +1228,15 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     }
     return rows;
   }
-  function bigThumb(w, h) {
-    var cw = w / BW, chh = h / BH, out = '<svg class="thumb" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" aria-hidden="true"><rect width="' + w + '" height="' + h + '" fill="#FFFFFF"/>';
-    Object.keys(BIG).forEach(function (k) { var p = k.split(",").map(Number); out += '<rect x="' + (p[1] * cw) + '" y="' + (p[0] * chh) + '" width="' + cw + '" height="' + chh + '" fill="#C9D2E0"/>'; });
+  /* Generic grid drawing for catalogue cards (human, 2026-10-17): built only from the grid's
+     width and height, which the catalogue already sends; the usual frame of clue cells
+     (row 0 and column 0, every other cell) on a white grid. Not the grid's real layout. */
+  function genericThumb(W, H, h) {
+    var c = h / H, w = Math.round(c * W), out = '<svg class="thumb" width="' + w + '" height="' + h + '" viewBox="0 0 ' + (W * 10) + " " + (H * 10) + '" aria-hidden="true"><rect width="' + (W * 10) + '" height="' + (H * 10) + '" fill="#FFFFFF"/>';
+    for (var x = 0; x < W; x += 2) out += '<rect x="' + (x * 10) + '" y="0" width="10" height="10" fill="#C9D2E0"/>';
+    for (var y = 2; y < H; y += 2) out += '<rect x="0" y="' + (y * 10) + '" width="10" height="10" fill="#C9D2E0"/>';
+    for (var gx = 1; gx < W; gx++) out += '<line x1="' + (gx * 10) + '" y1="0" x2="' + (gx * 10) + '" y2="' + (H * 10) + '" stroke="#DDE2EA" stroke-width="1"/>';
+    for (var gy = 1; gy < H; gy++) out += '<line x1="0" y1="' + (gy * 10) + '" x2="' + (W * 10) + '" y2="' + (gy * 10) + '" stroke="#DDE2EA" stroke-width="1"/>';
     return out + "</svg>";
   }
 
@@ -1327,15 +1333,15 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   }
 
   function catalogue(phone) {
-    var items = [[12, "16 octobre 2026", 3, "started"], [11, "15 octobre 2026", 2, ""], [10, "14 octobre 2026", 4, "done"], [9, "13 octobre 2026", 1, "done"],
-      [8, "12 octobre 2026", 3, ""], [7, "11 octobre 2026", 2, "started"]];
+    var items = [[12, "16 octobre 2026", 3, "started", 13, 17, 54], [11, "15 octobre 2026", 2, "", 13, 17, 52], [10, "14 octobre 2026", 4, "done", 13, 17, 55], [9, "13 octobre 2026", 1, "done", 9, 12, 28],
+      [8, "12 octobre 2026", 3, "", 13, 17, 53], [7, "11 octobre 2026", 2, "started", 11, 15, 41]];
     var notch = function (on) { return '<svg viewBox="0 0 10 14" aria-hidden="true"><polygon points="0,0 10,0 10,14 5,10 0,14" fill="' + (on ? "#1B2F55" : "#C9D2E0") + '"/></svg>'; };
     var list = items.map(function (it) {
       var n = ""; for (var i = 1; i <= 4; i++) n += notch(i <= it[2]);
       var st = it[3] === "started" ? '<span class="st started">Commencée</span>' : it[3] === "done" ? '<span class="st done">Terminée</span>' : "";
-      return '<div class="citem">' + bigThumb(phone ? 34 : 39, phone ? 44 : 51) + '<div class="cinfo"><div class="cnum">Grille n° ' + it[0] + st + "</div>" +
+      return '<div class="citem">' + (phone ? "" : genericThumb(it[4], it[5], 51)) + '<div class="cinfo"><div class="cnum">Grille n° ' + it[0] + st + "</div>" +
         '<div class="cmeta">Publiée le ' + it[1] + "</div>" +
-        '<div class="cmeta"><span class="notches">' + n + "</span>Force " + it[2] + " · 13 × 17 · 54 mots</div></div>" +
+        '<div class="cmeta"><span class="notches">' + n + "</span>Force " + it[2] + " · " + it[4] + " × " + it[5] + " · " + it[6] + " mots</div></div>" +
         '<button type="button" class="btn primary">Jouer</button></div>';
     }).join("");
     var f = '<div class="filters"><span class="lab">Force</span><button type="button" class="fbtn" aria-pressed="true">Toutes</button>' +
