@@ -11,14 +11,32 @@ status: approved
 (Note from the lead, 2026-10-15: folded in. The answer is decision 7, and "Open
 questions" is empty. Spec 013 is refined after this spec is built.)
 
+(Note from the lead, 2026-10-17: checked, before this spec's tests are written,
+against the code now built and against the specs refined since this spec was
+approved: 032 (seat back), 027 (shared timer), 038, and the nickname rule of
+2026-10-16 (specs 039, 040 and 012). Changed, each with a dated note: the
+nicknames that the server sends are written in capitals (`BOB`, `CY`), and a page
+shows them through spec 040's `displayNickname`; a return covers every snapshot
+after the first of a page load; the catch-up mark is also drawn under spec 019's
+`author-mark` and spec 024's `reveal-mark`; the locked look is spec 035's; decision
+4 no longer counts on rooms logged before this spec. Simplified under the human's
+rule of 2026-10-16: `load_room_at` has one rule and no range cases,
+`RoomRegistry.catch_up` no longer clips the request's seqs, and `build_catch_up`
+takes each nickname from the replay it already makes, so it loses its argument
+`current` and its four places to look. The criteria now name the models,
+attributes and values that the tests check. This spec has no tests yet
+(preparation of spec 034).)
+
 Epic E9 Accounts and resume (US-9.3) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; the stored identity and the room page flow in spec
 012; the activity feed, its lines and its scroll rules in spec 013; reconnection in
 spec 017; the store, `replay` and the log in spec 018; filled cells in spec 026;
-members, `past_players`, `peek_room` and the room record's other fields in specs
+members, `past_players`, `member_id` and the room record's other fields in specs
 032 and 010; checks in spec 023 and reveals in spec 024. The messages are those of
-spec 039. This spec is built after specs 032 and 038.
+spec 039. This spec is built after specs 032 and 038. (Note from the lead,
+2026-10-17: `peek_room` became `member_id`, the one lookup of spec 032 that this
+spec's hub now uses (preparation of spec 034).)
 
 ## Goal
 
@@ -34,10 +52,15 @@ The MVP ships with guests only: a guest can do everything needed to finish a gri
   040's `data-seq`). The page keeps it in memory, and in the room record
   `nock.room.<CODE>` (spec 010) as the field `seen_seq`.
 - **Return**: a snapshot whose `seq` is greater than the seen seq the page had when
-  the snapshot arrived. That seen seq is the one in memory for a snapshot after a
-  reconnection (spec 017), and the stored `seen_seq` for the first snapshot of a page
-  load. A page load with no stored `seen_seq` (a first visit on this device) has no
-  return; neither has a snapshot whose `seq` is not greater.
+  the snapshot arrived. That seen seq is the stored `seen_seq` for the first
+  snapshot of a page load, and the one in memory for every later snapshot (after a
+  reconnection, spec 017). The first snapshot of a page load with no stored
+  `seen_seq` (a first visit on this device) is no return; neither is a snapshot
+  whose `seq` is not greater. (Note from the lead, 2026-10-17: "for every later
+  snapshot" read "for a snapshot after a reconnection", which named no seen seq for
+  a second snapshot on the same socket, which spec 040 applies; and "has no return"
+  now says that only the first snapshot is concerned, as "Seen seq writes" in "Edge
+  cases and errors" already says (preparation of spec 034).)
 - **Absence**: the room's events with `seen seq < seq <= snapshot seq`.
 - **Changed cell**: a letter cell named by a `letter_changed` or a `cell_locked` of
   the absence (a letter written, erased, confirmed or undone, or a lock by a check
@@ -68,15 +91,24 @@ class RoomStore:
     def load_room_at(self, code: str, seq: int) -> RoomState | None:
         """Return the room's state just after its event `seq`.
 
-        The snapshot with the highest seq at most `seq`, then `replay` of the logged
-        entries after it, up to `seq`. A `seq` lower than the room's first snapshot
-        gives that first snapshot.
+        The snapshot with the highest seq at most `seq`, then `replay` of the
+        logged entries after it whose seq is at most `seq`. So a `seq` at or above
+        the room's last logged seq gives the room's latest stored state, as
+        `load_room` does.
 
         Returns:
-            The state, or None for an unknown room or a `seq` higher than the
-            room's last logged seq (its first snapshot's seq when the log is empty).
+            The state, or None when no snapshot of the room has a seq at most
+            `seq`: an unknown room, or a room whose first snapshot came after
+            `seq` (only a room added in a later state, as `add_room` allows).
         """
 ```
+
+(Note from the lead, 2026-10-17: the docstring said that a `seq` lower than the
+room's first snapshot gives that first snapshot, and that a `seq` higher than the
+room's last logged seq gives None. Both cases are gone: one query and one replay,
+with no range check. A room made by `register_room` has a snapshot at seq 0, so
+only a room seeded in a test can lack one (simplification, human's rule of
+2026-10-16).)
 
 ### `nock.catch_up` (new, pure: no I/O)
 
@@ -146,7 +178,6 @@ def build_catch_up(
     until_seq: int,
     before: RoomState,
     entries: Sequence[LogEntry],
-    current: RoomState,
 ) -> CatchUp:
     """Return the catch-up of the absence that `entries` hold.
 
@@ -154,22 +185,34 @@ def build_catch_up(
         after_seq: The request's `after_seq`, copied to the answer.
         until_seq: The request's `until_seq`, copied to the answer.
         before: The room just before the first entry (`load_room_at`).
-        entries: The logged entries of the absence, in seq order.
-        current: The room as it is now (`peek_room`), for the names.
+        entries: The logged entries of the absence, in seq order, the first one
+            right after `before`.
 
     Returns:
         `cells`: the changed cells. `lines`: the `CheckResult` and `RevealResult`
-        events of `entries` as they are, and a `WordCompleted` for each word
-        completed by a `letter_changed` of `entries` (found by replaying `entries`
-        from `before`), in seq order; words completed by one letter come in clue
-        order (`row`, `column`, `clue_index`); when there are more than
-        CATCH_UP_LINE_LIMIT lines, only the last CATCH_UP_LINE_LIMIT are kept.
-        `names`: for each distinct `player_id` of `lines`, in order of first
-        appearance, the nickname that `current.players` gives it, else
-        `current.past_players`, else its `player_joined` in `entries`, else
-        `before.players`; a player id with none of these is left out.
+        events of `entries` as they are (`entry.event`), and a `WordCompleted`
+        for each word completed by a `letter_changed` of `entries` (found by
+        replaying `entries` from `before`), in seq order; words completed by one
+        letter come in clue order (`row`, `column`, `clue_index`); when there
+        are more than CATCH_UP_LINE_LIMIT lines, only the last
+        CATCH_UP_LINE_LIMIT are kept. `names`: for each distinct `player_id` of
+        `lines`, in order of first appearance, the nickname of that player in
+        `players` of the replayed state just before the event of their first
+        line, that is, the nickname they had when they made it; a player id
+        that is not in `players` then is left out.
     """
 ```
+
+(Note from the lead, 2026-10-17: `build_catch_up` had a fifth argument,
+`current: RoomState`, "the room as it is now (`peek_room`), for the names", and
+looked for each nickname in `current.players`, else `current.past_players`, else a
+`player_joined` of `entries`, else `before.players`. The replay that finds the
+completed words already holds each line's player when they make the line, so the
+nickname comes from there, with no search over past, removed or seated-back
+players. The name is the one the player had then, as spec 013's live feed showed
+it ("The nickname is the one known when the event is applied"); spec 033's erasure
+rewrites the stored snapshots and `player_joined` entries, so the replay gives an
+erased player `--` (simplification, human's rule of 2026-10-16).)
 
 ### `nock.hub`
 
@@ -179,19 +222,28 @@ class RoomRegistry:
     def catch_up(self, code: str, request: CatchUpRequest) -> CatchUp | None:
         """Return the catch-up that a member asks for, or None.
 
-        None when the room is unknown or expired, or `request.resume_token` is not a
-        member's (spec 032 `member_id`). With `u = min(request.until_seq, <room's
-        seq>)`: when `request.after_seq >= u`, the answer has the request's bounds
-        and no cell, line or name; otherwise it is `build_catch_up` of
-        `before = store.load_room_at(code, request.after_seq)`, the entries of
-        `store.read_log(code, before.seq)` whose seq is at most `u`, and
-        `peek_room(code)`. It only reads: the room is not made live and nothing is
-        logged.
+        None when `member_id(code, request.resume_token)` is None (the room is
+        unknown or expired, or the token is not a member's, spec 032), or when
+        `before = store.load_room_at(code, request.after_seq)` is None.
+        Otherwise `build_catch_up(request.after_seq, request.until_seq, before,
+        entries)`, with `entries` the entries of
+        `store.read_log(code, before.seq)` whose seq is at most
+        `request.until_seq`. It only reads: the room is not made live and
+        nothing is logged.
         """
 ```
 
 Every event up to a snapshot's `seq` is in the log when the page asks, since the
-hub commits each step before it sends anything (spec 018 AC-4).
+hub commits each step before it sends anything (spec 018 AC-4). No range needs a
+rule of its own: an `until_seq` above the room's seq reads up to the room's last
+event, and an `after_seq` at or above `until_seq`, or above the room's seq, finds
+no entry, so the answer holds the request's two seqs and no cell, line or name.
+(Note from the lead, 2026-10-17: the docstring clipped `until_seq` to the room's
+seq (`u = min(request.until_seq, <room's seq>)`), answered an `after_seq` at or
+above `u` by a rule of its own, and passed `peek_room(code)` to `build_catch_up`
+for the names. The filter on `request.until_seq` gives the same answers without
+the clip or the rule, and the names come from the replay (simplification, human's
+rule of 2026-10-16).)
 
 ### `nock.server`
 
@@ -204,7 +256,9 @@ hub commits each step before it sends anything (spec 018 AC-4).
 The answer never says why it is 404 (unknown room, expired room or no member's
 token), so it is no oracle for room codes (spec 011's throttle does not count it).
 A `CatchUp` JSON, for example:
-`{"after_seq": 5, "until_seq": 9, "cells": [{"row": 2, "column": 1}], "lines": [{"type": "word_completed", "seq": 8, "player_id": "p2", "clue": {"row": 2, "column": 0, "clue_index": 0}}], "names": [{"player_id": "p2", "nickname": "Bob"}]}`.
+`{"after_seq": 5, "until_seq": 9, "cells": [{"row": 2, "column": 1}], "lines": [{"type": "word_completed", "seq": 8, "player_id": "p2", "clue": {"row": 2, "column": 0, "clue_index": 0}}], "names": [{"player_id": "p2", "nickname": "BOB"}]}`. (Note from the lead,
+2026-10-17: the nickname read `"Bob"`; the server sends nicknames in capitals,
+spec 039's "Nicknames in capitals" (preparation of spec 034).)
 
 ### Client
 
@@ -227,19 +281,27 @@ Applying a catch-up:
 
 1. Names: each `names` item whose `player_id` the page does not know yet is added to
    the names the feed uses (spec 013: known players include those who left).
-2. Highlight (AC-2): each cell of `cells` gets `data-caught-up="true"` for
-   `CATCH_UP_HIGHLIGHT_MS = 5000` milliseconds, then `"false"`; every other `cell`
-   has `"false"`. While highlighted, the cell holds one child
-   `data-testid="catch-up-mark"`, with `aria-hidden="true"` and
-   `pointer-events: none`, drawn as a solid ring on the cell's edge: its bounding box
-   equals the cell's (1 px tolerance); its computed `border-style` is `solid` and its
-   `border-width` at least 3 px on each of the four sides; its border colour has a
-   contrast of at least 3:1 with the cell's computed `background-color` (a colour
-   with alpha is first composited over white). The ring is the highlight's
-   non-colour sign (spec 035): a shape, unlike spec 016's flash. It is drawn under
-   spec 013's `remote-selection` outlines and spec 035's initials and `+k` labels,
-   which stay visible, and it never covers the cell's letter. A cell highlighted again
-   by a later catch-up starts its 5,000 ms again.
+2. Highlight (AC-2): every letter `cell` has `data-caught-up`, `"false"` from its
+   first render; each cell of `cells` gets `"true"` for
+   `CATCH_UP_HIGHLIGHT_MS = 5000` milliseconds, then `"false"` again. While
+   highlighted, the cell holds one child `data-testid="catch-up-mark"`, with
+   `aria-hidden="true"` and a computed `pointer-events` of `none`, drawn as a solid
+   ring on the cell's edge: its bounding box equals the cell's (1 px tolerance); its
+   computed `border-style` is `solid` and its `border-width` at least 3 px on each
+   of the four sides; its border colour has a contrast of at least 3:1 with the
+   cell's computed `background-color` (a colour with alpha is first composited over
+   white). The ring is the highlight's non-colour sign (spec 035): a shape, unlike
+   spec 016's flash. It is drawn under every other mark of the cell, which stay
+   visible: spec 013's `remote-selection` outlines, spec 019's `author-mark`, spec
+   024's `reveal-mark`, and spec 035's `remote-initials` and `remote-overflow`
+   labels (the `+k` of a crowded cell); it never covers the cell's letter. A cell
+   highlighted again by a later catch-up starts its 5,000 ms again. (Note from the
+   lead, 2026-10-17: "every other `cell` has `"false"`" became the first clause,
+   which gives the attribute to the letter cells, the only cells that `cells` can
+   name. The marks drawn over the ring read "spec 013's `remote-selection` outlines
+   and spec 035's initials and `+k` labels"; they gained `author-mark`, which spec
+   019 lets nothing but the corner labels cover, and `reveal-mark`, and the labels
+   are named by their test ids (preparation of spec 034).)
 3. Lines (AC-4): each line becomes an item of spec 013's feed (`feed-item`,
    `data-seq` = the line's `seq`):
 
@@ -249,8 +311,11 @@ Applying a catch-up:
    | `reveal_result` | `reveal` | spec 013's `feed.reveal.<scope>` text |
    | `word_completed` | `word_completed` | `t("feed.word_completed", {name, clue})`, `clue` the text of that clue in the snapshot's grid |
 
-   `name` is the nickname the page knows for the line's `player_id`, else
-   `t("feed.someone")`. The items go into the feed in `seq` order among the items it
+   `name` is the nickname the page knows for the line's `player_id`, written by
+   spec 040's `displayNickname` (`BOB` shows as `Bob`), else `t("feed.someone")`
+   (note from the lead, 2026-10-17: "written by spec 040's `displayNickname`" was
+   added for the nickname rule of 2026-10-16 (preparation of spec 034)). The items
+   go into the feed in `seq` order among the items it
    already holds (oldest first, the newest at the bottom), so they come after the
    lines of seq at most the seen seq and before the live lines that arrived since the
    snapshot. Then the feed keeps its newest 100 items (spec 013). Items are no longer
@@ -282,11 +347,16 @@ comes back see the same check, reveal and word lines for the time of the absence
 
 ### Test harness
 
-- Python (AC-1, AC-3): a FX-01 room driven with `join_room`, `handle_message`,
-  `disconnect_player` and `tick` at chosen times, each step's entries appended to a
-  store file
-  (`RoomStore(tmp_path / "nock.sqlite3")`), as spec 018's harness does. The
-  reference absence "ABSENCE" below: `Ana` (`p1`, token `TA`) and `Bob` (`p2`, token
+- Python (AC-1, AC-3): a FX-01 room `ABC123` created at `t` in a store file
+  (`RoomStore(tmp_path / "nock.sqlite3")`, then
+  `create_room(new_room("ABC123", fx01_grid, t))`, whose snapshot has seq 0),
+  driven with `join_room`, `handle_message`, `disconnect_player` and `tick` at
+  chosen times, each step's entries appended to the store, as spec 018's harness
+  does. `TA` and `TB` stand for two resume tokens that match `ResumeToken` (16 to
+  128 characters of `A-Z`, `a-z`, `0-9`, `_` and `-`), so that a request holding
+  one is valid. (Note from the lead, 2026-10-17: the room's code, its creation in
+  the store and what `TA` and `TB` stand for were added (preparation of spec 034).)
+  The reference absence "ABSENCE" below: `Ana` (`p1`, token `TA`) and `Bob` (`p2`, token
   `TB`) join (seq 1, 2); Ana writes `T` at (1, 0) (seq 3); Ana's socket closes (seq
   4); Bob writes `V`, `I`, `D`, `E` from (2, 1) across (seq 5 to 8; `E` completes
   `VIDE`, clue (2, 0, 0)); Bob checks that word (`check_result` seq 9, then four
@@ -297,22 +367,41 @@ comes back see the same check, reveal and word lines for the time of the absence
   times out Ana (`player_left` seq 20), hands the host role to Bob (`host_changed`
   seq 21, spec 014) and times out Bob (`player_left` seq 22); both become past
   players. The absence is `after_seq=3`, `until_seq=22`.
-- HTTP: `TestClient(create_app(rooms=registry, dist_dir=tmp_path))` on a registry
-  with a fake clock over the same store file.
+- Registry and HTTP (AC-1, AC-3): `RoomRegistry(clock=<a fake clock at t + 301>,
+  store=RoomStore(<the same file>))`, so that the room, last edited at `t`, is far
+  from its expiry (spec 032); HTTP criteria use
+  `TestClient(create_app(rooms=registry, dist_dir=tmp_path))` on that registry.
+  (Note from the lead, 2026-10-17: the clock's time was added, and the registry now
+  serves the Python calls of `RoomRegistry.catch_up` too; the item read "HTTP:
+  `TestClient(create_app(rooms=registry, dist_dir=tmp_path))` on a registry with a
+  fake clock over the same store file" (preparation of spec 034).)
 - Browser with mocked socket and mocked catch-up (AC-2, AC-4, AC-5): spec 040's
   mocked socket on `/r/ABC123`, plus
   `page.route("**/api/rooms/ABC123/catch-up", handler)`, which records each request
   body and answers with `CatchUp(...).model_dump_json()` (or a status, or later, as
-  the case says). `nock.identity.ABC123` (`p1`, `r7Kq2mXo9vB4tY1zW8nP`, `Ana`) and
-  `nock.room.ABC123` (with or without `seen_seq`) are seeded with
-  `context.add_init_script` before `page.goto`. Snapshots are FX-01 with players
-  `p1` (`you`, `Ana`) and `p2` (`Bob`).
+  the case says). `nock.identity.ABC123` (`p1`, `r7Kq2mXo9vB4tY1zW8nP`, `ANA`) and
+  `nock.room.ABC123` are seeded with `context.add_init_script` before `page.goto`;
+  the record is `{"grid": null, "selection": null}`, plus the case's `seen_seq`
+  when it names one, unless the case gives another record. Snapshots are FX-01,
+  with `you` `p1`, `resume_token` `r7Kq2mXo9vB4tY1zW8nP`, and players `p1` (`ANA`,
+  colour 0, host) and `p2` (`BOB`, colour 1), in capitals as the server sends them,
+  which the page shows as `Ana` and `Bob`. (Note from the lead, 2026-10-17: the
+  snapshots' `resume_token`, which AC-5's request body holds, the players' colours
+  and host, the record as seeded and the nicknames in capitals were added; the
+  harness read "(with or without `seen_seq`)" and "players `p1` (`you`, `Ana`) and
+  `p2` (`Bob`)" (preparation of spec 034).)
 - Browser with live server (AC-2, AC-4): two contexts, Ana and Bob, on a FX-01 room
   registered on the live server; Ana's page is closed (its context, and so its
   storage, stays) while Bob plays, then Ana opens the room again in a new page of
   her context.
 - Highlight timing (AC-2): measured with Playwright's waiting assertions from the
-  moment `room-page` gets its `data-catch-up` value.
+  moment `room-page` gets its `data-catch-up` value. The check that the marks are
+  still there 4,500 ms after it measures a time window, and AC-4's scroll checks are
+  of the kind that spec 013's serial file makes, so these tests go in test files of
+  their own, which the lead adds to `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`,
+  tooling). (Note from the lead,
+  2026-10-17: added, from the project's rule on timing-sensitive test files
+  (preparation of spec 034).)
 - Feed scroll measures (AC-4): spec 013's "Feed scroll states" (at its end, settled,
   items in view), at 1280 by 720.
 - Engines: every browser criterion runs in Chromium, Firefox and WebKit. No check of
@@ -322,11 +411,11 @@ comes back see the same check, reveal and word lines for the time of the absence
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-9.3.1) (Python; HTTP) The server names the cells that changed during my absence. Python: for ABSENCE, `store.load_room_at(code, 3)` has `seq` 3, the `cells` of the live state after seq 3, and its players' ids and nicknames, and `load_room_at(code, 99)` is None; `RoomRegistry.catch_up` with `TA`, `after_seq=3`, `until_seq=22` gives `cells` (0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (2, 4), (3, 1), (4, 1), in that order, which leaves out (1, 0), changed at seq 3; with `after_seq=15` it gives (0, 1), (3, 1), (4, 1); with `after_seq=22` or `after_seq=25` no cell, no line and no name; with `until_seq=99` the same as with 22. HTTP: `POST /api/rooms/<code>/catch-up` with `{"resume_token": TA, "after_seq": 3, "until_seq": 22}` answers 200 with JSON equal to `model_dump(mode="json")` of that catch-up, whose `after_seq` is 3 and `until_seq` 22; with `TB` the same (a past player is a member); with a token no player ever had, or the code `ZZZZZZ`, 404 with `{"detail": "Not Found"}`; with `after_seq` -1, a missing `until_seq`, or an extra key, 422. The request leaves the room's log unchanged, and the body holds none of the eight FX-01 answers and no key `answer` (spec 037).
-- **AC-2** (AC-9.3.1) (browser with mocked socket and catch-up; browser with live server) On my return, the cells changed since my last visit are highlighted for 5 seconds. Mocked: with `seen_seq` 5 stored, when the mock answers the join with a snapshot at `seq` 9 where `p2`'s selection is (2, 2) `across`, and the route answers `CatchUp(after_seq=5, until_seq=9, cells=((1, 0), (2, 2)), lines=(), names=())`: `room-page` gets `data-catch-up="5-9"`; (1, 0) and (2, 2) have `data-caught-up="true"` and one `catch-up-mark` each, which meets "Applying a catch-up" step 2 (box, solid border of 3 px or more on each side, 3:1 against the cell's background, `aria-hidden="true"`); every other cell has `data-caught-up="false"` and no mark; on (2, 2), `p2`'s `remote-selection` and its `remote-initials` stay visible, and `document.elementFromPoint` at the centre of the initials gives the initials; a click on (2, 2) selects it (spec 007). 4,500 ms after `data-catch-up` appears the two marks are still there; 6,000 ms after it, both cells have `data-caught-up="false"` and no mark is left. Live: Ana and Bob join; Ana types `T` at (1, 0); Ana's page is closed; Bob types `V`, `I`, `D`, `E` from (2, 1) across; Ana opens the room again: her page reaches `data-status="joined"`, (2, 1), (2, 2), (2, 3) and (2, 4) have `data-caught-up="true"` with a `catch-up-mark`, and (1, 0) has `data-caught-up="false"`.
-- **AC-3** (AC-9.3.2) (Python; HTTP) The server lists the words completed, the checks and the reveals of my absence, with the names of their players. Python: for ABSENCE with `TA`, `after_seq=3` and `until_seq=22`, `lines` is exactly `WordCompleted(seq=8, player_id="p2", clue=ClueRef(row=2, column=0, clue_index=0))`, the `CheckResult` of seq 9 as logged, the `RevealResult` of seq 14 as logged, then `WordCompleted(seq=18, player_id="p2", clue=ClueRef(row=0, column=0, clue_index=1))`, and `names` is `(PlayerName(player_id="p2", nickname="Bob"),)`, although Bob has left the room. On a FX-01 room where the cells of `VIDE` other than (2, 4) and those of `SENT` other than (2, 4) are filled, one letter at (2, 4) gives two `WordCompleted` with the same `seq`, in clue order: `SENT`'s clue (0, 4, 0) then `VIDE`'s (2, 0, 0). A letter written over another letter, a pencil letter confirmed (spec 020), an erase, and a reveal that fills a word's last empty cell add no `WordCompleted`; a pencil letter that fills a word's last empty cell adds one. With 150 `check_result` events in the absence, `lines` holds the last 100, by seq. HTTP: the 200 answer of AC-1 holds these lines and names.
-- **AC-4** (AC-9.3.2) (browser with mocked socket and catch-up; browser with live server) The activity feed lists the lines of my absence oldest first, with the newest at the bottom and in view (spec 013). Mocked: with `seen_seq` 5 stored and a snapshot at `seq` 9 whose players are `p1` and `p2`, when the route answers with the lines `WordCompleted` (seq 7, `p2`, clue (2, 0, 0)), `CheckResult` (seq 8, `p2`, scope word (2, 0, 0)) and `RevealResult` (seq 9, `p3`, scope letter (1, 1)) and the names `p3` = `Cy`: `activity-feed` holds three `feed-item` elements with `data-seq` 7, 8, 9 in that order, `data-kind` `word_completed`, `check`, `reveal`, and the texts `Bob a complété « Sans contenu »`, `Bob a vérifié un mot` and `Cy a révélé une lettre`, built from `fr.json`; the feed list is at its end (spec 013) and the item of seq 9 is in view. Then a live `check_result` with `seq` 10 adds its line after them. Live lines first: when the route holds its answer until the mock has sent 16 `check_result` events (`seq` 10 to 25) and the list is at its end, then answers, the items read `data-seq` 7, 8, 9, then 10 to 25, and within 300 ms the list is at its end. Reader scrolled up: in the same setup with the list's `scrollTop` set to the middle of its range (spec 013's harness) and settled before the answer, every item in view keeps the `top` of its box within 1 px after the three lines go in above. Live: in the play of AC-2, Bob also checks the word `VIDE` before Ana comes back; Ana's feed then ends with `Bob a complété « Sans contenu »` then `Bob a vérifié un mot`, the last one in view.
-- **AC-5** (new) (browser with mocked socket and catch-up) The page remembers what it saw, and asks for a catch-up only on a return. After the first snapshot of a page whose room record holds `{"grid": 1, "selection": null}` and no `seen_seq`, at `seq` 5: the page sends no catch-up request within 1 second, `data-catch-up` is `""`, and `nock.room.ABC123` parses to `{"grid": 1, "selection": null, "seen_seq": 5}`; after the events of `seq` 6 and 7 it holds `"seen_seq": 7`. Reconnection: the mock then closes the socket with 1011 and answers the new join with a snapshot at `seq` 12; the page sends one request whose body parses to `CatchUpRequest(resume_token="r7Kq2mXo9vB4tY1zW8nP", after_seq=7, until_seq=12)`. With `seen_seq` 9 stored and a snapshot at `seq` 9, or at `seq` 4, no request is sent. With `seen_seq` 5 stored and a snapshot at `seq` 9: when the route answers 500, or aborts, no cell gets `data-caught-up="true"`, no line is added, no second request is sent within 2 seconds, and typing `T` on (1, 0) still sends an `edit_letter`; when the mock sends a second snapshot at `seq` 15 before the route answers the first request, that answer is dropped (no highlight from it) and the page sends a second request with `after_seq=9` and `until_seq=15`.
+- **AC-1** (AC-9.3.1) (Python; HTTP) The server names the cells that changed during my absence. Python: for ABSENCE, `store.load_room_at("ABC123", 3)` has `seq` 3, the `cells` of the live state after seq 3, and its players' ids and nicknames; `load_room_at("ABC123", 99)` equals `store.load_room("ABC123")`, whose `seq` is 22, and `load_room_at("ZZZZZZ", 3)` is None. (Note from the lead, 2026-10-17: "and `load_room_at(code, 99)` is None" became the two checks before this note, since a `seq` beyond the log now reads the whole log ("`nock.store`") (simplification, human's rule of 2026-10-16).) `RoomRegistry.catch_up("ABC123", CatchUpRequest(resume_token=TA, after_seq=3, until_seq=22))` gives `cells` (0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (2, 4), (3, 1), (4, 1) as `CellRef` values, in that order, which leaves out (1, 0), changed at seq 3; with `after_seq=15` it gives (0, 1), (3, 1), (4, 1); with `after_seq=22` or `after_seq=25` no cell, no line and no name; with `until_seq=99` the same cells, lines and names as with 22, and `until_seq` 99. HTTP: `POST /api/rooms/ABC123/catch-up` with `{"resume_token": TA, "after_seq": 3, "until_seq": 22}` answers 200 with JSON equal to `model_dump(mode="json")` of that catch-up, whose `after_seq` is 3 and `until_seq` 22; with `TB` the same (a past player is a member); with a token no player ever had (one that matches `ResumeToken`, for example 24 times `Z`), or the code `ZZZZZZ`, 404 with `{"detail": "Not Found"}`; with `after_seq` -1, a missing `until_seq`, or an extra key, 422. The request leaves the room's log unchanged, and the body holds none of the eight FX-01 answers and no key `answer` (spec 037). (Note from the lead, 2026-10-17: the room's code, the `CatchUpRequest`, `CellRef`, "the same cells, lines and names" and the kind of token that no player ever had were named (preparation of spec 034).)
+- **AC-2** (AC-9.3.1) (browser with mocked socket and catch-up; browser with live server) On my return, the cells changed since my last visit are highlighted for 5 seconds. Mocked: with `seen_seq` 5 stored, when the mock answers the join with a snapshot at `seq` 9 where `p2`'s selection is `Selection(row=2, column=2, direction="across")`, and the route answers `CatchUp(after_seq=5, until_seq=9, cells=(CellRef(row=1, column=0), CellRef(row=2, column=2)), lines=(), names=())`: `room-page` gets `data-catch-up="5-9"`; (1, 0) and (2, 2) have `data-caught-up="true"` and one `catch-up-mark` each, which meets "Applying a catch-up" step 2 (box, solid border of 3 px or more on each side, 3:1 against the cell's background, `aria-hidden="true"`, computed `pointer-events` `none`); every other letter cell has `data-caught-up="false"` and no mark; on (2, 2), `p2`'s `remote-selection` and its `remote-initials` stay visible, and `document.elementFromPoint` at the centre of the initials gives the initials; a click on (2, 2) gives it `data-selected="true"` (spec 007). 4,500 ms after `data-catch-up` appears the two marks are still there; 6,000 ms after it, both cells have `data-caught-up="false"` and no mark is left. Live: Ana and Bob join; Ana types `T` at (1, 0), and once her (1, 0) has `data-letter="T"` and `data-unconfirmed="false"` (her `letter_changed` is applied, so her stored `seen_seq` holds its seq), her page is closed; Bob types `V`, `I`, `D`, `E` from (2, 1) across; Ana opens the room again: her page reaches `data-status="joined"`, (2, 1), (2, 2), (2, 3) and (2, 4) have `data-caught-up="true"` with a `catch-up-mark`, and (1, 0) has `data-caught-up="false"`. (Note from the lead, 2026-10-17: the cells read `((1, 0), (2, 2))`, which do not build `CellRef` values, and the selection read "(2, 2) `across`". The `Selection` and `CellRef` models, `pointer-events`, "letter cell", `data-selected` and the wait before Ana's page is closed were added (preparation of spec 034).)
+- **AC-3** (AC-9.3.2) (Python; HTTP) The server lists the words completed, the checks and the reveals of my absence, with the names of their players. Python: for ABSENCE with `TA`, `after_seq=3` and `until_seq=22`, `lines` is exactly `WordCompleted(seq=8, player_id="p2", clue=ClueRef(row=2, column=0, clue_index=0))`, the `CheckResult` of seq 9 as logged (its entry's `event`), the `RevealResult` of seq 14 as logged, then `WordCompleted(seq=18, player_id="p2", clue=ClueRef(row=0, column=0, clue_index=1))`, and `names` is `(PlayerName(player_id="p2", nickname="BOB"),)`, although Bob has left the room. On a FX-01 room where the cells of `VIDE` other than (2, 4) and those of `SENT` other than (2, 4) are filled, one letter at (2, 4) gives two `WordCompleted` with the same `seq`, in clue order: `SENT`'s clue (0, 4, 0) then `VIDE`'s (2, 0, 0). A letter written over another letter, a pencil letter confirmed (spec 020), an erase, and a reveal that fills a word's last empty cell add no `WordCompleted`; a pencil letter that fills a word's last empty cell adds one. With 150 `check_result` events in the absence, `lines` holds the last 100, by seq. HTTP: the 200 answer of AC-1 holds these lines and names. (Note from the lead, 2026-10-17: the nickname read `"Bob"`; the server stores nicknames in capitals, spec 039's "Nicknames in capitals". "(its entry's `event`)" was added (preparation of spec 034).)
+- **AC-4** (AC-9.3.2) (browser with mocked socket and catch-up; browser with live server) The activity feed lists the lines of my absence oldest first, with the newest at the bottom and in view (spec 013). Mocked: with `seen_seq` 5 stored and a snapshot at `seq` 9 whose players are `p1` and `p2`, when the route answers `CatchUp(after_seq=5, until_seq=9, cells=(), lines=(WordCompleted(seq=7, player_id="p2", clue=ClueRef(row=2, column=0, clue_index=0)), CheckResult(seq=8, player_id="p2", target=WordTarget(row=2, column=0, clue_index=0), correct=(), wrong=()), RevealResult(seq=9, player_id="p3", target=CellTarget(row=1, column=1), reveal_budget=RevealBudget(letters=4, words=1))), names=(PlayerName(player_id="p3", nickname="CY"),))`: `activity-feed` holds three `feed-item` elements with `data-seq` 7, 8, 9 in that order, `data-kind` `word_completed`, `check`, `reveal`, and the texts `Bob a complété « Sans contenu »`, `Bob a vérifié un mot` and `Cy a révélé une lettre`, built from `fr.json`; the feed list is at its end (spec 013) and the item of seq 9 is in view. Then a live `check_result` with `seq` 10, the line event of spec 013's "Feed scroll states" (by `p2`, scope grid, empty lists), adds its line, `Bob a vérifié la grille`, after them. Live lines first: when the route holds its answer until the mock has sent 16 such line events (`seq` 10 to 25) and the list is at its end, then answers, the items read `data-seq` 7, 8, 9, then 10 to 25, and within 300 ms of `data-catch-up="5-9"` the list is at its end. Reader scrolled up: in the same setup with the list's `scrollTop` set to the middle of its range (spec 013's harness) and settled before the answer, every item in view keeps the `top` of its box within 1 px, 300 ms after `data-catch-up="5-9"`, once the three lines have gone in above. Live: in the play of AC-2, Bob also checks the word `VIDE` before Ana comes back; Ana's feed then ends with `Bob a complété « Sans contenu »` then `Bob a vérifié un mot`, the last one in view. (Note from the lead, 2026-10-17: the route's answer is written as the models it is built from; it read "the lines `WordCompleted` (seq 7, `p2`, clue (2, 0, 0)), `CheckResult` (seq 8, `p2`, scope word (2, 0, 0)) and `RevealResult` (seq 9, `p3`, scope letter (1, 1)) and the names `p3` = `Cy`". The nickname is `CY`, as the server sends it, which spec 040's `displayNickname` shows as `Cy`. The live `check_result` and the moment of each scroll check were named (preparation of spec 034).)
+- **AC-5** (new) (browser with mocked socket and catch-up) The page remembers what it saw, and asks for a catch-up only on a return. After the first snapshot of a page whose room record holds `{"grid": 1, "selection": null}` and no `seen_seq`, at `seq` 5: the page sends no catch-up request within 1 second, `data-catch-up` is `""`, and `nock.room.ABC123` parses to `{"grid": 1, "selection": null, "seen_seq": 5}`; after `letter_changed` events of `p2` with `seq` 6 and 7 it holds `"seen_seq": 7`. Reconnection: the mock then closes the socket with 1011 and answers the new join with a snapshot at `seq` 12; the page sends one request whose body parses to `CatchUpRequest(resume_token="r7Kq2mXo9vB4tY1zW8nP", after_seq=7, until_seq=12)`. With `seen_seq` 9 stored and a snapshot at `seq` 9, or at `seq` 4, no request is sent within 1 second and `data-catch-up` stays `""`. With `seen_seq` 5 stored and a snapshot at `seq` 9: when the route answers 500, or aborts, no cell gets `data-caught-up="true"`, `activity-feed` holds no `feed-item`, `data-catch-up` stays `""`, no second request is sent within 2 seconds, and typing `T` on (1, 0) still sends an `edit_letter`. Dropped answer: in the same setup, the route holds the request; the mock closes the socket with 1011 and answers the new join with a snapshot at `seq` 15, and the page sends a second request, with `after_seq=9` and `until_seq=15`. The route then answers the first request with `CatchUp(after_seq=5, until_seq=9, cells=(CellRef(row=1, column=0),), lines=(), names=())`; 500 ms later, `data-catch-up` is still `""` and (1, 0) has `data-caught-up="false"`. It then answers the second request with `CatchUp(after_seq=9, until_seq=15, cells=(CellRef(row=2, column=2),), lines=(), names=())`, and `data-catch-up` becomes `"9-15"` with (2, 2) at `data-caught-up="true"`. (Note from the lead, 2026-10-17: the events of `seq` 6 and 7, the wait of 1 second, the empty feed and `data-catch-up` after a failure were named. The last case read "when the mock sends a second snapshot at `seq` 15 before the route answers the first request, that answer is dropped (no highlight from it) and the page sends a second request with `after_seq=9` and `until_seq=15`"; it now names the reconnection that brings that snapshot and the two answers that show the drop (preparation of spec 034).)
 
 ## Edge cases and errors
 
@@ -357,20 +446,33 @@ The words in brackets say how each criterion is tested.
 - Words in the absence (AC-3): a word completed, then emptied, then completed again
   gives two lines. A word whose last letter was written before the absence gives no
   line, even if a check locked it during the absence.
-- Removed players (AC-3): a player removed during the absence was a player at the
-  seen seq, so `before.players` gives their name.
+- Removed players (AC-3): a player removed during the absence, or gone by time-out,
+  was a player of the room when they made their line, so the replay gives their
+  name. A line whose player is not in the room when it is made, such as a vote that
+  passes after its requester left (spec 025), gets no name: the page shows the name
+  it knows, or `t("feed.someone")`. (Note from the lead, 2026-10-17: this item said
+  that `before.players` gives the name of a player removed during the absence; the
+  names now come from the replay (simplification, human's rule of 2026-10-16).)
 - Unknown names (AC-4): a line whose player the page cannot name reads
   `t("feed.someone")` (spec 013).
 - Many lines (AC-3, AC-4): the server sends the last 100; the feed then keeps its
   newest 100 items, so live lines that came in meanwhile push out the oldest catch-up
   lines.
-- Range limits (AC-1): `after_seq` below the room's first snapshot reads from that
-  snapshot; `until_seq` above the room's seq reads up to that seq.
+- Range limits (AC-1): `until_seq` above the room's seq reads up to the room's last
+  event, and `after_seq` at or above `until_seq`, or above the room's seq, gives no
+  cell, line or name; neither needs a rule of its own ("`nock.hub`"). A room with no
+  snapshot at or below `after_seq`, which only a room added in a later state with
+  `add_room` (a test seam) can be, gets None, so 404. (Note from the lead,
+  2026-10-17: this item said that an `after_seq` below the room's first snapshot
+  reads from that snapshot (simplification, human's rule of 2026-10-16).)
 - A long absence (AC-1): the server replays at most `snapshot_every - 1` entries
   (spec 018) to reach the seen seq, then every entry of the absence, once per return.
 - Highlight and other looks (AC-2): the ring adds to spec 016's flash, spec 013's
-  tint, spec 019's authorship colours and spec 016's locked look; it does not replace
-  them, and the cell's letter keeps its 4.5:1 contrast (spec 035).
+  tint, spec 019's authorship colours and the bold letter of a locked cell (spec
+  035); it does not replace them, and the cell's letter keeps its 4.5:1 contrast
+  (spec 035). (Note from the lead, 2026-10-17: "spec 016's locked look" became "the
+  bold letter of a locked cell (spec 035)", the spec that defines that look
+  (preparation of spec 034).)
 - Highlight while the player types (AC-2): typing in a highlighted cell does not end
   its highlight; the 5,000 ms run on.
 - Feed scroll (AC-4): catch-up lines are new lines for spec 013 AC-7: no special case,
@@ -419,8 +521,11 @@ They are part of the spec above and are approved with it.
    the body; it never makes the room live.
 4. Word completion (AC-3). Options: computed live and kept on each log entry, or
    computed when asked by replaying the absence from the seen seq. Pick: when asked,
-   with `load_room_at`; the live path and `LogEntry` do not change, and rooms logged
-   before this spec work too. "Complete" uses spec 026's "filled", as spec 021 uses
+   with `load_room_at`; the live path and `LogEntry` do not change. (Note from the
+   lead, 2026-10-17: ", and rooms logged before this spec work too" was taken out:
+   Nock has never been deployed and no store from before this release is kept
+   (specs 027 and 032), so no room was logged before this spec (preparation of spec
+   034).) "Complete" uses spec 026's "filled", as spec 021 uses
    "every cell of the word is filled"; a reveal's own line covers a word it fills.
 5. The highlight's look (AC-2). Spec 035 forbids colour-only signals and keeps the
    outline for the selected cell, the corners for initials and the dashed border for
@@ -428,7 +533,11 @@ They are part of the spec above and are approved with it.
    3:1 contrast (WCAG 1.4.11), under the other players' marks, for 5 seconds.
 6. Names (AC-3). The page knows only the players of its snapshot and those it saw
    join. Pick: the catch-up carries the nicknames of the players its lines name,
-   departed ones included.
+   departed ones included. (Note from the lead, 2026-10-17: each nickname is now
+   the one the player had when they made their line, read from the replay of the
+   absence; it was looked for among the room's members of now, then in the
+   absence's joins, then at the seen seq (simplification, human's rule of
+   2026-10-16).)
 
 Decided by the human on 2026-10-14, who approved the recommended answer to every
 open question.
