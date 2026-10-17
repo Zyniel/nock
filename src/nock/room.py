@@ -449,8 +449,8 @@ def team_nicknames(state: RoomState) -> tuple[str, ...]:
 
     Returns:
         First the nicknames of `past_players` in the order they left, then those
-        of `players` in `players` order. A nickname equal to an earlier one under
-        `casefold()` is left out.
+        of `players` in `players` order. A nickname equal to an earlier one is
+        left out.
     """
     member_nicknames: list[str] = []
     for past_player in state.past_players:
@@ -459,13 +459,9 @@ def team_nicknames(state: RoomState) -> tuple[str, ...]:
         member_nicknames.append(player.nickname)
 
     nicknames: list[str] = []
-    seen_folded: set[str] = set()
     for nickname in member_nicknames:
-        folded = nickname.casefold()
-        if folded in seen_folded:
-            continue
-        seen_folded.add(folded)
-        nicknames.append(nickname)
+        if nickname not in nicknames:
+            nicknames.append(nickname)
     return tuple(nicknames)
 
 
@@ -497,19 +493,26 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
 
 
 def normalize_nickname(text: str) -> str:
-    """Return the nickname as stored: NFC-normalised, then stripped.
+    """Return the nickname as stored: NFC, stripped, in capitals, then NFC again.
 
     Args:
-        text: The nickname as typed.
+        text: The nickname as typed, in any case.
 
     Returns:
-        The nickname, 2 to 20 characters, made of letters, combining marks,
-        ASCII digits and NICKNAME_PUNCTUATION, with at least one letter or digit.
+        The nickname in capitals (`str.upper()`) and in NFC, 2 to 20 characters,
+        made of letters, combining marks, ASCII digits and NICKNAME_PUNCTUATION,
+        with at least one letter or digit. The rules are checked on this result:
+        `ß` gives `SS`, two characters. A name typed in small letters and the
+        same name typed in the capitals that `str.upper()` gives have the same
+        result.
 
     Raises:
         ValueError: a rule is broken; the message names the rule.
     """
-    nickname = unicodedata.normalize("NFC", text).strip()
+    capitals = unicodedata.normalize("NFC", text).strip().upper()
+    # The capitals of a few Greek letters are not in NFC: U+0390 gives U+0399
+    # U+0308 U+0301, which NFC writes U+03AA U+0301.
+    nickname = unicodedata.normalize("NFC", capitals)
     if len(nickname) < NICKNAME_MIN_LENGTH or len(nickname) > NICKNAME_MAX_LENGTH:
         raise ValueError(
             f"The nickname must have {NICKNAME_MIN_LENGTH} to "
@@ -917,15 +920,15 @@ def _unique_nickname(state: RoomState, nickname: str) -> str:
     """Return `nickname`, or the first `nickname n` (n >= 2) no player has."""
     taken: set[str] = set()
     for player in state.players:
-        taken.add(player.nickname.casefold())
-    if nickname.casefold() not in taken:
+        taken.add(player.nickname)
+    if nickname not in taken:
         return nickname
     number = 2
     while True:
         suffix = f" {number}"
         base = nickname[: NICKNAME_MAX_LENGTH - len(suffix)].rstrip()
         candidate = base + suffix
-        if candidate.casefold() not in taken:
+        if candidate not in taken:
             return candidate
         number += 1
 

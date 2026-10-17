@@ -2,6 +2,7 @@
 // Plain functions: no DOM and no socket.
 
 import { t } from './i18n'
+import { displayNickname } from './nickname'
 import type { RoomEvent, RoomSettingsView, Snapshot } from './roomSession'
 
 // The feed keeps the newest items only.
@@ -13,11 +14,11 @@ export interface FeedItem {
   text: string
 }
 
-// The nickname of a player known to the page, even one who left; "Quelqu'un"
-// for a player the page never knew.
+// The nickname of a player known to the page, even one who left, as a page
+// shows it; "Quelqu'un" for a player the page never knew.
 export function nameOf(names: Map<string, string>, playerId: unknown): string {
   const name = typeof playerId === 'string' ? names.get(playerId) : undefined
-  return name ?? t('feed.someone')
+  return name === undefined ? t('feed.someone') : displayNickname(name)
 }
 
 function helpModeText(helpMode: string): string {

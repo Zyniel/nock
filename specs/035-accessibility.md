@@ -405,8 +405,11 @@ AC-11.)
   `fr.json` value read as a pattern (each placeholder, such as `{name}`, matches
   one or more characters, except a number placeholder, which matches one or more
   ASCII digits `0` to `9` and nothing else; everything else literally), or be data
-  of the test: a nickname of the snapshot or its initials, a clue text of FX-01,
-  one letter `A` to `Z`, the room code, the share URL, or digits only.
+  of the test: a nickname of the snapshot as spec 040's `displayNickname` writes
+  it, or its initials, a clue text of FX-01, one letter `A` to `Z`, the room code,
+  the share URL, or digits only. (Note from the lead, 2026-10-16: "as spec 040's
+  `displayNickname` writes it" was added, since a page shows `ANA` as `Ana`
+  (human's rule of 2026-10-16: nicknames in capitals).)
   - Number placeholders: a placeholder is a number placeholder when the client
     fills it with a whole number of at least 0 written in digits: a count, a
     size, a position, or one part of a time, padded with a zero or not. The test

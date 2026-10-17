@@ -52,7 +52,7 @@ from spec011_harness import (
 WAIT_TIMEOUT_MS = 5000
 STORED_IDENTITY_SCRIPT = (
     "localStorage.setItem('nock.identity.ABC123', JSON.stringify("
-    "{player_id: 'p1', resume_token: 'r7Kq2mXo9vB4tY1zW8nP', nickname: 'Ana'}));"
+    "{player_id: 'p1', resume_token: 'r7Kq2mXo9vB4tY1zW8nP', nickname: 'ANA'}));"
 )
 
 

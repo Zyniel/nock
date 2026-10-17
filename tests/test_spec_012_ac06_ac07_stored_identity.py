@@ -42,8 +42,9 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
+# A stored identity holds the nickname as the server sent it, in capitals.
 STORED_IDENTITY = json.dumps(
-    {"player_id": "p1", "resume_token": MOCK_TOKEN, "nickname": "Ana 2"}
+    {"player_id": "p1", "resume_token": MOCK_TOKEN, "nickname": "ANA 2"}
 )
 CATALOGUE_RECORD = json.dumps({"grid": 1, "selection": None})
 
@@ -81,7 +82,7 @@ def test_ac6_a_stored_identity_joins_at_once_with_its_token(
     mock.wait_for_frames(1)
 
     assert parse_client_message(mock.frames_without_pings()[0]) == Join(
-        nickname="Ana 2", resume_token=MOCK_TOKEN
+        nickname="ANA 2", resume_token=MOCK_TOKEN
     )
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-status", "joining")
@@ -110,7 +111,7 @@ def test_ac6_a_stored_identity_wins_over_the_record_and_the_remembered_nickname(
     mock.wait_for_frames(1)
 
     assert parse_client_message(mock.frames_without_pings()[0]) == Join(
-        nickname="Ana 2", resume_token=MOCK_TOKEN
+        nickname="ANA 2", resume_token=MOCK_TOKEN
     )
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joining")
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
@@ -184,8 +185,12 @@ def test_ac6_the_form_is_prefilled_with_the_remembered_nickname(
     expect(page.get_by_test_id("room-page")).to_have_attribute(
         "data-status", "nickname"
     )
-    expect(page.get_by_test_id("nickname-input")).to_have_value("Zo\u00e9")
+    # Step 3 of the room page flow: the prefill is the stored text as it is, which
+    # CSS shows in capitals.
+    nickname_input = page.get_by_test_id("nickname-input")
+    expect(nickname_input).to_have_value("Zo\u00e9")
     settle(page)
+    assert nickname_input.input_value() == "Zo\u00e9"
     assert mock.frames_without_pings() == []
 
 
@@ -243,7 +248,7 @@ def test_ac6_a_catalogue_creator_refused_by_the_server_gets_the_form(
     )
     submit_form(page, "Bob")
     mock.wait_for_frames(2)
-    assert mock.joins()[1] == Join(nickname="Bob", resume_token=None)
+    assert mock.joins()[1] == Join(nickname="BOB", resume_token=None)
 
 
 # ---- AC-7: what the page stores after a join ----------------------------------------
@@ -271,14 +276,14 @@ def test_ac7_a_join_from_the_form_stores_the_identity_and_the_nickname_as_sent(
     mock = open_mock_room(page, live_server)
     submit_form(page, " Ana ")
     mock.wait_for_frames(1)
-    assert mock.joins() == [Join(nickname="Ana", resume_token=None)]
+    assert mock.joins() == [Join(nickname="ANA", resume_token=None)]
 
-    mock.send(snapshot_frame(fx01_grid, players_named("Ana 2")))
+    mock.send(snapshot_frame(fx01_grid, players_named("ANA 2")))
 
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joined")
     identity = wait_for_storage(page, "nock.identity.ABC123")
-    assert json.loads(identity) == expected_identity("Ana 2")
-    assert wait_for_storage(page, "nock.nickname") == "Ana"
+    assert json.loads(identity) == expected_identity("ANA 2")
+    assert wait_for_storage(page, "nock.nickname") == "ANA"
 
 
 def test_ac7_a_refused_join_stores_no_nickname(
@@ -297,11 +302,11 @@ def test_ac7_a_refused_join_stores_no_nickname(
     submit_form(page, "Bob")
     mock.wait_for_frames(2)
 
-    mock.send(snapshot_frame(fx01_grid, players_named("Bob")))
+    mock.send(snapshot_frame(fx01_grid, players_named("BOB")))
 
-    assert wait_for_storage(page, "nock.nickname") == "Bob"
+    assert wait_for_storage(page, "nock.nickname") == "BOB"
     assert json.loads(wait_for_storage(page, "nock.identity.ABC123")) == (
-        expected_identity("Bob")
+        expected_identity("BOB")
     )
 
 
@@ -311,11 +316,11 @@ def test_ac7_a_join_sent_at_once_stores_the_identity_but_no_nickname(
     mock = open_mock_room(page, live_server, {"nock.room.ABC123": CATALOGUE_RECORD})
     mock.wait_for_frames(1)
 
-    mock.send(snapshot_frame(fx01_grid, players_named("Invit\u00e9")))
+    mock.send(snapshot_frame(fx01_grid, players_named("INVIT\u00c9")))
 
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joined")
     identity = wait_for_storage(page, "nock.identity.ABC123")
-    assert json.loads(identity) == expected_identity("Invit\u00e9")
+    assert json.loads(identity) == expected_identity("INVIT\u00c9")
     settle(page)
     assert read_storage(page, "nock.nickname") is None
 
@@ -327,10 +332,10 @@ def test_ac7_a_join_sent_at_once_never_rewrites_the_remembered_nickname(
     mock = open_mock_room(page, live_server, items)
     mock.wait_for_frames(1)
 
-    mock.send(snapshot_frame(fx01_grid, players_named("Zo\u00e9 2")))
+    mock.send(snapshot_frame(fx01_grid, players_named("ZO\u00c9 2")))
 
     identity = wait_for_storage(page, "nock.identity.ABC123")
-    assert json.loads(identity) == expected_identity("Zo\u00e9 2")
+    assert json.loads(identity) == expected_identity("ZO\u00c9 2")
     settle(page)
     assert read_storage(page, "nock.nickname") == "Zo\u00e9"
 
@@ -343,13 +348,13 @@ def test_ac7_a_resume_updates_the_identity_and_keeps_the_remembered_nickname(
     mock.wait_for_frames(1)
 
     mock.send(
-        snapshot_frame(fx01_grid, players_named("Ana 2"), resume_token=OTHER_TOKEN)
+        snapshot_frame(fx01_grid, players_named("ANA 2"), resume_token=OTHER_TOKEN)
     )
 
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joined")
     wait_until(
         page,
-        lambda: identity_is(page, expected_identity("Ana 2", OTHER_TOKEN)),
+        lambda: identity_is(page, expected_identity("ANA 2", OTHER_TOKEN)),
     )
     settle(page)
     assert read_storage(page, "nock.nickname") == "Zo\u00e9"

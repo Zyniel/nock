@@ -109,7 +109,7 @@ def eight_players(
         players.append(
             make_player(
                 index,
-                f"Player{index}",
+                f"PLAYER{index}",
                 state=state,
                 is_host=index == 0,
                 disconnected_at=disconnected_at,
@@ -183,7 +183,7 @@ def test_ac3_snapshot_arrives_within_a_second_with_letters_timer_and_budget(
 def test_ac3_snapshot_for_fills_every_field_from_the_room(fx01_grid: Grid) -> None:
     state = seeded_room(fx01_grid).model_copy(
         update={
-            "players": (make_player(0, "Ana", is_host=True), make_player(1, "Bob")),
+            "players": (make_player(0, "ANA", is_host=True), make_player(1, "BOB")),
             "seq": 7,
             "solved": True,
         }
@@ -209,7 +209,7 @@ def test_ac3_snapshot_for_fills_every_field_from_the_room(fx01_grid: Grid) -> No
 
 
 def test_ac3_snapshot_for_an_unknown_player_raises_key_error(fx01_grid: Grid) -> None:
-    state = make_state(fx01_grid, [make_player(0, "Ana", is_host=True)])
+    state = make_state(fx01_grid, [make_player(0, "ANA", is_host=True)])
 
     with pytest.raises(KeyError):
         snapshot_for(state, "nobody")
@@ -262,7 +262,7 @@ def test_ac4_a_room_of_seven_still_takes_one_more(fx01_grid: Grid) -> None:
 
 def test_ac4_a_resume_is_accepted_in_a_full_room(fx01_grid: Grid) -> None:
     players = eight_players()
-    players[3] = make_player(3, "Player3", state=PlayerState.DISCONNECTED)
+    players[3] = make_player(3, "PLAYER3", state=PlayerState.DISCONNECTED)
     state = make_state(fx01_grid, players)
 
     outcome = run_join(state, "Zoe", 9, token="resume-token-number-3")

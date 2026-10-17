@@ -36,8 +36,9 @@ from spec010_harness import (
 
 NICKNAME_KEY = "nock.nickname"
 IDENTITY_KEY = f"nock.identity.{MOCK_CODE}"
+# A stored identity holds the nickname as the server sent it, in capitals.
 STORED_IDENTITY = json.dumps(
-    {"player_id": "p7", "resume_token": MOCK_TOKEN, "nickname": "Ana 2"}
+    {"player_id": "p7", "resume_token": MOCK_TOKEN, "nickname": "ANA 2"}
 )
 
 
@@ -74,7 +75,8 @@ def test_ac6_the_creator_joins_with_the_saved_nickname(
     wait_for_storage(page, f"nock.identity.{code}")
     identity = read_json_object(page, f"nock.identity.{code}")
     assert identity["player_id"] == you
-    assert identity["nickname"] == "Zoé"
+    # The identity holds the nickname as the server stores it (spec 012).
+    assert identity["nickname"] == "ZOÉ"
 
 
 def test_ac6_without_a_saved_nickname_the_creator_is_the_default_guest(
@@ -94,7 +96,7 @@ def test_ac6_without_a_saved_nickname_the_creator_is_the_default_guest(
     wait_for_storage(page, f"nock.identity.{code}")
     identity = read_json_object(page, f"nock.identity.{code}")
     assert identity["player_id"] == room.get_attribute("data-you")
-    assert identity["nickname"] == default_nickname
+    assert identity["nickname"] == default_nickname.upper()
     assert read_storage(page, NICKNAME_KEY) is None
 
 
@@ -126,7 +128,7 @@ def test_ac6_the_creator_reload_sends_the_stored_token_and_nickname(
     page.reload()
 
     expect_joined(page)
-    assert recorder.first_join() == Join(nickname="Zoé", resume_token=token)
+    assert recorder.first_join() == Join(nickname="ZOÉ", resume_token=token)
 
 
 def test_ac6_a_stored_identity_wins_over_the_room_record_and_the_nickname(
@@ -139,7 +141,7 @@ def test_ac6_a_stored_identity_wins_over_the_room_record_and_the_nickname(
     }
     mock = open_mock_room(page, live_server, items)
 
-    assert mock.first_join() == Join(nickname="Ana 2", resume_token=MOCK_TOKEN)
+    assert mock.first_join() == Join(nickname="ANA 2", resume_token=MOCK_TOKEN)
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
 
 
@@ -148,7 +150,7 @@ def test_ac6_a_stored_identity_wins_without_a_room_record(
 ) -> None:
     mock = open_mock_room(page, live_server, {IDENTITY_KEY: STORED_IDENTITY})
 
-    assert mock.first_join() == Join(nickname="Ana 2", resume_token=MOCK_TOKEN)
+    assert mock.first_join() == Join(nickname="ANA 2", resume_token=MOCK_TOKEN)
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
 
 

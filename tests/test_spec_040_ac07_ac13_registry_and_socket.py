@@ -157,7 +157,7 @@ def test_ac8_join_gets_the_snapshot_of_the_room(
     assert snapshot.players == (
         PlayerView(
             player_id=snapshot.you,
-            nickname="Ana",
+            nickname="ANA",
             colour=0,
             state=PlayerState.ACTIVE,
             is_host=True,

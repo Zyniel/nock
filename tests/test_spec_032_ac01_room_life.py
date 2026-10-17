@@ -85,7 +85,7 @@ def store(store_path: Path) -> Iterator[RoomStore]:
 def ana_view() -> PlayerView:
     return PlayerView(
         player_id=ANA,
-        nickname="Ana",
+        nickname="ANA",
         colour=0,
         state=PlayerState.ACTIVE,
         is_host=True,

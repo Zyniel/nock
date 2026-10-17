@@ -361,6 +361,53 @@ def test_ac9_the_checker_accepts_the_data_of_the_test() -> None:
     assert unknown_texts(["Bobby"], data) == ["Bobby"]
 
 
+# Two of spec 040's examples: O'NEIL written with U+2019 as its apostrophe, and a
+# Greek name, U+039D U+038A U+039A U+039F U+03A3, which shows as U+039D U+03AF
+# U+03BA U+03BF U+03C2, ending with the final sigma.
+O_NEIL_CAPITALS = "O\N{RIGHT SINGLE QUOTATION MARK}NEIL"
+O_NEIL_SHOWN = "O\N{RIGHT SINGLE QUOTATION MARK}Neil"
+NIKOS_CAPITALS = (
+    "\N{GREEK CAPITAL LETTER NU}"
+    "\N{GREEK CAPITAL LETTER IOTA WITH TONOS}"
+    "\N{GREEK CAPITAL LETTER KAPPA}"
+    "\N{GREEK CAPITAL LETTER OMICRON}"
+    "\N{GREEK CAPITAL LETTER SIGMA}"
+)
+NIKOS_SHOWN = (
+    "\N{GREEK CAPITAL LETTER NU}"
+    "\N{GREEK SMALL LETTER IOTA WITH TONOS}"
+    "\N{GREEK SMALL LETTER KAPPA}"
+    "\N{GREEK SMALL LETTER OMICRON}"
+    "\N{GREEK SMALL LETTER FINAL SIGMA}"
+)
+
+# Spec 040's examples of `displayNickname`: a nickname of the test's data, and the
+# text a page shows for it.
+DISPLAYED_NICKNAMES = [
+    ("ANA", "Ana"),
+    ("JEAN-LUC", "Jean-Luc"),
+    ("D'ARTAGNAN", "D'Artagnan"),
+    ("ANA 2", "Ana 2"),
+    ("ÉLODIE", "Élodie"),
+    ("BOB_42", "Bob_42"),
+    (O_NEIL_CAPITALS, O_NEIL_SHOWN),
+    (NIKOS_CAPITALS, NIKOS_SHOWN),
+    ("<b>Eve</b>", "<b>eve</b>"),
+    ("<img src=x>", "<img Src=x>"),
+]
+
+
+@pytest.mark.parametrize(("nickname", "shown"), DISPLAYED_NICKNAMES)
+def test_ac9_the_checker_accepts_a_nickname_as_display_nickname_writes_it(
+    nickname: str, shown: str
+) -> None:
+    assert unknown_texts([shown], {nickname}) == []
+
+
+def test_ac9_the_checker_flags_a_nickname_written_another_way() -> None:
+    assert unknown_texts(["Anna", "ANa"], {"ANA"}) == ["Anna", "ANa"]
+
+
 def test_ac9_the_new_keys_exist_with_their_values() -> None:
     fr_json = load_fr()
 

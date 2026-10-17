@@ -4,6 +4,7 @@
   import { nameOf } from './activityFeed'
   import { shownChatLines } from './chat'
   import { listenForEscape } from './escapeKey'
+  import { displayNickname } from './nickname'
   import {
     followListTabStop,
     keepFeedEndOnResize,
@@ -210,16 +211,17 @@
       <h3 id="chat-moderation-heading">{t('chat.moderation_heading')}</h3>
       <div class="mute-rows">
         {#each otherPlayers as player (player.player_id)}
+          {@const name = displayNickname(player.nickname)}
           <div class="mute-row" data-testid="mute-row" data-player-id={player.player_id}>
-            <span data-testid="mute-name">{player.nickname}</span>
+            <span data-testid="mute-name">{name}</span>
             <button
               type="button"
               class="mute-player"
               data-testid="mute-player"
               data-muted={String(player.muted)}
               aria-label={player.muted
-                ? t('chat.unmute_label', { name: player.nickname })
-                : t('chat.mute_label', { name: player.nickname })}
+                ? t('chat.unmute_label', { name })
+                : t('chat.mute_label', { name })}
               onclick={() => onMute(player.player_id, player.muted)}
               >{player.muted ? t('chat.unmute') : t('chat.mute')}</button
             >

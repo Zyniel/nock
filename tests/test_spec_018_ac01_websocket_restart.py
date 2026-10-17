@@ -224,7 +224,7 @@ def test_ac1_websocket_a_new_player_can_join_a_room_that_only_the_store_knows(
 
         snapshot = newcomer.snapshot()
         assert grid_values(snapshot.grid) == grid_values(grid_state(live))
-        assert [p.nickname for p in snapshot.players] == ["Ana", "Bob", "Cleo", "Dan"]
+        assert [p.nickname for p in snapshot.players] == ["ANA", "BOB", "CLEO", "DAN"]
         assert [p.state for p in snapshot.players[:3]] == [PlayerState.DISCONNECTED] * 3
         assert snapshot.players[3].state is PlayerState.ACTIVE
         assert snapshot.seq == DRIVE_EVENTS + 3 + 1

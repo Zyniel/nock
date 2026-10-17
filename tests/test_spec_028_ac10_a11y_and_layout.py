@@ -636,8 +636,9 @@ def test_ac10_nicknames_with_markup_show_as_text_in_the_dialog(
     page.get_by_test_id("recap-open").click()
 
     names = page.get_by_test_id("recap-name")
-    expect(names.nth(0)).to_have_text("<b>Eve</b>")
-    expect(names.nth(1)).to_have_text("<img src=x>")
+    # The nicknames as spec 040's displayNickname writes them.
+    expect(names.nth(0)).to_have_text("<b>eve</b>")
+    expect(names.nth(1)).to_have_text("<img Src=x>")
     dialog = page.get_by_test_id("recap")
     expect(dialog.locator("b")).to_have_count(0)
     expect(dialog.locator("img")).to_have_count(0)

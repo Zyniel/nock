@@ -7,6 +7,7 @@
   import RecapDialog from './RecapDialog.svelte'
   import RoomTimer from './RoomTimer.svelte'
   import { t } from './i18n'
+  import { nameOf } from './activityFeed'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import {
     chatToggleLabel,
@@ -21,6 +22,7 @@
   import { newLinkCopier } from './copyLink'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
+  import { displayNickname } from './nickname'
   import { remoteSelectionsOf } from './remoteSelections'
   import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
   import {
@@ -89,8 +91,9 @@
 
   let session = $state(newSession())
   let rawSelection: Selection | null = $state(null)
-  // The nickname form: what is typed, the error shown, and the nickname of a
-  // join sent from the form that no snapshot has answered yet.
+  // The nickname form: the text as typed (CSS shows it in capitals), the error
+  // shown, and the nickname of a join sent from the form that no snapshot has
+  // answered yet.
   let nicknameText = $state(readNickname() ?? '')
   let formError: 'length' | 'characters' | null = $state(null)
   let formJoinNickname: string | null = $state(null)
@@ -535,7 +538,8 @@
     })
   }
 
-  // Check the nickname typed in the form, and join with it when it is valid.
+  // Check the nickname typed in the form, and join with it, in capitals, when it
+  // is valid.
   function submitNickname(event: SubmitEvent): void {
     event.preventDefault()
     if (session.status !== 'nickname') {
@@ -1154,8 +1158,7 @@
   // The question of a vote, with the requester's nickname (spec 013's known
   // names). The page inserts it as text.
   function voteQuestion(vote: VoteView): string {
-    const name = session.names.get(vote.player_id) ?? t('feed.someone')
-    return t(`vote.question.${vote.kind}`, { name })
+    return t(`vote.question.${vote.kind}`, { name: nameOf(session.names, vote.player_id) })
   }
 
   // The ballot buttons are disabled while the page is not joined: a ballot sent
@@ -1740,7 +1743,9 @@
               data-colour={String(player.colour)}
               style:background={`var(--player-colour-${player.colour})`}
             ></span>
-            <span class="roster-nickname" data-testid="roster-nickname">{player.nickname}</span>
+            <span class="roster-nickname" data-testid="roster-nickname"
+              >{displayNickname(player.nickname)}</span
+            >
             <span class="roster-state" data-testid="roster-state"
               >{t(`presence.${player.state}`)}</span
             >
@@ -1755,7 +1760,7 @@
                 class="remove-player"
                 class:compact={isRemoveCompact}
                 data-testid="remove-player"
-                aria-label={t('host.remove_label', { name: player.nickname })}
+                aria-label={t('host.remove_label', { name: displayNickname(player.nickname) })}
                 onclick={() => removePlayer(player.player_id)}
                 >{isRemoveCompact ? t('host.remove_short') : t('host.remove')}</button
               >
@@ -1960,6 +1965,13 @@
     flex-direction: column;
     gap: 0.5rem;
     max-width: 24rem;
+  }
+
+  /* The nickname shows in capitals, the placeholder too, while the value keeps
+     the text as typed, so input methods and the caret work as usual (spec 012,
+     room page flow step 3). */
+  .nickname-form input {
+    text-transform: uppercase;
   }
 
   .connection-banner {

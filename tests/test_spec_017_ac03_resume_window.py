@@ -143,7 +143,7 @@ def test_ac3_a_join_with_the_token_exactly_300_seconds_later_resumes_the_player(
     assert snapshot.you == "p2"
     views = {view.player_id: view for view in snapshot.players}
     assert sorted(views) == ["p1", "p2"]
-    assert (views["p2"].nickname, views["p2"].colour) == ("Bob", 1)
+    assert (views["p2"].nickname, views["p2"].colour) == ("BOB", 1)
     assert views["p2"].state == PlayerState.ACTIVE
     for event in events_of(outcome.entries):
         assert not isinstance(event, PlayerLeft | PlayerJoined)
@@ -161,7 +161,7 @@ def test_ac3_a_join_after_300_seconds_times_the_player_out_and_seats_them_back(
 
     assert events_of(outcome.entries) == [
         PlayerLeft(seq=4, player_id="p2", reason=LeaveReason.TIMED_OUT),
-        PlayerJoined(seq=5, player=player_view("p2", "Bob", 1)),
+        PlayerJoined(seq=5, player=player_view("p2", "BOB", 1)),
     ]
     assert outcome.entries[1].resume_token == token_of(2)
     assert len(outcome.reply) == 1
@@ -184,9 +184,9 @@ def test_ac3_a_player_seated_back_after_a_time_out_keeps_their_nickname(
 
     outcome = join_room(room, join, DISCONNECTED_AT + 300.5, NEW_PLAYER_ID, NEW_TOKEN)
 
-    assert player_of(outcome.state, "p2").nickname == "Bob"
+    assert player_of(outcome.state, "p2").nickname == "BOB"
     nicknames = [player.nickname for player in outcome.state.players]
-    assert nicknames == ["Ana", "Bob"]
+    assert nicknames == ["ANA", "BOB"]
 
 
 def test_ac3_a_tick_exactly_300_seconds_after_the_disconnection_keeps_the_player(
@@ -390,7 +390,7 @@ def test_ac3_after_the_tick_a_timed_out_token_seats_the_player_back(
     assert snapshot.you == "p2"
     # Not a resume, which gives a player_state_changed: a player_joined.
     assert events_of(outcome.entries) == [
-        PlayerJoined(seq=5, player=player_view("p2", "Bob", 1))
+        PlayerJoined(seq=5, player=player_view("p2", "BOB", 1))
     ]
 
 
@@ -427,7 +427,7 @@ def test_ac3_websocket_a_return_within_299_seconds_resumes_the_same_player(
             snapshot = second_a.snapshot()
             assert snapshot.you == a_id
             views = {view.player_id: view for view in snapshot.players}
-            assert (views[a_id].nickname, views[a_id].colour) == ("Ana", 0)
+            assert (views[a_id].nickname, views[a_id].colour) == ("ANA", 0)
             assert len(snapshot.players) == 2
             peer_b.wait_until(
                 lambda: has_state_change(peer_b, a_id, PlayerState.ACTIVE),
@@ -502,7 +502,7 @@ def test_ac3_websocket_after_301_seconds_the_player_times_out_and_is_seated_back
             assert snapshot.you == a_id
             views = {view.player_id: view for view in snapshot.players}
             assert sorted(views) == sorted([a_id, peer_b.snapshot().you])
-            assert (views[a_id].nickname, views[a_id].colour) == ("Ana", 0)
+            assert (views[a_id].nickname, views[a_id].colour) == ("ANA", 0)
             peer_b.wait_until(
                 lambda: has_player_joined(peer_b, a_id), "A's player_joined on B"
             )

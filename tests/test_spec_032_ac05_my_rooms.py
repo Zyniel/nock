@@ -310,8 +310,9 @@ def test_ac5_nicknames_are_shown_as_text(page_1280: Page, live_server: str) -> N
     expect_my_rooms_ready(page_1280, 1)
 
     item = my_room_items(page_1280)
+    # The nicknames as spec 040's displayNickname writes them.
     expect(item.get_by_test_id("my-room-players")).to_have_text(
-        "Joueurs : <b>Eve</b>, <img src=x>"
+        "Joueurs : <b>eve</b>, <img Src=x>"
     )
     expect(item.locator("b")).to_have_count(0)
     expect(item.locator("img")).to_have_count(0)

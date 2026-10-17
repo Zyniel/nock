@@ -22,16 +22,16 @@ Update it at the end of each session.
   the four test files that measure durations in the serial pass), PR #15 (spec
   032, room resume, seat back and "My rooms"; its two lead decisions stand
   unless the human overrides them: a mute survives a time-out, only lookups
-  check expiry). Tag `v0.1.0` exists locally on #6's merge commit but could not
-  be pushed from the cloud session (tag pushes are refused): the human pushes
-  it from a clone.
-- Open: the robustness pull request. It has three fixes and changes nothing in
-  the app:
-  - page loads in the tests keep Playwright's 30 s, which ends the Firefox-Windows
-    `Page.goto` timeouts that `main` had after #10, #12 and #14;
-  - the finish hook gives the gate 1,140 s instead of 540 s, since a timed-out
-    gate does not block;
-  - a spec 018 AC-2 race.
+  check expiry), PR #16 (tooling: page loads in the tests keep Playwright's
+  30 s, which ended the Firefox-Windows `Page.goto` timeouts; the finish hook
+  gives the gate 1,140 s; a spec 018 AC-2 race). Tag `v0.1.0` exists locally on
+  #6's merge commit but could not be pushed from the cloud session (tag pushes
+  are refused): the human pushes it from a clone.
+- Open: the nickname rule's pull request.
+  - **The rule:** typed in capitals, stored in capitals, compared exactly, shown
+    with capitalised words.
+  - **Review:** two review rounds; the second returned APPROVE.
+  - **For the human:** its description lists the manual input-method checks.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only); spec 033's
   open question 2 (players' addresses outside ASCII). When 033's turn comes the
@@ -47,36 +47,33 @@ Update it at the end of each session.
 - Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032 are `done` and
   merged. The human chose on 2026-10-16 to build the other four now, in the
   build plan's order, one pull request each: 038, then 034 ("Then catchup"),
-  033, 029. Before them, the nickname rule's pull request.
+  033, 029.
+- The nickname rule's fix round decided:
+  - NFC before and after the capitals;
+  - the field shows capitals through CSS `text-transform: uppercase` and keeps
+    its value as typed, since rewriting the value broke input methods and the
+    caret;
+  - `displayNickname` lowercases the whole text once, so Greek's final sigma
+    shows.
 
 ## Work in flight (not pushed)
 
-- Nickname rule (human, 2026-10-16): typed in capitals, stored in capitals,
-  compared exactly (no casefold left), shown with capitalised words (one display
-  function).
-  - **Branch:** worktree `.claude/worktrees/caps-names`, branch `caps-names`.
-    Its commits, in order: spec 2802053, tests 9548b18, code 1b6224f; the fix
-    round 94de7ce, f4d2daa, 76e7e31; the second review's suggestions 5006c99,
-    9b31f31, 38e27f4.
-  - **Review:** the second review returned APPROVE. Its pull request text is
-    drafted in the lead's scratchpad (`pr_caps.md`): the verification still has
-    to be filled in, and it lists the reviewer's manual checks of input methods.
-  - **The fix round decided:** NFC before and after the capitals; the field
-    shows capitals through CSS `text-transform: uppercase` and keeps its value
-    as typed (rewriting the value broke input methods and the caret);
-    `displayNickname` lowercases the whole text once, so Greek's final sigma
-    shows.
-  - **Next:** it is built on spec 032's commits before their last rebase
-    (c0f1be5). Once the robustness pull request is merged, rebase it with
-    `git rebase --onto origin/main c0f1be5 caps-names` and give it its own pull
-    request.
 - Spec 038 (privacy and operations).
-  - **Branch:** worktree `.claude/worktrees/spec-038`, branch `spec-038`, built
-    on `caps-names` (38e27f4). Its commits, in order: the spec preparation
-    51482ca, the tests 6a0cfc2, AC-11 in the serial list 62395ff, the spec's
-    gap-fills f66c0d9, the code 515e026, three test fixes 44b1536.
-  - **State:** the first review is running, and the gate passes for spec 038 in
-    all three engines.
+  - **Branch:** worktree `.claude/worktrees/spec-038`, branch `spec-038`. It is
+    built on the nickname branch before that branch's rebases (38e27f4). Its
+    commits, in order: the spec preparation 51482ca, the tests 6a0cfc2, AC-11 in
+    the serial list 62395ff, the spec's gap-fills f66c0d9, the code 515e026,
+    three test fixes 44b1536.
+  - **State:** the first review returned REQUEST CHANGES; its fix round is
+    running.
+  - **The blocking findings:**
+    - the throttle kept an address until that address failed again;
+    - the gap-fills had no tests;
+    - nothing checked that the token stays out of request URLs.
+  - **Also taken from that review:**
+    - a token given to `create_app` follows the variable's rule;
+    - every method on the ops paths answers 404 while the pages are off;
+    - a period change keeps the dashboard and an open replay on screen.
   - **The preparation:** spec 036 was refined after 038's decision 9 (logs at
     `warning`, no access log, `main()` checks `NOCK_OPERATOR_TOKEN` first). 038
     was aligned with the code and simplified: the ops API reuses spec 011's
@@ -84,7 +81,9 @@ Update it at the end of each session.
   - **The gap-fills:** after a 429 the page acts as after a 401; the token is
     checked before anything else; only token refusals count.
   - **Next:** after the nickname rule is merged, rebase with
-    `git rebase --onto origin/main 38e27f4 spec-038`.
+    `git rebase --onto origin/main 38e27f4 spec-038`. The nickname branch's
+    commits come back in `main` under other hashes, which that command leaves
+    out.
 - Then specs 034, 033 and 029, each built on the previous branch.
 - Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
@@ -107,7 +106,7 @@ Update it at the end of each session.
 
 1. Keep the open pull request green until the human merges it; answer its
    review comments.
-2. Then the nickname rule (above) in its own pull request, then spec 038's.
+2. Then spec 038's pull request.
 3. Then 034, 033 and 029, one pull request each. Pass
    `model: "opus"` to the implementer and to the test-writer of a whole spec
    (their definitions default to Sonnet); Sonnet for small spec notes and
