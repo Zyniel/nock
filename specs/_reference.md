@@ -3,6 +3,10 @@
 Not a spec: the quality gate ignores files starting with "_". Specs 002 to 038
 point here for the reference grid and the vocabulary. Source: `specs/_archive/complete.md`.
 
+Everything visual (colours, fonts, sizes, icons, grid cells, screen layouts,
+overlays) follows `specs/_design.md`, the design reference decided with the human
+on 2026-10-16; its section 12 lists the specs still to refine to match it.
+
 ## Reference grid
 
 FX-01 is an original 5×5 grid with 8 words, 18 letter cells and 7 clue cells; the acceptance criteria use it as the golden test case. It covers the four arrow types, a clue cell holding two clues at (0,0), and two letters that belong to one word only (N and T). A script confirmed that every arrow resolves to its answer and that no letter run lacks a clue.
@@ -96,6 +100,7 @@ the specs whose criteria this one mentions.
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 11 | 005, 006, 008, 010, 011, 018, 020, 022, 026, 032, 035, 036, 037 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
 | [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
+| [041](041-visual-foundation.md) | Visual foundation (design tokens, player colours, fonts, icons, styling primitives; no backlog story, `_design.md` step 1) | E10 | MVP | 20 | 004, 005, 007, 012, 013, 014, 016, 017, 019, 020, 021, 022, 024, 025, 027, 035, 038, 040 |
 
 ## Open decisions
 
