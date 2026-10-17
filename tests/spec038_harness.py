@@ -10,7 +10,9 @@ are in `tests/test_spec_038_*.py`, one file per criterion group:
   files once a room expired.
 - `test_spec_038_ac05_dashboard_figures.py`: AC-5, `dashboard_figures`.
 - `test_spec_038_ac06_ops_api.py`: AC-6, the ops API and `/ops` over HTTP.
+- `test_spec_038_ac06_throttle_memory.py`: AC-6, what a `_WrongCodeThrottle` keeps.
 - `test_spec_038_ac07_ops_page.py`: AC-7, the ops page.
+- `test_spec_038_ac07_period_change.py`: AC-7, a period change keeps the page.
 - `test_spec_038_ac08_room_edits.py`: AC-8, `room_edits` and the replay route.
 - `test_spec_038_ac09_replay_page.py`: AC-9, the replay on the ops page.
 - `test_spec_038_ac10_operator_token.py`: AC-10, `NOCK_OPERATOR_TOKEN`.
@@ -19,10 +21,11 @@ are in `tests/test_spec_038_*.py`, one file per criterion group:
   pass (`SERIAL_TEST_FILES` of `scripts/gate_browsers.py`).
 
 This module holds what more than one of those files uses: the values of the
-spec's "Test harness" (`OPS_TOKEN`, `DAY`, `LIFE`), the paths of the ops API, the
-hand-made room logs (`Log`), the bytes of the database files, the live server
-with a file database, the ops page helpers and the dashboard figures of AC-5.
-What only one file uses stays in that file, next to its tests.
+spec's "Test harness" (`OPS_TOKEN`, `DAY`, `LIFE`), the paths of the ops API and
+the unknown paths its answers are compared with, the hand-made room logs (`Log`),
+the bytes of the database files, the live server with a file database, the ops
+page helpers, and the dashboard figures of AC-5 with the six texts AC-7 writes
+for them. What only one file uses stays in that file, next to its tests.
 
 The names that this spec adds (`nock.operations`, `nock.settings`, the
 `operator_token` of `create_app`, `LogEntry.relay_ms`) are imported or used inside
@@ -50,6 +53,7 @@ from typing import TYPE_CHECKING, Literal, NamedTuple
 import pytest
 import uvicorn
 from fastapi import FastAPI
+from httpx2 import Response
 from playwright.sync_api import Locator, Page, Route, expect
 
 from nock.catalogue import Catalogue
@@ -92,6 +96,10 @@ OPS_TOKEN_KEY = "nock.ops_token"  # the page's sessionStorage key
 
 DASHBOARD_PATH = "/api/ops/dashboard"
 OPS_PAGE_PATH = "/ops"
+UNKNOWN_PATH = "/nothing-here"  # an unknown path, as in AC-3
+# An unknown path under /api/, as rule 1 names one. Not /nothing-here: the app
+# serves its root files on GET /<name>, so POST /nothing-here answers 405.
+UNKNOWN_API_PATH = "/api/xyz/dashboard"
 
 NOT_FOUND = {"detail": "Not Found"}
 NOT_AUTHORIZED = {"detail": "Not authorized"}
@@ -111,7 +119,9 @@ MISSING_BUILD_MESSAGE = "web/dist is missing: run npm --prefix web run build"
 SERVER_START_SECONDS = 10.0
 PARIS = "Europe/Paris"
 OPS_TIMEOUT_MS = 10_000
+HELD_POLL_MS = 20
 KEY_PAUSE_MS = 60  # spec 037's harness: 60 ms or more between keys
+DASHBOARD_ROUTE = "**/api/ops/dashboard*"  # the "Mocked ops API" of the spec
 
 
 # ---- The ops API ---------------------------------------------------------------------
@@ -125,6 +135,11 @@ def edits_path(code: str) -> str:
 def bearer(token: str) -> dict[str, str]:
     """The header `Authorization: Bearer <token>`."""
     return {"Authorization": f"Bearer {token}"}
+
+
+def answer_of(response: Response) -> tuple[int, bytes, dict[str, str]]:
+    """Everything an answer says: its status, its body and its headers."""
+    return (response.status_code, response.content, dict(response.headers))
 
 
 def utc(timestamp: float) -> datetime:
@@ -544,7 +559,66 @@ def attributes_of(locator: Locator, name: str) -> list[str | None]:
     return found
 
 
+def session_value(page: Page, key: str) -> str | None:
+    """The value the page's `sessionStorage` holds for `key`, or None."""
+    value = page.evaluate("key => sessionStorage.getItem(key)", key)
+    if value is None:
+        return None
+    assert isinstance(value, str), value
+    return value
+
+
+def period_button(page: Page, days: str) -> Locator:
+    """The period button of `days` days."""
+    return page.locator(f'[data-testid="ops-period"][data-days="{days}"]')
+
+
+def pressed_periods(page: Page) -> list[str | None]:
+    """The `aria-pressed` of the period buttons, in their order."""
+    return attributes_of(page.get_by_test_id("ops-period"), "aria-pressed")
+
+
+def wait_for_held_route(page: Page, held: list[Route]) -> None:
+    """Wait up to 10 seconds until `held` holds a request of the page.
+
+    The page can show what it shows while a request is pending before Playwright
+    has handed that request to the route handler, so a test that answers the
+    requests held so far first waits for one.
+    """
+    deadline = time.monotonic() + OPS_TIMEOUT_MS / 1000
+    while len(held) == 0:
+        if time.monotonic() >= deadline:
+            pytest.fail("the page's request never reached the route handler")
+        page.wait_for_timeout(HELD_POLL_MS)
+
+
+def answer_held_routes(held: list[Route], answer: tuple[int, str]) -> None:
+    """Answer every request held so far with `answer`, a status and a JSON body."""
+    status, body = answer
+    for route in held:
+        route.fulfill(status=status, content_type="application/json", body=body)
+
+
 # ---- The dashboard figures of AC-5 ---------------------------------------------------
+
+# The six texts of AC-5's 7-day result, and of the result with no room, as AC-7
+# writes them.
+SEVEN_DAY_TEXTS = [
+    "Salons créés : 3",
+    "Joueurs par salon : 2,0",
+    "Grilles terminées : 67 %",
+    "Temps médian de résolution : 12 min 30 s",
+    "Latence du serveur : 30 ms (médiane), 50 ms (95e centile)",
+    "Coupures par joueur : 0,50",
+]
+NO_ROOM_TEXTS = [
+    "Salons créés : 0",
+    "Joueurs par salon : aucune donnée",
+    "Grilles terminées : aucune donnée",
+    "Temps médian de résolution : aucune donnée",
+    "Latence du serveur : aucune donnée",
+    "Coupures par joueur : aucune donnée",
+]
 
 
 def seven_day_figures(now: float) -> DashboardFigures:
@@ -608,3 +682,9 @@ class DashboardRoute:
 def dashboard_answer(figures: DashboardFigures) -> tuple[int, str]:
     """A 200 answer whose body is `figures` as JSON."""
     return (200, figures.model_dump_json())
+
+
+def mocked_dashboard(page: Page, base_url: str, route: DashboardRoute) -> None:
+    """Answer the page's dashboard requests with `route`, then open the dashboard."""
+    page.route(DASHBOARD_ROUTE, route.handle)
+    open_dashboard(page, base_url)

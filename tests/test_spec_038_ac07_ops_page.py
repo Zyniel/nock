@@ -9,21 +9,26 @@ talks to the real ops API. Mocked: the same server serves `/ops`, and
 outline rule (spec 035 AC-2). Scans: spec 035's contrast and language scans, and
 spec 006 AC-5's window sizes.
 
-The six texts of the criterion are written as it writes them; every other French
-text comes from `fr.json`.
+The six texts of the criterion are written as it writes them (`SEVEN_DAY_TEXTS`
+and `NO_ROOM_TEXTS` of `spec038_harness`); every other French text comes from
+`fr.json`. The URL of every request of the page is recorded with
+`page.on("request")`, set before the page opens `/ops` ("Ops page requests").
+A period change, which keeps the page as it is, is checked in
+`test_spec_038_ac07_period_change.py`.
 
 Edge cases checked as well, from "Client: the ops page" and "Edge cases and
 errors": the labels and the password input with `autocomplete="off"`, a new tab
-that asks for the token again, a 401 while the dashboard is shown, a 429, an
-answer other than 200, 401 or 429 and a network failure (`error`), the `loading`
-state, the `data-value` of each figure as received, and the rounding rules of the
-duration, the percentage and the latency.
+that asks for the token again, a 401 while the dashboard is shown, a 429 (the
+token removed and the page `locked`), a 401 or a 429 to the replay's request,
+which locks the page as well, an answer other than 200, 401 or 429 and a network
+failure (`error`), the `loading` state and its `role="status"` text, the
+`data-value` of each figure (`String()` of the number received), and the
+rounding rules of the duration, the percentage and the latency.
 """
 
 from __future__ import annotations
 
 import json
-import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -32,7 +37,6 @@ import pytest
 from playwright.sync_api import (
     Browser,
     BrowserContext,
-    Locator,
     Page,
     Request,
     Route,
@@ -54,29 +58,37 @@ from spec035_harness import (
 )
 from spec038_harness import (
     DASHBOARD_PATH,
+    DASHBOARD_ROUTE,
+    NO_ROOM_TEXTS,
     NOT_AUTHORIZED,
     OPS_PAGE_PATH,
-    OPS_TIMEOUT_MS,
     OPS_TOKEN,
     OPS_TOKEN_KEY,
     PARIS,
+    SEVEN_DAY_TEXTS,
     TOO_MANY_REQUESTS,
     DashboardRoute,
     OpsServer,
+    answer_held_routes,
     attributes_of,
     dashboard_answer,
     expect_ops_state,
     fill,
     give_token,
     load_fr,
+    mocked_dashboard,
     no_room_figures,
     open_dashboard,
     open_ops_page,
     ops_live_server,
     ops_page,
+    period_button,
+    pressed_periods,
+    session_value,
     seven_day_figures,
     texts_of,
     utc,
+    wait_for_held_route,
 )
 
 # ---- Values of the spec --------------------------------------------------------------
@@ -91,29 +103,11 @@ METRICS = [
 ]
 PERIOD_DAYS = ["1", "7", "30"]
 
-# The six texts of AC-5's 7-day result, and of the result with no room.
-SEVEN_DAY_TEXTS = [
-    "Salons créés : 3",
-    "Joueurs par salon : 2,0",
-    "Grilles terminées : 67 %",
-    "Temps médian de résolution : 12 min 30 s",
-    "Latence du serveur : 30 ms (médiane), 50 ms (95e centile)",
-    "Coupures par joueur : 0,50",
-]
-NO_ROOM_TEXTS = [
-    "Salons créés : 0",
-    "Joueurs par salon : aucune donnée",
-    "Grilles terminées : aucune donnée",
-    "Temps médian de résolution : aucune donnée",
-    "Latence du serveur : aucune donnée",
-    "Coupures par joueur : aucune donnée",
-]
-
 # ---- Values of the test harness ------------------------------------------------------
 
 NOW = 1_800_000_000.0
-DASHBOARD_ROUTE = "**/api/ops/dashboard*"
-HELD_POLL_MS = 20
+REPLAY_ROUTE = "**/api/ops/rooms/*/edits"
+REPLAY_CODE = "ZZZZZZ"  # any code: the route answers before the server sees it
 WRONG_TOKEN = "wrong"
 FORM_WATCHER = (
     "window.__opsFormSeen = false;"
@@ -172,46 +166,25 @@ def new_page(browser: Browser) -> Iterator[NewPage]:
 # ---- Helpers -------------------------------------------------------------------------
 
 
-def session_value(page: Page, key: str) -> str | None:
-    value = page.evaluate("key => sessionStorage.getItem(key)", key)
-    if value is None:
-        return None
-    assert isinstance(value, str), value
-    return value
-
-
-def pressed_periods(page: Page) -> list[str | None]:
-    """The `aria-pressed` of the period buttons, in their order."""
-    return attributes_of(page.get_by_test_id("ops-period"), "aria-pressed")
-
-
-def period_button(page: Page, days: str) -> Locator:
-    """The period button of `days` days."""
-    return page.locator(f'[data-testid="ops-period"][data-days="{days}"]')
-
-
-def mocked_dashboard(page: Page, base_url: str, route: DashboardRoute) -> None:
-    """Answer the page's dashboard requests with `route`, then open the dashboard."""
-    page.route(DASHBOARD_ROUTE, route.handle)
-    open_dashboard(page, base_url)
-
-
-def wait_for_held_route(page: Page, held: list[Route]) -> None:
-    """Wait up to 10 seconds until `held` holds the page's dashboard request.
-
-    The page can show `loading` before Playwright has handed its request to the
-    route handler, so a test that answers the requests held so far first waits
-    for one.
-    """
-    deadline = time.monotonic() + OPS_TIMEOUT_MS / 1000
-    while len(held) == 0:
-        if time.monotonic() >= deadline:
-            pytest.fail("the dashboard request never reached the route handler")
-        page.wait_for_timeout(HELD_POLL_MS)
-
-
 def metric_values(page: Page, attribute: str) -> list[str | None]:
     return attributes_of(page.get_by_test_id("ops-metric"), attribute)
+
+
+def hold_the_first_load(page: Page, base_url: str) -> list[Route]:
+    """Open the ops page and give the token, holding the dashboard's request.
+
+    Returns the held requests, once the first one reached the route handler.
+    """
+    held: list[Route] = []
+
+    def hold(route: Route) -> None:
+        held.append(route)
+
+    page.route(DASHBOARD_ROUTE, hold)
+    open_ops_page(page, base_url)
+    give_token(page, OPS_TOKEN)
+    wait_for_held_route(page, held)
+    return held
 
 
 def outline_problems(reached: list[Reached]) -> list[str]:
@@ -376,6 +349,35 @@ def test_ac7_live_a_new_tab_asks_for_the_token_again(
     assert session_value(other_tab, OPS_TOKEN_KEY) is None
 
 
+def test_ac7_live_no_request_url_of_the_page_holds_the_token(
+    page: Page, server: OpsServer
+) -> None:
+    urls: list[str] = []
+
+    def keep(request: Request) -> None:
+        urls.append(request.url)
+
+    page.on("request", keep)
+    # The steps of the criterion: the wrong token, the operator token, the period
+    # 30, then a reload.
+    open_ops_page(page, server.base_url)
+    give_token(page, WRONG_TOKEN)
+    expect(page.get_by_test_id("ops-token-error")).to_be_visible()
+    give_token(page, OPS_TOKEN)
+    expect_ops_state(page, "ready")
+    with page.expect_request(lambda request: "days=30" in request.url):
+        period_button(page, "30").click()
+    expect(period_button(page, "30")).to_have_attribute("aria-pressed", "true")
+    with page.expect_request(lambda request: DASHBOARD_PATH in request.url):
+        page.reload()
+    expect_ops_state(page, "ready")
+
+    dashboard_urls = [url for url in urls if DASHBOARD_PATH in url]
+    # The wrong token, the first load, the period 30 and the reload.
+    assert len(dashboard_urls) >= 4, urls
+    assert [url for url in urls if OPS_TOKEN in url] == []
+
+
 # ---- AC-7: the dashboard with a mocked ops API ---------------------------------------
 
 
@@ -390,7 +392,7 @@ def test_ac7_mocked_the_six_texts_of_the_7_day_figures(
     assert texts_of(page.get_by_test_id("ops-metric")) == SEVEN_DAY_TEXTS
 
 
-def test_ac7_mocked_the_data_values_are_the_figures_as_received(
+def test_ac7_mocked_each_data_value_is_string_of_the_number_received(
     new_page: NewPage, server: OpsServer
 ) -> None:
     page = new_page(1280, 720)
@@ -398,11 +400,9 @@ def test_ac7_mocked_the_data_values_are_the_figures_as_received(
 
     mocked_dashboard(page, server.base_url, route)
 
-    # The figures whose JSON text and JavaScript value read the same.
-    values = metric_values(page, "data-value")
-    assert values[0] == "3"
-    assert values[2] == str(2 / 3)  # 0.6666666666666666, in JSON as in JavaScript
-    assert values[5] == "0.5"
+    # `String(figure)`: the JSON's 2.0, 750000.0 and 30.0 read 2, 750000 and 30.
+    expected = ["3", "2", "0.6666666666666666", "750000", "30", "0.5"]
+    assert metric_values(page, "data-value") == expected
     assert metric_values(page, "data-p95")[4] == "50"
 
 
@@ -517,7 +517,7 @@ def test_ac7_mocked_a_401_while_the_dashboard_is_shown_locks_the_page_again(
     assert session_value(page, OPS_TOKEN_KEY) is None
 
 
-def test_ac7_mocked_a_429_shows_the_throttle_text(
+def test_ac7_mocked_a_429_locks_the_page_and_shows_the_throttle_text(
     new_page: NewPage, server: OpsServer
 ) -> None:
     page = new_page(1280, 720)
@@ -530,6 +530,46 @@ def test_ac7_mocked_a_429_shows_the_throttle_text(
     error = page.get_by_test_id("ops-token-error")
     expect(error).to_have_text(load_fr()["ops.throttled"])
     expect(error).to_have_attribute("role", "alert")
+    expect_ops_state(page, "locked")
+    expect(page.get_by_test_id("ops-token-form")).to_be_visible()
+    # Submitting kept the token; the 429 removed it, as a 401 does.
+    assert session_value(page, OPS_TOKEN_KEY) is None
+
+
+@pytest.mark.parametrize(
+    ("status", "body", "text_key"),
+    [
+        pytest.param(401, NOT_AUTHORIZED, "ops.token_refused", id="401"),
+        pytest.param(429, TOO_MANY_REQUESTS, "ops.throttled", id="429"),
+    ],
+)
+def test_ac7_a_401_or_a_429_to_the_replay_request_locks_the_page(
+    page: Page,
+    server: OpsServer,
+    status: int,
+    body: dict[str, str],
+    text_key: str,
+) -> None:
+    # The dashboard comes from the live server; only the replay's request is
+    # answered here. A 401 or a 429 to every ops API request of the page locks
+    # it, the replay's included.
+    def refuse(route: Route) -> None:
+        route.fulfill(
+            status=status, content_type="application/json", body=json.dumps(body)
+        )
+
+    page.route(REPLAY_ROUTE, refuse)
+    open_dashboard(page, server.base_url)
+    assert session_value(page, OPS_TOKEN_KEY) == OPS_TOKEN
+
+    page.get_by_test_id("ops-replay-code").fill(REPLAY_CODE)
+    page.get_by_test_id("ops-replay-submit").click()
+
+    expect_ops_state(page, "locked")
+    error = page.get_by_test_id("ops-token-error")
+    expect(error).to_have_text(load_fr()[text_key])
+    expect(error).to_have_attribute("role", "alert")
+    assert session_value(page, OPS_TOKEN_KEY) is None
 
 
 @pytest.mark.parametrize("status", [500, 404, 403])
@@ -565,21 +605,28 @@ def test_ac7_mocked_the_page_is_loading_until_the_answer_comes(
     new_page: NewPage, server: OpsServer
 ) -> None:
     page = new_page(1280, 720)
-    held: list[Route] = []
 
-    def hold(route: Route) -> None:
-        held.append(route)
-
-    page.route(DASHBOARD_ROUTE, hold)
-    open_ops_page(page, server.base_url)
-
-    give_token(page, OPS_TOKEN)
-    wait_for_held_route(page, held)
+    held = hold_the_first_load(page, server.base_url)
     expect_ops_state(page, "loading")
-    status, body = dashboard_answer(seven_day_figures(NOW))
-    for route in held:
-        route.fulfill(status=status, content_type="application/json", body=body)
+    answer_held_routes(held, dashboard_answer(seven_day_figures(NOW)))
 
+    expect_ops_state(page, "ready")
+
+
+def test_ac7_mocked_while_loading_a_status_element_shows_the_loading_text(
+    new_page: NewPage, server: OpsServer
+) -> None:
+    loading_text = load_fr()["ops.loading"]
+    page = new_page(1280, 720)
+
+    held = hold_the_first_load(page, server.base_url)
+
+    expect_ops_state(page, "loading")
+    status = ops_page(page).get_by_role("status").filter(has_text=loading_text)
+    expect(status).to_have_count(1)
+    expect(status).to_have_text(loading_text)
+    expect(status).to_be_visible()
+    answer_held_routes(held, dashboard_answer(seven_day_figures(NOW)))
     expect_ops_state(page, "ready")
 
 

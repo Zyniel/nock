@@ -12,8 +12,12 @@ of base64 that the rule refuses (`=`, `+`, `/`), digits and letters outside ASCI
 and an invisible character; `main()` checks the token before the other variables
 and at each call, and leaves the variable as it was; the app reads the variable
 when it starts, not when it is built, and keeps it while it runs; a token given to
-`create_app` wins over the variable; and an invalid variable fails the app's
-startup with the same `SettingsError`.
+`create_app` wins over the variable, which is then never read; and an invalid
+variable fails the app's startup with the same `SettingsError`. A token given to
+`create_app` follows the variable's rule: `""` turns the pages off whatever the
+variable holds, a valid one or one breaking the rule, and any value the rule
+refuses raises `SettingsError` when `create_app` is called, with a message that
+never holds it (checked on distinctive values, never on `a`).
 
 `nock.settings` and `nock.__main__` are imported inside the tests, so that each
 test fails on the name it needs (see `spec038_harness`).
@@ -26,6 +30,7 @@ import socket
 import string
 import subprocess
 import sys
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -35,14 +40,22 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import nock.server
+from nock.grid import Grid
 from nock.hub import RoomRegistry
+from nock.room import new_room
 from nock.server import create_app
 from spec036_harness import DATABASE_VARIABLE, HOST_VARIABLE, PORT_VARIABLE
 from spec038_harness import (
     DASHBOARD_PATH,
+    NOT_FOUND,
     OPERATOR_TOKEN_VARIABLE,
+    OPS_PAGE_PATH,
     OPS_TOKEN,
+    UNKNOWN_API_PATH,
+    UNKNOWN_PATH,
+    answer_of,
     bearer,
+    edits_path,
 )
 
 # ---- Values of the spec --------------------------------------------------------------
@@ -96,6 +109,7 @@ OTHER_TOKEN = "Ops-" + "y" * 40  # a valid token other than OPS_TOKEN
 
 INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 PROCESS_EXIT_LIMIT_SECONDS = 20.0
+GIVEN_ROOM = "GIVEN1"  # a room of the registry, for the replay path
 
 
 # ---- Fixtures and helpers ------------------------------------------------------------
@@ -184,6 +198,14 @@ def registry() -> Iterator[RoomRegistry]:
     room_registry = RoomRegistry()
     yield room_registry
     room_registry.close()
+
+
+@pytest.fixture
+def given_room(registry: RoomRegistry, fx01_text: str) -> str:
+    """Add the FX-01 room GIVEN_ROOM to the registry; return its code."""
+    grid = Grid.model_validate_json(fx01_text)
+    registry.add_room(new_room(GIVEN_ROOM, grid, time.time()))
+    return GIVEN_ROOM
 
 
 def dashboard_status(client: TestClient, token: str) -> int:
@@ -446,3 +468,88 @@ def test_ac10_an_invalid_variable_fails_the_apps_startup_with_settings_error(
         start_and_stop(app)
 
     assert value not in str(caught.value)
+
+
+# ---- AC-10: a token given to create_app follows the same rule ------------------------
+
+
+# Each path of the operator pages, with the unknown path that rule 1 compares it
+# with: one under /api/ for the ops API, any unknown path for /ops.
+PAGES_OFF_REQUESTS = [
+    pytest.param(DASHBOARD_PATH, UNKNOWN_API_PATH, id="dashboard"),
+    pytest.param(edits_path(GIVEN_ROOM), UNKNOWN_API_PATH, id="replay"),
+    pytest.param(OPS_PAGE_PATH, UNKNOWN_PATH, id="ops-page"),
+]
+# "`""` turns the pages off whatever NOCK_OPERATOR_TOKEN holds."
+VARIABLE_VALUES = [
+    pytest.param(OPS_TOKEN, id="variable-ops-token"),
+    pytest.param(SHORT_TOKEN, id="variable-breaking-the-rule"),
+]
+
+
+@pytest.mark.usefixtures("given_room")
+@pytest.mark.parametrize("variable", VARIABLE_VALUES)
+@pytest.mark.parametrize(("path", "unknown_path"), PAGES_OFF_REQUESTS)
+def test_ac10_create_app_with_an_empty_token_has_the_pages_off_whatever_the_variable(
+    registry: RoomRegistry,
+    dist_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+    unknown_path: str,
+    variable: str,
+) -> None:
+    monkeypatch.setenv(OPERATOR_TOKEN_VARIABLE, variable)
+    app = create_app(rooms=registry, dist_dir=dist_dir, operator_token="")
+
+    with TestClient(app) as client:
+        unknown = client.get(unknown_path, headers=bearer(OPS_TOKEN))
+        response = client.get(path, headers=bearer(OPS_TOKEN))
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND
+    assert "cache-control" not in response.headers
+    assert answer_of(response) == answer_of(unknown)
+
+
+@pytest.mark.parametrize("value", [pytest.param("a", id="one-letter"), *REFUSED_VALUES])
+def test_ac10_create_app_with_a_token_breaking_the_rule_raises_settings_error(
+    registry: RoomRegistry, dist_dir: Path, monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    from nock.settings import SettingsError
+
+    monkeypatch.setenv(OPERATOR_TOKEN_VARIABLE, OPS_TOKEN)
+
+    # When create_app is called, not when the app starts.
+    with pytest.raises(SettingsError):
+        create_app(rooms=registry, dist_dir=dist_dir, operator_token=value)
+
+
+@pytest.mark.parametrize("value", REFUSED_VALUES)
+def test_ac10_the_message_of_create_apps_settings_error_never_holds_the_token(
+    registry: RoomRegistry, dist_dir: Path, value: str
+) -> None:
+    from nock.settings import SettingsError
+
+    with pytest.raises(SettingsError) as caught:
+        create_app(rooms=registry, dist_dir=dist_dir, operator_token=value)
+
+    message = str(caught.value)
+    shown: list[str] = []
+    for form in forms_of(value):
+        if form in message:
+            shown.append(form)
+    assert shown == [], message
+
+
+def test_ac10_a_token_given_to_create_app_leaves_the_variable_unread(
+    registry: RoomRegistry, dist_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The variable is read only when no token is given (None): one that breaks
+    # the rule does not stop the app's startup.
+    monkeypatch.setenv(OPERATOR_TOKEN_VARIABLE, SHORT_TOKEN)
+    app = create_app(rooms=registry, dist_dir=dist_dir, operator_token=OPS_TOKEN)
+
+    with TestClient(app) as client:
+        status = dashboard_status(client, OPS_TOKEN)
+
+    assert status == 200

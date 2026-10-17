@@ -11,10 +11,15 @@ NOCK_OPERATOR_TOKEN deleted. The shared setup is in `spec038_harness`; spec 011'
 Edge cases checked as well, from "Operator access" and "Edge cases and errors": a
 token that differs by one character, a token in a cookie, nine refusals, a 429
 that is not counted, the token in the query counted as a refusal, a burst of wrong
-tokens counted one after another, two apps with their own failures, the room
-sockets' separate wrong-code count, the replay route under the same rules, an
-empty NOCK_OPERATOR_TOKEN, `/ops` with no built client (503, as `/`), and a room
-that is only in the store, which the dashboard reads without making it live.
+tokens counted one after another while each token check is slow, two apps with
+their own failures, the room sockets' separate wrong-code count, the replay route
+under the same rules, the token checked before the query, the code and the room,
+an empty NOCK_OPERATOR_TOKEN, `/api/ops`, `/api/ops/` and `/api/ops/xyz` with any
+method while the pages are off, the other requests under `/api/ops/` while they
+are on (no token check, nothing counted), `/ops` with no built client (503, as
+`/`), and a room that is only in the store, which the dashboard reads without
+making it live. What a throttle keeps in memory is checked in Python, in
+`test_spec_038_ac06_throttle_memory.py`.
 
 The names this spec adds are used inside the tests, so that each test fails on
 the one it needs (see `spec038_harness`).
@@ -22,6 +27,9 @@ the one it needs (see `spec038_harness`).
 
 from __future__ import annotations
 
+import secrets
+import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -48,9 +56,12 @@ from spec038_harness import (
     OPS_PAGE_PATH,
     OPS_TOKEN,
     TOO_MANY_REQUESTS,
+    UNKNOWN_API_PATH,
+    UNKNOWN_PATH,
     WRONG_CODE_LIMIT,
     WRONG_CODE_WINDOW_SECONDS,
     Log,
+    answer_of,
     bearer,
     edits_path,
     seed_room,
@@ -63,6 +74,7 @@ if TYPE_CHECKING:
 
 NO_STORE = "no-store"
 BEARER_CHALLENGE = "Bearer"
+METHOD_NOT_ALLOWED = {"detail": "Method Not Allowed"}  # FastAPI's 405
 
 # Rooms created 8 days, 7 days and 1 day before `now`.
 OLD_CODE = "OLD8DY"
@@ -72,10 +84,36 @@ NEW_CODE = "NEW1DY"
 # ---- Values of the test harness ------------------------------------------------------
 
 INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
-UNKNOWN_PATH = "/nothing-here"  # an unknown path, as in AC-3
 UNKNOWN_ROOM = "ZZZZZZ"
 THROTTLED_CLOSE_CODE = 4429  # spec 011
 ROOM_NOT_FOUND_CLOSE_CODE = 4404
+TOKEN_CHECK_DELAY_SECONDS = 0.05
+# A wrong token as long as OPS_TOKEN: its check is the whole comparison of rule 3.
+SAME_LENGTH_WRONG_TOKEN = "Ops-" + "y" * 40
+
+
+class SlowTokenCheck:
+    """Rule 3's comparison, `secrets.compare_digest`, made slower and counted.
+
+    A token check can take a while on a busy server. In a burst the delay keeps
+    the wrong tokens in flight at the same time, between the throttle's check of
+    rule 2 and the record of their refusal, whatever the order in which their
+    threads run, so a check and a record that are not one step show on every
+    run, as spec 011's `SlowLookupRegistry` does with room lookups.
+    """
+
+    def __init__(self) -> None:
+        self.original = secrets.compare_digest
+        self.calls = 0
+        self.lock = threading.Lock()
+
+    # `Text` is str or bytes, the same for both values, as compare_digest takes.
+    def compare[Text: (str, bytes)](self, first: Text, second: Text) -> bool:
+        """Wait TOKEN_CHECK_DELAY_SECONDS, count the call, then compare as usual."""
+        time.sleep(TOKEN_CHECK_DELAY_SECONDS)
+        with self.lock:
+            self.calls += 1
+        return self.original(first, second)
 
 
 # ---- Fixtures ------------------------------------------------------------------------
@@ -118,6 +156,14 @@ def off_client(
     app = create_app(rooms=registry, dist_dir=dist_dir)
     with TestClient(app) as client:
         yield client
+
+
+@pytest.fixture
+def slow_token_check(monkeypatch: pytest.MonkeyPatch) -> SlowTokenCheck:
+    """Replace `secrets.compare_digest` by a `SlowTokenCheck` during the test."""
+    slow_check = SlowTokenCheck()
+    monkeypatch.setattr(secrets, "compare_digest", slow_check.compare)
+    return slow_check
 
 
 @pytest.fixture
@@ -173,11 +219,6 @@ def figures_from_the_store(registry: RoomRegistry, days: int) -> DashboardFigure
         entries = tuple(registry.store.read_log(code))
         rooms.append(RoomLog(code=code, created_at=created_at, entries=entries))
     return dashboard_figures(rooms, days, now)
-
-
-def answer_of(response: Response) -> tuple[int, bytes, dict[str, str]]:
-    """Everything an answer says: its status, its body and its headers."""
-    return (response.status_code, response.content, dict(response.headers))
 
 
 def status_and_body(response: Response) -> tuple[int, object]:
@@ -365,11 +406,25 @@ REFUSED_REQUESTS = [
         {"Cookie": f"token={OPS_TOKEN}; nock.ops_token={OPS_TOKEN}"},
         id="token-in-a-cookie",
     ),
-    # Rules 1 to 4 apply to every path under /api/ops/.
+    # Rules 2 and 3 apply to both ops routes.
     pytest.param(edits_path(NEW_CODE), {}, id="replay-no-header"),
     pytest.param(
         edits_path(NEW_CODE), {"Authorization": "Bearer wrong"}, id="replay-wrong"
     ),
+    # Rule 3 comes before anything else of the request is looked at: its query,
+    # its code, its room.
+    pytest.param(
+        f"{DASHBOARD_PATH}?days=2",
+        {"Authorization": "Bearer wrong"},
+        id="days-2-bearer-wrong",
+    ),
+    pytest.param(f"{DASHBOARD_PATH}?days=2", {}, id="days-2-no-header"),
+    pytest.param(
+        edits_path("abc"),
+        {"Authorization": "Bearer wrong"},
+        id="replay-code-breaking-the-pattern-wrong",
+    ),
+    pytest.param(edits_path(UNKNOWN_ROOM), {}, id="replay-unknown-room-no-header"),
 ]
 
 
@@ -496,11 +551,14 @@ def test_ac6_refusals_of_the_replay_route_count_too(ops_client: TestClient) -> N
 
 
 def test_ac6_forty_wrong_tokens_at_once_get_ten_401_and_thirty_429(
-    ops_client: TestClient,
+    ops_client: TestClient, slow_token_check: SlowTokenCheck
 ) -> None:
+    # The clock does not move. Each token check answers a little later
+    # (`SlowTokenCheck`), so that the 40 wrong tokens are in flight together.
+    wrong_token = bearer(SAME_LENGTH_WRONG_TOKEN)
     answers = at_once(
         BURST_SIZE,
-        lambda: status_and_body(ops_client.get(DASHBOARD_PATH, headers=bearer("x"))),
+        lambda: status_and_body(ops_client.get(DASHBOARD_PATH, headers=wrong_token)),
     )
 
     refused = 0
@@ -514,6 +572,8 @@ def test_ac6_forty_wrong_tokens_at_once_get_ten_401_and_thirty_429(
         else:
             others.append(answer)
     assert (refused, throttled, others) == (10, 30, [])
+    # The tokens were compared by secrets.compare_digest (rule 3), made slow here.
+    assert slow_token_check.calls >= WRONG_CODE_LIMIT
 
 
 def test_ac6_each_app_keeps_its_own_refusals(
@@ -565,9 +625,21 @@ OFF_ROOM = "OFF234"
 OFF_PATHS = [
     pytest.param(DASHBOARD_PATH, id="dashboard"),
     pytest.param(f"{DASHBOARD_PATH}?days=30", id="dashboard-30-days"),
+    # A `days` that the pages on would refuse with 422.
+    pytest.param(f"{DASHBOARD_PATH}?days=2", id="dashboard-2-days"),
     pytest.param(edits_path(OFF_ROOM), id="replay"),
     pytest.param(OPS_PAGE_PATH, id="ops-page"),
 ]
+# Every path of the ops API, and the edge cases' `/api/ops`, `/api/ops/` and
+# `/api/ops/xyz`.
+OFF_API_PATHS = [
+    pytest.param(DASHBOARD_PATH, id="dashboard"),
+    pytest.param(edits_path(OFF_ROOM), id="replay"),
+    pytest.param("/api/ops", id="api-ops"),
+    pytest.param("/api/ops/", id="api-ops-slash"),
+    pytest.param("/api/ops/xyz", id="api-ops-xyz"),
+]
+METHODS = ["GET", "POST", "DELETE"]
 
 
 @pytest.fixture
@@ -612,6 +684,22 @@ def test_ac6_with_an_empty_variable_the_pages_are_off(
     assert answer_of(response) == answer_of(unknown)
 
 
+@pytest.mark.usefixtures("off_room")
+@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("path", OFF_API_PATHS)
+def test_ac6_with_the_pages_off_every_method_answers_as_on_an_unknown_api_path(
+    off_client: TestClient, path: str, method: str
+) -> None:
+    unknown = off_client.request(method, UNKNOWN_API_PATH, headers=bearer(OPS_TOKEN))
+
+    response = off_client.request(method, path, headers=bearer(OPS_TOKEN))
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND
+    assert "cache-control" not in response.headers
+    assert answer_of(response) == answer_of(unknown)
+
+
 def test_ac6_with_the_pages_off_wrong_tokens_are_not_refusals(
     off_client: TestClient,
 ) -> None:
@@ -620,6 +708,58 @@ def test_ac6_with_the_pages_off_wrong_tokens_are_not_refusals(
         response = off_client.get(DASHBOARD_PATH, headers=bearer("wrong"))
         assert response.status_code == 404
         assert "www-authenticate" not in response.headers
+
+
+# ---- AC-6: other requests under /api/ops/ while the pages are on ---------------------
+
+
+UNKNOWN_OPS_PATHS = [
+    pytest.param("/api/ops/xyz", id="xyz"),
+    pytest.param(f"{DASHBOARD_PATH}/", id="dashboard-slash"),
+]
+WITH_AND_WITHOUT_THE_TOKEN = [
+    pytest.param({}, id="no-token"),
+    pytest.param(bearer(OPS_TOKEN), id="the-token"),
+]
+
+
+@pytest.mark.parametrize("headers", WITH_AND_WITHOUT_THE_TOKEN)
+@pytest.mark.parametrize("path", UNKNOWN_OPS_PATHS)
+def test_ac6_with_the_pages_on_an_unknown_ops_path_gets_a_plain_404_with_no_store(
+    ops_client: TestClient, path: str, headers: dict[str, str]
+) -> None:
+    response = ops_client.get(path, headers=headers)
+
+    assert response.status_code == 404
+    assert response.json() == NOT_FOUND
+    assert response.headers.get("cache-control") == NO_STORE
+    assert "www-authenticate" not in response.headers
+
+
+@pytest.mark.parametrize("headers", WITH_AND_WITHOUT_THE_TOKEN)
+def test_ac6_with_the_pages_on_post_on_the_dashboard_gets_fastapis_405_with_no_store(
+    ops_client: TestClient, headers: dict[str, str]
+) -> None:
+    response = ops_client.post(DASHBOARD_PATH, headers=headers)
+
+    assert response.status_code == 405
+    assert response.json() == METHOD_NOT_ALLOWED
+    assert response.headers.get("cache-control") == NO_STORE
+    assert "www-authenticate" not in response.headers
+
+
+def test_ac6_with_the_pages_on_other_ops_requests_are_not_counted(
+    ops_client: TestClient,
+) -> None:
+    # Ten of each, all without a token: not one of the two routes, so no refusal.
+    for _ in range(WRONG_CODE_LIMIT):
+        assert ops_client.get("/api/ops/xyz").status_code == 404
+        assert ops_client.get(f"{DASHBOARD_PATH}/").status_code == 404
+        assert ops_client.post(DASHBOARD_PATH).status_code == 405
+
+    response = ops_client.get(DASHBOARD_PATH, headers=bearer(OPS_TOKEN))
+
+    assert response.status_code == 200, response.text
 
 
 def test_ac6_with_the_pages_on_get_ops_answers_200_with_index_html(
