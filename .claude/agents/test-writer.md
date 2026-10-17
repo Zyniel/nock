@@ -3,7 +3,7 @@ name: test-writer
 description: Writes the tests for an approved spec in specs/, before any implementation exists. Use after a spec is approved and before the implementer, or when a reviewer asks for a test to be fixed.
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
-maxTurns: 60
+maxTurns: 250
 skills:
   - python-standards
 ---
