@@ -2,8 +2,8 @@
 // Plain functions: no socket and no DOM, so the rules are easy to read.
 
 import { SvelteMap } from 'svelte/reactivity'
-import { FEED_LIMIT, feedItemFor } from './activityFeed'
-import type { FeedItem } from './activityFeed'
+import { feedItemFor, trimFeed } from './activityFeed'
+import type { KeptFeedItem } from './activityFeed'
 import { timerValueMs } from './timer'
 
 export type RoomStatus =
@@ -213,7 +213,12 @@ export interface RoomSession {
   // player removed. The socket close that follows ends the attempts (spec 017).
   isRefused: boolean
   // The activity feed, oldest first (spec 013).
-  feed: FeedItem[]
+  feed: KeptFeedItem[]
+  // The id given to the next feed item.
+  nextFeedItemId: number
+  // How many times the feed changed: a line added, or the lines of a catch-up
+  // put in (spec 034). The feed list keeps its place on each change.
+  feedChanges: number
   // The nickname of every player seen so far, by id; those who left stay. A
   // reactive map: what the page shows of a name follows when the name arrives,
   // as for a player seated back (spec 032) whose letter is selected (spec 019).
@@ -234,6 +239,20 @@ export interface RoomSession {
   timerBaseMs: number
   timerRunning: boolean
   timerAnchor: number
+  // The cells highlighted by a catch-up (spec 034), each for
+  // CATCH_UP_HIGHLIGHT_MS, and the id given to the next one.
+  caughtUpCells: CaughtUpCell[]
+  nextCaughtUpId: number
+  // "<after_seq>-<until_seq>" of the last catch-up applied, '' before one.
+  catchUpLabel: string
+}
+
+// A cell that a catch-up highlights, as a cell that changed while the page was
+// away (spec 034).
+export interface CaughtUpCell {
+  id: number
+  row: number
+  column: number
 }
 
 // A cell that flashes in the colour of the player who replaced my letter.
@@ -279,6 +298,8 @@ export function newSession(): RoomSession {
     undoRefusals: 0,
     isRefused: false,
     feed: [],
+    nextFeedItemId: 1,
+    feedChanges: 0,
     names: new SvelteMap<string, string>(),
     votedIds: [],
     closedVote: null,
@@ -287,6 +308,9 @@ export function newSession(): RoomSession {
     timerBaseMs: 0,
     timerRunning: false,
     timerAnchor: 0,
+    caughtUpCells: [],
+    nextCaughtUpId: 1,
+    catchUpLabel: '',
   }
 }
 
@@ -901,10 +925,10 @@ function addFeedItem(session: RoomSession, snapshot: Snapshot, event: RoomEvent)
   if (item === null) {
     return
   }
-  session.feed.push(item)
-  if (session.feed.length > FEED_LIMIT) {
-    session.feed.splice(0, session.feed.length - FEED_LIMIT)
-  }
+  session.feed.push({ ...item, id: session.nextFeedItemId })
+  session.nextFeedItemId += 1
+  trimFeed(session.feed)
+  session.feedChanges += 1
 }
 
 function applyEvent(session: RoomSession, event: RoomEvent): void {

@@ -14,7 +14,13 @@
   import { authorMarkColour } from './authorsView'
   import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
   import { shownCell, shownGrid } from './roomSession'
-  import type { CellFlash, GridView, LetterCellView, PendingEdit } from './roomSession'
+  import type {
+    CaughtUpCell,
+    CellFlash,
+    GridView,
+    LetterCellView,
+    PendingEdit,
+  } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Position, Selection, Word } from './wordSelection'
   import type { RemoteSelection } from './remoteSelections'
@@ -39,6 +45,7 @@
     onUndo,
     pendingEdits,
     flashes,
+    caughtUpCells,
     remoteSelections,
     isAuthorsViewOn,
     playerColours,
@@ -58,6 +65,9 @@
     onUndo?: () => void
     pendingEdits: PendingEdit[]
     flashes: CellFlash[]
+    // The cells a catch-up highlights, as changed while the page was away (spec
+    // 034).
+    caughtUpCells: CaughtUpCell[]
     // The other players' selections, in roster order (spec 013).
     remoteSelections: RemoteSelection[]
     // The authors view of spec 019: true while its switch is on.
@@ -158,6 +168,11 @@
       }
     }
     return ''
+  }
+
+  // True while a catch-up highlights the cell (spec 034).
+  function isCaughtUp(row: number, column: number): boolean {
+    return caughtUpCells.some((cell) => cell.row === row && cell.column === column)
   }
 
   let gridElement: HTMLDivElement | undefined = $state()
@@ -522,6 +537,7 @@
             {@const tints = tintsOn(cell.row, cell.column)}
             {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
             {@const authorMark = authorMarkOf(cell)}
+            {@const caughtUp = isCaughtUp(cell.row, cell.column)}
             <div
               class="cell letter"
               class:locked={cell.locked}
@@ -541,6 +557,7 @@
               data-revealed={String(cell.revealed)}
               data-wrong={String(cell.wrong && !shown.unconfirmed)}
               data-flash={flashOf(cell.row, cell.column)}
+              data-caught-up={String(caughtUp)}
               data-selected={String(isSelected(cell.row, cell.column))}
               data-in-word={String(isInWord)}
               data-tinted-by={tints.map((remote) => remote.playerId).join(' ')}
@@ -550,7 +567,11 @@
               style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
               style:grid-row={cell.row + 1}
               style:grid-column={cell.column + 1}
-            >{shown.letter ?? ''}{#if authorMark !== null}<span
+            >{shown.letter ?? ''}{#if caughtUp}<span
+                  class="catch-up-mark"
+                  data-testid="catch-up-mark"
+                  aria-hidden="true"
+                ></span>{/if}{#if authorMark !== null}<span
                   class="author-mark"
                   data-testid="author-mark"
                   data-colour={authorMark}
@@ -781,6 +802,21 @@
     pointer-events: none;
   }
 
+  /* A cell changed while the page was away (spec 034): a solid ring on the
+     cell's edge, a shape and not a colour alone (spec 035). It covers the cell's
+     border (inset -1px) and is drawn in the cell's text colour, which keeps
+     4.5:1 on every background of the cell, so the ring keeps 3:1. It comes
+     first among the cell's marks, so every other mark (the outlines, the author
+     band, the reveal triangle, the corner labels) is drawn over it, and it
+     stays on the edge, away from the letter. */
+  .catch-up-mark {
+    position: absolute;
+    inset: -1px;
+    box-sizing: border-box;
+    border: 3px solid currentColor;
+    pointer-events: none;
+  }
+
   .letter.selected {
     background: #ffd54a;
     outline: 3px solid #1f2330;
@@ -874,11 +910,14 @@
      labels in diagonal corners fit one above the other from a 20px cell, the
      size where a cell gets its second slot (spec 035 AC-11). A label is drawn
      over the author band (z-index 1) where they meet, from the band's ends
-     inward (spec 019). */
+     inward (spec 019). A label takes the pointer, unlike the outline it sits
+     in, so that the page finds it at its place (spec 034 AC-2); a tap on it is
+     still a tap on its cell. */
   .remote-label {
     --corner-offset: calc(var(--shift, 0px) * -1);
     position: absolute;
     z-index: 2;
+    pointer-events: auto;
     padding: 0 1px;
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;

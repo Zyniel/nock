@@ -336,6 +336,37 @@ class RoomStore:
             state = replay(state, entry)
         return state
 
+    def load_room_at(self, code: str, seq: int) -> RoomState | None:
+        """Return the room's state just after its event `seq`.
+
+        The snapshot with the highest seq at most `seq`, then `replay` of the
+        logged entries after it whose seq is at most `seq`. So a `seq` at or above
+        the room's last logged seq gives the room's latest stored state, as
+        `load_room` does.
+
+        Returns:
+            The state, or None when no snapshot of the room has a seq at most
+            `seq`: an unknown room, or a room whose first snapshot came after
+            `seq` (only a room added in a later state, as `add_room` allows).
+
+        Raises:
+            pydantic.ValidationError: a stored row is damaged.
+        """
+        with self._lock:
+            snapshot_row = self._connection.execute(
+                "SELECT state_json FROM snapshots WHERE code = ? AND seq <= ? "
+                "ORDER BY seq DESC LIMIT 1",
+                (code, seq),
+            ).fetchone()
+        if snapshot_row is None:
+            return None
+        state = RoomState.model_validate_json(snapshot_row[0])
+        for entry in self.read_log(code, after_seq=state.seq):
+            if entry.event.seq > seq:
+                break
+            state = replay(state, entry)
+        return state
+
     def close(self) -> None:
         """Close the database. Idempotent."""
         with self._lock:
