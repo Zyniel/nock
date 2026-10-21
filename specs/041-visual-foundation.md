@@ -1,7 +1,7 @@
 ---
 id: "041"
 title: Visual foundation
-status: draft
+status: approved
 ---
 
 # 041 - Visual foundation
@@ -109,6 +109,16 @@ Font tokens:
 `body`: `font-family: var(--nock-font-ui)`, `color: var(--nock-ink)`,
 `background: var(--nock-white)`. Its margin, font size and line height do not
 change in this spec.
+
+Form controls: one global rule in `web/src/app.css`, next to the `body` rule,
+gives `button`, `input`, `select` and `textarea` `font: inherit`, so that they
+take their parent's font family, size, weight, style and line height instead of
+the OS control font. A component or a primitive (`nock-button`, `nock-menu-item`)
+that sets its own font on a control still overrides it. (Note from the spec
+writer, 2026-10-21, at the lead's request: added. Browsers draw form controls in the OS control font unless told
+otherwise, and only four components set `font: inherit` today, so the controls of
+the other screens were drawn in a font that differs between Windows and Ubuntu.
+Checked by AC-21.)
 
 ### Fonts
 
@@ -361,6 +371,7 @@ The words in brackets say how each criterion is tested.
 - **AC-18** (new) (static) The icon module holds the design's shapes. `web/src/lib/icons.ts` exports `ICONS`, `PLAYER_ICONS` and `NOCK_MARK_POINTS`; its text contains each `d` string and each `points` string of the two tables of "Icons" exactly once inside quotes, the numbers `x: 2`, `y: 6`, `width: 20`, `height: 12`, `rx: 2` for `clavier`'s rectangle, the circles `cx: 12, cy: 13.5, r: 7.5`, `cx: 12, cy: 12, r: 9` and `cx: 5, cy: 5, r: 4.4`, the rectangle `x: 0.9, y: 0.9, width: 8.2, height: 8.2`, the thirteen names `undo`, `aide`, `salon`, `clavier`, `menu`, `crayon`, `swap`, `effacer`, `chrono`, `flag`, `chevron-left`, `chevron-right`, `smile` as keys, and the string `'0,0 10,0 10,14 5,10 0,14'`. (Note from the spec writer, 2026-10-16: second round, the five icons of sheet 4.2 and the player icons of sheet 4.3 were added.)
 - **AC-19** (new) (static) The built CSS holds no colour outside the token block. With the rules of "Colour scans": the CSS under `web/dist/assets/` declares each custom property of "Colour tokens", the translucent tokens and the player table exactly once; and its built CSS scan finds no colour literal. The scan's checker flags the samples `a{color:#1b2f55}`, `a{color:#FFF}`, `a{background:rgb(0 0 0/20%)}`, `a{border-color:White}`, `a{box-shadow:0 1px 0 hsl(0 0% 0%)}`, `a{outline-color:Highlight}`, and accepts `:root{--nock-navy:#1b2f55}`, `:root{--player-ink-1:#4b6a2c}`, `a{color:var(--nock-navy)}`, `a{background:transparent}`, `a{border-color:currentColor}`, `a{background:#0000}`, `a{background:color-mix(in srgb,var(--player-colour-1) 16%,var(--nock-white))}`, `a{font-family:"White Rabbit"}`, `a{background:url(red.svg)}` and `a{grid-area:sidebar}`.
 - **AC-20** (new) (static) The client sources hold no colour outside the token block. With the rules of "Colour scans", the source scan of `web/src` finds nothing. The scan's checker flags the samples `<style>a{color:#1b2f55}</style>`, `<rect fill="#1B2F55"/>`, `<rect fill="white"/>`, `<div style="color: rgb(0 0 0)">`, and in a `.ts` file `const c = '#14181f'`; and accepts `<rect fill="currentColor"/>`, `<rect fill="none"/>`, `/* #1B2F55 */`, `// #1B2F55`, `const id = '#cell-1-2'` and `<p>white</p>`.
+- **AC-21** (new) (browser with live server, probes; browser with mocked socket, probes) Form controls take the page font, not the OS control font. On `/` once `catalogue-page` shows, and on the room page once the `grid` of a FX-01 snapshot shows, the test appends to `body` the probe `<div style="font-size: 20px"><button type="button">Bouton</button><input type="text" value="Texte"><select><option>Choix</option></select><textarea>Zone</textarea></div>` (setup). Each of the four controls has the computed `font-family` that, read as a list of family names with quotes removed (as AC-4), is `Source Sans 3`, `Segoe UI`, `system-ui`, `sans-serif`, and the computed `font-size` `20px`, equal to the wrapping `div`'s. On the same pages, a real control has the same `font-family`: on `/` the `force-filter` button `[data-force="1"]`, on the room page the `timer-toggle` button (spec 027). (Note from the spec writer, 2026-10-21, at the lead's request: added with the form-control rule of "Page base"; AC-4 only read `body`.)
 
 ## Edge cases and errors
 
@@ -402,6 +413,39 @@ checks each test against it.
   system font (DejaVu Sans in CI), which is narrower; the thresholds of spec 014
   are in rem and its compact-button rule follows measured widths. These tests are
   run in all three engines before this spec is done; a failure goes to the lead.
+- Control sizes (spec 006 AC-7, spec 013 AC-6, spec 014 AC-7 to AC-10 and the
+  compact-button rule of AC-9, spec 019 AC-5, spec 020 AC-7, spec 024 AC-8,
+  spec 027 AC-8, spec 028 AC-7, spec 033 AC-9): with the form-control rule of
+  "Page base", a `button`, `input`, `select` or `textarea` that sets no font of its
+  own goes from the browser's default control size (about 13.33 px) to its
+  parent's size (16 px on most of today's pages) and its family's widths, so it
+  gets wider and taller; the toolbar, the header and the roster may need more
+  room or another row. These tests measure controls' widths, heights or rows, or
+  check that the room page and its toolbar still fit; they are run in all three
+  engines before this spec is done; a failure goes to the lead. (AC-21) (Note from
+  the spec writer, 2026-10-21, at the lead's request: added with the form-control
+  rule.)
+- Measuring before the fonts load: with `font-display: swap` a text is first drawn
+  in the fallback font, which differs per OS (Segoe UI on Windows, DejaVu Sans in
+  CI), so a measurement taken then differs per OS. Rule for every browser test, of
+  this spec and of every other spec: a test that reads a size or a position that
+  depends on text (a bounding box, `clientWidth`, `scrollWidth`, `offsetHeight`,
+  an overflow, a wrap, a line count, or a check whether an element fits or is
+  clipped, of an element that holds text or is laid out next to text) first
+  waits for `document.fonts.ready`, with
+  `page.evaluate("() => document.fonts.ready.then(() => true)")`, after the page
+  shows the text it measures and before the first read; it waits again after a
+  change that shows a face not shown before (an italic pencil letter, a clue
+  cell's IBM Plex Sans Condensed, a bold text). Every shared helper in `tests/`
+  that opens a page and returns once it shows its content (for example
+  `open_room`, `open_fx01`, `open_mock_room` followed by `show_snapshot`,
+  `make_page`, `start_from_catalogue`) does the same wait before it returns. A
+  test that only reads colours, computed styles or texts needs no wait. The
+  test-writer applies the rule when writing or updating a test; the reviewer
+  checks it. (Note from the spec writer, 2026-10-21, at the lead's request: added
+  so that measurements are taken in Nock's fonts on every OS. It stays a rule, not
+  a criterion: the gate links criteria to the tests of one spec and cannot check
+  how other specs' tests measure. See Decision 7.)
 - Author band of a departed author (spec 019): its hatch goes from #333333 and
   white to ink and white; ink keeps at least 3:1 on every cell background.
 - A font file that fails to load (offline, blocked): the browser uses the next
@@ -468,6 +512,13 @@ Proposed by the spec writer, each already part of the spec above:
    on `--player-colour-1` neither ink (4.30:1) nor white (4.14:1) reaches 4.5:1.
 6. Both the built CSS and the sources are scanned: the build catches every rule
    that reaches the browser, the sources catch inline styles and SVG attributes.
+7. Form controls inherit the page font through one global rule rather than one
+   rule per component, and browser tests that measure text wait for
+   `document.fonts.ready` (rule in "Edge cases and errors"), so that text is set
+   and measured in Nock's own fonts on Windows and Ubuntu alike. The wait is a
+   test rule, not a criterion, because no criterion of this spec can observe how
+   another spec's tests measure. (Note from the spec writer, 2026-10-21, at the
+   lead's request: added.)
 
 ## Open questions
 
