@@ -159,6 +159,25 @@ minute. When the variable is unset or empty, the operator pages are off and
 their paths answer as unknown ones. A refused value stops the start with a
 message that names the variable and the rule broken, but never shows the value.
 
+### Optional accounts
+
+Accounts (spec 033) let a player get their rooms on another device. They are
+off unless both `NOCK_PUBLIC_URL` (the address players open, such as
+`https://nock.example`; the links of the e-mails start with it) and
+`NOCK_SMTP_HOST` are set. A player signs in with a link sent by e-mail, which
+works once and for 30 minutes. The other variables:
+
+| Variable | Default |
+| --- | --- |
+| `NOCK_SMTP_SECURITY` | `starttls` (or `tls`, or `none`) |
+| `NOCK_SMTP_PORT` | 587 with `starttls`, 465 with `tls`, 25 with `none` |
+| `NOCK_SMTP_USER`, `NOCK_SMTP_PASSWORD` | no login; set both or neither, never with `none` |
+| `NOCK_SMTP_FROM` | required: the sender's address |
+
+The accounts are kept in the `NOCK_DATABASE` file, with the rooms. A refused
+value stops the start with a message that names the variable; it never shows
+the password.
+
 ## 4. The quality gate
 
 `scripts/gate.py` is the single definition of "done". It runs:

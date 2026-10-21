@@ -1,17 +1,22 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import CatalogueItem from './CatalogueItem.svelte'
   import MyRooms from './MyRooms.svelte'
+  import { fetchAccountRooms, fetchAccountStatus, storeMissingIdentities } from './account'
   import { isGridSummary, type GridSummary } from './catalogue'
   import { t } from './i18n'
-  import { storedRoomKeys } from './myRooms'
+  import { storedRoomKeys, type RoomKey } from './myRooms'
 
   type State = 'loading' | 'ready' | 'error'
   type ForceFilter = 'all' | 1 | 2 | 3 | 4
 
   const FILTERS: ForceFilter[] = ['all', 1, 2, 3, 4]
 
-  // The rooms this device keeps an identity for (spec 032), read once at load.
-  const myRoomKeys = storedRoomKeys()
+  // The rooms this device keeps an identity for (spec 032), read once the
+  // account check below is done, so that they hold the account's rooms.
+  let myRoomKeys: RoomKey[] = $state([])
+  // Whether GET /api/account answered 200: accounts are on (spec 033).
+  let isAccountOn = $state(false)
 
   let pageState: State = $state('loading')
   let grids: GridSummary[] = $state([])
@@ -43,10 +48,33 @@
   $effect(() => {
     void loadGrids()
   })
+
+  // Spec 033: before "My rooms" asks for its summaries, a signed-in page stores
+  // each room of the account that this device has no identity for yet.
+  async function loadAccountRooms(): Promise<void> {
+    const status = await fetchAccountStatus()
+    isAccountOn = status !== null
+    if (status !== null && status.signed_in) {
+      const identities = await fetchAccountRooms()
+      if (identities !== null) {
+        storeMissingIdentities(identities)
+      }
+    }
+    myRoomKeys = storedRoomKeys()
+  }
+
+  // Once, when the page shows.
+  onMount(() => {
+    void loadAccountRooms()
+  })
 </script>
 
 <main data-testid="catalogue-page" data-state={pageState}>
   <h1>{t('catalogue.heading')}</h1>
+  {#if isAccountOn}
+    <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
+    <a data-testid="account-link" href="/account" tabindex="0">{t('account.open')}</a>
+  {/if}
   {#if myRoomKeys.length > 0}
     <MyRooms keys={myRoomKeys} />
   {/if}

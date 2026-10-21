@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AccountPage from './lib/AccountPage.svelte'
   import CataloguePage from './lib/CataloguePage.svelte'
   import GridPage from './lib/GridPage.svelte'
   import NotFoundPage from './lib/NotFoundPage.svelte'
@@ -28,6 +29,9 @@
   <GridPage number={gridMatch[1]} />
 {:else if recapMatch !== null}
   <SharePage token={recapMatch[1]} />
+{:else if path === '/account'}
+  <!-- The account page (spec 033); the server serves it only while accounts are on. -->
+  <AccountPage />
 {:else if path === '/ops'}
   <!-- The operator's page (spec 038); the server serves it only while it is on. -->
   <OpsPage />

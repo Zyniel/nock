@@ -11,6 +11,13 @@ The catalogue, its files and its routes are those of spec 004; rooms and their
 store are those of specs 011 and 018. The stack and modeling rules are in
 `specs/_architecture.md`.
 
+(Note from the lead, 2026-10-21: refined for the sign-in e-mail of spec 033, whose
+decisions 6 and 12 the human approved on 2026-10-14: the server scan allows
+`smtplib` and `ssl` in `src/nock/mailer.py` only, decision 7. Changed: "No
+third-party fetching", "Server scan (AC-4)", AC-4, the edge case "Static scan
+scope" and decision 7 (new). AC-4 changed, so its tests follow before spec 033's
+implementer runs.)
+
 ## Goal
 
 As the product owner, I want every grid tied to a source and a licence, so that we publish only what we may use.
@@ -102,7 +109,10 @@ The operator sets `"withdrawn": true` in the grid's file and restarts the server
 
 No code under `src/` imports a network client or opens an outgoing network
 connection, and no file under `web/src/` (nor `web/index.html`) names a URL on
-another host. Grids enter the product only as files in `grids/` (spec 004).
+another host. Grids enter the product only as files in `grids/` (spec 004). One
+file is the exception: `src/nock/mailer.py` sends spec 033's sign-in e-mail with
+`smtplib` over `ssl`, since sending mail is not fetching grids (decision 7). (Note
+from the lead, 2026-10-21: the last sentence was added.)
 
 Note from the lead (2026-10-12, from the spec 005 review): the first version of
 the two scans missed plain ways of reaching the network. On the server it did
@@ -187,6 +197,14 @@ A file is flagged when any of these holds:
    `s`, when `s` is a forbidden call name, or when the resolved path of the
    first argument followed by `.s` is a forbidden path.
 
+Sending mail (decision 7): a file's path is taken relative to the repository root
+and written with `/` (`Path.as_posix()`). In the file `src/nock/mailer.py`, and in
+no other, the forbidden modules do not include `smtplib` and `ssl`, so the six
+rules flag no path that is `smtplib` or `ssl` or starts with `smtplib.` or `ssl.`
+there. Every other forbidden module, callable and call name is flagged in that file
+as in any other, and `smtplib` and `ssl` stay forbidden in every other file. (Note
+from the lead, 2026-10-21: added for spec 033's mailer.)
+
 #### Client scan (AC-5)
 
 Every file under `web/src/` (all subfolders, any extension: `.ts`, `.svelte`,
@@ -225,7 +243,7 @@ The words in brackets say how each criterion is tested.
 - **AC-1** (AC-1.4.1) (Python) Import refuses a grid with no author, source or licence field. Given a catalogue directory holding one file `g1.json` with number 1 and `CREDITS`, when the file has no `author` key, or no `source` key, or no `licence` key (three runs), then `load_catalogue` raises `CatalogueError` whose message contains `g1.json` and whose `__cause__` is a `pydantic.ValidationError` naming the missing field.
 - **AC-2** (AC-1.4.1) (Python) A blank credit counts as missing. Given the same file, when `author` is `""`, `"   "`, or 201 times `a`, or when `licence` is `null` or `42`, then `load_catalogue` raises `CatalogueError` naming `g1.json`; when `author` is `"  Équipe Nock  "`, then the entry loads with `author == "Équipe Nock"`.
 - **AC-3** (AC-1.4.1) (Python) A complete file loads with its credits. Given `g1.json` with `CREDITS` and no `withdrawn` key, when it is loaded, then the entry has `author == "Équipe Nock"`, `source == "Commande Nock 2026"`, `licence == "Contrat d'auteur Nock n° 1"` and `withdrawn is False`; with `"withdrawn": true` it has `withdrawn is True`; with `"withdrawn": "yes"` or `"withdrawn": 1`, `load_catalogue` raises `CatalogueError` naming the file.
-- **AC-4** (AC-1.4.2) (static) No server component can fetch grids from a third-party site. Every `.py` file under `src/` is parsed with `ast` and the test fails when a file is flagged by one of the six rules of "Server scan (AC-4)" above (forbidden modules, forbidden callables, forbidden call names, bindings and resolved paths as defined there). The checker itself is checked on sample texts (a `\n` is a line break). Each of these is flagged: `import httpx`, `import requests as r`, `from urllib.request import urlopen`, `from urllib import request`, `import aiohttp.client`, `from http import client`, `import socket`, `asyncio.open_connection("x", 80)`, `loop.create_connection(f, "x", 80)`, `from asyncio import open_connection`, `from asyncio import open_connection as oc`, `asyncio.open_unix_connection("/tmp/s")`, `f = asyncio.open_connection`, `import urllib\nurllib.request.urlopen("https://x")`, `import http\nhttp.client.HTTPConnection("x")`, `import ssl`, `import smtplib as s`, `import xmlrpc.client`, `from xmlrpc import client`, `import anyio\nanyio.connect_tcp("x", 80)`, `import anyio\nanyio.connect_unix("/tmp/s")`, `from anyio import connect_tcp as c`, `import websockets\nwebsockets.connect("wss://x")`, `import websockets as ws\nws.connect("wss://x")`, `from websockets import connect`, `import websockets.client`, `from websockets.sync.client import connect`, `from websockets.sync import client`, `from websockets.asyncio.client import connect`, `import websockets.asyncio.client as c\nc.connect("wss://x")`, `from websockets.legacy.client import connect`, `import poplib`, `loop.create_unix_connection(f, "/tmp/s")`, `loop.sock_connect(s, addr)`, `import importlib\nimportlib.import_module("socket")`, `from importlib import import_module\nimport_module("http.client")`, `__import__("urllib.request")`, `import asyncio\ngetattr(asyncio, "open_connection")` and `import anyio\ngetattr(anyio, "connect_tcp")`. None of these is flagged: `import sqlite3`, `sqlite3.connect(path)`, `from urllib.parse import quote`, `import urllib\nurllib.parse.quote("a b")`, `import uvicorn`, `import asyncio\nasyncio.sleep(1)`, `import anyio\nanyio.to_thread.run_sync(f)`, `import websockets`, `import importlib\nimportlib.import_module("json")`, `import importlib\nimportlib.import_module(name)`, `getattr(state, "grid")`, `getattr(obj, name)`, `requests = []\nrequests.append(1)`, `from .room import RoomState` and `def connect(x): return x\nconnect(1)`. The scan of today's `src/` finds nothing.
+- **AC-4** (AC-1.4.2) (static) No server component can fetch grids from a third-party site. Every `.py` file under `src/` is parsed with `ast` and the test fails when a file is flagged by one of the six rules of "Server scan (AC-4)" above (forbidden modules, forbidden callables, forbidden call names, bindings and resolved paths as defined there). The checker itself is checked on sample texts (a `\n` is a line break). Each of these is flagged: `import httpx`, `import requests as r`, `from urllib.request import urlopen`, `from urllib import request`, `import aiohttp.client`, `from http import client`, `import socket`, `asyncio.open_connection("x", 80)`, `loop.create_connection(f, "x", 80)`, `from asyncio import open_connection`, `from asyncio import open_connection as oc`, `asyncio.open_unix_connection("/tmp/s")`, `f = asyncio.open_connection`, `import urllib\nurllib.request.urlopen("https://x")`, `import http\nhttp.client.HTTPConnection("x")`, `import ssl`, `import smtplib as s`, `import xmlrpc.client`, `from xmlrpc import client`, `import anyio\nanyio.connect_tcp("x", 80)`, `import anyio\nanyio.connect_unix("/tmp/s")`, `from anyio import connect_tcp as c`, `import websockets\nwebsockets.connect("wss://x")`, `import websockets as ws\nws.connect("wss://x")`, `from websockets import connect`, `import websockets.client`, `from websockets.sync.client import connect`, `from websockets.sync import client`, `from websockets.asyncio.client import connect`, `import websockets.asyncio.client as c\nc.connect("wss://x")`, `from websockets.legacy.client import connect`, `import poplib`, `loop.create_unix_connection(f, "/tmp/s")`, `loop.sock_connect(s, addr)`, `import importlib\nimportlib.import_module("socket")`, `from importlib import import_module\nimport_module("http.client")`, `__import__("urllib.request")`, `import asyncio\ngetattr(asyncio, "open_connection")` and `import anyio\ngetattr(anyio, "connect_tcp")`. None of these is flagged: `import sqlite3`, `sqlite3.connect(path)`, `from urllib.parse import quote`, `import urllib\nurllib.parse.quote("a b")`, `import uvicorn`, `import asyncio\nasyncio.sleep(1)`, `import anyio\nanyio.to_thread.run_sync(f)`, `import websockets`, `import importlib\nimportlib.import_module("json")`, `import importlib\nimportlib.import_module(name)`, `getattr(state, "grid")`, `getattr(obj, name)`, `requests = []\nrequests.append(1)`, `from .room import RoomState` and `def connect(x): return x\nconnect(1)`. The checker takes the file's path as "Sending mail" says, and the samples above are checked as `src/nock/room.py`. Checked as `src/nock/mailer.py`, none of `import smtplib`, `import smtplib as s`, `from smtplib import SMTP_SSL`, `import ssl` and `import ssl\nssl.create_default_context()` is flagged, while `import socket`, `from http import client` and `asyncio.open_connection("x", 80)` still are; checked as `src/nock/mailers.py`, `import smtplib` and `import ssl` are flagged. The scan of today's `src/` finds nothing. (Note from the lead, 2026-10-21: the checks of the file's path were added, for decision 7.)
 - **AC-5** (AC-1.4.2) (static) No client component can fetch grids from a third-party site. Every file under `web/src/` and `web/index.html` is read as text as described in "Client scan (AC-5)" above, and the test fails when one is flagged by one of its four rules. The checker itself is checked on sample texts (a `\t` is a tab, a `\n` is a line break). Each of these is flagged: `fetch("https://example.com/grids")`, `const u = 'HTTP://x'`, `new WebSocket("wss://example.com/ws")`, `const u = 'WS://x'`, `fetch('//example.com/grids')`, `` const u = `//${host}/api` ``, `<script src="//cdn.example.com/a.js"></script>`, `{"logo": "//cdn.example.com/l.png"}`, `{"logo": "https://example.com/l.png"}`, `src: url(//cdn.example.com/f.woff2);`, `background: url( "//cdn.example.com/b.png" );`, `@import url('//fonts.example.com/a.css');`, `@import "//fonts.example.com/a.css";`, `background: url(HTTPS://example.com/b.png);`, `src: url(\t//cdn.example.com/f.woff2);` and `background: url(\n  "//cdn.example.com/b.png");`. None of these is flagged: `` `${scheme}://${location.host}/api/rooms` ``, `fetch('/api/grids')`, `// a line comment`, `const s = "// not a url"`, `src: url(/fonts/a.woff2);`, `background: url("data:image/png;base64,AAAA");`, `@import "./theme.css";`, `{"title": "Nock"}` and `const u = "ht" + "tp://example.com"` (a split string, out of scope). The scan of today's `web/src/` and `web/index.html` finds nothing.
 - **AC-6** (AC-1.4.3) (Python; HTTP) No new room can start on a withdrawn grid. Given a catalogue with entry 1 (`CREDITS`, published) and entry 2 (`CREDITS`, published, `withdrawn` True), both on FX-01: `published_summaries()` lists only number 1, `find_published(2)` is None; `GET /api/grids` lists only 1; `GET /api/grids/2`, `GET /g/2` and `POST /api/rooms` with `{"grid_number": 2}` answer 404 with `{"detail": "Not Found"}`, while the same requests for 1 answer 200, 200 (or 503 without a built client, as spec 040) and 201.
 - **AC-7** (AC-1.4.3) (WebSocket) Open rooms on a withdrawn grid can finish. Given a registry `R` whose store is a SQLite file in `tmp_path`, app A built on `R` with entry 1 published and not withdrawn, and app B built on `R` with the same entry withdrawn: a room created with `POST /api/rooms` on app A, then, through app B, two clients join that room, type the 18 FX-01 letters between them and each `edit_letter` is answered with its `letter_changed` (no `error`), and `POST /api/rooms` with grid 1 on app B answers 404. After `R.close()`, a new registry on the same store file, served by an app built like B, still serves the room: a client joining it receives a `Snapshot` holding the 18 letters.
@@ -251,7 +269,9 @@ The words in brackets say how each criterion is tested.
 - Static scan scope (AC-4): `tests/` and `scripts/` are not scanned (tests use
   `httpx2` through the FastAPI test client, and tooling is not a product
   component). `src/nock/__main__.py`, if a later spec adds it, is scanned like
-  every other file; starting uvicorn is serving, not fetching.
+  every other file; starting uvicorn is serving, not fetching. `src/nock/mailer.py`
+  is scanned too, with `smtplib` and `ssl` allowed there only (decision 7). (Note
+  from the lead, 2026-10-21: the last sentence was added.)
 - Static scan limits (AC-4, AC-5): the scans are a guard against accidental use,
   not a sandbox (see the note under "No third-party fetching"). Names and URLs
   built at run time are not flagged, and no test may require them to be.
@@ -306,6 +326,20 @@ decisions. Each one is already part of the spec above.
    2026-10-12 (see the two notes under "No third-party fetching").
 6. Credits are not sent to browsers. Pick: `GridSummary` is unchanged, so spec 004's
    exact JSON criteria still hold.
+
+Decided by the human on 2026-10-14 (spec 033's decision 12), written here by the
+lead on 2026-10-21. It is already part of the spec above. (Note from the lead,
+2026-10-21: this group was added.)
+
+7. Sending mail (AC-4). Spec 033 sends a sign-in link by e-mail with the standard
+   library's `smtplib`, over a TLS connection of `ssl`, which this spec's scan
+   forbade in every file. Options: (a) one exception, so that `src/nock/mailer.py`
+   may import `smtplib` and `ssl`; (b) send mail from a separate process outside
+   `src/`, which splits the server in two. Pick: (a), the human's answer. The
+   exception names one file and two modules: every other network module stays
+   forbidden in that file, and `smtplib` and `ssl` stay forbidden in every other
+   file. What it changed: "No third-party fetching", "Server scan (AC-4)", AC-4
+   and the edge case "Static scan scope".
 
 ## Open questions
 

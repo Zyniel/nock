@@ -56,6 +56,7 @@ from nock.room import (
     room_summary,
     tick,
     with_last_seen,
+    with_player_erased,
 )
 from nock.room import member_id as room_member_id
 from nock.store import RoomStore
@@ -456,6 +457,18 @@ class _RoomRunner:
             await self.cancel()
         finally:
             self._close_open_connections()
+
+    def erase_player(self, player_id: str) -> None:
+        """Erase a player's nickname from the room, between two of its steps.
+
+        Called on the engine's loop, so no step runs meanwhile. The live state
+        changes first, then the store; no event is logged or sent (spec 033).
+        A deleted room changes nothing.
+        """
+        if self._is_deleted:
+            return
+        self.state = with_player_erased(self.state, player_id)
+        self._store.erase_player(self.state.code, player_id)
 
     def _close_open_connections(self) -> None:
         """Close each connection opened to the room with ROOM_NOT_FOUND_CLOSE_CODE."""
@@ -945,6 +958,42 @@ class RoomRegistry:
         for code in expired_codes:
             self._delete_room(code)
         return expired_codes
+
+    def erase_player(self, code: str, player_id: str) -> bool:
+        """Erase a player's nickname from a room, live state included (spec 033).
+
+        For a live room, the room's task does it between two steps: the player's
+        record (in `players` or `past_players`) gets FORMER_PLAYER_NICKNAME, then
+        `store.erase_player`. For a room only in the store, `store.erase_player`.
+        No event is logged or sent: a snapshot built afterwards shows the new
+        nickname. Returns once it is done.
+
+        Args:
+            code: The room.
+            player_id: The player whose account was deleted.
+
+        Returns:
+            True when the room exists; False when it is unknown or expired (an
+            expired room is deleted first, spec 032).
+        """
+        if self._delete_if_expired(code):
+            return False
+        with self._lock:
+            runner = self._runners.get(code)
+            loop = self._loop
+            if runner is None or loop is None or self._closed:
+                # No task runs the room, and none can start while the lock is
+                # held: the state can change here.
+                if runner is not None:
+                    runner.state = with_player_erased(runner.state, player_id)
+                return self._store.erase_player(code, player_id)
+
+        async def erase_between_steps() -> None:
+            runner.erase_player(player_id)
+
+        erasing = asyncio.run_coroutine_threadsafe(erase_between_steps(), loop)
+        erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
+        return True
 
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.

@@ -2,8 +2,10 @@
 
 AC-4 scans `src/` for an import of a network client or an outgoing connection, AC-5
 scans `web/index.html` and `web/src/` for a URL on another host. Each scan has its
-own checker, tested on samples that must and must not be flagged. Nothing in this
-file is shared with the other criterion groups of spec 005.
+own checker, tested on samples that must and must not be flagged. The server
+checker takes the file's path, since `smtplib` and `ssl` are allowed in
+`src/nock/mailer.py` only (spec 005 decision 7). Nothing in this file is shared
+with the other criterion groups of spec 005.
 """
 
 from __future__ import annotations
@@ -42,6 +44,8 @@ FORBIDDEN_PATHS = [
     "telnetlib",
     "websockets.connect",
 ]
+MAILER_PATH = "src/nock/mailer.py"
+MAILER_ONLY_MODULES = ["smtplib", "ssl"]
 ANYIO_CONNECT_PREFIX = "anyio.connect_"
 FORBIDDEN_CALL_NAMES = [
     "create_connection",
@@ -62,11 +66,31 @@ CLIENT_URL_PATTERNS = [
 # ---- AC-4: no outgoing connection from src/ ---------------------------------
 
 
-def path_is_forbidden(path: str) -> bool:
+def forbidden_paths_of(file_path: str) -> list[str]:
+    """Return the forbidden modules and callables of the file at `file_path`.
+
+    Args:
+        file_path: The file's path relative to the repository root, written with
+            `/` (`Path.as_posix()`).
+
+    Returns:
+        Every forbidden module and callable, without `smtplib` and `ssl` when the
+        file is `src/nock/mailer.py` (spec 005 decision 7).
+    """
+    if file_path != MAILER_PATH:
+        return list(FORBIDDEN_PATHS)
+    allowed_here: list[str] = []
+    for forbidden in FORBIDDEN_PATHS:
+        if forbidden not in MAILER_ONLY_MODULES:
+            allowed_here.append(forbidden)
+    return allowed_here
+
+
+def path_is_forbidden(path: str, forbidden_paths: list[str]) -> bool:
     """Tell whether a dotted path is a forbidden module, callable or inside one."""
     if path.startswith(ANYIO_CONNECT_PREFIX):
         return True
-    for forbidden in FORBIDDEN_PATHS:
+    for forbidden in forbidden_paths:
         if path == forbidden or path.startswith(forbidden + "."):
             return True
     return False
@@ -114,12 +138,12 @@ def string_argument(call: ast.Call, index: int) -> str | None:
     return None
 
 
-def find_import_findings(node: ast.stmt) -> list[str]:
+def find_import_findings(node: ast.stmt, forbidden_paths: list[str]) -> list[str]:
     """Apply rules 1 and 2 to an import statement."""
     findings: list[str] = []
     if isinstance(node, ast.Import):
         for alias in node.names:
-            if path_is_forbidden(alias.name):
+            if path_is_forbidden(alias.name, forbidden_paths):
                 findings.append(f"import {alias.name}")
     elif isinstance(node, ast.ImportFrom):
         if node.level > 0 or node.module is None:
@@ -127,15 +151,17 @@ def find_import_findings(node: ast.stmt) -> list[str]:
         for alias in node.names:
             full_path = node.module + "." + alias.name
             if (
-                path_is_forbidden(node.module)
-                or path_is_forbidden(full_path)
+                path_is_forbidden(node.module, forbidden_paths)
+                or path_is_forbidden(full_path, forbidden_paths)
                 or alias.name in FORBIDDEN_CALL_NAMES
             ):
                 findings.append(f"from {node.module} import {alias.name}")
     return findings
 
 
-def find_call_findings(call: ast.Call, bindings: dict[str, str]) -> list[str]:
+def find_call_findings(
+    call: ast.Call, bindings: dict[str, str], forbidden_paths: list[str]
+) -> list[str]:
     """Apply rules 5 and 6 to a call."""
     findings: list[str] = []
     function = call.func
@@ -145,7 +171,7 @@ def find_call_findings(call: ast.Call, bindings: dict[str, str]) -> list[str]:
     )
     if is_import_call:
         module_name = string_argument(call, 0)
-        if module_name is not None and path_is_forbidden(module_name):
+        if module_name is not None and path_is_forbidden(module_name, forbidden_paths):
             findings.append(f"import by name {module_name}")
     if isinstance(function, ast.Name) and function.id == "getattr":
         attribute_name = string_argument(call, 1)
@@ -154,29 +180,39 @@ def find_call_findings(call: ast.Call, bindings: dict[str, str]) -> list[str]:
             if attribute_name in FORBIDDEN_CALL_NAMES:
                 findings.append(f"getattr {attribute_name}")
             elif target_path is not None and path_is_forbidden(
-                target_path + "." + attribute_name
+                target_path + "." + attribute_name, forbidden_paths
             ):
                 findings.append(f"getattr {target_path}.{attribute_name}")
     return findings
 
 
-def find_network_use(source: str) -> list[str]:
-    """Return what `source` uses to reach a network, by the six rules of AC-4."""
+def find_network_use(source: str, file_path: str) -> list[str]:
+    """Return what `source` uses to reach a network, by the six rules of AC-4.
+
+    Args:
+        source: The text of a Python file.
+        file_path: The file's path relative to the repository root, written with
+            `/`, which decides whether `smtplib` and `ssl` are forbidden.
+
+    Returns:
+        One finding per use of the network; empty when nothing is flagged.
+    """
+    forbidden_paths = forbidden_paths_of(file_path)
     findings: list[str] = []
     tree = ast.parse(source)
     bindings = collect_bindings(tree)
     for node in ast.walk(tree):
         if isinstance(node, (ast.Import, ast.ImportFrom)):
-            findings.extend(find_import_findings(node))
+            findings.extend(find_import_findings(node, forbidden_paths))
         elif isinstance(node, (ast.Name, ast.Attribute)):
             resolved = resolve_path(node, bindings)
-            if resolved is not None and path_is_forbidden(resolved):
+            if resolved is not None and path_is_forbidden(resolved, forbidden_paths):
                 findings.append(f"path {resolved}")
             identifier = node.id if isinstance(node, ast.Name) else node.attr
             if identifier in FORBIDDEN_CALL_NAMES:
                 findings.append(f"name {identifier}")
         elif isinstance(node, ast.Call):
-            findings.extend(find_call_findings(node, bindings))
+            findings.extend(find_call_findings(node, bindings, forbidden_paths))
     return findings
 
 
@@ -241,14 +277,52 @@ UNFLAGGED_SERVER_SAMPLES = [
 ]
 
 
+SAMPLE_PATH = "src/nock/room.py"
+MAILERS_PATH = "src/nock/mailers.py"
+
+MAIL_SAMPLES_ALLOWED_IN_THE_MAILER = [
+    "import smtplib",
+    "import smtplib as s",
+    "from smtplib import SMTP_SSL",
+    "import ssl",
+    "import ssl\nssl.create_default_context()",
+]
+
+NETWORK_SAMPLES_FLAGGED_IN_THE_MAILER = [
+    "import socket",
+    "from http import client",
+    'asyncio.open_connection("x", 80)',
+]
+
+MAIL_SAMPLES_FLAGGED_OUTSIDE_THE_MAILER = [
+    "import smtplib",
+    "import ssl",
+]
+
+
 @pytest.mark.parametrize("sample", FLAGGED_SERVER_SAMPLES)
 def test_ac4_the_checker_flags_network_use(sample: str) -> None:
-    assert find_network_use(sample) != []
+    assert find_network_use(sample, SAMPLE_PATH) != []
 
 
 @pytest.mark.parametrize("sample", UNFLAGGED_SERVER_SAMPLES)
 def test_ac4_the_checker_does_not_flag_other_code(sample: str) -> None:
-    assert find_network_use(sample) == []
+    assert find_network_use(sample, SAMPLE_PATH) == []
+
+
+@pytest.mark.parametrize("sample", MAIL_SAMPLES_ALLOWED_IN_THE_MAILER)
+def test_ac4_the_checker_allows_smtplib_and_ssl_in_the_mailer(sample: str) -> None:
+    assert find_network_use(sample, MAILER_PATH) == []
+
+
+@pytest.mark.parametrize("sample", NETWORK_SAMPLES_FLAGGED_IN_THE_MAILER)
+def test_ac4_the_checker_flags_other_network_use_in_the_mailer(sample: str) -> None:
+    assert find_network_use(sample, MAILER_PATH) != []
+
+
+@pytest.mark.parametrize("sample", MAIL_SAMPLES_FLAGGED_OUTSIDE_THE_MAILER)
+def test_ac4_the_checker_flags_smtplib_and_ssl_in_a_near_namesake(sample: str) -> None:
+    assert find_network_use(sample, MAILERS_PATH) != []
 
 
 def test_ac4_no_module_of_src_imports_an_http_client_or_opens_a_connection() -> None:
@@ -258,8 +332,9 @@ def test_ac4_no_module_of_src_imports_an_http_client_or_opens_a_connection() -> 
     offences: list[str] = []
     for source_file in source_files:
         text = source_file.read_text(encoding="utf-8")
-        for finding in find_network_use(text):
-            offences.append(f"{source_file.relative_to(PROJECT_ROOT)}: {finding}")
+        relative_path = source_file.relative_to(PROJECT_ROOT).as_posix()
+        for finding in find_network_use(text, relative_path):
+            offences.append(f"{relative_path}: {finding}")
 
     assert offences == []
 

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { onMount, tick } from 'svelte'
+  import AccountDialog from './AccountDialog.svelte'
   import ChatPanel from './ChatPanel.svelte'
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
@@ -7,6 +8,7 @@
   import RecapDialog from './RecapDialog.svelte'
   import RoomTimer from './RoomTimer.svelte'
   import { t } from './i18n'
+  import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
   import { nameOf } from './activityFeed'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import {
@@ -1075,6 +1077,34 @@
 
   // The dialog is on the page only while it is open, so each opening fetches it.
   let isRecapOpen = $state(false)
+
+  // Spec 033: the answer of GET /api/account, asked once when the page loads.
+  // Null while it has not answered 200 (accounts off, or a failed request): the
+  // page then shows no account control.
+  let accountStatus: AccountStatus | null = $state(null)
+  let accountOpenButton: HTMLButtonElement | null = $state(null)
+  let accountDialog: AccountDialog | null = $state(null)
+  // Whether this page load sent its one PUT /api/account/rooms.
+  let isRoomLinked = false
+
+  onMount(() => {
+    void fetchAccountStatus().then((status) => {
+      accountStatus = status
+    })
+  })
+
+  // Once the page has its first snapshot and knows it is signed in, it links its
+  // player of the room to the account, once (spec 033).
+  $effect(() => {
+    if (isRoomLinked || accountStatus === null || !accountStatus.signed_in) {
+      return
+    }
+    if (session.snapshot === null) {
+      return
+    }
+    isRoomLinked = true
+    void linkRoom({ code, resume_token: session.snapshot.resume_token })
+  })
   let recapOpenButton: HTMLButtonElement | null = $state(null)
 
   // Escape or the close button closed the dialog: the focus goes back to the
@@ -1731,6 +1761,16 @@
           aria-pressed={isAuthorsViewOn}
           onclick={toggleAuthorsView}>{t('authors.switch')}</button
         >
+        <!-- The last button of the toolbar, while accounts are on (spec 033). -->
+        {#if accountStatus !== null}
+          <button
+            type="button"
+            class="account-open"
+            data-testid="account-open"
+            bind:this={accountOpenButton}
+            onclick={() => accountDialog?.open()}>{t('account.open')}</button
+          >
+        {/if}
         <span
           class="room-toolbar-more"
           class:shown={roomToolbarHasMore}
@@ -1774,6 +1814,16 @@
   {/if}
   {#if isRecapOpen}
     <RecapDialog {code} {you} {playerColours} onClose={closeRecap} />
+  {/if}
+  <!-- After the toolbar in document order: its sideways scrolling would clip it
+       (spec 033). -->
+  {#if session.snapshot !== null && accountStatus !== null}
+    <AccountDialog
+      bind:this={accountDialog}
+      status={accountStatus}
+      room={{ code, resume_token: session.snapshot.resume_token }}
+      onClosed={() => accountOpenButton?.focus()}
+    />
   {/if}
   {#if session.status === 'reconnecting'}
     <p class="connection-banner" data-testid="connection-banner" role="status">
@@ -2115,8 +2165,8 @@
 
   /* The room toolbar holds the shared timer and its toggle, the chat toggle, the
      recap button of a solved room, the undo, pencil, check and reveal controls,
-     the flag button and the authors switch (specs 027, 022, 028, 024, 020, 021
-     and 019). On a roomy window it is one
+     the flag button, the authors switch and the account button (specs 027, 022,
+     028, 024, 020, 021, 019 and 033). On a roomy window it is one
      item of the header row, and it wraps when it must. */
   .room-toolbar {
     display: flex;
@@ -2174,11 +2224,13 @@
     min-height: 24px;
   }
 
-  /* The chat toggle, the reaction button (spec 022) and the recap button (spec
-     028): the same target size as the flag button. */
+  /* The chat toggle, the reaction button (spec 022), the recap button (spec
+     028) and the account button (spec 033): the same target size as the flag
+     button. */
   .chat-toggle,
   .recap-open,
-  .react-button {
+  .react-button,
+  .account-open {
     flex: none;
     box-sizing: border-box;
     min-width: 24px;
