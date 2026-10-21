@@ -354,20 +354,20 @@ def test_ac2_device_2_sends_no_room_from_the_account_page(
 ) -> None:
     ana_writes_t(account_server, devices, fx01_grid, enter_room)
     page = devices.new().new_page()
-    bodies: list[object] = []
 
-    def keep_link_request(request: Request) -> None:
-        if request.method == "POST" and request.url.endswith("/api/account/link"):
-            bodies.append(json.loads(request.post_data or "null"))
+    def is_link_request(request: Request) -> bool:
+        return request.method == "POST" and request.url.endswith("/api/account/link")
 
-    page.on("request", keep_link_request)
     page.goto(f"{account_server.base_url}{ACCOUNT_PAGE_PATH}")
     expect_account_state(page, "signed_out")
 
-    ask_link_in_form(page, ANA_EMAIL)
+    # The request is read through Playwright: the mailer wait below does not
+    # call it, so a "request" handler could still be pending after that wait.
+    with page.expect_request(is_link_request) as request_info:
+        ask_link_in_form(page, ANA_EMAIL)
     wait_for_messages(account_server.mailer, 1)
 
-    assert bodies == [{"email": ANA_EMAIL, "room": None}]
+    assert request_info.value.post_data_json == {"email": ANA_EMAIL, "room": None}
 
 
 # ---- AC-11 (browser) ------------------------------------------------------------
