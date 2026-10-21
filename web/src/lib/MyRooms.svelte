@@ -7,7 +7,9 @@
   // "My rooms" of the catalogue page (spec 032): the open rooms this device
   // keeps an identity for, as the server sums them up. The catalogue page shows
   // it only when there is at least one key, and does not wait for it.
-  let { keys }: { keys: RoomKey[] } = $props()
+  // `onloaded` gets the summaries once they arrive (the history of spec 029).
+  let { keys, onloaded }: { keys: RoomKey[]; onloaded: (summaries: RoomSummary[]) => void } =
+    $props()
 
   type State = 'loading' | 'ready' | 'error'
 
@@ -22,6 +24,7 @@
     }
     summaries = loaded
     sectionState = 'ready'
+    onloaded(loaded)
   }
 
   // Once, when the page shows.
