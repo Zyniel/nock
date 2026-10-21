@@ -5,12 +5,15 @@ are in `tests/test_spec_033_*.py`, one file per criterion group:
 
 - `test_spec_033_ac01_sign_in_link.py`: AC-1, a link asked from a room and used,
   over HTTP, with the edge cases of the address, the sessions and the cookie.
+- `test_spec_033_ac01_purge.py`: AC-1, the purge of old links and sessions, on an
+  `AccountStore` and through the sweep the app runs when it starts.
 - `test_spec_033_ac02_ac11_devices.py`: AC-2 and the browser part of AC-11, two
   devices on the live server.
 - `test_spec_033_ac03_guest_finishes.py`: AC-3, a guest solves FX-01 with accounts
   on.
 - `test_spec_033_ac04_erasure.py`: AC-4, the deletion over HTTP and the bytes of
-  the database files, then the seat back of a former player with the rules.
+  the database files (also after a restart, sent to a second app, and for an
+  account with no room), then the seat back of a former player with the rules.
 - `test_spec_033_ac05_former_player_pages.py`: AC-5, what the other players' pages
   show once the account is deleted.
 - `test_spec_033_ac06_configuration.py`: AC-6, the variables of "Configuration",
@@ -269,6 +272,7 @@ def account_app(
     mailer: Mailer | None = None,
     config: RoomConfig = NO_TICK_CONFIG,
     dist_dir: Path | None = None,
+    store: RoomStore | None = None,
 ) -> Generator[AccountApp]:
     """Run the app of the "Test harness" in a `TestClient` and yield it.
 
@@ -285,6 +289,9 @@ def account_app(
         mailer: The mailer; None: a new `RecordingMailer`, which the result holds.
         config: The thresholds of the rooms.
         dist_dir: The built client; None: `tmp_path`, which holds none.
+        store: The rooms' store, opened on `tmp_path / "nock.sqlite3"` by the
+            caller (a `RoomStore` subclass that records what it is given); None:
+            `RoomStore(path)`. Closed at the end either way.
     """
     from nock.accounts import AccountStore
 
@@ -292,7 +299,8 @@ def account_app(
     recorder = RecordingMailer()
     app_mailer: Mailer = recorder if mailer is None else mailer
     app_settings = account_settings() if settings is None else settings
-    store = RoomStore(database_path)
+    if store is None:
+        store = RoomStore(database_path)
     registry = RoomRegistry(clock=clock, store=store, config=config)
     account_store = AccountStore(database_path)
     try:

@@ -39,6 +39,7 @@ from playwright.sync_api import (
     WebSocket,
     expect,
 )
+from playwright.sync_api import Response as PageResponse
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
@@ -55,6 +56,7 @@ from spec033_harness import (
     ACCOUNT_PAGE_PATH,
     ANA_EMAIL,
     ROOMS_PATH,
+    SIGN_IN_PATH,
     WAIT_TIMEOUT_MS,
     AccountServer,
     Devices,
@@ -468,16 +470,26 @@ def test_ac11_an_identity_on_the_device_is_never_replaced(
     enter_room: EnterRoom,
 ) -> None:
     device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    # Ana's account gets her identity of the room, which a sign-in then serves.
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     bob_page = devices.new().new_page()
     enter_room(bob_page, f"{account_server.base_url}/r/{device.code}", "Bob")
     bobs_identity = stored_identity(bob_page, device.code)
     assert bobs_identity is not None
     third = devices.new().new_page()
     seed_storage(third, {f"nock.identity.{device.code}": json.dumps(bobs_identity)})
+    sign_in_answers: list[object] = []
+
+    def keep_sign_in_answer(response: PageResponse) -> None:
+        if response.request.method == "POST" and response.url.endswith(SIGN_IN_PATH):
+            sign_in_answers.append(response.json())
+
+    third.on("response", keep_sign_in_answer)
     third.goto(f"{account_server.base_url}{ACCOUNT_PAGE_PATH}")
     expect_account_state(third, "signed_out")
     ask_link_in_form(third, ANA_EMAIL)
-    wait_for_messages(account_server.mailer, 1)
+    wait_for_messages(account_server.mailer, 2)
     sign_in_with_link(
         third, link_in(account_server.base_url, account_server.mailer.messages[-1])
     )
@@ -486,5 +498,10 @@ def test_ac11_an_identity_on_the_device_is_never_replaced(
     third.goto(f"{account_server.base_url}/")
     expect_my_rooms_ready(third, 1)
 
+    assert len(sign_in_answers) == 1
+    answer = sign_in_answers[0]
+    assert isinstance(answer, dict)
+    served = [(room["code"], room["player_id"]) for room in answer["rooms"]]
+    assert served == [(device.code, device.you)]
     assert after_sign_in == bobs_identity
     assert stored_identity(third, device.code) == bobs_identity

@@ -15,8 +15,9 @@ the sign-in, but neither the link token nor the session value: their SHA-256 hex
 digests are stored instead. A link is deleted once used, so its digest is checked
 while the link is pending.
 
-Edge case checked as well: the sign-out answers 204, clears the cookie and ends
-the session.
+Edge cases checked as well: the sign-out answers 204, clears the cookie and ends
+the session; the failed mail is logged by a `nock.*` logger at `warning` or above
+(the mailer row of "HTTP routes"), the level an operator sees by default.
 """
 
 from __future__ import annotations
@@ -165,7 +166,12 @@ def test_ac10_no_log_record_holds_a_token_a_session_the_address_or_the_password(
     assert leaks == []
 
 
-def test_ac10_the_failed_mail_is_logged_by_the_app(
+def is_app_logger(name: str) -> bool:
+    """Whether a logger is `nock` or one of the `nock.*` loggers."""
+    return name == "nock" or name.startswith("nock.")
+
+
+def test_ac10_the_failed_mail_is_logged_by_the_app_at_warning_or_above(
     tmp_path: Path, fake_clock: FakeClock, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.DEBUG)
@@ -176,9 +182,14 @@ def test_ac10_the_failed_mail_is_logged_by_the_app(
         response = ask_link(app.client, ANA_EMAIL)
         records = list(caplog.records)
 
-    app_records = [r for r in records if r.name.split(".")[0] == "nock"]
+    # Specs 036 and 038: the operator's log level is `warning` by default.
+    seen_by_the_operator = []
+    for record in records:
+        if is_app_logger(record.name) and record.levelno >= logging.WARNING:
+            seen_by_the_operator.append(record)
     assert response.status_code == 503
-    assert len(app_records) >= 1, [r.name for r in records]
+    every_record = [(r.name, r.levelname) for r in records]
+    assert len(seen_by_the_operator) >= 1, every_record
 
 
 # ---- Stored tokens --------------------------------------------------------------

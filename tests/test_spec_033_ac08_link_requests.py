@@ -69,7 +69,17 @@ REFUSED_ADDRESSES = [
     pytest.param(
         "fran\N{LATIN SMALL LETTER C WITH CEDILLA}ois@example.org", id="cedilla"
     ),
+    pytest.param("x1,victim@example.org", id="comma"),
+    pytest.param("a<b@example.org", id="less-than"),
+    pytest.param('a"b@example.org', id="quote"),
     pytest.param(ADDRESS_OF_255, id="255-characters"),
+]
+# Decision 15: local parts that a mailer could split into another address.
+SPLITTABLE_ADDRESSES = [
+    "x1,victim@example.org",
+    "x2,victim@example.org",
+    "a<b@example.org",
+    'a"b@example.org',
 ]
 
 
@@ -181,6 +191,29 @@ def test_ac8_refused_requests_count_toward_neither_limit(
         sent = sent_count(app)
 
     assert sorted(set(refusals)) == [404, 422]
+    assert for_ana == [202] * LINKS_PER_EMAIL
+    assert for_others == [202] * (LINKS_PER_ADDRESS - LINKS_PER_EMAIL)
+    assert sent == LINKS_PER_ADDRESS
+
+
+def test_ac8_local_parts_a_mailer_could_split_count_toward_neither_limit(
+    tmp_path: Path, fake_clock: FakeClock
+) -> None:
+    with account_app(tmp_path, fake_clock) as app:
+        refusals = []
+        for _ in range(LINKS_PER_ADDRESS + 1):
+            for address in SPLITTABLE_ADDRESSES:
+                refusals.append(ask_link(app.client, address).status_code)
+
+        for_ana = []
+        for _ in range(LINKS_PER_EMAIL):
+            for_ana.append(ask_link(app.client, ANA_EMAIL).status_code)
+        for_others = []
+        for address in addresses(LINKS_PER_ADDRESS - LINKS_PER_EMAIL):
+            for_others.append(ask_link(app.client, address).status_code)
+        sent = sent_count(app)
+
+    assert refusals == [422] * ((LINKS_PER_ADDRESS + 1) * len(SPLITTABLE_ADDRESSES))
     assert for_ana == [202] * LINKS_PER_EMAIL
     assert for_others == [202] * (LINKS_PER_ADDRESS - LINKS_PER_EMAIL)
     assert sent == LINKS_PER_ADDRESS
