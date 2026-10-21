@@ -565,7 +565,7 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
     finished_at = None
     elapsed_ms = None
     if state.solved and state.solved_at is not None:
-        finished_at = datetime.fromtimestamp(state.solved_at, UTC)
+        finished_at = utc_datetime(state.solved_at)
         elapsed_ms = state.solved_elapsed_ms
     return RoomSummary(
         code=state.code,

@@ -20,7 +20,6 @@ import secrets
 import sqlite3
 import string
 import threading
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import NamedTuple
 
@@ -33,6 +32,7 @@ from nock.room import (
     RoomKey,
     RoomState,
     member_id,
+    utc_datetime,
 )
 
 SESSION_COOKIE: str = "nock_session"
@@ -541,7 +541,7 @@ class AccountStore:
                 grid_number=grid_number,
                 width=width,
                 height=height,
-                finished_at=datetime.fromtimestamp(finished_at, UTC),
+                finished_at=utc_datetime(finished_at),
                 elapsed_ms=elapsed_ms,
                 teammates=tuple(teammates_by_code.get(code, [])),
             )
