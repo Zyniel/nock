@@ -554,6 +554,7 @@ def _history_saver(store: AccountStore) -> Callable[[RoomState], None]:
     """
 
     def save_before_deletion(state: RoomState) -> None:
+        """Save the records; runs under the registry lock in the deleting thread."""
         if not state.solved:
             return
         for account_id in store.accounts_of_room(state.code):
@@ -1226,8 +1227,12 @@ def create_app(
         account = require_account(request)
         store = account_store_in_use()
         room_registry = holder.get()
-        for identity in store.delete_account(account.account_id):
+        deleted_identities = store.delete_account(account.account_id)
+        for identity in deleted_identities:
             room_registry.erase_player(identity.code, identity.player_id)
+        # Erasing a player deletes an expired room, whose delete hook may have
+        # saved a record with the nickname: erase it from the records once more.
+        store.erase_players_from_history(deleted_identities)
         response = Response(status_code=204)
         _clear_session_cookie(response)
         return response

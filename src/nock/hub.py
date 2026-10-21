@@ -888,6 +888,8 @@ class RoomRegistry:
 
         A live room gives its live state; a room only in the store gives
         `store.load_room(code)`, with no `after_restart` step and nothing logged.
+        A room solved before spec 029 gets its `solved_at` and
+        `solved_elapsed_ms` from its `grid_solved` log entry.
 
         Returns:
             The state; None when the room is unknown or expired. An expired room
@@ -897,8 +899,11 @@ class RoomRegistry:
             return None
         runner = self._runners.get(code)
         if runner is not None:
-            return runner.state
-        return self._store.load_room(code)
+            return self._with_solved_values(runner.state)
+        stored = self._store.load_room(code)
+        if stored is None:
+            return None
+        return self._with_solved_values(stored)
 
     def member_id(self, code: str, resume_token: str) -> str | None:
         """Return the id of the room's member whose resume token is `resume_token`.
@@ -1172,7 +1177,7 @@ class RoomRegistry:
         last_edit_at = self._store.last_edit_at(code)
         if last_edit_at is None:
             return None  # deleted since `peek_room` read it
-        return room_summary(self._with_solved_values(state), last_edit_at)
+        return room_summary(state, last_edit_at)
 
     def _with_solved_values(self, state: RoomState) -> RoomState:
         """Return the state with `solved_at` and `solved_elapsed_ms` known.
@@ -1269,10 +1274,17 @@ class RoomRegistry:
             logger.exception("The delete hook of room %s failed", code)
 
     def _latest_state(self, code: str, runner: _RoomRunner | None) -> RoomState | None:
-        """Return the live state of a room with a runner, else its stored state."""
+        """Return the live state of a room with a runner, else its stored state.
+
+        A room solved before spec 029 gets its `solved_at` and
+        `solved_elapsed_ms` from its `grid_solved` log entry, as in `peek_room`.
+        """
         if runner is not None:
-            return runner.state
-        return self._store.load_room(code)
+            return self._with_solved_values(runner.state)
+        stored = self._store.load_room(code)
+        if stored is None:
+            return None
+        return self._with_solved_values(stored)
 
     def _finish(self) -> None:
         """Save a snapshot of each live room, then close the store if owned."""

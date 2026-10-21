@@ -20,6 +20,7 @@ import secrets
 import sqlite3
 import string
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -639,6 +640,29 @@ class AccountStore:
                 self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
         return held_identities
 
+    def erase_players_from_history(self, identities: Sequence[RoomIdentity]) -> None:
+        """Make the players of `identities` former players in every history.
+
+        In the records of every account, each team-mate whose room code and
+        player id are those of one of `identities` gets the nickname
+        FORMER_PLAYER_NICKNAME (spec 029). `DELETE /api/account` calls it once
+        the rooms are erased. On a file database the write-ahead log is then
+        checkpointed and emptied, as by `delete_account`.
+
+        Args:
+            identities: The identities of a deleted account.
+        """
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._mark_former_players(identities)
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
+            if self._is_file:
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+
     def purge(self, now: float) -> None:
         """Delete the links and the sessions that are too old to be used.
 
@@ -721,12 +745,7 @@ class AccountStore:
 
         The caller holds the lock and runs the transaction.
         """
-        for identity in held_identities:
-            self._connection.execute(
-                "UPDATE account_history_teammates SET nickname = ? "
-                "WHERE code = ? AND player_id = ? AND account_id != ?",
-                (FORMER_PLAYER_NICKNAME, identity.code, identity.player_id, account_id),
-            )
+        self._mark_former_players(held_identities)
         self._connection.execute(
             "DELETE FROM account_history_teammates WHERE account_id = ?",
             (account_id,),
@@ -734,6 +753,19 @@ class AccountStore:
         self._connection.execute(
             "DELETE FROM account_history WHERE account_id = ?", (account_id,)
         )
+
+    def _mark_former_players(self, identities: Sequence[RoomIdentity]) -> None:
+        """Give FORMER_PLAYER_NICKNAME to each team-mate matching an identity.
+
+        A team-mate matches when its room code and player id are the identity's.
+        The caller holds the lock and runs the transaction.
+        """
+        for identity in identities:
+            self._connection.execute(
+                "UPDATE account_history_teammates SET nickname = ? "
+                "WHERE code = ? AND player_id = ?",
+                (FORMER_PLAYER_NICKNAME, identity.code, identity.player_id),
+            )
 
     def _account_id_of(self, email: str) -> str | None:
         """Return the id of the account of `email`, or None. The caller locks."""
