@@ -10,12 +10,16 @@ than its room applies is closed as flooding.
 
 A room lives 30 days from its last edit (spec 032). An expired room is deleted by
 `expire_rooms`, which the app runs every hour, and by any lookup that meets it.
+
+Each step made by a client message logs its relay time (spec 038): how long the
+server took from reading the message to handing the step's entries to the store.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import secrets
 import threading
 import time
@@ -37,6 +41,7 @@ from nock.room import (
     DEFAULT_CONFIG,
     SILENCE_CLOSE_CODE,
     Clock,
+    LogEntry,
     Outcome,
     RoomConfig,
     RoomKey,
@@ -88,10 +93,11 @@ _STOP_TIMEOUT_SECONDS = 5.0
 
 
 class _Message(NamedTuple):
-    """Input: a client message from a joined player."""
+    """Input: a client message of a connection, a join included."""
 
     connection: RoomConnection
     message: ClientMessage
+    read_at: float  # time.monotonic() when the server read the message (spec 038)
 
 
 class _Invalid(NamedTuple):
@@ -171,10 +177,14 @@ class RoomConnection:
     def submit(self, message: ClientMessage) -> None:
         """Pass a message of this player to the room (any thread).
 
-        The message is dropped when it floods the connection, or comes after.
+        The server calls it as soon as it has read the message's frame, so the
+        time of the call goes with the message: the room logs its relay time
+        from it (spec 038). The message is dropped when it floods the
+        connection, or comes after.
         """
+        read_at = time.monotonic()
         if self._admit_frame():
-            self._post(_Message(self, message))
+            self._post(_Message(self, message, read_at))
 
     def submit_invalid(self) -> None:
         """Tell the room that this player sent an invalid frame (any thread).
@@ -529,7 +539,7 @@ class _RoomRunner:
             self._refuse(item.connection, ErrorCode.INVALID_MESSAGE)
             return
         if item.connection.player_id is None:
-            self._unjoined_step(item.connection, item.message)
+            self._unjoined_step(item.connection, item.message, item.read_at)
             return
         if isinstance(item.message, Join):
             self._note_frame_seen(item.connection)
@@ -548,7 +558,7 @@ class _RoomRunner:
         except Exception:
             logger.exception("A message in room %s failed", self.state.code)
             return
-        self._store_and_deliver(outcome, item.connection, joined)
+        self._store_and_deliver(outcome, item.connection, joined, read_at=item.read_at)
 
     def _note_frame_seen(self, connection: RoomConnection) -> None:
         """Set `last_seen_at` for a frame that has no other effect (spec 017)."""
@@ -557,11 +567,14 @@ class _RoomRunner:
         self.state = with_last_seen(self.state, connection.player_id, self._clock())
 
     def _unjoined_step(
-        self, connection: RoomConnection, message: ClientMessage
+        self, connection: RoomConnection, message: ClientMessage, read_at: float
     ) -> None:
-        """Handle a message of a connection that has not joined yet."""
+        """Handle a message of a connection that has not joined yet.
+
+        `read_at` is when the server read the message (see `RoomConnection.submit`).
+        """
         if isinstance(message, Join):
-            self._join_step(connection, message)
+            self._join_step(connection, message, read_at)
         elif isinstance(message, Ping):
             connection.deliver_text(Pong().model_dump_json())
         else:
@@ -572,11 +585,14 @@ class _RoomRunner:
         text = _REFUSAL_TEXTS[code]
         connection.deliver_text(ErrorMessage(code=code, message=text).model_dump_json())
 
-    def _join_step(self, connection: RoomConnection, message: Join) -> None:
+    def _join_step(
+        self, connection: RoomConnection, message: Join, read_at: float
+    ) -> None:
         """Run the join in the rules, then attach the connection if it succeeded.
 
         The snapshot is built by the rules in the same step as the attach, so
         the connection gets no event before it and none is missed after it.
+        `read_at` is when the server read the join (see `RoomConnection.submit`).
         """
         joined = list(self._connections)
         try:
@@ -591,7 +607,7 @@ class _RoomRunner:
         except Exception:
             logger.exception("A join in room %s failed", self.state.code)
             return
-        if not self._store_and_deliver(outcome, connection, joined):
+        if not self._store_and_deliver(outcome, connection, joined, read_at=read_at):
             # The player is not in the room: do not leave the joiner waiting.
             connection.deliver_close(_INTERNAL_ERROR_CLOSE_CODE)
             return
@@ -648,6 +664,8 @@ class _RoomRunner:
         outcome: Outcome,
         sender: RoomConnection | None,
         joined: list[RoomConnection],
+        *,
+        read_at: float | None = None,
     ) -> bool:
         """Commit the step's entries, store the new state, then deliver.
 
@@ -660,14 +678,19 @@ class _RoomRunner:
             sender: The connection whose message made the step; None for a tick
                 or a closed connection.
             joined: The connections that were joined before the step.
+            read_at: When the server read the client message of the step, from
+                `time.monotonic()`; None for a step without one (a tick, a
+                closed connection). The logged entries get their relay time
+                from it (spec 038); what the players receive does not change.
 
         Returns:
             False when the entries could not be committed: the step is then
             dropped, nothing is delivered and the state is left as it was.
         """
         if len(outcome.entries) > 0:
+            logged_entries = _with_relay_time(outcome.entries, read_at)
             try:
-                self._store.append(self.state.code, outcome.entries)
+                self._store.append(self.state.code, logged_entries)
             except Exception:
                 logger.exception("The log of room %s failed", self.state.code)
                 return False
@@ -1147,6 +1170,30 @@ class RoomRegistry:
         await self._cancel_runners()
         self._finish()
         asyncio.get_running_loop().stop()
+
+
+def _with_relay_time(
+    entries: Sequence[LogEntry], read_at: float | None
+) -> tuple[LogEntry, ...]:
+    """Return a step's entries as the log keeps them, with their relay time.
+
+    Args:
+        entries: The entries of one step, about to be handed to the store.
+        read_at: When the server read the client message of the step, from
+            `time.monotonic()`; None for a step without one.
+
+    Returns:
+        With `read_at`, each entry with `relay_ms` set to the whole milliseconds,
+        rounded down, from `read_at` to now (spec 038). Without it, the entries
+        as they are, whose `relay_ms` is None.
+    """
+    if read_at is None:
+        return tuple(entries)
+    relay_ms = math.floor((time.monotonic() - read_at) * 1000)
+    timed_entries: list[LogEntry] = []
+    for entry in entries:
+        timed_entries.append(entry.model_copy(update={"relay_ms": relay_ms}))
+    return tuple(timed_entries)
 
 
 def _newest_first(summary: RoomSummary) -> tuple[float, str]:

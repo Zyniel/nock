@@ -290,8 +290,11 @@ its undo tests cover that.
 - Multi-level undo and redo.
 - Several server processes sharing one database, replication, backups.
 - A real process kill or power cut in CI (see decision 2).
-- Expiry and deletion of rooms (spec 032), the operator replay tool (spec 038 AC-4,
-  which reads `read_log`), catch-up after an absence (spec 034).
+- Expiry and deletion of rooms (spec 032), the operator replay tool (spec 038 AC-8
+  and AC-9; the replay reads `read_log`), catch-up after an absence (spec 034).
+  (Note from the lead, 2026-10-16: this read "spec 038 AC-4, which reads
+  `read_log`"; spec 038's replay is its AC-8 and AC-9, and its AC-4 is the deletion
+  of a room's data at expiry. No criterion changes (preparation of spec 038).)
 
 ## Work packages
 

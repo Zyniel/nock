@@ -2,6 +2,7 @@
   import CataloguePage from './lib/CataloguePage.svelte'
   import GridPage from './lib/GridPage.svelte'
   import NotFoundPage from './lib/NotFoundPage.svelte'
+  import OpsPage from './lib/OpsPage.svelte'
   import RoomPage from './lib/RoomPage.svelte'
   import SharePage from './lib/SharePage.svelte'
   import { t } from './lib/i18n'
@@ -27,6 +28,9 @@
   <GridPage number={gridMatch[1]} />
 {:else if recapMatch !== null}
   <SharePage token={recapMatch[1]} />
+{:else if path === '/ops'}
+  <!-- The operator's page (spec 038); the server serves it only while it is on. -->
+  <OpsPage />
 {:else}
   <NotFoundPage />
 {/if}

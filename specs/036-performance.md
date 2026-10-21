@@ -39,6 +39,36 @@ cannot be bound" edge cases, decision 11 and the new decision 16. The tests of
 AC-10 to AC-12 are updated before the implementer runs (review of spec 036's
 refinement).)
 
+(Note from the lead, 2026-10-16: refined for spec 038, as its decision 9 asks.
+`server_config` sets `access_log=False`, and its `log_level` defaults to
+`"warning"`, the level that `main()` keeps. `main()` first checks spec 038's
+`NOCK_OPERATOR_TOKEN` with `operator_token_from_env(os.environ)` and turns a
+`SettingsError` into `SystemExit(str(error))` before any server is built, so
+`python -m nock` also reads that variable. Its rule is spec 038's: like `NOCK_HOST`
+and `NOCK_PORT` it takes ASCII characters only, and unlike the three other
+variables its message never shows the value, which is a secret. Changed: the code
+block of "Frame size at the socket" and its bullets on what `main()` reads, refuses
+and runs, the item "Production entry point" of "Test harness", the edge case
+"Several invalid variables", "Out of scope" and decision 11. No criterion's text
+changes, but these tests follow before spec 038's implementer runs: AC-7's test
+of `server_config`'s defaults, which expects `info`
+(`test_ac7_server_config_defaults_to_127_0_0_1_port_8000_and_info`); AC-7's test
+of a level given to `server_config`, which gives `warning`, now the default, so
+that it no longer shows that the level given is used
+(`test_ac7_server_config_uses_the_host_port_and_log_level_it_is_given`); AC-10's
+test of `main()`'s level, which expects `info`
+(`test_ac10_main_keeps_the_info_log_level_of_server_config`); and the setup of
+AC-8 to AC-12, which now runs every case without `NOCK_OPERATOR_TOKEN`
+(preparation of spec 038).)
+
+(Note from the lead, 2026-10-16: decided after the spec-writer's report, each with a
+dated note. This spec handed connection counts per address, and how many sockets
+one address may open, to spec 038, which sets no such limit: the edge case
+"Unjoined sockets" and "Out of scope" now say that no spec limits them for the
+MVP. The README bullet of "Frame size at the socket" adds `NOCK_OPERATOR_TOKEN`,
+with spec 038's rule, which spec 038's implementer documents. No criterion changes
+and no test follows (preparation of spec 038).)
+
 ## Goal
 
 As a player on a mid-range phone, I want a responsive grid, so that typing never lags.
@@ -134,28 +164,43 @@ WS_MAX_SIZE_BYTES: int = 8192  # uvicorn refuses larger frames (close 1009)
 
 
 def server_config(
-    app: FastAPI, host: str = "127.0.0.1", port: int = 8000, log_level: str = "info"
+    app: FastAPI, host: str = "127.0.0.1", port: int = 8000, log_level: str = "warning"
 ) -> uvicorn.Config:
     """Return the uvicorn configuration of the server: `ws_max_size` is
-    WS_MAX_SIZE_BYTES; every other option is uvicorn's default."""
+    WS_MAX_SIZE_BYTES and `access_log` is False (spec 038); every other option
+    is uvicorn's default."""
 
 
 # src/nock/__main__.py
 def main() -> None:
     """Run `nock.server.app` with `server_config`, host from NOCK_HOST (default
-    127.0.0.1) and port from NOCK_PORT (default 8000), once NOCK_HOST, NOCK_PORT
-    and NOCK_DATABASE have passed the checks below."""
+    127.0.0.1) and port from NOCK_PORT (default 8000), once NOCK_OPERATOR_TOKEN
+    (spec 038, checked first), NOCK_HOST, NOCK_PORT and NOCK_DATABASE have
+    passed the checks below."""
 ```
+
+(Note from the lead, 2026-10-16: spec 038 decision 9. `log_level` defaulted to
+`"info"`; the docstring of `server_config` read "`ws_max_size` is
+WS_MAX_SIZE_BYTES; every other option is uvicorn's default", and that of `main()`
+"once NOCK_HOST, NOCK_PORT and NOCK_DATABASE have passed the checks below"
+(preparation of spec 038).)
 
 - Frames of 4,097 to 8,192 bytes still reach the app and get spec 037's
   `invalid_message`; frames over 8,192 bytes are refused by uvicorn before they
   are buffered whole, and the socket is closed with code 1009.
-- `main()` reads `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE` from `os.environ`
-  each time it is called, and checks each one that is set and not empty before it
-  builds a server. An unset or empty `NOCK_HOST` or `NOCK_PORT` takes its default
+- `main()` reads `NOCK_OPERATOR_TOKEN` (spec 038), `NOCK_HOST`, `NOCK_PORT` and
+  `NOCK_DATABASE` from `os.environ` each time it is called, and checks each one
+  that is set and not empty before it builds a server, `NOCK_OPERATOR_TOKEN`
+  first. An unset or empty `NOCK_HOST` or `NOCK_PORT` takes its default
   (`127.0.0.1`, `8000`), so an empty host never makes uvicorn listen on every
   interface; an unset or empty `NOCK_DATABASE` is not checked, and the app then
-  keeps its rooms in memory (spec 018). The values each variable takes:
+  keeps its rooms in memory (spec 018); an unset or empty `NOCK_OPERATOR_TOKEN` is
+  not checked either, and the operator pages are off (spec 038). (Note from the
+  lead, 2026-10-16: the first sentence read "`main()` reads `NOCK_HOST`,
+  `NOCK_PORT` and `NOCK_DATABASE` from `os.environ` each time it is called, and
+  checks each one that is set and not empty before it builds a server", and the
+  clause on an unset or empty `NOCK_OPERATOR_TOKEN` was added, spec 038 decision 9
+  (preparation of spec 038).) The values each variable takes:
   - `NOCK_HOST`: a host name or an IP address. Each character is an ASCII letter
     (`A` to `Z`, `a` to `z`), an ASCII digit (`0` to `9`), `.`, `-` or `:`, and a
     value that holds `:` is an IPv6 address that `ipaddress.IPv6Address` accepts,
@@ -184,6 +229,14 @@ def main() -> None:
     so `C:\Users\François\nock.sqlite3` and `/srv/jeu de mots/données/nock.sqlite3`
     are valid. `main()` does not change the variable; the app reads it when it
     starts (spec 018).
+  - `NOCK_OPERATOR_TOKEN`: a value that spec 038's rule allows ("Operator
+    access"). `main()` checks it with `operator_token_from_env(os.environ)` and
+    turns a `SettingsError` into `SystemExit(str(error))`. Like `NOCK_HOST` and
+    `NOCK_PORT`, it takes ASCII characters only (ASCII letters, ASCII digits,
+    `_` and `-`), so it refuses every character that `NOCK_DATABASE` refuses.
+    `main()` does not change the variable; the app reads it when it starts
+    (spec 038). (Note from the lead, 2026-10-16: added, spec 038 decision 9
+    (preparation of spec 038).)
 
   `NOCK_HOST` and `NOCK_PORT` already refuse every character that `NOCK_DATABASE`
   refuses, since they take only ASCII letters, ASCII digits, `.`, `-` and `:`.
@@ -206,7 +259,13 @@ def main() -> None:
   (decision 15).) (Note from the lead, 2026-10-16, after the test-writer's
   question: in the sentence on `NOCK_HOST` and `NOCK_PORT`, "ASCII letters,
   digits" became "ASCII letters, ASCII digits", as in the `NOCK_HOST` bullet.)
-- The message shows the refused value as Python's `repr()` writes it
+  A refused `NOCK_OPERATOR_TOKEN` stops `main()` in the same way, but its message
+  names the variable and the rule broken and never shows the value, not even
+  escaped, since the token is a secret (spec 038; decision 12). (Note from the
+  lead, 2026-10-16: the sentence before this note was added, spec 038 decision 9
+  (preparation of spec 038).)
+- The message of a refused `NOCK_HOST`, `NOCK_PORT` or `NOCK_DATABASE` shows the
+  value as Python's `repr()` writes it
   (`repr(value)`): between quotes, each control character as an escape (`\n`,
   `\t`, `\r`, `\x1b`, `\x85` ...), each backslash doubled, the other characters
   that `str.isprintable()` rejects escaped too (`\u2028`, `\u200b`), and accents
@@ -216,25 +275,36 @@ def main() -> None:
   rest of the wording is free. (Note from the lead, 2026-10-16: added; see
   decision 12.) (Note from the lead, 2026-10-16, after the spec-writer's report:
   "no control character of the value reaches the message" became "the message
-  holds no character of categories Cc, Cf, Zl or Zp", with decision 14.)
+  holds no character of categories Cc, Cf, Zl or Zp", with decision 14.) (Note
+  from the lead, 2026-10-16: "The message shows the refused value" became "The
+  message of a refused `NOCK_HOST`, `NOCK_PORT` or `NOCK_DATABASE` shows the
+  value", since the message of `NOCK_OPERATOR_TOKEN` shows none, spec 038
+  decision 9 (preparation of spec 038).)
 - `main()` then runs
   `uvicorn.Server(server_config(nock.server.app, host=host, port=port)).run()`
-  and returns when the server stops (log level `info`, `server_config`'s
-  default). `src/nock/__main__.py` calls `main()` only under
-  `if __name__ == "__main__":`, so importing `nock.__main__` starts nothing.
-  (Note from the lead, 2026-10-14: added so that AC-10 and AC-11 can call
-  `main()` in the test process with `uvicorn.Server.run` replaced.)
+  and returns when the server stops (log level `warning`, `server_config`'s
+  default, and no access log: spec 038). `src/nock/__main__.py` calls `main()`
+  only under `if __name__ == "__main__":`, so importing `nock.__main__` starts
+  nothing. (Note from the lead, 2026-10-14: added so that AC-10 and AC-11 can call
+  `main()` in the test process with `uvicorn.Server.run` replaced.) (Note from
+  the lead, 2026-10-16: "(log level `info`, `server_config`'s default)" became
+  "(log level `warning`, `server_config`'s default, and no access log: spec
+  038)", spec 038 decision 9 (preparation of spec 038).)
 - The production command becomes `uv run python -m nock` (with `NOCK_DATABASE`,
   spec 018); the implementer updates `README.md` and documents `NOCK_HOST` and
   `NOCK_PORT` there, with the characters that `NOCK_HOST` and `NOCK_DATABASE`
   take, the labels of a `NOCK_HOST` name, and the fact that an empty
-  `NOCK_DATABASE` keeps the rooms in memory.
+  `NOCK_DATABASE` keeps the rooms in memory. The README also documents
+  `NOCK_OPERATOR_TOKEN`, with the rule of spec 038 ("Operator access"); spec 038's
+  implementer adds it.
   (Note from the lead, 2026-10-14: "and documents `NOCK_HOST` and `NOCK_PORT`
   there" added.) (Note from the lead, 2026-10-16: "with the characters that
   `NOCK_HOST` and `NOCK_DATABASE` take" added with decision 11, and "the fact that
   an empty `NOCK_DATABASE` keeps the rooms in memory" with decision 15.) (Note
   from the lead, 2026-10-16: "the labels of a `NOCK_HOST` name" added with
-  decision 16 (review of spec 036's refinement).)
+  decision 16 (review of spec 036's refinement).) (Note from the lead, 2026-10-16:
+  the sentence on `NOCK_OPERATOR_TOKEN` was added, decided after the
+  spec-writer's report (preparation of spec 038).)
 - The shared `live_server` fixture of `tests/conftest.py` builds its server with
   `server_config(app, log_level="warning")` once the implementation provides
   `server_config`. The test-writer switches it in a commit after the
@@ -288,17 +358,26 @@ def main() -> None:
   store, are closed. The test runs `[sys.executable, "-m", "nock"]` (the
   interpreter that `uv run` gives the tests) with its own environment plus
   `NOCK_DATABASE` (the file) and `NOCK_PORT` (a free port, bound on 127.0.0.1
-  with port 0, then released), and without `NOCK_HOST`. It polls
+  with port 0, then released), and without `NOCK_HOST` and
+  `NOCK_OPERATOR_TOKEN`. It polls
   `GET http://127.0.0.1:<port>/` for up to 10 seconds, opens the sockets from a
   Playwright page on that origin as AC-7 does, and stops the process at the end
   (terminate, then kill). In the test process (AC-10 to AC-12): the test imports
   `nock.__main__`, sets or deletes the three variables `NOCK_HOST`, `NOCK_PORT`
   and `NOCK_DATABASE` with `monkeypatch` (each one a case does not set is
-  deleted), and replaces `uvicorn.Server.run` (`monkeypatch.setattr`) with a
-  recorder that keeps `self.config` and returns None. (Note from the lead,
+  deleted), deletes `NOCK_OPERATOR_TOKEN`, which no case of this spec sets, and
+  replaces `uvicorn.Server.run` (`monkeypatch.setattr`) with a
+  recorder that keeps `self.config` and returns None. Every other
+  `python -m nock` subprocess of AC-8 to AC-12 runs without `NOCK_OPERATOR_TOKEN`
+  too. (Note from the lead,
   2026-10-14: added with AC-8 to AC-11.) (Note from the lead, 2026-10-16: AC-12
   and `NOCK_DATABASE` added, so that a variable left in the environment that runs
-  the tests cannot change a case.)
+  the tests cannot change a case.) (Note from the lead, 2026-10-16: "and
+  `NOCK_OPERATOR_TOKEN`", the deletion of `NOCK_OPERATOR_TOKEN` and the sentence
+  on the other subprocesses were added: `main()` checks that variable first (spec
+  038), so a value left in the environment that runs the tests could stop every
+  case. The text read "and without `NOCK_HOST`" and "(each one a case does not
+  set is deleted), and replaces" (preparation of spec 038).)
 - Values in AC-10 to AC-12 are Python string literals, or expressions that join
   or repeat them (`"0" * 5000 + "8000"`, and `"a" * 64 + ".example"`, which is 64
   `a` followed by `.example`): `"8000\n"` ends with a newline (U+000A), `"\x1b"`
@@ -379,8 +458,11 @@ client), AC-6 (per-connection inbound cap) and AC-7 (`ws_max_size` 8,192 bytes).
   5 counted at A's 5th edit (the join counts too) and is closed: the answer to
   that edit never comes, and the test fails on the wait. (Note from the lead,
   2026-10-15: added with the second case of AC-6.)
-- Unjoined sockets (AC-6): the inbound cap applies to them too; how many sockets
-  one address may open is spec 038's concern.
+- Unjoined sockets (AC-6): the inbound cap applies to them too; no spec limits how
+  many sockets one address may open, for the MVP. (Note from the lead, 2026-10-16:
+  this read "how many sockets one address may open is spec 038's concern"; spec
+  038 sets no such limit, and the lead decided after the spec-writer's report that
+  no spec does for the MVP (preparation of spec 038).)
 - Frame between 4,097 and 8,192 bytes (AC-7): spec 037's rule applies unchanged.
   Binary frames follow the same limits.
 - Mark timing (AC-1): the mark is set after the first snapshot's grid is in the
@@ -444,7 +526,11 @@ client), AC-6 (per-connection inbound cap) and AC-7 (`ws_max_size` 8,192 bytes).
     lead, 2026-10-16: the characters of categories Co, Cn and Cs added, with the
     new values of AC-12 (review of spec 036's refinement).)
   - Several invalid variables: `main()` stops with the message of one of them.
-    Which one is not specified; each case of AC-11 sets a single variable.
+    Which one is not specified, except that an invalid `NOCK_OPERATOR_TOKEN` is
+    the one reported, since `main()` checks it first (spec 038); each case of
+    AC-11 sets a single variable. (Note from the lead, 2026-10-16: the clause on
+    `NOCK_OPERATOR_TOKEN` was added, spec 038 decision 9 (preparation of spec
+    038).)
 - An address that cannot be bound (AC-8): a port in use, or a `NOCK_HOST` that is
   not an address of the machine, is uvicorn's error: it logs the error and ends
   the process with a non-zero status. `main()` adds nothing. (Note from the lead,
@@ -469,7 +555,12 @@ client), AC-6 (per-connection inbound cap) and AC-7 (`ws_max_size` 8,192 bytes).
 - Nothing stated in the backlog (epic E10).
 - Accessibility: spec 035.
 - Integrity: spec 037.
-- Privacy and operations: spec 038 (connection counts per address, deployment).
+- Privacy and operations: spec 038. (Note from the lead, 2026-10-16: this read
+  "spec 038 (connection counts per address, deployment)"; spec 038 covers neither
+  (preparation of spec 038).)
+- Limits on the connections of one address, such as how many sockets it may open:
+  no spec sets them for the MVP. (Note from the lead, 2026-10-16: added, decided
+  after the spec-writer's report (preparation of spec 038).)
 - Tests on real phones or real 4G networks; Firefox and WebKit timings (no CPU
   throttling there).
 - Load beyond 8 players per room or many rooms at once; server capacity planning.
@@ -477,8 +568,11 @@ client), AC-6 (per-connection inbound cap) and AC-7 (`ws_max_size` 8,192 bytes).
 - Throttling messages other than edits (spec 037 out of scope); the inbound cap
   bounds memory, not rate.
 - Other settings of `python -m nock` (command-line arguments, log level, workers,
-  TLS, reload): it reads only `NOCK_HOST`, `NOCK_PORT` and spec 018's
-  `NOCK_DATABASE`. (Note from the lead, 2026-10-14: added with AC-8 to AC-11.)
+  TLS, reload): it reads only `NOCK_HOST`, `NOCK_PORT`, spec 018's
+  `NOCK_DATABASE` and spec 038's `NOCK_OPERATOR_TOKEN`. (Note from the lead,
+  2026-10-14: added with AC-8 to AC-11.) (Note from the lead, 2026-10-16: the
+  list read "`NOCK_HOST`, `NOCK_PORT` and spec 018's `NOCK_DATABASE`", spec 038
+  decision 9 (preparation of spec 038).)
 - Checks of `NOCK_DATABASE` other than its characters (that its folder exists,
   that the file can be opened): the app's start, spec 018. The variables of specs
   033 and 038 follow the rules of those specs. (Note from the lead, 2026-10-16:
@@ -578,7 +672,13 @@ too, not only `NOCK_PORT`. Each one is already part of the spec above.
     U+200C and U+200D and the line and paragraph separators (decision 14)",
     since U+200C and U+200D are invisible too and stay allowed, and some format
     characters, such as U+0600 ARABIC NUMBER SIGN, are visible and refused all
-    the same (review of spec 036's refinement).)
+    the same (review of spec 036's refinement).) (Note from the lead,
+    2026-10-16: since spec 038, `main()` also reads `NOCK_OPERATOR_TOKEN`, which
+    it checks first, under spec 038's rule (its decision 9). This decision is
+    about the three other variables. The token takes ASCII letters, ASCII
+    digits, `_` and `-` only, so it refuses every character that
+    `NOCK_DATABASE` refuses as well, and its message never shows the value
+    (decision 12) (preparation of spec 038).)
 12. Refused values show escaped (AC-11). This answers the question that the
     tests of AC-11 left open in their case of a port ending with a newline:
     should the message show a control character raw or escaped? (It was listed

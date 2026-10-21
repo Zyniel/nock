@@ -2,8 +2,9 @@
 
 The server listens on the address in NOCK_HOST and the port in NOCK_PORT, with
 the limits of `nock.server.server_config`. The rooms are stored in the SQLite
-file named by NOCK_DATABASE (spec 018). The three variables are checked before
-the server is built, and a refused value stops the start (spec 036).
+file named by NOCK_DATABASE (spec 018), and NOCK_OPERATOR_TOKEN turns on the
+operator pages (spec 038). The four variables are checked before the server is
+built, and a refused value stops the start (specs 036 and 038).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import unicodedata
 import uvicorn
 
 import nock.server
+from nock.settings import SettingsError, operator_token_from_env
 
 HOST_VARIABLE: str = "NOCK_HOST"
 PORT_VARIABLE: str = "NOCK_PORT"
@@ -56,13 +58,19 @@ def main() -> None:
     """Run `nock.server.app` with `server_config` until the server stops.
 
     The host comes from NOCK_HOST (default 127.0.0.1) and the port from
-    NOCK_PORT (default 8000), once NOCK_HOST, NOCK_PORT and NOCK_DATABASE have
-    passed the checks below. The three variables are read at each call. An
-    unset or empty NOCK_HOST or NOCK_PORT takes its default. An unset or empty
-    NOCK_DATABASE is not checked, and the app then keeps its rooms in memory.
+    NOCK_PORT (default 8000), once NOCK_OPERATOR_TOKEN (checked first),
+    NOCK_HOST, NOCK_PORT and NOCK_DATABASE have passed the checks below. The
+    four variables are read at each call. An unset or empty NOCK_HOST or
+    NOCK_PORT takes its default. An unset or empty NOCK_DATABASE is not checked,
+    and the app then keeps its rooms in memory. An unset or empty
+    NOCK_OPERATOR_TOKEN is not checked either, and the operator pages are off.
 
     The values each variable takes:
 
+    - NOCK_OPERATOR_TOKEN: the rule of `nock.settings.operator_token_from_env`
+      (spec 038): 32 to 256 characters, each one an ASCII letter, an ASCII
+      digit, "_" or "-". The variable is not changed: the app reads it when it
+      starts.
     - NOCK_HOST: a host name or an IP address. Each character is an ASCII
       letter, an ASCII digit, a dot, a dash or a colon, and a value that holds
       a colon is an IPv6 address that `ipaddress.IPv6Address` accepts, so it is
@@ -79,15 +87,34 @@ def main() -> None:
       variable is not changed: the app reads it when it starts.
 
     Raises:
-        SystemExit: A variable holds a refused value. Its code is a one-line
-            message that names the variable and shows the value as `repr()`
-            writes it, and no server is built.
+        SystemExit: A variable holds a refused value, and no server is built.
+            Its code is a one-line message that names the variable. For
+            NOCK_HOST, NOCK_PORT and NOCK_DATABASE it shows the value as
+            `repr()` writes it; for NOCK_OPERATOR_TOKEN, a secret, it names the
+            rule broken and never shows the value.
     """
+    _check_operator_token()
     host = _read_host()
     port = _read_port()
     _check_database()
     config = nock.server.server_config(nock.server.app, host=host, port=port)
     uvicorn.Server(config).run()
+
+
+def _check_operator_token() -> None:
+    """Stop the start when NOCK_OPERATOR_TOKEN breaks the rule of spec 038.
+
+    An unset or empty NOCK_OPERATOR_TOKEN passes: the operator pages are off.
+    The variable is only read: the app reads it again when it starts.
+
+    Raises:
+        SystemExit: NOCK_OPERATOR_TOKEN breaks the rule. Its code is the message
+            of the SettingsError, which never holds the value.
+    """
+    try:
+        operator_token_from_env(os.environ)
+    except SettingsError as error:
+        raise SystemExit(str(error)) from error
 
 
 def _read_host() -> str:

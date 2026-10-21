@@ -16,7 +16,9 @@ Notes:
 
 - Every test sets or deletes all three variables (with `set_variables` or
   `set_only`, or in the environment of its subprocess), so that a variable left
-  in the shell that runs the tests cannot change a case.
+  in the shell that runs the tests cannot change a case. Each one also deletes
+  spec 038's NOCK_OPERATOR_TOKEN, which `main()` checks first and which no case
+  of this spec sets (spec 036's "Test harness", refined for spec 038).
 - Every test that calls `main()` uses the recorder, so that a `main()` that does
   not refuse a value records a run instead of serving.
 - Each of those tests imports `nock.__main__` itself, once the recorder is in
@@ -54,14 +56,20 @@ from fastapi.testclient import TestClient
 import nock.server
 from nock.store import RoomStore
 from spec036_frames_harness import MAX_WS_FRAME_BYTES
-from spec036_harness import DATABASE_VARIABLE, HOST_VARIABLE, PORT_VARIABLE
+from spec036_harness import (
+    DATABASE_VARIABLE,
+    HOST_VARIABLE,
+    OPERATOR_TOKEN_VARIABLE,
+    PORT_VARIABLE,
+)
 
 # ---- Values of the spec --------------------------------------------------------------
 
 MAIN_VARIABLES = (HOST_VARIABLE, PORT_VARIABLE, DATABASE_VARIABLE)
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
-SERVER_LOG_LEVEL = "info"  # server_config's default, which main() keeps
+# server_config's default, which main() keeps: `warning` since spec 038 decision 9.
+SERVER_LOG_LEVEL = "warning"
 MEMORY_DATABASE = ":memory:"  # the store of an unset or empty NOCK_DATABASE (018)
 
 # The general categories that the message of a refused value never holds (AC-11):
@@ -376,19 +384,25 @@ def set_variables(
     port: str | None,
     database: str | None,
 ) -> None:
-    """Set or delete the three variables that `main()` reads; None deletes one.
+    """Set or delete the three variables of this spec that `main()` reads.
 
-    Every test of AC-10 to AC-12 sets all three (or calls `set_only`), so that a
-    variable left in the shell that runs the tests cannot change a case.
+    None deletes one. NOCK_OPERATOR_TOKEN (spec 038) is always deleted. Every test
+    of AC-10 to AC-12 sets all three (or calls `set_only`), so that a variable left
+    in the shell that runs the tests cannot change a case.
     """
+    monkeypatch.delenv(OPERATOR_TOKEN_VARIABLE, raising=False)
     set_variable(monkeypatch, HOST_VARIABLE, host)
     set_variable(monkeypatch, PORT_VARIABLE, port)
     set_variable(monkeypatch, DATABASE_VARIABLE, database)
 
 
 def set_only(monkeypatch: pytest.MonkeyPatch, name: str, value: str) -> None:
-    """Set the variable `name` to `value`; delete the two others that main() reads."""
+    """Set the variable `name` to `value`; delete the others that main() reads.
+
+    The others are the two other variables of this spec and NOCK_OPERATOR_TOKEN.
+    """
     assert name in MAIN_VARIABLES, f"{name} is not a variable that main() reads"
+    monkeypatch.delenv(OPERATOR_TOKEN_VARIABLE, raising=False)
     for variable in MAIN_VARIABLES:
         if variable == name:
             monkeypatch.setenv(variable, value)
@@ -566,7 +580,7 @@ def test_ac10_main_reads_the_variables_each_time_it_is_called(
     ]
 
 
-def test_ac10_main_keeps_the_info_log_level_of_server_config(
+def test_ac10_main_keeps_the_warning_log_level_of_server_config(
     monkeypatch: pytest.MonkeyPatch, server_runs: list[uvicorn.Config]
 ) -> None:
     set_variables(monkeypatch, host=None, port=None, database=None)
@@ -688,6 +702,7 @@ def test_ac11_python_m_nock_with_an_invalid_port_prints_why_and_exits_with_1() -
     environment = dict(os.environ)
     environment.pop(HOST_VARIABLE, None)
     environment.pop(DATABASE_VARIABLE, None)
+    environment.pop(OPERATOR_TOKEN_VARIABLE, None)
     environment[PORT_VARIABLE] = INVALID_PORT
 
     try:

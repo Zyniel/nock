@@ -32,8 +32,8 @@ export function timerValueMs(
   return Math.max(0, Math.floor(value))
 }
 
-// A number on two digits: 5 gives "05".
-function twoDigits(value: number): string {
+// A number on two digits: 5 gives "05". The duration text uses it too.
+export function twoDigits(value: number): string {
   return String(value).padStart(2, '0')
 }
 
