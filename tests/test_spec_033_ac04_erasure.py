@@ -21,6 +21,11 @@ The three plays of the criterion that run the other paths of the erasure:
   `Cookie` header;
 - (c) the checkpoint of `delete_account` on its own: an account with no room.
 
+(d) Python and HTTP, a link after the erasure: on a new `AccountStore`,
+`link_identity` of an account that `delete_account` removed returns False and
+writes nothing; through `PUT /api/account/rooms`, a session checked before the
+deletion gets 401 and leaves no nickname in the files.
+
 Python, for "Seat back of a former player": a past player named `--` who comes
 back with their token is seated back as `--`, without spec 012's suffix, even
 when a player of `players` is `--` too.
@@ -34,6 +39,7 @@ setup is in `spec033_harness`, `spec032_harness` and `spec017_harness`.
 from __future__ import annotations
 
 import contextlib
+import sqlite3
 import threading
 from collections.abc import Iterator, Sequence
 from pathlib import Path
@@ -43,6 +49,7 @@ import pytest
 from httpx2 import Response
 
 import nock.room
+from nock.accounts import AccountStore, RoomIdentity
 from nock.grid import Grid
 from nock.protocol import EditLetter, LetterChanged, PlayerJoined, PlayerState
 from nock.room import PastPlayer, RoomState
@@ -93,6 +100,8 @@ from spec033_harness import (
 
 ZELIE_NICKNAME = "Zélie-Probe"
 ZELIE_STORED = "ZÉLIE-PROBE"  # as the server stores it (spec 012 decision 12)
+LINKED_AT = 1.0
+LINKED_AFTER_ERASURE_AT = 2.0
 RESUME_WINDOW = 300.0  # spec 017's resume window, RoomConfig's default
 
 
@@ -629,6 +638,160 @@ def test_ac4_after_the_deletion_of_an_account_with_no_room_no_file_holds_it(
 
     assert deletion.status_code == 204
     assert strings_in(data, [ANA_EMAIL]) == []
+
+
+# ---- (d) A link after the erasure -------------------------------------------------
+
+
+def zelie_identity() -> RoomIdentity:
+    """An identity of Zélie in a room, with the nickname the server stores."""
+    return RoomIdentity(
+        code="ABCDEF",
+        player_id="zelie-player-id",
+        resume_token="zelie-resume-token-0123456789",
+        nickname=ZELIE_STORED,
+    )
+
+
+def identity_rows_of(database_path: Path, account_id: str) -> list[tuple[object, ...]]:
+    """The raw rows of `account_identities` that belong to an account."""
+    with contextlib.closing(sqlite3.connect(database_path)) as connection:
+        cursor = connection.execute(
+            "SELECT * FROM account_identities WHERE account_id = ?", (account_id,)
+        )
+        return cursor.fetchall()
+
+
+@pytest.fixture
+def account_store(tmp_path: Path) -> Iterator[AccountStore]:
+    """A new `AccountStore` on `tmp_path / "nock.sqlite3"`, closed at the end."""
+    store = AccountStore(tmp_path / DATABASE_FILE_NAME)
+    yield store
+    store.close()
+
+
+def test_ac4_d_a_link_before_the_erasure_returns_true_and_the_files_hold_the_nickname(
+    tmp_path: Path, account_store: AccountStore
+) -> None:
+    account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
+
+    linked = account_store.link_identity(account_id, zelie_identity(), LINKED_AT)
+    data = database_bytes(tmp_path / DATABASE_FILE_NAME)
+
+    assert linked is True
+    assert strings_in(data, [ZELIE_STORED]) == [ZELIE_STORED]
+    assert account_store.identities(account_id) == [zelie_identity()]
+
+
+def test_ac4_d_a_link_after_the_erasure_returns_false(
+    account_store: AccountStore,
+) -> None:
+    account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
+    identity = zelie_identity()
+    assert account_store.link_identity(account_id, identity, LINKED_AT) is True
+    account_store.delete_account(account_id)
+
+    linked = account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
+
+    assert linked is False
+
+
+def test_ac4_d_a_link_after_the_erasure_leaves_no_identity(
+    account_store: AccountStore,
+) -> None:
+    account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
+    identity = zelie_identity()
+    assert account_store.link_identity(account_id, identity, LINKED_AT) is True
+    account_store.delete_account(account_id)
+
+    account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
+
+    assert account_store.identities(account_id) == []
+
+
+def test_ac4_d_a_link_after_the_erasure_writes_no_row_in_the_table(
+    tmp_path: Path, account_store: AccountStore
+) -> None:
+    account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
+    identity = zelie_identity()
+    assert account_store.link_identity(account_id, identity, LINKED_AT) is True
+    account_store.delete_account(account_id)
+
+    account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
+    rows = identity_rows_of(tmp_path / DATABASE_FILE_NAME, account_id)
+
+    assert rows == []
+
+
+def test_ac4_d_a_link_after_the_erasure_leaves_no_nickname_in_the_files(
+    tmp_path: Path, account_store: AccountStore
+) -> None:
+    account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
+    identity = zelie_identity()
+    assert account_store.link_identity(account_id, identity, LINKED_AT) is True
+    account_store.delete_account(account_id)
+
+    account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
+    data = database_bytes(tmp_path / DATABASE_FILE_NAME)
+
+    assert strings_in(data, [ZELIE_STORED]) == []
+
+
+def delete_the_account_before_each_link(
+    app: AccountApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Make the app's `link_identity` run a deletion first, as a race would.
+
+    The replacement does what `DELETE /api/account` does (the account goes, then
+    each of its players is erased from the rooms), then calls the original.
+    """
+    original_link_identity = app.accounts.link_identity
+
+    def deleting_first(account_id: str, identity: RoomIdentity, now: float) -> bool:
+        erased_identities = app.accounts.delete_account(account_id)
+        for erased in erased_identities:
+            app.registry.erase_player(erased.code, erased.player_id)
+        return original_link_identity(account_id, identity, now)
+
+    monkeypatch.setattr(app.accounts, "link_identity", deleting_first)
+
+
+def test_ac4_d_a_put_whose_account_was_deleted_after_its_session_check_answers_401(
+    tmp_path: Path,
+    fake_clock: FakeClock,
+    fx01_grid: Grid,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with account_app(tmp_path, fake_clock) as app, contextlib.ExitStack() as stack:
+        code = app.registry.register_room(fx01_grid, grid_number=1)
+        zelie = open_peer(stack, app.client, code, ZELIE_NICKNAME)
+        key = room_key(code, zelie.snapshot().resume_token)
+        link_and_sign_in(app, ZELIE_EMAIL, key)
+        delete_the_account_before_each_link(app, monkeypatch)
+
+        response = app.client.put(ROOMS_PATH, json=key)
+
+    assert response.status_code == 401
+    assert response.json() == NOT_AUTHORIZED
+
+
+def test_ac4_d_a_put_whose_account_was_deleted_leaves_no_nickname_in_the_files(
+    tmp_path: Path,
+    fake_clock: FakeClock,
+    fx01_grid: Grid,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with account_app(tmp_path, fake_clock) as app, contextlib.ExitStack() as stack:
+        code = app.registry.register_room(fx01_grid, grid_number=1)
+        zelie = open_peer(stack, app.client, code, ZELIE_NICKNAME)
+        key = room_key(code, zelie.snapshot().resume_token)
+        link_and_sign_in(app, ZELIE_EMAIL, key)
+        delete_the_account_before_each_link(app, monkeypatch)
+
+        app.client.put(ROOMS_PATH, json=key)
+        data = database_bytes(app.database_path)
+
+    assert strings_in(data, [ZELIE_STORED, ZELIE_EMAIL]) == []
 
 
 # ---- Python: a former player seated back ----------------------------------------

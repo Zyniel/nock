@@ -58,6 +58,9 @@ from spec033_harness import (
 
 UNKNOWN_CODE = "ZZZZZZ"
 BOB_EMAIL = "bob.probe@example.org"
+PLUS_EMAIL = "ana+1@example.org"  # a mark decision 15 allows in a local part
+EXPIRY_EMAIL = "ana@example.org"
+JUST_PAST_AN_HOUR = 3_601.0
 ADDRESS_OF_255 = "ana@" + "a" * 63 + "." + "b" * 63 + "." + "c" * 63 + "." + "d" * 59
 REFUSED_ADDRESSES = [
     pytest.param("", id="empty"),
@@ -124,6 +127,19 @@ def test_ac8_the_address_of_255_characters_breaks_the_length_rule_only() -> None
     assert len(ADDRESS_OF_255) == 255
     assert local_part == "ana"
     assert [len(label) for label in labels] == [63, 63, 63, 59]
+
+
+def test_ac8_an_address_with_an_allowed_mark_is_sent_to_that_address(
+    tmp_path: Path, fake_clock: FakeClock
+) -> None:
+    with account_app(tmp_path, fake_clock) as app:
+        response = ask_link(app.client, PLUS_EMAIL)
+        messages = list(app.mailer.messages)
+
+    assert response.status_code == 202
+    assert response.json() == {}
+    assert len(messages) == 1
+    assert messages[0]["To"] == PLUS_EMAIL
 
 
 # ---- Refused addresses and rooms ------------------------------------------------
@@ -269,6 +285,22 @@ def test_ac8_an_hour_later_one_is_sent_again(
     assert sent == LINKS_PER_EMAIL + 1
 
 
+def test_ac8_the_address_limit_forgets_a_request_older_than_an_hour(
+    tmp_path: Path, fake_clock: FakeClock
+) -> None:
+    with account_app(tmp_path, fake_clock) as app:
+        first = ask_link(app.client, EXPIRY_EMAIL)
+        fake_clock.advance(JUST_PAST_AN_HOUR)
+        later = []
+        for _ in range(LINKS_PER_EMAIL):
+            later.append(ask_link(app.client, EXPIRY_EMAIL).status_code)
+        sent = sent_count(app)
+
+    assert first.status_code == 202
+    assert later == [202] * LINKS_PER_EMAIL
+    assert sent == LINKS_PER_EMAIL + 1
+
+
 def test_ac8_a_second_short_of_an_hour_the_address_is_still_refused(
     tmp_path: Path, fake_clock: FakeClock
 ) -> None:
@@ -346,6 +378,27 @@ def test_ac8_an_hour_later_the_client_address_is_sent_again(
         response = ask_link(app.client, BOB_EMAIL)
 
     assert response.status_code == 202
+
+
+def test_ac8_the_client_address_limit_forgets_a_request_older_than_an_hour(
+    tmp_path: Path, fake_clock: FakeClock
+) -> None:
+    twenty = addresses(2 * LINKS_PER_ADDRESS)
+    first_ten = twenty[:LINKS_PER_ADDRESS]
+    next_ten = twenty[LINKS_PER_ADDRESS:]
+    with account_app(tmp_path, fake_clock) as app:
+        before = []
+        for address in first_ten:
+            before.append(ask_link(app.client, address).status_code)
+        fake_clock.advance(JUST_PAST_AN_HOUR)
+        after = []
+        for address in next_ten:
+            after.append(ask_link(app.client, address).status_code)
+        sent = sent_count(app)
+
+    assert before == [202] * LINKS_PER_ADDRESS
+    assert after == [202] * LINKS_PER_ADDRESS
+    assert sent == 2 * LINKS_PER_ADDRESS
 
 
 def test_ac8_the_limits_start_again_at_zero_in_a_new_app(
