@@ -9,7 +9,7 @@ from __future__ import annotations
 import secrets
 import unicodedata
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
@@ -473,6 +473,20 @@ def team_nicknames(state: RoomState) -> tuple[str, ...]:
     return tuple(nicknames)
 
 
+def utc_datetime(clock_time: float) -> datetime:
+    """Turn a clock time (seconds since the epoch) into an aware UTC datetime.
+
+    Unlike `datetime.fromtimestamp`, this accepts a negative time on Windows.
+
+    Args:
+        clock_time: Seconds since 1970-01-01 00:00 UTC.
+
+    Returns:
+        The same moment as a timezone-aware datetime in UTC.
+    """
+    return datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=clock_time)
+
+
 def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
     """Return the summary of a room, as "My rooms" shows it.
 
@@ -490,7 +504,7 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
         width=state.grid.width,
         height=state.grid.height,
         players=team_nicknames(state),
-        last_activity_at=datetime.fromtimestamp(last_edit_at, UTC),
+        last_activity_at=utc_datetime(last_edit_at),
         solved=state.solved,
     )
 

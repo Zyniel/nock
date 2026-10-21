@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import statistics
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
@@ -28,7 +27,7 @@ from nock.protocol import (
     PlayerStateChanged,
     Seq,
 )
-from nock.room import LogEntry, RoomCode, is_edit
+from nock.room import LogEntry, RoomCode, is_edit, utc_datetime
 
 DAY_SECONDS: float = 86_400.0
 # spec 036's p95: the ceil(0.95 * n)-th smallest of n values
@@ -138,7 +137,7 @@ def dashboard_figures(
     room_count = len(period_rooms)
     return DashboardFigures(
         days=period,
-        since=datetime.fromtimestamp(since, UTC),
+        since=utc_datetime(since),
         rooms_created=room_count,
         players_per_room=_ratio(join_count, room_count),
         completion_rate=_ratio(solved_room_count, room_count),
@@ -275,7 +274,7 @@ def _room_edit(entry: LogEntry, latest_nicknames: dict[str, str]) -> RoomEdit:
         ValueError: the entry is not an edit.
     """
     event = entry.event
-    at = datetime.fromtimestamp(entry.at, UTC)
+    at = utc_datetime(entry.at)
     if isinstance(event, LetterChanged):
         return RoomEdit(
             seq=event.seq,
