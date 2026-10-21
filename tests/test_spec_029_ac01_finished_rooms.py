@@ -17,7 +17,6 @@ a state built from JSON without the keys `solved_at` and `solved_elapsed_ms`.
 from __future__ import annotations
 
 import contextlib
-import json
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -39,6 +38,7 @@ from spec029_harness import (
     Player,
     parse_time,
     play_fx01,
+    store_legacy_room,
 )
 from spec032_harness import (
     NO_TICK_CONFIG,
@@ -50,8 +50,6 @@ from spec032_harness import (
 
 UNSOLVED_CODE = "OPEN01"
 PLAYERS = [Player("Ana", "p1", FIRST_TOKEN), Player("Bob", "p2", SECOND_TOKEN)]
-# The two fields of this spec: a room stored before it has neither.
-NEW_FIELDS = ("solved_at", "solved_elapsed_ms")
 
 
 @pytest.fixture
@@ -77,14 +75,6 @@ def replayed(play: Play) -> RoomState:
     return state
 
 
-def without_new_fields(state: RoomState) -> RoomState:
-    """The state as a room stored before this spec holds it: no two new fields."""
-    data = json.loads(state.model_dump_json())
-    for name in NEW_FIELDS:
-        data.pop(name, None)
-    return RoomState.model_validate_json(json.dumps(data))
-
-
 @contextlib.contextmanager
 def summaries_client(
     tmp_path: Path, clock: FakeClock
@@ -99,19 +89,6 @@ def summaries_client(
     finally:
         registry.close()
         store.close()
-
-
-def store_legacy_room(store: RoomStore, play: Play, clock: FakeClock) -> None:
-    """Write a room as before this spec: its log, then its solved snapshot.
-
-    The snapshot has `solved` True and neither `solved_at` nor
-    `solved_elapsed_ms`; the log holds the play's `grid_solved` entry.
-    """
-    store.create_room(play.initial, last_edit_at=clock())
-    store.append(play.initial.code, play.log)
-    legacy = without_new_fields(play.state)
-    assert legacy.solved is True
-    store.save_snapshot(legacy)
 
 
 # ---- Python: the state --------------------------------------------------------

@@ -12,6 +12,10 @@ time taken and `["BOB"]`, Bob's nickname as the server stores it (spec 012
 decision 12). A linked room that is not solved gives no record; without a session
 the route answers 401, and with accounts off 404.
 
+A room stored before this spec (solved, with no `solved_at` and no
+`solved_elapsed_ms`), linked to Ana, gives a record with the values of its
+`grid_solved` entry, over HTTP and through `save_history`.
+
 Code reused: Ana's account holds an identity in room C, which is not solved, and
 has not asked its history; C expires and the sweep deletes it (spec 032); a solved
 FX-01 room with the same code, whose members are Bob and Cy only, is registered
@@ -49,6 +53,7 @@ from spec029_harness import (
     play_fx01,
     sign_in_from,
     solved_at_of,
+    store_legacy_room,
 )
 from spec032_harness import (
     ANA,
@@ -293,6 +298,51 @@ def test_ac3_save_history_does_nothing_for_an_unsolved_room(
         records = app.accounts.history(account_id)
 
     assert records == []
+
+
+# ---- A room stored before this spec -------------------------------------------------
+
+
+def test_ac3_a_room_stored_before_this_spec_gives_a_record_with_its_log_values(
+    tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
+) -> None:
+    room = play_fx01(fx01_grid, R_CODE, [ANA_PLAYER, BOB_PLAYER], start=T0)
+    with account_app(tmp_path, fake_clock) as app:
+        store_legacy_room(app.store, room, fake_clock)
+        session = sign_in_from(app, ANA_EMAIL, R_CODE, TA)
+
+        records = history_body(app.client, session)
+
+    expected = expected_record(R_CODE, solved_at_of(room), elapsed_ms_of(room), ["BOB"])
+    assert records == [expected]
+
+
+def test_ac3_save_history_of_a_room_stored_before_this_spec_saves_its_record(
+    tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
+) -> None:
+    from nock.accounts import HistoryRecord
+
+    room = play_fx01(fx01_grid, R_CODE, [ANA_PLAYER, BOB_PLAYER], start=T0)
+    with account_app(tmp_path, fake_clock) as app:
+        store_legacy_room(app.store, room, fake_clock)
+        session = sign_in_from(app, ANA_EMAIL, R_CODE, TA)
+        account_id = account_id_of(app, session)
+        loaded = app.registry.peek_room(R_CODE)
+        assert loaded is not None
+
+        app.accounts.save_history(account_id, loaded)
+        records = app.accounts.history(account_id)
+
+    expected = HistoryRecord(
+        code=R_CODE,
+        grid_number=1,
+        width=5,
+        height=5,
+        finished_at=utc(solved_at_of(room)),
+        elapsed_ms=elapsed_ms_of(room),
+        teammates=("BOB",),
+    )
+    assert records == [expected]
 
 
 # ---- Code reused ------------------------------------------------------------------

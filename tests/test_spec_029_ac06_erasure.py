@@ -9,6 +9,14 @@ Zélie deletes her account, Ana's `GET /api/account/history` lists R with
 `"teammates": ["--", "BOB"]` in R's `team_nicknames` order, Zélie's records are
 gone, and the database files no longer hold `ZÉLIE-PROBE`.
 
+Expired room: the same R and accounts, but R has expired (the fake clock moved past
+spec 032's life) and has not been swept, and Ana has not asked her history; after
+Zélie's deletion Ana's history lists R with `["--", "BOB"]` and the files do not
+hold `ZÉLIE-PROBE` (they held it before). `AccountStore.erase_players_from_history`
+is also checked on its own: the records of another account whose team-mate matches
+an identity (room code and player id) read `--`, a team-mate with another player id
+or another code is kept, and the files no longer hold the nickname.
+
 Browser with mocked routes: on Ana's catalogue page, signed in, the account's
 record with `["--", "BOB"]` reads `Avec Ancien joueur, Bob`.
 """
@@ -23,7 +31,9 @@ from typing import NamedTuple
 import pytest
 from playwright.sync_api import Browser, expect
 
+from nock.accounts import AccountStore, RoomIdentity
 from nock.grid import Grid
+from nock.room import RoomState
 from spec017_harness import FakeClock
 from spec029_harness import (
     XYZ,
@@ -45,7 +55,7 @@ from spec029_harness import (
     sign_in_from,
     solved_at_of,
 )
-from spec032_harness import ANA, BOB, CY, T0, TA, TB, TC, grid_from_text, utc
+from spec032_harness import ANA, BOB, CY, LIFE, T0, TA, TB, TC, grid_from_text, utc
 from spec033_harness import (
     ACCOUNT_PATH,
     ANA_EMAIL,
@@ -91,18 +101,26 @@ class Erased(NamedTuple):
 
 @contextlib.contextmanager
 def zelie_deletes_her_account(
-    tmp_path: Path, clock: FakeClock, grid: Grid
+    tmp_path: Path, clock: FakeClock, grid: Grid, *, expired: bool = False
 ) -> Iterator[Erased]:
-    """AC-6's play, up to Zélie's `DELETE /api/account`."""
+    """AC-6's play, up to Zélie's `DELETE /api/account`.
+
+    With `expired`, nobody asks a history, and the clock moves past a room's life
+    just before the deletion, so that R has expired and no sweep has run.
+    """
     room = play_fx01(grid, R_CODE, PLAYERS, start=T0)
     with account_app(tmp_path, clock) as app:
         app.registry.add_room(room.state)
         ana_session = sign_in_from(app, ANA_EMAIL, R_CODE, TA)
         zelie_session = sign_in_from(app, ZELIE_EMAIL, R_CODE, TB)
         zelie_id = account_id_of(app, zelie_session)
-        ana_before = history_body(app.client, ana_session)
-        history_body(app.client, zelie_session)
+        ana_before: list[dict[str, object]] = []
+        if not expired:
+            ana_before = history_body(app.client, ana_session)
+            history_body(app.client, zelie_session)
         bytes_before = strings_in(database_bytes(app.database_path), [ZELIE_STORED])
+        if expired:
+            clock.advance(LIFE + 1)
         app.client.cookies.clear()
         deletion = app.client.delete(ACCOUNT_PATH, headers=with_session(zelie_session))
         app.client.cookies.clear()
@@ -173,6 +191,159 @@ def test_ac6_the_database_files_no_longer_hold_zelies_stored_nickname(
 
     assert erased.bytes_before == [ZELIE_STORED]
     assert found == []
+
+
+# ---- R expired and not swept, nobody asked a history -------------------------------
+
+
+def test_ac6_an_expired_room_still_gives_anas_history_zelie_as_a_former_player(
+    tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
+) -> None:
+    with zelie_deletes_her_account(
+        tmp_path, fake_clock, fx01_grid, expired=True
+    ) as erased:
+        assert erased.deletion_status == 204
+
+        records = history_body(erased.app.client, erased.ana_session)
+
+    assert records == [anas_record(erased.room, ["--", "BOB"])]
+
+
+def test_ac6_an_expired_room_leaves_no_trace_of_zelies_nickname_in_the_files(
+    tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
+) -> None:
+    with zelie_deletes_her_account(
+        tmp_path, fake_clock, fx01_grid, expired=True
+    ) as erased:
+        assert erased.deletion_status == 204
+
+        found = strings_in(database_bytes(erased.app.database_path), [ZELIE_STORED])
+
+    assert erased.bytes_before == [ZELIE_STORED]
+    assert found == []
+
+
+# ---- AccountStore.erase_players_from_history --------------------------------------
+
+OTHER_CODE = "SSSSSS"
+UNKNOWN_PLAYER_ID = "p9"
+BOTH_ROOMS_BEFORE = {
+    R_CODE: [ZELIE_STORED, "BOB"],
+    OTHER_CODE: [ZELIE_STORED, "BOB"],
+}
+
+
+class TwoRecords(NamedTuple):
+    """An account store whose one account holds the records of two rooms."""
+
+    accounts: AccountStore
+    path: Path
+    account_id: str
+
+
+def identity_of(code: str, player_id: str, token: str, nickname: str) -> RoomIdentity:
+    return RoomIdentity(
+        code=code, player_id=player_id, resume_token=token, nickname=nickname
+    )
+
+
+def solved_state(grid: Grid, code: str) -> RoomState:
+    """A solved FX-01 room: Ana, Zélie (`Zélie-Probe`) and Bob."""
+    return play_fx01(grid, code, PLAYERS, start=T0).state
+
+
+@contextlib.contextmanager
+def account_with_two_records(tmp_path: Path, grid: Grid) -> Iterator[TwoRecords]:
+    """Ana's account on its own store file, with the records of R and S.
+
+    Ana is `ANA` in both rooms; Zélie (`BOB`'s player id) and Bob are her
+    team-mates. No room store holds the nickname: only the records do.
+    """
+    path = tmp_path / "accounts.sqlite3"
+    accounts = AccountStore(path)
+    try:
+        started = accounts.sign_in(ANA_EMAIL, T0)
+        for code in (R_CODE, OTHER_CODE):
+            ana = identity_of(code, ANA, TA, "ANA")
+            assert accounts.link_identity(started.account_id, ana, T0)
+            accounts.save_history(started.account_id, solved_state(grid, code))
+        yield TwoRecords(accounts, path, started.account_id)
+    finally:
+        accounts.close()
+
+
+def teammates_by_code(accounts: AccountStore, account_id: str) -> dict[str, list[str]]:
+    """The team-mates of each record of the account, by room code."""
+    found: dict[str, list[str]] = {}
+    for record in accounts.history(account_id):
+        found[record.code] = list(record.teammates)
+    return found
+
+
+def test_ac6_erase_players_from_history_makes_the_matching_teammate_a_former_player(
+    tmp_path: Path, fx01_grid: Grid
+) -> None:
+    with account_with_two_records(tmp_path, fx01_grid) as held:
+        zelie = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
+        before = teammates_by_code(held.accounts, held.account_id)
+
+        held.accounts.erase_players_from_history([zelie])
+        after = teammates_by_code(held.accounts, held.account_id)
+
+    assert before == BOTH_ROOMS_BEFORE
+    assert after[R_CODE] == ["--", "BOB"]
+
+
+def test_ac6_erase_players_from_history_keeps_a_teammate_of_another_room_code(
+    tmp_path: Path, fx01_grid: Grid
+) -> None:
+    with account_with_two_records(tmp_path, fx01_grid) as held:
+        zelie = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
+
+        held.accounts.erase_players_from_history([zelie])
+        after = teammates_by_code(held.accounts, held.account_id)
+
+    assert after[OTHER_CODE] == [ZELIE_STORED, "BOB"]
+
+
+def test_ac6_erase_players_from_history_keeps_a_teammate_with_another_player_id(
+    tmp_path: Path, fx01_grid: Grid
+) -> None:
+    with account_with_two_records(tmp_path, fx01_grid) as held:
+        stranger = identity_of(R_CODE, UNKNOWN_PLAYER_ID, TB, ZELIE_STORED)
+
+        held.accounts.erase_players_from_history([stranger])
+        after = teammates_by_code(held.accounts, held.account_id)
+
+    assert after == BOTH_ROOMS_BEFORE
+
+
+def test_ac6_erase_players_from_history_erases_every_identity_given(
+    tmp_path: Path, fx01_grid: Grid
+) -> None:
+    with account_with_two_records(tmp_path, fx01_grid) as held:
+        zelie_in_r = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
+        zelie_in_s = identity_of(OTHER_CODE, BOB, TB, ZELIE_STORED)
+
+        held.accounts.erase_players_from_history([zelie_in_r, zelie_in_s])
+        after = teammates_by_code(held.accounts, held.account_id)
+
+    assert after == {R_CODE: ["--", "BOB"], OTHER_CODE: ["--", "BOB"]}
+
+
+def test_ac6_erase_players_from_history_leaves_the_files_without_the_nickname(
+    tmp_path: Path, fx01_grid: Grid
+) -> None:
+    with account_with_two_records(tmp_path, fx01_grid) as held:
+        zelie_in_r = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
+        zelie_in_s = identity_of(OTHER_CODE, BOB, TB, ZELIE_STORED)
+        before = strings_in(database_bytes(held.path), [ZELIE_STORED])
+
+        held.accounts.erase_players_from_history([zelie_in_r, zelie_in_s])
+        after = strings_in(database_bytes(held.path), [ZELIE_STORED])
+
+    assert before == [ZELIE_STORED]
+    assert after == []
 
 
 # ---- Ana's page -------------------------------------------------------------------

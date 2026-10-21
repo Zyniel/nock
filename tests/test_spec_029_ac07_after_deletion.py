@@ -6,6 +6,10 @@ history yet; both rooms expire and the sweep (`expire_rooms`, spec 032) deletes
 them. Then `GET /api/account/history` lists R's record, saved by the app's delete
 hook, and nothing for S.
 
+A room stored before spec 029 (solved, with no `solved_at`), linked to Ana, that
+expires and is swept before Ana asks, gives its record with the values of its
+`grid_solved` entry.
+
 Code reused: Ana's account holds an identity in room C (not solved) and has not
 asked its history; C expires and the sweep deletes it; a solved FX-01 room with the
 same code C, whose members are Bob and Cy only, is registered with `add_room`,
@@ -32,6 +36,7 @@ from nock.grid import Grid
 from nock.room import RoomState
 from spec017_harness import FakeClock
 from spec029_harness import (
+    SOLVE_SECONDS,
     Player,
     account_id_of,
     elapsed_ms_of,
@@ -40,6 +45,7 @@ from spec029_harness import (
     play_fx01,
     sign_in_from,
     solved_at_of,
+    store_legacy_room,
 )
 from spec032_harness import (
     ANA,
@@ -137,6 +143,31 @@ def test_ac7_a_record_saved_before_the_deletion_stays_one_record(
 
     assert len(before) == 1
     assert after == before
+
+
+def test_ac7_the_hook_saves_the_record_of_a_room_stored_before_spec_029(
+    tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
+) -> None:
+    solved = play_fx01(fx01_grid, R_CODE, [ANA_PLAYER, BOB_PLAYER], start=T0)
+    with account_app(tmp_path, fake_clock) as app:
+        store_legacy_room(app.store, solved, fake_clock)
+        session = sign_in_from(app, ANA_EMAIL, R_CODE, TA)
+        # The last edit is the play's, at T0 + SOLVE_SECONDS (spec 032 AC-1).
+        fake_clock.advance(LIFE + SOLVE_SECONDS + 1)
+        assert app.registry.expire_rooms() == [R_CODE]
+
+        records = history_body(app.client, session)
+
+    expected = {
+        "code": R_CODE,
+        "grid_number": 1,
+        "width": 5,
+        "height": 5,
+        "finished_at": utc(solved_at_of(solved)),
+        "elapsed_ms": elapsed_ms_of(solved),
+        "teammates": ["BOB"],
+    }
+    assert records == [expected]
 
 
 def test_ac7_a_reused_code_gives_no_record_through_the_delete_hook(

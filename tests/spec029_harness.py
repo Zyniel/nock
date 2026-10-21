@@ -63,6 +63,8 @@ from nock.room import (
     join_room,
     new_room,
 )
+from nock.store import RoomStore
+from spec017_harness import FakeClock
 from spec026_harness import FIRST_17, LAST_CELL, SOLUTION
 from spec032_harness import NO_TICK_CONFIG, PARIS, SummariesRoute, summary_json
 from spec033_harness import (
@@ -196,6 +198,32 @@ def records_with_parsed_times(body: object) -> list[dict[str, object]]:
     for record in body:
         records.append(with_parsed_time(record))
     return records
+
+
+# The two fields of this spec: a room stored before it has neither.
+NEW_FIELDS = ("solved_at", "solved_elapsed_ms")
+
+
+def without_new_fields(state: RoomState) -> RoomState:
+    """The state as a room stored before this spec holds it: no two new fields."""
+    data = json.loads(state.model_dump_json())
+    for name in NEW_FIELDS:
+        data.pop(name, None)
+    return RoomState.model_validate_json(json.dumps(data))
+
+
+def store_legacy_room(store: RoomStore, play: Play, clock: FakeClock) -> None:
+    """Write a room as before this spec: its log, then its solved snapshot.
+
+    The snapshot has `solved` True and neither `solved_at` nor
+    `solved_elapsed_ms`; the log holds the play's `grid_solved` entry. The room is
+    in the store only: the registry loads it when it is asked for.
+    """
+    store.create_room(play.initial, last_edit_at=clock())
+    store.append(play.initial.code, play.log)
+    legacy = without_new_fields(play.state)
+    assert legacy.solved is True
+    store.save_snapshot(legacy)
 
 
 # ---- Accounts over HTTP ----------------------------------------------------------
