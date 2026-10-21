@@ -3,7 +3,8 @@ name: implementer
 description: Writes the implementation that makes the existing tests of an approved spec pass. Use after the test-writer has delivered failing tests for a spec, or when a reviewer asks for a code change.
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
-maxTurns: 80
+maxTurns: 250
+effort: high
 skills:
   - python-standards
 ---

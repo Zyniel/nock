@@ -387,7 +387,7 @@ def test_ac7_websocket_the_player_seated_back_keeps_nickname_colour_and_letters(
     views = {view.player_id: view for view in snapshot.players}
     assert timed_out.ana_id in views
     ana_view = views[timed_out.ana_id]
-    assert (ana_view.nickname, ana_view.colour) == ("Ana", 0)
+    assert (ana_view.nickname, ana_view.colour) == ("ANA", 0)
     assert snapshot_cell(snapshot, 1, 0).author == timed_out.ana_id
 
 
@@ -407,7 +407,7 @@ def test_ac7_websocket_a_join_with_the_token_and_a_refused_nickname_seats_her_ba
     assert isinstance(answer, Snapshot), answer
     assert answer.you == timed_out.ana_id
     views = {view.player_id: view for view in answer.players}
-    assert views[timed_out.ana_id].nickname == "Ana"
+    assert views[timed_out.ana_id].nickname == "ANA"
 
 
 def test_ac7_websocket_bob_receives_the_player_joined_of_the_same_id(
@@ -443,4 +443,4 @@ def test_ac7_http_after_the_seat_back_the_summary_names_each_member_once(
     assert isinstance(body, list)
     assert len(body) == 1
     summary = nock.room.RoomSummary.model_validate(body[0])
-    assert summary.players == ("Bob", "Ana")
+    assert summary.players == ("BOB", "ANA")

@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import { newLinkCopier } from './copyLink'
   import { t } from './i18n'
+  import { displayNickname } from './nickname'
   import { fetchRecap, recapColour, shownRecapPlayers, type Recap } from './recap'
   import { timerText } from './timer'
 
@@ -145,7 +146,7 @@
             style:background={colour === '' ? null : `var(--player-colour-${colour})`}
           ></span>
           <span class="recap-name" data-testid="recap-name"
-            >{player.nickname ?? t('feed.someone')}</span
+            >{player.nickname === null ? t('feed.someone') : displayNickname(player.nickname)}</span
           >
           {#if isYou}
             <span class="recap-you">{t('roster.you')}</span>

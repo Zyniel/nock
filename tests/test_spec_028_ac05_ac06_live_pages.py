@@ -361,7 +361,7 @@ def test_ac6_the_stored_room_s_share_page_receives_only_the_public_recap(
     api_urls = [r.url for r in responses if "/api/" in r.url]
     assert api_urls == [f"{live_server}/api/recaps/{SHARE_TOKEN}"]
     body = responses[[r.url for r in responses].index(api_urls[0])].json()
-    assert body == {"grid_number": 1, "elapsed_ms": 754000, "team": ["Ana", "Bob"]}
+    assert body == {"grid_number": 1, "elapsed_ms": 754000, "team": ["ANA", "BOB"]}
 
 
 # ---- AC-10: the share page is accessible and shows nicknames as text ----
@@ -423,7 +423,8 @@ def test_ac10_nicknames_with_markup_show_as_text_on_the_share_page(
     open_share_page(page, live_server, HOSTILE_NAMES)
 
     team = page.get_by_test_id("share-team")
-    expect(team).to_have_text("Équipe : <b>Eve</b>, <img src=x>")
+    # The nicknames as spec 040's displayNickname writes them.
+    expect(team).to_have_text("Équipe : <b>eve</b>, <img Src=x>")
     page_box = page.get_by_test_id("recap-page")
     expect(page_box.locator("b")).to_have_count(0)
     expect(page_box.locator("img")).to_have_count(0)

@@ -87,6 +87,8 @@ ROOM_CODE = "ABCDEF"
 NOW = 2_000_000.0
 NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eva", "Fay", "Gus", "Hal"]
 SNAPSHOT_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
+# The identity holds the nickname of `p1` in the mocked snapshot (`Ana`): the page
+# stores it again from each snapshot and sends it in the join of every new socket.
 STORED_IDENTITY = json.dumps(
     {"player_id": "p1", "resume_token": SNAPSHOT_TOKEN, "nickname": "Ana"}
 )

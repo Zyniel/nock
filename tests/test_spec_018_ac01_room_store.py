@@ -120,7 +120,7 @@ def test_ac1_store_appended_entries_read_back_equal_and_in_order(
             seq=3,
             player=PlayerView(
                 player_id="p3",
-                nickname="Cleo",
+                nickname="CLEO",
                 colour=2,
                 state=PlayerState.ACTIVE,
                 is_host=False,

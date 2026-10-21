@@ -11,6 +11,13 @@ status: approved
 (Note from the lead, 2026-10-15: folded in. The answer is decision 6, and "Open
 questions" is empty.)
 
+(Note from the lead, 2026-10-16: refined for the human's rule that nicknames are
+stored in capitals and shown with capitalised words (spec 012 decision 12; spec
+039's "Nicknames in capitals"). Changed: the comparison with this device's own
+nickname when a record is written (exact, no longer `toLowerCase()`), the edge case
+"My own nickname" and AC-6. This spec has no tests yet (human's rule of
+2026-10-16: nicknames in capitals).)
+
 Epic E7 Completion and recap (US-7.3) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid is in `specs/_reference.md`. The catalogue page and
 `nock.progress` are those of spec 004; the play flow of spec 010; the stored identity
@@ -142,7 +149,10 @@ Writing a record: from a `RoomSummary` with `solved` true, the page writes a rec
 its code, replacing any record of that code: `grid` from `grid_number`, `width`,
 `height`, `finished_at`, `elapsed_ms`, and `teammates` = the summary's `players`
 without the names equal to the nickname of this device's identity for that room
-(spec 012), compared with `toLowerCase()`. It does so:
+(spec 012), compared exactly, since every nickname is in capitals (spec 012
+decision 12). (Note from the lead, 2026-10-16: "compared exactly ..." read
+"compared with `toLowerCase()`" (human's rule of 2026-10-16: nicknames in
+capitals).) It does so:
 
 - on the catalogue page, for each solved summary of "My rooms" (spec 032);
 - on the room page, when the grid becomes solved (a `grid_solved` event, or a snapshot
@@ -231,7 +241,7 @@ The words in brackets say how each criterion is tested.
 - **AC-3** (AC-7.3.1) (HTTP; browser with live server) With an account, my history follows me across devices. HTTP: Ana signs in from room R (spec 033) and R is solved with `Bob`; `GET /api/account/history` answers one record `{"code": R, "grid_number": 1, "width": 5, "height": 5, "finished_at": <R's solved_at in UTC>, "elapsed_ms": <R's>, "teammates": ["Bob"]}`; a linked room that is not solved gives no record; without a session it answers 401, and with accounts off 404. Browser: after Ana and Bob solve R, Ana's second device (a new context, empty storage) signs in with her address (spec 033 AC-2) and opens `/`: `history` lists R with `Avec Bob`, although that device never opened R.
 - **AC-4** (AC-7.3.2) (browser with live server) Replaying a finished grid opens a new room with an empty grid. With `nock.progress` seeded to `{"1": "finished"}` and a history record of a room on grid 1, a click on its `history-replay` loads `/r/<code>` with a code other than the record's; the room page reaches `data-status="joined"` without `nickname-form`, `data-solved="false"`, 18 letter cells with `data-letter=""`; `nock.room.<code>` holds `"grid": 1`, and `nock.progress["1"]` is still `"finished"`. When `POST /api/rooms` answers 500 (or 404, as for a withdrawn grid, spec 005), the page stays on `/`, the item shows `history-error` with `fr.json["catalogue.play_failed"]`, and the button is enabled again.
 - **AC-5** (new) (browser with mocked routes; keyboard only for the walk) The history list meets spec 035 and the window sizes of spec 006 AC-5. With the two records of AC-2, at 1280 by 720 and at 360 by 740: spec 035's contrast scan and language scan find no offending element on `/`; keyboard only, `tab_to` reaches each `history-replay`, which shows spec 035 AC-2's outline, and `Enter` on it sends `POST /api/rooms` with that grid number. At each window size of spec 006 AC-5, `document.documentElement.scrollWidth <= window.innerWidth`, also with a record that lists 7 team-mates of 20 characters each.
-- **AC-6** (new) (HTTP) Deleting an account removes its history and makes its player a former player in the others' history. Ana's and Zélie's accounts (spec 033) both hold room R, solved with Ana, Zélie and Bob, and both have asked their history once. When Zélie deletes her account, Ana's `GET /api/account/history` lists R with `"teammates": ["--", "Bob"]` in R's `team_nicknames` order, Zélie's records are gone, and the database files no longer hold `Zélie-Probe`. On Ana's page, that item reads `Avec Ancien joueur, Bob`.
+- **AC-6** (new) (HTTP) Deleting an account removes its history and makes its player a former player in the others' history. Ana's and Zélie's accounts (spec 033) both hold room R, solved with Ana, Zélie and Bob, and both have asked their history once. When Zélie deletes her account, Ana's `GET /api/account/history` lists R with `"teammates": ["--", "BOB"]` in R's `team_nicknames` order, Zélie's records are gone, and the database files no longer hold `ZÉLIE-PROBE`, the nickname she joined with as the server stores it (spec 012). On Ana's page, that item reads `Avec Ancien joueur, Bob`. (Note from the lead, 2026-10-16: the team-mates were `["--", "Bob"]` and the bytes searched were `Zélie-Probe`, which the store never holds once nicknames are in capitals (human's rule of 2026-10-16: nicknames in capitals).)
 - **AC-7** (new) (HTTP with a fake clock) An account's finished grid stays in its history after the room is deleted. Ana's account holds room R (solved) and room S (not solved), and has not asked its history yet; both rooms expire and the sweep deletes them (spec 032). Then `GET /api/account/history` lists R's record, saved by the delete hook, and nothing for S; a hook that raises is logged, and the room is deleted all the same.
 
 ## Edge cases and errors
@@ -245,9 +255,13 @@ The words in brackets say how each criterion is tested.
   record of them; an account keeps one (AC-7).
 - Removed players (AC-2): a removed player is not a member (spec 032), so the room
   gives them no summary and no record.
-- My own nickname (AC-2): removed from the team-mates by name, so a team-mate with my
-  nickname in another case is removed too (rare; spec 012 makes such names unique in
-  a room with a suffix only while both are present).
+- My own nickname (AC-2): removed from the team-mates by name, compared exactly, so a
+  team-mate with my nickname is removed too (rare; spec 012 makes such names unique in
+  a room with a suffix only while both are present, and `team_nicknames` already
+  names it once). (Note from the lead, 2026-10-16: "compared exactly" and the clause
+  on `team_nicknames` were added, and "my nickname in another case" became "my
+  nickname": every nickname is in capitals (human's rule of 2026-10-16: nicknames in
+  capitals).)
 - Former players (AC-2, AC-6): a team-mate erased by spec 033 reads `Ancien joueur`;
   a name already stored on another device stays as it was (spec 033).
 - Team-mates after the room is gone (AC-3, AC-6, AC-7): an account's records keep

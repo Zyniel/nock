@@ -148,7 +148,7 @@ def test_ac1_the_seat_colour_and_nickname_are_freed(fx01_grid: Grid) -> None:
 
     snapshot = sole_snapshot(outcome)
     views = {view.player_id: view for view in snapshot.players}
-    assert views[NEW_PLAYER_ID].nickname == "Bob"
+    assert views[NEW_PLAYER_ID].nickname == "BOB"
     assert views[NEW_PLAYER_ID].colour == 1
     assert len(snapshot.players) == 3
 

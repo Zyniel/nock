@@ -97,14 +97,14 @@ def test_ac2_eight_joins_give_eight_colours_and_unique_nicknames(
         state = outcome.state
 
     assert [player.nickname for player in state.players] == [
-        "Ana",
-        "ana 2",
-        "Ana 3",
-        "Bob",
-        "Cy",
-        "Di",
-        "Ed",
-        "Flo",
+        "ANA",
+        "ANA 2",
+        "ANA 3",
+        "BOB",
+        "CY",
+        "DI",
+        "ED",
+        "FLO",
     ]
     assert [player.colour for player in state.players] == [0, 1, 2, 3, 4, 5, 6, 7]
     assert [player.is_host for player in state.players] == [True] + [False] * 7
@@ -112,95 +112,100 @@ def test_ac2_eight_joins_give_eight_colours_and_unique_nicknames(
 
 
 def test_ac2_a_taken_nickname_gets_the_smallest_free_suffix(fx01_grid: Grid) -> None:
-    players = [make_player(0, "Ana", is_host=True), make_player(1, "Ana 3")]
+    players = [make_player(0, "ANA", is_host=True), make_player(1, "ANA 3")]
     state = make_state(fx01_grid, players)
 
     first = run_join(state, "Ana", 5)
     second = run_join(first.state, "Ana", 6)
 
-    assert first.state.players[-1].nickname == "Ana 2"
-    assert second.state.players[-1].nickname == "Ana 4"
+    assert first.state.players[-1].nickname == "ANA 2"
+    assert second.state.players[-1].nickname == "ANA 4"
 
 
 def test_ac2_a_player_called_ana_2_pushes_the_next_ana_to_ana_3(
     fx01_grid: Grid,
 ) -> None:
-    players = [make_player(0, "Ana", is_host=True), make_player(1, "Ana 2")]
+    players = [make_player(0, "ANA", is_host=True), make_player(1, "ANA 2")]
     state = make_state(fx01_grid, players)
 
     outcome = run_join(state, "Ana", 5)
 
-    assert outcome.state.players[-1].nickname == "Ana 3"
+    assert outcome.state.players[-1].nickname == "ANA 3"
 
 
 def test_ac2_a_nickname_of_20_characters_keeps_the_suffix_within_20(
     fx01_grid: Grid,
 ) -> None:
-    state = make_state(fx01_grid, [make_player(0, "x" * 20, is_host=True)])
+    state = make_state(fx01_grid, [make_player(0, "X" * 20, is_host=True)])
 
     second = run_join(state, "x" * 20, 5)
     third = run_join(second.state, "x" * 20, 6)
 
-    assert second.state.players[-1].nickname == "x" * 18 + " 2"
-    assert third.state.players[-1].nickname == "x" * 18 + " 3"
+    assert second.state.players[-1].nickname == "X" * 18 + " 2"
+    assert third.state.players[-1].nickname == "X" * 18 + " 3"
     assert len(second.state.players[-1].nickname) == 20
 
 
 def test_ac2_trailing_spaces_of_the_cut_base_are_removed(fx01_grid: Grid) -> None:
-    taken = "a" * 17 + " bb"
+    taken = "A" * 17 + " BB"
     assert len(taken) == 20
     state = make_state(fx01_grid, [make_player(0, taken, is_host=True)])
 
-    outcome = run_join(state, taken, 5)
+    outcome = run_join(state, "a" * 17 + " bb", 5)
 
-    assert outcome.state.players[-1].nickname == "a" * 17 + " 2"
-
-
-def test_ac2_the_duplicate_check_ignores_case_with_casefold(fx01_grid: Grid) -> None:
-    state = make_state(fx01_grid, [make_player(0, "Strasse", is_host=True)])
-
-    outcome = run_join(state, "STRA\u00dfE", 5)
-
-    assert outcome.state.players[-1].nickname == "STRA\u00dfE 2"
+    assert outcome.state.players[-1].nickname == "A" * 17 + " 2"
 
 
-def test_ac2_the_duplicate_check_casefolds_the_taken_nickname(
-    fx01_grid: Grid,
-) -> None:
-    state = make_state(fx01_grid, [make_player(0, "STRAßE", is_host=True)])
+def test_ac2_the_duplicate_check_compares_the_capitals(fx01_grid: Grid) -> None:
+    # "Stra\u00dfe" in capitals is "STRASSE", the nickname of the player in the room.
+    state = make_state(fx01_grid, [make_player(0, "STRASSE", is_host=True)])
 
-    outcome = run_join(state, "strasse", 5)
+    outcome = run_join(state, "Stra\u00dfe", 5)
 
-    assert outcome.state.players[-1].nickname == "strasse 2"
+    assert outcome.state.players[-1].nickname == "STRASSE 2"
+
+
+# U+1E9E, the capital sharp s, which `str.upper()` keeps.
+STRASSE_WITH_CAPITAL_SHARP_S = "STRA\N{LATIN CAPITAL LETTER SHARP S}E"
+
+
+def test_ac2_a_capital_sharp_s_and_ss_are_two_nicknames(fx01_grid: Grid) -> None:
+    existing = make_player(0, STRASSE_WITH_CAPITAL_SHARP_S, is_host=True)
+    state = make_state(fx01_grid, [existing])
+
+    outcome = run_join(state, "Strasse", 5)
+
+    nicknames = [player.nickname for player in outcome.state.players]
+    assert nicknames == [STRASSE_WITH_CAPITAL_SHARP_S, "STRASSE"]
 
 
 def test_ac2_the_duplicate_check_is_accent_sensitive(fx01_grid: Grid) -> None:
-    state = make_state(fx01_grid, [make_player(0, "Elodie", is_host=True)])
+    state = make_state(fx01_grid, [make_player(0, "ELODIE", is_host=True)])
 
     outcome = run_join(state, "\u00c9lodie", 5)
 
-    assert outcome.state.players[-1].nickname == "\u00c9lodie"
+    assert outcome.state.players[-1].nickname == "\u00c9LODIE"
 
 
 def test_ac2_a_disconnected_player_still_holds_their_nickname(
     fx01_grid: Grid,
 ) -> None:
-    players = [make_player(0, "Ana", is_host=True, state=PlayerState.DISCONNECTED)]
+    players = [make_player(0, "ANA", is_host=True, state=PlayerState.DISCONNECTED)]
     state = make_state(fx01_grid, players)
 
     outcome = run_join(state, "Ana", 5)
 
-    assert outcome.state.players[-1].nickname == "Ana 2"
+    assert outcome.state.players[-1].nickname == "ANA 2"
 
 
 def test_ac2_the_suffix_goes_to_the_newcomer_only(fx01_grid: Grid) -> None:
-    existing = make_player(0, "Ana", is_host=True)
+    existing = make_player(0, "ANA", is_host=True)
     state = make_state(fx01_grid, [existing])
 
     outcome = run_join(state, "ana", 5)
 
     assert outcome.state.players[0] == existing
-    assert outcome.state.players[1].nickname == "ana 2"
+    assert outcome.state.players[1].nickname == "ANA 2"
 
 
 @pytest.mark.parametrize(
@@ -212,7 +217,7 @@ def test_ac2_a_new_player_gets_the_lowest_colour_nobody_has(
 ) -> None:
     players: list[PlayerRecord] = []
     for index, colour in enumerate(taken_colours):
-        players.append(make_player(index, f"Player{index}", colour=colour))
+        players.append(make_player(index, f"PLAYER{index}", colour=colour))
     state = make_state(fx01_grid, players)
 
     outcome = run_join(state, "Newbie", 9)
@@ -222,8 +227,8 @@ def test_ac2_a_new_player_gets_the_lowest_colour_nobody_has(
 
 def test_ac2_a_disconnected_player_keeps_their_colour(fx01_grid: Grid) -> None:
     players = [
-        make_player(0, "Ana", is_host=True, state=PlayerState.DISCONNECTED),
-        make_player(1, "Bob"),
+        make_player(0, "ANA", is_host=True, state=PlayerState.DISCONNECTED),
+        make_player(1, "BOB"),
     ]
     state = make_state(fx01_grid, players)
 
@@ -233,7 +238,7 @@ def test_ac2_a_disconnected_player_keeps_their_colour(fx01_grid: Grid) -> None:
 
 
 def test_ac2_only_the_first_joiner_is_host(fx01_grid: Grid) -> None:
-    host_away = make_player(0, "Ana", is_host=True, state=PlayerState.DISCONNECTED)
+    host_away = make_player(0, "ANA", is_host=True, state=PlayerState.DISCONNECTED)
     state = make_state(fx01_grid, [host_away])
 
     outcome = run_join(state, "Bob", 5)
@@ -245,7 +250,7 @@ def test_ac2_only_the_first_joiner_is_host(fx01_grid: Grid) -> None:
 def test_ac2_a_room_without_host_gives_the_role_to_the_next_joiner(
     fx01_grid: Grid,
 ) -> None:
-    state = make_state(fx01_grid, [make_player(0, "Ana"), make_player(1, "Bob")])
+    state = make_state(fx01_grid, [make_player(0, "ANA"), make_player(1, "BOB")])
 
     outcome = run_join(state, "Cy", 5)
 
@@ -261,10 +266,10 @@ def test_ac2_player_views_copy_the_player_records_without_the_token(
     fx01_grid: Grid,
 ) -> None:
     selection = Selection(row=1, column=2, direction=Direction.DOWN)
-    host = make_player(0, "Ana", is_host=True).model_copy(
+    host = make_player(0, "ANA", is_host=True).model_copy(
         update={"muted": True, "selection": selection}
     )
-    away = make_player(1, "Bob", state=PlayerState.DISCONNECTED)
+    away = make_player(1, "BOB", state=PlayerState.DISCONNECTED)
     state = make_state(fx01_grid, [host, away])
 
     views = player_views(state)
@@ -272,7 +277,7 @@ def test_ac2_player_views_copy_the_player_records_without_the_token(
     assert views == (
         PlayerView(
             player_id="player0",
-            nickname="Ana",
+            nickname="ANA",
             colour=0,
             state=PlayerState.ACTIVE,
             is_host=True,
@@ -281,7 +286,7 @@ def test_ac2_player_views_copy_the_player_records_without_the_token(
         ),
         PlayerView(
             player_id="player1",
-            nickname="Bob",
+            nickname="BOB",
             colour=1,
             state=PlayerState.DISCONNECTED,
             is_host=False,
@@ -302,12 +307,12 @@ def test_ac2_websocket_three_clients_get_distinct_colours_and_suffixes(
         _, third_snapshot = join_as(stack, ws_client, room_code, "Bob")
 
         assert [(p.nickname, p.colour) for p in third_snapshot.players] == [
-            ("Ana", 0),
-            ("Ana 2", 1),
-            ("Bob", 2),
+            ("ANA", 0),
+            ("ANA 2", 1),
+            ("BOB", 2),
         ]
-        second_view = active_view(second_snapshot.you, "Ana 2", 1)
-        bob_view = active_view(third_snapshot.you, "Bob", 2)
+        second_view = active_view(second_snapshot.you, "ANA 2", 1)
+        bob_view = active_view(third_snapshot.you, "BOB", 2)
         player_ids = {first_snapshot.you, second_snapshot.you, third_snapshot.you}
         assert len(player_ids) == 3
         assert receive_message(first) == PlayerJoined(seq=2, player=second_view)
@@ -410,7 +415,8 @@ def test_ac2_browser_a_nickname_is_shown_as_plain_text(
     mock.send(snapshot_frame(fx01_grid, players, you="p0"))
 
     nickname = page.get_by_test_id("roster-nickname")
-    expect(nickname).to_have_text("<b>Eve</b>")
+    # Spec 040's displayNickname writes `<b>Eve</b>` as `<b>eve</b>`.
+    expect(nickname).to_have_text("<b>eve</b>")
     expect(nickname.locator("b")).to_have_count(0)
 
 

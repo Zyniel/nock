@@ -99,7 +99,7 @@ def ana_and_bob(grid: Grid) -> Run:
 
 def bobs_past_record() -> object:
     return nock.room.PastPlayer(
-        player_id=BOB, resume_token=TB, nickname="Bob", colour=1
+        player_id=BOB, resume_token=TB, nickname="BOB", colour=1
     )
 
 
@@ -144,7 +144,7 @@ def past_records(count: int) -> list[object]:
         record = nock.room.PastPlayer(
             player_id=f"past{number}",
             resume_token=f"token-of-past-{number:04d}",
-            nickname=f"Past {number}",
+            nickname=f"PAST {number}",
             colour=number % 8,
         )
         records.append(record)
@@ -171,7 +171,7 @@ def test_ac4_a_room_state_with_101_past_players_is_refused(fx01_grid: Grid) -> N
             {
                 "player_id": f"past{number}",
                 "resume_token": f"token-of-past-{number:04d}",
-                "nickname": f"Past {number}",
+                "nickname": f"PAST {number}",
                 "colour": number % 8,
                 "muted": False,
             }
@@ -222,11 +222,35 @@ def test_ac4_team_nicknames_names_past_then_present_members_once(
     run.join_new("Cy", CY, TC, T0)
     past = (
         bobs_past_record(),
-        nock.room.PastPlayer(player_id=DAN, resume_token=TD, nickname="ana", colour=3),
+        nock.room.PastPlayer(player_id=DAN, resume_token=TD, nickname="ANA", colour=3),
     )
     state = run.state.model_copy(update={"past_players": past})
 
-    assert nock.room.team_nicknames(state) == ("Bob", "ana", "Cy")
+    assert nock.room.team_nicknames(state) == ("BOB", "ANA", "CY")
+
+
+# U+1E9E, the capital sharp s: compared exactly, it differs from SS.
+STRASSE_WITH_CAPITAL_SHARP_S = "STRA\N{LATIN CAPITAL LETTER SHARP S}E"
+
+
+def test_ac4_team_nicknames_keeps_a_capital_sharp_s_and_ss_as_two_names(
+    fx01_grid: Grid,
+) -> None:
+    run = Run(fx01_grid)
+    run.join_new("STRASSE", CY, TC, T0)
+    past = (
+        nock.room.PastPlayer(
+            player_id=BOB,
+            resume_token=TB,
+            nickname=STRASSE_WITH_CAPITAL_SHARP_S,
+            colour=1,
+        ),
+    )
+    state = run.state.model_copy(update={"past_players": past})
+
+    names = nock.room.team_nicknames(state)
+
+    assert names == (STRASSE_WITH_CAPITAL_SHARP_S, "STRASSE")
 
 
 # ---- Python: summaries ---------------------------------------------------------
@@ -245,7 +269,7 @@ def test_ac4_room_summary_holds_the_grid_the_members_and_the_last_edit_time(
         grid_number=1,
         width=5,
         height=5,
-        players=("Ana", "Bob"),
+        players=("ANA", "BOB"),
         last_activity_at=utc(T0 + 10),
         solved=False,
     )
@@ -375,7 +399,7 @@ def summary_of_a() -> object:
         grid_number=1,
         width=5,
         height=5,
-        players=("Bob", "Ana"),
+        players=("BOB", "ANA"),
         last_activity_at=utc(T0 + 10),
         solved=False,
     )
@@ -387,7 +411,7 @@ def summary_of_b() -> object:
         grid_number=None,
         width=5,
         height=5,
-        players=("Dan",),
+        players=("DAN",),
         last_activity_at=utc(T0 + 50),
         solved=False,
     )
@@ -534,7 +558,7 @@ def test_ac4_http_the_route_is_not_counted_by_the_wrong_code_throttle(
     with contextlib.ExitStack() as stack:
         _, snapshot = join_as(stack, rooms.client, CODE_B, "Eve")
 
-    assert [view.nickname for view in snapshot.players] == ["Dan", "Eve"]
+    assert [view.nickname for view in snapshot.players] == ["DAN", "EVE"]
 
 
 def test_ac4_http_a_summary_holds_no_answer(rooms: Rooms) -> None:

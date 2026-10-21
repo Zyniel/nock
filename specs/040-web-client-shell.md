@@ -12,6 +12,16 @@ The FX-01 reference grid is in `specs/_reference.md`. The stack, the modeling ru
 and the toolchain are in `specs/_architecture.md`. The messages are those of spec
 039 (`nock.protocol`).
 
+(Note from the lead, 2026-10-16: refined after the first review of the nickname
+rule (spec 012 decision 12). `displayNickname` now puts the whole nickname through
+one `toLowerCase()`, which keeps Greek's final sigma, before it puts the first
+character of each word in capitals: "Nicknames on screen" says so, with two more
+examples, and says that the nickname form's input shows capitals through CSS. A
+second note in AC-18 gives the reason for its capitals that now holds. No criterion
+of this spec changes, so none of its tests follows; spec 012 AC-8, whose tests
+follow, reads the display in every place that shows a nickname (review of the
+nickname rule, 2026-10-16).)
+
 ## Goal
 
 Players reach Nock through a browser. This spec puts the frame in place: FastAPI
@@ -184,6 +194,42 @@ Binding for the tests:
   `String(values[name])`; a placeholder with no value is left as written. Every
   string the user can read (text, `alt`, `title`, `placeholder`, `aria-*`, the
   document title) is produced by `t`.
+- Nicknames on screen: a page shows a nickname only through one function,
+  `displayNickname(nickname: string): string` (for example in
+  `web/src/lib/nickname.ts`), which writes it with capitalised words (spec 012
+  decision 12). The whole nickname first goes through one `toLowerCase()`, which
+  applies Unicode's final-sigma rule (a `Σ` that ends a word becomes `ς`, U+03C2,
+  not `σ`, U+03C3). Then, in that text, the first character, and each character
+  right after a space, a hyphen `-` or an apostrophe (`'` or U+2019), goes through
+  `toUpperCase()`. Characters are code points. So `ANA` shows as `Ana`,
+  `JEAN-LUC` as `Jean-Luc`, `D'ARTAGNAN` as `D'Artagnan`, `ANA 2` as `Ana 2`,
+  `ÉLODIE` as `Élodie`, `BOB_42` as `Bob_42`, `O’NEIL` (with U+2019) as `O’Neil`,
+  and `ΝΊΚΟΣ` (whose `Ί` is U+038A) as `Νίκος` (U+039D U+03AF U+03BA U+03BF
+  U+03C2). A nickname the server would refuse shows the same way:
+  `<b>Eve</b>` as `<b>eve</b>`, `<img src=x>` as `<img Src=x>`. It applies
+  wherever a page shows a nickname, as text or as the value of a `t` placeholder
+  (`{name}`, `{names}`): among others the roster (spec 012), the activity feed
+  (specs 013 and 034), clue flags (spec 021), chat authors, mute rows and reaction
+  labels (spec 022), the vote banner (spec 025), the clue bar's author line (spec
+  019), the host controls' labels (spec 014), the recap and the share page (spec
+  028), "My rooms" (spec 032), the history list (spec 029) and the ops replay
+  (spec 038). What a page keeps, stores or sends (its kept snapshot,
+  `nock.identity.<CODE>`, `nock.nickname`, a `join`) is not rewritten, and the
+  nickname form's input shows its text in capitals through CSS while its value
+  keeps the text as typed (spec 012). (Note from the lead, 2026-10-16: added
+  (human's rule of 2026-10-16: nicknames in capitals).) (Note from the lead,
+  2026-10-16: the rule read "It reads the nickname one character (code point) at
+  a time: the first character, and each character right after a space, a hyphen
+  `-` or an apostrophe (`'` or U+2019), goes through `toUpperCase()`; every other
+  character goes through `toLowerCase()`." Lowercasing one code point at a time
+  showed `ΝΊΚΟΣ` as `Νίκοσ` and `ἈΛΈΞΗΣ` (whose `Ἀ` is U+1F08 and `Έ` U+0388) as
+  `Ἀλέξησ` (whose `έ` is U+03AD), both ending with `σ` (U+03C3), and spec 012
+  accepts the name `Ἀλέξης`; one `toLowerCase()` of the whole text ends them with
+  `ς` (U+03C2). The examples `O’NEIL` and `ΝΊΚΟΣ` were added; the other examples
+  give the same result as before. "shows capitals (spec 012)" became "shows its
+  text in capitals through CSS while its value keeps the text as typed (spec
+  012)", spec 012's room page flow step 3 (review of the nickname rule,
+  2026-10-16).)
 - Routing is done by the app itself from `location.pathname`, with no new npm
   dependency: `/` shows the catalogue page, `/r/<code>` (code matching
   `^[A-Z0-9]{6}$`) shows the room page, any other path shows a not-found page with
@@ -300,7 +346,7 @@ The word in brackets says how each criterion is tested.
 - **AC-15** (browser) Given the live server, when the page opens `/` and, separately, `/r/ABC123`, then in both cases `document.title` equals `fr.json["app.title"]` and the `<html>` element has `lang="fr"`.
 - **AC-16** (browser) Given the live server and a room registered on FX-01 with code `<code>`, when the page enters the room through the `enter_room` fixture of spec 011 (it opens `/r/<code>` and, when the page shows the nickname form of spec 012, submits it with `Ana`), then `data-testid="room-page"` reaches `data-room-code="<code>"`, `data-status="joined"`, `data-seq="1"` and `data-grid="5x5"`, and `data-testid="room-status"` shows `fr.json["room.status.joined"]`.
 - **AC-17** (browser) Given the live server and an empty registry, when the page opens `/r/ZZZZZZ`, then the room page reaches `data-status="not_found"` with `data-seq=""`, and `data-testid="room-status"` shows `fr.json["room.status.not_found"]`.
-- **AC-18** (browser, mocked socket) Given the page on `/r/ABC123` with nothing in `localStorage`, when the socket opens, then the room page shows `data-status="nickname"` and sends nothing (no frame within 300 ms; Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted, so the test ignores any `ping` among the frames it reads); after the nickname form of spec 012 is submitted with `Ana`, the first message the page sends parses with `parse_client_message` to `Join(nickname="Ana", resume_token=None)`, the page has opened one socket only, and until a snapshot is sent the room page has `data-status="joining"`, `data-seq=""`, `data-grid=""`, `data-pending="0"`, with `data-testid="room-status"` showing `fr.json["room.status.joining"]`.
+- **AC-18** (browser, mocked socket) Given the page on `/r/ABC123` with nothing in `localStorage`, when the socket opens, then the room page shows `data-status="nickname"` and sends nothing (no frame within 300 ms; Note from the lead, 2026-10-15: spec 017's heartbeat `ping` frames are not counted, so the test ignores any `ping` among the frames it reads); after the nickname form of spec 012 is submitted with `Ana` typed, the first message the page sends parses with `parse_client_message` to `Join(nickname="ANA", resume_token=None)` (Note from the lead, 2026-10-16: the join's nickname was `"Ana"`; the nickname input now holds capitals, spec 012's room page flow step 3 (human's rule of 2026-10-16: nicknames in capitals)) (Note from the lead, 2026-10-16: the join is in capitals because step 4 of spec 012's room page flow sends the normalised nickname, which is in capitals; the input keeps `Ana` as typed and shows it in capitals through CSS (its step 3), so the reason given in the note before this one no longer holds. Wording only: the check is unchanged (review of the nickname rule, 2026-10-16).), the page has opened one socket only, and until a snapshot is sent the room page has `data-status="joining"`, `data-seq=""`, `data-grid=""`, `data-pending="0"`, with `data-testid="room-status"` showing `fr.json["room.status.joining"]`.
 - **AC-19** (browser, mocked socket) Given the page on `/r/ABC123` that received a FX-01 snapshot with `seq` 5, when the mock sends `letter_changed` events with `seq` 4, then 5, then 7, then the room page shows `data-seq="5"` and `data-pending="1"`; when it then sends `seq` 6, the page shows `data-seq="7"` and `data-pending="0"`.
 - **AC-20** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 5, when the mock sends the `selection_moved`, `reaction` and `error` wire examples of spec 039, then a `letter_changed` with `seq` 6, then the page shows `data-seq="6"`, `data-pending="0"` and `data-status="joined"`.
 - **AC-21** (browser, mocked socket) Given the page that received a FX-01 snapshot with `seq` 0, when the mock closes the socket with code 1011, then the room page reaches `data-status="reconnecting"`, `data-testid="room-status"` shows `fr.json["room.status.reconnecting"]` and the `connection-banner` is visible (amended for spec 017, which reconnects after a lost connection).

@@ -132,7 +132,7 @@ def test_ac7_a_seat_back_gives_one_player_joined_of_the_past_players_id(
     outcome = seat_back(ana_timed_out(fx01_grid))
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=8, player=view(ANA, "Ana", 0, is_host=False))
+        PlayerJoined(seq=8, player=view(ANA, "ANA", 0, is_host=False))
     ]
 
 
@@ -215,7 +215,7 @@ def test_ac7_the_record_of_a_player_seated_back_is_a_new_one_with_their_id(
     assert player_of(state, ANA) == PlayerRecord(
         player_id=ANA,
         resume_token=TA,
-        nickname="Ana",
+        nickname="ANA",
         colour=0,
         is_host=False,
         joined_seq=8,
@@ -297,7 +297,7 @@ def test_ac7_a_player_seated_back_in_a_room_nobody_else_is_in_is_host(
 
     # seq 1 to 4: Ana's join, her `T`, her leave and her time-out.
     assert events_of(outcome) == [
-        PlayerJoined(seq=5, player=view(ANA, "Ana", 0, is_host=True))
+        PlayerJoined(seq=5, player=view(ANA, "ANA", 0, is_host=True))
     ]
 
 
@@ -320,7 +320,7 @@ def test_ac7_the_flag_of_a_player_does_not_come_back_with_the_seat(
     outcome = seat_back(ana_flagged_and_timed_out(fx01_grid))
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=9, player=view(ANA, "Ana", 0, is_host=False))
+        PlayerJoined(seq=9, player=view(ANA, "ANA", 0, is_host=False))
     ]
     assert player_of(outcome.state, ANA).flag is None
     assert snapshot_of(outcome).flags == ()
@@ -363,7 +363,7 @@ def test_ac7_a_muted_player_who_times_out_keeps_the_mute_in_the_past_record(
     assert events_of(ticked) == [
         PlayerLeft(seq=7, player_id=CY, reason=LeaveReason.TIMED_OUT)
     ]
-    assert ticked.state.past_players == (past(CY, TC, "Cy", 2, muted=True),)
+    assert ticked.state.past_players == (past(CY, TC, "CY", 2, muted=True),)
 
 
 def test_ac7_a_muted_player_comes_back_muted(fx01_grid: Grid) -> None:
@@ -373,7 +373,7 @@ def test_ac7_a_muted_player_comes_back_muted(fx01_grid: Grid) -> None:
     outcome = seat_back(run, TC)
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=8, player=view(CY, "Cy", 2, is_host=False, muted=True))
+        PlayerJoined(seq=8, player=view(CY, "CY", 2, is_host=False, muted=True))
     ]
     snapshot = snapshot_of(outcome)
     assert snapshot.you == CY
@@ -457,7 +457,7 @@ def test_ac7_a_colour_taken_meanwhile_gives_the_lowest_free_one(
     outcome = seat_back(run)
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=9, player=view(ANA, "Ana", 3, is_host=False))
+        PlayerJoined(seq=9, player=view(ANA, "ANA", 3, is_host=False))
     ]
 
 
@@ -466,13 +466,13 @@ def test_ac7_a_nickname_taken_meanwhile_gets_spec_012s_suffix(
 ) -> None:
     run = ana_timed_out(fx01_grid)
     run.join_new("ana", "p5", "token-of-lower-ana-5", T0 + 320)
-    lower_ana = player_of(run.state, "p5")
-    assert (lower_ana.nickname, lower_ana.colour) == ("ana", 0)
+    newcomer = player_of(run.state, "p5")
+    assert (newcomer.nickname, newcomer.colour) == ("ANA", 0)
 
     outcome = seat_back(run)
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=9, player=view(ANA, "Ana 2", 3, is_host=False))
+        PlayerJoined(seq=9, player=view(ANA, "ANA 2", 3, is_host=False))
     ]
 
 
@@ -544,7 +544,7 @@ def test_ac7_once_the_room_is_unlocked_the_same_join_seats_the_player_back(
     outcome = seat_back(run, now=T0 + 420)
 
     assert snapshot_of(outcome).you == ANA
-    assert player_of(outcome.state, ANA).nickname == "Ana"
+    assert player_of(outcome.state, ANA).nickname == "ANA"
 
 
 def test_ac7_a_time_out_in_the_join_itself_still_seats_the_player_back(
@@ -558,7 +558,7 @@ def test_ac7_a_time_out_in_the_join_itself_still_seats_the_player_back(
     assert events_of(outcome) == [
         PlayerLeft(seq=6, player_id=ANA, reason=LeaveReason.TIMED_OUT),
         HostChanged(seq=7, player_id=BOB),
-        PlayerJoined(seq=8, player=view(ANA, "Ana", 0, is_host=False)),
+        PlayerJoined(seq=8, player=view(ANA, "ANA", 0, is_host=False)),
     ]
     assert snapshot_of(outcome).you == ANA
 
@@ -686,7 +686,7 @@ def test_ac7_a_player_seated_back_during_a_vote_gets_it_in_the_snapshot(
     outcome = seat_back(run, now=T0 + 395)
 
     assert events_of(outcome) == [
-        PlayerJoined(seq=10, player=view(ANA, "Ana", 0, is_host=False))
+        PlayerJoined(seq=10, player=view(ANA, "ANA", 0, is_host=False))
     ]
     assert snapshot_of(outcome).open_vote == vote_one()
 

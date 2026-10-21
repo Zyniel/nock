@@ -17,6 +17,10 @@ Exit codes understood by Claude Code:
        it, so it keeps working until the gate is green.
     1: the hook itself could not run (shown to the user, never blocks).
 
+The gate checks the checkout the agent edited, found from its transcript: the
+hook input's "cwd" is the session's directory, so it names the main checkout
+even when the agent worked in a git worktree of its own (2026-10-17).
+
 A failure the agent cannot fix, such as a stale test that only the test-writer
 may change, must not hold it for ever (2026-10-16: an implementer was blocked at
 every stop by a spec 018 test that spec 028 had made stale). When the hook
@@ -65,14 +69,30 @@ SPEC_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
 # Where the hook keeps, per agent, the fingerprint of the checkout it last
 # blocked (one small file per agent, removed when the gate passes).
 BLOCK_STATE_DIRECTORY = Path(tempfile.gettempdir()) / "nock-role-gate"
+# The tools whose input names a file the agent wrote.
+FILE_EDIT_TOOLS: frozenset[str] = frozenset(
+    {"Edit", "MultiEdit", "NotebookEdit", "Write"}
+)
+
+
+def nearest_project_root(start_directory: Path) -> Path | None:
+    """Walk up from a directory until the folder holding pyproject.toml.
+
+    Args:
+        start_directory: Directory to start the search from.
+
+    Returns:
+        The project root, or None when no folder above holds pyproject.toml.
+    """
+    candidates = [start_directory, *start_directory.parents]
+    for candidate in candidates:
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    return None
 
 
 def find_project_root(start_directory: Path) -> Path:
-    """Walk up from a directory until the folder holding pyproject.toml.
-
-    The hook input gives the directory the agent is working in. That is the
-    main checkout in a normal session and the worktree root for an agent
-    running in a git worktree, so the gate checks the files the agent edited.
+    """Return the project root above a directory.
 
     Args:
         start_directory: Directory to start the search from.
@@ -80,11 +100,10 @@ def find_project_root(start_directory: Path) -> Path:
     Returns:
         The project root. Falls back to the checkout that contains this script.
     """
-    candidates = [start_directory, *start_directory.parents]
-    for candidate in candidates:
-        if (candidate / "pyproject.toml").is_file():
-            return candidate
-    return Path(__file__).resolve().parents[2]
+    project_root = nearest_project_root(start_directory)
+    if project_root is None:
+        return Path(__file__).resolve().parents[2]
+    return project_root
 
 
 def resolve_stage(role_name: str) -> str | None:
@@ -287,6 +306,115 @@ def gate_takes_specs(project_root: Path) -> bool:
     return '"--specs"' in gate_text
 
 
+def agent_transcript(hook_input: dict[str, object]) -> Path | None:
+    """Return the path of the agent's own transcript, or None.
+
+    SubagentStop gives it as "agent_transcript_path". Without it, the agent's
+    transcript sits next to the session's, in subagents/agent-<agent_id>.jsonl.
+
+    Args:
+        hook_input: The hook input.
+    """
+    given_path = hook_input.get("agent_transcript_path")
+    if isinstance(given_path, str) and given_path:
+        return Path(given_path)
+    session_transcript = hook_input.get("transcript_path")
+    agent_id = hook_input.get("agent_id")
+    if not isinstance(session_transcript, str) or not session_transcript:
+        return None
+    if not isinstance(agent_id, str) or not agent_id:
+        return None
+    session_folder = Path(session_transcript).with_suffix("")
+    return session_folder / "subagents" / f"agent-{agent_id}.jsonl"
+
+
+def edited_files(transcript_path: Path) -> list[Path]:
+    """Return the files an agent's transcript shows it writing, in order.
+
+    Args:
+        transcript_path: The agent's transcript, one JSON object per line.
+
+    Returns:
+        The paths given to its Edit, MultiEdit, NotebookEdit and Write calls;
+        empty when the transcript cannot be read.
+    """
+    try:
+        lines = transcript_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    paths: list[Path] = []
+    for line in lines.splitlines():
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        message = entry.get("message") if isinstance(entry, dict) else None
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict) or block.get("type") != "tool_use":
+                continue
+            if block.get("name") not in FILE_EDIT_TOOLS:
+                continue
+            tool_input = block.get("input")
+            if not isinstance(tool_input, dict):
+                continue
+            file_path = tool_input.get("file_path") or tool_input.get("notebook_path")
+            if isinstance(file_path, str) and file_path:
+                paths.append(Path(file_path))
+    return paths
+
+
+def repository_checkouts(project_root: Path) -> set[Path]:
+    """Return the main checkout and every git worktree of the repository.
+
+    Args:
+        project_root: Any checkout of the repository.
+    """
+    output = run_git(project_root, ["worktree", "list", "--porcelain"])
+    checkouts: set[Path] = set()
+    if output is None:
+        return checkouts
+    for line in output.splitlines():
+        if line.startswith("worktree "):
+            checkouts.add(Path(line.removeprefix("worktree ")).resolve())
+    return checkouts
+
+
+def checkout_to_check(hook_input: dict[str, object]) -> Path:
+    """Return the checkout the gate checks: the one the agent last edited.
+
+    The hook input's "cwd" is the session's directory. For an agent that
+    worked in a git worktree, it still names the main checkout: on 2026-10-17
+    the hook ran an implementer's quick gate there and missed every change it
+    had made in its worktree. The agent's transcript names the files it
+    wrote. The checkout of the last one counts, provided that checkout is
+    the main checkout or one of its worktrees, not a scratch copy. With no
+    such file, "cwd" decides.
+
+    Args:
+        hook_input: The hook input.
+
+    Returns:
+        The project root of the checkout to check.
+    """
+    working_directory = Path(str(hook_input.get("cwd") or Path.cwd()))
+    session_root = find_project_root(working_directory)
+    transcript_path = agent_transcript(hook_input)
+    if transcript_path is None:
+        return session_root
+    checkouts = repository_checkouts(session_root)
+    edited_root: Path | None = None
+    for file_path in edited_files(transcript_path):
+        file_root = nearest_project_root(file_path.parent)
+        if file_root is not None and file_root.resolve() in checkouts:
+            edited_root = file_root
+    if edited_root is None:
+        return session_root
+    return edited_root
+
+
 def main() -> int:
     """Read the hook input from stdin, run the gate and decide."""
     try:
@@ -302,8 +430,7 @@ def main() -> int:
     if stage is None:
         return 0
 
-    working_directory = Path(str(hook_input.get("cwd") or Path.cwd()))
-    project_root = find_project_root(working_directory)
+    project_root = checkout_to_check(hook_input)
     gate_script = project_root / "scripts" / "gate.py"
 
     uv_path = shutil.which("uv")

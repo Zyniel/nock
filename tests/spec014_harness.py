@@ -92,7 +92,7 @@ NEW_PLAYER_ID = "new-player"
 NEW_TOKEN = "new-player-token-0000"
 SNAPSHOT_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 STORED_IDENTITY = json.dumps(
-    {"player_id": "p1", "resume_token": SNAPSHOT_TOKEN, "nickname": "Ana"}
+    {"player_id": "p1", "resume_token": SNAPSHOT_TOKEN, "nickname": "ANA"}
 )
 IDENTITY_KEY = "nock.identity.ABC123"
 

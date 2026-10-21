@@ -77,7 +77,7 @@ def test_ac1_replay_player_joined_appends_a_record_with_the_logged_token(
     empty = new_room(ROOM_CODE, fx01_grid, START_TIME)
     view = PlayerView(
         player_id="p1",
-        nickname="Ana",
+        nickname="ANA",
         colour=3,
         state=PlayerState.ACTIVE,
         is_host=True,
@@ -95,7 +95,7 @@ def test_ac1_replay_player_joined_appends_a_record_with_the_logged_token(
         PlayerRecord(
             player_id="p1",
             resume_token=FIRST_TOKEN,
-            nickname="Ana",
+            nickname="ANA",
             colour=3,
             is_host=True,
             muted=False,
@@ -115,7 +115,7 @@ def test_ac1_replay_a_second_join_goes_after_the_first(fx01_grid: Grid) -> None:
     base = two_player_room(fx01_grid)
     view = PlayerView(
         player_id="p3",
-        nickname="Cleo",
+        nickname="CLEO",
         colour=2,
         state=PlayerState.ACTIVE,
         is_host=False,
@@ -486,7 +486,7 @@ def test_ac1_after_restart_keeps_the_grid_and_the_tokens(fx01_grid: Grid) -> Non
     assert [player.state for player in after.players] == [PlayerState.DISCONNECTED] * 3
     assert after.cells == before.cells
     assert resume_tokens(after) == resume_tokens(before)
-    assert [player.nickname for player in after.players] == ["Ana", "Bob", "Cleo"]
+    assert [player.nickname for player in after.players] == ["ANA", "BOB", "CLEO"]
     assert player_record(after, "p1").last_edit == player_record(before, "p1").last_edit
 
 

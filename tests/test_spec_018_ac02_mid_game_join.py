@@ -205,7 +205,7 @@ def test_ac2_websocket_a_joiner_gets_a_snapshot_then_every_event_without_a_gap(
         final = registry.room_state(room_code)
         assert final is not None
         assert final.seq == 2 + 2 * EDITS_PER_WRITER + 1
-        assert [player.nickname for player in final.players] == ["Ana", "Bob", "Cy"]
+        assert [player.nickname for player in final.players] == ["ANA", "BOB", "CY"]
 
 
 def test_ac2_websocket_the_joiner_does_not_receive_its_own_player_joined(
@@ -221,9 +221,9 @@ def test_ac2_websocket_the_joiner_does_not_receive_its_own_player_joined(
 
         assert cy.snapshot().seq == 3
         assert [player.nickname for player in cy.snapshot().players] == [
-            "Ana",
-            "Bob",
-            "Cy",
+            "ANA",
+            "BOB",
+            "CY",
         ]
         assert [type(message).__name__ for message in cy.events()] == ["LetterChanged"]
         # Bob, who was in the room already, did receive Cy's join, as event 3.

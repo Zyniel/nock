@@ -302,8 +302,9 @@ def test_ac4_browser_a_nickname_with_html_is_shown_as_plain_text(
 
     expect(page.get_by_test_id("roster-player")).to_have_count(3)
     expect(page.locator(roster_nickname(page, "p1"))).to_have_text("Ana")
-    expect(page.locator(roster_nickname(page, "p2"))).to_have_text("<b>Eve</b>")
-    expect(page.locator(roster_nickname(page, "p3"))).to_have_text("<img src=x>")
+    # The nicknames as spec 040's displayNickname writes them.
+    expect(page.locator(roster_nickname(page, "p2"))).to_have_text("<b>eve</b>")
+    expect(page.locator(roster_nickname(page, "p3"))).to_have_text("<img Src=x>")
     expect(page.get_by_test_id("roster").locator("b")).to_have_count(0)
     expect(page.get_by_test_id("roster").locator("img")).to_have_count(0)
     expect(page.locator('img[src="x"]')).to_have_count(0)

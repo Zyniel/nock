@@ -29,9 +29,11 @@ export function identityKey(code: string): string {
   return `nock.identity.${code}`
 }
 
-// The same rule as `normalize_nickname` on the server.
+// The same rule as `normalize_nickname` on the server: NFC, trimmed, in
+// capitals, then NFC again, since the capitals of a few Greek letters are not in
+// NFC. The rules are checked on that result, which is the nickname a join sends.
 export function checkNickname(text: string): NicknameCheck {
-  const nickname = text.normalize('NFC').trim()
+  const nickname = text.normalize('NFC').trim().toUpperCase().normalize('NFC')
   const characters = Array.from(nickname)
   if (characters.length < NICKNAME_MIN_LENGTH || characters.length > NICKNAME_MAX_LENGTH) {
     return { ok: false, reason: 'length' }

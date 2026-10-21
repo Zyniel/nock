@@ -340,7 +340,8 @@ def test_ac5_browser_a_nickname_is_inserted_as_text(
     mock.send(joined_frame(6, "p3", "<b>Eve</b>", 2))
 
     expect(feed_locator(page)).to_have_count(1)
-    assert feed_items(page) == [("player_joined", "6", "<b>Eve</b> a rejoint le salon")]
+    # Spec 040's displayNickname writes `<b>Eve</b>` as `<b>eve</b>`.
+    assert feed_items(page) == [("player_joined", "6", "<b>eve</b> a rejoint le salon")]
     expect(feed_locator(page).locator("b")).to_have_count(0)
 
 
