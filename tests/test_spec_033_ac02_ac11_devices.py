@@ -286,6 +286,8 @@ def test_ac2_device_2_stores_anas_identity_of_the_room(
     enter_room: EnterRoom,
 ) -> None:
     device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     anas_identity = stored_identity(device.page, device.code)
     assert anas_identity is not None
 
@@ -304,6 +306,8 @@ def test_ac2_device_2_opens_the_room_as_ana_without_the_nickname_form(
     enter_room: EnterRoom,
 ) -> None:
     device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     second = device_two_signs_in(account_server, devices)
     second.add_init_script(FORM_WATCHER)
 
@@ -326,6 +330,8 @@ def test_ac2_device_1_is_then_replaced(
     enter_room: EnterRoom,
 ) -> None:
     device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     second = device_two_signs_in(account_server, devices)
 
     second.goto(f"{account_server.base_url}/r/{device.code}")
@@ -372,6 +378,8 @@ def test_ac11_device_2_lists_anas_room_in_my_rooms(
     enter_room: EnterRoom,
 ) -> None:
     device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     second = device_two_signs_in(account_server, devices)
 
     second.goto(f"{account_server.base_url}/")
@@ -386,7 +394,9 @@ def test_ac11_the_catalogue_links_to_the_account_page(
     fx01_grid: Grid,
     enter_room: EnterRoom,
 ) -> None:
-    ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     second = device_two_signs_in(account_server, devices)
 
     second.goto(f"{account_server.base_url}/")
@@ -429,6 +439,8 @@ def test_ac11_a_signed_in_room_page_sends_one_put_after_its_first_snapshot(
     enter_room: EnterRoom,
 ) -> None:
     device = ana_writes_t(account_server, devices, fx01_grid, enter_room)
+    ana_asks_a_link(account_server, device)
+    ana_opens_the_link(account_server, device)
     second = device_two_signs_in(account_server, devices)
     traffic = PageTraffic()
     traffic.watch(second)

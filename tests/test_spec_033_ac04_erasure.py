@@ -32,9 +32,9 @@ from httpx2 import Response
 
 import nock.room
 from nock.grid import Grid
-from nock.protocol import EditLetter, LetterChanged, PlayerJoined
+from nock.protocol import EditLetter, LetterChanged, PlayerJoined, PlayerState
 from nock.room import PastPlayer, RoomState
-from spec017_harness import FakeClock, open_peer
+from spec017_harness import FakeClock, has_state_change, open_peer
 from spec032_harness import (
     BOB,
     CY,
@@ -159,12 +159,19 @@ def zelie_deleted(tmp_path: Path, clock: FakeClock, grid: Grid) -> Iterator[Eras
         old_session = set_cookie_of(signed_in).value
         joined_seq_in_r = player_joined_entries(app, r_code, zelie_id)[0]
 
+        # A room ticks only while someone is connected to it (specs 017 and 032):
+        # Dan stays in S so that Zélie's time-out happens, and sees her leave.
+        dan_in_s = open_peer(stack, app.client, s_code, "Dan")
         with contextlib.ExitStack() as s_stack:
             zelie_s = open_peer(s_stack, app.client, s_code, ZELIE_NICKNAME)
             zelie_in_s = zelie_s.snapshot().you
             s_key = room_key(s_code, zelie_s.snapshot().resume_token)
             linked = app.client.put(ROOMS_PATH, json=s_key)
             assert linked.status_code == 204, linked.text
+        dan_in_s.wait_until(
+            lambda: has_state_change(dan_in_s, zelie_in_s, PlayerState.DISCONNECTED),
+            "Zélie's disconnection from S",
+        )
         clock.advance(RESUME_WINDOW + 1)
         wait_for(
             lambda: is_past_player_of(state_of(app.registry, s_code), zelie_in_s),
