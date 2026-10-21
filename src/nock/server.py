@@ -1,5 +1,8 @@
 """FastAPI app: serves the built web client, the room WebSocket and the recaps.
 
+It also answers a member's catch-up request: what changed in a room while their
+page was away (spec 034).
+
 While the app runs, it deletes the expired rooms of the registry it serves once
 when it starts, then every `expiry_sweep_seconds` (spec 032).
 
@@ -34,6 +37,7 @@ from nock.catalogue import (
     load_catalogue,
     summarize,
 )
+from nock.catch_up import CatchUpRequest
 from nock.hub import (
     MAX_FRAME_BYTES,
     ROOM_NOT_FOUND_CLOSE_CODE,
@@ -686,6 +690,18 @@ def create_app(
         for summary in summaries:
             bodies.append(summary.model_dump(mode="json"))
         return bodies
+
+    # Spec 034: what changed in a room while a member's page was away. A 404
+    # never says why, so this route is no oracle for room codes and is not
+    # throttled.
+    @web_app.post("/api/rooms/{code}/catch-up")
+    def get_catch_up(code: str, body: CatchUpRequest) -> dict[str, object]:
+        if room_code_regex.fullmatch(code) is None:
+            raise _not_found()
+        catch_up = holder.get().catch_up(code, body)
+        if catch_up is None:
+            raise _not_found()
+        return catch_up.model_dump(mode="json")
 
     # Spec 038: the figures of the rooms created in the last `days` days, read
     # from the store without making any room live.

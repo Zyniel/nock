@@ -1,5 +1,6 @@
 // The room record kept on this device, `nock.room.<code>` (spec 010): the
-// catalogue number of the room and the selection. Unknown fields are kept.
+// catalogue number of the room, the selection and the seen seq (spec 034).
+// Unknown fields are kept.
 
 import { parseObject, readItem, roomRecordKey, writeItem } from './storage'
 import type { Direction } from './wordSelection'
@@ -43,6 +44,30 @@ export function writeRoomSelection(code: string, selection: SavedSelection): voi
     direction: selection.direction,
   }
   writeRecord(code, record)
+}
+
+// Remember the seq the page holds now (spec 034); a missing or corrupt record
+// gets `grid: null` and `selection: null`.
+export function writeRoomSeenSeq(code: string, seenSeq: number): void {
+  const record = readRecord(code)
+  if (!('grid' in record)) {
+    record.grid = null
+  }
+  if (!('selection' in record)) {
+    record.selection = null
+  }
+  record.seen_seq = seenSeq
+  writeRecord(code, record)
+}
+
+// The stored seen seq, or null when there is none or it is not a whole number
+// of 0 or more.
+export function readRoomSeenSeq(code: string): number | null {
+  const { seen_seq } = readRecord(code)
+  if (typeof seen_seq !== 'number' || !Number.isInteger(seen_seq) || seen_seq < 0) {
+    return null
+  }
+  return seen_seq
 }
 
 // The saved selection when it has the right shape, otherwise null. Whether the

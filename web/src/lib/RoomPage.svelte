@@ -22,9 +22,21 @@
   import { newLinkCopier } from './copyLink'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
+  import {
+    CATCH_UP_HIGHLIGHT_MS,
+    applyCatchUp,
+    endCaughtUp,
+    fetchCatchUp,
+  } from './catchUp'
   import { displayNickname } from './nickname'
   import { remoteSelectionsOf } from './remoteSelections'
-  import { readRoomGrid, readRoomSelection, writeRoomSelection } from './roomRecord'
+  import {
+    readRoomGrid,
+    readRoomSeenSeq,
+    readRoomSelection,
+    writeRoomSeenSeq,
+    writeRoomSelection,
+  } from './roomRecord'
   import {
     followListTabStop,
     keepFeedEndOnResize,
@@ -417,32 +429,97 @@
     }
   })
 
-  // The feed list keeps the reader's place (spec 013 AC-7): a new line brings
-  // the list to its newest line only if the list was at its end just before.
-  // Each new line has a new seq, also when it removes the oldest line.
-  let newestFeedSeq = $derived(
-    session.feed.length === 0 ? null : session.feed[session.feed.length - 1].seq,
-  )
+  // The feed list keeps the reader's place (spec 013 AC-7): new lines bring the
+  // list to its newest line only if the list was at its end just before. The
+  // lines of a catch-up are new lines too, also when they go in above the
+  // others (spec 034).
   let feedPlaceBeforeNewLine: FeedPlace | null = null
 
-  // Runs before the new line is on the page: note where the list is.
+  // Runs before the new lines are on the page: note where the list is.
   $effect.pre(() => {
-    const newestSeq = newestFeedSeq
-    if (feedList === null || newestSeq === null) {
+    const changes = session.feedChanges
+    if (feedList === null || changes === 0) {
       return
     }
     feedPlaceBeforeNewLine = noteFeedPlace(feedList)
   })
 
-  // Runs once the new line is on the page.
+  // Runs once the new lines are on the page.
   $effect(() => {
-    const newestSeq = newestFeedSeq
-    if (feedList === null || newestSeq === null || feedPlaceBeforeNewLine === null) {
+    const changes = session.feedChanges
+    if (feedList === null || changes === 0 || feedPlaceBeforeNewLine === null) {
       return
     }
     keepFeedPlace(feedList, feedPlaceBeforeNewLine)
     feedPlaceBeforeNewLine = null
   })
+
+  // Each cell highlighted by a catch-up goes back to normal CATCH_UP_HIGHLIGHT_MS
+  // after its highlight started (spec 034). A cell highlighted again has a new
+  // id, so the timer of its old highlight finds nothing to end.
+  const scheduledCaughtUp = new Set<number>()
+  const caughtUpTimers = new Set<ReturnType<typeof setTimeout>>()
+  $effect(() => {
+    for (const cell of session.caughtUpCells) {
+      if (scheduledCaughtUp.has(cell.id)) {
+        continue
+      }
+      scheduledCaughtUp.add(cell.id)
+      const timer = setTimeout(() => {
+        caughtUpTimers.delete(timer)
+        scheduledCaughtUp.delete(cell.id)
+        endCaughtUp(session, cell.id)
+      }, CATCH_UP_HIGHLIGHT_MS)
+      caughtUpTimers.add(timer)
+    }
+  })
+
+  // Leaving the page must not leave the highlight timers to fire on a destroyed
+  // page (a separate effect, as for the flashes).
+  $effect(() => {
+    return () => {
+      for (const timer of caughtUpTimers) {
+        clearTimeout(timer)
+      }
+      caughtUpTimers.clear()
+      scheduledCaughtUp.clear()
+    }
+  })
+
+  // ---- Catching up after an absence (spec 034) ----
+
+  // The seen seq: the seq this page last held, kept in the room record too. Until
+  // the first snapshot, the one stored by the last visit on this device, read
+  // when the page opens.
+  let seenSeq: number | null = null
+  // How many snapshots the page applied: an answer to a catch-up request is
+  // applied only while no newer snapshot came.
+  let snapshotCount = 0
+
+  // Remember the page's seq each time it changes.
+  function rememberSeenSeq(): void {
+    if (session.seq === null || session.seq === seenSeq) {
+      return
+    }
+    seenSeq = session.seq
+    writeRoomSeenSeq(code, seenSeq)
+  }
+
+  // Ask once for what changed between the seen seq and the snapshot, and apply
+  // the answer if the snapshot is still the page's latest. A failed request
+  // shows nothing and is not sent again.
+  async function catchUpOnReturn(snapshot: Snapshot, afterSeq: number): Promise<void> {
+    const askedAt = snapshotCount
+    const catchUp = await fetchCatchUp(code, {
+      resume_token: snapshot.resume_token,
+      after_seq: afterSeq,
+      until_seq: snapshot.seq,
+    })
+    if (catchUp === null || askedAt !== snapshotCount) {
+      return
+    }
+    applyCatchUp(session, catchUp)
+  }
 
   // A feed list at its end stays at its end through a resize, a rotation or a
   // new root font, so the newest line stays in view (spec 013 AC-8).
@@ -1414,8 +1491,15 @@
       return
     }
     const snapshotBefore = session.snapshot
+    const seenSeqBefore = seenSeq
     receiveFrame(session, event.data)
     if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
+      snapshotCount += 1
+      // A return: a snapshot past the seen seq the page had when it arrived. A
+      // first visit on this device has no seen seq, so no return.
+      if (seenSeqBefore !== null && session.snapshot.seq > seenSeqBefore) {
+        void catchUpOnReturn(session.snapshot, seenSeqBefore)
+      }
       rememberJoin(session.snapshot)
       // Only the first snapshot of the page: a reconnection keeps the old
       // snapshot until the new one arrives, so it sets no second mark.
@@ -1431,6 +1515,7 @@
     if (session.status === 'nickname') {
       formJoinNickname = null
     }
+    rememberSeenSeq()
   }
 
   function openSocket(): void {
@@ -1452,6 +1537,7 @@
   }
 
   $effect(() => {
+    seenSeq = readRoomSeenSeq(code)
     openSocket()
     window.addEventListener('online', onBrowserOnline)
 
@@ -1475,6 +1561,7 @@
   data-status={session.status}
   data-you={session.snapshot === null ? '' : session.snapshot.you}
   data-seq={session.seq === null ? '' : String(session.seq)}
+  data-catch-up={session.catchUpLabel}
   data-solved={String(session.solved)}
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
@@ -1772,7 +1859,7 @@
     <section class="feed" data-testid="activity-feed">
       <h2 id="feed-heading">{t('feed.heading')}</h2>
       <ul bind:this={feedList} role="list" aria-labelledby="feed-heading">
-        {#each session.feed as item (item.seq)}
+        {#each session.feed as item (item.id)}
           <li data-testid="feed-item" data-kind={item.kind} data-seq={String(item.seq)}>
             {item.text}
           </li>
@@ -1900,6 +1987,7 @@
         {words}
         pendingEdits={session.pendingEdits}
         flashes={session.flashes}
+        caughtUpCells={session.caughtUpCells}
         {remoteSelections}
         {isAuthorsViewOn}
         {playerColours}

@@ -50,6 +50,7 @@
   "feed.reveal.letter": "{name} a révélé une lettre",
   "feed.reveal.word": "{name} a révélé un mot",
   "feed.flag": "{name} bloque sur « {clue} »",
+  "feed.word_completed": "{name} a complété « {clue} »",
   "feed.room_locked": "{name} a verrouillé le salon",
   "feed.room_unlocked": "{name} a déverrouillé le salon",
   "feed.settings_changed": "{name} a modifié les réglages : aide {help_mode}, {letters} lettres et {words} mots à révéler",

@@ -1,5 +1,5 @@
-// The activity feed of a room (spec 013): which events add a line, and its text.
-// Plain functions: no DOM and no socket.
+// The activity feed of a room (spec 013): which events add a line, and its text,
+// and the lines of a catch-up (spec 034). Plain functions: no DOM and no socket.
 
 import { t } from './i18n'
 import { displayNickname } from './nickname'
@@ -12,6 +12,50 @@ export interface FeedItem {
   seq: number
   kind: string
   text: string
+}
+
+// A feed item as the page keeps it. Items are not unique by seq: one letter
+// that completes two words gives two items of one seq (spec 034), so the page
+// tells them apart by `id`, a number given once per page.
+export interface KeptFeedItem extends FeedItem {
+  id: number
+}
+
+// Drop the oldest items of a feed that holds more than FEED_LIMIT.
+export function trimFeed(feed: KeptFeedItem[]): void {
+  if (feed.length > FEED_LIMIT) {
+    feed.splice(0, feed.length - FEED_LIMIT)
+  }
+}
+
+// Put `items`, in seq order, into the feed in seq order among the items it
+// holds: each goes after every item of its seq or lower. Then the feed keeps its
+// newest FEED_LIMIT items.
+export function insertFeedItems(feed: KeptFeedItem[], items: KeptFeedItem[]): void {
+  for (const item of items) {
+    let index = feed.findIndex((kept) => kept.seq > item.seq)
+    if (index === -1) {
+      index = feed.length
+    }
+    feed.splice(index, 0, item)
+  }
+  trimFeed(feed)
+}
+
+// The feed item of a word completed during an absence (spec 034): `clue` names
+// the word by its clue.
+export function wordCompletedItem(
+  snapshot: Snapshot,
+  names: Map<string, string>,
+  seq: number,
+  playerId: string,
+  clue: unknown,
+): FeedItem {
+  const text = t('feed.word_completed', {
+    name: nameOf(names, playerId),
+    clue: clueText(snapshot, clue),
+  })
+  return { seq, kind: 'word_completed', text }
 }
 
 // The nickname of a player known to the page, even one who left, as a page

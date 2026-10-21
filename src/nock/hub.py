@@ -26,6 +26,7 @@ import time
 from collections.abc import Awaitable, Callable, Sequence
 from typing import NamedTuple
 
+from nock.catch_up import CatchUp, CatchUpRequest, build_catch_up
 from nock.grid import Grid
 from nock.protocol import (
     ClientMessage,
@@ -881,6 +882,29 @@ class RoomRegistry:
         if state is None:
             return None
         return room_member_id(state, resume_token)
+
+    def catch_up(self, code: str, request: CatchUpRequest) -> CatchUp | None:
+        """Return the catch-up that a member asks for, or None (spec 034).
+
+        None when `member_id(code, request.resume_token)` is None (the room is
+        unknown or expired, or the token is not a member's, spec 032), or when
+        `before = store.load_room_at(code, request.after_seq)` is None.
+        Otherwise `build_catch_up(request.after_seq, request.until_seq, before,
+        entries)`, with `entries` the entries of
+        `store.read_log(code, before.seq)` whose seq is at most
+        `request.until_seq`. It only reads: the room is not made live and
+        nothing is logged.
+        """
+        if self.member_id(code, request.resume_token) is None:
+            return None
+        before = self._store.load_room_at(code, request.after_seq)
+        if before is None:
+            return None
+        entries: list[LogEntry] = []
+        for entry in self._store.read_log(code, before.seq):
+            if entry.event.seq <= request.until_seq:
+                entries.append(entry)
+        return build_catch_up(request.after_seq, request.until_seq, before, entries)
 
     def room_summaries(self, keys: Sequence[RoomKey]) -> list[RoomSummary]:
         """Return the summaries of the rooms that a key's token is a member of.
