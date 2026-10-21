@@ -51,7 +51,8 @@ WARM_UP_TIMEOUT_MS = 60_000
 # most); with four workers that once took 341 ms in WebKit on CI (2026-10-16).
 # The relay of spec 015 (95 % within 100 ms) once failed in the parallel pass
 # while another agent's browsers loaded the machine (2026-10-16); spec 013's
-# relay, spec 025's banner window (2.5 to 4.5 s) and spec 026's solve budget
+# relay, spec 025's banner window (2.5 to 4.5 s), spec 026's solve budget and
+# spec 034's highlight window (on at 4.5 s, gone at 6 s) and feed scroll
 # measure durations too.
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
@@ -63,6 +64,8 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_spec_025_ac07_vote_banner.py",
         "test_spec_026_ac01_ac03_grid_solved.py",
         "test_spec_027_ac02_ac03_live_pages.py",
+        "test_spec_034_ac02_highlight_timing.py",
+        "test_spec_034_ac04_feed_scroll.py",
         "test_spec_036_ac01_time_budgets.py",
         "test_spec_038_ac11_relay_time.py",
     }
