@@ -15,9 +15,10 @@ Stages:
 
 Options of the full stage (2026-10-15, so CI can run one job per engine):
     --browsers: the engines of the browser tests, comma-separated, or "all".
-        Default: the NOCK_BROWSERS environment variable, else chromium,webkit
-        (Windows blocks Firefox on the human's machine). Engines that are not
-        installed are left out with a warning, except in CI.
+        Default: the NOCK_BROWSERS environment variable, else chromium (human
+        decision, 2026-10-21: one engine while the design moves; it was
+        chromium,webkit). Engines that are not installed are left out with a
+        warning, except in CI.
     --tests: "all" (default), "browser" (only the browser tests) or "other"
         (only the tests that run without a browser).
     --skip-static: skip ruff, black, traceability, pyrefly and svelte-check,
@@ -77,7 +78,7 @@ BUILD_STEP: tuple[str, list[str]] = (
 )
 
 ENGINE_NAMES: tuple[str, ...] = ("chromium", "firefox", "webkit")
-DEFAULT_ENGINES = "chromium,webkit"
+DEFAULT_ENGINES = "chromium"
 # The `-m` expression of each --tests choice.
 TEST_SELECTIONS: dict[str, str] = {
     "all": "",
