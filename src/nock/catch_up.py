@@ -194,7 +194,7 @@ def _words_of_grid(grid: Grid) -> list[tuple[ClueRef, list[tuple[int, int]]]]:
     """Return each clue of the grid with the positions of its word, in clue order.
 
     Clue order is by the clue cell's row, then its column, then the clue's index
-    in that cell. A clue whose word does not resolve is left out.
+    in that cell.
     """
     clue_cells: list[ClueCell] = []
     for cell in grid.cells:
@@ -205,10 +205,7 @@ def _words_of_grid(grid: Grid) -> list[tuple[ClueRef, list[tuple[int, int]]]]:
     words: list[tuple[ClueRef, list[tuple[int, int]]]] = []
     for clue_cell in clue_cells:
         for clue_index in range(len(clue_cell.clues)):
-            try:
-                positions = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
-            except (IndexError, ValueError):
-                continue
+            positions = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
             clue = ClueRef(
                 row=clue_cell.row, column=clue_cell.column, clue_index=clue_index
             )

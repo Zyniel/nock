@@ -910,14 +910,11 @@
      labels in diagonal corners fit one above the other from a 20px cell, the
      size where a cell gets its second slot (spec 035 AC-11). A label is drawn
      over the author band (z-index 1) where they meet, from the band's ends
-     inward (spec 019). A label takes the pointer, unlike the outline it sits
-     in, so that the page finds it at its place (spec 034 AC-2); a tap on it is
-     still a tap on its cell. */
+     inward (spec 019). */
   .remote-label {
     --corner-offset: calc(var(--shift, 0px) * -1);
     position: absolute;
     z-index: 2;
-    pointer-events: auto;
     padding: 0 1px;
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;
