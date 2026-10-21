@@ -16,6 +16,10 @@ button (spec 014). Mocked: `page.route("**/api/ops/dashboard*", handler)`
 answers the dashboard's requests with JSON built from `DashboardFigures`, and
 holds the request of the period change while the test looks at the page.
 
+Mocked too, "an answer once the page is no longer `ready`": the request of a
+press of the period 30 is held, a mocked replay request (`EDITS_ROUTE`) answers
+401 and locks the page, then the held request gets a 200; the page stays locked.
+
 Edge cases checked as well, from "Edge cases and errors": `data-state` stays
 `ready` while the request of a period change is pending (a script records every
 state the page takes), and `loading` never shows for it.
@@ -39,6 +43,7 @@ from spec038_harness import (
     DASHBOARD_PATH,
     DASHBOARD_ROUTE,
     NO_ROOM_TEXTS,
+    NOT_AUTHORIZED,
     OPS_TIMEOUT_MS,
     OPS_TOKEN,
     OPS_TOKEN_KEY,
@@ -97,6 +102,23 @@ STATE_WATCHER_SCRIPT = """
 }
 """
 STATES_SEEN_SCRIPT = "() => window.__opsStates"
+
+# Resolves after the page has drawn `FRAMES_TO_WAIT` frames.
+FRAMES_SCRIPT = """
+(frames) => new Promise((resolve) => {
+  const next = (left) => {
+    if (left === 0) {
+      resolve(null);
+    } else {
+      requestAnimationFrame(() => next(left - 1));
+    }
+  };
+  next(frames);
+})
+"""
+FRAMES_TO_WAIT = 2
+ANY_ROOM_CODE = "ABCDEF"
+EDITS_ROUTE = "**/api/ops/rooms/*/edits"  # the replay requests
 
 NewPage = Callable[[int, int], Page]
 
@@ -207,6 +229,13 @@ def hold_after_the_first_answer(page: Page, first: tuple[int, str]) -> list[Rout
     return held
 
 
+def answer_replay_with_401(route: Route) -> None:
+    """Answer a replay request with a 401, `Not authorized`."""
+    route.fulfill(
+        status=401, content_type="application/json", body=json.dumps(NOT_AUTHORIZED)
+    )
+
+
 def states_seen(page: Page) -> list[str | None]:
     """The states that STATE_WATCHER_SCRIPT recorded, in their order."""
     states = page.evaluate(STATES_SEEN_SCRIPT)
@@ -310,3 +339,35 @@ def test_ac7_mocked_a_429_to_a_period_change_locks_the_page(
     expect(error).to_have_text(load_fr()["ops.throttled"])
     expect(error).to_have_attribute("role", "alert")
     assert session_value(page, OPS_TOKEN_KEY) is None
+
+
+def test_ac7_mocked_an_answer_to_a_period_change_after_the_page_locked_changes_nothing(
+    new_page: NewPage, server: OpsServer
+) -> None:
+    page = new_page(1280, 720)
+    held = hold_after_the_first_answer(page, dashboard_answer(seven_day_figures(NOW)))
+    page.route(EDITS_ROUTE, answer_replay_with_401)
+    open_dashboard(page, server.base_url)
+    period_button(page, "30").click()
+    wait_for_held_route(page, held)
+    code_input = page.get_by_test_id("ops-replay-code")
+    code_input.fill(ANY_ROOM_CODE)
+    code_input.press("Enter")
+    expect_ops_state(page, "locked")
+    refused = load_fr()["ops.token_refused"]
+    error = page.get_by_test_id("ops-token-error")
+    expect(error).to_have_text(refused)
+
+    late_answer = dashboard_answer(seven_day_figures(NOW))
+    with page.expect_response(
+        lambda response: DASHBOARD_PATH in response.url and "days=30" in response.url,
+        timeout=OPS_TIMEOUT_MS,
+    ) as response_info:
+        answer_held_routes(held, late_answer)
+    response_info.value.finished()
+    page.evaluate(FRAMES_SCRIPT, FRAMES_TO_WAIT)
+
+    assert ops_page(page).get_attribute("data-state") == "locked"
+    expect(page.get_by_test_id("ops-token-input")).to_be_visible()
+    expect(error).to_have_text(refused)
+    expect(page.get_by_test_id("ops-dashboard")).to_have_count(0)
