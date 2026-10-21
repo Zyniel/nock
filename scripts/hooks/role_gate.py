@@ -19,7 +19,10 @@ Exit codes understood by Claude Code:
 
 The gate checks the checkout the agent edited, found from its transcript: the
 hook input's "cwd" is the session's directory, so it names the main checkout
-even when the agent worked in a git worktree of its own (2026-10-17).
+even when the agent worked in a git worktree of its own (2026-10-17). The files
+it wrote with Edit or Write name that checkout, and so do the directories its
+Bash commands name with `git -C`, `cd` and `--directory` (2026-10-21: an
+implementer that edited only through Bash was gated in the session's directory).
 
 A failure the agent cannot fix, such as a stale test that only the test-writer
 may change, must not hold it for ever (2026-10-16: an implementer was blocked at
@@ -73,6 +76,16 @@ BLOCK_STATE_DIRECTORY = Path(tempfile.gettempdir()) / "nock-role-gate"
 FILE_EDIT_TOOLS: frozenset[str] = frozenset(
     {"Edit", "MultiEdit", "NotebookEdit", "Write"}
 )
+# The tool whose commands can name the directory the agent works in.
+SHELL_TOOL = "Bash"
+# A directory a shell command works in: `git -C <path>`, `cd <path>`,
+# `--directory <path>` or `--directory=<path>`, the path bare or quoted.
+SHELL_DIRECTORY_PATTERN = re.compile(
+    r"""(?:\bgit\s+-C\s+|(?<![\w-])cd\s+|--directory(?:=|\s+))"""
+    r"""(?:"([^"]+)"|'([^']+)'|([^\s;&|)]+))"""
+)
+# A Git Bash path to a Windows drive: /k/Projects/awf is K:/Projects/awf.
+DRIVE_PATH_PATTERN = re.compile(r"^/([A-Za-z])(/.*)?$")
 
 
 def nearest_project_root(start_directory: Path) -> Path | None:
@@ -328,21 +341,59 @@ def agent_transcript(hook_input: dict[str, object]) -> Path | None:
     return session_folder / "subagents" / f"agent-{agent_id}.jsonl"
 
 
-def edited_files(transcript_path: Path) -> list[Path]:
-    """Return the files an agent's transcript shows it writing, in order.
+def shell_path(text: str) -> Path:
+    """Return the path a shell command names, read as this system reads it.
+
+    On Windows, a Git Bash path to a drive (/k/Projects/awf) becomes the drive's
+    path (K:/Projects/awf).
+
+    Args:
+        text: The path as the command writes it.
+    """
+    if os.name == "nt":
+        match = DRIVE_PATH_PATTERN.match(text)
+        if match is not None:
+            drive = match.group(1).upper()
+            rest = match.group(2) or "/"
+            return Path(f"{drive}:{rest}")
+    return Path(text)
+
+
+def command_directories(command: str) -> list[Path]:
+    """Return the absolute directories a shell command works in, in order.
+
+    Args:
+        command: The command given to the Bash tool.
+
+    Returns:
+        The paths after `git -C`, `cd` and `--directory`; relative paths are
+        left out, since the shell's directory at that point is not known.
+    """
+    directories: list[Path] = []
+    for match in SHELL_DIRECTORY_PATTERN.finditer(command):
+        text = match.group(1) or match.group(2) or match.group(3)
+        directory = shell_path(text)
+        if directory.is_absolute():
+            directories.append(directory)
+    return directories
+
+
+def worked_directories(transcript_path: Path) -> list[Path]:
+    """Return the directories an agent's transcript shows it working in, in order.
 
     Args:
         transcript_path: The agent's transcript, one JSON object per line.
 
     Returns:
-        The paths given to its Edit, MultiEdit, NotebookEdit and Write calls;
-        empty when the transcript cannot be read.
+        The folder of each file given to its Edit, MultiEdit, NotebookEdit and
+        Write calls, and the directories its Bash commands name; empty when the
+        transcript cannot be read.
     """
     try:
         lines = transcript_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return []
-    paths: list[Path] = []
+    directories: list[Path] = []
     for line in lines.splitlines():
         try:
             entry = json.loads(line)
@@ -355,15 +406,21 @@ def edited_files(transcript_path: Path) -> list[Path]:
         for block in content:
             if not isinstance(block, dict) or block.get("type") != "tool_use":
                 continue
-            if block.get("name") not in FILE_EDIT_TOOLS:
-                continue
             tool_input = block.get("input")
             if not isinstance(tool_input, dict):
                 continue
+            tool_name = block.get("name")
+            if tool_name == SHELL_TOOL:
+                command = tool_input.get("command")
+                if isinstance(command, str):
+                    directories.extend(command_directories(command))
+                continue
+            if tool_name not in FILE_EDIT_TOOLS:
+                continue
             file_path = tool_input.get("file_path") or tool_input.get("notebook_path")
             if isinstance(file_path, str) and file_path:
-                paths.append(Path(file_path))
-    return paths
+                directories.append(Path(file_path).parent)
+    return directories
 
 
 def repository_checkouts(project_root: Path) -> set[Path]:
@@ -389,9 +446,9 @@ def checkout_to_check(hook_input: dict[str, object]) -> Path:
     worked in a git worktree, it still names the main checkout: on 2026-10-17
     the hook ran an implementer's quick gate there and missed every change it
     had made in its worktree. The agent's transcript names the files it
-    wrote. The checkout of the last one counts, provided that checkout is
-    the main checkout or one of its worktrees, not a scratch copy. With no
-    such file, "cwd" decides.
+    wrote and the directories its shell commands worked in. The checkout of
+    the last one counts, provided that checkout is the main checkout or one
+    of its worktrees, not a scratch copy. With none, "cwd" decides.
 
     Args:
         hook_input: The hook input.
@@ -406,10 +463,10 @@ def checkout_to_check(hook_input: dict[str, object]) -> Path:
         return session_root
     checkouts = repository_checkouts(session_root)
     edited_root: Path | None = None
-    for file_path in edited_files(transcript_path):
-        file_root = nearest_project_root(file_path.parent)
-        if file_root is not None and file_root.resolve() in checkouts:
-            edited_root = file_root
+    for directory in worked_directories(transcript_path):
+        directory_root = nearest_project_root(directory)
+        if directory_root is not None and directory_root.resolve() in checkouts:
+            edited_root = directory_root
     if edited_root is None:
         return session_root
     return edited_root
