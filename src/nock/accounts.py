@@ -33,10 +33,11 @@ EMAIL_MAX_LENGTH: int = 254
 
 LOCAL_PART_MAX_LENGTH: int = 64
 DOMAIN_LABEL_MAX_LENGTH: int = 63
-# A local part takes the printable ASCII characters other than the space, U+0021
-# to U+007E (decision 15).
-FIRST_LOCAL_PART_CHARACTER: str = "!"
-LAST_LOCAL_PART_CHARACTER: str = "~"
+# A local part takes RFC 5322's `atext` characters and the dot (decision 15): the
+# ASCII letters, the digits and these 19 characters.
+LOCAL_PART_CHARACTERS: frozenset[str] = frozenset(
+    string.ascii_letters + string.digits + "!#$%&'*+-/=?^_`{|}~."
+)
 # The characters of a domain label: ASCII letters (lower case once normalised),
 # ASCII digits and the hyphen.
 DOMAIN_LABEL_CHARACTERS: frozenset[str] = frozenset(
@@ -82,10 +83,11 @@ def normalize_email(text: str) -> str:
     """Return the address as stored: `strip()`ped, then lower-cased.
 
     Rules, on the result: at most EMAIL_MAX_LENGTH characters; exactly one `@`; a
-    local part of 1 to 64 characters, each a printable ASCII character other than
-    the space, U+0021 to U+007E (decision 15); a domain of two or more labels
-    separated by `.`, each 1 to 63 ASCII letters, digits and hyphens, not starting
-    or ending with a hyphen.
+    local part of 1 to 64 characters, each an ASCII letter, an ASCII digit, `.` or
+    one of these 19 characters: ! # $ % & ' * + - / = ? ^ _ ` { | } ~ (with the
+    letters and digits, RFC 5322's `atext`; decision 15); a domain of two or more
+    labels separated by `.`, each 1 to 63 ASCII letters, digits and hyphens, not
+    starting or ending with a hyphen.
 
     Args:
         text: The address as the player typed it.
@@ -104,8 +106,8 @@ def normalize_email(text: str) -> str:
     local_part, domain = address.split("@")
     if not _is_local_part(local_part):
         raise ValueError(
-            f"The part before '@' must have 1 to {LOCAL_PART_MAX_LENGTH} printable "
-            "ASCII characters, without spaces"
+            f"The part before '@' must have 1 to {LOCAL_PART_MAX_LENGTH} ASCII "
+            "letters, digits, dots or these characters: !#$%&'*+-/=?^_`{|}~"
         )
     if not _is_domain(domain):
         raise ValueError(
@@ -120,12 +122,7 @@ def _is_local_part(local_part: str) -> bool:
     """Tell whether the part before "@" keeps the rule of `normalize_email`."""
     if len(local_part) < 1 or len(local_part) > LOCAL_PART_MAX_LENGTH:
         return False
-    for character in local_part:
-        if character < FIRST_LOCAL_PART_CHARACTER:
-            return False
-        if character > LAST_LOCAL_PART_CHARACTER:
-            return False
-    return True
+    return all(character in LOCAL_PART_CHARACTERS for character in local_part)
 
 
 def _is_domain(domain: str) -> bool:
@@ -442,10 +439,11 @@ class AccountStore:
             Every identity the account held (not only the latest of each room),
             newest link first.
         """
-        held_identities = self._all_identities(account_id)
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                # Read inside the transaction: a link made before it is erased.
+                held_identities = self._read_identities(account_id)
                 row = self._connection.execute(
                     "SELECT email FROM accounts WHERE account_id = ?", (account_id,)
                 ).fetchone()
@@ -475,6 +473,9 @@ class AccountStore:
     def purge(self, now: float) -> None:
         """Delete the links and the sessions that are too old to be used.
 
+        On a file database the write-ahead log is then checkpointed and emptied,
+        so no deleted row stays in the database files.
+
         Args:
             now: Clock time of the sweep. A link older than LINK_LIFE_SECONDS and
                 a session older than SESSION_LIFE_SECONDS are deleted.
@@ -488,6 +489,8 @@ class AccountStore:
                 "DELETE FROM account_sessions WHERE started_at < ?",
                 (now - SESSION_LIFE_SECONDS,),
             )
+            if self._is_file:
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
 
     def close(self) -> None:
         """Close the database. Idempotent."""
@@ -513,12 +516,16 @@ class AccountStore:
         a row inserted later has a larger one.
         """
         with self._lock:
-            rows = self._connection.execute(
-                "SELECT code, player_id, resume_token, nickname "
-                "FROM account_identities WHERE account_id = ? "
-                "ORDER BY linked_at DESC, rowid DESC",
-                (account_id,),
-            ).fetchall()
+            return self._read_identities(account_id)
+
+    def _read_identities(self, account_id: str) -> list[RoomIdentity]:
+        """Read `_all_identities` without taking the lock: the caller holds it."""
+        rows = self._connection.execute(
+            "SELECT code, player_id, resume_token, nickname "
+            "FROM account_identities WHERE account_id = ? "
+            "ORDER BY linked_at DESC, rowid DESC",
+            (account_id,),
+        ).fetchall()
         found: list[RoomIdentity] = []
         for code, player_id, resume_token, nickname in rows:
             identity = RoomIdentity(

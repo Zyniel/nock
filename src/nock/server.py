@@ -1145,14 +1145,16 @@ def create_app(
         return bodies
 
     # The dependency refuses a request without a session before its body is
-    # read (spec 033); the route then reads the account of the session.
-    @web_app.put(
-        f"{ACCOUNT_API_ROOT}/rooms",
-        status_code=204,
-        dependencies=[Depends(require_account)],
-    )
-    def link_account_room(body: RoomKey, request: Request) -> Response:
-        account = require_account(request)
+    # read (spec 033) and hands the account of the session to the route. The
+    # dependency is a default value, not an `Annotated` one: `require_account` is
+    # local to this function, so FastAPI could not find it from the annotation text
+    # that `from __future__ import annotations` leaves.
+    account_of_request = Depends(require_account)
+
+    @web_app.put(f"{ACCOUNT_API_ROOT}/rooms", status_code=204)
+    def link_account_room(
+        body: RoomKey, account: Account = account_of_request
+    ) -> Response:
         store = account_store_in_use()
         room_registry = holder.get()
         identity = _member_identity(room_registry, body)
