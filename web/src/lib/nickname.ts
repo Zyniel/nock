@@ -3,6 +3,12 @@
 // words. displayNickname is only for what a page shows: a page never rewrites
 // with it what it keeps, stores or sends.
 
+import { t } from './i18n'
+
+// The nickname the server gives a player whose account was deleted (spec 033).
+// No player can choose it: spec 012 needs a letter or a digit.
+export const FORMER_PLAYER_NICKNAME = '--'
+
 // A character right after one of these starts a word.
 const WORD_SEPARATORS = " -'’"
 
@@ -11,8 +17,12 @@ const WORD_SEPARATORS = " -'’"
 // through one toLowerCase(), which ends a Greek word with the final sigma, `ς`
 // (`ΝΊΚΟΣ` shows as `Νίκος`); lowering one character at a time would give `σ`.
 // Then the first character, and each one right after a space, a hyphen or an
-// apostrophe, goes through toUpperCase(). Characters are code points.
+// apostrophe, goes through toUpperCase(). Characters are code points. A former
+// player, `--`, shows as `Ancien joueur` (spec 033).
 export function displayNickname(nickname: string): string {
+  if (nickname === FORMER_PLAYER_NICKNAME) {
+    return t('player.former')
+  }
   const lowered = nickname.toLowerCase()
   let shown = ''
   let startsWord = true

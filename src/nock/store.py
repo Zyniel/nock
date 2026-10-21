@@ -10,7 +10,8 @@ only held for the duration of one short statement or transaction.
 
 A deleted room leaves no copy behind (spec 038): SQLite overwrites deleted rows
 with zeros (`secure_delete`), and in a file database each deletion ends with a
-checkpoint that empties the write-ahead log.
+checkpoint that empties the write-ahead log. Erasing a player's nickname (spec
+033) ends the same way.
 """
 
 from __future__ import annotations
@@ -20,7 +21,14 @@ import threading
 from collections.abc import Sequence
 from pathlib import Path
 
-from nock.room import LogEntry, RoomState, is_edit, replay
+from nock.room import (
+    LogEntry,
+    RoomState,
+    entry_with_player_erased,
+    is_edit,
+    replay,
+    with_player_erased,
+)
 
 _MEMORY_PATH = ":memory:"
 
@@ -239,6 +247,38 @@ class RoomStore:
                 self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
             return True
 
+    def erase_player(self, code: str, player_id: str) -> bool:
+        """Replace the nickname of `player_id` with FORMER_PLAYER_NICKNAME.
+
+        In every stored snapshot of the room (its record in `players` or
+        `past_players`) and in every logged `player_joined` of that player, in
+        one transaction (spec 033). Seqs, order and everything else stay. This
+        is the second exception to the rule that the log is never rewritten
+        (spec 018). In a file database the write-ahead log is then checkpointed
+        and emptied, as in `delete_room`, so the old nickname leaves the files.
+
+        Args:
+            code: The room.
+            player_id: The player whose account was deleted.
+
+        Returns:
+            True when the room exists.
+        """
+        with self._lock:
+            if not self._room_exists(code):
+                return False
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._erase_in_snapshots(code, player_id)
+                self._erase_in_log(code, player_id)
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
+            if self._is_file:
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+            return True
+
     def append(self, code: str, entries: Sequence[LogEntry]) -> None:
         """Append `entries` to the log of room `code`, committed before returning.
 
@@ -374,6 +414,34 @@ class RoomStore:
                 return
             self._is_closed = True
             self._connection.close()
+
+    def _erase_in_snapshots(self, code: str, player_id: str) -> None:
+        """Rewrite each snapshot of the room with the player erased. Caller locks."""
+        rows = self._connection.execute(
+            "SELECT seq, state_json FROM snapshots WHERE code = ?", (code,)
+        ).fetchall()
+        for seq, state_json in rows:
+            state = RoomState.model_validate_json(state_json)
+            erased = with_player_erased(state, player_id)
+            self._connection.execute(
+                "UPDATE snapshots SET state_json = ? WHERE code = ? AND seq = ?",
+                (erased.model_dump_json(), code, seq),
+            )
+
+    def _erase_in_log(self, code: str, player_id: str) -> None:
+        """Rewrite each logged `player_joined` of the player. Caller locks."""
+        rows = self._connection.execute(
+            "SELECT seq, entry_json FROM log WHERE code = ?", (code,)
+        ).fetchall()
+        for seq, entry_json in rows:
+            entry = LogEntry.model_validate_json(entry_json)
+            erased = entry_with_player_erased(entry, player_id)
+            if erased is None:
+                continue
+            self._connection.execute(
+                "UPDATE log SET entry_json = ? WHERE code = ? AND seq = ?",
+                (erased.model_dump_json(), code, seq),
+            )
 
     def _room_exists(self, code: str) -> bool:
         """Tell whether the room is recorded. The caller holds the lock."""

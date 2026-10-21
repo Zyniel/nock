@@ -3,40 +3,35 @@
 The server listens on the address in NOCK_HOST and the port in NOCK_PORT, with
 the limits of `nock.server.server_config`. The rooms are stored in the SQLite
 file named by NOCK_DATABASE (spec 018), and NOCK_OPERATOR_TOKEN turns on the
-operator pages (spec 038). The four variables are checked before the server is
-built, and a refused value stops the start (specs 036 and 038).
+operator pages (spec 038). NOCK_PUBLIC_URL and the NOCK_SMTP_* variables turn
+on the accounts (spec 033). The variables are checked before the server is
+built, and a refused value stops the start (specs 036, 038 and 033).
 """
 
 from __future__ import annotations
 
-import ipaddress
 import os
-import string
 import unicodedata
 
 import uvicorn
 
 import nock.server
-from nock.settings import SettingsError, operator_token_from_env
+from nock.settings import (
+    MAX_LABEL_LENGTH,
+    MAX_PORT,
+    MIN_PORT,
+    SettingsError,
+    account_settings_from_env,
+    is_host,
+    operator_token_from_env,
+    port_number,
+)
 
 HOST_VARIABLE: str = "NOCK_HOST"
 PORT_VARIABLE: str = "NOCK_PORT"
 DATABASE_VARIABLE: str = nock.server.DATABASE_VARIABLE  # the app reads it (spec 018)
 DEFAULT_HOST: str = "127.0.0.1"
 DEFAULT_PORT: int = 8000
-MIN_PORT: int = 1
-MAX_PORT: int = 65535
-
-# The characters of NOCK_HOST are explicit ASCII sets: str.isalnum() and
-# str.isdigit() also accept the letters and digits of other scripts.
-HOST_LETTERS: str = string.ascii_letters  # A to Z and a to z: host names are ASCII
-HOST_DIGITS: str = string.digits  # 0 to 9 only, not the digits of other scripts
-HOST_NAME_MARKS: str = ".-"  # the dot between the labels of a name, the dash in one
-IPV6_MARK: str = ":"  # only an IPv6 address holds it, written without brackets
-HOST_CHARACTERS: str = HOST_LETTERS + HOST_DIGITS + HOST_NAME_MARKS + IPV6_MARK
-# The idna codec's limit on a label: uvicorn would end with a traceback past it.
-MAX_LABEL_LENGTH: int = 63
-
 # NOCK_DATABASE refuses the characters of these Unicode general categories (as
 # unicodedata.category gives them): most are invisible, or they end a line, so
 # the path could name another file than the one the operator reads.
@@ -85,6 +80,9 @@ def main() -> None:
       (format characters), Zl or Zp (line and paragraph separators), except
       U+200C and U+200D. Spaces, accents and path separators are allowed. The
       variable is not changed: the app reads it when it starts.
+    - NOCK_PUBLIC_URL and the NOCK_SMTP_* variables, checked last: the rules of
+      `nock.settings.account_settings_from_env` (spec 033). The app reads them
+      again when it starts.
 
     Raises:
         SystemExit: A variable holds a refused value, and no server is built.
@@ -97,6 +95,7 @@ def main() -> None:
     host = _read_host()
     port = _read_port()
     _check_database()
+    _check_account_settings()
     config = nock.server.server_config(nock.server.app, host=host, port=port)
     uvicorn.Server(config).run()
 
@@ -117,6 +116,24 @@ def _check_operator_token() -> None:
         raise SystemExit(str(error)) from error
 
 
+def _check_account_settings() -> None:
+    """Stop the start when a variable of the accounts breaks its rule (spec 033).
+
+    While NOCK_PUBLIC_URL and NOCK_SMTP_HOST are both unset or empty, accounts
+    are off and the other NOCK_SMTP_* variables are not read. The variables are
+    only read: the app reads them again when it starts.
+
+    Raises:
+        SystemExit: a variable breaks the rule of `account_settings_from_env`.
+            Its code is the message of the SettingsError, which never holds the
+            SMTP password.
+    """
+    try:
+        account_settings_from_env(os.environ)
+    except SettingsError as error:
+        raise SystemExit(str(error)) from error
+
+
 def _read_host() -> str:
     """Return the host in NOCK_HOST, or DEFAULT_HOST when it is unset or empty.
 
@@ -126,7 +143,7 @@ def _read_host() -> str:
     host = os.environ.get(HOST_VARIABLE, "")
     if host == "":
         return DEFAULT_HOST
-    if not _is_host(host):
+    if not is_host(host):
         raise _refusal(
             HOST_VARIABLE,
             "a host name or an IP address, written with the letters A to Z and "
@@ -139,45 +156,6 @@ def _read_host() -> str:
     return host
 
 
-def _is_host(text: str) -> bool:
-    """Tell whether `text` is a host name or an IP address that NOCK_HOST takes.
-
-    Every character is in HOST_CHARACTERS. A text that holds a colon is an IPv6
-    address, and any other text is a name whose labels are valid. Whether a name
-    resolves is not checked: uvicorn reports it.
-    """
-    for character in text:
-        if character not in HOST_CHARACTERS:
-            return False
-    if IPV6_MARK in text:
-        return _is_ipv6_address(text)
-    return _has_valid_labels(text)
-
-
-def _has_valid_labels(name: str) -> bool:
-    """Tell whether the dots of the host name `name` cut it into valid labels.
-
-    A label holds 1 to MAX_LABEL_LENGTH characters. Only the last label may be
-    empty, so that a name ending with a dot passes (example.org.).
-    """
-    labels = name.split(".")
-    last_label = labels[-1]
-    other_labels = labels[:-1]
-    for label in other_labels:
-        if label == "" or len(label) > MAX_LABEL_LENGTH:
-            return False
-    return len(last_label) <= MAX_LABEL_LENGTH
-
-
-def _is_ipv6_address(text: str) -> bool:
-    """Tell whether `ipaddress.IPv6Address` accepts `text`."""
-    try:
-        ipaddress.IPv6Address(text)
-    except ipaddress.AddressValueError:
-        return False
-    return True
-
-
 def _read_port() -> int:
     """Return the port in NOCK_PORT, or DEFAULT_PORT when it is unset or empty.
 
@@ -187,7 +165,7 @@ def _read_port() -> int:
     text = os.environ.get(PORT_VARIABLE, "")
     if text == "":
         return DEFAULT_PORT
-    port = _port_number(text)
+    port = port_number(text)
     if port is None:
         raise _refusal(
             PORT_VARIABLE,
@@ -195,26 +173,6 @@ def _read_port() -> int:
             "written with the digits 0 to 9 only",
             text,
         )
-    return port
-
-
-def _port_number(text: str) -> int | None:
-    """Return the port number written in `text`, or None when it is not one.
-
-    A port number is written with the ASCII digits 0 to 9 only (leading zeros
-    are allowed) and is from MIN_PORT to MAX_PORT.
-    """
-    if not text.isascii() or not text.isdigit():
-        return None
-    significant_digits = text.lstrip("0")
-    if len(significant_digits) > len(str(MAX_PORT)):
-        return None  # far too big, and int() refuses numbers of 4,300 digits
-    if significant_digits == "":
-        significant_digits = "0"  # all zeros: the number 0, below MIN_PORT
-    # Convert without the leading zeros: int() also refuses 4,300 of them.
-    port = int(significant_digits)
-    if port < MIN_PORT or port > MAX_PORT:
-        return None
     return port
 
 

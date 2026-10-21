@@ -98,6 +98,9 @@ MAX_PAST_PLAYERS: int = 100  # spec 032 AC-4: past players a room keeps
 NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
 NICKNAME_MIN_LENGTH: int = 2
 NICKNAME_MAX_LENGTH: int = 20
+# Spec 033: the nickname of a player whose account was deleted. No player can
+# choose it, since spec 012 needs a letter or a digit.
+FORMER_PLAYER_NICKNAME: str = "--"
 _NORMAL_CLOSE_CODE: int = 1000  # a normal closing
 SILENCE_CLOSE_CODE: int = 4408  # spec 017: close code of a silent socket
 _REMOVED_TEXT: str = "You were removed from this room."
@@ -447,6 +450,58 @@ def member_id(state: RoomState, resume_token: str) -> str | None:
         if secrets.compare_digest(past_player.resume_token, resume_token):
             return past_player.player_id
     return None
+
+
+def with_player_erased(state: RoomState, player_id: str) -> RoomState:
+    """Return the room with FORMER_PLAYER_NICKNAME as the nickname of a player.
+
+    The player's record in `players` or `past_players` gets the nickname; the
+    rest of the room stays as it is (spec 033, erasing a player).
+
+    Args:
+        state: The room.
+        player_id: The player whose account was deleted.
+
+    Returns:
+        The new state; the same content when the room has no such player.
+    """
+    erased = {"nickname": FORMER_PLAYER_NICKNAME}
+    players: list[PlayerRecord] = []
+    for player in state.players:
+        if player.player_id == player_id:
+            players.append(player.model_copy(update=erased))
+        else:
+            players.append(player)
+    past_players: list[PastPlayer] = []
+    for past_player in state.past_players:
+        if past_player.player_id == player_id:
+            past_players.append(past_player.model_copy(update=erased))
+        else:
+            past_players.append(past_player)
+    return state.model_copy(
+        update={"players": tuple(players), "past_players": tuple(past_players)}
+    )
+
+
+def entry_with_player_erased(entry: LogEntry, player_id: str) -> LogEntry | None:
+    """Return a logged `player_joined` of the player with FORMER_PLAYER_NICKNAME.
+
+    Args:
+        entry: One entry of a room's log.
+        player_id: The player whose account was deleted.
+
+    Returns:
+        The entry with the nickname replaced when it is a `player_joined` of
+        `player_id`; None for any other entry, which stays as it is.
+    """
+    event = entry.event
+    if not isinstance(event, PlayerJoined):
+        return None
+    if event.player.player_id != player_id:
+        return None
+    erased_view = event.player.model_copy(update={"nickname": FORMER_PLAYER_NICKNAME})
+    erased_event = event.model_copy(update={"player": erased_view})
+    return entry.model_copy(update={"event": erased_event})
 
 
 def team_nicknames(state: RoomState) -> tuple[str, ...]:
@@ -1010,13 +1065,17 @@ def _seat_back(state: RoomState, past_player: PastPlayer, now: float) -> Outcome
     """Bring a past player back into the room, with their id and token (spec 032).
 
     Their nickname gets spec 012's suffix when a player has it, and their colour
-    is theirs again unless a player has it. Their mute is kept (spec 032
-    decision 13). The rest is a new player's: the host role only when nobody is
-    host, no flag, no last edit. The join's nickname is not used.
+    is theirs again unless a player has it. A former player (spec 033) keeps
+    FORMER_PLAYER_NICKNAME as it is, without the suffix. Their mute is kept (spec
+    032 decision 13). The rest is a new player's: the host role only when nobody
+    is host, no flag, no last edit. The join's nickname is not used.
     """
+    nickname = past_player.nickname
+    if nickname != FORMER_PLAYER_NICKNAME:
+        nickname = _unique_nickname(state, nickname)
     view = PlayerView(
         player_id=past_player.player_id,
-        nickname=_unique_nickname(state, past_player.nickname),
+        nickname=nickname,
         colour=_seat_back_colour(state, past_player.colour),
         state=PlayerState.ACTIVE,
         is_host=not _has_host(state),

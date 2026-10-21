@@ -9,6 +9,10 @@ when it starts, then every `expiry_sweep_seconds` (spec 032).
 With an operator token, it also serves the operator pages (spec 038): the page
 `/ops` and the ops API under `/api/ops/`, the dashboard and the replay of a room,
 which only a request carrying the token reaches.
+
+With account settings, it also serves the optional accounts (spec 033): the page
+`/account` and the routes under `/api/account`, which sign a player in with a
+link sent by e-mail and keep the rooms of their account.
 """
 
 from __future__ import annotations
@@ -25,11 +29,33 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    WebSocket,
+)
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from nock.accounts import (
+    LINKS_PER_ADDRESS_PER_HOUR,
+    LINKS_PER_EMAIL_PER_HOUR,
+    SESSION_COOKIE,
+    SESSION_LIFE_SECONDS,
+    Account,
+    AccountStatus,
+    AccountStore,
+    RoomIdentity,
+    SignInLinkRequest,
+    SignInRequest,
+    SignInResult,
+    normalize_email,
+)
 from nock.catalogue import (
     GRIDS_DIR,
     Catalogue,
@@ -46,6 +72,7 @@ from nock.hub import (
     RoomConnection,
     RoomRegistry,
 )
+from nock.mailer import Mailer, MailError, SmtpMailer, sign_in_message
 from nock.operations import (
     DAY_SECONDS,
     RoomLog,
@@ -54,8 +81,14 @@ from nock.operations import (
     room_edits,
 )
 from nock.protocol import grid_view, parse_client_message
-from nock.room import RoomKey, RoomSummary
-from nock.settings import OPERATOR_TOKEN_VARIABLE, operator_token_from_env
+from nock.room import RoomKey, RoomState, RoomSummary
+from nock.room import member_id as room_member_id
+from nock.settings import (
+    OPERATOR_TOKEN_VARIABLE,
+    AccountSettings,
+    account_settings_from_env,
+    operator_token_from_env,
+)
 from nock.store import RoomStore
 
 __all__ = [
@@ -85,6 +118,10 @@ OPS_API_ROOT: str = "/api/ops"  # spec 038: hidden too while the pages are off
 OPS_API_PREFIX: str = "/api/ops/"  # spec 038: the paths of the ops API
 BEARER_PREFIX: str = "Bearer "  # spec 038: the operator token's header value
 NO_STORE: str = "no-store"  # spec 038: the Cache-Control of every ops API answer
+ACCOUNT_PAGE_PATH: str = "/account"  # spec 033: hidden too while accounts are off
+ACCOUNT_API_ROOT: str = "/api/account"  # spec 033: its routes are under it
+ACCOUNT_API_PREFIX: str = "/api/account/"
+LINK_LIMIT_WINDOW_SECONDS: float = 3_600.0  # spec 033: the limits count an hour
 
 # The ?days= of the dashboard as written in the URL: exactly 1, 7 or 30 (spec 038).
 DashboardDays = Literal["1", "7", "30"]
@@ -227,10 +264,7 @@ class _RoomsHolder:
         """Return the registry, creating it from NOCK_DATABASE the first time."""
         with self._lock:
             if self._registry is None:
-                database = os.environ.get(DATABASE_VARIABLE, "")
-                if database == "":
-                    database = MEMORY_DATABASE  # an empty variable counts as unset
-                self._registry = RoomRegistry(store=RoomStore(database))
+                self._registry = RoomRegistry(store=RoomStore(_database_path()))
                 self._is_created_here = True
             return self._registry
 
@@ -280,6 +314,141 @@ class _OperatorToken:
             self.token = operator_token_from_env(os.environ)
 
 
+class _LinkLimits:
+    """The two limits of the sign-in link requests, kept in memory (spec 033).
+
+    Per normalised address and per client address, the times of the counted
+    requests of the last hour. A key is kept until LINK_LIMIT_WINDOW_SECONDS
+    after its last counted request, and at most until the next request counted
+    after that. Every method may be called from any thread: each one takes the
+    lock.
+    """
+
+    def __init__(self) -> None:
+        """Create limits that hold no request."""
+        self._lock = threading.Lock()
+        self._times_per_email: dict[str, list[float]] = {}
+        self._times_per_address: dict[str, list[float]] = {}
+
+    def count_unless_reached(self, email: str, address: str, now: float) -> bool:
+        """Count one request for `email` from `address`, unless a limit is reached.
+
+        The check and the count are one step under the lock, so requests that
+        arrive at once are counted one after another. Before it counts, each
+        limit forgets the keys whose counted requests are all out of the hour.
+
+        Args:
+            email: The normalised address the link is for.
+            address: The client's address.
+            now: Clock time of the request.
+
+        Returns:
+            True when the request is counted, and its mail may be sent. False
+            when LINKS_PER_EMAIL_PER_HOUR requests for `email`, or
+            LINKS_PER_ADDRESS_PER_HOUR from `address`, have a time `t` with
+            `t > now - 3600`: nothing is counted or forgotten then.
+        """
+        with self._lock:
+            email_times = _times_in_window(self._times_per_email.get(email, []), now)
+            address_times = _times_in_window(
+                self._times_per_address.get(address, []), now
+            )
+            if len(email_times) >= LINKS_PER_EMAIL_PER_HOUR:
+                return False
+            if len(address_times) >= LINKS_PER_ADDRESS_PER_HOUR:
+                return False
+            self._times_per_email = _forget_old_times(self._times_per_email, now)
+            self._times_per_address = _forget_old_times(self._times_per_address, now)
+            email_times.append(now)
+            address_times.append(now)
+            self._times_per_email[email] = email_times
+            self._times_per_address[address] = address_times
+            return True
+
+
+def _times_in_window(times: list[float], now: float) -> list[float]:
+    """Return the times of `times` inside the hour that ends at `now`."""
+    recent: list[float] = []
+    for counted_at in times:
+        if counted_at > now - LINK_LIMIT_WINDOW_SECONDS:
+            recent.append(counted_at)
+    return recent
+
+
+def _forget_old_times(
+    times_per_key: dict[str, list[float]], now: float
+) -> dict[str, list[float]]:
+    """Return the keys with their times inside the hour; a key with none goes."""
+    kept: dict[str, list[float]] = {}
+    for key, times in times_per_key.items():
+        recent = _times_in_window(times, now)
+        if len(recent) > 0:
+            kept[key] = recent
+    return kept
+
+
+class _AccountService:
+    """What an app's accounts run on: their settings, their store, their mailer.
+
+    Settings given are used as they are. Without them, the variables of spec
+    033 are read each time the app starts. While `settings` is None, accounts
+    are off. A store or a mailer given is used and never closed; a store created
+    here is opened when the app starts and closed when it stops.
+    """
+
+    def __init__(
+        self,
+        settings: AccountSettings | None,
+        store: AccountStore | None,
+        mailer: Mailer | None,
+    ) -> None:
+        """Keep what `create_app` was given; the rest is made at the start."""
+        self._given_settings = settings
+        self._given_store = store
+        self._given_mailer = mailer
+        self.settings: AccountSettings | None = None
+        self.store: AccountStore | None = None
+        self.mailer: Mailer | None = None
+        self.limits = _LinkLimits()
+        self._is_store_created_here = False
+
+    def start(self) -> None:
+        """Turn the accounts on or off, as the app starts.
+
+        Raises:
+            SettingsError: no settings were given, and a variable of spec 033
+                breaks its rule.
+        """
+        settings = self._given_settings
+        if settings is None:
+            settings = account_settings_from_env(os.environ)
+        self.settings = settings
+        if settings is None:
+            return
+        self.mailer = self._given_mailer
+        if self.mailer is None:
+            self.mailer = SmtpMailer(settings.smtp)
+        self.store = self._given_store
+        if self.store is None:
+            self.store = AccountStore(_database_path())
+            self._is_store_created_here = True
+
+    def stop(self) -> None:
+        """Close the store when it was created at the start."""
+        if self.store is not None and self._is_store_created_here:
+            self.store.close()
+        self.store = None
+        self._is_store_created_here = False
+
+
+def _database_path() -> str:
+    """Return the path of NOCK_DATABASE, or ":memory:" when unset or empty."""
+    database = os.environ.get(DATABASE_VARIABLE, "")
+    if database == "":
+        return MEMORY_DATABASE  # an empty variable counts as unset
+    return database
+
+
 def _not_found() -> HTTPException:
     """Return the 404 error with FastAPI's usual body."""
     return HTTPException(status_code=404, detail="Not Found")
@@ -297,6 +466,72 @@ def _not_authorized() -> HTTPException:
         detail="Not authorized",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+
+def _no_session() -> HTTPException:
+    """Return the 401 error of an account route asked without a session."""
+    return HTTPException(status_code=401, detail="Not authorized")
+
+
+def _is_account_path(path: str) -> bool:
+    """Tell whether `path` is `/account`, `/api/account` or under it (spec 033)."""
+    if path in (ACCOUNT_PAGE_PATH, ACCOUNT_API_ROOT):
+        return True
+    return path.startswith(ACCOUNT_API_PREFIX)
+
+
+def _member_identity(rooms: RoomRegistry, key: RoomKey) -> RoomIdentity | None:
+    """Return the member of a room whose resume token is the key's, or None.
+
+    The player id and the nickname come from the room (spec 033). None when the
+    room is unknown or expired, or when the token is no member's.
+    """
+    state = rooms.peek_room(key.code)
+    if state is None:
+        return None
+    player_id = room_member_id(state, key.resume_token)
+    if player_id is None:
+        return None
+    nickname = _nickname_of(state, player_id)
+    if nickname is None:
+        return None
+    return RoomIdentity(
+        code=key.code,
+        player_id=player_id,
+        resume_token=key.resume_token,
+        nickname=nickname,
+    )
+
+
+def _nickname_of(state: RoomState, player_id: str) -> str | None:
+    """Return the nickname of a member of the room, in `players` or past ones."""
+    for player in state.players:
+        if player.player_id == player_id:
+            return player.nickname
+    for past_player in state.past_players:
+        if past_player.player_id == player_id:
+            return past_player.nickname
+    return None
+
+
+def _served_identities(
+    rooms: RoomRegistry, store: AccountStore, account_id: str
+) -> list[RoomIdentity]:
+    """Return the account's identities whose token is still a member's of the room.
+
+    So an identity of a deleted room is left out, also once a new room has its
+    code (spec 033, "Room code reused").
+    """
+    served: list[RoomIdentity] = []
+    for identity in store.identities(account_id):
+        if rooms.member_id(identity.code, identity.resume_token) is not None:
+            served.append(identity)
+    return served
+
+
+def _clear_session_cookie(response: Response) -> None:
+    """Make the browser forget its session cookie (`Max-Age=0`)."""
+    response.delete_cookie(SESSION_COOKIE, path="/")
 
 
 def _is_ops_path(path: str) -> bool:
@@ -457,31 +692,43 @@ async def _serve_socket(
             await writer
 
 
-async def _sweep_expired_rooms(rooms: RoomRegistry, stop: asyncio.Event) -> None:
+async def _sweep_expired_rooms(
+    rooms: RoomRegistry, accounts: _AccountService, stop: asyncio.Event
+) -> None:
     """Delete the expired rooms now, then every `expiry_sweep_seconds`, until `stop`.
 
-    Each sweep runs in a worker thread, since it waits for the disk. A sweep that
-    raises is logged, and the next one runs as planned (spec 032).
+    While accounts are on, each sweep then deletes the old sign-in links and
+    sessions (spec 033). Each sweep runs in a worker thread, since it waits for
+    the disk. A sweep that raises is logged, and the next one runs as planned
+    (spec 032).
     """
     while not stop.is_set():
         try:
             await asyncio.to_thread(rooms.expire_rooms)
         except Exception:
             logger.exception("The sweep of the expired rooms failed")
+        account_store = accounts.store
+        if account_store is not None:
+            try:
+                await asyncio.to_thread(account_store.purge, rooms.clock())
+            except Exception:
+                logger.exception("The sweep of the old links and sessions failed")
         # The interval, or less when the app stops meanwhile.
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(stop.wait(), rooms.config.expiry_sweep_seconds)
 
 
 @contextlib.asynccontextmanager
-async def _expiry_sweeps(rooms: RoomRegistry) -> AsyncGenerator[None]:
+async def _expiry_sweeps(
+    rooms: RoomRegistry, accounts: _AccountService
+) -> AsyncGenerator[None]:
     """Run the expiry sweeps of `rooms` in the background while the block runs.
 
     On the way out, a sweep under way is waited for, so that it never meets a
-    closed registry.
+    closed registry or account store.
     """
     stop = asyncio.Event()
-    sweeping = asyncio.create_task(_sweep_expired_rooms(rooms, stop))
+    sweeping = asyncio.create_task(_sweep_expired_rooms(rooms, accounts, stop))
     try:
         yield
     finally:
@@ -495,6 +742,9 @@ def create_app(
     catalogue: Catalogue | None = None,
     *,
     operator_token: str | None = None,
+    accounts: AccountSettings | None = None,
+    account_store: AccountStore | None = None,
+    mailer: Mailer | None = None,
 ) -> FastAPI:
     """Build the app.
 
@@ -512,10 +762,18 @@ def create_app(
             variable is not read. None: the token of NOCK_OPERATOR_TOKEN, read
             when the app starts; the pages are off when the variable is unset
             or empty.
+        accounts: The account settings (spec 033). None: the settings of
+            `account_settings_from_env(os.environ)`, read when the app starts;
+            accounts are off when NOCK_PUBLIC_URL and NOCK_SMTP_HOST are unset.
+        account_store: Where the accounts are kept. None, accounts on: a new
+            AccountStore on NOCK_DATABASE (":memory:" when unset or empty),
+            opened when the app starts and closed when it stops; accounts off:
+            none. A store given is never closed by the app.
+        mailer: What sends the sign-in links. None: SmtpMailer(accounts.smtp).
 
     Never raises because `dist_dir` is missing or empty (see AC-6). The app's
     startup raises SettingsError when it reads a NOCK_OPERATOR_TOKEN that breaks
-    the rule of spec 038.
+    the rule of spec 038, or account variables that break the rules of spec 033.
 
     Raises:
         SettingsError: `operator_token` breaks the rule of NOCK_OPERATOR_TOKEN.
@@ -523,6 +781,7 @@ def create_app(
     """
     holder = _RoomsHolder(rooms)
     operator = _OperatorToken(operator_token)
+    account_service = _AccountService(accounts, account_store, mailer)
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
     room_code_regex = re.compile(ROOM_CODE_PATTERN)
@@ -534,11 +793,13 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         operator.read_at_start()
-        room_registry = holder.get()
+        account_service.start()
         try:
-            async with _expiry_sweeps(room_registry):
+            room_registry = holder.get()
+            async with _expiry_sweeps(room_registry, account_service):
                 yield
         finally:
+            account_service.stop()
             holder.close_if_created()
 
     # No slash redirect: a path ending with "/" matches no route and is a 404.
@@ -569,6 +830,54 @@ def create_app(
         if path.startswith(OPS_API_PREFIX):
             response.headers["Cache-Control"] = NO_STORE
         return response
+
+    # Spec 033: while accounts are off, the account page and every path under
+    # /api/account answer as an unknown path does, whatever the method. While
+    # they are on, no browser or proxy keeps an answer under /api/account.
+    @web_app.middleware("http")
+    async def guard_account_paths(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        path = request.url.path
+        if not _is_account_path(path):
+            return await call_next(request)
+        if account_service.settings is None:
+            return await http_exception_handler(request, _not_found())
+        response = await call_next(request)
+        if path != ACCOUNT_PAGE_PATH:
+            response.headers["Cache-Control"] = NO_STORE
+        return response
+
+    def account_store_in_use() -> AccountStore:
+        """Return the account store, or refuse the request while accounts are off.
+
+        Raises:
+            HTTPException: 404 while accounts are off; `guard_account_paths`
+                already answers so.
+        """
+        store = account_service.store
+        if store is None:
+            raise _not_found()
+        return store
+
+    def signed_in_account(request: Request) -> Account | None:
+        """Return the account of the request's session cookie, or None."""
+        store = account_store_in_use()
+        session = request.cookies.get(SESSION_COOKIE)
+        if session is None:
+            return None
+        return store.account_of_session(session, holder.get().clock())
+
+    def require_account(request: Request) -> Account:
+        """Return the account of the session, or refuse the request (spec 033).
+
+        Raises:
+            HTTPException: 401 without a session that signs an account in.
+        """
+        account = signed_in_account(request)
+        if account is None:
+            raise _no_session()
+        return account
 
     def check_operator(request: Request) -> None:
         """Let an ops API request through, or refuse it (spec 038, rules 1 to 3).
@@ -607,6 +916,10 @@ def create_app(
     def serve_ops_page() -> Response:
         if operator.token is None:
             raise _not_found()
+        return _index_response(client_dir)
+
+    @web_app.get(ACCOUNT_PAGE_PATH, include_in_schema=False)
+    def serve_account_page() -> Response:
         return _index_response(client_dir)
 
     @web_app.get("/r/{code}", include_in_schema=False)
@@ -732,6 +1045,134 @@ def create_app(
             code=code, grid=grid_view(state.grid), edits=room_edits(entries)
         )
         return replay.model_dump(mode="json")
+
+    @web_app.get(ACCOUNT_API_ROOT)
+    def get_account_status(request: Request) -> dict[str, object]:
+        account = signed_in_account(request)
+        if account is None:
+            status = AccountStatus(signed_in=False, email=None)
+        else:
+            status = AccountStatus(signed_in=True, email=account.email)
+        return status.model_dump(mode="json")
+
+    # Spec 033: checked in this order: the body, the address, the room, the
+    # limits; then the mail is sent. Only a request that reaches the mailer
+    # counts toward the limits.
+    @web_app.post(f"{ACCOUNT_API_ROOT}/link", status_code=202)
+    def ask_sign_in_link(
+        body: SignInLinkRequest, request: Request
+    ) -> dict[str, object]:
+        store = account_store_in_use()
+        settings = account_service.settings
+        sender = account_service.mailer
+        if settings is None or sender is None:
+            raise _not_found()
+        try:
+            email = normalize_email(body.email)
+        except ValueError:
+            raise HTTPException(
+                status_code=422, detail="Invalid e-mail address"
+            ) from None
+        room_registry = holder.get()
+        room = body.room
+        if (
+            room is not None
+            and room_registry.member_id(room.code, room.resume_token) is None
+        ):
+            raise _not_found()
+        now = room_registry.clock()
+        address = _client_address(request)
+        if not account_service.limits.count_unless_reached(email, address, now):
+            raise _too_many_requests()
+        token = store.add_link(email, body.room, now)
+        try:
+            sender.send(sign_in_message(settings, email, token))
+        except MailError as error:
+            # A MailError names the kind of failure only: no address, no secret.
+            logger.warning("A sign-in link was not sent: %s", error)
+            raise HTTPException(status_code=503, detail="Mail not sent") from None
+        return {}
+
+    @web_app.post(f"{ACCOUNT_API_ROOT}/sign-in")
+    def sign_in_with_link(body: SignInRequest, response: Response) -> dict[str, object]:
+        store = account_store_in_use()
+        settings = account_service.settings
+        if settings is None:
+            raise _not_found()
+        room_registry = holder.get()
+        now = room_registry.clock()
+        link = store.use_link(body.token, now)
+        if link is None:
+            raise _not_found()
+        session = store.sign_in(link.email, now)
+        room_code = None
+        if link.room is not None:
+            identity = _member_identity(room_registry, link.room)
+            if identity is not None:
+                store.link_identity(session.account_id, identity, now)
+                room_code = identity.code
+        rooms = _served_identities(room_registry, store, session.account_id)
+        response.set_cookie(
+            SESSION_COOKIE,
+            session.session,
+            max_age=int(SESSION_LIFE_SECONDS),
+            path="/",
+            secure=settings.public_url.startswith("https://"),
+            httponly=True,
+            samesite="lax",
+        )
+        result = SignInResult(email=link.email, room_code=room_code, rooms=tuple(rooms))
+        return result.model_dump(mode="json")
+
+    @web_app.post(f"{ACCOUNT_API_ROOT}/sign-out", status_code=204)
+    def sign_out(request: Request) -> Response:
+        store = account_store_in_use()
+        session = request.cookies.get(SESSION_COOKIE)
+        if session is not None:
+            store.end_session(session)
+        response = Response(status_code=204)
+        _clear_session_cookie(response)
+        return response
+
+    @web_app.get(f"{ACCOUNT_API_ROOT}/rooms")
+    def list_account_rooms(request: Request) -> list[dict[str, object]]:
+        account = require_account(request)
+        store = account_store_in_use()
+        identities = _served_identities(holder.get(), store, account.account_id)
+        bodies: list[dict[str, object]] = []
+        for identity in identities:
+            bodies.append(identity.model_dump(mode="json"))
+        return bodies
+
+    # The dependency refuses a request without a session before its body is
+    # read (spec 033); the route then reads the account of the session.
+    @web_app.put(
+        f"{ACCOUNT_API_ROOT}/rooms",
+        status_code=204,
+        dependencies=[Depends(require_account)],
+    )
+    def link_account_room(body: RoomKey, request: Request) -> Response:
+        account = require_account(request)
+        store = account_store_in_use()
+        room_registry = holder.get()
+        identity = _member_identity(room_registry, body)
+        if identity is None:
+            raise _not_found()
+        store.link_identity(account.account_id, identity, room_registry.clock())
+        return Response(status_code=204)
+
+    # Spec 033: the account goes at once, then each of its players is erased
+    # from the rooms that still exist.
+    @web_app.delete(ACCOUNT_API_ROOT, status_code=204)
+    def delete_account(request: Request) -> Response:
+        account = require_account(request)
+        store = account_store_in_use()
+        room_registry = holder.get()
+        for identity in store.delete_account(account.account_id):
+            room_registry.erase_player(identity.code, identity.player_id)
+        response = Response(status_code=204)
+        _clear_session_cookie(response)
+        return response
 
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:
