@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Every engine on demand, from the Actions tab.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,21 +15,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
+  # Whether a pull request changes anything a browser test can see. One that
+  # changes only files under specs/ or docs/ skips the browser jobs: no test
+  # reads those folders, and the static job still checks the specs against
+  # their tests (spec traceability). A push to main runs every job (human
+  # decision, 2026-10-21).
+  changes:
+    name: Changed files
+    runs-on: ubuntu-latest
+    outputs:
+      browsers: ${{ steps.files.outputs.browsers }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: List the changed files
+        id: files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          browsers=true
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            changed_files=$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA")
+            echo "$changed_files"
+            other_files=$(echo "$changed_files" | grep -vE '^(specs|docs)/' || true)
+            if [ -n "$changed_files" ] && [ -z "$other_files" ]; then
+              browsers=false
+            fi
+          fi
+          echo "Browser jobs run: $browsers"
+          echo "browsers=$browsers" >> "$GITHUB_OUTPUT"
+
+  # The static checks and the tests without a browser, on the oldest Python.
+  # They run for every pull request.
+  static:
     name: Quality gate (${{ matrix.label }})
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
-      # One job per browser engine on Ubuntu, Chromium and WebKit on Windows,
-      # and one job for the static checks and the tests without a browser on
-      # the oldest Python (human decisions, 2026-10-15 and 2026-10-17). The
-      # Chromium jobs also run the tests without a browser, so those run on
-      # both systems and both Pythons. Firefox has no Windows job: it was the
-      # slowest job, and it failed in 5 of 10 runs, each time a timeout that
-      # passed on re-run (2026-10-17). The Windows jobs run 3 workers, one less
-      # than the runner's 4 CPUs: with 4, each driving a browser and a local
-      # server, the runner once stalled for over 5 s and two tests timed out
-      # together (2026-10-16).
       matrix:
         include:
           - label: static and non-browser tests, ubuntu-latest, Python 3.13
@@ -35,32 +62,7 @@ jobs:
             python-version: "3.13"
             gate-options: --tests other
             engine: ""
-          - label: chromium, ubuntu-latest, Python 3.14
-            os: ubuntu-latest
-            python-version: "3.14"
-            gate-options: --skip-static --browsers chromium
-            engine: chromium
-          - label: firefox, ubuntu-latest, Python 3.14
-            os: ubuntu-latest
-            python-version: "3.14"
-            gate-options: --skip-static --tests browser --browsers firefox
-            engine: firefox
-          - label: webkit, ubuntu-latest, Python 3.14
-            os: ubuntu-latest
-            python-version: "3.14"
-            gate-options: --skip-static --tests browser --browsers webkit
-            engine: webkit
-          - label: chromium, windows-latest, Python 3.14
-            os: windows-latest
-            python-version: "3.14"
-            gate-options: --skip-static --browsers chromium --workers 3
-            engine: chromium
-          - label: webkit, windows-latest, Python 3.14
-            os: windows-latest
-            python-version: "3.14"
-            gate-options: --skip-static --tests browser --browsers webkit --workers 3
-            engine: webkit
-    steps:
+    steps: &gate-steps
       - uses: actions/checkout@v7
 
       - name: Install uv
@@ -85,36 +87,83 @@ jobs:
         if: matrix.engine != ''
         run: uv run playwright install --with-deps ${{ matrix.engine }}
 
-      # Each test runs its own local server and opens new connections to it, and
-      # a closed connection keeps its port for minutes (TIME_WAIT). With four
-      # workers, Windows' default 16,384 ephemeral ports ran out once
-      # (net::ERR_NO_BUFFER_SPACE, 2026-10-15); this gives it 49,152. The range
-      # starts above 10080, the highest port browsers refuse to load
-      # (net::ERR_UNSAFE_PORT, 2026-10-16).
-      - name: Widen the range of ephemeral ports
-        if: runner.os == 'Windows'
-        run: |
-          netsh int ipv4 set dynamicport tcp start=16384 num=49152
-          "Logical processors: $env:NUMBER_OF_PROCESSORS"
-
       # The same command you run locally and that the Claude Code hooks run.
       - name: Run the quality gate
         run: uv run python scripts/gate.py ${{ matrix.gate-options }}
 
-      - name: Show the connections waiting out TIME_WAIT
-        if: failure() && runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          netsh int ipv4 show dynamicport tcp
-          "TIME_WAIT connections: $((Get-NetTCPConnection -State TimeWait -ErrorAction SilentlyContinue).Count)"
+  # The browser tests of a pull request: Chromium on Ubuntu, which also runs
+  # the tests without a browser on the newer Python (human decision,
+  # 2026-10-21: while the design is still moving, pull requests run one engine
+  # and no Windows job; the Windows jobs were the slowest and the WebKit ones
+  # failed most often on a tap timeout that passed on re-run). Windows is
+  # covered by the local gate, which every agent runs there before it stops.
+  browsers:
+    name: Quality gate (${{ matrix.label }})
+    needs: changes
+    if: needs.changes.outputs.browsers == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - label: chromium, ubuntu-latest, Python 3.14
+            os: ubuntu-latest
+            python-version: "3.14"
+            gate-options: --skip-static --browsers chromium
+            engine: chromium
+    steps: *gate-steps
+
+  # Firefox and WebKit, on Ubuntu, after a merge into main and on demand
+  # (workflow_dispatch), never on a pull request (human decision, 2026-10-21).
+  # A failure here is fixed in the next pull request.
+  other-engines:
+    name: Quality gate (${{ matrix.label }})
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: firefox, ubuntu-latest, Python 3.14
+            os: ubuntu-latest
+            python-version: "3.14"
+            gate-options: --skip-static --tests browser --browsers firefox
+            engine: firefox
+          - label: webkit, ubuntu-latest, Python 3.14
+            os: ubuntu-latest
+            python-version: "3.14"
+            gate-options: --skip-static --tests browser --browsers webkit
+            engine: webkit
+    steps: *gate-steps
 
   # One check that passes only when every gate job passed, so the branch rule
-  # of main needs to require this name only, whatever the matrix holds.
+  # of main needs to require this name only, whatever the matrix holds. The
+  # browser jobs may be skipped only when the changed files allow it, and the
+  # other engines only on a pull request.
   all-gates:
     name: Quality gate
     if: always()
-    needs: gate
+    needs: [changes, static, browsers, other-engines]
     runs-on: ubuntu-latest
     steps:
       - name: Check that every gate job passed
-        run: test "${{ needs.gate.result }}" = "success"
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          STATIC_RESULT: ${{ needs.static.result }}
+          BROWSERS_RESULT: ${{ needs.browsers.result }}
+          BROWSERS_RUN: ${{ needs.changes.outputs.browsers }}
+          OTHER_ENGINES_RESULT: ${{ needs.other-engines.result }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          echo "changes: $CHANGES_RESULT, static: $STATIC_RESULT, browsers: $BROWSERS_RESULT (run: $BROWSERS_RUN), other engines: $OTHER_ENGINES_RESULT"
+          test "$CHANGES_RESULT" = "success"
+          test "$STATIC_RESULT" = "success"
+          if [ "$BROWSERS_RUN" = "false" ]; then
+            test "$BROWSERS_RESULT" = "skipped"
+          else
+            test "$BROWSERS_RESULT" = "success"
+          fi
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            test "$OTHER_ENGINES_RESULT" = "skipped"
+          else
+            test "$OTHER_ENGINES_RESULT" = "success"
+          fi
