@@ -72,7 +72,12 @@ the selected word's clue).
 Highlights are visible: the computed `background-color` of the selected cell, of
 the other cells of the selected word, and of the letter cells outside it are three
 different colours; an active `clue` has a `background-color` different from an
-inactive one.
+inactive one. (Note from the lead, 2026-10-22: refined by spec 042, the design's
+grid cells, which fixes these colours (selected blue, word blue, white; the active
+clue's half in selected blue with a 2 px radius) and lets a locked cell keep its
+locked grey inside my word. No criterion of this spec changes: the three colours
+still differ. An arrow is now drawn inside the word's first letter cell, so a tap
+on it selects that cell.)
 
 ### Clue bar
 

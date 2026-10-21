@@ -335,7 +335,10 @@ order of the snapshot's `players` with joiners appended. Each item has
 `data-player-id`, `data-colour` (the index), `data-state` (`active`, `idle` or
 `disconnected`), `data-you` (`true` on the receiving player's item, else
 `false`), a `data-testid="roster-colour"` swatch whose background is that
-player's colour, and a `data-testid="roster-nickname"` element whose text is the
+player's colour (Note from the lead, 2026-10-22: refined by spec 042, the design's
+grid cells: while spec 042's Accessibilité switch is on, the swatch has a
+transparent background and shows that player's icon in their colour instead; it
+is off by default, so no criterion of this spec changes), and a `data-testid="roster-nickname"` element whose text is the
 nickname as spec 040's `displayNickname` writes it, with capitalised words (`ANA`
 shows as `Ana`), in plain text, never HTML. The own item also shows
 `t("roster.you")`. (Note from the lead, 2026-10-16: "whose text is the nickname

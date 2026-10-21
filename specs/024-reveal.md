@@ -8,6 +8,8 @@ status: done
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 11 and 12 below, and "Open questions" says "None.")
 
+(Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells (`_design.md` section 6). The corner mark becomes the bottom-centre notch of the design, `max(7px, 0.22 s)` by `max(4px, 0.11 s)`, in `--nock-reveal` and in ink during a flash; the lead decided on 2026-10-22, on the human's instruction, that this size wins over AC-9's former minimum. "Client: revealed cells", AC-9, decision 14 and two edge cases change, so the test-writer updates the tests of AC-9 before the implementer runs. The other criteria do not change.)
+
 Epic E6 Help and validation (US-6.2) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The rooms
 engine (`nock.room`, `nock.hub`, delivery order, test harness) is defined in spec
@@ -223,40 +225,34 @@ On the `cell` element of each letter cell (spec 006):
   true, else `false`.
 - A cell with `data-revealed="true"` holds one `data-testid="reveal-mark"` and one
   `data-testid="reveal-label"`; any other cell holds neither.
-  - `reveal-mark` is the corner marker: `aria-hidden="true"`, no text, a box drawn
-    with its `background-color` (a `clip-path` may cut it to a triangle) in the
-    cell's top-right corner. Its bounding box lies inside the cell's box (1 px
-    tolerance), with its right edge within 4 px of the cell's right edge and its
-    top edge within 4 px of the cell's top edge. It is at least 6 px and at least
-    a quarter of the cell side wide and high. Its colour has a contrast of at
-    least 3:1 against the cell's computed `background-color`. Its computed
-    `visibility` is `visible`.
-  - That 3:1 holds in every state of the cell: not selected, selected, and while
-    the cell flashes in a player's colour (spec 016: up to 1,000 ms in the colour
-    of another player who replaced my letter), which happens when the cell is
-    revealed within such a flash. (Note from the lead, 2026-10-15: added;
-    the ink-coloured mark had only 2.99:1 and 2.27:1 on the flash colours 2 and 4
-    (review of spec 024).)
-  - The mark may be drawn in more than one colour, for example a fill and a
-    contrasting edge around it, with layers inside `reveal-mark` (element
-    descendants, or its `::before` and `::after` pseudo-elements whose computed
-    `content` is not `none`). Its colours are the computed `background-color` of
-    `reveal-mark` and of each layer at least 6 px and at least a quarter of the
-    cell side wide and high (bounding box for an element, computed `width` and
-    `height` for a pseudo-element). Its contrast against the cell is the highest
-    contrast of its colours against the cell's computed `background-color`. A
-    colour counts only where it shows: a layer under another shows at least 1 px
-    of its colour around it (the reviewer checks this; the tests read the
-    colours). (Note from the lead, 2026-10-15: added, so that both a mark colour
-    that changes with the flash and a contrasting edge can pass (review of spec
-    024).)
-  - How the mark keeps 3:1 on the flash colours is the implementer's choice
-    between changing its colour while the cell flashes and giving it a
-    contrasting edge; neither contradicts spec 016. Ending the flash at the
-    reveal is not allowed: spec 016 keeps `data-flash` and the flash colour for
-    1,000 ms after the `letter_changed` is applied, and no rule there lets a
-    `cell_locked` end it. (Note from the lead, 2026-10-15: added; this is the
-    lead's decision 14 (review of spec 024).)
+  - `reveal-mark` is the revealed notch of spec 042 ("Revealed notch"):
+    `aria-hidden="true"`, no text, an isosceles triangle pointing up
+    (`clip-path: polygon(50% 0%, 100% 100%, 0% 100%)`) on a box
+    `max(7px, 0.22 s)` wide and `max(4px, 0.11 s)` high, where `s` is the cell's
+    side, centred on the cell's inner box (its box less the 1 px right and bottom
+    grid lines) horizontally, its bottom on the inner box's bottom, drawn with its
+    `background-color` `--nock-reveal`. Its computed `visibility` is `visible`.
+    Its colour has a contrast of at least 3:1 against the cell's computed
+    `background-color` (locked grey 4.17:1, selected blue 3.77:1). (Note from the
+    lead, 2026-10-22: refined by spec 042, the design's grid cells. The mark was a
+    triangle in the top-right corner, at least 6 px and a quarter of the side wide
+    and high; the corners now belong to the other players' triangles, and the
+    lead decided on 2026-10-22, on the human's instruction, that the design's
+    size wins over that minimum.)
+  - While the cell flashes in a player's colour (spec 016: up to 1,000 ms in the
+    colour of another player who replaced my letter), which happens when the cell
+    is revealed within such a flash, the notch's `background-color` is
+    `--nock-ink`, and its contrast against the flash, the composite of that
+    player's colour at 38 % over white (spec 041's `cell-flash`), is at least
+    3:1. Ending the flash at the reveal is not allowed: spec 016 keeps
+    `data-flash` and the flash colour for 1,000 ms after the `letter_changed` is
+    applied, and no rule there lets a `cell_locked` end it. (Note from the lead,
+    2026-10-15: added; this is the lead's decision 14 (review of spec 024).)
+    (Note from the lead, 2026-10-22: refined by spec 042, the design's grid
+    cells: the mark is one colour, orange-red, and ink during a flash, decided by
+    the lead on 2026-10-22 on the human's instruction (`_design.md` section 15).
+    The bullets that let the mark have layers and a contrasting edge, at the
+    implementer's choice, are gone.)
   - `reveal-label` has the class `visually-hidden` (spec 035) and the text
     `t("a11y.revealed")`, so a screen reader reads the cell as revealed.
 - A revealed cell is locked: spec 016's rules apply (typing and erasing do
@@ -438,7 +434,7 @@ The words in brackets say how each criterion is tested.
   - Keyboard, desktop context: after the test calls `focus()` on `share-link` from `page.evaluate`, it presses `Tab` until each of the six buttons has had the focus (at most 60 presses). While each one has the focus: its box lies inside the toolbar's client area (1 px tolerance); its computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against white (spec 035 AC-2); the outline passes the "Not clipped" measure of spec 035's "Focus outline of the feed's scrolling list", with the toolbar among the clipping ancestors; and `room-toolbar-more` is not visible.
   - Pointer: for each of the six buttons, after `scrollIntoView({block: "nearest", inline: "nearest"})`, `document.elementFromPoint` at the centre of its box returns the button or one of its descendants.
   - Pointer focus, at 320 by 568 only, with a mouse click in the desktop context and a tap in the touch context, on each of the six buttons, tested as spec 035 tests the host panel ("Pointer focus in the host panel"). The test sets the toolbar's `scrollLeft` to the value that puts the button's centre on the toolbar's right edge, clamped to the toolbar's scroll range, so that the button is partly hidden past that edge wherever the range allows it. Then it wraps `scrollIntoView`, `scrollIntoViewIfNeeded` (where the engine has it), `scroll`, `scrollTo`, `scrollBy` and the `scrollLeft` setter of `Element.prototype`, so that each call made on `room-toolbar` or on an element inside it is recorded, and presses the centre of the button's visible part (its box cut to the toolbar's client area) at raw coordinates with `page.mouse.click` or `page.touchscreen.tap`, because `locator.click()` would scroll the button into view first. 300 ms after the press, no call has been recorded, and `room-toolbar-more` is visible (computed `visibility` `visible`, `display` not `none`) if toolbar content is still hidden past the right edge (`scrollWidth - clientWidth - scrollLeft > 1`). Both hold whether or not the engine gives the pressed button the focus (spec 014 AC-7: WebKit on Windows and macOS does not). The test does not compare `scrollLeft` before and after the press, since a scroll that the browser makes by itself is allowed (spec 035 decision 13). (Note from the lead, 2026-10-15: added; "Client: room toolbar" had these two pointer rules without a check (review of spec 024).)
-- **AC-9** (new) (browser with mocked socket) A revealed cell is marked by more than its colour, and the reveal controls meet spec 035. Given a FX-01 snapshot (`seq` 10, `you` `p1` and host, players `p1` and `p2`) where (1, 0) holds `T` revealed (`locked`, `revealed`, no author) and (1, 1) holds `A` locked by a check (`revealed` false, author `p2`): (1, 0) has `data-revealed="true"`, one `reveal-mark` and one `reveal-label` whose text is `fr.json["a11y.revealed"]`; (1, 1) has `data-revealed="false"` and neither; the mark's contrast, measured over its colours as "Client: revealed cells" says, is at least 3:1 against the `background-color` of (1, 0), both while (1, 0) is not selected and while it is selected. (Note from the lead, 2026-10-15: "the mark's `background-color` has a contrast" became "the mark's contrast, measured over its colours", so that a contrasting edge can pass (review of spec 024).) In this state with (2, 2) tapped, at 1280 by 720 and at 360 by 740, spec 035's contrast scan (AC-8) and language scan (AC-9) find no offending element. In a separate run on the same snapshot at 1280 by 720, keyboard only with no tap (spec 035's harness): `tab_to` `grid`, then `Tab` selects the first unfinished word (spec 009), then `tab_to` `reveal-letter` and `tab_to` `reveal-word` each reach an enabled button that shows spec 035 AC-2's outline. The mark also keeps 3:1 while the revealed cell flashes in any of the eight player colours (spec 016). Flash run, at 1280 by 720 in the desktop context: a FX-01 snapshot (`seq` 10, `you` `p1` and host with colour 0, players `p2` to `p8` with colours 1 to 7, allowance and `reveal_budget` 8 letters and 1 word) where (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 2) and (2, 3) hold `X` with author `p1`, unlocked. For each colour index c from 0 to 7, on the cell at position c + 1 of that list (solution letters `T`, `A`, `M`, `I`, `S`, `V`, `I`, `D`), the mock sends back to back, with consecutive seqs from 11: a `letter_changed` with letter `Y` from the player whose colour is c (for c = 0, `p9`, a player not in the roster, whom spec 016 flashes in colour 0), then a `reveal_result` (scope letter, that cell, 1 letter fewer than the previous budget), then a `cell_locked` (that cell, its solution letter, `revealed` true). Right after the cell's `data-revealed` becomes `true`, the test reads in one `page.evaluate` the cell's `data-flash`, which is still `c`; its computed `background-color`, which equals the computed background colour of the `roster-colour` of the player with colour c (`p1`'s for c = 0), as in spec 016 AC-2; and the mark's colours, whose contrast against that background is at least 3:1. A second flash run does the same but taps each cell just before the mock sends its three frames, so the cell is also selected while it flashes. Ending the flash at the reveal fails this check, as `data-flash` must still be `c` (decision 14). (Note from the lead, 2026-10-15: added; the ink-coloured mark had 2.99:1 and 2.27:1 on the flash colours 2 and 4 (review of spec 024).)
+- **AC-9** (new) (browser with mocked socket) A revealed cell is marked by more than its colour, and the reveal controls meet spec 035. Given a FX-01 snapshot (`seq` 10, `you` `p1` and host, players `p1` and `p2`) where (1, 0) holds `T` revealed (`locked`, `revealed`, no author) and (1, 1) holds `A` locked by a check (`revealed` false, author `p2`): (1, 0) has `data-revealed="true"`, one `reveal-mark` and one `reveal-label` whose text is `fr.json["a11y.revealed"]`; (1, 1) has `data-revealed="false"` and neither; the mark is the notch of "Client: revealed cells" (its `clip-path`, its box `max(7, 0.22 s)` by `max(4, 0.11 s)` with 0.5 px of tolerance, horizontally centred on the inner box and its bottom on the inner box's bottom with 1 px of tolerance, and its `background-color` rgb(194, 65, 12)), and its contrast is at least 3:1 against the `background-color` of (1, 0), both while (1, 0) is not selected and while it is selected. (Note from the lead, 2026-10-15: "the mark's `background-color` has a contrast" became "the mark's contrast, measured over its colours", so that a contrasting edge can pass (review of spec 024).) (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells: the mark is checked as the bottom-centre notch, in one colour.) In this state with (2, 2) tapped, at 1280 by 720 and at 360 by 740, spec 035's contrast scan (AC-8) and language scan (AC-9) find no offending element. In a separate run on the same snapshot at 1280 by 720, keyboard only with no tap (spec 035's harness): `tab_to` `grid`, then `Tab` selects the first unfinished word (spec 009), then `tab_to` `reveal-letter` and `tab_to` `reveal-word` each reach an enabled button that shows spec 035 AC-2's outline. The mark also keeps 3:1 while the revealed cell flashes in any of the eight player colours (spec 016). Flash run, at 1280 by 720 in the desktop context: a FX-01 snapshot (`seq` 10, `you` `p1` and host with colour 0, players `p2` to `p8` with colours 1 to 7, allowance and `reveal_budget` 8 letters and 1 word) where (1, 0), (1, 1), (1, 2), (1, 3), (1, 4), (2, 1), (2, 2) and (2, 3) hold `X` with author `p1`, unlocked. For each colour index c from 0 to 7, on the cell at position c + 1 of that list (solution letters `T`, `A`, `M`, `I`, `S`, `V`, `I`, `D`), the mock sends back to back, with consecutive seqs from 11: a `letter_changed` with letter `Y` from the player whose colour is c (for c = 0, `p9`, a player not in the roster, whom spec 016 flashes in colour 0), then a `reveal_result` (scope letter, that cell, 1 letter fewer than the previous budget), then a `cell_locked` (that cell, its solution letter, `revealed` true). Right after the cell's `data-revealed` becomes `true`, the test reads in one `page.evaluate` the cell's `data-flash`, which is still `c`; the computed `background-color` of the cell's `cell-flash` (spec 041), which equals the computed background colour of the `roster-colour` of the player with colour c (`p1`'s for c = 0), as in spec 016 AC-2; and the notch's `background-color`, which is rgb(20, 24, 31) and whose contrast against the composite of that colour at 38 % over white is at least 3:1. (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells: the flash colour is read from `cell-flash`, since spec 041 draws the flash as an overlay over a white cell, and the notch is ink during the flash.) A second flash run does the same but taps each cell just before the mock sends its three frames, so the cell is also selected while it flashes. Ending the flash at the reveal fails this check, as `data-flash` must still be `c` (decision 14). (Note from the lead, 2026-10-15: added; the ink-coloured mark had 2.99:1 and 2.27:1 on the flash colours 2 and 4 (review of spec 024).)
 - **AC-10** (new) (rule unit test) Reveals and the budget survive a reload. Given the entries of `R1`'s play followed by the two reveals of AC-1 (seq 1 to 12), when they are replayed in order with `replay` from `new_room` on the same grid, the result equals the live state for `seq`, `reveal_budget`, `reveals_used`, `settings` and `cells`; and the same room saved in a `RoomStore` and loaded again (spec 018) has `reveal_budget` 4 letters and 0 words and `reveals_used` 1 letter and 1 word, keeps (1, 1) and the four cells of MIME revealed with no author, and answers a word reveal with `budget_exhausted`. (Note from the lead, 2026-10-15: `reveals_used` was added to the compared fields and to the loaded room (review of spec 024).) Given the entries of AC-2's allowance example up to its first `ChangeSettings` (the joins of `p1` and `p2`, the four reveals, then the allowance set to 1 letter and 0 words), `replay` from `new_room` gives the live `reveal_budget` `RevealBudget(letters=0, words=0)` and `reveals_used` `RevealBudget(letters=3, words=1)`. The same room is loaded from a `RoomStore` in two ways: (a) created with `create_room` on its `new_room` state and every entry appended, with no other snapshot, so that `load_room` replays the whole log; (b) the same plus `save_snapshot` of the live state after the allowance change, so that `load_room` reads `reveals_used` from that snapshot. Each loaded room has those two values, and the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=5, words=1))` on it gives a `SettingsChanged` whose `reveal_budget` is `RevealBudget(letters=2, words=0)`. (Note from the lead, 2026-10-15: added, the lead's decision 13 (review of spec 024).) A stored snapshot without `reveals_used`: a FX-01 room with `p1` (host) and `p2` (seq 2, allowance and `reveal_budget` 5 letters and 1 word) is stored with `create_room` while `RoomState.model_dump_json` is patched to leave the `reveals_used` key out of the JSON (spec 018 writes a stored `RoomState` with `model_dump_json()`); `load_room` then returns a state whose `reveals_used` is `RevealBudget(letters=0, words=0)`, and the host's `ChangeSettings(help_mode="free", reveal_budget=RevealBudget(letters=3, words=1))` on it gives a `SettingsChanged` whose `reveal_budget` is `RevealBudget(letters=3, words=1)`. (Note from the lead, 2026-10-15: added; a database written before this spec holds such snapshots (review of spec 024).)
 
 ## Edge cases and errors
@@ -487,6 +483,8 @@ Revealing on a solved grid is refused with `grid_solved` (spec 026 AC-4).
   is revealed less than 1,000 ms later. The cell keeps its flash colour until the
   flash ends (spec 016), with the corner mark at 3:1 on it, then shows the look of
   a revealed cell. (Note from the lead, 2026-10-15: added (review of spec 024).)
+  (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells:
+  the mark is the bottom-centre notch, in ink while the cell flashes.)
 - Undo after a reveal (AC-1): an undo of an edit whose cell was revealed since is
   refused `nothing_to_undo` (spec 018 step 2: the cell is locked).
 - Checks after a reveal (AC-1): a revealed cell is locked, so checks leave it out
@@ -503,7 +501,10 @@ Revealing on a solved grid is refused with `grid_solved` (spec 026 AC-4).
   tests read the letter from `data-letter`.
 - Crowded revealed cell (AC-9): a label of spec 035 AC-11 in the top-right slot
   (three or more cursors on a cell of 44 px or more) may cover the corner mark;
-  the label is drawn over it.
+  the label is drawn over it. (Note from the lead, 2026-10-22: refined by spec
+  042, the design's grid cells: the labels are gone and the notch is
+  bottom-centre, away from the corner triangles, and drawn over them where they
+  meet on tiny cells.)
 - Tab order (AC-8): the toolbar comes before the roster, the feed, the host panel
   and the grid in document order, so spec 035's walks keep their landmarks
   (`share-link` first among the room's controls, the grid last). Its controls add
@@ -557,7 +558,8 @@ questions: the human's answers to them are items 11 and 12 below.
    controls cost no height.
 9. The corner mark (a shape) and a hidden text are the signs of a revealed cell
    that do not rely on colour (spec 035), and they tell it apart from a cell locked
-   by a check.
+   by a check. (Note from the lead, 2026-10-22: refined by spec 042, the design's
+   grid cells: the mark is now the bottom-centre notch.)
 10. The reveal panel is hidden in `none` mode from this spec on (spec 025 AC-4),
     rather than disabled first and hidden later.
 
@@ -593,7 +595,10 @@ added (review of spec 024).)
     every flash colour, by a colour that changes with the flash or by a
     contrasting edge, at the implementer's choice; the flash itself keeps its
     1,000 ms, since ending it at the reveal would contradict spec 016. (Note from
-    the lead, 2026-10-15: added (review of spec 024).)
+    the lead, 2026-10-15: added (review of spec 024).) (Note from the lead,
+    2026-10-22: refined by spec 042, the design's grid cells: the choice is made,
+    the mark turns ink while the cell flashes, decided by the lead on 2026-10-22
+    on the human's instruction.)
 
 ## Open questions
 

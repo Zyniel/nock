@@ -309,7 +309,9 @@ Nock's own marks, never Font Awesome:
   navy. Force notch in the catalogue: 8 by 11 px.
 
 Text glyphs used as pictograms, in the current font: ✓ (done, check line), → (joined
-line), ← (left line; not in the sheet, the spec writer's pick), ▲ (reveal line, in
+line), ← (left line; not in the sheet, the spec writer's pick, decided by the
+lead's decision of 2026-10-22 on the human's instruction, note from the spec writer
+of that day, section 15 item 11), ▲ (reveal line, in
 orange-red), ✎ (detail of the pencil confirm item), ▾ (Aide menu on a computer).
 The flag and the clue bar's ‹ › are drawn icons, never text glyphs (the fonts have
 no ⚑). No emoji in the interface; reactions and chat text are user content.
@@ -364,8 +366,12 @@ Revealed notch: an isosceles triangle in `--nock-reveal`, pointing up, centred o
 the middle of the bottom edge and flush with it. Base max(7px, 0.22 s), height
 max(4px, 0.11 s). Corners belong to players, and no arrow ever enters a cell from
 the bottom, so nothing else uses that spot. During a flash the notch is drawn in
-`--nock-ink`, so it keeps 3:1 on every player colour (OPEN: applied in sheet 4.2
-as `.flash.rev::after`, pending approval). Its size is DEFERRED (section 15).
+`--nock-ink`, so it keeps 3:1 on every player colour (sheet 4.2,
+`.flash.rev::after`). (Note from the spec writer, 2026-10-22: the ink during a
+flash and the size above are decided, by the lead's decision of 2026-10-22 on the
+human's instruction; they read "OPEN: ... pending approval" and "Its size is
+DEFERRED". The size wins over spec 024 AC-9's former minimum, which spec 042
+refines; section 15.)
 
 ### Catch-up ring (spec 034)
 
@@ -531,7 +537,10 @@ Replaces the author band of spec 019, which is removed. Kept, toggled on and off
 by each player, off by default (decided by the human on 2026-10-16).
 
 - A switch in the Menu (section 8): « Auteurs » with the detail « activé » or
-  « désactivé ». Whether it is remembered across reloads is OPEN (section 15).
+  « désactivé », remembered per browser, as the tint switch. (Note from the spec
+  writer, 2026-10-22: decided by the lead's decision of 2026-10-22 on the human's
+  instruction; it read "Whether it is remembered across reloads is OPEN (section
+  15)".)
 - When on, each letter is drawn in its finder's ink `--player-ink-N` (section 3),
   on whatever background the cell has.
 - A revealed letter has no finder: it stays ink.
@@ -563,8 +572,12 @@ on the right).
   its in-app keyboard is hidden.
 - Otherwise, sheet.
 
-How the two rules combine for phones narrower than 900 px held sideways is OPEN
-(section 15).
+How the two rules combine: column when the window is landscape and either at
+least 900 px wide and more than 500 px high, or at most 500 px high with the
+in-app keyboard hidden; otherwise sheet. (Note from the spec writer, 2026-10-22:
+decided by the lead's decision of 2026-10-22 on the human's instruction; it read
+"How the two rules combine for phones narrower than 900 px held sideways is OPEN
+(section 15)".)
 
 ### Phone and upright tablet (sheet layout)
 
@@ -620,7 +633,11 @@ Top to bottom, filling the window, nothing scrolls:
    timer is hidden; then buttons 38 px high, padding 0 12 px, radius 6 px, gap
    6 px, icon 20 px beside its label: Annuler, Crayon, « Aide ▾ », Salon, Clavier
    (touch screens only), Menu. Pressed: word-blue background. Unread badge on
-   Salon: top 2 px, left 24 px.
+   Salon: top 2 px, left 24 px; the new-events dot, with no unread message, at the
+   same place. `room-heading` (spec 040) is visually hidden in the room, on a
+   computer and on a phone. (Note from the spec writer, 2026-10-22: the dot's place
+   and `room-heading` are decided by the lead's decision of 2026-10-22 on the
+   human's instruction; section 15, items 9 and 10.)
 2. Connection band under the top bar while the connection is lost.
 3. Body: the main area and, on its right, the side column.
    - Main area: padding 12 px, the grid centred and as large as fits in all the
@@ -657,7 +674,9 @@ order: « Auteurs » (detail « activé » / « désactivé »); « Mots des aut
 « désactivée », off by default, per browser, section 6; its place in the list is
 the spec writer's pick); « Inviter » (detail « lien »); « Réglages
 de l'hôte » (host only); « Compte » (spec 033; not drawn in the sheet's Menu, the
-spec writer's place for it); separator; « Masquer le chrono » (« Afficher le
+spec writer's place for it, decided by the lead's decision of 2026-10-22 on the
+human's instruction, note from the spec writer of that day, section 15 item 7);
+separator; « Masquer le chrono » (« Afficher le
 chrono » while hidden); « Retour aux grilles ».
 
 On a phone, a scrim (`--nock-scrim`) covers everything below the top bar (top
@@ -739,8 +758,11 @@ Content, top to bottom:
   hover), emoji 22 px.
 - A shown reaction: a white pill centred over its clue cell, 1 px line-grey
   border, radius 12 px, padding 2 px 6 px, emoji 16 px, line height 1.2, shadow
-  `0 4px 10px -4px var(--nock-shadow-soft)`, layer 8, for 3 s (spec 022). For a
-  two-clue cell the sheet draws none (section 15).
+  `0 4px 10px -4px var(--nock-shadow-soft)`, layer 8, for 3 s (spec 022). On a
+  two-clue cell it is centred on its own clue's half, as spec 022 does. (Note from
+  the spec writer, 2026-10-22: decided by the lead's decision of 2026-10-22 on the
+  human's instruction; it read "For a two-clue cell the sheet draws none (section
+  15)".)
 
 ### Connection lost (spec 017)
 
@@ -956,7 +978,7 @@ Refinements to make, each with dated notes, before the matching build step
 | 021 | done | `flag-button` in the toolbar; marker position and size (AC-9), the second clue's flag under the separator today | Je bloque in the clue bar with its pressed state; flag icon of section 6 at the top-left of its own half |
 | 022 | done | Chat panel drawn over the page (decision 6, AC-17); `chat-toggle` and `react-button` in the toolbar (AC-5); chat notes (AC-19); reaction look (AC-4) | Discussion tab of the Salon; « Salon » with the red unread badge and the new-events dot; « Réagir » in the clue bar between the clue text and Je bloque; picker over the bottom of the grid area; reaction pill over the clue cell; 3-second notes |
 | 023 | done | `check-panel` in the toolbar (AC-9); strike look | Aide menu « Vérifier »; strike of section 6; check lines in the stream |
-| 024 | done | `reveal-panel` in the toolbar (AC-7, AC-8); `reveal-mark` in the top-right corner, at least 6 px and a quarter of the side (AC-9), 3:1 during a flash | Aide menu « Révéler »; bottom-centre notch of section 6, ink during a flash (OPEN), its size DEFERRED |
+| 024 | done | `reveal-panel` in the toolbar (AC-7, AC-8); `reveal-mark` in the top-right corner, at least 6 px and a quarter of the side (AC-9), 3:1 during a flash | Aide menu « Révéler »; bottom-centre notch of section 6, ink during a flash, the design's size (both decided on 2026-10-22; AC-9 refined by spec 042) |
 | 025 | done | Vote banner look; AC-4 hides `check-panel` and `reveal-panel` in none mode | Section 9 banner; in none mode « Aide » is hidden (to confirm in the refinement) |
 | 026 | done | `grid-status` look; AC-10 puts the status in the clue bar's row on windows at most 500 px high | Band under the clue bar (section 9): finished replaces the keyboard, full-but-wrong sits above the keyboard; AC-10 rewritten |
 | 027 | done | `timer`, `timer-toggle`, `chat-toggle` are the first three toolbar elements (AC-8); « ⏱ » toggle | Timer in the top bar; « Masquer le chrono » in the Menu; « Chrono » in the timer's slot while hidden |
@@ -969,8 +991,10 @@ Refinements to make, each with dated notes, before the matching build step
 | 040 | done | `room-heading` (« Salon {code} ») and `room-status` shown on the page; not-found page has no way back; styles were "not binding" | « Salon {code} » above the entry cards; `room-status` visually hidden while the connection band shows; « Voir les grilles » on the not-found card (an addition); styles now follow this file |
 
 New specs, numbers proposed in build order (section 14): 041 visual foundation
-(written); then grid cells, room layout, keyboard, Auteurs mode, catalogue,
-overlays, remaining screens.
+(written); 042 grid cells (written); then room layout, keyboard, Auteurs mode,
+catalogue, overlays, remaining screens. (Note from the spec writer, 2026-10-22:
+042 written; its "Refined specs" table lists the criteria of 006, 013, 019, 021,
+024, 034, 035 and 041 that it changes.)
 
 ## 13. How conformance is secured
 
@@ -1008,14 +1032,20 @@ Each step leaves the app working and every test passing.
    badges, notes (spec 041). Today's screens take the token colours with no layout
    change.
 2. Grid cells: section 6 (with specs 006, 007, 013, 016, 021, 023, 024, 034, 035
-   refined), with the Accessibilité mode's icons. Needs the DEFERRED, high notch item settled first.
+   refined), with the Accessibilité mode's icons (spec 042). The notch item it
+   needed is settled (decided on 2026-10-22, section 15).
 3. Room layout: top bar, sheet and column, Salon, 3-second notes, Aide and Menu,
    connection band, reactions, room sheets (specs 010, 011, 013, 014, 017, 018,
-   020, 022, 023, 024, 027, 033, 035, 040 refined). Needs the DEFERRED, high notch
-   item settled first, as the grid-cell step does.
+   020, 022, 023, 024, 027, 033, 035, 040 refined). The notch item it needed is
+   settled (decided on 2026-10-22, section 15).
 4. Keyboard: ✎, ⇄, « Clavier » (specs 009, 020 refined).
 5. Auteurs mode, catalogue and its sections, entry pages, overlays (specs 019,
    004, 012, 025, 026, 028, 029, 032, 040 refined).
+
+(Note from the spec writer, 2026-10-22: steps 2 and 3 read "Needs the DEFERRED,
+high notch item settled first"; the lead decided it on 2026-10-22 on the human's
+instruction. The human's instruction of 2026-10-22: the game is now built on the
+full design system; competitive modes (epic E8) wait.)
 
 ## 15. Open decisions
 
@@ -1048,20 +1078,48 @@ Each step leaves the app working and every test passing.
 - Grid lines and input borders keep the sheet's rule grey #9AA3B2 ("use the one
   from the style"); its contrast is tracked below as low importance.
 
+### Decided by the lead on 2026-10-22, on the human's instruction
+
+(Note from the spec writer, 2026-10-22: this list is new. The human's instruction
+of 2026-10-22: "the game is now to be implemented on the full design system
+provided; competitive modes wait". On it, the lead settled the deferred high item
+and accepted the spec writer's pick of every "Still open" item, for the human to
+override at the approval of spec 042. Each item below left "Deferred, high
+importance" or "Still open"; the sections it touches carry a note of the same
+day.)
+
+- The revealed notch keeps the design's size, 0.22 s by 0.11 s (min 7 by 4 px),
+  which wins over spec 024 AC-9's former minimum (at least 6 px and a quarter of
+  the side, wide and high; at a 29 px cell, 7 by 4 px against 8 by 8 px). The
+  notch, the bold letter on locked grey and spec 024's hidden label remain the
+  non-colour signs of a revealed letter. Spec 042 refines spec 024 AC-9 (section
+  6). Formerly "Deferred, high importance", item 1, skipped by the human on
+  2026-10-16.
+- The revealed notch is drawn in ink during a flash (orange-red falls to 2.1:1 to
+  2.8:1 on the Orange, Cramoisi and Magenta flashes, below spec 024's 3:1), as
+  sheet 4.2's `.flash.rev::after` (section 6). Formerly "Still open", item 2.
+- A phone held sideways and the 900 px rule: column when the window is landscape
+  and either at least 900 px wide and more than 500 px high, or at most 500 px
+  high with the in-app keyboard hidden; otherwise sheet (section 8). Formerly
+  item 5.
+- Auteurs mode is remembered per browser, as the tint switch (section 7).
+  Formerly item 6.
+- « Compte » in the room Menu: after « Réglages de l'hôte », before the separator
+  (section 8). Formerly item 7.
+- A shown reaction on a two-clue cell is centred on its own clue's half, as spec
+  022 does today (section 8). Formerly item 8.
+- The new-events dot on the computer top bar sits at the unread badge's place
+  (top 2 px, left 24 px) (section 8). Formerly item 9.
+- `room-heading` inside the room is visually hidden (section 8). Formerly item
+  10.
+- The « ← » pictogram for departures (section 5). Formerly item 11.
+
 ### Deferred, high importance
 
-Skipped by the human on 2026-10-16: neither accepted nor refused. It must be
-settled before the grid-cell and room-layout specs are approved (section 14),
-because it decides how a spec of the accessibility bar is refined. (The other
-item first deferred here, "corner triangles carry colour only", was settled the
-same day by the Accessibilité mode; see "Decided" above.)
-
-1. The revealed notch is 0.22 s by 0.11 s (min 7 by 4 px), smaller than spec 024
-   AC-9's minimum (at least 6 px and a quarter of the side, wide and high). At a
-   29 px cell it is 7 by 4 px, against 8 by 8 px. Why it matters: the notch is the
-   non-colour sign of a revealed letter (with bold), and spec 024 sized it so it
-   stays visible on small cells. Until settled, spec 024 AC-9 stands, and the
-   grid-cell spec cannot move the mark.
+None left. (Note from the spec writer, 2026-10-22: its one item, the size of the
+revealed notch, was decided by the lead on 2026-10-22 on the human's instruction;
+see the list above. The other item first deferred here, "corner triangles carry
+colour only", was settled on 2026-10-16 by the Accessibilité mode.)
 
 ### Deferred, low importance
 
@@ -1072,31 +1130,10 @@ same day by the Accessibilité mode; see "Decided" above.)
 
 ### Still open
 
-The spec writer's pick comes last in each item.
-
-1. (Settled: font files, decided by the human on 2026-10-16; see "Decided"
-   above. The numbering of this list is kept.)
-2. The revealed notch in ink during a flash (orange-red falls to 2.1:1 to 2.8:1 on
-   the Orange, Cramoisi and Magenta flashes, below spec 024's 3:1). Applied in
-   sheet 4.2 (`.flash.rev::after`), pending approval. Pick: approve.
-3. (Settled: departed grey, decided by the human on 2026-10-16; see "Decided"
-   above.)
-4. (Settled: catalogue thumbnail, decided by the human on 2026-10-17; see
-   "Decided" above.)
-5. Phone held sideways and the 900 px rule (section 8). Pick: column when
-   landscape and either at least 900 px wide and more than 500 px high, or at most
-   500 px high with the keyboard hidden.
-6. Whether Auteurs mode is remembered across reloads. Pick: per browser, as the
-   tint toggle.
-7. Place of « Compte » in the room Menu (not drawn there). Pick: after « Réglages
-   de l'hôte », before the separator.
-8. A shown reaction on a two-clue cell (the sheet centres the pill on the whole
-   cell). Pick: centred on its own clue's half, as spec 022 does today.
-9. Place of the new-events dot on the computer top bar (drawn on the phone only).
-   Pick: at the unread badge's place (top 2 px, left 24 px).
-10. `room-heading` inside the room (not drawn; the grid name is in the computer
-    top bar, nothing on the phone). Pick: visually hidden.
-11. The « ← » pictogram for departures (not in the sheet). Pick: ←.
+None left. (Note from the spec writer, 2026-10-22: items 2 and 5 to 11 moved to
+"Decided by the lead on 2026-10-22, on the human's instruction" above, each with
+the spec writer's pick; items 1, 3 and 4 had been settled by the human on
+2026-10-16 and 2026-10-17. The numbers are kept there as "Formerly item N".)
 
 ### The sheet, version 4.2
 

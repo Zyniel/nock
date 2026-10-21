@@ -116,7 +116,11 @@ On the `cell` element of each letter cell (spec 006), a new attribute
 `data-wrong`: `true` when the cell's confirmed `wrong` is true and its shown
 letter is the confirmed one (no pending edit, spec 015), else `false`. A cell with
 `data-wrong="true"` shows its letter struck through: computed
-`text-decoration-line` includes `line-through`.
+`text-decoration-line` includes `line-through`. (Note from the lead, 2026-10-22:
+refined by spec 042, the design's grid cells (`_design.md` section 6): the strike
+is `--nock-red`, `max(2px, 0.07em)` thick, still set on the cell; a locked cell
+keeps its locked grey and bold letter inside my selected word. No criterion of
+this spec changes. The check controls move into the Aide menu in step 3.)
 
 ### Client: check controls
 

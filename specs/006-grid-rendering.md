@@ -11,6 +11,13 @@ The FX-01 reference grid and the glossary are in `specs/_reference.md`. The room
 page, its WebSocket, i18n and the test harness are those of spec 040; the grid
 view is `GridView` of spec 039.
 
+(Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells
+(`_design.md` section 6): arrows are drawn in the word's first letter cell, the
+separator and the clue text follow the design, and one clue size serves every clue
+cell. AC-2 and the edge case "Two clues pointing right" change, so the test-writer
+updates their tests before the implementer runs. The other criteria do not
+change.)
+
 ## Goal
 
 As a player, I want the grid and its clues readable on my phone, so that I can play without a desktop.
@@ -65,16 +72,23 @@ later `closed`):
   letter (nothing when empty).
 - A clue cell holds one `data-testid="clue"` per clue, in `clues` order, with
   `data-clue-index` (`0` or `1`) and `data-arrow` (the `Arrow` value). Each clue
-  holds `data-testid="clue-text"`, whose text is exactly the clue text, and
-  `data-testid="clue-arrow"` with `data-arrow` (same value) and `data-side`:
-  `right` for `right` and `right_then_down` (the word starts at (r, c + 1)),
-  `bottom` for `down` and `down_then_right` (the word starts at (r + 1, c)). The
-  arrow is drawn on that side of the clue cell, next to the word's first letter
-  cell; it is `aria-hidden="true"` and holds no text.
+  holds `data-testid="clue-text"`, whose text is exactly the clue text. Each clue
+  has one `data-testid="clue-arrow"` with `data-arrow` (same value) and
+  `data-side`: `right` for `right` and `right_then_down` (the word starts at
+  (r, c + 1)), `bottom` for `down` and `down_then_right` (the word starts at
+  (r + 1, c)). The arrow is a child of the word's first letter cell, drawn
+  against the side that cell shares with the clue cell, with `data-clue-row`,
+  `data-clue-column` and `data-clue-index` naming its clue; it is
+  `aria-hidden="true"` and holds no text. Its look and its place in that cell are
+  spec 042's. (Note from the lead, 2026-10-22: refined by spec 042, the design's
+  grid cells: the arrow was a child of its `clue` and drawn in the clue cell, on
+  that side; the design draws it in the letter cell, as printed grids do.)
 - A clue cell with two clues stacks them, clue 0 on top, and holds one
   `data-testid="clue-separator"` between them: a horizontal line at least 1 px
   thick (its height, or its top or bottom border width, is 1 px or more) with a
-  colour different from the cell background.
+  colour different from the cell background. (Note from the lead, 2026-10-22:
+  spec 042 gives its exact look, clue ink at 55 % opacity inset 14 % on each
+  side; this rule still holds.)
 - An empty cell holds nothing.
 - The grid element has `aria-label` `t("grid.label")`.
 
@@ -121,7 +135,7 @@ New `fr.json` key:
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-2.1.1) (browser with live server, phone emulation; at-load part in all three engines, gesture part Chromium only) On a 360 px wide screen, FX-02 can be panned and pinch-zoomed, and no clue text is cut off at full zoom. With a room on FX-02 opened in the phone context: at load `data-zoom` equals `data-zoom-min` and the grid's box is no wider than the viewport's client width (all three engines). Then, in Chromium only (CDP touch input, see "Test harness"): one pinch out raises `data-zoom`; pinching out again (at most five pinches) reaches `data-zoom == data-zoom-max`; the grid is then wider than the viewport, and a pan raises the viewport's `scrollLeft` and `scrollTop` above 0; every `clue-text` of the grid passes the "cut off" check; a pinch in lowers `data-zoom`.
-- **AC-2** (AC-2.1.2) (browser with live server) Each clue draws its arrow on the side of its word's first letter cell. On FX-01 in a 1280 by 800 window, for each of the 8 clues: `clue-arrow` has the clue's `data-arrow` and the `data-side` of the table above, and its box centre lies on that side of the clue cell: for `right`, centre x at least the cell's centre x plus a quarter of the cell width and at most the cell's right edge plus half a cell width, centre y within the cell's top and bottom; for `bottom`, the same with x and y swapped. At (0, 0), clue 0 (`down_then_right`) has side `bottom` and clue 1 (`right_then_down`) side `right`.
+- **AC-2** (AC-2.1.2) (browser with live server) Each clue draws its arrow on the side of its word's first letter cell. On FX-01 in a 1280 by 800 window, for each of the 8 clues: the one `clue-arrow` whose `data-clue-row`, `data-clue-column` and `data-clue-index` name the clue is a child of the word's first letter cell, has the clue's `data-arrow` and the `data-side` of the table above, and its box centre lies on that side of the clue cell (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells: the arrow is found in the letter cell by its clue attributes, no longer inside its `clue`; the box rule below is unchanged and spec 042's places meet it): for `right`, centre x at least the cell's centre x plus a quarter of the cell width and at most the cell's right edge plus half a cell width, centre y within the cell's top and bottom; for `bottom`, the same with x and y swapped. At (0, 0), clue 0 (`down_then_right`) has side `bottom` and clue 1 (`right_then_down`) side `right`.
 - **AC-3** (AC-2.1.3) (browser with live server) A cell with two clues shows both, separated by a line; FX-01 shows this at (0,0). The cell (0, 0) holds two `clue` elements whose `clue-text` read `Passoire fine` and `De la marine`, in that order, and one `clue-separator` that meets the line rule above and whose box lies between the two texts (its centre y at or below the bottom of clue 0's text and at or above the top of clue 1's text). Single-clue cells (0, 2) and (2, 0) hold one `clue` and no `clue-separator`.
 - **AC-4** (AC-2.1.4) (browser with live server) A new game on FX-01 renders 7 clue cells and 18 empty letter cells. A fresh room on FX-01 shows 25 `cell` elements: 7 with `data-type="clue"`, 18 with `data-type="letter"`, all 18 with `data-letter=""`, `data-locked="false"` and no visible text, and none with `data-type="empty"`; the grid has `data-width="5"` and `data-height="5"`.
 - **AC-5** (AC-2.1.5) (browser with live server, viewport emulation in Chromium, Firefox and WebKit) The game is a responsive web app with no native app and no install. Every screen works from 320 px wide up to desktop, in portrait and landscape, on current Chrome, Safari, Firefox and Edge. In each of the three engines (Chromium standing for Chrome and Edge, WebKit for Safari), for each window size 320x568, 568x320, 360x740, 740x360, 768x1024, 1024x768, 1280x800 and 1920x1080, and for each page `/` and `/r/<code>` (a room on FX-02): `document.documentElement.scrollWidth <= window.innerWidth` (no horizontal page scroll); on the room page, the `grid-viewport` box lies inside the window horizontally, is at least 100 px wide and 100 px high, and at least one `cell` is inside the window.
@@ -136,11 +150,18 @@ The words in brackets say how each criterion is tested.
 - After the socket closes (AC-6): the last grid stays on screen.
 - Two clues pointing right from one cell (AC-2): a cell holding a `right` and a
   `right_then_down` clue (both start at (r, c + 1)) draws both arrows on the right
-  side, clue 0's within the top half of the cell and clue 1's within the bottom
-  half.
-- Long clue text (AC-1): the text wraps on several lines and may use a smaller font
-  inside two-clue cells; it is never ended with an ellipsis or clipped at full zoom.
-  At zoom 1 on a phone, small text is allowed.
+  side, the ↴ (`right_then_down`) within the top half of the cell and the →
+  (`right`) within the bottom half, whatever their clue indexes; two `right` clues
+  put clue 0's in the top half and clue 1's in the bottom half. (Note from the
+  lead, 2026-10-22: refined by spec 042, the design's grid cells, whose collision
+  rule gives the → the low slot; it read "clue 0's within the top half of the cell
+  and clue 1's within the bottom half".)
+- Long clue text (AC-1): the text wraps on several lines; it is never ended with
+  an ellipsis or clipped at full zoom. At zoom 1 on a phone, small text is
+  allowed. (Note from the lead, 2026-10-22: refined by spec 042, the design's grid
+  cells: "and may use a smaller font inside two-clue cells" is gone, one clue size
+  serves every clue cell, and the implementer may raise `data-zoom-max` to keep
+  this rule (decision 3).)
 - Zoom limits (AC-1): a pinch beyond the limits leaves `data-zoom` at
   `data-zoom-min` or `data-zoom-max`; a one-finger drag never changes the zoom.
 - Zoom 1 (AC-1, AC-5): since the whole grid fits in the viewport, at 1280x800 and
@@ -206,7 +227,9 @@ Each one is already part of the spec above.
    test of its own.
 7. Arrow placement. Options: inside the clue cell, on the shared border, or inside
    the letter cell. Pick: the test accepts any position from the outer quarter of
-   the clue cell to the near half of the letter cell, on the correct side.
+   the clue cell to the near half of the letter cell, on the correct side. (Note
+   from the lead, 2026-10-22: spec 042 settles the place: inside the letter cell,
+   against the shared side, which this range accepts.)
 8. Locked cells are shown (`data-locked`) here because the snapshot already holds
    them; their look is the implementer's choice until spec 016.
 

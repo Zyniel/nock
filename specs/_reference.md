@@ -101,6 +101,9 @@ the specs whose criteria this one mentions.
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
 | [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
 | [041](041-visual-foundation.md) | Visual foundation (design tokens, player colours, fonts, icons, styling primitives; no backlog story, `_design.md` step 1) | E10 | MVP | 21 | 004, 005, 006, 007, 012, 013, 014, 016, 017, 019, 020, 021, 022, 024, 025, 027, 028, 033, 035, 038, 040 |
+| [042](042-grid-cells.md) | Grid cells (grid lines, backgrounds, letters, revealed notch, catch-up ring, corner triangles and Accessibilité icons, clue cells, flag, arrows in letter cells; no backlog story, `_design.md` step 2) | E10 | MVP | 20 | 003, 006, 007, 012, 013, 016, 017, 019, 020, 021, 022, 023, 024, 033, 034, 035, 039, 040, 041 |
+
+(Note from the spec writer, 2026-10-22: the row of spec 042 was added, a draft.)
 
 (Note from the lead, 2026-10-16: spec 012's row read 7 criteria and referred to no
 spec; its AC-8, added for nicknames in capitals, names specs 019 and 022 (human's

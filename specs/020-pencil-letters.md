@@ -8,6 +8,8 @@ status: done
 
 (Note from the lead, 2026-10-14: approved by the human after the Phase 6 refine, with the recommended answer to every open question. Before the test-writer runs, the spec-writer folds those answers into the text, moves them to the decisions, and makes the follow-on refinements of the other specs they name.) (Note from the lead, 2026-10-15: done. The human's answers are decisions 8 to 11 below, "Open questions" says "None.", and the refinements of `done` specs are listed in the note under "Public interface".)
 
+(Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells (`_design.md` section 6): a letter is drawn in a `cell-letter` element at 0.56 of the cell side, and a pencil letter keeps its italics in `--nock-pencil` (spec 041), in ink and italic during a flash. The cell keeps the letter's colour and style, which `cell-letter` inherits, so no criterion of this spec changes. The pencil controls move in step 3 (Aide menu, « Crayon ») and step 4 (✎ key).)
+
 Epic E5 Collaboration aids (US-5.2) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The grid
 elements are those of spec 006, typing and erasing spec 008, the arrow keys and the
