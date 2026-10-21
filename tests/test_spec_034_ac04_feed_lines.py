@@ -44,7 +44,9 @@ from spec034_harness import (
     grid_line_frame,
     load_fr,
     open_mocked_room,
+    reconnect_with_snapshot,
     record_with,
+    request_body,
     reveal_line,
     word_completed_line,
 )
@@ -230,6 +232,32 @@ def test_ac4_live_lines_that_came_first_follow_the_catch_up_lines(
     for seq in range(10, 26):
         expected.append(str(seq))
     assert feed_seqs(page) == expected
+
+
+def test_ac4_catch_up_lines_go_after_the_lines_the_page_already_held(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    # "Lines already held": a first visit (no `seen_seq`, so no request), a live
+    # line at seq 6, a reconnection with a snapshot at seq 12.
+    route = CatchUpRoute(
+        answer=catch_up_json(6, 12, lines=[word_completed_line(10, BOB, VIDE)])
+    )
+    mock = open_mocked_room(
+        page, live_server, fx01_grid, route, record=record_with(None), seq=5
+    )
+    mock.send(grid_line_frame(6))
+    expect_seq(page, 6)
+    expect(feed_item_locator(page)).to_have_count(1)
+
+    reconnect_with_snapshot(mock, fx01_grid, 12)
+
+    expect_catch_up_applied(page, "6-12")
+    expect(feed_item_locator(page)).to_have_count(2)
+    assert route.parsed_bodies() == [request_body(6, 12)]
+    assert feed_items(page) == [
+        ("check", "6", "Bob a vérifié la grille"),
+        ("word_completed", "10", "Bob a complété « Sans contenu »"),
+    ]
 
 
 def test_ac4_live_lines_push_out_the_oldest_catch_up_lines_past_100_items(

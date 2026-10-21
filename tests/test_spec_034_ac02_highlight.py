@@ -42,8 +42,9 @@ MIN_RING_CONTRAST = 3.0
 # `catch-up-mark` elements of the cell and, for the first one, its box and the
 # cell's, its `aria-hidden` and computed `pointer-events`, and per side its
 # computed border style, width and colour, with the contrast of that colour
-# against the cell's computed background (a colour with alpha first composited
-# over white).
+# against the cell's computed background (that background first composited over
+# white, the border colour, when it has alpha, then composited over that
+# background: the note of 2026-10-21 on step 2).
 RING_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + r"""
   const marks = cell.querySelectorAll('[data-testid="catch-up-mark"]');
   const result = {marks: marks.length};
@@ -69,15 +70,20 @@ RING_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + r"""
       style: style['border' + side + 'Style'],
       width: parseFloat(style['border' + side + 'Width']),
       colour: colour,
-      ratio: contrast(over(parseColour(colour), WHITE), background),
+      ratio: contrast(over(parseColour(colour), background), background),
     });
   }
   return result;
 }
 """
 
+# The drawing order on the cell, as spec 019 AC-1's tests read it: after
+# `scrollIntoView`, a test style sets `pointer-events: auto !important` on every
+# descendant of every cell (hit testing follows the drawing order but skips an
+# element with `pointer-events: none`, such as the ring), then
 # `document.elementFromPoint` at the centre of the cell's `remote-initials`
-# (spec 035): whether it gives the initials (or an element inside them).
+# (spec 035) must give the initials or an element inside them, never the
+# `catch-up-mark`. The style is removed afterwards.
 INITIALS_HIT_SCRIPT = r"""
 cell => {
   const initials = cell.querySelector(
@@ -86,15 +92,24 @@ cell => {
   if (initials === null) {
     return {found: false};
   }
-  const box = initials.getBoundingClientRect();
-  const hit = document.elementFromPoint(
-    box.left + box.width / 2, box.top + box.height / 2
-  );
-  return {
-    found: true,
-    hits: hit !== null && initials.contains(hit),
-    hit: hit === null ? null : hit.outerHTML.slice(0, 200),
-  };
+  cell.scrollIntoView();
+  const style = document.createElement('style');
+  style.textContent = '[data-testid="cell"] * { pointer-events: auto !important; }';
+  document.head.appendChild(style);
+  try {
+    const box = initials.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      box.left + box.width / 2, box.top + box.height / 2
+    );
+    return {
+      found: true,
+      hits: hit !== null && initials.contains(hit),
+      hitsMark: hit !== null && hit.closest('[data-testid="catch-up-mark"]') !== null,
+      hit: hit === null ? null : hit.outerHTML.slice(0, 200),
+    };
+  } finally {
+    style.remove();
+  }
 }
 """
 
@@ -203,9 +218,6 @@ def test_ac2_the_other_players_outline_and_initials_stay_visible_over_the_ring(
 
     expect(outline).to_be_visible()
     expect(initials).to_be_visible()
-    hit = cell.evaluate(INITIALS_HIT_SCRIPT)
-    assert hit["found"] is True, "no remote-initials on (2, 2)"
-    assert hit["hits"] is True, f"elementFromPoint found {hit['hit']}"
 
 
 def test_ac2_a_click_on_a_highlighted_cell_selects_it(
@@ -217,6 +229,22 @@ def test_ac2_a_click_on_a_highlighted_cell_selects_it(
     cell.click()
 
     expect(cell).to_have_attribute("data-selected", "true")
+
+
+def test_ac2_the_initials_are_drawn_over_the_ring(return_page: Page) -> None:
+    wait_for_the_highlight(return_page)
+    cell = cell_at(return_page, 2, 2)
+    # The spec's order: the click and the step 2 checks first, since the test
+    # style of the hit test changes the computed `pointer-events` they read.
+    cell.click()
+    expect(cell).to_have_attribute("data-selected", "true")
+    assert ring_problems(cell) == []
+
+    hit = cell.evaluate(INITIALS_HIT_SCRIPT)
+
+    assert hit["found"] is True, "no remote-initials on (2, 2)"
+    assert hit["hitsMark"] is False, f"elementFromPoint found the ring: {hit['hit']}"
+    assert hit["hits"] is True, f"elementFromPoint found {hit['hit']}"
 
 
 def test_ac2_typing_in_a_highlighted_cell_keeps_its_highlight(

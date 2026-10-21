@@ -299,11 +299,15 @@ def test_ac3_names_come_in_order_of_first_appearance(fx01_grid: Grid) -> None:
     from nock.catch_up import PlayerName, WordCompleted, build_catch_up
 
     clock = Clock()
-    play = two_players(fx01_grid)
-    write_letters(play, clock, ANA, VID)
+    play = Play(fx01_grid)
+    play.join("Ana", ANA, TA)
+    # Bob joins during the absence: only the replay of the entries knows him.
     before = play.state
+    play.join("Bob", BOB, TB)
+    write_letters(play, clock, ANA, VID)
+    seq_before_check = play.state.seq
     play.send(BOB, Check(target=CellTarget(row=2, column=1)), now=clock.next())
-    check = play.entry_of(before.seq + 1).event
+    check = play.entry_of(seq_before_check + 1).event
     play.write(ANA, 2, 4, "E", now=clock.next())
     completed = play.state.seq
 
