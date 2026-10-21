@@ -9,8 +9,8 @@ Update it at the end of each session.
 
 - Phase 6 is complete (2026-10-22): its 13 specs are merged and `done`. The
   last four went in one pull request each: 038 (#22), 034 (#24), 033 (#25) and
-  029 (#26). Phase 7 (specs 030 and 031, competitive modes) waits for the
-  human's choice: the build plan builds it only if E8 is wanted.
+  029 (#26). Next is the visual design (`_design.md`, from spec 041); Phase 7
+  (specs 030 and 031, competitive modes) is wanted and queued after it.
 - The work moved on 2026-10-21 from the cloud session to a session on the
   human's Windows computer. The cloud session's worktrees are gone.
 - Local setup: section 1 of the README (`uv sync`, `npm --prefix web ci`,
@@ -126,11 +126,19 @@ Update it at the end of each session.
 
 1. Phase 6's end in the build plan: tag `v1.0.0` on `main`, if the human wants
    it.
-2. Phase 7 (competitive modes) is built only if the human wants E8. If yes:
-   spec 030 (race mode), then 031 (team mode), one pull request each, through
-   the usual roles and two review rounds; both specs are `approved` already.
-   If not, they are deleted and removed from `specs/_reference.md`.
-3. The small follow-ups below ("Follow-up noted from spec 028's first review",
+2. The visual design first (human, 2026-10-22: "I want the game now to be
+   implemented based on the full design system provided"): `_design.md`
+   section 14's build order. Step 1 is spec 041 (approved). Steps 2 to 5 get
+   specs drafted from `_design.md`, which the human approves one by one. Lead
+   decisions of 2026-10-22, for the human to override: the design's revealed
+   notch (0.22 by 0.11 of the side) wins over spec 024 AC-9's minimum, and the
+   spec writer's picks of section 15's "Still open" items are accepted.
+3. Phase 7 (competitive modes) is wanted (human, 2026-10-22: "E8 is wanted"),
+   and queued after the design ("Stop and queue 030 or any competitive
+   modes"): spec 030 (race mode), then 031 (team mode), one pull request each.
+   Both are 45-line stubs, approved before their public interface existed: a
+   spec writer writes them in full first.
+4. The small follow-ups below ("Follow-up noted from spec 028's first review",
    the README's missing word on how to add grids), when a spec touches them.
 - **Models:** pass `model: "opus"` to the implementer and to the test-writer of
   a whole spec (their definitions default to Sonnet, at high effort). Use
