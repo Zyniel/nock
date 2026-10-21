@@ -175,11 +175,12 @@ message that names the variable and the rule broken, but never shows the value.
 pass, because at that point the code does not exist yet and the tests are
 supposed to fail.
 
-The browser tests run in Chromium and WebKit by default; `--browsers all` (or
-`NOCK_BROWSERS=all`) adds Firefox. `--tests browser` or `--tests other` runs only
+The browser tests run in Chromium by default; `--browsers all` (or
+`NOCK_BROWSERS=all`) adds Firefox and WebKit. `--tests browser` or `--tests other` runs only
 the tests with or without a browser, and `--skip-static` skips steps 1 to 4
-except the build. CI uses them to run one job per engine on Ubuntu, plus
-Chromium and WebKit on Windows.
+except the build. CI uses them: each pull request runs Chromium on Ubuntu, and a
+merge into `main` (or a run started by hand from the Actions tab) adds one job
+each for Firefox and WebKit, on Ubuntu.
 `--specs 027,028` keeps the browser tests of those specs only (the tests without
 a browser all run): the quick gate an implementer passes before it finishes.
 

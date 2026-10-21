@@ -68,15 +68,16 @@ write the implementation before its tests exist.
   contradiction, a missing rule). It keeps the status and adds a dated note next
   to each change; the tests follow before the code. Only a human sets `approved`.
 - The gate leaves out the tests of a browser engine that is not installed, with a
-  warning (`scripts/gate_browsers.py`); CI still runs all three engines, one job
-  per engine on Ubuntu, plus Chromium and WebKit on Windows.
+  warning (`scripts/gate_browsers.py`). CI runs, on Ubuntu, Chromium for each
+  pull request, and Firefox and WebKit too after a merge into `main` or when
+  started by hand (human decision, 2026-10-21; no Windows job).
 - The gate runs the tests in parallel (pytest-xdist), then the timing-sensitive
   files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) on their own.
   A test file that measures a duration or a pace (a latency percentile, a time
   budget, a time window) goes in that list; a check that only waits up to a
   bound for a change stays in the parallel pass unless it flakes there.
 - The gate's engines come from `--browsers` or the `NOCK_BROWSERS` environment
-  variable (default `chromium,webkit`).
+  variable (default `chromium`).
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: the
   test-writer's `--stage tests`, the implementer's quick gate (the specs whose
   spec, test or harness files the branch changed since `main`, with `--specs`
