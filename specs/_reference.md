@@ -100,7 +100,7 @@ the specs whose criteria this one mentions.
 | [038](038-privacy-operations.md) | US-10.4 Privacy and operations | E10 | MVP | 11 | 005, 006, 008, 010, 011, 018, 020, 022, 026, 032, 035, 036, 037 |
 | [039](039-room-events-protocol.md) | Room events protocol (shared contract, no backlog story) | E3, E4 | MVP | 21 | 002 |
 | [040](040-web-client-shell.md) | Web client shell (server, routes, room socket, i18n; no backlog story) | E2, E3 | MVP | 29 | 039 |
-| [041](041-visual-foundation.md) | Visual foundation (design tokens, player colours, fonts, icons, styling primitives; no backlog story, `_design.md` step 1) | E10 | MVP | 20 | 004, 005, 007, 012, 013, 014, 016, 017, 019, 020, 021, 022, 024, 025, 027, 035, 038, 040 |
+| [041](041-visual-foundation.md) | Visual foundation (design tokens, player colours, fonts, icons, styling primitives; no backlog story, `_design.md` step 1) | E10 | MVP | 21 | 004, 005, 006, 007, 012, 013, 014, 016, 017, 019, 020, 021, 022, 024, 025, 027, 028, 033, 035, 038, 040 |
 
 ## Open decisions
 
