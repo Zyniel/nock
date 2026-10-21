@@ -5,6 +5,9 @@ sign-in link sent to that address is used. A signed-in browser holds a session
 cookie, and the account keeps the room identities its player linked, so that
 another device can get them.
 
+An account also keeps a record of each finished grid of its rooms (spec 029), so
+that its history stays listed after the room is deleted.
+
 `AccountStore` keeps the accounts in the database file of the rooms. Link tokens
 and session values are stored as their SHA-256 hex digests only, so a copy of
 the database cannot sign anybody in.
@@ -17,12 +20,21 @@ import secrets
 import sqlite3
 import string
 import threading
+from collections.abc import Sequence
 from pathlib import Path
+from typing import NamedTuple
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
 
 from nock.protocol import Nickname, PlayerId, ResumeToken
-from nock.room import RoomCode, RoomKey
+from nock.room import (
+    FORMER_PLAYER_NICKNAME,
+    RoomCode,
+    RoomKey,
+    RoomState,
+    member_id,
+    utc_datetime,
+)
 
 SESSION_COOKIE: str = "nock_session"
 LINK_LIFE_SECONDS: float = 1_800.0  # 30 minutes (decision 11)
@@ -75,6 +87,24 @@ CREATE TABLE IF NOT EXISTS account_identities (
     nickname TEXT NOT NULL,
     linked_at REAL NOT NULL,
     PRIMARY KEY (account_id, code, player_id)
+);
+CREATE TABLE IF NOT EXISTS account_history (
+    account_id TEXT NOT NULL REFERENCES accounts (account_id),
+    code TEXT NOT NULL,
+    grid_number INTEGER,
+    width INTEGER NOT NULL,
+    height INTEGER NOT NULL,
+    finished_at REAL NOT NULL,
+    elapsed_ms INTEGER NOT NULL,
+    PRIMARY KEY (account_id, code)
+);
+CREATE TABLE IF NOT EXISTS account_history_teammates (
+    account_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    player_id TEXT NOT NULL,
+    nickname TEXT NOT NULL,
+    PRIMARY KEY (account_id, code, position)
 );
 """
 
@@ -205,6 +235,25 @@ class SessionStart(AccountModel):
 
     account_id: str
     session: str  # the raw cookie value; only its SHA-256 is stored
+
+
+class HistoryRecord(AccountModel):
+    """One finished grid of an account (spec 029)."""
+
+    code: RoomCode
+    grid_number: int | None
+    width: int = Field(gt=0, strict=True)
+    height: int = Field(gt=0, strict=True)
+    finished_at: AwareDatetime
+    elapsed_ms: int = Field(ge=0, strict=True)
+    teammates: tuple[Nickname, ...]  # in team_nicknames order
+
+
+class _Teammate(NamedTuple):
+    """A team-mate of a history record, kept with the player id for erasure."""
+
+    player_id: str
+    nickname: str
 
 
 def _digest(secret: str) -> str:
@@ -418,6 +467,111 @@ class AccountStore:
             self._connection.execute("COMMIT")
             return True
 
+    def save_history(self, account_id: str, state: RoomState) -> None:
+        """Save the record of the solved room `state` for the account, once.
+
+        A record already saved for that account and room code is kept as it is.
+
+        Only the account's identities with code `state.code` whose resume token
+        is a member's of `state` count (`member_id(state, identity.resume_token)`
+        of spec 032 is not None); an identity of an older room that had the same
+        code does not. Does nothing when the room is not solved or when no
+        identity counts. Team-mates are the members of `state` whose player id
+        is not that of an identity that counts, kept with their player ids (for
+        erasure).
+
+        Args:
+            account_id: The account.
+            state: The room's latest state.
+        """
+        solved_at = state.solved_at
+        elapsed_ms = state.solved_elapsed_ms
+        if not state.solved or solved_at is None or elapsed_ms is None:
+            return
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                # Read inside the transaction: an erasure cannot come in between.
+                identities = self._read_identities(account_id)
+                own_player_ids = _counting_player_ids(identities, state)
+                is_saved = self._has_record(account_id, state.code)
+                if len(own_player_ids) == 0 or is_saved:
+                    self._connection.execute("ROLLBACK")
+                    return
+                self._insert_record(account_id, state, solved_at, elapsed_ms)
+                teammates = _teammates_of(state, own_player_ids)
+                self._insert_teammates(account_id, state.code, teammates)
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
+
+    def history(self, account_id: str) -> list[HistoryRecord]:
+        """Return the account's records, `finished_at` newest first, then code.
+
+        Args:
+            account_id: The account.
+
+        Returns:
+            The records. The team-mates of each are in the order they were
+            saved, a nickname equal to an earlier one left out, as
+            `team_nicknames` does.
+        """
+        with self._lock:
+            record_rows = self._connection.execute(
+                "SELECT code, grid_number, width, height, finished_at, elapsed_ms "
+                "FROM account_history WHERE account_id = ? "
+                "ORDER BY finished_at DESC, code",
+                (account_id,),
+            ).fetchall()
+            teammate_rows = self._connection.execute(
+                "SELECT code, nickname FROM account_history_teammates "
+                "WHERE account_id = ? ORDER BY code, position",
+                (account_id,),
+            ).fetchall()
+        teammates_by_code: dict[str, list[str]] = {}
+        for code, nickname in teammate_rows:
+            if code not in teammates_by_code:
+                teammates_by_code[code] = []
+            if nickname not in teammates_by_code[code]:
+                teammates_by_code[code].append(nickname)
+        records: list[HistoryRecord] = []
+        for code, grid_number, width, height, finished_at, elapsed_ms in record_rows:
+            record = HistoryRecord(
+                code=code,
+                grid_number=grid_number,
+                width=width,
+                height=height,
+                finished_at=utc_datetime(finished_at),
+                elapsed_ms=elapsed_ms,
+                teammates=tuple(teammates_by_code.get(code, [])),
+            )
+            records.append(record)
+        return records
+
+    def accounts_of_room(self, code: str) -> list[str]:
+        """Return the ids of the accounts that hold an identity with code `code`.
+
+        The identity may be of this room or of an older room that had the same
+        code (save_history skips the latter).
+
+        Args:
+            code: The room code.
+
+        Returns:
+            The account ids, each once, in code-point order.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT DISTINCT account_id FROM account_identities "
+                "WHERE code = ? ORDER BY account_id",
+                (code,),
+            ).fetchall()
+        account_ids: list[str] = []
+        for (account_id,) in rows:
+            account_ids.append(str(account_id))
+        return account_ids
+
     def identities(self, account_id: str) -> list[RoomIdentity]:
         """Return the account's identity of each of its rooms.
 
@@ -439,10 +593,13 @@ class AccountStore:
     def delete_account(self, account_id: str) -> list[RoomIdentity]:
         """Delete the account and everything it holds, at once.
 
-        The account, its sessions, its identities and every sign-in link of its
-        address go in one transaction. On a file database the write-ahead log is
-        then checkpointed and emptied, so no copy of the address stays in the
-        database files (spec 038).
+        The account, its sessions, its identities, its history records and every
+        sign-in link of its address go in one transaction. In the same
+        transaction, each team-mate of another account's record whose room code
+        and player id are an identity of this account gets the nickname
+        FORMER_PLAYER_NICKNAME (spec 029). On a file database the write-ahead log
+        is then checkpointed and emptied, so no copy of the address or of the
+        nickname stays in the database files (spec 038).
 
         Args:
             account_id: The account.
@@ -463,6 +620,7 @@ class AccountStore:
                     self._connection.execute(
                         "DELETE FROM account_links WHERE email = ?", (row[0],)
                     )
+                self._erase_from_history(account_id, held_identities)
                 self._connection.execute(
                     "DELETE FROM account_identities WHERE account_id = ?",
                     (account_id,),
@@ -481,6 +639,29 @@ class AccountStore:
             if self._is_file:
                 self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
         return held_identities
+
+    def erase_players_from_history(self, identities: Sequence[RoomIdentity]) -> None:
+        """Make the players of `identities` former players in every history.
+
+        In the records of every account, each team-mate whose room code and
+        player id are those of one of `identities` gets the nickname
+        FORMER_PLAYER_NICKNAME (spec 029). `DELETE /api/account` calls it once
+        the rooms are erased. On a file database the write-ahead log is then
+        checkpointed and emptied, as by `delete_account`.
+
+        Args:
+            identities: The identities of a deleted account.
+        """
+        with self._lock:
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._mark_former_players(identities)
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
+            if self._is_file:
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
 
     def purge(self, now: float) -> None:
         """Delete the links and the sessions that are too old to be used.
@@ -511,6 +692,80 @@ class AccountStore:
                 return
             self._is_closed = True
             self._connection.close()
+
+    def _has_record(self, account_id: str, code: str) -> bool:
+        """Tell whether the account has a record of room `code`. The caller locks."""
+        row = self._connection.execute(
+            "SELECT 1 FROM account_history WHERE account_id = ? AND code = ?",
+            (account_id, code),
+        ).fetchone()
+        return row is not None
+
+    def _insert_record(
+        self, account_id: str, state: RoomState, solved_at: float, elapsed_ms: int
+    ) -> None:
+        """Insert the record of a solved room, without its team-mates.
+
+        The caller holds the lock and runs the transaction.
+        """
+        self._connection.execute(
+            "INSERT INTO account_history "
+            "(account_id, code, grid_number, width, height, finished_at, elapsed_ms) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                account_id,
+                state.code,
+                state.grid_number,
+                state.grid.width,
+                state.grid.height,
+                solved_at,
+                elapsed_ms,
+            ),
+        )
+
+    def _insert_teammates(
+        self, account_id: str, code: str, teammates: list[_Teammate]
+    ) -> None:
+        """Insert the team-mates of a record, in their order.
+
+        The caller holds the lock and runs the transaction.
+        """
+        for position, teammate in enumerate(teammates):
+            self._connection.execute(
+                "INSERT INTO account_history_teammates "
+                "(account_id, code, position, player_id, nickname) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (account_id, code, position, teammate.player_id, teammate.nickname),
+            )
+
+    def _erase_from_history(
+        self, account_id: str, held_identities: list[RoomIdentity]
+    ) -> None:
+        """Delete the account's records, and erase its players from the others'.
+
+        The caller holds the lock and runs the transaction.
+        """
+        self._mark_former_players(held_identities)
+        self._connection.execute(
+            "DELETE FROM account_history_teammates WHERE account_id = ?",
+            (account_id,),
+        )
+        self._connection.execute(
+            "DELETE FROM account_history WHERE account_id = ?", (account_id,)
+        )
+
+    def _mark_former_players(self, identities: Sequence[RoomIdentity]) -> None:
+        """Give FORMER_PLAYER_NICKNAME to each team-mate matching an identity.
+
+        A team-mate matches when its room code and player id are the identity's.
+        The caller holds the lock and runs the transaction.
+        """
+        for identity in identities:
+            self._connection.execute(
+                "UPDATE account_history_teammates SET nickname = ? "
+                "WHERE code = ? AND player_id = ?",
+                (FORMER_PLAYER_NICKNAME, identity.code, identity.player_id),
+            )
 
     def _account_id_of(self, email: str) -> str | None:
         """Return the id of the account of `email`, or None. The caller locks."""
@@ -548,3 +803,36 @@ class AccountStore:
             )
             found.append(identity)
         return found
+
+
+def _counting_player_ids(identities: list[RoomIdentity], state: RoomState) -> set[str]:
+    """Return the player ids of the identities that count for a room's record.
+
+    An identity counts when its code is the room's and its resume token is a
+    member's of the room (spec 032's `member_id`), so an identity of an older
+    room that had the same code does not.
+    """
+    player_ids: set[str] = set()
+    for identity in identities:
+        if identity.code != state.code:
+            continue
+        player_id = member_id(state, identity.resume_token)
+        if player_id is not None:
+            player_ids.add(player_id)
+    return player_ids
+
+
+def _teammates_of(state: RoomState, own_player_ids: set[str]) -> list[_Teammate]:
+    """Return the room's members other than the account's own players.
+
+    They come in `team_nicknames` order: the past players in the order they
+    left, then the players in `players` order.
+    """
+    teammates: list[_Teammate] = []
+    for past_player in state.past_players:
+        if past_player.player_id not in own_player_ids:
+            teammates.append(_Teammate(past_player.player_id, past_player.nickname))
+    for player in state.players:
+        if player.player_id not in own_player_ids:
+            teammates.append(_Teammate(player.player_id, player.nickname))
+    return teammates

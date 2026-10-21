@@ -382,6 +382,10 @@ class RoomRegistry:
         None when the room is unknown or expired (an expired room is deleted first,
         as by `expire_rooms`).
         """
+        # (Note from the lead, 2026-10-21, first review of spec 029: for a room
+        # solved before spec 029, whose state has no `solved_at`, both states come
+        # with `solved_at` and `solved_elapsed_ms` filled in from its `grid_solved`
+        # log entry, as spec 029 AC-1 fills a summary's.)
 
     def member_id(self, code: str, resume_token: str) -> str | None:
         """Return `nock.room.member_id` of the room's latest state (as `peek_room`

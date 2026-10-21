@@ -24,6 +24,7 @@
   import { newLinkCopier } from './copyLink'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
+  import { recordOwnRoom } from './history'
   import {
     CATCH_UP_HIGHLIGHT_MS,
     applyCatchUp,
@@ -541,6 +542,17 @@
     if (grid !== null) {
       markFinished(grid)
     }
+  })
+
+  // Spec 029: once the grid is solved, the page asks its room's summary and
+  // writes its record in this device's history. Once per page.
+  let isRecordAsked = false
+  $effect(() => {
+    if (!session.solved || session.snapshot === null || isRecordAsked) {
+      return
+    }
+    isRecordAsked = true
+    void recordOwnRoom(code, session.snapshot.resume_token)
   })
 
   // Send a message when the socket is open; after a close nothing is sent.

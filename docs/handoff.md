@@ -2,10 +2,19 @@
 
 Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 `docs/build-plan.md`. It replaces the long conversations of the sessions that
-wrote it (2026-10-12 to 2026-10-17), so a fresh session can continue cheaply.
+wrote it (2026-10-12 to 2026-10-21), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-17, morning)
+## Where things stand (2026-10-22)
+
+- All 13 Phase 6 specs are built. Specs 038 (PR #22), 034 (PR #24) and 033
+  (PR #25) are merged; spec 029, the last one, is in review in the pull request
+  that carries this handoff ("Spec 029, the last pull request" below).
+- The work moved on 2026-10-21 from the cloud session to a session on the
+  human's Windows computer. The cloud session's worktrees are gone.
+- Local setup: section 1 of the README (`uv sync`, `npm --prefix web ci`,
+  `uv run playwright install chromium firefox webkit`). The session-start hook
+  and CI's fonts are for cloud sessions; the finish hook works in both.
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -28,19 +37,23 @@ Update it at the end of each session.
   typed and stored in capitals, compared exactly, shown with capitalised words;
   NFC before and after the capitals; the field shows capitals through CSS and
   keeps its value as typed), PR #18 (from the design session: `specs/_design.md`,
-  `docs/design/cell-sheet.html` and the draft spec 041, the visual foundation).
-  Tag `v0.1.0` exists locally on #6's merge commit but could not be pushed from
-  the cloud session (tag pushes are refused): the human pushes it from a clone.
-- Open: the tooling pull request of 2026-10-17, for a faster pipeline:
-  - CI drops Firefox's Windows job (human decision);
-  - the test-writer and implementer run at high effort (human decision) and get
-    250 turns instead of 60 and 80;
-  - the finish hook gates the checkout the agent edited, not the session's.
+  `docs/design/cell-sheet.html` and the draft spec 041, the visual foundation),
+  PR #19 (tooling, for a faster pipeline: CI drops Firefox's Windows job; the
+  test-writer and implementer run at high effort with 250 turns; the finish hook
+  gates the checkout the agent edited), PR #20 (spec 041, the visual
+  foundation, from the design session), PR #21 (tooling: CI skips the browser
+  jobs for a pull request that only changes `specs/` or `docs/`), PR #22 (spec
+  038, privacy and operations, with the `utc_datetime` fix for Windows), PR #23
+  (tooling: the new CI workflow, below), PR #24 (spec 034, catching up after an
+  absence), PR #25 (spec 033, optional account, with its `link_identity` race
+  fix). Tag `v0.1.0` exists locally on #6's merge commit but could not be
+  pushed from the cloud session (tag pushes are refused): the human pushes it
+  from a clone.
+- Open: spec 029's pull request (game history), which carries this handoff.
 - Questions left to the human from PR #12: the reading of the rule for
-  `NOCK_DATABASE` (control, separator and format characters only); spec 033's
-  open question 2 (players' addresses outside ASCII). When 033's turn comes the
-  lead takes (b) under the human's simplicity rule and says so in its pull
-  request.
+  `NOCK_DATABASE` (control, separator and format characters only). Spec 033's
+  open question 2 (players' addresses outside ASCII) is answered with (b), under
+  the human's simplicity rule: say so in its pull request.
 - Pull requests, human decision of 2026-10-16: one pull request per spec (with
   its refinements of other specs), and tooling changes in a pull request of
   their own. With one designated branch there is one open pull request at a
@@ -48,58 +61,66 @@ Update it at the end of each session.
   merged. CI runs only on pull requests, so a local check comes first.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
-- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032 are `done` and
-  merged. The human chose on 2026-10-16 to build the other four now, in the
-  build plan's order, one pull request each: 038, then 034 ("Then catchup"),
-  033, 029.
+- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032, 038, 034 and 033
+  are merged; 029 is in review (human decision of 2026-10-16: 038, then 034,
+  033, 029, one pull request each).
 
-## Work in flight (not pushed)
+## Spec 029, the last pull request
 
-- Spec 038 (privacy and operations).
-  - **Branch:** worktree `.claude/worktrees/spec-038`, branch `spec-038`. It is
-    built on the nickname branch before that branch's rebases (38e27f4). Its
-    commits, in order: the spec preparation 51482ca, the tests 6a0cfc2, AC-11 in
-    the serial list 62395ff, the spec's gap-fills f66c0d9, the code 515e026,
-    three test fixes 44b1536; then the fix round: spec 77e2c3e, tests 5865cda,
-    code 1d95eb8.
-  - **State:** the first review returned REQUEST CHANGES; its fix round is
-    done, and the second (last) review is running.
-  - **The blocking findings:**
-    - the throttle kept an address until that address failed again;
-    - the gap-fills had no tests;
-    - nothing checked that the token stays out of request URLs.
-  - **Also taken from that review:**
-    - a token given to `create_app` follows the variable's rule;
-    - every method on the ops paths answers 404 while the pages are off;
-    - a period change keeps the dashboard and an open replay on screen.
-  - **Added by the implementer, not in the spec:** the page ignores an answer
-    that arrives after it has left `ready`.
-  - **The preparation:** spec 036 was refined after 038's decision 9 (logs at
-    `warning`, no access log, `main()` checks `NOCK_OPERATOR_TOKEN` first). 038
-    was aligned with the code and simplified: the ops API reuses spec 011's
-    throttle, and one store read gives each room's code and creation time.
-  - **The gap-fills:** after a 429 the page acts as after a 401; the token is
-    checked before anything else; only token refusals count.
-  - **Next:** after the tooling pull request is merged, rebase with
-    `git rebase --onto origin/main 38e27f4 spec-038`. The nickname branch's
-    commits came back in `main` under other hashes, which that command leaves
-    out.
-- Spec 034 (catching up after an absence).
-  - **Branch:** worktree `.claude/worktrees/spec-034`, branch `spec-034`, built
-    on `spec-038` at 5865cda. Its preparation is 7b2d491 (the nickname rule,
-    stale references, three simplifications, testable criteria).
-  - **State:** its tests are being written. The files that measure time (AC-2's
-    highlight window, AC-4's scroll) go in `SERIAL_TEST_FILES`, a lead commit
-    on the branch.
-  - **Accepted, under the simplicity rule:** a line from a vote that passes
-    after the player who asked for it has left gets no name.
-  - **Next:** rebase onto `spec-038`'s last commit, later onto `main`.
-- Then specs 033 and 029, each built on the previous branch.
+- **Branch:** spec 029's 10 commits and this handoff, rebased onto `main` after
+  PR #25's merge (local branch `pr-029`, worktree `.claude/worktrees/pr-029`).
+  Its code and tests are the same as on `specs-chain`, where they were
+  reviewed. Turn Auto-fix on when the human says so (they asked for it on #22,
+  #24 and #25).
+- **How the spec pull requests were opened:** `specs-chain` (a local branch)
+  keeps the whole reviewed chain. Each spec was cherry-picked onto `main` in a
+  worktree `pr-NNN` once the previous one was merged. Cherry-pick ranges and
+  single commits in separate calls: one call with both walks the whole history
+  between them.
+- **Local gate on `pr-029`, 2026-10-22 (Chromium):** the static checks and
+  5,911 of 5,913 parallel tests passed, and the serial pass. The two failures
+  were load flakes (`net::ERR_NO_BUFFER_SPACE`, Windows out of local ports
+  after four gates in a row; and a click on a cell "not visible" at 320 by
+  568). Both files and spec 029's tests then passed in parallel (301 tests).
+- **Spec 029 (game history):** approved by its second review (2026-10-21).
+  - **Commits:** spec d1f3388; tests 4239b0b; code 27fa970 (server) and
+    ce383c6 (client); the first review's fix round: spec 6402495, tests
+    822bddb, code a2b65d3, spec 032 note 28768fc.
+  - **Also in its pull request:** 2272dda (two spec 032 AC-4 tests compare
+    summaries as models, since spec 029 adds two summary fields) and 4ba1ce5
+    (`utc_datetime` in `room.py` replaces `datetime.fromtimestamp(..., UTC)`,
+    which raises `OSError` on Windows for a negative time; spec 038's AC-6
+    `[30-3]` test failed locally for that reason).
+  - **First review's blocking finding, fixed:** deleting an account while one
+    of its solved rooms had expired but was not swept left the nickname in
+    another account's history and in the files. The route now runs
+    `AccountStore.erase_players_from_history` after the rooms are erased.
+  - **For the human, in its pull request:**
+    - One race is left: a history save that read the room before the erasure
+      and writes after it keeps the nickname. Very unlikely (the other thread
+      must stall through `erase_player` and two commits). Closing it: the
+      store keeps the erased `(code, player_id)` pairs and writes `--` for
+      them on every later save.
+    - The delete hook writes SQLite under the registry lock.
+    - Two erased team-mates of one record show as one `--`.
+    - The room page asks its summary once per page and does not retry; "My
+      rooms" writes the record on the next visit.
+    - `peek_room` re-reads the log of a room solved before spec 029 at each
+      call (correct, slower on old rooms).
+- **Tooling, ready on branch `feat/hook-bash-paths` (db88bed, from `main`, not pushed):** the
+  finish hook also finds the agent's checkout from the directories its Bash
+  commands name (`git -C`, `cd`, `--directory`; Git Bash `/k/...` paths read as
+  `K:/...`). Its own pull request; worktree `.claude/worktrees/hook-bash-paths`.
+- **Local environment, 2026-10-21:** the `.venv` launchers failed with "uv
+  trampoline failed to canonicalize script path" (black, playwright,
+  uvicorn); `uv sync --reinstall` fixed it.
+- **Waiting for another agent's gate:** use
+  `pgrep -f '^[^ ]*python[0-9.]* [^ ]*scripts/gate[.]py'`. The simpler
+  `pgrep -f scripts/gate.py` matches its own shell, and a wait loop on it never
+  ends.
 - Follow-up noted from spec 028's first review: spec 035's scan accepts any
   "X : Y" text through `{name} : {reaction}` (bind open placeholders to their
   values, a spec 035 refinement, after 032).
-- For spec 033's turn: a seated-back player whose nickname spec 033 erased to
-  `--` keeps it, exempt from spec 012's suffix rule (from spec 032's pass).
 - A tool call can turn a typed `\uXXXX` into the character itself: the first
   draft of spec 036 held six raw invisible characters, U+202E among them. Write
   such characters as `\N{NAME}` in code and as typed escapes in specs, and scan
@@ -115,14 +136,13 @@ Update it at the end of each session.
 
 ## First tasks for the next session
 
-1. Keep the open pull request green until the human merges it; answer its
-   review comments.
-2. Then spec 038's pull request.
-3. Then 034, 033 and 029, one pull request each. Pass
-   `model: "opus"` to the implementer and to the test-writer of a whole spec
-   (their definitions default to Sonnet, at high effort); Sonnet for small spec
-   notes and mechanical test edits.
-- Phase 7 (030, 031): untouched.
+1. Follow spec 029's pull request to its merge ("Spec 029, the last pull
+   request").
+2. The finish hook's tooling pull request (`feat/hook-bash-paths`).
+3. Phase 6 is then complete; Phase 7 (030, 031) is next, untouched so far.
+- **Models:** pass `model: "opus"` to the implementer and to the test-writer of
+  a whole spec (their definitions default to Sonnet, at high effort). Use
+  Sonnet for small spec notes and mechanical test edits.
 
 ## How a feature is built here
 
@@ -170,8 +190,10 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   `uv run python scripts/gate.py --tests other`.
 - One engine's browser tests, as a CI job runs them (7 to 15 minutes here):
   `uv run python scripts/gate.py --skip-static --tests browser --browsers firefox`.
-  `--browsers all` runs all three engines; the default is chromium,webkit
-  (`NOCK_BROWSERS` overrides it).
+  `--browsers all` runs all three engines; the default is chromium since
+  2026-10-21 (`NOCK_BROWSERS` overrides it). A full Chromium gate takes about
+  6 minutes on the human's machine. After several gates in a row, Windows can
+  run out of local ports (`net::ERR_NO_BUFFER_SPACE`): rerun the failures.
 - Targeted runs, in parallel:
   `PYTHONPATH=scripts uv run pytest -p gate_browsers -n auto --browser chromium --browser webkit --browser firefox tests/test_spec_NNN*.py -q`.
   A bare `uv run pytest` runs the browser tests in Chromium only.
@@ -191,17 +213,18 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   not block. Since 2026-10-17 it gates the checkout of the last file the agent
   edited, read from the agent's transcript. Before, it ran in the session's
   directory, the main checkout, and checked none of a worktree agent's changes.
-- CI runs only on pull requests and pushes to `main`, and cancels a run when a
-  new commit is pushed. Six jobs (static and non-browser tests on Ubuntu 3.13;
-  each engine on Ubuntu, and Chromium and WebKit on Windows, Python 3.14), then
-  `Quality gate`, which passes only when all six passed. About 20 minutes; the
-  Windows jobs are the slowest. Firefox's Windows job was dropped on 2026-10-17
-  (human decision): it took about 26 minutes and failed in 5 of 10 runs, each
-  time a timeout that passed on re-run. The Windows jobs run 3 workers on their
-  4 CPUs (with 4 the runner once stalled for over 5 s), use ephemeral ports
-  16384 to 65535 (the default range ran out once; the range starts above 10080,
-  the highest port browsers refuse), and print the TIME_WAIT count when they
-  fail.
+- CI runs on pull requests, on pushes to `main` and by hand
+  (`workflow_dispatch`), and cancels a run when a new commit is pushed (on
+  `main`, each merge cancels the previous merge's run). Since 2026-10-21 (PR
+  #23, human decision): a pull request runs the static and non-browser tests
+  (Ubuntu, Python 3.13) and Chromium (Ubuntu, 3.14), about 13 minutes; a push
+  to `main` or a manual run adds Firefox and WebKit on Ubuntu. No Windows job:
+  Windows is covered by the local gate. `Quality gate` passes only when the
+  jobs that should run passed (the other engines' job skipped on a pull
+  request). Auto-fix watches pull requests, not `main`: check `main`'s run
+  (`gh run list --branch main`) before opening the next pull request. A
+  pull request's re-run keeps its old workflow file; to run a new workflow,
+  push to its branch (for example a merge of `main`).
 - `SERIAL_TEST_FILES` holds the files that measure a duration or a pace: spec
   013 AC-7/AC-8 and spec 022 AC-11/AC-12 (list scroll, 300 ms), spec 022 AC-10
   (pacing), spec 036 AC-1 (time budgets), spec 027's live pages, and since
@@ -252,7 +275,24 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
 - 2026-10-17: the pipeline is too slow ("I'm really upset by the time
   everything now takes"). The test-writer and implementer run at high effort,
   the spec-writer and reviewer keep the session's max; CI drops Firefox's
-  Windows job. PRs #17 and #18 merged.
+  Windows job. PRs #17, #18 and #19 merged.
+- 2026-10-17 to 21: the weekly usage limit stopped every agent until 07:00 UTC
+  on 2026-10-21.
+- 2026-10-21: the work moves from the cloud session to a session on the human's
+  computer. The work in flight of specs 038, 034 and 033 is saved as one chain
+  on `feat/phase5-mvp-ldddid`. Then: "Finish both other specs I'll move when all
+  is green". Specs 034 and 033 were built through their two review rounds that
+  day, and 038's two small fixes went in.
+
+- 2026-10-21, evening: CI is too slow and WebKit flakes ("would reducing the
+  Browser coverage be a better option?"). Pull requests run the static checks,
+  the tests without a browser and Chromium, on Ubuntu; Firefox and WebKit run
+  on Ubuntu after a merge into `main` or by hand (`workflow_dispatch`); no
+  Windows job; the local gate defaults to Chromium (PR #23). A failure on
+  `main` is fixed in the next pull request. Bring WebKit back to pull requests
+  once the visual design settles.
+- 2026-10-21 to 22: the four spec pull requests opened one at a time; #22 and
+  #24 merged.
 
 ## Lead decisions of 2026-10-15 worth knowing
 

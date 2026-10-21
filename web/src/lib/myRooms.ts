@@ -23,6 +23,10 @@ export interface RoomSummary {
   // The last edit time, an ISO 8601 time in UTC.
   last_activity_at: string
   solved: boolean
+  // Spec 029: when the grid was solved (ISO 8601, UTC) and the time it took;
+  // null unless solved. A server before spec 029 sends neither.
+  finished_at?: string | null
+  elapsed_ms?: number | null
 }
 
 // The server takes at most this many keys in one request.
@@ -77,8 +81,17 @@ function isNumberOrNull(value: unknown): boolean {
   return value === null || typeof value === 'number'
 }
 
-function isTime(value: unknown): value is string {
+export function isTime(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+}
+
+// A field the server may leave out: absent, null, or of the type `isType` checks.
+function isMissingOr(value: unknown, isType: (value: unknown) => boolean): boolean {
+  return value === undefined || value === null || isType(value)
+}
+
+function isNumber(value: unknown): boolean {
+  return typeof value === 'number'
 }
 
 // Tell whether a parsed JSON value looks like one room summary.
@@ -96,7 +109,9 @@ function isRoomSummary(value: unknown): value is RoomSummary {
     Array.isArray(record.players) &&
     record.players.every((name: unknown) => typeof name === 'string') &&
     isTime(record.last_activity_at) &&
-    typeof record.solved === 'boolean'
+    typeof record.solved === 'boolean' &&
+    isMissingOr(record.finished_at, isTime) &&
+    isMissingOr(record.elapsed_ms, isNumber)
   )
 }
 
@@ -166,7 +181,13 @@ export async function fetchRoomSummaries(keys: RoomKey[]): Promise<RoomSummary[]
 export function lastActivityText(lastActivityAt: string): string {
   const moment = new Date(lastActivityAt)
   return t('my_rooms.last_activity', {
-    date: dateFormat.format(moment),
+    date: dateText(moment),
     time: timeFormat.format(moment),
   })
+}
+
+// "14 octobre 2026": the day, the long month and the year, in the browser's time
+// zone. The history of spec 029 writes its dates so too.
+export function dateText(moment: Date): string {
+  return dateFormat.format(moment)
 }

@@ -1,11 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import CatalogueItem from './CatalogueItem.svelte'
+  import HistoryList from './HistoryList.svelte'
   import MyRooms from './MyRooms.svelte'
   import { fetchAccountRooms, fetchAccountStatus, storeMissingIdentities } from './account'
   import { isGridSummary, type GridSummary } from './catalogue'
+  import {
+    fetchAccountHistory,
+    mergeHistories,
+    readHistory,
+    writeSolvedSummaries,
+    type HistoryRecord,
+  } from './history'
   import { t } from './i18n'
-  import { storedRoomKeys, type RoomKey } from './myRooms'
+  import { storedRoomKeys, type RoomKey, type RoomSummary } from './myRooms'
 
   type State = 'loading' | 'ready' | 'error'
   type ForceFilter = 'all' | 1 | 2 | 3 | 4
@@ -17,6 +25,25 @@
   let myRoomKeys: RoomKey[] = $state([])
   // Whether GET /api/account answered 200: accounts are on (spec 033).
   let isAccountOn = $state(false)
+
+  // The finished grids (spec 029): this device's records, and the account's
+  // while signed in, which are never written to the device.
+  let deviceHistory: HistoryRecord[] = $state(readHistory())
+  let accountHistory: HistoryRecord[] = $state([])
+  const shownHistory = $derived(mergeHistories(deviceHistory, accountHistory))
+
+  // "My rooms" has its summaries: each solved room gets its record on the device.
+  function recordSolvedRooms(summaries: RoomSummary[]): void {
+    writeSolvedSummaries(summaries)
+    deviceHistory = readHistory()
+  }
+
+  async function loadAccountHistory(): Promise<void> {
+    const records = await fetchAccountHistory()
+    if (records !== null) {
+      accountHistory = records
+    }
+  }
 
   let pageState: State = $state('loading')
   let grids: GridSummary[] = $state([])
@@ -55,6 +82,7 @@
     const status = await fetchAccountStatus()
     isAccountOn = status !== null
     if (status !== null && status.signed_in) {
+      void loadAccountHistory()
       const identities = await fetchAccountRooms()
       if (identities !== null) {
         storeMissingIdentities(identities)
@@ -76,7 +104,7 @@
     <a data-testid="account-link" href="/account" tabindex="0">{t('account.open')}</a>
   {/if}
   {#if myRoomKeys.length > 0}
-    <MyRooms keys={myRoomKeys} />
+    <MyRooms keys={myRoomKeys} onloaded={recordSolvedRooms} />
   {/if}
   <div role="group" aria-label={t('catalogue.filter.label')}>
     {#each FILTERS as filter (filter)}
@@ -107,5 +135,8 @@
         <CatalogueItem summary={grid} />
       {/each}
     </div>
+  {/if}
+  {#if shownHistory.length > 0}
+    <HistoryList records={shownHistory} />
   {/if}
 </main>

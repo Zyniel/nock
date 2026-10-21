@@ -286,7 +286,7 @@ def test_ac4_a_summary_in_json_reads_as_the_example_of_the_spec() -> None:
         solved=False,
     )
 
-    assert summary.model_dump(mode="json") == {
+    example = {
         "code": "XYZ789",
         "grid_number": 2,
         "width": 5,
@@ -296,13 +296,28 @@ def test_ac4_a_summary_in_json_reads_as_the_example_of_the_spec() -> None:
         "solved": False,
     }
 
+    dumped = summary.model_dump(mode="json")
+    # Fields that a later spec adds with a default (spec 029's) may come after
+    # the example's, so the example is compared as a model and key by key.
+    assert nock.room.RoomSummary.model_validate(example) == summary
+    for key, value in example.items():
+        assert dumped[key] == value
+
 
 def test_ac4_the_summaries_the_page_tests_answer_with_are_dumped_summaries() -> None:
     first = nock.room.RoomSummary.model_validate(xyz_summary())
     second = nock.room.RoomSummary.model_validate(abc_summary())
 
-    assert first.model_dump(mode="json") == xyz_summary()
-    assert second.model_dump(mode="json") == abc_summary()
+    # Compared as models: a field that a later spec adds with a default (spec
+    # 029's `finished_at` and `elapsed_ms`) keeps the dumped form valid.
+    assert nock.room.RoomSummary.model_validate(first.model_dump(mode="json")) == first
+    assert (
+        nock.room.RoomSummary.model_validate(second.model_dump(mode="json")) == second
+    )
+    for key, value in xyz_summary().items():
+        assert first.model_dump(mode="json")[key] == value
+    for key, value in abc_summary().items():
+        assert second.model_dump(mode="json")[key] == value
     assert second.grid_number is None
     assert second.last_activity_at == datetime(2026, 10, 13, 20, 5, tzinfo=UTC)
 
