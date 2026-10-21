@@ -368,8 +368,8 @@ class AccountStore:
 
     def link_identity(
         self, account_id: str, identity: RoomIdentity, now: float
-    ) -> None:
-        """Link an identity to the account.
+    ) -> bool:
+        """Link an identity to the account, while the account exists.
 
         Linking the same player again updates its token and nickname and makes it
         the newest.
@@ -378,10 +378,21 @@ class AccountStore:
             account_id: The account.
             identity: The member of a room, as the room holds them.
             now: Clock time of the link.
+
+        Returns:
+            True when the identity is linked. False, with nothing written, when the
+            account does not exist (it was deleted).
         """
         with self._lock:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
+                account_row = self._connection.execute(
+                    "SELECT account_id FROM accounts WHERE account_id = ?",
+                    (account_id,),
+                ).fetchone()
+                if account_row is None:
+                    self._connection.execute("ROLLBACK")
+                    return False
                 # Deleted, then inserted again: the new row is the newest one.
                 self._connection.execute(
                     "DELETE FROM account_identities "
@@ -405,6 +416,7 @@ class AccountStore:
                 self._connection.execute("ROLLBACK")
                 raise
             self._connection.execute("COMMIT")
+            return True
 
     def identities(self, account_id: str) -> list[RoomIdentity]:
         """Return the account's identity of each of its rooms.

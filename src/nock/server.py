@@ -1160,7 +1160,12 @@ def create_app(
         identity = _member_identity(room_registry, body)
         if identity is None:
             raise _not_found()
-        store.link_identity(account.account_id, identity, room_registry.clock())
+        linked = store.link_identity(
+            account.account_id, identity, room_registry.clock()
+        )
+        if not linked:
+            # The account was deleted after the session was read.
+            raise _no_session()
         return Response(status_code=204)
 
     # Spec 033: the account goes at once, then each of its players is erased
