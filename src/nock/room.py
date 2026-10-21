@@ -279,6 +279,10 @@ class RoomState(RoomModel):
     past_players: tuple[PastPlayer, ...] = Field(
         default=(), max_length=MAX_PAST_PLAYERS
     )
+    # spec 029: the `at` and the `elapsed_ms` of the grid_solved entry. A room
+    # stored before this spec has no such keys and loads with None, solved or not.
+    solved_at: float | None = None
+    solved_elapsed_ms: int | None = Field(default=None, ge=0, strict=True)
 
 
 class RoomKey(RoomModel):
@@ -298,6 +302,9 @@ class RoomSummary(RoomModel):
     players: tuple[Nickname, ...]  # team_nicknames(state)
     last_activity_at: AwareDatetime  # the last edit time, in UTC
     solved: StrictBool
+    # spec 029: solved_at in UTC and the time taken; None unless solved
+    finished_at: AwareDatetime | None = None
+    elapsed_ms: int | None = Field(default=None, ge=0, strict=True)
 
 
 class LogEntry(RoomModel):
@@ -551,8 +558,15 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
 
     Returns:
         The grid number, the grid's width and height, `team_nicknames(state)`,
-        `last_edit_at` as a UTC datetime, and whether the grid is solved.
+        `last_edit_at` as a UTC datetime, and whether the grid is solved. A
+        solved room also has `solved_at` as a UTC datetime and
+        `solved_elapsed_ms` (spec 029); an unsolved one has None for both.
     """
+    finished_at = None
+    elapsed_ms = None
+    if state.solved and state.solved_at is not None:
+        finished_at = datetime.fromtimestamp(state.solved_at, UTC)
+        elapsed_ms = state.solved_elapsed_ms
     return RoomSummary(
         code=state.code,
         grid_number=state.grid_number,
@@ -561,6 +575,8 @@ def room_summary(state: RoomState, last_edit_at: float) -> RoomSummary:
         players=team_nicknames(state),
         last_activity_at=utc_datetime(last_edit_at),
         solved=state.solved,
+        finished_at=finished_at,
+        elapsed_ms=elapsed_ms,
     )
 
 
@@ -2378,7 +2394,13 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
     elif isinstance(event, PlayerMuted):
         replayed = _replay_player_muted(state, event)
     elif isinstance(event, GridSolved):
-        replayed = state.model_copy(update={"solved": True})
+        replayed = state.model_copy(
+            update={
+                "solved": True,
+                "solved_at": entry.at,
+                "solved_elapsed_ms": event.elapsed_ms,
+            }
+        )
     elif isinstance(event, VoteOpened):
         replayed = _replay_vote_opened(state, entry, event)
     elif isinstance(event, VoteClosed):

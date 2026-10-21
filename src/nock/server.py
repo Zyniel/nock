@@ -12,7 +12,9 @@ which only a request carrying the token reaches.
 
 With account settings, it also serves the optional accounts (spec 033): the page
 `/account` and the routes under `/api/account`, which sign a player in with a
-link sent by e-mail and keep the rooms of their account.
+link sent by e-mail and keep the rooms of their account. Before a room is
+deleted, each account of the room keeps the record of its finished grid
+(spec 029).
 """
 
 from __future__ import annotations
@@ -529,6 +531,37 @@ def _served_identities(
     return served
 
 
+def _save_missing_history(
+    rooms: RoomRegistry, store: AccountStore, account_id: str
+) -> None:
+    """Save the record of each solved room of the account that has none yet.
+
+    Each room code of the account's identities is looked up; `save_history`
+    takes only the identities whose token is a member's of that room (spec 029).
+    """
+    for identity in store.identities(account_id):
+        state = rooms.peek_room(identity.code)
+        if state is not None and state.solved:
+            store.save_history(account_id, state)
+
+
+def _history_saver(store: AccountStore) -> Callable[[RoomState], None]:
+    """Return the delete hook that saves the history records of a room (spec 029).
+
+    The hook saves the record of a solved room for each account of
+    `accounts_of_room(code)`; `save_history` skips an account whose identities
+    are of an older room that had the same code.
+    """
+
+    def save_before_deletion(state: RoomState) -> None:
+        if not state.solved:
+            return
+        for account_id in store.accounts_of_room(state.code):
+            store.save_history(account_id, state)
+
+    return save_before_deletion
+
+
 def _clear_session_cookie(response: Response) -> None:
     """Make the browser forget its session cookie (`Max-Age=0`)."""
     response.delete_cookie(SESSION_COOKIE, path="/")
@@ -796,8 +829,15 @@ def create_app(
         account_service.start()
         try:
             room_registry = holder.get()
-            async with _expiry_sweeps(room_registry, account_service):
-                yield
+            # Spec 029: before a room is deleted, its accounts keep their records.
+            account_store = account_service.store
+            if account_store is not None:
+                room_registry.set_delete_hook(_history_saver(account_store))
+            try:
+                async with _expiry_sweeps(room_registry, account_service):
+                    yield
+            finally:
+                room_registry.set_delete_hook(None)
         finally:
             account_service.stop()
             holder.close_if_created()
@@ -1142,6 +1182,17 @@ def create_app(
         bodies: list[dict[str, object]] = []
         for identity in identities:
             bodies.append(identity.model_dump(mode="json"))
+        return bodies
+
+    # Spec 029: the account's finished grids, after saving the missing records.
+    @web_app.get(f"{ACCOUNT_API_ROOT}/history")
+    def list_account_history(request: Request) -> list[dict[str, object]]:
+        account = require_account(request)
+        store = account_store_in_use()
+        _save_missing_history(holder.get(), store, account.account_id)
+        bodies: list[dict[str, object]] = []
+        for record in store.history(account.account_id):
+            bodies.append(record.model_dump(mode="json"))
         return bodies
 
     # The dependency refuses a request without a session before its body is

@@ -10,6 +10,8 @@ than its room applies is closed as flooding.
 
 A room lives 30 days from its last edit (spec 032). An expired room is deleted by
 `expire_rooms`, which the app runs every hour, and by any lookup that meets it.
+Just before each deletion, the registry's delete hook gets the room's latest
+state (spec 029).
 
 Each step made by a client message logs its relay time (spec 038): how long the
 server took from reading the message to handing the step's entries to the store.
@@ -32,6 +34,7 @@ from nock.protocol import (
     ClientMessage,
     ErrorCode,
     ErrorMessage,
+    GridSolved,
     Join,
     Ping,
     Pong,
@@ -784,6 +787,8 @@ class RoomRegistry:
         # Deletions started on the engine's own thread, kept until they end: an
         # event loop keeps only weak references to its tasks.
         self._deletion_tasks: set[asyncio.Task[None]] = set()
+        # Spec 029: called with a room's latest state just before its deletion.
+        self._delete_hook: Callable[[RoomState], None] | None = None
 
     @property
     def config(self) -> RoomConfig:
@@ -799,6 +804,18 @@ class RoomRegistry:
     def store(self) -> RoomStore:
         """The store of the rooms. The server's routes read logs through it."""
         return self._store
+
+    def set_delete_hook(self, hook: Callable[[RoomState], None] | None) -> None:
+        """Call `hook` with a room's latest state just before each deletion.
+
+        The deletions are those of spec 032, by the sweep or by a lookup that
+        meets an expired room. The hook runs in the deleting thread. A hook that
+        raises is logged, and the deletion goes on (spec 029).
+
+        Args:
+            hook: The function to call; None calls nothing.
+        """
+        self._delete_hook = hook
 
     def register_room(self, grid: Grid, grid_number: int | None = None) -> str:
         """Create a room on `grid` and return its code.
@@ -1155,7 +1172,31 @@ class RoomRegistry:
         last_edit_at = self._store.last_edit_at(code)
         if last_edit_at is None:
             return None  # deleted since `peek_room` read it
-        return room_summary(state, last_edit_at)
+        return room_summary(self._with_solved_values(state), last_edit_at)
+
+    def _with_solved_values(self, state: RoomState) -> RoomState:
+        """Return the state with `solved_at` and `solved_elapsed_ms` known.
+
+        A room solved before spec 029 may have a stored state that is solved
+        without them: they are then read from the room's `grid_solved` entry.
+
+        Returns:
+            The state as it is when it is not solved or already has them, or when
+            its log holds no `grid_solved` entry; otherwise a copy with the two
+            values of that entry.
+        """
+        if not state.solved or state.solved_at is not None:
+            return state
+        for entry in self._store.read_log(state.code):
+            event = entry.event
+            if isinstance(event, GridSolved):
+                return state.model_copy(
+                    update={
+                        "solved_at": entry.at,
+                        "solved_elapsed_ms": event.elapsed_ms,
+                    }
+                )
+        return state
 
     def _expiry_limit(self) -> float:
         """Return the oldest last edit time a room may have at `clock()`.
@@ -1183,9 +1224,12 @@ class RoomRegistry:
         it goes. A live room is stopped on the engine's loop, which then deletes
         it from the store and closes its sockets (`_RoomRunner.delete`); this
         waits until that is done, except on the engine's own thread.
+
+        The delete hook (spec 029) runs first, with the room's latest state.
         """
         with self._lock:
             runner = self._runners.pop(code, None)
+            self._call_delete_hook(code, runner)
             loop = self._loop
             if runner is None or loop is None or self._closed:
                 # No task or socket to stop: none ever connected, or close()
@@ -1206,6 +1250,29 @@ class RoomRegistry:
                 return
             deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
             deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
+
+    def _call_delete_hook(self, code: str, runner: _RoomRunner | None) -> None:
+        """Call the delete hook with the latest state of a room about to go.
+
+        The state is the live one when the room has a runner, else the stored
+        one. A failure, of the hook or of reading the state, is logged and goes
+        no further, so the deletion goes on (spec 029).
+        """
+        hook = self._delete_hook
+        if hook is None:
+            return
+        try:
+            state = self._latest_state(code, runner)
+            if state is not None:
+                hook(state)
+        except Exception:
+            logger.exception("The delete hook of room %s failed", code)
+
+    def _latest_state(self, code: str, runner: _RoomRunner | None) -> RoomState | None:
+        """Return the live state of a room with a runner, else its stored state."""
+        if runner is not None:
+            return runner.state
+        return self._store.load_room(code)
 
     def _finish(self) -> None:
         """Save a snapshot of each live room, then close the store if owned."""
