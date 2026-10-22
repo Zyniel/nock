@@ -3,21 +3,25 @@
 This module is not a test file: pytest does not collect it. The tests of spec 019
 are in `tests/test_spec_019_*.py`, one file per criterion group:
 
-- `test_spec_019_ac01_ac02_marks_and_switch.py`: AC-1 and AC-2 (the marks with the
-  switch on, the departed author's hatched band, the neutral look with the switch
-  off);
-- `test_spec_019_ac01_band_contrast.py`: AC-1's contrast run (3:1 in every state
-  of the cell, the flash included);
-- `test_spec_019_ac01_box_and_drawing_order.py`: AC-1's box run (box rules, the
-  letter's baseline and the drawing order at three window sizes);
+- `test_spec_019_ac01_ac02_inks_and_switch.py`: AC-1 and AC-2 (the letters in
+  their finders' inks with the switch on, the neutral look with the switch off,
+  the switch kept across a reload);
 - `test_spec_019_ac03_authorship_kept.py`: AC-3 (rules, WebSocket, live browser);
-- `test_spec_019_ac04_author_in_words.py`: AC-4 (`clue-bar-author`);
+- `test_spec_019_ac04_author_in_words.py`: AC-4 (the legend, a clue bar without
+  `clue-bar-author`);
 - `test_spec_019_ac05_switch_in_menu.py`: AC-5 (the switch in `room-menu`,
-  keyboard, contrast and language).
+  keyboard, the legend's room, contrast and language).
 
 Refined by spec 043 (the design's room layout): `authors-switch` is the first item
 of the room Menu, so the helpers that press it open the Menu first (spec 043's
 `open_menu`) and close it after.
+
+Refined by spec 045 (the design's Auteurs mode): the band `author-mark` is gone,
+with its box, drawing-order and contrast runs, and the clue bar's
+`clue-bar-author`. The tests read the letters' inks and `authors-legend` with
+spec 045's readers (`spec045_harness`). The band's colour reader
+(`BAND_COLOURS_JS`) and its gradient helpers stay here for spec 028's recap
+swatch, which keeps spec 019's hatching until spec 047 replaces it.
 
 The spec adds no Python name and no server change, so the browser tests drive the
 room page through a mocked socket (spec 023's "browser with mocked socket") or the
@@ -26,33 +30,20 @@ live server, and AC-3 pins the server's existing behaviour with `nock.room`,
 
 This module holds what more than one of those files uses: the mocked room, the
 snapshot builders, the AC-1 snapshot, spec 026's FX-02 snapshot with eight
-players, the reading of the marks, of their colours and of the roster swatches,
-the desktop and touch windows and spec 013 AC-6's layout checks. What only one
-file uses stays in that file. Fixtures are thin wrappers defined in each file
-(`fx01_grid`, `window`): a fixture imported from here would be an unused import
-for ruff.
+players, the desktop and touch windows and spec 013 AC-6's layout checks. What
+only one file uses stays in that file. Fixtures are thin wrappers defined in each
+file (`fx01_grid`, `window`): a fixture imported from here would be an unused
+import for ruff.
 
 Choices where the spec leaves room:
 
-- A mark's box is compared with the cell's box with `SUBPIXEL_PX` (0.05 px) of
-  allowance, for the sub-pixel rounding of layout units; the spec's 3 px, 6 px,
-  half side and tenth of a side are used as written.
 - "Within 300 ms of each event the page applies" (AC-1) is measured from the moment
   `room-page` shows the event's `data-seq` (spec 040's attribute).
-- The band's colours (AC-1, "Contrast") are read with spec 035's colour helpers,
-  shared through spec 024's `COLOUR_CONTRAST_JS`. Spec 024's `MARK_COLOURS_JS`
-  measures a corner mark with other size limits and no gradient, so the band has
-  its own reader, `BAND_COLOURS_JS`: the computed `background-color` and the
-  colour stops of the computed `background-image` of `author-mark` and of each
-  layer at least half the cell side wide and 1 px high. Like spec 024's, it
-  composites each colour over the cell's computed background (itself over white)
-  and keeps the highest ratio. "The cell side" is the cell's width.
-- During a flash the cell's computed background is white and the replacer's colour
-  is drawn by its `cell-flash` element at 38 % opacity (spec 041, AC-16), so the
-  band is measured against that composite: the cell's background, then the
-  overlay over it (`flashOver` in `BAND_COLOURS_JS`).
-- The colours of the "layers" whose `background-image` must be `none` (players'
-  bands) are those of the same reader, so the same size limits apply.
+- The hatching's colours (spec 028's recap swatch) are read with spec 035's colour
+  helpers, shared through spec 024's `COLOUR_CONTRAST_JS`: the computed
+  `background-color` and the colour stops of the computed `background-image` of
+  the element and of each layer at least half the cell side wide and 1 px high
+  (`BAND_COLOURS_JS`).
 """
 
 from __future__ import annotations
@@ -62,7 +53,7 @@ import math
 import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
-from typing import Any, NamedTuple, Protocol
+from typing import NamedTuple, Protocol
 
 import pytest
 from playwright.sync_api import (
@@ -112,7 +103,6 @@ SETTLE_MS = 300
 TAP_TIMEOUT_MS = 3000
 
 FX01_CELL_COUNT = 25
-SUBPIXEL_PX = 0.05
 
 # The eight window sizes of spec 006 AC-5.
 WINDOW_SIZES = [
@@ -192,11 +182,6 @@ def room_page(page: Page) -> Locator:
 
 def authors_switch(page: Page) -> Locator:
     return page.get_by_test_id("authors-switch")
-
-
-def marks_in(page: Page, row: int, column: int) -> Locator:
-    """The `author-mark` elements inside one cell."""
-    return cell_at(page, row, column).get_by_test_id("author-mark")
 
 
 def press(locator: Locator, touch: bool) -> None:
@@ -452,7 +437,7 @@ def player_joined_frame(seq: int, player: PlayerView) -> str:
     return PlayerJoined(seq=seq, player=player).model_dump_json()
 
 
-# ---- Marks and swatches -----------------------------------------------------
+# ---- Boxes -------------------------------------------------------------------
 
 
 class Box(NamedTuple):
@@ -462,63 +447,6 @@ class Box(NamedTuple):
     top: float
     right: float
     bottom: float
-
-
-class Mark(NamedTuple):
-    """One `author-mark` element as the page draws it."""
-
-    colour: str | None
-    aria_hidden: str | None
-    text: str
-    background: str
-    visibility: str
-    box: Box
-
-
-MARKS_SCRIPT = """
-cell => {
-  const found = [];
-  for (const mark of cell.querySelectorAll('[data-testid="author-mark"]')) {
-    const style = getComputedStyle(mark);
-    const box = mark.getBoundingClientRect();
-    found.push({
-      colour: mark.getAttribute('data-colour'),
-      ariaHidden: mark.getAttribute('aria-hidden'),
-      text: mark.textContent,
-      background: style.backgroundColor,
-      visibility: style.visibility,
-      left: box.left, top: box.top, right: box.right, bottom: box.bottom,
-    });
-  }
-  return found;
-}
-"""
-
-
-def marks_of(page: Page, row: int, column: int) -> list[Mark]:
-    """Every `author-mark` inside the cell, in document order."""
-    raw_marks = cell_at(page, row, column).evaluate(MARKS_SCRIPT)
-    marks: list[Mark] = []
-    for raw in raw_marks:
-        box = Box(raw["left"], raw["top"], raw["right"], raw["bottom"])
-        marks.append(
-            Mark(
-                colour=raw["colour"],
-                aria_hidden=raw["ariaHidden"],
-                text=raw["text"],
-                background=raw["background"],
-                visibility=raw["visibility"],
-                box=box,
-            )
-        )
-    return marks
-
-
-def only_mark_of(page: Page, row: int, column: int) -> Mark:
-    """The one `author-mark` of a cell; fails unless there is exactly one."""
-    marks = marks_of(page, row, column)
-    assert len(marks) == 1, f"({row}, {column}) holds {len(marks)} author marks"
-    return marks[0]
 
 
 def box_of(locator: Locator) -> Box:
@@ -532,65 +460,8 @@ def box_of(locator: Locator) -> Box:
     )
 
 
-MIN_SIDE_FOR_BOX_RULES_PX = 20.0
-MARK_INSET_PX = 3.0
-MARK_BOTTOM_GAP_MIN_PX = 3.0
-MARK_BOTTOM_GAP_MAX_PX = 6.0
-MARK_MIN_HEIGHT_PX = 3.0
+# ---- The hatching's colours (spec 028's recap swatch) ------------------------
 
-
-def mark_box_problems(cell: Box, mark: Box) -> list[str]:
-    """How a mark breaks the box rules of "The view, switch on" (empty: none).
-
-    On a cell whose side (its width) is 20 px or more: inside the cell's box
-    shrunk by 3 px on every side; bottom edge 3 to 6 px above the cell's bottom
-    edge; at least half the side wide; at least 3 px and a tenth of the side high.
-    On a smaller cell: inside the cell's box only.
-    """
-    side = cell.right - cell.left
-    problems: list[str] = []
-    inset = MARK_INSET_PX if side >= MIN_SIDE_FOR_BOX_RULES_PX else 0.0
-    if mark.left < cell.left + inset - SUBPIXEL_PX:
-        problems.append(f"left edge {mark.left} is left of {cell.left + inset}")
-    if mark.top < cell.top + inset - SUBPIXEL_PX:
-        problems.append(f"top edge {mark.top} is above {cell.top + inset}")
-    if mark.right > cell.right - inset + SUBPIXEL_PX:
-        problems.append(f"right edge {mark.right} is right of {cell.right - inset}")
-    if mark.bottom > cell.bottom - inset + SUBPIXEL_PX:
-        problems.append(f"bottom edge {mark.bottom} is below {cell.bottom - inset}")
-    if side < MIN_SIDE_FOR_BOX_RULES_PX:
-        return problems
-    gap = cell.bottom - mark.bottom
-    if gap < MARK_BOTTOM_GAP_MIN_PX - SUBPIXEL_PX:
-        problems.append(f"bottom edge only {gap} px above the cell's")
-    if gap > MARK_BOTTOM_GAP_MAX_PX + SUBPIXEL_PX:
-        problems.append(f"bottom edge {gap} px above the cell's")
-    width = mark.right - mark.left
-    if width < side / 2 - SUBPIXEL_PX:
-        problems.append(f"{width} px wide on a {side} px cell")
-    height = mark.bottom - mark.top
-    min_height = max(MARK_MIN_HEIGHT_PX, side / 10)
-    if height < min_height - SUBPIXEL_PX:
-        problems.append(f"{height} px high on a {side} px cell")
-    return problems
-
-
-def background_of(locator: Locator) -> str:
-    background = locator.evaluate("el => getComputedStyle(el).backgroundColor")
-    assert isinstance(background, str)
-    return background
-
-
-def swatch_colour(page: Page, player_id: str) -> str:
-    """The computed background colour of the `roster-colour` of a player."""
-    selector = f'[data-testid="roster-player"][data-player-id="{player_id}"]'
-    swatch = page.locator(selector).get_by_test_id("roster-colour")
-    return background_of(swatch)
-
-
-# ---- The band's colours (AC-1, "Contrast" and the departed band) ------------
-
-MIN_BAND_CONTRAST = 3.0
 ANGLE_TOLERANCE_DEGREES = 0.001
 
 # Declares `readBand(cell)`, after spec 035's colour helpers (`parseColour`,
@@ -686,141 +557,12 @@ function readBand(cell) {
 }
 """
 
-BANDS_SCRIPT = "cells => {\n" + BAND_COLOURS_JS + r"""
-  const found = [];
-  for (const [row, column] of cells) {
-    const cell = document.querySelector(
-      `[data-testid="cell"][data-row="${row}"][data-column="${column}"]`
-    );
-    found.push(readBand(cell));
-  }
-  return found;
-}
-"""
-
 Rgba = tuple[float, float, float, float]
-
-
-class BandColour(NamedTuple):
-    """One colour of a band: where it comes from, its text, value and ratio."""
-
-    source: str
-    text: str
-    rgba: Rgba
-    ratio: float
-
-
-class BandReading(NamedTuple):
-    """A cell's computed background and the colours of its `author-mark`."""
-
-    marks: int
-    background: str
-    mark_background: str
-    mark_image: str
-    layer_images: list[tuple[str, str]]
-    mark_stops: list[Rgba]
-    colours: list[BandColour]
 
 
 def rgba_from(raw: list[float]) -> Rgba:
     """The (red, green, blue, alpha) tuple of a colour read in the page."""
     return (float(raw[0]), float(raw[1]), float(raw[2]), float(raw[3]))
-
-
-# Any: a JSON object returned by `readBand` in the page.
-def band_reading_from(raw: dict[str, Any]) -> BandReading:
-    """Turn what `readBand` returned into a `BandReading`."""
-    colours: list[BandColour] = []
-    for colour in raw["colours"]:
-        colours.append(
-            BandColour(
-                source=colour["source"],
-                text=colour["text"],
-                rgba=rgba_from(colour["rgba"]),
-                ratio=float(colour["ratio"]),
-            )
-        )
-    layer_images: list[tuple[str, str]] = []
-    for source, image in raw["layerImages"]:
-        layer_images.append((source, image))
-    mark_stops: list[Rgba] = []
-    for stop in raw["markStops"]:
-        mark_stops.append(rgba_from(stop))
-    return BandReading(
-        marks=int(raw["marks"]),
-        background=raw["background"],
-        mark_background=raw["markBackground"],
-        mark_image=raw["markImage"],
-        layer_images=layer_images,
-        mark_stops=mark_stops,
-        colours=colours,
-    )
-
-
-def band_readings(page: Page, cells: list[Cell]) -> list[BandReading]:
-    """Read the bands of several cells in one `page.evaluate`, in that order."""
-    raw_readings = page.evaluate(BANDS_SCRIPT, [list(cell) for cell in cells])
-    readings: list[BandReading] = []
-    for raw in raw_readings:
-        readings.append(band_reading_from(raw))
-    return readings
-
-
-def counted_colours(reading: BandReading) -> list[BandColour]:
-    """The colours of a band that count: every one whose alpha is not 0."""
-    counted: list[BandColour] = []
-    for colour in reading.colours:
-        if colour.rgba[3] > 0:
-            counted.append(colour)
-    return counted
-
-
-def band_contrast(reading: BandReading) -> float:
-    """The band's contrast: the highest ratio of its colours against the cell."""
-    highest = 0.0
-    for colour in counted_colours(reading):
-        highest = max(highest, colour.ratio)
-    return highest
-
-
-def describe_colours(reading: BandReading) -> str:
-    """The band's colours and ratios, for a failure message."""
-    parts: list[str] = []
-    for colour in reading.colours:
-        parts.append(f"{colour.source} {colour.text} ({colour.ratio:.2f}:1)")
-    return "; ".join(parts)
-
-
-def band_contrast_problems(reading: BandReading, swatch: str | None) -> list[str]:
-    """How a band breaks "Contrast" and its first item (empty: none).
-
-    Args:
-        reading: The band of one cell, in the state to check.
-        swatch: The computed background colour of the author's `roster-colour`,
-            which the mark's own background colour must equal; None for a
-            departed author, who has no swatch.
-
-    Returns:
-        One line per broken rule: a colour that counts but is not opaque, a
-        contrast under 3:1, a main colour that is not the author's swatch.
-    """
-    if reading.marks != 1:
-        return [f"{reading.marks} author-mark elements in the cell"]
-    problems: list[str] = []
-    for colour in counted_colours(reading):
-        if colour.rgba[3] < 1.0:
-            problems.append(f"{colour.source} {colour.text} is not opaque")
-    contrast = band_contrast(reading)
-    if contrast < MIN_BAND_CONTRAST:
-        problems.append(
-            f"contrast {contrast:.2f}:1 on {reading.background}: "
-            f"{describe_colours(reading)}"
-        )
-    if swatch is not None and reading.mark_background != swatch:
-        problems.append(
-            f"background-color {reading.mark_background}, not the swatch {swatch}"
-        )
-    return problems
 
 
 def first_gradient_argument(image: str) -> str:
@@ -874,49 +616,6 @@ def is_ink_or_white(rgba: Rgba) -> bool:
     red, green, blue, _alpha = rgba
     channels = (red, green, blue)
     return channels in (INK, WHITE)
-
-
-def hatched_problems(reading: BandReading) -> list[str]:
-    """How a departed author's band fails to be hatched (empty: none).
-
-    Its computed `background-image` is a `repeating-linear-gradient` whose line
-    is diagonal and whose colour stops hold at least two different colours, and
-    each colour of the band that counts is ink or white (spec 041).
-    """
-    if reading.marks != 1:
-        return [f"{reading.marks} author-mark elements in the cell"]
-    problems: list[str] = []
-    image = reading.mark_image
-    if not image.startswith("repeating-linear-gradient("):
-        problems.append(f"background-image {image!r} is no repeating-linear-gradient")
-    else:
-        direction = first_gradient_argument(image)
-        if not is_diagonal(direction):
-            problems.append(f"the gradient's line {direction!r} is not diagonal")
-    different_stops = set(reading.mark_stops)
-    if len(different_stops) < 2:
-        problems.append(f"the colour stops of {image!r} hold under two colours")
-    for colour in counted_colours(reading):
-        if not is_ink_or_white(colour.rgba):
-            problems.append(f"{colour.source} {colour.text} is neither ink nor white")
-    return problems
-
-
-def pattern_problems(reading: BandReading) -> list[str]:
-    """How a player's band has a pattern (empty: none).
-
-    The computed `background-image` of `author-mark` and of each of its layers is
-    `none`.
-    """
-    if reading.marks != 1:
-        return [f"{reading.marks} author-mark elements in the cell"]
-    problems: list[str] = []
-    if reading.mark_image != "none":
-        problems.append(f"author-mark has the background-image {reading.mark_image}")
-    for source, image in reading.layer_images:
-        if image != "none":
-            problems.append(f"its layer {source} has the background-image {image}")
-    return problems
 
 
 # ---- FX-02 with eight players (spec 026's `FX02_FULL_WRONG`) ----------------

@@ -13,6 +13,12 @@ opens the Menu with `tab_to` `menu-button` and `Enter`, which puts the focus on 
 switch. The rules of spec 024 AC-8's toolbar (one row, the toolbar's client area,
 the fade) went with the toolbar.
 
+Refined by spec 045 (the design's Auteurs mode): the band is gone, so the checks
+run on the inks and on `authors-legend`, which shows while the switch is on. At
+every window size above, the legend lies inside the window and overlaps neither
+the `grid` nor `clue-bar`; the contrast and language scans run once the legend
+shows (they read `clue-bar-author` before, which is gone).
+
 Choices where the spec leaves room:
 
 - "The first item of `room-menu`": the first `button` or `a` inside it.
@@ -55,6 +61,14 @@ from spec019_harness import (
     with_letter_cells,
 )
 from spec035_harness import unknown_texts
+from spec043_harness import box_inside, window_box
+from spec045_harness import (
+    boxes_of,
+    legend_of,
+    overlap_area,
+    required_box,
+    settle_layout,
+)
 
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_LIMIT = 100
@@ -218,6 +232,20 @@ def open_setup(page: Page, base_url: str, grid: Grid, touch: bool) -> None:
     turn_switch_on(page, touch)
 
 
+def legend_problems(page: Page) -> list[str]:
+    """The legend inside the window, overlapping neither the grid nor clue-bar."""
+    boxes = boxes_of(page, ["authors-legend", "grid", "clue-bar"])
+    legend = required_box(boxes, "authors-legend")
+    problems: list[str] = []
+    if not box_inside(legend, window_box(page)):
+        problems.append(f"authors-legend {legend} is not inside the window")
+    for test_id in ("grid", "clue-bar"):
+        other = required_box(boxes, test_id)
+        if overlap_area(legend, other) > 0:
+            problems.append(f"authors-legend {legend} overlaps {test_id} {other}")
+    return problems
+
+
 def outline_problems(page: Page) -> list[str]:
     """How the focused element's outline breaks spec 035 AC-2 (empty: none)."""
     outline = page.evaluate(FOCUS_OUTLINE_SCRIPT)
@@ -253,7 +281,7 @@ def tab_to(page: Page, test_id: str) -> None:
 
 @pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
-def test_ac5_the_grid_keeps_its_room_with_the_switch_on(
+def test_ac5_the_grid_keeps_its_room_and_the_legend_covers_nothing(
     window: OpenWindow,
     live_server: str,
     fx01_grid: Grid,
@@ -266,7 +294,11 @@ def test_ac5_the_grid_keeps_its_room_with_the_switch_on(
 
     open_setup(page, live_server, fx01_grid, touch)
 
-    assert layout_problems(page, touch) == []
+    expect(legend_of(page)).to_be_visible()
+    settle_layout(page)
+    problems = layout_problems(page, touch)
+    problems.extend(legend_problems(page))
+    assert problems == []
 
 
 @pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
@@ -361,7 +393,7 @@ def test_ac5_the_contrast_scan_finds_no_offender_with_the_switch_on(
 ) -> None:
     page = window(width, height, False)
     open_setup(page, live_server, fx01_grid, False)
-    expect(page.get_by_test_id("clue-bar-author")).to_have_count(1)
+    expect(legend_of(page)).to_be_visible()
 
     measurements: list[dict[str, Any]] = page.evaluate(CONTRAST_SCAN_SCRIPT)
 
@@ -377,7 +409,7 @@ def test_ac5_the_language_scan_finds_no_offender_with_the_switch_on(
 ) -> None:
     page = window(width, height, False)
     open_setup(page, live_server, fx01_grid, False)
-    expect(page.get_by_test_id("clue-bar-author")).to_have_count(1)
+    expect(legend_of(page)).to_be_visible()
     wait_until(page, lambda: page.evaluate("document.documentElement.lang") == "fr")
 
     texts: list[str] = page.evaluate(LANGUAGE_SCAN_SCRIPT)

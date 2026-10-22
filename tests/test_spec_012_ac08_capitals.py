@@ -8,8 +8,9 @@ and with spec 040's mocked socket, shows the nickname input in capitals through 
 while its value keeps the text as typed, applies the same rule to the join it sends
 (from the form, and in case (b) of AC-6), and shows a nickname with capitalised
 words, as spec 040's `displayNickname` writes it: in the roster, the host's remove
-labels (spec 014), a clue flag's label (spec 021), the author line (spec 019), the
-chat authors and the mute rows (spec 022). The shared setup is in `spec012_harness`.
+labels (spec 014), a clue flag's label (spec 021), the authors legend (spec 019,
+refined by spec 045), the chat authors and the mute rows (spec 022). The shared
+setup is in `spec012_harness`.
 
 Choices where the spec leaves room:
 
@@ -21,11 +22,11 @@ Choices where the spec leaves room:
   colours 0 to 4 and are all active. The chat lines are `salut`, `bonjour`,
   `coucou`, `bonsoir` and `hello`. The snapshot's seq is 18: five joins, five chat
   lines, five letters, two flags and a mute.
-- Only the chat tests open the chat panel, so that it never covers a cell that the
-  author-line test taps.
-- AC-8 names no `fr.json` key for the author line and writes its texts out
-  (`Lettre de Jean-Luc`), so this file does too. The other texts come from the key
-  that AC-8 names, filled as `t` fills it.
+- Only the chat tests open the chat panel. The texts come from the key that AC-8
+  names, filled as `t` fills it.
+- Refined by spec 045 (the design's Auteurs mode): the clue bar's author line
+  (`Lettre de Jean-Luc`) is gone, so with `authors-switch` on the five
+  `authors-legend-name` of the legend read the five nicknames, in roster order.
 - The Greek and Devanagari letters, the sharp s, U+2019 and the combining marks
   are written as named escapes, never as raw characters.
 
@@ -489,13 +490,6 @@ LETTERS_BY_AUTHOR = [
     (1, 3, "I", "p4"),
     (1, 4, "S", "p5"),
 ]
-AUTHOR_LINES = [
-    ((1, 0), "Lettre de Jean-Luc"),
-    ((1, 1), "Lettre de D'Artagnan"),
-    ((1, 2), "Lettre de Ana 2"),
-    ((1, 3), "Lettre de " + O_NEIL_SHOWN),
-    ((1, 4), "Lettre de " + NIKOS_SHOWN),
-]
 
 
 def fr_text(key: str, **values: str) -> str:
@@ -621,23 +615,21 @@ def test_ac8_browser_the_clue_flag_label_shows_capitalised_words(
     expect(label).to_have_text(fr_text("flag.marker_label", names=flaggers))
 
 
-def test_ac8_browser_the_author_line_shows_capitalised_words(
+def test_ac8_browser_the_authors_legend_shows_capitalised_words(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    # Spec 045: the clue bar's author line is gone; the legend of the Auteurs
+    # mode names each player, in roster order.
     open_places_room(page, live_server, fx01_grid)
     switch = page.get_by_test_id("authors-switch")
     open_menu(page)  # spec 043: the switch is an item of the room Menu
     switch.click()
     expect(switch).to_have_attribute("aria-pressed", "true")
     page.get_by_test_id("menu-button").click()
-    author_line = page.get_by_test_id("clue-bar-author")
 
-    for (row, column), expected_line in AUTHOR_LINES:
-        cell = page.locator(
-            f'[data-testid="cell"][data-row="{row}"][data-column="{column}"]'
-        )
-        cell.click()
-        expect(author_line).to_have_text(expected_line)
+    legend = page.get_by_test_id("authors-legend")
+
+    expect(legend.get_by_test_id("authors-legend-name")).to_have_text(SHOWN_NICKNAMES)
 
 
 def test_ac8_browser_the_chat_authors_show_capitalised_words(
