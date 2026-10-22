@@ -35,7 +35,7 @@ that is not drawn.
 
 Labels on the sheet: a grey label cites the `_design.md` section or the spec a
 screen follows; « Decided Pn » names a decision of 2026-10-22; a dashed label marks
-what is still pending, with an item in `_design.md` section 15. The page is static:
+what is still pending (none today), with an item in `_design.md` section 15. The page is static:
 no script, the width switch is CSS. Fonts are the app's own @fontsource files once
 spec 041's packages are installed, else a local copy, else the fallback stack;
 never Google.
@@ -67,12 +67,13 @@ account sheet's intro outside a room, P14 the operator page, P15 the slider, P16
 « Lien copié » in the recap, D1 no « danger » button, D2 no grid credits for now,
 D3 the sheet's fonts.
 
-Still pending, to settle when approving spec 043 (the sheet draws spec 043's pick):
+Where the sheet met spec 043, spec 043's version is decided, by the human's approval
+of spec 043 on 2026-10-22 (`_design.md` section 15):
 
-1. The Joueurs row: state and clue on a second line (spec 043) or on the right of
-   the name with the host's buttons below (P5).
-2. Help mode `none`: « Aide » stays with the pencil confirm or a muted line (spec
-   043) or is hidden (P7), which would leave no way to confirm a pencil letter on
-   a computer.
-3. Réagir and Je bloque with nothing selected: disabled in rule grey (spec 043) or
-   not drawn (P8).
+1. The Joueurs row: the state and the current clue on a second line under the
+   name; the host's buttons on the right of the first (not P5's second line of
+   buttons).
+2. Help mode `none`: « Aide » stays, with the pencil confirm or « L'aide est
+   désactivée dans ce salon. » (not P7's hidden button).
+3. Réagir and Je bloque with nothing selected: disabled in rule grey (not P8's
+   hidden buttons).

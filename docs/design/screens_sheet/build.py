@@ -48,7 +48,9 @@ def marks(ms: list[str]) -> str:
     out = ""
     for m in ms:
         if m.startswith("pending"):
-            out += f'<a class="prop" href="#d-043">{m}</a>'
+            out += f'<span class="prop">{m}</span>'
+        elif m == "spec 043 approved":
+            out += f'<a class="dec" href="#d-043">{m}</a>'
         elif m[0] in "PD" and m[1:].isdigit():
             out += f'<a class="dec" href="#d-{m}">Decided {m}</a>'
         else:
@@ -585,7 +587,7 @@ def sec_room() -> str:
     out += screen(
         "s-players",
         "Salon: Joueurs, invitation, host's moderation",
-        ["§8 Salon", "specs 011, 013, 014", "P5", "pending spec 043"],
+        ["§8 Salon", "specs 011, 013, 014", "P5", "spec 043 approved"],
         [
             (
                 "Each row: dot, name (mine bold with « (vous) »), the « hôte "
@@ -604,10 +606,10 @@ def sec_room() -> str:
             ),
             (
                 '<span class="m">The row on two lines (state and clue under '
-                "the name, buttons on the right) is spec 043's pick, pending "
-                "its approval; the sheet's P5 had the buttons on a second "
-                "line (_design.md §15 « Where the screens sheet meets spec "
-                "043 »).</span>"
+                "the name, buttons on the right) is spec 043's, decided by "
+                "the human's approval of spec 043 on 2026-10-22; the sheet's "
+                "P5 had the buttons on a second line (_design.md §15 « Where "
+                "the screens sheet met spec 043 »).</span>"
             ),
         ],
         [
@@ -1013,14 +1015,14 @@ def sec_help() -> str:
     out += screen(
         "s-nohelp",
         "Help switched off",
-        ["spec 025", "pending spec 043"],
+        ["spec 025", "spec 043 approved"],
         [
             (
                 "Host setting « Aide : désactivée ». « Aide » stays in the "
                 "top bar; its menu holds the pencil confirm when it applies, "
                 "otherwise one muted line « L'aide est désactivée dans ce "
-                "salon. ». This is spec 043's pick, pending its approval: "
-                "the sheet's P7 hid the button, which would leave no way "
+                "salon. ». Spec 043's version, decided by its approval on "
+                "2026-10-22: the sheet's P7 hid the button, which would leave no way "
                 "to confirm a pencil letter on a computer (_design.md §15). "
                 "The vote result notes are drawn here too."
             ),
@@ -1689,7 +1691,7 @@ def sec_states() -> str:
         f'<div style="width:330px">{cluebar("", empty=True)}</div>',
         (
             "No cell selected yet (P8): the hint; Réagir and Je bloque "
-            "disabled in rule grey (spec 043's pick, pending)."
+            "disabled in rule grey (spec 043, approved 2026-10-22)."
         ),
     ) + box(
         f'<div style="width:330px">{cluebar("Flaire", "↓", pressed=True)}</div>',
@@ -2008,7 +2010,7 @@ def sec_later() -> str:
 
 
 def sec_decisions() -> str:
-    """Return the record of the decisions and the points still pending."""
+    """Return the record of the decisions, with the three spec 043 settled."""
     items = ""
     for pid, title, now, rec, alt in DECISIONS:
         a = f'<span class="alt">Not chosen: {alt}</span>' if alt else ""
@@ -2026,10 +2028,10 @@ def sec_decisions() -> str:
     pending = ""
     for title, sheet, spec in MEETS_043:
         pending += (
-            '<li><span class="q"><span class="prop">pending spec 043</span> '
+            '<li><span class="q"><span class="dec">spec 043 approved</span> '
             f"{title}</span>"
-            f'<span class="alt">Sheet: {sheet}</span><span class="rec"><b>Drawn, '
-            f"recommended:</b> {spec}</span></li>"
+            f'<span class="alt">Set aside: {sheet}</span><span class="rec">'
+            f"<b>Decided:</b> {spec}</span></li>"
         )
     return part(
         "p-decisions",
@@ -2042,12 +2044,11 @@ def sec_decisions() -> str:
         ),
         f'<ol class="decisions">{items}</ol>'
         '<h3 id="d-043" style="margin:8px 0 0;font:700 1.1rem/1.3 '
-        'var(--nock-font-ui)">Where the sheet meets spec 043 (still '
-        "to settle)</h3>"
+        'var(--nock-font-ui)">Where the sheet met spec 043</h3>'
         '<p class="lead">The sheet was drawn from <code>main</code>, before '
         "spec 043 (room layout) was drafted. On three points the accepted "
-        "answer and spec 043's pick differ; the human settles them when "
-        "approving spec 043. The sheet draws spec 043's pick.</p>"
+        "answer and spec 043's pick differed; the human approved spec 043 on "
+        "2026-10-22, so its version is decided on all three.</p>"
         f'<ol class="decisions">{pending}</ol>',
     )
 
