@@ -1,7 +1,7 @@
 ---
 id: "048"
 title: Plain pages and states
-status: draft
+status: approved
 ---
 
 # 048 - Plain pages and states

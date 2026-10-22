@@ -1,7 +1,7 @@
 ---
 id: "047"
 title: Room overlays
-status: draft
+status: approved
 ---
 
 # 047 - Room overlays

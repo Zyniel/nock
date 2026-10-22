@@ -1,7 +1,7 @@
 ---
 id: "044"
 title: Keyboard
-status: draft
+status: approved
 ---
 
 # 044 - Keyboard

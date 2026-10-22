@@ -1,7 +1,7 @@
 ---
 id: "045"
 title: Auteurs mode
-status: draft
+status: approved
 ---
 
 # 045 - Auteurs mode
