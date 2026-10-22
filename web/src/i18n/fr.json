@@ -95,6 +95,7 @@
   "clue_bar.empty": "Touchez une case ou une définition.",
   "keyboard.label": "Clavier",
   "keyboard.delete": "Effacer",
+  "keyboard.swap": "Changer de sens",
   "completion.solved": "Grille terminée, bravo !",
   "completion.full_wrong": "Grille complète, mais pas encore juste.",
   "not_found.heading": "Page introuvable",
