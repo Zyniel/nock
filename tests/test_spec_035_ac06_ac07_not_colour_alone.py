@@ -17,7 +17,7 @@ from nock.protocol import Direction, PlayerState, PlayerView, Selection
 from spec035_harness import (
     EPSILON,
     WINDOW_SIZES,
-    Cell,
+    MockRoomSocket,
     build_fx01_grid,
     build_reference_catalogue,
     cell_at,
@@ -26,8 +26,15 @@ from spec035_harness import (
     open_room,
     page_factory,
     player_view,
-    remote_initials,
     selection_frame,
+)
+from spec042_harness import (
+    ACCESS_SWITCH,
+    click_switch,
+    icon_shape_problems,
+    read_cursors,
+    read_swatches,
+    to_box,
 )
 
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
@@ -54,9 +61,15 @@ BOLD_WEIGHT = 700
 
 
 # ---- AC-6: colour is not the only signal of a cursor ----------------------------
+#
+# Spec 042 (the design's grid cells) refines AC-6, as the human decided on
+# 2026-10-16: the non-colour sign of a cursor is its player's own icon while the
+# Accessibilité mode is on (`access-switch`), shown in the roster too; with the
+# mode off the cursors are triangles with no text. The initials are gone. The
+# readers and the icon table are spec 042's (`tests/spec042_harness.py`).
 
 
-def initials_players() -> list[PlayerView]:
+def icon_players() -> list[PlayerView]:
     return [
         player_view("p1", "Ana", 0, is_host=True),
         player_view(
@@ -80,107 +93,115 @@ def initials_players() -> list[PlayerView]:
     ]
 
 
-def assert_initials_inside_the_cell(page: Page, row: int, column: int) -> None:
-    cell_box = cell_at(page, row, column).bounding_box()
-    assert cell_box is not None
-    initials = remote_initials(page, row, column)
-    for index in range(initials.count()):
-        box = initials.nth(index).bounding_box()
-        assert box is not None
-        assert box["x"] >= cell_box["x"] - EPSILON
-        assert box["y"] >= cell_box["y"] - EPSILON
-        assert box["x"] + box["width"] <= cell_box["x"] + cell_box["width"] + EPSILON
-        assert box["y"] + box["height"] <= cell_box["y"] + cell_box["height"] + EPSILON
-        assert computed(initials.nth(index), "visibility") == "visible"
+def open_icon_room(page: Page, base_url: str, grid: Grid) -> MockRoomSocket:
+    """The snapshot of AC-6, then a click on `access-switch` (spec 042)."""
+    mock = open_room(page, base_url, grid, players=icon_players())
+    expect(cell_at(page, 2, 2).get_by_test_id("remote-selection")).to_have_count(2)
+    click_switch(page, ACCESS_SWITCH, "true")
+    return mock
 
 
-def corners_of(page: Page, row: int, column: int) -> list[str | None]:
-    """The `data-corner` of each `remote-initials` of a cell, in document order."""
-    corners: list[str | None] = []
-    initials = remote_initials(page, row, column)
-    for index in range(initials.count()):
-        corners.append(initials.nth(index).get_attribute("data-corner"))
-    return corners
+def icons_on(page: Page, row: int, column: int) -> dict[str, str | None]:
+    """The `data-icon` of each cursor's `player-icon` on a cell, by player id."""
+    _, cursors = read_cursors(page, row, column)
+    icons: dict[str, str | None] = {}
+    for cursor in cursors:
+        found: str | None = None
+        for svg in cursor["svgs"]:
+            if svg["testId"] == "player-icon":
+                found = svg["dataIcon"]
+        icons[str(cursor["playerId"])] = found
+    return icons
 
 
-def test_ac6_each_remote_cursor_carries_the_initials_of_its_player(
+def icon_place_problems(page: Page, row: int, column: int) -> list[str]:
+    """Each cursor of a cell: an icon of its colour, visible, inside the cell."""
+    cell, cursors = read_cursors(page, row, column)
+    problems: list[str] = []
+    for cursor in cursors:
+        name = f"({row}, {column}) {cursor['playerId']}"
+        if cursor["shape"] != "icon":
+            problems.append(f"{name}: data-shape {cursor['shape']!r}")
+        icons = [svg for svg in cursor["svgs"] if svg["testId"] == "player-icon"]
+        if len(icons) != 1:
+            problems.append(f"{name}: {len(icons)} player-icon elements")
+            continue
+        problems.extend(icon_shape_problems(icons[0], int(cursor["colour"])))
+        box = to_box(icons[0]["box"])
+        inside = (
+            box.left >= cell.left - EPSILON
+            and box.top >= cell.top - EPSILON
+            and box.right <= cell.right + EPSILON
+            and box.bottom <= cell.bottom + EPSILON
+        )
+        if not inside:
+            problems.append(f"{name}: icon {box} outside the cell {cell}")
+    return problems
+
+
+def test_ac6_with_the_mode_on_each_cursor_is_its_players_own_icon(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
-    open_room(page, live_server, fx01_grid, players=initials_players())
+    open_icon_room(page, live_server, fx01_grid)
 
-    shared = cell_at(page, 2, 2).get_by_test_id("remote-selection")
-    expect(shared).to_have_count(2)
-    expect(remote_initials(page, 2, 2)).to_have_text(["JL", "AN"])
-    expect(cell_at(page, 1, 0).get_by_test_id("remote-selection")).to_have_count(1)
-    expect(remote_initials(page, 1, 0)).to_have_text(["ZO"])
-    assert_initials_inside_the_cell(page, 2, 2)
-    assert_initials_inside_the_cell(page, 1, 0)
+    assert icons_on(page, 2, 2) == {"p2": "1", "p3": "2"}
+    assert icons_on(page, 1, 0) == {"p4": "3"}
+    assert icon_place_problems(page, 2, 2) == []
+    assert icon_place_problems(page, 1, 0) == []
+    for player_id in ("p2", "p3", "p4"):
+        selector = f'[data-testid="remote-selection"][data-player-id="{player_id}"]'
+        assert computed(page.locator(selector), "visibility") == "visible"
 
 
-def test_ac6_data_corner_holds_the_name_of_the_corner(
+def test_ac6_the_roster_shows_which_icon_is_whose(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
-    open_room(page, live_server, fx01_grid, players=initials_players())
+    open_icon_room(page, live_server, fx01_grid)
 
-    expect(remote_initials(page, 2, 2)).to_have_text(["JL", "AN"])
-    assert corners_of(page, 2, 2) == ["top-left", "bottom-right"]
-    assert corners_of(page, 1, 0) == ["top-left"]
+    shown: dict[str, list[str | None]] = {}
+    for swatch in read_swatches(page):
+        icons: list[str | None] = []
+        for svg in swatch["svgs"]:
+            if svg["testId"] == "player-icon":
+                icons.append(svg["dataIcon"])
+        shown[str(swatch["playerId"])] = icons
+
+    assert shown["p2"] == ["1"]
+    assert shown["p3"] == ["2"]
+    assert shown["p4"] == ["3"]
 
 
-def test_ac6_each_labelled_cursor_holds_exactly_one_initials_element(
+def test_ac6_an_icon_follows_a_moved_selection(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
-    open_room(page, live_server, fx01_grid, players=initials_players())
-
-    cursors = page.get_by_test_id("remote-selection")
-    expect(cursors).to_have_count(3)
-    for index in range(3):
-        initials = cursors.nth(index).get_by_test_id("remote-initials")
-        expect(initials).to_have_count(1)
-
-
-def test_ac6_the_initials_follow_a_moved_selection(
-    page: Page, live_server: str, fx01_grid: Grid
-) -> None:
-    mock = open_room(page, live_server, fx01_grid, players=initials_players())
-    expect(remote_initials(page, 2, 2)).to_have_text(["JL", "AN"])
+    mock = open_icon_room(page, live_server, fx01_grid)
 
     mock.send(selection_frame("p2", 3, 1, Direction.DOWN))
 
-    expect(remote_initials(page, 3, 1)).to_have_text(["JL"])
-    expect(remote_initials(page, 2, 2)).to_have_text(["AN"])
-    assert_initials_inside_the_cell(page, 3, 1)
-    assert corners_of(page, 3, 1) == ["top-left"]
-    assert corners_of(page, 2, 2) == ["top-left"]
+    expect(cell_at(page, 3, 1).get_by_test_id("remote-selection")).to_have_count(1)
+    assert icons_on(page, 3, 1) == {"p2": "1"}
+    assert icons_on(page, 2, 2) == {"p3": "2"}
 
 
-def test_ac6_two_players_with_the_same_initials_are_both_shown(
+def test_ac6_with_the_mode_off_the_cursors_are_triangles_with_no_text(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
-    players = [
-        player_view("p1", "Ana", 0, is_host=True),
-        player_view(
-            "p2",
-            "Anne",
-            1,
-            selection=Selection(row=2, column=2, direction=Direction.DOWN),
-        ),
-        player_view(
-            "p3",
-            "Anouk",
-            2,
-            selection=Selection(row=2, column=2, direction=Direction.ACROSS),
-        ),
-    ]
-
-    open_room(page, live_server, fx01_grid, players=players)
-
+    open_room(page, live_server, fx01_grid, players=icon_players())
     expect(cell_at(page, 2, 2).get_by_test_id("remote-selection")).to_have_count(2)
-    expect(remote_initials(page, 2, 2)).to_have_text(["AN", "AN"])
-    assert_initials_inside_the_cell(page, 2, 2)
+
+    problems: list[str] = []
+    for row, column in ((2, 2), (1, 0)):
+        _, cursors = read_cursors(page, row, column)
+        for cursor in cursors:
+            if cursor["shape"] != "triangle" or cursor["text"] != "":
+                problems.append(f"{cursor['playerId']}: {cursor['shape']!r}")
+    assert problems == []
+    expect(page.get_by_test_id("access-switch")).to_have_attribute(
+        "aria-pressed", "false"
+    )
 
 
-def test_ac6_a_disconnected_player_has_no_cursor_and_no_initials(
+def test_ac6_a_disconnected_player_has_no_cursor(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     players = [
@@ -196,63 +217,7 @@ def test_ac6_a_disconnected_player_has_no_cursor_and_no_initials(
 
     open_room(page, live_server, fx01_grid, players=players)
 
-    expect(page.get_by_test_id("remote-initials")).to_have_count(0)
-
-
-INITIALS_EXAMPLES = [
-    ("Ana", "AN"),
-    ("Jean-Luc", "JL"),
-    ("marie ève", "MÈ"),
-    ("R2", "R2"),
-    ("Zoé", "ZO"),
-    ("_Max_", "MA"),
-    ("O" + chr(0x2019) + "Neil", "ON"),
-]
-MORE_INITIALS_EXAMPLES = [
-    ("O'Neil", "ON"),
-    ("Anne Marie", "AM"),
-    ("a-b-c", "AB"),
-    ("Élodie", "ÉL"),
-    ("Jean Luc Paul", "JL"),
-    ("\U0001d49cbc", "\U0001d49cB"),
-]
-INITIALS_CELLS: list[Cell] = [
-    (1, 0),
-    (1, 1),
-    (1, 2),
-    (1, 3),
-    (1, 4),
-    (0, 1),
-    (2, 1),
-]
-
-
-def players_with_nicknames(nicknames: list[str]) -> list[PlayerView]:
-    players = [player_view("p1", "Host", 0, is_host=True)]
-    for index, nickname in enumerate(nicknames):
-        row, column = INITIALS_CELLS[index]
-        selection = Selection(row=row, column=column, direction=Direction.ACROSS)
-        players.append(
-            player_view(f"p{index + 2}", nickname, index % 8, selection=selection)
-        )
-    return players
-
-
-@pytest.mark.parametrize(
-    "examples",
-    [INITIALS_EXAMPLES, MORE_INITIALS_EXAMPLES],
-    ids=["spec_examples", "more_examples"],
-)
-def test_ac6_initials_follow_the_rule_of_initials_of(
-    page: Page, live_server: str, fx01_grid: Grid, examples: list[tuple[str, str]]
-) -> None:
-    nicknames = [nickname for nickname, _ in examples]
-    open_room(page, live_server, fx01_grid, players=players_with_nicknames(nicknames))
-
-    for index, (nickname, initials) in enumerate(examples):
-        row, column = INITIALS_CELLS[index]
-        shown = remote_initials(page, row, column)
-        expect(shown, f"initials of {nickname}").to_have_text([initials])
+    expect(page.get_by_test_id("remote-selection")).to_have_count(0)
 
 
 # ---- AC-7: locked letters differ by more than colour -----------------------------

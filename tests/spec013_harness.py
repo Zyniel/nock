@@ -561,14 +561,19 @@ def expected_tints(tinted: dict[tuple[int, int], str]) -> dict[tuple[int, int], 
 ROW_2_WORD = [(2, 1), (2, 2), (2, 3), (2, 4)]
 
 
-def border_of(locator: Locator) -> tuple[str, str, float]:
-    """The top border (style, colour, width in px) of an element."""
+def triangle_fill(locator: Locator) -> str | None:
+    """The computed `fill` of a `remote-selection`'s polygon (None: no polygon).
+
+    Spec 042 draws another player's selected cell as a corner triangle: an `svg`
+    holding one `polygon` filled with the player's colour.
+    """
     script = (
-        "el => { const s = getComputedStyle(el);"
-        " return [s.borderTopStyle, s.borderTopColor, s.borderTopWidth]; }"
+        "el => { const polygon = el.querySelector('polygon');"
+        " return polygon === null ? null : getComputedStyle(polygon).fill; }"
     )
-    style, colour, width = locator.evaluate(script)
-    return style, colour, float(width.removesuffix("px"))
+    fill = locator.evaluate(script)
+    assert fill is None or isinstance(fill, str)
+    return fill
 
 
 # ---- Helpers for the activity feed (AC-5, AC-6, AC-7, AC-8) -----------------

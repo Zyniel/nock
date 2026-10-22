@@ -4,6 +4,7 @@
   import ChatPanel from './ChatPanel.svelte'
   import GridViewport from './GridViewport.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
+  import PlayerIcon from './PlayerIcon.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
   import RoomTimer from './RoomTimer.svelte'
@@ -20,6 +21,13 @@
     unreadBadgeText,
     unreadCount,
   } from './chat'
+  import {
+    ACCESSIBILITY_KEY,
+    OTHERS_TINT_KEY,
+    readAccessibility,
+    readOthersTint,
+    writeSwitch,
+  } from './cellDisplaySwitches'
   import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
   import { newLinkCopier } from './copyLink'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
@@ -341,7 +349,7 @@
   // A new snapshot may remove the word of the selection: then nothing is selected.
   let selection = $derived(validSelection(words, rawSelection))
   let activeWord = $derived(selectedWord(words, selection))
-  let remoteSelections = $derived(remoteSelectionsOf(session.snapshot, words))
+  let remoteSelections = $derived(remoteSelectionsOf(session.snapshot, words, session.cursors))
 
   // ---- The authors view (spec 019) ----
 
@@ -357,6 +365,23 @@
 
   function toggleAuthorsView(): void {
     isAuthorsViewOn = !isAuthorsViewOn
+  }
+
+  // ---- The two display switches of the grid cells (spec 042) ----
+
+  // « Mots des autres » and « Accessibilité » start from what this browser
+  // remembers, and remember each change. They send nothing.
+  let isOthersTintOn = $state(readOthersTint())
+  let isAccessibilityOn = $state(readAccessibility())
+
+  function toggleOthersTint(): void {
+    isOthersTintOn = !isOthersTintOn
+    writeSwitch(OTHERS_TINT_KEY, isOthersTintOn)
+  }
+
+  function toggleAccessibility(): void {
+    isAccessibilityOn = !isAccessibilityOn
+    writeSwitch(ACCESSIBILITY_KEY, isAccessibilityOn)
   }
 
   // The line naming the author of the selected cell's confirmed letter, while
@@ -1773,6 +1798,22 @@
           aria-pressed={isAuthorsViewOn}
           onclick={toggleAuthorsView}>{t('authors.switch')}</button
         >
+        <!-- The display switches of the grid cells, until the Menu holds them
+             (spec 042, spec 043). -->
+        <button
+          type="button"
+          class="others-tint-switch"
+          data-testid="others-tint-switch"
+          aria-pressed={isOthersTintOn}
+          onclick={toggleOthersTint}>{t('others_tint.switch')}</button
+        >
+        <button
+          type="button"
+          class="access-switch"
+          data-testid="access-switch"
+          aria-pressed={isAccessibilityOn}
+          onclick={toggleAccessibility}>{t('access.switch')}</button
+        >
         <!-- The last button of the toolbar, while accounts are on (spec 033). -->
         {#if accountStatus !== null}
           <button
@@ -1890,8 +1931,9 @@
               class="roster-colour"
               data-testid="roster-colour"
               data-colour={String(player.colour)}
-              style:background={`var(--player-colour-${player.colour})`}
-            ></span>
+              style:background={isAccessibilityOn ? null : `var(--player-colour-${player.colour})`}
+              >{#if isAccessibilityOn}<PlayerIcon colour={player.colour} side="12px" />{/if}</span
+            >
             <span class="roster-nickname" data-testid="roster-nickname"
               >{displayNickname(player.nickname)}</span
             >
@@ -2052,6 +2094,8 @@
         caughtUpCells={session.caughtUpCells}
         {remoteSelections}
         {isAuthorsViewOn}
+        {isOthersTintOn}
+        {isAccessibilityOn}
         {playerColours}
         {clueFlags}
         {clueReactions}
@@ -2189,8 +2233,9 @@
 
   /* The room toolbar holds the shared timer and its toggle, the chat toggle, the
      recap button of a solved room, the undo, pencil, check and reveal controls,
-     the flag button, the authors switch and the account button (specs 027, 022,
-     028, 024, 020, 021, 019 and 033). On a roomy window it is one
+     the flag button, the authors switch, the two display switches of the grid
+     cells and the account button (specs 027, 022, 028, 024, 020, 021, 019, 042
+     and 033). On a roomy window it is one
      item of the header row, and it wraps when it must. */
   .room-toolbar {
     display: flex;
@@ -2233,6 +2278,8 @@
      look and keeps the button's size. The pencil toggle shows that it is on the
      same way. */
   .authors-switch[aria-pressed='true'],
+  .others-tint-switch[aria-pressed='true'],
+  .access-switch[aria-pressed='true'],
   .pencil-toggle[aria-pressed='true'] {
     text-decoration: underline;
     text-decoration-thickness: 2px;

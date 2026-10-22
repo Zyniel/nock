@@ -2,7 +2,8 @@
 //
 // A component draws them in an SVG with the stroke attributes of _design.md
 // section 5 (fill none, stroke currentColor, round caps and joins,
-// aria-hidden). No screen draws them yet.
+// aria-hidden). The grid draws the flag on a flagged clue and the player icons
+// of the Accessibilité mode (spec 042, IconShapes.svelte).
 
 export type IconName =
   | 'undo'

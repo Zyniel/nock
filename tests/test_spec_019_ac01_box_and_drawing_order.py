@@ -18,9 +18,11 @@ its row 1 letters by `p9` instead of `p2`, and `p2` to `p6` selecting (1, 6)
   bounding box), asserted before the box rules and the drawing order, so that the
   page keeps testing the cells closest to the letter rule's limit; the bands are
   then held to the full rules of a cell of 20 px or more;
-- the drawing order on the cell with the five outlines: `elementFromPoint` along
-  the band's middle line finds the corner labels inside their boxes and the band
-  everywhere else, never a `remote-selection`.
+- the drawing order on the cell with the five cursors: `elementFromPoint` along
+  the band's middle line finds a corner triangle inside it and the band outside
+  every triangle. (Spec 042, the design's grid cells: the cursors are corner
+  triangles, at most four, in place of outlines with corner labels; the fifth
+  cursor waits and is not drawn.)
 
 Choices where the spec leaves room:
 
@@ -95,8 +97,7 @@ BOX_PAGE_IDS = [f"{name}-{width}x{height}" for name, width, height in BOX_PAGES]
 BOX_RUN_SCRIPT = r"""
 () => {
   const SKIPPED_TEST_IDS = [
-    'author-mark', 'remote-selection', 'remote-initials', 'remote-overflow',
-    'remote-overflow-label', 'reveal-mark', 'reveal-label',
+    'author-mark', 'remote-selection', 'reveal-mark', 'reveal-label',
   ];
   const edges = box => [box.left, box.top, box.right, box.bottom];
   const letterTextNode = cell => {
@@ -197,10 +198,17 @@ CELL_SIDES_SCRIPT = r"""
 
 # The drawing order on one cell, after `scrollIntoView`:`elementFromPoint` along
 # the band's middle line, with `pointer-events: auto !important` on every
-# descendant of every cell. Points within 1 px of a label's area (its box and the
-# client rects of its text) are not judged, as
-# the spec says; on a small cell that can be every point (at 568 by 320 today the
-# band's middle line runs within 1 px of the bottom edge of the cell's label).
+# descendant of every cell. Spec 042 (the design's grid cells) replaced the corner
+# labels with corner triangles: a point inside a triangle (at distances `dx` and
+# `dy` from the two edges of its corner of the inner box, `dx + dy < t - 1.5`,
+# spec 042's "Test harness") must return that triangle or one of its
+# descendants; a point outside every triangle (`dx + dy > t + 1.5` for each)
+# must return the band. Points in between, and points inside the box of a mark
+# that the design draws over the triangles (`reveal-mark`, `clue-arrow`), are not
+# judged.
+# `cell-selection` (my selection border, spec 042 AC-17) keeps its own
+# `pointer-events: none`: it is drawn over the triangles by design, so a probe in
+# its 2 px band would return it.
 DRAWING_ORDER_SCRIPT = r"""
 ([row, column]) => {
   const cell = document.querySelector(
@@ -208,7 +216,8 @@ DRAWING_ORDER_SCRIPT = r"""
   );
   cell.scrollIntoView();
   const style = document.createElement('style');
-  style.textContent = '[data-testid="cell"] * { pointer-events: auto !important; }';
+  style.textContent = '[data-testid="cell"] *:not([data-testid="cell-selection"])'
+    + ' { pointer-events: auto !important; }';
   document.head.appendChild(style);
   const describe = element => {
     if (element === null) {
@@ -222,20 +231,27 @@ DRAWING_ORDER_SCRIPT = r"""
     if (mark === null) {
       return {points: 0, judged: 0, wrong: ['the cell holds no author-mark']};
     }
-    const labels = Array.from(cell.querySelectorAll(
-      '[data-testid="remote-initials"], [data-testid="remote-overflow"]'
-    ));
-    // A label's area is the union of its bounding box and the client rects of its
-    // text. The label's box is as tall as its line height (1.1), while the text's
-    // inline content area (the font's ascent plus descent) is taller with some
-    // fonts (Windows' default one), so the text, which hit-testing returns as the
-    // label, extends past `getBoundingClientRect()`. That text is still the
-    // corner label, which the spec lets be drawn over the band.
-    const labelAreas = labels.map(label => {
-      const range = document.createRange();
-      range.selectNodeContents(label);
-      return [label.getBoundingClientRect(), ...Array.from(range.getClientRects())];
-    });
+    const cellBox = cell.getBoundingClientRect();
+    const inner = {
+      left: cellBox.left, top: cellBox.top,
+      right: cellBox.right - 1, bottom: cellBox.bottom - 1,
+    };
+    const triangles = Array.from(
+      cell.querySelectorAll('[data-testid="remote-selection"]')
+    ).map(element => ({
+      element: element,
+      corner: element.getAttribute('data-corner'),
+      side: element.getBoundingClientRect().width,
+    }));
+    const overMarks = Array.from(cell.querySelectorAll(
+      '[data-testid="reveal-mark"], [data-testid="clue-arrow"]'
+    )).map(element => element.getBoundingClientRect());
+    const sum = (triangle, x, y) => {
+      const corner = triangle.corner || '';
+      const dx = corner.endsWith('left') ? x - inner.left : inner.right - x;
+      const dy = corner.startsWith('top') ? y - inner.top : inner.bottom - y;
+      return dx < 0 || dy < 0 ? Infinity : dx + dy;
+    };
     const box = mark.getBoundingClientRect();
     const y = box.top + box.height / 2;
     const xs = [];
@@ -248,28 +264,23 @@ DRAWING_ORDER_SCRIPT = r"""
     const wrong = [];
     let judged = 0;
     for (const x of xs) {
+      const underOtherMark = overMarks.some(other =>
+        x >= other.left - 1 && x <= other.right + 1
+        && y >= other.top - 1 && y <= other.bottom + 1);
+      if (underOtherMark) {
+        continue;
+      }
       const found = document.elementFromPoint(x, y);
-      const insideLabels = [];
-      let outsideAll = true;
-      labels.forEach((label, index) => {
-        for (const area of labelAreas[index]) {
-          if (x > area.left + 1 && x < area.right - 1
-              && y > area.top + 1 && y < area.bottom - 1) {
-            insideLabels.push(label);
-          }
-          if (!(x < area.left - 1 || x > area.right + 1
-                || y < area.top - 1 || y > area.bottom + 1)) {
-            outsideAll = false;
-          }
-        }
-      });
+      const inside = triangles.filter(
+        triangle => sum(triangle, x, y) < triangle.side - 1.5
+      );
+      const outsideAll = triangles.every(
+        triangle => sum(triangle, x, y) > triangle.side + 1.5
+      );
       let right = true;
-      if (insideLabels.length > 0) {
-        // Inside a label's box, any of the cell's corner labels may be found:
-        // two labels can overlap on a small cell, and the spec lets every
-        // corner label be drawn over the band. The other two branches (the band
-        // outside every label, a ring skipped) are unchanged.
-        right = found !== null && labels.some(label => label.contains(found));
+      if (inside.length > 0) {
+        right = found !== null
+          && inside.some(triangle => triangle.element.contains(found));
       } else if (outsideAll) {
         right = found !== null && mark.contains(found);
       } else {
@@ -406,7 +417,7 @@ def baseline_problems(where: str, mark_box: Box, item: dict[str, object]) -> lis
 
 
 def drawing_order_problems(page: Page, cell: Cell) -> list[str]:
-    """The drawing order on the cell with the five outlines."""
+    """The drawing order on the cell with the five cursors (four drawn)."""
     found = page.evaluate(DRAWING_ORDER_SCRIPT, list(cell))
     problems: list[str] = []
     for wrong in found["wrong"]:
@@ -437,7 +448,8 @@ def test_ac1_every_band_meets_the_box_rules_and_the_drawing_order(
         crowded = FX02_CROWDED
         expected_cells = len(letter_positions_of(fx02_grid))
     crowded_cell = cell_at(page, *crowded)
-    expect(crowded_cell.get_by_test_id("remote-selection")).to_have_count(5)
+    # Spec 042: at most four cursors are drawn, one per corner; the fifth waits.
+    expect(crowded_cell.get_by_test_id("remote-selection")).to_have_count(4)
 
     turn_switch_on(page)
 

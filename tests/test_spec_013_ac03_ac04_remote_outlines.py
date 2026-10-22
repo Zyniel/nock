@@ -2,6 +2,12 @@
 
 AC-3: two outlines on one cell. AC-4: my own selection looks different. The page is
 tested with spec 040's mocked socket. The shared setup is in `spec013_harness`.
+
+Spec 042 (the design's grid cells) refines AC-3: another player's selected cell is
+a corner triangle, whose polygon's `fill`, not a dashed `border-color`, equals the
+roster swatch, and corners go by order of arrival (`p2` then `p3`: `top-left`
+then `top-right`). The order of `data-tinted-by` stays the roster's. AC-4's check
+that the others' cursors are dashed becomes a check that they are triangles.
 """
 
 from __future__ import annotations
@@ -17,7 +23,6 @@ from spec013_harness import (
     MockRoomSocket,
     all_remote_selections,
     background_of,
-    border_of,
     cell_at,
     clear_frame,
     expected_tints,
@@ -29,6 +34,7 @@ from spec013_harness import (
     settle,
     swatch_colour,
     tinted_by_map,
+    triangle_fill,
 )
 
 
@@ -38,6 +44,12 @@ def fx01_grid(fx01_text: str) -> Grid:
 
 
 # ---- AC-3: two outlines on one cell ------------------------------------------------
+
+
+def outline_of(page: Page, row: int, column: int, player_id: str) -> Locator:
+    """The `remote-selection` of one player on a cell."""
+    selector = f'[data-testid="remote-selection"][data-player-id="{player_id}"]'
+    return cell_at(page, row, column).locator(selector)
 
 
 def three_player_snapshot() -> list[PlayerView]:
@@ -73,10 +85,12 @@ def test_ac3_browser_two_outlines_on_one_cell_are_both_visible_and_distinct(
     assert first_box is not None
     assert second_box is not None
     assert first_box != second_box
-    first_style, first_colour, _ = border_of(first)
-    second_style, second_colour, _ = border_of(second)
-    assert first_style == "dashed"
-    assert second_style == "dashed"
+    # Spec 042: triangles in the corners of arrival, filled with each colour.
+    expect(first).to_have_attribute("data-corner", "top-left")
+    expect(second).to_have_attribute("data-corner", "top-right")
+    first_colour = triangle_fill(first)
+    second_colour = triangle_fill(second)
+    assert first_colour is not None
     assert first_colour != second_colour
     assert first_colour == swatch_colour(page, "p2")
     assert second_colour == swatch_colour(page, "p3")
@@ -106,7 +120,7 @@ def test_ac3_browser_the_overlapping_tint_is_the_one_of_the_first_player(
     assert only_first != only_second
 
 
-def test_ac3_browser_the_order_follows_the_roster_not_the_order_of_arrival(
+def test_ac3_browser_the_tint_follows_the_roster_and_the_corners_the_arrival(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_room(page, live_server, fx01_grid, three_player_snapshot())
@@ -116,7 +130,11 @@ def test_ac3_browser_the_order_follows_the_roster_not_the_order_of_arrival(
 
     expect(cell_at(page, 1, 1).get_by_test_id("remote-selection")).to_have_count(2)
     expect(cell_at(page, 1, 1)).to_have_attribute("data-tinted-by", "p2 p3")
-    assert remote_players_on(page, 1, 1) == [("p2", "1"), ("p3", "2")]
+    assert sorted(remote_players_on(page, 1, 1)) == [("p2", "1"), ("p3", "2")]
+    # Spec 042: corners go by order of arrival, so `p3`, who came first, holds
+    # the top-left corner.
+    expect(outline_of(page, 1, 1, "p3")).to_have_attribute("data-corner", "top-left")
+    expect(outline_of(page, 1, 1, "p2")).to_have_attribute("data-corner", "top-right")
 
 
 def test_ac3_browser_the_outlines_stay_when_i_select_the_same_cell(
@@ -209,8 +227,10 @@ def test_ac4_browser_my_selection_is_never_dashed(
 
     assert styles != []
     assert "dashed" not in styles
-    theirs = border_of(cell_at(page, 2, 2).get_by_test_id("remote-selection"))
-    assert theirs[0] == "dashed"
+    # Spec 042: the others' cursors are corner triangles (they were dashed
+    # borders), so this check now reads their shape.
+    theirs = cell_at(page, 2, 2).get_by_test_id("remote-selection")
+    expect(theirs).to_have_attribute("data-shape", "triangle")
 
 
 def test_ac4_browser_my_background_differs_from_the_others(

@@ -46,7 +46,6 @@ from spec013_harness import (
     Peer,
     all_remote_selections,
     background_of,
-    border_of,
     cell_at,
     clear_frame,
     events_of,
@@ -71,6 +70,7 @@ from spec013_harness import (
     state_frame,
     swatch_colour,
     tinted_by_map,
+    triangle_fill,
 )
 
 RELAY_P95_SECONDS = 0.1
@@ -492,10 +492,10 @@ def test_ac2_browser_the_selection_of_another_player_is_outlined_and_tinted(
     expect(outline).to_have_count(1)
     expect(outline).to_have_attribute("data-player-id", "p2")
     expect(outline).to_have_attribute("data-colour", "3")
-    style, colour, width = border_of(outline)
-    assert style == "dashed"
-    assert width >= 2
-    assert colour == swatch_colour(page, "p2")
+    # Spec 042: a corner triangle whose polygon's fill is the player's colour, in
+    # place of a dashed border.
+    expect(outline).to_have_attribute("data-corner", "top-left")
+    assert triangle_fill(outline) == swatch_colour(page, "p2")
     assert all_remote_selections(page) == 1
     expect(cell_at(page, 2, 4)).to_have_attribute("data-tinted-by", "p2")
     assert tinted_by_map(page) == expected_tints(dict.fromkeys(ROW_2_WORD, "p2"))
@@ -522,8 +522,9 @@ def test_ac2_browser_the_outline_colour_is_the_colour_of_that_player(
     expect(outline).to_have_count(1)
     expect(outline).to_have_attribute("data-player-id", "p3")
     expect(outline).to_have_attribute("data-colour", "5")
-    assert border_of(outline)[1] == swatch_colour(page, "p3")
-    assert border_of(outline)[1] != swatch_colour(page, "p2")
+    # Spec 042: the triangle's polygon carries the colour, not a border.
+    assert triangle_fill(outline) == swatch_colour(page, "p3")
+    assert triangle_fill(outline) != swatch_colour(page, "p2")
 
 
 def test_ac2_browser_the_tint_follows_the_direction_of_the_selection(

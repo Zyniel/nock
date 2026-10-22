@@ -1122,29 +1122,23 @@ COLOUR_CONTRAST_JS = (Path(__file__).parent / "colour_contrast.js").read_text(
     encoding="utf-8"
 )
 
-MARK_TOLERANCE_PX = 1.0
-MARK_EDGE_PX = 4.0
-MARK_MIN_PX = 6.0
+MARK_POSITION_TOLERANCE_PX = 1.0
+MARK_SIZE_TOLERANCE_PX = 0.5
 MARK_MIN_CONTRAST = 3.0
+NOTCH_CLIP_PATH = "polygon(50% 0%, 100% 100%, 0% 100%)"
+REVEAL_COLOUR = "rgb(194, 65, 12)"
 
-# The colours of a corner mark, as "Client: revealed cells" measures them (the
-# lead's refinement of 2026-10-15). The JavaScript declares `markColours(cell,
-# mark)`, to be used after COLOUR_CONTRAST_JS. Its colours are the computed
-# `background-color` of `reveal-mark` and of each layer inside it that is at least
-# MARK_MIN_PX and a quarter of the cell side wide and high: an element descendant
-# (sized by its bounding box), or the mark's `::before` or `::after` whose
-# computed `content` is not `none` (sized by its computed `width` and `height`).
-# Each colour is composited over the cell's computed background (itself over
-# white) and, while the cell flashes, the `cell-flash` element over it (spec 041,
-# AC-16: the cell is white and the flash is drawn by that overlay at its opacity),
-# as the check of a one-colour mark does, and measured against it. The mark's
-# contrast is the highest of these ratios. Where each colour shows is the
-# reviewer's check, not the tests' (the spec says so).
-MARK_COLOURS_JS = f"const MARK_MIN_PX = {MARK_MIN_PX};\n" + r"""
+# The colour of the revealed notch, as "Client: revealed cells" measures it. Spec
+# 042 (the design's grid cells) refines the mark: it is one colour, the
+# `background-color` of `reveal-mark` (orange-red, ink during a flash), so the
+# layers the lead's refinement of 2026-10-15 allowed are gone. The JavaScript
+# declares `markColours(cell, mark)`, to be used after COLOUR_CONTRAST_JS: one
+# colour, composited over the cell's computed background (itself over white) and,
+# while the cell flashes, the `cell-flash` element over it (spec 041, AC-16: the
+# cell is white and the flash is drawn by that overlay at its opacity), and
+# measured against it. `highestRatio` keeps the readings' form.
+MARK_COLOURS_JS = r"""
 function markColours(cell, mark) {
-  const cellBox = cell.getBoundingClientRect();
-  const minWidth = Math.max(MARK_MIN_PX, cellBox.width / 4);
-  const minHeight = Math.max(MARK_MIN_PX, cellBox.height / 4);
   let cellBackground = over(
     parseColour(getComputedStyle(cell).backgroundColor), WHITE
   );
@@ -1155,31 +1149,10 @@ function markColours(cell, mark) {
     flash[3] = flash[3] * parseFloat(overlayStyle.opacity);
     cellBackground = over(flash, cellBackground);
   }
-  const colours = [];
-  const addColour = (source, text) => {
-    const shown = over(parseColour(text), cellBackground);
-    const ratio = contrast(shown, cellBackground);
-    colours.push({source: source, colour: text, ratio: ratio});
-  };
-  addColour('reveal-mark', getComputedStyle(mark).backgroundColor);
-  for (const layer of mark.querySelectorAll('*')) {
-    const box = layer.getBoundingClientRect();
-    if (box.width >= minWidth && box.height >= minHeight) {
-      addColour(layer.tagName, getComputedStyle(layer).backgroundColor);
-    }
-  }
-  for (const pseudo of ['::before', '::after']) {
-    const style = getComputedStyle(mark, pseudo);
-    if (style.content === 'none') {
-      continue;
-    }
-    const width = parseFloat(style.width);
-    const height = parseFloat(style.height);
-    if (width >= minWidth && height >= minHeight) {
-      addColour(pseudo, style.backgroundColor);
-    }
-  }
-  return colours;
+  const text = getComputedStyle(mark).backgroundColor;
+  const shown = over(parseColour(text), cellBackground);
+  return [{source: 'reveal-mark', colour: text,
+    ratio: contrast(shown, cellBackground)}];
 }
 function highestRatio(colours) {
   let highest = 0;
@@ -1190,7 +1163,7 @@ function highestRatio(colours) {
 }
 """
 
-# What the rules of the corner mark need, measured on the `cell` element.
+# What the rules of the notch need, measured on the `cell` element.
 MARK_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + MARK_COLOURS_JS + r"""
   const marks = cell.querySelectorAll('[data-testid="reveal-mark"]');
   const result = {marks: marks.length};
@@ -1205,6 +1178,9 @@ MARK_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + MARK_COLOURS_JS + r"""
   result.ariaHidden = mark.getAttribute('aria-hidden');
   result.text = mark.textContent;
   result.visibility = markStyle.visibility;
+  result.clipPath = markStyle.clipPath;
+  result.background = markStyle.backgroundColor;
+  result.flash = cell.getAttribute('data-flash');
   result.cell = [cellBox.left, cellBox.top, cellBox.right, cellBox.bottom];
   result.mark = [markBox.left, markBox.top, markBox.right, markBox.bottom];
   result.colours = colours;
@@ -1222,14 +1198,48 @@ def read_mark(cell: Locator) -> dict[str, Any]:
 
 
 def mark_contrast(cell: Locator) -> float:
-    """The mark's contrast against the cell: the highest over the mark's colours."""
+    """The notch's contrast against the cell (spec 042: one colour)."""
     reading = read_mark(cell)
     assert reading["marks"] == 1, reading
     return float(reading["ratio"])
 
 
+def notch_geometry_problems(reading: dict[str, Any]) -> list[str]:
+    """The notch's box: `max(7, 0.22 s)` by `max(4, 0.11 s)`, on the inner box.
+
+    The inner box is the cell's box less its 1 px right and bottom grid lines
+    (spec 042); the notch is centred on it horizontally, its bottom on its bottom.
+    """
+    cell_left, _, cell_right, cell_bottom = reading["cell"]
+    mark_left, mark_top, mark_right, mark_bottom = reading["mark"]
+    side = cell_right - cell_left
+    inner_right = cell_right - 1
+    inner_bottom = cell_bottom - 1
+    problems: list[str] = []
+    width = mark_right - mark_left
+    height = mark_bottom - mark_top
+    expected_width = max(7.0, 0.22 * side)
+    expected_height = max(4.0, 0.11 * side)
+    if abs(width - expected_width) > MARK_SIZE_TOLERANCE_PX:
+        problems.append(f"width {width}, expected {expected_width:.2f}")
+    if abs(height - expected_height) > MARK_SIZE_TOLERANCE_PX:
+        problems.append(f"height {height}, expected {expected_height:.2f}")
+    centre = (mark_left + mark_right) / 2
+    inner_centre = (cell_left + inner_right) / 2
+    if abs(centre - inner_centre) > MARK_POSITION_TOLERANCE_PX:
+        problems.append(f"centre {centre}, expected {inner_centre:.2f}")
+    if abs(mark_bottom - inner_bottom) > MARK_POSITION_TOLERANCE_PX:
+        problems.append(f"bottom {mark_bottom}, expected {inner_bottom:.2f}")
+    return problems
+
+
 def mark_problems(cell: Locator) -> list[str]:
-    """How the cell's `reveal-mark` breaks the rules of "Client: revealed cells"."""
+    """How the cell's `reveal-mark` breaks the rules of "Client: revealed cells".
+
+    Spec 042 (the design's grid cells): the mark is the bottom-centre notch, an
+    isosceles triangle in `--nock-reveal` (ink while the cell flashes, which the
+    flash run checks), at least 3:1 against the cell.
+    """
     reading = read_mark(cell)
     if reading["marks"] != 1:
         return [f"{reading['marks']} reveal-mark elements in the cell"]
@@ -1240,26 +1250,11 @@ def mark_problems(cell: Locator) -> list[str]:
         problems.append(f"the mark holds the text {reading['text']!r}")
     if reading["visibility"] != "visible":
         problems.append(f"visibility is {reading['visibility']!r}")
-    cell_left, cell_top, cell_right, cell_bottom = reading["cell"]
-    mark_left, mark_top, mark_right, mark_bottom = reading["mark"]
-    inside = (
-        mark_left >= cell_left - MARK_TOLERANCE_PX
-        and mark_top >= cell_top - MARK_TOLERANCE_PX
-        and mark_right <= cell_right + MARK_TOLERANCE_PX
-        and mark_bottom <= cell_bottom + MARK_TOLERANCE_PX
-    )
-    if not inside:
-        problems.append(f"mark {reading['mark']} outside cell {reading['cell']}")
-    if abs(cell_right - mark_right) > MARK_EDGE_PX:
-        problems.append(f"right edge {mark_right} is far from {cell_right}")
-    if abs(mark_top - cell_top) > MARK_EDGE_PX:
-        problems.append(f"top edge {mark_top} is far from {cell_top}")
-    min_width = max(MARK_MIN_PX, (cell_right - cell_left) / 4)
-    min_height = max(MARK_MIN_PX, (cell_bottom - cell_top) / 4)
-    if mark_right - mark_left < min_width:
-        problems.append(f"width {mark_right - mark_left} below {min_width}")
-    if mark_bottom - mark_top < min_height:
-        problems.append(f"height {mark_bottom - mark_top} below {min_height}")
+    if " ".join(str(reading["clipPath"]).split()) != NOTCH_CLIP_PATH:
+        problems.append(f"clip-path is {reading['clipPath']!r}")
+    problems.extend(notch_geometry_problems(reading))
+    if reading["flash"] == "" and reading["background"] != REVEAL_COLOUR:
+        problems.append(f"background {reading['background']}, not {REVEAL_COLOUR}")
     if reading["ratio"] < MARK_MIN_CONTRAST:
         problems.append(f"contrast {reading['ratio']} below 3:1: {reading['colours']}")
     return problems

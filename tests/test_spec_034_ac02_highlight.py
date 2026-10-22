@@ -5,6 +5,11 @@ the ring's look ("Applying a catch-up" step 2), the marks drawn over it and the
 cell still taking clicks and letters. The timing of the highlight (still on at
 4.5 s, gone at 6 s) is in `test_spec_034_ac02_highlight_timing.py`, which runs in
 the serial pass. The shared setup is in `spec034_harness`.
+
+Spec 042 (the design's grid cells) refines AC-2: the other players' cursors are
+corner triangles with no initials, so the hit test is on `p2`'s triangle, at the
+point 1.5 px inside both edges of the inner box's corner that holds it (inside the
+ring's band and the triangle), in place of the centre of its initials.
 """
 
 from __future__ import annotations
@@ -81,29 +86,45 @@ RING_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + r"""
 # `scrollIntoView`, a test style sets `pointer-events: auto !important` on every
 # descendant of every cell (hit testing follows the drawing order but skips an
 # element with `pointer-events: none`, such as the ring), then
-# `document.elementFromPoint` at the centre of the cell's `remote-initials`
-# (spec 035) must give the initials or an element inside them, never the
-# `catch-up-mark`. The style is removed afterwards.
-INITIALS_HIT_SCRIPT = r"""
+# `document.elementFromPoint` at the point 1.5 px inside both edges of the inner
+# box's corner (the cell's box less its 1 px right and bottom grid lines) that
+# holds `p2`'s triangle (spec 042) must give that `remote-selection` or an element
+# inside it, never the `catch-up-mark`. The point is checked to lie inside the
+# ring's band (3 px) and inside the triangle (`dx + dy < t - 1.5`, `t` the
+# triangle's side, spec 042's "Test harness") before the hit. The style is
+# removed afterwards.
+# `cell-selection` (my selection border, spec 042 AC-17) keeps its own
+# `pointer-events: none`: it is drawn over the triangles by design, so a probe in
+# its 2 px band would return it.
+TRIANGLE_HIT_SCRIPT = r"""
 cell => {
-  const initials = cell.querySelector(
-    '[data-testid="remote-selection"] [data-testid="remote-initials"]'
+  const triangle = cell.querySelector(
+    '[data-testid="remote-selection"][data-player-id="p2"]'
   );
-  if (initials === null) {
+  if (triangle === null) {
     return {found: false};
   }
   cell.scrollIntoView();
   const style = document.createElement('style');
-  style.textContent = '[data-testid="cell"] * { pointer-events: auto !important; }';
+  style.textContent = '[data-testid="cell"] *:not([data-testid="cell-selection"])'
+    + ' { pointer-events: auto !important; }';
   document.head.appendChild(style);
   try {
-    const box = initials.getBoundingClientRect();
-    const hit = document.elementFromPoint(
-      box.left + box.width / 2, box.top + box.height / 2
-    );
+    const corner = triangle.getAttribute('data-corner') || '';
+    const cellBox = cell.getBoundingClientRect();
+    const left = cellBox.left;
+    const top = cellBox.top;
+    const right = cellBox.right - 1;
+    const bottom = cellBox.bottom - 1;
+    const x = corner.endsWith('left') ? left + 1.5 : right - 1.5;
+    const y = corner.startsWith('top') ? top + 1.5 : bottom - 1.5;
+    const side = triangle.getBoundingClientRect().width;
+    const hit = document.elementFromPoint(x, y);
     return {
       found: true,
-      hits: hit !== null && initials.contains(hit),
+      corner: corner,
+      insideTriangle: 1.5 + 1.5 < side - 1.5,
+      hits: hit !== null && triangle.contains(hit),
       hitsMark: hit !== null && hit.closest('[data-testid="catch-up-mark"]') !== null,
       hit: hit === null ? null : hit.outerHTML.slice(0, 200),
     };
@@ -208,16 +229,16 @@ def test_ac2_the_mark_is_a_solid_ring_on_the_cells_edge(
     assert ring_problems(cell_at(return_page, row, column)) == []
 
 
-def test_ac2_the_other_players_outline_and_initials_stay_visible_over_the_ring(
+def test_ac2_the_other_players_triangle_stays_visible_over_the_ring(
     return_page: Page,
 ) -> None:
     wait_for_the_highlight(return_page)
     cell = cell_at(return_page, 2, 2)
     outline = cell.locator(f'[data-testid="remote-selection"][data-player-id="{BOB}"]')
-    initials = outline.get_by_test_id("remote-initials")
 
+    # Spec 042: the cursor is a corner triangle; its initials are gone.
     expect(outline).to_be_visible()
-    expect(initials).to_be_visible()
+    expect(outline).to_have_attribute("data-shape", "triangle")
 
 
 def test_ac2_a_click_on_a_highlighted_cell_selects_it(
@@ -231,7 +252,7 @@ def test_ac2_a_click_on_a_highlighted_cell_selects_it(
     expect(cell).to_have_attribute("data-selected", "true")
 
 
-def test_ac2_the_initials_are_drawn_over_the_ring(return_page: Page) -> None:
+def test_ac2_the_triangle_is_drawn_over_the_ring(return_page: Page) -> None:
     wait_for_the_highlight(return_page)
     cell = cell_at(return_page, 2, 2)
     # The spec's order: the click and the step 2 checks first, since the test
@@ -240,9 +261,12 @@ def test_ac2_the_initials_are_drawn_over_the_ring(return_page: Page) -> None:
     expect(cell).to_have_attribute("data-selected", "true")
     assert ring_problems(cell) == []
 
-    hit = cell.evaluate(INITIALS_HIT_SCRIPT)
+    hit = cell.evaluate(TRIANGLE_HIT_SCRIPT)
 
-    assert hit["found"] is True, "no remote-initials on (2, 2)"
+    assert hit["found"] is True, "no remote-selection of p2 on (2, 2)"
+    assert hit["corner"] in ("top-left", "top-right", "bottom-right", "bottom-left")
+    if not hit["insideTriangle"]:
+        pytest.fail(f"the point is not inside p2's triangle: {hit}")
     assert hit["hitsMark"] is False, f"elementFromPoint found the ring: {hit['hit']}"
     assert hit["hits"] is True, f"elementFromPoint found {hit['hit']}"
 

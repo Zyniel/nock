@@ -4,6 +4,8 @@
 import { SvelteMap } from 'svelte/reactivity'
 import { feedItemFor, trimFeed } from './activityFeed'
 import type { KeptFeedItem } from './activityFeed'
+import { cursorPositionsOf, nextCursors } from './remoteSelections'
+import type { CellCursor } from './remoteSelections'
 import { timerValueMs } from './timer'
 
 export type RoomStatus =
@@ -245,6 +247,9 @@ export interface RoomSession {
   nextCaughtUpId: number
   // "<after_seq>-<until_seq>" of the last catch-up applied, '' before one.
   catchUpLabel: string
+  // The other players' cursors, in the order they arrived on their cells, with
+  // the corner each holds (spec 042). Brought up to date after every frame.
+  cursors: CellCursor[]
 }
 
 // A cell that a catch-up highlights, as a cell that changed while the page was
@@ -311,6 +316,7 @@ export function newSession(): RoomSession {
     caughtUpCells: [],
     nextCaughtUpId: 1,
     catchUpLabel: '',
+    cursors: [],
   }
 }
 
@@ -1064,8 +1070,15 @@ function receiveEvent(session: RoomSession, event: RoomEvent): void {
   }
 }
 
-// Take one frame received from the server and update the session.
+// Take one frame received from the server and update the session. The corners
+// of the other players' cursors follow each frame in turn, so they go by the
+// order in which the players arrived on their cells (spec 042).
 export function receiveFrame(session: RoomSession, text: string): void {
+  applyFrame(session, text)
+  session.cursors = nextCursors(session.cursors, cursorPositionsOf(session.snapshot))
+}
+
+function applyFrame(session: RoomSession, text: string): void {
   const message = parseFrame(text)
   if (message === null) {
     return

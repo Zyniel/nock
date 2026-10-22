@@ -1,7 +1,7 @@
 ---
 id: "042"
 title: Grid cells
-status: approved
+status: done
 ---
 
 # 042 - Grid cells
@@ -53,6 +53,12 @@ Terms used below:
   neighbour's right edge.
 - Letter cells and empty cells clip their content (`overflow: hidden`); clue
   cells do not (`overflow: visible`).
+- The `grid` itself clips at its outer edge: `overflow: clip` on its own box, so
+  that nothing of its content (a clue text spilling over neighbouring cells, an
+  arrow, a ring) paints outside the grid's box. (Note from the lead, 2026-10-22,
+  from spec 042's implementation: added. At 1280 by 800, FX-02's row 16 clue
+  texts reached 7 px below the grid and made the viewport scroll, against spec 006
+  "at 1280x800 and above FX-01 and FX-02 need no pan".)
 - An empty cell (`data-type="empty"`) has the background `--nock-rule` and holds
   no element.
 - The grid's box is `W x s + 1` wide and `H x s + 1` high (`W`, `H` its width and
@@ -187,7 +193,17 @@ The Accessibilité switch, « Accessibilité » (`_design.md` section 6):
 ### Clue cells (`_design.md` sections 4 and 6)
 
 - Background `--nock-clue-bg`; padding 2 px top and bottom, 3 px left and right;
-  the cell's `clue` elements fill its content box: one clue fills it, two clues
+  (Note from the lead, 2026-10-22, first and second review of spec 042: the
+  top and bottom padding is `min(2px, 0.17 s)` (2 px from 12 px cells up), and
+  the side padding is `min(3px, 0.2 s)` (3 px from 15 px cells up), so that a
+  clue keeps a box that takes taps: spec 019 AC-4 at 568 by 320 with the in-app
+  keyboard, where FX-02's cells are about 5.8 px. The side padding was first
+  `min(3px, 0.25 s)`, which leaves a clue's box 1.92 px wide there, and
+  Firefox's tap misses it; with `0.2 s` it is about 2.5 px. The design draws
+  nothing at that size. The flag's 1 px inset from the cell's left edge, below,
+  follows the padding there: the flag's left is the smaller of 1 px and the
+  left padding.)
+  The cell's `clue` elements fill its content box: one clue fills it, two clues
   share it in two halves of equal height, clue 0 on top, with the separator
   between them. Each `clue` centres its `clue-text` vertically.
 - `clue-text`: family `var(--nock-font-clue)`, weight 600, size
@@ -257,8 +273,13 @@ is there (strokes start 2 units in).
 
 ### Drawing order (`_design.md` section 6)
 
-Top first, inside one cell: my selection border (the cell's `outline`, 2 px
-solid `--nock-navy`, `outline-offset: -2px`, spec 041); the arrows (6); the
+Top first, inside one cell: my selection border (7), drawn by the cell's
+`cell-selection` element: `aria-hidden="true"`, `data-testid="cell-selection"`,
+`position: absolute; inset: 0; box-sizing: border-box; border: 2px solid
+var(--nock-navy); z-index: 7; pointer-events: none`, in every selected letter
+cell; the cell's own `outline` (2 px solid `--nock-navy`, `outline-offset: -2px`,
+spec 041) stays, since spec 035 AC-2 reads it (Note from the lead, 2026-10-22,
+first review of spec 042: the element is required, see Decision 10); the arrows (6); the
 notch (3); the triangles or icons (2), and in clue cells the flag (2); the
 catch-up ring (1); the letter or the clue text; the flash overlay (spec 041),
 then the background. Each letter cell stays a stacking context of its own
@@ -341,7 +362,10 @@ mode is off, the flash colour on `cell-flash`, the pencil italics and grey, the
   or `stroke`.
 - Hit tests: after `scrollIntoView` of the cell, a test style sets
   `pointer-events: auto !important` on every descendant of every `cell` (spec
-  019 AC-1's method), then `document.elementFromPoint` at the named point. The
+  019 AC-1's method), then `document.elementFromPoint` at the named point.
+  (Note from the lead, 2026-10-22, second review of spec 042: `cell-selection`
+  keeps `pointer-events: none` (spec 042 AC-17 draws it on top); the style
+  leaves it out.) The
   test first checks that the point lies where the criterion says (inside the
   triangle, inside the ring's band) and fails otherwise.
 - "Inside a triangle": for a point at distances `dx` and `dy` from the two edges
@@ -356,7 +380,7 @@ mode is off, the flash colour on `cell-flash`, the pencil italics and grey, the
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (new) (browser with mocked socket) Grid lines are single 1 px rule-grey lines and empty cells are rule grey. On a FX-01 snapshot: the `grid` has a computed `border-left` and `border-top` of `1px` `solid` rgb(154, 163, 178) and a `border-right-width` and `border-bottom-width` of `0px`; every `cell` has `border-right` and `border-bottom` `1px` `solid` rgb(154, 163, 178) and `border-left-width` and `border-top-width` `0px`; the left edge of (2, 2) is within 0.5 px of the right edge of (2, 1), and the top edge of (2, 2) within 0.5 px of the bottom edge of (1, 2); the grid's box is `5 s + 1` wide and high (1 px tolerance); every letter cell has computed `overflow` `hidden` and every clue cell `visible`. On spec 007's hand-built view (width 3, height 1, (0, 2) an `EmptyCellView`), (0, 2) has `background-color` rgb(154, 163, 178), `overflow` `hidden` and no child element.
+- **AC-1** (new) (browser with mocked socket) Grid lines are single 1 px rule-grey lines and empty cells are rule grey. On a FX-01 snapshot: the `grid` has a computed `border-left` and `border-top` of `1px` `solid` rgb(154, 163, 178) and a `border-right-width` and `border-bottom-width` of `0px`; every `cell` has `border-right` and `border-bottom` `1px` `solid` rgb(154, 163, 178) and `border-left-width` and `border-top-width` `0px`; the left edge of (2, 2) is within 0.5 px of the right edge of (2, 1), and the top edge of (2, 2) within 0.5 px of the bottom edge of (1, 2); the grid's box is `5 s + 1` wide and high (1 px tolerance); every letter cell has computed `overflow` `hidden` and every clue cell `visible`; the `grid` has computed `overflow` `clip` (both axes), and on a FX-02 room in a 1280 by 800 window nothing of the grid's content paints outside the grid's box: the bounding box of every descendant of the `grid`, `clue-text` included, is clipped to it, and the viewport's `scrollHeight` and `scrollWidth` do not exceed its `clientHeight` and `clientWidth` (1 px tolerance), so spec 006 AC-1's no-pan check holds. (Note from the lead, 2026-10-22, from spec 042's implementation: the `overflow: clip` and the FX-02 check are added; the test-writer updates the AC-1 tests.) On spec 007's hand-built view (width 3, height 1, (0, 2) an `EmptyCellView`), (0, 2) has `background-color` rgb(154, 163, 178), `overflow` `hidden` and no child element.
 - **AC-2** (new) (browser with mocked socket) One background per letter cell, by the design's precedence. Given a FX-01 snapshot with `p2` (colour 3) selecting (2, 2) `down` (MIME), (1, 0) holding `T` locked and (1, 2) holding `M` locked: before any tap, (3, 2) has a `background-color` within 1 per channel of rgb(231, 223, 250) and (2, 1) rgb(255, 255, 255). After a tap on (1, 1) (`across`, TAMIS): (1, 1) has rgb(207, 221, 243); (1, 0), locked and in my word, rgb(227, 231, 238); (1, 2), locked, in my word and in `p2`'s word, rgb(227, 231, 238); (1, 3), in my word, rgb(230, 237, 249); (3, 2) still the tint. After a tap on (1, 0): (1, 0), selected and locked, has rgb(207, 221, 243) and (1, 1) rgb(230, 237, 249). After a tap on (3, 2): (3, 2), selected and tinted, has rgb(207, 221, 243).
 - **AC-3** (new) (browser with mocked socket) Each player can turn the other players' word tint off, and the choice is kept in the browser. With the snapshot of AC-2 and empty `localStorage`: `others-tint-switch` has `aria-pressed="true"` and (3, 2) has the tint of AC-2. After a click, `aria-pressed` is `false`, (3, 2) and (4, 2) have `background-color` rgb(255, 255, 255) while their `data-tinted-by` is still `p2`, `localStorage["nock.others_tint"]` is `"false"`, and the page sent no frame within 300 ms (spec 017's `ping` frames are not counted). After a reload with the same mock, the switch has `aria-pressed="false"` and (3, 2) is white. A second click gives `aria-pressed="true"`, the tint again, and `"true"` in storage.
 - **AC-4** (new) (browser with mocked socket) Grid letters are Source Sans 3 at 0.56 of the cell, bold when locked. Given a FX-01 snapshot where (1, 0) holds `T` locked and (1, 1) holds `A`: each of the two cells holds one `cell-letter` with the text of its `data-letter`, whose computed `font-family`, read as spec 041 AC-4 reads it, is `Source Sans 3`, `Segoe UI`, `system-ui`, `sans-serif`, whose `font-size` is `0.56 s` and `line-height` equal to its `font-size`, and whose `color` is rgb(20, 24, 31); its `font-weight` is 700 in (1, 0) and 500 in (1, 1). (1, 2), empty, holds no `cell-letter`. Where the engine supports `text-box` (see "Test harness"), `cell-letter` has the computed `text-box-trim` `trim-both` and `text-box-edge` `cap alphabetic`. The centre of the `cell-letter` box is within 1 px of the centre of the cell's inner box on the horizontal axis.
@@ -372,7 +396,7 @@ The words in brackets say how each criterion is tested.
 - **AC-14** (new; refines spec 021 AC-9) (browser with mocked socket) A flagged clue shows the red flag icon at the top-left of its own half, over the text. Given a FX-01 snapshot whose `flags` hold `p2` on IDES (0, 3, 0) and `p3` on NAVAL (0, 0, 1): each `clue-flag` has computed `position` `absolute`, `z-index` `2`, `background-color` rgb(238, 242, 248), `border-bottom-right-radius` `3px` and the three other radii `0px`, no text, and a box of side `f = max(8, 0.22 s)` whose left edge is 1 px right of its cell's left edge and whose top is its `clue` element's top (for NAVAL, the bottom of the `clue-separator`, 1 px tolerance). It holds one `svg` with `aria-hidden="true"` and `viewBox="0 0 24 24"`, of side `0.86 f`, centred in the flag's box, with two `path` elements whose `d` are `M6 21V4` and `M6 4h12l-3 4.5 3 4.5H6z`, each with computed `fill` and `stroke` rgb(180, 35, 24) and `stroke-width` `2px`; the red's contrast against the flag's background is at least 3:1. With the hit-test style, `document.elementFromPoint` at the centre of each flag returns the `clue-flag` or a descendant. The `clue-text` of IDES has the same box as on a snapshot without the flag (1 px).
 - **AC-15** (new; refines spec 006 AC-2) (browser with mocked socket) Each arrow is drawn in its word's first letter cell. On a FX-01 snapshot: no clue cell holds a `clue-arrow`; for each of the 8 clues, exactly one `clue-arrow` has its `data-clue-row`, `data-clue-column` and `data-clue-index`, with the clue's `data-arrow`, and it is an `svg` child of the cell where the word starts ((1, 0) for `0,0,0`, (0, 1) for `0,0,1`, (1, 2), (1, 3), (1, 4), (2, 1), (3, 1), (4, 1)), with `aria-hidden="true"`, `viewBox="0 0 24 24"`, computed `pointer-events` `none`, `z-index` `6`, a box of side `a = max(9, 0.26 s)`, one `path` and one `polygon` with the `d` and `points` of the table for its arrow, the path's computed `stroke` rgb(20, 24, 31), `stroke-width` `2.4px`, `stroke-linecap` and `stroke-linejoin` `round` and `fill` `none`, the polygon's `fill` rgb(20, 24, 31), and a computed `filter` of two `drop-shadow` functions, each of rgb(255, 255, 255) with offsets 0 and blur `0.8px`. Positions in the target cell: the ↳ in (1, 0) has its top at `T - 1` and its left at `L + 0.06 s`; the ↴ in (0, 1) its left at `L - 1` and its top at `T + 0.06 s`; each ↓ its top at `T - 1` and its horizontal centre at `L + 0.5 s`; each → its left at `L - 1` and its vertical centre at `T + 0.5 s`.
 - **AC-16** (new) (browser with mocked socket) Two arrows in one cell never meet. Three hand-built views, each at 1280 by 720: view A, width 2 and height 3, (0, 0) a clue cell with clue 0 `{"text": "Un", "arrow": "right"}` and clue 1 `{"text": "Deux", "arrow": "right_then_down"}`, (1, 0) and (2, 0) empty, (0, 1), (1, 1), (2, 1) letters: in (0, 1), the → has its vertical centre at `T + 0.72 s` and the ↴ its top at `T + 0.06 s` and its left at `L - 1`. View B, width 2 and height 1, (0, 0) a clue cell with two clues `right` (`Un`, `Deux`), (0, 1) a letter: in (0, 1), the → of clue 0 has its centre at `T + 0.25 s` and that of clue 1 at `T + 0.72 s`. View C, width 3 and height 3, (0, 1) a clue cell with one clue `{"text": "Est", "arrow": "down_then_right"}`, (1, 0) one with `{"text": "Sud", "arrow": "right_then_down"}`, (1, 1), (1, 2), (2, 1) letters, the other cells empty: in (1, 1), the ↳ has its left at `L + 0.4 s` and its top at `T - 1`, and the ↴ its left at `L - 1` and its top at `T + 0.06 s`. In each view the two arrow boxes of the cell overlap by at most 1 px on one axis.
-- **AC-17** (new) (browser with mocked socket and mocked catch-up) The marks of one cell are drawn in the design's order. With `seen_seq` 5 stored, a FX-01 snapshot at `seq` 9 with `p2` to `p5` (colours 1 to 4) selecting (0, 1) `down` and (0, 1) holding `N` revealed, and the catch-up `CatchUp(after_seq=5, until_seq=9, cells=(CellRef(row=0, column=1),), lines=(), names=())`, after a tap on (0, 1): (0, 1) has `background-color` rgb(207, 221, 243) and `outline` `2px` `solid` rgb(27, 47, 85) with `outline-offset` `-2px`; it holds the triangles of `p2` `top-left`, `p3` `top-right`, `p4` `bottom-right`, `p5` `bottom-left`, its `reveal-mark`, its `catch-up-mark` and the ↴ `clue-arrow`. With the hit-test style: at the point of the ↴'s path `6/24 a` right of and `5/24 a` below the arrow box's top-left corner, inside `p2`'s triangle, `elementFromPoint` returns the `clue-arrow` or a descendant; at the point 1.5 px inside both edges of each of the corners `top-right`, `bottom-right` and `bottom-left` of the inner box (inside the ring's band and the triangle), it returns that corner's `remote-selection` or a descendant, never the `catch-up-mark`; at the notch's horizontal centre, 1.5 px above the inner box's bottom, it returns the `reveal-mark`.
+- **AC-17** (new) (browser with mocked socket and mocked catch-up) The marks of one cell are drawn in the design's order. With `seen_seq` 5 stored, a FX-01 snapshot at `seq` 9 with `p2` to `p5` (colours 1 to 4) selecting (0, 1) `down` and (0, 1) holding `N` revealed, and the catch-up `CatchUp(after_seq=5, until_seq=9, cells=(CellRef(row=0, column=1),), lines=(), names=())`, after a tap on (0, 1): (0, 1) has `background-color` rgb(207, 221, 243) and `outline` `2px` `solid` rgb(27, 47, 85) with `outline-offset` `-2px`; it holds the triangles of `p2` `top-left`, `p3` `top-right`, `p4` `bottom-right`, `p5` `bottom-left`, its `reveal-mark`, its `catch-up-mark`, the ↴ `clue-arrow` and one `cell-selection` (`aria-hidden="true"`, computed `position` `absolute`, `box-sizing` `border-box`, `z-index` 7, `pointer-events` `none`, `border` `2px` `solid` rgb(27, 47, 85), its box equal to the cell's padding box within 0.5 px) (Note from the lead, 2026-10-22, first review of spec 042: `cell-selection` is required, and the checks of this paragraph on it are new; in all three engines the `outline` paints under the positioned children, so only this element puts the border over the arrows and triangles; a cell that is not selected holds none). With the hit-test style: at the point of the ↴'s path `6/24 a` right of and `5/24 a` below the arrow box's top-left corner, inside `p2`'s triangle, `elementFromPoint` returns the `clue-arrow` or a descendant; at the point 1.5 px inside both edges of each of the corners `top-right`, `bottom-right` and `bottom-left` of the inner box (inside the ring's band and the triangle), it returns that corner's `remote-selection` or a descendant, never the `catch-up-mark`; at the notch's horizontal centre, 1.5 px above the inner box's bottom, it returns the `reveal-mark`. (Note from the lead, 2026-10-22, first review of spec 042: the three probes above and the arrow probe are made with the `cell-selection` left at `pointer-events: none`, which they were written for, since their points lie in its 2 px band; the probes below turn pointer events on for every element of the cell, `cell-selection` included.) With pointer events on for the probe, a point in the border band (1 px inside the cell's padding box edge) that lies inside the ↴ arrow's box, on its stroke or its halo, and a point in the band inside the corner triangle of another player (for example 1 px inside both edges at `top-right`, p3's) return the `cell-selection`. In the caught-up cell (0, 1), the point 1 px inside the left edge, half way down the cell, returns the `cell-selection`, and the band's pixels there are navy rgb(27, 47, 85), not the ring's ink, the ring showing only inside the band. A cell that is not selected holds no `cell-selection`: after a tap on another cell, (0, 1) holds none.
 - **AC-18** (new) (browser with mocked socket) On small cells every mark keeps its minimum size. At 568 by 320 in the desktop context, on a FX-02 snapshot where L, the first letter cell in row-major order, holds `A` revealed and is selected by `p2` (colour 1, in L's across word if it has one, else down), and `p2` flags clue 0 of C, the first clue cell in row-major order: the test first reads `s` and fails, reporting it, unless `s` is below 20. Then L's `reveal-mark` is 7 by 4 px, `p2`'s triangle is `max(6, round(0.3 s))` px, every `clue-arrow` is 9 by 9 px, C's `clue-flag` is 8 by 8 px, and every `clue-text` has a `font-size` of `6px`. After a click on `access-switch`, `p2`'s icon box is 6 by 6 px, 1 px from its corner's edges.
 - **AC-19** (new) (browser with mocked socket) The two switches are controls that every player can reach and that keep the grid's room. On a FX-01 snapshot: `room-menu` (spec 043) holds `authors-switch`, `others-tint-switch` and `access-switch` in this order, as its first three items, each a `BUTTON` with `type="button"`, an `aria-pressed` attribute, never disabled, whose label (the item's text without its `aria-hidden` detail) is `fr.json["others_tint.switch"]` and `fr.json["access.switch"]` for the two of this spec; with accounts on (spec 033), both come before `account-open`. Keyboard only (spec 035's harness, no tap): with the Menu opened from the keyboard (`tab_to` `menu-button`, `Enter`), `Tab` gives each switch the focus with spec 035 AC-2's outline, and `Enter` flips its `aria-pressed` and leaves the Menu open. Layout: in spec 024 AC-8's setup, at every window size of spec 006 AC-5, in desktop and touch contexts, with the Menu open, spec 013 AC-6's checks pass, both switches lie inside the window, and `elementFromPoint` at the centre of each, after `scrollIntoView({block: "nearest"})`, returns the switch. (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "toolbar controls", "`room-toolbar` holds `authors-switch`, `others-tint-switch` and `access-switch` in this relative order", "with the texts", "`tab_to` each switch" and "both switches meet spec 024 AC-8's toolbar rules (one row with the other buttons on the four small windows; with the keyboard focus, inside the toolbar's client area with an outline that passes "Not clipped"; `elementFromPoint` at the centre after `scrollIntoView` returns the switch)".)
 - **AC-20** (new) (browser with mocked socket; static) The new cells keep the text contrast and the language of spec 035. In the state of AC-17 without the catch-up (no `seen_seq`), plus `p2`'s flag on IDES and (1, 1) holding `X` wrong, at 1280 by 720 and at 360 by 740, once with `access-switch` off and once on, spec 035's contrast scan (AC-8) and language scan (AC-9) find no offending element. Static: `web/src/i18n/fr.json` holds `others_tint.switch` and `access.switch` with the values of "`fr.json` keys", and none of `grid.remote_overflow`, `a11y.remote_overflow` and `flag.marker`.
@@ -404,8 +428,8 @@ The words in brackets say how each criterion is tested.
   triangles end `t` from their corners, so they do not overlap from 20 px cells;
   below, they may touch, the notch being drawn over.
 - Arrows and the selection border (AC-17): the arrow box starts on the grid line,
-  so its tail passes under the 2 px border; the border is drawn over it (see
-  Decision 10).
+  so its tail passes under the 2 px border; the border is drawn over it by the
+  required `cell-selection` (see Decision 10).
 - Arrow targets (AC-15): spec 003 refuses an arrow whose word starts outside the
   grid or on a clue cell, so every clue of a valid grid has its arrow; a
   hand-built view with such a clue simply draws no arrow for it.
@@ -416,7 +440,11 @@ The words in brackets say how each criterion is tested.
   two-clue size (0.145 s against 0.09 s); spec 006 AC-1 still requires no cut at
   full zoom, so the implementer may raise `data-zoom-max` (spec 006 decision 3).
   At zoom 1 a two-clue cell of about 29 px may not hold its text; clue cells do
-  not clip, and players zoom (`_design.md` section 15, sheet notes).
+  not clip, and players zoom (`_design.md` section 15, sheet notes). The text may
+  still spill over neighbouring cells inside the grid, but never past the grid's
+  outer edge, which clips (`overflow: clip`, AC-1): FX-02's row 16 clue texts
+  would otherwise reach 7 px below the grid at 1280 by 800. (Note from the lead,
+  2026-10-22, from spec 042's implementation: grid clipping added.)
 - Capitals by CSS (AC-12): the text node keeps the clue as written, so spec
   035's language scan and the tests that read `textContent` see `Passoire fine`;
   `innerText` may show the capitals in some engines.
@@ -497,12 +525,13 @@ Proposed by the spec writer, each already part of the spec above:
    decorates its text. So the checks of specs 019, 020, 023 and 035 that read the
    cell's computed `color`, `font-weight`, `font-style` and `text-decoration-line`
    keep reading the same values.
-10. My selection border stays the cell's `outline`, which spec 035 AC-2 reads.
-    The reviewer checks in the three engines that it shows over the arrows; if an
-    engine paints an outline under its element's positioned children, the
-    implementer may draw the same 2 px navy border a second time as an
-    `aria-hidden` element at `z-index: 7` with `pointer-events: none`, the outline
-    staying.
+10. My selection border stays the cell's `outline`, which spec 035 AC-2 reads,
+    and a second, identical 2 px navy border is drawn as the `cell-selection`
+    element at `z-index: 7` with `pointer-events: none`: it is required (Note from
+    the lead, 2026-10-22, first review of spec 042: it was optional; in all three
+    engines the outline paints under its element's positioned children (arrows,
+    triangles, notch, ring), while the design draws the border as the top layer,
+    `.c.sel::before`, `z-index: 7`).
 11. The two switches go in today's room toolbar, after `authors-switch`, until
     step 3 moves them into the Menu (Open question 2). The Accessibilité mode
     must ship with this step: it is the non-colour sign that replaces the
