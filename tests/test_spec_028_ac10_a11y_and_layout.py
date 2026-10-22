@@ -72,13 +72,6 @@ SHARE_PATH = "/recap/tok_ABCDEFGHIJKLMNOP"
 FEED_ITEMS = 100
 EPSILON = 1.0
 SCAN_SIZES = [(1280, 720), (360, 740)]
-
-
-def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
-    """Readable ids of window sizes for `parametrize`."""
-    return [f"{width}x{height}" for width, height in sizes]
-
-
 HOSTILE_NAMES = ["<b>Eve</b>", "<img src=x>"]
 FR_KEYS = {
     "recap.open": "Voir le bilan",
@@ -101,12 +94,17 @@ FR_KEYS = {
 }
 
 
+def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
+    """Readable ids of window sizes for `parametrize`."""
+    return [f"{width}x{height}" for width, height in sizes]
+
+
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-def open_solved_toolbar_room(
+def open_solved_eight_player_room(
     browser: Browser,
     browser_name: str,
     live_server: str,
@@ -115,7 +113,12 @@ def open_solved_toolbar_room(
     height: int,
     touch: bool,
 ) -> tuple[Page, Callable[[], None]]:
-    """Spec 027's toolbar room, solved, with the recap route; page and closer."""
+    """The room of spec 013 AC-6, solved, with the recap route; page and closer.
+
+    Eight players with `you` host, the timer stopped at 10:00:00, 100 event lines
+    (seq 6 to 105) and (3, 1) tapped, the recap route answering AC-2's recap with
+    a `share_path`.
+    """
     page, close = open_context_page(browser, browser_name, width, height, touch)
     try:
         serve_recap(page, recap_body(share_path=SHARE_PATH))
@@ -300,7 +303,7 @@ def test_ac10_spec_013_layout_holds_on_the_solved_page(
     context_kind: str,
 ) -> None:
     touch = context_kind == "touch"
-    page, close = open_solved_toolbar_room(
+    page, close = open_solved_eight_player_room(
         browser, browser_name, live_server, fx01_grid, width, height, touch
     )
     try:
@@ -349,7 +352,7 @@ def test_ac10_on_the_solved_page_every_button_and_recap_open_can_be_hit(
     height: int,
     context_kind: str,
 ) -> None:
-    page, close = open_solved_toolbar_room(
+    page, close = open_solved_eight_player_room(
         browser,
         browser_name,
         live_server,
@@ -369,7 +372,7 @@ def test_ac10_on_the_solved_page_every_button_and_recap_open_can_be_hit(
 def test_ac10_tab_reaches_recap_open_with_the_outline_and_enter_opens_the_dialog(
     browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
 ) -> None:
-    page, close = open_solved_toolbar_room(
+    page, close = open_solved_eight_player_room(
         browser, browser_name, live_server, fx01_grid, 1280, 720, False
     )
     try:
