@@ -11,6 +11,15 @@ The FX-01 reference grid is in `specs/_reference.md`. The rooms engine (`nock.ro
 `nock.hub`, runtime, test harness) is defined in spec 011; the messages are those of
 spec 039; the room page those of specs 040 and 006.
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): the roster becomes the Joueurs tab of the Salon, each
+row on two lines with the player dot, the « hôte » tag and, under the name, the
+state and the player's current clue. The roster's ids, attributes and texts do
+not change, and the tab is in the DOM while closed, so no criterion of this spec
+changes; a test that clicks `authors-switch` (AC-8) opens the Menu first (spec
+043's "Test harness"). The nickname form and the entry statuses are redrawn in
+step 5.)
+
 (Note from the lead, 2026-10-16: refined for spec 032's seat back (its decisions 11
 and 12): a join whose token belongs to a past player of the room, one who left by a
 time-out, seats that player back with their id and token. Changed: "Join" (step 2's

@@ -12,6 +12,12 @@ The FX-01 reference grid is in `specs/_reference.md`. The catalogue, its items a
 and 006 to 009; room creation is spec 011, guest join spec 012, shared letters
 spec 015. Built after 011, 012, 015 and 016.
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): the roster and the share link move into the Salon's
+Joueurs tab, which is in the DOM while closed. No criterion of this spec changes:
+AC-3 and AC-6 read the `roster-player` items and their nicknames, which keep their
+ids and texts.)
+
 ## Goal
 
 As a player, I want to start a grid alone at once, so that I can invite people later without losing my letters.

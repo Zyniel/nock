@@ -729,7 +729,10 @@ Content, top to bottom:
    section heading), the URL box (1 px rule-grey border, radius 6 px, padding
    8 px 10 px, one line, full width), the primary « Copier le lien », and after a
    copy the green confirmation line « Lien copié ». « Inviter » in the Menu opens
-   the Salon on this tab.
+   the Salon on this tab. (Note from the spec writer, 2026-10-22: spec 043 draws
+   each row on two lines, the state and the current clue under the name, and puts
+   the host's « Couper » (spec 022's mute) beside « Retirer »; pending the human's
+   approval of spec 043, section 15.)
 
 ### 3-second notes
 
@@ -991,10 +994,15 @@ Refinements to make, each with dated notes, before the matching build step
 | 040 | done | `room-heading` (« Salon {code} ») and `room-status` shown on the page; not-found page has no way back; styles were "not binding" | « Salon {code} » above the entry cards; `room-status` visually hidden while the connection band shows; « Voir les grilles » on the not-found card (an addition); styles now follow this file |
 
 New specs, numbers proposed in build order (section 14): 041 visual foundation
-(written); 042 grid cells (written); then room layout, keyboard, Auteurs mode,
-catalogue, overlays, remaining screens. (Note from the spec writer, 2026-10-22:
-042 written; its "Refined specs" table lists the criteria of 006, 013, 019, 021,
-024, 034, 035 and 041 that it changes.)
+(written); 042 grid cells (written); 043 room layout (written); then keyboard,
+Auteurs mode, catalogue, overlays, remaining screens. (Note from the spec writer,
+2026-10-22: 042 written; its "Refined specs" table lists the criteria of 006, 013,
+019, 021, 024, 034, 035 and 041 that it changes.) (Note from the spec writer,
+2026-10-22: 043 written; its "Refined specs" table lists the criteria of 011, 013,
+014, 019, 020, 021, 022, 023, 024, 025, 026, 027, 028, 033, 035 and 042 that it
+changes, and notes 007, 010, 012, 017, 018, 034 and 040. It also takes, from step 5, the
+end band's look and « Voir le bilan » in it, since the toolbar that held that
+button goes.)
 
 ## 13. How conformance is secured
 
@@ -1113,6 +1121,28 @@ day.)
 - `room-heading` inside the room is visually hidden (section 8). Formerly item
   10.
 - The « ← » pictogram for departures (section 5). Formerly item 11.
+
+### Proposed by spec 043, pending the human's approval
+
+(Note from the spec writer, 2026-10-22: this list is new. Each item is the pick of
+an open question of spec 043, the room layout; the human confirms or changes it
+when approving that spec.)
+
+- Joueurs rows on two lines, the state and the current clue under the name, and
+  the host's « Couper » beside « Retirer » (section 8, "Salon"; spec 043 Open
+  questions 2 and 3).
+- A disabled icon button on the navy clue bar draws its icon in `--nock-rule`
+  (5.22:1 on navy), a new job for the rule grey (section 2; spec 043 Open question
+  10).
+- The timer in the top bar is text, not a button (spec 043 Open question 7).
+- « Aide » stays in help mode `none`, holding the pencil confirm or a muted line
+  (section 12's "to confirm"; spec 043 Open question 4).
+- Until step 4, « Crayon » takes the phone top bar's fourth slot, where
+  « Clavier » goes (spec 043 Open question 5).
+- The computer top bar shows no grid name until the client knows the grid's number
+  and force (spec 043 Open question 6).
+- The clue bar in the column layout is never narrower than the smaller of 320 px
+  and the play area (spec 043 Decision 12).
 
 ### Deferred, high importance
 

@@ -19,6 +19,12 @@ with the same id, no longer joined as a new player. Changed: the time-out step o
 changed, so the test-writer of spec 032 updates its tests before the implementer
 runs.)
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): `connection-banner` is the connection band under the top
+bar, in the flow, with a red dot before its text, and `room-status` is visually
+hidden while the page is `joined` or `reconnecting`. Its id, text, `role` and
+presence rules do not change, so no criterion of this spec changes.)
+
 ## Goal
 
 As a player on a train, I want to keep my place when my connection drops, so that I rejoin without starting over.

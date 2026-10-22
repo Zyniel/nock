@@ -19,6 +19,17 @@ revealed notch and the arrows, and the initials it was tested against are gone.
 of AC-2 before the implementer runs. The catch-up lines go into the Salon's stream
 in step 3.)
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): the catch-up lines are items of the Salon's stream, in
+seq order among the messages and the other event lines, with the event look of
+spec 043 (`check` with ✓, `reveal` in orange-red with ▲, `word_completed` with no
+pictogram); they count as new events for the « Salon » dot and make no 3-second
+note. The `word_completed` lines stay, as this spec has them, although the design
+drops a live « a rempli » line (spec 043's Open question 11), and no live
+`word_completed` line is added. No criterion of this spec changes; a test that
+measures the feed list shows the Discussion tab first (spec 043's "Test
+harness").)
+
 (Note from the lead, 2026-10-17: checked, before this spec's tests are written,
 against the code now built and against the specs refined since this spec was
 approved: 032 (seat back), 027 (shared timer), 038, and the nickname rule of

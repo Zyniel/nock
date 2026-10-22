@@ -11,6 +11,14 @@ The FX-01 reference grid and the glossary are in `specs/_reference.md`. The room
 page and grid elements are those of specs 040 and 006; the messages are those of
 spec 039.
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): `clue-bar` is the navy bar, 34 px high, with ‹ and ›
+around `clue-bar-text` (white, 15.2 px, one line with an ellipsis, followed by a
+direction pictogram that adds no text) and the « Réagir » and « Je bloque »
+buttons. `clue-bar`, `clue-bar-text`, `data-word` and their texts keep their
+rules, so no criterion of this spec changes: AC-4's 14 px minimum and its place
+inside the window still hold.)
+
 ## Goal
 
 As a player, I want to pick a word with one tap, so that I always know which clue I am answering.

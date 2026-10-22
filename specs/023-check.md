@@ -13,6 +13,17 @@ engine (`nock.room`, `nock.hub`, delivery order, test harness) is defined in spe
 018, the activity feed in spec 013, the messages in spec 039 (`Check`,
 `CheckTarget`, `CheckResult`, `CellLocked`).
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): `check-panel` is the « Vérifier » group of the Aide menu
+(`aide-menu`), labelled by its menu heading `check-heading`; its three items read
+« La lettre », « Le mot », « La grille » (the values of `check.letter`,
+`check.word` and `check.grid` change) and have no `aria-label` (the three
+`check.*_label` keys are removed); activating one closes the menu. "Client: check
+controls", "New `fr.json` keys" and AC-9 change, so the test-writer updates the
+tests of AC-9 before the implementer runs. The other criteria do not change; a
+test that clicks a check item opens the Aide menu first (spec 043's "Test
+harness").)
+
 ## Goal
 
 As a player, I want to check what we wrote, so that an early mistake doesn't block the crossing words.
@@ -138,14 +149,18 @@ sees no help controls, as spec 025 words it for both help panels. Spec 025 AC-4 
 that with `vote` the panel shows too, and that it shows again after `none` gives way
 to `free`.)
 
-- `data-testid="check-panel"`, a `role="group"` with `aria-label`
-  `t("check.label")`, holding three buttons in this order:
+- `data-testid="check-panel"`, a `role="group"` labelled (`aria-labelledby`) by
+  its heading `check-heading`, whose text is `t("check.label")`, inside spec 043's
+  `aide-menu`, holding three menu items in this order (Note from the lead,
+  2026-10-22: refined by spec 043, the design's room layout; the group had the
+  `aria-label` `t("check.label")`, and the table had an `aria-label` column with
+  `t("check.letter_label")`, `t("check.word_label")` and `t("check.grid_label")`):
 
-  | `data-testid` | Text | `aria-label` | Sends |
-  | --- | --- | --- | --- |
-  | `check-letter` | `t("check.letter")` | `t("check.letter_label")` | `{"type": "check", "target": {"scope": "letter", "row": r, "column": c}}` for the selected cell |
-  | `check-word` | `t("check.word")` | `t("check.word_label")` | `{"type": "check", "target": {"scope": "word", "row": cr, "column": cc, "clue_index": i}}` for the selected word's clue |
-  | `check-grid` | `t("check.grid")` | `t("check.grid_label")` | `{"type": "check", "target": {"scope": "grid"}}` |
+  | `data-testid` | Text | Sends |
+  | --- | --- | --- |
+  | `check-letter` | `t("check.letter")` | `{"type": "check", "target": {"scope": "letter", "row": r, "column": c}}` for the selected cell |
+  | `check-word` | `t("check.word")` | `{"type": "check", "target": {"scope": "word", "row": cr, "column": cc, "clue_index": i}}` for the selected word's clue |
+  | `check-grid` | `t("check.grid")` | `{"type": "check", "target": {"scope": "grid"}}` |
 
 - `check-letter` and `check-word` are `disabled` while nothing is selected. All
   three are `disabled` while the grid is solved (spec 026). (Note from the lead,
@@ -172,12 +187,14 @@ Spec 013 already turns each applied `check_result` into one feed item,
 | Key | Value |
 | --- | --- |
 | `check.label` | `Vérifier` |
-| `check.letter` | `Lettre` |
-| `check.word` | `Mot` |
-| `check.grid` | `Grille` |
-| `check.letter_label` | `Vérifier la lettre` |
-| `check.word_label` | `Vérifier le mot` |
-| `check.grid_label` | `Vérifier la grille` |
+| `check.letter` | `La lettre` |
+| `check.word` | `Le mot` |
+| `check.grid` | `La grille` |
+
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout: the
+three texts read `Lettre`, `Mot` and `Grille`, and the table held `check.letter_label`
+(`Vérifier la lettre`), `check.word_label` (`Vérifier le mot`) and
+`check.grid_label` (`Vérifier la grille`), which are removed.)
 
 ### Test harness
 
@@ -208,7 +225,7 @@ The words in brackets say how each criterion is tested.
 - **AC-6** (AC-6.1.2) (rule unit test) Empty cells in the scope are ignored. Given `S1`, when `p1` checks `WordTarget(row=0, column=2, clue_index=0)` (MIME: (1, 2) empty, (2, 2) `Q`, (3, 2) and (4, 2) empty), then `correct == ()`, `wrong == (CellRef(row=2, column=2),)`, no `CellLocked` follows, and (1, 2), (3, 2), (4, 2) are unchanged (`letter=None`, `locked=False`, `wrong=False`). Checking `CellTarget(row=1, column=2)` gives a `CheckResult` with `correct == ()` and `wrong == ()`, one entry only, and seq 9.
 - **AC-7** (AC-6.1.3) (rule unit test; WebSocket) The result is computed on the server from the letters in place, and the answer is not sent. Rule: given `S1` where `p2` then writes `A` at (1, 1) (seq 9), a check of TAMIS by `p1` lists (1, 1) in `correct` and locks it with letter `A`. WebSocket: the full FX-01 game of spec 037's test harness, where Ana sends a grid check right after the three wrong letters `X` are typed (and the remaining edits skip cells that the check locked), passes spec 037's three rules of "What a browser may receive" on every recorded frame, and every `cell_locked` with `revealed` false holds a letter typed at that cell before it.
 - **AC-8** (AC-6.1.4) (browser with live server) Each check adds a line to the activity feed with the player and the scope. In the room of AC-4, after Ana's `check-word`, both pages' `activity-feed` hold one new `feed-item` with `data-kind="check"` and the text `fr.json["feed.check.word"]` with `{name}` = `Ana`; after Bob selects (2, 1) and clicks `check-letter`, then `check-grid`, both feeds end with the texts of `feed.check.letter` and `feed.check.grid` with `{name}` = `Bob`.
-- **AC-9** (new) (browser with mocked socket) The check controls send the right message and are disabled when they cannot apply. Given a FX-01 snapshot (`help_mode` `free`): `check-panel` holds `check-letter`, `check-word`, `check-grid` in that order with the texts and `aria-label`s of the table; with nothing selected `check-letter` and `check-word` are disabled and `check-grid` is enabled, and clicking `check-grid` sends one frame that parses to `Check(target=GridTarget())`; after tapping (2, 2) twice (`down`, word `0,2,0`), `check-letter` sends `Check(target=CellTarget(row=2, column=2))` and `check-word` sends `Check(target=WordTarget(row=0, column=2, clue_index=0))`, and the selection is still (2, 2) `down`. When the mock then sends `settings_changed` (seq 6) with `help_mode` `none`, `check-panel` does not exist, and neither do `check-letter`, `check-word` and `check-grid`; when it then sends `settings_changed` (seq 7) with `help_mode` `free`, `check-panel` shows again with its three buttons, all enabled since the selection is still (2, 2) `down`; in a second run, `vote` instead of `free` shows it too. A first snapshot whose `help_mode` is `none` shows no `check-panel` either. (Note from the lead, 2026-10-15: spec 025 (AC-4, decision 10) asks for this change. The sentence used to end "When the mock then sends `settings_changed` with `help_mode` `none`, all three buttons are disabled." Why: help mode `none` now removes the panel instead of disabling its buttons, and the panel comes back with `free` or `vote`, as spec 025 AC-4 words it. The seqs 6 and 7 are those of spec 025 AC-4, the mock's FX-01 snapshot being at seq 5. The last sentence, on a first snapshot in `none`, is the rule of "Client: check controls" restated: it covers the test that used to read "a help mode `none` in the snapshot disables all three buttons". The test-writer of spec 025 updates the two tests of this criterion that check `none`.)
+- **AC-9** (new) (browser with mocked socket) The check controls send the right message and are disabled when they cannot apply. Given a FX-01 snapshot (`help_mode` `free`): `check-panel` is inside `aide-menu`, is labelled by `check-heading` (`fr.json["check.label"]`), and holds `check-letter`, `check-word`, `check-grid` in that order with the texts of the table and no `aria-label` (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "with the texts and `aria-label`s of the table"; the clicks below are made with the Aide menu open, each closing it); with nothing selected `check-letter` and `check-word` are disabled and `check-grid` is enabled, and clicking `check-grid` sends one frame that parses to `Check(target=GridTarget())`; after tapping (2, 2) twice (`down`, word `0,2,0`), `check-letter` sends `Check(target=CellTarget(row=2, column=2))` and `check-word` sends `Check(target=WordTarget(row=0, column=2, clue_index=0))`, and the selection is still (2, 2) `down`. When the mock then sends `settings_changed` (seq 6) with `help_mode` `none`, `check-panel` does not exist, and neither do `check-letter`, `check-word` and `check-grid`; when it then sends `settings_changed` (seq 7) with `help_mode` `free`, `check-panel` shows again with its three buttons, all enabled since the selection is still (2, 2) `down`; in a second run, `vote` instead of `free` shows it too. A first snapshot whose `help_mode` is `none` shows no `check-panel` either. (Note from the lead, 2026-10-15: spec 025 (AC-4, decision 10) asks for this change. The sentence used to end "When the mock then sends `settings_changed` with `help_mode` `none`, all three buttons are disabled." Why: help mode `none` now removes the panel instead of disabling its buttons, and the panel comes back with `free` or `vote`, as spec 025 AC-4 words it. The seqs 6 and 7 are those of spec 025 AC-4, the mock's FX-01 snapshot being at seq 5. The last sentence, on a first snapshot in `none`, is the rule of "Client: check controls" restated: it covers the test that used to read "a help mode `none` in the snapshot disables all three buttons". The test-writer of spec 025 updates the two tests of this criterion that check `none`.)
 - **AC-10** (new) (rule unit test) A check that cannot apply is refused and changes nothing. Given `S1`: with `help_mode` `none` (set by a `ChangeSettings` from the host), any check is answered `help_disabled`; `CellTarget(row=0, column=0)` (a clue cell) and `CellTarget(row=5, column=0)` are answered `not_a_letter_cell`; `WordTarget(row=1, column=0, clue_index=0)` (a letter cell), `WordTarget(row=0, column=2, clue_index=1)` (one clue only) and `WordTarget(row=9, column=9, clue_index=0)` are answered `invalid_target`. Each refusal returns the state it was given apart from the player's `last_seen_at`, `last_input_at` and, if they were idle, their state (seq unchanged for an active sender: 9 after the `ChangeSettings`, 8 otherwise; an idle sender is first woken by spec 013's entry, which takes one seq and which a refusal does not undo), no entry of its own and exactly one `ErrorMessage` in `reply`. (Note from the lead, 2026-10-15: an idle sender is woken even when its message is refused, as spec 013's input rule and the code do.) With `help_mode` `vote`, a check of TAMIS gives the result of AC-1.
 
 ## Edge cases and errors
