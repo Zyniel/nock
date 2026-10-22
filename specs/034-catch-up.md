@@ -324,7 +324,9 @@ Applying a catch-up:
    from the lead, 2026-10-22: refined by spec 042, the design's grid cells: the
    ring is `--nock-ink`, `inset: 0`, `z-index: 1`; the marks over it are the
    `remote-selection` triangles or icons, `author-mark`, `reveal-mark` and the
-   arrows (`clue-arrow`), the labels being gone.) A cell
+   arrows (`clue-arrow`), the labels being gone.) (Note from the lead, 2026-10-22:
+   refined by spec 045, the design's Auteurs mode: `author-mark` is gone; no
+   criterion of this spec changes.) A cell
    highlighted again by a later catch-up starts its 5,000 ms again. (Note from the
    lead, 2026-10-17: "every other `cell` has `"false"`" became the first clause,
    which gives the attribute to the letter cells, the only cells that `cells` can

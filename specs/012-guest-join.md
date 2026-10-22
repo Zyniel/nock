@@ -20,6 +20,15 @@ changes; a test that clicks `authors-switch` (AC-8) opens the Menu first (spec
 043's "Test harness"). The nickname form and the entry statuses are redrawn in
 step 5.)
 
+(Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode: the
+clue bar's `clue-bar-author` is gone, so AC-8 reads the nicknames in spec 045's
+Auteurs legend instead; the test-writer updates that part of AC-8's test before
+spec 045's implementer runs. Refined by spec 046, the design's catalogue and entry
+pages: the nickname form is a card under the room code line, its field red with
+its error line under it while `nickname-error` shows, and the entry statuses are
+status cards with « Voir les grilles »; the ids, texts and rules of this spec do
+not change, so no other criterion changes.)
+
 (Note from the lead, 2026-10-16: refined for spec 032's seat back (its decisions 11
 and 12): a join whose token belongs to a past player of the room, one who left by a
 time-out, seats that player back with their id and token. Changed: "Join" (step 2's
@@ -402,7 +411,7 @@ The words in brackets say how each criterion is tested.
   - the five `roster-nickname`, in roster order, read `Jean-Luc`, `D'Artagnan`, `Ana 2`, `O’Neil` and `Νίκος`;
   - the `remove-player` in the `roster-player` of `p2`, `p3`, `p4` and `p5` (spec 014) has the `aria-label` `Retirer D'Artagnan du salon`, `Retirer Ana 2 du salon`, `Retirer O’Neil du salon` and `Retirer Νίκος du salon` (`fr.json["host.remove_label"]`);
   - the `clue-flag-label` of IDES (spec 021), in the `clue` of the clue cell (0, 3) with `data-clue-index="0"`, reads `Bloqué : O’Neil, Νίκος` (`fr.json["flag.marker_label"]`);
-  - with `authors-switch` on (spec 019), a tap on each of the cells (1, 0) to (1, 4) shows `clue-bar-author` reading `Lettre de Jean-Luc`, `Lettre de D'Artagnan`, `Lettre de Ana 2`, `Lettre de O’Neil` and `Lettre de Νίκος`;
+  - with `authors-switch` on (spec 019), the five `authors-legend-name` of spec 045's legend read, in roster order, `Jean-Luc`, `D'Artagnan`, `Ana 2`, `O’Neil` and `Νίκος` (Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode; this read "a tap on each of the cells (1, 0) to (1, 4) shows `clue-bar-author` reading `Lettre de Jean-Luc`, `Lettre de D'Artagnan`, `Lettre de Ana 2`, `Lettre de O’Neil` and `Lettre de Νίκος`", a line the design's clue bar no longer has);
   - with the chat panel open (spec 022), the five `chat-author` read the same five names, in the order of the lines;
   - in that panel, `chat-moderation` holds four `mute-row`, for `p2` to `p5` in roster order, whose `mute-name` read `D'Artagnan`, `Ana 2`, `O’Neil` and `Νίκος`; the `mute-player` of `p2`, `p3` and `p5` reads `fr.json["chat.mute"]`, with the `aria-label` `Couper la discussion de D'Artagnan`, `Couper la discussion de Ana 2` and `Couper la discussion de Νίκος` (`fr.json["chat.mute_label"]`), and that of `p4`, who is muted, reads `fr.json["chat.unmute"]`, with the `aria-label` `Rétablir la discussion de O’Neil` (`fr.json["chat.unmute_label"]`).
 

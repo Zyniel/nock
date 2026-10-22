@@ -18,6 +18,11 @@ Joueurs tab, which is in the DOM while closed. No criterion of this spec changes
 AC-3 and AC-6 read the `roster-player` items and their nicknames, which keep their
 ids and texts.)
 
+(Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue and
+entry pages (`_design.md` section 10): `catalogue-play` is the card's primary
+button, and `catalogue-error` an error line inside the card, under its text. No
+criterion of this spec changes: their ids, texts and rules stay.)
+
 ## Goal
 
 As a player, I want to start a grid alone at once, so that I can invite people later without losing my letters.

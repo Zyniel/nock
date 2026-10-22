@@ -63,6 +63,25 @@ implementer runs; AC-2's click on `account-open` opens the Menu first (spec 043'
 "Test harness"). The catalogue's « Compte » is step 5's. The other criteria do not
 change.)
 
+(Note from the lead, 2026-10-22: refined by spec 048, the design's plain pages and
+states (`_design.md` section 8 "Plain pages", the human's decisions P12 and D1 of
+2026-10-22): the account page is one card « Mon compte » in the entry-page frame;
+each state other than `signed_in` and `signed_out` is one line in it; `loading`, the
+state while the first `GET /api/account` runs, joins the table and shows the card's
+title only; `account-delete` is a disclosure (`aria-expanded`) that shows the
+question in the same card, under a divider, with no red button; `deleted` adds
+`account-home`, a link to `/`; a 422 gives `account-email-input` the red border.
+"Account page `/account`" changes; no criterion changes (AC-5 and AC-9 read texts,
+states and scans, which hold).)
+
+(Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue
+(`_design.md` sections 8 and 10, the human's decision P13): the catalogue's
+`account-link` becomes `account-open`, a top-bar button that opens `account-dialog`
+with the intro `t("account.signed_out_intro")` and a link request with `"room":
+null`; signed in, its `account-page-link` points to `/account`. The catalogue part
+of "Client" and AC-11's browser part change, so the test-writer updates that test
+before the implementer runs.)
+
 Epic E9 Accounts and resume (US-9.2) · Release: V1 · Epic depends on: E3
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; joining, the stored identity and the room page flow
@@ -768,7 +787,14 @@ with the text `t("account.open")`, after the `h1`. When signed in, before spec 0
 "My rooms" request, the page asks `GET /api/account/rooms` and stores each identity
 whose room has no valid identity on this device yet, as spec 012's
 `nock.identity.<CODE>` record (`player_id`, `resume_token`, `nickname`); an identity
-already stored on the device is never replaced.
+already stored on the device is never replaced. (Note from the lead, 2026-10-22:
+refined by spec 046, the design's catalogue (`_design.md` sections 8 and 10, the
+human's decision P13): the link `account-link` becomes `data-testid="account-open"`,
+a `<button type="button">` with `t("account.open")` in the catalogue's top bar,
+which opens `account-dialog` as in a room; outside a room its intro is
+`t("account.signed_out_intro")` and its link request sends `"room": null`. Signed in,
+its `account-page-link` points to `/account`. The identities rule of this paragraph
+is unchanged.)
 
 Account page `/account` (routing of spec 040 gains it; the server serves it only
 while accounts are on): root `data-testid="account-page"`, heading
@@ -782,6 +808,17 @@ while accounts are on): root `data-testid="account-page"`, heading
 | `signed_out` | not signed in | `t("account.signed_out_intro")` and the e-mail form of the dialog (same test ids), sending `"room": null` |
 | `deleted` | `DELETE /api/account` answered 204 | `t("account.deleted")` |
 | `error` | any other failure | `t("account.error.generic")` |
+| `loading` | `GET /api/account` has not answered yet, and the URL holds no link token | nothing after the heading (Note from the lead, 2026-10-22: row added by spec 048, the design's plain pages; the code already had this state) |
+
+(Note from the lead, 2026-10-22: refined by spec 048, the design's plain pages and
+states: the page is one card, `account-card`, whose title is the heading; the one
+line of `signing_in`, `link_invalid`, `deleted` and `error` is
+`data-testid="account-state-line"`; `deleted` also shows `data-testid="account-home"`,
+a link to `/` with `t("share.home")`; `account-delete` has `aria-expanded` and
+`aria-controls` naming `data-testid="account-delete-panel"`, which holds the warning,
+the confirm and the cancel of the item below, and a second click on
+`account-delete` hides it as the cancel does; after a 422, `account-email-input` has
+`aria-invalid="true"`. The look is spec 048's.)
 
 - A sign-in that answers 200 stores each `rooms` identity whose room has no valid
   identity on this device, as on the catalogue page.
@@ -810,7 +847,8 @@ against spec 040).)
 Accessibility (spec 035): every control above is reachable with `Tab` (the links
 `account-link`, `account-page-link` and `account-room-link` have `tabindex="0"`,
 since WebKit puts a link in the Tab order only with one, as spec 035 does for
-`share-link`), shows AC-2's visible focus, has a label from `fr.json`, and its texts
+`share-link`; note from the lead, 2026-10-22: refined by spec 046, `account-link`
+is now the button `account-open`, which needs no `tabindex`), shows AC-2's visible focus, has a label from `fr.json`, and its texts
 meet 4.5:1; the dialog keeps
 the focus inside while open (a modal `<dialog>`); messages use `role="status"` or
 `role="alert"` as written. The account page has no horizontal scroll at the sizes of
@@ -934,7 +972,7 @@ The words in brackets say how each criterion is tested.
 - **AC-8** (new) (HTTP) Link requests reveal nothing and cannot flood a mailbox. The answer to a link request is the same 202 `{}` for an address that has an account and one that has none. `POST /api/account/link` with `email` `""`, `ana`, `ana@`, `@example.org`, `ana@example`, `ana @example.org`, `"françois@example.org"` (decision 15), `x1,victim@example.org`, `a<b@example.org`, `a"b@example.org` (decision 15, the local part's characters) or the address of 255 characters of "Test harness" answers 422 with exactly `{"detail": "Invalid e-mail address"}` and sends nothing. With a `room` whose token is no member's, it answers 404 with `{"detail": "Not Found"}` and sends nothing. None of these refusals counts toward the limits below. Three requests for one address within an hour of the fake clock are sent; the fourth answers 429 and sends nothing; after `advance(3600)` one is sent again. From one client address, ten requests for ten addresses are sent and the eleventh answers 429. An address with an allowed mark in its local part, `ana+1@example.org`, answers 202 and is sent to `ana+1@example.org`. The limits stop counting a request once it is older than an hour: one request for `ana@example.org` at fake time t, then `advance(3601)` and 3 more for the same address, are all answered 202 and sent; and ten requests from one client address at t, then `advance(3601)` and ten more for ten other addresses, are all answered 202. (Note from the lead, 2026-10-21, second review of spec 033: the `+` address and the two expiry cases were added; the review found them untested. The first one is a mark that decision 15 allows, so a rule that refused every mark would have passed the others; the others are the "forgets them" rule of "A link request" for the address and for the client address, where the check above only covers the address at exactly 3,600 seconds.) With accounts off, `GET /account`, `GET /api/account`, `POST /api/account/link` and `DELETE /api/account` answer 404. (Note from the lead, 2026-10-21: `"françois@example.org"` was added with decision 15; "or 255 characters" now names the value of "Test harness"; "answers 422, sends nothing, and its body does not hold the address sent" became the exact body, which holds no address, since no body can leave out the empty address; the 404's body and the sentence on counting ("A link request" of "HTTP routes") were added.) (Note from the lead, 2026-10-21, first review of spec 033: `x1,victim@example.org`, `a<b@example.org` and `a"b@example.org` were added, with the new rule for the local part (decision 15). Each is refused as decision 15 says: 422 and `account.error.email` (the page shows any 422 of a link request with that text, "Client"), nothing sent and no count toward the limits. So `x1,victim@example.org` and `x2,victim@example.org` no longer count as two addresses that both reach `victim@example.org`.)
 - **AC-9** (new) (browser with mocked socket and routes; keyboard only for the walk) The account controls meet spec 035 and keep the room page's layout. With accounts on (mocked `GET /api/account`) and a FX-01 snapshot, at each window size of spec 006 AC-5, in desktop and touch contexts: `account-open` is the item of `room-menu` right after `host-settings-open` (the snapshot's `you` is host) and before its `nock-menu-separator`; with the Menu open, it lies inside the window and `elementFromPoint` at its centre, after `scrollIntoView({block: "nearest"})`, returns it; and spec 013 AC-6's checks pass (after a tap on a cell, `grid-viewport` at least 100 px high, no page scroll, the grid fits at zoom 1, the clue bar inside the window above the keyboard). Keyboard only: `tab_to` `menu-button` and `Enter` open the Menu, `Tab` reaches `account-open`, which shows spec 035 AC-2's outline; `Enter` opens `account-dialog` with the focus on `account-email-input`; during 10 presses of `Tab`, then 10 of `Shift+Tab`, no element outside `account-dialog` gets the focus (the rest of the page is inert while it is open; the browser may move the focus to its own interface); `Escape` closes it and the focus is on `menu-button`. (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "`account-open` is the last `button` element inside `room-toolbar`; at 320 by 568, 568 by 320, 360 by 740 and 740 by 360 its vertical range overlaps those of the toolbar's other buttons (spec 024's one-row rule), and after `account-open` is scrolled into view (as a keyboard focus does) it is visible whole inside the toolbar", "`tab_to` reaches `account-open`" and "the focus is back on `account-open`".) Spec 035's contrast and language scans find no offending element at 1280 by 720 and 360 by 740 on the room page with the dialog open, then showing `account-sent`, then showing `account-error`, and on `/account` in the states `signed_out`, `signed_in`, `link_invalid` and `deleted` (mocked answers); `/account` has no horizontal scroll at the sizes of spec 006 AC-5. (Note from the lead, 2026-10-21: "the last control" became "the last `button` element", since spec 024's `room-toolbar-more` mark is the toolbar's last child.)
 - **AC-10** (new) (HTTP with captured logs) Secrets and addresses never reach a log, and tokens are stored hashed. With `SETTINGS` given the user `nock` and the password `pw-SECRET-9`, during a link request, a sign-in, `GET /api/account`, a `PUT /api/account/rooms`, a sign-out, a link request that fails with the failing mailer, and a deletion, no log record holds (as "Logs" of "Test harness" reads a record) the link token, the session cookie's value, `TA`, the address `ana.probe@example.org`, or the SMTP password `pw-SECRET-9`. After the sign-in, the database files hold the address but neither the link token nor the session value (their SHA-256 hex digests are stored instead). (Note from the lead, 2026-10-21: "(formatted)" became the reference to "Logs", whose formatter now adds the traceback, as spec 038's does.)
-- **AC-11** (new) (HTTP; browser with live server) A signed-in device gets the rooms of the account. HTTP: after Ana's sign-in of AC-1, `GET /api/account/rooms` answers `[{"code": R, "player_id": <Ana>, "resume_token": TA, "nickname": "ANA"}]`; after she joins room S as a new player (token `TA2`) and sends `PUT /api/account/rooms` with S and `TA2` (204), it lists S then R; a `PUT` with a token that is no member's of S answers 404, and one without the cookie 401; once R expires (spec 032), the list holds S only. Browser: device 2 of AC-2, once signed in, opens `/`: its "My rooms" (spec 032) lists Ana's room, and `account-link` points to `/account`; a signed-in room page sends one `PUT /api/account/rooms` with its code and token after its first snapshot. (Note from the lead, 2026-10-21: the nickname read `"Ana"`; the server sends it in capitals, spec 039's "Nicknames in capitals".)
+- **AC-11** (new) (HTTP; browser with live server) A signed-in device gets the rooms of the account. HTTP: after Ana's sign-in of AC-1, `GET /api/account/rooms` answers `[{"code": R, "player_id": <Ana>, "resume_token": TA, "nickname": "ANA"}]`; after she joins room S as a new player (token `TA2`) and sends `PUT /api/account/rooms` with S and `TA2` (204), it lists S then R; a `PUT` with a token that is no member's of S answers 404, and one without the cookie 401; once R expires (spec 032), the list holds S only. Browser: device 2 of AC-2, once signed in, opens `/`: its "My rooms" (spec 032) lists Ana's room, and a click on `account-open` opens `account-dialog`, whose `account-page-link` points to `/account` (Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue; this read "and `account-link` points to `/account`"); a signed-in room page sends one `PUT /api/account/rooms` with its code and token after its first snapshot. (Note from the lead, 2026-10-21: the nickname read `"Ana"`; the server sends it in capitals, spec 039's "Nicknames in capitals".)
 
 ## Edge cases and errors
 

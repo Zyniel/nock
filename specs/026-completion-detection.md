@@ -35,6 +35,14 @@ change: it presses physical keys, and its page has no in-app keyboard. The note 
 spec 043 above, "The in-app keyboard stays on a solved page until step 5", is
 replaced by this one.)
 
+(Note from the lead, 2026-10-22: refined by spec 047, the design's room overlays
+(`_design.md` section 9, "End of grid"): in the end band under the clue bar,
+`grid-status` is a row of `grid-status-text` (the ✓ pictogram and this spec's
+text) and, when solved, spec 028's `recap-open`, 10 px apart; on a narrow window
+the text wraps and `recap-open` never does. The texts, roles, states and places of
+this spec do not change, and no criterion changes: AC-10's in-row checks run on the
+full-but-wrong status (spec 044), which keeps its one line in the clue bar's row.)
+
 ## Goal
 
 As a team, we want the game to recognise the finished grid, so that we don't have to press anything to win.

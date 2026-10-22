@@ -264,7 +264,10 @@ catch-up ring (1); the letter or the clue text; the flash overlay (spec 041),
 then the background. Each letter cell stays a stacking context of its own
 (`isolation: isolate`, spec 041), so these z-indexes order the cell's marks only.
 Spec 019's `author-mark` (until step 5 replaces it) sits above the ring and under
-the triangles.
+the triangles. (Note from the lead, 2026-10-22: refined by spec 045, the design's
+Auteurs mode: the band is gone; in Auteurs mode only the letter's colour and the
+strike's colour change, and this drawing order holds as written. No criterion of
+this spec changes.)
 
 ### Room toolbar
 

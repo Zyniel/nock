@@ -24,6 +24,20 @@ crowded cell", "New `fr.json` keys", AC-6, AC-9 and AC-11 change, so the
 test-writer updates the tests of AC-6, AC-9 and AC-11 before the implementer runs.
 The other criteria do not change.)
 
+(Note from the lead, 2026-10-22: refined by specs 045 and 046, the design's Auteurs
+mode and catalogue and entry pages: the scan states K1, K5 and K7 are redrawn (the
+catalogue, the nickname card, the not-found card), and the authorship line in the
+clue bar is gone (spec 045); no criterion of this spec changes.)
+
+(Note from the lead, 2026-10-22: specs 047 and 048, the design's room overlays and
+plain pages, keep this spec's rules and change none of its criteria. A closed vote
+is still announced by spec 025's `vote-announcement`; the vote's countdown (spec
+047) is not a live region, so it announces nothing each second. The operator's step
+slider (spec 048) stays the native range input, transparent over drawn parts, so
+its role, name and keys are the browser's. Each state of the three plain pages is
+one line, `role="status"` while waiting or done and `role="alert"` on an error (spec
+048). Their scans run through spec 047 AC-14 and spec 048 AC-14.)
+
 (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
 (`_design.md` section 8). The room's controls move into a top bar, the Aide menu,
 the Menu, the Salon (whose Joueurs tab holds the roster and the invitation link,

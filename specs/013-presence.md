@@ -132,10 +132,13 @@ decision 12).
 | `settings_changed`, only `locked` differs from the previous settings | `room_locked` or `room_unlocked` | `t("feed.room_locked", {name})` or `t("feed.room_unlocked", {name})` |
 | `settings_changed`, otherwise | `settings_changed` | `t("feed.settings_changed", {name, help_mode, letters, words})`, `help_mode` = `t("settings.help_mode.<mode>")`, `letters` and `words` from `settings.reveal_budget` |
 | `host_changed` | `host_changed` | `t("feed.host_changed", {name})` |
+| `vote_closed` | `vote` | `t("vote.result.<outcome>")` (Note from the lead, 2026-10-22: row added by spec 047, the design's room overlays, for the human's decision P6: a vote's result is a line in the stream; it names no player) |
 
 Other events (`letter_changed`, `cell_locked`, `player_state_changed`,
-`flag_changed` with `null`, votes, chat, completion) add no item. The nickname is
-the one known when the event is applied.
+`flag_changed` with `null`, `vote_opened`, chat, completion) add no item. The
+nickname is the one known when the event is applied. (Note from the lead,
+2026-10-22: refined by spec 047; "votes" became `vote_opened`. No criterion of this
+spec changes: AC-5 sends no vote.)
 
 New `fr.json` keys:
 

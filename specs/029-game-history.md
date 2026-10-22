@@ -18,6 +18,13 @@ nickname when a record is written (exact, no longer `toLowerCase()`), the edge c
 "My own nickname" and AC-6. This spec has no tests yet (human's rule of
 2026-10-16: nicknames in capitals).)
 
+(Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue and
+entry pages (`_design.md` section 10): « Grilles terminées » is drawn as list rows,
+each with the grid label and size as its title, `history-date`, `history-time` and
+`history-teammates` on one line separated by « · », and « Rejouer » as a secondary
+button; a failed replay is an error line in the row. No criterion of this spec
+changes: the ids, texts and rules stay.)
+
 Epic E7 Completion and recap (US-7.3) · Release: V1 · Epic depends on: E6
 The FX-01 reference grid is in `specs/_reference.md`. The catalogue page and
 `nock.progress` are those of spec 004; the play flow of spec 010; the stored identity

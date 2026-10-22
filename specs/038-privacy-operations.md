@@ -74,6 +74,11 @@ criterion depends on (first review of spec 038). The lead answered it on 2026-10
 with option (a): `error`, as for the first load, now written in "Period change" of
 "Client: the ops page `/ops`"; "Open questions" reads "None." again.)
 
+(Note from the lead, 2026-10-22: refined by spec 048, the design's plain pages and
+states: "Client: the ops page `/ops`" gets the design's cards, state lines, chips,
+tiles, replay layout, cells and slider, with a note there. The server, the ops API
+and every criterion are unchanged.)
+
 Epic E10 Quality bar (US-10.4) · Release: MVP · Epic depends on: All
 The FX-01 reference grid is in `specs/_reference.md`. The rooms engine and its
 harness are defined in spec 011; guests and the stored identity in spec 012; the
@@ -502,6 +507,22 @@ it)" became "(spec 026; spec 027 made it the shared timer's value when the grid 
 solved)", since spec 027 is built (preparation of spec 038).)
 
 ### Client: the ops page `/ops`
+
+(Note from the lead, 2026-10-22: refined by spec 048, the design's plain pages and
+states (`_design.md` section 8 "Plain pages", the human's decisions P14 and P15 of
+2026-10-22): the page sits in the catalogue's frame; the token form, the dashboard
+and the replay are cards; the `loading` and `error` lines are
+`data-testid="ops-state-line"` and the replay's lines `ops-replay-state-line`; the
+periods are filter chips in `ops-period-field` and the figures tiles; the replay
+lists the edits (`ops-edits`, each `ops-edit` with `data-step` `done`, `current` or
+`later`) beside the grid on a window at least 900 px wide and under it otherwise;
+the grid has the playing grid's cells, each `ops-replay-cell` gaining
+`data-locked`, `data-revealed` and `data-pencil`, and the other cells are
+`ops-replay-block` with `data-type`; the slider is drawn by `ops-replay-track`,
+`ops-replay-fill` and `ops-replay-knob` under the transparent `ops-replay-position`;
+a room with no edit shows its `ops.replay_empty` line only, with no slider and no
+grid. No criterion changes: AC-7 and AC-9 read texts, attributes and positions that
+hold, and AC-9's room has edits.)
 
 Routing (spec 040) gains `/ops`, shown by the ops page; the server serves `index.html`
 on `GET /ops` while the operator pages are on (503 when the client is not built, as

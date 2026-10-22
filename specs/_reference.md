@@ -104,10 +104,16 @@ the specs whose criteria this one mentions.
 | [042](042-grid-cells.md) | Grid cells (grid lines, backgrounds, letters, revealed notch, catch-up ring, corner triangles and Accessibilité icons, clue cells, flag, arrows in letter cells; no backlog story, `_design.md` step 2) | E10 | MVP | 20 | 003, 006, 007, 012, 013, 016, 017, 019, 020, 021, 022, 023, 024, 033, 034, 035, 039, 040, 041 |
 | [043](043-room-layout.md) | Room layout (top bar, sheet and column layouts, Aide menu and Menu, Salon with its stream and Joueurs list, room sheets, navy clue bar, reactions, 3-second notes, connection band; no backlog story, `_design.md` step 3) | E10 | MVP | 31 | 006, 007, 009, 010, 011, 012, 013, 014, 016, 017, 018, 019, 020, 021, 022, 023, 024, 025, 026, 027, 028, 033, 034, 035, 040, 041, 042 |
 | [044](044-keyboard.md) | Keyboard (« Clavier » in the top bar, the in-app keyboard's look, ✎ and ⇄ keys, keyboard gone once solved; no backlog story, `_design.md` step 4) | E10 | MVP | 11 | 006, 007, 008, 009, 013, 017, 020, 024, 026, 035, 041, 042, 043 |
+| [045](045-auteurs-mode.md) | Auteurs mode (each letter in its finder's ink, the Auteurs legend under the grid, the switch remembered per browser, the strike in ink, the clue bar without « Lettre de … »; replaces spec 019's band; no backlog story, `_design.md` step 5) | E10 | MVP | 11 | 006, 012, 013, 015, 016, 017, 019, 020, 023, 024, 028, 032, 034, 035, 037, 040, 041, 042, 043, 044, 047 |
+| [046](046-catalogue-and-entry-pages.md) | Catalogue and entry pages (page top bar and frames, catalogue with « Compte », filter chips, grid cards and their drawing, « Mes salons », « Grilles terminées », the catalogue's states, the grid page, the nickname card, the status cards, a room not found or expired, the page not found, the opening room; no backlog story, `_design.md` step 5) | E10 | MVP | 23 | 004, 005, 006, 010, 011, 012, 014, 017, 028, 029, 032, 033, 035, 037, 040, 041, 043, 044, 047, 048 |
+| [047](047-room-overlays.md) | Room overlays | E10 | MVP | 14 | 011, 013, 019, 022, 025, 026, 028, 033, 034, 035, 039, 040, 041, 042, 043, 044, 045, 046, 048 |
+| [048](048-plain-pages-and-states.md) | Plain pages and states | E10 | MVP | 14 | 002, 006, 011, 028, 033, 035, 038, 040, 041, 042, 043, 046, 047 |
 
 (Note from the spec writer, 2026-10-22: the row of spec 042 was added, a draft.)
 (Note from the spec writer, 2026-10-22: the row of spec 043 was added, a draft.)
 (Note from the spec writer, 2026-10-22: the row of spec 044 was added, a draft.)
+(Note from the spec writer, 2026-10-22: the rows of specs 045, 046, 047 and 048 were
+added, drafts; the counts and references of 047 and 048 are their spec-writer's.)
 
 (Note from the lead, 2026-10-16: spec 012's row read 7 criteria and referred to no
 spec; its AC-8, added for nicknames in capitals, names specs 019 and 022 (human's

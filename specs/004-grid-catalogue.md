@@ -6,6 +6,18 @@ status: done
 
 # 004 - Grid catalogue
 
+(Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue and
+entry pages (`_design.md` section 10): the catalogue page and the grid page take a
+56 px brand bar and a 920 px column; the force filter is a visible label and five
+chips, the group labelled by `aria-labelledby` (in place of the `aria-label` of
+"`catalogue.filter.label` labels the filter group"); each item is a card with its
+number, its progress as a status pill, its force marks, its generic grid drawing on
+wide windows and « Jouer »; and the loading, empty and error texts are one line
+where the cards will be. The ids, attributes and texts of this spec do not change,
+and no criterion changes, except the check of the edge case "Empty catalogue": the
+filter buttons are no longer shown with no grid at all (screens sheet P4), so the
+test-writer updates that check before spec 046's implementer runs.)
+
 Epic E1 Grid content and model (US-1.3) · Release: MVP · Epic depends on: None
 The FX-01 reference grid is in `specs/_reference.md`. The stack and modeling rules
 are in `specs/_architecture.md`. The server, routes, i18n and test harness this
@@ -283,8 +295,9 @@ The words in brackets say how each criterion is tested.
 - Ignored files (AC-5): `notes.txt` and a sub-directory `old/` holding a `.json`
   file are not loaded.
 - Empty catalogue (AC-1, AC-2): `GET /api/grids` answers `[]`; the page shows
-  `t("catalogue.empty")`, `data-state="ready"`, no list item, and the filter
-  buttons are still shown.
+  `t("catalogue.empty")`, `data-state="ready"`, no list item, and no filter button.
+  (Note from the lead, 2026-10-22: refined by spec 046 (P4); this read "and the
+  filter buttons are still shown".)
 - Force query (AC-2): `?force=0`, `?force=5`, `?force=x` and `?force=` answer 422;
   an unknown query parameter is ignored. In Python,
   `published_summaries(force=5)` returns `[]` (no entry can have force 5).

@@ -20,6 +20,14 @@ redefines none of them; where it changes one of their rules, "Refined specs" say
 so. The FX-01 reference grid is in `specs/_reference.md`; the stack in
 `specs/_architecture.md`.
 
+(Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue and
+entry pages: while the room opens, before its first snapshot, `room-topbar` shows
+with its buttons and the `inert` attribute, so `keyboard-toggle` is on the page then
+too (on a touch screen, with `aria-pressed="false"`, since the keyboard does not
+show before a snapshot); "on the page only on a touch screen once the page has a
+snapshot" reads "on the page only on a touch screen, from the opening on". No
+criterion of this spec changes.)
+
 ## Goal
 
 A player on a touch screen types with the in-app keyboard of the design: AZERTY

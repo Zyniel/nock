@@ -266,7 +266,7 @@ border width, padding, position or element changes, except the flash overlay.
 | `vote-banner` | background; bottom border colour | `--nock-white`; `--nock-navy` |
 | `connection-banner` | background; text | `--nock-clue-bg`; `--nock-ink` (the band's colours; its place and dot come with the room layout) |
 | Chat panel and reaction picker shadows | shadow colour | `--nock-shadow` (offsets and blur unchanged) |
-| Author band of a departed author (spec 019) | the two hatch colours | `--nock-ink` and `--nock-white` |
+| Author band of a departed author (spec 019) | the two hatch colours | `--nock-ink` and `--nock-white` (Note from the lead, 2026-10-22: spec 045 removes the band; the hatch stays only for spec 028's recap swatch until spec 047 replaces it. No criterion changes.) |
 
 ### Flash overlay (spec 016)
 
