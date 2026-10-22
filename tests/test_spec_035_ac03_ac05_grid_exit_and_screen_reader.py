@@ -609,7 +609,8 @@ def test_ac5_the_selection_is_exposed_by_activedescendant_and_aria_selected(
         '[data-testid="cell"][data-type="letter"][aria-selected="false"]'
     )
     expect(others).to_have_count(17)
-    assert page.locator('[aria-selected="true"]').count() == 1
+    # The Salon's selected tab has `aria-selected` too (spec 043): count the grid's.
+    assert grid_of(page).locator('[aria-selected="true"]').count() == 1
 
     cell_at(page, 1, 0).click()
     expect(grid_of(page)).to_have_attribute("aria-activedescendant", "cell-1-0")

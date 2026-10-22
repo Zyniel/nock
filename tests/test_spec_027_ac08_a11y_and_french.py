@@ -194,20 +194,29 @@ def test_ac8_the_timer_text_is_never_a_tab_stop(
         open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
         )
-        page.evaluate("() => document.body.focus()")
+        # The walk starts on `undo-button`, which comes right after `timer`, and goes
+        # backwards: a Tab stop on `timer` would be the first one reached.
+        # (`document.body.focus()` does not reset where Tab starts.)
+        undo = page.get_by_test_id("undo-button")
+        undo.focus()
+        expect(undo).to_be_focused()
         visited: list[str] = []
         for _ in range(8):
-            page.keyboard.press("Tab")
+            page.keyboard.press("Shift+Tab")
             focused = page.evaluate(
-                "() => document.activeElement"
-                " && document.activeElement.getAttribute('data-testid')"
+                "() => document.activeElement === null"
+                " || document.activeElement === document.body ? null"
+                " : document.activeElement.getAttribute('data-testid')"
+                " || document.activeElement.tagName"
             )
+            if focused is None:
+                break
             visited.append(str(focused))
     finally:
         close()
 
     assert "timer" not in visited
-    assert "undo-button" in visited
+    assert "undo-button" not in visited[:1], visited
 
 
 # ---- Spec 035's scans ----

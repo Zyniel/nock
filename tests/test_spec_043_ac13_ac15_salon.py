@@ -88,6 +88,11 @@ def cell_side(page: Page) -> float:
     return box_of(cell_at(page, 1, 1)).width
 
 
+def grid_centre(page: Page) -> float:
+    """The horizontal centre of `grid`."""
+    return box_of(page.get_by_test_id("grid")).centre_x
+
+
 def salon_inside_focus(page: Page) -> bool:
     found = page.evaluate(
         "() => document.querySelector('[data-testid=\"salon\"]')"
@@ -140,11 +145,15 @@ def test_ac13_closing_the_column_is_remembered_and_gives_its_room_to_the_grid(
     mock = open_room(page, live_server, frame)
     salon = page.get_by_test_id("salon")
     noted_side = cell_side(page)
+    noted_centre = grid_centre(page)
 
     page.get_by_test_id("chat-toggle").click()
     expect_closed(salon)
     assert stored_value(page, SALON_KEY) == "true"
-    assert cell_side(page) > noted_side + 0.5
+    # Decision of 2026-10-22: `s` does not shrink and the grid's centre moves right
+    # by half the column's 340 px.
+    assert cell_side(page) >= noted_side - 1.0
+    assert same_position(grid_centre(page), noted_centre + 170.0)
 
     reload_room(page, mock, frame)
     expect_closed(salon)
@@ -156,6 +165,7 @@ def test_ac13_opening_the_column_again_forgets_the_key_and_focuses_the_input(
     frame = fx01_frame(fx01_grid)
     mock = open_room(page, live_server, frame)
     noted_side = cell_side(page)
+    noted_centre = grid_centre(page)
     page.get_by_test_id("chat-toggle").click()
     expect_closed(page.get_by_test_id("salon"))
     reload_room(page, mock, frame)
@@ -166,6 +176,7 @@ def test_ac13_opening_the_column_again_forgets_the_key_and_focuses_the_input(
     assert stored_value(page, SALON_KEY) is None
     expect(page.get_by_test_id("chat-input")).to_be_focused()
     assert same_position(cell_side(page), noted_side)
+    assert same_position(grid_centre(page), noted_centre)
 
 
 def test_ac13_escape_in_the_column_focuses_chat_toggle_and_leaves_it_open(

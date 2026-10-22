@@ -93,7 +93,7 @@ def test_ac2_fr_json_holds_the_lock_texts() -> None:
     fr = load_fr()
 
     assert fr["host.lock"] == "Verrouiller le salon"
-    assert fr["host.unlock"] == "Déverrouiller le salon"
+    assert "host.unlock" not in fr  # removed by spec 043
     assert fr["room.status.locked"] == "Ce salon est verrouillé."
 
 

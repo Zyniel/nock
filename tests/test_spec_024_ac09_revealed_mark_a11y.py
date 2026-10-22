@@ -233,6 +233,11 @@ def test_ac9_the_keyboard_reaches_both_reveal_buttons_with_a_visible_focus(
     walker.tab_to("grid")
     page.keyboard.press("Tab")
     expect_selection(page, 1, 2, "across", "0,0,0")
+    # Spec 043: the reveal buttons are items of the Aide menu, opened from the
+    # keyboard first.
+    walker.tab_to("aide-button")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("aide-menu")).to_be_visible()
     for test_id in ("reveal-letter", "reveal-word"):
         walker.tab_to(test_id)
         expect(page.get_by_test_id(test_id)).to_be_enabled()

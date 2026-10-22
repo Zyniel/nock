@@ -58,6 +58,7 @@ from spec043_harness import (
     chat_line,
     colour_matches,
     error_frame,
+    expect_closed,
     expect_colour,
     expect_layout,
     fr_value,
@@ -278,6 +279,43 @@ def test_ac27_on_a_low_touch_window_full_but_wrong_sits_in_the_clue_bars_row(
     expect(page.get_by_test_id("recap-open")).to_have_count(0)
 
 
+LOW_TOUCH_SIZES = [(568, 320), (740, 360)]
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), LOW_TOUCH_SIZES, ids=["568x320", "740x360"]
+)
+def test_ac27_until_spec_044_a_solved_low_touch_window_sits_in_the_clue_bars_row(
+    window: OpenWindow, live_server: str, fx01_grid: Grid, width: int, height: int
+) -> None:
+    # Decision of 2026-10-22: until spec 044 hides the keyboard on a solved page,
+    # the solved status sits in the clue bar's row like the full-and-wrong one,
+    # with `recap-open` in the secondary button's colours.
+    page = window(width, height, True)
+    open_solved(page, live_server, fx01_grid)
+    expect_layout(page, "sheet")
+    expect(page.get_by_test_id("keyboard")).to_be_visible()
+    button = page.get_by_test_id("grid-status").get_by_test_id("recap-open")
+    expect(button).to_have_count(1)
+
+    box = box_of(page.get_by_test_id("grid-status"))
+    bar_box = box_of(page.get_by_test_id("clue-bar"))
+    text_box = box_of(page.get_by_test_id("clue-bar-text"))
+    react_box = box_of(page.get_by_test_id("react-button"))
+    text = status_text(page)
+
+    assert box.left >= bar_box.left - 1.0, (box, bar_box)
+    assert box.right <= bar_box.right + 1.0, (box, bar_box)
+    assert box.top >= bar_box.top - 1.0, (box, bar_box)
+    assert box.bottom <= bar_box.bottom + 1.0, (box, bar_box)
+    assert box.left >= text_box.right - 1.0, (box, text_box)
+    assert box.right <= react_box.left + 1.0, (box, react_box)
+    assert colour_matches(text["colour"], WHITE), text
+    expect_colour(button, "backgroundColor", WHITE)
+    expect_colour(button, "color", NAVY)
+    expect_colour(button, "borderTopColor", NAVY)
+
+
 @pytest.mark.parametrize("state", ["solved", "full_wrong"])
 def test_ac27_on_a_low_desktop_window_the_status_is_under_the_bar(
     window: OpenWindow, live_server: str, fx01_grid: Grid, state: str
@@ -320,10 +358,16 @@ def swatches(page: Page) -> list[Reading]:
 
 
 def flip_access(page: Page, pressed: str) -> None:
+    """Flip `access-switch` in the Menu, then close the Menu with `Escape`.
+
+    The Menu stays open after a switch (AC-11) and would cover the Salon's tabs.
+    """
     open_menu(page)
     switch = page.get_by_test_id("access-switch")
     switch.click()
     expect(switch).to_have_attribute("aria-pressed", pressed)
+    page.keyboard.press("Escape")
+    expect_closed(page.get_by_test_id("room-menu"))
 
 
 def ac30_frame(grid: Grid) -> str:
@@ -364,7 +408,6 @@ def test_ac30_with_access_off_again_the_dots_have_their_colours_back(
 ) -> None:
     open_room(page, live_server, ac30_frame(fx01_grid))
     flip_access(page, "true")
-    page.keyboard.press("Escape")
 
     flip_access(page, "false")
 

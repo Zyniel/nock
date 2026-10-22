@@ -45,6 +45,7 @@ from spec026_harness import (
     type_17_letters,
     write,
 )
+from spec043_harness import expect_status_text
 
 SOLVED_BUDGET_SECONDS = 1.0
 SOLVED_BUDGET_MS = 1000
@@ -256,7 +257,7 @@ def test_ac3_both_pages_show_the_solved_grid_within_a_second(
             expect(status).to_have_attribute(
                 "data-state", "solved", timeout=SOLVED_BUDGET_MS
             )
-            expect(status).to_have_text(load_fr()["completion.solved"])
+            expect_status_text(status, load_fr()["completion.solved"])
             expect(status).to_have_attribute("role", "status")
     finally:
         bob_context.close()

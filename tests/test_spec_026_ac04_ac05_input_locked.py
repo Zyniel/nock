@@ -56,6 +56,7 @@ from spec026_harness import (
     wait_until_page,
     write,
 )
+from spec043_harness import expect_status_text
 
 QUIET_MS = 300
 
@@ -305,7 +306,7 @@ def test_ac5_the_page_shows_the_solved_attribute_and_status(
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-solved", "true")
     status = page.get_by_test_id("grid-status")
     expect(status).to_have_attribute("data-state", "solved")
-    expect(status).to_have_text(load_fr()["completion.solved"])
+    expect_status_text(status, load_fr()["completion.solved"])
 
 
 def test_ac5_control_an_unsolved_page_sends_the_same_keys(

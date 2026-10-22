@@ -23,6 +23,7 @@ from playwright.sync_api import Browser, Page, expect
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import Direction, Selection, SelectionMoved, grid_view
+from room_panels import open_menu
 from spec019_harness import (
     FOLLOW_MS,
     SETTLE_MS,
@@ -478,6 +479,7 @@ def test_ac2_the_switch_is_a_button_reading_auteurs_that_starts_off(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_ac1(page, live_server, fx01_grid)
+    open_menu(page)  # spec 043: the switch is a Menu item, named once it shows
     switch = authors_switch(page)
 
     expect(switch).to_have_count(1)

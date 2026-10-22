@@ -27,7 +27,7 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import ChangeSettings, HelpMode
 from nock.server import create_app
-from room_panels import open_aide
+from room_panels import open_aide, open_host_settings
 from spec010_harness import ROOM_URL_PATTERN
 from spec025_harness import (
     FIVE_AND_ONE,
@@ -153,6 +153,7 @@ def test_ac1_browser_the_creator_finds_free_selected_among_three_modes(
     roster = page.get_by_test_id("roster-player")
     expect(roster).to_have_count(1)
     expect(roster).to_have_attribute("data-host", "true")
+    open_host_settings(page)  # spec 043: the modes are in the host's settings sheet
     select = page.get_by_test_id("help-mode-select")
     options = select.get_by_test_id("help-mode-option")
     expect(options).to_have_count(3)

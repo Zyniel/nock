@@ -79,6 +79,7 @@ from spec035_harness import (
     contrast_offenders,
     unknown_texts,
 )
+from spec043_harness import expect_status_text
 
 NewPage = Callable[[int, int, bool], Page]
 
@@ -390,7 +391,7 @@ def expect_status_shows(page: Page, state: str) -> None:
     expect(status).to_be_visible()
     expect(status).to_have_attribute("role", "status")
     expect(status).to_have_attribute("data-state", state)
-    expect(status).to_have_text(load_fr()[STATUS_TEXT_KEYS[state]])
+    expect_status_text(status, load_fr()[STATUS_TEXT_KEYS[state]])
 
 
 # ---- Measures ----

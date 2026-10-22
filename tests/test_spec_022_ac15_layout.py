@@ -500,7 +500,13 @@ def test_ac15_browser_the_chat_and_reaction_controls_keep_the_rooms_layout(
         if sheet:
             salon_open += moved_boxes(before, layout_boxes(page, touch))
         else:
-            salon_open += moved_boxes(bar_before, top_bar_boxes(page))
+            # Showing the stream reads the messages (spec 043 AC-17): the badge
+            # goes, and the rest of the top bar stays put.
+            bar_after = top_bar_boxes(page)
+            if "chat-unread" in bar_after:
+                salon_open.append("chat-unread still shows with the stream shown")
+            bar_before.pop("chat-unread", None)
+            salon_open += moved_boxes(bar_before, bar_after)
         problems["salon"] = salon_open
         targets += target_problems(page, ["chat-send"])
         input_inside = page.evaluate(INPUT_INSIDE_SCRIPT)

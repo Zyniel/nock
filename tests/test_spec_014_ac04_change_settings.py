@@ -75,7 +75,7 @@ def room_with_used_budget(grid: Grid) -> RoomState:
 def test_ac4_fr_json_holds_the_settings_texts() -> None:
     fr = load_fr()
 
-    assert fr["settings.heading"] == "Réglages"
+    assert fr["settings.heading"] == "Réglages de l'hôte"  # changed by spec 043
     assert fr["settings.help_mode_label"] == "Aide"
     assert fr["settings.reveal_letters_label"] == "Lettres à révéler"
     assert fr["settings.reveal_words_label"] == "Mots à révéler"

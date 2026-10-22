@@ -48,6 +48,7 @@ from spec043_harness import (
     PHONE_TOP_BAR_HEIGHT,
     SPEC043_JS,
     WHITE,
+    WORD,
     Reading,
     border_problems,
     colour_matches,
@@ -160,9 +161,17 @@ def one_icon(
     return svg, problems
 
 
-def phone_button_problems(page: Page, test_id: str) -> list[str]:
-    """How a phone top-bar button differs from AC-2."""
-    parts = parts_of(page.get_by_test_id(test_id))
+def phone_button_problems(page: Page, test_id: str, expanded: bool) -> list[str]:
+    """How a phone top-bar button differs from AC-2.
+
+    Args:
+        page: The room page.
+        test_id: The button.
+        expanded: Whether the button must show AC-5's expanded look (`aria-expanded`
+            `"true"`, background `WORD`) rather than a transparent background.
+    """
+    button = page.get_by_test_id(test_id)
+    parts = parts_of(button)
     problems: list[str] = []
     if parts["tag"] != "BUTTON" or parts["type"] != "button":
         problems.append(f"{test_id}: a {parts['tag']} of type {parts['type']!r}")
@@ -171,7 +180,12 @@ def phone_button_problems(page: Page, test_id: str) -> list[str]:
         problems.append(f"{test_id}: width {box.width}, not 56")
     if not same_position(box.height, 53.0):
         problems.append(f"{test_id}: height {box.height}, not 53")
-    if not is_clear(parts["background"]):
+    if expanded:
+        if button.get_attribute("aria-expanded") != "true":
+            problems.append(f"{test_id}: not aria-expanded")
+        if not colour_matches(parts["background"], WORD):
+            problems.append(f"{test_id}: background {parts['background']}, not WORD")
+    elif not is_clear(parts["background"]):
         problems.append(f"{test_id}: background {parts['background']}")
     svg, icon_found = one_icon(test_id, parts, 22.0)
     problems.extend(icon_found)
@@ -258,8 +272,11 @@ def test_ac2_each_phone_button_is_56_by_53_with_its_icon_above_its_label(
     test_id: str,
 ) -> None:
     page = open_at(window, live_server, fx01_grid, width, height)
+    # In the column layout the Salon is open at load, so « Salon » has AC-5's
+    # expanded look there (spec 043 AC-2, decision of 2026-10-22).
+    expanded = test_id == "chat-toggle" and (width, height) in LOW_WINDOWS
 
-    assert phone_button_problems(page, test_id) == []
+    assert phone_button_problems(page, test_id, expanded) == []
 
 
 @pytest.mark.parametrize(("width", "height"), PHONE_BAR_SIZES, ids=PHONE_BAR_IDS)

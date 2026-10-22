@@ -352,7 +352,7 @@ def test_ac5_browser_a_nickname_is_inserted_as_text(
 def test_ac5_fr_json_has_the_feed_texts() -> None:
     fr = load_fr()
 
-    assert fr["feed.heading"] == "Activité"
+    assert "feed.heading" not in fr  # removed by spec 043
     assert fr["feed.someone"] == "Quelqu'un"
     assert fr["feed.player_joined"] == "{name} a rejoint le salon"
     assert fr["feed.player_left"] == "{name} a quitté le salon"

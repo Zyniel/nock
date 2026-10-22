@@ -50,7 +50,6 @@ from spec043_harness import (
     open_room,
     player,
     players_up_to,
-    press_cell,
     same_position,
     selecting,
     snapshot_frame,
@@ -555,7 +554,8 @@ def test_ac12_on_a_phone_opening_the_salon_closes_the_reaction_picker(
 ) -> None:
     page = window(360, 740, False)
     open_fx01(page, live_server, fx01_grid)
-    press_cell(page, 0, 3)
+    cell_at(page, 0, 3).click()
+    expect_selected(page, 1, 3)  # a clue cell selects its word's first cell
     page.get_by_test_id("react-button").click()
     expect(page.get_by_test_id("reaction-picker")).to_be_visible()
 
@@ -581,7 +581,8 @@ def test_ac12_on_a_computer_the_salon_column_stays_open_and_no_scrim_shows(
     expect(scrim).not_to_be_visible()
     expect_closed(page.get_by_test_id("aide-menu"))
     page.keyboard.press("Escape")
-    press_cell(page, 0, 3)
+    cell_at(page, 0, 3).click()
+    expect_selected(page, 1, 3)  # a clue cell selects its word's first cell
     page.get_by_test_id("react-button").click()
     expect(page.get_by_test_id("reaction-picker")).to_be_visible()
 

@@ -18,6 +18,15 @@ panel, the lines the mock sends). "Not clipped" and "Not covered" are spec 035's
 measures (`FOCUS_BAND_SCRIPT`).
 
 The shared setup is in `spec022_harness`.
+
+Refined for spec 043 (the design's room layout): the chat list is the Salon's
+stream, which fills the Salon's height (about 510 px at 1280 by 720, 299 px at 360
+by 740), so ten lines no longer make it scroll. "Filling" sends 40 lines (`seq` 6
+to 45), the later cases take `seq` 46 to 50, and the full list `seq` 51 to 205, so
+it still holds 200 lines, `seq` 6 to 205. In spec 013 AC-8's "Smaller window",
+the resize to 360 by 740 turns the column layout into the sheet layout, which
+closes the Salon: the test shows the Discussion tab again and checks that the list
+is at its end within 300 ms of being shown, as spec 013 AC-8's test does.
 """
 
 from __future__ import annotations
@@ -29,6 +38,7 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import PlayerView
+from room_panels import show_tab
 from spec022_harness import (
     CHAT_LIST_SELECTOR,
     chat_frame,
@@ -54,6 +64,16 @@ from spec035_harness import (
 )
 
 CHAT_WINDOWS = [(1280, 720), (360, 740)]
+# The `seq` of each case's line (see the module docstring for the count).
+FILL_FIRST_SEQ = 6
+FILL_LAST_SEQ = 45
+AT_END_SEQ = 46
+SCROLLED_UP_SEQ = 47
+OWN_LINE_SEQ = 48
+BACK_AT_END_SEQ = 49
+ONE_PX_SEQ = 50
+FULL_FIRST_SEQ = 51
+FULL_LAST_SEQ = 205
 KEYBOARD_SIZES = [(360, 740), (568, 320), (1280, 720)]
 TOLERANCE_PX = 1.0
 FOLLOW_MS = 300
@@ -428,8 +448,8 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
         chat_input = page.get_by_test_id("chat-input")
 
         # Filling.
-        start_end_watch(page, "seq", "15")
-        send_lines(scene, 6, 15)
+        start_end_watch(page, "seq", str(FILL_LAST_SEQ))
+        send_lines(scene, FILL_FIRST_SEQ, FILL_LAST_SEQ)
         filled = read_list(page)
         assert filled.scrolls, f"Filling: the chat list does not scroll: {filled}"
         assert_at_end_within_300_ms(page, "Filling")
@@ -438,8 +458,8 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
         # At the end.
         start = read_list(page)
         assert_case_starts(start.at_end, "At the end", "the list is at its end", start)
-        start_end_watch(page, "seq", "16")
-        send_lines(scene, 16, 16)
+        start_end_watch(page, "seq", str(AT_END_SEQ))
+        send_lines(scene, AT_END_SEQ, AT_END_SEQ)
         assert_at_end_within_300_ms(page, "At the end")
         let_the_case_end(page)
 
@@ -449,10 +469,10 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
             not start.at_end, "Scrolled up", "the list is not at its end", start
         )
         start_probe(page)
-        send_lines(scene, 17, 17)
+        send_lines(scene, SCROLLED_UP_SEQ, SCROLLED_UP_SEQ)
         page.wait_for_timeout(FOLLOW_MS)
         assert_probe_stayed_put(page, "Scrolled up")
-        assert last_line_seq(page) == "17"
+        assert last_line_seq(page) == str(SCROLLED_UP_SEQ)
         let_the_case_end(page)
 
         # My own line.
@@ -464,11 +484,11 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
         start_probe(page)
         chat_input.press("Enter")
         wait_for_frame_count(page, scene.mock, "chat", 1)
-        scene.mock.send(chat_frame(18, "p1", "moi"))
-        expect_seq(page, 18)
+        scene.mock.send(chat_frame(OWN_LINE_SEQ, "p1", "moi"))
+        expect_seq(page, OWN_LINE_SEQ)
         page.wait_for_timeout(FOLLOW_MS)
         assert_probe_stayed_put(page, "My own line")
-        assert last_line_seq(page) == "18"
+        assert last_line_seq(page) == str(OWN_LINE_SEQ)
         let_the_case_end(page)
 
         # Back at the end.
@@ -476,8 +496,8 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
         assert_case_starts(
             start.at_end, "Back at the end", "the list is at its end", start
         )
-        start_end_watch(page, "seq", "19")
-        send_lines(scene, 19, 19)
+        start_end_watch(page, "seq", str(BACK_AT_END_SEQ))
+        send_lines(scene, BACK_AT_END_SEQ, BACK_AT_END_SEQ)
         assert_at_end_within_300_ms(page, "Back at the end")
         let_the_case_end(page)
 
@@ -486,16 +506,16 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
         assert_case_starts(
             start.at_end, "Within 1 px", "the distance to the end is at most 1", start
         )
-        start_end_watch(page, "seq", "20")
-        send_lines(scene, 20, 20)
+        start_end_watch(page, "seq", str(ONE_PX_SEQ))
+        send_lines(scene, ONE_PX_SEQ, ONE_PX_SEQ)
         assert_at_end_within_300_ms(page, "Within 1 px of the end")
         let_the_case_end(page)
 
         # Full list: 200 lines.
         start = read_list(page)
         assert_case_starts(start.at_end, "Full list", "the list is at its end", start)
-        start_end_watch(page, "seq", "205")
-        send_lines(scene, 21, 205)
+        start_end_watch(page, "seq", str(FULL_LAST_SEQ))
+        send_lines(scene, FULL_FIRST_SEQ, FULL_LAST_SEQ)
         assert chat_seqs(page) == list(range(6, 206))
         assert_at_end_within_300_ms(page, "Full list")
         middle = scroll_list_and_settle(page, "middle")
@@ -543,14 +563,15 @@ def test_ac11_browser_a_chat_list_at_its_end_stays_there_when_the_layout_changes
     page, close = open_context_page(browser, browser_name, 1280, 720, False)
     try:
         scene = open_scene(page, live_server, fx01_grid)
-        send_lines(scene, 6, 15)
+        send_lines(scene, FILL_FIRST_SEQ, FILL_LAST_SEQ)
         let_the_case_end(page)
         setup = read_list(page)
         assert_case_starts(setup.at_end, "Setup", "the list is at its end", setup)
 
-        # Smaller window.
-        start_end_watch(page, "width", "360")
+        # Smaller window: the sheet layout closes the Salon, shown again here.
         resize_window(page, 360, 740)
+        show_tab(page, "discussion")
+        start_end_watch(page, "width", "360")
         resized = read_list(page)
         assert resized.scrolls, f"Smaller window: no scroll: {resized}"
         assert_at_end_within_300_ms(page, "Smaller window")

@@ -12,7 +12,10 @@ two runs of the criterion one after the other, each ending with its vote's resul
 The second run starts once the first banner has left the page.
 
 "The five points" of an element are the centre of its bounding box and its four
-corners, each moved 2 px inwards on both axes.
+corners, each moved 2 px inwards on both axes. On a rounded corner (the Salon's
+sheet has 14 px corners, spec 043) the corner point is first moved onto the
+rounded edge's diagonal, `r * (1 - 1 / sqrt 2)` px on each axis, then 2 px more,
+so that it lies inside the shape the element draws.
 
 Refined by spec 043 (the design's room layout): the open chat panel is the Salon
 on its Discussion tab (the harness's `open_panel`), and the panel's box in the
@@ -91,12 +94,20 @@ testId => {
     return [{point: 'none', inside: false, hit: 'no element'}];
   }
   const box = element.getBoundingClientRect();
+  const style = getComputedStyle(element);
+  // 2 px inwards from the corner of the shape: a rounded corner of radius r
+  // takes r * (1 - 1 / sqrt 2) more on each axis.
+  const inset = radius => 2 + (parseFloat(radius) || 0) * (1 - Math.SQRT1_2);
+  const topLeft = inset(style.borderTopLeftRadius);
+  const topRight = inset(style.borderTopRightRadius);
+  const bottomLeft = inset(style.borderBottomLeftRadius);
+  const bottomRight = inset(style.borderBottomRightRadius);
   const points = [
     ['centre', box.left + box.width / 2, box.top + box.height / 2],
-    ['top left', box.left + 2, box.top + 2],
-    ['top right', box.right - 2, box.top + 2],
-    ['bottom left', box.left + 2, box.bottom - 2],
-    ['bottom right', box.right - 2, box.bottom - 2],
+    ['top left', box.left + topLeft, box.top + topLeft],
+    ['top right', box.right - topRight, box.top + topRight],
+    ['bottom left', box.left + bottomLeft, box.bottom - bottomLeft],
+    ['bottom right', box.right - bottomRight, box.bottom - bottomRight],
   ];
   const found = [];
   for (const [name, x, y] of points) {

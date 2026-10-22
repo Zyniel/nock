@@ -13,7 +13,9 @@ Choices where the spec leaves room:
 - The language scan's data are the nicknames as the page shows them and their two
   first letters, the room code, its link and FX-01's clue texts (spec 024's
   `language_data`); `H8` has no chat line.
-- The reaction is sent once the state is set, so that it shows during the scan.
+- The reaction is sent once the state is set, so that it shows during the scan;
+  in the `connection-banner` state it is sent just before the socket closes, since
+  a closed socket delivers nothing.
 """
 
 from __future__ import annotations
@@ -156,10 +158,19 @@ def open_scan_state(
         flags = [FlagView(player_id="p2", clue=IDES)]
         view = fx01_view(grid, changes)
         mock = open_h8(page, base_url, grid, False, view=view, flags=flags)
+        if state == "banner":
+            send_the_reaction(page, mock)
         set_state(page, mock, state)
-    mock.send(reaction_frame("p2", IDES, Reaction.CLAP))
+    if state != "banner":
+        send_the_reaction(page, mock)
     expect(page.get_by_test_id("clue-reaction")).to_have_count(1)
     return page
+
+
+def send_the_reaction(page: Page, mock: RoomMock) -> None:
+    """Send `p2`'s `clap` on IDES and wait until it shows."""
+    mock.send(reaction_frame("p2", IDES, Reaction.CLAP))
+    expect(page.get_by_test_id("clue-reaction")).to_have_count(1)
 
 
 def set_state(page: Page, mock: RoomMock, state: str) -> None:

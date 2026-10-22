@@ -1123,6 +1123,40 @@ def expect_closed(locator: Locator) -> None:
     )
 
 
+# The text of `grid-status` without the `recap-open` button it holds while the page
+# is solved, with its white space collapsed as Playwright's `to_have_text` does.
+STATUS_OWN_TEXT_SCRIPT = r"""
+element => {
+  const copy = element.cloneNode(true);
+  for (const button of copy.querySelectorAll('[data-testid="recap-open"]')) {
+    button.remove();
+  }
+  return copy.textContent.replace(/\s+/g, ' ').trim();
+}
+"""
+STATUS_POLL_MS = 50
+
+
+def expect_status_text(status: Locator, expected: str) -> None:
+    """Wait until `grid-status`'s own text, without `recap-open`, is `expected`.
+
+    Spec 043 puts « Voir le bilan » inside `grid-status` on a solved page, so the
+    status's text is read without that button.
+
+    Args:
+        status: The `grid-status` locator.
+        expected: The text it must show, for example `fr.json["completion.solved"]`.
+    """
+    expect(status).to_have_count(1)
+    text = ""
+    for _ in range(WAIT_TIMEOUT_MS // STATUS_POLL_MS):
+        text = str(status.evaluate(STATUS_OWN_TEXT_SCRIPT))
+        if text == expected:
+            return
+        status.page.wait_for_timeout(STATUS_POLL_MS)
+    raise AssertionError(f"grid-status reads {text!r}, not {expected!r}")
+
+
 def focused_test_id(page: Page) -> str | None:
     found = page.evaluate(
         "() => document.activeElement === null ? null"
