@@ -828,7 +828,11 @@ Other cases:
 - Cut heading (AC-12): in the low layout the feed heading can end with an ellipsis
   or shrink to no width (spec 014 AC-10). The feed list is still named by the
   heading's whole text, because `aria-labelledby` reads the text, not what is
-  shown. (Note from the lead, 2026-10-14.)
+  shown. (Note from the lead, 2026-10-14.) (Note from the lead, 2026-10-22: no
+  longer applies since spec 043, the design's room layout: the low layout and the
+  feed heading (`feed.heading`) are gone, and the stream list is named by the
+  Discussion panel's visually hidden `h2` `chat-heading` (spec 043, "Discussion:
+  the stream"), which is never cut. The item is kept as it read, for the record.)
 - Other Tab order checks (AC-12 with AC-1 to AC-3, AC-10 and spec 014). (Note from
   the lead, 2026-10-14: checked when AC-12 was added. None of them changes.)
   - Both lists come before the grid in document order. So "Nothing focusable after
