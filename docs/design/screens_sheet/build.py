@@ -2531,7 +2531,8 @@ def specs_kbd() -> str:
             "layout, but keeps the phone top bar: the computer bar's brand and "
             "labelled buttons need about 650 px. « Salon » is pressed while the "
             "340 px column is open (open by default); the menus open 58 px from the "
-            "top, as on a phone. The clue bar is never narrower than 320 px.",
+            "top, as on a phone. The clue bar is as wide as the smaller of 320 px "
+            "and the play area (about 203 px at 568 &times; 320).",
             '<span class="m">The same frame is drawn for a low desktop window '
             "(568 &times; 320), with « Crayon » in the fourth slot.</span>",
         ],
