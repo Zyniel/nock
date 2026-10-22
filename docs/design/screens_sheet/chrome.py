@@ -183,6 +183,11 @@ def note(text: str) -> str:
     return f'<div class="toast">{text}</div>'
 
 
+def note_under_vote(banner: str, text: str) -> str:
+    """Return the vote banner with a 3-second note 8 px under it (spec 043)."""
+    return f'<div class="vstack">{banner}{note(text)}</div>'
+
+
 def legend(players: list[int], names_of: list[str] | None = None) -> str:
     """Return the Auteurs legend; it wraps onto more lines (spec 045)."""
     who = names_of or FOUR

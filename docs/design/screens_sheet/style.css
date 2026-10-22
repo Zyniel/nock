@@ -295,6 +295,10 @@ ol.decisions li .alt { color: var(--nock-muted); font-size: .88rem; }
 .dcol { width: 340px; flex: none; border-left: 1px solid var(--nock-line); display: flex; flex-direction: column; background: var(--nock-white); }
 .dcol .prog { padding-top: 14px; }
 .dmain .vote { left: 8px; right: 8px; }
+/* a note while the vote banner shows: 8 px under the banner (spec 043 Decision 25) */
+.vstack { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.vstack .vote { position: relative; top: auto; left: auto; right: auto; align-self: stretch; }
+.vstack .toast { position: relative; top: auto; left: auto; transform: none; max-width: 100%; }
 
 /* plain pages */
 .screen { flex: 1; min-height: 0; display: grid; align-content: start; gap: 14px; padding: 20px 16px; background: var(--nock-page); overflow: hidden; }

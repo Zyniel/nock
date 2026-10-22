@@ -790,6 +790,13 @@ Content, top to bottom:
 - One line, ink background, white text (section 4), padding 8 px 12 px, radius
   6 px, shadow `0 6px 18px -8px var(--nock-shadow-strong)`, centred over the top
   edge of the grid area, 8 px down, layer 6 of the grid area. No layout shift.
+- While the vote banner shows, a note that shows (only « Rien à annuler. », since
+  the others wait) sits 8 px under the banner's bottom edge instead, with the same
+  look, layer 6 and horizontal centre, so that the banner (layer 9) never covers
+  it; it moves with the banner when the banner comes, changes height or goes.
+  (Note from the lead, 2026-10-22: added after spec 043 WP-2's first review, spec
+  043 Decision 25; at the usual place the banner covered the message. The screens
+  sheet's « Help by vote » screen draws it.)
 - A long note stays on its one line and ends with an ellipsis: at most the grid
   viewport's width in the sheet layout, that width less 16 px in the column layout,
   `overflow: hidden`, `text-overflow: ellipsis`. (Note from the lead, 2026-10-22:
@@ -810,7 +817,10 @@ Content, top to bottom:
 - Not shown while the stream is visible (Salon open on Discussion), and held back
   while the vote banner shows; they come after it goes. (Note from the lead,
   2026-10-22, after spec 043 WP-2's build: only the newest waits, and it is
-  dropped if the stream shows when the banner goes.)
+  dropped if the stream shows when the banner goes.) A note already showing when
+  the stream opens stays until its 3 s end. (Note from the lead, 2026-10-22: added
+  after spec 043 WP-2's first review, spec 043 Decision 26: "not shown" is about
+  making notes.)
 - Which events: others' messages (« Bruno : … »), « Je bloque », reveals, others'
   checks, joins and departures, and my own reaction. Never typed letters. Also two
   short answers of the room: « Rien à annuler. » after « Annuler » with nothing to
@@ -1031,7 +1041,9 @@ the room page"). Content: the question
 (`vote.question.*`); a row with « Oui » (primary) and « Non » (secondary), both with
 padding 7 px 16 px, and on the right the seconds left (« 18 s »); then a progress
 bar 4 px high, radius 2 px, word-blue track, navy fill for the time left. No
-layout shift. Notes wait while it shows.
+layout shift. Notes wait while it shows; « Rien à annuler. », which does not wait,
+shows 8 px under its bottom edge (section 8, « 3-second notes »; note from the
+lead, 2026-10-22, added after spec 043 WP-2's first review).
 
 Once I have voted, « Oui » and « Non » give way to the muted line « Vote
 enregistré. En attente des autres joueurs… » (500 0.85rem/1.3) in their row, the

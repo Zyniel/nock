@@ -29,6 +29,7 @@ from chrome import (
     keyboard,
     low_column_room,
     note,
+    note_under_vote,
     phone_dialog_sheet,
     phone_page,
     phone_pop,
@@ -527,7 +528,7 @@ def sec_entry() -> str:
 
 NOTE_MSG = "Bruno : AMEN, je pense 👍"
 NOTE_LONG = (
-    "Céline : Je crois que le mot du bas à droite est faux, " "on le reprend ensemble ?"
+    "Céline : Je crois que le mot du bas à droite est faux, on le reprend ensemble ?"
 )
 
 
@@ -1090,6 +1091,12 @@ def sec_help() -> str:
                 "», « Temps écoulé, vote annulé. ») comes as a 3-second note "
                 "when the banner goes."
             ),
+            (
+                "« Rien à annuler. » does not wait: during a vote it sits 8 px "
+                "under the banner's bottom edge, same look, layer 6, so the "
+                "banner never covers it (spec 043 Decision 25, the lead, "
+                "2026-10-22)."
+            ),
         ],
         [
             ("ph", PH + " · asked", phone_room(stage_extra=vote_banner())),
@@ -1097,6 +1104,15 @@ def sec_help() -> str:
                 "ph",
                 PH + " · voted",
                 phone_room(stage_extra=vote_banner("cast", secs="11 s", pct=55)),
+            ),
+            (
+                "ph",
+                PH + " · undo during the vote",
+                phone_room(
+                    stage_extra=note_under_vote(
+                        vote_banner("cast", secs="9 s", pct=45), "Rien à annuler."
+                    )
+                ),
             ),
             (
                 "pc",
