@@ -1229,7 +1229,6 @@ def hit_problem(page: Page, test_id: str) -> str | None:
 
 # ---- 3-second notes (WP-2) -------------------------------------------------------
 
-NOTE_SHOWN_MS = 3000  # "A note shows for 3,000 ms"
 NOTE_TOP_GAP_PX = 8.0  # "its top 8 px below the viewport's top"
 
 

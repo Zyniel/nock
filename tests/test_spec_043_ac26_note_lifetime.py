@@ -9,7 +9,9 @@ gets `data-off` and when it is removed, and a read at every animation frame note
 when its computed `opacity` first reads 0. The test then compares the noted
 times, so the wait between the test and the page does not count.
 
-The other checks of AC-26 are in `test_spec_043_ac26_notes.py`.
+A note that shows when `chat-toggle` opens the stream stays: it still shows 300 ms
+after the click (no `data-off`) and is gone by 3,700 ms after it appeared
+(Decision 26). The other checks of AC-26 are in `test_spec_043_ac26_notes.py`.
 
 Choices where the spec leaves room:
 
@@ -23,7 +25,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page
+from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from spec019_harness import OpenWindow, window_opener
@@ -152,3 +154,32 @@ def test_ac26_a_note_shows_3_seconds_then_fades_and_leaves(
     assert transparent <= OFF_BY_MS, reading
     assert gone is not None, reading
     assert STILL_SHOWS_MS <= gone <= GONE_BY_MS, reading
+
+
+# ---- AC-26: a shown note stays when the stream opens (Decision 26) ------------------
+
+AFTER_CLICK_MS = 300  # "it still shows 300 ms after the click"
+
+
+def test_ac26_a_note_shown_when_chat_toggle_opens_the_stream_stays_its_time(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(
+        page, live_server, snapshot_frame(fx01_view(fx01_grid), players_up_to(3))
+    )
+    page.evaluate(START_PROBE_SCRIPT)
+    mock.send(chat_frame(6, "p2", "IDES ?"))
+    note = page.get_by_test_id("room-note")
+    expect(note).to_be_visible()
+
+    page.get_by_test_id("chat-toggle").click()
+    expect(page.get_by_test_id("chat-panel")).to_be_visible()
+    page.wait_for_timeout(AFTER_CLICK_MS)
+
+    expect(note).to_have_count(1)
+    assert note.get_attribute("data-off") is None
+    reading = wait_until_the_note_is_gone(page)
+    gone = since_appeared(reading, "goneAt")
+    assert gone is not None, reading
+    assert gone <= GONE_BY_MS, reading

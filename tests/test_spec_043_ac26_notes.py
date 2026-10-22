@@ -6,28 +6,24 @@ the top of `grid-viewport` while the stream is not shown: for a message of
 another player, for the event lines of "3-second notes" (a check only when it is
 another player's) and for my own reaction. One note shows at a time, the newest
 replacing the older at once. A click opens the Salon on its Discussion tab. No
-note is made while the stream shows, and a note made while `vote-banner` is on
-the page waits for it to go. `undo-message` answers my own « Annuler » with the
-note's look and place, whatever shows. How long a note shows is tested in
+note is made while the stream shows, but a note already showing when the stream
+opens with `chat-toggle` stays (Decision 26), and a note made while `vote-banner`
+is on the page waits for it to go. `undo-message` answers my own « Annuler » with
+the note's look and place, whatever shows; while the banner is on the page it sits
+8 px under the banner, uncovered (Decision 25). How long a note shows is tested in
 `test_spec_043_ac26_note_lifetime.py`.
+
+The end of a vote is tested in the reading spec 043's build meets (AC-26's note
+"until spec 047 is built"): the banner keeps spec 025's result time, then exactly
+one note shows, the latest that waited (`Bob : deux`, never `Bob : un`). Spec
+047's build checks the banner leaving within 300 ms and the note of the vote's
+result.
 
 Also tested, from "3-second notes" and "Edge cases and errors": each kind of
 event line that makes a note (joins, the three departures, a flag and a reveal,
 mine too), the kinds that make none, the snapshot and catch-up lines (spec 034)
 making none, a click on a note selecting Discussion after Joueurs, a note while
-the Salon column shows Joueurs, and `undo-message` replacing a shown note and
-showing during a vote.
-
-Not tested, a question for the lead: AC-26's end of a vote as spec 047 refines it
-("once the mock's `vote_closed` (`passed`) comes, the banner is gone within 300 ms
-and one note shows, reading `fr.json["vote.result.passed"]`"). Spec 047 is not
-built: until it is, the banner shows spec 025's result for 2.5 to 4.5 s, the
-stream has no `vote` line, and the note that waited (`Bob : deux`) shows after
-the banner, as AC-26 read before spec 047's note. Spec 043 has no "until spec 047
-is built" reading for it (as it has for AC-27 and spec 044), and spec 047's
-"Refined specs" gives this test to spec 047's test-writer. What holds in both
-readings is tested: no note while the banner is on the page, and once it has gone
-exactly one note shows, never the older waiting `Bob : un`.
+the Salon column shows Joueurs, and `undo-message` replacing a shown note.
 
 Choices where the spec leaves room:
 
@@ -79,6 +75,7 @@ from spec043_harness import (
     FOLLOW_MS,
     FX01_CLUE_TEXTS,
     IDES,
+    NOTE_TOP_GAP_PX,
     QUIET_MS,
     WAIT_TIMEOUT_MS,
     Reading,
@@ -92,6 +89,7 @@ from spec043_harness import (
     fr_format,
     fr_value,
     fx01_view,
+    hit_problem,
     icon_problems,
     joined_frame,
     left_frame,
@@ -103,6 +101,7 @@ from spec043_harness import (
     players_up_to,
     reaction_frame,
     reveal_frame,
+    same_position,
     send_and_wait,
     settings_frame,
     shows_pictogram,
@@ -569,9 +568,12 @@ def recorded_notes(page: Page) -> list[str]:
     return [str(text) for text in found]
 
 
-def open_vote(window: OpenWindow, base_url: str, grid: Grid) -> tuple[Page, RoomMock]:
-    """The room at 360 by 740 in help mode `vote`, once `p2`'s grid check vote shows."""
-    page, mock = open_fx01(window, base_url, grid, help_mode=HelpMode.VOTE)
+def open_vote(
+    window: OpenWindow, base_url: str, grid: Grid, size: tuple[int, int] = PHONE
+) -> tuple[Page, RoomMock]:
+    """The room in help mode `vote` (360 by 740 by default), once `p2`'s grid check
+    vote shows."""
+    page, mock = open_fx01(window, base_url, grid, size=size, help_mode=HelpMode.VOTE)
     send_and_wait(page, mock, vote_opened_frame(6, "p2"))
     expect(page.get_by_test_id("vote-banner")).to_be_visible()
     return page, mock
@@ -607,8 +609,7 @@ def test_ac26_after_the_vote_one_note_shows_and_never_the_older_waiting_one(
     page.wait_for_timeout(SETTLE_AFTER_NOTE_MS)
 
     texts = recorded_notes(page)
-    assert len(texts) == 1, texts
-    assert texts[0] != fr_format("note.message", name="Bob", text="un"), texts
+    assert texts == [fr_format("note.message", name="Bob", text="deux")]
 
 
 # ---- Reduced motion --------------------------------------------------------------
@@ -685,11 +686,23 @@ def test_ac26_undo_message_replaces_a_shown_note(
     expect(notes(page)).to_have_count(0, timeout=FOLLOW_MS)
 
 
-def test_ac26_undo_message_shows_while_the_vote_banner_is_on_the_page(
-    window: OpenWindow, live_server: str, fx01_grid: Grid
+@pytest.mark.parametrize("size", [PHONE, COMPUTER], ids=["360x740", "1280x720"])
+def test_ac26_during_a_vote_undo_message_sits_8_px_under_the_banner_uncovered(
+    window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
 ) -> None:
-    page, mock = open_vote(window, live_server, fx01_grid)
+    page, mock = open_vote(window, live_server, fx01_grid, size=size)
 
-    answer_undo_with_nothing(page, mock)
+    message = answer_undo_with_nothing(page, mock)
 
-    expect(page.get_by_test_id("vote-banner")).to_be_visible()
+    banner = page.get_by_test_id("vote-banner")
+    expect(banner).to_be_visible()
+    box = box_of(message)
+    banner_box = box_of(banner)
+    viewport_box = box_of(page.get_by_test_id("grid-viewport"))
+    assert same_position(box.centre_x, viewport_box.centre_x), (box, viewport_box)
+    assert same_position(box.top, banner_box.bottom + NOTE_TOP_GAP_PX), (
+        box,
+        banner_box,
+    )
+    assert style_of(message, "zIndex") == "6"
+    assert hit_problem(page, "undo-message") is None

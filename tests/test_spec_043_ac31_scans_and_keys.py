@@ -19,7 +19,9 @@ Choices where the spec leaves room:
   note's message, so that both are as fresh as can be (each shows 3 seconds).
 - The `room-note` state: the Salon closed (with `chat-toggle` in the column
   layout, where it is open at load), then a `chat_message` from `p2` (seq 106,
-  after `H8`'s lines) makes the note, `Bob : IDES ?`.
+  after `H8`'s lines) makes the note, `Bob : IDES ?`. After each scan the test
+  checks that the note is still on the page, so that a scan that outlasts the
+  note's 3 seconds fails rather than checking a page without it.
 """
 
 from __future__ import annotations
@@ -223,6 +225,16 @@ def set_state(page: Page, mock: RoomMock, state: str) -> None:
         expect(page.get_by_test_id("connection-banner")).to_be_visible()
 
 
+def expect_note_outlasted_the_scan(page: Page, state: str) -> None:
+    """In the `note` state, fail unless `room-note` is still on the page.
+
+    A scan that outlasts the note's 3 seconds would check a page without it.
+    """
+    if state == "note":
+        count = page.get_by_test_id("room-note").count()
+        assert count == 1, "the room-note left before the scan ended"
+
+
 # ---- AC-31: the scans --------------------------------------------------------------
 
 
@@ -236,7 +248,10 @@ def test_ac31_the_contrast_scan_finds_no_offender(
 ) -> None:
     page = open_scan_state(window, live_server, fx01_grid, size, state)
 
-    assert contrast_problems(page) == []
+    problems = contrast_problems(page)
+
+    expect_note_outlasted_the_scan(page, state)
+    assert problems == []
 
 
 @pytest.mark.parametrize(("size", "state"), SCAN_CASES, ids=SCAN_IDS)
@@ -252,8 +267,10 @@ def test_ac31_the_language_scan_finds_no_offender(
 
     data = language_data(live_server, DISPLAY_NICKNAMES)
     data.add(NOTE_CHAT_TEXT)
+    problems = language_problems(page, data)
 
-    assert language_problems(page, data) == []
+    expect_note_outlasted_the_scan(page, state)
+    assert problems == []
 
 
 # ---- AC-31: the keys of fr.json ------------------------------------------------------
