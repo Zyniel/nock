@@ -197,11 +197,11 @@
   }
 
   .ops-replay-cell {
-    border: 1px solid #5b6070;
+    border: 1px solid var(--nock-rule);
     font-weight: bold;
   }
 
   .ops-replay-block {
-    background: #5b6070;
+    background: var(--nock-thumb);
   }
 </style>

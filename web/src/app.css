@@ -1,36 +1,99 @@
-/* One colour per player index 0 to 7 (spec 012); later specs reuse them. */
+/* The token block (spec 041, specs/_design.md sections 2 to 4): every colour of
+   the client is declared here, once, and used everywhere else through var().
+   No other rule of the client writes a colour value. */
 :root {
-  --player-colour-0: #e6194b;
-  --player-colour-1: #3cb44b;
-  --player-colour-2: #4363d8;
-  --player-colour-3: #f58231;
-  --player-colour-4: #911eb4;
-  --player-colour-5: #008080;
-  --player-colour-6: #9a6324;
-  --player-colour-7: #808000;
+  /* Colour tokens (_design.md section 2). */
+  --nock-navy: #1b2f55;
+  --nock-ink: #14181f;
+  --nock-muted: #5e6573;
+  --nock-pencil: #555b67;
+  --nock-white: #ffffff;
+  --nock-page: #f6f7f9;
+  --nock-clue-bg: #eef2f8;
+  --nock-clue-ink: #1b2230;
+  --nock-word: #e6edf9;
+  --nock-selected: #cfddf3;
+  --nock-locked: #e3e7ee;
+  --nock-rule: #9aa3b2;
+  --nock-line: #dde2ea;
+  --nock-red: #b42318;
+  --nock-reveal: #c2410c;
+  --nock-green: #1e7b45;
+  --nock-green-bg: #e6f2ea;
+  --nock-key: #e9ecf1;
+  --nock-keyboard-bg: #d9dee6;
+  --nock-handle: #c5ccd8;
+  --nock-thumb: #c9d2e0;
 
-  /* The neutral colours of the authors view (spec 019): the two greys of the
-     hatched band of an author who is no longer in the room. They are greys, so
-     neither is a player colour, and between them they keep at least 3:1 on every
-     background a letter cell can have. */
-  --author-departed-dark: #333333;
-  --author-departed-light: #ffffff;
+  /* Translucent tokens, all built on ink or white. */
+  --nock-scrim: rgb(20 24 31 / 35%);
+  --nock-scrim-dialog: rgb(20 24 31 / 38%);
+  --nock-dot-ring: rgb(20 24 31 / 55%);
+  --nock-key-shadow: rgb(20 24 31 / 25%);
+  --nock-shadow-soft: rgb(20 24 31 / 35%);
+  --nock-shadow: rgb(20 24 31 / 45%);
+  --nock-shadow-strong: rgb(20 24 31 / 50%);
+  --nock-legend-bg: rgb(255 255 255 / 96%);
+  --nock-pen-fill: rgb(255 255 255 / 35%);
+
+  /* One colour per player, by join index 0 to 7 (spec 012, _design.md
+     section 3): corner triangles, word tints, flashes, dots and swatches. */
+  --player-colour-0: #604800;
+  --player-colour-1: #608838;
+  --player-colour-2: #008878;
+  --player-colour-3: #6838e0;
+  --player-colour-4: #b83850;
+  --player-colour-5: #d000a0;
+  --player-colour-6: #b06000;
+  --player-colour-7: #784030;
+
+  /* The Auteurs ink of each player: the player colour darkened just enough to
+     keep 4.5:1 on the selected cell. Nothing uses them yet. */
+  --player-ink-0: #604800;
+  --player-ink-1: #4b6a2c;
+  --player-ink-2: #006d60;
+  --player-ink-3: #6838e0;
+  --player-ink-4: #ad354b;
+  --player-ink-5: #b3008a;
+  --player-ink-6: #904f00;
+  --player-ink-7: #784030;
+
+  /* Font tokens (_design.md section 4). The faces are served by Nock itself
+     (the @fontsource imports of main.ts). */
+  --nock-font-ui: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  --nock-font-clue:
+    'IBM Plex Sans Condensed', 'Arial Narrow', 'Roboto Condensed', sans-serif;
+
+  /* The focus ring (spec 035, spec 041). It is a variable for the controls
+     that draw it on :focus instead of :focus-visible. */
+  --focus-outline: 2px solid var(--nock-navy);
 
   /* The hatching of a player who is no longer in the room: diagonal stripes of
-     those two greys, 2px each, a pattern no player colour has. The band of the
-     authors view (spec 019) and the swatch of the recap (spec 028) both use it. */
+     ink and white, 2px each, a pattern no player colour has. The band of the
+     authors view (spec 019) and the swatch of the recap (spec 028) both use it.
+     Ink keeps at least 3:1 on every background a letter cell can have. */
   --author-departed-hatching: repeating-linear-gradient(
     45deg,
-    var(--author-departed-dark) 0 2px,
-    var(--author-departed-light) 2px 4px
+    var(--nock-ink) 0 2px,
+    var(--nock-white) 2px 4px
   );
 }
 
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
-  color: #1f2330;
-  background: #ffffff;
+  font-family: var(--nock-font-ui);
+  color: var(--nock-ink);
+  background: var(--nock-white);
+}
+
+/* Form controls take their parent's font instead of the OS control font, so
+   that they look the same on every OS. A component or a primitive that sets its
+   own font on a control still wins. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 main {
@@ -39,15 +102,23 @@ main {
   padding: 2rem 1rem;
 }
 
-/* A visible focus on every focusable element after a keyboard move (spec 035).
-   The outline is a variable for the controls that draw it on :focus instead. */
-:root {
-  --focus-outline: 3px solid #1a4fd6;
-}
-
+/* A visible focus on every focusable element after a keyboard move (spec 035):
+   2px navy, 2px away from the element. */
 :focus-visible {
   outline: var(--focus-outline);
   outline-offset: 2px;
+}
+
+/* A navy surface (the clue bar of _design.md section 8 will be one). Its focus
+   ring is white and drawn inside the element. */
+.nock-on-navy {
+  background: var(--nock-navy);
+  color: var(--nock-white);
+}
+
+.nock-on-navy :focus-visible {
+  outline-color: var(--nock-white);
+  outline-offset: -4px;
 }
 
 /* Hidden from sight but read by assistive technology (spec 035). */
@@ -61,4 +132,124 @@ main {
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* ---- Styling primitives (_design.md section 11) ------------------------------
+   Global classes that later specs put on controls. */
+
+/* A button: every variant has this shape. */
+.nock-button {
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: 600 0.95rem/1 var(--nock-font-ui);
+  cursor: pointer;
+}
+
+.nock-button-primary {
+  color: var(--nock-white);
+  background: var(--nock-navy);
+  border-color: transparent;
+}
+
+.nock-button-secondary {
+  color: var(--nock-navy);
+  background: var(--nock-white);
+  border-color: var(--nock-navy);
+}
+
+.nock-button-quiet {
+  color: var(--nock-navy);
+  background: var(--nock-word);
+  border-color: transparent;
+}
+
+/* Any variant, disabled: muted on clue blue-grey keeps 5.22:1. */
+.nock-button:disabled {
+  color: var(--nock-muted);
+  background: var(--nock-clue-bg);
+  border-color: var(--nock-line);
+  cursor: not-allowed;
+}
+
+/* A menu or a popover. */
+.nock-menu {
+  min-width: 220px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--nock-white);
+  box-shadow: 0 12px 30px -10px var(--nock-shadow);
+}
+
+/* A full-width button in a menu; its detail, if any, on the right. */
+.nock-menu-item {
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  font: 500 1rem/1.2 var(--nock-font-ui);
+  color: var(--nock-navy);
+  background: transparent;
+  text-align: left;
+}
+
+.nock-menu-item:hover {
+  background: var(--nock-word);
+}
+
+.nock-menu-detail {
+  color: var(--nock-muted);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.nock-menu-heading {
+  margin: 6px 16px 2px;
+  font: 600 0.7rem/1.2 var(--nock-font-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--nock-muted);
+}
+
+.nock-menu-separator {
+  margin: 4px 0;
+  border: 0;
+  border-top: 1px solid var(--nock-line);
+}
+
+/* A count on a button: white on red keeps 6.57:1. */
+.nock-badge {
+  padding: 2px 4px;
+  border-radius: 8px;
+  font: 700 0.62rem/1 var(--nock-font-ui);
+  color: var(--nock-white);
+  background: var(--nock-red);
+}
+
+/* The 3-second note. With the attribute data-off it fades out and lets the
+   pointer through; the fade is left out when motion is reduced. */
+.nock-note {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font: 500 0.85rem/1.2 var(--nock-font-ui);
+  white-space: nowrap;
+  color: var(--nock-white);
+  background: var(--nock-ink);
+  box-shadow: 0 6px 18px -8px var(--nock-shadow-strong);
+  transition: opacity 0.25s;
+}
+
+.nock-note[data-off] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nock-note {
+    transition: none;
+  }
 }

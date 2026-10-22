@@ -53,6 +53,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from playwright.sync_api import Browser, BrowserContext, Locator, Page, Route, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.protocol import EditLetter, GridSolved, Join
 from nock.room import (
@@ -462,6 +463,7 @@ def open_catalogue(page: Page, base_url: str, summaries: SummariesRoute | None) 
     expect(page.get_by_test_id("catalogue-page")).to_have_attribute(
         "data-state", "ready", timeout=WAIT_TIMEOUT_MS
     )
+    wait_for_fonts(page)
 
 
 def history_section(page: Page) -> Locator:

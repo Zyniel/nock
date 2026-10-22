@@ -80,12 +80,17 @@ the selected word's clue).
 Highlights are visible: the computed `background-color` of the selected cell, of
 the other cells of the selected word, and of the letter cells outside it are three
 different colours; an active `clue` has a `background-color` different from an
-inactive one. (Note from the lead, 2026-10-22: refined by spec 042, the design's
-grid cells, which fixes these colours (selected blue, word blue, white; the active
-clue's half in selected blue with a 2 px radius) and lets a locked cell keep its
-locked grey inside my word. No criterion of this spec changes: the three colours
-still differ. An arrow is now drawn inside the word's first letter cell, so a tap
-on it selects that cell.)
+inactive one. (Note from the lead, 2026-10-22: since spec 041 AC-15, the selected
+cell has the background rgb(207, 221, 243) (selected blue) and a 2 px solid navy
+outline, rgb(27, 47, 85), drawn inside the cell (`outline-offset` `-2px`); the
+other cells of the selected word have rgb(230, 237, 249); a plain letter cell is
+white. Before, the selected cell was yellow with a 3 px ink outline. The three
+colours still differ.) (Note from the lead, 2026-10-22: refined by spec 042, the
+design's grid cells, which fixes these colours (selected blue, word blue, white;
+the active clue's half in selected blue with a 2 px radius) and lets a locked
+cell keep its locked grey inside my word. No criterion of this spec changes: the
+three colours still differ. An arrow is now drawn inside the word's first letter
+cell, so a tap on it selects that cell.)
 
 ### Clue bar
 
@@ -132,7 +137,7 @@ page may send at any time once the socket is open.)
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-2.2.1) (browser with mocked socket) Tapping a letter cell selects it and highlights its whole word and that word's clue. On an empty FX-01 grid, tapping (2, 2) gives the grid `data-selected-row="2"`, `data-selected-column="2"`, `data-direction="across"`, `data-word="2,0,0"` (VIDE); (2, 2) has `data-selected="true"`; exactly (2, 1), (2, 2), (2, 3), (2, 4) have `data-in-word="true"`; the clue `Sans contenu` has `data-active="true"` and no other clue does; the three highlight colours differ as stated above.
+- **AC-1** (AC-2.2.1) (browser with mocked socket) Tapping a letter cell selects it and highlights its whole word and that word's clue. On an empty FX-01 grid, tapping (2, 2) gives the grid `data-selected-row="2"`, `data-selected-column="2"`, `data-direction="across"`, `data-word="2,0,0"` (VIDE); (2, 2) has `data-selected="true"`; exactly (2, 1), (2, 2), (2, 3), (2, 4) have `data-in-word="true"`; the clue `Sans contenu` has `data-active="true"` and no other clue does; the three highlight colours differ as stated above (Note from the lead, 2026-10-22: since spec 041 they are rgb(207, 221, 243), rgb(230, 237, 249) and white, as the note above says).
 - **AC-2** (AC-2.2.2) (browser with mocked socket) Tapping the selected cell again switches between its across and down word. On a cell with one word (N or T in FX-01), nothing changes. Tapping (1, 1) gives `across`, `data-word="0,0,0"`; tapping it again gives `down`, `data-word="0,0,1"`; a third tap gives `across` again. Tapping (0, 1) gives `down`, `data-word="0,0,1"`, and tapping it again leaves `down` and `0,0,1`; tapping (1, 0) gives `across`, `0,0,0`, and again leaves them.
 - **AC-3** (AC-2.2.3) (browser with mocked socket) Tapping a clue selects the first empty cell of its word. In a two-clue cell, each half selects its own word. With a snapshot where (1, 2) holds `M`, tapping the clue `Artiste muet` gives (2, 2), `down`, `data-word="0,2,0"`. Tapping the clue `Passoire fine` gives (1, 0), `across`, `0,0,0`; tapping `De la marine` gives (0, 1), `down`, `0,0,1`. With a snapshot where (1, 3), (2, 3), (3, 3), (4, 3) hold `I`, `D`, `E`, `S`, tapping `Fatales à César` gives (1, 3), `down`, `0,3,0`.
 - **AC-4** (AC-2.2.4) (browser with mocked socket, phone window) The selected word's clue is repeated at 14 px or more in a bar that stays visible above the keyboard. After tapping (3, 1), `clue-bar-text` reads `Fin de prière`, `clue-bar` has `data-word="3,0,0"`, its computed `font-size` is 14 px or more, and its box lies inside the window (top at least 0, bottom at most `window.innerHeight`). It stays inside the window after `window.scrollTo(0, 10000)` and after scrolling `grid-viewport` to its end. Before any tap it reads `fr.json["clue_bar.empty"]`. The in-app keyboard part is spec 009 AC-4.

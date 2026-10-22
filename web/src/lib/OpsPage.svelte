@@ -192,16 +192,16 @@
 
   .ops-periods button {
     padding: 0.4rem 0.75rem;
-    border: 1px solid #1f2330;
+    border: 1px solid var(--nock-navy);
     border-radius: 0.25rem;
-    background: #ffffff;
-    color: #1f2330;
+    background: var(--nock-white);
+    color: var(--nock-navy);
     font: inherit;
   }
 
   .ops-periods button[aria-pressed='true'] {
-    background: #1f2330;
-    color: #ffffff;
+    background: var(--nock-navy);
+    color: var(--nock-white);
   }
 
   .ops-metrics {

@@ -32,7 +32,105 @@ claude                               # log in with your Claude account, accept t
 Accepting the trust prompt matters: the hooks in `.claude/settings.json` only run
 in a folder you have trusted.
 
-## 2. Building a feature
+## 2. Adding grids
+
+The repository holds no grid: a fresh server lists none. Grids enter the
+product only as files in a `grids/` folder (specs 004 and 005).
+
+**Where the server looks.** In the `grids/` folder at the root of the
+repository, next to `src/` and `web/` (`GRIDS_DIR` in `src/nock/catalogue.py`,
+worked out from the place of that module). No environment variable and no
+option changes it. The folder is not created for you: create it, and a missing
+folder gives an empty catalogue. The server reads it once, when it starts, so
+restart the server after any change.
+
+**Files.** One file per grid, directly inside `grids/`. Any name ending in
+lower-case `.json` is read (`grid-0001.json`); a name that starts with `.`, a
+name ending in `.JSON` or any other extension, and sub-folders, are ignored.
+The files are read in the order of their names, but the grid number comes from
+the `number` key inside the file, not from the name. Two files with the same
+number are refused.
+
+**File format.** A JSON object (UTF-8) with exactly these keys, and no other:
+
+| Key | Rule |
+| --- | --- |
+| `number` | Whole number from 1 to 999999999, unique in the folder. |
+| `published_on` | Text written `YYYY-MM-DD`. |
+| `force` | Whole number from 1 (easy) to 4 (hard). |
+| `published` | `true` or `false`. A grid that is not published is not listed and its address answers "not found". |
+| `author`, `source`, `licence` | The credits, see below. |
+| `withdrawn` | Optional `true` or `false` (default `false`). A withdrawn grid is not listed and no new room can start on it; rooms already created on it keep working. |
+| `grid` | The grid itself, in the format of spec 002. |
+
+The example below is the file of grid 1, built from the FX-01 grid
+(`tests/fixtures/fx01.json`) and the credits of `tests/fixtures/credits.json`.
+The `...` stands for the other 20 cells of `fx01.json`, which must all be
+written out (a 5 by 5 grid has 25 cells):
+
+```json
+{
+  "number": 1,
+  "published_on": "2026-10-01",
+  "force": 2,
+  "published": true,
+  "author": "Équipe Nock",
+  "source": "Commande Nock 2026",
+  "licence": "Contrat d'auteur Nock n° 1",
+  "grid": {
+    "width": 5,
+    "height": 5,
+    "cells": [
+      {"type": "clue", "row": 0, "column": 0, "clues": [{"text": "Passoire fine", "arrow": "down_then_right", "answer": "TAMIS"},{"text": "De la marine", "arrow": "right_then_down", "answer": "NAVAL"}]},
+      {"type": "letter", "row": 0, "column": 1},
+      {"type": "clue", "row": 0, "column": 2, "clues": [{"text": "Artiste muet", "arrow": "down", "answer": "MIME"}]},
+      ...
+    ]
+  }
+}
+```
+
+In `grid`, `width` and `height` count the cells, and `cells` holds exactly one
+cell per position, with `row` and `column` counted from 0. A cell is
+`"letter"` (a letter of the solution), `"clue"` (one or two `clues`) or
+`"empty"`. A clue has a `text`, an `answer` and an `arrow`: `right`, `down`,
+`down_then_right` or `right_then_down`; the arrow says where the word starts and
+which way it runs. The answer is normalised to the letters A to Z (accents and
+the ligatures Œ and Æ are folded; spaces, hyphens and apostrophes are removed).
+A grid is refused when an arrow points outside the grid or to a cell that is not
+a letter, when an answer is not as long as its word, when two clues give the same
+word, when a letter belongs to no word, when a run of two or more letters has no
+clue, or when two crossing words disagree on their shared letter.
+
+**Credits and licence.** Spec 005 requires `author`, `source` and `licence` in
+every file: the creator of the grid, where it comes from, and the licence or
+contract that lets you publish it. Each one is a text of 1 to 200 characters
+once the spaces at both ends are removed. A key that is missing, blank, too long
+or not a text refuses the file, so the server does not start with a grid whose
+rights are not written down.
+
+**An invalid file.** `load_catalogue` stops at the first bad file, in the order
+of the names, and raises `CatalogueError`; the server loads the folder when
+`nock.server` is imported, so `uv run python -m nock` stops with that error and
+its traceback instead of starting. The last line gives the file name and the
+reason, for example:
+
+```text
+nock.catalogue.CatalogueError: grid-0002.json: invalid catalogue file: words TAMIX and SENT disagree at (1, 4): X against S
+nock.catalogue.CatalogueError: grid-0003.json: duplicate grid number 1
+```
+
+Fix or remove the file and start again.
+
+**Checking the result.** Build the web client once (`npm --prefix web ci`, then
+`npm --prefix web run build`; without it, `/` answers 503 with "The web client
+is not built"), start the server with `uv run python -m nock`, and open
+`http://127.0.0.1:8000/`. The page lists the published grids, newest
+publication date first, with their number, date, force, size and word count.
+`http://127.0.0.1:8000/api/grids` gives the same list as JSON, without any
+clue, and `/g/<number>` opens a grid.
+
+## 3. Building a feature
 
 Inside `claude`, in this folder:
 
@@ -60,7 +158,7 @@ tests (`tests/test_spec_002_grid_schema.py`) and its code (`src/nock/grid.py`).
 `001-slugify` and the original backlog, `complete.md`, that specs 002 to 038 were
 split from. The gate, pytest and pyrefly ignore it.
 
-## 3. Where things go
+## 4. Where things go
 
 | You want to change | Put it in | Loaded |
 | --- | --- | --- |
@@ -178,7 +276,7 @@ The accounts are kept in the `NOCK_DATABASE` file, with the rooms. A refused
 value stops the start with a message that names the variable; it never shows
 the password.
 
-## 4. The quality gate
+## 5. The quality gate
 
 `scripts/gate.py` is the single definition of "done". It runs:
 
@@ -233,7 +331,7 @@ play both sides from PowerShell:
   uv run --no-project python scripts/hooks/role_gate.py; $LASTEXITCODE
 ```
 
-## 5. GitHub
+## 6. GitHub
 
 ```powershell
 gh auth login
@@ -244,7 +342,7 @@ CI needs no secret and no configuration. To make it binding, protect `main` in t
 repository settings and require the `Quality gate` check before merging: it
 passes only when every job of CI passed.
 
-## 6. From subagents to an agent team
+## 7. From subagents to an agent team
 
 The default mode uses **subagents**: the three agents run one after the other
 inside your session and report to the lead. It is the cheaper mode and it fits a
@@ -266,7 +364,7 @@ Known limits of teams today: they need an interactive session, resuming a sessio
 does not bring teammates back, and split panes do not work in Windows Terminal
 (teammates show in a panel under the prompt instead).
 
-## 7. Changing the kit
+## 8. Changing the kit
 
 - **Package name:** the package is `nock` in `src/nock/`. To rename it, ask Claude:
   "rename the package nock to X everywhere, then run the gate".
@@ -278,3 +376,13 @@ does not bring teammates back, and split panes do not work in Windows Terminal
 - **Another role** (security review, documentation): copy an agent file, give it
   a new `name` and `description`, and add a step to
   `.claude/skills/feature/SKILL.md`.
+
+## 8. Credits
+
+The web client uses two font families, served by Nock itself from its own origin
+(the npm packages `@fontsource/source-sans-3` and
+`@fontsource/ibm-plex-sans-condensed`, built into `web/dist`):
+
+- Source Sans 3, designed by Adobe, under the SIL Open Font License 1.1.
+- IBM Plex Sans Condensed, copyright 2019 IBM Corp., under the SIL Open Font
+  License 1.1.

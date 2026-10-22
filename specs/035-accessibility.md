@@ -236,10 +236,16 @@ remove button.)
   `outline-color` of contrast at least 3:1 against the page background. (A global
   `:focus-visible` rule is enough; spec 006's `.grid:focus { outline: none; }`
   goes.) (Note from the lead, 2026-10-14: the scrolling lists of AC-12 were added
-  to the list of elements in brackets.)
+  to the list of elements in brackets.) (Note from the lead, 2026-10-22: since
+  spec 041, the focus ring is 2 px solid navy, rgb(27, 47, 85), 13.26:1 against
+  white, where it was 3 px blue #1A4FD6; the rule above, at least 2 px and 3:1,
+  still holds.)
 - The selected letter cell (spec 007) always has a computed `outline-style` of
   `solid` and an `outline-width` of at least 2 px, whether the grid has the focus
-  or not; other letter cells have `outline-style` `none`.
+  or not; other letter cells have `outline-style` `none`. (Note from the lead,
+  2026-10-22: since spec 041, the selected cell's outline is 2 px solid navy
+  drawn inside the cell (`outline-offset` `-2px`), where it was 3 px ink; the rule
+  above still holds.)
 - A locked letter cell (spec 016) shows its letter with a computed `font-weight`
   of at least 700; an unlocked letter cell's `font-weight` is below 700.
 - Each `remote-selection` element (spec 013) of a player who gets a label (see
@@ -574,7 +580,7 @@ The words in brackets say how each criterion is tested.
 - **AC-5** (new, from spec 006's review) (browser with mocked socket) The grid exposes grid, row and gridcell roles. On a FX-01 snapshot: `page.get_by_role("grid")` has one element; it has 5 `grid-row` children with `role="row"` and `data-row` 0 to 4; each holds 5 elements with `role="gridcell"`, `data-row` equal to its row and `data-column` 0 to 4 in order; `page.get_by_role("gridcell")` counts 25; `cell-2-2` is the `cell` at (2, 2); with nothing selected the grid has no `aria-activedescendant` and every letter cell has `aria-selected="false"`; after tapping (2, 2) the grid's `aria-activedescendant` is `cell-2-2`, that cell has `aria-selected="true"` and the 17 other letter cells `false`; spec 006's layout criteria (cell squares, positions) still pass.
 - **AC-6** (AC-10.1.3) (browser with mocked socket) Colour is never the only signal: with the Accessibilité mode on, each player's cursor is their own icon, and the roster shows which icon is whose. Given a FX-01 snapshot with `p1` (`you`, colour 0), `p2` `Jean-Luc` (colour 1) selecting (2, 2) `down`, `p3` `Ana` (colour 2) selecting (2, 2) `across` and `p4` `zoé` (colour 3) selecting (1, 0), after a click on `access-switch` (spec 042): the cell (2, 2) holds two `remote-selection` elements with `data-shape="icon"`, whose `player-icon` elements have `data-icon` `1` and `2`, hold the shapes of `PLAYER_ICONS[1]` (a square) and `PLAYER_ICONS[2]` (a triangle), and lie inside the cell's bounding box (1 px tolerance) with computed `visibility` `visible`; (1, 0) holds one with `data-icon` `3` (a diamond); the `roster-colour` of each of `p2`, `p3` and `p4` holds one `player-icon` with the same `data-icon` as on the grid; after `selection_moved` of `p2` to (3, 1), (3, 1) holds `p2`'s icon and (2, 2) only `p3`'s. With the switch off, the same cursors are triangles with no text (spec 042 AC-9). (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells, as the human decided on 2026-10-16. This read "each player's cursor also carries their initials" and checked the `remote-initials` `JL`, `AN` and `ZO`.)
 - **AC-7** (AC-10.1.3) (browser with mocked socket) Locked letters and roster states differ by more than colour. In state K2, (1, 0) (locked) has a computed `font-weight` of 700 or more and (1, 2) (not locked) below 700. In the same state, at 1280 by 720 and at 360 by 740, the roster items behave as follows. The `roster-player` items of `p2` (active), `p3` (idle) and `p4` (disconnected), each of their descendants and each of their ancestors have a computed `opacity` of `1`. The `roster-nickname` of `p3` has `font-style` `italic` and a `text-decoration-line` without `line-through`, and its `roster-state` reads `inactif`. The `roster-nickname` of `p4` has `font-style` `italic` and a `text-decoration-line` containing `line-through`, and its `roster-state` reads `déconnecté`. The `roster-nickname` of `p2` has `font-style` `normal` and no `line-through`, and its `roster-state` reads `actif`. (Note from the lead, 2026-10-13: the roster part was added. It settles the "Translucent styles" edge case.)
-- **AC-8** (AC-10.1.3) (browser with live server and mocked socket) Text contrast is at least 4.5:1. The contrast scan of the test harness finds no offending element in each of the states K1 to K7, at both window sizes.
+- **AC-8** (AC-10.1.3) (browser with live server and mocked socket) Text contrast is at least 4.5:1. The contrast scan of the test harness finds no offending element in each of the states K1 to K7, at both window sizes. (Note from the lead, 2026-10-22: since spec 041, every text pair is in `_design.md` section 2 and reaches 4.5:1; in K3 the letter is ink on the white cell, the flash colour being a `cell-flash` overlay at 38 % opacity; the muted labels of the disabled reveal and vote buttons on clue blue-grey reach 5.22:1.)
 - **AC-9** (AC-10.1.4) (browser with live server and mocked socket; static) The interface is in French by default, with every string in a translation file. In each state K1 to K7, `document.documentElement.lang` is `fr` and the language scan of the test harness finds no text outside `fr.json` and the test's data; the scan's checker flags the samples `Loading…`, `Salle` (alone, no template is exactly `Salle`) and `Check word`, and accepts `Salon` (spec 043's `topbar.salon`), `Salon ABC123`, `Grille n° 2` and `Ana a rejoint le salon`. (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; the flagged sample was `Salon` ("no template is exactly `Salon`"), which the « Salon » button's label now is.) (Note from the lead, 2026-10-16: the checker also flags the samples `Error: connection lost`, `Score: 3` and `Grille n° deux`, and accepts `0:00` and `1:02:05`, as the number placeholders of "Language scan" in "Test harness" require (second review of spec 027).) The five keys of "New `fr.json` keys" that remain exist with those values, and `grid.remote_overflow` and `a11y.remote_overflow` do not exist. (Note from the lead, 2026-10-13: five keys became seven, with `grid.remote_overflow` and `a11y.remote_overflow`.) (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells: seven keys became five, the two `+k` keys being removed.)
 - **AC-10** (new, from the spec 009 and 035 contradiction) (browser with mocked socket, touch context, in Chromium, Firefox and WebKit) The in-app keyboard keys stay out of the Tab order but stay in the accessibility tree. Given a FX-01 snapshot in the touch context:
   - Markup: each of the 26 `key` elements and the `key-delete` is a `BUTTON` element with `type="button"` and the attribute `tabindex="-1"` (its `tabIndex` property is `-1`). For each letter `L` from `A` to `Z`, `page.get_by_role("button", name=L, exact=True)` inside `keyboard` resolves to exactly the `key` with `data-key=L`. `page.get_by_role("button", name="Effacer", exact=True)` resolves to exactly `key-delete`. No key and no ancestor of a key has `aria-hidden="true"`, the `inert` attribute, or `role` `presentation` or `none`.
@@ -670,7 +676,11 @@ Other cases:
   text said the keys are focusable, which contradicted spec 009.)
 - Flash colours (AC-8, state K3): a letter on a flashing cell must still reach
   4.5:1; the implementer may change how the flash is drawn (spec 016 only fixes
-  its colour and duration).
+  its colour and duration). (Note from the lead, 2026-10-22: since spec 041
+  AC-16, the flash is drawn by a `cell-flash` overlay at 38 % opacity over a white
+  cell background, under an ink letter; the scan measures the letter against the
+  cell's computed background, white, at 17.79:1, and AC-17 of spec 041 checks the
+  letter against the composite of each player colour at 38 % over white.)
 - Translucent styles (AC-7, AC-8): the idle and disconnected roster rows use no
   opacity. The nickname is italic for idle, and italic with line-through for
   disconnected, and the state text (`inactif`, `déconnecté`) is written in the
@@ -749,7 +759,8 @@ Other cases:
     `overflow-y` is not `visible`. A client area is the box inside the borders,
     without scrollbars: the ancestor's `getBoundingClientRect()` moved in by
     `clientLeft` and `clientTop`, `clientWidth` wide and `clientHeight` high. On
-    each side, the edge may go past by at most 0.5 px (the test rounds to whole
+    each side (Note from the lead, 2026-10-22: since spec 041, the ring measured is
+    2 px wide, so the outer edge is the offset plus 2 px, not plus 3 px), the edge may go past by at most 0.5 px (the test rounds to whole
     pixels).
   - Not covered: the test samples points on the middle line of the outline band,
     half the `outline-width` in from the outer edge: every 2 px along each side,

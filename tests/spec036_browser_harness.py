@@ -28,6 +28,7 @@ from playwright.sync_api import (
 )
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.protocol import (
     HelpMode,
@@ -556,6 +557,7 @@ def open_mock_room(page: Page, base_url: str, grid: Grid) -> MockRoomServer:
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-seq", "5")
     expect(room).to_have_attribute("data-status", "joined")
+    wait_for_fonts(page)
     return server
 
 

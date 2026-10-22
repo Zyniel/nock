@@ -16,9 +16,10 @@ Readings that the spec leaves open:
 - "The swatch of a recap player" is read on the `recap-colour` element's own
   computed `background-color` and `background-image`. The colours of the image
   are its colour stops as spec 019's band reader finds them (`BAND_COLOURS_JS`), and
-  the gradient's line and the greys are judged with spec 019's
-  `first_gradient_argument`, `is_diagonal` and `is_grey`, as for its departed
-  author's band.
+  the gradient's line and the colours are judged with spec 019's
+  `first_gradient_argument`, `is_diagonal` and `is_ink_or_white`, as for its
+  departed author's band: the hatch is ink and white since spec 041, which
+  removed the departed greys.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ from spec019_harness import (
     Rgba,
     first_gradient_argument,
     is_diagonal,
-    is_grey,
+    is_ink_or_white,
     rgba_from,
 )
 from spec024_harness import (
@@ -299,12 +300,13 @@ def swatch_look(swatch: Locator) -> SwatchLook:
 
 
 def hatched_swatch_problems(look: SwatchLook) -> list[str]:
-    """How a swatch fails to be hatched in greys (empty: none).
+    """How a swatch fails to be hatched in ink and white (empty: none).
 
     "The swatch of a recap player": its computed `background-image` is a
     `repeating-linear-gradient` whose line is diagonal and whose colour stops hold
     at least two different colours, and each colour of the swatch (its
-    `background-color` and those stops) whose alpha is not 0 is a grey.
+    `background-color` and those stops) whose alpha is not 0 is ink or white
+    (spec 041, which removed the departed greys).
     """
     problems: list[str] = []
     image = look.image
@@ -317,8 +319,8 @@ def hatched_swatch_problems(look: SwatchLook) -> list[str]:
     if len(set(look.stops)) < 2:
         problems.append(f"the colour stops of {image!r} hold under two colours")
     for colour in [look.colour, *look.stops]:
-        if colour[3] > 0 and not is_grey(colour):
-            problems.append(f"the colour {colour} is not a grey")
+        if colour[3] > 0 and not is_ink_or_white(colour):
+            problems.append(f"the colour {colour} is neither ink nor white")
     return problems
 
 
@@ -335,7 +337,7 @@ def test_ac2_the_swatches_of_the_players_in_the_room_have_no_pattern(
         assert swatch_look(swatch).image == "none", player_id
 
 
-def test_ac2_a_player_who_left_gets_a_hatched_grey_swatch(
+def test_ac2_a_player_who_left_gets_a_hatched_ink_and_white_swatch(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_solved_page(page, live_server, fx01_grid, recap_body()).mock
@@ -353,7 +355,7 @@ def test_ac2_a_player_who_left_gets_a_hatched_grey_swatch(
     assert hatched_swatch_problems(swatch_look(departed)) == []
 
 
-def test_ac2_a_player_unknown_to_the_page_gets_the_hatched_grey_swatch(
+def test_ac2_a_player_unknown_to_the_page_gets_the_hatched_ink_and_white_swatch(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     players = [recap_player("p1", "Ana", 8, 4), recap_player("p9", "Zoe", 2, 1)]

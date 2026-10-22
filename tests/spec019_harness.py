@@ -43,6 +43,10 @@ Choices where the spec leaves room:
   layer at least half the cell side wide and 1 px high. Like spec 024's, it
   composites each colour over the cell's computed background (itself over white)
   and keeps the highest ratio. "The cell side" is the cell's width.
+- During a flash the cell's computed background is white and the replacer's colour
+  is drawn by its `cell-flash` element at 38 % opacity (spec 041, AC-16), so the
+  band is measured against that composite: the cell's background, then the
+  overlay over it (`flashOver` in `BAND_COLOURS_JS`).
 - The colours of the "layers" whose `background-image` must be `none` (players'
   bands) are those of the same reader, so the same size limits apply.
 """
@@ -66,6 +70,7 @@ from playwright.sync_api import (
     expect,
 )
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid, LetterCell
 from nock.protocol import (
     CellLocked,
@@ -89,6 +94,7 @@ from nock.protocol import (
     parse_client_message,
 )
 from spec024_harness import COLOUR_CONTRAST_JS
+from spec041_harness import INK, WHITE
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 ROOM_CODE = "ABC123"
@@ -360,6 +366,7 @@ def open_room(
     mock.send(snapshot_frame(view, seq, players, solved=solved))
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(cell_count)
+    wait_for_fonts(page)
     return mock
 
 
@@ -568,7 +575,6 @@ def swatch_colour(page: Page, player_id: str) -> str:
 # ---- The band's colours (AC-1, "Contrast" and the departed band) ------------
 
 MIN_BAND_CONTRAST = 3.0
-GREY_CHANNEL_SPREAD = 8.0  # "its red, green and blue channels are within 8"
 ANGLE_TOLERANCE_DEGREES = 0.001
 
 # Declares `readBand(cell)`, after spec 035's colour helpers (`parseColour`,
@@ -577,7 +583,9 @@ ANGLE_TOLERANCE_DEGREES = 0.001
 # images of its layers, the colour stops of the mark's own image and every colour
 # of the band with its ratio against the cell. A layer is an element inside the
 # mark, or the mark's `::before` or `::after` whose computed `content` is not
-# `none`, at least half the cell side wide and 1 px high.
+# `none`, at least half the cell side wide and 1 px high. The colours are
+# measured against what is painted behind the band: the cell's background and,
+# while the cell flashes, its `cell-flash` overlay over it (spec 041, AC-16).
 BAND_COLOURS_JS = COLOUR_CONTRAST_JS + r"""
 const BAND_COLOUR_PATTERN = new RegExp(
   '(?:rgba?|hsla?|hwb|oklab|oklch|lab|lch|color)\\([^()]*\\)'
@@ -615,6 +623,16 @@ function bandLayers(cell, mark) {
   }
   return layers;
 }
+function flashOver(cell, background) {
+  const overlay = cell.querySelector('[data-testid="cell-flash"]');
+  if (overlay === null) {
+    return background;
+  }
+  const style = getComputedStyle(overlay);
+  const colour = parseColour(style.backgroundColor);
+  colour[3] = colour[3] * parseFloat(style.opacity);
+  return over(colour, background);
+}
 function readBand(cell) {
   const marks = cell.querySelectorAll('[data-testid="author-mark"]');
   const backgroundText = getComputedStyle(cell).backgroundColor;
@@ -625,7 +643,7 @@ function readBand(cell) {
   if (marks.length !== 1) {
     return reading;
   }
-  const cellBackground = over(parseColour(backgroundText), WHITE);
+  const cellBackground = flashOver(cell, over(parseColour(backgroundText), WHITE));
   const addColour = (source, text) => {
     const rgba = parseColour(text);
     const ratio = contrast(over(rgba, cellBackground), cellBackground);
@@ -830,18 +848,24 @@ def is_diagonal(direction: str) -> bool:
     return len(sides & VERTICAL_SIDES) == 1 and len(sides & HORIZONTAL_SIDES) == 1
 
 
-def is_grey(rgba: Rgba) -> bool:
-    """Tell whether a colour's red, green and blue channels are within 8."""
+def is_ink_or_white(rgba: Rgba) -> bool:
+    """Tell whether a colour is `--nock-ink` or `--nock-white`, exactly.
+
+    Spec 041 ("Today's elements in the token colours": "the two hatch colours")
+    replaced the greys of a departed author's hatch by these two tokens; the human
+    removed the departed grey on 2026-10-16.
+    """
     red, green, blue, _alpha = rgba
-    return max(red, green, blue) - min(red, green, blue) <= GREY_CHANNEL_SPREAD
+    channels = (red, green, blue)
+    return channels in (INK, WHITE)
 
 
 def hatched_problems(reading: BandReading) -> list[str]:
-    """How a departed author's band fails to be hatched in greys (empty: none).
+    """How a departed author's band fails to be hatched (empty: none).
 
     Its computed `background-image` is a `repeating-linear-gradient` whose line
     is diagonal and whose colour stops hold at least two different colours, and
-    each colour of the band that counts is a grey.
+    each colour of the band that counts is ink or white (spec 041).
     """
     if reading.marks != 1:
         return [f"{reading.marks} author-mark elements in the cell"]
@@ -857,8 +881,8 @@ def hatched_problems(reading: BandReading) -> list[str]:
     if len(different_stops) < 2:
         problems.append(f"the colour stops of {image!r} hold under two colours")
     for colour in counted_colours(reading):
-        if not is_grey(colour.rgba):
-            problems.append(f"{colour.source} {colour.text} is not a grey")
+        if not is_ink_or_white(colour.rgba):
+            problems.append(f"{colour.source} {colour.text} is neither ink nor white")
     return problems
 
 

@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Locator, Page, WebSocketRoute, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import (
@@ -176,6 +177,7 @@ def start_page(page: Page, base_url: str) -> MockRoomSocket:
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/ABC123")
     expect(page.get_by_test_id("nickname-input")).to_be_visible(timeout=WAIT_TIMEOUT_MS)
+    wait_for_fonts(page)
     return mock
 
 

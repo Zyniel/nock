@@ -110,10 +110,10 @@
     display: flex;
     gap: 0.25rem;
     padding: 0.25rem;
-    background: #ffffff;
-    border: 1px solid #5b6070;
+    background: var(--nock-white);
+    border: 1px solid var(--nock-line);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+    box-shadow: 0 4px 12px var(--nock-shadow);
   }
 
   .reaction-picker .reaction-option {

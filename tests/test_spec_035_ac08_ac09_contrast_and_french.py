@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import PlayerJoined
@@ -99,6 +100,7 @@ def open_k1(page: Page, live_server: str, grid: Grid) -> None:
         timeout=ROOM_TIMEOUT_MS
     )
     expect(page.get_by_test_id("catalogue-progress").first).to_be_visible()
+    wait_for_fonts(page)
 
 
 def open_k3(page: Page, live_server: str, grid: Grid) -> None:
@@ -144,6 +146,7 @@ def open_k7(page: Page, live_server: str, grid: Grid) -> None:
     expect(page.get_by_test_id("room-page")).to_have_attribute(
         "data-status", "not_found", timeout=ROOM_TIMEOUT_MS
     )
+    wait_for_fonts(page)
 
 
 def open_k2_state(page: Page, live_server: str, grid: Grid) -> None:

@@ -66,6 +66,7 @@ from fastapi.testclient import TestClient
 from httpx2 import Response
 from playwright.sync_api import Browser, BrowserContext, Locator, Page, Route, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.hub import RoomRegistry
 from nock.room import CellState, RoomConfig, RoomState
@@ -648,6 +649,7 @@ def sign_in_with_link(page: Page, link: str) -> None:
     """Open a sign-in link and wait until the account page is `signed_in`."""
     page.goto(link)
     expect_account_state(page, "signed_in")
+    wait_for_fonts(page)
 
 
 # ---- Browser: mocked account routes (AC-9) -------------------------------------------

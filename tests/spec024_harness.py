@@ -45,6 +45,7 @@ from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Locator, Page, WebSocketRoute, expect
 from starlette.testclient import WebSocketTestSession
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
 from nock.hub import RoomRegistry
@@ -1040,6 +1041,7 @@ def open_room(
     mock.send(frame)
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(page)
     return mock
 
 
@@ -1133,17 +1135,26 @@ MARK_MIN_CONTRAST = 3.0
 # (sized by its bounding box), or the mark's `::before` or `::after` whose
 # computed `content` is not `none` (sized by its computed `width` and `height`).
 # Each colour is composited over the cell's computed background (itself over
-# white), as the check of a one-colour mark does, and measured against it. The
-# mark's contrast is the highest of these ratios. Where each colour shows is the
+# white) and, while the cell flashes, the `cell-flash` element over it (spec 041,
+# AC-16: the cell is white and the flash is drawn by that overlay at its opacity),
+# as the check of a one-colour mark does, and measured against it. The mark's
+# contrast is the highest of these ratios. Where each colour shows is the
 # reviewer's check, not the tests' (the spec says so).
 MARK_COLOURS_JS = f"const MARK_MIN_PX = {MARK_MIN_PX};\n" + r"""
 function markColours(cell, mark) {
   const cellBox = cell.getBoundingClientRect();
   const minWidth = Math.max(MARK_MIN_PX, cellBox.width / 4);
   const minHeight = Math.max(MARK_MIN_PX, cellBox.height / 4);
-  const cellBackground = over(
+  let cellBackground = over(
     parseColour(getComputedStyle(cell).backgroundColor), WHITE
   );
+  const overlay = cell.querySelector('[data-testid="cell-flash"]');
+  if (overlay !== null) {
+    const overlayStyle = getComputedStyle(overlay);
+    const flash = parseColour(overlayStyle.backgroundColor);
+    flash[3] = flash[3] * parseFloat(overlayStyle.opacity);
+    cellBackground = over(flash, cellBackground);
+  }
   const colours = [];
   const addColour = (source, text) => {
     const shown = over(parseColour(text), cellBackground);

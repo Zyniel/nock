@@ -138,8 +138,8 @@ Update it at the end of each session.
    modes"): spec 030 (race mode), then 031 (team mode), one pull request each.
    Both are 45-line stubs, approved before their public interface existed: a
    spec writer writes them in full first.
-4. The small follow-ups below ("Follow-up noted from spec 028's first review",
-   the README's missing word on how to add grids), when a spec touches them.
+4. The small follow-up below ("Follow-up noted from spec 028's first review"),
+   when a spec touches it.
 - **Models:** pass `model: "opus"` to the implementer and to the test-writer of
   a whole spec (their definitions default to Sonnet, at high effort). Use
   Sonnet for small spec notes and mechanical test edits.
@@ -327,9 +327,9 @@ pings aside. The toolbar order (spec 024 AC-8) is relative.
   assumed, and `specs/_reference.md` keeps "Le Parisien baseline" as an open
   decision, to confirm from screenshots of the listing, an open grid and its
   help menu. Those screenshots would let a spec-writer draft a visual spec.
-- The README does not say how to add grids: the repository has no `grids/`
-  folder, so a fresh server lists none. For the implementer's next README
-  change (the folder, the file format of `nock.catalogue`).
+- Closed 2026-10-22: the README now says how to add grids (section 2, "Adding
+  grids": the `grids/` folder, the file format, the credits, what an invalid
+  file does). The repository still ships no grid of its own.
 
 ## Showing the app
 

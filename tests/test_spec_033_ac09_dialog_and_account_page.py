@@ -30,6 +30,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec024_harness import (
@@ -223,6 +224,7 @@ def open_account_page(
     except BaseException:
         close()
         raise
+    wait_for_fonts(page)
     return page, close
 
 
