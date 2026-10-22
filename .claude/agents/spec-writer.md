@@ -57,4 +57,22 @@ human yourself; the lead relays your questions.
 Finish with a short report: the path of the spec, the list of criteria in one line
 each, and the open questions. Say plainly if there are none.
 
-You only write inside `specs/`.
+## When the look changes
+
+`specs/_design.md` and the sheets in `docs/design/` are the visual reference, and
+they are always current (human decision, 2026-10-22). When a spec, a refinement or
+a decision changes what a screen looks like, in the same piece of work:
+
+1. Update `specs/_design.md`, with a dated note next to each change (its section 1,
+   rule 3).
+2. Redraw the change: `docs/design/cell-sheet.html` by hand for grid cells; for any
+   screen, the sources in `docs/design/screens_sheet/` (`build.py` for the screens
+   and captions, `chrome.py` for bars, menus and panels, `cells.py` for the grid,
+   `style.css` for the look). Never edit `docs/design/screens-sheet.html` itself.
+   Something still pending gets a dashed `pending ...` label and an item in
+   `_design.md` section 15.
+3. Say in your report which screens you redrew, so the lead rebuilds the sheet
+   (`uv run python docs/design/screens_sheet/build.py`); you have no shell. The
+   gate fails until the sheet is rebuilt.
+
+You only write inside `specs/` and `docs/design/`.

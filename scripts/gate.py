@@ -9,7 +9,7 @@ Usage:
     uv run python scripts/gate.py --browsers all  # browser tests in all three engines
 
 Stages:
-    tests: ruff + black + spec traceability.
+    tests: ruff + black + the screens sheet up to date + spec traceability.
     full:  everything in "tests", then pyrefly, svelte-check and the vite build
            of web/, then pytest (browser tests included).
 
@@ -64,6 +64,12 @@ TEST_FUNCTION_PATTERN = re.compile(r"^\s*def\s+test_ac(\d+)_", re.MULTILINE)
 STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("ruff (lint)", ["ruff", "check", "."]),
     ("black (format)", ["black", "--check", "--diff", "--quiet", "."]),
+    # The visual reference stays what its sources build (specs/_design.md
+    # section 1, rule 3; human decision, 2026-10-22).
+    (
+        "screens sheet (up to date)",
+        ["python", "docs/design/screens_sheet/build.py", "--check"],
+    ),
 ]
 WEB_DIR = PROJECT_ROOT / "web"
 
