@@ -1,7 +1,7 @@
 ---
 id: "043"
 title: Room layout
-status: draft
+status: approved
 ---
 
 # 043 - Room layout
