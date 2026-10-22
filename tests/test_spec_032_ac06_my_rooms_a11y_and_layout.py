@@ -48,15 +48,18 @@ from spec035_harness import (
 SCAN_SIZES = [(1280, 720), (360, 740)]
 SCAN_DATA = {XYZ, ABC, "Ana", "Bob"}
 # Spec 035 AC-9's samples: the checker flags the first ones and accepts the others.
+# Spec 043 made `Salon` a template (`topbar.salon`): the flagged sample is `Salle`,
+# and `Salon` is accepted.
 FLAGGED_SAMPLES = [
     "Loading\N{HORIZONTAL ELLIPSIS}",
-    "Salon",
+    "Salle",
     "Check word",
     "Error: connection lost",
     "Score: 3",
     "Grille n\N{DEGREE SIGN} deux",
 ]
 ACCEPTED_SAMPLES = [
+    "Salon",
     "Salon ABC123",
     "Grille n\N{DEGREE SIGN} 2",
     "Ana a rejoint le salon",

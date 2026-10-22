@@ -25,6 +25,7 @@ from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import PlayerJoined
+from room_panels import show_tab
 from spec035_harness import (
     FX01_CLUES,
     LANGUAGE_SCAN_SCRIPT,
@@ -243,6 +244,7 @@ def test_ac8_the_idle_and_disconnected_nicknames_are_scanned_and_reach_4_5_to_1(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_k2(page, live_server, fx01_grid)
+    show_tab(page, "players")  # spec 043: the roster is the Salon's Joueurs tab
 
     measurements = contrast_measurements(page)
 
@@ -306,14 +308,16 @@ def test_ac8_the_contrast_scan_folds_in_opacity(
 # ---- AC-9: the interface is in French, every string from fr.json -----------------
 
 
-def test_ac9_the_checker_flags_english_and_a_bare_salon() -> None:
-    samples = ["Loading…", "Salon", "Check word"]
+def test_ac9_the_checker_flags_english_and_a_bare_salle() -> None:
+    # Spec 043: the flagged sample was `Salon`, now `fr.json["topbar.salon"]`.
+    samples = ["Loading…", "Salle", "Check word"]
 
     assert unknown_texts(samples, set()) == samples
 
 
 def test_ac9_the_checker_accepts_templates_filled_in() -> None:
-    samples = ["Salon ABC123", "Grille n° 2", "Ana a rejoint le salon"]
+    # Spec 043: `Salon` is accepted, as `topbar.salon`.
+    samples = ["Salon", "Salon ABC123", "Grille n° 2", "Ana a rejoint le salon"]
 
     assert unknown_texts(samples, set()) == []
 

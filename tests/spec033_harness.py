@@ -72,6 +72,7 @@ from nock.hub import RoomRegistry
 from nock.room import CellState, RoomConfig, RoomState
 from nock.server import WEB_DIST_DIR, create_app, server_config
 from nock.store import RoomStore
+from room_panels import open_menu
 from spec017_harness import FakeClock
 from spec032_harness import NO_TICK_CONFIG
 
@@ -628,7 +629,11 @@ def ask_link_in_form(page: Page, email: str) -> None:
 
 
 def open_account_dialog(page: Page) -> Locator:
-    """Click `account-open` and wait until `account-dialog` is open."""
+    """Click `account-open` and wait until `account-dialog` is open.
+
+    The item is in the room Menu (spec 043), which is opened first.
+    """
+    open_menu(page)
     page.get_by_test_id("account-open").click()
     dialog = page.get_by_test_id("account-dialog")
     expect(dialog).to_have_attribute("open", "", timeout=WAIT_TIMEOUT_MS)

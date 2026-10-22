@@ -8,6 +8,7 @@
   // The reaction picker of spec 022. It is on the page only while it is open:
   // the room page decides when, and this component handles what happens inside.
   let {
+    viewport,
     isPaced,
     isButtonDisabled,
     onPick,
@@ -16,6 +17,8 @@
     onFocusButton,
     onFocusGrid,
   }: {
+    // The grid viewport: the picker floats over its bottom (spec 043).
+    viewport: HTMLElement | null
     // True while the page holds back its own reactions: every option is disabled.
     isPaced: boolean
     // True when `react-button` is disabled (a mute, or no word selected).
@@ -31,6 +34,38 @@
   } = $props()
 
   let picker: HTMLElement | null = $state(null)
+
+  // The space between the picker's bottom and the viewport's (spec 043).
+  const ABOVE_BOTTOM_PX = 8
+
+  // The picker's place in the window: centred on the viewport, its bottom
+  // ABOVE_BOTTOM_PX above the viewport's bottom.
+  let centreX = $state(0)
+  let bottom = $state(0)
+
+  function place(): void {
+    if (viewport === null) {
+      return
+    }
+    const box = viewport.getBoundingClientRect()
+    centreX = box.left + box.width / 2
+    bottom = window.innerHeight - box.bottom + ABOVE_BOTTOM_PX
+  }
+
+  // Follow the viewport when the window or the play area changes size.
+  $effect(() => {
+    if (viewport === null) {
+      return
+    }
+    place()
+    const observer = new ResizeObserver(place)
+    observer.observe(viewport)
+    window.addEventListener('resize', place)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', place)
+    }
+  })
 
   // `tick` resolves once the picker is on the page. While the reactions are
   // paced, every option is disabled: the focus then stays on the button.
@@ -80,6 +115,8 @@
   data-testid="reaction-picker"
   role="group"
   aria-label={t('reaction.picker_label')}
+  style:left="{centreX}px"
+  style:bottom="{bottom}px"
   bind:this={picker}
 >
   {#each REACTION_VALUES as reaction (reaction)}
@@ -96,32 +133,40 @@
 </div>
 
 <style>
-  /* Drawn over the page below the header, like the vote banner: absolutely
-     placed, so it moves nothing. The vote banner comes later in the document
-     with the same z-index, so it is drawn over the picker and its buttons
-     always stay uncovered. One row of five options at the left: 2.25rem and its
-     border high. */
+  /* Over the bottom of the grid, layer 9 (_design.md section 8): drawn over the
+     page, so it moves nothing. */
   .reaction-picker {
-    position: absolute;
-    z-index: 1;
+    position: fixed;
+    z-index: 9;
     box-sizing: border-box;
-    top: var(--popover-top);
-    left: 0.5rem;
     display: flex;
-    gap: 0.25rem;
-    padding: 0.25rem;
+    gap: 2px;
+    padding: 5px;
+    transform: translateX(-50%);
     background: var(--nock-white);
     border: 1px solid var(--nock-line);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px var(--nock-shadow);
+    border-radius: 24px;
+    box-shadow: 0 10px 24px -10px var(--nock-shadow);
   }
 
   .reaction-picker .reaction-option {
     box-sizing: border-box;
-    width: 1.75rem;
-    height: 1.75rem;
+    width: 40px;
+    height: 40px;
     padding: 0;
-    font-size: 1rem;
+    border: 0;
+    border-radius: 20px;
+    font-size: 22px;
     line-height: 1;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .reaction-picker .reaction-option:hover {
+    background: var(--nock-word);
+  }
+
+  .reaction-picker .reaction-option:disabled {
+    cursor: not-allowed;
   }
 </style>

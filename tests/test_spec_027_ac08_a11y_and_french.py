@@ -2,12 +2,21 @@
 in French.
 
 The page runs on spec 025's mocked socket. The semantics of `timer` (role, no live
-region, label), the place of the two elements at the start of `room-toolbar`, the
-toggle's text and label, the keyboard (spec 035's `tab_to`: the toggle gets the
-focus with spec 035 AC-2's outline and `Enter` hides the timer; the timer is never a
-Tab stop), spec 035's contrast and language scans on a snapshot of 36,000,000 ms
-running (`10:00:00`), and the five new `fr.json` keys. The layout at every window
-size is in `test_spec_027_ac08_layout.py`. The shared setup is in `spec027_harness`.
+region, label, never a Tab stop), its place in `room-topbar`, the Menu's
+`timer-toggle` and the top bar's `timer-show` from the keyboard (spec 035's
+`tab_to`, with spec 035 AC-2's outline), spec 035's contrast and language scans on
+a snapshot of 36,000,000 ms running (`10:00:00`), and the `fr.json` keys. The
+layout at every window size is in `test_spec_027_ac08_layout.py`. The shared setup
+is in `spec027_harness`.
+
+Refined by spec 043 (the design's room layout): this read "`timer`,
+`timer-toggle` and `chat-toggle` are the first three elements of `room-toolbar`",
+the toggle was the `⏱` button with an `aria-label`, and the scan accepted `⏱`.
+Now `timer` is in `room-topbar` before `undo-button` (the first element of the
+phone top bar that shows, right after `topbar-brand` in the computer top bar), the
+hide control is the Menu's `timer-toggle` (`fr.json["timer.hide"]`), and the show
+control is `timer-show` (« Chrono »); `timer.toggle` is removed from `fr.json`, and
+spec 035 AC-9's flagged sample `Salon` became `Salle`.
 """
 
 from __future__ import annotations
@@ -27,15 +36,15 @@ from spec024_harness import (
     outline_problems,
 )
 from spec027_harness import open_timer_room, timer_of
-from spec027_toolbar_harness import FIRST_THREE, FOCUS_SHARE_LINK_SCRIPT
 from spec035_harness import unknown_texts
+from spec043_harness import shown_test_ids
 
-NEW_FR_KEYS = {
+KEPT_FR_KEYS = {
     "timer.label": "Chrono",
     "timer.minutes_seconds": "{minutes}:{seconds}",
     "timer.hours_minutes_seconds": "{hours}:{minutes}:{seconds}",
-    "timer.toggle": "⏱",
     "timer.toggle_label": "Afficher le chrono",
+    "timer.hide": "Masquer le chrono",
 }
 TEN_HOURS_MS = 36_000_000
 SCAN_SIZES = [(1280, 720), (360, 740)]
@@ -52,15 +61,12 @@ def fx01_grid(fx01_text: str) -> Grid:
 # ---- The text in fr.json ----
 
 
-def test_ac8_fr_json_holds_the_five_timer_keys() -> None:
+def test_ac8_fr_json_holds_the_timer_keys() -> None:
     fr = load_fr()
 
-    for key, value in NEW_FR_KEYS.items():
+    for key, value in KEPT_FR_KEYS.items():
         assert fr.get(key) == value, key
-
-
-def test_ac8_the_toggle_symbol_is_the_stopwatch_u23f1() -> None:
-    assert load_fr().get("timer.toggle") == "⏱"
+    assert "timer.toggle" not in fr
 
 
 def test_ac8_the_time_patterns_do_not_hide_the_untranslated_samples() -> None:
@@ -69,13 +75,13 @@ def test_ac8_the_time_patterns_do_not_hide_the_untranslated_samples() -> None:
     assert "timer.hours_minutes_seconds" in fr
     # The time patterns need digits on both sides of each `:`, not a `:` alone
     # (spec 027, "New `fr.json` keys"): `Error: connection lost` holds a `:` too.
-    samples = ["Loading…", "Salon", "Check word", "Error: connection lost", "Score: 3"]
+    samples = ["Loading…", "Salle", "Check word", "Error: connection lost", "Score: 3"]
 
     assert unknown_texts(samples, set()) == samples
     assert unknown_texts(["1:05", "1:02:05", "10:00:00", "0:00"], set()) == []
 
 
-# ---- The semantics of the timer and of its toggle ----
+# ---- The semantics of the timer ----
 
 
 def test_ac8_the_timer_is_a_timer_without_a_live_region_and_has_a_label(
@@ -97,7 +103,33 @@ def test_ac8_the_timer_is_a_timer_without_a_live_region_and_has_a_label(
         close()
 
 
-def test_ac8_the_timer_and_its_toggle_open_the_toolbar_before_the_chat_toggle(
+@pytest.mark.parametrize(
+    ("width", "height", "before_timer"),
+    [(1280, 720, ["topbar-brand"]), (360, 740, [])],
+    ids=["1280x720", "360x740"],
+)
+def test_ac8_the_timer_is_in_the_top_bar_before_undo(
+    browser: Browser,
+    browser_name: str,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    before_timer: list[str],
+) -> None:
+    page, close = open_context_page(browser, browser_name, width, height, touch=False)
+    try:
+        open_timer_room(
+            page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
+        )
+        shown = shown_test_ids(page.get_by_test_id("room-topbar"))
+    finally:
+        close()
+
+    assert shown[: len(before_timer) + 2] == [*before_timer, "timer", "undo-button"]
+
+
+def test_ac8_the_hide_item_is_in_the_menu_with_its_text(
     browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
 ) -> None:
     page, close = open_context_page(browser, browser_name, 1280, 720, touch=False)
@@ -105,27 +137,21 @@ def test_ac8_the_timer_and_its_toggle_open_the_toolbar_before_the_chat_toggle(
         open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
         )
-        # The toolbar's direct children: three elements inside a wrapper, or a
-        # wrapper first, would not be "the first three elements of room-toolbar".
-        script = """
-        () => {
-          const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-          const found = [];
-          for (const child of Array.from(toolbar.children).slice(0, 3)) {
-            found.push(child.getAttribute('data-testid'));
-          }
-          return found;
-        }
-        """
+        toggle = page.get_by_test_id("timer-toggle")
+        in_menu = toggle.evaluate(
+            "item => item.closest('[data-testid=\"room-menu\"]') !== null"
+        )
 
-        first_three = page.evaluate(script)
+        expect(toggle).to_have_text(load_fr()["timer.hide"])
+        assert in_menu is True
     finally:
         close()
 
-    assert first_three == FIRST_THREE
+
+# ---- The keyboard ----
 
 
-def test_ac8_the_toggle_has_the_symbol_as_text_and_its_own_label(
+def test_ac8_from_the_keyboard_the_menu_item_hides_and_chrono_shows_the_timer(
     browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
 ) -> None:
     fr = load_fr()
@@ -134,65 +160,28 @@ def test_ac8_the_toggle_has_the_symbol_as_text_and_its_own_label(
         open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
         )
-        toggle = page.get_by_test_id("timer-toggle")
-
-        expect(toggle).to_have_text(fr["timer.toggle"])
-        expect(toggle).to_have_attribute("aria-label", fr["timer.toggle_label"])
-        assert toggle.evaluate("element => element.tagName") == "BUTTON"
-    finally:
-        close()
-
-
-@pytest.mark.parametrize(("width", "height"), [(1280, 720), (360, 740), (320, 568)])
-def test_ac8_the_toggle_keeps_its_symbol_at_every_window_size(
-    browser: Browser,
-    browser_name: str,
-    live_server: str,
-    fx01_grid: Grid,
-    width: int,
-    height: int,
-) -> None:
-    page, close = open_context_page(browser, browser_name, width, height, touch=False)
-    try:
-        open_timer_room(
-            page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
-        )
-
-        expect(page.get_by_test_id("timer-toggle")).to_have_text(
-            load_fr()["timer.toggle"]
-        )
-    finally:
-        close()
-
-
-# ---- The keyboard ----
-
-
-def test_ac8_tab_gives_the_toggle_the_focus_with_the_outline_and_enter_hides_the_timer(
-    browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
-) -> None:
-    page, close = open_context_page(browser, browser_name, 1280, 720, touch=False)
-    try:
-        open_timer_room(
-            page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
-        )
         walker = make_walker(page)
 
+        walker.tab_to("menu-button")
+        page.keyboard.press("Enter")
+        expect(page.get_by_test_id("room-menu")).to_be_visible()
         walker.tab_to("timer-toggle")
-        reached = walker.reached[-1]
+        page.keyboard.press("Enter")
+        expect(page.get_by_test_id("timer")).to_have_count(0)
+        show = page.get_by_test_id("timer-show")
+        expect(show).to_have_text(fr["timer.label"])
+        expect(show).to_have_attribute("aria-label", fr["timer.toggle_label"])
+        walker.tab_to("timer-show")
         page.keyboard.press("Enter")
 
-        assert reached.test_id == "timer-toggle"
-        assert (
-            outline_problems(
-                reached.outline_style, reached.outline_width, reached.outline_contrast
+        expect(timer_of(page)).to_be_visible()
+        reached = {step.test_id: step for step in walker.reached}
+        for test_id in ("timer-toggle", "timer-show"):
+            step = reached[test_id]
+            problems = outline_problems(
+                step.outline_style, step.outline_width, step.outline_contrast
             )
-            == []
-        )
-        expect(page.get_by_test_id("timer")).to_have_count(0)
-        expect(page.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "false"
-        )
+            assert problems == [], (test_id, problems)
     finally:
         close()
 
@@ -205,22 +194,29 @@ def test_ac8_the_timer_text_is_never_a_tab_stop(
         open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=TEN_HOURS_MS, running=True
         )
-        page.evaluate(FOCUS_SHARE_LINK_SCRIPT)
+        # The walk starts on `undo-button`, which comes right after `timer`, and goes
+        # backwards: a Tab stop on `timer` would be the first one reached.
+        # (`document.body.focus()` does not reset where Tab starts.)
+        undo = page.get_by_test_id("undo-button")
+        undo.focus()
+        expect(undo).to_be_focused()
         visited: list[str] = []
-        for _ in range(12):
-            page.keyboard.press("Tab")
+        for _ in range(8):
+            page.keyboard.press("Shift+Tab")
             focused = page.evaluate(
-                "() => document.activeElement"
-                " && document.activeElement.getAttribute('data-testid')"
+                "() => document.activeElement === null"
+                " || document.activeElement === document.body ? null"
+                " : document.activeElement.getAttribute('data-testid')"
+                " || document.activeElement.tagName"
             )
+            if focused is None:
+                break
             visited.append(str(focused))
     finally:
         close()
 
     assert "timer" not in visited
-    assert "timer-toggle" in visited
-    assert "chat-toggle" in visited
-    assert visited.index("timer-toggle") < visited.index("chat-toggle")
+    assert "undo-button" not in visited[:1], visited
 
 
 # ---- Spec 035's scans ----
@@ -265,7 +261,7 @@ def test_ac8_the_language_scan_finds_no_text_outside_fr_json_and_the_data(
         )
         expect(timer_of(page)).to_be_visible()
         data = language_data(live_server, ["Ana", "Bob"])
-        data.update({"10:00:00", "⏱", "Chrono"})
+        data.update({"10:00:00", "Chrono"})
 
         unknown = language_problems(page, data)
     finally:

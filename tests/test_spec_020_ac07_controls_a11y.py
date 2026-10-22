@@ -3,28 +3,35 @@ and keep the grid's room.
 
 Four parts, all on the page with a mocked socket:
 
-- the toolbar at the eight window sizes of spec 006 AC-5, in desktop and touch
-  contexts, with spec 013 AC-6's setup: spec 013 AC-6's layout checks, the
-  relative order (`undo-button`, `pencil-toggle`, `confirm-pencil`, then
-  spec 024's `check-letter`; the lead's note of 2026-10-15 on spec 024 AC-8),
-  "right after" (nothing stands between what holds `undo-button` and what holds
-  the pencil buttons), one row on small windows, the keyboard focus of
-  `pencil-toggle` (desktop) and `elementFromPoint` at each button's centre. One
-  page per size and context, so that the suite stays lean;
-- the keyboard-only run at 1280 by 720 (spec 035's walker);
+- the top bar at the eight window sizes of spec 006 AC-5, in desktop and touch
+  contexts, with spec 013 AC-6's setup and (1, 0) holding a pencil letter: spec
+  013 AC-6's layout checks with `pencil-toggle` in `room-topbar` (right after
+  `undo-button` in the computer top bar, right after `chat-toggle` in the phone
+  top bar), and, with (1, 0) selected, `confirm-pencil` the first item of the
+  open `aide-menu`; spec 043 AC-28's checks for both (inside the window,
+  `elementFromPoint` at their centre returns them). One page per size and context,
+  so that the suite stays lean;
+- the keyboard-only run at 1280 by 720 (spec 035's walker), which reaches
+  `confirm-pencil` by opening the Aide menu from the keyboard;
 - the contrast states of the spec's "Test harness" (spec 035's contrast scan) and
-  the language scan of the two buttons' texts, with the new `fr.json` keys; outside
-  a flash, a pencil letter's colour differs from a normal letter's in the same
+  the language scan of the two buttons' texts, with the `fr.json` keys; outside a
+  flash, a pencil letter's colour differs from a normal letter's in the same
   state (selected, tinted; AC-1 checks the plain cell and my word); in the flash
   states (decision 12), the flashing pencil cell's `data-flash`, `data-pencil`,
   italics and 4.5:1 contrast against the flash composite (spec 041, AC-16);
-- the edge case "Solved grid" (AC-3, AC-7): both controls disabled, and spec
-  026's input lock sends nothing in pencil mode.
+- the edge case "Solved grid" (AC-3, AC-7): `pencil-toggle` disabled and
+  `confirm-pencil` gone, and spec 026's input lock sends nothing in pencil mode.
 
-Not tested: the keyboard focus of `confirm-pencil` in spec 013 AC-6's setup. The
-tapped (3, 1) is empty, so the button is disabled there (it is enabled only on a
-pencil letter) and cannot take the focus; the keyboard-only run checks its
-outline instead. The shared setup is in `spec020_harness` and `spec024_harness`.
+Refined by spec 043 (the design's room layout): this read "both are in
+`room-toolbar` right after `undo-button`, and spec 024 AC-8's toolbar rules hold
+for them" and "`tab_to` `confirm-pencil` and `Enter`"; `confirm-pencil` is now
+present only while it applies, with the text `fr.json["pencil.confirm"]` (« Confirmer
+la lettre au crayon ») and no `aria-label`. Spec 044 (the design's keyboard) refines
+the touch context's sheet layout once more (`key-pencil` in place of
+`pencil-toggle`); until it is built, `pencil-toggle` holds the phone top bar's
+fourth slot there too (spec 043, Decision 6).
+
+The shared setup is in `spec020_harness`, `spec024_harness` and `spec043_harness`.
 """
 
 from __future__ import annotations
@@ -46,11 +53,13 @@ from nock.protocol import (
     PlayerView,
     Selection,
 )
+from room_panels import open_aide
 from spec013_harness import swatch_colour
 from spec020_harness import (
     confirm_button,
     edit_messages_after_a_pause,
     expect_cell_shows,
+    expect_selected_cell,
     grid_solved_frame,
     letter_changed_frame,
     pencil_toggle,
@@ -63,7 +72,6 @@ from spec024_harness import (
     COLOUR_CONTRAST_JS,
     LAST_CELL,
     ROW_MAJOR,
-    SETTLE_MS,
     SOLUTION,
     WAIT_TIMEOUT_MS,
     ChangeList,
@@ -82,6 +90,8 @@ from spec024_harness import (
     player_view,
 )
 from spec035_harness import LANGUAGE_SCAN_SCRIPT, MIN_TEXT_CONTRAST, unknown_texts
+from spec042_harness import box_of
+from spec043_harness import box_inside, hit_problem, shown_test_ids, window_box
 
 WINDOW_SIZES = [
     (320, 568),
@@ -104,10 +114,6 @@ SPEC024_BUTTONS = [
     "reveal-letter",
     "reveal-word",
 ]
-# Relative document order (spec 024's toolbar: the pencil controls come right
-# after the undo control and before `check-panel`). RIGHT_AFTER_UNDO_SCRIPT checks
-# that nothing stands between the undo control and the pencil controls.
-TOOLBAR_ORDER = ["undo-button", "pencil-toggle", "confirm-pencil", "check-letter"]
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_ITEMS = 100
 MIN_GRID_VIEWPORT_PX = 100.0
@@ -116,11 +122,12 @@ MAX_TABS = 60
 WORD_W1 = "0,0,0"
 WORD_W7 = "3,0,0"
 COLOURS = list(range(8))
+# Spec 043 changed `pencil.confirm` and removed `pencil.confirm_label`.
 NEW_KEYS = {
     "pencil.toggle": "Crayon",
-    "pencil.confirm": "Confirmer",
-    "pencil.confirm_label": "Confirmer la lettre au crayon",
+    "pencil.confirm": "Confirmer la lettre au crayon",
 }
+REMOVED_KEYS = ["pencil.confirm_label"]
 
 
 def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
@@ -179,7 +186,7 @@ def check_frame(seq: int) -> str:
     return event.model_dump_json()
 
 
-def open_toolbar_room(
+def open_top_bar_room(
     browser: Browser,
     browser_name: str,
     live_server: str,
@@ -188,11 +195,19 @@ def open_toolbar_room(
     height: int,
     touch: bool,
 ) -> tuple[Page, Callable[[], None]]:
-    """Open the room of the setup with (3, 1) tapped; return the page, its closer."""
+    """Open the room of the setup with (3, 1) tapped; return the page, its closer.
+
+    The snapshot also has a pencil `T` by `p2` in (1, 0), for `confirm-pencil`.
+    """
     page, close = open_context_page(browser, browser_name, width, height, touch)
     try:
-        mock = open_room(page, live_server, grid, players=eight_players())
-        expect(page.get_by_test_id("room-toolbar")).to_be_visible()
+        mock = open_room(
+            page,
+            live_server,
+            grid,
+            players=eight_players(),
+            changes=[(1, 0, pencil_letter("T", "p2"))],
+        )
         last_seq = 5 + FEED_ITEMS
         for seq in range(6, last_seq + 1):
             mock.send(check_frame(seq))
@@ -204,7 +219,6 @@ def open_toolbar_room(
             cell.click(timeout=WAIT_TIMEOUT_MS)
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", WORD_W7)
         expect(pencil_toggle(page)).to_be_visible()
-        expect(confirm_button(page)).to_be_visible()
     except BaseException:
         close()
         raise
@@ -268,256 +282,59 @@ def spec013_layout_problems(page: Page, touch: bool) -> list[str]:
     return problems
 
 
-# ---- Order, one row, keyboard focus and hit test ----
-
-ORDER_SCRIPT = """
-testIds => {
-  const byTestId = (id) => document.querySelectorAll(`[data-testid="${id}"]`);
-  const follows = (first, second) => Boolean(
-    first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
-  );
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const counts = {};
-  const outside = [];
-  for (const id of testIds) {
-    const found = byTestId(id);
-    counts[id] = found.length;
-    if (found.length === 1 && (toolbar === null || !toolbar.contains(found[0]))) {
-      outside.push(id);
-    }
-  }
-  const outOfOrder = [];
-  for (let index = 0; index + 1 < testIds.length; index += 1) {
-    const first = byTestId(testIds[index])[0];
-    const second = byTestId(testIds[index + 1])[0];
-    if (first && second && !follows(first, second)) {
-      outOfOrder.push([testIds[index], testIds[index + 1]]);
-    }
-  }
-  return {counts: counts, outside: outside, outOfOrder: outOfOrder};
-}
-"""
-# "Right after the undo control": take the closest element that holds both
-# `undo-button` and `pencil-toggle`; among its children, the one that holds
-# `pencil-toggle` must be the next element sibling of the one that holds
-# `undo-button` (each child may be the button itself or a group around it), and
-# `confirm-pencil` must be in the same child or in the next one. `between` lists
-# what stands between the two children (null when the pencil child does not come
-# after the undo child); null for the whole result when an element is missing.
-RIGHT_AFTER_UNDO_SCRIPT = """
-() => {
-  const byTestId = (id) => document.querySelector(`[data-testid="${id}"]`);
-  const toolbar = byTestId('room-toolbar');
-  const undo = byTestId('undo-button');
-  const toggle = byTestId('pencil-toggle');
-  const confirm = byTestId('confirm-pencil');
-  if (!toolbar || !undo || !toggle || !confirm) {
-    return null;
-  }
-  let common = undo.parentElement;
-  while (!common.contains(toggle)) {
-    common = common.parentElement;
-  }
-  const childHolding = (element) => {
-    let node = element;
-    while (node !== null && node.parentElement !== common) {
-      node = node.parentElement;
-    }
-    return node;
-  };
-  const undoChild = childHolding(undo);
-  const toggleChild = childHolding(toggle);
-  const confirmChild = childHolding(confirm);
-  let between = [];
-  let node = undoChild.nextElementSibling;
-  while (node !== null && node !== toggleChild) {
-    between.push(node.getAttribute('data-testid') || node.tagName.toLowerCase());
-    node = node.nextElementSibling;
-  }
-  if (node === null) {
-    between = null;
-  }
-  const confirmBesideToggle = confirmChild !== null && (
-    confirmChild === toggleChild || confirmChild === toggleChild.nextElementSibling
-  );
-  return {
-    inToolbar: toolbar.contains(common),
-    between: between,
-    confirmBesideToggle: confirmBesideToggle,
-  };
-}
-"""
-RIGHT_AFTER_UNDO = {"inToolbar": True, "between": [], "confirmBesideToggle": True}
-RANGES_SCRIPT = """
-testIds => {
-  const ranges = [];
-  for (const id of testIds) {
-    const box = document.querySelector(`[data-testid="${id}"]`).getBoundingClientRect();
-    ranges.push([id, box.top, box.bottom]);
-  }
-  return ranges;
-}
-"""
-FOCUSED_TEST_ID_SCRIPT = (
-    "() => document.activeElement && document.activeElement.getAttribute('data-testid')"
-)
-FOCUS_SHARE_LINK_SCRIPT = """
-() => document.querySelector('[data-testid="share-link"]').focus()
-"""
-# Spec 024 AC-8's measure: the focused button's box, the toolbar's client area,
-# the outline (spec 035 AC-2), how much of the outline's outer edge is cut ("Not
-# clipped" of spec 035, with the toolbar always among the clipping ancestors) and
-# whether the edge fade is visible.
-FOCUS_IN_TOOLBAR_SCRIPT = "() => {\n" + COLOUR_CONTRAST_JS + r"""
-  const element = document.activeElement;
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const fade = document.querySelector('[data-testid="room-toolbar-more"]');
-  const box = element.getBoundingClientRect();
-  const toolbarBox = toolbar.getBoundingClientRect();
-  const area = {
-    left: toolbarBox.left + toolbar.clientLeft,
-    top: toolbarBox.top + toolbar.clientTop,
-    right: toolbarBox.left + toolbar.clientLeft + toolbar.clientWidth,
-    bottom: toolbarBox.top + toolbar.clientTop + toolbar.clientHeight,
-  };
-  const style = getComputedStyle(element);
-  const width = parseFloat(style.outlineWidth);
-  const offset = parseFloat(style.outlineOffset);
-  const grow = offset + width;
-  const outer = {
-    left: box.left - grow, top: box.top - grow,
-    right: box.right + grow, bottom: box.bottom + grow,
-  };
-  const clip = {left: 0, top: 0, right: innerWidth, bottom: innerHeight};
-  for (let node = element.parentElement; node; node = node.parentElement) {
-    const nodeStyle = getComputedStyle(node);
-    const clips = nodeStyle.overflowX !== 'visible'
-      || nodeStyle.overflowY !== 'visible';
-    if (!clips && node !== toolbar) {
-      continue;
-    }
-    const rect = node.getBoundingClientRect();
-    clip.left = Math.max(clip.left, rect.left + node.clientLeft);
-    clip.top = Math.max(clip.top, rect.top + node.clientTop);
-    clip.right = Math.min(clip.right, rect.left + node.clientLeft + node.clientWidth);
-    clip.bottom = Math.min(clip.bottom, rect.top + node.clientTop + node.clientHeight);
-  }
-  let fadeVisible = false;
-  if (fade !== null) {
-    const fadeStyle = getComputedStyle(fade);
-    fadeVisible = fadeStyle.visibility === 'visible' && fadeStyle.display !== 'none';
-  }
-  const outline = readFocusOutline();
-  return {
-    testId: element.getAttribute('data-testid'),
-    box: [box.left, box.top, box.right, box.bottom],
-    area: [area.left, area.top, area.right, area.bottom],
-    cut: {
-      top: Math.max(clip.top - outer.top, 0),
-      right: Math.max(outer.right - clip.right, 0),
-      bottom: Math.max(outer.bottom - clip.bottom, 0),
-      left: Math.max(clip.left - outer.left, 0),
-    },
-    outline: outline,
-    fadeVisible: fadeVisible,
-  };
-}
-"""
-SCROLL_INTO_VIEW_SCRIPT = """
-testId => {
-  const button = document.querySelector(`[data-testid="${testId}"]`);
-  button.scrollIntoView({block: 'nearest', inline: 'nearest'});
-}
-"""
-HIT_AT_CENTRE_SCRIPT = """
-testId => {
-  const button = document.querySelector(`[data-testid="${testId}"]`);
-  const box = button.getBoundingClientRect();
-  const hit = document.elementFromPoint(
-    box.left + box.width / 2, box.top + box.height / 2
-  );
-  return {
-    hits: hit !== null && (hit === button || button.contains(hit)),
-    hit: hit === null ? null : (hit.getAttribute('data-testid') || hit.tagName),
-  };
-}
-"""
+# ---- The top bar's place and the Aide menu's first item ----
 
 
-def one_row_problems(page: Page) -> list[str]:
-    """The pairs of a pencil button and another toolbar button on different rows."""
-    ranges = page.evaluate(RANGES_SCRIPT, [*SPEC024_BUTTONS, *PENCIL_BUTTONS])
+def top_bar_place_problems(page: Page) -> list[str]:
+    """`pencil-toggle` right after `undo-button` (computer top bar) or right after
+    `chat-toggle` (phone top bar, the one without `topbar-brand`)."""
+    shown = shown_test_ids(page.get_by_test_id("room-topbar"))
+    if "pencil-toggle" not in shown:
+        return [f"pencil-toggle does not show in the top bar: {shown}"]
+    before = "undo-button" if "topbar-brand" in shown else "chat-toggle"
+    index = shown.index("pencil-toggle")
+    if index == 0 or shown[index - 1] != before:
+        return [f"pencil-toggle is not right after {before}: {shown}"]
+    return []
+
+
+def reach_problems(page: Page, test_id: str) -> list[str]:
+    """Spec 043 AC-28's checks for one control: inside the window, and hit."""
     problems: list[str] = []
-    for index, (first_id, first_top, first_bottom) in enumerate(ranges):
-        for second_id, second_top, second_bottom in ranges[index + 1 :]:
-            if first_id not in PENCIL_BUTTONS and second_id not in PENCIL_BUTTONS:
-                continue
-            overlap_top = max(first_top, second_top)
-            overlap_bottom = min(first_bottom, second_bottom)
-            if overlap_top >= overlap_bottom:
-                problems.append(f"{first_id} and {second_id} are on different rows")
+    box = box_of(page.get_by_test_id(test_id))
+    if not box_inside(box, window_box(page)):
+        problems.append(f"{test_id} {box} is not inside the window")
+    found = hit_problem(page, test_id)
+    if found is not None:
+        problems.append(found)
     return problems
 
 
-def keyboard_focus_problems(reading: dict[str, object]) -> list[str]:
-    """How a button with the keyboard focus breaks spec 024 AC-8's keyboard rules."""
-    problems: list[str] = []
-    box = reading["box"]
-    area = reading["area"]
-    assert isinstance(box, list)
-    assert isinstance(area, list)
-    left, top, right, bottom = box
-    area_left, area_top, area_right, area_bottom = area
-    inside = (
-        left >= area_left - EPSILON
-        and top >= area_top - EPSILON
-        and right <= area_right + EPSILON
-        and bottom <= area_bottom + EPSILON
+def confirm_problems(page: Page, touch: bool) -> list[str]:
+    """With (1, 0) selected, `confirm-pencil` is the open Aide menu's first item."""
+    cell = cell_at(page, 1, 0)
+    if touch:
+        cell.tap(timeout=WAIT_TIMEOUT_MS)
+    else:
+        cell.click(timeout=WAIT_TIMEOUT_MS)
+    expect_selected_cell(page, 1, 0)
+    open_aide(page)
+    first = page.get_by_test_id("aide-menu").evaluate(
+        "menu => menu.querySelector('button, a')?.getAttribute('data-testid')"
     )
-    if not inside:
-        problems.append(f"box {box} outside the toolbar's client area {area}")
-    outline = reading["outline"]
-    assert isinstance(outline, dict)
-    problems.extend(
-        outline_problems(outline["style"], outline["width"], outline["ratio"])
-    )
-    cut = reading["cut"]
-    assert isinstance(cut, dict)
-    for side, pixels in cut.items():
-        if round(pixels) != 0:
-            problems.append(f"outline cut by {pixels} px on the {side}")
-    if reading["fadeVisible"] is not False:
-        problems.append("room-toolbar-more is visible")
-    return problems
-
-
-def pencil_toggle_focus_problems(page: Page) -> list[str]:
-    """Tab from `share-link` to `pencil-toggle`, then measure it (desktop context)."""
-    page.evaluate(FOCUS_SHARE_LINK_SCRIPT)
-    for _ in range(MAX_TABS):
-        page.keyboard.press("Tab")
-        if page.evaluate(FOCUSED_TEST_ID_SCRIPT) == "pencil-toggle":
-            page.wait_for_timeout(SETTLE_MS)
-            reading = page.evaluate(FOCUS_IN_TOOLBAR_SCRIPT)
-            return keyboard_focus_problems(reading)
-    return [f"pencil-toggle not focused in {MAX_TABS} presses of Tab"]
-
-
-def hit_problems(page: Page) -> list[str]:
-    """The pencil buttons that `elementFromPoint` misses after `scrollIntoView`."""
     problems: list[str] = []
-    for test_id in PENCIL_BUTTONS:
-        page.evaluate(SCROLL_INTO_VIEW_SCRIPT, test_id)
-        page.wait_for_timeout(SETTLE_MS)
-        result = page.evaluate(HIT_AT_CENTRE_SCRIPT, test_id)
-        if result["hits"] is not True:
-            problems.append(f"{test_id}: elementFromPoint gives {result['hit']}")
+    if first != "confirm-pencil":
+        problems.append(f"the Aide menu's first item is {first}")
+    page.get_by_test_id("confirm-pencil").evaluate(
+        "item => item.scrollIntoView({block: 'nearest'})"
+    )
+    problems.extend(reach_problems(page, "confirm-pencil"))
     return problems
 
 
 @pytest.mark.parametrize("context_kind", CONTEXTS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
-def test_ac7_the_pencil_buttons_keep_the_grid_room_and_the_toolbar_rules(
+def test_ac7_the_pencil_controls_keep_the_grid_room_in_the_top_bar_and_the_aide_menu(
     browser: Browser,
     browser_name: str,
     live_server: str,
@@ -527,30 +344,21 @@ def test_ac7_the_pencil_buttons_keep_the_grid_room_and_the_toolbar_rules(
     context_kind: str,
 ) -> None:
     touch = context_kind == "touch"
-    small = (width, height) in SMALL_WINDOWS
-    page, close = open_toolbar_room(
+    page, close = open_top_bar_room(
         browser, browser_name, live_server, fx01_grid, width, height, touch
     )
     try:
         layout = spec013_layout_problems(page, touch)
-        order = page.evaluate(ORDER_SCRIPT, TOOLBAR_ORDER)
-        right_after_undo = page.evaluate(RIGHT_AFTER_UNDO_SCRIPT)
-        row = one_row_problems(page) if small else []
-        focus = [] if touch else pencil_toggle_focus_problems(page)
-        hits = hit_problems(page)
+        place = top_bar_place_problems(page)
+        toggle = reach_problems(page, "pencil-toggle")
+        confirm = confirm_problems(page, touch)
     finally:
         close()
 
     assert layout == []
-    assert order == {
-        "counts": dict.fromkeys(TOOLBAR_ORDER, 1),
-        "outside": [],
-        "outOfOrder": [],
-    }
-    assert right_after_undo == RIGHT_AFTER_UNDO
-    assert row == []
-    assert focus == []
-    assert hits == []
+    assert place == []
+    assert toggle == []
+    assert confirm == []
 
 
 # ---- The keyboard-only run at 1280 by 720 ----
@@ -574,10 +382,12 @@ def test_ac7_keyboard_only_turns_pencil_mode_on_types_and_confirms(
     typed = wait_for_edit_messages(page, mock.frames_without_pings, 1)
     page.keyboard.press("ArrowLeft")
     expect_selection(page, 1, 0, "across", WORD_W1)
-    # The grid has the focus, so `tab_to` presses Escape first (spec 035).
-    walker.tab_to("confirm-pencil")
-    expect(confirm_button(page)).to_be_enabled()
+    page.keyboard.press("Escape")
+    walker.tab_to("aide-button")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("aide-menu")).to_be_visible()
     expect(confirm_button(page)).to_be_focused()
+    walker.record("confirm-pencil")
     page.keyboard.press("Enter")
     sent = wait_for_edit_messages(page, mock.frames_without_pings, 2)
 
@@ -598,13 +408,15 @@ def test_ac7_keyboard_only_turns_pencil_mode_on_types_and_confirms(
 # ---- Contrast states and the language scan ----
 
 
-def test_ac7_fr_json_holds_the_three_pencil_keys() -> None:
+def test_ac7_fr_json_holds_the_pencil_keys_of_spec_043() -> None:
     fr = load_fr()
     found: dict[str, str | None] = {}
     for key in NEW_KEYS:
         found[key] = fr.get(key)
 
     assert found == NEW_KEYS
+    for key in REMOVED_KEYS:
+        assert key not in fr, key
 
 
 def test_ac7_scans_pass_with_pencil_letters_plain_selected_and_in_my_word(
@@ -624,7 +436,8 @@ def test_ac7_scans_pass_with_pencil_letters_plain_selected_and_in_my_word(
     expect(cell_at(page, 1, 2)).to_have_attribute("data-in-word", "true")
     expect(cell_at(page, 2, 2)).to_have_attribute("data-in-word", "false")
     expect(cell_at(page, 2, 2)).to_have_attribute("data-tinted-by", "")
-    expect(confirm_button(page)).to_be_enabled()
+    open_aide(page)
+    expect(confirm_button(page)).to_be_visible()
 
     offenders = contrast_problems(page)
     scanned = page.evaluate(LANGUAGE_SCAN_SCRIPT)
@@ -643,8 +456,8 @@ def test_ac7_scans_pass_with_pencil_letters_plain_selected_and_in_my_word(
 
     assert offenders == []
     assert selected_pencil_colour != selected_normal_colour
-    assert confirm_label is not None
-    button_texts = [toggle_text, confirm_text, confirm_label]
+    assert confirm_label is None
+    button_texts = [toggle_text, confirm_text]
     assert button_texts == list(NEW_KEYS.values())
     for text in button_texts:
         assert text in scanned
@@ -766,14 +579,14 @@ def solve_from_the_mock_frames() -> list[str]:
     ]
 
 
-def test_ac7_both_pencil_buttons_are_disabled_once_the_grid_is_solved(
+def test_ac7_once_solved_the_toggle_is_disabled_and_the_confirm_item_gone(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     changes = seventeen_right_letters()
     changes.append((1, 0, pencil_letter("T", "p2")))
     mock = open_room(page, live_server, fx01_grid, changes=changes)
     tap(page, 1, 0)
-    expect(confirm_button(page)).to_be_enabled()
+    expect(confirm_button(page)).to_have_count(1)
     expect(pencil_toggle(page)).to_be_enabled()
 
     for frame in solve_from_the_mock_frames():
@@ -781,7 +594,7 @@ def test_ac7_both_pencil_buttons_are_disabled_once_the_grid_is_solved(
     expect_seq(page, 7)
 
     expect(pencil_toggle(page)).to_be_disabled()
-    expect(confirm_button(page)).to_be_disabled()
+    expect(confirm_button(page)).to_have_count(0)
 
 
 def test_ac7_typing_in_pencil_mode_on_the_solved_grid_sends_nothing(

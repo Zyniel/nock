@@ -30,6 +30,7 @@ from playwright.sync_api import Browser, Page, Request, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
+from room_panels import open_aide
 from spec011_harness import EnterRoom
 from spec024_harness import make_catalogue
 from spec032_harness import expect_my_rooms_ready, grid_from_text, my_room_items
@@ -262,6 +263,7 @@ def test_ac5_her_word_check_reads_ancien_joueur_in_bobs_feed(
     reload_bob(play)
 
     cell_at(play.zelie, 1, 0).click()
+    open_aide(play.zelie)  # spec 043: the item is in a panel, opened first
     play.zelie.get_by_test_id("check-word").click()
 
     feed = play.bob.get_by_test_id("activity-feed")

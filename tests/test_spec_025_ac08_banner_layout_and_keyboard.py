@@ -10,9 +10,10 @@ banner leaves (decision 19), while a focus outside the banner stays where it is;
 the contrast and language scans run in the state before the ballot. The shared
 setup is in `spec025_harness`.
 
-The room header has no test id in any spec: the test reads it as the `header`
-element that holds `share-panel` (spec 024: `room-toolbar` is "inside the room
-header after `share-panel`").
+Refined by spec 043 (the design's room layout): "the room header" reads
+`room-topbar` (it was the `header` element that holds `share-panel`); the focus
+outside the banner is put on `copy-link` once the Salon's Joueurs tab shows
+(spec 043's `show_tab`), since `copy-link` is in that tab.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from playwright.sync_api import Browser, FloatRect, Locator, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import GridSolved, Vote, VoteOutcome
+from room_panels import show_tab
 from spec025_harness import (
     EIGHT_NICKNAMES,
     GRID_CHECK,
@@ -134,7 +136,7 @@ def active_test_id(page: Page) -> str | None:
 
 
 def room_header(page: Page) -> Locator:
-    return page.locator("header", has=page.get_by_test_id("share-panel"))
+    return page.get_by_test_id("room-topbar")
 
 
 def layout_boxes(page: Page, touch: bool) -> dict[str, FloatRect]:
@@ -408,6 +410,7 @@ def test_ac8_a_focus_outside_the_banner_stays_where_it_is(
     try:
         mock = open_spec_013_room(page, live_server, fx01_grid)
         send_grid_check_vote(page, mock)
+        show_tab(page, "players")
         page.get_by_test_id("copy-link").focus()
         assert active_test_id(page) == "copy-link"
 

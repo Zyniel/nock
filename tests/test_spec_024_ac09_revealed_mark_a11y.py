@@ -34,6 +34,7 @@ from playwright.sync_api import Browser, BrowserContext, Page, expect
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import CellTarget, LetterChanged, PlayerView, RevealBudget
+from room_panels import open_aide
 from spec024_harness import (
     COLOUR_CONTRAST_JS,
     MARK_COLOURS_JS,
@@ -187,6 +188,7 @@ def open_scanned_state(page: Page, live_server: str, grid: Grid) -> None:
     """AC-9's state with (2, 2) tapped and the reveal controls shown."""
     open_ac9(page, live_server, grid)
     cell_at(page, 2, 2).click()
+    open_aide(page)  # spec 043: the item is in a panel, opened first
     expect(page.get_by_test_id("reveal-letter")).to_be_visible()
     expect(page.get_by_test_id("reveal-word")).to_be_visible()
     expect(cell_at(page, 1, 0)).to_have_attribute("data-revealed", "true")
@@ -231,6 +233,11 @@ def test_ac9_the_keyboard_reaches_both_reveal_buttons_with_a_visible_focus(
     walker.tab_to("grid")
     page.keyboard.press("Tab")
     expect_selection(page, 1, 2, "across", "0,0,0")
+    # Spec 043: the reveal buttons are items of the Aide menu, opened from the
+    # keyboard first.
+    walker.tab_to("aide-button")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("aide-menu")).to_be_visible()
     for test_id in ("reveal-letter", "reveal-word"):
         walker.tab_to(test_id)
         expect(page.get_by_test_id(test_id)).to_be_enabled()

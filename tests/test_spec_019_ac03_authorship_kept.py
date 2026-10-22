@@ -606,7 +606,7 @@ def test_ac3_browser_marks_keep_their_colours_after_a_reload(
 
         expect(room_page(page)).to_have_attribute("data-status", "joined")
         expect(room_page(page)).to_have_attribute("data-you", ana_id)
-        expect(authors_switch(page)).to_be_visible()
+        expect(authors_switch(page)).to_have_count(1)
         turn_switch_on(page)
         expect(marks_in(page, 1, 0)).to_have_count(1)
         expect(marks_in(page, 1, 1)).to_have_count(1)

@@ -6,6 +6,11 @@ and spec 040's mocked socket).
 The shared setup is in `tests/spec014_harness.py`, whose docstring says how the
 tests are built.
 
+Refined by spec 043 (the design's room layout): the remove buttons sit in the
+Salon's Joueurs tab, which the tests show with `show_tab` before a click, and the
+host panel is the room sheet `host-settings` behind the Menu's
+`host-settings-open`, which a player who is not host does not have.
+
 Not tested here, with the reason:
 
 - The `disconnects` entry when the removed player has no open connection: the spec
@@ -26,6 +31,7 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import ErrorCode, LeaveReason, PlayerLeft, RemovePlayer
 from nock.room import CellState, RoomState, disconnect_player, handle_message, join_room
+from room_panels import show_tab
 from spec014_harness import (
     FORM_TIMEOUT_MS,
     IDENTITY_KEY,
@@ -446,9 +452,11 @@ def test_ac1_browser_the_host_removes_a_player_who_cannot_come_back(
         bob_id = room_page(bob_page).get_attribute("data-you")
         assert bob_id
         expect(bob_page.get_by_test_id("remove-player")).to_have_count(0)
-        expect(bob_page.get_by_test_id("host-panel")).to_have_count(0)
-        expect(page.get_by_test_id("host-panel")).to_be_visible()
+        expect(bob_page.get_by_test_id("host-settings-open")).to_have_count(0)
+        expect(bob_page.get_by_test_id("host-settings")).to_have_count(0)
+        expect(page.get_by_test_id("host-settings-open")).to_have_count(1)
 
+        show_tab(page, "players")
         remove_button = roster_item(page, bob_id).get_by_test_id("remove-player")
         expect(remove_button).to_have_text(load_fr()["host.remove"])
         remove_button.click(timeout=FORM_TIMEOUT_MS)
@@ -501,6 +509,7 @@ def test_ac1_browser_the_host_sees_a_labelled_button_on_each_other_player(
         expect(button).to_have_text(load_fr()["host.remove"])
         expect(button).to_have_attribute("aria-label", f"Retirer {name} du salon")
 
+    show_tab(page, "players")
     roster_item(page, "p3").get_by_test_id("remove-player").click(
         timeout=FORM_TIMEOUT_MS
     )
@@ -521,7 +530,8 @@ def test_ac1_browser_a_player_who_is_not_host_sees_no_host_control(
 
     expect(roster_item(page, "p2")).to_have_count(1)
     expect(page.get_by_test_id("remove-player")).to_have_count(0)
-    expect(page.get_by_test_id("host-panel")).to_have_count(0)
+    expect(page.get_by_test_id("host-settings-open")).to_have_count(0)
+    expect(page.get_by_test_id("host-settings")).to_have_count(0)
     expect(page.get_by_test_id("lock-room")).to_have_count(0)
     expect(page.get_by_test_id("settings-form")).to_have_count(0)
 

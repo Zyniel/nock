@@ -524,8 +524,9 @@ def test_ac3_browser_a_failed_vote_shows_its_result_and_changes_nothing(
     page: Page, live_server: str, fx01_grid: Grid, outcome: VoteOutcome
 ) -> None:
     mock = open_room(page, live_server, fx01_grid)
-    reveal_letter = page.get_by_test_id("reveal-letter")
-    expect(reveal_letter).to_have_text(fr_text("reveal.letter", count=5))
+    # Spec 043: what is left is the item's detail.
+    reveal_letter = page.get_by_test_id("reveal-letter-detail")
+    expect(reveal_letter).to_have_text(fr_text("reveal.letters_left", count=5))
     banner = page.get_by_test_id("vote-banner")
     request = Reveal(target=CellTarget(row=1, column=0))
     mock.send(opened(6, 1, "p2", request, 3).model_dump_json())
@@ -542,6 +543,6 @@ def test_ac3_browser_a_failed_vote_shows_its_result_and_changes_nothing(
     expect(cell).to_have_attribute("data-letter", "")
     expect(cell).to_have_attribute("data-locked", "false")
     expect(cell).to_have_attribute("data-revealed", "false")
-    expect(reveal_letter).to_have_text(fr_text("reveal.letter", count=5))
+    expect(reveal_letter).to_have_text(fr_text("reveal.letters_left", count=5))
     elapsed = seconds_until_hidden(page, banner, started)
     assert VOTE_RESULT_MIN_SECONDS <= elapsed <= VOTE_RESULT_MAX_SECONDS, elapsed

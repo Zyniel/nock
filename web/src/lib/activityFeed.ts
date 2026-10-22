@@ -3,7 +3,7 @@
 
 import { t } from './i18n'
 import { displayNickname } from './nickname'
-import type { RoomEvent, RoomSettingsView, Snapshot } from './roomSession'
+import type { ChatLine, RoomEvent, RoomSettingsView, Snapshot } from './roomSession'
 
 // The feed keeps the newest items only.
 export const FEED_LIMIT = 100
@@ -19,6 +19,34 @@ export interface FeedItem {
 // tells them apart by `id`, a number given once per page.
 export interface KeptFeedItem extends FeedItem {
   id: number
+}
+
+// One item of the Salon's stream (spec 043): a chat message or an event line.
+export type StreamEntry =
+  | { kind: 'message'; key: string; seq: number; line: ChatLine }
+  | { kind: 'event'; key: string; seq: number; item: KeptFeedItem }
+
+// The stream of the Salon: the shown chat lines and the feed's event lines in one
+// list, in seq order, oldest first. Each kind keeps its own cap before they meet
+// (the callers pass the lines they keep), and two items of one seq keep their
+// own order (spec 043).
+export function streamEntries(lines: ChatLine[], feed: KeptFeedItem[]): StreamEntry[] {
+  const entries: StreamEntry[] = []
+  let lineIndex = 0
+  let feedIndex = 0
+  while (lineIndex < lines.length || feedIndex < feed.length) {
+    const line = lineIndex < lines.length ? lines[lineIndex] : null
+    const item = feedIndex < feed.length ? feed[feedIndex] : null
+    const takeLine = line !== null && (item === null || line.seq < item.seq)
+    if (takeLine && line !== null) {
+      entries.push({ kind: 'message', key: `message-${line.seq}`, seq: line.seq, line })
+      lineIndex += 1
+    } else if (item !== null) {
+      entries.push({ kind: 'event', key: `event-${item.id}`, seq: item.seq, item })
+      feedIndex += 1
+    }
+  }
+  return entries
 }
 
 // Drop the oldest items of a feed that holds more than FEED_LIMIT.

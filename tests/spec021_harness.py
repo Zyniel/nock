@@ -89,7 +89,6 @@ IDES_CLUE_TEXT = "Fatales à César"
 
 # The values of the new `fr.json` keys ("New `fr.json` keys"), which AC-10 checks
 # in the file: the page tests compare with them directly.
-FLAG_BUTTON_TEXT = "Je bloque"
 FLAG_BUTTON_LABEL = "Je bloque sur ce mot"
 # Spec 042 (the design's grid cells): the marker holds the flag icon's `svg` and
 # no text; `fr.json["flag.marker"]` (the black flag glyph) is gone.

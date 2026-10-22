@@ -12,6 +12,17 @@ nicknames, the clues, the room code and link, and the chat texts the test sent
 of `fr.json` against the table of "New `fr.json` keys" and checks that spec 035
 AC-9's checker still flags its three samples.
 
+Refined by spec 043 (the design's room layout): the walk reaches `chat-toggle`
+(the « Salon » button), `chat-input` and `chat-send` on the Salon's Discussion
+tab, and `p2`'s `mute-player` on its Joueurs tab (the tabs are reached with
+`tab_to` and the arrow keys); one `Tab` from the last `reaction-option` lands
+inside `salon`, whose tabs come before its panel. The keys that spec 043 removes
+(`chat.toggle`, `chat.toggle_label_unread`, `chat.moderation_heading`,
+`reaction.button`) are no longer expected; the toggle's unread label is
+`Salon, 3 messages non lus`; spec 035 AC-9's flagged sample `Salon` became
+`Salle`. In the column layout the Salon is open at load, so the walk closes it
+and opens it again from the keyboard, and the scans close it with a click.
+
 The shared setup is in `spec022_harness`.
 """
 
@@ -46,8 +57,6 @@ from spec024_harness import (
 from spec035_harness import unknown_texts
 
 NEW_FR_KEYS = {
-    "chat.toggle": "Discussion",
-    "chat.toggle_label_unread": "Discussion, {count} messages non lus",
     "chat.unread_many": "99+",
     "chat.heading": "Discussion",
     "chat.input_label": "Message",
@@ -55,12 +64,10 @@ NEW_FR_KEYS = {
     "chat.send": "Envoyer",
     "chat.wait": "Patientez avant d'envoyer.",
     "chat.muted": "L'hôte a coupé votre discussion.",
-    "chat.moderation_heading": "Sourdine",
     "chat.mute": "Couper",
     "chat.unmute": "Rétablir",
     "chat.mute_label": "Couper la discussion de {name}",
     "chat.unmute_label": "Rétablir la discussion de {name}",
-    "reaction.button": "Réagir",
     "reaction.button_label": "Réagir sur ce mot",
     "reaction.picker_label": "Réactions",
     "reaction.thumbs_up": "\U0001f44d",
@@ -75,7 +82,7 @@ NEW_FR_KEYS = {
     "reaction.thinking_label": "Je réfléchis",
     "reaction.shown_label": "{name} : {reaction}",
 }
-CHECKER_SAMPLES = ["Loading…", "Salon", "Check word"]
+CHECKER_SAMPLES = ["Loading…", "Salle", "Check word"]
 SCAN_SIZES = [(1280, 720), (360, 740)]
 NICKNAMES = ["Ana", "Bob", "Cy"]
 OPEN_CHAT = [
@@ -83,12 +90,12 @@ OPEN_CHAT = [
     ChatMessage(seq=4, player_id="p3", text="Bonne idée !"),
 ]
 UNREAD_TEXTS = ["Ligne 6", "Ligne 7", "Ligne 8"]
-ACCEPTED_SAMPLES = ["Discussion, 3 messages non lus", "Bob : Bravo", "\U0001f44f"]
+ACCEPTED_SAMPLES = ["Salon, 3 messages non lus", "Bob : Bravo", "\U0001f44f"]
 TYPED_TEXT = "Bonne idée !"
-# Whether `chat-panel` exists and holds the focused element (not the panel itself).
+# Whether `salon` exists and holds the focused element (not the Salon itself).
 FOCUS_IN_PANEL_SCRIPT = r"""
 () => {
-  const panel = document.querySelector('[data-testid="chat-panel"]');
+  const panel = document.querySelector('[data-testid="salon"]');
   const focused = document.activeElement;
   return {
     panel: panel !== null,
@@ -139,18 +146,30 @@ def test_ac16_browser_every_chat_and_reaction_control_is_reached_from_the_keyboa
     expect(page.get_by_test_id("reaction-picker")).to_have_count(0)
 
     walker.tab_to("chat-toggle")
+    salon = page.get_by_test_id("salon")
+    if salon.get_attribute("hidden") is None:
+        page.keyboard.press("Enter")  # the column layout opened it at load
+        expect(salon).to_be_hidden()
     page.keyboard.press("Enter")
     expect(page.get_by_test_id("chat-panel")).to_be_visible()
     walker.tab_to("chat-input")
     page.keyboard.type(TYPED_TEXT)
     walker.tab_to("chat-send")
-    p2_row = '[data-testid="mute-row"][data-player-id="p2"] [data-testid="mute-player"]'
+    walker.tab_to("salon-tab-discussion")
+    page.keyboard.press("ArrowRight")
+    expect(page.get_by_test_id("roster")).to_be_visible()
+    p2_row = (
+        '[data-testid="roster-player"][data-player-id="p2"] [data-testid="mute-player"]'
+    )
     walker.tab_to("mute-player", p2_row)
+    walker.tab_to("salon-tab-players")
+    page.keyboard.press("ArrowLeft")
+    expect(page.get_by_test_id("chat-panel")).to_be_visible()
     walker.tab_to("chat-input")
     page.keyboard.press("Enter")
     wait_for_frame_count(page, mock, "chat", 1)
 
-    # The panel still open, the picker opened too: one Tab from its last option.
+    # The Salon still open, the picker opened too: one Tab from its last option.
     expect(page.get_by_test_id("chat-panel")).to_be_visible()
     walker.tab_to("react-button")
     page.keyboard.press("Enter")
@@ -167,7 +186,9 @@ def test_ac16_browser_every_chat_and_reaction_control_is_reached_from_the_keyboa
         "chat-toggle",
         "chat-input",
         "chat-send",
+        "salon-tab-discussion",
         "mute-player",
+        "salon-tab-players",
         "chat-input",
         "react-button",
         "reaction-option",
@@ -211,9 +232,9 @@ def test_ac16_browser_the_chat_and_reactions_pass_the_contrast_and_language_scan
         open_contrast = contrast_problems(page)
         open_language = language_problems(page, data)
 
-        # The panel closed, with 3 unread lines.
-        page.keyboard.press("Escape")
-        expect(page.get_by_test_id("chat-panel")).to_have_count(0)
+        # The Salon closed, with 3 unread lines.
+        page.get_by_test_id("chat-toggle").click()
+        expect(page.get_by_test_id("salon")).to_be_hidden()
         for seq, text in zip((6, 7, 8), UNREAD_TEXTS, strict=True):
             mock.send(chat_frame(seq, "p2", text))
         expect_seq(page, 8)

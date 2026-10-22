@@ -41,6 +41,7 @@ from nock.protocol import (
 )
 from nock.room import CellState, RoomConfig, handle_message, tick
 from nock.server import create_app
+from room_panels import open_aide
 from spec024_harness import (
     MIME,
     NOW,
@@ -440,6 +441,7 @@ def ana_reveals_bobs_letter(
     bob_page.keyboard.press("x")
     expect(cell_at(page, 1, 1)).to_have_attribute("data-letter", "X")
     cell_at(page, 1, 1).click()
+    open_aide(page)  # spec 043: the item is in a panel, opened first
     page.get_by_test_id("reveal-letter").click(timeout=WAIT_TIMEOUT_MS)
     for watcher in (page, bob_page):
         expect(cell_at(watcher, 1, 1)).to_have_attribute("data-letter", "A")

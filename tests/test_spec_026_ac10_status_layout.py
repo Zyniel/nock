@@ -26,6 +26,17 @@ The layout problems of a page are collected and reported together, so a failing
 test names every check its page misses. The mocked socket (which answers each
 `ping` with a `pong`), the desktop and touch contexts and the feed events come
 from `spec013_harness`; the scans from `spec035_harness`.
+
+Refined by spec 043 (the design's room layout): the in-row checks at 568 by 320
+and 740 by 360 run in the touch context, spec 043's sheet layout; in the desktop
+context these two windows are the column layout, where `grid-status` sits under
+the clue bar, as at 1280 by 720. The edge case of a resize across 500 px runs in
+the touch context, where the status changes its place. Spec 044 (the design's
+keyboard, built after this step) refines the touch context's solved page once more
+(no keyboard, the column layout, the status under the bar); until then the in-app
+keyboard stays on a solved page (spec 026 AC-5), so the place of the solved status
+in the touch context of a low window is not checked here, and the in-row checks
+and the resize run with `FX02_FULL_WRONG`. Its layout checks and scans still run.
 """
 
 from __future__ import annotations
@@ -68,6 +79,7 @@ from spec035_harness import (
     contrast_offenders,
     unknown_texts,
 )
+from spec043_harness import expect_status_text
 
 NewPage = Callable[[int, int, bool], Page]
 
@@ -379,7 +391,7 @@ def expect_status_shows(page: Page, state: str) -> None:
     expect(status).to_be_visible()
     expect(status).to_have_attribute("role", "status")
     expect(status).to_have_attribute("data-state", state)
-    expect(status).to_have_text(load_fr()[STATUS_TEXT_KEYS[state]])
+    expect_status_text(status, load_fr()[STATUS_TEXT_KEYS[state]])
 
 
 # ---- Measures ----
@@ -698,36 +710,76 @@ def status_place_problems(page: Page, size: tuple[int, int]) -> list[str]:
 # ---- AC-10: the completion status never takes the grid's room ----
 
 
-@pytest.mark.parametrize("state", STATES)
-@pytest.mark.parametrize("context_kind", CONTEXTS)
 @pytest.mark.parametrize(
     ("width", "height"), LOW_WINDOW_SIZES, ids=size_ids(LOW_WINDOW_SIZES)
 )
-def test_ac10_on_a_low_window_the_status_sits_in_the_clue_bar_row(
+def test_ac10_on_a_low_touch_window_the_status_sits_in_the_clue_bar_row(
     new_page: NewPage,
     live_server: str,
     fx02_grid: Grid,
     width: int,
     height: int,
-    context_kind: str,
+) -> None:
+    state = "full_wrong"
+    height_without_status = clue_bar_height_without_status(
+        new_page, live_server, fx02_grid, (width, height), True
+    )
+    page = new_page(width, height, True)
+    open_status_page(page, live_server, status_view(fx02_grid, state), False, True)
+
+    expect_status_shows(page, state)
+    problems = room_layout_problems(page, True)
+    problems.extend(clue_bar_row_problems(page, height_without_status))
+    if (width, height) == SCAN_WINDOW:
+        problems.extend(scan_problems(page, live_server, fx02_grid))
+
+    assert problems == [], f"{width}x{height} touch {state}: {problems}"
+
+
+@pytest.mark.parametrize(
+    ("width", "height"), LOW_WINDOW_SIZES, ids=size_ids(LOW_WINDOW_SIZES)
+)
+def test_ac10_on_a_low_touch_window_the_solved_status_shows_and_keeps_the_room(
+    new_page: NewPage,
+    live_server: str,
+    fx02_grid: Grid,
+    width: int,
+    height: int,
+) -> None:
+    state = "solved"
+    page = new_page(width, height, True)
+    open_status_page(page, live_server, status_view(fx02_grid, state), True, True)
+
+    expect_status_shows(page, state)
+    problems = room_layout_problems(page, True)
+    if (width, height) == SCAN_WINDOW:
+        problems.extend(scan_problems(page, live_server, fx02_grid))
+
+    assert problems == [], f"{width}x{height} touch {state}: {problems}"
+
+
+@pytest.mark.parametrize("state", STATES)
+@pytest.mark.parametrize(
+    ("width", "height"), LOW_WINDOW_SIZES, ids=size_ids(LOW_WINDOW_SIZES)
+)
+def test_ac10_on_a_low_desktop_window_the_status_sits_under_the_clue_bar(
+    new_page: NewPage,
+    live_server: str,
+    fx02_grid: Grid,
+    width: int,
+    height: int,
     state: str,
 ) -> None:
-    touch = context_kind == "touch"
-    height_without_status = clue_bar_height_without_status(
-        new_page, live_server, fx02_grid, (width, height), touch
-    )
-    page = new_page(width, height, touch)
+    page = new_page(width, height, False)
     open_status_page(
-        page, live_server, status_view(fx02_grid, state), state == "solved", touch
+        page, live_server, status_view(fx02_grid, state), state == "solved", False
     )
 
     expect_status_shows(page, state)
-    problems = room_layout_problems(page, touch)
-    problems.extend(clue_bar_row_problems(page, height_without_status))
-    if touch and (width, height) == SCAN_WINDOW:
-        problems.extend(scan_problems(page, live_server, fx02_grid))
+    problems = room_layout_problems(page, False)
+    problems.extend(under_the_clue_bar_problems(page))
 
-    assert problems == [], f"{width}x{height} {context_kind} {state}: {problems}"
+    assert problems == [], f"{width}x{height} desktop {state}: {problems}"
 
 
 @pytest.mark.parametrize("state", STATES)
@@ -781,15 +833,13 @@ def test_ac10_at_1280_by_720_the_status_sits_under_the_clue_bar(
 # ---- AC-10, edge case "Low windows (AC-10)": a resize across 500 px ----
 
 
-@pytest.mark.parametrize("state", STATES)
 def test_ac10_a_resize_across_500_px_moves_the_status(
-    new_page: NewPage, live_server: str, fx02_grid: Grid, state: str
+    new_page: NewPage, live_server: str, fx02_grid: Grid
 ) -> None:
+    state = "full_wrong"
     width, height = RESIZE_START
-    page = new_page(width, height, False)
-    open_status_page(
-        page, live_server, status_view(fx02_grid, state), state == "solved", False
-    )
+    page = new_page(width, height, True)
+    open_status_page(page, live_server, status_view(fx02_grid, state), False, True)
     expect_status_shows(page, state)
     problems: dict[str, list[str]] = {}
     found = status_place_problems(page, RESIZE_START)

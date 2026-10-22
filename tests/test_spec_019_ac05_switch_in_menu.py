@@ -2,22 +2,20 @@
 
 The setup is spec 013 AC-6's (FX-01, `you` host among 8 players, 100 feed items,
 (3, 1) tapped), with letters by four of the players and the switch on, at the
-window sizes of spec 006 AC-5 in desktop and touch contexts. The switch must sit
-in spec 024's `room-toolbar` after `reveal-panel` (a relative order: other specs
-add controls to the toolbar) and follow spec 024 AC-8's toolbar rules. A separate
+window sizes of spec 006 AC-5 in desktop and touch contexts. A separate
 keyboard-only run uses spec 035's `tab_to`, and spec 035's contrast and language
 scans run with the switch on. The shared setup is in `spec019_harness`.
 
+Refined by spec 043 (the design's room layout): `authors-switch` is the first item
+of `room-menu`, and with the Menu open spec 043 AC-28's checks hold for it (inside
+the window; `elementFromPoint` at its centre returns it); the keyboard-only run
+opens the Menu with `tab_to` `menu-button` and `Enter`, which puts the focus on the
+switch. The rules of spec 024 AC-8's toolbar (one row, the toolbar's client area,
+the fade) went with the toolbar.
+
 Choices where the spec leaves room:
 
-- "One row": at the four small windows of spec 024 AC-8, the switch's vertical
-  range overlaps that of every other visible button of the toolbar.
-- "With the toolbar among the clipping ancestors" (spec 024 AC-8): the toolbar's
-  client area always counts as a clip in the "Not clipped" measure, whatever its
-  `overflow`, as do the window and every ancestor whose `overflow` is not
-  `visible` (0.5 px allowance, spec 035).
-- The focused switch is measured 300 ms after it got the focus, so that a scroll
-  of the toolbar has ended (spec 035 measures its feed list 300 ms later too).
+- "The first item of `room-menu`": the first `button` or `a` inside it.
 - The keyboard-only run uses the setup's snapshot and feed, with no tap and the
   switch off at first.
 """
@@ -33,11 +31,11 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import CheckResult, GridTarget, PlayerView, grid_view
+from room_panels import open_menu
 from spec019_harness import (
     CONTEXT_KINDS,
     LAYOUT_EPSILON_PX,
     ROOM_CODE,
-    SETTLE_MS,
     WINDOW_IDS,
     WINDOW_SIZES,
     ChangeList,
@@ -60,13 +58,11 @@ from spec035_harness import unknown_texts
 
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_LIMIT = 100
-SMALL_WINDOWS = [(320, 568), (568, 320), (360, 740), (740, 360)]
 SCAN_WINDOWS = [(1280, 720), (360, 740)]
 MAX_TABS = 60
 MIN_OUTLINE_PX = 2.0
 MIN_FOCUS_CONTRAST = 3.0
 MIN_TEXT_CONTRAST = 4.5
-CLIP_ALLOWANCE_PX = 0.5
 
 FX01_CLUES = [
     "Passoire fine",
@@ -122,128 +118,26 @@ LANGUAGE_SCAN_SCRIPT = r"""
 }
 """
 
-ORDER_SCRIPT = """
-() => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const panel = document.querySelector('[data-testid="reveal-panel"]');
-  const switches = document.querySelectorAll('[data-testid="authors-switch"]');
-  if (toolbar === null || panel === null || switches.length !== 1) {
-    return {
-      toolbar: toolbar !== null, panel: panel !== null, switches: switches.length,
-    };
-  }
-  const authors = switches[0];
-  const position = panel.compareDocumentPosition(authors);
-  return {
-    toolbar: true, panel: true, switches: 1,
-    panelInToolbar: toolbar.contains(panel),
-    switchInToolbar: toolbar.contains(authors),
-    switchAfterPanel: (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-      && !panel.contains(authors),
-  };
-}
-"""
-
-# The vertical range of the switch and of each other visible toolbar button.
-ROWS_SCRIPT = """
-() => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const authors = document.querySelector('[data-testid="authors-switch"]');
-  const own = authors.getBoundingClientRect();
-  const others = [];
-  for (const button of toolbar.querySelectorAll('button')) {
-    const box = button.getBoundingClientRect();
-    const shown = box.width > 0 && box.height > 0
-      && getComputedStyle(button).visibility === 'visible';
-    if (button !== authors && shown) {
-      others.push([button.getAttribute('data-testid'), box.top, box.bottom]);
-    }
-  }
-  return {top: own.top, bottom: own.bottom, others: others};
-}
-"""
-
 HIT_SCRIPT = """
 () => {
   const authors = document.querySelector('[data-testid="authors-switch"]');
-  authors.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  authors.scrollIntoView({block: 'nearest'});
   const box = authors.getBoundingClientRect();
   const hit = document.elementFromPoint(
     box.left + box.width / 2, box.top + box.height / 2
   );
   return {
+    box: [box.left, box.top, box.right, box.bottom],
     hits: hit !== null && (hit === authors || authors.contains(hit)),
     hit: hit === null ? null : (hit.getAttribute('data-testid') || hit.tagName),
   };
 }
 """
 
-FOCUSED_TEST_ID_SCRIPT = (
-    "() => document.activeElement && document.activeElement.getAttribute('data-testid')"
-)
-
-# The focused element's box against the toolbar's client area, and the cuts of
-# its outline's outer edge by the window, the toolbar and every ancestor whose
-# overflow is not `visible` (spec 035, "Not clipped").
-FOCUS_PLACE_SCRIPT = """
-allowance => {
-  const element = document.activeElement;
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const clientArea = node => {
-    const rect = node.getBoundingClientRect();
-    return {
-      left: rect.left + node.clientLeft, top: rect.top + node.clientTop,
-      right: rect.left + node.clientLeft + node.clientWidth,
-      bottom: rect.top + node.clientTop + node.clientHeight,
-    };
-  };
-  const box = element.getBoundingClientRect();
-  const area = clientArea(toolbar);
-  const style = getComputedStyle(element);
-  const grow = parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth);
-  const outer = {
-    left: box.left - grow, top: box.top - grow,
-    right: box.right + grow, bottom: box.bottom + grow,
-  };
-  const clips = [
-    ['window', {left: 0, top: 0, right: innerWidth, bottom: innerHeight}],
-    ['room-toolbar', area],
-  ];
-  for (let node = element.parentElement; node; node = node.parentElement) {
-    const nodeStyle = getComputedStyle(node);
-    if (nodeStyle.overflowX === 'visible' && nodeStyle.overflowY === 'visible') {
-      continue;
-    }
-    clips.push([node.getAttribute('data-testid') || node.tagName, clientArea(node)]);
-  }
-  const cuts = [];
-  for (const [name, clip] of clips) {
-    const cut = {
-      top: clip.top - outer.top, right: outer.right - clip.right,
-      bottom: outer.bottom - clip.bottom, left: clip.left - outer.left,
-    };
-    for (const side of Object.keys(cut)) {
-      if (cut[side] > allowance) {
-        cuts.push(`${name} cuts the ${side} by ${cut[side]} px`);
-      }
-    }
-  }
-  return {
-    box: [box.left, box.top, box.right, box.bottom],
-    area: [area.left, area.top, area.right, area.bottom],
-    cuts: cuts,
-  };
-}
-"""
-
-MORE_VISIBLE_SCRIPT = """
-() => {
-  const more = document.querySelector('[data-testid="room-toolbar-more"]');
-  if (more === null) {
-    return false;
-  }
-  const style = getComputedStyle(more);
-  return style.visibility === 'visible' && style.display !== 'none';
+FIRST_ITEM_SCRIPT = """
+menu => {
+  const first = menu.querySelector('button, a');
+  return first === null ? null : first.getAttribute('data-testid');
 }
 """
 
@@ -324,10 +218,6 @@ def open_setup(page: Page, base_url: str, grid: Grid, touch: bool) -> None:
     turn_switch_on(page, touch)
 
 
-def toolbar_more_visible(page: Page) -> bool:
-    return bool(page.evaluate(MORE_VISIBLE_SCRIPT))
-
-
 def outline_problems(page: Page) -> list[str]:
     """How the focused element's outline breaks spec 035 AC-2 (empty: none)."""
     outline = page.evaluate(FOCUS_OUTLINE_SCRIPT)
@@ -339,21 +229,6 @@ def outline_problems(page: Page) -> list[str]:
     if outline["ratio"] < MIN_FOCUS_CONTRAST:
         problems.append(f"outline contrast {outline['ratio']} against white")
     return problems
-
-
-def tab_from_share_link_to_the_switch(page: Page) -> None:
-    """Focus `share-link`, then press Tab until the switch has the focus."""
-    page.evaluate(
-        "() => document.querySelector('[data-testid=\"share-link\"]').focus()"
-    )
-    for _ in range(MAX_TABS):
-        page.keyboard.press("Tab")
-        focused = page.evaluate(FOCUSED_TEST_ID_SCRIPT)
-        if focused == "authors-switch":
-            return
-        if focused == "grid":
-            page.keyboard.press("Escape")
-    pytest.fail(f"authors-switch not reached in {MAX_TABS} Tab presses")
 
 
 def tab_to(page: Page, test_id: str) -> None:
@@ -396,7 +271,7 @@ def test_ac5_the_grid_keeps_its_room_with_the_switch_on(
 
 @pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
-def test_ac5_the_switch_is_in_the_toolbar_after_the_reveal_panel(
+def test_ac5_the_switch_is_the_first_item_of_the_menu(
     window: OpenWindow,
     live_server: str,
     fx01_grid: Grid,
@@ -406,73 +281,17 @@ def test_ac5_the_switch_is_in_the_toolbar_after_the_reveal_panel(
 ) -> None:
     touch = context_kind == "touch"
     page = window(width, height, touch)
-
     open_setup(page, live_server, fx01_grid, touch)
 
-    order = page.evaluate(ORDER_SCRIPT)
-    assert order == {
-        "toolbar": True,
-        "panel": True,
-        "switches": 1,
-        "panelInToolbar": True,
-        "switchInToolbar": True,
-        "switchAfterPanel": True,
-    }
+    open_menu(page)
 
-
-@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
-@pytest.mark.parametrize(
-    ("width", "height"), SMALL_WINDOWS, ids=[f"{w}x{h}" for w, h in SMALL_WINDOWS]
-)
-def test_ac5_on_small_windows_the_switch_shares_the_toolbars_one_row(
-    window: OpenWindow,
-    live_server: str,
-    fx01_grid: Grid,
-    width: int,
-    height: int,
-    context_kind: str,
-) -> None:
-    touch = context_kind == "touch"
-    page = window(width, height, touch)
-
-    open_setup(page, live_server, fx01_grid, touch)
-
-    rows = page.evaluate(ROWS_SCRIPT)
-    assert rows["others"] != [], "no other visible button in room-toolbar"
-    for test_id, top, bottom in rows["others"]:
-        overlaps = top < rows["bottom"] and rows["top"] < bottom
-        assert overlaps, f"{test_id} ({top}-{bottom}) is not on the switch's row"
-
-
-@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
-def test_ac5_with_the_keyboard_focus_the_switch_is_whole_inside_the_toolbar(
-    window: OpenWindow,
-    live_server: str,
-    fx01_grid: Grid,
-    width: int,
-    height: int,
-) -> None:
-    page = window(width, height, False)
-    open_setup(page, live_server, fx01_grid, False)
-
-    tab_from_share_link_to_the_switch(page)
-    page.wait_for_timeout(SETTLE_MS)
-
-    place = page.evaluate(FOCUS_PLACE_SCRIPT, CLIP_ALLOWANCE_PX)
-    left, top, right, bottom = place["box"]
-    area_left, area_top, area_right, area_bottom = place["area"]
-    assert left >= area_left - LAYOUT_EPSILON_PX, place
-    assert top >= area_top - LAYOUT_EPSILON_PX, place
-    assert right <= area_right + LAYOUT_EPSILON_PX, place
-    assert bottom <= area_bottom + LAYOUT_EPSILON_PX, place
-    assert outline_problems(page) == []
-    assert place["cuts"] == []
-    assert toolbar_more_visible(page) is False
+    first = page.get_by_test_id("room-menu").evaluate(FIRST_ITEM_SCRIPT)
+    assert first == "authors-switch"
 
 
 @pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
-def test_ac5_a_pointer_at_the_centre_of_the_switch_reaches_it(
+def test_ac5_with_the_menu_open_the_switch_is_in_the_window_and_reachable(
     window: OpenWindow,
     live_server: str,
     fx01_grid: Grid,
@@ -483,9 +302,15 @@ def test_ac5_a_pointer_at_the_centre_of_the_switch_reaches_it(
     touch = context_kind == "touch"
     page = window(width, height, touch)
     open_setup(page, live_server, fx01_grid, touch)
+    open_menu(page)
 
     hit = page.evaluate(HIT_SCRIPT)
 
+    left, top, right, bottom = hit["box"]
+    assert left >= -LAYOUT_EPSILON_PX, hit
+    assert top >= -LAYOUT_EPSILON_PX, hit
+    assert right <= width + LAYOUT_EPSILON_PX, hit
+    assert bottom <= height + LAYOUT_EPSILON_PX, hit
     assert hit["hits"] is True, f"elementFromPoint found {hit['hit']}"
 
 
@@ -500,7 +325,10 @@ def test_ac5_keyboard_only_enter_turns_the_switch_on_then_off(
     switch = authors_switch(page)
     expect(switch).to_have_attribute("aria-pressed", "false")
 
-    tab_to(page, "authors-switch")
+    tab_to(page, "menu-button")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("room-menu")).to_be_visible()
+    expect(switch).to_be_focused()
     assert outline_problems(page) == []
     page.keyboard.press("Enter")
     expect(switch).to_have_attribute("aria-pressed", "true")

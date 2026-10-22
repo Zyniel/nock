@@ -6,6 +6,11 @@ and spec 040's mocked socket).
 The shared setup is in `tests/spec014_harness.py`, whose docstring says how the
 tests are built.
 
+Refined by spec 043 (the design's room layout): `lock-room` is a switch in the
+host's settings sheet, which the browser tests open first with
+`open_host_settings`; its accessible name is `fr.json["host.lock"]` in both
+states (`host.unlock` is gone) and `aria-pressed` gives its state.
+
 Not tested here, with the reason:
 
 - The seq of the entries of a refused join that also timed out the member in the
@@ -32,6 +37,7 @@ from nock.protocol import (
     SettingsChanged,
 )
 from nock.room import disconnect_player, handle_message, join_room, tick
+from room_panels import open_host_settings
 from spec014_harness import (
     FORM_TIMEOUT_MS,
     LOSS_BUDGET_MS,
@@ -87,7 +93,7 @@ def test_ac2_fr_json_holds_the_lock_texts() -> None:
     fr = load_fr()
 
     assert fr["host.lock"] == "Verrouiller le salon"
-    assert fr["host.unlock"] == "Déverrouiller le salon"
+    assert "host.unlock" not in fr  # removed by spec 043
     assert fr["room.status.locked"] == "Ce salon est verrouillé."
 
 
@@ -408,14 +414,15 @@ def test_ac2_browser_the_host_locks_the_room_and_a_newcomer_is_refused(
     bob_context = browser.new_context()
     try:
         enter_room(page, url, "Ana")
+        open_host_settings(page)
         lock = page.get_by_test_id("lock-room")
         expect(lock).to_have_attribute("aria-pressed", "false")
-        expect(lock).to_have_text(load_fr()["host.lock"])
+        expect(lock).to_have_attribute("aria-label", load_fr()["host.lock"])
 
         lock.click(timeout=FORM_TIMEOUT_MS)
 
         expect(lock).to_have_attribute("aria-pressed", "true")
-        expect(lock).to_have_text(load_fr()["host.unlock"])
+        expect(lock).to_have_attribute("aria-label", load_fr()["host.lock"])
         expect(feed_lines(page, "room_locked")).to_have_text(
             "Ana a verrouillé le salon"
         )
@@ -442,7 +449,7 @@ def test_ac2_browser_the_host_locks_the_room_and_a_newcomer_is_refused(
         lock.click(timeout=FORM_TIMEOUT_MS)
 
         expect(lock).to_have_attribute("aria-pressed", "false")
-        expect(lock).to_have_text(load_fr()["host.lock"])
+        expect(lock).to_have_attribute("aria-label", load_fr()["host.lock"])
         expect(feed_lines(page, "room_unlocked")).to_have_text(
             "Ana a déverrouillé le salon"
         )
@@ -462,6 +469,7 @@ def test_ac2_browser_the_lock_button_sends_the_opposite_of_the_current_state(
 ) -> None:
     room = joined_mock_room(page, live_server, fx01_grid, three_players())
     connection = room.connections[0]
+    open_host_settings(page)
     lock = page.get_by_test_id("lock-room")
     expect(lock).to_have_attribute("aria-pressed", "false")
 
@@ -475,7 +483,7 @@ def test_ac2_browser_the_lock_button_sends_the_opposite_of_the_current_state(
     locked_settings = START_SETTINGS.model_copy(update={"locked": True})
     connection.send(settings_frame(6, "p1", locked_settings))
     expect(lock).to_have_attribute("aria-pressed", "true")
-    expect(lock).to_have_text(load_fr()["host.unlock"])
+    expect(lock).to_have_attribute("aria-label", load_fr()["host.lock"])
 
     lock.click(timeout=FORM_TIMEOUT_MS)
 
@@ -486,7 +494,7 @@ def test_ac2_browser_the_lock_button_sends_the_opposite_of_the_current_state(
     }
     connection.send(settings_frame(7, "p1", START_SETTINGS))
     expect(lock).to_have_attribute("aria-pressed", "false")
-    expect(lock).to_have_text(load_fr()["host.lock"])
+    expect(lock).to_have_attribute("aria-label", load_fr()["host.lock"])
 
 
 def test_ac2_browser_a_locked_snapshot_shows_the_button_pressed(
@@ -499,7 +507,7 @@ def test_ac2_browser_a_locked_snapshot_shows_the_button_pressed(
 
     lock = page.get_by_test_id("lock-room")
     expect(lock).to_have_attribute("aria-pressed", "true")
-    expect(lock).to_have_text(load_fr()["host.unlock"])
+    expect(lock).to_have_attribute("aria-label", load_fr()["host.lock"])
 
 
 @pytest.mark.parametrize("scenario", ["join", "game", "reconnection"])

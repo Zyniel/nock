@@ -34,6 +34,7 @@ from playwright.sync_api import Locator, Page, expect
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Direction, PlayerState, PlayerView
+from room_panels import show_tab
 from spec013_harness import state_frame
 from spec019_harness import MockRoomSocket, player_joined_frame, player_left_frame
 from spec042_harness import (
@@ -618,6 +619,7 @@ def test_ac11_with_the_mode_on_each_roster_swatch_shows_its_icon(
     open_ac11(page, live_server, fx01_grid)
 
     click_switch(page, ACCESS_SWITCH, "true")
+    show_tab(page, "players")  # spec 043: the roster is the Salon's Joueurs tab
 
     assert swatch_icon_problems(page) == []
 
@@ -631,6 +633,7 @@ def test_ac11_every_colour_index_has_its_own_icon_in_the_roster(
     open_room(page, live_server, fx01_view(fx01_grid), players)
 
     click_switch(page, ACCESS_SWITCH, "true")
+    show_tab(page, "players")  # spec 043: the roster is the Salon's Joueurs tab
 
     assert len(read_swatches(page)) == 8
     assert swatch_icon_problems(page) == []

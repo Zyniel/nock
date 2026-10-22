@@ -7,6 +7,12 @@ settled (two reads of `scrollTop` 100 ms apart are equal) and items in view (a
 300 ms and 300 ms after `data-catch-up="5-9"` are of the kind of spec 013's
 serial file, so this file runs in the serial pass (`SERIAL_TEST_FILES` of
 `scripts/gate_browsers.py`). The shared setup is in `spec034_harness`.
+
+Refined for spec 043 (the design's room layout): the feed list is the Salon's
+stream, which fills the Salon's height (about 510 px at 1280 by 720), so the 16
+live lines of "Live lines first" (`seq` 10 to 25) no longer make it scroll. The
+setup sends 40 live lines (`seq` 10 to 49) instead, which keeps the case's intent:
+a list that scrolls, at its end or scrolled up, before the answer.
 """
 
 from __future__ import annotations
@@ -43,7 +49,9 @@ END_WATCH_LIMIT_MS = 1000
 SETTLED_READ_MS = 100
 SETTLED_LIMIT_MS = 2000
 FIRST_LIVE_SEQ = 10
-LAST_LIVE_SEQ = 25
+LAST_LIVE_SEQ = 49
+LIVE_LINES = LAST_LIVE_SEQ - FIRST_LIVE_SEQ + 1
+CATCH_UP_LINES = 3
 
 FEED_SCROLL_SCRIPT = """
 selector => {
@@ -239,13 +247,13 @@ def assert_at_end_within_300_ms(page: Page) -> None:
 def open_return_with_live_lines(
     page: Page, base_url: str, grid: Grid, route: CatchUpRoute
 ) -> None:
-    """The return of AC-4, its request held while 16 live lines (10 to 25) arrive."""
+    """The return of AC-4, its request held while 40 live lines (10 to 49) arrive."""
     mock = open_mocked_room(page, base_url, grid, route, record=record_with(5), seq=9)
     route.wait_for_requests(page, 1)
     for seq in range(FIRST_LIVE_SEQ, LAST_LIVE_SEQ + 1):
         mock.send(grid_line_frame(seq))
     expect_seq(page, LAST_LIVE_SEQ)
-    expect(feed_item_locator(page)).to_have_count(16)
+    expect(feed_item_locator(page)).to_have_count(LIVE_LINES)
 
 
 def test_ac4_the_newest_catch_up_line_is_in_view_with_the_list_at_its_end(
@@ -277,7 +285,7 @@ def test_ac4_after_live_lines_at_its_end_the_list_is_at_its_end_within_300_ms(
     route.answer_json(0, absence_lines_json())
 
     expect_catch_up_applied(page, "5-9")
-    expect(feed_item_locator(page)).to_have_count(19)
+    expect(feed_item_locator(page)).to_have_count(LIVE_LINES + CATCH_UP_LINES)
     assert_at_end_within_300_ms(page)
 
 
@@ -296,7 +304,7 @@ def test_ac4_a_reader_scrolled_up_keeps_every_item_in_view_in_its_place(
     route.answer_json(0, absence_lines_json())
 
     expect_catch_up_applied(page, "5-9")
-    expect(feed_item_locator(page)).to_have_count(19)
+    expect(feed_item_locator(page)).to_have_count(LIVE_LINES + CATCH_UP_LINES)
     page.wait_for_timeout(FOLLOW_MS)
     tops_now = item_tops(page)
     out_of_place: list[tuple[int, float, float | None]] = []

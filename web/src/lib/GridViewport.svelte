@@ -263,28 +263,36 @@
   let fitSize = $derived(fitCellSize(areaWidth, areaHeight, grid.width, grid.height))
   let cellSize = $derived(fitSize * zoom)
 
+  // The exact size of the viewport, rounded down. clientWidth and clientHeight
+  // round to the nearest pixel, sometimes up, and a grid fitted to them then
+  // overflows the viewport by a fraction of a pixel: Firefox makes such a
+  // viewport a Tab stop between the vote banner and the grid (spec 025 AC-8).
+  // The room page also calls it when it changes the play area itself, so the
+  // grid refits at once (spec 043).
+  export function measureViewport(): void {
+    if (viewport !== undefined) {
+      const box = viewport.getBoundingClientRect()
+      areaWidth = Math.floor(box.width)
+      areaHeight = Math.floor(box.height)
+    }
+  }
+
   // Follow the size of the viewport (the area the grid must fit in at zoom 1).
   $effect(() => {
     const element = viewport
     if (element === undefined) {
       return
     }
-    // The exact size, rounded down. clientWidth and clientHeight round to the
-    // nearest pixel, sometimes up, and a grid fitted to them then overflows the
-    // viewport by a fraction of a pixel: Firefox makes such a viewport a Tab
-    // stop between the vote banner and the grid (spec 025 AC-8).
-    function measure(): void {
-      if (element !== undefined) {
-        const box = element.getBoundingClientRect()
-        areaWidth = Math.floor(box.width)
-        areaHeight = Math.floor(box.height)
-      }
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
+    measureViewport()
+    const observer = new ResizeObserver(measureViewport)
     observer.observe(element)
     return () => observer.disconnect()
   })
+
+  // The viewport element: the reaction picker floats over its bottom (spec 043).
+  export function viewportElement(): HTMLElement | null {
+    return viewport ?? null
+  }
 
   // Put the focus back on the grid (the in-app keyboard uses it).
   export function focusGrid(): void {
@@ -725,13 +733,16 @@
 <div class="visually-hidden" id="grid-hint" data-testid="grid-hint">{t('a11y.grid_hint')}</div>
 
 <style>
-  /* A stacking context of its own (isolation), so the z-index of a reaction
+  /* The grid is centred in it while it fits (spec 043); zoomed past the
+     viewport, its auto margins are 0 and it scrolls from its top left corner.
+     A stacking context of its own (isolation), so the z-index of a reaction
      or a flag below orders it inside the grid only, and never against the rest
-     of the page (the vote banner, the chat panel). */
+     of the page (the vote banner). */
   .viewport {
     width: 100%;
     flex: 1 1 0;
     min-height: 0;
+    display: flex;
     overflow: auto;
     isolation: isolate;
     /* The app handles touch pan and pinch itself. */
@@ -749,9 +760,10 @@
      it, never past the grid, so the grid that fits its viewport leaves nothing
      to scroll (spec 006). Every mark of a letter cell is already inside it. */
   .grid {
+    flex: none;
     display: grid;
     width: max-content;
-    margin: 0 auto;
+    margin: auto;
     overflow: clip;
     border-left: 1px solid var(--nock-rule);
     border-top: 1px solid var(--nock-rule);

@@ -51,7 +51,10 @@
     bind:this={input}
     bind:value={email}
   />
-  <button type="submit" data-testid="account-email-submit" disabled={isSending}
+  <button
+    type="submit"
+    class="nock-button nock-button-primary"
+    data-testid="account-email-submit" disabled={isSending}
     >{t('account.send')}</button
   >
 </form>

@@ -63,6 +63,7 @@ from nock.protocol import (
     Snapshot,
     grid_view,
 )
+from room_panels import open_menu
 from spec019_harness import MockRoomSocket, with_letter_cells
 from spec034_harness import CATCH_UP_ROUTE, CatchUpRoute, seed_storage
 from spec035_harness import COLOUR_CONTRAST_JS, credits, load_fr
@@ -900,10 +901,18 @@ def tap(page: Page, row: int, column: int) -> None:
 
 
 def click_switch(page: Page, test_id: str, pressed: str) -> None:
-    """Click a switch and wait until its `aria-pressed` is `pressed`."""
+    """Click a switch and wait until its `aria-pressed` is `pressed`.
+
+    The switches are items of the room Menu (spec 043): the Menu is opened first
+    with spec 043's `open_menu`, then closed again with a click on `menu-button`,
+    so that it covers nothing the test reads next.
+    """
+    open_menu(page)
     switch = page.get_by_test_id(test_id)
     switch.click(timeout=WAIT_TIMEOUT_MS)
     expect(switch).to_have_attribute("aria-pressed", pressed)
+    page.get_by_test_id("menu-button").click(timeout=WAIT_TIMEOUT_MS)
+    expect(page.get_by_test_id("room-menu")).to_be_hidden()
 
 
 # ---- Readings -------------------------------------------------------------------

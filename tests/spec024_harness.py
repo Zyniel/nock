@@ -11,7 +11,7 @@ are in `tests/test_spec_024_*.py`, one file per criterion group:
   game on the WebSocket and in browsers on the live server);
 - `test_spec_024_ac06_completion.py`: AC-6 (rule, WebSocket);
 - `test_spec_024_ac07_controls.py`: AC-7 (page with a mocked socket);
-- `test_spec_024_ac08_toolbar.py`: AC-8 (page with a mocked socket, every window);
+- `test_spec_024_ac08_aide_menu.py`: AC-8 (page with a mocked socket, every window);
 - `test_spec_024_ac09_revealed_mark_a11y.py`: AC-9 (page with a mocked socket);
 - `test_spec_024_ac10_reload.py`: AC-10 (`replay` and `RoomStore`).
 

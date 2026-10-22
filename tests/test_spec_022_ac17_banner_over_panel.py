@@ -12,7 +12,15 @@ two runs of the criterion one after the other, each ending with its vote's resul
 The second run starts once the first banner has left the page.
 
 "The five points" of an element are the centre of its bounding box and its four
-corners, each moved 2 px inwards on both axes.
+corners, each moved 2 px inwards on both axes. On a rounded corner (the Salon's
+sheet has 14 px corners, spec 043) the corner point is first moved onto the
+rounded edge's diagonal, `r * (1 - 1 / sqrt 2)` px on each axis, then 2 px more,
+so that it lies inside the shape the element draws.
+
+Refined by spec 043 (the design's room layout): the open chat panel is the Salon
+on its Discussion tab (the harness's `open_panel`), and the panel's box in the
+checks is `salon`'s; in the column layout the banner and the Salon do not overlap,
+and the checks hold as written.
 
 The shared setup is in `spec022_harness`.
 """
@@ -62,7 +70,7 @@ TOLERANCE_PX = 1.0
 # The measures of the page that the criterion compares before and during the vote.
 STATE_SCRIPT = r"""
 () => {
-  const panel = document.querySelector('[data-testid="chat-panel"]');
+  const panel = document.querySelector('[data-testid="salon"]');
   const list = document.querySelector('[data-testid="chat-list"]');
   const active = document.activeElement;
   const box = panel === null ? null : panel.getBoundingClientRect();
@@ -86,12 +94,20 @@ testId => {
     return [{point: 'none', inside: false, hit: 'no element'}];
   }
   const box = element.getBoundingClientRect();
+  const style = getComputedStyle(element);
+  // 2 px inwards from the corner of the shape: a rounded corner of radius r
+  // takes r * (1 - 1 / sqrt 2) more on each axis.
+  const inset = radius => 2 + (parseFloat(radius) || 0) * (1 - Math.SQRT1_2);
+  const topLeft = inset(style.borderTopLeftRadius);
+  const topRight = inset(style.borderTopRightRadius);
+  const bottomLeft = inset(style.borderBottomLeftRadius);
+  const bottomRight = inset(style.borderBottomRightRadius);
   const points = [
     ['centre', box.left + box.width / 2, box.top + box.height / 2],
-    ['top left', box.left + 2, box.top + 2],
-    ['top right', box.right - 2, box.top + 2],
-    ['bottom left', box.left + 2, box.bottom - 2],
-    ['bottom right', box.right - 2, box.bottom - 2],
+    ['top left', box.left + topLeft, box.top + topLeft],
+    ['top right', box.right - topRight, box.top + topRight],
+    ['bottom left', box.left + bottomLeft, box.bottom - bottomLeft],
+    ['bottom right', box.right - bottomRight, box.bottom - bottomRight],
   ];
   const found = [];
   for (const [name, x, y] of points) {
@@ -169,7 +185,6 @@ def open_scene(
             players=eight_players_with_p2_host(),
             chat=snapshot_chat(),
         )
-        expect(page.get_by_test_id("room-toolbar")).to_be_visible()
         for seq in range(SNAPSHOT_SEQ + 1, LAST_FEED_SEQ + 1):
             mock.send(check_frame(seq))
         expect_seq(page, LAST_FEED_SEQ)
@@ -225,7 +240,7 @@ def state_problems(page: Page, before: PageState, active: str, label: str) -> li
     """How the panel, the list, the scroll and the focus differ from `before`."""
     now = read_state(page)
     if now.panel_box is None or before.panel_box is None:
-        return [f"{label}: chat-panel is not on the page"]
+        return [f"{label}: salon is not on the page"]
     problems: list[str] = []
     names = ["x", "y", "width", "height"]
     for index, name in enumerate(names):
@@ -263,7 +278,7 @@ def after_the_vote(
         closed(seq, seq - 1, VoteOutcome.REJECTED, 1, EIGHT_VOTERS).model_dump_json()
     )
     expect(page.get_by_test_id("vote-banner")).to_have_count(0, timeout=BANNER_GONE_MS)
-    problems = point_problems(page, "chat-panel", "after the vote")
+    problems = point_problems(page, "salon", "after the vote")
     problems += state_problems(page, before, active, "after the vote")
     return problems
 

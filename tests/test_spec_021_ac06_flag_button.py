@@ -12,8 +12,10 @@ flag on a word I then type full: the button stays enabled and pressed, since my
 flag is on it ("Client: the flag button"), and a click removes my flag. The shared
 setup is in `spec021_harness`.
 
-Spec 019 is built, so the page has an `authors-switch` and the button must come
-before it.
+Refined by spec 043 (the design's room layout): the button sits in `clue-bar`,
+after `react-button` and before `clue-next`, with no text and the `aria-label`
+`fr.json["flag.button_label"]`; it read "inside `room-toolbar`, after
+`reveal-panel` and before `authors-switch`, with the text `fr.json["flag.button"]`".
 """
 
 from __future__ import annotations
@@ -32,7 +34,6 @@ from nock.protocol import (
 )
 from spec021_harness import (
     FLAG_BUTTON_LABEL,
-    FLAG_BUTTON_TEXT,
     LEST,
     MIME,
     TAMIS,
@@ -59,17 +60,17 @@ WIDTH, HEIGHT = 1280, 720
 MIME_WIRE = {"type": "flag", "clue": {"row": 0, "column": 2, "clue_index": 0}}
 NULL_WIRE = {"type": "flag", "clue": None}
 
-# The place of `flag-button`: inside `room-toolbar`, after `reveal-panel`, and
-# before `authors-switch` (spec 019), which must exist.
+# The place of `flag-button` (spec 043): inside `clue-bar`, after `react-button`
+# and before `clue-next`, which must exist.
 PLACE_SCRIPT = """
 () => {
   const follows = (first, second) => Boolean(
     first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
   );
   const buttons = document.querySelectorAll('[data-testid="flag-button"]');
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const reveal = document.querySelector('[data-testid="reveal-panel"]');
-  const authors = document.querySelector('[data-testid="authors-switch"]');
+  const bar = document.querySelector('[data-testid="clue-bar"]');
+  const react = document.querySelector('[data-testid="react-button"]');
+  const next = document.querySelector('[data-testid="clue-next"]');
   if (buttons.length !== 1) {
     return {count: buttons.length};
   }
@@ -78,9 +79,10 @@ PLACE_SCRIPT = """
     count: 1,
     tag: button.tagName,
     type: button.getAttribute('type'),
-    inToolbar: toolbar !== null && toolbar.contains(button),
-    afterReveal: reveal !== null && follows(reveal, button),
-    beforeAuthors: authors !== null && follows(button, authors),
+    inClueBar: bar !== null && bar.contains(button),
+    afterReact: react !== null && follows(react, button),
+    beforeNext: next !== null && follows(button, next),
+    text: button.textContent.trim(),
   };
 }
 """
@@ -169,11 +171,11 @@ def test_ac6_browser_the_flag_button_sends_my_flag_and_follows_the_kept_flags(
             "count": 1,
             "tag": "BUTTON",
             "type": "button",
-            "inToolbar": True,
-            "afterReveal": True,
-            "beforeAuthors": True,
+            "inClueBar": True,
+            "afterReact": True,
+            "beforeNext": True,
+            "text": "",
         }
-        expect(button).to_have_text(FLAG_BUTTON_TEXT)
         expect(button).to_have_attribute("aria-label", FLAG_BUTTON_LABEL)
         expect(button).to_have_attribute("aria-pressed", "false")
         expect(button).to_be_disabled()

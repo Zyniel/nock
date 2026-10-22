@@ -162,9 +162,13 @@ Two lists of the room page can scroll with nothing focusable inside them:
 
 - The roster list: the `ul` element inside `roster` (`[data-testid="roster"] ul`,
   spec 014 "Small windows"). On a small window it scrolls sideways.
-- The feed list: the `ul` element inside `activity-feed`
-  (`[data-testid="activity-feed"] ul`) that holds the `feed-item` elements. It
-  scrolls vertically, and on a small window it shows one line.
+- The feed list, now the stream list: the `ul` element `chat-list` inside
+  `activity-feed` (`[data-testid="activity-feed"] ul`), in the Salon's Discussion
+  tab `chat-panel`, that holds the `chat-message` and `feed-item` elements. It
+  scrolls vertically. (Note from the lead, 2026-10-22: refined by spec 043, the
+  design's room layout, in line with AC-12; this read "the `ul` element inside
+  `activity-feed` (`[data-testid="activity-feed"] ul`) that holds the `feed-item`
+  elements. It scrolls vertically, and on a small window it shows one line.")
 
 Terms:
 
@@ -180,12 +184,18 @@ Terms:
 
 Rules:
 
-- The `h2` of `roster` has `id="roster-heading"`, and the `h2` of `activity-feed`
-  has `id="feed-heading"`.
+- The visually hidden `h2` of `roster` has `id="roster-heading"`, and the
+  visually hidden `h2` of `chat-panel` has `id="chat-heading"`.
 - In every state, each list has `role="list"` and an `aria-labelledby` equal to
-  the `id` of the `h2` of its own section. So the roster list is named
-  `t("roster.heading")` (`Joueurs`) and the feed list `t("feed.heading")`
-  (`Activité`). No new `fr.json` key is needed. The explicit role is there because
+  the `id` of the `h2` of its own tab panel. So the roster list is named
+  `t("roster.heading")` (`Joueurs`) and the stream list `t("chat.heading")`
+  (`Discussion`). No new `fr.json` key is needed. (Note from the lead, 2026-10-22:
+  refined by spec 043, the design's room layout, in line with AC-12; these two
+  rules read "The `h2` of `roster` has `id="roster-heading"`, and the `h2` of
+  `activity-feed` has `id="feed-heading"`" and "the `id` of the `h2` of its own
+  section. So the roster list is named `t("roster.heading")` (`Joueurs`) and the
+  feed list `t("feed.heading")` (`Activité`)". Spec 043 removes the feed's heading
+  and the key `feed.heading`.) The explicit role is there because
   WebKit does not expose a `ul` styled with `list-style: none` as a list.
 - While a list scrolls and holds no focusable element, it has `tabindex="0"`, so
   it is a Tab stop in every engine.
@@ -565,8 +575,8 @@ cells: `grid.remote_overflow` and `a11y.remote_overflow` are removed from
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-10.1.1) (browser with live server, keyboard only) Every action is reachable from the keyboard. With `CAT` served: on `/`, `tab_to` `force-filter` `data-force="1"` then `Enter` makes it `aria-pressed="true"`; `tab_to` the `catalogue-play` of item 1 then `Enter` opens the room page, which reaches `data-status="joined"` (Ana, host). There: `tab_to` `grid` then `Tab` selects `0,0,0` on (1, 0); `T` then `A` fill (1, 0) and (1, 1); `ArrowDown` moves the selection; `Backspace` erases; `Control+z` sends `undo`; `Escape` then `Tab` leaves the grid: the focus moves to the sentinel of "Test harness", which the test adds once the room page is `joined`. `tab_to` `check-word` and `Enter` sends a `check`; the same for `check-letter`, `check-grid` and `undo-button`; `tab_to` `copy-link` and `share-link` focus them; `tab_to` `lock-room` then `Enter` makes it `aria-pressed="true"` and again unlocks; `tab_to` `help-mode-select`, `ArrowDown`, then `tab_to` `settings-save` and `Enter` sends `change_settings`. A second page (Bob) opens the room link and, keyboard only, `tab_to` `nickname-input`, types `Bob`, presses `Enter` and reaches `joined`; then on Ana's page `tab_to` the `remove-player` of Bob and `Enter` removes him (Bob's page reaches `data-status="removed"`). (Note from the lead, 2026-10-14: the sentinel was added so that leaving the grid shows in every engine, and each `tab_to` follows its new definition in "Test harness". The walk's steps and intent are unchanged.)
-- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against the surface behind the outline (white on the page, the background of the button for the navy clue bar's buttons of spec 043; Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "against white"); this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to the sentinel (AC-1). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".) The scrolling list of `activity-feed`, a Tab stop in every engine while it scrolls (AC-12), shows its whole focus outline at three window sizes ("Focus outline of the feed's scrolling list" in "Edge cases and errors"). (Note from the lead, 2026-10-14: this sentence was added. The tests already ran that check, but the spec did not describe it.) (Note from the lead, 2026-10-14: "a Tab stop in Chromium" became "a Tab stop in every engine while it scrolls (AC-12)", so this check now runs in Chromium, Firefox and WebKit.)
+- **AC-1** (AC-10.1.1) (browser with live server, keyboard only) Every action is reachable from the keyboard. With `CAT` served: on `/`, `tab_to` `force-filter` `data-force="1"` then `Enter` makes it `aria-pressed="true"`; `tab_to` the `catalogue-play` of item 1 then `Enter` opens the room page, which reaches `data-status="joined"` (Ana, host). There: `tab_to` `grid` then `Tab` selects `0,0,0` on (1, 0); `T` then `A` fill (1, 0) and (1, 1); `ArrowDown` moves the selection; `Backspace` erases; `Control+z` sends `undo`; `Escape` then `Tab` leaves the grid: the focus moves to spec 043's `clue-prev`, the first focusable element after the grid in document order (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "the focus moves to the sentinel of "Test harness", which the test adds once the room page is `joined`": the clue bar's buttons now follow the grid, so no sentinel is needed, as in AC-3). `tab_to` `check-word` and `Enter` sends a `check`; the same for `check-letter`, `check-grid` and `undo-button`; `tab_to` `copy-link` and `share-link` focus them; `tab_to` `lock-room` then `Enter` makes it `aria-pressed="true"` and again unlocks; `tab_to` `help-mode-select`, `ArrowDown`, then `tab_to` `settings-save` and `Enter` sends `change_settings`. A second page (Bob) opens the room link and, keyboard only, `tab_to` `nickname-input`, types `Bob`, presses `Enter` and reaches `joined`; then on Ana's page `tab_to` the `remove-player` of Bob and `Enter` removes him (Bob's page reaches `data-status="removed"`). (Note from the lead, 2026-10-14: the sentinel was added so that leaving the grid shows in every engine, and each `tab_to` follows its new definition in "Test harness". The walk's steps and intent are unchanged.)
+- **AC-2** (AC-10.1.1) (browser with live server, keyboard only) The focus is always visible. During the walk of AC-1, each time `tab_to` reaches an element, that element's computed outline has a style other than `none` and `auto`, a width of at least 2 px and a colour of contrast at least 3:1 against the surface behind the outline (white on the page, the background of the button for the navy clue bar's buttons of spec 043; Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "against white"); this includes the `grid`. While a cell is selected, the selected cell has `outline-style` `solid` and `outline-width` of at least 2 px, and any other letter cell has `outline-style` `none`, with the focus on the grid and after `Escape` then `Tab` moved it to `clue-prev` (AC-1) (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "moved it to the sentinel (AC-1)"). (Note from the lead, 2026-10-14: "moved it away" became "moved it to the sentinel", which every engine shows. The pointer-focus check of the host panel is described under "Edge cases and errors".) The scrolling list of `activity-feed`, a Tab stop in every engine while it scrolls (AC-12), shows its whole focus outline at three window sizes ("Focus outline of the feed's scrolling list" in "Edge cases and errors"). (Note from the lead, 2026-10-14: this sentence was added. The tests already ran that check, but the spec did not describe it.) (Note from the lead, 2026-10-14: "a Tab stop in Chromium" became "a Tab stop in every engine while it scrolls (AC-12)", so this check now runs in Chromium, Firefox and WebKit.)
 - **AC-3** (new, from spec 009 decision 5) (browser with mocked socket, keyboard only) A keyboard player can leave the grid. Given a FX-01 snapshot (`you` host, so the host panel shows) and the focus on the grid with (1, 0) selected, the following holds. (Note from the lead, 2026-10-14: split into the cases below, with the sentinel and the `Tab` listener of "Test harness", so that every check holds in Chromium, Firefox and WebKit. The old text required "`document.activeElement` is not the grid" even when nothing follows the grid, which Firefox under automation cannot show.)
   - Word navigation: `Tab` selects `0,0,1` and the focus stays on the grid (as spec 009).
   - Forward: `Escape` then `Tab` moves the focus to the first focusable element after the grid in document order, which is spec 043's `clue-prev`. The selection is unchanged.
@@ -818,7 +828,11 @@ Other cases:
 - Cut heading (AC-12): in the low layout the feed heading can end with an ellipsis
   or shrink to no width (spec 014 AC-10). The feed list is still named by the
   heading's whole text, because `aria-labelledby` reads the text, not what is
-  shown. (Note from the lead, 2026-10-14.)
+  shown. (Note from the lead, 2026-10-14.) (Note from the lead, 2026-10-22: no
+  longer applies since spec 043, the design's room layout: the low layout and the
+  feed heading (`feed.heading`) are gone, and the stream list is named by the
+  Discussion panel's visually hidden `h2` `chat-heading` (spec 043, "Discussion:
+  the stream"), which is never cut. The item is kept as it read, for the record.)
 - Other Tab order checks (AC-12 with AC-1 to AC-3, AC-10 and spec 014). (Note from
   the lead, 2026-10-14: checked when AC-12 was added. None of them changes.)
   - Both lists come before the grid in document order. So "Nothing focusable after

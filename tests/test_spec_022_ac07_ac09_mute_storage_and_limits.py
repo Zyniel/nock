@@ -10,6 +10,13 @@ with `sqlite3`, `replay` through `RoomStore.load_room`, and the WebSocket with
 every logger captured at level DEBUG. AC-9: the rule with exact clock values, and
 the WebSocket with spec 011's fake clock frozen.
 
+Refined by spec 043 (the design's room layout): the host's `mute-player` sits in
+each other player's row of the Salon's Joueurs tab (`show_tab(page, "players")`),
+where it sat in the chat panel's moderation section (`chat-moderation`,
+`mute-row`, `mute-name`, all gone); Bob's chat controls are checked on his
+Discussion tab. Opening the Salon with `chat-toggle` while `chat-input` is
+disabled puts the focus on the selected tab (spec 043's "Salon").
+
 The shared setup is in `spec022_harness`.
 """
 
@@ -57,6 +64,7 @@ from nock.room import (
     tick,
 )
 from nock.store import RoomStore
+from room_panels import show_tab
 from spec013_harness import FakeClock
 from spec021_harness import IDES, MIME, send_flag
 from spec022_harness import (
@@ -239,7 +247,20 @@ def test_ac7_browser_the_host_mutes_and_unmutes_a_players_chat(
             bob_id = own_player_id(bob)
             cell_at(bob, 0, 3).click()
             expect(bob.get_by_test_id("grid")).to_have_attribute("data-word", "0,3,0")
-            open_panel(ana)
+            show_tab(ana, "players")
+            show_tab(bob, "players")
+            expect(bob.get_by_test_id("roster-player")).to_have_count(2)
+            expect(bob.get_by_test_id("mute-player")).to_have_count(0)
+            ana_id = own_player_id(ana)
+            own_row = ana.locator(
+                f'[data-testid="roster-player"][data-player-id="{ana_id}"]'
+            )
+            expect(own_row.get_by_test_id("mute-player")).to_have_count(0)
+            bob_row = ana.locator(
+                f'[data-testid="roster-player"][data-player-id="{bob_id}"]'
+            )
+            mute = bob_row.get_by_test_id("mute-player")
+            expect(mute).to_have_count(1)
             open_panel(bob)
             bob_input = bob.get_by_test_id("chat-input")
             bob_send = bob.get_by_test_id("chat-send")
@@ -247,15 +268,7 @@ def test_ac7_browser_the_host_mutes_and_unmutes_a_players_chat(
             bob_input.fill("salut")
             expect(bob_send).to_be_enabled()
             expect(bob_react).to_be_enabled()
-            expect(bob.get_by_test_id("chat-moderation")).to_have_count(0)
 
-            moderation = ana.get_by_test_id("chat-moderation")
-            rows = moderation.get_by_test_id("mute-row")
-            expect(rows).to_have_count(1)
-            expect(rows).to_have_attribute("data-player-id", bob_id)
-            expect(rows.get_by_test_id("mute-name")).to_have_text("Bob")
-            expect(moderation.locator("h3")).to_have_text(fr["chat.moderation_heading"])
-            mute = rows.get_by_test_id("mute-player")
             expect(mute).to_have_text(fr["chat.mute"])
             expect(mute).to_have_attribute("aria-label", "Couper la discussion de Bob")
             expect(mute).to_have_attribute("data-muted", "false")
@@ -303,16 +316,21 @@ def test_ac7_browser_a_muted_page_cannot_chat_and_keeps_its_pending_edits(
     cell_at(page, 0, 3).click()
     expect(page.get_by_test_id("grid")).to_have_attribute("data-word", "0,3,0")
     expect(page.get_by_test_id("react-button")).to_be_disabled()
+    salon = page.get_by_test_id("salon")
+    if salon.get_attribute("hidden") is None:
+        toggle.click()  # the column layout opens the Salon at load
+    expect(salon).to_be_hidden()
     toggle.click()
     expect(page.get_by_test_id("chat-panel")).to_be_visible()
     expect(page.get_by_test_id("chat-input")).to_be_disabled()
     expect(page.get_by_test_id("chat-send")).to_be_disabled()
     expect(page.get_by_test_id("chat-muted")).to_have_text(fr["chat.muted"])
-    expect(toggle).to_be_focused()  # the input is disabled, so the focus stays
+    # The input is disabled, so the focus goes to the selected tab (spec 043).
+    expect(page.get_by_test_id("salon-tab-discussion")).to_be_focused()
 
     # A muted player still types; an `error` `muted` answers no edit (spec 015).
     toggle.click()
-    expect(page.get_by_test_id("chat-panel")).to_have_count(0)
+    expect(salon).to_be_hidden()
     cell_at(page, 1, 0).click()
     page.keyboard.press("t")
     letter_cell = cell_at(page, 1, 0)

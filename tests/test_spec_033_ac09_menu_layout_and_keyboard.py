@@ -1,4 +1,4 @@
-"""Tests of spec 033, AC-9 (first part): the account button in the room toolbar.
+"""Tests of spec 033, AC-9 (first part): the account item in the room Menu.
 
 The room page runs on spec 040's mocked socket, with `GET /api/account` and the
 other account routes answered by `page.route` (the "Browser with mocked routes" of
@@ -7,17 +7,23 @@ server of the harness, with accounts on.
 
 Layout, at each window size of spec 006 AC-5, in desktop and touch contexts (spec
 009's touch harness), with spec 013 AC-6's setup (FX-01, `you` host among 8
-players, 100 feed items, (3, 1) tapped): `account-open` is the last `button`
-element of `room-toolbar`; on the four small windows its vertical range overlaps
-those of the toolbar's other buttons (spec 024's one-row rule); scrolled into view
-it is whole inside the toolbar; and spec 013 AC-6's checks pass.
+players, 100 feed items, (3, 1) tapped): `account-open` is the item of `room-menu`
+right after `host-settings-open` and before its `nock-menu-separator`; with the
+Menu open (spec 043's `open_menu`) it lies inside the window and `elementFromPoint`
+at its centre, after `scrollIntoView({block: "nearest"})`, returns it; and spec
+013 AC-6's checks pass.
 
-Keyboard only (desktop context, each window size): spec 035's `tab_to` reaches
-`account-open`, which shows spec 035 AC-2's outline; `Enter` opens
-`account-dialog` with the focus on `account-email-input`; during 10 presses of
-`Tab`, then 10 of `Shift+Tab`, no element outside the dialog gets the focus (the
-browser may take it to its own interface: the focus is then on no element of the
-page); `Escape` closes the dialog and the focus is back on `account-open`.
+Keyboard only (desktop context, each window size): `tab_to` `menu-button` and
+`Enter` open the Menu, `Tab` reaches `account-open`, which shows spec 035 AC-2's
+outline; `Enter` opens `account-dialog` with the focus on `account-email-input`;
+during 10 presses of `Tab`, then 10 of `Shift+Tab`, no element outside the dialog
+gets the focus (the browser may take it to its own interface: the focus is then on
+no element of the page); `Escape` closes the dialog and the focus is on
+`menu-button`.
+
+Refined by spec 043 (the design's room layout): this file was
+`test_spec_033_ac09_toolbar_layout_and_keyboard.py`, which checked `account-open` as
+the last button of `room-toolbar` with spec 024's toolbar rules.
 
 The scans, `/account` and the dialog's edge cases are in
 `test_spec_033_ac09_dialog_and_account_page.py`. The shared setup is in
@@ -36,6 +42,7 @@ from playwright.sync_api import Browser, Page, expect
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import CheckResult, GridTarget, PlayerView
+from room_panels import open_menu
 from spec024_harness import (
     SETTLE_MS,
     cell_at,
@@ -57,7 +64,6 @@ from spec033_harness import (
     size_ids,
 )
 
-SMALL_WINDOWS = WINDOW_SIZES[:4]
 CONTEXTS = ["desktop", "touch"]
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_ITEMS = 100
@@ -110,7 +116,6 @@ def open_layout_room(
     try:
         AccountRoutes().install(page)
         mock = open_room(page, base_url, grid, players=eight_players())
-        expect(page.get_by_test_id("room-toolbar")).to_be_visible()
         last_seq = 5 + FEED_ITEMS
         for seq in range(6, last_seq + 1):
             mock.send(check_frame(seq))
@@ -130,54 +135,35 @@ def open_layout_room(
 
 # ---- Layout ---------------------------------------------------------------------
 
-LAST_BUTTON_SCRIPT = """
-() => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const buttons = toolbar.querySelectorAll('button');
-  const last = buttons[buttons.length - 1];
-  return {
-    lastTestId: last.getAttribute('data-testid'),
-    tag: last.tagName,
-    type: last.getAttribute('type'),
-    text: last.textContent.trim(),
-    count: document.querySelectorAll('[data-testid="account-open"]').length,
-  };
-}
-"""
-
-ROW_SCRIPT = """
-() => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const account = document.querySelector('[data-testid="account-open"]');
-  const own = account.getBoundingClientRect();
-  const apart = [];
-  let others = 0;
-  for (const button of toolbar.querySelectorAll('button')) {
-    if (button === account) {
-      continue;
-    }
-    others += 1;
-    const box = button.getBoundingClientRect();
-    if (Math.max(box.top, own.top) >= Math.min(box.bottom, own.bottom)) {
-      apart.push(button.getAttribute('data-testid'));
+# The names of the Menu's items and separators, in document order.
+MENU_ORDER_SCRIPT = """
+menu => {
+  const found = [];
+  for (const element of menu.querySelectorAll('*')) {
+    const testId = element.getAttribute('data-testid');
+    if (element.classList.contains('nock-menu-separator')) {
+      found.push('separator');
+    } else if (testId !== null && (element.tagName === 'BUTTON'
+        || element.tagName === 'A')) {
+      found.push(testId);
     }
   }
-  return {others: others, apart: apart};
+  return found;
 }
 """
 
-SCROLLED_INTO_VIEW_SCRIPT = """
+ACCOUNT_REACH_SCRIPT = """
 () => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
   const account = document.querySelector('[data-testid="account-open"]');
-  account.scrollIntoView({block: 'nearest', inline: 'nearest'});
+  account.scrollIntoView({block: 'nearest'});
   const box = account.getBoundingClientRect();
-  const toolbarBox = toolbar.getBoundingClientRect();
-  const left = toolbarBox.left + toolbar.clientLeft;
-  const top = toolbarBox.top + toolbar.clientTop;
+  const hit = document.elementFromPoint(box.left + box.width / 2,
+    box.top + box.height / 2);
   return {
     box: [box.left, box.top, box.right, box.bottom],
-    area: [left, top, left + toolbar.clientWidth, top + toolbar.clientHeight],
+    window: [innerWidth, innerHeight],
+    hits: hit !== null && (hit === account || account.contains(hit)),
+    hit: hit === null ? null : (hit.getAttribute('data-testid') || hit.tagName),
   };
 }
 """
@@ -185,7 +171,7 @@ SCROLLED_INTO_VIEW_SCRIPT = """
 
 @pytest.mark.parametrize("context_kind", CONTEXTS)
 @pytest.mark.parametrize("size", WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
-def test_ac9_account_open_is_the_last_button_of_the_toolbar(
+def test_ac9_account_open_follows_the_host_settings_before_the_separator(
     browser: Browser,
     browser_name: str,
     account_server: AccountServer,
@@ -202,49 +188,18 @@ def test_ac9_account_open_is_the_last_button_of_the_toolbar(
         context_kind == "touch",
     )
     try:
-        reading = page.evaluate(LAST_BUTTON_SCRIPT)
+        order = page.get_by_test_id("room-menu").evaluate(MENU_ORDER_SCRIPT)
     finally:
         close()
 
-    assert reading == {
-        "lastTestId": "account-open",
-        "tag": "BUTTON",
-        "type": "button",
-        "text": "Compte",
-        "count": 1,
-    }
-
-
-@pytest.mark.parametrize("context_kind", CONTEXTS)
-@pytest.mark.parametrize("size", SMALL_WINDOWS, ids=size_ids(SMALL_WINDOWS))
-def test_ac9_on_a_small_window_account_open_is_on_the_toolbars_row(
-    browser: Browser,
-    browser_name: str,
-    account_server: AccountServer,
-    fx01_grid: Grid,
-    size: tuple[int, int],
-    context_kind: str,
-) -> None:
-    page, close = open_layout_room(
-        browser,
-        browser_name,
-        account_server.base_url,
-        fx01_grid,
-        size,
-        context_kind == "touch",
-    )
-    try:
-        row = page.evaluate(ROW_SCRIPT)
-    finally:
-        close()
-
-    assert row["others"] >= 1, row
-    assert row["apart"] == [], row
+    index = order.index("account-open")
+    assert order[index - 1] == "host-settings-open", order
+    assert order[index + 1] == "separator", order
 
 
 @pytest.mark.parametrize("context_kind", CONTEXTS)
 @pytest.mark.parametrize("size", WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
-def test_ac9_scrolled_into_view_account_open_is_whole_inside_the_toolbar(
+def test_ac9_with_the_menu_open_account_open_is_in_the_window_and_reachable(
     browser: Browser,
     browser_name: str,
     account_server: AccountServer,
@@ -261,18 +216,18 @@ def test_ac9_scrolled_into_view_account_open_is_whole_inside_the_toolbar(
         context_kind == "touch",
     )
     try:
-        page.evaluate(SCROLLED_INTO_VIEW_SCRIPT)
-        page.wait_for_timeout(SETTLE_MS)
-        reading = page.evaluate(SCROLLED_INTO_VIEW_SCRIPT)
+        open_menu(page)
+        reading = page.evaluate(ACCOUNT_REACH_SCRIPT)
     finally:
         close()
 
     left, top, right, bottom = reading["box"]
-    area_left, area_top, area_right, area_bottom = reading["area"]
-    assert left >= area_left - EPSILON, reading
-    assert top >= area_top - EPSILON, reading
-    assert right <= area_right + EPSILON, reading
-    assert bottom <= area_bottom + EPSILON, reading
+    width, height = reading["window"]
+    assert left >= -EPSILON, reading
+    assert top >= -EPSILON, reading
+    assert right <= width + EPSILON, reading
+    assert bottom <= height + EPSILON, reading
+    assert reading["hits"] is True, reading
 
 
 def assert_spec013_layout(page: Page, touch: bool) -> None:
@@ -335,6 +290,14 @@ def test_ac9_spec_013_layout_holds_with_account_open(
 
 # ---- Keyboard only --------------------------------------------------------------
 
+
+def open_menu_from_the_keyboard(page: Page) -> None:
+    """`tab_to` `menu-button`, then `Enter`; wait until `room-menu` is open."""
+    make_walker(page).tab_to("menu-button")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("room-menu")).to_be_visible()
+
+
 FOCUS_PLACE_SCRIPT = """
 () => {
   const dialog = document.querySelector('[data-testid="account-dialog"]');
@@ -363,6 +326,7 @@ def test_ac9_keyboard_tab_reaches_account_open_with_a_visible_outline(
         browser, browser_name, account_server.base_url, fx01_grid, size, False
     )
     try:
+        open_menu_from_the_keyboard(page)
         walker = make_walker(page)
         walker.tab_to("account-open")
         page.wait_for_timeout(SETTLE_MS)
@@ -389,6 +353,7 @@ def test_ac9_keyboard_enter_opens_the_dialog_with_the_focus_on_the_address(
         browser, browser_name, account_server.base_url, fx01_grid, size, False
     )
     try:
+        open_menu_from_the_keyboard(page)
         make_walker(page).tab_to("account-open")
         page.keyboard.press("Enter")
 
@@ -412,6 +377,7 @@ def test_ac9_keyboard_the_focus_stays_in_the_dialog_and_escape_gives_it_back(
     )
     places: list[str] = []
     try:
+        open_menu_from_the_keyboard(page)
         make_walker(page).tab_to("account-open")
         page.keyboard.press("Enter")
         dialog = page.get_by_test_id("account-dialog")
@@ -423,7 +389,7 @@ def test_ac9_keyboard_the_focus_stays_in_the_dialog_and_escape_gives_it_back(
         page.keyboard.press("Escape")
 
         expect(dialog).not_to_have_attribute("open", "")
-        expect(page.get_by_test_id("account-open")).to_be_focused()
+        expect(page.get_by_test_id("menu-button")).to_be_focused()
     finally:
         close()
 

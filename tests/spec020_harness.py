@@ -46,6 +46,7 @@ from nock.protocol import (
     parse_client_message,
 )
 from nock.room import Outcome, RoomConfig, RoomState, handle_message
+from room_panels import open_aide
 from spec024_harness import (
     LAST_CELL,
     NOW,
@@ -275,7 +276,11 @@ def turn_pencil_mode_on(page: Page) -> None:
 
 
 def click_confirm(page: Page) -> None:
-    """Click `confirm-pencil` (bounded wait: the control may not exist yet)."""
+    """Click `confirm-pencil` (bounded wait: the control may not exist yet).
+
+    It is the first item of the Aide menu (spec 043), which is opened first.
+    """
+    open_aide(page)
     confirm_button(page).click(timeout=WAIT_TIMEOUT_MS)
 
 

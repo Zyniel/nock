@@ -178,3 +178,19 @@ export function distanceBetween(
 ): number {
   return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY)
 }
+
+// The box of a grid fitted to an area at zoom 1, in px: its cells at the side
+// that fits (fitCellSize) and the grid's own left and top line. The column
+// layout sizes the grid viewport to it (spec 043, "Play area and fit").
+export function fittedGridBox(
+  areaWidth: number,
+  areaHeight: number,
+  columns: number,
+  rows: number,
+): { width: number; height: number } {
+  const side = Math.max(0, fitCellSize(areaWidth, areaHeight, columns, rows))
+  return {
+    width: side * columns + GRID_LINE_PX,
+    height: side * rows + GRID_LINE_PX,
+  }
+}

@@ -195,10 +195,18 @@ main {
   color: var(--nock-navy);
   background: transparent;
   text-align: left;
+  cursor: pointer;
 }
 
 .nock-menu-item:hover {
   background: var(--nock-word);
+}
+
+/* A disabled item (spec 043): its text and detail muted, no hover. */
+.nock-menu-item:disabled {
+  color: var(--nock-muted);
+  background: transparent;
+  cursor: not-allowed;
 }
 
 .nock-menu-detail {
@@ -252,4 +260,52 @@ main {
   .nock-note {
     transition: none;
   }
+}
+
+/* ---- Room sheets (spec 043, _design.md section 8) -----------------------------
+   The host's settings and the account dialog: modal dialogs, centred in the
+   column layout; with the class `bottom`, bottom sheets in the sheet layout,
+   whose backdrop leaves the top bar uncovered. */
+
+.room-sheet {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 20px 22px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--nock-ink);
+  background: var(--nock-white);
+  box-shadow: 0 20px 40px -16px var(--nock-shadow-strong);
+}
+
+.room-sheet[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.room-sheet::backdrop {
+  background: var(--nock-scrim);
+}
+
+.room-sheet.bottom {
+  width: 100%;
+  max-height: calc(100dvh - 54px);
+  margin: auto 0 0;
+  padding: 14px 18px 18px;
+  border-radius: 16px 16px 0 0;
+}
+
+.room-sheet.bottom::backdrop {
+  top: 54px;
+}
+
+/* The title of a room sheet: 700 1.2rem/1.2, navy. */
+.room-sheet-title {
+  margin: 0;
+  font: 700 1.2rem/1.2 var(--nock-font-ui);
+  color: var(--nock-navy);
 }

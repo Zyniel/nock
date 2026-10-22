@@ -6,6 +6,12 @@ zero budget the reveal buttons are disabled and say why (the page with a mocked
 socket). The edge cases "Rate" and "Allowance changed after reveals" are tested
 under AC-2, with "Reveals used and allowance changes" (`RoomState.reveals_used`,
 the lead's decision 13 of 2026-10-15). The shared setup is in `spec024_harness`.
+
+Refined by spec 043 (the design's room layout): the reveal items are in the Aide
+menu with the texts « La lettre » and « Le mot » and no `aria-label`; what is left
+of the budget is each item's detail (`reveal-letter-detail`, `reveal-word-detail`),
+`5 restantes`, `1 restant` or « Plus de … » (the `reveal.*_label` keys are
+removed). A click or a measure of an item is made with the Aide menu open.
 """
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ from nock.protocol import (
 )
 from nock.room import RoomConfig, RoomState, handle_message, new_room
 from nock.server import create_app
+from room_panels import open_aide
 from spec024_harness import (
     ALLOWANCE_EXAMPLE_LETTERS,
     COLOUR_CONTRAST_JS,
@@ -453,28 +460,46 @@ def test_ac2_websocket_a_later_joiner_gets_the_budget_left_and_the_allowance(
 # ---- AC-2, page with a mocked socket ----
 
 
-def test_ac2_the_new_fr_json_keys_of_the_buttons() -> None:
+def letter_detail(page: Page) -> Locator:
+    return page.get_by_test_id("reveal-letter-detail")
+
+
+def word_detail(page: Page) -> Locator:
+    return page.get_by_test_id("reveal-word-detail")
+
+
+def expect_no_item_label(page: Page) -> None:
+    """Spec 043: the reveal items' names are their visible texts."""
+    for test_id in ("reveal-letter", "reveal-word"):
+        assert page.get_by_test_id(test_id).get_attribute("aria-label") is None
+
+
+def test_ac2_the_fr_json_keys_of_the_items_and_their_details() -> None:
     texts = load_fr()
 
-    assert texts["reveal.letter"] == "Lettre ({count})"
-    assert texts["reveal.word"] == "Mot ({count})"
-    assert texts["reveal.letter_label"] == "Révéler la lettre (reste {count})"
-    assert texts["reveal.word_label"] == "Révéler le mot (reste {count})"
+    assert texts["reveal.letter"] == "La lettre"
+    assert texts["reveal.word"] == "Le mot"
+    assert texts["reveal.letters_left"] == "{count} restantes"
+    assert texts["reveal.letters_left_one"] == "1 restante"
+    assert texts["reveal.words_left"] == "{count} restants"
+    assert texts["reveal.words_left_one"] == "1 restant"
+    assert "reveal.letter_label" not in texts
+    assert "reveal.word_label" not in texts
 
 
-def test_ac2_browser_the_buttons_show_what_is_left_of_the_budget(
+def test_ac2_browser_the_details_show_what_is_left_of_the_budget(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid)
     cell_at(page, 2, 2).click()
 
-    letter = page.get_by_test_id("reveal-letter")
-    word = page.get_by_test_id("reveal-word")
-    expect(letter).to_have_text(fr_count("reveal.letter", 5))
-    expect(letter).to_have_attribute("aria-label", fr_count("reveal.letter_label", 5))
-    expect(word).to_have_text(fr_count("reveal.word", 1))
-    expect(word).to_have_attribute("aria-label", fr_count("reveal.word_label", 1))
-    assert fr_count("reveal.letter", 5) == "Lettre (5)"
+    expect(page.get_by_test_id("reveal-letter")).to_contain_text(
+        load_fr()["reveal.letter"]
+    )
+    expect(letter_detail(page)).to_have_text(fr_count("reveal.letters_left", 5))
+    expect(word_detail(page)).to_have_text(load_fr()["reveal.words_left_one"])
+    expect_no_item_label(page)
+    assert fr_count("reveal.letters_left", 5) == "5 restantes"
 
 
 def test_ac2_browser_a_reveal_result_updates_the_letter_count(
@@ -482,16 +507,15 @@ def test_ac2_browser_a_reveal_result_updates_the_letter_count(
 ) -> None:
     mock = open_room(page, live_server, fx01_grid)
     cell_at(page, 2, 2).click()
-    letter = page.get_by_test_id("reveal-letter")
-    expect(letter).to_have_text(fr_count("reveal.letter", 5))
+    expect(letter_detail(page)).to_have_text(fr_count("reveal.letters_left", 5))
 
     target = CellTarget(row=4, column=4)
     mock.send(reveal_result_frame(6, target, RevealBudget(letters=4, words=1)))
 
     expect_seq(page, 6)
-    expect(letter).to_have_text(fr_count("reveal.letter", 4))
-    expect(letter).to_have_attribute("aria-label", fr_count("reveal.letter_label", 4))
-    expect(page.get_by_test_id("reveal-word")).to_have_text(fr_count("reveal.word", 1))
+    expect(letter_detail(page)).to_have_text(fr_count("reveal.letters_left", 4))
+    expect_no_item_label(page)
+    expect(word_detail(page)).to_have_text(load_fr()["reveal.words_left_one"])
 
     # The page shows the event's `reveal_budget` ("Client: revealed cells"), not
     # one less than it showed: a jump from 4 to 2 tells the two apart.
@@ -499,9 +523,8 @@ def test_ac2_browser_a_reveal_result_updates_the_letter_count(
     mock.send(reveal_result_frame(7, other_target, RevealBudget(letters=2, words=1)))
 
     expect_seq(page, 7)
-    expect(letter).to_have_text(fr_count("reveal.letter", 2))
-    expect(letter).to_have_attribute("aria-label", fr_count("reveal.letter_label", 2))
-    expect(page.get_by_test_id("reveal-word")).to_have_text(fr_count("reveal.word", 1))
+    expect(letter_detail(page)).to_have_text(fr_count("reveal.letters_left", 2))
+    expect(word_detail(page)).to_have_text(load_fr()["reveal.words_left_one"])
 
 
 def test_ac2_browser_settings_changed_updates_the_letter_count(
@@ -511,16 +534,15 @@ def test_ac2_browser_settings_changed_updates_the_letter_count(
     cell_at(page, 2, 2).click()
     target = CellTarget(row=4, column=4)
     mock.send(reveal_result_frame(6, target, RevealBudget(letters=4, words=1)))
-    letter = page.get_by_test_id("reveal-letter")
-    expect(letter).to_have_text(fr_count("reveal.letter", 4))
+    expect(letter_detail(page)).to_have_text(fr_count("reveal.letters_left", 4))
 
     allowance = RevealBudget(letters=4, words=1)
     left = RevealBudget(letters=3, words=1)
     mock.send(settings_changed_frame(7, HelpMode.FREE, allowance, left))
 
     expect_seq(page, 7)
-    expect(letter).to_have_text(fr_count("reveal.letter", 3))
-    expect(letter).to_have_attribute("aria-label", fr_count("reveal.letter_label", 3))
+    expect(letter_detail(page)).to_have_text(fr_count("reveal.letters_left", 3))
+    expect_no_item_label(page)
 
 
 # ---- AC-3: at zero budget the buttons are disabled and say why ----
@@ -598,10 +620,8 @@ def test_ac3_the_new_fr_json_keys_of_a_spent_budget() -> None:
 
     assert texts["reveal.letter_none"] == "Plus de lettre"
     assert texts["reveal.word_none"] == "Plus de mot"
-    assert texts["reveal.letter_none_label"] == (
-        "Révéler la lettre : plus de lettre à révéler"
-    )
-    assert texts["reveal.word_none_label"] == "Révéler le mot : plus de mot à révéler"
+    assert "reveal.letter_none_label" not in texts
+    assert "reveal.word_none_label" not in texts
 
 
 def test_ac3_no_letter_left_disables_the_letter_button_and_says_why(
@@ -612,11 +632,11 @@ def test_ac3_no_letter_left_disables_the_letter_button_and_says_why(
 
     letter = page.get_by_test_id("reveal-letter")
     expect(letter).to_be_disabled()
-    expect(letter).to_have_text(texts["reveal.letter_none"])
-    expect(letter).to_have_attribute("aria-label", texts["reveal.letter_none_label"])
+    expect(letter_detail(page)).to_have_text(texts["reveal.letter_none"])
     word = page.get_by_test_id("reveal-word")
     expect(word).to_be_enabled()
-    expect(word).to_have_text(fr_count("reveal.word", 1))
+    expect(word_detail(page)).to_have_text(texts["reveal.words_left_one"])
+    expect_no_item_label(page)
 
 
 def test_ac3_clicking_the_disabled_letter_button_sends_nothing(
@@ -626,6 +646,7 @@ def test_ac3_clicking_the_disabled_letter_button_sends_nothing(
     cell_at(page, 2, 2).click()
     letter = page.get_by_test_id("reveal-letter")
     expect(letter).to_be_disabled()
+    open_aide(page)
     page.wait_for_timeout(QUIET_MS)
     sent_before = len(mock.frames_without_pings())
 
@@ -648,8 +669,8 @@ def test_ac3_no_word_left_after_a_reveal_result_disables_the_word_button(
     texts = load_fr()
     expect_seq(page, 6)
     expect(word).to_be_disabled()
-    expect(word).to_have_text(texts["reveal.word_none"])
-    expect(word).to_have_attribute("aria-label", texts["reveal.word_none_label"])
+    expect(word_detail(page)).to_have_text(texts["reveal.word_none"])
+    expect_no_item_label(page)
     expect(page.get_by_test_id("reveal-letter")).to_be_disabled()
 
     # The page takes the words left from the event ("Client: revealed cells"), not
@@ -658,8 +679,8 @@ def test_ac3_no_word_left_after_a_reveal_result_disables_the_word_button(
 
     expect_seq(page, 7)
     expect(word).to_be_enabled()
-    expect(word).to_have_text(fr_count("reveal.word", 2))
-    expect(word).to_have_attribute("aria-label", fr_count("reveal.word_label", 2))
+    expect(word_detail(page)).to_have_text(fr_count("reveal.words_left", 2))
+    expect_no_item_label(page)
     expect(page.get_by_test_id("reveal-letter")).to_be_disabled()
 
 
@@ -671,12 +692,13 @@ def test_ac3_a_disabled_reveal_button_keeps_a_text_contrast_of_4_5(
     letter = page.get_by_test_id("reveal-letter")
     word = page.get_by_test_id("reveal-word")
     expect(letter).to_be_disabled()
-    expect(letter).to_have_text(load_fr()["reveal.letter_none"])
+    expect(letter_detail(page)).to_have_text(load_fr()["reveal.letter_none"])
+    open_aide(page)
     assert_text_keeps_contrast(letter)
 
     mock.send(reveal_result_frame(6, MIME, NOTHING_LEFT))
     expect(word).to_be_disabled()
-    expect(word).to_have_text(load_fr()["reveal.word_none"])
+    expect(word_detail(page)).to_have_text(load_fr()["reveal.word_none"])
 
     assert_text_keeps_contrast(letter)
     assert_text_keeps_contrast(word)
@@ -692,11 +714,10 @@ def test_ac3_a_first_snapshot_with_a_zero_allowance_shows_both_buttons_disabled(
     letter = page.get_by_test_id("reveal-letter")
     word = page.get_by_test_id("reveal-word")
     expect(letter).to_be_disabled()
-    expect(letter).to_have_text(texts["reveal.letter_none"])
-    expect(letter).to_have_attribute("aria-label", texts["reveal.letter_none_label"])
+    expect(letter_detail(page)).to_have_text(texts["reveal.letter_none"])
     expect(word).to_be_disabled()
-    expect(word).to_have_text(texts["reveal.word_none"])
-    expect(word).to_have_attribute("aria-label", texts["reveal.word_none_label"])
+    expect(word_detail(page)).to_have_text(texts["reveal.word_none"])
+    expect_no_item_label(page)
 
 
 def test_ac3_the_default_budget_leaves_both_buttons_enabled_as_a_control(

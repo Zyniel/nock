@@ -18,8 +18,13 @@ while its request runs; `account-close`; the signed-in dialog; no account contro
 while `GET /api/account` answers 404; the new `fr.json` keys.
 
 The toolbar's layout and the keyboard walk are in
-`test_spec_033_ac09_toolbar_layout_and_keyboard.py`. The shared setup is in
+`test_spec_033_ac09_menu_layout_and_keyboard.py`. The shared setup is in
 `spec033_harness` and `spec024_harness` (the mocked room and spec 035's scans).
+
+Refined by spec 043 (the design's room layout): `account-open` is an item of the
+room Menu, which is opened first (spec 043's `open_menu`); the dialog comes after
+`room-topbar` (it came after `room-toolbar`), and once it closes the focus goes to
+`menu-button` (spec 043's "Room sheets").
 """
 
 from __future__ import annotations
@@ -33,6 +38,7 @@ from playwright.sync_api import Browser, Page, expect
 from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
+from room_panels import open_menu
 from spec024_harness import (
     SETTLE_MS,
     contrast_problems,
@@ -144,6 +150,8 @@ def open_plain_room(
 
 
 def open_dialog(page: Page) -> None:
+    """Open the Menu (spec 043), then the account dialog from its item."""
+    open_menu(page)
     page.get_by_test_id("account-open").click()
     expect(page.get_by_test_id("account-dialog")).to_have_attribute("open", "")
 
@@ -285,7 +293,7 @@ def test_ac9_the_account_page_has_no_horizontal_scroll(
 DIALOG_STRUCTURE_SCRIPT = """
 () => {
   const dialog = document.querySelector('[data-testid="account-dialog"]');
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
+  const toolbar = document.querySelector('[data-testid="room-topbar"]');
   const input = document.querySelector('[data-testid="account-email-input"]');
   const labelledBy = dialog.getAttribute('aria-labelledby');
   const heading = labelledBy === null ? null : document.getElementById(labelledBy);
@@ -307,7 +315,7 @@ DIALOG_STRUCTURE_SCRIPT = """
 """
 
 
-def test_ac9_the_dialog_is_a_modal_dialog_after_the_toolbar_labelled_by_its_heading(
+def test_ac9_the_dialog_is_a_modal_dialog_after_the_top_bar_labelled_by_its_heading(
     browser: Browser,
     browser_name: str,
     account_server: AccountServer,
@@ -439,7 +447,7 @@ def test_ac9_account_close_closes_the_dialog_and_gives_the_focus_back(
         close_button.click()
 
         expect(page.get_by_test_id("account-dialog")).not_to_have_attribute("open", "")
-        expect(page.get_by_test_id("account-open")).to_be_focused()
+        expect(page.get_by_test_id("menu-button")).to_be_focused()
     finally:
         close()
 

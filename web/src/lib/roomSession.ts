@@ -219,7 +219,7 @@ export interface RoomSession {
   // The id given to the next feed item.
   nextFeedItemId: number
   // How many times the feed changed: a line added, or the lines of a catch-up
-  // put in (spec 034). The feed list keeps its place on each change.
+  // put in (spec 034).
   feedChanges: number
   // The nickname of every player seen so far, by id; those who left stay. A
   // reactive map: what the page shows of a name follows when the name arrives,

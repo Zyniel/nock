@@ -4,13 +4,17 @@
   import { t } from './i18n'
   import type { RoomKey } from './myRooms'
 
-  // The account dialog of the room page (spec 033), a modal dialog. The room
-  // page keeps it on the page while accounts are on and opens it with `open`.
+  // The account dialog of the room page (spec 033), a modal dialog with the
+  // look of a room sheet (spec 043): centred in the column layout, a bottom
+  // sheet in the sheet layout. The room page keeps it on the page while
+  // accounts are on and opens it with `open`.
   let {
+    layout,
     status,
     room,
     onClosed,
   }: {
+    layout: 'sheet' | 'column'
     // What GET /api/account answered.
     status: AccountStatus
     // The room the link is asked from.
@@ -34,6 +38,22 @@
       return
     }
     tabStops()[0]?.focus()
+  }
+
+  // A click on the backdrop lands on the dialog itself, outside its box.
+  function closeOnBackdrop(event: MouseEvent): void {
+    if (dialog === null || event.target !== dialog) {
+      return
+    }
+    const box = dialog.getBoundingClientRect()
+    const isInside =
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom
+    if (!isInside) {
+      dialog.close()
+    }
   }
 
   // The controls of the dialog that Tab moves between, in document order.
@@ -71,49 +91,56 @@
 
 <dialog
   bind:this={dialog}
-  class="account-dialog"
+  class="room-sheet account-dialog"
+  class:bottom={layout === 'sheet'}
   data-testid="account-dialog"
   aria-labelledby="account-dialog-heading"
+  onclick={closeOnBackdrop}
   onclose={onClosed}
   onkeydown={keepTabInside}
 >
   {#if status.signed_in}
-    <h2 id="account-dialog-heading">{t('account.signed_in_heading')}</h2>
+    <h2 class="room-sheet-title" id="account-dialog-heading">{t('account.signed_in_heading')}</h2>
     <p>{t('account.signed_in_as', { email: status.email ?? '' })}</p>
     <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
     <a data-testid="account-page-link" href="/account" tabindex="0">{t('account.manage')}</a>
   {:else}
-    <h2 id="account-dialog-heading">{t('account.dialog_heading')}</h2>
-    <p>{t('account.dialog_intro')}</p>
+    <h2 class="room-sheet-title" id="account-dialog-heading">{t('account.dialog_heading')}</h2>
+    <p class="intro">{t('account.dialog_intro')}</p>
     <AccountEmailForm {room} bind:input={emailInput} />
   {/if}
-  <button type="button" data-testid="account-close" onclick={() => dialog?.close()}
-    >{t('account.close')}</button
-  >
+  <div class="dialog-end">
+    <button
+      type="button"
+      class="nock-button nock-button-secondary"
+      data-testid="account-close"
+      onclick={() => dialog?.close()}>{t('account.close')}</button
+    >
+  </div>
 </dialog>
 
 <style>
-  .account-dialog {
-    box-sizing: border-box;
-    width: min(28rem, calc(100vw - 2rem));
-    max-height: calc(100dvh - 2rem);
-    overflow: auto;
-    color: var(--nock-ink);
-    background: var(--nock-white);
-    border: 1px solid var(--nock-line);
-    border-radius: 0.5rem;
-  }
-
-  .account-dialog h2 {
-    margin: 0 0 0.5rem;
-    font-size: 1.25rem;
-  }
-
   .account-dialog p {
+    margin: 0;
+    font-size: 0.95rem;
     overflow-wrap: anywhere;
   }
 
-  [data-testid='account-close'] {
-    margin-top: 1rem;
+  .account-dialog .intro {
+    font-size: 0.9rem;
+    color: var(--nock-muted);
+  }
+
+  /* The text link « Gérer mon compte » (_design.md section 11). */
+  .account-dialog a {
+    align-self: flex-start;
+    font-weight: 600;
+    color: var(--nock-navy);
+  }
+
+  /* « Fermer », right-aligned. */
+  .dialog-end {
+    display: flex;
+    justify-content: flex-end;
   }
 </style>

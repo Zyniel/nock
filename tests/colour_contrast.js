@@ -124,15 +124,44 @@ function scanTextContrast() {
   return measurements;
 }
 
+// The surface behind an element's outline (spec 043, refining spec 035 AC-2: a
+// ring's contrast is measured against the surface behind it). An outline drawn
+// inside the element (a negative `outline-offset`) lies on the element's own
+// background; one drawn outside it lies on its parent's. The surface is the first
+// non-transparent background from there up, composited over the ones above it and
+// over white. On a white page it is white, as before spec 043; on the navy clue bar
+// it is navy.
+function surfaceBehindOutline(element) {
+  const offset = parseFloat(getComputedStyle(element).outlineOffset);
+  const layers = [];
+  let node = offset < 0 ? element : element.parentElement;
+  for (; node !== null; node = node.parentElement) {
+    const colour = parseColour(getComputedStyle(node).backgroundColor);
+    if (colour[3] > 0) {
+      layers.push(colour);
+      if (colour[3] >= 1) {
+        break;
+      }
+    }
+  }
+  let surface = WHITE;
+  for (let index = layers.length - 1; index >= 0; index -= 1) {
+    surface = over(layers[index], surface);
+  }
+  return surface;
+}
+
 // The outline of the focused element: its computed style, its width in px and the
-// contrast of its colour (composited over white) against white.
+// contrast of its colour (composited over the surface behind it) against that
+// surface (spec 035 AC-2, as spec 043 refines it).
 function readFocusOutline() {
   const element = document.activeElement;
   const style = getComputedStyle(element);
-  const colour = over(parseColour(style.outlineColor), WHITE);
+  const surface = surfaceBehindOutline(element);
+  const colour = over(parseColour(style.outlineColor), surface);
   return {
     style: style.outlineStyle,
     width: parseFloat(style.outlineWidth),
-    ratio: contrast(colour, WHITE),
+    ratio: contrast(colour, surface),
   };
 }

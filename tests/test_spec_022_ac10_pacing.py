@@ -88,9 +88,10 @@ def test_ac10_browser_the_page_paces_its_chat_messages_and_reactions(
     expect(send).to_be_enabled(timeout=remaining_ms(deadline))
     expect(wait).to_have_count(0, timeout=remaining_ms(deadline))
 
-    # Five reactions chosen in the picker.
-    page.keyboard.press("Escape")
-    expect(page.get_by_test_id("chat-panel")).to_have_count(0)
+    # Five reactions chosen in the picker, the Salon closed first (spec 043: a
+    # click on `chat-toggle` closes it in both layouts).
+    page.get_by_test_id("chat-toggle").click()
+    expect(page.get_by_test_id("salon")).to_be_hidden()
     button = page.get_by_test_id("react-button")
     picker = page.get_by_test_id("reaction-picker")
     first_reaction = time.monotonic()

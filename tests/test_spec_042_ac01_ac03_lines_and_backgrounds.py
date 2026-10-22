@@ -14,7 +14,7 @@ Choices where the spec leaves room:
   `page.evaluate`, the second puts `p3` (colour 1) before `p2` (colour 3) in the
   roster, both words holding (3, 2).
 - AC-3, the edge cases "Tint off and my word" and "A `localStorage` that throws"
-  are tested here; the switch's markup in `room-toolbar` is AC-19's.
+  are tested here; the switch's markup in `room-menu` is AC-19's.
 """
 
 from __future__ import annotations

@@ -3,6 +3,12 @@
 They use a mocked socket. The setup the test files of spec 035 share is in
 `tests/spec035_harness.py`.
 
+Refined by spec 043 (the design's room layout): the navy clue bar's buttons follow
+the grid in document order, so `Escape` then `Tab` moves the focus to `clue-prev`
+and `Escape` then `Shift+Tab` to `menu-button` (the last top-bar button). No
+sentinel is needed and no engine is skipped; the run "with nothing after the grid"
+became the run on the page as it is.
+
 Not tested here, and why:
 
 - The announcement of a word of one cell (`a11y.announcement_one`): FX-01 holds no
@@ -27,13 +33,11 @@ from spec035_harness import (
     SETTLE_MS,
     MockRoomSocket,
     Walker,
-    add_sentinel,
     build_fx01_grid,
     build_reference_catalogue,
     cell_at,
     computed,
     expect_focus_on_grid,
-    expect_focus_on_sentinel,
     expect_selected,
     expect_word,
     grid_of,
@@ -41,7 +45,6 @@ from spec035_harness import (
     load_fr,
     open_room,
     selection_frame,
-    wait_until,
 )
 
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
@@ -72,15 +75,6 @@ TAB_LISTENER_SCRIPT = r"""
       });
     }
   });
-}
-"""
-
-# After the released Tab, with nothing focusable after the grid: the focus left the
-# page content wherever the browser could move it.
-FOCUS_LEFT_THE_PAGE_CONTENT_SCRIPT = r"""
-() => {
-  const grid = document.querySelector('[data-testid="grid"]');
-  return document.activeElement !== grid || !document.hasFocus();
 }
 """
 
@@ -147,7 +141,7 @@ def tab_keydowns(page: Page) -> list[dict[str, Any]]:
 
 
 def open_host_room(page: Page, live_server: str, fx01_grid: Grid) -> MockRoomSocket:
-    """A FX-01 room where `you` (`p1`) is host, so the host panel shows."""
+    """A FX-01 room where `you` (`p1`) is host."""
     return open_room(page, live_server, fx01_grid)
 
 
@@ -163,8 +157,6 @@ def test_ac3_tab_stays_on_the_grid_then_escape_tab_leaves_forward(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
-    expect(page.get_by_test_id("host-panel")).to_be_visible()
-    add_sentinel(page)
     walker = Walker(page)
     focus_grid_with_first_word(page, walker)
 
@@ -175,7 +167,7 @@ def test_ac3_tab_stays_on_the_grid_then_escape_tab_leaves_forward(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
-    expect_focus_on_sentinel(page)
+    expect(page.get_by_test_id("clue-prev")).to_be_focused()
     assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, 1) is True
     expect_word(page, "0,0,1")
     expect_selected(page, 0, 1)
@@ -193,7 +185,7 @@ def test_ac3_escape_then_shift_tab_leaves_backward(
     page.keyboard.press("Escape")
     page.keyboard.press("Shift+Tab")
 
-    expect(grid_of(page)).not_to_be_focused()
+    expect(page.get_by_test_id("menu-button")).to_be_focused()
     assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, -1) is True
     expect_word(page, "0,0,1")
     expect_selected(page, 0, 1)
@@ -203,12 +195,11 @@ def test_ac3_coming_back_to_the_grid_with_shift_tab_works_both_ways(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
-    add_sentinel(page)
     walker = Walker(page)
     focus_grid_with_first_word(page, walker)
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
-    expect_focus_on_sentinel(page)
+    expect(page.get_by_test_id("clue-prev")).to_be_focused()
 
     page.keyboard.press("Shift+Tab")
     expect_focus_on_grid(page)
@@ -216,14 +207,14 @@ def test_ac3_coming_back_to_the_grid_with_shift_tab_works_both_ways(
     page.keyboard.press("Escape")
     page.keyboard.press("Shift+Tab")
 
-    expect(grid_of(page)).not_to_be_focused()
+    expect(page.get_by_test_id("menu-button")).to_be_focused()
     assert page.evaluate(NEIGHBOUR_FOCUSED_SCRIPT, -1) is True
     expect_word(page, "0,0,0")
     expect_selected(page, 1, 0)
 
 
-def test_ac3_escape_tab_with_nothing_after_the_grid_leaves_the_page_content(
-    page: Page, live_server: str, fx01_grid: Grid, browser_name: str
+def test_ac3_on_the_page_as_it_is_escape_tab_reaches_the_clue_bar_in_every_engine(
+    page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
     walker = Walker(page)
@@ -232,27 +223,16 @@ def test_ac3_escape_tab_with_nothing_after_the_grid_leaves_the_page_content(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
+    expect(page.get_by_test_id("clue-prev")).to_be_focused()
     expect_word(page, "0,0,0")
     expect_selected(page, 1, 0)
-    if browser_name == "firefox":
-        # Firefox under automation has no toolbar to move the focus to, so it leaves
-        # the focus on the grid. That the page released the Tab is checked in every
-        # engine by test_ac3_a_tab_pressed_right_after_escape_is_not_cancelled.
-        pytest.skip("Firefox under automation keeps the focus on the grid")
-    wait_until(page, lambda: page.evaluate(FOCUS_LEFT_THE_PAGE_CONTENT_SCRIPT) is True)
 
 
-@pytest.mark.parametrize(
-    ("with_sentinel", "key"),
-    [(True, "Tab"), (False, "Shift+Tab"), (False, "Tab")],
-    ids=["forward_with_sentinel", "backward", "forward_without_sentinel"],
-)
+@pytest.mark.parametrize("key", ["Tab", "Shift+Tab"], ids=["forward", "backward"])
 def test_ac3_a_tab_pressed_right_after_escape_is_not_cancelled(
-    page: Page, live_server: str, fx01_grid: Grid, with_sentinel: bool, key: str
+    page: Page, live_server: str, fx01_grid: Grid, key: str
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
-    if with_sentinel:
-        add_sentinel(page)
     walker = Walker(page)
     focus_grid_with_first_word(page, walker)
     watch_tab_keys(page)
@@ -363,7 +343,6 @@ def test_ac3_escape_with_nothing_selected_lets_tab_leave(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_host_room(page, live_server, fx01_grid)
-    add_sentinel(page)
     walker = Walker(page)
     walker.tab_to("grid")
     expect(grid_of(page)).to_have_attribute("data-word", "")
@@ -371,7 +350,7 @@ def test_ac3_escape_with_nothing_selected_lets_tab_leave(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
-    expect_focus_on_sentinel(page)
+    expect(page.get_by_test_id("clue-prev")).to_be_focused()
     expect(grid_of(page)).to_have_attribute("data-word", "")
     expect(grid_of(page)).not_to_have_attribute(
         "aria-activedescendant", re.compile(r".")
@@ -630,7 +609,8 @@ def test_ac5_the_selection_is_exposed_by_activedescendant_and_aria_selected(
         '[data-testid="cell"][data-type="letter"][aria-selected="false"]'
     )
     expect(others).to_have_count(17)
-    assert page.locator('[aria-selected="true"]').count() == 1
+    # The Salon's selected tab has `aria-selected` too (spec 043): count the grid's.
+    assert grid_of(page).locator('[aria-selected="true"]').count() == 1
 
     cell_at(page, 1, 0).click()
     expect(grid_of(page)).to_have_attribute("aria-activedescendant", "cell-1-0")

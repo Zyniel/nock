@@ -74,7 +74,7 @@ def phone_top(
     fourth = (
         tb("kbd", "Clavier", "kbd" in pressed, off="kbd" in off)
         if slot4 == "kbd"
-        else tb("pen", "Crayon", "pen" in pressed)
+        else tb("pen", "Crayon", "pen" in pressed, off="pen" in off)
     )
     h += (
         tb("salon", "Salon", "salon" in pressed, extra)
@@ -111,8 +111,9 @@ def cluebar(
     pressed: bool = False,
     width: int | None = None,
     empty: bool = False,
+    status: str = "",
 ) -> str:
-    """Return the clue bar."""
+    """Return the clue bar; status: the completion status in its row, if any."""
     st = f' style="width:{width}px"' if width else ""
     if empty:
         return (
@@ -125,7 +126,7 @@ def cluebar(
         )
     return (
         f'<div class="cluebar"{st}><span class="cb">{IC["chev_l"]}</span><div '
-        f'class="txt">{esc(text)}<i>{glyph}</i></div>'
+        f'class="txt">{esc(text)}<i>{glyph}</i></div>{status}'
         f'<span class="cb pin">{IC["smile"]}</span><span class="cb '
         f'pin" aria-pressed="{str(pressed).lower()}">{IC["flag"]}</span>'
         f'<span class="cb">{IC["chev_r"]}</span></div>'
@@ -139,6 +140,25 @@ def netband() -> str:
         "perdue. Vous pouvez continuer : "
         "vos lettres seront envoyées au retour du réseau.</span></div>"
     )
+
+
+def status_band(text: str) -> str:
+    """Return the status band: a final status after the room showed (spec 043)."""
+    return f'<div class="netband">{esc(text)}</div>'
+
+
+def row_status(state: str) -> str:
+    """Return the completion status in the clue bar's row (spec 043).
+
+    Args:
+        state: "notyet" (full but wrong) or "done" (solved, until spec 044).
+    """
+    if state == "done":
+        return (
+            '<span class="rowstat">✓ Grille terminée, bravo !<span class="btn '
+            'secondary">Voir le bilan</span></span>'
+        )
+    return '<span class="rowstat">Grille complète, mais pas encore juste.</span>'
 
 
 def band_done(width: int | None = None) -> str:
@@ -195,8 +215,14 @@ def phone_room(
     off: set | None = None,
     slot4: str = "kbd",
     band_lines: int = 1,
+    final_status: str | None = None,
+    row_state: str | None = None,
 ) -> str:
-    """Return a phone room, 360 x 720 by default (sheet layout)."""
+    """Return a phone room, 360 x 720 by default (sheet layout).
+
+    final_status: the text of the status band under the top bar (spec 043);
+    row_state: the completion status in the clue bar's row, "notyet" or "done".
+    """
     width, height = size
     low = height <= 500
     if pressed is None:
@@ -204,13 +230,15 @@ def phone_room(
     grid_opts = grid_opts or {}
     kb_h = (110 if low else 158) if kbd else 0
     band_h = {"done": 46, "notyet": 35}.get(band or "", 0) + 19 * (band_lines - 1)
-    net_h = 52 if net else 0
+    net_h = (52 if net else 0) + (35 if final_status else 0)
     stage_h = height - 2 - 54 - 34 - kb_h - band_h - net_h
     leg_h = (38 + 15 * (legend_lines - 1)) if authors else 0
     s = floor(min((width - 2 - 16 - 1) / 5, (stage_h - 16 - leg_h - 1) / 5))
     h = phone_top(timer, pressed, badge, newdot, aide, off, slot4)
     if net:
         h += netband()
+    if final_status:
+        h += status_band(final_status)
     if stage_html is None:
         g = grid(fx_rows(s, authors=authors, **grid_opts), s)
         if authors and legend_names:
@@ -227,7 +255,8 @@ def phone_room(
         else:
             word = grid_opts.get("word", 5)
             text, glyph = clue if clue else (FX_CLUE_TEXT[word], FX_DIR[word])
-            h += cluebar(text, glyph, flag_pressed)
+            status = row_status(row_state) if row_state else ""
+            h += cluebar(text, glyph, flag_pressed, status=status)
     if band == "done":
         h += band_done()
     elif band == "notyet":
@@ -659,11 +688,15 @@ def desk_room(
     col_kw: dict | None = None,
     kbd: bool = False,
     clue: tuple = ("Fin de journée", "→"),
+    final_status: str | None = None,
 ) -> str:
-    """A computer room, 1280 x 800 (_design.md section 8, column layout)."""
+    """A computer room, 1280 x 800 (_design.md section 8, column layout).
+
+    final_status: the text of the status band under the top bar (spec 043).
+    """
     col_w = 340 if column else 0
     band_h = 46 if solved else (35 if notyet else 0)
-    net_h = 36 if net else 0
+    net_h = (36 if net else 0) + (35 if final_status else 0)
     kb_h = 168 if kbd else 0
     leg = 38 if authors else 0
     s = floor(
@@ -682,6 +715,8 @@ def desk_room(
     h = desk_top(timer, pressed, badge, newdot, aide, kbd)
     if net:
         h += netband()
+    if final_status:
+        h += status_band(final_status)
     g = grid(big_rows(s, solved=solved, authors=authors), s)
     if authors:
         g = f'<div class="gwrap">{g}{legend([0, 1, 2, 3])}</div>'
@@ -704,6 +739,36 @@ def desk_room(
         kw.update(col_kw or {})
         col = f'<aside class="dcol">{salon(tab=column, **kw)}</aside>'
     return f'<div class="desk">{h}<div class="dbody">{main}{col}</div>{layer}</div>'
+
+
+def low_column_room(size: tuple[int, int] = (740, 360), touch: bool = True) -> str:
+    """Return the column layout on a window at most 500 px high (spec 044 D8).
+
+    The phone top bar, then the play area (12 px padding) and the 340 px Salon
+    column, open by default. The clue bar is as wide as the grid but never
+    narrower than the smaller of 320 px and the play area (spec 043).
+
+    Args:
+        size: The window's width and height.
+        touch: A touch screen with the keyboard hidden (« Clavier » in the
+            fourth slot), else a desktop window (« Crayon »).
+    """
+    width, height = size
+    col_w = 340
+    play_w = width - 2 - col_w - 1 - 24
+    s = floor(min((play_w - 1) / 5, (height - 2 - 54 - 34 - 24 - 1) / 5))
+    bar_w = max(s * 5 + 1, min(320, play_w))
+    top = phone_top(pressed={"salon"}, slot4="kbd" if touch else "pen")
+    bar = cluebar(FX_CLUE_TEXT[5], FX_DIR[5], width=bar_w)
+    main = (
+        f'<div class="dmain"><div class="dstage">{grid(fx_rows(s), s)}</div>'
+        f"{bar}</div>"
+    )
+    col = f'<aside class="dcol">{salon()}</aside>'
+    return (
+        f'<div class="phone" style="width:{width}px;height:{height}px">{top}'
+        f'<div class="dbody">{main}{col}</div></div>'
+    )
 
 
 def desk_pop(

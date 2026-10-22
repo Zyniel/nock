@@ -1,24 +1,28 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte'
+  import { flushSync, onMount, tick } from 'svelte'
   import AccountDialog from './AccountDialog.svelte'
-  import ChatPanel from './ChatPanel.svelte'
+  import AideMenu from './AideMenu.svelte'
+  import ClueBar from './ClueBar.svelte'
   import GridViewport from './GridViewport.svelte'
+  import HostSettings from './HostSettings.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
-  import PlayerIcon from './PlayerIcon.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
-  import RoomTimer from './RoomTimer.svelte'
+  import RoomMenu from './RoomMenu.svelte'
+  import RoomPopover from './RoomPopover.svelte'
+  import RoomTopBar from './RoomTopBar.svelte'
+  import Salon from './Salon.svelte'
   import { t } from './i18n'
   import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
-  import { nameOf } from './activityFeed'
+  import { nameOf, streamEntries } from './activityFeed'
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import {
-    chatToggleLabel,
     clueReactionMarkers,
     isPaced,
     msUntilNextExpiry,
+    salonToggleLabel,
     sendsInWindow,
-    unreadBadgeText,
+    shownChatLines,
     unreadCount,
   } from './chat'
   import {
@@ -29,7 +33,6 @@
     writeSwitch,
   } from './cellDisplaySwitches'
   import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
-  import { newLinkCopier } from './copyLink'
   import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
   import { markFinished } from './catalogue'
   import { recordOwnRoom } from './history'
@@ -39,7 +42,7 @@
     endCaughtUp,
     fetchCatchUp,
   } from './catchUp'
-  import { displayNickname } from './nickname'
+  import { selectionAfterTab } from './navigation'
   import { remoteSelectionsOf } from './remoteSelections'
   import {
     readRoomGrid,
@@ -48,14 +51,8 @@
     writeRoomSeenSeq,
     writeRoomSelection,
   } from './roomRecord'
-  import {
-    followListTabStop,
-    keepFeedEndOnResize,
-    keepFeedPlace,
-    noteFeedPlace,
-    watchListChanges,
-  } from './scrollingLists'
-  import type { FeedPlace } from './scrollingLists'
+  import { readItem, removeItem, writeItem } from './storage'
+  import { readTimerHidden, writeTimerHidden } from './timer'
   import type {
     LetterCellView,
     PendingEdit,
@@ -83,6 +80,7 @@
     statusAfterFinalClose,
     statusAfterLoss,
   } from './roomSession'
+  import { fittedGridBox } from './gridLayout'
   import {
     computeWords,
     sameSelection,
@@ -91,7 +89,7 @@
     selectionAfterClueTap,
     selectionOnCell,
     validSelection,
-    wordKey,
+    wordAt,
   } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
@@ -99,16 +97,19 @@
   const MAX_REVEAL_COUNT = 99
   // The performance mark set once the grid takes taps and keys (spec 036).
   const INTERACTIVE_MARK = 'nock:interactive'
-  // The remove buttons are compact in a roster list narrower than this many root
-  // font sizes (spec 014 AC-9).
-  const COMPACT_REMOVE_BELOW_ROOT_FONTS = 4.5
-  // The space between the header and the chat panel or the reaction picker.
-  const POPOVER_GAP_PX = 4
-  // The reaction picker and the chat panel sit side by side on a page at least
-  // this many root font sizes wide: the picker (10.25rem and its border), the
-  // panel (22rem) and three gaps of 0.5rem. On a narrower page the picker sits
-  // above the panel (spec 022 decision 15).
-  const SIDE_BY_SIDE_MIN_ROOT_FONTS = 34
+  // The two layouts of the room (spec 043, "Which layout"): the column layout
+  // needs a landscape window at least COLUMN_MIN_WIDTH_PX wide and more than
+  // LOW_WINDOW_PX high, or a landscape window at most LOW_WINDOW_PX high with no
+  // in-app keyboard.
+  const COLUMN_MIN_WIDTH_PX = 900
+  const LOW_WINDOW_PX = 500
+  // The Salon column closed by the player, for every room of this browser.
+  const SALON_CLOSED_KEY = 'nock.salon_closed'
+  const SALON_CLOSED_VALUE = 'true'
+  // The column layout's play area: its padding, and the smallest width of the
+  // clue bar when the play area has that much room (spec 043, Decision 12).
+  const PLAY_AREA_PADDING_PX = 12
+  const CLUE_BAR_MIN_PX = 320
 
   let { code }: { code: string } = $props()
 
@@ -125,205 +126,178 @@
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
-  // A low window (at most 500 px high, a phone on its side), the same breakpoint
-  // as the styles below. There the completion status sits in the clue bar's row,
-  // so that it takes no height from the grid (spec 026 AC-10). It follows a
-  // resize or a rotation.
-  const lowWindowQuery = window.matchMedia('(max-height: 500px)')
-  let isLowWindow = $state(lowWindowQuery.matches)
+  // ---- The layout (spec 043) ----
 
-  $effect(() => {
-    const onChange = (): void => {
-      isLowWindow = lowWindowQuery.matches
+  // The window's size, followed through each resize and rotation
+  // (<svelte:window> below).
+  let windowWidth = $state(window.innerWidth)
+  let windowHeight = $state(window.innerHeight)
+
+  // A low window: at most 500 px high, a phone on its side.
+  let isLowWindow = $derived(windowHeight <= LOW_WINDOW_PX)
+  let layout = $derived(layoutOf(windowWidth, windowHeight))
+  // The phone top bar is the sheet layout's, and the column layout's on a low
+  // window, where the computer top bar would not fit.
+  let topBarForm: 'phone' | 'computer' = $derived(
+    layout === 'sheet' || isLowWindow ? 'phone' : 'computer',
+  )
+
+  // "column" for a landscape window that is wide enough and not low, or low
+  // with no in-app keyboard; "sheet" otherwise.
+  function layoutOf(width: number, height: number): 'sheet' | 'column' {
+    const isLandscape = width > height
+    if (!isLandscape) {
+      return 'sheet'
     }
-    lowWindowQuery.addEventListener('change', onChange)
-    return () => lowWindowQuery.removeEventListener('change', onChange)
+    const isWideWindow = width >= COLUMN_MIN_WIDTH_PX && height > LOW_WINDOW_PX
+    const isLowWithoutKeyboard = height <= LOW_WINDOW_PX && !isTouchScreen
+    if (isWideWindow || isLowWithoutKeyboard) {
+      return 'column'
+    }
+    return 'sheet'
+  }
+
+  // ---- The popovers, the Salon and the scrim (spec 043) ----
+
+  // The open popover: the Aide menu, the Menu, or none.
+  let openPopover: 'aide' | 'menu' | null = $state(null)
+  let aideButton: HTMLButtonElement | null = $state(null)
+  let menuButton: HTMLButtonElement | null = $state(null)
+  let chatToggle: HTMLButtonElement | null = $state(null)
+  let aideMenu: HTMLElement | null = $state(null)
+  let roomMenu: HTMLElement | null = $state(null)
+  let salon: Salon | undefined = $state()
+
+  // The Salon is closed at load in the sheet layout; in the column layout it
+  // is open unless the player closed it in this browser.
+  let isSheetSalonOpen = $state(false)
+  let isColumnSalonOpen = $state(readItem(SALON_CLOSED_KEY) !== SALON_CLOSED_VALUE)
+  let isSalonOpen = $derived(layout === 'sheet' ? isSheetSalonOpen : isColumnSalonOpen)
+  let salonTab: 'discussion' | 'players' = $state('discussion')
+  // The stream is read while it shows: the Salon open on its Discussion tab.
+  let isStreamShown = $derived(isSalonOpen && salonTab === 'discussion')
+  // The scrim covers the page under the top bar while a popover or the Salon
+  // sheet is open (sheet layout only).
+  let isScrimShown = $derived(layout === 'sheet' && (openPopover !== null || isSalonOpen))
+
+  // A change of layout closes the popovers and the reaction picker; the Salon
+  // takes the state it has in the new layout (the sheet starts closed).
+  let lastLayout: 'sheet' | 'column' = layoutOf(window.innerWidth, window.innerHeight)
+  $effect(() => {
+    const current = layout
+    if (current === lastLayout) {
+      return
+    }
+    lastLayout = current
+    openPopover = null
+    isPickerOpen = false
+    isSheetSalonOpen = false
   })
 
-  // The host panel scrolls sideways on a small window. An edge fade says so
-  // without depending on the scrollbar, which some engines hide. Svelte sets
-  // the element back to null when the panel goes (the host role moved away).
-  let hostPanel: HTMLElement | null = $state(null)
-  let hostPanelHasMore = $state(false)
-
-  // The room toolbar (spec 024) scrolls sideways on a small window too, with the
-  // same edge fade.
-  let roomToolbar: HTMLElement | null = $state(null)
-  let roomToolbarHasMore = $state(false)
-
-  // True while content is hidden past the right edge of a row that scrolls.
-  function hasContentPastRightEdge(row: HTMLElement | null): boolean {
-    if (row === null) {
-      return false
+  // Open or close a popover. In the sheet layout one overlay shows at a time;
+  // in the column layout the Salon column stays as it is.
+  function togglePopover(popover: 'aide' | 'menu'): void {
+    if (openPopover === popover) {
+      openPopover = null
+      return
     }
-    const hiddenOnTheRight = row.scrollWidth - row.clientWidth - row.scrollLeft
-    return hiddenOnTheRight > 1
+    openPopover = popover
+    isPickerOpen = false
+    if (layout === 'sheet') {
+      isSheetSalonOpen = false
+    }
   }
 
-  // Show the fade while content is hidden past the right edge of the panel.
-  function updateHostPanelMore(): void {
-    hostPanelHasMore = hasContentPastRightEdge(hostPanel)
+  // Close the open popover and put the focus on its button.
+  function closePopoverToButton(): void {
+    const button = openPopover === 'aide' ? aideButton : menuButton
+    openPopover = null
+    button?.focus()
   }
 
-  function updateRoomToolbarMore(): void {
-    roomToolbarHasMore = hasContentPastRightEdge(roomToolbar)
-  }
-
-  // The last way the user acted: a key press or a pointer (mouse, touch, pen).
-  // :focus-visible cannot tell them apart, because a select or an input that is
-  // focused by a pointer is :focus-visible too.
-  let lastActionWasKeyboard = false
-  // True while a host panel control has the focus from the keyboard.
-  let hostPanelHasKeyboardFocus = $state(false)
-  // True while a room toolbar control has the focus from the keyboard.
-  let roomToolbarHasKeyboardFocus = $state(false)
-
+  // In the column layout a pointer press outside the open popover and its
+  // button closes it, and the focus goes where the pointer puts it.
   $effect(() => {
-    const onKeyDown = (): void => {
-      lastActionWasKeyboard = true
+    if (openPopover === null || layout !== 'column') {
+      return
     }
-    const onPointerDown = (): void => {
-      lastActionWasKeyboard = false
-      hostPanelHasKeyboardFocus = false
-      roomToolbarHasKeyboardFocus = false
+    const popover = openPopover === 'aide' ? aideMenu : roomMenu
+    const button = openPopover === 'aide' ? aideButton : menuButton
+    const onPointerDown = (event: PointerEvent): void => {
+      const target = event.target
+      if (!(target instanceof Node)) {
+        return
+      }
+      if (popover?.contains(target) || button?.contains(target)) {
+        return
+      }
+      openPopover = null
     }
-    window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener('pointerdown', onPointerDown, true)
-    return () => {
-      window.removeEventListener('keydown', onKeyDown, true)
-      window.removeEventListener('pointerdown', onPointerDown, true)
-    }
+    return () => window.removeEventListener('pointerdown', onPointerDown, true)
   })
 
-  // Chromium does not scroll a control that is already partly visible when it gets
-  // the focus, so its outline stays cut. Scroll it fully into view, but only for
-  // keyboard focus: scrolling after a click would move a partly visible "Retirer"
-  // away from under the pointer.
-  function scrollKeyboardFocusIntoView(event: FocusEvent): void {
-    const target = event.target
-    if (!(target instanceof HTMLElement)) {
-      return
-    }
-    if (!lastActionWasKeyboard) {
-      return
-    }
-    target.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  // A tap or a click on the scrim closes what it lies under; the focus does
+  // not move.
+  function closeOverlays(): void {
+    openPopover = null
+    isSheetSalonOpen = false
   }
 
-  // Remember whether the focus inside the host panel comes from the keyboard.
-  function followHostPanelFocus(event: FocusEvent): void {
-    hostPanelHasKeyboardFocus = lastActionWasKeyboard
-    scrollKeyboardFocusIntoView(event)
+  // « Salon » opens the Salon, with the focus inside it, or closes it.
+  function toggleSalon(): void {
+    if (isSalonOpen) {
+      setSalonOpen(false)
+      return
+    }
+    setSalonOpen(true)
+    void salon?.focusInside()
   }
 
-  function leaveHostPanelFocus(): void {
-    hostPanelHasKeyboardFocus = false
+  // Open or close the Salon of the current layout. The column remembers a
+  // close in this browser; in the sheet layout one overlay shows at a time.
+  function setSalonOpen(isOpen: boolean): void {
+    if (layout === 'column') {
+      isColumnSalonOpen = isOpen
+      if (isOpen) {
+        removeItem(SALON_CLOSED_KEY)
+      } else {
+        writeItem(SALON_CLOSED_KEY, SALON_CLOSED_VALUE)
+      }
+      refitNow()
+      return
+    }
+    isSheetSalonOpen = isOpen
+    if (isOpen) {
+      openPopover = null
+      isPickerOpen = false
+    }
   }
 
-  // The same for the room toolbar: a keyboard focus hides its edge fade.
-  function followRoomToolbarFocus(event: FocusEvent): void {
-    roomToolbarHasKeyboardFocus = lastActionWasKeyboard
-    scrollKeyboardFocusIntoView(event)
+  // Escape inside the Salon: the focus goes to « Salon »; the sheet closes, the
+  // column stays open.
+  function onSalonEscape(): void {
+    if (layout === 'sheet') {
+      isSheetSalonOpen = false
+    }
+    chatToggle?.focus()
   }
 
-  function leaveRoomToolbarFocus(): void {
-    roomToolbarHasKeyboardFocus = false
+  // ---- The timer's slot (spec 027, spec 043) ----
+
+  // The choice is read when the page loads, and holds for every room.
+  let isTimerShown = $state(!readTimerHidden())
+
+  function setTimerShown(isShown: boolean): void {
+    isTimerShown = isShown
+    writeTimerHidden(!isShown)
   }
-
-  // Measure again whenever the toolbar changes size or content: a resize, the
-  // reveal panel coming or going, a button text that changes.
-  $effect(() => {
-    if (roomToolbar === null) {
-      return
-    }
-    const stopWatching = watchListChanges(roomToolbar, updateRoomToolbarMore)
-    updateRoomToolbarMore()
-    return stopWatching
-  })
-
-  // Measure again whenever the panel or its content changes size.
-  $effect(() => {
-    if (hostPanel === null) {
-      return
-    }
-    const observer = new ResizeObserver(updateHostPanelMore)
-    observer.observe(hostPanel)
-    for (const child of Array.from(hostPanel.children)) {
-      observer.observe(child)
-    }
-    updateHostPanelMore()
-    return () => observer.disconnect()
-  })
-
-  // On a small window the roster list is narrow: every remove button then shows a
-  // short text instead of "Retirer" (spec 014 AC-9).
-  let rosterList: HTMLUListElement | null = $state(null)
-  let isRemoveCompact = $state(false)
-
-  // Compare the width of the list with the root font size, both in CSS pixels.
-  function updateRemoveForm(): void {
-    if (rosterList === null) {
-      return
-    }
-    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
-    isRemoveCompact = rosterList.clientWidth < COMPACT_REMOVE_BELOW_ROOT_FONTS * rootFontSize
-  }
-
-  // Measure again when the list changes size (a resize, a rotation) and when a
-  // style or a class on <html> changes the root font.
-  $effect(() => {
-    if (rosterList === null) {
-      return
-    }
-    const sizeObserver = new ResizeObserver(updateRemoveForm)
-    sizeObserver.observe(rosterList)
-    const rootObserver = new MutationObserver(updateRemoveForm)
-    rootObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['style', 'class'],
-    })
-    updateRemoveForm()
-    return () => {
-      sizeObserver.disconnect()
-      rootObserver.disconnect()
-    }
-  })
-
-  // The list of the activity feed, which scrolls up to the older lines.
-  let feedList: HTMLUListElement | null = $state(null)
-
-  // A list that scrolls with nothing focusable inside is a Tab stop, so that a
-  // keyboard player can scroll it with the arrow keys (spec 035 AC-12).
-  $effect(() => {
-    if (rosterList === null) {
-      return
-    }
-    return followListTabStop(rosterList)
-  })
-
-  $effect(() => {
-    if (feedList === null) {
-      return
-    }
-    return followListTabStop(feedList)
-  })
 
   let shareLink = $derived(`${location.origin}/r/${code}`)
-  // True while the copy button reads "copied", after a successful copy.
-  let copied = $state(false)
-  const linkCopier = newLinkCopier((isCopied) => {
-    copied = isCopied
-  })
-
-  // Write the link to the clipboard. Without a usable clipboard nothing changes.
-  async function copyLink(): Promise<void> {
-    await linkCopier.copy(shareLink)
-  }
 
   // Leaving the page must not leave the timers to fire on a destroyed page.
   $effect(() => {
     return () => {
-      linkCopier.stop()
       clearTimeout(undoMessageTimer)
       clearTimeout(pacingTimer)
     }
@@ -457,31 +431,6 @@
     }
   })
 
-  // The feed list keeps the reader's place (spec 013 AC-7): new lines bring the
-  // list to its newest line only if the list was at its end just before. The
-  // lines of a catch-up are new lines too, also when they go in above the
-  // others (spec 034).
-  let feedPlaceBeforeNewLine: FeedPlace | null = null
-
-  // Runs before the new lines are on the page: note where the list is.
-  $effect.pre(() => {
-    const changes = session.feedChanges
-    if (feedList === null || changes === 0) {
-      return
-    }
-    feedPlaceBeforeNewLine = noteFeedPlace(feedList)
-  })
-
-  // Runs once the new lines are on the page.
-  $effect(() => {
-    const changes = session.feedChanges
-    if (feedList === null || changes === 0 || feedPlaceBeforeNewLine === null) {
-      return
-    }
-    keepFeedPlace(feedList, feedPlaceBeforeNewLine)
-    feedPlaceBeforeNewLine = null
-  })
-
   // Each cell highlighted by a catch-up goes back to normal CATCH_UP_HIGHLIGHT_MS
   // after its highlight started (spec 034). A cell highlighted again has a new
   // id, so the timer of its old highlight finds nothing to end.
@@ -549,15 +498,6 @@
     applyCatchUp(session, catchUp)
   }
 
-  // A feed list at its end stays at its end through a resize, a rotation or a
-  // new root font, so the newest line stays in view (spec 013 AC-8).
-  $effect(() => {
-    if (feedList === null) {
-      return
-    }
-    return keepFeedEndOnResize(feedList)
-  })
-
   // A solved grid is finished on this device, when the room knows its number.
   $effect(() => {
     if (!session.solved) {
@@ -609,10 +549,14 @@
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
   let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
-  // Where the status shows: in the clue bar's row on a low window, under the clue
-  // bar otherwise (spec 026 AC-10).
-  let isStatusInClueBar = $derived(gridStatus !== null && isLowWindow)
-  let isStatusUnderClueBar = $derived(gridStatus !== null && !isLowWindow)
+  // Where the status shows (spec 026 AC-10, spec 043 AC-27): in the clue bar's
+  // row while the in-app keyboard shows on a low window, where a band would take
+  // the grid's height; under the bar, as a band, everywhere else. Until spec 044
+  // hides the keyboard on a solved page, a solved status takes the row too.
+  let isStatusInClueBar = $derived(
+    gridStatus !== null && layout === 'sheet' && isLowWindow && isTouchScreen,
+  )
+  let isStatusUnderClueBar = $derived(gridStatus !== null && !isStatusInClueBar)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
   // The settings form shows the settings of the room; it follows each change.
@@ -642,17 +586,21 @@
     send({ type: 'lock_room', locked: !isLocked })
   }
 
-  function submitSettings(event: SubmitEvent): void {
-    event.preventDefault()
+  // Send the settings of the form; false when a count is not valid.
+  function saveSettings(): boolean {
     if (!isValidCount(lettersInput) || !isValidCount(wordsInput)) {
-      return
+      return false
     }
     send({
       type: 'change_settings',
       help_mode: helpModeInput,
       reveal_budget: { letters: lettersInput, words: wordsInput },
     })
+    return true
   }
+
+  // The host's settings sheet, opened from the Menu.
+  let hostSettings: HostSettings | undefined = $state()
 
   // Check the nickname typed in the form, and join with it, in capitals, when it
   // is valid.
@@ -955,22 +903,6 @@
       wordsLeft === 0,
   )
 
-  // A spent budget replaces the count with the reason the button is disabled.
-  let revealLetterText = $derived(
-    lettersLeft === 0 ? t('reveal.letter_none') : t('reveal.letter', { count: lettersLeft }),
-  )
-  let revealLetterLabel = $derived(
-    lettersLeft === 0
-      ? t('reveal.letter_none_label')
-      : t('reveal.letter_label', { count: lettersLeft }),
-  )
-  let revealWordText = $derived(
-    wordsLeft === 0 ? t('reveal.word_none') : t('reveal.word', { count: wordsLeft }),
-  )
-  let revealWordLabel = $derived(
-    wordsLeft === 0 ? t('reveal.word_none_label') : t('reveal.word_label', { count: wordsLeft }),
-  )
-
   // Ask the server to reveal the selected cell. The letter comes back in a
   // cell_locked event: the page never guesses it.
   function onRevealLetter(): void {
@@ -1047,38 +979,6 @@
 
   // ---- Chat and reactions (spec 022) ----
 
-  // The chat panel and the reaction picker are drawn over the page, just below
-  // the header, so opening them moves nothing. `popoverTop` is that place, from
-  // the top of the page.
-  let roomMain: HTMLElement | null = $state(null)
-  let roomHeader: HTMLElement | null = $state(null)
-  let popoverTop = $state(0)
-  let isPopoverSideBySide = $state(true)
-
-  function updatePopoverPlace(): void {
-    if (roomMain === null || roomHeader === null) {
-      return
-    }
-    const mainBox = roomMain.getBoundingClientRect()
-    const headerBox = roomHeader.getBoundingClientRect()
-    popoverTop = headerBox.bottom - mainBox.top + POPOVER_GAP_PX
-    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
-    isPopoverSideBySide = roomMain.clientWidth >= SIDE_BY_SIDE_MIN_ROOT_FONTS * rootFontSize
-  }
-
-  // Measure again when the window or the header changes size (a resize, a
-  // rotation, a new root font, a toolbar that wraps).
-  $effect(() => {
-    if (roomMain === null || roomHeader === null) {
-      return
-    }
-    const observer = new ResizeObserver(updatePopoverPlace)
-    observer.observe(roomMain)
-    observer.observe(roomHeader)
-    updatePopoverPlace()
-    return () => observer.disconnect()
-  })
-
   let you = $derived(session.snapshot === null ? '' : session.snapshot.you)
   // True while the host muted my chat and my reactions.
   let isMuted = $derived(
@@ -1119,7 +1019,6 @@
   // Null while it has not answered 200 (accounts off, or a failed request): the
   // page then shows no account control.
   let accountStatus: AccountStatus | null = $state(null)
-  let accountOpenButton: HTMLButtonElement | null = $state(null)
   let accountDialog: AccountDialog | null = $state(null)
   // Whether this page load sent its one PUT /api/account/rooms.
   let isRoomLinked = false
@@ -1151,24 +1050,28 @@
     recapOpenButton?.focus()
   }
 
-  // ---- The chat panel ----
+  // ---- The stream and its unread messages (specs 013, 022, 043) ----
 
-  let isChatOpen = $state(false)
   let chatText = $state('')
-  let chatToggle: HTMLButtonElement | null = $state(null)
   // Lines up to this seq are read: the seq of the page's first snapshot, then
-  // the seq of the newest line while the panel is open. A reconnection keeps it,
+  // the seq of the newest line while the stream shows. A reconnection keeps it,
   // so the lines that came meanwhile count as unread. null before the first
   // snapshot.
   let lastSeenChatSeq: number | null = $state(null)
 
   let chatHistory = $derived(session.snapshot === null ? [] : session.snapshot.chat)
+  // The stream: the newest messages and the newest event lines, each kind with
+  // its own cap, in seq order.
+  let stream = $derived(streamEntries(shownChatLines(chatHistory), session.feed))
   let unreadLines = $derived(
-    isChatOpen || lastSeenChatSeq === null ? 0 : unreadCount(chatHistory, lastSeenChatSeq, you),
+    isStreamShown || lastSeenChatSeq === null
+      ? 0
+      : unreadCount(chatHistory, lastSeenChatSeq, you),
   )
-  // While the panel is open, every line of the history is read.
+  let salonLabel = $derived(salonToggleLabel(unreadLines))
+  // While the stream shows, every line of the history is read.
   $effect(() => {
-    if (!isChatOpen || chatHistory.length === 0) {
+    if (!isStreamShown || chatHistory.length === 0) {
       return
     }
     const newestSeq = chatHistory[chatHistory.length - 1].seq
@@ -1176,19 +1079,6 @@
       lastSeenChatSeq = newestSeq
     }
   })
-
-  function toggleChat(): void {
-    if (isChatOpen) {
-      closeChat()
-      return
-    }
-    isChatOpen = true
-  }
-
-  function closeChat(): void {
-    isChatOpen = false
-    chatToggle?.focus()
-  }
 
   // Send a message; the line shows when the server's chat_message comes back:
   // no local echo.
@@ -1208,14 +1098,19 @@
 
   let isPickerOpen = $state(false)
   let reactButton: HTMLButtonElement | null = $state(null)
-  let isReactDisabled = $derived(activeWord === null || isMuted)
 
+  // In the sheet layout one overlay shows at a time; in the column layout the
+  // picker closes the popovers and leaves the Salon column.
   function toggleReactionPicker(): void {
     if (isPickerOpen) {
       closeReactionPicker()
       return
     }
     isPickerOpen = true
+    openPopover = null
+    if (layout === 'sheet') {
+      isSheetSalonOpen = false
+    }
   }
 
   function closeReactionPicker(): void {
@@ -1287,6 +1182,9 @@
   let isVoteBannerShown = $derived(
     !session.solved && (openVote !== null || session.closedVote !== null),
   )
+  // « Réagir » is disabled while the vote banner shows, so the picker never
+  // covers the vote's buttons (spec 043, Decision 10).
+  let isReactDisabled = $derived(activeWord === null || isMuted || isVoteBannerShown)
   let isMyRequest = $derived(
     openVote !== null && session.snapshot !== null && openVote.player_id === session.snapshot.you,
   )
@@ -1378,6 +1276,197 @@
       select(selectionAfterClueTap(shownGrid(session.snapshot.grid, session.pendingEdits), word))
     }
   }
+
+  // ‹ and › of the clue bar do what Shift+Tab and Tab do in the grid (spec
+  // 009): the previous or the next unfinished word. With none, nothing changes.
+  function selectAfterTab(step: 1 | -1): void {
+    if (session.snapshot === null) {
+      return
+    }
+    const grid = shownGrid(session.snapshot.grid, session.pendingEdits)
+    select(selectionAfterTab(grid, words, selection, step))
+  }
+
+  // ---- The Aide menu's items (spec 043) ----
+
+  // An enabled item closes the menu, puts the focus back on « Aide », then
+  // sends its message.
+  function aideAction(action: () => void): () => void {
+    return () => {
+      openPopover = null
+      aideButton?.focus()
+      action()
+    }
+  }
+
+  // ---- The Menu's items (spec 043) ----
+
+  // « Inviter »: the Salon on its Joueurs tab, the focus on « Copier le lien ».
+  function invite(): void {
+    openPopover = null
+    salonTab = 'players'
+    setSalonOpen(true)
+    void salon?.focusCopyLink()
+  }
+
+  function openHostSettings(): void {
+    openPopover = null
+    hostSettings?.open()
+  }
+
+  function openAccount(): void {
+    openPopover = null
+    accountDialog?.open()
+  }
+
+  // « Masquer le chrono » or « Afficher le chrono »: sends nothing.
+  function toggleTimerFromMenu(): void {
+    openPopover = null
+    setTimerShown(!isTimerShown)
+    menuButton?.focus()
+  }
+
+  // A room sheet closed: the focus goes back to « Menu ».
+  function onRoomSheetClosed(): void {
+    menuButton?.focus()
+  }
+
+  // ---- The Salon's progress and the Joueurs rows (spec 043) ----
+
+  // The words whose every cell shows a letter on the page, pending edits
+  // included.
+  let filledWords = $derived(countFilledWords(session.snapshot, words, session.pendingEdits))
+
+  function countFilledWords(
+    snapshot: Snapshot | null,
+    allWords: Word[],
+    pendingEdits: PendingEdit[],
+  ): number {
+    if (snapshot === null) {
+      return 0
+    }
+    const shownLetters = new Map<string, string | null>()
+    for (const cell of shownGrid(snapshot.grid, pendingEdits).cells) {
+      if (cell.type === 'letter') {
+        shownLetters.set(`${cell.row},${cell.column}`, cell.letter)
+      }
+    }
+    let count = 0
+    for (const word of allWords) {
+      let isFull = true
+      for (const position of word.cells) {
+        const letter = shownLetters.get(`${position.row},${position.column}`)
+        if (letter === null || letter === undefined) {
+          isFull = false
+        }
+      }
+      if (isFull) {
+        count += 1
+      }
+    }
+    return count
+  }
+
+  // The clue of each player's selected word, by player id: mine follows my
+  // selection at once; the others' follow their selections (spec 007's word of
+  // a cell and a direction). A player with no selection has none.
+  let rosterClues = $derived(cluesOfPlayers(session.snapshot, words, activeWord))
+
+  function cluesOfPlayers(
+    snapshot: Snapshot | null,
+    allWords: Word[],
+    myWord: Word | null,
+  ): Map<string, string> {
+    const clues = new Map<string, string>()
+    if (snapshot === null) {
+      return clues
+    }
+    for (const player of snapshot.players) {
+      if (player.player_id === snapshot.you) {
+        if (myWord !== null) {
+          clues.set(player.player_id, myWord.text)
+        }
+        continue
+      }
+      const chosen = player.selection
+      if (chosen === null) {
+        continue
+      }
+      const word = wordAt(allWords, chosen.row, chosen.column, chosen.direction)
+      if (word !== null) {
+        clues.set(player.player_id, word.text)
+      }
+    }
+    return clues
+  }
+
+  // ---- The play area (spec 043, "Play area and fit") ----
+
+  // The clue bar's height (_design.md section 8).
+  const CLUE_BAR_HEIGHT_PX = 34
+
+  // The block of the grid, the clue bar and the status, as large as the play
+  // area leaves; and the height of the status band under the bar.
+  let playBlock: HTMLElement | null = $state(null)
+  let playBlockWidth = $state(0)
+  let playBlockHeight = $state(0)
+  let statusBandHeight = $state(0)
+
+  function measurePlayBlock(): void {
+    if (playBlock !== null) {
+      playBlockWidth = playBlock.clientWidth
+      playBlockHeight = playBlock.clientHeight
+    }
+  }
+
+  // Follow the size of the block: a resize, a rotation, a band, the Salon.
+  $effect(() => {
+    if (playBlock === null) {
+      return
+    }
+    measurePlayBlock()
+    const observer = new ResizeObserver(measurePlayBlock)
+    observer.observe(playBlock)
+    return () => observer.disconnect()
+  })
+
+  // After the page changed the play area itself (the Salon column opened or
+  // closed), the grid refits at once rather than at the next frame.
+  function refitNow(): void {
+    flushSync()
+    measurePlayBlock()
+    flushSync()
+    gridViewport?.measureViewport()
+    flushSync()
+  }
+
+  // In the column layout the grid viewport is the grid's box at zoom 1, as large
+  // as the room left after the clue bar and the status; null in the sheet
+  // layout, where the viewport fills its area.
+  let columnGridBox = $derived(
+    layout === 'column' && session.snapshot !== null
+      ? fittedGridBox(
+          playBlockWidth,
+          Math.max(
+            0,
+            playBlockHeight -
+              PLAY_AREA_PADDING_PX -
+              CLUE_BAR_HEIGHT_PX -
+              (isStatusUnderClueBar ? statusBandHeight : 0),
+          ),
+          session.snapshot.grid.width,
+          session.snapshot.grid.height,
+        )
+      : null,
+  )
+  // The clue bar is as wide as the grid, but never narrower than the smaller of
+  // CLUE_BAR_MIN_PX and the play area (Decision 12); the full width in the sheet
+  // layout.
+  let clueBarWidth = $derived(
+    columnGridBox === null
+      ? null
+      : Math.max(columnGridBox.width, Math.min(CLUE_BAR_MIN_PX, playBlockWidth)),
+  )
 
   function roomSocketUrl(roomCode: string): string {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -1620,12 +1709,47 @@
   })
 </script>
 
+<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
+
+<!-- The completion status (spec 026, spec 043): its text, after the ✓
+     pictogram once solved, and « Voir le bilan » in the band of a solved grid.
+     The page shows it in one of two places, never both: see isStatusInClueBar
+     and isStatusUnderClueBar. -->
+{#snippet gridStatusContent(isInRow: boolean)}
+  {#if gridStatus === 'solved'}
+    <span class="status-check" aria-hidden="true"></span>
+  {/if}
+  <span class="grid-status-text"
+    >{gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}</span
+  >
+  <!-- « Voir le bilan »: the primary button in the band, the secondary one in
+       the clue bar's row (spec 043 AC-27). -->
+  {#if gridStatus === 'solved'}
+    <button
+      type="button"
+      class="nock-button recap-open"
+      class:nock-button-primary={!isInRow}
+      class:nock-button-secondary={isInRow}
+      data-testid="recap-open"
+      bind:this={recapOpenButton}
+      onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
+    >
+  {/if}
+{/snippet}
+
+{#snippet statusInRow()}
+  <p class="grid-status in-row" data-testid="grid-status" data-state={gridStatus} role="status">
+    {@render gridStatusContent(true)}
+  </p>
+{/snippet}
+
 <main
-  bind:this={roomMain}
-  style:--popover-top={`${popoverTop}px`}
+  class="room-page"
+  class:with-snapshot={session.snapshot !== null}
   data-testid="room-page"
   data-room-code={code}
   data-status={session.status}
+  data-layout={session.snapshot === null ? undefined : layout}
   data-you={session.snapshot === null ? '' : session.snapshot.you}
   data-seq={session.seq === null ? '' : String(session.seq)}
   data-catch-up={session.catchUpLabel}
@@ -1633,256 +1757,107 @@
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
-  <header class="room-header" bind:this={roomHeader}>
-    <h1>{t('room.heading', { code })}</h1>
-    <p data-testid="room-status">{t(`room.status.${session.status}`)}</p>
-    {#if session.snapshot !== null}
-      <div class="share-panel" data-testid="share-panel">
-        <span id="share-label" class="share-label">{t('room.share.label')}</span>
-        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-        <a
-          data-testid="share-link"
-          href={shareLink}
-          tabindex="0"
-          aria-describedby="share-label"
-          >{shareLink}</a
-        >
-        <button type="button" data-testid="copy-link" onclick={copyLink}
-          >{copied ? t('room.share.copied') : t('room.share.copy')}</button
-        >
-      </div>
-      <div
-        class="room-toolbar"
-        data-testid="room-toolbar"
-        bind:this={roomToolbar}
-        onscroll={updateRoomToolbarMore}
-        onfocusin={followRoomToolbarFocus}
-        onfocusout={leaveRoomToolbarFocus}
-        class:keyboard-focus={roomToolbarHasKeyboardFocus}
-      >
-        <!-- The shared timer and its toggle come first, so that the time shows
-             before any sideways scroll on a small window (spec 027). -->
-        <RoomTimer
-          baseMs={session.timerBaseMs}
-          isRunning={session.timerRunning}
-          anchor={session.timerAnchor}
-        />
-        <!-- Next, so its unread count shows before any sideways scroll on a small
-             window (spec 022). The count has a slot of its own width, so the button
-             keeps its size when the count goes. -->
-        <button
-          type="button"
-          class="chat-toggle"
-          data-testid="chat-toggle"
-          aria-expanded={isChatOpen}
-          aria-controls="chat-panel"
-          aria-label={chatToggleLabel(unreadLines)}
-          bind:this={chatToggle}
-          onclick={toggleChat}
-          >{t('chat.toggle')}<span class="chat-unread-slot"
-            >{#if unreadLines > 0}<span
-                class="chat-unread"
-                data-testid="chat-unread"
-                aria-hidden="true">{unreadBadgeText(unreadLines)}</span
-              >{/if}</span
-          ></button
-        >
-        {#if session.solved}
-          <button
-            type="button"
-            class="recap-open"
-            data-testid="recap-open"
-            bind:this={recapOpenButton}
-            onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
-          >
-        {/if}
-        <div class="undo-panel">
-          <button type="button" data-testid="undo-button" disabled={session.solved} onclick={onUndo}
-            >{t('room.undo')}</button>
-          {#if isUndoMessageShown}
-            <span data-testid="undo-message" role="status">{t('undo.nothing')}</span>
-          {/if}
-        </div>
-        <div class="pencil-panel">
-          <button
-            type="button"
-            class="pencil-toggle"
-            data-testid="pencil-toggle"
-            aria-pressed={isPencilMode}
-            disabled={session.solved}
-            onclick={togglePencilMode}>{t('pencil.toggle')}</button
-          >
-          <button
-            type="button"
-            data-testid="confirm-pencil"
-            aria-label={t('pencil.confirm_label')}
-            disabled={isConfirmPencilDisabled}
-            onclick={onConfirmPencil}>{t('pencil.confirm')}</button
-          >
-        </div>
-        {#if isHelpShown}
-          <div
-            class="check-panel"
-            data-testid="check-panel"
-            role="group"
-            aria-label={t('check.label')}
-          >
-            <button
-              type="button"
-              data-testid="check-letter"
-              aria-label={t('check.letter_label')}
-              disabled={session.solved || selection === null}
-              onclick={onCheckLetter}>{t('check.letter')}</button
-            >
-            <button
-              type="button"
-              data-testid="check-word"
-              aria-label={t('check.word_label')}
-              disabled={session.solved || activeWord === null}
-              onclick={onCheckWord}>{t('check.word')}</button
-            >
-            <button
-              type="button"
-              data-testid="check-grid"
-              aria-label={t('check.grid_label')}
-              disabled={session.solved || isVoteOpen}
-              onclick={() => onCheck({ scope: 'grid' })}>{t('check.grid')}</button
-            >
-          </div>
-          <div
-            class="reveal-panel"
-            data-testid="reveal-panel"
-            role="group"
-            aria-label={t('reveal.label')}
-          >
-            <button
-              type="button"
-              data-testid="reveal-letter"
-              aria-label={revealLetterLabel}
-              disabled={isRevealLetterDisabled}
-              onclick={onRevealLetter}>{revealLetterText}</button
-            >
-            <button
-              type="button"
-              data-testid="reveal-word"
-              aria-label={revealWordLabel}
-              disabled={isRevealWordDisabled}
-              onclick={onRevealWord}>{revealWordText}</button
-            >
-          </div>
-        {/if}
-        <button
-          type="button"
-          class="flag-button"
-          data-testid="flag-button"
-          aria-label={t('flag.button_label')}
-          aria-pressed={isFlagPressed}
-          disabled={isFlagDisabled}
-          onclick={onFlag}>{t('flag.button')}</button
-        >
-        <button
-          type="button"
-          class="react-button"
-          data-testid="react-button"
-          aria-label={t('reaction.button_label')}
-          aria-expanded={isPickerOpen}
-          aria-controls="reaction-picker"
-          disabled={isReactDisabled}
-          bind:this={reactButton}
-          onclick={toggleReactionPicker}>{t('reaction.button')}</button
-        >
-        <button
-          type="button"
-          class="authors-switch"
-          data-testid="authors-switch"
-          aria-pressed={isAuthorsViewOn}
-          onclick={toggleAuthorsView}>{t('authors.switch')}</button
-        >
-        <!-- The display switches of the grid cells, until the Menu holds them
-             (spec 042, spec 043). -->
-        <button
-          type="button"
-          class="others-tint-switch"
-          data-testid="others-tint-switch"
-          aria-pressed={isOthersTintOn}
-          onclick={toggleOthersTint}>{t('others_tint.switch')}</button
-        >
-        <button
-          type="button"
-          class="access-switch"
-          data-testid="access-switch"
-          aria-pressed={isAccessibilityOn}
-          onclick={toggleAccessibility}>{t('access.switch')}</button
-        >
-        <!-- The last button of the toolbar, while accounts are on (spec 033). -->
-        {#if accountStatus !== null}
-          <button
-            type="button"
-            class="account-open"
-            data-testid="account-open"
-            bind:this={accountOpenButton}
-            onclick={() => accountDialog?.open()}>{t('account.open')}</button
-          >
-        {/if}
-        <span
-          class="room-toolbar-more"
-          class:shown={roomToolbarHasMore}
-          data-testid="room-toolbar-more"
-          aria-hidden="true"
-        ></span>
-      </div>
-    {/if}
-  </header>
-  <!-- The reaction picker and the chat panel come right after the toolbar in
-       document order, outside it (its sideways scrolling would clip them), and
-       are drawn over the page (spec 022). -->
-  {#if session.snapshot !== null && isPickerOpen}
-    <ReactionPicker
-      isPaced={isReactionPaced}
-      isButtonDisabled={isReactDisabled}
-      onPick={sendReaction}
-      onClose={closeReactionPicker}
-      onDismiss={dismissReactionPicker}
-      onFocusButton={() => reactButton?.focus()}
-      onFocusGrid={() => gridViewport?.focusGrid()}
+  <!-- The room's heading: read but not seen once the room shows (spec 043). -->
+  <h1 class:visually-hidden={session.snapshot !== null}>{t('room.heading', { code })}</h1>
+  {#if session.snapshot !== null}
+    <RoomTopBar
+      form={topBarForm}
+      {isTimerShown}
+      timerBaseMs={session.timerBaseMs}
+      isTimerRunning={session.timerRunning}
+      timerAnchor={session.timerAnchor}
+      isSolved={session.solved}
+      {isPencilMode}
+      isAideOpen={openPopover === 'aide'}
+      isMenuOpen={openPopover === 'menu'}
+      {isSalonOpen}
+      {unreadLines}
+      {salonLabel}
+      bind:aideButton
+      bind:menuButton
+      bind:chatToggle
+      onShowTimer={() => setTimerShown(true)}
+      {onUndo}
+      onTogglePencil={togglePencilMode}
+      onToggleAide={() => togglePopover('aide')}
+      onToggleSalon={toggleSalon}
+      onToggleMenu={() => togglePopover('menu')}
     />
-  {/if}
-  {#if session.snapshot !== null && isChatOpen}
-    <ChatPanel
-      history={chatHistory}
-      players={session.snapshot.players}
-      names={session.names}
-      {you}
-      {isHost}
-      {isMuted}
-      isPaced={isChatPaced}
-      isJoined={session.status === 'joined'}
-      isBelowPicker={!isPopoverSideBySide}
-      bind:text={chatText}
-      onSend={sendChat}
-      onMute={toggleMute}
-      onClose={closeChat}
-      onFocusToggle={() => chatToggle?.focus()}
-    />
-  {/if}
-  {#if isRecapOpen}
-    <RecapDialog {code} {you} {playerColours} onClose={closeRecap} />
-  {/if}
-  <!-- After the toolbar in document order: its sideways scrolling would clip it
-       (spec 033). -->
-  {#if session.snapshot !== null && accountStatus !== null}
-    <AccountDialog
-      bind:this={accountDialog}
-      status={accountStatus}
-      room={{ code, resume_token: session.snapshot.resume_token }}
-      onClosed={() => accountOpenButton?.focus()}
-    />
+    <RoomPopover
+      testId="aide-menu"
+      label={t('topbar.aide')}
+      isOpen={openPopover === 'aide'}
+      form={topBarForm}
+      side="left"
+      anchor={aideButton}
+      bind:element={aideMenu}
+      onEscape={closePopoverToButton}
+    >
+      <AideMenu
+        isConfirmShown={!isConfirmPencilDisabled}
+        {isHelpShown}
+        isCheckLetterDisabled={session.solved || selection === null}
+        isCheckWordDisabled={session.solved || activeWord === null}
+        isCheckGridDisabled={session.solved || isVoteOpen}
+        {isRevealLetterDisabled}
+        {isRevealWordDisabled}
+        {lettersLeft}
+        {wordsLeft}
+        onConfirmPencil={aideAction(onConfirmPencil)}
+        onCheckLetter={aideAction(onCheckLetter)}
+        onCheckWord={aideAction(onCheckWord)}
+        onCheckGrid={aideAction(() => onCheck({ scope: 'grid' }))}
+        onRevealLetter={aideAction(onRevealLetter)}
+        onRevealWord={aideAction(onRevealWord)}
+      />
+    </RoomPopover>
+    <RoomPopover
+      testId="room-menu"
+      label={t('topbar.menu')}
+      isOpen={openPopover === 'menu'}
+      form={topBarForm}
+      side="right"
+      anchor={menuButton}
+      bind:element={roomMenu}
+      onEscape={closePopoverToButton}
+    >
+      <RoomMenu
+        {isAuthorsViewOn}
+        {isOthersTintOn}
+        {isAccessibilityOn}
+        {isHost}
+        isAccountShown={accountStatus !== null}
+        {isTimerShown}
+        onToggleAuthors={toggleAuthorsView}
+        onToggleOthersTint={toggleOthersTint}
+        onToggleAccessibility={toggleAccessibility}
+        onInvite={invite}
+        onOpenHostSettings={openHostSettings}
+        onOpenAccount={openAccount}
+        onToggleTimer={toggleTimerFromMenu}
+      />
+    </RoomPopover>
   {/if}
   {#if session.status === 'reconnecting'}
-    <p class="connection-banner" data-testid="connection-banner" role="status">
-      {t('room.banner.offline')}
+    <p class="room-band connection-banner" data-testid="connection-banner" role="status">
+      <span class="connection-dot" data-testid="connection-dot" aria-hidden="true"></span><span
+        >{t('room.banner.offline')}</span
+      >
     </p>
   {/if}
+  <!-- Once the room shows, a joined or reconnecting status is read but not
+       seen; any other status is a band under the top bar (spec 043). -->
+  <p
+    class="room-status"
+    class:visually-hidden={session.snapshot !== null &&
+      (session.status === 'joined' || session.status === 'reconnecting')}
+    class:room-band={session.snapshot !== null &&
+      session.status !== 'joined' &&
+      session.status !== 'reconnecting'}
+    data-testid="room-status"
+  >
+    {t(`room.status.${session.status}`)}
+  </p>
   {#if isFormShown}
     <form data-testid="nickname-form" class="nickname-form" onsubmit={submitNickname}>
       <h2>{t('join.heading')}</h2>
@@ -1906,252 +1881,234 @@
     </form>
   {/if}
   {#if session.snapshot !== null}
-    <div class="presence">
-    <section class="roster" data-testid="roster">
-      <h2 id="roster-heading">{t('roster.heading')}</h2>
-      <!-- The explicit role: WebKit does not expose a list without bullets as a
-           list. The tabindex is set from the script (spec 035 AC-12). -->
-      <ul
-        bind:this={rosterList}
-        role="list"
-        aria-labelledby="roster-heading"
-        onfocusin={scrollKeyboardFocusIntoView}
-      >
-        {#each session.snapshot.players as player (player.player_id)}
-          {@const isYou = player.player_id === session.snapshot.you}
-          <li
-            data-testid="roster-player"
-            data-player-id={player.player_id}
-            data-colour={String(player.colour)}
-            data-state={player.state}
-            data-you={String(isYou)}
-            data-host={String(player.is_host)}
+    <div class="room-body {layout}">
+      <div class="play-area">
+        <div class="play-block" bind:this={playBlock}>
+          <!-- The vote banner is laid over the top of the grid viewport, so
+               showing it changes no layout; it comes before the grid in document
+               order (spec 025, spec 035). -->
+          <div
+            class="grid-area"
+            data-testid="grid-area"
+            style:width={columnGridBox === null ? null : `${columnGridBox.width}px`}
+            style:height={columnGridBox === null ? null : `${columnGridBox.height}px`}
           >
-            <span
-              class="roster-colour"
-              data-testid="roster-colour"
-              data-colour={String(player.colour)}
-              style:background={isAccessibilityOn ? null : `var(--player-colour-${player.colour})`}
-              >{#if isAccessibilityOn}<PlayerIcon colour={player.colour} side="12px" />{/if}</span
-            >
-            <span class="roster-nickname" data-testid="roster-nickname"
-              >{displayNickname(player.nickname)}</span
-            >
-            <span class="roster-state" data-testid="roster-state"
-              >{t(`presence.${player.state}`)}</span
-            >
-            {#if player.is_host}
-              <span class="roster-host">{t('roster.host')}</span>
-            {/if}
-            {#if isYou}
-              <span class="roster-you">{t('roster.you')}</span>
-            {:else if isHost}
-              <button
-                type="button"
-                class="remove-player"
-                class:compact={isRemoveCompact}
-                data-testid="remove-player"
-                aria-label={t('host.remove_label', { name: displayNickname(player.nickname) })}
-                onclick={() => removePlayer(player.player_id)}
-                >{isRemoveCompact ? t('host.remove_short') : t('host.remove')}</button
+            <div
+              class="visually-hidden"
+              data-testid="vote-announcement"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >{voteAnnouncement}</div>
+            {#if isVoteBannerShown}
+              <div
+                class="vote-banner"
+                data-testid="vote-banner"
+                role="group"
+                aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
+                bind:this={voteBanner}
               >
+                {#if openVote !== null}
+                  <p id="vote-question" class="vote-text" data-testid="vote-question">
+                    {voteQuestionText}
+                  </p>
+                  <div class="vote-actions">
+                    {#if isMyRequest || hasVoted}
+                      <!-- Not a Tab stop, but it takes the focus after a ballot. -->
+                      <span
+                        data-testid="vote-status"
+                        tabindex="-1"
+                        bind:this={voteStatus}
+                        >{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
+                      >
+                    {:else}
+                      <button
+                        type="button"
+                        data-testid="vote-yes"
+                        disabled={isVotingOffline}
+                        onclick={() => castVote(true)}>{t('vote.yes')}</button
+                      >
+                      <button
+                        type="button"
+                        data-testid="vote-no"
+                        disabled={isVotingOffline}
+                        onclick={() => castVote(false)}>{t('vote.no')}</button
+                      >
+                    {/if}
+                  </div>
+                {:else}
+                  <p id="vote-result" class="vote-text" data-testid="vote-result">
+                    {voteResultText}
+                  </p>
+                {/if}
+              </div>
             {/if}
-          </li>
-        {/each}
-      </ul>
-    </section>
-    <section class="feed" data-testid="activity-feed">
-      <h2 id="feed-heading">{t('feed.heading')}</h2>
-      <ul bind:this={feedList} role="list" aria-labelledby="feed-heading">
-        {#each session.feed as item (item.id)}
-          <li data-testid="feed-item" data-kind={item.kind} data-seq={String(item.seq)}>
-            {item.text}
-          </li>
-        {/each}
-      </ul>
-    </section>
-    {#if isHost}
-      <div
-        class="host-panel"
-        data-testid="host-panel"
-        bind:this={hostPanel}
-        onscroll={updateHostPanelMore}
-        onfocusin={followHostPanelFocus}
-        onfocusout={leaveHostPanelFocus}
-        class:keyboard-focus={hostPanelHasKeyboardFocus}
-      >
-        <strong class="host-heading">{t('settings.heading')}</strong>
-        <button type="button" data-testid="lock-room" aria-pressed={isLocked} onclick={toggleLock}
-          >{isLocked ? t('host.unlock') : t('host.lock')}</button
-        >
-        <form class="settings-form" data-testid="settings-form" onsubmit={submitSettings}>
-          <label>
-            {t('settings.help_mode_label')}
-            <select data-testid="help-mode-select" bind:value={helpModeInput}>
-              <option value="free">{t('settings.help_mode.free')}</option>
-              <option value="vote">{t('settings.help_mode.vote')}</option>
-              <option value="none">{t('settings.help_mode.none')}</option>
-            </select>
-          </label>
-          <label>
-            {t('settings.reveal_letters_label')}
-            <input
-              type="number"
-              data-testid="reveal-letters-input"
-              min="0"
-              max="99"
-              step="1"
-              bind:value={lettersInput}
+            {#if isUndoMessageShown}
+              <p class="undo-message" data-testid="undo-message" role="status">
+                {t('undo.nothing')}
+              </p>
+            {/if}
+            <GridViewport
+              bind:this={gridViewport}
+              grid={session.snapshot.grid}
+              {selection}
+              {activeWord}
+              {onCellTap}
+              {onClueTap}
+              onSelect={select}
+              {onLetter}
+              {onErase}
+              {onUndo}
+              {words}
+              pendingEdits={session.pendingEdits}
+              flashes={session.flashes}
+              caughtUpCells={session.caughtUpCells}
+              {remoteSelections}
+              {isAuthorsViewOn}
+              {isOthersTintOn}
+              {isAccessibilityOn}
+              {playerColours}
+              {clueFlags}
+              {clueReactions}
             />
-          </label>
-          <label>
-            {t('settings.reveal_words_label')}
-            <input
-              type="number"
-              data-testid="reveal-words-input"
-              min="0"
-              max="99"
-              step="1"
-              bind:value={wordsInput}
+          </div>
+          <ClueBar
+            {activeWord}
+            authorLine={selectedAuthorLine}
+            width={clueBarWidth}
+            isPickerOpen={isPickerOpen}
+            {isReactDisabled}
+            {isFlagPressed}
+            {isFlagDisabled}
+            bind:reactButton
+            onPrevious={() => selectAfterTab(-1)}
+            onNext={() => selectAfterTab(1)}
+            onToggleReactions={toggleReactionPicker}
+            {onFlag}
+            status={isStatusInClueBar ? statusInRow : undefined}
+          />
+          {#if isPickerOpen}
+            <ReactionPicker
+              viewport={gridViewport?.viewportElement() ?? null}
+              isPaced={isReactionPaced}
+              isButtonDisabled={isReactDisabled}
+              onPick={sendReaction}
+              onClose={closeReactionPicker}
+              onDismiss={dismissReactionPicker}
+              onFocusButton={() => reactButton?.focus()}
+              onFocusGrid={() => gridViewport?.focusGrid()}
             />
-          </label>
-          <button type="submit" data-testid="settings-save">{t('settings.save')}</button>
-        </form>
-        <span
-          class="host-panel-more"
-          class:shown={hostPanelHasMore}
-          data-testid="host-panel-more"
-          aria-hidden="true"
-        ></span>
-      </div>
-    {/if}
-    </div>
-    <!-- The vote banner is laid over the top of the grid viewport, so showing it
-         changes no layout; it comes before the grid in document order, since
-         nothing focusable follows the grid (spec 025, spec 035). -->
-    <div class="grid-area">
-      <div
-        class="visually-hidden"
-        data-testid="vote-announcement"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >{voteAnnouncement}</div>
-      {#if isVoteBannerShown}
-        <div
-          class="vote-banner"
-          data-testid="vote-banner"
-          role="group"
-          aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
-          bind:this={voteBanner}
-        >
-          {#if openVote !== null}
-            <p id="vote-question" class="vote-text" data-testid="vote-question">
-              {voteQuestionText}
+          {/if}
+          {#if isStatusUnderClueBar}
+            <p
+              class="grid-status band"
+              data-testid="grid-status"
+              data-state={gridStatus}
+              role="status"
+              style:width={clueBarWidth === null ? null : `${clueBarWidth}px`}
+              bind:offsetHeight={statusBandHeight}
+            >
+              {@render gridStatusContent(false)}
             </p>
-            <div class="vote-actions">
-              {#if isMyRequest || hasVoted}
-                <!-- Not a Tab stop, but it takes the focus after a ballot. -->
-                <span
-                  data-testid="vote-status"
-                  tabindex="-1"
-                  bind:this={voteStatus}>{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
-                >
-              {:else}
-                <button
-                  type="button"
-                  data-testid="vote-yes"
-                  disabled={isVotingOffline}
-                  onclick={() => castVote(true)}>{t('vote.yes')}</button
-                >
-                <button
-                  type="button"
-                  data-testid="vote-no"
-                  disabled={isVotingOffline}
-                  onclick={() => castVote(false)}>{t('vote.no')}</button
-                >
-              {/if}
-            </div>
-          {:else}
-            <p id="vote-result" class="vote-text" data-testid="vote-result">{voteResultText}</p>
           {/if}
         </div>
-      {/if}
-      <GridViewport
-        bind:this={gridViewport}
-        grid={session.snapshot.grid}
-        {selection}
-        {activeWord}
-        {onCellTap}
-        {onClueTap}
-        onSelect={select}
-        {onLetter}
-        {onErase}
-        {onUndo}
-        {words}
-        pendingEdits={session.pendingEdits}
-        flashes={session.flashes}
-        caughtUpCells={session.caughtUpCells}
-        {remoteSelections}
-        {isAuthorsViewOn}
-        {isOthersTintOn}
+        {#if isTouchScreen}
+          <InAppKeyboard {onLetter} {onErase} onKeyUsed={() => gridViewport?.focusGrid()} />
+        {/if}
+      </div>
+      <Salon
+        bind:this={salon}
+        {layout}
+        isOpen={isSalonOpen}
+        bind:tab={salonTab}
+        {filledWords}
+        totalWords={words.length}
+        entries={stream}
+        names={session.names}
+        players={session.snapshot.players}
+        {you}
+        {isHost}
+        {isMuted}
+        isPaced={isChatPaced}
+        isJoined={session.status === 'joined'}
         {isAccessibilityOn}
-        {playerColours}
-        {clueFlags}
-        {clueReactions}
+        clues={rosterClues}
+        {shareLink}
+        bind:chatText
+        onSend={sendChat}
+        onMute={toggleMute}
+        onRemove={removePlayer}
+        onEscape={onSalonEscape}
+        onMuted={() => chatToggle?.focus()}
       />
     </div>
-    <!-- The completion status line. The page shows it in one of two places,
-         never both: see isStatusInClueBar and isStatusUnderClueBar. -->
-    {#snippet gridStatusLine()}
-      <p class="grid-status" data-testid="grid-status" data-state={gridStatus} role="status">
-        {gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
-      </p>
-    {/snippet}
-    <div
-      class="clue-bar"
-      class:with-status={isStatusInClueBar}
-      class:with-author={selectedAuthorLine !== null}
-      data-testid="clue-bar"
-      data-word={activeWord === null ? '' : wordKey(activeWord)}
-      role="region"
-      aria-label={t('clue_bar.label')}
-    >
-      <span class="clue-bar-text" data-testid="clue-bar-text"
-        >{activeWord === null ? t('clue_bar.empty') : activeWord.text}</span
-      >
-      {#if selectedAuthorLine !== null}
-        <span class="clue-bar-author" data-testid="clue-bar-author">{selectedAuthorLine}</span>
-      {/if}
-      {#if isStatusInClueBar}
-        {@render gridStatusLine()}
-      {/if}
-    </div>
-    {#if isStatusUnderClueBar}
-      {@render gridStatusLine()}
+    {#if isScrimShown}
+      <!-- A pointer press on the scrim keeps the focus where it is. -->
+      <div
+        class="room-scrim"
+        data-testid="room-scrim"
+        aria-hidden="true"
+        onmousedown={(event) => event.preventDefault()}
+        onclick={closeOverlays}
+      ></div>
     {/if}
-    {#if isTouchScreen}
-      <InAppKeyboard
-        {onLetter}
-        {onErase}
-        onKeyUsed={() => gridViewport?.focusGrid()}
+    {#if isHost}
+      <HostSettings
+        bind:this={hostSettings}
+        {layout}
+        isLocked={isLocked}
+        bind:helpMode={helpModeInput}
+        bind:letters={lettersInput}
+        bind:words={wordsInput}
+        onToggleLock={toggleLock}
+        onSave={saveSettings}
+        onClosed={onRoomSheetClosed}
       />
     {/if}
+    {#if accountStatus !== null}
+      <AccountDialog
+        bind:this={accountDialog}
+        {layout}
+        status={accountStatus}
+        room={{ code, resume_token: session.snapshot.resume_token }}
+        onClosed={onRoomSheetClosed}
+      />
+    {/if}
+  {/if}
+  {#if isRecapOpen}
+    <RecapDialog {code} {you} {playerColours} onClose={closeRecap} />
   {/if}
 </main>
 
 <style>
-  /* The page fills the window; the grid viewport takes the height left. */
-  /* Positioned: the chat panel and the reaction picker are placed against it. */
-  main {
+  /* Before the first snapshot the page keeps its plain look: the heading, the
+     status and the nickname form. */
+  .room-page {
     position: relative;
     box-sizing: border-box;
-    /* Little padding: the clue bar and the grid need the height. */
     padding: 0.5rem 1rem;
     height: 100vh;
     height: 100dvh;
     display: flex;
     flex-direction: column;
+  }
+
+  /* Once the room shows, it fills the window: the top bar, the bands, then the
+     play area and the Salon (spec 043). Nothing scrolls. */
+  .room-page.with-snapshot {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .room-page h1 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .room-status {
+    margin: 0;
   }
 
   .nickname-form {
@@ -2168,318 +2125,64 @@
     text-transform: uppercase;
   }
 
-  .connection-banner {
-    margin: 0.25rem 0;
-    padding: 0.4rem 0.75rem;
-    color: var(--nock-ink);
-    background: var(--nock-clue-bg);
-    border: 1px solid var(--nock-line);
-  }
-
   .nickname-error {
     margin: 0;
     color: var(--nock-red);
   }
 
-  /* Title, status, invitation link and the room toolbar on one row; it wraps
-     when it must. */
-  .room-header {
-    flex: none;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.75rem;
-  }
+  /* ---- The bands under the top bar (spec 043) ---- */
 
-  /* The title, status, share and toolbar rows set their line height rather
-     than take the font's normal one, which is 1px taller per row in Source
-     Sans 3 than in the system font: each row keeps the height it had, and the
-     grid its room (spec 041). */
-  .room-header h1,
-  .room-header p,
-  .share-panel,
-  .room-toolbar {
-    line-height: 1.33;
-  }
-
-  .room-header h1 {
-    margin: 0;
-    font-size: 1.25rem;
-  }
-
-  .room-header p {
-    margin: 0;
-  }
-
-  .share-panel {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-  }
-
-  .share-panel a {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Only the link gives way when the panel is short of room: the button keeps
-     its label on one line. */
-  .share-panel button {
-    flex: none;
-  }
-
-  /* The room toolbar holds the shared timer and its toggle, the chat toggle, the
-     recap button of a solved room, the undo, pencil, check and reveal controls,
-     the flag button, the authors switch, the two display switches of the grid
-     cells and the account button (specs 027, 022, 028, 024, 020, 021, 019, 042
-     and 033). On a roomy window it is one
-     item of the header row, and it wraps when it must. */
-  .room-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.75rem;
-  }
-
-  .undo-panel,
-  .pencil-panel,
-  .check-panel,
-  .reveal-panel {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  /* A toolbar that scrolls cuts an outline drawn outside a control: draw it
-     inside instead (3px wide, so spec 035 AC-2 still holds). The same on a roomy
-     window, so the outline always stays inside the toolbar. The second selector
-     reaches the toggle of the timer, which is drawn by a component of its own
-     (RoomTimer), and nothing else that a child component puts in the toolbar. */
-  .room-toolbar :focus-visible,
-  .room-toolbar :global(.timer-toggle:focus-visible) {
-    outline-offset: -3px;
-  }
-
-  /* A reveal button disabled by a spent budget says why with its own text
-     ("Plus de lettre"), so the text keeps 4.5:1 against the button instead of
-     the browser's pale grey (spec 024). The dashed border shows it is disabled. */
-  .reveal-panel button:disabled {
-    color: var(--nock-muted);
-    background-color: var(--nock-clue-bg);
-    border-style: dashed;
-    cursor: not-allowed;
-  }
-
-  /* The authors switch when it is on: its text is underlined, like the band it
-     draws under the letters. A text decoration shows on the engines' own button
-     look and keeps the button's size. The pencil toggle shows that it is on the
-     same way. */
-  .authors-switch[aria-pressed='true'],
-  .others-tint-switch[aria-pressed='true'],
-  .access-switch[aria-pressed='true'],
-  .pencil-toggle[aria-pressed='true'] {
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 2px;
-  }
-
-  /* A target of 24 by 24 CSS px at least, whatever the engine's button style
-     (spec 021, spec 014 AC-7). It never shrinks in the toolbar's row. */
-  .flag-button {
+  /* The connection band, and the status band of a final status: full width, in
+     the flow, so they push the play area down. */
+  .room-band {
     flex: none;
     box-sizing: border-box;
-    min-width: 24px;
-    min-height: 24px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+    padding: 8px 12px;
+    font: 500 0.85rem/1.3 var(--nock-font-ui);
+    color: var(--nock-ink);
+    background: var(--nock-clue-bg);
+    border-bottom: 1px solid var(--nock-line);
   }
 
-  /* The chat toggle, the reaction button (spec 022), the recap button (spec
-     028) and the account button (spec 033): the same target size as the flag
-     button. */
-  .chat-toggle,
-  .recap-open,
-  .react-button,
-  .account-open {
+  .connection-dot {
     flex: none;
-    box-sizing: border-box;
-    min-width: 24px;
-    min-height: 24px;
-  }
-
-  /* Room for the unread count, kept whether the count shows or not, so that
-     the button and the toolbar keep their size when the panel opens. */
-  .chat-unread-slot {
-    display: inline-block;
-    width: 2.4em;
-    text-align: center;
-  }
-
-  .chat-unread {
-    display: inline-block;
-    padding: 0.15em 0.3em;
-    border-radius: 1em;
-    font-size: 0.8em;
-    line-height: 1;
-    color: var(--nock-white);
+    width: 8px;
+    height: 8px;
+    margin-top: 5px;
+    border-radius: 50%;
     background: var(--nock-red);
   }
 
-  .host-panel-more,
-  .room-toolbar-more {
-    display: none;
+  /* ---- The body: the play area, and the Salon column ---- */
+
+  .room-body {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
   }
 
-  /* The roster and the feed: stacked on a roomy window. */
-  .presence {
-    /* The smallest remove button (spec 014 AC-7), and the room left after a
-       remove button so that a tap reaches all of it (spec 014 AC-8): after the
-       last item of the scrolling roster list, and under the last row. */
-    --remove-size: 24px;
-    --list-end-room: 3px;
-    flex: none;
+  .play-area {
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
   }
 
-  .roster {
-    flex: none;
-    /* A little room under the last row. A browser tests a tap against about one
-       pixel around the point, so an element that starts at the bottom edge of a
-       remove button would take a tap on the last pixel row of the button
-       (spec 014 AC-8). */
-    padding-bottom: var(--list-end-room);
+  /* The column layout's play area has a padding of 12 px; its top padding is
+     the grid area's, so the grid area starts right under the top bar and the
+     bands. */
+  .column .play-area {
+    padding: 0 12px 12px;
   }
 
-  .roster h2 {
-    margin: 0.25rem 0;
-    font-size: 1rem;
-  }
-
-  .roster ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 1rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .roster li {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-  }
-
-  .roster-colour {
-    display: inline-block;
-    width: 0.8rem;
-    height: 0.8rem;
-    border-radius: 50%;
-  }
-
-  .roster-state {
-    font-size: 0.8rem;
-    color: var(--nock-muted);
-  }
-
-  /* No opacity: dimmed text would not reach 4.5:1 (spec 035). The state is
-     also written in the row, and the nickname shows it by its style. */
-  .roster li[data-state='idle'] .roster-nickname {
-    font-style: italic;
-  }
-
-  .roster li[data-state='disconnected'] .roster-nickname {
-    font-style: italic;
-    text-decoration: line-through;
-  }
-
-  .roster-host {
-    font-size: 0.8rem;
-    font-weight: bold;
-  }
-
-  .remove-player {
-    min-width: var(--remove-size);
-    min-height: var(--remove-size);
-    padding: 0 0.3rem;
-    font-size: 0.75rem;
-  }
-
-  /* The short button is exactly as wide as the smallest size, whatever the root
-     font and the font that draws its sign: the roster list keeps room for this
-     width (spec 014 AC-10). */
-  .remove-player.compact {
-    box-sizing: border-box;
-    width: var(--remove-size);
-    padding-inline: 0;
-  }
-
-  /* One compact row of controls for the host; it wraps on a roomy window and
-     scrolls sideways on a small one. */
-  .host-panel {
-    flex: none;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.5rem;
-    font-size: 0.8rem;
-  }
-
-  .settings-form {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.5rem;
-  }
-
-  .settings-form input[type='number'] {
-    width: 3.5rem;
-  }
-
-  /* A short list that scrolls: the grid keeps the height (spec 006). */
-  .feed {
-    flex: none;
-    box-sizing: border-box;
-    overflow-wrap: anywhere;
-    font-size: 0.85rem;
-  }
-
-  .feed h2 {
-    margin: 0;
-    font-size: 0.85rem;
-  }
-
-  /* The list has a fixed height, about three lines, whatever the number of its
-     items: a new line never moves the grid (spec 013 "Client: feed height",
-     spec 021 AC-9). The lines beyond it scroll (spec 013 AC-7). */
-  .feed ul {
-    height: 3.6rem;
-    overflow-y: auto;
-    /* The page keeps the reader's place itself when lines come and go (spec
-       013 AC-7), the same way in every engine: no scroll anchoring from the
-       browser on top of it. */
-    overflow-anchor: none;
-    /* Room for the focus outline drawn outside the list (spec 035 AC-2): it
-       stays clear of the heading above and of the next panel. */
-    margin: 0.25rem 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* The grid state line, kept out of the scrolling area: under the clue bar,
-     or in its row on a low window (below). */
-  .grid-status {
-    flex: none;
-    margin: 0;
-    padding: 0.25rem 0.75rem;
-    font-weight: bold;
-  }
-
-  /* The area of the grid: it takes the height left, as the grid viewport did,
-     and holds the vote banner over the viewport's top edge. */
-  .grid-area {
+  /* The grid, the clue bar and the status: in the column layout a block
+     centred in the play area. */
+  .play-block {
     position: relative;
     flex: 1 1 0;
     min-height: 0;
@@ -2487,14 +2190,70 @@
     flex-direction: column;
   }
 
+  .column .play-block {
+    align-items: center;
+  }
+
+  /* Two spacers centre the block; with no room left (for a frame, while the
+     grid refits) they shrink to nothing and the block starts at the top. */
+  .column .play-block::before,
+  .column .play-block::after {
+    content: '';
+    flex: 1 1 0;
+  }
+
+  /* The area of the grid: it holds the vote banner over the viewport's top
+     edge. In the sheet layout it takes the height left and the viewport is its
+     box less 8 px on each side; in the column layout it is the grid's box at
+     zoom 1 and its 12 px of top padding. */
+  .grid-area {
+    position: relative;
+    box-sizing: content-box;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sheet .grid-area {
+    flex: 1 1 0;
+    padding: 8px;
+  }
+
+  .column .grid-area {
+    flex: none;
+    padding-top: 12px;
+  }
+
+  /* The in-app keyboard spans the column layout's play area at its bottom. */
+  .column .play-area > :global(.keyboard) {
+    margin: 10px -12px -12px;
+  }
+
+  /* Until the 3-second notes (spec 043 WP-2), the undo message keeps its plain
+     look, over the top of the grid area: it moves nothing. */
+  .undo-message {
+    position: absolute;
+    z-index: 6;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    padding: 2px 8px;
+    white-space: nowrap;
+    color: var(--nock-ink);
+    background: var(--nock-white);
+  }
+
   /* Over the grid (spec 025 decision 9): absolutely placed, so it takes no
-     height from the grid, and above the cells, some of which are positioned. */
+     height from the grid. The vote wins over the Salon sheet and the scrim
+     (spec 022 decision 16), which come later in the page on layer 8: it is
+     drawn one layer above them. */
   .vote-banner {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1;
+    z-index: 9;
     box-sizing: border-box;
     display: flex;
     flex-wrap: wrap;
@@ -2505,6 +2264,18 @@
     background: var(--nock-white);
     border-bottom: 1px solid var(--nock-navy);
     font-size: 0.9rem;
+  }
+
+  /* It lies over the top of the grid viewport, inside the grid area's
+     padding. */
+  .sheet .vote-banner {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+  }
+
+  .column .vote-banner {
+    top: 12px;
   }
 
   .vote-text {
@@ -2540,381 +2311,66 @@
     border-radius: 4px;
   }
 
-  /* Below the scrolling grid, so it is always inside the window. */
-  .clue-bar {
+  /* ---- The completion status (spec 026; _design.md section 9) ---- */
+
+  .grid-status {
+    margin: 0;
+    font: 600 0.95rem/1.2 var(--nock-font-ui);
+  }
+
+  /* The end band under the clue bar, as wide as the bar. */
+  .grid-status.band {
     flex: none;
     box-sizing: border-box;
-    padding: 0.5rem 0.75rem;
-    background: var(--nock-clue-bg);
-    border-top: 1px solid var(--nock-rule);
-  }
-
-  .clue-bar-text {
-    display: block;
-    font-size: 1rem;
-    line-height: 1.3;
-  }
-
-  /* On a low window the completion status shares the clue bar's row and adds no
-     height (spec 026 AC-10). It keeps its whole text on one line; the clue text
-     gives up the width and ends with an ellipsis, but keeps its whole text in
-     the page, so a screen reader reads the whole clue. */
-  .clue-bar.with-status {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 10px;
+    max-width: 100%;
+    padding: 8px 12px;
   }
 
-  .clue-bar.with-status .clue-bar-text {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .grid-status.band[data-state='solved'] {
+    color: var(--nock-green);
+    background: var(--nock-green-bg);
   }
 
-  /* The same font size and line height as the clue text, so the row is no
-     higher than the clue text alone. */
-  .clue-bar .grid-status {
+  .grid-status.band[data-state='full_wrong'] {
+    color: var(--nock-navy);
+    background: var(--nock-clue-bg);
+  }
+
+  /* In the clue bar's row: white text on one line, after the clue. */
+  .grid-status.in-row {
     flex: none;
-    padding: 0;
-    font-size: 1rem;
-    line-height: 1.3;
-    white-space: nowrap;
-  }
-
-  /* The author of the selected letter (spec 019) follows the clue text: on its
-     line when there is room, otherwise on a line of its own, where it ends with
-     an ellipsis if that line is too short. */
-  .clue-bar.with-author {
     display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 0.75rem;
-  }
-
-  .clue-bar-author {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px;
     white-space: nowrap;
-    font-size: 0.875rem;
-    line-height: 1.3;
-    color: var(--nock-muted);
+    color: var(--nock-white);
   }
 
-  /* A narrow or low window (a phone) keeps its height for the grid: the roster
-     and the feed are one line each, the roster scrolls sideways and the feed
-     shows its newest item and scrolls up to the older ones. */
-  @media (max-height: 500px), (max-width: 480px) {
-    .room-header h1 {
-      font-size: 1rem;
-    }
-
-    .share-label {
-      display: none;
-    }
-
-    /* The header buttons get the same size in every engine. WebKit on a touch
-       screen gives a button a 16px font and a taller padding than Chromium and
-       Firefox, and then the header needs a third row, on a low window and on a
-       narrow tall one alike (spec 013 AC-6). The second selector reaches the
-       toggle of the timer, which is drawn by a component of its own (RoomTimer),
-       and nothing else that a child component puts in the header. */
-    .room-header button,
-    .room-header :global(.timer-toggle) {
-      padding-block: 1px;
-      font-size: 0.8rem;
-    }
-
-    /* The header takes two rows whatever the width of the system font (a wider
-       font made it take three, and the grid lost its room): the title, the
-       status and the invitation link on the first, the room toolbar on the
-       second. The link has a basis that is smaller than its text, so the panel
-       stays on the first row and the link shrinks, with its ellipsis, to the
-       room left there. The toolbar has a basis of the whole width, so it always
-       goes to the second row (spec 013 AC-6, spec 014 AC-7). */
-    .share-panel {
-      flex: 1 1 17rem;
-    }
-
-    /* The toolbar is one row that never wraps, so new controls cost no height,
-       and it scrolls sideways when its content is wider (spec 024). Its
-       scrollbar is hidden: it would take height, and the edge fade already
-       shows that more content is hidden. */
-    .room-toolbar {
-      flex: 1 1 100%;
-      min-width: 0;
-      flex-wrap: nowrap;
-      white-space: nowrap;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    .room-toolbar::-webkit-scrollbar {
-      display: none;
-    }
-
-    .undo-panel,
-    .pencil-panel,
-    .check-panel,
-    .reveal-panel {
-      flex: none;
-    }
-
-    .presence {
-      gap: 0.1rem;
-    }
-
-    .roster,
-    .feed {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      min-width: 0;
-    }
-
-    .roster h2,
-    .feed h2 {
-      flex: none;
-      margin: 0;
-      font-size: 0.8rem;
-    }
-
-    /* No scroll padding: the focus outline is drawn inside the buttons (see
-       below), and the list can be only 3px wider than a button (spec 014
-       AC-10). A padding of 8px would push a button scrolled into view out of
-       the list. */
-    .roster ul {
-      flex: 1 1 auto;
-      flex-wrap: nowrap;
-      min-width: 0;
-      gap: 0.75rem;
-      overflow-x: auto;
-    }
-
-    .roster li {
-      flex: none;
-      white-space: nowrap;
-    }
-
-    /* The list scrolls sideways and its width is rarely a whole number of
-       pixels, so at the end of the scroll the last button can stay a fraction of
-       a pixel out of the list, where a tap does not reach it. A few pixels of
-       room after the last item keep the button whole (spec 014 AC-8). */
-    .roster li:last-child {
-      padding-right: var(--list-end-room);
-    }
-
-    /* The line takes the room that the heading leaves, so a squeezed feed cuts
-       the heading only when the line has no room left (spec 014 AC-10). The
-       list is one line high, whatever the number of its items (spec 013 AC-6). */
-    .feed ul {
-      flex: 1 1 0;
-      min-width: 0;
-      margin: 0;
-      height: 1.3rem;
-      line-height: 1.3rem;
-    }
-
-    .host-panel,
-    .settings-form {
-      flex-wrap: nowrap;
-      white-space: nowrap;
-    }
-
-    .host-panel {
-      overflow-x: auto;
-      scrollbar-width: thin;
-      /* A focused control is scrolled clear of the edge fade on the right. */
-      scroll-padding: 0 2rem 0 8px;
-    }
-
-    /* A fade stuck to the right edge of the visible part of the host panel or
-       the toolbar. Its negative margin cancels its width and the gap before
-       it: no layout change. */
-    .host-panel-more,
-    .room-toolbar-more {
-      display: block;
-      flex: none;
-      position: sticky;
-      right: 0;
-      align-self: stretch;
-      width: 1.5rem;
-      background: linear-gradient(to right, transparent, var(--nock-white));
-      pointer-events: none;
-      visibility: hidden;
-    }
-
-    .host-panel-more {
-      margin-left: calc(-1.5rem - 0.5rem);
-    }
-
-    .room-toolbar-more {
-      margin-left: calc(-1.5rem - 0.75rem);
-    }
-
-    .host-panel-more.shown,
-    .room-toolbar-more.shown {
-      visibility: visible;
-    }
-
-    /* A scroll container clips an outline drawn outside a control: draw it
-       inside instead (3px wide, so spec 035 AC-2 still holds). */
-    .roster ul :focus-visible,
-    .host-panel :focus-visible {
-      outline-offset: -3px;
-    }
-
-    /* A list that scrolls is a Tab stop (spec 035 AC-12). Drawn outside, the
-       bottom edge of its outline is painted over by the next panel, or by the
-       grid that comes right after the row on a low window (spec 035 AC-2), so
-       draw it inside the list's own box. */
-    .roster ul:focus-visible,
-    .feed ul:focus-visible {
-      outline-offset: -3px;
-    }
-
-    /* The fade never covers a control that has the keyboard focus. A mouse click
-       or a tap also focuses a control, but it must not hide the fade (spec 014
-       AC-7), so this follows a class set only for keyboard focus. */
-    .host-panel.keyboard-focus .host-panel-more,
-    .room-toolbar.keyboard-focus .room-toolbar-more {
-      visibility: hidden;
-    }
-
-    .host-panel button,
-    .host-panel select,
-    .host-panel input,
-    .remove-player {
-      height: 1.2rem;
-      box-sizing: border-box;
-      padding-block: 0;
-      font-size: 0.75rem;
-    }
-
-    /* A target of 24 by 24 CSS pixels at least (spec 014 AC-7). It may make the
-       row taller, but never sticks out of the scrolling list (spec 014 AC-8). */
-    .remove-player {
-      min-width: var(--remove-size);
-      min-height: var(--remove-size);
-    }
-
-    .feed li {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .vote-banner {
-      font-size: 0.8rem;
-    }
+  /* The ✓ of a solved grid: a pictogram drawn by CSS, never read. */
+  .status-check::before {
+    content: '✓';
   }
 
-  /* A low window (a phone on its side) also takes the padding down, and puts the
-     roster, the feed and the host panel side by side. */
-  @media (max-height: 500px) {
-    main {
-      padding: 0.25rem 0.5rem;
-    }
+  .recap-open {
+    flex: none;
+    margin-left: auto;
+    padding: 7px 12px;
+    font-size: 0.85rem;
+  }
 
-    /* The header's two rows sit 1px apart: the room toolbar's row is 24px high
-       for the flag button's target (spec 021 AC-11), and the grid keeps the
-       height it had before. */
-    .room-header {
-      row-gap: 1px;
-    }
+  /* ---- The scrim of the sheet layout (layer 7) ---- */
 
-    .clue-bar {
-      padding: 0.25rem 0.75rem;
-    }
-
-    /* The author shares the clue text's row too and adds no height (spec 019
-       AC-4): the clue text and the author give up the width and end with an
-       ellipsis. The author follows the clue text, and the status keeps the end
-       of the row. Centred like the status: the author's smaller text has a
-       shorter line than the clue text, so the row keeps the clue text's
-       height. */
-    .clue-bar.with-author {
-      flex-wrap: nowrap;
-      align-items: center;
-    }
-
-    .clue-bar.with-author .clue-bar-text {
-      flex: 0 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    /* The clue text has priority over the author (spec 019 decision 11). The
-       author's flex basis is 0, so it never takes width from the clue text: it
-       grows into the room the clue text leaves, up to its whole text
-       (max-content), and never goes under 6 times its font size. When the row
-       is too short for that minimum, the clue text is the one that shrinks. */
-    .clue-bar.with-author .clue-bar-author {
-      flex: 1 1 0;
-      min-width: 6em;
-      max-width: max-content;
-    }
-
-    .clue-bar.with-author .grid-status {
-      margin-left: auto;
-    }
-
-    /* The grid comes right after this row, so the room under the remove buttons
-       goes under the whole row, not under the roster alone (spec 014 AC-8). On
-       the roster alone, the feed and the host panel would stretch 3px taller and
-       their content would sit 1.5px lower than the roster's. */
-    .presence {
-      --presence-gap: 1rem;
-      flex-direction: row;
-      gap: var(--presence-gap);
-      padding-bottom: var(--list-end-room);
-    }
-
-    /* The three boxes start as thirds of the row. The host panel keeps its third
-       and scrolls sideways. The roster takes more width only when its list needs
-       it for one remove button, and it takes that width from the feed alone
-       (spec 014 AC-10). */
-    .roster,
-    .feed {
-      flex: 1 1 0;
-      min-width: 0;
-    }
-
-    .host-panel {
-      flex: 0 0 calc((100% - 2 * var(--presence-gap)) / 3);
-      min-width: 0;
-    }
-
-    .roster {
-      padding-bottom: 0;
-      /* Never narrower than the heading, the gap and the list at its minimum. */
-      min-width: min-content;
-    }
-
-    /* Without inline-size containment, the list would ask for the width of all
-       its items in one line: with eight players the roster would span all eight
-       of them and push the feed and the host panel out of the row. With it, the
-       list takes no width from its content (a box with inline-size containment
-       measures zero), so it takes the width the row leaves and scrolls, and a
-       change of the buttons' text cannot change the width of the list. The list
-       is never narrower than one compact remove button and the room after it. */
-    .roster ul {
-      contain: inline-size;
-      min-width: calc(var(--remove-size) + var(--list-end-room));
-    }
-
-    /* The feed gives up width when the roster needs it: its heading ends with an
-       ellipsis instead of spilling out of the box. */
-    .feed h2 {
-      flex: 0 1 auto;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
+  .room-scrim {
+    position: fixed;
+    top: 54px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 7;
+    background: var(--nock-scrim);
   }
 </style>

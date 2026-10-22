@@ -3,6 +3,12 @@
 The HTTP route `POST /api/rooms`, the registry and the room module it relies on,
 and the share panel of the page (all three engines; the clipboard in Chromium).
 The shared setup is in `spec011_harness`.
+
+Refined by spec 043 (the design's room layout): `share-panel` sits in the Salon's
+Joueurs tab, so the browser tests open it with `show_tab(page, "players")` (spec
+043's "Test harness") before they look at it or click in it; after a copy the
+green line `share-copied` shows `fr.json["room.share.copied"]` while `copy-link`
+keeps its text.
 """
 
 from __future__ import annotations
@@ -40,6 +46,7 @@ from nock.room import (
     new_room,
 )
 from nock.server import CreateRoomRequest, CreateRoomResponse, create_app
+from room_panels import show_tab
 from spec011_harness import (
     CODE_PATTERN,
     EXPECTED_FR_VALUES,
@@ -476,6 +483,7 @@ def test_ac1_browser_share_link_points_at_the_room(
 ) -> None:
     link = open_fx01_room(enter_room, page, live_server, room_registry, fx01_grid)
     fr = load_fr()
+    show_tab(page, "players")
 
     expect(page.get_by_test_id("share-panel")).to_be_visible()
     share_link = page.get_by_test_id("share-link")
@@ -518,13 +526,17 @@ def test_ac1_browser_copy_link_puts_the_link_in_the_clipboard(
         enter_room, clipboard_page, live_server, room_registry, fx01_grid
     )
     fr = load_fr()
+    show_tab(clipboard_page, "players")
     copy_button = clipboard_page.get_by_test_id("copy-link")
 
     copy_button.click()
 
-    expect(copy_button).to_have_text(fr["room.share.copied"])
+    copied = clipboard_page.get_by_test_id("share-copied")
+    expect(copied).to_have_text(fr["room.share.copied"])
+    expect(copied).to_have_attribute("role", "status")
+    expect(copy_button).to_have_text(fr["room.share.copy"])
     assert clipboard_page.evaluate("navigator.clipboard.readText()") == link
-    expect(copy_button).to_have_text(fr["room.share.copy"], timeout=4000)
+    expect(copied).to_have_count(0, timeout=4000)
 
 
 def clipboard_page_with(browser: Browser, init_script: str) -> BrowserContext:
@@ -555,12 +567,14 @@ def test_ac1_browser_copy_does_nothing_without_a_usable_clipboard(
         page = context.new_page()
         link = open_fx01_room(enter_room, page, live_server, room_registry, fx01_grid)
         fr = load_fr()
+        show_tab(page, "players")
         copy_button = page.get_by_test_id("copy-link")
 
         copy_button.click()
         page.wait_for_timeout(SETTLE_MS)
 
         expect(copy_button).to_have_text(fr["room.share.copy"])
+        expect(page.get_by_test_id("share-copied")).to_have_count(0)
         expect(page.get_by_test_id("share-link")).to_have_text(link)
     finally:
         context.close()

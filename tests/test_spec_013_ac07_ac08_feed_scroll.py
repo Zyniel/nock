@@ -3,6 +3,29 @@
 The scripts and the helpers that measure and move the feed list are used by these
 two criteria only, so they stay in this file. The shared setup is in
 `spec013_harness`.
+
+Refined by spec 043 (the design's room layout): the feed list is the Salon's
+stream list (the one `ul` of `activity-feed`), so each page shows the Discussion
+tab first with spec 043's `show_tab`, and measures the list once it returned.
+`lock-room` is in the host's settings sheet (`open_host_settings`). Two places
+follow spec 043's layout:
+
+- AC-8's "Smaller window" turns the column layout into the sheet layout, which
+  closes the Salon ("Which layout"); the test shows the Discussion tab again
+  after the resize and checks that the list is at its end within 300 ms of
+  being shown ("Edge cases and errors": the stream keeps spec 013's rules, so it
+  shows the newest line when it was at its end).
+- AC-7's "Filling" sends 40 line events (`seq` 6 to 45) where it sent ten: the
+  stream fills the Salon's height (about 510 px at 1280 by 720, 299 px at 360 by
+  740), so ten lines no longer make it scroll. The later cases take the next
+  `seq` values (46 to 50), and "Full feed" sends `seq` 51 to 105, so it still ends
+  with 100 items, `seq` 6 to 105.
+- AC-7's "My own action" runs at 1280 by 720 only. At 360 by 740 (the sheet
+  layout) opening the Menu to reach the host's settings closes the Salon (one
+  overlay at a time), so the list is not on screen while the lock is clicked and
+  "the probe stays put" cannot be read; this is reported to the lead. The later
+  cases replay the action at both sizes and show the Discussion tab again after
+  it.
 """
 
 from __future__ import annotations
@@ -21,6 +44,7 @@ from nock.protocol import (
     SettingsChanged,
     parse_client_message,
 )
+from room_panels import open_host_settings, show_tab
 from spec013_harness import (
     DEFAULT_ROOM_SETTINGS,
     FORM_TIMEOUT_MS,
@@ -387,11 +411,19 @@ def locked_settings_frame(seq: int) -> str:
     return event.model_dump_json()
 
 
+def open_the_lock(scene: FeedScene) -> None:
+    """Open the host's settings, where `lock-room` is (spec 043)."""
+    open_host_settings(scene.page)
+
+
 def lock_from_the_page(scene: FeedScene) -> None:
-    """Click `lock-room`; once the page has sent `lock_room`, answer it (seq 18)."""
+    """Click `lock-room`; once the page has sent `lock_room`, answer it.
+
+    The host's settings are already open (`open_the_lock`).
+    """
     scene.page.get_by_test_id("lock-room").click(timeout=FORM_TIMEOUT_MS)
     wait_until(scene.page, lambda: has_sent_lock_room(scene.mock))
-    scene.mock.send(locked_settings_frame(18))
+    scene.mock.send(locked_settings_frame(OWN_ACTION_SEQ))
 
 
 def feed_seqs(page: Page) -> list[int]:
@@ -435,48 +467,66 @@ def items_out_of_place(
     return out_of_place
 
 
+# The `seq` of each case's line event (see the module docstring for the count).
+FILL_FIRST_SEQ = 6
+FILL_LAST_SEQ = 45
+AT_END_SEQ = 46
+SCROLLED_UP_SEQ = 47
+OWN_ACTION_SEQ = 48
+BACK_AT_END_SEQ = 49
+ONE_PX_SEQ = 50
+FULL_FIRST_SEQ = 51
+FULL_LAST_SEQ = 105
+
 # The cases of AC-7 without their checks, replayed before a later case. Each one
 # ends once the page has applied its last event, 300 ms have passed and the list
 # is settled.
 
 
 def replay_filling(scene: FeedScene) -> None:
-    """AC-7 "Filling" without its checks: lines 6 to 15."""
-    send_lines(scene, 6, 15)
+    """AC-7 "Filling" without its checks: lines 6 to 45."""
+    send_lines(scene, FILL_FIRST_SEQ, FILL_LAST_SEQ)
     let_the_case_end(scene.page)
 
 
 def replay_at_the_end(scene: FeedScene) -> None:
-    """AC-7 "At the end" without its checks: line 16."""
-    send_lines(scene, 16, 16)
+    """AC-7 "At the end" without its checks: line 46."""
+    send_lines(scene, AT_END_SEQ, AT_END_SEQ)
     let_the_case_end(scene.page)
 
 
 def replay_scrolled_up(scene: FeedScene) -> None:
-    """AC-7 "Scrolled up" without its checks: to the middle, then line 17."""
+    """AC-7 "Scrolled up" without its checks: to the middle, then line 47."""
     scroll_feed_and_settle(scene.page, "middle")
-    send_lines(scene, 17, 17)
+    send_lines(scene, SCROLLED_UP_SEQ, SCROLLED_UP_SEQ)
     let_the_case_end(scene.page)
 
 
 def replay_my_own_action(scene: FeedScene) -> None:
-    """AC-7 "My own action" without its checks: the lock and its line 18."""
+    """AC-7 "My own action" without its checks: the lock and its line 48.
+
+    The host's settings are closed again and the Discussion tab shown again, which
+    the sheet layout closed while the settings were open (spec 043).
+    """
+    open_the_lock(scene)
     lock_from_the_page(scene)
-    wait_for_seq(scene.page, 18)
+    wait_for_seq(scene.page, OWN_ACTION_SEQ)
+    scene.page.keyboard.press("Escape")
+    show_tab(scene.page, "discussion")
     let_the_case_end(scene.page)
 
 
 def replay_back_at_the_end(scene: FeedScene) -> None:
-    """AC-7 "Back at the end" without its checks: to the end, then line 19."""
+    """AC-7 "Back at the end" without its checks: to the end, then line 49."""
     scroll_feed_and_settle(scene.page, "end")
-    send_lines(scene, 19, 19)
+    send_lines(scene, BACK_AT_END_SEQ, BACK_AT_END_SEQ)
     let_the_case_end(scene.page)
 
 
 def replay_within_1_px_of_the_end(scene: FeedScene) -> None:
-    """AC-7 "Within 1 px of the end" without its checks: 1 px short, line 20."""
+    """AC-7 "Within 1 px of the end" without its checks: 1 px short, line 50."""
     scroll_feed_and_settle(scene.page, "one_px_before_end")
-    send_lines(scene, 20, 20)
+    send_lines(scene, ONE_PX_SEQ, ONE_PX_SEQ)
     let_the_case_end(scene.page)
 
 
@@ -493,6 +543,21 @@ def feed_scene(
     page, close = make_page(browser, browser_name, width, height, touch=False)
     try:
         mock = open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
+        show_tab(page, "discussion")
+        yield FeedScene(page=page, mock=mock)
+    finally:
+        close()
+
+
+@pytest.fixture
+def computer_feed_scene(
+    browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
+) -> Iterator[FeedScene]:
+    """The page of "Feed scroll states" at 1280 by 720 only (see the docstring)."""
+    page, close = make_page(browser, browser_name, 1280, 720, touch=False)
+    try:
+        mock = open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
+        show_tab(page, "discussion")
         yield FeedScene(page=page, mock=mock)
     finally:
         close()
@@ -500,9 +565,9 @@ def feed_scene(
 
 def test_ac7_browser_filling_brings_the_list_to_its_end(feed_scene: FeedScene) -> None:
     page = feed_scene.page
-    start_end_watch(page, "seq", "15")
+    start_end_watch(page, "seq", str(FILL_LAST_SEQ))
 
-    send_lines(feed_scene, 6, 15)
+    send_lines(feed_scene, FILL_FIRST_SEQ, FILL_LAST_SEQ)
 
     filled = read_feed_scroll(page)
     assert filled.scrolls, f"Filling: the feed list does not scroll: {filled}"
@@ -516,9 +581,9 @@ def test_ac7_browser_at_the_end_a_new_line_keeps_the_list_at_its_end(
     replay_filling(feed_scene)
     start = read_feed_scroll(page)
     assert_case_starts(start.at_end, "At the end", "the list is at its end", start)
-    start_end_watch(page, "seq", "16")
+    start_end_watch(page, "seq", str(AT_END_SEQ))
 
-    send_lines(feed_scene, 16, 16)
+    send_lines(feed_scene, AT_END_SEQ, AT_END_SEQ)
 
     assert_at_end_within_300_ms(page, "At the end")
 
@@ -535,20 +600,22 @@ def test_ac7_browser_scrolled_up_a_new_line_leaves_the_list_in_place(
     )
     start_probe(page)
 
-    send_lines(feed_scene, 17, 17)
+    send_lines(feed_scene, SCROLLED_UP_SEQ, SCROLLED_UP_SEQ)
 
     page.wait_for_timeout(FOLLOW_MS)
     assert_probe_stayed_put(page, "Scrolled up")
-    expect(feed_locator(page).last).to_have_attribute("data-seq", "17")
+    expect(feed_locator(page).last).to_have_attribute("data-seq", str(SCROLLED_UP_SEQ))
 
 
 def test_ac7_browser_my_own_lock_line_leaves_the_list_in_place(
-    feed_scene: FeedScene,
+    computer_feed_scene: FeedScene,
 ) -> None:
+    feed_scene = computer_feed_scene
     page = feed_scene.page
     replay_filling(feed_scene)
     replay_at_the_end(feed_scene)
     replay_scrolled_up(feed_scene)
+    open_the_lock(feed_scene)
     start = read_feed_scroll(page)
     assert_case_starts(
         not start.at_end,
@@ -560,11 +627,11 @@ def test_ac7_browser_my_own_lock_line_leaves_the_list_in_place(
 
     lock_from_the_page(feed_scene)
 
-    wait_for_seq(page, 18)
+    wait_for_seq(page, OWN_ACTION_SEQ)
     page.wait_for_timeout(FOLLOW_MS)
     assert_probe_stayed_put(page, "My own action")
     last_item = feed_locator(page).last
-    expect(last_item).to_have_attribute("data-seq", "18")
+    expect(last_item).to_have_attribute("data-seq", str(OWN_ACTION_SEQ))
     expect(last_item).to_have_text(LOCKED_LINE)
 
 
@@ -578,9 +645,9 @@ def test_ac7_browser_back_at_the_end_the_list_follows_new_lines_again(
     replay_my_own_action(feed_scene)
     start = scroll_feed_and_settle(page, "end")
     assert_case_starts(start.at_end, "Back at the end", "the list is at its end", start)
-    start_end_watch(page, "seq", "19")
+    start_end_watch(page, "seq", str(BACK_AT_END_SEQ))
 
-    send_lines(feed_scene, 19, 19)
+    send_lines(feed_scene, BACK_AT_END_SEQ, BACK_AT_END_SEQ)
 
     assert_at_end_within_300_ms(page, "Back at the end")
 
@@ -601,9 +668,9 @@ def test_ac7_browser_within_1_px_of_the_end_counts_as_the_end(
         "the distance to the end is at most 1 px",
         start,
     )
-    start_end_watch(page, "seq", "20")
+    start_end_watch(page, "seq", str(ONE_PX_SEQ))
 
-    send_lines(feed_scene, 20, 20)
+    send_lines(feed_scene, ONE_PX_SEQ, ONE_PX_SEQ)
 
     assert_at_end_within_300_ms(page, "Within 1 px of the end")
 
@@ -625,8 +692,8 @@ def test_ac7_browser_full_feed_the_items_in_view_keep_their_place(
         "the list is at its end, where Within 1 px of the end left it",
         start,
     )
-    start_end_watch(page, "seq", "105")
-    send_lines(feed_scene, 21, 105)
+    start_end_watch(page, "seq", str(FULL_LAST_SEQ))
+    send_lines(feed_scene, FULL_FIRST_SEQ, FULL_LAST_SEQ)
     assert feed_seqs(page) == list(range(6, 106))
     assert_at_end_within_300_ms(page, "Full feed")
     middle = scroll_feed_and_settle(page, "middle")
@@ -664,8 +731,12 @@ def set_root_font(page: Page, size_px: int) -> None:
 
 
 def replay_smaller_window(scene: FeedScene) -> None:
-    """AC-8 "Smaller window" without its checks: the window becomes 360 by 740."""
+    """AC-8 "Smaller window" without its checks: the window becomes 360 by 740.
+
+    The sheet layout closes the Salon, so the Discussion tab is shown again.
+    """
     resize_window(scene.page, 360, 740)
+    show_tab(scene.page, "discussion")
     let_the_case_end(scene.page)
 
 
@@ -679,10 +750,11 @@ def replay_larger_root_font(scene: FeedScene) -> None:
 def filled_feed_scene(
     browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
 ) -> Iterator[FeedScene]:
-    """AC-8's setup: "Feed scroll states" at 1280 by 720 with lines 6 to 15."""
+    """AC-8's setup: "Feed scroll states" at 1280 by 720 with lines 6 to 45."""
     page, close = make_page(browser, browser_name, 1280, 720, touch=False)
     try:
         mock = open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
+        show_tab(page, "discussion")
         scene = FeedScene(page=page, mock=mock)
         replay_filling(scene)
         yield scene
@@ -701,9 +773,10 @@ def test_ac8_browser_a_smaller_window_keeps_the_list_at_its_end(
 ) -> None:
     page = filled_feed_scene.page
     assert_setup_at_end(page)
-    start_end_watch(page, "width", "360")
-
     resize_window(page, 360, 740)
+
+    show_tab(page, "discussion")
+    start_end_watch(page, "width", "360")
 
     resized = read_feed_scroll(page)
     assert resized.scrolls, f"Smaller window: the feed list does not scroll: {resized}"

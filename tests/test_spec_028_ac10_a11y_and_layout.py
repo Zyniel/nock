@@ -1,23 +1,20 @@
 """Tests of spec 028, AC-10: the recap dialog and the share page are accessible and
 fit every window (page with a mocked socket; the share page on the live server).
 
-The room page is spec 027's toolbar setup (spec 013 AC-6's FX-01 snapshot, `you`
-host among 8 players, 100 feed items, (3, 1) tapped) but solved, with the recap
-route answering the recap of AC-2 plus a `share_path`. Spec 027's harness holds the
-toolbar readings; the button lists below add `recap-open`.
+The room page is spec 013 AC-6's FX-01 snapshot (`you` host among 8 players, 100
+feed items, (3, 1) tapped) but solved, with the recap route answering the recap of
+AC-2 plus a `share_path`.
+
+Refined by spec 043 (the design's room layout) and spec 047's note on this
+criterion: the toolbar is gone and `recap-open` is in the end band (`grid-status`),
+so spec 024 AC-8's toolbar checks (order, one row, the edge fade, the keyboard
+focus inside the toolbar, the pointer focus) go; on the solved page spec 043
+AC-28's checks hold (`room-topbar` and `clue-bar` inside the window, each of their
+buttons hit at its centre) and `elementFromPoint` at the centre of `recap-open`
+returns it.
 
 Readings the spec leaves open:
 
-- On a solved page `undo-button`, the three check buttons and the two reveal
-  buttons are disabled (spec 026 AC-5, spec 024 AC-7), so they cannot take the
-  keyboard focus. The keyboard test therefore walks to `recap-open` only and runs
-  every keyboard check of spec 024 AC-8 on it: its box inside the toolbar's client
-  area, its outline, the outline not clipped, and `room-toolbar-more` not visible,
-  since spec 024 hides the edge fade while any toolbar control has the focus from
-  the keyboard.
-- "Spec 024 AC-8's toolbar checks" for the other buttons (header, order, the reveal
-  buttons, one row, the edge fade, hit at the centre, pointer focus) run on the
-  buttons of spec 027's list plus `recap-open`.
 - Every measure and scan of the open dialog waits for `recap-time`, so that it
   reads the loaded recap and not `recap-loading` (the spec names no other ready
   state).
@@ -34,6 +31,7 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
+from spec019_harness import CONTEXT_KINDS, WINDOW_SIZES, layout_problems
 from spec024_harness import (
     LANGUAGE_SCAN_SCRIPT,
     cell_at,
@@ -46,49 +44,41 @@ from spec024_harness import (
     player_view,
 )
 from spec027_harness import open_timer_room
-from spec027_toolbar_harness import (
-    CONTEXTS,
-    FADE_VISIBLE_SCRIPT,
-    FIRST_THREE,
-    FOCUS_IN_TOOLBAR_SCRIPT,
-    FOCUS_SHARE_LINK_SCRIPT,
-    FOCUSED_TEST_ID_SCRIPT,
-    HIT_AT_CENTRE_SCRIPT,
-    MAX_TABS,
-    SCROLL_INTO_VIEW_SCRIPT,
-    SCROLL_TO_START_SCRIPT,
-    SEVEN_BUTTONS,
-    SIX_BUTTONS,
-    SMALL_WINDOWS,
-    TEN_HOURS_MS,
-    TOOLBAR_SCRIPT,
-    WINDOW_SIZES,
-    check_frame,
-    eight_players,
-    keyboard_focus_problems,
-    pairs_that_do_not_overlap,
-    press_partly_hidden_button,
-    size_ids,
-    spec013_layout_problems,
-)
 from spec028_harness import (
+    eight_players,
     recap_body,
     recap_player,
     serve_recap,
 )
 from spec035_harness import (
-    SETTLE_MS,
+    MAX_TABS,
     WAIT_TIMEOUT_MS,
     Walker,
     contrast_offenders,
     unknown_texts,
 )
+from spec042_harness import box_of
+from spec043_harness import (
+    CLUE_BAR_BUTTONS,
+    H8_TIMER_MS,
+    box_inside,
+    check_frame,
+    hit_problem,
+    shown_items,
+    window_box,
+)
 
 SHARE_PATH = "/recap/tok_ABCDEFGHIJKLMNOP"
-EIGHT_BUTTONS = [*SEVEN_BUTTONS, "recap-open"]
 FEED_ITEMS = 100
 EPSILON = 1.0
 SCAN_SIZES = [(1280, 720), (360, 740)]
+
+
+def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
+    """Readable ids of window sizes for `parametrize`."""
+    return [f"{width}x{height}" for width, height in sizes]
+
+
 HOSTILE_NAMES = ["<b>Eve</b>", "<img src=x>"]
 FR_KEYS = {
     "recap.open": "Voir le bilan",
@@ -133,7 +123,7 @@ def open_solved_toolbar_room(
             page,
             live_server,
             grid,
-            elapsed_ms=TEN_HOURS_MS,
+            elapsed_ms=H8_TIMER_MS,
             running=False,
             solved=True,
             players=eight_players(),
@@ -141,7 +131,7 @@ def open_solved_toolbar_room(
         expect(page.get_by_test_id("recap-open")).to_be_visible()
         last_seq = 5 + FEED_ITEMS
         for seq in range(6, last_seq + 1):
-            mock.send(check_frame(seq))
+            mock.send(check_frame(seq, "p2"))
         expect_seq(page, last_seq)
         cell = cell_at(page, 3, 1)
         if touch:
@@ -222,7 +212,7 @@ IN_DIALOG_SCRIPT = """
 """
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_the_open_dialog_lies_inside_the_window(
     browser: Browser,
@@ -255,7 +245,7 @@ def test_ac10_the_open_dialog_lies_inside_the_window(
     assert bottom <= window_height + EPSILON, reading
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_close_copy_and_the_share_link_take_the_focus_with_tab(
     browser: Browser,
@@ -298,7 +288,7 @@ def test_ac10_close_copy_and_the_share_link_take_the_focus_with_tab(
 # ---- The solved page: spec 013 AC-6 and spec 024 AC-8 with recap-open ----
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_spec_013_layout_holds_on_the_solved_page(
     browser: Browser,
@@ -315,63 +305,42 @@ def test_ac10_spec_013_layout_holds_on_the_solved_page(
     )
     try:
         expect(page.get_by_test_id("recap-open")).to_be_visible()
-        problems = spec013_layout_problems(page, touch)
+        problems = layout_problems(page, touch)
     finally:
         close()
 
     assert problems == []
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+def solved_page_reach_problems(page: Page) -> list[str]:
+    """Spec 043 AC-28's checks on the solved page, and the hit of `recap-open`.
+
+    `room-topbar` and `clue-bar` lie inside the window, and `elementFromPoint` at
+    the centre of each top-bar button, each clue-bar button and `recap-open`
+    returns it.
+    """
+    window = window_box(page)
+    problems: list[str] = []
+    for test_id in ("room-topbar", "clue-bar"):
+        box = box_of(page.get_by_test_id(test_id))
+        if not box_inside(box, window):
+            problems.append(f"{test_id} {box} is not inside the window")
+    targets: list[str] = []
+    for item in shown_items(page.get_by_test_id("room-topbar")):
+        if item["tag"] == "BUTTON":
+            targets.append(str(item["testId"]))
+    targets.extend(CLUE_BAR_BUTTONS)
+    targets.append("recap-open")
+    for test_id in targets:
+        found = hit_problem(page, test_id)
+        if found is not None:
+            problems.append(found)
+    return problems
+
+
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
-def test_ac10_the_toolbar_holds_recap_open_in_order_on_one_row(
-    browser: Browser,
-    browser_name: str,
-    live_server: str,
-    fx01_grid: Grid,
-    width: int,
-    height: int,
-    context_kind: str,
-) -> None:
-    touch = context_kind == "touch"
-    small = (width, height) in SMALL_WINDOWS
-    page, close = open_solved_toolbar_room(
-        browser, browser_name, live_server, fx01_grid, width, height, touch
-    )
-    try:
-        reading = page.evaluate(
-            TOOLBAR_SCRIPT, {"sevenIds": EIGHT_BUTTONS, "sixIds": SIX_BUTTONS}
-        )
-        ids = page.evaluate("""() => Array.from(
-              document.querySelectorAll('[data-testid="room-toolbar"] [data-testid]')
-            ).map(element => element.getAttribute('data-testid'))""")
-        page.evaluate(SCROLL_TO_START_SCRIPT)
-        page.wait_for_timeout(SETTLE_MS)
-        fade_visible = page.evaluate(FADE_VISIBLE_SCRIPT)
-    finally:
-        close()
-
-    assert reading["inHeader"] is True, reading
-    assert reading["counts"] == dict.fromkeys(EIGHT_BUTTONS, 1), reading
-    assert reading["outside"] == [], reading
-    assert reading["outOfOrder"] == [], reading
-    assert reading["revealButtons"] == ["reveal-letter", "reveal-word"], reading
-    assert reading["firstThree"] == FIRST_THREE, reading
-    assert ids.index("recap-open") == ids.index("chat-toggle") + 1, ids
-    if small:
-        assert pairs_that_do_not_overlap(reading["ranges"]) == [], reading
-        if reading["scrollWidth"] > reading["clientWidth"] + 1:
-            assert reading["overflowX"] in ("auto", "scroll"), reading
-            assert fade_visible is True, reading
-    else:
-        assert fade_visible is False, reading
-
-
-@pytest.mark.parametrize("context_kind", CONTEXTS)
-@pytest.mark.parametrize(
-    ("width", "height"), SMALL_WINDOWS, ids=size_ids(SMALL_WINDOWS)
-)
-def test_ac10_on_a_small_window_recap_open_shows_before_any_sideways_scroll(
+def test_ac10_on_the_solved_page_every_button_and_recap_open_can_be_hit(
     browser: Browser,
     browser_name: str,
     live_server: str,
@@ -390,108 +359,11 @@ def test_ac10_on_a_small_window_recap_open_shows_before_any_sideways_scroll(
         context_kind == "touch",
     )
     try:
-        page.evaluate(SCROLL_TO_START_SCRIPT)
-        page.wait_for_timeout(SETTLE_MS)
-        reading = page.evaluate("""() => {
-              const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-              const box = document.querySelector('[data-testid="recap-open"]')
-                .getBoundingClientRect();
-              const toolbarBox = toolbar.getBoundingClientRect();
-              return {
-                left: box.left,
-                right: box.right,
-                areaLeft: toolbarBox.left + toolbar.clientLeft,
-                areaRight: toolbarBox.left + toolbar.clientLeft + toolbar.clientWidth,
-                scrollLeft: toolbar.scrollLeft,
-              };
-            }""")
+        problems = solved_page_reach_problems(page)
     finally:
         close()
 
-    assert reading["scrollLeft"] == 0, reading
-    assert reading["left"] >= reading["areaLeft"] - EPSILON, reading
-    assert reading["left"] < reading["areaRight"], reading
-
-
-@pytest.mark.parametrize("context_kind", CONTEXTS)
-@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
-def test_ac10_recap_open_is_hit_at_its_centre_once_scrolled_into_view(
-    browser: Browser,
-    browser_name: str,
-    live_server: str,
-    fx01_grid: Grid,
-    width: int,
-    height: int,
-    context_kind: str,
-) -> None:
-    page, close = open_solved_toolbar_room(
-        browser,
-        browser_name,
-        live_server,
-        fx01_grid,
-        width,
-        height,
-        context_kind == "touch",
-    )
-    try:
-        page.evaluate(SCROLL_INTO_VIEW_SCRIPT, "recap-open")
-        page.wait_for_timeout(SETTLE_MS)
-        result = page.evaluate(HIT_AT_CENTRE_SCRIPT, "recap-open")
-    finally:
-        close()
-
-    assert result["hits"] is True, result
-
-
-@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
-def test_ac10_a_keyboard_focus_keeps_recap_open_and_its_outline_in_the_toolbar(
-    browser: Browser,
-    browser_name: str,
-    live_server: str,
-    fx01_grid: Grid,
-    width: int,
-    height: int,
-) -> None:
-    page, close = open_solved_toolbar_room(
-        browser, browser_name, live_server, fx01_grid, width, height, False
-    )
-    reading: dict[str, Any] | None = None
-    try:
-        page.evaluate(FOCUS_SHARE_LINK_SCRIPT)
-        for _ in range(MAX_TABS):
-            page.keyboard.press("Tab")
-            if page.evaluate(FOCUSED_TEST_ID_SCRIPT) == "recap-open":
-                page.wait_for_timeout(SETTLE_MS)
-                reading = page.evaluate(FOCUS_IN_TOOLBAR_SCRIPT)
-                break
-    finally:
-        close()
-
-    assert reading is not None, f"recap-open not focused in {MAX_TABS} presses of Tab"
-    assert reading["testId"] == "recap-open", reading
-    assert keyboard_focus_problems(reading) == []
-
-
-@pytest.mark.parametrize("context_kind", CONTEXTS)
-def test_ac10_a_pointer_focus_on_recap_open_makes_no_scroll_call(
-    browser: Browser,
-    browser_name: str,
-    live_server: str,
-    fx01_grid: Grid,
-    context_kind: str,
-) -> None:
-    touch = context_kind == "touch"
-    page, close = open_solved_toolbar_room(
-        browser, browser_name, live_server, fx01_grid, 320, 568, touch
-    )
-    try:
-        after = press_partly_hidden_button(page, "recap-open", touch)
-    finally:
-        close()
-
-    assert after["calls"] == [], after
-    if after["hiddenPastRight"] > 1:
-        assert after["fadeVisible"] is True, after
+    assert problems == []
 
 
 def test_ac10_tab_reaches_recap_open_with_the_outline_and_enter_opens_the_dialog(

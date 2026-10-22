@@ -21,6 +21,14 @@ Choices where the spec leaves room:
 - "It sits on the line of the clue text when there is room" is tested where the
   spec says where it sits: on windows at most 500 px high, at 568 by 320 and 740
   by 360.
+
+Refined by spec 043 (the design's room layout): at 568 by 320 and 740 by 360 the
+in-row checks (text, author line and status in the clue bar's row) run in the
+touch context, spec 043's sheet layout; in the desktop context these windows are
+the column layout, where `grid-status` sits under the clue bar, so there the text
+and the author line lie in the bar's row with the same rules for the author line,
+and `grid-status` starts at or below the bar's bottom. The switch is pressed in
+the room Menu (spec 019's harness opens it).
 - The pending edit of decision 12 is seen on the page as spec 015 shows it:
   (1, 1) has `data-letter="Z"` and `data-unconfirmed="true"`, and the page sent
   an `edit_letter` frame for (1, 1) with the letter `Z`.
@@ -400,15 +408,23 @@ def overlaps_vertically(first: Box, second: Box) -> bool:
     )
 
 
-def row_place_problems(page: Page) -> list[str]:
-    """Text, author line and status inside `clue-bar`, in this order, one row."""
+def row_place_problems(page: Page, with_status: bool) -> list[str]:
+    """Text, author line (and status) inside `clue-bar`, in this order, one row.
+
+    Without the status (spec 043's column layout), `grid-status` starts at or below
+    the bar's bottom.
+    """
     bar = box_of(page.get_by_test_id("clue-bar"))
+    status_box = box_of(page.get_by_test_id("grid-status"))
     named_boxes = [
         ("clue-bar-text", box_of(page.get_by_test_id("clue-bar-text"))),
         ("clue-bar-author", box_of(author_line(page))),
-        ("grid-status", box_of(page.get_by_test_id("grid-status"))),
     ]
     problems: list[str] = []
+    if with_status:
+        named_boxes.append(("grid-status", status_box))
+    elif status_box.top < bar.bottom - LAYOUT_EPSILON_PX:
+        problems.append(f"grid-status {status_box} is not under clue-bar {bar}")
     for name, box in named_boxes:
         if not box_inside(box, bar):
             problems.append(f"{name} {box} is not inside clue-bar {bar}")
@@ -426,7 +442,7 @@ def row_place_problems(page: Page) -> list[str]:
     return problems
 
 
-def row_width_problems(page: Page) -> list[str]:
+def row_width_problems(page: Page, with_status: bool) -> list[str]:
     """The author line shortens first, down to M; the status keeps its text."""
     measures = page.evaluate(ROW_MEASURES_SCRIPT)
     text = measures["text"]
@@ -447,7 +463,8 @@ def row_width_problems(page: Page) -> list[str]:
             f"clue-bar-text is cut ({text['scrollWidth']} > {text['clientWidth']}) "
             f"while clue-bar-author is {author['clientWidth']} px, above M {minimum}"
         )
-    if status["scrollWidth"] > status["clientWidth"] + LAYOUT_EPSILON_PX:
+    status_cut = status["scrollWidth"] > status["clientWidth"] + LAYOUT_EPSILON_PX
+    if with_status and status_cut:
         problems.append(
             f"grid-status cuts its text: {status['scrollWidth']} > "
             f"{status['clientWidth']}"
@@ -493,6 +510,6 @@ def test_ac4_fx02_the_grid_keeps_its_room_and_the_author_line_fits_the_bar(
                 f"clue-bar is {height_on:.1f} px high with the author line and "
                 f"{height_off:.1f} px without it"
             )
-        problems.extend(row_place_problems(page))
-        problems.extend(row_width_problems(page))
+        problems.extend(row_place_problems(page, with_status=touch))
+        problems.extend(row_width_problems(page, with_status=touch))
     assert problems == [], f"{width}x{height} {context_kind}: {problems}"
