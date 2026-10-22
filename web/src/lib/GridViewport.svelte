@@ -740,11 +740,15 @@
   }
 
   /* The grid lines (spec 042): the grid draws the left and top line, each cell
-     its own right and bottom line, so every line is one pixel wide. */
+     its own right and bottom line, so every line is one pixel wide. The grid
+     clips at its outer edge: a long clue text may spill over the cells around
+     it, never past the grid, so the grid that fits its viewport leaves nothing
+     to scroll (spec 006). Every mark of a letter cell is already inside it. */
   .grid {
     display: grid;
     width: max-content;
     margin: 0 auto;
+    overflow: clip;
     border-left: 1px solid var(--nock-rule);
     border-top: 1px solid var(--nock-rule);
   }
