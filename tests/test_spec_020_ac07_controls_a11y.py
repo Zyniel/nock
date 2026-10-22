@@ -17,7 +17,7 @@ Four parts, all on the page with a mocked socket:
   a flash, a pencil letter's colour differs from a normal letter's in the same
   state (selected, tinted; AC-1 checks the plain cell and my word); in the flash
   states (decision 12), the flashing pencil cell's `data-flash`, `data-pencil`,
-  italics and 4.5:1 contrast against the flash colour;
+  italics and 4.5:1 contrast against the flash composite (spec 041, AC-16);
 - the edge case "Solved grid" (AC-3, AC-7): both controls disabled, and spec
   026's input lock sends nothing in pencil mode.
 
@@ -671,25 +671,28 @@ def tinting_players(colour: int) -> list[PlayerView]:
 # The flash state of AC-7, read at once on the flashing `cell`: its `data-flash`,
 # `data-pencil` and computed `font-style`; whether the flash colour (the
 # `roster-colour` of the player who flashed it, as spec 016 AC-2 measures it) is
-# the computed `background-color` of the cell or of an element inside it (its
-# overlay); and the contrast of the cell's computed `color` (its letter is the
-# cell's own text) against that colour, composited over white.
+# the computed `background-color` of the one `cell-flash` element inside the cell,
+# at the opacity 0.38 over a white cell (spec 041, AC-16: the flash is that colour
+# at 38 % over white, under an ink letter, not an opaque swatch); and the contrast
+# of the cell's computed `color` (its letter is the cell's own text) against that
+# composite.
 FLASH_READING_SCRIPT = "(cell, flashColour) => {\n" + COLOUR_CONTRAST_JS + r"""
   const style = getComputedStyle(cell);
-  let flashShown = false;
-  for (const element of [cell, ...cell.querySelectorAll('*')]) {
-    if (getComputedStyle(element).backgroundColor === flashColour) {
-      flashShown = true;
-    }
-  }
-  const flash = over(parseColour(flashColour), WHITE);
-  const text = over(parseColour(style.color), flash);
+  const overlays = cell.querySelectorAll('[data-testid="cell-flash"]');
+  const overlay = overlays.length === 1 ? getComputedStyle(overlays[0]) : null;
+  const flashShown = overlay !== null
+    && overlay.backgroundColor === flashColour
+    && overlay.opacity === '0.38'
+    && style.backgroundColor === 'rgb(255, 255, 255)';
+  const swatch = parseColour(flashColour);
+  const composite = over([swatch[0], swatch[1], swatch[2], 0.38], WHITE);
+  const text = over(parseColour(style.color), composite);
   return {
     flash: cell.getAttribute('data-flash'),
     pencil: cell.getAttribute('data-pencil'),
     fontStyle: style.fontStyle,
     flashShown: flashShown,
-    ratio: contrast(text, flash),
+    ratio: contrast(text, composite),
   };
 }
 """
@@ -736,6 +739,7 @@ def test_ac7_pencil_letters_tinted_and_flashed_by_colour_keep_their_sign_and_con
     assert flash_reading["flash"] == str(colour)
     assert flash_reading["pencil"] == "true"
     assert flash_reading["fontStyle"] == "italic"
+    # Spec 041 AC-16: a white cell under one 38 % `cell-flash` overlay of the colour.
     assert flash_reading["flashShown"] is True, (flash_colour, flash_reading)
     assert flash_reading["ratio"] >= MIN_TEXT_CONTRAST, flash_reading
 

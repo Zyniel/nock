@@ -1,11 +1,11 @@
 """Tests of spec 019, AC-1 and AC-2: the authors switch and the marks.
 
 AC-1: with the switch on, each letter cell with an author holds one `author-mark`
-in that author's colour, and a departed author's band is hatched in greys while
-no player's band has a pattern (mocked socket and live server). AC-2: with the
-switch off, no mark exists and a letter's look does not depend on its author
-(mocked socket). The shared setup is in `spec019_harness`. AC-1's contrast run
-and box run have files of their own.
+in that author's colour, and a departed author's band is hatched in ink and
+white (spec 041: the hatch has no grey) while no player's band has a pattern
+(mocked socket and live server). AC-2: with the switch off, no mark exists and
+a letter's look does not depend on its author (mocked socket). The shared setup
+is in `spec019_harness`. AC-1's contrast run and box run have files of their own.
 
 Besides the criteria's own steps, the tests cover the edge cases the spec files
 under AC-1 and AC-2: pending edits, a newcomer who takes a departed player's
@@ -221,7 +221,7 @@ def test_ac1_the_switch_on_marks_each_letter_in_its_authors_colour(
         assert by_p2.background == swatch_colour(page, "p2")
 
 
-def test_ac1_only_the_band_of_an_author_not_in_the_room_is_hatched_in_greys(
+def test_ac1_only_the_band_of_an_author_not_in_the_room_is_hatched_ink_and_white(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_ac1(page, live_server, fx01_grid)

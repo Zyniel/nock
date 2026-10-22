@@ -12,6 +12,11 @@ spec lists for it, reading each state in one `page.evaluate`:
 - flash states, one page per flash colour: nine cells flashing in that colour, one
   per band, as the spec builds them with `letter_changed` events from `seq` 11.
 
+Since spec 041 (AC-16) a flashing cell is white under a `cell-flash` overlay in the
+replacer's colour at 38 % opacity, not an opaque swatch: the flash states check
+that, and the band's 3:1 is measured against that composite (the cell's
+background, then the overlay), which `BAND_COLOURS_JS` does.
+
 In every state the band's contrast, measured over its colours (`BAND_COLOURS_JS`
 of `spec019_harness`), is at least 3:1, each colour that counts is opaque, and
 the mark's own background colour is still its author's swatch colour (the first
@@ -68,6 +73,9 @@ DEPARTED = "p9"
 BAND_AUTHORS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", DEPARTED]
 BAND_IDS = [f"colour-{index}" for index in range(8)] + ["departed"]
 FX01_LETTER_CELL_COUNT = 18
+# Spec 041, AC-16: a flashing cell is white, with the replacer's colour over it.
+FLASH_CELL_BACKGROUND = "rgb(255, 255, 255)"
+FLASH_OVERLAY_OPACITY = "0.38"
 
 PLAIN_CELL: Cell = (0, 1)
 LOCKED_CELL: Cell = (4, 4)
@@ -98,8 +106,9 @@ expected => expected.every(([row, column, author]) => {
 })
 """
 
-# One reading of a flash page: for each cell its `data-flash` and band, and the
-# computed background colour of the swatch of the player whose colour flashes.
+# One reading of a flash page: for each cell its `data-flash`, band and
+# `cell-flash` overlay (count, computed colour and opacity), and the computed
+# background colour of the swatch of the player whose colour flashes.
 FLASH_SCRIPT = "args => {\n" + BAND_COLOURS_JS + r"""
   const swatch = document.querySelector(
     `[data-testid="roster-player"][data-player-id="${args.flashPlayer}"]`
@@ -110,7 +119,15 @@ FLASH_SCRIPT = "args => {\n" + BAND_COLOURS_JS + r"""
     const cell = document.querySelector(
       `[data-testid="cell"][data-row="${row}"][data-column="${column}"]`
     );
-    cells.push({flash: cell.getAttribute('data-flash'), band: readBand(cell)});
+    const overlays = cell.querySelectorAll('[data-testid="cell-flash"]');
+    const overlay = overlays.length === 1 ? getComputedStyle(overlays[0]) : null;
+    cells.push({
+      flash: cell.getAttribute('data-flash'),
+      band: readBand(cell),
+      overlays: overlays.length,
+      overlayColour: overlay === null ? '' : overlay.backgroundColor,
+      overlayOpacity: overlay === null ? '' : overlay.opacity,
+    });
   }
   return {swatch: getComputedStyle(swatch).backgroundColor, cells: cells};
 }
@@ -305,10 +322,17 @@ def test_ac1_every_band_keeps_3_to_1_on_a_cell_flashing_in_each_colour(
         band = band_reading_from(found["band"])
         if found["flash"] != str(flash_colour):
             problems.append(f"{cell}: data-flash is {found['flash']!r}")
-        if band.background != flash_swatch:
+        if band.background != FLASH_CELL_BACKGROUND:
+            problems.append(f"{cell}: background {band.background}, not white")
+        if found["overlays"] != 1:
+            problems.append(f"{cell}: {found['overlays']} cell-flash elements")
+        if found["overlayColour"] != flash_swatch:
             problems.append(
-                f"{cell}: background {band.background}, not the flash {flash_swatch}"
+                f"{cell}: cell-flash {found['overlayColour']}, "
+                f"not the flash {flash_swatch}"
             )
+        if found["overlayOpacity"] != FLASH_OVERLAY_OPACITY:
+            problems.append(f"{cell}: cell-flash opacity {found['overlayOpacity']}")
         for problem in band_contrast_problems(band, swatches[author]):
             problems.append(f"{cell} band of {author}: {problem}")
     assert problems == [], f"flash in colour {flash_colour}: {problems}"

@@ -13,7 +13,8 @@ pattern, and the clue bar names her `Ana`.
 
 The bands are read with spec 019's readers and checks (`band_readings`,
 `hatched_problems` and `pattern_problems`, which use `first_gradient_argument`,
-`is_diagonal` and `is_grey`), and the swatch with `swatch_colour`.
+`is_diagonal` and `is_ink_or_white`: the hatch is ink and white since spec 041),
+and the swatch with `swatch_colour`.
 """
 
 from __future__ import annotations
