@@ -376,3 +376,13 @@ does not bring teammates back, and split panes do not work in Windows Terminal
 - **Another role** (security review, documentation): copy an agent file, give it
   a new `name` and `description`, and add a step to
   `.claude/skills/feature/SKILL.md`.
+
+## 8. Credits
+
+The web client uses two font families, served by Nock itself from its own origin
+(the npm packages `@fontsource/source-sans-3` and
+`@fontsource/ibm-plex-sans-condensed`, built into `web/dist`):
+
+- Source Sans 3, designed by Adobe, under the SIL Open Font License 1.1.
+- IBM Plex Sans Condensed, copyright 2019 IBM Corp., under the SIL Open Font
+  License 1.1.
