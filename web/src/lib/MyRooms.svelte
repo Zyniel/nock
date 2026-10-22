@@ -106,7 +106,7 @@
 
   .my-rooms-list li {
     padding: 0.75rem;
-    border: 1px solid #5b6070;
+    border: 1px solid var(--nock-line);
     border-radius: 0.5rem;
   }
 

@@ -5,9 +5,12 @@ The page is driven with a mocked socket. The contrast scan, the language scan an
 the keyboard walker (`tab_to`) are spec 035's. The mark's contrast is measured over
 its colours, as "Client: revealed cells" says since the lead's refinement of
 2026-10-15. The flash run (decision 14) reads the flash as spec 016 AC-2's tests
-do: `data-flash` holds the colour index, and the cell's background is the colour
-of the matching roster swatch. The edge case "Revealed while flashing" is tested by
-the flash run. The shared setup is in `spec024_harness`.
+do: `data-flash` holds the colour index; since spec 041 (AC-16) the cell's
+background is white and the colour of the matching roster swatch is the
+background of the cell's one `cell-flash` element, at the opacity 0.38, and the
+mark's contrast is measured against that composite. The edge case "Revealed
+while flashing" is tested by the flash run. The shared setup is in
+`spec024_harness`.
 """
 
 from __future__ import annotations
@@ -255,8 +258,9 @@ ABSENT_PLAYER = "p9"  # not in the roster: spec 016 flashes it in colour 0
 
 # Polled on each animation frame: false until the cell's `data-revealed` is
 # `true`, then, read at once, the cell's `data-flash`, its computed background,
-# the computed background of the roster swatch of the player whose colour
-# flashes, the grid's selected cell, and the colours of the cell's corner mark.
+# the computed background and opacity of its `cell-flash` elements, the computed
+# background of the roster swatch of the player whose colour flashes, the grid's
+# selected cell, and the colours of the cell's corner mark.
 FLASH_READING_SCRIPT = (
     "([selector, swatchPlayerId]) => {\n" + COLOUR_CONTRAST_JS + MARK_COLOURS_JS + r"""
   const cell = document.querySelector(selector);
@@ -270,9 +274,15 @@ FLASH_READING_SCRIPT = (
   );
   const marks = cell.querySelectorAll('[data-testid="reveal-mark"]');
   const colours = marks.length === 1 ? markColours(cell, marks[0]) : [];
+  const overlays = [];
+  for (const overlay of cell.querySelectorAll('[data-testid="cell-flash"]')) {
+    const style = getComputedStyle(overlay);
+    overlays.push({background: style.backgroundColor, opacity: style.opacity});
+  }
   return {
     flash: cell.getAttribute('data-flash'),
     background: getComputedStyle(cell).backgroundColor,
+    overlays: overlays,
     swatch: swatch === null ? null : getComputedStyle(swatch).backgroundColor,
     selected: [
       grid.getAttribute('data-selected-row'),
@@ -357,6 +367,34 @@ def read_at_reveal(page: Page, colour: int) -> dict[str, Any]:
     return reading
 
 
+def overlay_problems(reading: dict[str, Any]) -> list[str]:
+    """How the flash breaks spec 041 AC-16: white cell, one overlay at 38 %.
+
+    Args:
+        reading: What `read_at_reveal` read.
+
+    Returns:
+        One line per broken rule; an empty list when the cell is white under one
+        `cell-flash` of the swatch's colour at the opacity 0.38.
+    """
+    problems: list[str] = []
+    if reading["background"] != "rgb(255, 255, 255)":
+        problems.append(f"background {reading['background']} is not white")
+    overlays = reading["overlays"]
+    if len(overlays) != 1:
+        problems.append(f"{len(overlays)} cell-flash elements in the cell")
+    else:
+        overlay = overlays[0]
+        if overlay["background"] != reading["swatch"]:
+            problems.append(
+                f"cell-flash {overlay['background']} is not the swatch "
+                f"{reading['swatch']}"
+            )
+        if overlay["opacity"] != "0.38":
+            problems.append(f"cell-flash opacity {overlay['opacity']} is not 0.38")
+    return problems
+
+
 def flash_problems(
     reading: dict[str, Any], colour: int, selected: list[str] | None
 ) -> list[str]:
@@ -376,10 +414,8 @@ def flash_problems(
         problems.append(f"data-flash is {reading['flash']!r}, not {colour!r}")
     if reading["swatch"] is None:
         problems.append(f"no roster swatch for {swatch_owner_of(colour)}")
-    elif reading["background"] != reading["swatch"]:
-        problems.append(
-            f"background {reading['background']} is not the swatch {reading['swatch']}"
-        )
+    else:
+        problems.extend(overlay_problems(reading))
     if selected is not None and reading["selected"] != selected:
         problems.append(f"selected cell {reading['selected']}, expected {selected}")
     if reading["marks"] != 1:

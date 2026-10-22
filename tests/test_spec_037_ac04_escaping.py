@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Dialog, Page, WebSocketRoute, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
@@ -279,6 +280,7 @@ def open_mock_room(
     mock.send(snapshot_frame(view, players))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "5")
     expect(page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(page)
     return dialogs
 
 

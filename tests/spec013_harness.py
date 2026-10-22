@@ -30,6 +30,7 @@ from playwright.sync_api import Browser, Locator, Page, WebSocketRoute, expect
 from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -456,6 +457,7 @@ def open_room(
     mock.send(snapshot_frame(grid, players, seq, settings))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
     expect(page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(page)
     return mock
 
 

@@ -348,7 +348,7 @@ The kept snapshot is updated by these events (spec 040 "applying an event"):
 
 Player colours: 8 CSS colours, one per index 0 to 7, defined once (for example
 CSS custom properties `--player-colour-0` to `--player-colour-7`), pairwise
-different. Later specs (013, 016) reuse them.
+different. Later specs (013, 016) reuse them. (Note from the lead, 2026-10-22: since spec 041 AC-3, the eight colours are those of `_design.md`, defined once as `--player-colour-0` to `--player-colour-7`; they are still pairwise different, and the tests compare colours with the roster swatches, which follow the new values.)
 
 New `fr.json` keys:
 

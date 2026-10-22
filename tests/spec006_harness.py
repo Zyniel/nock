@@ -19,6 +19,7 @@ from collections.abc import Callable
 import pytest
 from playwright.sync_api import FloatRect, Locator, Page, WebSocketRoute, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import ClueCell, Grid
 from nock.protocol import (
     GridView,
@@ -63,6 +64,7 @@ def open_room(page: Page, base_url: str, registry: RoomRegistry, grid: Grid) -> 
     submit_nickname_form(page)
     viewport = page.get_by_test_id("grid-viewport")
     expect(viewport).to_be_visible()
+    wait_for_fonts(page)
     return viewport
 
 
@@ -196,3 +198,4 @@ def show_snapshot(page: Page, mock: MockRoomSocket, view: GridView, seq: int) ->
     mock.send(snapshot_frame(view, seq))
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-seq", str(seq))
+    wait_for_fonts(page)

@@ -80,7 +80,7 @@
     flex: none;
     box-sizing: border-box;
     padding: 0.25rem;
-    background: #dfe3ee;
+    background: var(--nock-keyboard-bg);
     -webkit-user-select: none;
     user-select: none;
   }
@@ -99,9 +99,9 @@
     padding: 0;
     font: inherit;
     font-size: 1.1rem;
-    color: #1f2330;
-    background: #ffffff;
-    border: 1px solid #8a8fa0;
+    color: var(--nock-ink);
+    background: var(--nock-key);
+    border: 1px solid var(--nock-rule);
     border-radius: 0.3rem;
     display: flex;
     align-items: center;

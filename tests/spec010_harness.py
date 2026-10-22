@@ -26,6 +26,7 @@ import pytest
 from playwright.sync_api import Locator, Page, WebSocket, WebSocketRoute, expect
 
 import nock.room
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
 from nock.protocol import (
@@ -178,6 +179,7 @@ def start_from_catalogue(page: Page, base_url: str) -> str:
     page.goto(f"{base_url}/")
     item_play_button(page).click()
     page.wait_for_url(ROOM_URL_PATTERN)
+    wait_for_fonts(page)
     return code_from_url(page.url)
 
 
@@ -347,3 +349,4 @@ def snapshot_of(grid: Grid, solved: bool = False, seq: int = 0) -> Snapshot:
 def send_snapshot(mock: MockRoomSocket, grid: Grid, solved: bool = False) -> None:
     mock.send(snapshot_of(grid, solved).model_dump_json())
     expect(mock.page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(mock.page)

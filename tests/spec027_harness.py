@@ -53,6 +53,7 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 from playwright.sync_api import Error as PlaywrightError
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -481,6 +482,7 @@ def show_snapshot(page: Page, mock: MockRoomSocket, frame: str, seq: int) -> Non
     mock.send(frame)
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(page)
 
 
 def open_timer_room(

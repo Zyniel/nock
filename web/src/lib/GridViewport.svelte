@@ -538,6 +538,7 @@
             {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
             {@const authorMark = authorMarkOf(cell)}
             {@const caughtUp = isCaughtUp(cell.row, cell.column)}
+            {@const flash = flashOf(cell.row, cell.column)}
             <div
               class="cell letter"
               class:locked={cell.locked}
@@ -556,7 +557,7 @@
               data-locked={String(cell.locked)}
               data-revealed={String(cell.revealed)}
               data-wrong={String(cell.wrong && !shown.unconfirmed)}
-              data-flash={flashOf(cell.row, cell.column)}
+              data-flash={flash}
               data-caught-up={String(caughtUp)}
               data-selected={String(isSelected(cell.row, cell.column))}
               data-in-word={String(isInWord)}
@@ -567,7 +568,12 @@
               style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
               style:grid-row={cell.row + 1}
               style:grid-column={cell.column + 1}
-            >{shown.letter ?? ''}{#if caughtUp}<span
+            >{shown.letter ?? ''}{#if flash !== ''}<span
+                  class="cell-flash"
+                  data-testid="cell-flash"
+                  aria-hidden="true"
+                  style:background-color={`var(--player-colour-${flash})`}
+                ></span>{/if}{#if caughtUp}<span
                   class="catch-up-mark"
                   data-testid="catch-up-mark"
                   aria-hidden="true"
@@ -741,8 +747,8 @@
     box-sizing: border-box;
     min-width: 0;
     min-height: 0;
-    border: 1px solid #8a8fa0;
-    background: #ffffff;
+    border: 1px solid var(--nock-rule);
+    background: var(--nock-white);
   }
 
   /* A letter cell is a stacking context of its own (isolation), so the z-index
@@ -751,6 +757,7 @@
   .letter {
     position: relative;
     isolation: isolate;
+    color: var(--nock-ink);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -759,36 +766,36 @@
     text-transform: uppercase;
   }
 
-  /* A letter found wrong by a check: the line is on the cell itself. */
+  /* A letter found wrong by a check: the line is on the cell itself, in red. */
   .letter[data-wrong='true'] {
     text-decoration-line: line-through;
+    text-decoration-color: var(--nock-red);
   }
 
   /* A pencil letter (spec 020): in italics, the sign that does not rely on
-     colour, and in a grey that keeps at least 4.5:1 on the plain, word,
-     selected and tinted backgrounds. While the cell flashes, a pencil letter
-     takes the flash's text colour like a normal letter (the data-flash rules
-     below) and its italics alone mark it (spec 020 decision 12): on flashes 0,
-     5 and 7, no colour that keeps 4.5:1 differs visibly from the normal text. */
+     colour, and in the pencil grey, which keeps at least 4.5:1 on the plain,
+     word, selected and tinted backgrounds. While the cell flashes, a pencil
+     letter takes the ink like a normal letter (the data-flash rule below) and
+     its italics alone mark it (spec 020 decision 12). */
   .letter[data-pencil='true'] {
     font-style: italic;
-    color: #505050;
+    color: var(--nock-pencil);
   }
 
   .letter.locked {
-    background: #dfe3ee;
+    background: var(--nock-locked);
     font-weight: 700;
   }
 
   .letter.in-word {
-    background: #cfe3ff;
+    background: var(--nock-word);
   }
 
   /* A revealed cell: a triangle in its top-right corner, a shape that does not
      rely on colour (spec 024). It is drawn in the cell's text colour
      (currentColor), so it keeps 3:1 in every state of the cell: the ink on the
-     locked, selected, word and tinted backgrounds, and the text colour of each
-     flash (the data-flash rules below) while the cell flashes. The flash keeps
+     locked, selected, word and tinted backgrounds, and on the white background
+     of a flashing cell (the data-flash rule below). The flash keeps
      its full length (spec 024 decision 14). A remote label in the same corner
      comes later in the cell, so it is drawn over the mark. */
   .reveal-mark {
@@ -817,23 +824,25 @@
     pointer-events: none;
   }
 
+  /* My cell: the selected blue, with a 2px navy border drawn inside it. */
   .letter.selected {
-    background: #ffd54a;
-    outline: 3px solid #1f2330;
-    outline-offset: -3px;
+    background: var(--nock-selected);
+    outline: 2px solid var(--nock-navy);
+    outline-offset: -2px;
   }
 
-  /* The word of another player: their colour at low opacity. My own word
-     (in-word) and my cell (selected) keep their look. */
+  /* The word of another player: their colour at 16 % over white, which keeps
+     the pencil grey above 5.2:1. My own word (in-word) and my cell (selected)
+     keep their look. */
   .letter.tinted {
-    background: color-mix(in srgb, var(--tint) 28%, #ffffff);
+    background: color-mix(in srgb, var(--tint) 16%, var(--nock-white));
   }
 
   /* The authors view (spec 019): a band along the bottom of the cell. It is
      drawn over the cell's background and replaces none of it. Its sides keep
      3px inside the cell's padding box (4px inside its edge) and its bottom 2px
-     (3px inside its edge), so the selected cell's outline (3px, drawn inside
-     the cell) never covers it. Its z-index draws it above the other players'
+     (3px inside its edge), so the selected cell's outline (2px, drawn inside the
+     cell) never covers it. Its z-index draws it above the other players'
      outlines, so no outline crosses it; only their corner labels (z-index 2,
      below) are drawn over its ends.
      Its height is 11% of the cell side and at least 4px, but at most a quarter
@@ -887,8 +896,8 @@
 
   /* The band of an author who is no longer in the room (their colour may now
      be someone else's): the departed hatching of app.css, diagonal stripes of
-     a dark grey and white, a pattern no player's band has. One of the two
-     greys keeps 3:1 on every background of the cell. */
+     ink and white, a pattern no player's band has. The ink keeps 3:1 on every
+     background of the cell. */
   .author-mark[data-colour=''] {
     background-image: var(--author-departed-hatching);
   }
@@ -919,8 +928,8 @@
     font-size: max(7px, calc(var(--cell) * 0.2));
     font-weight: 700;
     line-height: 1.1;
-    color: #1f2330;
-    background: #ffffff;
+    color: var(--nock-ink);
+    background: var(--nock-white);
   }
 
   .remote-label[data-corner='top-left'] {
@@ -943,52 +952,31 @@
     left: var(--corner-offset);
   }
 
-  /* After the other states, so a flash shows over them. Each text colour keeps
-     at least 4.5:1 on its flash colour. A pencil letter takes it too, and keeps
-     only its italics during the flash (spec 020 decision 12); the corner mark of
-     a revealed cell is drawn in it too. */
-  .letter[data-flash='0'] {
-    background: var(--player-colour-0);
-    color: #000000;
+  /* A flashing cell (spec 016): after the other states, so a flash shows over
+     them. The cell turns white and its letter ink; the cell-flash element below
+     lays the replacer's colour at 38 % over the white. Ink keeps at least
+     4.5:1 on that mix for every player colour. A pencil letter takes the ink
+     too, and keeps only its italics during the flash (spec 020 decision 12);
+     the corner mark of a revealed cell is drawn in it too. */
+  .letter:not([data-flash='']) {
+    background: var(--nock-white);
+    color: var(--nock-ink);
   }
 
-  .letter[data-flash='1'] {
-    background: var(--player-colour-1);
-    color: #1f2330;
+  /* The replacer's colour, set on the element. Its negative z-index paints it
+     over the cell's background and under the letter and the marks, inside the
+     cell's own stacking context (isolation on .letter). */
+  .cell-flash {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.38;
+    pointer-events: none;
   }
 
-  .letter[data-flash='2'] {
-    background: var(--player-colour-2);
-    color: #ffffff;
-  }
-
-  .letter[data-flash='3'] {
-    background: var(--player-colour-3);
-    color: #1f2330;
-  }
-
-  .letter[data-flash='4'] {
-    background: var(--player-colour-4);
-    color: #ffffff;
-  }
-
-  .letter[data-flash='5'] {
-    background: var(--player-colour-5);
-    color: #ffffff;
-  }
-
-  .letter[data-flash='6'] {
-    background: var(--player-colour-6);
-    color: #ffffff;
-  }
-
-  .letter[data-flash='7'] {
-    background: var(--player-colour-7);
-    color: #000000;
-  }
-
+  /* The clue of my selected word (decided by the human on 2026-10-16). */
   .clue.active {
-    background: #ffd54a;
+    background: var(--nock-selected);
   }
 
   /* The focus outline stays inside the scrolling viewport. */
@@ -997,7 +985,7 @@
   }
 
   .empty {
-    background: #c9cdd8;
+    background: var(--nock-rule);
   }
 
   /* Room on the right and at the bottom for the arrows. */
@@ -1007,7 +995,7 @@
     flex-direction: column;
     padding: calc(var(--cell) * 0.03) calc(var(--cell) * 0.12)
       calc(var(--cell) * 0.12) calc(var(--cell) * 0.03);
-    background: #eef1fa;
+    background: var(--nock-clue-bg);
   }
 
   .clue {
@@ -1018,11 +1006,16 @@
     justify-content: center;
   }
 
+  /* The line height holds Source Sans 3's ascent and descent (1.424 em; IBM
+     Plex Sans Condensed's is 1.3 em), so no line overflows its box and no clue
+     text is cut off at full zoom (spec 006 AC-1, spec 041). Spec 042 sets the
+     clue text's final type. */
   .clue-text {
     display: block;
     max-width: 100%;
     font-size: calc(var(--cell) * 0.11);
-    line-height: 1.1;
+    line-height: 1.424;
+    color: var(--nock-clue-ink);
     text-align: center;
     overflow-wrap: anywhere;
   }
@@ -1034,7 +1027,7 @@
   /* The flag marker of spec 021, laid over the top left corner of its clue: the
      clue cell's corner for the first clue, just under the separator for the
      second one. Positioned against the clue cell, like the arrows, so it adds no
-     layout; a tap on it is a tap on its clue. Dark red keeps 4.5:1 on the cell
+     layout; a tap on it is a tap on its clue. Red keeps 4.5:1 on the cell
      and on the selected clue. */
   .clue-flag {
     position: absolute;
@@ -1042,7 +1035,7 @@
     left: 0;
     font-size: max(7px, calc(var(--cell) * 0.15));
     line-height: 1;
-    color: #a4161a;
+    color: var(--nock-red);
   }
 
   .clue-flag.second {
@@ -1064,9 +1057,9 @@
     font-size: max(12px, calc(var(--cell) * 0.3));
     line-height: 1;
     white-space: nowrap;
-    color: #1f2330;
-    background: #ffffff;
-    border: 1px solid #5b6070;
+    color: var(--nock-ink);
+    background: var(--nock-white);
+    border: 1px solid var(--nock-line);
     border-radius: 0.3em;
     pointer-events: none;
   }
@@ -1082,7 +1075,7 @@
   .separator {
     flex: none;
     height: 1px;
-    background: #1f2330;
+    background: var(--nock-clue-ink);
   }
 
   /* Arrows are small triangles against the cell's right or bottom edge. */
@@ -1099,7 +1092,7 @@
     margin-top: calc(var(--cell) * -0.07);
     border-width: calc(var(--cell) * 0.07) 0 calc(var(--cell) * 0.07)
       calc(var(--cell) * 0.1);
-    border-left-color: #1f2330;
+    border-left-color: var(--nock-ink);
   }
 
   .arrow.bottom {
@@ -1108,6 +1101,6 @@
     margin-left: calc(var(--cell) * -0.07);
     border-width: calc(var(--cell) * 0.1) calc(var(--cell) * 0.07) 0
       calc(var(--cell) * 0.07);
-    border-top-color: #1f2330;
+    border-top-color: var(--nock-ink);
   }
 </style>

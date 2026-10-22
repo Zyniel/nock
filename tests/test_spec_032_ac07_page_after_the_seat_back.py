@@ -13,7 +13,8 @@ pattern, and the clue bar names her `Ana`.
 
 The bands are read with spec 019's readers and checks (`band_readings`,
 `hatched_problems` and `pattern_problems`, which use `first_gradient_argument`,
-`is_diagonal` and `is_grey`), and the swatch with `swatch_colour`.
+`is_diagonal` and `is_ink_or_white`: the hatch is ink and white since spec 041),
+and the swatch with `swatch_colour`.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ import re
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.protocol import RevealBudget, Snapshot, grid_view
 from spec019_harness import (
@@ -94,6 +96,7 @@ def open_bobs_page(page: Page, base_url: str, grid: Grid) -> MockRoomSocket:
     expect(page.get_by_test_id("cell")).to_have_count(FX01_CELL_COUNT)
     turn_switch_on(page)
     expect(marks_in(page, 1, 0)).to_have_count(1)
+    wait_for_fonts(page)
     return mock
 
 

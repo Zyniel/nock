@@ -37,6 +37,7 @@ from typing import NamedTuple
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Arrow, ClueCell, Grid, LetterCell
 from nock.protocol import (
     GridTarget,
@@ -368,6 +369,7 @@ def open_status_page(
     if touch:
         expect(page.get_by_test_id("keyboard")).to_be_visible()
     page.evaluate(SETTLE_LAYOUT_SCRIPT)
+    wait_for_fonts(page)
 
 
 def expect_status_shows(page: Page, state: str) -> None:

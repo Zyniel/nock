@@ -53,6 +53,7 @@ import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Locator, Page, Route, WebSocketRoute, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -656,6 +657,7 @@ def open_mocked_room(
     mock.send(snapshot_frame(grid, seq, shown_players))
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(page)
     return mock
 
 
