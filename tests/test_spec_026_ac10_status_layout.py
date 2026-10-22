@@ -147,7 +147,7 @@ LONGEST_CLUE = "On la glisse dans une enveloppe"
 LONGEST_CLUE_CELL: Cell = (0, 6)
 LONGEST_WORD = "0,6,0"
 # Spec 043's 3-second note for `p2`'s last check covers the top row while it
-# shows (a tap on it opens the Salon); it leaves 3.25 s after it appeared.
+# shows (a tap on it opens the Salon); it leaves the page 3,350 ms after it showed.
 NOTE_GONE_TIMEOUT_MS = 5000
 
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]

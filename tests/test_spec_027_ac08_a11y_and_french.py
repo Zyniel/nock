@@ -197,10 +197,15 @@ def test_ac8_the_timer_text_is_never_a_tab_stop(
         # The walk starts on `undo-button`, which comes right after `timer`, and goes
         # backwards: a Tab stop on `timer` would be the first one reached.
         # (`document.body.focus()` does not reset where Tab starts.)
+        # `undo-button` is the page's first Tab stop. Before the first one,
+        # Chromium and WebKit move the focus out of the document (`body`), while
+        # Firefox under automation leaves it where it is (spec 035, "Nothing
+        # focusable after the grid"): the walk stops on either.
         undo = page.get_by_test_id("undo-button")
         undo.focus()
         expect(undo).to_be_focused()
         visited: list[str] = []
+        previous = "undo-button"
         for _ in range(8):
             page.keyboard.press("Shift+Tab")
             focused = page.evaluate(
@@ -209,14 +214,14 @@ def test_ac8_the_timer_text_is_never_a_tab_stop(
                 " : document.activeElement.getAttribute('data-testid')"
                 " || document.activeElement.tagName"
             )
-            if focused is None:
+            if focused is None or focused == previous:
                 break
             visited.append(str(focused))
+            previous = str(focused)
     finally:
         close()
 
-    assert "timer" not in visited
-    assert "undo-button" not in visited[:1], visited
+    assert "timer" not in visited, visited
 
 
 # ---- Spec 035's scans ----

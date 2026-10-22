@@ -75,7 +75,7 @@ LAST_FEED_SEQ = 5 + FEED_ITEMS
 LAST_CHAT_SEQ = LAST_FEED_SEQ + CHAT_LINES
 VOTE_SEQ = LAST_CHAT_SEQ + 1
 # Spec 043's 3-second note for `p2`'s last line covers the top row while it shows
-# (a tap on it opens the Salon); it leaves 3.25 s after it appeared.
+# (a tap on it opens the Salon); it leaves the page 3,350 ms after it showed.
 NOTE_GONE_TIMEOUT_MS = 5000
 MIN_GRID_VIEWPORT_PX = 100.0
 MIN_TARGET_PX = 24.0
