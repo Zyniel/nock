@@ -841,8 +841,8 @@
   /* The authors view (spec 019): a band along the bottom of the cell. It is
      drawn over the cell's background and replaces none of it. Its sides keep
      3px inside the cell's padding box (4px inside its edge) and its bottom 2px
-     (3px inside its edge), so the selected cell's outline (3px, drawn inside
-     the cell, 2px since spec 041) never covers it. Its z-index draws it above the other players'
+     (3px inside its edge), so the selected cell's outline (2px, drawn inside the
+     cell) never covers it. Its z-index draws it above the other players'
      outlines, so no outline crosses it; only their corner labels (z-index 2,
      below) are drawn over its ends.
      Its height is 11% of the cell side and at least 4px, but at most a quarter
