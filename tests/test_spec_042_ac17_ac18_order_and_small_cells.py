@@ -30,11 +30,13 @@ from spec034_harness import CatchUpRoute, catch_up_json
 from spec042_harness import (
     ACCESS_SWITCH,
     CORNERS,
+    INK,
     NAVY,
     SELECTED,
     Box,
     ChangeList,
     Reading,
+    Rgb,
     across_word_holds,
     arrow_of,
     box_problems,
@@ -416,6 +418,31 @@ def test_ac17_the_selection_border_is_drawn_over_another_players_triangle(
     assert hit_owner(chain) == SELECTION, chain
 
 
+def band_pixels(page: Page) -> tuple[Rgb, Rgb]:
+    """The painted pixels of (0, 1) 1 px and 2.5 px inside its left edge.
+
+    The first is in the 2 px band of `cell-selection`, the second in the ring's
+    3 px border, a half pixel past the band; both half way down the cell.
+    """
+    start_hit_test(page, 0, 1, with_selection=True)
+    try:
+        cell, _ = cursor_boxes(page)
+        y = (cell.top + inner_box(cell).bottom) / 2
+        in_band = pixel_at(page, cell.left + 1, y)
+        past_band = pixel_at(page, cell.left + 2.5, y)
+    finally:
+        end_hit_test(page)
+    return in_band, past_band
+
+
+def colour_within_one(painted: Rgb, expected: Rgb) -> bool:
+    """Tell whether each channel of `painted` is within 1 of `expected`."""
+    for channel, wanted in zip(painted, expected, strict=True):
+        if abs(channel - wanted) > 1:
+            return False
+    return True
+
+
 def test_ac17_the_caught_up_cell_shows_the_navy_band_over_the_ring(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
@@ -427,13 +454,23 @@ def test_ac17_the_caught_up_cell_shows_the_navy_band_over_the_ring(
         x = cell.left + 1
         y = (cell.top + inner_box(cell).bottom) / 2
         chain = hit_chain(page, x, y)
-        painted = pixel_at(page, x, y)
     finally:
         end_hit_test(page)
+    in_band, _ = band_pixels(page)
 
     assert hit_owner(chain) == SELECTION, chain
-    for channel, expected in zip(painted, NAVY, strict=True):
-        assert abs(channel - expected) <= 1, (painted, NAVY)
+    assert colour_within_one(in_band, NAVY), (in_band, NAVY)
+
+
+def test_ac17_the_ring_shows_only_past_the_navy_band(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    _, past_band = band_pixels(page)
+
+    assert colour_within_one(past_band, INK), (past_band, INK)
+    assert not colour_within_one(past_band, NAVY), (past_band, NAVY)
 
 
 # ---- AC-18: small cells keep the marks' minimum sizes ----------------------------

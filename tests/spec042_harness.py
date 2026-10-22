@@ -1038,6 +1038,11 @@ def pixel_at(page: Page, x: float, y: float) -> Rgb:
     return png_single_pixel(png)
 
 
+# The channels per pixel of the PNG colour types a screenshot can have:
+# 2 is RGB and 6 is RGBA.
+PNG_CHANNELS = {2: 3, 6: 4}
+
+
 def png_single_pixel(png: bytes) -> Rgb:
     """The colour of the one pixel of an 8-bit RGB or RGBA PNG of 1 by 1."""
     data = b""
@@ -1049,7 +1054,9 @@ def png_single_pixel(png: bytes) -> Rgb:
         body = png[position + 8 : position + 8 + length]
         if kind == b"IHDR":
             assert body[8] == 8, "not an 8-bit PNG"
-            channels = {2: 3, 6: 4}[body[9]]
+            colour_type = body[9]
+            assert colour_type in PNG_CHANNELS, f"PNG colour type {colour_type}"
+            channels = PNG_CHANNELS[colour_type]
             assert int.from_bytes(body[0:4], "big") == 1, "not 1 px wide"
             assert int.from_bytes(body[4:8], "big") == 1, "not 1 px high"
         if kind == b"IDAT":
