@@ -30,7 +30,7 @@ from pathlib import Path
 # Folders (ending with "/") and single files each role may write, relative to
 # the project root. A role that is not listed here is not restricted.
 ROLE_WRITE_PATHS: dict[str, list[str]] = {
-    "spec-writer": ["specs/"],
+    "spec-writer": ["specs/", "docs/design/"],
     "test-writer": ["tests/"],
     "implementer": ["src/", "web/", "docs/", "README.md"],
     "reviewer": [],
@@ -42,7 +42,10 @@ ROLE_WRITE_PATHS: dict[str, list[str]] = {
 # files and folders such as .npmrc, .gitignore and .vscode/ (fnmatch's "*" also
 # matches "/").
 ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
+    # docs/design/ is the visual reference, drawn with specs/_design.md by the
+    # spec-writer before tests and code (human decision, 2026-10-22).
     "implementer": [
+        "docs/design/*",
         "web/package*.json",
         "web/*.config.*",
         "web/tsconfig*.json",

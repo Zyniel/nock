@@ -40,6 +40,12 @@ Then look at the change as a whole:
 - Tests changed in the same commit as the implementation.
 - Code that breaks the python-standards skill in a way the linters do not catch,
   mainly readability.
+- A change of look that is not in the visual reference: every colour, size,
+  layout or new state that reaches the screen must match `specs/_design.md` and be
+  drawn in `docs/design/` (the screens sheet's sources in
+  `docs/design/screens_sheet/`, the cell sheet for cells), in the same change
+  (human decision, 2026-10-22). A screen that changed without its drawing is a
+  blocking finding for the spec-writer.
 
 Finally run `uv run python scripts/gate.py` and read its output yourself.
 
