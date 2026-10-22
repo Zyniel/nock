@@ -98,9 +98,9 @@
     width: min(28rem, calc(100vw - 2rem));
     max-height: calc(100dvh - 2rem);
     overflow: auto;
-    color: #1f2330;
-    background: #ffffff;
-    border: 1px solid #5b6070;
+    color: var(--nock-ink);
+    background: var(--nock-white);
+    border: 1px solid var(--nock-line);
     border-radius: 0.5rem;
   }
 

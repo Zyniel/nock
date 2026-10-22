@@ -2127,13 +2127,14 @@
   .connection-banner {
     margin: 0.25rem 0;
     padding: 0.4rem 0.75rem;
-    background: #fff3cd;
-    border: 1px solid #b38600;
+    color: var(--nock-ink);
+    background: var(--nock-clue-bg);
+    border: 1px solid var(--nock-line);
   }
 
   .nickname-error {
     margin: 0;
-    color: #a4161a;
+    color: var(--nock-red);
   }
 
   /* Title, status, invitation link and the room toolbar on one row; it wraps
@@ -2210,8 +2211,8 @@
      ("Plus de lettre"), so the text keeps 4.5:1 against the button instead of
      the browser's pale grey (spec 024). The dashed border shows it is disabled. */
   .reveal-panel button:disabled {
-    color: #4a4f5c;
-    background-color: #f2f3f6;
+    color: var(--nock-muted);
+    background-color: var(--nock-clue-bg);
     border-style: dashed;
     cursor: not-allowed;
   }
@@ -2263,8 +2264,8 @@
     border-radius: 1em;
     font-size: 0.8em;
     line-height: 1;
-    color: #ffffff;
-    background: #a4161a;
+    color: var(--nock-white);
+    background: var(--nock-red);
   }
 
   .host-panel-more,
@@ -2322,7 +2323,7 @@
 
   .roster-state {
     font-size: 0.8rem;
-    color: #5b6070;
+    color: var(--nock-muted);
   }
 
   /* No opacity: dimmed text would not reach 4.5:1 (spec 035). The state is
@@ -2441,10 +2442,10 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.25rem 0.75rem;
-    /* Room for the focus outline of the buttons (3px, 2px away). */
+    /* Room for the focus outline of the buttons (2px, 2px away). */
     padding: 0.375rem 0.5rem;
-    background: #fff3cd;
-    border-bottom: 1px solid #b38600;
+    background: var(--nock-white);
+    border-bottom: 1px solid var(--nock-navy);
     font-size: 0.9rem;
   }
 
@@ -2462,8 +2463,8 @@
 
   /* A disabled ballot button (offline) keeps a readable text. */
   .vote-actions button:disabled {
-    color: #4a4f5c;
-    background-color: #f2f3f6;
+    color: var(--nock-muted);
+    background-color: var(--nock-clue-bg);
     border-style: dashed;
     cursor: not-allowed;
   }
@@ -2475,9 +2476,9 @@
     min-height: 28px;
     padding: 0 0.75rem;
     font: inherit;
-    color: #1f2330;
-    background: #ffffff;
-    border: 1px solid #5b6070;
+    color: var(--nock-ink);
+    background: var(--nock-white);
+    border: 1px solid var(--nock-rule);
     border-radius: 4px;
   }
 
@@ -2486,8 +2487,8 @@
     flex: none;
     box-sizing: border-box;
     padding: 0.5rem 0.75rem;
-    background: #eef1fa;
-    border-top: 1px solid #8a8fa0;
+    background: var(--nock-clue-bg);
+    border-top: 1px solid var(--nock-rule);
   }
 
   .clue-bar-text {
@@ -2541,7 +2542,7 @@
     white-space: nowrap;
     font-size: 0.875rem;
     line-height: 1.3;
-    color: #4a4f5c;
+    color: var(--nock-muted);
   }
 
   /* A narrow or low window (a phone) keeps its height for the grid: the roster
@@ -2682,7 +2683,7 @@
       right: 0;
       align-self: stretch;
       width: 1.5rem;
-      background: linear-gradient(to right, transparent, Canvas);
+      background: linear-gradient(to right, transparent, var(--nock-white));
       pointer-events: none;
       visibility: hidden;
     }

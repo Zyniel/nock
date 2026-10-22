@@ -202,9 +202,9 @@
     max-height: calc(100% - 1rem);
     overflow-y: auto;
     padding: 1rem;
-    color: #1f2330;
-    background: #ffffff;
-    border: 1px solid #5b6070;
+    color: var(--nock-ink);
+    background: var(--nock-white);
+    border: 1px solid var(--nock-line);
     border-radius: 0.5rem;
   }
 
@@ -258,7 +258,7 @@
   }
 
   .recap-you {
-    color: #4a4f5c;
+    color: var(--nock-muted);
   }
 
   .recap-share {

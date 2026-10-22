@@ -273,10 +273,10 @@
     z-index: 1;
     box-sizing: border-box;
     top: var(--popover-top);
-    background: #ffffff;
-    border: 1px solid #5b6070;
+    background: var(--nock-white);
+    border: 1px solid var(--nock-line);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+    box-shadow: 0 4px 12px var(--nock-shadow);
     /* The picker's height and the gap under it. */
     --picker-row: calc(2.5rem + 2px);
     right: 0.5rem;
@@ -389,6 +389,6 @@
     min-height: 1.2em;
     line-height: 1.2;
     font-size: 0.8rem;
-    color: #4a4f5c;
+    color: var(--nock-muted);
   }
 </style>
