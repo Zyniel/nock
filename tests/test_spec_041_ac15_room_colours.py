@@ -205,7 +205,16 @@ def test_ac15_down_arrow_of_the_clue_is_ink(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_ac15_room(page, live_server, fx01_grid)
-    arrow = cell_at(page, 0, 2).get_by_test_id("clue-arrow")
+    # Spec 042: the arrow of (0, 2) is drawn in its word's first letter cell,
+    # (1, 2), as an svg whose path is stroked in ink (it was a border triangle
+    # in the clue cell, read on its `border-top-color`).
+    arrow = cell_at(page, 1, 2).locator(
+        '[data-testid="clue-arrow"][data-clue-row="0"][data-clue-column="2"]'
+        '[data-clue-index="0"]'
+    )
+    expect(arrow).to_have_count(1)
     expect(arrow).to_have_attribute("data-side", "bottom")
+    path = arrow.locator("path")
+    expect(path).to_have_count(1)
 
-    assert_colour(colour_of(arrow, "borderTopColor"), INK)
+    assert_colour(colour_of(path, "stroke"), INK)

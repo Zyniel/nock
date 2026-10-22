@@ -3,14 +3,21 @@ the keyboard and in French.
 
 AC-9 on the page with a mocked socket: the `clue-flag` of IDES on FX-01 at 1280 by
 720, and of the first clue of FX-02 at 360 by 740 and 568 by 320, lies inside its
-clue cell, is visible, is at least 7 px, and leaves the `clue-text` where it was
-before the flag arrived; at 1280 by 720 spec 035's contrast scan finds no
-offender, and it measured the marker. AC-9 also measures the marker of NAVAL, the
-clue of index 1 of (0, 0), at 1280 by 720: the same checks, and the marker just
-under the cell's `clue-separator` and clear of NAVAL's `clue-text`. AC-10: the
-four `fr.json` texts; `tab_to` reaches `flag-button` with spec 035 AC-2's outline
-and `Enter` flags MIME; the language and contrast scans with `p2`'s flag on IDES at
-1280 by 720 and 360 by 740. The shared setup is in `spec021_harness`.
+clue cell, is visible, is a square of side `max(8, 0.22 s)`, and leaves the
+`clue-text` where it was before the flag arrived; at 1280 by 720 spec 035's
+contrast scan finds no offender. AC-9 also measures the marker of NAVAL, the clue
+of index 1 of (0, 0), at 1280 by 720: the same checks, and the marker just under
+the cell's `clue-separator`. AC-10: the three `fr.json` texts; `tab_to` reaches
+`flag-button` with spec 035 AC-2's outline and `Enter` flags MIME; the language
+and contrast scans with `p2`'s flag on IDES at 1280 by 720 and 360 by 740. The
+shared setup is in `spec021_harness`.
+
+Spec 042 (the design's grid cells) refines AC-1, AC-9 and AC-10: `clue-flag`
+holds the flag icon and no text (`fr.json["flag.marker"]` is gone); AC-9 checks
+the square's side (`s` the clue cell's side, 0.5 px) instead of a font size and
+drops the check that NAVAL's marker is clear of its text (the design draws the
+flag over the text's corner); the scans of AC-9 and AC-10 no longer meet the
+marker's glyph.
 """
 
 from __future__ import annotations
@@ -25,7 +32,6 @@ from nock.grid import ClueCell, Grid
 from nock.protocol import ClueRef, Flag, FlagView, grid_view, parse_client_message
 from spec021_harness import (
     FLAG_BUTTON_TEXT,
-    FLAG_MARKER,
     IDES,
     MIME,
     NAVAL,
@@ -56,13 +62,13 @@ from spec035_harness import (
 )
 
 TOLERANCE_PX = 1.0
-MIN_MARKER_FONT_PX = 7.0
+SIZE_TOLERANCE_PX = 0.5
 NICKNAMES = ["Ana", "Bob", "Cy"]
 MARKER_CASES = [("FX-01", 1280, 720), ("FX-02", 360, 740), ("FX-02", 568, 320)]
 
 # The boxes of a clue's cell, the cell's `clue-separator` (null when it has
 # none), the clue's `clue-text` and its `clue-flag`, with the marker's computed
-# visibility and font size. A box is [left, top, right, bottom].
+# visibility. A box is [left, top, right, bottom].
 GEOMETRY_SCRIPT = r"""
 clue => {
   const box = (element) => {
@@ -83,7 +89,6 @@ clue => {
     const style = getComputedStyle(markers[0]);
     result.marker = box(markers[0]);
     result.visibility = style.visibility;
-    result.fontSize = parseFloat(style.fontSize);
   }
   return result;
 }
@@ -145,8 +150,12 @@ def marker_problems(reading: dict[str, Any]) -> list[str]:
         problems.append(f"marker {reading['marker']} outside cell {reading['cell']}")
     if reading["visibility"] != "visible":
         problems.append(f"visibility {reading['visibility']!r}")
-    if reading["fontSize"] < MIN_MARKER_FONT_PX:
-        problems.append(f"font size {reading['fontSize']} px")
+    # Spec 042: the marker is a square of side max(8px, 0.22 s), s the clue
+    # cell's side.
+    side = max(8.0, 0.22 * (cell_right - cell_left))
+    for name, size in (("width", right - left), ("height", bottom - top)):
+        if abs(size - side) > SIZE_TOLERANCE_PX:
+            problems.append(f"{name} {size} px, expected {side:.2f}")
     return problems
 
 
@@ -182,24 +191,6 @@ def under_separator_problems(reading: dict[str, Any]) -> list[str]:
     return problems
 
 
-def overlap_px(first: list[float], second: list[float]) -> float:
-    """By how much two boxes overlap: the smaller of their two axis overlaps.
-
-    Args:
-        first: A box as [left, top, right, bottom].
-        second: Another box, the same way.
-
-    Returns:
-        0 when the boxes are apart or only touch, else the width or the height of
-        their common part, whichever is smaller.
-    """
-    first_left, first_top, first_right, first_bottom = first
-    second_left, second_top, second_right, second_bottom = second
-    across = min(first_right, second_right) - max(first_left, second_left)
-    down = min(first_bottom, second_bottom) - max(first_top, second_top)
-    return max(0.0, min(across, down))
-
-
 def measured_texts(page: Page) -> list[str]:
     """The texts that spec 035's contrast scan measured."""
     texts: list[str] = []
@@ -216,14 +207,16 @@ def language_texts(page: Page) -> list[str]:
 
 
 def assert_scans_pass_with_the_flag_texts(page: Page, live_server: str) -> None:
-    """The language and contrast scans pass, and they read the flag texts."""
+    """The language and contrast scans pass, and they read the flag texts.
+
+    Spec 042: the marker shows no glyph any more, so the scans do not meet it.
+    """
     texts = language_texts(page)
-    for expected in (FLAG_BUTTON_TEXT, FLAG_MARKER, flag_label(["Bob"])):
+    for expected in (FLAG_BUTTON_TEXT, flag_label(["Bob"])):
         assert expected in texts, expected
     data = language_data(live_server, NICKNAMES)
     assert language_problems(page, data) == []
     assert contrast_problems(page) == []
-    assert FLAG_MARKER in measured_texts(page)
 
 
 # ---- AC-9 ----
@@ -262,7 +255,6 @@ def test_ac9_browser_the_marker_sits_in_its_clue_cell_and_keeps_the_clue_text(
         assert moved_edges(before["text"], after["text"]) == []
         if grid_name == "FX-01":
             assert contrast_problems(page) == []
-            assert FLAG_MARKER in measured_texts(page)
     finally:
         close()
 
@@ -285,8 +277,6 @@ def test_ac9_browser_the_marker_of_a_second_clue_sits_just_under_the_separator(
         assert marker_problems(after) == []
         assert moved_edges(before["text"], after["text"]) == []
         assert under_separator_problems(after) == []
-        overlap = overlap_px(after["marker"], after["text"])
-        assert overlap <= TOLERANCE_PX, (after["marker"], after["text"])
     finally:
         close()
 
@@ -294,12 +284,13 @@ def test_ac9_browser_the_marker_of_a_second_clue_sits_just_under_the_separator(
 # ---- AC-10 ----
 
 
-def test_ac10_fr_json_holds_the_four_flag_texts() -> None:
+def test_ac10_fr_json_holds_the_three_flag_texts() -> None:
     fr = load_fr()
 
     assert fr.get("flag.button") == "Je bloque"
     assert fr.get("flag.button_label") == "Je bloque sur ce mot"
-    assert fr.get("flag.marker") == "\u2691"
+    # Spec 042: the marker is a drawn icon, so `flag.marker` is removed.
+    assert "flag.marker" not in fr
     assert fr.get("flag.marker_label") == "Bloqué : {names}"
     english = ["Loading…", "Salon", "Check word"]
     assert unknown_texts(english, set()) == english

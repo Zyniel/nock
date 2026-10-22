@@ -91,7 +91,9 @@ IDES_CLUE_TEXT = "Fatales à César"
 # in the file: the page tests compare with them directly.
 FLAG_BUTTON_TEXT = "Je bloque"
 FLAG_BUTTON_LABEL = "Je bloque sur ce mot"
-FLAG_MARKER = "\u2691"  # BLACK FLAG
+# Spec 042 (the design's grid cells): the marker holds the flag icon's `svg` and
+# no text; `fr.json["flag.marker"]` (the black flag glyph) is gone.
+FLAG_MARKER_TEXT = ""
 
 # The players of the browser tests with a mocked socket ("Test harness").
 NICKNAMES = {"p1": "Ana", "p2": "Bob", "p3": "Cy"}
@@ -326,6 +328,7 @@ clue => {
     result.flaggedBy = markers[0].getAttribute('data-flagged-by');
     result.ariaHidden = markers[0].getAttribute('aria-hidden');
     result.markerText = markers[0].textContent.trim();
+    result.markerSvgs = markers[0].querySelectorAll('svg').length;
   }
   if (labels.length === 1) {
     result.labelText = labels[0].textContent.trim();
@@ -379,7 +382,8 @@ def flagged_reading(flagged_by: str, names: list[str]) -> dict[str, object]:
         "labels": 1,
         "flaggedBy": flagged_by,
         "ariaHidden": "true",
-        "markerText": FLAG_MARKER,
+        "markerText": FLAG_MARKER_TEXT,
+        "markerSvgs": 1,
         "labelText": flag_label(names),
         "labelHidden": True,
     }

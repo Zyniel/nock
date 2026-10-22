@@ -2,6 +2,12 @@
 
 AC-2: each arrow is drawn on the side of its word's first letter. AC-3: a cell with
 two clues shows both, separated by a line. The shared setup is in `spec006_harness`.
+
+Spec 042 (the design's grid cells) refines AC-2: each `clue-arrow` is a child of
+its word's first letter cell, found there by its `data-clue-row`,
+`data-clue-column` and `data-clue-index`, no longer inside its `clue`; the box
+rule is unchanged. Of a → and a ↴ from one cell, the ↴ is in the top half and
+the → in the bottom half, whatever their indexes.
 """
 
 from __future__ import annotations
@@ -57,6 +63,36 @@ def assert_arrow_on_side(arrow_box: FloatRect, cell_box: FloatRect, side: str) -
         assert cell_left <= arrow_x <= cell_left + cell_width
 
 
+CLUE_ARROW = '[data-testid="clue-arrow"]'
+
+
+def first_letter_of(row: int, column: int, side: str) -> tuple[int, int]:
+    """The word's first letter cell: right of the clue cell, or below it."""
+    if side == "right":
+        return (row, column + 1)
+    return (row + 1, column)
+
+
+def arrow_of_clue(page: Page, row: int, column: int, index: int) -> Locator:
+    """The `clue-arrow` named by its clue's `data-clue-*` (spec 042)."""
+    return page.locator(
+        f'{CLUE_ARROW}[data-clue-row="{row}"][data-clue-column="{column}"]'
+        f'[data-clue-index="{index}"]'
+    )
+
+
+def is_child_of(arrow: Locator, row: int, column: int, side: str) -> bool:
+    """Tell whether the arrow's parent is the word's first letter cell."""
+    letter_row, letter_column = first_letter_of(row, column, side)
+    parent = arrow.evaluate(
+        "e => [e.parentElement.getAttribute('data-testid'),"
+        " e.parentElement.getAttribute('data-row'),"
+        " e.parentElement.getAttribute('data-column'),"
+        " e.parentElement.getAttribute('data-type')]"
+    )
+    return parent == ["cell", str(letter_row), str(letter_column), "letter"]
+
+
 @pytest.mark.parametrize(
     ("row", "column", "index", "arrow", "side"),
     FX01_CLUES,
@@ -77,10 +113,12 @@ def test_ac2_arrow_is_drawn_on_the_side_of_the_first_letter(
     open_room(page, live_server, room_registry, fx01_grid)
     cell = cell_at(page, row, column)
     clue = cell.locator(f'[data-testid="clue"][data-clue-index="{index}"]')
-    clue_arrow = clue.get_by_test_id("clue-arrow")
+    # Spec 042: the arrow is a child of the word's first letter cell.
+    clue_arrow = arrow_of_clue(page, row, column, index)
 
     expect(clue).to_have_attribute("data-arrow", arrow)
     expect(clue_arrow).to_have_count(1)
+    assert is_child_of(clue_arrow, row, column, side)
     expect(clue_arrow).to_have_attribute("data-arrow", arrow)
     expect(clue_arrow).to_have_attribute("data-side", side)
     expect(clue_arrow).to_have_attribute("aria-hidden", "true")
@@ -119,16 +157,18 @@ def test_ac2_two_arrows_on_the_right_share_the_sides_of_the_cell(
         cell_locator = cell_at(page, cell.row, cell.column)
         cell_box = box_of(cell_locator)
         for index in (0, 1):
-            clue = cell_locator.locator(
-                f'[data-testid="clue"][data-clue-index="{index}"]'
-            )
-            clue_arrow = clue.get_by_test_id("clue-arrow")
+            # Spec 042: the arrow is found by its clue attributes, in the letter
+            # cell; the ↴ is in the top half and the → in the bottom half,
+            # whatever their indexes.
+            clue_arrow = arrow_of_clue(page, cell.row, cell.column, index)
+            expect(clue_arrow).to_have_count(1)
             expect(clue_arrow).to_have_attribute("data-side", "right")
+            assert is_child_of(clue_arrow, cell.row, cell.column, "right")
             assert_arrow_on_side(box_of(clue_arrow), cell_box, "right")
             arrow_box = box_of(clue_arrow)
             arrow_y = arrow_box["y"] + arrow_box["height"] / 2
             middle = cell_box["y"] + cell_box["height"] / 2
-            if index == 0:
+            if cell.clues[index].arrow == Arrow.RIGHT_THEN_DOWN:
                 assert cell_box["y"] <= arrow_y <= middle
             else:
                 assert middle <= arrow_y <= cell_box["y"] + cell_box["height"]

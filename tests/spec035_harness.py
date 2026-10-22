@@ -116,9 +116,10 @@ NEW_KEYS = {
         "Flèches pour se déplacer, Tab pour le mot suivant. "
         "Échap puis Tab pour quitter la grille."
     ),
-    "grid.remote_overflow": "+{count}",
-    "a11y.remote_overflow": "{count} autres joueurs",
 }
+# Spec 042 (the design's grid cells) removes the two keys of the "+k" label,
+# which nothing shows any more: seven keys became five.
+REMOVED_KEYS = ("grid.remote_overflow", "a11y.remote_overflow")
 
 # ---- In-page scripts ----------------------------------------------------------
 
@@ -713,11 +714,6 @@ def fill_feed_and_check_it_scrolls(page: Page, mock: MockRoomSocket) -> None:
     )
     overflows = page.evaluate(FEED_OVERFLOWS_SCRIPT, FEED_LIST_SELECTOR)
     assert overflows is True, "the feed list does not scroll after extra events"
-
-
-def remote_initials(page: Page, row: int, column: int) -> Locator:
-    selector = '[data-testid="remote-selection"] [data-testid="remote-initials"]'
-    return cell_at(page, row, column).locator(selector)
 
 
 K2_PLAYERS_SELECTION = Selection(row=2, column=2, direction=Direction.DOWN)

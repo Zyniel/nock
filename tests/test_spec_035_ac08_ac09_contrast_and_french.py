@@ -29,6 +29,7 @@ from spec035_harness import (
     FX01_CLUES,
     LANGUAGE_SCAN_SCRIPT,
     NEW_KEYS,
+    REMOVED_KEYS,
     ROOM_CODE,
     ROOM_TIMEOUT_MS,
     WINDOW_SIZES,
@@ -414,8 +415,17 @@ def test_ac9_the_checker_flags_a_nickname_written_another_way() -> None:
 def test_ac9_the_new_keys_exist_with_their_values() -> None:
     fr_json = load_fr()
 
+    assert len(NEW_KEYS) == 5
     for key, value in NEW_KEYS.items():
         assert fr_json.get(key) == value, key
+
+
+def test_ac9_the_keys_of_the_overflow_label_are_gone() -> None:
+    # Spec 042: the "+k" label and its hidden text are gone, with their keys.
+    fr_json = load_fr()
+
+    for key in REMOVED_KEYS:
+        assert key not in fr_json, key
 
 
 NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve"]

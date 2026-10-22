@@ -11,6 +11,12 @@ background of the cell's one `cell-flash` element, at the opacity 0.38, and the
 mark's contrast is measured against that composite. The edge case "Revealed
 while flashing" is tested by the flash run. The shared setup is in
 `spec024_harness`.
+
+Spec 042 (the design's grid cells) refines AC-9: `reveal-mark` is the
+bottom-centre notch of its "Revealed notch" (its `clip-path`, its box
+`max(7, 0.22 s)` by `max(4, 0.11 s)` centred on the inner box with its bottom on
+the inner box's bottom, in rgb(194, 65, 12)), in one colour; during a flash it is
+ink, rgb(20, 24, 31), and the flash run reads the flash colour from `cell-flash`.
 """
 
 from __future__ import annotations
@@ -58,6 +64,7 @@ from spec024_harness import (
 
 SCAN_SIZES = [(1280, 720), (360, 740)]
 MIN_MARK_CONTRAST = 3.0
+INK_COLOUR = "rgb(20, 24, 31)"
 LETTER_CELLS = [(0, 1), *[(1, column) for column in range(5)]]
 for _row in range(2, 5):
     for _column in range(1, 5):
@@ -115,7 +122,7 @@ def test_ac9_the_new_fr_json_key_of_a_revealed_cell() -> None:
     assert load_fr()["a11y.revealed"] == "lettre révélée"
 
 
-def test_ac9_a_revealed_cell_holds_the_corner_mark_and_the_hidden_label(
+def test_ac9_a_revealed_cell_holds_the_notch_and_the_hidden_label(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_ac9(page, live_server, fx01_grid)
@@ -260,7 +267,7 @@ ABSENT_PLAYER = "p9"  # not in the roster: spec 016 flashes it in colour 0
 # `true`, then, read at once, the cell's `data-flash`, its computed background,
 # the computed background and opacity of its `cell-flash` elements, the computed
 # background of the roster swatch of the player whose colour flashes, the grid's
-# selected cell, and the colours of the cell's corner mark.
+# selected cell, and the colour of the cell's notch (spec 042).
 FLASH_READING_SCRIPT = (
     "([selector, swatchPlayerId]) => {\n" + COLOUR_CONTRAST_JS + MARK_COLOURS_JS + r"""
   const cell = document.querySelector(selector);
@@ -420,7 +427,12 @@ def flash_problems(
         problems.append(f"selected cell {reading['selected']}, expected {selected}")
     if reading["marks"] != 1:
         problems.append(f"{reading['marks']} reveal-mark elements in the cell")
-    elif reading["ratio"] < MIN_MARK_CONTRAST:
+        return problems
+    # Spec 042: during a flash the notch is ink.
+    notch = reading["colours"][0]["colour"]
+    if notch != INK_COLOUR:
+        problems.append(f"notch {notch} during the flash, not {INK_COLOUR}")
+    if reading["ratio"] < MIN_MARK_CONTRAST:
         problems.append(f"mark contrast {reading['ratio']}: {reading['colours']}")
     return problems
 
