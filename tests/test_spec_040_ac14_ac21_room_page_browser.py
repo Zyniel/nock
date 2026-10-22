@@ -19,6 +19,7 @@ from typing import Protocol
 import pytest
 from playwright.sync_api import Page, WebSocketRoute, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.protocol import (
     Join,
@@ -180,6 +181,7 @@ def joined_mock_room(page: Page, base_url: str, grid: Grid, seq: int) -> MockRoo
     mock = open_mock_room(page, base_url)
     mock.send(snapshot_frame(grid, seq))
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
+    wait_for_fonts(page)
     return mock
 
 

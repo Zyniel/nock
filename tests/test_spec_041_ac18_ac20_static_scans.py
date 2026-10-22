@@ -252,10 +252,12 @@ def hex_colours(text: str) -> list[str]:
 
 
 def colour_functions(text: str) -> list[str]:
+    """Return every colour function call (`rgb(...)`, `hsl(...)`) in `text`."""
     return [match.group(0) for match in COLOUR_FUNCTION.finditer(text)]
 
 
 def named_colours(text: str) -> list[str]:
+    """Return every named CSS colour found in `text`."""
     return [match.group(0) for match in NAMED_COLOUR.finditer(text)]
 
 
@@ -291,6 +293,7 @@ def css_declarations(css: str) -> list[tuple[str, str]]:
 
 
 def is_token_declaration(name: str) -> bool:
+    """Tell whether a declaration `name` is one of the design tokens."""
     return name.startswith(TOKEN_PREFIXES)
 
 
@@ -387,11 +390,13 @@ def quoted_count(code: str, text: str) -> int:
 
 
 def holds_number(object_text: str, name: str, number: str) -> bool:
+    """Tell whether an object literal gives `name` the value `number`."""
     pattern = rf"(?<![\w$.-]){re.escape(name)}\s*:\s*{re.escape(number)}(?![\w.])"
     return re.search(pattern, object_text) is not None
 
 
 def object_holds_group(code: str, group: tuple[tuple[str, str], ...]) -> bool:
+    """Tell whether one object literal in `code` holds every pair of `group`."""
     for match in OBJECT_LITERAL.finditer(code):
         object_text = match.group(0)
         if all(holds_number(object_text, name, number) for name, number in group):
@@ -400,6 +405,7 @@ def object_holds_group(code: str, group: tuple[tuple[str, str], ...]) -> bool:
 
 
 def is_key(code: str, name: str) -> bool:
+    """Tell whether `name` is used as an object key in `code`."""
     pattern = rf"""(?<![\w$'"-])(['"]?){re.escape(name)}\1\s*:"""
     return re.search(pattern, code) is not None
 
@@ -487,6 +493,7 @@ BUILT_ACCEPTED = [
 
 
 def built_css_files() -> list[Path]:
+    """List the CSS files of the built web client, sorted by path."""
     require_build()
     return sorted(WEB_DIST_ASSETS_DIR.glob("**/*.css"))
 

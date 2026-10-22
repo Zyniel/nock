@@ -40,6 +40,7 @@ from playwright.sync_api import Locator, Page, WebSocketRoute, expect
 from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -712,6 +713,7 @@ def joined_mock_room(
     room.connections[0].send(frame)
     expect(room_page(page)).to_have_attribute("data-seq", "5")
     expect(room_page(page)).to_have_attribute("data-status", "joined")
+    wait_for_fonts(page)
     return room
 
 

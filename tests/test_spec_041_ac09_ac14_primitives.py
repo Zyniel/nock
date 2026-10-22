@@ -113,6 +113,7 @@ BUTTON_PROBES = {
 
 
 def add_button(page: Page, base_url: str, variant: str) -> Locator:
+    """Open the catalogue, add a `variant` button probe and return its locator."""
     open_catalogue(page, base_url)
     return add_probe(page, f"button-{variant}", BUTTON_PROBES[variant])
 
@@ -290,6 +291,7 @@ class MenuParts:
 
 
 def add_menu(page: Page, base_url: str) -> MenuParts:
+    """Open the catalogue, add a menu probe and return its parts."""
     open_catalogue(page, base_url)
     holder = add_probe(page, "menu", MENU_PROBE)
     return MenuParts(holder)

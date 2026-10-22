@@ -142,6 +142,7 @@ class FlashReading(NamedTuple):
 
 
 def read_overlay(found: object) -> OverlayReading | None:
+    """Turn the overlay data read in the page into an `OverlayReading`."""
     if found is None:
         return None
     assert isinstance(found, dict)
@@ -181,6 +182,7 @@ def read_during_flash(page: Page, row: int, column: int, flash: str) -> FlashRea
 
 
 def overlay_of(reading: FlashReading) -> OverlayReading:
+    """Return the single flash overlay of `reading`, after checking there is one."""
     assert reading.overlay_count == 1, f"{reading.overlay_count} cell-flash elements"
     assert reading.overlay is not None
     return reading.overlay
@@ -192,8 +194,7 @@ def overlay_of(reading: FlashReading) -> OverlayReading:
 def open_flash_room(
     page: Page, base_url: str, grid: Grid, my_colour: int, their_colour: int
 ) -> MockRoomSocket:
-    """The room of AC-16: `p1` (you) and `p2`; (1, 0) holds `T` by `p1` and (1, 1)
-    `A` as a pencil letter of `p1`. The player then taps (1, 0)."""
+    """Open the room of AC-16 with `T` at (1, 0), a pencil `A` at (1, 1); tap (1, 0)."""
     players = [
         player_view("p1", "Ana", my_colour, is_host=True),
         player_view("p2", "Bob", their_colour),
@@ -390,6 +391,7 @@ def start_flash_in_colour(page: Page, base_url: str, grid: Grid, colour: int) ->
 
 
 def flash_contrast(page: Page, letter: Colour, player: Colour) -> float:
+    """Return the contrast between `letter` and the flash over `player`."""
     ratio = page.evaluate(
         FLASH_CONTRAST_SCRIPT, [list(letter), list(player), FLASH_OPACITY]
     )

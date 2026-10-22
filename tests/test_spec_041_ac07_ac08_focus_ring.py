@@ -69,6 +69,7 @@ def touch_page(browser: Browser, browser_name: str) -> Iterator[Page]:
 
 
 def force_one_filter(page: Page) -> Locator:
+    """Return a locator for the catalogue's force 1 filter button."""
     return page.locator('[data-testid="force-filter"][data-force="1"]')
 
 
@@ -168,6 +169,7 @@ NAVY_SURFACE_PROBE = (
 
 
 def add_navy_surface(page: Page, base_url: str) -> Locator:
+    """Open the catalogue, add a navy surface probe and return its locator."""
     open_catalogue(page, base_url)
     return add_probe(page, "navy-surface", NAVY_SURFACE_PROBE)
 

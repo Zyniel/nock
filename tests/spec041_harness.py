@@ -133,10 +133,12 @@ PLAYER_INKS: tuple[str, ...] = (
 
 
 def player_colour_token(index: int) -> str:
+    """The name of the CSS token holding player colour `index`."""
     return f"--player-colour-{index}"
 
 
 def player_ink_token(index: int) -> str:
+    """The name of the CSS token holding the ink for player colour `index`."""
     return f"--player-ink-{index}"
 
 
@@ -283,6 +285,7 @@ def touch_context(browser: Browser, browser_name: str) -> BrowserContext:
 
 
 def cell_at(page: Page, row: int, column: int) -> Locator:
+    """Return a locator for the grid cell at `row` and `column`."""
     selector = f'[data-testid="cell"][data-row="{row}"][data-column="{column}"]'
     return page.locator(selector)
 

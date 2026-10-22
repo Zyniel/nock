@@ -99,6 +99,7 @@ def load_face(page: Page, font: str) -> list[str]:
 
 
 def load_every_face(page: Page) -> None:
+    """Ask the page to load every face of `FACES`."""
     for font in FACES:
         load_face(page, font)
 
