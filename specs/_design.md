@@ -1398,7 +1398,10 @@ refined. Section 8's "Computer and landscape tablet" top bar applies only to a
 column layout more than 500 px high.)
 
 From specs 047 (room overlays) and 048 (plain pages and states), none of them
-drawn in the screens sheet yet:
+drawn in the screens sheet yet: (Note from the lead, 2026-10-22: the screens sheet,
+version 1.4, now draws every item of this list and of spec 044's above as decided,
+with specs 045 and 046's answers; the words "none of them drawn in the screens sheet
+yet" no longer hold.)
 
 - The vote banner goes as soon as the vote closes and never shows the result; the
   result is the note and a muted stream line with no pictogram, for every outcome

@@ -54,6 +54,12 @@ never Google.
 8. Keyboard; 9. « Auteurs » and « Accessibilité »; 10. small states.
 11. Later: competitive modes (specs 030 and 031), named only.
 12. Decisions: the record below.
+13. Specs 044 to 048: their open questions, decided with their approval of
+    2026-10-22 and drawn as decided (version 1.4): the grid page `/g/N`, tablets in
+    portrait and landscape, the low keyboard, the wrapped Auteurs legend, the end of a
+    vote and a vote from a snapshot, the recap with a player who left, the end band at
+    320 px, the disabled « Envoyer », the plain pages while loading, and the replay of
+    FX-02 in one column with its states.
 
 ## Decisions (human, 2026-10-22)
 

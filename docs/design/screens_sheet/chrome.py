@@ -19,6 +19,7 @@ from cells import (
 )
 
 FOUR = ["Ana", "Bruno", "Céline", "Dédé"]
+NODOT = '<i class="pdot none"></i>'
 YOU = ' <span class="you">(vous)</span>'
 URL_ROOM = "https://nock.fr/r/K7QM2X"
 URL_RECAP = "https://nock.fr/recap/k7Qm2xTa9LpR4vWd"
@@ -30,10 +31,13 @@ def brand() -> str:
 
 
 # ---------- phone room ----------
-def tb(icon: str, label: str, pressed: bool = False, extra: str = "") -> str:
-    """Return a phone top-bar button."""
+def tb(
+    icon: str, label: str, pressed: bool = False, extra: str = "", off: bool = False
+) -> str:
+    """Return a phone top-bar button, muted when disabled (spec 043)."""
+    cls = "tb off" if off else "tb"
     return (
-        f'<span class="tb" aria-pressed="{str(pressed).lower()}"'
+        f'<span class="{cls}" aria-pressed="{str(pressed).lower()}"'
         f">{IC[icon]}{label}{extra}"
         "</span>"
     )
@@ -45,9 +49,12 @@ def phone_top(
     badge: str | None = None,
     newdot: bool = False,
     aide: bool = True,
+    off: set | None = None,
+    slot4: str = "kbd",
 ) -> str:
     """Return the phone top bar of the room."""
     pressed = pressed or set()
+    off = off or set()
     left = (
         f'<span class="timer">{timer}</span>'
         if timer is not None
@@ -61,12 +68,17 @@ def phone_top(
         extra = f'<span class="badge">{badge}</span>'
     elif newdot:
         extra = '<span class="dot8"></span>'
-    h = '<div class="topbar">' + left + tb("undo", "Annuler")
+    h = '<div class="topbar">' + left + tb("undo", "Annuler", off="undo" in off)
     if aide:
         h += tb("aide", "Aide", "aide" in pressed)
+    fourth = (
+        tb("kbd", "Clavier", "kbd" in pressed, off="kbd" in off)
+        if slot4 == "kbd"
+        else tb("pen", "Crayon", "pen" in pressed)
+    )
     h += (
         tb("salon", "Salon", "salon" in pressed, extra)
-        + tb("kbd", "Clavier", "kbd" in pressed)
+        + fourth
         + tb("menu", "Menu", "menu" in pressed)
     )
     return h + "</div>"
@@ -77,11 +89,12 @@ def keys(s: str, pencil: bool = False) -> str:
     return "".join(f'<span class="k l">{ch}</span>' for ch in s)
 
 
-def keyboard(pencil: bool = False) -> str:
-    """Return the in-app keyboard."""
+def keyboard(pencil: bool = False, low: bool = False) -> str:
+    """Return the in-app keyboard; low: 28 px keys (spec 044)."""
     pen = "true" if pencil else "false"
+    cls = "kbd" + (" pencil" if pencil else "") + (" low" if low else "")
     return (
-        f'<div class="kbd{" pencil" if pencil else ""}"><div '
+        f'<div class="{cls}"><div '
         f'class="krow">{keys("AZERTYUIOP")}'
         "</div>"
         f'<div class="krow">{keys("QSDFGHJKLM")}</div>'
@@ -150,10 +163,11 @@ def note(text: str) -> str:
     return f'<div class="toast">{text}</div>'
 
 
-def legend(players: list[int]) -> str:
-    """Return the Auteurs legend."""
+def legend(players: list[int], names_of: list[str] | None = None) -> str:
+    """Return the Auteurs legend; it wraps onto more lines (spec 045)."""
+    who = names_of or FOUR
     names = " ".join(
-        (f'<b style="color:var(--player-ink-{p})">{FOUR[p]}' "</b>") for p in players
+        (f'<b style="color:var(--player-ink-{p})">{who[p]}' "</b>") for p in players
     )
     return f'<div class="legend">Auteurs : {names}</div>'
 
@@ -175,23 +189,35 @@ def phone_room(
     layer: str = "",
     authors: bool = False,
     stage_html: str | None = None,
+    size: tuple[int, int] = (360, 720),
+    legend_names: list[str] | None = None,
+    legend_lines: int = 1,
+    off: set | None = None,
+    slot4: str = "kbd",
+    band_lines: int = 1,
 ) -> str:
-    """A phone room, 360 x 720 (_design.md section 8, sheet layout)."""
+    """Return a phone room, 360 x 720 by default (sheet layout)."""
+    width, height = size
+    low = height <= 500
     if pressed is None:
         pressed = {"kbd"} if kbd else set()
     grid_opts = grid_opts or {}
-    kb_h = 158 if kbd else 0
-    band_h = {"done": 46, "notyet": 35}.get(band or "", 0)
+    kb_h = (110 if low else 158) if kbd else 0
+    band_h = {"done": 46, "notyet": 35}.get(band or "", 0) + 19 * (band_lines - 1)
     net_h = 52 if net else 0
-    stage_h = 720 - 2 - 54 - 34 - kb_h - band_h - net_h
-    leg_h = 38 if authors else 0
-    s = floor(min((360 - 2 - 16 - 1) / 5, (stage_h - 16 - leg_h - 1) / 5))
-    h = phone_top(timer, pressed, badge, newdot, aide)
+    stage_h = height - 2 - 54 - 34 - kb_h - band_h - net_h
+    leg_h = (38 + 15 * (legend_lines - 1)) if authors else 0
+    s = floor(min((width - 2 - 16 - 1) / 5, (stage_h - 16 - leg_h - 1) / 5))
+    h = phone_top(timer, pressed, badge, newdot, aide, off, slot4)
     if net:
         h += netband()
     if stage_html is None:
         g = grid(fx_rows(s, authors=authors, **grid_opts), s)
-        inner = f'<div class="gwrap">{g}{legend([0, 1, 2, 3]) if authors else ""}</div>'
+        if authors and legend_names:
+            leg = legend(list(range(len(legend_names))), legend_names)
+        else:
+            leg = legend([0, 1, 2, 3]) if authors else ""
+        inner = f'<div class="gwrap">{g}{leg}</div>'
     else:
         inner = stage_html
     h += f'<div class="stage">{inner}{stage_extra}</div>'
@@ -207,9 +233,10 @@ def phone_room(
     elif band == "notyet":
         h += band_notyet()
     if kbd:
-        h += keyboard(kbd == "pencil")
+        h += keyboard(kbd == "pencil", low)
     h += layer
-    return f'<div class="phone">{h}</div>'
+    st = f' style="width:{width}px;height:{height}px"' if size != (360, 720) else ""
+    return f'<div class="phone"{st}>{h}</div>'
 
 
 # ---------- Salon (sheet or column) ----------
@@ -256,7 +283,8 @@ def compose(muted: bool = False, wait: bool = False, typed: str = "") -> str:
             if typed
             else "Écrire au salon"
         )
-        box = f'<span class="msgbox">{txt}</span><span class="pill">Envoyer</span>'
+        pill = "pill" if typed and not wait else "pill off"
+        box = f'<span class="msgbox">{txt}</span><span class="{pill}">Envoyer</span>'
         line = '<div class="chatnote">Patientez avant d\'envoyer.</div>' if wait else ""
     return f'<div class="compose"><div class="crow">{box}</div>{line}</div>'
 
@@ -417,16 +445,19 @@ def phone_pop(inner: str, left: int | None = None, right: int | None = None) -> 
 
 
 # ---------- dialogs and sheets ----------
-def recap_body(phone: bool = False) -> str:
-    """Return the recap's content."""
+def recap_body(phone: bool = False, departed: bool = False) -> str:
+    """Return the recap's content; departed adds a player who left (no dot)."""
     rows = [
         (0, "Ana", True, 7, 3),
         (1, "Bruno", False, 6, 2),
         (2, "Céline", False, 3, 1),
         (3, "Dédé", False, 2, 1),
     ]
+    if departed:
+        rows.append((-1, "Éloïse", False, 2, 0))
     plist = "".join(
-        f'<li>{dot(p)}<span class="n">{n}</span>{YOU if y else ""}'
+        f'<li>{dot(p) if p >= 0 else NODOT}<span class="n">{n}</span>'
+        f'{YOU if y else ""}'
         f'<span class="v">{a} lettres · {w} mots complétés</span></li>'
         for p, n, y, a, w in rows
     )
@@ -527,6 +558,14 @@ def vote_banner(
             'class="btn secondary">Non</span><s'
             f'pan class="t">{secs}</span>'
         )
+    elif state == "snap":
+        row = (
+            '<span class="btn primary">Oui</span><span class="btn secondary">Non</span>'
+        )
+        return (
+            f'<div class="vote"><div class="q">{question}</div>'
+            f'<div class="row">{row}</div></div>'
+        )
     elif state == "cast":
         row = (
             '<span class="vmuted">Vote enregistré. En attente des autres '
@@ -553,11 +592,19 @@ def picker() -> str:
 
 
 # ---------- computer room ----------
-def dbtn(icon: str | None, label: str, pressed: bool = False, extra: str = "") -> str:
-    """Return a computer top-bar button."""
+def dbtn(
+    icon: str | None,
+    label: str,
+    pressed: bool = False,
+    extra: str = "",
+    off: bool = False,
+) -> str:
+    """Return a computer top-bar button, muted when disabled (spec 043)."""
     ic = IC[icon] if icon else ""
+    cls = "dbtn off" if off else "dbtn"
+    pressed = pressed and not off
     return (
-        f'<span class="dbtn" aria-pressed="{str(pressed).lower()}">{ic}{label}{extra}<'
+        f'<span class="{cls}" aria-pressed="{str(pressed).lower()}">{ic}{label}{extra}<'
         "/span>"
     )
 
@@ -584,7 +631,9 @@ def desk_top(
         else dbtn("chrono", "Chrono")
     )
     h = f'<div class="dtop">{brand()}<span class="gname">{gname}</span>{t}'
-    h += dbtn("undo", "Annuler") + dbtn("pen", "Crayon", "pen" in pressed)
+    h += dbtn("undo", "Annuler", off="undo" in pressed) + dbtn(
+        "pen", "Crayon", "pen" in pressed, off="pen-off" in pressed
+    )
     if aide:
         h += dbtn("aide", "Aide ▾", "aide" in pressed)
     h += dbtn("salon", "Salon", "salon" in pressed, extra)
@@ -628,6 +677,8 @@ def desk_room(
         pressed = {"salon"} if column else set()
         if kbd:
             pressed.add("kbd")
+    if solved:
+        pressed = set(pressed) | {"undo", "pen-off"}
     h = desk_top(timer, pressed, badge, newdot, aide, kbd)
     if net:
         h += netband()
@@ -682,12 +733,39 @@ def phone_page(
 
 
 def desk_page(
-    body: str, right: str = "", layer: str = "", page: bool = True, extra_top: str = ""
+    body: str,
+    right: str = "",
+    layer: str = "",
+    page: bool = True,
+    extra_top: str = "",
+    size: tuple[int, int] = (1280, 800),
+    narrow: bool = False,
 ) -> str:
-    """Return a plain computer page (brand bar, centred column)."""
+    """Return a plain page at a computer or tablet size.
+
+    Args:
+        body: The page column's content.
+        right: The top bar's right side.
+        layer: An overlay over the page.
+        page: The page grey (else white).
+        extra_top: Text after the brand.
+        size: The frame's width and height.
+        narrow: The narrow form (54 px bar, phone padding), spec 046.
+    """
+    if narrow:
+        bar = (
+            f'<div class="topbar brandbar">{brand()}<span '
+            f'class="right">{right}</span></div>'
+        )
+        st = f' style="width:{size[0]}px;height:{size[1]}px"'
+        return (
+            f'<div class="desk"{st}>{bar}<div class="dscreen narrow">{body}</div>'
+            f"{layer}</div>"
+        )
     bar = (
         f'<div class="dtop">{brand()}<span class="gname">{extra_top}</span>{right}</di'
         "v>"
     )
     cls = "dscreen" if page else "dscreen white"
-    return f'<div class="desk">{bar}<div class="{cls}">{body}</div>{layer}</div>'
+    st = f' style="width:{size[0]}px;height:{size[1]}px"' if size != (1280, 800) else ""
+    return f'<div class="desk"{st}>{bar}<div class="{cls}">{body}</div>{layer}</div>'
