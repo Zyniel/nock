@@ -12,6 +12,37 @@ export interface FeedItem {
   seq: number
   kind: string
   text: string
+  // The player the line is about (the event's player_id, or the player who
+  // joined), or null when the event names none. The new-events dot of « Salon »
+  // counts the lines of the other players only (spec 043).
+  playerId: string | null
+  // True for a check that found no wrong letter: its line is green (spec 043).
+  isCleanCheck: boolean
+}
+
+// The text pictogram, or the flag icon, that starts the line of an event of
+// each kind (spec 043, "Discussion: the stream"). The other kinds have none.
+export type LinePictogram = 'joined' | 'left' | 'check' | 'reveal' | 'flag'
+
+const PICTOGRAM_OF_KIND: Record<string, LinePictogram> = {
+  player_joined: 'joined',
+  player_left: 'left',
+  player_removed: 'left',
+  player_timed_out: 'left',
+  check: 'check',
+  reveal: 'reveal',
+  flag: 'flag',
+}
+
+// The pictogram that starts a line of `kind`, or null when it has none.
+export function pictogramOfKind(kind: string): LinePictogram | null {
+  return PICTOGRAM_OF_KIND[kind] ?? null
+}
+
+// The kind and the text of a line, before the page adds its seq and player.
+interface LineText {
+  kind: string
+  text: string
 }
 
 // A feed item as the page keeps it. Items are not unique by seq: one letter
@@ -83,7 +114,7 @@ export function wordCompletedItem(
     name: nameOf(names, playerId),
     clue: clueText(snapshot, clue),
   })
-  return { seq, kind: 'word_completed', text }
+  return { seq, kind: 'word_completed', text, playerId, isCleanCheck: false }
 }
 
 // The nickname of a player known to the page, even one who left, as a page
@@ -125,42 +156,38 @@ function scopeOf(event: RoomEvent): unknown {
   return target.scope
 }
 
-function leftItem(event: RoomEvent, name: string): FeedItem {
+function leftLine(event: RoomEvent, name: string): LineText {
   const { reason } = event.message
   if (reason === 'removed') {
-    return { seq: event.seq, kind: 'player_removed', text: t('feed.player_removed', { name }) }
+    return { kind: 'player_removed', text: t('feed.player_removed', { name }) }
   }
   if (reason === 'timed_out') {
-    return {
-      seq: event.seq,
-      kind: 'player_timed_out',
-      text: t('feed.player_timed_out', { name }),
-    }
+    return { kind: 'player_timed_out', text: t('feed.player_timed_out', { name }) }
   }
-  return { seq: event.seq, kind: 'player_left', text: t('feed.player_left', { name }) }
+  return { kind: 'player_left', text: t('feed.player_left', { name }) }
 }
 
-function checkItem(event: RoomEvent, name: string): FeedItem | null {
+function checkLine(event: RoomEvent, name: string): LineText | null {
   const scope = scopeOf(event)
   if (scope === 'letter') {
-    return { seq: event.seq, kind: 'check', text: t('feed.check.letter', { name }) }
+    return { kind: 'check', text: t('feed.check.letter', { name }) }
   }
   if (scope === 'word') {
-    return { seq: event.seq, kind: 'check', text: t('feed.check.word', { name }) }
+    return { kind: 'check', text: t('feed.check.word', { name }) }
   }
   if (scope === 'grid') {
-    return { seq: event.seq, kind: 'check', text: t('feed.check.grid', { name }) }
+    return { kind: 'check', text: t('feed.check.grid', { name }) }
   }
   return null
 }
 
-function revealItem(event: RoomEvent, name: string): FeedItem | null {
+function revealLine(event: RoomEvent, name: string): LineText | null {
   const scope = scopeOf(event)
   if (scope === 'letter') {
-    return { seq: event.seq, kind: 'reveal', text: t('feed.reveal.letter', { name }) }
+    return { kind: 'reveal', text: t('feed.reveal.letter', { name }) }
   }
   if (scope === 'word') {
-    return { seq: event.seq, kind: 'reveal', text: t('feed.reveal.word', { name }) }
+    return { kind: 'reveal', text: t('feed.reveal.word', { name }) }
   }
   return null
 }
@@ -183,7 +210,7 @@ function eventSettings(event: RoomEvent): RoomSettingsView | null {
   }
 }
 
-function settingsItem(snapshot: Snapshot, event: RoomEvent, name: string): FeedItem | null {
+function settingsLine(snapshot: Snapshot, event: RoomEvent, name: string): LineText | null {
   const next = eventSettings(event)
   if (next === null) {
     return null
@@ -195,10 +222,10 @@ function settingsItem(snapshot: Snapshot, event: RoomEvent, name: string): FeedI
     before.words === next.words &&
     before.locked !== next.locked
   if (onlyLockChanged && next.locked) {
-    return { seq: event.seq, kind: 'room_locked', text: t('feed.room_locked', { name }) }
+    return { kind: 'room_locked', text: t('feed.room_locked', { name }) }
   }
   if (onlyLockChanged) {
-    return { seq: event.seq, kind: 'room_unlocked', text: t('feed.room_unlocked', { name }) }
+    return { kind: 'room_unlocked', text: t('feed.room_unlocked', { name }) }
   }
   const text = t('feed.settings_changed', {
     name,
@@ -206,7 +233,62 @@ function settingsItem(snapshot: Snapshot, event: RoomEvent, name: string): FeedI
     letters: next.letters,
     words: next.words,
   })
-  return { seq: event.seq, kind: 'settings_changed', text }
+  return { kind: 'settings_changed', text }
+}
+
+// The player an event is about: the player who joined, or the event's
+// player_id; null when it names none.
+function playerOfEvent(event: RoomEvent): string | null {
+  if (event.type === 'player_joined') {
+    const player = event.message.player as Record<string, unknown> | null
+    if (player === null || typeof player !== 'object') {
+      return null
+    }
+    return typeof player.player_id === 'string' ? player.player_id : null
+  }
+  const playerId = event.message.player_id
+  return typeof playerId === 'string' ? playerId : null
+}
+
+// True for a check_result whose wrong list is empty.
+function isCleanCheckResult(event: RoomEvent): boolean {
+  if (event.type !== 'check_result') {
+    return false
+  }
+  const wrong = event.message.wrong
+  return Array.isArray(wrong) && wrong.length === 0
+}
+
+// The kind and the text of the line of an event, or null when it has none.
+function lineOf(snapshot: Snapshot, names: Map<string, string>, event: RoomEvent): LineText | null {
+  const name = nameOf(names, event.message.player_id)
+  if (event.type === 'player_joined') {
+    const joinedName = nameOf(names, playerOfEvent(event))
+    return { kind: 'player_joined', text: t('feed.player_joined', { name: joinedName }) }
+  }
+  if (event.type === 'player_left') {
+    return leftLine(event, name)
+  }
+  if (event.type === 'check_result') {
+    return checkLine(event, name)
+  }
+  if (event.type === 'reveal_result') {
+    return revealLine(event, name)
+  }
+  if (event.type === 'flag_changed') {
+    if (event.message.clue === null || typeof event.message.clue !== 'object') {
+      return null
+    }
+    const clue = clueText(snapshot, event.message.clue)
+    return { kind: 'flag', text: t('feed.flag', { name, clue }) }
+  }
+  if (event.type === 'settings_changed') {
+    return settingsLine(snapshot, event, name)
+  }
+  if (event.type === 'host_changed') {
+    return { kind: 'host_changed', text: t('feed.host_changed', { name }) }
+  }
+  return null
 }
 
 // The feed item of an event about to be applied, or null when it has none.
@@ -216,36 +298,15 @@ export function feedItemFor(
   names: Map<string, string>,
   event: RoomEvent,
 ): FeedItem | null {
-  const name = nameOf(names, event.message.player_id)
-  if (event.type === 'player_joined') {
-    const player = event.message.player as Record<string, unknown>
-    return {
-      seq: event.seq,
-      kind: 'player_joined',
-      text: t('feed.player_joined', { name: nameOf(names, player.player_id) }),
-    }
+  const line = lineOf(snapshot, names, event)
+  if (line === null) {
+    return null
   }
-  if (event.type === 'player_left') {
-    return leftItem(event, name)
+  return {
+    seq: event.seq,
+    kind: line.kind,
+    text: line.text,
+    playerId: playerOfEvent(event),
+    isCleanCheck: isCleanCheckResult(event),
   }
-  if (event.type === 'check_result') {
-    return checkItem(event, name)
-  }
-  if (event.type === 'reveal_result') {
-    return revealItem(event, name)
-  }
-  if (event.type === 'flag_changed') {
-    if (event.message.clue === null || typeof event.message.clue !== 'object') {
-      return null
-    }
-    const clue = clueText(snapshot, event.message.clue)
-    return { seq: event.seq, kind: 'flag', text: t('feed.flag', { name, clue }) }
-  }
-  if (event.type === 'settings_changed') {
-    return settingsItem(snapshot, event, name)
-  }
-  if (event.type === 'host_changed') {
-    return { seq: event.seq, kind: 'host_changed', text: t('feed.host_changed', { name }) }
-  }
-  return null
 }

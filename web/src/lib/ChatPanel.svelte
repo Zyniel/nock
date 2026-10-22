@@ -1,4 +1,6 @@
 <script lang="ts">
+  import LinePictogram from './LinePictogram.svelte'
+  import PlayerIcon from './PlayerIcon.svelte'
   import { t } from './i18n'
   import { nameOf } from './activityFeed'
   import type { StreamEntry } from './activityFeed'
@@ -17,11 +19,13 @@
   let {
     entries,
     names,
+    colours,
     you,
     isShown,
     isMuted,
     isPaced,
     isJoined,
+    isAccessibilityOn,
     text = $bindable(),
     input = $bindable(null),
     onSend,
@@ -30,6 +34,9 @@
     // The stream, oldest first.
     entries: StreamEntry[]
     names: Map<string, string>
+    // The colour index of each player of the kept snapshot, by id: a message
+    // of anyone else has no dot.
+    colours: Map<string, number>
     you: string
     // True while the tab is selected.
     isShown: boolean
@@ -39,6 +46,8 @@
     isPaced: boolean
     // True while the page is joined to the room.
     isJoined: boolean
+    // « Accessibilité » (spec 042): each dot shows its player's icon.
+    isAccessibilityOn: boolean
     // What is typed in the input. The page keeps it while the Salon is closed.
     text: string
     input?: HTMLInputElement | null
@@ -144,24 +153,34 @@
     >
       {#each entries as entry (entry.key)}
         {#if entry.kind === 'message'}
+          {@const colour = colours.get(entry.line.player_id)}
+          <!-- No white space between the dot, the name and the text: the gaps
+               are the margins. -->
           <li
             class="message"
             data-testid="chat-message"
             data-seq={String(entry.line.seq)}
             data-player-id={entry.line.player_id}
             data-you={String(entry.line.player_id === you)}
-          >
-            <span class="chat-author" data-testid="chat-author"
+          >{#if colour !== undefined}<span
+                class="chat-dot"
+                class:icon={isAccessibilityOn}
+                data-testid="chat-dot"
+                data-colour={String(colour)}
+                style:background={isAccessibilityOn ? null : `var(--player-colour-${colour})`}
+                >{#if isAccessibilityOn}<PlayerIcon {colour} side="12px" />{/if}</span
+              >{/if}<span class="chat-author" data-testid="chat-author"
               >{nameOf(names, entry.line.player_id)}</span
-            ><span class="chat-text" data-testid="chat-text">{entry.line.text}</span>
-          </li>
+            ><span class="chat-text" data-testid="chat-text">{entry.line.text}</span></li>
         {:else}
           <li
             class="event"
+            class:reveal={entry.item.kind === 'reveal'}
             data-testid="feed-item"
             data-kind={entry.item.kind}
             data-seq={String(entry.item.seq)}
-          >{entry.item.text}</li>
+            data-ok={entry.item.isCleanCheck ? 'true' : null}
+          ><LinePictogram kind={entry.item.kind} testId="feed-picto" />{entry.item.text}</li>
         {/if}
       {/each}
     </ul>
@@ -249,16 +268,46 @@
     color: var(--nock-ink);
   }
 
+  /* The player dot (_design.md section 11), 6 px before the name. */
+  .chat-dot {
+    display: inline-block;
+    box-sizing: border-box;
+    width: 10px;
+    height: 10px;
+    margin-right: 6px;
+    vertical-align: middle;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px var(--nock-dot-ring);
+  }
+
+  /* « Accessibilité » (spec 042): the player's own icon, with no ring. */
+  .chat-dot.icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
   .chat-author {
     margin-right: 6px;
     font-weight: 700;
   }
 
-  /* An event line (spec 013): muted, a little smaller and set in. */
+  /* An event line (spec 013): muted, a little smaller and set in; green for a
+     check that found no wrong letter, orange-red for a reveal. */
   .event {
     padding-left: 16px;
     font-size: 0.82rem;
     color: var(--nock-muted);
+  }
+
+  .event[data-ok='true'] {
+    color: var(--nock-green);
+  }
+
+  .event.reveal {
+    color: var(--nock-reveal);
   }
 
   .chat-form {

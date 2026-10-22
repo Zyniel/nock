@@ -1213,24 +1213,25 @@
     stroke-linejoin: round;
   }
 
-  /* A shown reaction (spec 022), centred on its clue. Positioned against the
-     clue, so it adds no layout, and above the flag and the cells around it,
-     since it may reach past the cell's edges. Its opaque background keeps the
-     emoji readable over the clue text. A tap goes through it to its clue. */
+  /* A shown reaction (spec 022): the white pill of _design.md section 8,
+     centred on its own clue (one half of a two-clue cell). Positioned against
+     the clue, so it adds no layout, and on layer 8, above the flag and the
+     cells around it, since it may reach past the cell's edges. It lies inside
+     its clue, so a tap on it is a tap on its clue. */
   .clue-reaction {
     position: absolute;
-    z-index: 3;
+    z-index: 8;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    padding: 0.1em 0.2em;
-    font-size: max(12px, calc(var(--cell) * 0.3));
-    line-height: 1;
+    padding: 2px 6px;
+    font-size: 16px;
+    line-height: 1.2;
     white-space: nowrap;
     color: var(--nock-ink);
     background: var(--nock-white);
     border: 1px solid var(--nock-line);
-    border-radius: 0.3em;
-    pointer-events: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px -4px var(--nock-shadow-soft);
   }
 </style>

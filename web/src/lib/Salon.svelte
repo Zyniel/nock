@@ -19,6 +19,7 @@
     totalWords,
     entries,
     names,
+    colours,
     players,
     you,
     isHost,
@@ -45,6 +46,8 @@
     // The stream of the Discussion tab, oldest first.
     entries: StreamEntry[]
     names: Map<string, string>
+    // The colour index of each player of the kept snapshot, by id.
+    colours: Map<string, number>
     players: PlayerView[]
     you: string
     isHost: boolean
@@ -164,11 +167,13 @@
   <ChatPanel
     {entries}
     {names}
+    {colours}
     {you}
     isShown={tab === 'discussion'}
     {isMuted}
     {isPaced}
     {isJoined}
+    {isAccessibilityOn}
     bind:text={chatText}
     bind:input={chatInput}
     {onSend}

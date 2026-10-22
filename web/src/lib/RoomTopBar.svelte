@@ -21,6 +21,7 @@
     isMenuOpen,
     isSalonOpen,
     unreadLines,
+    hasNewEvents,
     salonLabel,
     aideButton = $bindable(null),
     menuButton = $bindable(null),
@@ -45,7 +46,11 @@
     isSalonOpen: boolean
     // The messages of others that came since the stream was last shown.
     unreadLines: number
-    // The accessible name of « Salon » while the badge shows, else null.
+    // True while the new-events dot shows: lines of other players came since
+    // the stream was last shown, and no message is unread.
+    hasNewEvents: boolean
+    // The accessible name of « Salon » while the badge or the dot shows, else
+    // null.
     salonLabel: string | null
     aideButton?: HTMLButtonElement | null
     menuButton?: HTMLButtonElement | null
@@ -111,6 +116,8 @@
       <span class="nock-badge chat-unread" data-testid="chat-unread" aria-hidden="true"
         >{unreadBadgeText(unreadLines)}</span
       >
+    {:else if hasNewEvents}
+      <span class="salon-dot" data-testid="salon-dot" aria-hidden="true"></span>
     {/if}
   </TopBarButton>
 {/snippet}
@@ -229,6 +236,15 @@
     position: absolute;
   }
 
+  /* The new-events dot (_design.md section 11): an 8 px red circle. */
+  .salon-dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--nock-red);
+  }
+
   /* ---- The phone top bar: icons over labels ---- */
 
   .phone {
@@ -267,6 +283,11 @@
   .phone .chat-unread {
     top: 5px;
     right: 8px;
+  }
+
+  .phone .salon-dot {
+    top: 8px;
+    right: 15px;
   }
 
   /* ---- The computer top bar: the brand, then icons beside labels ---- */
@@ -318,7 +339,10 @@
     font-size: 0.92rem;
   }
 
-  .computer .chat-unread {
+  /* The dot takes the badge's place on a computer (_design.md section 15,
+     item 9). */
+  .computer .chat-unread,
+  .computer .salon-dot {
     top: 2px;
     left: 24px;
   }
