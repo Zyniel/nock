@@ -194,12 +194,18 @@ The Accessibilité switch, « Accessibilité » (`_design.md` section 6):
 
 - Background `--nock-clue-bg`; padding 2 px top and bottom, 3 px left and right;
   (Note from the lead, 2026-10-22, first review of spec 042: below 12 px cells,
-  the padding shrinks to `min(2px, 0.17 s)` top and bottom by `min(3px, 0.25 s)`
+  the padding shrinks to `min(2px, 0.17 s)` top and bottom by `min(3px, 0.2 s)`
   left and right, so that a clue keeps a box that takes taps: spec 019 AC-4 at
   568 by 320 with the in-app keyboard, and FX-02's cells of about 5.8 px. The
   design draws nothing at that size. The flag's 1 px inset from the cell's left
   edge, below, follows the padding there: the flag's left is the smaller of 1 px
   and the left padding.)
+  (Note from the lead, 2026-10-22, from spec 042's first-review fix: the side
+  padding below 12 px cells is `min(3px, 0.2 s)`, not `min(3px, 0.25 s)`, so
+  that it stays exactly 3 px from 15 px cells up. At 568 by 320 with the in-app
+  keyboard, FX-02's cells are about 5.8 px; with `0.25 s` a clue's box is
+  1.92 px wide and Firefox's tap misses it (spec 019 AC-4), with `0.2 s` it is
+  about 2.5 px. The top and bottom padding stays `min(2px, 0.17 s)`.)
   The cell's `clue` elements fill its content box: one clue fills it, two clues
   share it in two halves of equal height, clue 0 on top, with the separator
   between them. Each `clue` centres its `clue-text` vertically.
