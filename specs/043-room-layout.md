@@ -715,7 +715,9 @@ it fully: a probe found `vote-question` at its centre at 360 by 740 and 1280 by
   before it, the note of the first item made the solved status always the band,
   which on spec 043's build left the grid under 100 px on these windows. It
   restores, for spec 043's build, what the text read before spec 044's
-  refinement.)
+  refinement.) (Note from the lead, 2026-10-22: spec 044 is built; this case
+  ended with it. A solved page has no in-app keyboard, its status is always the
+  band and `recap-open` always the primary button.)
 
 ### Play area and fit (specs 006, 013)
 
@@ -1030,7 +1032,8 @@ The words in brackets say how each criterion is tested.
   layout with the band.) (Note from the lead, 2026-10-22: the note before this one
   holds from spec 044's build on; in spec 043's build the keyboard still shows on
   a solved page, so a solved status uses the row too, with the secondary
-  `recap-open` (AC-27, "Completion status").)
+  `recap-open` (AC-27, "Completion status").) (Note from the lead, 2026-10-22:
+  spec 044 is built; that solved case in spec 043's build ended with it.)
 - Top bar at 283 px (AC-4): the five buttons shrink to about 44 px; below 296 px
   with the timer at `10:00:00` they would reach their 40 px minimum and the timer
   may push them past the right edge. The test sizes start at 320 px for the long

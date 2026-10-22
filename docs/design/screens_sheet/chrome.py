@@ -151,13 +151,10 @@ def row_status(state: str) -> str:
     """Return the completion status in the clue bar's row (spec 043).
 
     Args:
-        state: "notyet" (full but wrong) or "done" (solved, until spec 044).
+        state: "notyet" (full but wrong); a solved page has no row status
+            since spec 044 (no in-app keyboard, so the status is the band).
     """
-    if state == "done":
-        return (
-            '<span class="rowstat">✓ Grille terminée, bravo !<span class="btn '
-            'secondary">Voir le bilan</span></span>'
-        )
+    del state
     return '<span class="rowstat">Grille complète, mais pas encore juste.</span>'
 
 

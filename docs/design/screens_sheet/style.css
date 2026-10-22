@@ -366,7 +366,6 @@ ol.decisions li .alt { color: var(--nock-muted); font-size: .88rem; }
 
 /* additions after spec 043 WP-1's first review (_design.md sections 8, 9, 11) */
 .cluebar .rowstat { flex: none; display: flex; align-items: center; gap: 10px; padding: 0 8px; white-space: nowrap; font: 600 .95rem/1.2 var(--nock-font-ui); color: var(--nock-white); }
-.cluebar .rowstat .btn { padding: 7px 12px; font-size: .85rem; }
 .ring-in { outline: 2px solid var(--nock-navy); outline-offset: -2px; }
 .seg span.ring-in4 { outline: 2px solid var(--nock-navy); outline-offset: -4px; }
 .seg span.on.ring-in4 { outline-color: var(--nock-white); }

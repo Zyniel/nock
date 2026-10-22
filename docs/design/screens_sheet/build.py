@@ -1246,7 +1246,7 @@ def sec_end() -> str:
     out += screen(
         "s-rowstat",
         "The status in the clue bar's row",
-        ["§9 End of grid", "spec 026", "spec 043", "until spec 044"],
+        ["§9 End of grid", "spec 026", "spec 043", "spec 044"],
         [
             (
                 "On a touch screen in the sheet layout at most 500 px high, the "
@@ -1255,12 +1255,8 @@ def sec_end() -> str:
                 "Réagir », in white on one line; the clue gives it its width."
             ),
             (
-                '<span class="m">Solved, until spec 044 is built: the keyboard '
-                "still shows on a solved page in spec 043's build, so the solved "
-                "status takes the row too, with « Voir le bilan » secondary; « "
-                "Crayon » holds the fourth slot, disabled. From spec 044 on, the "
-                "keyboard leaves a solved page and the status is the band; only "
-                "the full-but-wrong row stays.</span>"
+                "Only full but wrong takes the row: a solved page has no in-app "
+                "keyboard (spec 044), so its status is the band."
             ),
         ],
         [
@@ -1271,21 +1267,6 @@ def sec_end() -> str:
                     size=(568, 320),
                     grid_opts={"full": True, "sel": (3, 3), "word": 6},
                     row_state="notyet",
-                ),
-            ),
-            (
-                "ph",
-                low + " · solved (spec 043's build)",
-                phone_room(
-                    size=(568, 320),
-                    timer="12:34",
-                    grid_opts={"solved": True},
-                    off={"undo", "pen"},
-                    slot4="pen",
-                    pressed=set(),
-                    badge=None,
-                    clue=("Alourdit le ballon", "→"),
-                    row_state="done",
                 ),
             ),
         ],
