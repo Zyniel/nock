@@ -1,110 +1,78 @@
 # Screens sheet
 
-`screens-sheet.html` draws every screen and state of Nock as it exists on `main`
-(2026-10-22) in the validated design: the tokens, player colours, type, icons and
-components of `specs/_design.md`, and the cells of `cell-sheet.html`, whose cell
-drawing it reuses so the two sheets read as one system. It is a design document,
-not a spec: nothing in it binds the code until `_design.md` and the specs take it in.
+`screens-sheet.html` draws every screen and state of Nock at phone width
+(360 × 720) and computer width (1280 × 800, scaled down), with the strings of
+`web/src/i18n/fr.json` and spec 043's. With `specs/_design.md` and `cell-sheet.html`
+it is the visual reference of the web client (`_design.md` section 1). It reuses
+the cell sheet's drawing of cells, so the two sheets read as one system.
 
-Each screen is drawn at phone width (360 × 720) and at computer width (1280 × 800,
-scaled down), with the strings of `web/src/i18n/fr.json`. The page is static (no
-script); a CSS-only switch shows both widths, phones only, or computers only. Fonts
-are the app's own files from `web/node_modules/@fontsource` once spec 041's packages
-are installed, else a local copy, else the fallback stack; never Google.
+## Keeping it current
 
-A grey label on a screen cites the `_design.md` section or the spec it follows. A
-dashed orange-red label marks a proposal where `_design.md` says nothing; each one
-is listed below, as in the sheet's last part.
+The visual documentation is always current (human decision, 2026-10-22). Any change
+that alters what a screen looks like updates `_design.md` (dated note) and redraws
+the change here, in the same commit, before tests and code (`_design.md` section 1,
+rule 3).
+
+The page is generated; never edit the HTML by hand:
+
+| File | Holds |
+| --- | --- |
+| `screens_sheet/build.py` | the parts, screens, captions and the decisions record |
+| `screens_sheet/chrome.py` | bars, keyboard, Salon, menus, dialogs, plain pages |
+| `screens_sheet/cells.py` | the grid cells, arrows and sample grids (ported from the cell sheet) |
+| `screens_sheet/style.css` | the tokens, fonts and components of `_design.md` |
+| `screens_sheet/header.html` | the page's header, width switch and summary |
+
+```
+uv run python docs/design/screens_sheet/build.py          # rebuild
+uv run python docs/design/screens_sheet/build.py --check  # what the gate runs
+```
+
+The gate fails when the committed HTML is not what the sources build. The
+spec-writer edits these files (it may write `docs/design/`); having no shell, it says
+which screens it redrew and the lead rebuilds. The reviewer blocks a change of look
+that is not drawn.
+
+Labels on the sheet: a grey label cites the `_design.md` section or the spec a
+screen follows; « Decided Pn » names a decision of 2026-10-22; a dashed label marks
+what is still pending, with an item in `_design.md` section 15. The page is static:
+no script, the width switch is CSS. Fonts are the app's own @fontsource files once
+spec 041's packages are installed, else a local copy, else the fallback stack;
+never Google.
 
 ## What it covers
 
-1. Catalogue: « Mes salons », filter chips, grid cards, « Grilles terminées »;
-   loading, empty and error states; « Jouer » failing.
-2. Entry pages: nickname form (with its error), the refusal cards (full, locked,
-   removed, other tab, throttled), the expired or unknown room, page not found.
-3. The room: in play, Salon Discussion (and paced chat), Joueurs with the invite link
-   and the host's tools, a muted player, Aide, Menu, host settings, reactions and
-   3-second notes, timer hidden with the new-events dot, connection lost, catch-up,
-   opening the room.
-4. Help: check, reveal, help by vote (asked, voted, waiting), help switched off.
-5. Completion: full but not right, solved, the recap (and its loading and error),
-   the shared recap page.
-6. Account: the sign-in sheet in a room and on the catalogue, the account page,
-   deletion, and the page's other states.
-7. Operator page (spec 038): token form, dashboard, room replay.
-8. The in-app keyboard: normal, pencil on, hidden, on a touch computer.
-9. « Auteurs » and « Accessibilité » modes.
-10. Small states: notes, clue bar states, buttons, fields, switch, segmented
-    control, slider.
-11. Later: competitive modes (specs 030 and 031) are not drawn, only named.
+1. Catalogue with « Mes salons » and the history; loading, empty and error states.
+2. Entry pages: nickname, refusals, expired or unknown room, page not found.
+3. The room: in play, Salon (Discussion, Joueurs, host tools, muted player), Aide,
+   Menu, host settings, reactions and notes, timer hidden, connection lost,
+   catch-up, opening.
+4. Help: check, reveal, vote, help switched off.
+5. Completion: full but wrong, solved, recap and its states, shared recap page.
+6. Account: sign-in sheet in a room and on the catalogue, account page, deletion.
+7. Operator page (spec 038): token, dashboard, replay.
+8. Keyboard; 9. « Auteurs » and « Accessibilité »; 10. small states.
+11. Later: competitive modes (specs 030 and 031), named only.
+12. Decisions: the record below.
 
-Where the lead decided an open item of `_design.md` on 2026-10-22 (branch
-`design-specs`, not yet on `main`: « Compte » placed after « Réglages de l'hôte »,
-the new-events dot on a computer, a reaction on a two-clue cell), the sheet follows
-that decision.
+## Decisions (human, 2026-10-22)
 
-## Proposals and decisions to take
+The human accepted every recommended answer of version 1.0. `_design.md` section 15
+lists them with the sections that now carry them: P1 plain pages on a computer, P2
+the opening room, P3 an expired room, P4 catalogue states, P5 the host's mute in
+Joueurs and the chat notes, P6 the vote after voting, P7 spent reveal items, P8 the
+empty clue bar's text, P9 « Rien à annuler. » as a note, P10 recap states, P11 the
+shared recap page, P12 the account page and deletion (no red button), P13 the
+account sheet's intro outside a room, P14 the operator page, P15 the slider, P16
+« Lien copié » in the recap, D1 no « danger » button, D2 no grid credits for now,
+D3 the sheet's fonts.
 
-Each item: what the sheet proposes (recommended), and the alternative.
+Still pending, to settle when approving spec 043 (the sheet draws spec 043's pick):
 
-- **P1 Plain pages on a computer** (entry, not found, account page, shared recap).
-  Recommended: the phone's column, centred, at most 420 px, 48 px under the 56 px
-  top bar, on the page grey. Alternative: a wide two-column page.
-- **P2 The room while it connects and joins.** Recommended: the top bar in place,
-  one muted line (« Connexion… », « Entrée dans le salon… ») where the grid will be;
-  no clue bar, no keyboard, no spinner. Alternative: a skeleton grid.
-- **P3 An expired room.** Recommended: the not-found card « Ce salon n'existe pas. »
-  plus a muted line « Un salon est effacé 30 jours après sa dernière modification. »
-  (a new fr.json key) and « Voir les grilles » primary. Alternative: no extra line.
-- **P4 Catalogue and « Mes salons » states.** Recommended: one line where the content
-  will be, muted while loading or empty, red on error; a failed « Jouer » shows its
-  red line inside the card; « Mes salons » shows nothing while loading and no section
-  when empty. Alternative: skeleton cards.
-- **P5 Chat moderation and chat notes** (spec 022's « Sourdine » block, « Patientez
-  avant d'envoyer. », « L'hôte a coupé votre discussion. »). Recommended: the host's
-  « Couper » / « Rétablir » as small secondary buttons beside « Retirer », on a line
-  under each other player's row in Joueurs; the notes as one muted line under the
-  message box; a muted player's box disabled. Alternative: keep a « Sourdine » block
-  in the Discussion tab.
-- **P6 The vote after voting, and its result.** Recommended: after my vote the
-  buttons give way to a muted « Vote enregistré. En attente des autres joueurs… »;
-  the asker sees « En attente des autres joueurs… »; the result is a 3-second note
-  and a stream line. Alternative: keep the buttons with the chosen one pressed.
-- **P7 Help with no budget, and help switched off.** Recommended: spent reveal items
-  stay, muted and inert, with « Plus de lettre » / « Plus de mot » as the detail; in
-  « désactivée » mode the Aide button is not drawn (confirms `_design.md` §12's « to
-  confirm »). Alternative: hide spent items, or show Aide disabled.
-- **P8 Clue bar with nothing selected.** Recommended: « Touchez une case ou une
-  définition. » with the ‹ › chevrons only; Réagir and Je bloque not drawn.
-  Alternative: show them disabled (needs a disabled look on navy).
-- **P9 « Rien à annuler. »** Recommended: a 3-second note. Alternative: disable
-  « Annuler ».
-- **P10 Recap loading and unavailable.** Recommended: inside the sheet or dialog, the
-  title, then a muted « Chargement du bilan… » or the red « Le bilan n'est pas
-  disponible. », and « Fermer ».
-- **P11 Shared recap page `/recap/<token>`.** Recommended: an entry page with one
-  card: « Grille terminée », « Grille n° 12 », the time in the recap's large style,
-  « Équipe : … », primary « Voir les grilles »; the unavailable recap uses the same
-  card.
-- **P12 Account page `/account` and deletion.** Recommended: an entry page with one
-  card « Mon compte »; « Se déconnecter » and « Supprimer mon compte » secondary;
-  the confirmation in the same card, « Supprimer définitivement » primary and
-  « Garder mon compte » secondary; no red button. Alternative: a red « danger »
-  button variant.
-- **P13 Account sheet outside a room.** Recommended: on the catalogue the intro is
-  `account.signed_out_intro`, since `account.dialog_intro` speaks of « ce salon ».
-- **P14 Operator page `/ops`.** Recommended: the catalogue's frame and column; the
-  token form in one card; the periods as the catalogue's filter chips; one tile per
-  figure with fr.json's line as it is; the replay as the list of edits beside the
-  grid (cell styles, no clue text, no arrows) with a step slider. Alternative: leave
-  browser defaults.
-- **P15 A slider** (the replay's step). Recommended: built from the progress bar:
-  word-blue 6 px track, navy fill, 18 px navy knob, §11's focus ring; added to §11.
-- **P16 « Lien copié » in the recap.** Recommended: the button keeps « Copier le
-  lien » and the green « Lien copié » line appears under it, as in Joueurs (spec 028
-  refined; today it changes the button's text).
-- **D1 Is a destructive action ever red?** Recommended: no (see P12).
-- **D2 Grid credits (spec 005).** Recommended: leave them off the screens until a
-  spec sends them to players; then one muted line on the catalogue card.
-- **D3 The sheet's fonts.** Recommended: keep loading the app's own @fontsource
-  files, else local, else the fallback stack; never Google.
+1. The Joueurs row: state and clue on a second line (spec 043) or on the right of
+   the name with the host's buttons below (P5).
+2. Help mode `none`: « Aide » stays with the pencil confirm or a muted line (spec
+   043) or is hidden (P7), which would leave no way to confirm a pencil letter on
+   a computer.
+3. Réagir and Je bloque with nothing selected: disabled in rule grey (spec 043) or
+   not drawn (P8).

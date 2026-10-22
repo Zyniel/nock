@@ -21,9 +21,13 @@ default). Items marked OPEN or DEFERRED are in section 15.
 
 ## 1. Purpose and authority
 
-This file and `docs/design/cell-sheet.html` are the visual reference of the web
-client. Where they differ, this file wins, and the difference is listed in
-section 15 or fixed in the sheet.
+This file and the two sheets in `docs/design/` are the visual reference of the
+web client: `cell-sheet.html` draws the grid cells, `screens-sheet.html` every
+screen and state at phone width (360 px) and computer width (1280 px). Where they
+differ, this file wins, and the difference is listed in section 15 or fixed in the
+sheet. (Note from the lead, 2026-10-22: the screens sheet joins the reference, its
+proposals P1 to P16 and D1 to D3 decided by the human on 2026-10-22, section 15; this
+paragraph named the cell sheet only.)
 
 Rules:
 
@@ -34,9 +38,16 @@ Rules:
 2. No spec and no code introduces a colour, a font, a font size, a radius, a
    shadow or an icon that is not listed here. Colours are used only through the
    tokens of sections 2 and 3.
-3. A change of look starts here. The spec writer updates this file (and the sheet
-   when the change is visible in it), with a dated note next to the change, before
-   any spec, test or code changes.
+3. A change of look starts here. Any change that alters what a screen looks
+   like (a decision of the human, a new or refined spec, a review finding) updates
+   this file, with a dated note next to the change, and redraws what it changes in
+   the sheets, in the same commit, before any test or code changes. The screens
+   sheet is generated: edit `docs/design/screens_sheet/` and run
+   `uv run python docs/design/screens_sheet/build.py`; its HTML is never edited by
+   hand. A screen whose look changed without its drawing is a review finding
+   (section 13). (Note from the lead, 2026-10-22: the human's rule of 2026-10-22,
+   "always update this visual documentation to include changes"; the rule read "The
+   spec writer updates this file (and the sheet when the change is visible in it)".)
 4. Where an existing `approved` or `done` spec contradicts this file, this file
    describes the target and the spec is refined to match (section 12 lists them).
    Until a spec is refined, it wins for its own tests, and the code keeps passing
@@ -45,6 +56,10 @@ Rules:
 6. Strings are the app's own: `fr.json` and the key tables of the specs. Where the
    sheet's sample text differs from a spec's string (for example « a rejoint la
    partie » against spec 013's « a rejoint le salon »), the spec's string wins.
+7. The sheets draw the decided design. Something not yet decided (a spec's pick
+   pending its approval, a proposal) carries a dashed label in the screens sheet
+   and an item in section 15 until the human decides it. (Note from the lead,
+   2026-10-22: new rule, with the screens sheet.)
 
 ## 2. Colour tokens
 
@@ -54,7 +69,7 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 
 | Token | Value | Its one job | Never for | On white |
 | --- | --- | --- | --- | --- |
-| `--nock-navy` | #1B2F55 | The app's colour: top bar, top-bar icons and labels, clue bar, primary buttons, my selection border, focus ring, links, headings, segmented control and switch when on | Player marks | 13.26:1 |
+| `--nock-navy` | #1B2F55 | The app's colour: top bar, top-bar icons and labels, clue bar, primary buttons, my selection border, focus ring, links, headings, segmented control and switch when on, slider fill and knob (section 11; P15, 2026-10-22) | Player marks | 13.26:1 |
 | `--nock-ink` | #14181F | All text and grid letters, direction arrows, the catch-up ring, 3-second notes (background), the revealed notch during a flash, scrim and shadow base | Backgrounds of cells | 17.79:1 |
 | `--nock-muted` | #5E6573 | Secondary text: captions, event lines in the stream, disabled labels, menu details, inactive tabs, the room code above an entry card | Grid letters | 5.86:1 |
 | `--nock-pencil` | #555B67 | Pencil letters (italic), letter keys in pencil mode | Any other text | 6.82:1 |
@@ -62,7 +77,7 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 | `--nock-page` | #F6F7F9 | Background of the pages that are not the room (nickname, entry statuses, not found) behind their white card | Room page, cells | 1.07:1 |
 | `--nock-clue-bg` | #EEF2F8 | Clue cells, disabled buttons, the "not yet" status band, the connection band, the « hôte » tag | Selection | 1.12:1 |
 | `--nock-clue-ink` | #1B2230 | Clue text in clue cells, the separator between two clues | Any other text | 15.97:1 |
-| `--nock-word` | #E6EDF9 | My selected word, hovered menu item, pressed top-bar button, quiet buttons, pressed filter chips, progress bar track, hovered reaction | Player tints | 1.18:1 |
+| `--nock-word` | #E6EDF9 | My selected word, hovered menu item, pressed top-bar button, quiet buttons, pressed filter chips, progress bar and slider track, hovered reaction | Player tints | 1.18:1 |
 | `--nock-selected` | #CFDDF3 | My selected cell, and the half of the clue cell that holds my selected word's clue (decided by the human on 2026-10-16, drawn in sheet 4.2) | Anything else | 1.37:1 |
 | `--nock-locked` | #E3E7EE | Locked letter cells (with bold letters) | Disabled states | 1.24:1 |
 | `--nock-rule` | #9AA3B2 | Grid lines, empty cells, input borders, border of the catalogue's grid drawing, switch track when off | Text | 2.54:1 (DEFERRED, low) |
@@ -672,6 +687,10 @@ A popover (section 11) under the button, min width 220 px:
 - separator;
 - heading « Révéler »; items « La lettre » with the detail « n restantes », « Le
   mot » with « n restant » or « n restants » (spec 024's budget).
+- An item whose budget is spent stays in place, disabled: its text and detail
+  muted, the detail « Plus de lettre » or « Plus de mot » (`reveal.letter_none`,
+  `reveal.word_none`), no hover; the menu keeps its shape (decided by the human on 2026-10-22, screens sheet P7; spec 043 AC-8
+  draws it so).
 
 The pencil toggle itself is the ✎ key on touch screens and the « Crayon » top-bar
 button on a computer.
@@ -728,7 +747,10 @@ Content, top to bottom:
      letters or filled words (the sheet's « a rempli » line is dropped).
    - Message box: padding 8 px 12 px 12 px, 1 px line-grey top border, gap 8 px;
      the input with a 1 px rule-grey border, radius 18 px, padding 7 px 12 px; the
-     « Envoyer » pill (section 11).
+     « Envoyer » pill (section 11). Spec 022's chat notes (« Patientez avant
+     d'envoyer. », « L'hôte a coupé votre discussion. ») show as one muted line
+     under the input (500 0.85rem/1.3, 12 px left padding), one at a time; while I
+     am muted, the input and « Envoyer » are disabled (section 11) (decided by the human on 2026-10-22, screens sheet P5).
 4. Joueurs (specs 011, 013, 014): padding 10 px 16 px, rows 8 px apart, 0.95rem.
    Each row: player dot; name, « (vous) » after my own (my name weight 700); the
    « hôte » tag after the host's name (section 11); then on the right the state
@@ -742,7 +764,12 @@ Content, top to bottom:
    the Salon on this tab. (Note from the spec writer, 2026-10-22: spec 043 draws
    each row on two lines, the state and the current clue under the name, and puts
    the host's « Couper » (spec 022's mute) beside « Retirer »; pending the human's
-   approval of spec 043, section 15.)
+   approval of spec 043, section 15.) (Note from the lead, 2026-10-22: the host's
+   « Couper » / « Rétablir » beside « Retirer », as small secondary buttons, is
+   decided by the human on 2026-10-22, screens sheet P5; spec 022's separate
+   « Sourdine » block goes. The row's two lines are spec 043's, decided by the
+   human's approval of spec 043 on 2026-10-22, section 15 « Where the screens sheet
+   met spec 043 ».)
 
 ### 3-second notes
 
@@ -757,7 +784,10 @@ Content, top to bottom:
 - Not shown while the stream is visible (Salon open on Discussion), and held back
   while the vote banner shows; they come after it goes.
 - Which events: others' messages (« Bruno : … »), « Je bloque », reveals, others'
-  checks, joins and departures, and my own reaction. Never typed letters.
+  checks, joins and departures, and my own reaction. Never typed letters. Also two
+  short answers of the room: « Rien à annuler. » after « Annuler » with nothing to
+  undo (P9), and a vote's result, « Vote accepté. », « Vote refusé. » or « Temps
+  écoulé, vote annulé. », once its banner has gone (P6) (decided by the human on 2026-10-22, screens sheet).
 
 ### Reactions (spec 022)
 
@@ -805,7 +835,9 @@ computer as the recap's dialog (440 px, section 9).
   field « Adresse e-mail », primary « Recevoir le lien », after sending the green
   line (« Lien envoyé à … Il est valable 30 minutes. »), secondary « Fermer »
   right-aligned. Signed in: title « Votre compte », « Connecté avec {email} », the
-  text link « Gérer mon compte », secondary « Fermer » right-aligned.
+  text link « Gérer mon compte », secondary « Fermer » right-aligned. Outside a
+  room (the catalogue's « Compte »), the intro is `account.signed_out_intro`, since
+  `account.dialog_intro` speaks of « ce salon » (decided by the human on 2026-10-22, screens sheet P13).
 
 ### Entry and not-found pages (specs 012, 040)
 
@@ -827,6 +859,77 @@ Cards:
   one, secondary « Voir les grilles ».
 - Not found (spec 040): title « Page introuvable », primary « Voir les grilles »
   (an addition to spec 040), no room code line.
+- A room that is not found or has expired (spec 032 deletes an expired room, so
+  both read « Ce salon n'existe pas. »): the status card with the muted line « Un
+  salon est effacé 30 jours après sa dernière modification. » (a new `fr.json`
+  key) and « Voir les grilles » primary, the only way on (decided by the human on 2026-10-22, screens sheet P3).
+
+On a computer (and any window wider than a phone), these pages, and the plain
+pages below, use the 56 px top bar of the catalogue (section 10) and the phone's
+column, centred, at most 420 px wide, 48 px under the top bar, on `--nock-page`
+(decided by the human on 2026-10-22, screens sheet P1).
+
+### Plain pages: account, shared recap, operator (specs 028, 033, 038)
+
+Decided by the human on 2026-10-22 (screens sheet P11, P12, P14); drawn in the
+screens sheet, parts 5 to 7.
+
+- Shared recap `/recap/<token>` (spec 028): an entry page with no room code line
+  and one card: title « Grille terminée » (`share.heading`), « Grille n° N »
+  (card secondary text), « Temps : m:ss » in the recap time style (section 4),
+  « Équipe : … » (card text), primary « Voir les grilles ». The unavailable recap
+  is the same card with the title « Ce bilan n'est pas disponible. » and the
+  button.
+- Account page `/account` (spec 033): an entry page with one card titled « Mon
+  compte ». Signed in: « Connecté avec {email} », the text link « Retourner au
+  salon {code} » when there is one, then « Se déconnecter » and « Supprimer mon
+  compte », both secondary, side by side (gap 8 px, wrapping). « Supprimer mon
+  compte » asks once more in the same card, under a line-grey divider: the warning
+  (`account.delete_warning`) in ink, then « Supprimer définitivement » (primary)
+  and « Garder mon compte » (secondary); while asked, « Supprimer mon compte » shows
+  pressed (quiet). No red button: red keeps its one job (section 2; D1). The other
+  states are one line in the card (« States » below): « Connexion… » muted, the
+  invalid link as an error line above the e-mail field and « Recevoir le lien »,
+  « Votre compte a été supprimé. » as a confirmation line with « Voir les grilles »
+  primary, the generic error as an error line.
+- Operator page `/ops` (spec 038): the catalogue's frame (top bar with the brand
+  only, the 920 px column on `--nock-page`), heading « Exploitation » in the
+  catalogue heading style. The token form is one card: the field « Jeton
+  d'opérateur » (a password input), the error line « Jeton refusé. » or « Trop
+  d'essais… » under it, primary « Ouvrir ». Then a card « Tableau de bord » (card
+  title): the field « Période » with the three periods as the catalogue's filter
+  chips, then one tile per figure (white, 1 px line-grey border, radius 8 px,
+  padding 12 px 14 px, in a grid of `repeat(auto-fill, minmax(min(100%, 270px),
+  1fr))`, gap 10 px) holding the `fr.json` line as it is. Then a card « Relecture
+  d'un salon »: the field « Code du salon » with « Relire » (primary) beside it;
+  the edits, one line each (0.85rem, tabular), the current step on word blue and
+  weight 600, later steps muted; the grid at the chosen step, drawn with the cells
+  of section 6 at 44 px (36 px on a phone) with no clue text, no arrows and no
+  players; under it the field « Étape » with the slider (section 11) and « Étape n
+  sur m » (card secondary text). On a computer the edits sit left of the grid, gap
+  20 px; on a phone the grid, the slider, then the edits.
+
+### States: opening, loading, empty, error
+
+Decided by the human on 2026-10-22 (screens sheet P2, P4, P10). One rule for every
+page: a state is one line of text where its content will be; muted (`--nock-muted`,
+the page's text size) while waiting or when empty, an error line (section 11) when
+something failed, a confirmation line when done. No spinner, no skeleton.
+
+- Opening the room (P2): before the first snapshot, the room's top bar is in place
+  (no timer yet, no grid name), and the grid area holds one muted line,
+  « Connexion… » or « Entrée dans le salon… » (spec 040's `room-status`); no clue
+  bar, no keyboard. A refusal before the join then shows its card (above); a final
+  status after a snapshot shows spec 043's status band.
+- Catalogue (P4): « Chargement… », « Aucune grille pour le moment. » (the chips are
+  not shown) and « Aucune grille de cette force. » (the chips stay) as muted lines
+  under the heading, « Impossible de charger les grilles. » as an error line there;
+  a failed « Jouer » puts « Impossible de lancer la partie. Réessayez. » as an error
+  line inside its card, under its text. « Mes salons » shows nothing while it loads
+  and has no section when there is no room; « Impossible de charger vos salons. »
+  is an error line under its heading.
+- Recap (P10): inside its sheet or dialog, the title, then « Chargement du bilan… »
+  muted or « Le bilan n'est pas disponible. » as an error line, and « Fermer ».
 
 ### Focus and keyboard
 
@@ -855,6 +958,12 @@ white, 2 px navy border, radius 10 px, padding 10 px 12 px, gap 8 px, shadow
 padding 7 px 16 px, and on the right the seconds left (« 18 s »); then a progress
 bar 4 px high, radius 2 px, word-blue track, navy fill for the time left. No
 layout shift. Notes wait while it shows.
+
+Once I have voted, « Oui » and « Non » give way to the muted line « Vote
+enregistré. En attente des autres joueurs… » (500 0.85rem/1.3) in their row, the
+seconds kept on the right; the player who asked sees « En attente des autres
+joueurs… » there from the start. The result is a 3-second note when the banner
+goes (section 8) and a line in the stream (decided by the human on 2026-10-22, screens sheet P6).
 
 ### End of grid (spec 026)
 
@@ -886,6 +995,10 @@ m:ss » (recap time style); the lines « Vérifications : n », « Révélations
 complétés »), rows 8 px apart (on the phone the value wraps under the name, 18 px
 in); heading « Lien à partager »; the URL box and « Copier le lien » (secondary,
 padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
+After a copy, « Copier le lien » keeps its label and the confirmation line « Lien
+copié » shows under the URL box, as in the Joueurs tab (section 8); spec 028
+changes the button's text today and is refined (decided by the human on 2026-10-22, screens sheet P16). Loading and
+unavailable: section 8 « States ».
 
 ## 10. Catalogue (spec 004, with 029, 032, 033)
 
@@ -930,6 +1043,10 @@ padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
     `--nock-thumb` after, then « Force F · W × H · N mots ». Force is written, so
     it never relies on the drawing alone;
   - the primary button « Jouer » on the right (padding 9 px 16 px).
+- Loading, empty and error states: section 8 « States » (decided by the human on 2026-10-22, screens sheet P4).
+- Grid credits (spec 005) are not on the screens while no spec sends them to
+  players; when one does, they take one muted card line (« Auteur : … ») (decided by the human on 2026-10-22, screens sheet
+  D2).
 
 ## 11. Components
 
@@ -966,6 +1083,9 @@ padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
 | Text link | navy, weight 600 |
 | Player dot | 10 px circle, player colour, ring `0 0 0 1px var(--nock-dot-ring)` |
 | Reaction picker, shown reaction | section 8 |
+| Slider | a native range input styled: track 6 px high, radius 3 px, `--nock-word`; the part before the knob `--nock-navy`; knob 18 px navy circle; the focus ring of this table on the knob. Full width of its field (decided by the human on 2026-10-22, screens sheet P15) |
+| Destructive action | no variant of its own: a primary or secondary button after a confirmation step in place, never red (red means "look here", section 2) (decided by the human on 2026-10-22, screens sheet D1) |
+| State line | section 8 « States » |
 
 ## 12. Spec impact
 
@@ -1002,6 +1122,17 @@ Refinements to make, each with dated notes, before the matching build step
 | 034 | approved | AC-2: changed cells highlighted for 5 s, no look | Catch-up ring (section 6); lines in the stream |
 | 035 | done | AC-2: focus outline 3 px blue today, and "3:1 against the page background" fails for a white ring on navy; AC-6 initials; AC-11 slots and "+k"; AC-7 roster states; AC-12 lists named `roster` and `activity-feed`; "Reduced motion" out of scope | 2 px navy ring (spec 041); measure against the surface behind the ring; AC-6 and AC-11 refined: the non-colour sign of a player's cursor is the Accessibilité mode's icons (section 6) plus the Joueurs list, and triangles stay colour-only while the mode is off (decided by the human on 2026-10-16); AC-7 and AC-12 follow the Salon lists; notes respect reduced motion |
 | 040 | done | `room-heading` (« Salon {code} ») and `room-status` shown on the page; not-found page has no way back; styles were "not binding" | « Salon {code} » above the entry cards; `room-status` visually hidden while the connection band shows; « Voir les grilles » on the not-found card (an addition); styles now follow this file |
+
+(Note from the lead, 2026-10-22: the screens sheet's decisions (section 15) add
+these refinements: 022, the chat notes under the message box and the mute in the
+Joueurs rows (P5, as spec 043 does); 024, spent reveal items disabled in place (P7,
+as spec 043 AC-8 does); 025, the line after a vote and the result notes (P6); 018,
+« Rien à annuler. » as a note (P9, as spec 043 AC-26 does); 028, the recap's states
+(P10), the « Lien copié » line (P16) and the shared recap page (P11); 032 and 040,
+the expired room's line and its new `fr.json` key (P3); 033, the account page and
+deletion (P12) and the sheet's intro outside a room (P13); 038, the operator page
+(P14, P15); 004, 029 and 032, the catalogue's states (P4); 012 and 040, the plain
+pages on a computer (P1) and the opening room (P2).)
 
 New specs, numbers proposed in build order (section 14): 041 visual foundation
 (written); 042 grid cells (written); 043 room layout (written); then keyboard,
@@ -1041,9 +1172,15 @@ grid is solved.)
    - the layout rules of section 8, and that nothing extra is permanently on
      screen;
    - focus ring and Échap behaviour of sections 8 and 11;
-   - the spec cites the sections it applies.
-6. The sheet stays in `docs/design/` as the visual reference, updated with this
-   file.
+   - the spec cites the sections it applies;
+   - every change of look is drawn in the sheets in the same change (section 1
+     rule 3), and the screens sheet's HTML is what its generator builds.
+6. The sheets stay in `docs/design/` as the visual reference, updated with this
+   file in the same change: `cell-sheet.html` by hand, `screens-sheet.html` from
+   `docs/design/screens_sheet/` (`uv run python docs/design/screens_sheet/build.py`).
+   (Note from the lead, 2026-10-22: the screens sheet and its generator added; the
+   item read "The sheet stays in `docs/design/` as the visual reference, updated
+   with this file.")
 
 ## 14. Build order
 
@@ -1061,7 +1198,11 @@ Each step leaves the app working and every test passing.
    settled (decided on 2026-10-22, section 15).
 4. Keyboard: ✎, ⇄, « Clavier » (specs 009, 020 refined).
 5. Auteurs mode, catalogue and its sections, entry pages, overlays (specs 019,
-   004, 012, 025, 026, 028, 029, 032, 040 refined).
+   004, 012, 025, 026, 028, 029, 032, 040 refined), and the screens sheet's plain
+   pages and states: the account page, the shared recap page, the operator page,
+   the opening room and the states of section 8 (specs 028, 033, 038 refined).
+   (Note from the lead, 2026-10-22: the plain pages and states added, decided by the
+   human on 2026-10-22.)
 
 (Note from the spec writer, 2026-10-22: steps 2 and 3 read "Needs the DEFERRED,
 high notch item settled first"; the lead decided it on 2026-10-22 on the human's
@@ -1179,6 +1320,68 @@ the column layout on a window at most 500 px high the top bar is the phone top b
 is wider than those windows (568 to 740 px). Spec 044 Decision 8; spec 043 is
 refined. Section 8's "Computer and landscape tablet" top bar applies only to a
 column layout more than 500 px high.)
+
+### Decided by the human on 2026-10-22, from the screens sheet
+
+(Note from the lead, 2026-10-22: this list is new. The human accepted every
+recommended answer of `docs/design/screens-sheet.html` (version 1.0, its part 12);
+each item names the section that now carries it.)
+
+- P1. Entry and plain pages on a computer: the phone's column, centred, at most
+  420 px, 48 px under the 56 px top bar, on the page grey (section 8).
+- P2. The opening room: top bar in place, one muted line in the grid area, no clue
+  bar or keyboard, no spinner (section 8 « States »).
+- P3. An expired room: the not-found card with one muted line on expiry (a new
+  `fr.json` key) and « Voir les grilles » primary (section 8).
+- P4. Catalogue and « Mes salons » states as one line in place of the content
+  (section 8 « States », section 10).
+- P5. The host's « Couper » / « Rétablir » beside « Retirer » in the Joueurs rows;
+  the chat notes as a muted line under the message box; a muted player's input
+  disabled (section 8). The row's lines: spec 043's, see the next list.
+- P6. After a vote: a muted waiting line instead of « Oui » / « Non »; the result
+  as a note and a stream line (sections 8, 9).
+- P7. A spent reveal item stays, disabled, with « Plus de lettre » / « Plus de mot »
+  (section 8). Help mode `none`: spec 043's, see the next list.
+- P8. The clue bar with nothing selected shows « Touchez une case ou une
+  définition. »; its buttons: spec 043's, see the next list.
+- P9. « Rien à annuler. » is a 3-second note (section 8).
+- P10. The recap's loading and unavailable states inside its sheet or dialog
+  (section 8 « States »).
+- P11. The shared recap page (section 8 « Plain pages »).
+- P12. The account page and deletion, with no red button (section 8 « Plain
+  pages »).
+- P13. Outside a room, the account sheet's intro is `account.signed_out_intro`
+  (section 8).
+- P14. The operator page (section 8 « Plain pages »).
+- P15. A slider component (section 11).
+- P16. « Lien copié » as a line under the recap's URL box (section 9).
+- D1. No red « danger » button (section 11).
+- D2. Grid credits stay off the screens until a spec sends them (section 10).
+- D3. The screens sheet loads the app's own font files, else a local copy, else
+  the fallback stack; never Google.
+
+### Where the screens sheet met spec 043
+
+(Note from the lead, 2026-10-22: the screens sheet was drawn from `main`, before
+spec 043 was drafted, and on three points the answer the human accepted from the
+sheet differed from spec 043's pick. The human approved spec 043 on 2026-10-22
+("Approve specs 042 and 043."), so spec 043's version is decided on all three, by
+that approval; the sheet's answers P5 (the row's lines), P7 (help mode `none`) and
+P8 (the clue bar's buttons) are set aside on these points. This list read "both
+wait for the human, who settles them when approving spec 043".)
+
+1. The Joueurs row: line 1 the dot, the name, « (vous) », the « hôte » tag and, for
+   the host, « Couper » / « Rétablir » and « Retirer » on the right; line 2, under
+   the name, the state and the player's current clue (spec 043 Decision 5), so the
+   current clue never ends in an ellipsis at 340 px. Not P5's buttons on a second
+   line.
+2. Help mode `none`: « Aide » stays in the top bar; its menu holds the pencil
+   confirm when it applies, otherwise the muted line « L'aide est désactivée dans ce
+   salon. » (spec 043 Decision 7), since the pencil confirm lives in the Aide menu on
+   a computer. Not P7's hidden button.
+3. Réagir and Je bloque while nothing is selected: drawn disabled, their icon in
+   `--nock-rule` (5.22:1 on navy; spec 043 Open question 10), so the clue bar keeps
+   its shape. Not P8's hidden buttons.
 
 ### Deferred, high importance
 
