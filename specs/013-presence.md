@@ -12,6 +12,28 @@ fake-clock harness are defined in spec 011; players, colours and the roster in s
 012; disconnection detection in spec 017; the grid, selection and words on the page
 in specs 006 and 007. The messages are those of spec 039.
 
+(Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells
+(`_design.md` section 6): another player's selected cell is a plain triangle in
+their colour in a corner of the cell, corners given by order of arrival, at most
+four, instead of a dashed border; the word tint is 16 % (spec 041) and each player
+can turn it off with spec 042's « Mots des autres » switch. "Client: other
+players' selections", decision 3, AC-2 and AC-3 change, so the test-writer updates
+the tests of AC-2 and AC-3 before the implementer runs. The feed, the roster and
+the other criteria do not change; the feed becomes the Salon's stream in step 3.)
+
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8). The roster is the Salon's Joueurs tab, with each
+player's current clue under the name; the feed is the Salon's stream, one list
+shared with the chat messages (`chat-list` inside `activity-feed`), in seq order,
+with its own cap of 100 event lines and spec 043's pictograms, which are drawn by
+CSS and leave each `feed-item`'s text as below; its heading (`feed.heading`) goes,
+and the list is named by the Discussion tab's hidden heading. "Client: activity
+feed", "Client: feed height" (the list fills its tab panel, which is never above
+the grid) and AC-6 change, so the test-writer updates the tests of AC-6 before the
+implementer runs. The scroll rules (AC-7, AC-8) apply to the stream list
+unchanged; their tests show the Discussion tab first (spec 043's "Test
+harness"). The other criteria do not change.)
+
 ## Goal
 
 As a player, I want to see who is here and where they are working, so that we don't solve the same clue twice.
@@ -62,12 +84,20 @@ state becomes `disconnected` or the player leaves).
 
 On a `cell` (spec 006):
 
-- for each other player whose selection is that cell, one child
-  `data-testid="remote-selection"` with `data-player-id` and `data-colour`, drawn
-  as a dashed border (computed `border-style` `dashed`, at least 2 px wide) in that
-  player's colour (computed `border-color` equal to the computed
-  `background-color` of their `roster-colour`). With several, each is inset by a
-  different amount (for example 3 px per rank in roster order), so all stay visible.
+- for each other player whose selection is that cell and who holds one of its
+  four corners, one child `data-testid="remote-selection"` with `data-player-id`,
+  `data-colour` and `data-corner`, drawn as a plain right triangle in that corner
+  whose fill is that player's colour (the computed `fill` of its `polygon` equal
+  to the computed `background-color` of their `roster-colour`), with no outline
+  and no text. Corners go by order of arrival on the cell, top-left, top-right,
+  bottom-right, bottom-left; at most four players are drawn; the sizes, the
+  arrival rules and the Accessibilité icons are spec 042's ("Other players on a
+  cell"). (Note from the lead, 2026-10-22: refined by spec 042, the design's grid
+  cells. This read "drawn as a dashed border (computed `border-style` `dashed`, at
+  least 2 px wide) in that player's colour (computed `border-color` equal to the
+  computed `background-color` of their `roster-colour`). With several, each is
+  inset by a different amount (for example 3 px per rank in roster order), so all
+  stay visible.")
 - `data-tinted-by`: the ids of the other players whose selected word holds that
   cell (word of their selected cell in their direction, spec 007 rules), separated
   by one space, in roster order; `""` when none. A tinted cell that is not in my
@@ -81,7 +111,9 @@ My own selection keeps the look of spec 007 (background fill, no dashed border;
 note from the lead, 2026-10-22: since spec 041, a background of rgb(207, 221, 243)
 and a 2 px solid navy outline inside the cell, where it was yellow with a 3 px
 ink outline),
-and the page never draws a `remote-selection` for `you`.
+and the page never draws a `remote-selection` for `you`. (Note from the lead,
+2026-10-22: with spec 042, my selection is the selected blue with a 2 px navy
+border inside the cell, and never a triangle.)
 
 ### Client: activity feed
 
@@ -105,10 +137,13 @@ decision 12).
 | `settings_changed`, only `locked` differs from the previous settings | `room_locked` or `room_unlocked` | `t("feed.room_locked", {name})` or `t("feed.room_unlocked", {name})` |
 | `settings_changed`, otherwise | `settings_changed` | `t("feed.settings_changed", {name, help_mode, letters, words})`, `help_mode` = `t("settings.help_mode.<mode>")`, `letters` and `words` from `settings.reveal_budget` |
 | `host_changed` | `host_changed` | `t("feed.host_changed", {name})` |
+| `vote_closed` | `vote` | `t("vote.result.<outcome>")` (Note from the lead, 2026-10-22: row added by spec 047, the design's room overlays, for the human's decision P6: a vote's result is a line in the stream; it names no player) |
 
 Other events (`letter_changed`, `cell_locked`, `player_state_changed`,
-`flag_changed` with `null`, votes, chat, completion) add no item. The nickname is
-the one known when the event is applied.
+`flag_changed` with `null`, `vote_opened`, chat, completion) add no item. The
+nickname is the one known when the event is applied. (Note from the lead,
+2026-10-22: refined by spec 047; "votes" became `vote_opened`. No criterion of this
+spec changes: AC-5 sends no vote.)
 
 New `fr.json` keys:
 
@@ -248,11 +283,11 @@ Feed scroll states (AC-7, AC-8). (Note from the lead, 2026-10-14: added.)
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (AC-3.3.1) (Python; WebSocket with a fake clock; browser with mocked socket) A roster lists each player with a colour and a state: active, idle after 2 minutes without input, or disconnected. Python: with `p1` whose `last_input_at` is `t`, `tick` at `t + 119.9` changes nothing and at `t + 120` gives `PlayerStateChanged(p1, idle)`; a `SelectCell` from `p1` at `t + 130` gives `PlayerStateChanged(p1, active)` then the selection; a `Ping` at `t + 130` does not. WebSocket: A and B join; after `advance(120)` B receives `PlayerStateChanged(<A>, idle)` (and A receives B's) within one second of real time; A's next `select_cell` makes B receive `PlayerStateChanged(<A>, active)` before the `selection_moved`. Browser: given a snapshot with `p1` (`you`, colour 0, active), `p2` (colour 1, idle) and `p3` (colour 2, disconnected), the roster shows three items in that order with `data-colour` 0, 1, 2, pairwise different `roster-colour` background colours, `data-state` `active`, `idle`, `disconnected`, and `roster-state` texts `fr.json["presence.active"]`, `fr.json["presence.idle"]`, `fr.json["presence.disconnected"]`; a `player_state_changed` for `p2` `active` updates its item.
-- **AC-2** (AC-3.3.2) (WebSocket; browser with mocked socket) Another player's selected cell is outlined in their colour and their word lightly tinted, within 300 ms of their move. WebSocket: A and B join a FX-01 room; A sends 100 `select_cell` messages on random letter cells, each after B received the previous `selection_moved`; B receives each as `SelectionMoved(player_id=<A>, selection=...)` with the same values, A receives none, and the 95th percentile of the relay times is at most 100 ms; a `select_cell` on (0, 0) is answered `not_a_letter_cell` to A and nothing to B. Browser: given the page joined with `p1` (`you`) and `p2` (colour 3), within 300 ms of the mock sending `selection_moved` for `p2` on (2, 2) `across`, (2, 2) holds one `remote-selection` with `data-player-id="p2"` and `data-colour="3"`, whose computed `border-style` is `dashed` and `border-color` equals `p2`'s `roster-colour` background colour; exactly (2, 1), (2, 2), (2, 3), (2, 4) have `data-tinted-by="p2"`, and (2, 1)'s background colour differs from that of (1, 1) (Note from the lead, 2026-10-22: since spec 041, the tint is the colour at 16 % over white); a `selection_moved` for `p2` with `null` removes them.
-- **AC-3** (AC-3.3.3) (browser with mocked socket) When two players select the same cell, both outlines are visible. Given `p1` (`you`), `p2` (colour 1) and `p3` (colour 2), when the mock sends `selection_moved` for `p2` and for `p3`, both on (1, 1) (`p2` across, `p3` down), then (1, 1) holds two `remote-selection` elements with `data-player-id` `p2` and `p3`, both visible, with different bounding boxes and different border colours; (1, 1) has `data-tinted-by="p2 p3"`. When `p1` also taps (1, 1), the two outlines stay visible and the cell also shows `p1`'s own selection (spec 007 `data-selected="true"`).
+- **AC-2** (AC-3.3.2) (WebSocket; browser with mocked socket) Another player's selected cell is outlined in their colour and their word lightly tinted, within 300 ms of their move. WebSocket: A and B join a FX-01 room; A sends 100 `select_cell` messages on random letter cells, each after B received the previous `selection_moved`; B receives each as `SelectionMoved(player_id=<A>, selection=...)` with the same values, A receives none, and the 95th percentile of the relay times is at most 100 ms; a `select_cell` on (0, 0) is answered `not_a_letter_cell` to A and nothing to B. Browser: given the page joined with `p1` (`you`) and `p2` (colour 3), within 300 ms of the mock sending `selection_moved` for `p2` on (2, 2) `across`, (2, 2) holds one `remote-selection` with `data-player-id="p2"`, `data-colour="3"` and `data-corner="top-left"`, whose `polygon` has a computed `fill` equal to `p2`'s `roster-colour` background colour (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells; this read "whose computed `border-style` is `dashed` and `border-color` equals `p2`'s `roster-colour` background colour"); exactly (2, 1), (2, 2), (2, 3), (2, 4) have `data-tinted-by="p2"`, and (2, 1)'s background colour differs from that of (1, 1) (Note from the lead, 2026-10-22: since spec 041, the tint is the colour at 16 % over white); a `selection_moved` for `p2` with `null` removes them.
+- **AC-3** (AC-3.3.3) (browser with mocked socket) When two players select the same cell, both outlines are visible. Given `p1` (`you`), `p2` (colour 1) and `p3` (colour 2), when the mock sends `selection_moved` for `p2` and for `p3`, both on (1, 1) (`p2` across, `p3` down), then (1, 1) holds two `remote-selection` elements with `data-player-id` `p2` and `p3`, both visible, `p2`'s with `data-corner="top-left"` and `p3`'s with `data-corner="top-right"`, with different bounding boxes and different `polygon` fill colours (Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells; this read "with different bounding boxes and different border colours"); (1, 1) has `data-tinted-by="p2 p3"`. When `p1` also taps (1, 1), the two outlines stay visible and the cell also shows `p1`'s own selection (spec 007 `data-selected="true"`).
 - **AC-4** (AC-3.3.4) (browser with mocked socket) My own selection is styled differently from every other player's. Given `p1` (`you`) and `p2`, after `p1` taps (3, 1) and the mock sends `p2`'s selection on (2, 2): (3, 1) has `data-selected="true"` and no `remote-selection` child; no cell has a `remote-selection` with `data-player-id="p1"`; the computed `border-style` of (3, 1) and of its children is never `dashed`; and the background colour of (3, 1) differs from the background colour of (2, 2) and of the tinted (2, 3) (Note from the lead, 2026-10-22: since spec 041, (3, 1) has rgb(207, 221, 243), (2, 2) white and (2, 3) the 16 % tint, so the three still differ; (3, 1) has a 2 px solid navy outline inside the cell).
 - **AC-5** (AC-3.3.5) (browser with mocked socket) An activity feed lists joins, departures, checks, reveals, flags and setting changes in the order they happened. Given the page joined at `seq` 5 with players `p1` (`you`, `Ana`) and `p2` (`Bob`), when the mock sends, with seqs 6 to 12: `player_joined` (`p3`, `Cy`), `check_result` (`p2`, scope word), `reveal_result` (`p3`, scope letter), `flag_changed` (`p2`, clue (0, 3, 0)), `settings_changed` (`p1`, help mode `vote`, budget 5 letters and 1 word, unlocked), `settings_changed` (`p1`, same values but `locked` true), `player_left` (`p3`, reason `removed`), then `activity-feed` holds 7 `feed-item` elements with `data-seq` 6 to 12 in that order and `data-kind` `player_joined`, `check`, `reveal`, `flag`, `settings_changed`, `room_locked`, `player_removed`, whose texts are, in order, `Cy a rejoint le salon`, `Bob a vérifié un mot`, `Cy a révélé une lettre`, `Bob bloque sur « Fatales à César »`, `Ana a modifié les réglages : aide par vote, 5 lettres et 1 mots à révéler`, `Ana a verrouillé le salon` and `Cy a été retiré du salon` (each built from `fr.json`). Sending those events out of order (seq 8 before 7) still lists them by seq.
-- **AC-6** (new) (browser with mocked socket) The roster and the feed never take the grid's room. With a snapshot of 8 players and 100 feed items, at every window size of spec 006 AC-5, in desktop and touch contexts (touch with spec 009's on-screen keyboard), and after a tap on a cell: the `grid-viewport` is at least 100 px high, the page has no vertical or horizontal scroll, the grid fits the viewport at zoom 1, and the clue bar is fully inside the window above the keyboard (specs 006 AC-5 and AC-7, 009 AC-4). On small windows the roster and the feed may be compact (for example one line each, the feed showing its newest item) as long as their content stays reachable. (Note from the lead, 2026-10-22: since spec 041, text is set in Source Sans 3 and controls without their own font take their parent's size and family; the room header's title, share and toolbar rows have explicit line heights so that the header keeps its 48 px, and the clue text has an explicit line height of about 1.42 em; the 100 px of the viewport at 568 by 320 still holds, and the test reads the page after `document.fonts.ready`.) (Note from the lead, 2026-10-22, second review of spec 041: the rows with an explicit line height are the title row, the status row, the share row and the toolbar row; `RoomPage.svelte` sets it on `.room-header h1`, `.room-header p`, `.share-panel` and `.room-toolbar`.) Feed height: with the same snapshot of 8 players and no feed item, at 1280 by 720 and at each window size of spec 006 AC-5, in desktop and touch contexts and without a tap on a cell, the mock sends the line event of "Feed scroll states" (sent by a player of the snapshot) three times, one at a time with the next seq; with 0, 1, 2 and 3 items (once `room-page` has the `data-seq` of each), the bounding box of `grid-viewport` (x, y, width, height) is the same, with 1 px of tolerance; and the height of the feed list with 3 items is the one it has after 100 items (1 px tolerance). (Note from the lead, 2026-10-15: the feed height check is added to AC-6, keeping its other checks, for "Client: feed height" (review of spec 021).)
+- **AC-6** (new) (browser with mocked socket) The roster and the feed never take the grid's room. With a snapshot of 8 players and 100 feed items, at every window size of spec 006 AC-5, in desktop and touch contexts (touch with spec 009's on-screen keyboard), and after a tap on a cell, with the Salon closed and again with the Salon open on its Discussion tab: the `grid-viewport` is at least 100 px high, the page has no vertical or horizontal scroll, the grid fits the viewport at zoom 1, and the clue bar is fully inside the window above the keyboard (specs 006 AC-5 and AC-7, 009 AC-4); in the sheet layout, `grid-viewport` has the same box in both states (1 px). (Note from the lead, 2026-10-22: since spec 041, text is set in Source Sans 3 and controls without their own font take their parent's size and family; the room header's title, share and toolbar rows have explicit line heights so that the header keeps its 48 px, and the clue text has an explicit line height of about 1.42 em; the 100 px of the viewport at 568 by 320 still holds, and the test reads the page after `document.fonts.ready`.) (Note from the lead, 2026-10-22, second review of spec 041: the rows with an explicit line height are the title row, the status row, the share row and the toolbar row; `RoomPage.svelte` sets it on `.room-header h1`, `.room-header p`, `.share-panel` and `.room-toolbar`.) (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "On small windows the roster and the feed may be compact (for example one line each, the feed showing its newest item) as long as their content stays reachable." in place of the two Salon states.) Feed height: with the same snapshot of 8 players and no feed item, at 1280 by 720 and at each window size of spec 006 AC-5, in desktop and touch contexts and without a tap on a cell, the mock sends the line event of "Feed scroll states" (sent by a player of the snapshot) three times, one at a time with the next seq; with 0, 1, 2 and 3 items (once `room-page` has the `data-seq` of each), the bounding box of `grid-viewport` (x, y, width, height) is the same, with 1 px of tolerance; and the height of the feed list with 3 items is the one it has after 100 items (1 px tolerance). (Note from the lead, 2026-10-15: the feed height check is added to AC-6, keeping its other checks, for "Client: feed height" (review of spec 021).) (Note from the lead, 2026-10-22: refined by spec 043: the feed height check runs with the Salon open on its Discussion tab, where the feed list is the stream list.)
 - **AC-7** (AC-3.3.5; new, from the lead's review of 2026-10-14) (browser with mocked socket) A new feed line brings the feed list to the newest line only when the list was already at its end; otherwise the player keeps their place. The rules are those of "Client: feed scroll position". The setup, "settled", the scroll probe and "items in view" are in "Feed scroll states" in "Test harness". The cases below run in this order on one page, at 1280 by 720 and again at 360 by 740, each from the state the case before it left. Wherever a case says that the list scrolls, or that it is or is not at its end before an event, the test first checks it from the list's measures and fails if it does not hold. (Note from the lead, 2026-10-14: added.)
   - Filling: the mock sends ten line events, `seq` 6 to 15, one right after another without waiting. Once `room-page` has `data-seq` 15, the list scrolls, and within 300 ms it is at its end.
   - At the end: the mock sends the line event with `seq` 16. Within 300 ms after `room-page` has `data-seq` 16, the list is at its end.
@@ -280,7 +315,8 @@ The words in brackets say how each criterion is tested.
 - Selection relay (AC-2): never sent back to the mover; never logged, so it has no
   `seq` and is lost on a server restart (spec 018 `after_restart`).
 - Tint overlap (AC-3): two players on one word tint it with the first player's
-  colour (roster order); both outlines remain distinct.
+  colour (roster order); both outlines remain distinct. (Note from the lead,
+  2026-10-22: with spec 042 the outlines are triangles in different corners.)
 - My own word (AC-4): a cell in my selected word keeps spec 007's highlight even
   when also tinted by others; `data-tinted-by` still lists them.
 - Unknown player id in an event (AC-5): `{name}` is `t("feed.someone")`; the page
@@ -360,7 +396,10 @@ AC-1 refer to is part of spec 039 since its reopening, decision 17 there.)
    labels. Pick: other players get a dashed border in their colour, inset per player
    so several stay visible, and a light tint of their word; my own selection keeps
    spec 007's fill and never a dashed border. Exact sizes and opacity are the
-   implementer's.
+   implementer's. (Note from the lead, 2026-10-22: replaced by the design the human
+   validated on 2026-10-16, built by spec 042: a corner triangle per player, by
+   order of arrival, at most four, a 16 % tint that each player can turn off, and
+   the Accessibilité icons; the sizes are now the design's.)
 4. Feed contents. The backlog lists joins, departures, checks, reveals, flags and
    setting changes. Picks: departures are `player_left` only (a disconnection is
    shown in the roster, not the feed); a cleared flag adds no line; lock and

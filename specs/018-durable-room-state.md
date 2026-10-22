@@ -12,6 +12,13 @@ The FX-01 reference grid is in `specs/_reference.md`. The rooms engine
 in spec 011, joins in spec 012, edits in specs 015 and 016. The messages are those
 of spec 039.
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): `undo-button` is the top bar's « Annuler » button, with
+the undo icon over or beside its label `t("room.undo")`, and `undo-message` takes
+the look and place of a 3-second note over the top of the grid, for its 3
+seconds. Their ids, texts and behaviour do not change, so no criterion of this
+spec changes.)
+
 ## Goal
 
 As a player, I want the room to survive a server incident, so that an hour of solving is never lost.

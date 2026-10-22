@@ -12,6 +12,25 @@ The FX-01 reference grid is in `specs/_reference.md`. The stack, the modeling ru
 and the toolchain are in `specs/_architecture.md`. The messages are those of spec
 039 (`nock.protocol`).
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8; the lead's decision of 2026-10-22 on `_design.md` section
+15 item 10): once the room page has a snapshot, the room's `h1` (« Salon {code} »)
+and `room-status` have the class `visually-hidden` while the page is `joined` or
+`reconnecting`, read by screen readers only; in a final status after a snapshot,
+`room-status` shows as a band under the top bar. The page gains `data-layout`. No
+criterion of this spec changes: AC-16 and AC-21 read `room-status`'s text, which a
+visually hidden element keeps. The pages shown before a snapshot and the
+not-found page are step 5's.)
+
+(Note from the lead, 2026-10-22: refined by spec 046, the design's catalogue and
+entry pages (`_design.md` section 8): before a snapshot, the room page shows the
+room's top bar, inert, and `room-status` as one muted line while it connects or
+joins; the nickname form and every final status before a snapshot are cards on the
+page grey under the room code line (the room's `h1`), `room-status` being the
+status card's title; the not-found page is a card with « Voir les grilles » (an
+addition); and the styles, which "Not binding" left to the implementer, follow
+`_design.md`. No criterion of this spec changes: their ids and texts stay.)
+
 (Note from the lead, 2026-10-16: refined after the first review of the nickname
 rule (spec 012 decision 12). `displayNickname` now puts the whole nickname through
 one `toLowerCase()`, which keeps Greek's final sigma, before it puts the first

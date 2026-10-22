@@ -288,20 +288,20 @@ git push origin v0.1.0
   Remove the answered questions and list any new ones.
   ```
 
-- [ ] Approve them, then build:
-  - [ ] `/feature specs/024-reveal.md`
-  - [ ] `/feature specs/025-help-mode-vote.md`
-  - [ ] `/feature specs/019-authorship-view.md`
-  - [ ] `/feature specs/020-pencil-letters.md`
-  - [ ] `/feature specs/021-clue-flag.md`
-  - [ ] `/feature specs/022-chat-reactions.md`
-  - [ ] `/feature specs/027-shared-timer.md`
-  - [ ] `/feature specs/028-end-of-game-recap.md` (needs authorship, 019)
-  - [ ] `/feature specs/032-room-resume.md`
-  - [ ] `/feature specs/038-privacy-operations.md` (needs room expiry, 032)
-  - [ ] `/feature specs/034-catch-up.md`
-  - [ ] `/feature specs/033-optional-account.md`
-  - [ ] `/feature specs/029-game-history.md` (history across devices needs 033)
+- [x] Approve them, then build (all merged by 2026-10-22, PRs #7 to #26):
+  - [x] `/feature specs/024-reveal.md`
+  - [x] `/feature specs/025-help-mode-vote.md`
+  - [x] `/feature specs/019-authorship-view.md`
+  - [x] `/feature specs/020-pencil-letters.md`
+  - [x] `/feature specs/021-clue-flag.md`
+  - [x] `/feature specs/022-chat-reactions.md`
+  - [x] `/feature specs/027-shared-timer.md`
+  - [x] `/feature specs/028-end-of-game-recap.md` (needs authorship, 019)
+  - [x] `/feature specs/032-room-resume.md`
+  - [x] `/feature specs/038-privacy-operations.md` (needs room expiry, 032)
+  - [x] `/feature specs/034-catch-up.md`
+  - [x] `/feature specs/033-optional-account.md`
+  - [x] `/feature specs/029-game-history.md` (history across devices needs 033)
 
 ```bash
 git tag v1.0.0
@@ -311,9 +311,61 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-## Phase 7 - Later: competitive modes (only if wanted)
+## Phase 7 - Visual design
 
-The backlog still asks whether E8 is wanted at all. If yes:
+Decided by the human on 2026-10-22: the whole client is rebuilt on the design
+system before any extra mode ("a new phase BEFORE phase 7 and any extra mode").
+The design system is `specs/_design.md` (the reference), drawn in
+`docs/design/cell-sheet.html` (grid cells) and `docs/design/screens-sheet.html`
+(every screen, built by `docs/design/screens_sheet/build.py`). Today's screens
+work but use browser defaults; this phase changes their look and layout, not the
+game's rules or its protocol.
+
+Every spec of this phase is a set of screens that one pull request can carry
+(spec 043 is the exception: two, one per work package). Each one leaves the app
+working and every test passing, and builds on the ones before it. A spec also
+refines the older specs whose tests check the look it changes, with dated notes,
+so their tests change in the same pull request.
+
+| Order | Spec | Screens | Status (2026-10-22) |
+| --- | --- | --- | --- |
+| 1 | 041 Visual foundation | tokens, player colours, fonts, icons, buttons, focus ring, menus, badge, note; today's screens take the colours, no layout change | approved, being built |
+| 2 | 042 Grid cells | every cell: letters, marks, players' corners, clues, arrows, flag, the « Accessibilité » and « Mots des autres » switches | approved |
+| 3 | 043 Room layout | top bar, Aide and Menu, Salon (column or sheet), Joueurs, clue bar, notes, completion band; two pull requests (WP-1 the frame, WP-2 the feedback) | approved |
+| 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | draft |
+| 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | to draft |
+| 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | to draft |
+| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | to draft |
+| 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | to draft |
+
+- [ ] Draft and approve: specs 044 to 048 are drafted from `_design.md` and the
+  screens sheet; the human approves each (only the human sets `approved`).
+- [ ] Merge the design specs: one pull request of `specs/` and `docs/design/`
+  only (branch `design-specs`), so every build starts from the approved text.
+  Then the tooling rule that keeps the visual documentation current (PR #30).
+- [ ] Build, in the order of the table, one pull request each:
+  - [ ] `/feature specs/041-visual-foundation.md`
+  - [ ] `/feature specs/042-grid-cells.md`
+  - [ ] `/feature specs/043-room-layout.md` (WP-1, then WP-2)
+  - [ ] `/feature specs/044-keyboard.md`
+  - [ ] `/feature specs/045-auteurs-mode.md`
+  - [ ] `/feature specs/046-catalogue-and-entry-pages.md`
+  - [ ] `/feature specs/047-room-overlays.md`
+  - [ ] `/feature specs/048-plain-pages-and-states.md`
+
+```bash
+git tag v1.1.0
+```
+
+```bash
+git push origin v1.1.0
+```
+
+## Phase 8 - Later: competitive modes
+
+Decided by the human on 2026-10-22: E8 is wanted, and waits until the visual
+design (Phase 7) is built. Specs 030 and 031 are 45-line stubs approved before
+their interface existed: the spec-writer writes them in full first.
 
 - [ ] Refine. Prompt:
 
@@ -327,9 +379,6 @@ The backlog still asks whether E8 is wanted at all. If yes:
 - [ ] Approve them, then build:
   - [ ] `/feature specs/030-race-mode.md`
   - [ ] `/feature specs/031-team-mode.md`
-
-If not, prompt: `Specs 030 and 031 are dropped: delete them and remove them from
-specs/_reference.md.`
 
 ## Decisions still yours
 

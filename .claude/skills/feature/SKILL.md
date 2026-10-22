@@ -32,7 +32,10 @@ summarising them.
 Delegate to `test-writer` with the spec path. When it returns:
 
 - If it reports questions or untested criteria, stop and take them to the user.
-  A fix to the spec goes through `spec-writer`, then back to `test-writer`.
+  A fix to the spec goes through `spec-writer`, then back to `test-writer`. When
+  the fix changes a look, the spec-writer redraws it in `docs/design/`; rebuild
+  the screens sheet (`uv run python docs/design/screens_sheet/build.py`) and
+  commit it with the spec.
 - Otherwise commit only the test files: `test: add tests for spec NNN`.
 
 ## 3. Implementation

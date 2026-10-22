@@ -10,6 +10,12 @@ status: done
 
 (Note from the lead, 2026-10-15: refined after the review of spec 019 with the lead's decisions 9 to 14 below. AC-1 and AC-4 changed, so the test-writer updates their tests before the implementer runs (review of spec 019).) (Note from the lead, 2026-10-15: AC-1's box run changed again, with a fourth page at 296 by 640 (296 by 568 gave 18.28 px cells, limited by the height), so the test-writer updates its test before the implementer runs (second review of spec 019).)
 
+(Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells (`_design.md` section 6): the other players' cursors are corner triangles with no labels, so the band's "Drawing order" rule and AC-1's drawing-order check change, and the test-writer updates that check before the implementer runs. The band itself, the switch and the other criteria do not change until step 5 brings the Auteurs mode of `_design.md` section 7.)
+
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout (`_design.md` section 8): `authors-switch` is the first item of the room Menu (« Auteurs », with the detail « activé » or « désactivé »), still off at each page load until step 5; `clue-bar-author` stays in the navy clue bar, after the clue text, in white, with the shrinking rules of AC-4; the new layout's cells at 296 by 640 on FX-02 are about 21.5 px. "Client: the authors switch", AC-1's fourth page (283 by 640 in place of 296 by 640), AC-4's in-row checks and AC-5 change, so the test-writer updates their tests before the implementer runs. The other criteria do not change; a test that clicks the switch opens the Menu first (spec 043's "Test harness").)
+
+(Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode (`_design.md` section 7): the band at the bottom of each cell is gone, with its colour, hatching, box, baseline, drawing-order and contrast rules; while the switch is on each letter is drawn in its finder's ink (`--player-ink-N`), a letter with no finder (empty, revealed, or by a player who is not in the kept snapshot) in plain ink, and a legend under the grid names each player in their ink; the clue bar's `clue-bar-author` goes; the switch is remembered per browser (`nock.authors`). "Client: the authors switch", "Client: the view, switch on", "Client: the author in words", "New `fr.json` keys", "Test harness", AC-1, AC-2, AC-3 (its browser part only), AC-4, AC-5, the edge cases and "Out of scope" change, so the test-writer updates the tests of AC-1, AC-2, AC-3's browser part, AC-4 and AC-5 before spec 045's implementer runs. AC-3's rule and WebSocket parts (the server keeps authors) do not change.)
+
 Epic E5 Collaboration aids (US-5.1) · Release: V1 · Epic depends on: E4
 The FX-01 reference grid and the glossary are in `specs/_reference.md`. The grid
 elements are those of spec 006, the selection and the clue bar spec 007, the
@@ -47,8 +53,13 @@ pending edit.
 ### Client: the authors switch
 
 - `data-testid="authors-switch"`: a `<button type="button">` with `aria-pressed`
-  (`false` or `true`) and the text `t("authors.switch")`, last in spec 024's
-  `room-toolbar`. It is `false` at each page load, and each click flips it. It is
+  (`false` or `true`) and the text `t("authors.switch")`, the first item of spec
+  043's room Menu (`room-menu`), with its detail. (Note from the lead, 2026-10-22:
+  refined by spec 043; this read "last in spec 024's `room-toolbar`".) It starts
+  from `localStorage["nock.authors"]` (`"true"` gives `true`, any other value or
+  none `false`), and each click flips it and writes `"true"` or `"false"` there.
+  (Note from the lead, 2026-10-22: refined by spec 045; this read "It is `false` at
+  each page load, and each click flips it".) It is
   never disabled (the view is useful on a solved grid too) and sends nothing.
   (Note from the lead, 2026-10-15: "sends nothing" leaves aside the heartbeat
   `ping` frames of spec 017, which the page may send at any time once the socket
@@ -56,131 +67,55 @@ pending edit.
 
 ### Client: the view, switch on
 
-On each letter `cell` (spec 006) whose confirmed cell has a letter and an author:
+(Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode.
+This section described `author-mark`, a band in the author's colour along the
+bottom of each filled cell: its colour, the hatching of a departed author's band,
+its 3:1 contrast in every state of the cell, its box rules, its baseline probe, its
+drawing order and its visibility. The band is gone; the section now reads as
+follows, and spec 045's "The letters while the mode is on" gives the whole rule.)
 
-- `data-author-colour`: the author's colour index (`0` to `7`) when the author is a
-  player of the kept snapshot; `""` when they are not (they left the room, spec
-  017, or were removed, spec 014);
-- one child `data-testid="author-mark"`, with `data-colour` (the same value),
-  `aria-hidden="true"` and no text: a band in the author's colour along the bottom
-  of the cell.
-  - Its computed `background-color` equals the computed `background-color` of the
-    author's `roster-colour` swatch (spec 012), in every state of the cell. (Note
-    from the lead, 2026-10-15: "in every state of the cell" was added. The band's
-    main colour never changes; its contrast comes from its other colours, decision
-    9 (review of spec 019).)
-  - With `data-colour=""` it is hatched, never a plain colour: its computed
-    `background-image` is a `repeating-linear-gradient` whose line is diagonal (an
-    angle that is not a whole multiple of 90 degrees, or a corner keyword such as
-    `to top right`) and whose colour stops hold at least two different colours.
-    Each of its colours (as "Contrast" below lists them) is a grey: its red, green
-    and blue channels are within 8 of each other, so none is a player colour.
-    (Note from the lead, 2026-10-22: since spec 041, each of its colours is exactly
-    `--nock-ink`, rgb(20, 24, 31), or `--nock-white`, rgb(255, 255, 255): the hatch
-    is ink and white, no longer greys, and the "within 8 of each other" test does
-    not hold for ink, whose channels differ by 11. Ink and white are still none of
-    the eight player colours. The tests use `is_ink_or_white` of
-    `tests/spec019_harness.py`.) No
-    player's band has a pattern: with `data-colour` `0` to `7`, the computed
-    `background-image` of `author-mark` and of each of its layers is `none`. So a
-    departed author's band differs from every player's band by its pattern, not by
-    its colour. (Note from the lead, 2026-10-15: this item replaces the sentence
-    "With `data-colour=""` it is a neutral grey that is none of the eight player
-    colours". That grey, `#737885`, has almost the lightness of red, olive and
-    teal, so many colour-blind players saw it as the teal band; decision 10 (review
-    of spec 019).)
-  - Contrast: the band keeps a contrast of at least 3:1 against the cell's
-    computed `background-color` in every state of the cell: not selected;
-    selected; in my selected word (spec 007); in another player's word, tinted in
-    their colour (spec 013); locked by a check (spec 016's locked grey); struck
-    through by a check (spec 023); and flashing in any of the eight player colours
-    (spec 016), whatever the band's own colour. A revealed cell has no author, so
-    it has no band to check. (Note from the lead, 2026-10-15: added. With spec
-    012's palette, the bands of colours 1 and 3 had under 3:1 on every cell
-    background, the grey band under 3:1 on some word tints, and on a flashing cell
-    the band vanished, since the flash is in the new author's colour; decision 9
-    (review of spec 019).) (Note from the lead, 2026-10-22: since spec 041 AC-16,
-    on a flashing cell the cell's computed `background-color` is white and the
-    flash colour is a `cell-flash` overlay at 38 % opacity over it, so the band's
-    contrast is measured against the cell's background with that overlay composited
-    over it, not against a full player colour.)
-  - The band's contrast is measured over its colours, as spec 024 measures its
-    corner mark. Its colours are the computed `background-color` of `author-mark`
-    and the colour stops of its computed `background-image`, and the same for each
-    layer inside it (element descendants, or its `::before` and `::after`
-    pseudo-elements whose computed `content` is not `none`) that is at least half
-    the cell side wide and at least 1 px high (bounding box for an element,
-    computed `width` and `height` for a pseudo-element). A colour with alpha 0 does
-    not count; every other colour of the band is opaque. The band's contrast is the
-    highest contrast of its colours against the cell's computed
-    `background-color`. A colour counts only where it shows: an edge shows at least
-    1 px of its colour along the whole length of the band, above it and below it,
-    and each stripe of a hatched band is at least 1 px wide (the reviewer checks
-    this; the tests read the colours). (Note from the lead, 2026-10-15: added,
-    decision 9 (review of spec 019).)
-  - How the band keeps 3:1 is the implementer's choice, for example an edge in a
-    colour that contrasts with every background, or one that changes with the
-    cell's state. The ink colour alone has under 3:1 on the flash colours 2 and 4
-    (spec 024 decision 14), and white alone on the light backgrounds. The band's
-    main colour stays the author's swatch colour (first item), and the flash keeps
-    its colour and its 1,000 ms (spec 016). (Note from the lead, 2026-10-15: added,
-    decision 9 (review of spec 019).)
-  - On a cell whose side is 20 px or more: its box lies inside the cell's box
-    shrunk by 3 px on every side, so the selected cell's outline (spec 035 AC-2)
-    never covers it; its bottom edge is between 3 and 6 px above the cell's bottom
-    edge; it is at least half the cell side wide, and at least 3 px and at least a
-    tenth of the cell side high. On a smaller cell (a large grid on a small window)
-    it only has to lie inside the cell's box and below the letter's baseline (next
-    item); the player can zoom in (spec 006), as spec 035 says of its labels.
-    (Note from the lead, 2026-10-15: "and below the letter's baseline (next item)"
-    was added, decision 13 (review of spec 019).)
-  - At every cell size, the band never overlaps the letter: its top is at or below
-    the letter's baseline (1 px tolerance). The letters are capitals, with no ink
-    below the baseline. Measure: right after the text node holding the cell's
-    shown letter (the letter of `data-letter`), the test inserts a probe, an empty
-    `span` with `display: inline-block`, `width` and `height` 0 and
-    `vertical-align: baseline`; the probe's top is the baseline. The probe must
-    share the letter's line: when the text node's parent is a flex or grid
-    container (the cell is a flex container today), an element beside the text
-    would be an item of its own, so the test first wraps the text node in a `span`
-    and puts the probe in that `span`. The probe changes nothing the test
-    measures: the bounding box of a DOM `Range` over the text node moves by at
-    most 0.5 px when the probe is inserted. The tests confirm this rule on every
-    box page of AC-1, among them the page whose cells measure 20 to 21 px; an
-    estimate with common font metrics puts cells of 20 to about 23 px closest to
-    the limit. (Note from the lead, 2026-10-15: added, decision 13. The rule first
-    measured the bottom of the letter's `Range` box, which includes the font's
-    descent, and now measures the baseline, so that small cells need no smaller
-    letters (review of spec 019).) (Note from the lead, 2026-10-15: "The current
-    layout is expected to meet this rule, to be confirmed by the tests" became
-    "The tests confirm this rule on every box page of AC-1, among them the page
-    whose cells measure 20 to 21 px". The second review measured the band's top
-    1.50 px above the baseline at 20.00 px cells, 1.27 px at 20.30 px and 1.03 px
-    at 20.61 px, over the 1 px tolerance, so the layout as it stands is not
-    expected to meet the rule on that range until the implementer changes it; no
-    other box page reaches it (second review of spec 019).)
-  - Drawing order: the band is drawn above the `remote-selection` outlines of
-    other players (spec 013), whatever their inset, so no outline crosses it. Only
-    the corner labels of spec 035 AC-11 (`remote-initials`, `remote-overflow`) are
-    drawn over it, where they meet it, from its ends inward; nothing else covers
-    it. (Note from the lead, 2026-10-15: added. The band was drawn under the
-    outlines, and their bottom sides crossed it; decision 13 (review of spec 019).)
-  - Its computed `visibility` is `visible`.
+(Note from the lead, 2026-10-22: since spec 041, the band's hatch was ink
+rgb(20, 24, 31) and white, no longer greys, and on a flashing cell (spec 041
+AC-16) the cell's computed `background-color` is white and the flash colour is a
+`cell-flash` overlay at 38 % opacity over it, against which the band's contrast
+was measured. The band is gone with spec 045, above.)
 
-Every other cell (empty, revealed, clue or empty type) holds no `author-mark` and
-has `data-author-colour=""`.
+On each letter `cell` (spec 006):
 
-The marks follow the confirmed grid, within 300 ms of each event the page applies:
-a `letter_changed` (spec 015) gives the mark the new author's colour, or removes
-it for an erase; a `cell_locked` with `revealed` true removes it (spec 016 clears
-the author); a `player_left` turns that player's marks to `data-colour=""`; a
-`player_joined` of a new player changes no mark, since letters keep the ids of
-their authors.
+- `data-author-colour`: the colour index (`0` to `7`) of the cell's finder (spec
+  045: the confirmed author of a letter that is not revealed, when that author is a
+  player of the kept snapshot); `""` when the cell has no finder (empty, revealed,
+  or written by a player who left the room, spec 017, was removed, spec 014, or was
+  never known to the page);
+- the cell's computed `color`, which its letter inherits, is the finder's ink
+  `var(--player-ink-N)` (spec 041), and `--nock-ink` when it has no finder, on every
+  background of the cell; a pencil letter keeps its italics in that ink, a locked
+  letter its weight, and the strike of a wrong letter turns `--nock-ink`;
+- nothing else of the cell changes (spec 042's background, marks and drawing
+  order).
+
+Every other cell (clue or empty type) has `data-author-colour=""`. No cell holds an
+`author-mark`.
+
+The inks follow the confirmed grid, within 300 ms of each event the page applies:
+a `letter_changed` (spec 015) gives the cell the new author's ink, or no letter for
+an erase; a `cell_locked` with `revealed` true leaves the cell with no finder (spec
+016 clears the author); a `player_left` turns that player's letters to plain ink; a
+`player_joined` of a new player changes no letter, since letters keep the ids of
+their authors, and a player seated back (spec 032) is the finder of their letters
+again. (Note from the lead, 2026-10-22: refined by spec 045; this paragraph read
+"The marks follow the confirmed grid", with the mark's colour in place of the
+ink.)
+
+While the switch is on, a legend under the grid (`authors-legend`, spec 045) names
+each player of the kept snapshot in their ink, in join order. (Note from the lead,
+2026-10-22: added by spec 045.)
 
 ### Client: the view, switch off
 
-No `author-mark` exists, and every cell has `data-author-colour=""`. A letter's
-look does not depend on its author: two letter cells in the same state (pencil
+No `authors-legend` exists, and every cell has `data-author-colour=""`. (Note from
+the lead, 2026-10-22: refined by spec 045; this read "No `author-mark` exists".) A
+letter's look does not depend on its author: two letter cells in the same state (pencil
 flag of spec 020, lock, selection and word highlight, other players' word tints,
 wrong mark, flash) but with different authors have the same computed `color`,
 `background-color`, `font-style` and `font-weight`. Spec 016's flash, which shows
@@ -189,53 +124,28 @@ view and is unchanged.
 
 ### Client: the author in words
 
-While the switch is on and the selected cell's confirmed letter has an author,
-`clue-bar` (spec 007) holds `data-testid="clue-bar-author"` after `clue-bar-text`,
-with the text `t("authors.selected", { name })`, where `name` is the author's
-nickname from spec 013's known names (so a player who left is still named), or
-`t("feed.someone")` when unknown, inserted as text (spec 037 AC-4). It is absent
-while the switch is off, while nothing is selected, and while the selected cell is
-empty or revealed. `clue-bar-text` keeps its text exactly (spec 007).
+(Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode.
+This section described `clue-bar-author`, the line « Lettre de {name} » that the
+clue bar showed after the clue for the selected cell's author while the switch was
+on, with its rules of following the cell (decision 12) and of shrinking first on a
+low window (decision 11). The design's clue bar shows only the clue (`_design.md`
+section 7), so the line and its rules are gone. The section now reads as follows.)
 
-The line follows the selected cell's confirmed author within 300 ms of each event
-the page applies, as the bands do: after a `letter_changed` on that cell it names
-the event's player, and after an erase of that cell or a `cell_locked` on it with
-`revealed` true it is absent. The page's own pending edit on the selected cell
-(spec 015) does not change it; the line changes when the server's
-`letter_changed` confirms the edit, as AC-1's bands follow confirmed letters only.
-(Note from the lead, 2026-10-15: added, decision 12 (review of spec 019).)
-
-It sits on the line of the clue text when there is room, and may end with an
-ellipsis. At 568 by 320 and 740 by 360, where the height is tight, the clue bar is
-no taller with it than without it (1 px tolerance); at every size, spec 013 AC-6's
-guarantees and spec 009 AC-4 keep holding.
-
-On a window at most 500 px high (`window.innerHeight <= 500`, as in spec 026's
-"Where `grid-status` sits"), `clue-bar-author` sits in `clue-bar`'s row, after
-`clue-bar-text` and before `grid-status` when the status is there, on one line
-(computed `white-space` `nowrap`, `overflow` `hidden` and `text-overflow`
-`ellipsis`); `clue-bar-text` is then one line too, cut at its end with an
-ellipsis, as spec 026 says for the status. The clue text has priority over the
-author: `clue-bar-author` shortens first, and `clue-bar-text` shortens only once
-`clue-bar-author` is down to its minimum width. That minimum is the smaller of the
-width of its whole text (its `scrollWidth`) and 6 times its computed `font-size`,
-about the width of `Lettre de `, one character and the ellipsis;
-`clue-bar-author` is never narrower. `grid-status` keeps its whole text (spec
-026), and the bar is never higher with the author than without it (spec 026
-AC-10's rule). (Note from the lead, 2026-10-15: added. On low windows the clue
-text and the author shrank together, so the clue text lost about half its room to
-the author; decision 11 (review of spec 019).)
-
-This text is the way to tell authors apart that does not rely on colour (spec 035
-AC-6): a player who cannot tell two colours apart selects a cell and reads who
-wrote it.
+The names in words are the legend's: while the switch is on, `authors-legend`
+(spec 045) names every player of the kept snapshot, each in their ink, so a player
+reads which ink is whose. The clue bar holds no `clue-bar-author`, and
+`clue-bar-text` keeps its text exactly (spec 007). Nothing on the grid names the
+author of one letter in words (spec 045's Open question 1).
 
 ### New `fr.json` keys
 
 | Key | Value |
 | --- | --- |
 | `authors.switch` | `Auteurs` |
-| `authors.selected` | `Lettre de {name}` |
+| `authors.legend` | `Auteurs :` |
+
+(Note from the lead, 2026-10-22: refined by spec 045; the key `authors.selected`
+(`Lettre de {name}`) is removed and `authors.legend` added.)
 
 ### Test harness
 
@@ -244,14 +154,12 @@ wrote it.
   restart).
 - "Browser with mocked socket" and "browser with live server": as spec 023;
   snapshots built with `grid_view(fx01_grid)` (or FX-02) and `model_copy`.
-- Colours are compared as spec 016 AC-2 does for the flash: the computed
-  `background-color` of a mark against the computed `background-color` of a
-  `roster-colour` swatch; the eight player colours are read from the page's
-  `--player-colour-0` to `--player-colour-7`.
-- Contrast (AC-1): WCAG 2.x ratios, computed as spec 035's contrast scan does; a
-  band's colours are read as "The view, switch on" says, with the colour stops
-  parsed from the computed `background-image`. (Note from the lead, 2026-10-15:
-  added (review of spec 019).)
+- Colours: a letter cell's computed `color` against the colour of a probe `span`
+  whose style is `color: var(--player-ink-N)`, appended to `body` (setup), as spec
+  041 reads a token; plain ink is rgb(20, 24, 31). (Note from the lead, 2026-10-22:
+  refined by spec 045; this item compared a mark's computed `background-color` with
+  that of a `roster-colour` swatch, and a second item read a band's colours for its
+  contrast run, which is gone.)
 - Window sizes and contexts: as spec 024 (the eight sizes of spec 006 AC-5, desktop
   and touch contexts).
 - Engines: every browser criterion runs in Chromium and WebKit locally and also
@@ -261,13 +169,19 @@ wrote it.
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-5.1.1) (browser with mocked socket; browser with live server) An "authors" switch tints each filled cell with the colour of the last player who edited it. Mocked: given a FX-01 snapshot with players `p1` (`you`, `Ana`, colour 0) and `p2` (`Bob`, colour 3), where (1, 0) holds `T` by `p1`, (1, 1) `A` by `p2`, (1, 2) `M` by `p9` (not in the room), (1, 3) `I` locked by a check with author `p2`, and (1, 4) `S` revealed (no author): after a click on `authors-switch`, which then has `aria-pressed="true"`, (1, 0) holds one `author-mark` with `data-colour="0"` whose background colour equals the background colour of `p1`'s `roster-colour`; (1, 1) and (1, 3) each hold one with `data-colour="3"` equal to `p2`'s swatch; (1, 2) holds one with `data-colour=""`, hatched as "The view, switch on" says (its computed `background-image` a diagonal `repeating-linear-gradient` whose colours, like all the band's colours, are greys (Note from the lead, 2026-10-22: since spec 041, they are ink and white, not greys)), while the computed `background-image` of the marks of (1, 0), (1, 1) and (1, 3) and of their layers is `none` (Note from the lead, 2026-10-15: this said "whose background colour is none of the eight player colours"; the departed band is now hatched, decision 10 (review of spec 019)); (1, 4) and every empty letter cell hold none; each mark meets the box rules of "The view, switch on". Then, within 300 ms of each event: after `letter_changed` (seq 6) at (1, 0) letter `X` from `p2`, (1, 0)'s mark has `data-colour="3"`; after `letter_changed` (seq 7) erasing (1, 1), (1, 1) holds no mark; after `cell_locked` (seq 8) at (1, 0) letter `T` with `revealed` true, (1, 0) holds no mark; after `player_left` (seq 9) of `p2`, (1, 3)'s mark has `data-colour=""` and is hatched. (Note from the lead, 2026-10-15: "and is hatched" was added, decision 10 (review of spec 019).) Live: two pages join one FX-01 room as `Ana` and `Bob`; Ana types `T` at (1, 0), Bob types `A` at (1, 1); Ana clicks `authors-switch`; on Ana's page, (1, 0)'s mark has the background colour of Ana's `roster-colour` and (1, 1)'s that of Bob's. Box run, in the desktop context, on four mocked pages: the snapshot above with `p3` to `p6` added (colours 1, 2, 4 and 5) and `p2` to `p6` selecting (1, 0) `across`, at the default window (1280 by 720); and, at 320 by 568, at 568 by 320 and at 296 by 640, a FX-02 snapshot built as spec 026's `FX02_FULL_WRONG` (players `p1` to `p8`, every letter cell `E` by `p2`), without its feed items or tap, whose letter cells of row 1 are by `p9` instead and where `p2` to `p6` select (1, 6) `down`; the selections are given in the snapshot (spec 013). On each page, with the switch on, every `author-mark` meets the box rules of "The view, switch on" (inside the cell, distance from the cell's bottom edge, width, height, and top at or below the letter's baseline, measured with the probe that rule describes), each held to the rule of its own cell's side as measured on the page; FX-02's cells are under 20 px at 568 by 320 (spec 035 AC-11), so the small-cell rule is tested there. (Note from the lead, 2026-10-15: added; the box rules were checked at the default window only, decisions 13 and 14. The letter check measures the baseline, not the bottom of the letter's `Range` box (review of spec 019).) At 296 by 640 FX-02's cells measure between 20 and 21 px, the cells closest to the letter rule's limit, so each band is held to the full rules of a cell of 20 px or more; the test asserts that the measured side of a letter cell (the width of its bounding box) is in [20, 21] px, so that the page keeps testing that range. (Note from the lead, 2026-10-15: "three mocked pages" became four, with FX-02 at 296 by 640 (296 by 568 gave 18.28 px cells, limited by the height). None of the first three pages has cells of 20 to 21 px, and the second review measured the band's top 1.50 px above the baseline at 20.00 px cells, 1.27 px at 20.30 px and 1.03 px at 20.61 px; 296 by 640 gives cells of about 20.2 to 20.3 px, and it is the page the test uses (second review of spec 019).) On each of these pages the drawing order also holds on the cell with the five outlines (spec 035 AC-11 gives it its labels): after `scrollIntoView` of that cell, a test style sets `pointer-events: auto !important` on every descendant of every `cell`, since hit testing follows the drawing order but skips elements with `pointer-events: none`; then `document.elementFromPoint`, at points of the band's middle line (half its height below its top), every 2 px from 1 px inside its left end to 1 px inside its right end, returns, at a point more than 1 px inside the box of a `remote-initials` or `remote-overflow` element, that label or one of its descendants, and at a point more than 1 px outside every such box, `author-mark` or one of its descendants, never a `remote-selection` or any other element. (Note from the lead, 2026-10-15: added, decision 13 (review of spec 019).) Contrast run, at 1280 by 720 in the desktop context, with the switch on, on FX-01 snapshots (`seq` 10) where `you` is `p1` (colour 0) and `p2` to `p8` have colours 1 to 7. There are nine bands: those of colours 0 to 7, by `p1` and by `p2` to `p8`, and the departed band, by `p9`. In each state below, the test reads in one `page.evaluate` the cell's computed `background-color` and the band's colours, and the band's contrast, measured over its colours as "The view, switch on" says, is at least 3:1. Static states, on one page per band whose letter cells all hold letters by the band's author, with (4, 4) locked by a check (`locked` true, `revealed` false) and (3, 3) struck through (`wrong` true), nothing selected: (0, 1) not selected, (4, 4) locked and (3, 3) struck through; after a tap on (1, 0), (1, 0) selected and (1, 1) in my word; then, for each colour k from 1 to 7 in turn, (2, 2) after a `selection_moved` of the player with colour k to (2, 2) `across` (tinted in colour k), followed by a `selection_moved` of that player to `null`. Flash states, on one page per flash colour f from 0 to 7, whose cells (1, 0) to (1, 4) and (2, 1) to (2, 4) hold `X` by `p1`, nothing selected, one cell per band: on each cell the mock sends, back to back with consecutive seqs from 11, a `letter_changed` with letter `Y` from the player other than `p1` whose colour is f (for f = 0, `p9`, whom spec 016 flashes in colour 0), which starts the flash, then, unless that player is the band's author, a `letter_changed` with letter `Z` from the band's author, which keeps the flash, since the letter it replaces is not mine (spec 016). Once each of the nine cells has its band's author in `data-author`, the test reads in one `page.evaluate`, for each cell, `data-flash`, which is still f; the computed `background-color`, which equals the computed background colour of the `roster-colour` of the player with colour f (`p1`'s for f = 0), as in spec 016 AC-2 (Note from the lead, 2026-10-22: since spec 041 AC-16, the cell's computed `background-color` is white and that colour is the one of its `cell-flash` overlay at 38 % opacity; the band's contrast is measured against the overlay composited over the cell's background); and the band's colours. (Note from the lead, 2026-10-15: added, decision 9 (review of spec 019).)
-- **AC-2** (AC-5.1.2) (browser with mocked socket) With the switch off, all letters share one neutral colour. Given the snapshot of AC-1: `authors-switch` starts with `aria-pressed="false"`; no `author-mark` exists and every cell has `data-author-colour=""`; with nothing selected, (1, 0) (by `p1`), (1, 1) (by `p2`) and (1, 2) (by `p9`), none of them locked or wrong and none in another player's word, have the same computed `color`, `background-color`, `font-style` and `font-weight`. After switching the view on and then off again, the same holds. After a page reload, the switch is off again.
-- **AC-3** (AC-5.1.3) (rule unit test; WebSocket; browser with live server) Authorship survives reconnection and is kept for the recap (spec 028, backlog US-7.2). Rule: in a FX-01 room, the entries of a play by `p1` and `p2` (letters, one letter written over another player's, an erase, an undo, a check that locks a cell, a reveal) replayed in order from `new_room` give each cell the same `author` as the live state: a cell locked by a check keeps its author, a revealed cell has `author=None`, and the letter put back by an undo has the undoer as author (spec 018); `p1`, disconnected then resumed with its token (`join_room`, spec 017), keeps its id, and its cells keep `author="p1"`; after `p1` times out and leaves (spec 017), its cells keep `author="p1"`; the room saved in a `RoomStore` and loaded again (spec 018) has the same authors. The recap itself is spec 028's, built from these authors; this spec checks only that they are kept. WebSocket: A (`Ana`) types `T` at (1, 0) and B (`Bob`) types `A` at (1, 1); A's socket closes and A joins again with its resume token: A's snapshot holds (1, 0) with `author` equal to A's id and (1, 1) with B's, and A's player view keeps colour 0; after a simulated restart (spec 018 AC-1's harness), B's new snapshot holds the same two authors. Browser: two pages join one FX-01 room as `Ana` and `Bob`; Ana types `T` at (1, 0) and Bob types `A` at (1, 1); Ana's page is reloaded (spec 017 decision 7), reaches `data-status="joined"`, and once its switch is on again, (1, 0)'s mark has the colour of Ana's `roster-colour` and (1, 1)'s the colour of Bob's, as before the reload.
-- **AC-4** (new) (browser with mocked socket) The view names the author of the selected letter in words, so colour is not the only signal (spec 035 AC-6). Given the snapshot of AC-1 with the switch on: tapping (1, 1) shows `clue-bar-author` with the text `Lettre de Bob` (built from `fr.json["authors.selected"]`) while `clue-bar-text` still reads `Passoire fine`; after `player_left` (seq 6) of `p2`, tapping (1, 3) still shows `Lettre de Bob`; tapping (1, 4) (revealed) or (2, 1) (empty) shows no `clue-bar-author`; switching the view off removes it. The line follows the cell, in a separate run on the snapshot of AC-1 in the desktop context with the switch on and (1, 0) tapped (`Lettre de Ana`), each check within 300 ms of its event: after `letter_changed` (seq 6) at (1, 0) letter `X` from `p2`, `clue-bar-author` reads `Lettre de Bob`; after `letter_changed` (seq 7) erasing (1, 0) from `p2`, it is absent; after `letter_changed` (seq 8) at (1, 0) letter `T` from `p2`, it reads `Lettre de Bob`; after `cell_locked` (seq 9) at (1, 0) letter `T` with `revealed` true, it is absent. Then the test taps (1, 1) (`Lettre de Bob`), presses `z`, which the page sends as `edit_letter` and shows as a pending letter, and taps (1, 1) again (spec 009 may have moved the selection): 500 ms after that tap, with no answer from the mock, it still reads `Lettre de Bob`; after `letter_changed` (seq 10) at (1, 1) letter `Z` from `p1`, it reads `Lettre de Ana`. (Note from the lead, 2026-10-15: added, decision 12 (review of spec 019).) With a FX-02 snapshot whose letter cells are all filled by `p2`, whose nickname has 20 characters, and the first cell of the word with FX-02's longest clue selected: at every window size of spec 006 AC-5, in desktop and touch contexts, spec 013 AC-6's checks pass with the switch on; and at 568 by 320 and 740 by 360, `clue-bar`'s height with the switch on equals its height with the switch off (1 px tolerance). That FX-02 page is spec 026's `FX02_FULL_WRONG` page (its players, feed items and tap of `On la glisse dans une enveloppe`, which selects (1, 6)) with `p2`'s nickname 20 characters long, so `grid-status` shows with `data-state="full_wrong"`. (Note from the lead, 2026-10-15: added, so that the status is in the row (review of spec 019).) At 568 by 320 and 740 by 360, in both contexts, with the switch on: `clue-bar-text`, `clue-bar-author` and `grid-status` lie inside `clue-bar`'s box, in this order from left to right (each one's left edge at or right of the right edge of the one before), with vertical ranges that overlap pairwise; `clue-bar-author` has the computed `white-space` `nowrap`, `overflow` `hidden` and `text-overflow` `ellipsis`; with M the smaller of its `scrollWidth` and 6 times its computed `font-size`, its `clientWidth` is at least M; either `clue-bar-text` shows its whole text (`scrollWidth <= clientWidth + 1`) or the `clientWidth` of `clue-bar-author` is at most M; `grid-status` shows its whole text (the same measure); and `clue-bar-text` still has the text `On la glisse dans une enveloppe`. Each comparison has 1 px of tolerance. (Note from the lead, 2026-10-15: added. The clue text has priority over the author line, which shortens first, down to M; decision 11 (review of spec 019).)
-- **AC-5** (new) (browser with mocked socket) The authors switch meets spec 035 and keeps the grid's room. Setup: spec 013 AC-6's (FX-01, `you` host among 8 players, 100 feed items, (3, 1) tapped), with letters by four of the players and the switch on. At every window size of spec 006 AC-5, in desktop and touch contexts, spec 013 AC-6's checks pass, `authors-switch` is in `room-toolbar` after `reveal-panel`, and spec 024 AC-8's toolbar rules hold for it (one row on small windows; with the keyboard focus, inside the toolbar's client area and an outline that is not clipped; `elementFromPoint` at its centre after `scrollIntoView`). In a separate run at 1280 by 720, keyboard only with no tap (spec 035's harness): `tab_to` `authors-switch`, then `Enter` turns it on (`aria-pressed="true"`) and `Enter` again off, with spec 035 AC-2's outline. With the switch on, at 1280 by 720 and 360 by 740, spec 035's contrast scan and language scan find no offending element. (Note from the lead, 2026-10-22: since spec 041, the page is set in Source Sans 3 and a `button` that sets no font takes its parent's size and family, so the toolbar's controls, `authors-switch` among them, are wider and taller than before; the sizes are read after `document.fonts.ready`, and the focus ring is 2 px solid navy.)
+- **AC-1** (AC-5.1.1) (browser with mocked socket; browser with live server) An "authors" switch draws each filled cell's letter in the ink of the last player who edited it. Mocked: given a FX-01 snapshot with players `p1` (`you`, `Ana`, colour 0) and `p2` (`Bob`, colour 3), where (1, 0) holds `T` by `p1`, (1, 1) `A` by `p2`, (1, 2) `M` by `p9` (not in the room), (1, 3) `I` locked by a check with author `p2`, and (1, 4) `S` revealed (no author): after a click on `authors-switch`, which then has `aria-pressed="true"`, (1, 0) has `data-author-colour="0"` and the computed `color` of `--player-ink-0`; (1, 1) and (1, 3) have `data-author-colour="3"` and the colour of `--player-ink-3` ((1, 3) still in `font-weight` 700); (1, 2) and (1, 4) have `data-author-colour=""` and the colour rgb(20, 24, 31); no cell holds an `author-mark`. Then, within 300 ms of each event: after `letter_changed` (seq 6) at (1, 0) letter `X` from `p2`, (1, 0) has `data-author-colour="3"` and the ink of colour 3; after `letter_changed` (seq 7) erasing (1, 1), (1, 1) has `data-author-colour=""`; after `cell_locked` (seq 8) at (1, 0) letter `T` with `revealed` true, (1, 0) has `data-author-colour=""` and plain ink; after `player_left` (seq 9) of `p2`, (1, 3) has `data-author-colour=""` and plain ink. Live: two pages join one FX-01 room as `Ana` and `Bob`; Ana types `T` at (1, 0), Bob types `A` at (1, 1); Ana clicks `authors-switch`; on Ana's page, (1, 0) has the ink of Ana's colour index and (1, 1) the ink of Bob's, each index read from that player's `roster-player` `data-colour`. (Note from the lead, 2026-10-22: since spec 041, the hatch of a departed author's band is ink rgb(20, 24, 31) and white, no longer greys; and on a flashing cell (AC-16 of spec 041) the cell's computed `background-color` is white and the flash colour is a `cell-flash` overlay at 38 % opacity over it, against which the band's contrast was measured.) (Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode. This criterion checked an `author-mark` band per filled cell: its colour against the author's `roster-colour`, the hatching of a departed author's band, the band's box rules on four pages (FX-01 at 1280 by 720, FX-02 at 320 by 568, 568 by 320 and 283 by 640), its drawing order under the corner triangles and its 3:1 contrast in every cell state and flash; the band and those runs are gone, and spec 045 AC-2 to AC-5 check the inks in detail.)
+- **AC-2** (AC-5.1.2) (browser with mocked socket) With the switch off, all letters share one neutral colour. Given the snapshot of AC-1: `authors-switch` starts with `aria-pressed="false"`; no `author-mark` exists and every cell has `data-author-colour=""`, and there is no `authors-legend`; with nothing selected, (1, 0) (by `p1`), (1, 1) (by `p2`) and (1, 2) (by `p9`), none of them locked or wrong and none in another player's word, have the same computed `color` (rgb(20, 24, 31)), `background-color`, `font-style` and `font-weight`. After switching the view on and then off again, the same holds. After a page reload, the switch keeps the state it had (`localStorage["nock.authors"]`): off after it was turned off, on after it was turned on. (Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode; this read "no `author-mark` exists" and "After a page reload, the switch is off again".)
+- **AC-3** (AC-5.1.3) (rule unit test; WebSocket; browser with live server) Authorship survives reconnection and is kept for the recap (spec 028, backlog US-7.2). Rule: in a FX-01 room, the entries of a play by `p1` and `p2` (letters, one letter written over another player's, an erase, an undo, a check that locks a cell, a reveal) replayed in order from `new_room` give each cell the same `author` as the live state: a cell locked by a check keeps its author, a revealed cell has `author=None`, and the letter put back by an undo has the undoer as author (spec 018); `p1`, disconnected then resumed with its token (`join_room`, spec 017), keeps its id, and its cells keep `author="p1"`; after `p1` times out and leaves (spec 017), its cells keep `author="p1"`; the room saved in a `RoomStore` and loaded again (spec 018) has the same authors. The recap itself is spec 028's, built from these authors; this spec checks only that they are kept. WebSocket: A (`Ana`) types `T` at (1, 0) and B (`Bob`) types `A` at (1, 1); A's socket closes and A joins again with its resume token: A's snapshot holds (1, 0) with `author` equal to A's id and (1, 1) with B's, and A's player view keeps colour 0; after a simulated restart (spec 018 AC-1's harness), B's new snapshot holds the same two authors. Browser: two pages join one FX-01 room as `Ana` and `Bob`; Ana types `T` at (1, 0) and Bob types `A` at (1, 1); Ana's page is reloaded (spec 017 decision 7), reaches `data-status="joined"`, and with its switch on (it stays on across the reload, spec 045), (1, 0) has the ink of Ana's colour index and (1, 1) the ink of Bob's, as before the reload. (Note from the lead, 2026-10-22: refined by spec 045; this read "once its switch is on again, (1, 0)'s mark has the colour of Ana's `roster-colour` and (1, 1)'s the colour of Bob's".)
+- **AC-4** (new) (browser with mocked socket) The view names the players in words, each in their ink, and the clue bar keeps only the clue. Given the snapshot of AC-1 with the switch on: `authors-legend` shows under the grid, holding `authors-legend-label` (`fr.json["authors.legend"]`) then two `authors-legend-name` reading `Ana` and `Bob`, in that order, each with the computed `color` of its player's ink (`--player-ink-0`, `--player-ink-3`); tapping (1, 1) shows no `clue-bar-author`, and `clue-bar-text` reads `Passoire fine`; after `player_left` (seq 6) of `p2`, the legend reads `Ana` only; switching the view off removes the legend. With a FX-02 snapshot whose letter cells are all filled by `p2`, whose nickname has 20 characters, at every window size of spec 006 AC-5, in desktop and touch contexts, spec 013 AC-6's checks pass with the switch on, and at 568 by 320 and 740 by 360 `clue-bar`'s height with the switch on equals its height with the switch off (1 px). (Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode. This criterion checked `clue-bar-author` (« Lettre de … ») for the selected cell, its following of the cell's events and pending edits, and its shrinking rules in the clue bar's row on a low window with spec 026's `FX02_FULL_WRONG` page; the line is gone, and spec 045 AC-6 to AC-9 check the legend. The text that follows is kept for its history and is not tested.) The line followed the cell, in a separate run on the snapshot of AC-1 in the desktop context with the switch on and (1, 0) tapped (`Lettre de Ana`), each check within 300 ms of its event: after `letter_changed` (seq 6) at (1, 0) letter `X` from `p2`, `clue-bar-author` reads `Lettre de Bob`; after `letter_changed` (seq 7) erasing (1, 0) from `p2`, it is absent; after `letter_changed` (seq 8) at (1, 0) letter `T` from `p2`, it reads `Lettre de Bob`; after `cell_locked` (seq 9) at (1, 0) letter `T` with `revealed` true, it is absent. Then the test taps (1, 1) (`Lettre de Bob`), presses `z`, which the page sends as `edit_letter` and shows as a pending letter, and taps (1, 1) again (spec 009 may have moved the selection): 500 ms after that tap, with no answer from the mock, it still reads `Lettre de Bob`; after `letter_changed` (seq 10) at (1, 1) letter `Z` from `p1`, it reads `Lettre de Ana`. (Note from the lead, 2026-10-15: added, decision 12 (review of spec 019).) With a FX-02 snapshot whose letter cells are all filled by `p2`, whose nickname has 20 characters, and the first cell of the word with FX-02's longest clue selected: at every window size of spec 006 AC-5, in desktop and touch contexts, spec 013 AC-6's checks pass with the switch on; and at 568 by 320 and 740 by 360, `clue-bar`'s height with the switch on equals its height with the switch off (1 px tolerance). That FX-02 page is spec 026's `FX02_FULL_WRONG` page (its players, feed items and tap of `On la glisse dans une enveloppe`, which selects (1, 6)) with `p2`'s nickname 20 characters long, so `grid-status` shows with `data-state="full_wrong"`. (Note from the lead, 2026-10-15: added, so that the status is in the row (review of spec 019).) At 568 by 320 and 740 by 360, in the touch context (spec 043's sheet layout, where `grid-status` sits in the clue bar's row), with the switch on: `clue-bar-text`, `clue-bar-author` and `grid-status` lie inside `clue-bar`'s box, in this order from left to right (each one's left edge at or right of the right edge of the one before), with vertical ranges that overlap pairwise; `clue-bar-author` has the computed `white-space` `nowrap`, `overflow` `hidden` and `text-overflow` `ellipsis`; with M the smaller of its `scrollWidth` and 6 times its computed `font-size`, its `clientWidth` is at least M; either `clue-bar-text` shows its whole text (`scrollWidth <= clientWidth + 1`) or the `clientWidth` of `clue-bar-author` is at most M; `grid-status` shows its whole text (the same measure); and `clue-bar-text` still has the text `On la glisse dans une enveloppe`. Each comparison has 1 px of tolerance. (Note from the lead, 2026-10-15: added. The clue text has priority over the author line, which shortens first, down to M; decision 11 (review of spec 019).) (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout: the in-row checks read "in both contexts"; in the desktop context these two windows are spec 043's column layout, where `grid-status` sits under the clue bar, and there `clue-bar-text` and `clue-bar-author` lie inside `clue-bar`'s box, in this order, on one line, with the same `clue-bar-author` rules.)
+- **AC-5** (new) (browser with mocked socket) The authors switch meets spec 035 and keeps the grid's room. Setup: spec 013 AC-6's (FX-01, `you` host among 8 players, 100 feed items, (3, 1) tapped), with letters by four of the players and the switch on. At every window size of spec 006 AC-5, in desktop and touch contexts, spec 013 AC-6's checks pass, `authors-switch` is the first item of `room-menu`, and, with the Menu open, spec 043 AC-28's checks hold for it (inside the window; `elementFromPoint` at its centre returns it). In a separate run at 1280 by 720, keyboard only with no tap (spec 035's harness): `tab_to` `menu-button` and `Enter` open the Menu with the focus on `authors-switch`, then `Enter` turns it on (`aria-pressed="true"`) and `Enter` again off, with spec 035 AC-2's outline. (Note from the lead, 2026-10-22: since spec 041, the page is set in Source Sans 3 and a `button` that sets no font takes its parent's size and family; the sizes are read after `document.fonts.ready`, and the focus ring is 2 px solid navy.) (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "`authors-switch` is in `room-toolbar` after `reveal-panel`, and spec 024 AC-8's toolbar rules hold for it (one row on small windows; with the keyboard focus, inside the toolbar's client area and an outline that is not clipped; `elementFromPoint` at its centre after `scrollIntoView`)" and "`tab_to` `authors-switch`".) With the switch on, at 1280 by 720 and 360 by 740, spec 035's contrast scan and language scan find no offending element, and `authors-legend` lies inside the window and does not overlap the `grid` or `clue-bar` at every window size above. (Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode: the legend's check was added; the checks now run on the inks and the legend, the band being gone.)
 
 ## Edge cases and errors
+
+(Note from the lead, 2026-10-22: refined by spec 045, the design's Auteurs mode: in
+the items below, a "mark" or "band" reads the letter's ink, the "hatched grey
+mark" of a player who left reads plain ink, the corner labels and the overlap rules
+no longer apply, and the clue bar names no author; spec 045's "Edge cases and
+errors" holds the current rules.)
 
 - AC-3 depends on behaviour owned by spec 028; test only this spec's side of it here.
 - A player who left (AC-1, AC-4): their letters keep their id as author (spec 017),
@@ -315,8 +229,9 @@ The words in brackets say how each criterion is tested.
 - Clue flag: spec 021.
 - Chat and reactions: spec 022.
 - The recap and its credits: spec 028.
-- Remembering the switch across reloads or devices; a filter that shows one
-  player's letters only.
+- Remembering the switch across devices; a filter that shows one player's letters
+  only. (Note from the lead, 2026-10-22: refined by spec 045; this read "across
+  reloads or devices": the switch is now remembered per browser.)
 - Initials or patterns on every cell for the authors (the clue bar names the
   selected cell's author). The hatching of a departed author's band is one
   pattern shared by every player who left, not a pattern per author. (Note from

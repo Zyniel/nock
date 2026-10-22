@@ -12,6 +12,17 @@ elements are those of spec 006, the selection, focus and clue bar those of spec
 007, the typing and erasing rules those of spec 008 (built before this one: see
 "Build order").
 
+(Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard
+(`_design.md` section 8): the in-app keyboard shows on a touch screen once the page
+has a snapshot, unless the player hid it with the top bar's « Clavier »
+(`keyboard-toggle`, remembered in `localStorage["nock.keyboard_hidden"]`) or the
+grid is solved; while hidden it is absent from the page. Row 3 also holds the ✎ key
+(`key-pencil`, pencil mode, spec 020) first and the ⇄ key (`key-swap`, the second
+tap of spec 007) before `key-delete`; neither is a `key` or has a `data-key`.
+`key-delete` draws the `effacer` icon. The keys take the design's look (44 px high,
+28 px on a window at most 500 px high). AC-3 and AC-4 hold as written, so no
+criterion of this spec changes.)
+
 ## Goal
 
 As a player, I want to move around the grid from the keyboard, so that I never need the mouse on desktop.
@@ -67,7 +78,10 @@ otherwise absent from the page.
   `data-testid="key"` buttons with `data-key` and the letter as text:
   row 1 `A Z E R T Y U I O P`, row 2 `Q S D F G H J K L M`, row 3 `W X C V B N`
   followed by `data-testid="key-delete"`, a button with `aria-label`
-  `t("keyboard.delete")` and an icon (no text).
+  `t("keyboard.delete")` and an icon (no text). (Note from the lead, 2026-10-22:
+  refined by spec 044, the design's keyboard: row 3 is `key-pencil`, `W X C V B
+  N`, `key-swap`, `key-delete`, and the keyboard is absent while the player hid it
+  or the grid is solved; spec 044's "In-app keyboard" gives the look.)
 - Tapping a letter key does what typing that letter does (spec 008); tapping
   `key-delete` does what `Backspace` does (spec 008). Tapping a key never moves the
   focus away from the grid and never opens the system keyboard.

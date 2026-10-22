@@ -11,6 +11,13 @@ The rooms engine is defined in spec 011, edits and the page's pending queue in
 spec 015, the grid elements in spec 006, typing in spec 008, player colours in
 spec 012. The messages are those of spec 039.
 
+(Note from the lead, 2026-10-22: refined by spec 042, the design's grid cells
+(`_design.md` section 6): the flash comes first among a letter cell's
+backgrounds, over my selection and the locked grey, drawn as spec 041's
+`cell-flash` overlay (the replacer's colour at 38 % over white) under an ink
+letter, and a revealed notch turns ink while the cell flashes. No criterion of this
+spec changes: AC-2 finds the replacer's colour on `cell-flash`, as spec 041 says.)
+
 ## Goal
 
 As a player, I want a clear rule when two of us type in one cell, so that nobody is surprised by a vanishing letter.

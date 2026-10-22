@@ -11,6 +11,14 @@ The FX-01 reference grid and the glossary are in `specs/_reference.md`. The room
 page and grid elements are those of specs 040 and 006; the messages are those of
 spec 039.
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): `clue-bar` is the navy bar, 34 px high, with ‹ and ›
+around `clue-bar-text` (white, 15.2 px, one line with an ellipsis, followed by a
+direction pictogram that adds no text) and the « Réagir » and « Je bloque »
+buttons. `clue-bar`, `clue-bar-text`, `data-word` and their texts keep their
+rules, so no criterion of this spec changes: AC-4's 14 px minimum and its place
+inside the window still hold.)
+
 ## Goal
 
 As a player, I want to pick a word with one tap, so that I always know which clue I am answering.
@@ -77,7 +85,12 @@ cell has the background rgb(207, 221, 243) (selected blue) and a 2 px solid navy
 outline, rgb(27, 47, 85), drawn inside the cell (`outline-offset` `-2px`); the
 other cells of the selected word have rgb(230, 237, 249); a plain letter cell is
 white. Before, the selected cell was yellow with a 3 px ink outline. The three
-colours still differ.)
+colours still differ.) (Note from the lead, 2026-10-22: refined by spec 042, the
+design's grid cells, which fixes these colours (selected blue, word blue, white;
+the active clue's half in selected blue with a 2 px radius) and lets a locked
+cell keep its locked grey inside my word. No criterion of this spec changes: the
+three colours still differ. An arrow is now drawn inside the word's first letter
+cell, so a tap on it selects that cell.)
 
 ### Clue bar
 

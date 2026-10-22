@@ -24,6 +24,14 @@ spec 040", where its class `_WrongCodeThrottle` is now written out. Spec 038 AC-
 checks it, for this throttle and for spec 038's instance of it; no criterion of
 this spec changes (first review of spec 038).)
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` section 8): `share-panel` moves into the Salon's Joueurs tab, under
+the players, with « Lien d'invitation » as its heading, `share-link` as a URL box,
+and, after a copy, a green confirmation line `share-copied` in place of the
+button's changed text. "Client: `web/`" and AC-1's browser part change, so the
+test-writer updates the tests of AC-1 before the implementer runs. The server
+and the other criteria do not change.)
+
 ## Goal
 
 As a host, I want a link to send to my friends, so that they land directly on our grid.
@@ -464,8 +472,12 @@ Room page additions (shown once `data-status="joined"`):
     `location.origin + "/r/" + code`, labelled `t("room.share.label")`;
   - `data-testid="copy-link"`: a button with the text `t("room.share.copy")`.
     Clicking it writes the link with `navigator.clipboard.writeText`; on success
-    the button text becomes `t("room.share.copied")` for 2 seconds, then returns.
-    If the clipboard is not available or refuses, nothing changes.
+    `data-testid="share-copied"` (`role="status"`) shows `t("room.share.copied")`
+    for 2 seconds, and the button keeps its text. If the clipboard is not
+    available or refuses, nothing changes. (Note from the lead, 2026-10-22: refined
+    by spec 043, the design's room layout; this read "on success the button text
+    becomes `t("room.share.copied")` for 2 seconds, then returns". The panel's
+    place and look are spec 043's "Joueurs".)
 - Closing code 4429 sets `data-status="throttled"`; `room-status` shows
   `t("room.status.throttled")`. Like `not_found`, it is final.
 
@@ -523,7 +535,7 @@ These apply to every spec from 011 to 018 and 037.
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (AC-3.1.1) (HTTP; browser with live server) Creating a room gives a share link and a 6-character room code. HTTP: with a catalogue holding FX-01 as published entry 2, `POST /api/rooms` with `{"grid_number": 2}` answers 201 with a JSON body that parses to `CreateRoomResponse`, whose `code` matches `^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$` and whose `share_url` is `http://testserver/r/<code>`; then `registry.find_room(code)` equals the FX-01 grid and `registry.room_state(code).grid_number == 2`. Browser (all three engines): for a room registered on FX-01, after `enter_room`, `share-link` has `href` and text `<base_url>/r/<code>`. Browser (Chromium only, clipboard, see "Test harness"): clicking `copy-link` puts that same text in the clipboard and shows `fr.json["room.share.copied"]` on the button.
+- **AC-1** (AC-3.1.1) (HTTP; browser with live server) Creating a room gives a share link and a 6-character room code. HTTP: with a catalogue holding FX-01 as published entry 2, `POST /api/rooms` with `{"grid_number": 2}` answers 201 with a JSON body that parses to `CreateRoomResponse`, whose `code` matches `^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$` and whose `share_url` is `http://testserver/r/<code>`; then `registry.find_room(code)` equals the FX-01 grid and `registry.room_state(code).grid_number == 2`. Browser (all three engines): for a room registered on FX-01, after `enter_room`, `share-link` has `href` and text `<base_url>/r/<code>`. Browser (Chromium only, clipboard, see "Test harness"): clicking `copy-link` puts that same text in the clipboard and shows `fr.json["room.share.copied"]` in `share-copied`, while `copy-link` still reads `fr.json["room.share.copy"]`. (Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "and shows `fr.json["room.share.copied"]` on the button". The test opens the Salon's Joueurs tab first, spec 043's "Test harness".)
 - **AC-2** (AC-3.1.2) (browser with live server, phone and desktop contexts) The link opens the room on the grid, on phone and desktop, with no install. For a room registered on FX-01, opening its `share_url` path `/r/<code>` with `enter_room` in the phone context and, separately, in the desktop context reaches `data-status="joined"` and `data-grid="5x5"`, and the `grid` element of spec 006 is visible with 25 `cell` elements.
 - **AC-3** (AC-3.1.3) (Python; WebSocket with a fake clock; browser with mocked socket) Room codes are random, not sequential. Ten wrong codes from one address within a minute are throttled. Python: 1,000 calls to `register_room` on one registry give 1,000 distinct codes, all matching the alphabet pattern of AC-1; at each of the 6 positions at least 20 different characters occur; and no code, read as a base-32 number over `ROOM_CODE_ALPHABET`, is exactly 1 more than the code returned just before it. WebSocket: with a registry holding one room `<code>` and a `FakeClock`, ten connections to `/api/rooms/ZZZZZZ/ws` each close with 4404; the eleventh connection, to `/api/rooms/<code>/ws`, closes with 4429 before any message; after `advance(60)` a connection to `<code>` is accepted and its join receives a `Snapshot`. Burst: on a fresh app whose `FakeClock` does not move, 40 sockets opened at once from one address to `/api/rooms/ZZZZZZ/ws` (for example from 40 threads) are closed, each before any message, exactly 10 with 4404 and 30 with 4429. (Note from the lead, 2026-10-16: the burst was added, for the rule on wrong codes that arrive at once (second review of spec 032).) Browser: when the mock closes the socket with 4429, the room page reaches `data-status="throttled"` and `room-status` shows `fr.json["room.status.throttled"]`.
 - **AC-4** (new) (Python with monkeypatched rule functions; WebSocket via TestClient) The room engine keeps its runtime guarantees, so later specs can rely on them. With `tick_seconds` small (for example 0.05) and the rule functions of `nock.room` replaced in the test by recording fakes: (a) `tick` runs repeatedly while at least one connection is attached to a room, and no longer once every connection has left; (b) for one input, the events of the outcome reach every joined connection before the `reply` reaches the sender, and `to_others` reach every joined connection except the sender, in that order; (c) when the last connection leaves, the room's task stops; the next connection starts a new task, which runs one `tick` before any input; (d) when a rule function raises, the error is logged, the room's state is unchanged, and the next input to that room is processed normally; (e) connections are tracked per connection, not per player: two connections attached under one player id are delivered to and detached independently, and detaching one never detaches the other; (f) `close()` stops the engine thread (no `nock-rooms` thread is left alive), a second `close()` does nothing, and any input posted after `close()` is refused without starting a task. Tests close every registry they create, so no engine thread outlives its test.

@@ -12,6 +12,37 @@ engine is defined in spec 011, edits and their check order in spec 015, undo and
 `replay` in spec 018, checks in spec 023, the messages in spec 039 (`GridSolved`,
 `GridFullWrong`, `ErrorCode.GRID_SOLVED`, `Snapshot.solved`).
 
+(Note from the lead, 2026-10-22: refined by spec 043, the design's room layout
+(`_design.md` sections 8 and 9): "a low window" of "Where `grid-status` sits" is now
+spec 043's sheet layout on a window at most 500 px high (a touch screen, since a
+low window without the in-app keyboard is the column layout); there `grid-status`
+shares the navy clue bar's row in white; everywhere else it is the end band under
+the clue bar (green on its green background when solved, navy on clue blue-grey
+when full and wrong), and spec 028's « Voir le bilan » sits inside it. AC-10's
+in-row checks therefore run in the touch context, so the test-writer updates its
+test before the implementer runs. The in-app keyboard stays on a solved page until
+step 5 (AC-5 unchanged). The other criteria do not change.)
+
+(Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard
+(`_design.md` sections 8 and 9): the in-app keyboard goes away once the grid is
+solved, and the player can hide it with « Clavier ». `grid-status` sits in the clue
+bar's row only while the in-app keyboard shows on a window at most 500 px high;
+since the keyboard never shows on a solved page, a solved status is always the end
+band under the clue bar, and on a phone held sideways a solved page is spec 043's
+column layout. AC-10 changes (its in-row checks run with `FX02_FULL_WRONG` only),
+so the test-writer updates its test before the implementer runs. AC-5 does not
+change: it presses physical keys, and its page has no in-app keyboard. The note of
+spec 043 above, "The in-app keyboard stays on a solved page until step 5", is
+replaced by this one.)
+
+(Note from the lead, 2026-10-22: refined by spec 047, the design's room overlays
+(`_design.md` section 9, "End of grid"): in the end band under the clue bar,
+`grid-status` is a row of `grid-status-text` (the ✓ pictogram and this spec's
+text) and, when solved, spec 028's `recap-open`, 10 px apart; on a narrow window
+the text wraps and `recap-open` never does. The texts, roles, states and places of
+this spec do not change, and no criterion changes: AC-10's in-row checks run on the
+full-but-wrong status (spec 044), which keeps its one line in the clue bar's row.)
+
 ## Goal
 
 As a team, we want the game to recognise the finished grid, so that we don't have to press anything to win.
@@ -119,7 +150,14 @@ snapshot with `solved: true`.
   `grid-viewport` about 75 px high at 568 by 320 in the touch context, below the
   100 px floor of spec 013 AC-6.)
   - On a window at most 500 px high (`window.innerHeight <= 500`, the height part
-    of spec 024's small window), `grid-status` sits in `clue-bar`'s row, after
+    of spec 024's small window) in spec 043's sheet layout (Note from the lead,
+    2026-10-22: refined by spec 043; "in spec 043's sheet layout" is new: in the
+    column layout the status is the band under the clue bar at any height) (Note
+    from the lead, 2026-10-22: refined by spec 044, the design's keyboard: read
+    "while spec 044's in-app keyboard shows on a window at most 500 px high", which
+    is always the sheet layout; a solved page has no keyboard, so its status is
+    always under the clue bar),
+    `grid-status` sits in `clue-bar`'s row, after
     `clue-bar-text`, and never makes `clue-bar` higher than it is on the same page
     without the status. (Note from the lead, 2026-10-15: this sentence said "adds no
     height: `clue-bar` is as high with it as without it". That cannot hold for a
@@ -154,7 +192,9 @@ snapshot with `solved: true`.
   `disabled`. Selecting cells and moving with the arrow keys still work. (Note
   from the lead, 2026-10-15: "send nothing" leaves aside the heartbeat `ping`
   frames of spec 017, which the page may send at any time once the socket is
-  open.)
+  open.) (Note from the lead, 2026-10-22: refined by spec 044, the design's
+  keyboard: once solved there is no in-app keyboard on the page, so no key of it
+  can be pressed.)
 - No cell changes look when `grid_full_wrong` arrives: there is no hint of where
   the mistake is.
 
@@ -228,7 +268,7 @@ The words in brackets say how each criterion is tested.
 - **AC-7** (AC-6.4.2) (browser with mocked socket; browser with live server) All players see "grid full, not yet correct". Mocked: given a FX-01 snapshot where 17 cells are filled and (4, 4) is empty, `grid-status` is absent; after `letter_changed` at (4, 4) letter `X` from `p2` and `grid_full_wrong`, `grid-status` has `data-state="full_wrong"` and the text `fr.json["completion.full_wrong"]`, no cell has `data-wrong="true"`, and the room page has `data-solved="false"`; after `letter_changed` erasing (4, 4), `grid-status` is absent again. A page whose first snapshot already holds a full, wrong grid shows the `full_wrong` status at once. Live: in the room of AC-3 with `X` typed at (4, 4) instead of `T`, both pages show `data-state="full_wrong"`.
 - **AC-8** (AC-6.4.3) (rule unit test) On FX-01, entering the 18 letters triggers completion; with the M at (1, 2) replaced by N, it does not. Given a fresh FX-01 room with `p1`, when `p1` writes the 18 solution letters in row-major order, then exactly one `GridSolved` is produced, by the 18th edit, and `solved` is True. In a second run with `N` written at (1, 2) instead of `M`, the 18th edit produces `GridFullWrong` and no `GridSolved`, `solved` is False; when `p1` then writes `M` at (1, 2), that edit produces `GridSolved`.
 - **AC-9** (new) (rule unit test) The solved state survives a reload. Given the entries of AC-1's whole play (joins, 18 edits, `grid_solved`), when they are replayed in order with `replay` from `new_room` on the same grid, then the result equals the live state for `solved`, `seq` and `cells`; and a room saved in a `RoomStore` and loaded again (spec 018) has `solved=True` and still refuses an `EditLetter` with `grid_solved`.
-- **AC-10** (new, from the lead's decision of 2026-10-15) (browser with mocked socket) The completion status never takes the grid's room: on a window at most 500 px high it sits in the clue bar's row. Setup: "Status snapshots (AC-10)" in "Test harness", run with `FX02_FULL_WRONG` and again with `FX02_SOLVED`, the clue at (0, 6) tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, `grid-status` shows with the snapshot's `data-state` and the text `fr.json["completion.full_wrong"]` or `fr.json["completion.solved"]`, and spec 013 AC-6's checks pass. At 568 by 320 and 740 by 360, in both contexts: the box of `grid-status` lies inside the box of `clue-bar`; its vertical range overlaps that of `clue-bar-text`, and its left edge is at or right of the right edge of `clue-bar-text`; its whole text shows (`scrollWidth <= clientWidth + 1`); `clue-bar-text` still has the text `On la glisse dans une enveloppe`, a computed `font-size` of 14 px or more, and computed `text-overflow` `ellipsis`, `white-space` `nowrap` and `overflow` `hidden`; and the height of `clue-bar` equals its height on a page given `FX02_EMPTY` with the same feed, tap, window and context, where `grid-status` is absent. (Note from the lead, 2026-10-15: the computed `text-overflow`, `white-space` and `overflow` checks were added, to pin the one-line rule of "Where `grid-status` sits". The rule itself is that the status never makes `clue-bar` higher. The check that the heights are equal stays, and still holds in this test, since FX-02's 31-character clue fits on one line at both sizes, with and without the status; no test needs a clue that wraps. (second review of spec 024)) At 1280 by 720, in both contexts, the top of `grid-status` is at or below the bottom of `clue-bar`, and its bottom is at most `window.innerHeight`. Each comparison of boxes has 1 px of tolerance. (Note from the lead, 2026-10-15: added. A test-writer found that `grid-status`, then always under the clue bar, left `grid-viewport` about 75 px high at 568 by 320 in the touch context with a full grid, in all three engines, and that no test covered the room layout while the status shows. Spec 019 AC-4 checks spec 013 AC-6 with every letter cell filled, so it relies on this rule too.) At 568 by 320 in the touch context, with each of the two snapshots, spec 035's contrast scan (its AC-8) and language scan (its AC-9) find no offending element, FX-02's clue texts counting as data of the test as FX-01's do. (Note from the lead, 2026-10-15: this sentence was added after the criterion, so that the status inside the clue bar's row is scanned too; spec 035's own scans run only at 1280 by 720 and 360 by 740, where the status sits under the clue bar. Spec 035's language scan lists the clue texts of FX-01 only as test data, so this sentence adds FX-02's.)
+- **AC-10** (new, from the lead's decision of 2026-10-15) (browser with mocked socket) The completion status never takes the grid's room: on a window at most 500 px high it sits in the clue bar's row. Setup: "Status snapshots (AC-10)" in "Test harness", run with `FX02_FULL_WRONG` and again with `FX02_SOLVED`, the clue at (0, 6) tapped. At every window size of spec 006 AC-5, in desktop and touch contexts, `grid-status` shows with the snapshot's `data-state` and the text `fr.json["completion.full_wrong"]` or `fr.json["completion.solved"]`, and spec 013 AC-6's checks pass. At 568 by 320 and 740 by 360, in the touch context with `FX02_FULL_WRONG` (Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard; this read "with either snapshot". With `FX02_SOLVED` the page there has no `keyboard` (spec 044: the keyboard goes away once solved) and `data-layout="column"`, and the top of `grid-status` is at or below the bottom of `clue-bar` and its bottom at most `window.innerHeight`, as at 1280 by 720) (spec 043's sheet layout; Note from the lead, 2026-10-22: refined by spec 043, the design's room layout; this read "in both contexts"; in the desktop context these two windows are the column layout, where the top of `grid-status` is at or below the bottom of `clue-bar` and its bottom at most `window.innerHeight`, as at 1280 by 720): the box of `grid-status` lies inside the box of `clue-bar`; its vertical range overlaps that of `clue-bar-text`, and its left edge is at or right of the right edge of `clue-bar-text`; its whole text shows (`scrollWidth <= clientWidth + 1`); `clue-bar-text` still has the text `On la glisse dans une enveloppe`, a computed `font-size` of 14 px or more, and computed `text-overflow` `ellipsis`, `white-space` `nowrap` and `overflow` `hidden`; and the height of `clue-bar` equals its height on a page given `FX02_EMPTY` with the same feed, tap, window and context, where `grid-status` is absent. (Note from the lead, 2026-10-15: the computed `text-overflow`, `white-space` and `overflow` checks were added, to pin the one-line rule of "Where `grid-status` sits". The rule itself is that the status never makes `clue-bar` higher. The check that the heights are equal stays, and still holds in this test, since FX-02's 31-character clue fits on one line at both sizes, with and without the status; no test needs a clue that wraps. (second review of spec 024)) At 1280 by 720, in both contexts, the top of `grid-status` is at or below the bottom of `clue-bar`, and its bottom is at most `window.innerHeight`. Each comparison of boxes has 1 px of tolerance. (Note from the lead, 2026-10-15: added. A test-writer found that `grid-status`, then always under the clue bar, left `grid-viewport` about 75 px high at 568 by 320 in the touch context with a full grid, in all three engines, and that no test covered the room layout while the status shows. Spec 019 AC-4 checks spec 013 AC-6 with every letter cell filled, so it relies on this rule too.) At 568 by 320 in the touch context, with each of the two snapshots, spec 035's contrast scan (its AC-8) and language scan (its AC-9) find no offending element, FX-02's clue texts counting as data of the test as FX-01's do. (Note from the lead, 2026-10-15: this sentence was added after the criterion, so that the status inside the clue bar's row is scanned too; spec 035's own scans run only at 1280 by 720 and 360 by 740, where the status sits under the clue bar. Spec 035's language scan lists the clue texts of FX-01 only as test data, so this sentence adds FX-02's.)
 
 ## Edge cases and errors
 
