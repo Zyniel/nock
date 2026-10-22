@@ -540,7 +540,7 @@
                  then the flash overlay (under it, z-index -1), the catch-up ring
                  (1), the author band (spec 019, over the ring), the revealed
                  notch (3), the other players' triangles or icons (2) and the
-                 arrows (6). -->
+                 arrows (6); last, my selection border (7). -->
             <div
               class="cell letter"
               class:locked={cell.locked}
@@ -629,7 +629,11 @@
                   ><path d={ARROW_GLYPHS[placed.arrow].path} /><polygon
                     points={ARROW_GLYPHS[placed.arrow].head}
                   /></svg
-                >{/each}</div>
+                >{/each}{#if isSelected(cell.row, cell.column)}<span
+                  class="cell-selection"
+                  data-testid="cell-selection"
+                  aria-hidden="true"
+                ></span>{/if}</div>
           {:else if cell.type === 'clue'}
             <div
               class="cell clue-cell"
@@ -830,12 +834,25 @@
     font-weight: 700;
   }
 
-  /* My cell: the selected blue, with a 2px navy border drawn inside it, over
-     every mark of the cell. */
+  /* My cell: the selected blue, with a 2px navy border drawn inside it. The
+     cell's own outline is that border for spec 035 AC-2, but the engines paint
+     it under the cell's marks; the cell-selection element below draws it again
+     over every mark of the cell. */
   .letter.selected {
     background: var(--nock-selected);
     outline: 2px solid var(--nock-navy);
     outline-offset: -2px;
+  }
+
+  /* My selection border as the top layer of the cell (spec 042, decision 10):
+     on the cell's padding box, over the arrows (6) and every other mark. */
+  .cell-selection {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    box-sizing: border-box;
+    border: 2px solid var(--nock-navy);
+    pointer-events: none;
   }
 
   /* A flashing cell (spec 016): the cell turns white and its letter ink; the
@@ -1095,9 +1112,10 @@
      a cell of less than 12px (a large grid beside the in-app keyboard on a low
      window) does it give way, so that the clues keep a box that takes taps. */
   .clue-cell {
+    --clue-padding-x: min(3px, calc(var(--cell) * 0.25));
     display: flex;
     flex-direction: column;
-    padding: min(2px, calc(var(--cell) * 0.17)) min(3px, calc(var(--cell) * 0.25));
+    padding: min(2px, calc(var(--cell) * 0.17)) var(--clue-padding-x);
     background: var(--nock-clue-bg);
   }
 
@@ -1155,13 +1173,14 @@
 
   /* The flag of spec 021 on its own clue: the red flag icon on a square of
      clue blue-grey at the clue's top left, 1px right of the cell's left edge
-     (the clue starts 3px in). It is drawn over the clue text and never moves
-     it; a tap on it is a tap on its clue. */
+     (the clue starts 3px in), or on that edge's padding when it is thinner
+     than 1px. It is drawn over the clue text and never moves it; a tap on it is
+     a tap on its clue. */
   .clue-flag {
     position: absolute;
     z-index: 2;
     top: 0;
-    left: -2px;
+    left: calc(min(1px, var(--clue-padding-x)) - var(--clue-padding-x));
     display: grid;
     place-items: center;
     width: max(8px, calc(var(--cell) * 0.22));
