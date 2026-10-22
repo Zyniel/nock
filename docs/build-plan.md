@@ -327,26 +327,26 @@ working and every test passing, and builds on the ones before it. A spec also
 refines the older specs whose tests check the look it changes, with dated notes,
 so their tests change in the same pull request.
 
-| Order | Spec | Screens | Status (2026-10-22) |
+| Order | Spec | Screens | Status (2026-10-23) |
 | --- | --- | --- | --- |
-| 1 | 041 Visual foundation | tokens, player colours, fonts, icons, buttons, focus ring, menus, badge, note; today's screens take the colours, no layout change | approved, being built |
-| 2 | 042 Grid cells | every cell: letters, marks, players' corners, clues, arrows, flag, the « Accessibilité » and « Mots des autres » switches | approved |
-| 3 | 043 Room layout | top bar, Aide and Menu, Salon (column or sheet), Joueurs, clue bar, notes, completion band; two pull requests (WP-1 the frame, WP-2 the feedback) | approved |
-| 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | draft |
-| 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | to draft |
-| 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | to draft |
-| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | to draft |
-| 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | to draft |
+| 1 | 041 Visual foundation | tokens, player colours, fonts, icons, buttons, focus ring, menus, badge, note; today's screens take the colours, no layout change | done (#32) |
+| 2 | 042 Grid cells | every cell: letters, marks, players' corners, clues, arrows, flag, the « Accessibilité » and « Mots des autres » switches | done (#34) |
+| 3 | 043 Room layout | top bar, Aide and Menu, Salon (column or sheet), Joueurs, clue bar, notes, completion band; two pull requests (WP-1 the frame, WP-2 the feedback) | done (#35, WP-2's pull request) |
+| 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | approved |
+| 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | approved |
+| 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | approved |
+| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | approved |
+| 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | approved |
 
-- [ ] Draft and approve: specs 044 to 048 are drafted from `_design.md` and the
+- [x] Draft and approve: specs 044 to 048 are drafted from `_design.md` and the
   screens sheet; the human approves each (only the human sets `approved`).
-- [ ] Merge the design specs: one pull request of `specs/` and `docs/design/`
+- [x] Merge the design specs: one pull request of `specs/` and `docs/design/`
   only (branch `design-specs`), so every build starts from the approved text.
   Then the tooling rule that keeps the visual documentation current (PR #30).
 - [ ] Build, in the order of the table, one pull request each:
-  - [ ] `/feature specs/041-visual-foundation.md`
-  - [ ] `/feature specs/042-grid-cells.md`
-  - [ ] `/feature specs/043-room-layout.md` (WP-1, then WP-2)
+  - [x] `/feature specs/041-visual-foundation.md`
+  - [x] `/feature specs/042-grid-cells.md`
+  - [x] `/feature specs/043-room-layout.md` (WP-1, then WP-2)
   - [ ] `/feature specs/044-keyboard.md`
   - [ ] `/feature specs/045-auteurs-mode.md`
   - [ ] `/feature specs/046-catalogue-and-entry-pages.md`
