@@ -338,7 +338,10 @@ no ⚑). No emoji in the interface; reactions and chat text are user content.
 The grid container has a 1 px rule-grey left and top border; each cell has a
 1 px rule-grey right and bottom border, inside its side `s`. No gap between cells.
 Cells clip their content (`overflow: hidden`), except clue cells (see "Clue
-cells").
+cells"). The grid container itself clips at its outer edge (`overflow: clip`): a
+clue text may spill over neighbouring cells, never past the grid's box. (Note from
+the lead, 2026-10-22, from spec 042's implementation: added, so that FX-02 needs
+no pan at 1280 by 800.)
 
 An empty cell (spec 002's `empty` type) is filled with `--nock-rule` (decided by
 the human on 2026-10-16, drawn in sheet 4.2).

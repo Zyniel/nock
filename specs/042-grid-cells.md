@@ -53,6 +53,12 @@ Terms used below:
   neighbour's right edge.
 - Letter cells and empty cells clip their content (`overflow: hidden`); clue
   cells do not (`overflow: visible`).
+- The `grid` itself clips at its outer edge: `overflow: clip` on its own box, so
+  that nothing of its content (a clue text spilling over neighbouring cells, an
+  arrow, a ring) paints outside the grid's box. (Note from the lead, 2026-10-22,
+  from spec 042's implementation: added. At 1280 by 800, FX-02's row 16 clue
+  texts reached 7 px below the grid and made the viewport scroll, against spec 006
+  "at 1280x800 and above FX-01 and FX-02 need no pan".)
 - An empty cell (`data-type="empty"`) has the background `--nock-rule` and holds
   no element.
 - The grid's box is `W x s + 1` wide and `H x s + 1` high (`W`, `H` its width and
@@ -356,7 +362,7 @@ mode is off, the flash colour on `cell-flash`, the pencil italics and grey, the
 
 The words in brackets say how each criterion is tested.
 
-- **AC-1** (new) (browser with mocked socket) Grid lines are single 1 px rule-grey lines and empty cells are rule grey. On a FX-01 snapshot: the `grid` has a computed `border-left` and `border-top` of `1px` `solid` rgb(154, 163, 178) and a `border-right-width` and `border-bottom-width` of `0px`; every `cell` has `border-right` and `border-bottom` `1px` `solid` rgb(154, 163, 178) and `border-left-width` and `border-top-width` `0px`; the left edge of (2, 2) is within 0.5 px of the right edge of (2, 1), and the top edge of (2, 2) within 0.5 px of the bottom edge of (1, 2); the grid's box is `5 s + 1` wide and high (1 px tolerance); every letter cell has computed `overflow` `hidden` and every clue cell `visible`. On spec 007's hand-built view (width 3, height 1, (0, 2) an `EmptyCellView`), (0, 2) has `background-color` rgb(154, 163, 178), `overflow` `hidden` and no child element.
+- **AC-1** (new) (browser with mocked socket) Grid lines are single 1 px rule-grey lines and empty cells are rule grey. On a FX-01 snapshot: the `grid` has a computed `border-left` and `border-top` of `1px` `solid` rgb(154, 163, 178) and a `border-right-width` and `border-bottom-width` of `0px`; every `cell` has `border-right` and `border-bottom` `1px` `solid` rgb(154, 163, 178) and `border-left-width` and `border-top-width` `0px`; the left edge of (2, 2) is within 0.5 px of the right edge of (2, 1), and the top edge of (2, 2) within 0.5 px of the bottom edge of (1, 2); the grid's box is `5 s + 1` wide and high (1 px tolerance); every letter cell has computed `overflow` `hidden` and every clue cell `visible`; the `grid` has computed `overflow` `clip` (both axes), and on a FX-02 room in a 1280 by 800 window nothing of the grid's content paints outside the grid's box: the bounding box of every descendant of the `grid`, `clue-text` included, is clipped to it, and the viewport's `scrollHeight` and `scrollWidth` do not exceed its `clientHeight` and `clientWidth` (1 px tolerance), so spec 006 AC-1's no-pan check holds. (Note from the lead, 2026-10-22, from spec 042's implementation: the `overflow: clip` and the FX-02 check are added; the test-writer updates the AC-1 tests.) On spec 007's hand-built view (width 3, height 1, (0, 2) an `EmptyCellView`), (0, 2) has `background-color` rgb(154, 163, 178), `overflow` `hidden` and no child element.
 - **AC-2** (new) (browser with mocked socket) One background per letter cell, by the design's precedence. Given a FX-01 snapshot with `p2` (colour 3) selecting (2, 2) `down` (MIME), (1, 0) holding `T` locked and (1, 2) holding `M` locked: before any tap, (3, 2) has a `background-color` within 1 per channel of rgb(231, 223, 250) and (2, 1) rgb(255, 255, 255). After a tap on (1, 1) (`across`, TAMIS): (1, 1) has rgb(207, 221, 243); (1, 0), locked and in my word, rgb(227, 231, 238); (1, 2), locked, in my word and in `p2`'s word, rgb(227, 231, 238); (1, 3), in my word, rgb(230, 237, 249); (3, 2) still the tint. After a tap on (1, 0): (1, 0), selected and locked, has rgb(207, 221, 243) and (1, 1) rgb(230, 237, 249). After a tap on (3, 2): (3, 2), selected and tinted, has rgb(207, 221, 243).
 - **AC-3** (new) (browser with mocked socket) Each player can turn the other players' word tint off, and the choice is kept in the browser. With the snapshot of AC-2 and empty `localStorage`: `others-tint-switch` has `aria-pressed="true"` and (3, 2) has the tint of AC-2. After a click, `aria-pressed` is `false`, (3, 2) and (4, 2) have `background-color` rgb(255, 255, 255) while their `data-tinted-by` is still `p2`, `localStorage["nock.others_tint"]` is `"false"`, and the page sent no frame within 300 ms (spec 017's `ping` frames are not counted). After a reload with the same mock, the switch has `aria-pressed="false"` and (3, 2) is white. A second click gives `aria-pressed="true"`, the tint again, and `"true"` in storage.
 - **AC-4** (new) (browser with mocked socket) Grid letters are Source Sans 3 at 0.56 of the cell, bold when locked. Given a FX-01 snapshot where (1, 0) holds `T` locked and (1, 1) holds `A`: each of the two cells holds one `cell-letter` with the text of its `data-letter`, whose computed `font-family`, read as spec 041 AC-4 reads it, is `Source Sans 3`, `Segoe UI`, `system-ui`, `sans-serif`, whose `font-size` is `0.56 s` and `line-height` equal to its `font-size`, and whose `color` is rgb(20, 24, 31); its `font-weight` is 700 in (1, 0) and 500 in (1, 1). (1, 2), empty, holds no `cell-letter`. Where the engine supports `text-box` (see "Test harness"), `cell-letter` has the computed `text-box-trim` `trim-both` and `text-box-edge` `cap alphabetic`. The centre of the `cell-letter` box is within 1 px of the centre of the cell's inner box on the horizontal axis.
@@ -416,7 +422,11 @@ The words in brackets say how each criterion is tested.
   two-clue size (0.145 s against 0.09 s); spec 006 AC-1 still requires no cut at
   full zoom, so the implementer may raise `data-zoom-max` (spec 006 decision 3).
   At zoom 1 a two-clue cell of about 29 px may not hold its text; clue cells do
-  not clip, and players zoom (`_design.md` section 15, sheet notes).
+  not clip, and players zoom (`_design.md` section 15, sheet notes). The text may
+  still spill over neighbouring cells inside the grid, but never past the grid's
+  outer edge, which clips (`overflow: clip`, AC-1): FX-02's row 16 clue texts
+  would otherwise reach 7 px below the grid at 1280 by 800. (Note from the lead,
+  2026-10-22, from spec 042's implementation: grid clipping added.)
 - Capitals by CSS (AC-12): the text node keeps the clue as written, so spec
   035's language scan and the tests that read `textContent` see `Passoire fine`;
   `innerText` may show the capitals in some engines.
