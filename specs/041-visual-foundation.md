@@ -410,6 +410,9 @@ checks each test against it.
   flash, the same colour as a normal letter there, as its note of 2026-10-15
   requires. Spec 024's `reveal-mark` is drawn in the cell's text colour (ink)
   against the cell's computed background (white during the flash): 17.79:1.
+  (Note from the lead, 2026-10-22, second review of spec 041: replaced by
+  "against the cell's background with the `cell-flash` overlay composited over
+  it (the swatch colour at 38 % over white); ink keeps 3:1 there".)
   Spec 035's contrast scan measures the letter against the cell's background.
   Spec 016's text "uses that player's colour" still holds; its dated note says
   "at 38 % over white". (AC-16, AC-17)
