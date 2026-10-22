@@ -50,6 +50,13 @@ every icon comes from `ICONS` of `web/src/lib/icons.ts`, every string from
 
 - Sheet layout and column layout: the two layouts of `_design.md` section 8 ("Which
   layout"), chosen as "Which layout" below says.
+- Phone top bar and computer top bar: the two forms of `room-topbar` (see "Top
+  bar"). The phone top bar is used in the sheet layout and in the column layout on
+  a window at most 500 px high (`window.innerHeight <= 500`); the computer top bar
+  only in the column layout on a window more than 500 px high. (Note from the lead,
+  2026-10-22: added, the lead's decision recorded as spec 044's Decision 8: the
+  computer top bar needs about 650 px, more than the 568 to 740 px of a low
+  column-layout window.)
 - Popover: the Aide menu (`aide-menu`) or the Menu (`room-menu`).
 - The Salon: `data-testid="salon"`, the bottom sheet of the sheet layout or the side
   column of the column layout.
@@ -58,7 +65,12 @@ every icon comes from `ICONS` of `web/src/lib/icons.ts`, every string from
 - The in-app keyboard is shown on a touch screen (`(pointer: coarse)`, spec 009)
   and nowhere else; step 4 adds the « Clavier » button that hides it. "The in-app
   keyboard is hidden" therefore means, in this spec, "the page is not on a touch
-  screen".
+  screen". (Note from the lead, 2026-10-22: refined by spec 044, the design's
+  keyboard: the in-app keyboard shows when the page has a snapshot, is on a touch
+  screen, the player has not hidden it with « Clavier »
+  (`localStorage["nock.keyboard_hidden"]`) and the grid is not solved; otherwise
+  it is hidden and absent. Every rule of this spec that reads "the in-app keyboard
+  is hidden", or "on a touch screen" for `keyboard`, reads spec 044's definition.)
 - A pictogram is one of the text glyphs of `_design.md` section 5 (→ ← ✓ ▲ ✎ ▾ and
   the direction glyphs → ↓ of the clue bar). It is drawn by CSS generated content
   (`::before` or `::after`) on an element with `aria-hidden="true"` and no text
@@ -89,7 +101,8 @@ Once the page has a snapshot, the room page holds, in this document order:
 4. the play area: `grid-area` (holding spec 025's `vote-announcement` and
    `vote-banner`, `room-note`, `undo-message` and `grid-viewport`), `clue-bar`,
    `reaction-picker` while open, `grid-status` while shown (spec 026), `keyboard`
-   on a touch screen (spec 009);
+   on a touch screen (spec 009) (Note from the lead, 2026-10-22: refined by spec
+   044: `keyboard` while it shows, by spec 044's definition);
 5. `salon`;
 6. `room-scrim`;
 7. the dialogs: `host-settings`, `account-dialog` (spec 033), `recap` (spec 028).
@@ -105,7 +118,9 @@ today's content and look; step 5 redraws those pages.
 `data-testid="room-topbar"`: a `header`, white, with a 1 px solid `--nock-line`
 bottom border, full window width, at the top of the window.
 
-Sheet layout: 54 px high (its border included), padding 0 4 px 0 10 px, items
+Phone top bar (Note from the lead, 2026-10-22: this read "Sheet layout"; it is also
+the top bar of the column layout on a window at most 500 px high, see "Terms"): 54
+px high (its border included), padding 0 4 px 0 10 px, items
 centred vertically. In this order: the timer slot (`timer`, or `timer-show` while
 the timer is hidden), then, pushed right (`margin-right: auto` on the timer slot),
 five top-bar buttons: `undo-button`, `aide-button`, `chat-toggle`, `pencil-toggle`,
@@ -114,9 +129,20 @@ five top-bar buttons: `undo-button`, `aide-button`, `chat-toggle`, `pencil-toggl
 timer slot never shrinks. Each holds its 22 px icon (stroke width 1.8) above its
 label (gap 2 px), the label in 500 0.68rem/1 `--nock-font-ui`, navy, on one line.
 The fourth slot holds « Crayon » in this step; step 4 puts « Clavier » there and
-moves the pencil toggle to the ✎ key (Decision 6).
+moves the pencil toggle to the ✎ key (Decision 6). (Note from the lead, 2026-10-22:
+refined by spec 044, the design's keyboard: on a touch screen the fourth slot is
+`keyboard-toggle` (« Clavier ») and there is no `pencil-toggle`, the ✎ key
+`key-pencil` being the pencil toggle; off a touch screen the fourth slot keeps
+`pencil-toggle`. In the computer top bar on a touch screen, `keyboard-toggle` comes
+between `chat-toggle` and `menu-button`, and `pencil-toggle` stays after
+`undo-button`. Once the grid is solved, `keyboard-toggle` is a disabled top-bar
+button.) (Note from the lead, 2026-10-22: the phone top bar has these slots and
+this order in both layouts, so a touch screen in the column layout on a low window
+has `keyboard-toggle` in the fourth slot and no `pencil-toggle`.)
 
-Column layout: 56 px high, padding 0 16 px, gap 4 px, items centred vertically. In
+Computer top bar (Note from the lead, 2026-10-22: this read "Column layout"; it is
+used only in the column layout on a window more than 500 px high, see "Terms"): 56
+px high, padding 0 16 px, gap 4 px, items centred vertically. In
 this order: `topbar-brand` (the Nock mark, an `svg` with `viewBox="0 0 10 14"`, 12
 by 18 px, holding one `polygon` with `NOCK_MARK_POINTS`, filled navy, then the
 text `t("app.title")`, 700 1.3rem/1, navy, letter spacing 0.01em; gap 8 px) with
@@ -151,6 +177,9 @@ The unread badge and the new-events dot, on `chat-toggle`:
 - `data-testid="salon-dot"`, an 8 px circle in `--nock-red`, `aria-hidden="true"`,
   no text, at top 8 px and right 15 px of `chat-toggle`'s box in the sheet layout,
   and at the badge's place in the column layout (`_design.md` section 15 item 9).
+- (Note from the lead, 2026-10-22: in the two items above, and for `timer-show`'s
+  place, "sheet layout" reads "phone top bar" and "column layout" reads "computer
+  top bar".)
   It shows while at least one event line by another player came since the stream
   was last shown (see "Discussion") and no message is unread; otherwise it is
   absent.
@@ -267,6 +296,10 @@ with `aria-hidden="true"`, so the accessible name is the label.
 - Place, column layout: top 4 px under the top bar; `aide-menu`'s left edge is
   `aide-button`'s left edge, `room-menu`'s right edge is `menu-button`'s right
   edge.
+- (Note from the lead, 2026-10-22: the place follows the top bar's form: "sheet
+  layout" in the two items above reads "phone top bar" and "column layout" reads
+  "computer top bar". The scrim, the Salon and the room sheets keep following the
+  layout.)
 - Height: at most the window's height less its top and 6 px; its content scrolls
   inside it when higher (the Menu is about 300 px high, more than a window of 320
   px allows under the top bar).
@@ -592,8 +625,14 @@ viewport's top, layer 6. It takes no room (no layout shift).
   page is solved, after its text and pushed right: `nock-button
   nock-button-primary`, padding 7 px 12 px, 0.85rem, under the bar;
   `nock-button nock-button-secondary` with the same size in the clue bar's row.
+  (Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard:
+  `grid-status` sits in the clue bar's row only while the in-app keyboard shows on
+  a window at most 500 px high, which never happens on a solved page, so
+  `recap-open` is always the primary button of the band; the secondary variant
+  goes.)
 - The in-app keyboard stays shown on a solved page in this step (spec 026 AC-5);
-  step 5 hides it.
+  step 5 hides it. (Note from the lead, 2026-10-22: refined by spec 044, the
+  design's keyboard: the keyboard goes away once the grid is solved, in step 4.)
 
 ### Play area and fit (specs 006, 013)
 
@@ -609,6 +648,9 @@ viewport's top, layer 6. It takes no room (no layout shift).
   bottom (margins −12 px, 10 px above it).
 - Spec 006's zoom and pan, spec 025's `vote-banner` (over the top of
   `grid-viewport`) and spec 013 AC-6's guarantees apply to this play area.
+- (Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard: "on
+  a touch screen" for `keyboard` in the first two items of this list reads "while the in-app
+  keyboard shows"; hiding it gives its room to `grid-viewport`.)
 
 ### Layers (`_design.md` section 8)
 
@@ -714,6 +756,10 @@ package that makes the change (see "Work packages").
 | 035 | AC-2 (ring contrast), AC-3, AC-9 (samples), AC-12 | AC-2: a ring's contrast is measured against the surface behind it (navy for the clue bar's white ring), the walk's stream list check shows the Discussion tab first; AC-3: after the grid come the clue bar's buttons (no sentinel needed, no Firefox skip), before it `menu-button`; AC-9: the flagged sample `Salon` becomes `Salle`, and `Salon` (`topbar.salon`) is accepted; AC-12: the stream list (named « Discussion ») is the one scrolling list; the roster list never scrolls on its own | 1 |
 | 042 | AC-19 | The two switches are `room-menu` items (spec 043 AC-11) | 1 |
 
+(Note from the lead, 2026-10-22: spec 044, the design's keyboard, refines this
+spec's AC-27 and the rows of 020 (AC-7) and 026 (AC-10) above once more; its
+"Refined specs" says how.)
+
 Spec 022 and spec 027 say that spec 035 AC-9's checker "must still flag `Loading…`,
 `Salon` and `Check word`"; with this refinement the sample is `Salle`. Their notes
 say so; no criterion of theirs changes for it.
@@ -779,9 +825,9 @@ first ("Test harness").
 The words in brackets say how each criterion is tested.
 
 - **AC-1** (new) (browser with mocked socket) The layout follows the window's shape, size and pointer. On a FX-01 snapshot, `room-page` has `data-layout="column"` at 1920 by 1080, 1280 by 720, 1024 by 768, 900 by 600, 740 by 360 and 568 by 320, and `data-layout="sheet"` at 899 by 600, 800 by 800, 768 by 1024, 360 by 740 and 320 by 568, in the desktop context; in the touch context it has `"column"` at 1024 by 768 and `"sheet"` at 740 by 360 and 568 by 320. In the desktop context, after `page.set_viewport_size` from 1280 by 720 to 360 by 740 it reads `"sheet"` within 300 ms, and `"column"` again within 300 ms of the way back; an open `room-menu` is closed after each change.
-- **AC-2** (new) (browser with mocked socket) The phone top bar has the timer and five buttons, icons over labels. At 360 by 740: `room-topbar` is a `HEADER` with the box left 0, top 0, width 360, height 54, computed `background-color` rgb(255, 255, 255) and a `1px` `solid` rgb(221, 226, 234) bottom border; it holds no `topbar-brand` that shows; its children that show are, in document order, `timer`, `undo-button`, `aide-button`, `chat-toggle`, `pencil-toggle`, `menu-button`. Each of the five buttons is a `BUTTON` with `type="button"`, 56 px wide (0.5 px) and 53 px high (1 px), with a transparent background, and holds one `svg` with `aria-hidden="true"`, 22 by 22 px, `stroke-width` 1.8, whose shapes are those of `ICONS` for `undo`, `aide`, `salon`, `crayon` and `menu`, above its label (the icon's bottom at or above the label's top), the label's text `fr.json["room.undo"]`, `["topbar.aide"]`, `["topbar.salon"]`, `["pencil.toggle"]`, `["topbar.menu"]`, computed `font-size` 10.88 px, `font-weight` 500 and `color` rgb(27, 47, 85). `timer` has `font-size` 18.4 px, `font-weight` 600, `color` rgb(27, 47, 85) and `font-variant-numeric` `tabular-nums`, its left edge 10 px or more from the window's left edge (1 px), and `menu-button`'s right edge is 4 px from the window's right edge (1 px).
-- **AC-3** (new) (browser with mocked socket) The computer top bar has the brand, the timer and five buttons, icons beside labels. At 1280 by 720: `room-topbar` is 56 px high and 1280 px wide; `topbar-brand` is its first child that shows, 16 px from its left edge (1 px), holding an `svg` with `viewBox="0 0 10 14"`, 12 by 18 px, whose one `polygon` has `points` `0,0 10,0 10,14 5,10 0,14` and computed `fill` rgb(27, 47, 85), then the text `fr.json["app.title"]` in `font-weight` 700, `font-size` 20.8 px, navy. Then, left to right: `timer` (its right edge at least 10 px left of `undo-button`'s left edge), `undo-button`, `pencil-toggle`, `aide-button`, `chat-toggle`, `menu-button`, each 38 px high (0.5 px), radius `6px`, padding left and right `12px`, 6 px from the next (1 px), its 20 by 20 px icon left of its label (the icon's right at or left of the label's left, their vertical centres within 1 px), the label in 14.72 px, weight 500, navy; `menu-button`'s right edge is 16 px from the window's right edge (1 px). `aide-button` holds `aide-caret`, `aria-hidden="true"`, with no text node and a `::after` or `::before` whose computed `content` is `"▾"`.
-- **AC-4** (new) (browser with mocked socket) The top bar never overflows, and the room's heading and status are read but not seen. At 320 by 568 with the timer at 36,000,000 ms running, and at 283 by 640 with a snapshot whose `timer_elapsed_ms` is 0: each top-bar button lies inside `room-topbar`'s box, is at least 40 px wide, and its label shows its whole text on one line (`scrollWidth <= clientWidth + 1`, one `getClientRects()` line); `timer` is on one line and does not overlap `undo-button`; `document.documentElement.scrollWidth <= window.innerWidth`. At 1280 by 720 and 360 by 740 with `data-status="joined"`: the room's `h1` and `room-status` have the class `visually-hidden`, a box at most 1 by 1 px, and the texts `Salon ABC123` (from `fr.json["room.heading"]`) and `fr.json["room.status.joined"]`.
+- **AC-2** (new) (browser with mocked socket) The phone top bar has the timer and five buttons, icons over labels. At 360 by 740: `room-topbar` is a `HEADER` with the box left 0, top 0, width 360, height 54, computed `background-color` rgb(255, 255, 255) and a `1px` `solid` rgb(221, 226, 234) bottom border; it holds no `topbar-brand` that shows; its children that show are, in document order, `timer`, `undo-button`, `aide-button`, `chat-toggle`, `pencil-toggle`, `menu-button`. Each of the five buttons is a `BUTTON` with `type="button"`, 56 px wide (0.5 px) and 53 px high (1 px), with a transparent background, and holds one `svg` with `aria-hidden="true"`, 22 by 22 px, `stroke-width` 1.8, whose shapes are those of `ICONS` for `undo`, `aide`, `salon`, `crayon` and `menu`, above its label (the icon's bottom at or above the label's top), the label's text `fr.json["room.undo"]`, `["topbar.aide"]`, `["topbar.salon"]`, `["pencil.toggle"]`, `["topbar.menu"]`, computed `font-size` 10.88 px, `font-weight` 500 and `color` rgb(27, 47, 85). `timer` has `font-size` 18.4 px, `font-weight` 600, `color` rgb(27, 47, 85) and `font-variant-numeric` `tabular-nums`, its left edge 10 px or more from the window's left edge (1 px), and `menu-button`'s right edge is 4 px from the window's right edge (1 px). The same holds, with the window's width in place of 360, at 740 by 360 and at 568 by 320 in the desktop context, where `room-page` has `data-layout="column"`. (Note from the lead, 2026-10-22: added; the phone top bar is also the column layout's on a window at most 500 px high.)
+- **AC-3** (new) (browser with mocked socket) The computer top bar has the brand, the timer and five buttons, icons beside labels. At 1280 by 720: `room-topbar` is 56 px high and 1280 px wide; `topbar-brand` is its first child that shows, 16 px from its left edge (1 px), holding an `svg` with `viewBox="0 0 10 14"`, 12 by 18 px, whose one `polygon` has `points` `0,0 10,0 10,14 5,10 0,14` and computed `fill` rgb(27, 47, 85), then the text `fr.json["app.title"]` in `font-weight` 700, `font-size` 20.8 px, navy. Then, left to right: `timer` (its right edge at least 10 px left of `undo-button`'s left edge), `undo-button`, `pencil-toggle`, `aide-button`, `chat-toggle`, `menu-button`, each 38 px high (0.5 px), radius `6px`, padding left and right `12px`, 6 px from the next (1 px), its 20 by 20 px icon left of its label (the icon's right at or left of the label's left, their vertical centres within 1 px), the label in 14.72 px, weight 500, navy; `menu-button`'s right edge is 16 px from the window's right edge (1 px). `aide-button` holds `aide-caret`, `aria-hidden="true"`, with no text node and a `::after` or `::before` whose computed `content` is `"▾"`. At 740 by 360 and 568 by 320 in the desktop context (column layout), no `topbar-brand` shows and `room-topbar` is 54 px high: the computer top bar is used only on a window more than 500 px high. (Note from the lead, 2026-10-22: added, with the phone top bar of a low column-layout window.)
+- **AC-4** (new) (browser with mocked socket) The top bar never overflows, and the room's heading and status are read but not seen. At 320 by 568 with the timer at 36,000,000 ms running, and at 283 by 640 with a snapshot whose `timer_elapsed_ms` is 0: each top-bar button lies inside `room-topbar`'s box, is at least 40 px wide, and its label shows its whole text on one line (`scrollWidth <= clientWidth + 1`, one `getClientRects()` line); `timer` is on one line and does not overlap `undo-button`; `document.documentElement.scrollWidth <= window.innerWidth`. The same checks hold at 568 by 320 and 740 by 360 with the timer at 36,000,000 ms running, in the desktop context and in the touch context with `nock.keyboard_hidden` seeded `"true"` (spec 044; both the column layout with the phone top bar). (Note from the lead, 2026-10-22: added, so that the low column-layout windows are checked.) At 1280 by 720 and 360 by 740 with `data-status="joined"`: the room's `h1` and `room-status` have the class `visually-hidden`, a box at most 1 by 1 px, and the texts `Salon ABC123` (from `fr.json["room.heading"]`) and `fr.json["room.status.joined"]`.
 - **AC-5** (new) (browser with mocked socket) The top-bar buttons show their state, and « Salon » shows unread messages and new activity. At 360 by 740: `aide-button`, `chat-toggle` and `menu-button` have `aria-expanded="false"` and `aria-controls` `aide-menu`, `salon`, `room-menu`; after a click on each in turn, the clicked one has `aria-expanded="true"` and a computed `background-color` rgb(230, 237, 249), and the others `aria-expanded="false"`; `pencil-toggle` after a click has `aria-pressed="true"` and rgb(230, 237, 249). With the Salon closed, after `chat_message` seq 6 and 7 from `p2`: `chat-unread` is inside `chat-toggle`, has the classes of `nock-badge` (computed background rgb(180, 35, 24), colour rgb(255, 255, 255)), the text `2`, its top 5 px below and its right 8 px left of `chat-toggle`'s (1 px), and `chat-toggle` has the `aria-label` `Salon, 2 messages non lus`; no `salon-dot` shows. On a new page, after a `check_result` seq 6 by `p2` (scope `grid`, empty lists) with the Salon closed: `salon-dot` shows, an 8 by 8 px box with `border-radius` `50%` and `background-color` rgb(180, 35, 24), its top 8 px below and its right 15 px left of `chat-toggle`'s; `chat-toggle`'s `aria-label` is `fr.json["topbar.salon_events"]`; a `chat_message` seq 7 from `p2` then hides it (the badge shows); `show_tab(page, "discussion")` removes both, and `chat-toggle` has no `aria-label`. A `check_result` by `p1` (`you`) with the Salon closed makes no `salon-dot`. At 1280 by 720 with `nock.salon_closed` seeded `"true"`, the badge's top is 2 px below and its left 24 px right of `chat-toggle`'s, and `salon-dot` (after a check by `p2`) has the same top and left.
 - **AC-6** (new; refines spec 027 AC-4 and AC-8) (browser with mocked socket) The timer sits in the top bar, the Menu hides it and « Chrono » shows it again. With a snapshot of 65,000 ms running at 360 by 740: `timer` reads `1:05` or later, has `role="timer"`, is no `BUTTON` and no Tab stop. After `open_menu` and a click on `timer-toggle` (text `fr.json["timer.hide"]`, no `aria-pressed` attribute): `room-menu` is closed, the focus is on `menu-button`, no `timer` is on the page, `timer-show` holds the `chrono` icon and the label `fr.json["timer.label"]`, has the `aria-label` `fr.json["timer.toggle_label"]` and the box of a top-bar button at the timer's place (left of `undo-button`), `localStorage["nock.timer_hidden"]` is `"true"`, no frame was sent within 300 ms (pings not counted), and `timer-toggle` reads `fr.json["timer.toggle_label"]`. After a reload, `timer-show` shows. A click on it shows `timer` again, removes the key, and `timer-toggle` reads `fr.json["timer.hide"]`. At 1280 by 720 the same holds with `timer-show` between `topbar-brand` and `undo-button`.
 - **AC-7** (new) (browser with mocked socket) The connection band sits under the top bar and pushes the grid down; a final status shows in a band. At 360 by 740 and 1280 by 720, joined on a FX-01 snapshot, the test notes the top of `grid-area`; when the mock closes the socket with code 1011: `connection-banner` shows within 5,000 ms, its top is the top bar's bottom (1 px), it is as wide as the window, with computed `background-color` rgb(238, 242, 248), a `1px` `solid` rgb(221, 226, 234) bottom border and padding `8px 12px`; its first child `connection-dot` is 8 by 8 px with `background-color` rgb(180, 35, 24), `aria-hidden="true"`, its top 5 px below the band's content top (1 px); its text is `fr.json["room.banner.offline"]` in `font-size` 13.6 px, weight 500, colour rgb(20, 24, 31); the top of `grid-area` is the band's bottom, below the noted top; `room-status` has the class `visually-hidden`. When the mock answers the next join with a snapshot, the band is gone and `grid-area`'s top is back at the noted top (1 px). In a second run, the mock sends `error` `removed` then closes: `room-page` has `data-status="removed"`, `room-status` has no class `visually-hidden`, shows `fr.json["room.status.removed"]` under the top bar with the band's background and border, and holds no `connection-dot`.
@@ -804,8 +850,8 @@ The words in brackets say how each criterion is tested.
 - **AC-24** (new) (browser with mocked socket) ‹ and › move to the previous and the next unfinished word, and a pointer press keeps the focus on the grid. On a FX-01 snapshot where TAMIS is full and every other cell empty, at 1280 by 720: with nothing selected, a click on `clue-next` selects `0,0,1` (NAVAL, TAMIS being finished) on its first unfilled cell (spec 009's `Tab`), sends `select_cell`, and `clue-bar` has `data-word="0,0,1"`; a second click selects `0,2,0`; a click on `clue-prev` selects `0,0,1` again. After a tap on the clue cell (2, 0) (VIDE; the grid has the focus), a `page.mouse.click` on `clue-next` selects AMEN on (3, 1) and leaves `document.activeElement` on the `grid`, and the key `I` then shows `I` in (3, 1). Keyboard only: `tab_to` `clue-next` and `Enter` move the selection and leave the focus on `clue-next`.
 - **AC-25** (new; refines spec 022 AC-5's picker place and AC-4's look) (browser with mocked socket) The picker floats over the bottom of the grid, and a shown reaction is a pill over its clue. At 360 by 740 and 1280 by 720, after a tap on the clue cell (0, 3) and a click on `react-button`: `reaction-picker` is centred on `grid-viewport` (its centre x within 1 px of the viewport's), its bottom 8 px above the viewport's bottom (1 px), `z-index` 9, background rgb(255, 255, 255), a `1px` `solid` rgb(221, 226, 234) border, `border-radius` `24px`, padding `5px`; each `reaction-option` is 40 by 40 px with `border-radius` `20px`, a background alpha 0 and `font-size` 22 px, and after `page.hover` on the first, its background is rgb(230, 237, 249); `react-button` has `aria-expanded="true"` and a background rgb(255, 255, 255); a second click closes the picker. When the mock sends a `reaction` of `p2` with `clap` on IDES (0, 3, 0), the `clue-reaction` has `background-color` rgb(255, 255, 255), a `1px` `solid` rgb(221, 226, 234) border, `border-radius` `12px`, padding `2px 6px`, `font-size` 16 px, `line-height` 19.2 px, `z-index` 8, its centre within 1 px of the centre of the `clue` element of IDES, and `elementFromPoint` at its centre returns it; a `reaction` on NAVAL (0, 0, 1) shows its pill centred on the lower `clue` element of (0, 0).
 - **AC-26** (new) (browser with mocked socket) Others' actions show as a 3-second note while the stream is not shown. At 360 by 740 (Salon closed) on a FX-01 snapshot: `chat_message` seq 6 from `p2` with `IDES ?` shows within 300 ms one `room-note` reading `Bob : IDES ?` (built from `fr.json["note.message"]`), with spec 041's `nock-note` look, `aria-hidden="true"`, `tabindex="-1"`, its centre x within 1 px of `grid-viewport`'s, its top 8 px below the viewport's top (1 px), `z-index` 6, and `grid-viewport`'s box unchanged (1 px). It still shows 2,700 ms after it appeared, has `data-off` and `opacity` 0 by 3,400 ms, and is gone by 3,700 ms. A `reveal_result` seq 7 by `p2` (scope letter) shows the note `Bob a révélé une lettre` whose first child has the pictogram `content` `"▲"`; a `flag_changed` seq 8 by `p2` on IDES, 1,000 ms later, replaces it at once by `Bob bloque sur « Fatales à César »` with the flag icon first. A `check_result` by `p1` and a `chat_message` of `p1` make no note; a `check_result` by `p2` makes one; a `reaction` of `p1` with `wow` makes `Vous avez réagi : 😮`; a `reaction` of `p2` makes none. A click on a shown note opens the Salon on `salon-tab-discussion` and removes the note. With the Salon open on Discussion, a `chat_message` from `p2` makes no note. While the mock's `vote_opened` (by `p2`, a grid check) keeps `vote-banner` on the page, two `chat_message` from `p2` (`un`, `deux`) make no note; once the banner has gone (after `vote_closed` and spec 025's result time), one note `Bob : deux` shows. Under `page.emulate_media(reduced_motion="reduce")` the note's `transition-duration` is `0s`. A click on `undo-button` answered by `error` `nothing_to_undo` shows `undo-message` (`role="status"`, `fr.json["undo.nothing"]`) with the note's look and place, also with the Salon open on Discussion.
-- **AC-27** (new; refines spec 026 AC-10 and spec 028 AC-7) (browser with mocked socket) The completion status is a band under the clue bar, except in the phone row, and holds « Voir le bilan ». On a FX-01 snapshot whose 18 cells hold their solution and `solved` true, at 1280 by 720 and 360 by 740: `grid-status` (`data-state="solved"`) has its top on `clue-bar`'s bottom and its left and right on the bar's (1 px), `background-color` rgb(230, 242, 234), padding `8px 12px`, its text `fr.json["completion.solved"]` in rgb(30, 123, 69), weight 600, `font-size` 15.2 px, after a pictogram whose `content` is `"✓"`; `recap-open` is inside it, after its text, its right edge on the band's content right edge (1 px), with the primary button's colours, padding `7px 12px` and `font-size` 13.6 px; a click on it opens `recap` (spec 028). On a full and wrong grid (`grid_full_wrong`), `grid-status` (`data-state="full_wrong"`) has `background-color` rgb(238, 242, 248), text colour rgb(27, 47, 85), and no `recap-open`. At 568 by 320 in the touch context (sheet layout), the solved `grid-status` lies inside `clue-bar`'s box, right of `clue-bar-text` and left of `react-button`, its text colour rgb(255, 255, 255), and `recap-open` has the secondary button's colours; at 568 by 320 in the desktop context (column layout), `grid-status` is under the bar.
-- **AC-28** (new) (browser with mocked socket) Everything stays inside the window and the grid keeps its room, whatever is open. With `H8`, at each window size of spec 006 AC-5, in desktop and touch contexts, in four states (all closed, the column layout's Salon closed by a click on `chat-toggle`; the Salon open on Discussion; `aide-menu` open; `room-menu` open): spec 013 AC-6's checks hold (`grid-viewport` at least 100 px high, no vertical or horizontal page scroll, the grid inside the viewport at zoom 1, `clue-bar` inside the window and, in the touch context, at or above the top of `keyboard`); `room-topbar`, `clue-bar` and, when open, the popover and the Salon lie inside the window (1 px); `elementFromPoint` at the centre of each top-bar button and each clue-bar button returns it, except where the open Salon sheet covers the clue bar (sheet layout); at the centre of each item of an open popover, after `scrollIntoView({block: "nearest"})` of the item, it returns that item; `grid-viewport`'s box is the same in the four states in the sheet layout (1 px); and the timer's text `10:00:00` is on one line. On the same page, with the Salon open in the column layout, the `grid` box is the same before and after the mock sends 3 more line events (1 px).
+- **AC-27** (new; refines spec 026 AC-10 and spec 028 AC-7) (browser with mocked socket) The completion status is a band under the clue bar, except in the phone row, and holds « Voir le bilan ». On a FX-01 snapshot whose 18 cells hold their solution and `solved` true, at 1280 by 720 and 360 by 740: `grid-status` (`data-state="solved"`) has its top on `clue-bar`'s bottom and its left and right on the bar's (1 px), `background-color` rgb(230, 242, 234), padding `8px 12px`, its text `fr.json["completion.solved"]` in rgb(30, 123, 69), weight 600, `font-size` 15.2 px, after a pictogram whose `content` is `"✓"`; `recap-open` is inside it, after its text, its right edge on the band's content right edge (1 px), with the primary button's colours, padding `7px 12px` and `font-size` 13.6 px; a click on it opens `recap` (spec 028). On a full and wrong grid (`grid_full_wrong`), `grid-status` (`data-state="full_wrong"`) has `background-color` rgb(238, 242, 248), text colour rgb(27, 47, 85), and no `recap-open`. At 568 by 320 in the touch context, the solved page has no `keyboard` and `data-layout="column"` (spec 044), and `grid-status` is under the bar with the primary `recap-open`; on the full-and-wrong snapshot there (sheet layout, the keyboard shown), `grid-status` lies inside `clue-bar`'s box, right of `clue-bar-text` and left of `react-button`, its text colour rgb(255, 255, 255), with no `recap-open`; at 568 by 320 in the desktop context (column layout), `grid-status` is under the bar. (Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard; this read "At 568 by 320 in the touch context (sheet layout), the solved `grid-status` lies inside `clue-bar`'s box, right of `clue-bar-text` and left of `react-button`, its text colour rgb(255, 255, 255), and `recap-open` has the secondary button's colours".)
+- **AC-28** (new) (browser with mocked socket) Everything stays inside the window and the grid keeps its room, whatever is open. With `H8`, at each window size of spec 006 AC-5, in desktop and touch contexts, in four states (all closed, the column layout's Salon closed by a click on `chat-toggle`; the Salon open on Discussion; `aide-menu` open; `room-menu` open): spec 013 AC-6's checks hold (`grid-viewport` at least 100 px high, no vertical or horizontal page scroll, the grid inside the viewport at zoom 1, `clue-bar` inside the window and, in the touch context, at or above the top of `keyboard`); `room-topbar`, `clue-bar` and, when open, the popover and the Salon lie inside the window (1 px); `elementFromPoint` at the centre of each top-bar button and each clue-bar button returns it, except where the open Salon sheet covers the clue bar (sheet layout); at the centre of each item of an open popover, after `scrollIntoView({block: "nearest"})` of the item, it returns that item; `grid-viewport`'s box is the same in the four states in the sheet layout (1 px); and the timer's text `10:00:00` is on one line. On the same page, with the Salon open in the column layout, the `grid` box is the same before and after the mock sends 3 more line events (1 px). At 568 by 320 and 740 by 360, in the desktop context and in the touch context with `nock.keyboard_hidden` seeded `"true"` (spec 044's column layout), `room-topbar` is the phone top bar (54 px high, no `topbar-brand` shown) and the checks above hold in the four states. (Note from the lead, 2026-10-22: added, the lead's decision recorded as spec 044's Decision 8; with the computer top bar these windows were narrower than the bar.)
 - **AC-29** (new; refines spec 035 AC-3's order) (browser with mocked socket, keyboard only after the setup) The page reads in the design's order and every control shows its ring. At 1280 by 720 on a FX-01 snapshot with `you` host, the focusable elements that show come in this document order: `undo-button`, `pencil-toggle`, `aide-button`, `chat-toggle`, `menu-button`, the `grid`, `clue-prev`, `react-button`, `flag-button`, `clue-next`, then the Salon's `salon-tab-discussion` and its later controls. With the grid focused and (1, 0) selected, `Escape` then `Tab` puts the focus on `clue-prev` with the selection unchanged; `Escape` then `Shift+Tab` from the grid puts it on `menu-button`. Each top-bar button reached by `tab_to` has a `2px` `solid` rgb(27, 47, 85) outline with `outline-offset` `2px`, inside the window; each clue-bar button the white ring of AC-23. At 360 by 740 the order is `undo-button`, `aide-button`, `chat-toggle`, `pencil-toggle`, `menu-button`, the `grid`, then the clue bar's four buttons.
 - **AC-30** (new; extends spec 042's swatch rule to the stream) (browser with mocked socket) The Accessibilité mode shows each player's icon wherever a dot shows. On a FX-01 snapshot with `p2` (colour 1) and `p3` (colour 2) and `chat` lines of `p2` and `p3`, at 1280 by 720, after `open_menu` and a click on `access-switch`: each `chat-dot` and each `roster-colour` has a background alpha 0 and holds one `player-icon`, 12 by 12 px (0.5 px), with `data-icon` equal to its `data-colour` and the shapes of `PLAYER_ICONS[N]` (spec 042 AC-11); after a second click they hold none and have their player colours again.
 - **AC-31** (new) (browser with mocked socket; static) The new room passes spec 035's scans, and `fr.json` holds the keys of this spec. At 1280 by 720 and 360 by 740, in these states of `H8` with `p2`'s flag on IDES, (1, 1) holding `X` wrong and a `clap` reaction of `p2` shown on IDES: all closed; the Salon on Discussion; the Salon on Joueurs; `aide-menu` open; `room-menu` open; `host-settings` open; a `room-note` shown; `connection-banner` shown; and `grid-status` solved (on the solved snapshot of AC-27), spec 035's contrast scan (its AC-8) and language scan (its AC-9, with the nicknames, the chat texts and the clue texts as test data) find no offending element. Static: `web/src/i18n/fr.json` holds every key of "New" and "Changed values" with those values, and none of the keys of "Removed".
@@ -868,7 +914,11 @@ The words in brackets say how each criterion is tested.
 - Completion in the phone row (AC-27): on a sheet layout at most 500 px high, the
   status and « Voir le bilan » share the clue bar's row, so they take no height
   from the grid while the in-app keyboard shows (spec 026 decision of 2026-10-15);
-  step 4's « Clavier » and step 5's band remove this case.
+  step 4's « Clavier » and step 5's band remove this case. (Note from the lead,
+  2026-10-22: refined by spec 044, the design's keyboard: the row is kept only
+  while the keyboard shows on a low window, so only a full-but-wrong status uses
+  it; a solved page has no keyboard, and on a phone held sideways it is the column
+  layout with the band.)
 - Top bar at 283 px (AC-4): the five buttons shrink to about 44 px; below 296 px
   with the timer at `10:00:00` they would reach their 40 px minimum and the timer
   may push them past the right edge. The test sizes start at 320 px for the long
@@ -888,7 +938,9 @@ Dependencies on later steps, which this step leaves as they are:
   phone held sideways keeps the sheet layout in this step), the ✎ and ⇄ keys, the
   key geometry and colours of `_design.md` section 8. Until then `pencil-toggle`
   sits in the phone top bar (Decision 6) and the in-app keyboard keeps spec 009's
-  look.
+  look. (Note from the lead, 2026-10-22: spec 044, the design's keyboard, does all
+  of this, and also hides the in-app keyboard once the grid is solved, which the
+  next item gave to step 5.)
 - Step 5: the Auteurs mode (its inks, its legend, its persistence; `authors-switch`
   is moved, not changed, and `clue-bar-author` stays in the clue bar until then),
   the vote banner's look (spec 025), hiding the in-app keyboard once solved and the
@@ -974,7 +1026,9 @@ Proposed by the spec writer, each already part of the spec above:
    line of its own to stay readable at 340 px.
 6. « Crayon » takes the phone top bar's fourth slot until step 4 puts « Clavier »
    there and the ✎ key on the keyboard (Open question 5), so a touch player keeps
-   the pencil mode in this step.
+   the pencil mode in this step. (Note from the lead, 2026-10-22: spec 044, the
+   design's keyboard, does it on touch screens; off a touch screen, where there is
+   no keyboard to hide, « Crayon » keeps the fourth slot.)
 7. The Aide button stays in help mode `none` (Open question 4); its menu then holds
    the pencil confirm or a muted line.
 8. Aide items have no `aria-label`: their names are their visible texts, inside a
@@ -984,7 +1038,9 @@ Proposed by the spec writer, each already part of the spec above:
 9. The completion status keeps spec 026's in-row place only in the phone layout of a
    low window, where the in-app keyboard leaves no height for a band (Open question
    8); everywhere else it is the design's band, and « Voir le bilan » moves into it
-   now, since the toolbar it lived in goes.
+   now, since the toolbar it lived in goes. (Note from the lead, 2026-10-22: refined
+   by spec 044, the design's keyboard: the row is used only while the keyboard
+   shows on a low window, never on a solved page.)
 10. `react-button` is disabled while the vote banner shows (Open question 9): the
     picker and the banner sit over the same viewport and could meet on a short grid
     area.
@@ -1011,7 +1067,9 @@ The pick of each is already in the spec above; the human may change it at approv
    or kept with the pencil confirm and a muted line. Pick: kept (Decision 7).
 5. The pencil toggle on touch screens before step 4. Options: « Crayon » in the
    phone top bar's fourth slot; or no pencil mode on touch screens until step 4.
-   Pick: the fourth slot (Decision 6).
+   Pick: the fourth slot (Decision 6). (Note from the lead, 2026-10-22: spec 044
+   settles what follows step 4: « Clavier » on touch screens, « Crayon » kept off
+   them; its Open question 2.)
 6. The grid name « Grille n° N · Force F » of the computer top bar. The client knows
    the grid number only for rooms started on this device (spec 010's room record)
    and never the force. Options: leave it out in this step; show « Grille n° N »
@@ -1023,7 +1081,9 @@ The pick of each is already in the spec above; the human may change it at approv
    the clue bar now (the grid then falls under spec 013 AC-6's 100 px at 568 by 320
    with the in-app keyboard); or spec 026's place in the clue bar's row there until
    step 4 can hide the keyboard. Pick: the row there, the band elsewhere (Decision
-   9).
+   9). (Note from the lead, 2026-10-22: spec 044 keeps the row only while the
+   keyboard shows on a low window; a solved page has no keyboard, so its status is
+   always the band.)
 9. Reactions during a vote. Options: `react-button` disabled while the banner shows;
    the picker drawn under the banner (against the design's layers). Pick: disabled
    (Decision 10).

@@ -588,7 +588,10 @@ Top to bottom, filling the window, nothing scrolls:
    `margin-right: auto`, then five buttons 56 px wide and the bar's full height:
    Annuler, Aide, Salon, Clavier, Menu. Each holds its 22 px icon over its label
    (gap 2 px), navy, radius 6 px. Pressed (Aide, Salon, Menu while open; Clavier
-   while the keyboard shows): word-blue background.
+   while the keyboard shows): word-blue background. (Note from the spec writer,
+   2026-10-22: spec 044 proposes, pending the human's approval, that « Clavier »
+   takes this slot on touch screens only; on a narrow window that is not a touch
+   screen, which has no in-app keyboard, the slot holds « Crayon » (section 15).)
    - Unread badge on Salon (messages): top 5 px, right 8 px (section 11).
    - New events and no unread message: an 8 px red dot on Salon, top 8 px, right
      15 px.
@@ -623,10 +626,17 @@ Top to bottom, filling the window, nothing scrolls:
      ⌫ (decided by the human on 2026-10-16).
    - « Clavier » hides and shows the keyboard; the choice is remembered per
      browser. The grid takes the space back.
+   - (Note from the spec writer, 2026-10-22: spec 044 proposes, pending the
+     human's approval, keys 28 px high on a window at most 500 px high, so that a
+     phone held sideways keeps 100 px of grid with the keyboard shown (section
+     15). Once the grid is solved the keyboard goes away (section 9) and
+     « Clavier » is disabled.)
 
 ### Computer and landscape tablet (column layout)
 
-1. Top bar, 56 px high, white, 1 px line-grey bottom border, padding 0 16 px, gap
+1. (Note from the lead, 2026-10-22: on a window at most 500 px high the column
+   layout has the phone top bar of the section above instead; spec 044 Decision 8,
+   section 15.) Top bar, 56 px high, white, 1 px line-grey bottom border, padding 0 16 px, gap
    4 px, items centred vertically, in this order: the Nock mark and « Nock »
    (gap 8 px); the grid name « Grille n° N · Force F » (14 px left margin, then
    `margin-right: auto`); the timer (10 px right margin), or « Chrono » while the
@@ -1002,7 +1012,10 @@ Auteurs mode, catalogue, overlays, remaining screens. (Note from the spec writer
 014, 019, 020, 021, 022, 023, 024, 025, 026, 027, 028, 033, 035 and 042 that it
 changes, and notes 007, 010, 012, 017, 018, 034 and 040. It also takes, from step 5, the
 end band's look and « Voir le bilan » in it, since the toolbar that held that
-button goes.)
+button goes.) (Note from the spec writer, 2026-10-22: 044 keyboard written; its
+"Refined specs" table lists the criteria of 020, 026 and 043 that it changes, and
+notes 009 and 035. It also takes, from step 5, hiding the in-app keyboard once the
+grid is solved.)
 
 ## 13. How conformance is secured
 
@@ -1138,11 +1151,34 @@ when approving that spec.)
 - « Aide » stays in help mode `none`, holding the pencil confirm or a muted line
   (section 12's "to confirm"; spec 043 Open question 4).
 - Until step 4, « Crayon » takes the phone top bar's fourth slot, where
-  « Clavier » goes (spec 043 Open question 5).
+  « Clavier » goes (spec 043 Open question 5). (Note from the spec writer,
+  2026-10-22: spec 044 is step 4; see the list below.)
 - The computer top bar shows no grid name until the client knows the grid's number
   and force (spec 043 Open question 6).
 - The clue bar in the column layout is never narrower than the smaller of 320 px
   and the play area (spec 043 Decision 12).
+
+### Proposed by spec 044, pending the human's approval
+
+(Note from the spec writer, 2026-10-22: this list is new. Each item is the pick of
+an open question of spec 044, the keyboard.)
+
+- Keys 28 px high instead of 44 px on a window at most 500 px high (section 8; spec
+  044 Open question 1): with 44 px keys a phone held sideways keeps about 58 px of
+  grid at 568 by 320, below spec 013 AC-6's 100 px.
+- « Clavier » on touch screens only; on a narrow window without touch the phone top
+  bar's fourth slot holds « Crayon » (section 8; spec 044 Open question 2).
+- A phone held sideways goes to the column layout when the grid is solved, since
+  the keyboard goes away (section 8, "Which layout"; spec 044 Open question 3).
+- « Clavier » is disabled once the grid is solved (spec 044 Open question 4).
+- The ⇄ key is named « Changer de sens » (spec 044 Open question 5).
+
+(Note from the lead, 2026-10-22: decided by the lead, spec 043 being a draft: in
+the column layout on a window at most 500 px high the top bar is the phone top bar
+(54 px, icons over labels, the phone's slots and order), since the computer top bar
+is wider than those windows (568 to 740 px). Spec 044 Decision 8; spec 043 is
+refined. Section 8's "Computer and landscape tablet" top bar applies only to a
+column layout more than 500 px high.)
 
 ### Deferred, high importance
 

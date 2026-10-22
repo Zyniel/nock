@@ -130,6 +130,13 @@ focus stays on the grid. This spec adds the following:
 - If a key gets the focus anyway (a screen reader can move the focus there), it
   shows the visible focus of "Visible focus and non-colour signals" (AC-2's
   outline).
+- (Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard: the
+  keyboard also holds the ✎ key `key-pencil` (named `fr.json["pencil.toggle"]`,
+  with `aria-pressed`) and the ⇄ key `key-swap` (named `fr.json["keyboard.swap"]`),
+  which follow the rules above; spec 044 AC-8 tests them. The keyboard is absent
+  while the player hid it with « Clavier » or once the grid is solved. AC-10 holds
+  as written for the 26 letter keys and `key-delete`, so no criterion of this spec
+  changes.)
 
 ### Scrolling lists (AC-12)
 

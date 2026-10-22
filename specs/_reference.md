@@ -103,9 +103,11 @@ the specs whose criteria this one mentions.
 | [041](041-visual-foundation.md) | Visual foundation (design tokens, player colours, fonts, icons, styling primitives; no backlog story, `_design.md` step 1) | E10 | MVP | 21 | 004, 005, 006, 007, 012, 013, 014, 016, 017, 019, 020, 021, 022, 024, 025, 027, 028, 033, 035, 038, 040 |
 | [042](042-grid-cells.md) | Grid cells (grid lines, backgrounds, letters, revealed notch, catch-up ring, corner triangles and Accessibilité icons, clue cells, flag, arrows in letter cells; no backlog story, `_design.md` step 2) | E10 | MVP | 20 | 003, 006, 007, 012, 013, 016, 017, 019, 020, 021, 022, 023, 024, 033, 034, 035, 039, 040, 041 |
 | [043](043-room-layout.md) | Room layout (top bar, sheet and column layouts, Aide menu and Menu, Salon with its stream and Joueurs list, room sheets, navy clue bar, reactions, 3-second notes, connection band; no backlog story, `_design.md` step 3) | E10 | MVP | 31 | 006, 007, 009, 010, 011, 012, 013, 014, 016, 017, 018, 019, 020, 021, 022, 023, 024, 025, 026, 027, 028, 033, 034, 035, 040, 041, 042 |
+| [044](044-keyboard.md) | Keyboard (« Clavier » in the top bar, the in-app keyboard's look, ✎ and ⇄ keys, keyboard gone once solved; no backlog story, `_design.md` step 4) | E10 | MVP | 11 | 006, 007, 008, 009, 013, 017, 020, 024, 026, 035, 041, 042, 043 |
 
 (Note from the spec writer, 2026-10-22: the row of spec 042 was added, a draft.)
 (Note from the spec writer, 2026-10-22: the row of spec 043 was added, a draft.)
+(Note from the spec writer, 2026-10-22: the row of spec 044 was added, a draft.)
 
 (Note from the lead, 2026-10-16: spec 012's row read 7 criteria and referred to no
 spec; its AC-8, added for nicknames in capitals, names specs 019 and 022 (human's
