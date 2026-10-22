@@ -70,6 +70,7 @@ from nock.protocol import (
 from nock.room import Outcome, RoomConfig, RoomState, handle_message
 from nock.server import create_app
 from nock.store import RoomStore
+from room_panels import show_tab
 from spec021_harness import clue_at
 from spec024_harness import (
     NOW,
@@ -361,12 +362,22 @@ def reaction_frame(player_id: str, clue: ClueRef, reaction: Reaction) -> str:
 
 
 def open_panel(page: Page, touch: bool = False) -> None:
-    """Click (or tap) `chat-toggle` and wait until `chat-panel` shows."""
-    toggle = page.get_by_test_id("chat-toggle")
-    if touch:
-        toggle.tap()
-    else:
-        toggle.click()
+    """Show the Salon's Discussion tab and put the focus in `chat-input`.
+
+    Refined by spec 043 (the design's room layout): "opens the chat panel with
+    `chat-toggle`" reads spec 043's `show_tab(page, "discussion")`, which clicks
+    `chat-toggle` only while the Salon is closed (the column layout opens it at
+    load). In a touch context the toggle is tapped. Opening the Salon with
+    `chat-toggle` puts the focus in `chat-input`; when the page opened it at load,
+    the test puts it there itself, as the player would with a tap in the field.
+    """
+    salon = page.get_by_test_id("salon")
+    if touch and salon.get_attribute("hidden") is not None:
+        page.get_by_test_id("chat-toggle").tap()
+    show_tab(page, "discussion")
+    field = page.get_by_test_id("chat-input")
+    if field.is_enabled():
+        field.focus()
     expect(page.get_by_test_id("chat-panel")).to_be_visible()
 
 
@@ -481,46 +492,6 @@ def remaining_ms(deadline: float) -> float:
 
 
 # Where a popover (`chat-panel`, `reaction-picker`) sits in the document: inside
-# `room-toolbar` or not, after it or not, and which of the roster, the feed and
-# the grid it does not come before.
-POPOVER_PLACE_SCRIPT = r"""
-testId => {
-  const element = document.querySelector(`[data-testid="${testId}"]`);
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  if (element === null || toolbar === null) {
-    return null;
-  }
-  const follows = (first, second) => Boolean(
-    first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
-  );
-  const notBefore = [];
-  for (const id of ['roster', 'activity-feed', 'grid']) {
-    const other = document.querySelector(`[data-testid="${id}"]`);
-    if (other === null || !follows(element, other)) {
-      notBefore.push(id);
-    }
-  }
-  return {
-    insideToolbar: toolbar.contains(element),
-    afterToolbar: follows(toolbar, element),
-    notBefore: notBefore,
-  };
-}
-"""
-
-# A popover outside the toolbar, after it, before the roster, the feed and the grid.
-POPOVER_PLACE: dict[str, object] = {
-    "insideToolbar": False,
-    "afterToolbar": True,
-    "notBefore": [],
-}
-
-
-def popover_place(page: Page, test_id: str) -> object:
-    """Where `chat-panel` or `reaction-picker` sits in the document order."""
-    return page.evaluate(POPOVER_PLACE_SCRIPT, test_id)
-
-
 # ---- A clue's reaction ----
 
 REACTION_SCRIPT = r"""

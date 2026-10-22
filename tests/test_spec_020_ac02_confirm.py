@@ -8,6 +8,12 @@ confirmation of my own pending pencil letter, and a cell locked over it. The
 confirmer becomes the author (decision 1); a cell without a pencil letter is
 refused `stale_edit` (decision 2); the page's `seq` goes in `base_seq` (decision
 3). The shared setup is in `spec020_harness` and `spec024_harness`.
+
+Refined by spec 043 (the design's room layout): `confirm-pencil` is the first item
+of the Aide menu, present only while the selected cell shows a pencil letter, is
+not locked and the grid is not solved (it was disabled otherwise), with the text
+`fr.json["pencil.confirm"]` (« Confirmer la lettre au crayon ») and no
+`aria-label`. The harness's `click_confirm` opens the Aide menu first.
 """
 
 from __future__ import annotations
@@ -72,8 +78,7 @@ from spec024_harness import (
     write,
 )
 
-CONFIRM_TEXT = "Confirmer"  # `pencil.confirm` in "New fr.json keys"
-CONFIRM_LABEL = "Confirmer la lettre au crayon"  # `pencil.confirm_label`
+CONFIRM_TEXT = "Confirmer la lettre au crayon"  # `pencil.confirm`, spec 043
 WORD_W1 = "0,0,0"
 
 # (1, 0) holds a pencil `T` by `p2` (AC-2's mocked snapshot, seq 5).
@@ -235,25 +240,26 @@ def test_ac2_of_two_confirmations_at_once_the_second_is_refused_stale_edit(
 # ---- AC-2, page with a mocked socket ----
 
 
-def test_ac2_page_confirm_pencil_is_a_button_enabled_only_on_a_selected_pencil_letter(
+def test_ac2_page_confirm_pencil_is_a_button_present_only_on_a_selected_pencil_letter(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid, changes=PENCIL_T_BY_P2)
     button = confirm_button(page)
+
+    expect(button).to_have_count(0)
+    tap(page, 1, 1)
+    expect_selected_cell(page, 1, 1)
+    expect(button).to_have_count(0)
+    tap(page, 1, 0)
+    expect_selected_cell(page, 1, 0)
+    expect(button).to_have_count(1)
+    expect(button).to_be_enabled()
+
     expect(button).to_have_text(CONFIRM_TEXT)
-    expect(button).to_have_attribute("aria-label", CONFIRM_LABEL)
+    assert button.get_attribute("aria-label") is None
     kind = button.evaluate(
         "el => [el.tagName, el.getAttribute('type')]", timeout=WAIT_TIMEOUT_MS
     )
-
-    expect(button).to_be_disabled()
-    tap(page, 1, 1)
-    expect_selected_cell(page, 1, 1)
-    expect(button).to_be_disabled()
-    tap(page, 1, 0)
-    expect_selected_cell(page, 1, 0)
-    expect(button).to_be_enabled()
-
     assert kind == ["BUTTON", "button"]
 
 
@@ -344,7 +350,7 @@ def test_ac2_page_confirm_pencil_is_enabled_on_my_pending_pencil_letter(
     ]
 
 
-def test_ac2_page_confirm_pencil_is_disabled_on_a_cell_locked_over_my_pencil_letter(
+def test_ac2_page_confirm_pencil_is_absent_on_a_cell_locked_over_my_pencil_letter(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_room(page, live_server, fx01_grid)
@@ -361,7 +367,7 @@ def test_ac2_page_confirm_pencil_is_disabled_on_a_cell_locked_over_my_pencil_let
 
     expect_selected_cell(page, 1, 0)
     expect(cell_at(page, 1, 0)).to_have_attribute("data-locked", "true")
-    expect(confirm_button(page)).to_be_disabled()
+    expect(confirm_button(page)).to_have_count(0)
 
 
 def test_ac2_page_another_player_confirming_my_pencil_letter_makes_it_flash(

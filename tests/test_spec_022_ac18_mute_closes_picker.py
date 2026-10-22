@@ -16,6 +16,11 @@ opened (the state is the one the criterion describes: panel open, VIDE selected,
 picker open, its first option focused), so that the tap cannot depend on where the
 panel is drawn on a narrow window.
 
+Refined by spec 043 (the design's room layout): the second picker run is at 1280
+by 720 only (the column layout, where the Salon and the picker may be open
+together; in the sheet layout the picker closes the Salon), with the Salon open on
+its Discussion tab, and checks `salon`'s box where it checked `chat-panel`'s.
+
 Timing: the 300 ms are the criterion's and are counted on the test's side. The
 checks of a case pass within about 10 to 100 ms of the mute on a busy machine, but a
 heavier load can break the bound: the file is a candidate for the gate's serial
@@ -63,7 +68,7 @@ ACTIVE_SCRIPT = r"""
 """
 PANEL_BOX_SCRIPT = r"""
 () => {
-  const panel = document.querySelector('[data-testid="chat-panel"]');
+  const panel = document.querySelector('[data-testid="salon"]');
   if (panel === null) {
     return null;
   }
@@ -169,17 +174,14 @@ def test_ac18_browser_a_mute_closes_the_picker_and_focuses_the_grid(
         close()
 
 
-@pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids())
-def test_ac18_browser_a_mute_closes_the_picker_and_keeps_the_open_panel(
+def test_ac18_browser_a_mute_closes_the_picker_and_keeps_the_open_salon(
     browser: Browser,
     browser_name: str,
     live_server: str,
     fx01_grid: Grid,
-    width: int,
-    height: int,
 ) -> None:
     page, mock, close = open_room_where_you_are_not_host(
-        browser, browser_name, live_server, fx01_grid, width, height
+        browser, browser_name, live_server, fx01_grid, 1280, 720
     )
     try:
         select_word(page, VIDE)
@@ -194,8 +196,8 @@ def test_ac18_browser_a_mute_closes_the_picker_and_keeps_the_open_panel(
         deadline = send_mute(mock)
         expect_picker_closed_by_the_mute(page, mock, deadline)
         expect_focus_on(page, "grid", deadline)
-        panel = page.get_by_test_id("chat-panel")
-        expect(panel).to_have_count(1, timeout=remaining_ms(deadline))
+        salon = page.get_by_test_id("salon")
+        expect(salon).to_be_visible(timeout=remaining_ms(deadline))
         panel_after = page.evaluate(PANEL_BOX_SCRIPT)
     finally:
         close()

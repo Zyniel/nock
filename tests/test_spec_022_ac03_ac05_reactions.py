@@ -7,12 +7,19 @@ reaction whose clue names no word is dropped, and an idle sender is still woken,
 the lead's note of 2026-10-15) is tested on `handle_message`; its page part runs
 with a mocked socket, where an in-page probe reads the reaction at every animation
 frame and times its life with `performance.now()`. AC-5 checks the button and the
-picker with a mocked socket. The order in the toolbar is relative (spec 024
-AC-8). "Sends nothing" and "exactly one frame" leave the heartbeat `ping` frames
-aside (the lead's note of 2026-10-15). AC-5's last step opens the panel, then the
-picker, and checks their document order with both open (decision 15); after
-`Escape` in the picker, the test waits SETTLE_MS before it checks that the panel
-is still there, so that a panel closing with a transition is not missed.
+picker with a mocked socket. "Sends nothing" and "exactly one frame" leave the
+heartbeat `ping` frames aside (the lead's note of 2026-10-15). AC-5's last step
+opens the panel, then the picker, and checks their document order with both open
+(decision 15); after `Escape` in the picker, the test waits SETTLE_MS before it
+checks that the panel is still there, so that a panel closing with a transition is
+not missed.
+
+Refined by spec 043 (the design's room layout): `react-button` is in `clue-bar`,
+right after `clue-bar-text` and before `flag-button`, with no text (it read "inside
+`room-toolbar`, right after `flag-button` and before `authors-switch`, with the
+text `fr.json["reaction.button"]`"); the picker comes after `clue-bar` and before
+`salon`, over the bottom of `grid-viewport` (spec 043 AC-25: centred, 8 px above
+its bottom), and the last step runs with the Salon open on Discussion.
 
 The shared setup is in `spec022_harness`.
 """
@@ -46,7 +53,6 @@ from nock.store import RoomStore
 from spec021_harness import IDES, SENT, VIDE, clue_at, clue_key, select_word
 from spec022_harness import (
     LIVE_WITHIN_SECONDS,
-    POPOVER_PLACE,
     REACTION_VALUES,
     SETTLE_MS,
     WS_CONFIG,
@@ -58,7 +64,6 @@ from spec022_harness import (
     open_chat_room,
     open_panel,
     own_player_id,
-    popover_place,
     reaction_frame,
     reactions_on_page,
     read_reaction,
@@ -441,20 +446,45 @@ def test_ac4_browser_a_reaction_lasts_3_seconds_and_a_newer_one_replaces_it(
 
 # ---- AC-5: the reaction button and the picker ----
 
+# Spec 043: `react-button` is inside `clue-bar`, right after `clue-bar-text` and
+# before `flag-button` in document order.
 BUTTON_ORDER_SCRIPT = r"""
 () => {
   const byId = (id) => document.querySelector(`[data-testid="${id}"]`);
   const follows = (first, second) => Boolean(
     first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
   );
-  const toolbar = byId('room-toolbar');
+  const bar = byId('clue-bar');
   const button = byId('react-button');
+  const text = byId('clue-bar-text');
   const flag = byId('flag-button');
-  const authors = byId('authors-switch');
   return {
-    insideToolbar: toolbar !== null && button !== null && toolbar.contains(button),
-    afterFlag: flag !== null && button !== null && follows(flag, button),
-    beforeAuthors: authors !== null && button !== null && follows(button, authors),
+    insideClueBar: bar !== null && button !== null && bar.contains(button),
+    afterText: text !== null && button !== null && follows(text, button)
+      && !text.contains(button),
+    beforeFlag: flag !== null && button !== null && follows(button, flag),
+  };
+}
+"""
+# Spec 043: the picker comes after `clue-bar` and before `salon` in document
+# order, and its box, with the box of `grid-viewport`.
+PICKER_PLACE_SCRIPT = r"""
+() => {
+  const byId = (id) => document.querySelector(`[data-testid="${id}"]`);
+  const follows = (first, second) => Boolean(
+    first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING
+  );
+  const picker = byId('reaction-picker');
+  const bar = byId('clue-bar');
+  const salon = byId('salon');
+  const viewport = byId('grid-viewport').getBoundingClientRect();
+  const box = picker.getBoundingClientRect();
+  return {
+    afterClueBar: bar !== null && follows(bar, picker) && !bar.contains(picker),
+    beforeSalon: salon !== null && follows(picker, salon),
+    centreOffset: Math.abs((box.left + box.right) / 2
+      - (viewport.left + viewport.right) / 2),
+    bottomGap: viewport.bottom - box.bottom,
   };
 }
 """
@@ -477,7 +507,7 @@ OPTIONS_SCRIPT = r"""
 PICKER_BEFORE_PANEL_SCRIPT = r"""
 () => {
   const picker = document.querySelector('[data-testid="reaction-picker"]');
-  const panel = document.querySelector('[data-testid="chat-panel"]');
+  const panel = document.querySelector('[data-testid="salon"]');
   if (picker === null || panel === null) {
     return {picker: picker !== null, panel: panel !== null};
   }
@@ -511,7 +541,7 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(button).to_have_count(1)
     order = page.evaluate(BUTTON_ORDER_SCRIPT)
     expect(button).to_have_attribute("type", "button")
-    expect(button).to_have_text(fr["reaction.button"])
+    expect(button).to_have_text("")
     expect(button).to_have_attribute("aria-label", fr["reaction.button_label"])
     expect(button).to_have_attribute("aria-controls", "reaction-picker")
     expect(button).to_have_attribute("aria-expanded", "false")
@@ -528,7 +558,6 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(picker).to_have_attribute("aria-label", fr["reaction.picker_label"])
     options = page.evaluate(OPTIONS_SCRIPT)
     expect(page.get_by_test_id("reaction-option").first).to_be_focused()
-    place = popover_place(page, "reaction-picker")
 
     laugh = picker.locator('[data-reaction="laugh"]')
     frames = frames_after(page, mock, lambda: laugh.click())
@@ -548,7 +577,8 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(picker).to_have_count(0)
     expect(button).to_be_focused()
 
-    # Last: with VIDE still selected, the panel, then the picker (decision 15).
+    # Last: with VIDE still selected and the Salon open on Discussion (the column
+    # layout at 1280 by 720), the picker (decision 15).
     panel = page.get_by_test_id("chat-panel")
     open_panel(page)
     expect(page.get_by_test_id("grid")).to_have_attribute("data-word", clue_key(VIDE))
@@ -556,8 +586,7 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(picker).to_be_visible()
     expect(panel).to_be_visible()
     expect(page.get_by_test_id("reaction-option").first).to_be_focused()
-    picker_place_with_panel = popover_place(page, "reaction-picker")
-    panel_place_with_picker = popover_place(page, "chat-panel")
+    picker_place = page.evaluate(PICKER_PLACE_SCRIPT)
     pair_order = page.evaluate(PICKER_BEFORE_PANEL_SCRIPT)
     page.keyboard.press("Escape")
     expect(picker).to_have_count(0)
@@ -565,11 +594,12 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     page.wait_for_timeout(SETTLE_MS)
     expect(panel).to_be_visible()
 
-    assert order == {"insideToolbar": True, "afterFlag": True, "beforeAuthors": True}
+    assert order == {"insideClueBar": True, "afterText": True, "beforeFlag": True}
     assert options == expected_options()
-    assert place == POPOVER_PLACE
-    assert picker_place_with_panel == POPOVER_PLACE
-    assert panel_place_with_picker == POPOVER_PLACE
+    assert picker_place["afterClueBar"] is True, picker_place
+    assert picker_place["beforeSalon"] is True, picker_place
+    assert picker_place["centreOffset"] <= 1.0, picker_place
+    assert abs(picker_place["bottomGap"] - 8.0) <= 1.0, picker_place
     assert pair_order == PICKER_BEFORE_PANEL
     assert len(frames) == 1, frames
     parsed = parse_client_message(json.dumps(frames[0]))

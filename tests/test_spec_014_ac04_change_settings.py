@@ -26,6 +26,7 @@ from nock.protocol import (
     SettingsChanged,
 )
 from nock.room import RoomState, handle_message
+from room_panels import open_host_settings
 from spec014_harness import (
     FORM_TIMEOUT_MS,
     LOSS_BUDGET_MS,
@@ -307,6 +308,39 @@ def test_ac4_websocket_a_change_reaches_both_players_once_and_only_the_host_may(
 
 
 # ---- AC-4: browser ----------------------------------------------------------
+#
+# Refined by spec 043 (the design's room layout): the settings form is in the
+# host's settings sheet, which the tests open first with `open_host_settings`;
+# `help-mode-select` is a fieldset of three `help-mode-option` radios drawn as a
+# segmented control, so a mode is chosen with a click on its radio's label and read
+# as the checked radio; saving closes the sheet.
+
+CHECKED_MODE_SCRIPT = """
+() => {
+  const checked = document.querySelector('[data-testid="help-mode-option"]:checked');
+  return checked === null ? null : checked.value;
+}
+"""
+MODE_LABEL_BOX_SCRIPT = """
+mode => {
+  const selector = `[data-testid="help-mode-option"][value="${mode}"]`;
+  const box = document.querySelector(selector).labels[0].getBoundingClientRect();
+  return [box.left + box.width / 2, box.top + box.height / 2];
+}
+"""
+
+
+def choose_help_mode(page: Page, mode: str) -> None:
+    """Click the label of the help-mode radio of `mode`, at its centre."""
+    x, y = page.evaluate(MODE_LABEL_BOX_SCRIPT, mode)
+    page.mouse.click(x, y)
+    wait_until(page, lambda: page.evaluate(CHECKED_MODE_SCRIPT) == mode)
+
+
+def checked_help_mode(page: Page) -> str | None:
+    found = page.evaluate(CHECKED_MODE_SCRIPT)
+    assert found is None or isinstance(found, str)
+    return found
 
 
 def test_ac4_browser_the_host_changes_the_settings_and_both_feeds_say_so(
@@ -329,9 +363,8 @@ def test_ac4_browser_the_host_changes_the_settings_and_both_feeds_say_so(
             "Ana a modifié les réglages : aide par vote, 3 lettres et 0 mots à révéler"
         )
 
-        page.get_by_test_id("help-mode-select").select_option(
-            "vote", timeout=FORM_TIMEOUT_MS
-        )
+        open_host_settings(page)
+        choose_help_mode(page, "vote")
         page.get_by_test_id("reveal-letters-input").fill("3", timeout=FORM_TIMEOUT_MS)
         page.get_by_test_id("reveal-words-input").fill("0", timeout=FORM_TIMEOUT_MS)
         page.get_by_test_id("settings-save").click(timeout=FORM_TIMEOUT_MS)
@@ -348,6 +381,7 @@ def test_ac4_browser_the_host_changes_the_settings_and_both_feeds_say_so(
             locked=False,
         )
 
+        open_host_settings(page)
         page.get_by_test_id("settings-save").click(timeout=FORM_TIMEOUT_MS)
         settle(page)
 
@@ -376,25 +410,28 @@ def test_ac4_browser_the_form_lists_the_modes_and_limits_the_counts(
         remaining=RevealBudget(letters=1, words=0),
     )
 
+    open_host_settings(page)
     form = page.get_by_test_id("settings-form")
     select = page.get_by_test_id("help-mode-select")
     letters = page.get_by_test_id("reveal-letters-input")
     words = page.get_by_test_id("reveal-words-input")
-    expect(page.get_by_test_id("host-panel")).to_contain_text(fr["settings.heading"])
+    expect(page.get_by_test_id("host-settings")).to_contain_text(fr["settings.heading"])
     expect(select).to_have_accessible_name(fr["settings.help_mode_label"])
     expect(letters).to_have_accessible_name(fr["settings.reveal_letters_label"])
     expect(words).to_have_accessible_name(fr["settings.reveal_words_label"])
     expect(form.get_by_test_id("settings-save")).to_have_text(fr["settings.save"])
-    options = select.locator("option")
+    options = select.get_by_test_id("help-mode-option")
     expect(options).to_have_count(3)
     for index, mode in enumerate(["free", "vote", "none"]):
         expect(options.nth(index)).to_have_attribute("value", mode)
-        expect(options.nth(index)).to_have_text(fr[f"settings.help_mode.{mode}"])
+        expect(options.nth(index)).to_have_accessible_name(
+            fr[f"settings.help_mode.{mode}"]
+        )
     for number_input in (letters, words):
         expect(number_input).to_have_attribute("type", "number")
         expect(number_input).to_have_attribute("min", "0")
         expect(number_input).to_have_attribute("max", "99")
-    expect(select).to_have_value("vote")
+    assert checked_help_mode(page) == "vote"
     expect(letters).to_have_value("3")
     expect(words).to_have_value("2")
 
@@ -411,7 +448,7 @@ def test_ac4_browser_the_form_follows_a_settings_changed_event(
 
     room.connections[0].send(settings_frame(6, "p2", new_settings))
 
-    expect(page.get_by_test_id("help-mode-select")).to_have_value("none")
+    wait_until(page, lambda: checked_help_mode(page) == "none")
     expect(page.get_by_test_id("reveal-letters-input")).to_have_value("8")
     expect(page.get_by_test_id("reveal-words-input")).to_have_value("4")
 
@@ -422,9 +459,8 @@ def test_ac4_browser_submitting_sends_the_change_settings_message(
     room = joined_mock_room(page, live_server, fx01_grid, three_players())
     connection = room.connections[0]
 
-    page.get_by_test_id("help-mode-select").select_option(
-        "none", timeout=FORM_TIMEOUT_MS
-    )
+    open_host_settings(page)
+    choose_help_mode(page, "none")
     page.get_by_test_id("reveal-letters-input").fill("12", timeout=FORM_TIMEOUT_MS)
     page.get_by_test_id("reveal-words-input").fill("0", timeout=FORM_TIMEOUT_MS)
     page.get_by_test_id("settings-save").click(timeout=FORM_TIMEOUT_MS)
@@ -447,6 +483,7 @@ def test_ac4_browser_the_form_never_sends_a_count_out_of_its_bounds(
 ) -> None:
     room = joined_mock_room(page, live_server, fx01_grid, three_players())
     connection = room.connections[0]
+    open_host_settings(page)
     page.get_by_test_id("reveal-letters-input").fill(bad_value, timeout=FORM_TIMEOUT_MS)
 
     page.get_by_test_id("settings-save").click(timeout=FORM_TIMEOUT_MS)

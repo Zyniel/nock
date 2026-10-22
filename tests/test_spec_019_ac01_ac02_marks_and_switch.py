@@ -51,6 +51,7 @@ from spec019_harness import (
     player_joined_frame,
     player_left_frame,
     player_view,
+    press_authors_switch,
     room_page,
     snapshot_frame,
     swatch_colour,
@@ -208,7 +209,7 @@ def test_ac1_the_switch_on_marks_each_letter_in_its_authors_colour(
 ) -> None:
     open_ac1(page, live_server, fx01_grid)
 
-    authors_switch(page).click()
+    press_authors_switch(page)
 
     expect(authors_switch(page)).to_have_attribute("aria-pressed", "true")
     expect(page.get_by_test_id("author-mark")).to_have_count(4)
@@ -433,7 +434,7 @@ def test_ac1_the_switch_keeps_working_on_a_solved_grid(
     switch = authors_switch(page)
     expect(switch).to_be_enabled()
 
-    switch.click()
+    press_authors_switch(page)
 
     expect(switch).to_have_attribute("aria-pressed", "true")
     expect(page.get_by_test_id("author-mark")).to_have_count(18)
@@ -460,7 +461,7 @@ def test_ac1_live_each_mark_has_the_colour_of_its_authors_swatch(
             page, bob_page, f"{live_server}/r/{code}", enter_room
         )
 
-        authors_switch(page).click()
+        press_authors_switch(page)
 
         expect(authors_switch(page)).to_have_attribute("aria-pressed", "true")
         expect(marks_in(page, 1, 0)).to_have_count(1)
@@ -483,7 +484,7 @@ def test_ac2_the_switch_is_a_button_reading_auteurs_that_starts_off(
     assert switch.evaluate("el => el.tagName") == "BUTTON"
     expect(switch).to_have_attribute("type", "button")
     assert load_fr()["authors.switch"] == "Auteurs"
-    expect(switch).to_have_text("Auteurs")
+    expect(switch).to_have_accessible_name("Auteurs")
     expect(switch).to_have_attribute("aria-pressed", "false")
     expect(switch).to_be_enabled()
 
@@ -526,7 +527,7 @@ def test_ac2_each_click_flips_the_switch(
     switch = authors_switch(page)
 
     for expected in ["true", "false", "true"]:
-        switch.click()
+        press_authors_switch(page)
         expect(switch).to_have_attribute("aria-pressed", expected)
 
 

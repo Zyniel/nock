@@ -104,6 +104,7 @@ from nock.room import (
     new_room,
     tick,
 )
+from room_panels import open_host_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FR_JSON_PATH = PROJECT_ROOT / "web" / "src" / "i18n" / "fr.json"
@@ -888,9 +889,26 @@ def feed_lines(page: Page, kind: str) -> Locator:
     return page.get_by_test_id("activity-feed").locator(selector)
 
 
+# The centre of the label of the help-mode radio of a mode (spec 043: the
+# radios are drawn as a segmented control, so their labels take the click).
+MODE_LABEL_CENTRE_SCRIPT = """
+mode => {
+  const selector = `[data-testid="help-mode-option"][value="${mode}"]`;
+  const box = document.querySelector(selector).labels[0].getBoundingClientRect();
+  return [box.left + box.width / 2, box.top + box.height / 2];
+}
+"""
+
+
 def host_sets_help_mode(page: Page, help_mode: str) -> None:
-    """The host picks a help mode in spec 014's settings form and saves it."""
-    page.get_by_test_id("help-mode-select").select_option(
-        help_mode, timeout=WAIT_TIMEOUT_MS
-    )
+    """The host picks a help mode in spec 014's settings form and saves it.
+
+    Spec 043: the form is in the host's settings sheet, opened from the Menu, and
+    the mode is a radio of a segmented control, chosen with a click on its label.
+    """
+    open_host_settings(page)
+    x, y = page.evaluate(MODE_LABEL_CENTRE_SCRIPT, help_mode)
+    page.mouse.click(x, y)
+    checked = page.locator(f'[data-testid="help-mode-option"][value="{help_mode}"]')
+    expect(checked).to_be_checked(timeout=WAIT_TIMEOUT_MS)
     page.get_by_test_id("settings-save").click(timeout=WAIT_TIMEOUT_MS)

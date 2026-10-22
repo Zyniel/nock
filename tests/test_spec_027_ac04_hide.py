@@ -7,15 +7,23 @@ element is on the page; shown, the key is absent, and a key holding anything els
 counts as absent. The lead's note of 2026-10-15 applies: the heartbeat `ping`
 frames of spec 017 are not counted as frames the page sends. The shared setup is in
 `spec027_harness`.
+
+Refined by spec 043 (the design's room layout): the hide control is the room
+Menu's `timer-toggle` (opened with spec 043's `open_menu`), with no `aria-pressed`:
+its text says what it does (`fr.json["timer.hide"]`, or
+`fr.json["timer.toggle_label"]` while the timer is hidden); the show control is
+the top bar's `timer-show` (« Chrono »), which takes the timer's place while it is
+hidden.
 """
 
 from __future__ import annotations
 
 import pytest
-from playwright.sync_api import Browser, expect
+from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
-from spec024_harness import grid_from_text
+from room_panels import open_menu
+from spec024_harness import grid_from_text, load_fr
 from spec027_harness import (
     QUIET_MS,
     clock_seconds,
@@ -41,10 +49,42 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
+# ---- Helpers ----
+
+
+def hide_timer(page: Page) -> None:
+    """Hide the timer with the Menu's `timer-toggle` (spec 043)."""
+    open_menu(page)
+    page.get_by_test_id("timer-toggle").click()
+
+
+def show_timer(page: Page) -> None:
+    """Show the timer again with the top bar's `timer-show` (spec 043)."""
+    page.get_by_test_id("timer-show").click()
+
+
+def expect_shown(page: Page) -> None:
+    """The timer shows, and the Menu's item offers to hide it."""
+    expect(timer_of(page)).to_be_visible()
+    expect(page.get_by_test_id("timer-show")).to_have_count(0)
+    toggle = page.get_by_test_id("timer-toggle")
+    expect(toggle).to_have_text(load_fr()["timer.hide"])
+    assert toggle.get_attribute("aria-pressed") is None
+
+
+def expect_hidden(page: Page) -> None:
+    """No timer, `timer-show` in its place, and the item offers to show it."""
+    expect(page.get_by_test_id("timer")).to_have_count(0)
+    expect(page.get_by_test_id("timer-show")).to_be_visible()
+    toggle = page.get_by_test_id("timer-toggle")
+    expect(toggle).to_have_text(load_fr()["timer.toggle_label"])
+    assert toggle.get_attribute("aria-pressed") is None
+
+
 # ---- AC-4 ----
 
 
-def test_ac4_both_pages_show_the_timer_and_a_pressed_toggle(
+def test_ac4_both_pages_show_the_timer_and_the_menu_offers_to_hide_it(
     browser: Browser, live_server: str, fx01_grid: Grid
 ) -> None:
     first, close_first = new_context_page(browser)
@@ -58,17 +98,13 @@ def test_ac4_both_pages_show_the_timer_and_a_pressed_toggle(
         )
 
         for page in (first, second):
-            expect(timer_of(page)).to_be_visible()
-            expect(page.get_by_test_id("timer-toggle")).to_be_visible()
-            expect(page.get_by_test_id("timer-toggle")).to_have_attribute(
-                "aria-pressed", "true"
-            )
+            expect_shown(page)
     finally:
         close_first()
         close_second()
 
 
-def test_ac4_a_click_hides_the_timer_on_this_page_only_and_sends_nothing(
+def test_ac4_hiding_on_one_page_only_shows_chrono_and_sends_nothing(
     browser: Browser, live_server: str, fx01_grid: Grid
 ) -> None:
     first, close_first = new_context_page(browser)
@@ -82,18 +118,12 @@ def test_ac4_a_click_hides_the_timer_on_this_page_only_and_sends_nothing(
         )
         frames_before = len(mock.frames_without_pings())
 
-        first.get_by_test_id("timer-toggle").click()
+        hide_timer(first)
         first.wait_for_timeout(QUIET_MS)
 
-        expect(first.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "false"
-        )
-        expect(first.get_by_test_id("timer")).to_have_count(0)
+        expect_hidden(first)
         assert len(mock.frames_without_pings()) == frames_before
-        expect(timer_of(second)).to_be_visible()
-        expect(second.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "true"
-        )
+        expect_shown(second)
     finally:
         close_first()
         close_second()
@@ -107,23 +137,20 @@ def test_ac4_the_choice_holds_after_a_reload(
         mock = open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=RUNNING_AT_65_S, running=True
         )
-        page.get_by_test_id("timer-toggle").click()
+        hide_timer(page)
         expect(page.get_by_test_id("timer")).to_have_count(0)
 
         page.reload()
         send_reconnect_snapshot(mock, fx01_grid, 1, elapsed_ms=RUNNING_AT_65_S)
         expect(page.get_by_test_id("cell")).to_have_count(25)
 
-        expect(page.get_by_test_id("timer")).to_have_count(0)
-        expect(page.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "false"
-        )
+        expect_hidden(page)
         assert local_storage_value(page, KEY) == "true"
     finally:
         close()
 
 
-def test_ac4_a_second_click_shows_the_timer_again_and_removes_the_key(
+def test_ac4_chrono_shows_the_timer_again_and_removes_the_key(
     browser: Browser, live_server: str, fx01_grid: Grid
 ) -> None:
     page, close = new_context_page(browser)
@@ -131,19 +158,16 @@ def test_ac4_a_second_click_shows_the_timer_again_and_removes_the_key(
         mock = open_timer_room(
             page, live_server, fx01_grid, elapsed_ms=RUNNING_AT_65_S, running=True
         )
-        page.get_by_test_id("timer-toggle").click()
+        hide_timer(page)
         page.reload()
         send_reconnect_snapshot(mock, fx01_grid, 1, elapsed_ms=RUNNING_AT_65_S)
         expect(page.get_by_test_id("cell")).to_have_count(25)
         expect(page.get_by_test_id("timer")).to_have_count(0)
 
-        page.get_by_test_id("timer-toggle").click()
+        show_timer(page)
 
-        expect(page.get_by_test_id("timer")).to_be_visible()
+        expect_shown(page)
         assert clock_seconds(text_of(page)) >= 65
-        expect(page.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "true"
-        )
         assert local_storage_value(page, KEY) is None
     finally:
         close()
@@ -159,10 +183,10 @@ def test_ac4_hiding_stores_true_and_showing_removes_the_key_without_a_reload(
         )
         assert local_storage_value(page, KEY) is None
 
-        page.get_by_test_id("timer-toggle").click()
+        hide_timer(page)
         assert local_storage_value(page, KEY) == "true"
 
-        page.get_by_test_id("timer-toggle").click()
+        show_timer(page)
         expect(page.get_by_test_id("timer")).to_be_visible()
         assert local_storage_value(page, KEY) is None
     finally:
@@ -178,7 +202,7 @@ def test_ac4_the_choice_holds_for_every_room_opened_in_this_browser(
         open_timer_room(
             first, live_server, fx01_grid, elapsed_ms=RUNNING_AT_65_S, running=True
         )
-        first.get_by_test_id("timer-toggle").click()
+        hide_timer(first)
         expect(first.get_by_test_id("timer")).to_have_count(0)
 
         other = context.new_page()
@@ -191,10 +215,7 @@ def test_ac4_the_choice_holds_for_every_room_opened_in_this_browser(
             room_code=OTHER_ROOM_CODE,
         )
 
-        expect(other.get_by_test_id("timer")).to_have_count(0)
-        expect(other.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "false"
-        )
+        expect_hidden(other)
     finally:
         context.close()
 
@@ -211,10 +232,7 @@ def test_ac4_a_key_holding_true_at_load_hides_the_timer(
             page, live_server, fx01_grid, elapsed_ms=RUNNING_AT_65_S, running=True
         )
 
-        expect(page.get_by_test_id("timer")).to_have_count(0)
-        expect(page.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "false"
-        )
+        expect_hidden(page)
     finally:
         context.close()
 
@@ -232,9 +250,6 @@ def test_ac4_a_key_holding_anything_else_counts_as_absent(
             page, live_server, fx01_grid, elapsed_ms=RUNNING_AT_65_S, running=True
         )
 
-        expect(timer_of(page)).to_be_visible()
-        expect(page.get_by_test_id("timer-toggle")).to_have_attribute(
-            "aria-pressed", "true"
-        )
+        expect_shown(page)
     finally:
         context.close()

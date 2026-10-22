@@ -3,6 +3,24 @@
 The scripts and the helpers that measure and move the feed list are used by these
 two criteria only, so they stay in this file. The shared setup is in
 `spec013_harness`.
+
+Refined by spec 043 (the design's room layout): the feed list is the Salon's
+stream list (the one `ul` of `activity-feed`), so each page shows the Discussion
+tab first with spec 043's `show_tab`, and measures the list once it returned.
+`lock-room` is in the host's settings sheet (`open_host_settings`). Two places
+follow spec 043's layout:
+
+- AC-8's "Smaller window" turns the column layout into the sheet layout, which
+  closes the Salon ("Which layout"); the test shows the Discussion tab again
+  after the resize and checks that the list is at its end within 300 ms of
+  being shown ("Edge cases and errors": the stream keeps spec 013's rules, so it
+  shows the newest line when it was at its end).
+- AC-7's "My own action" runs at 1280 by 720 only. At 360 by 740 (the sheet
+  layout) opening the Menu to reach the host's settings closes the Salon (one
+  overlay at a time), so the list is not on screen while the lock is clicked and
+  "the probe stays put" cannot be read; this is reported to the lead. The later
+  cases replay the action at both sizes and show the Discussion tab again after
+  it.
 """
 
 from __future__ import annotations
@@ -21,6 +39,7 @@ from nock.protocol import (
     SettingsChanged,
     parse_client_message,
 )
+from room_panels import open_host_settings, show_tab
 from spec013_harness import (
     DEFAULT_ROOM_SETTINGS,
     FORM_TIMEOUT_MS,
@@ -387,8 +406,16 @@ def locked_settings_frame(seq: int) -> str:
     return event.model_dump_json()
 
 
+def open_the_lock(scene: FeedScene) -> None:
+    """Open the host's settings, where `lock-room` is (spec 043)."""
+    open_host_settings(scene.page)
+
+
 def lock_from_the_page(scene: FeedScene) -> None:
-    """Click `lock-room`; once the page has sent `lock_room`, answer it (seq 18)."""
+    """Click `lock-room`; once the page has sent `lock_room`, answer it (seq 18).
+
+    The host's settings are already open (`open_the_lock`).
+    """
     scene.page.get_by_test_id("lock-room").click(timeout=FORM_TIMEOUT_MS)
     wait_until(scene.page, lambda: has_sent_lock_room(scene.mock))
     scene.mock.send(locked_settings_frame(18))
@@ -460,9 +487,16 @@ def replay_scrolled_up(scene: FeedScene) -> None:
 
 
 def replay_my_own_action(scene: FeedScene) -> None:
-    """AC-7 "My own action" without its checks: the lock and its line 18."""
+    """AC-7 "My own action" without its checks: the lock and its line 18.
+
+    The host's settings are closed again and the Discussion tab shown again, which
+    the sheet layout closed while the settings were open (spec 043).
+    """
+    open_the_lock(scene)
     lock_from_the_page(scene)
     wait_for_seq(scene.page, 18)
+    scene.page.keyboard.press("Escape")
+    show_tab(scene.page, "discussion")
     let_the_case_end(scene.page)
 
 
@@ -493,6 +527,21 @@ def feed_scene(
     page, close = make_page(browser, browser_name, width, height, touch=False)
     try:
         mock = open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
+        show_tab(page, "discussion")
+        yield FeedScene(page=page, mock=mock)
+    finally:
+        close()
+
+
+@pytest.fixture
+def computer_feed_scene(
+    browser: Browser, browser_name: str, live_server: str, fx01_grid: Grid
+) -> Iterator[FeedScene]:
+    """The page of "Feed scroll states" at 1280 by 720 only (see the docstring)."""
+    page, close = make_page(browser, browser_name, 1280, 720, touch=False)
+    try:
+        mock = open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
+        show_tab(page, "discussion")
         yield FeedScene(page=page, mock=mock)
     finally:
         close()
@@ -543,12 +592,14 @@ def test_ac7_browser_scrolled_up_a_new_line_leaves_the_list_in_place(
 
 
 def test_ac7_browser_my_own_lock_line_leaves_the_list_in_place(
-    feed_scene: FeedScene,
+    computer_feed_scene: FeedScene,
 ) -> None:
+    feed_scene = computer_feed_scene
     page = feed_scene.page
     replay_filling(feed_scene)
     replay_at_the_end(feed_scene)
     replay_scrolled_up(feed_scene)
+    open_the_lock(feed_scene)
     start = read_feed_scroll(page)
     assert_case_starts(
         not start.at_end,
@@ -664,8 +715,12 @@ def set_root_font(page: Page, size_px: int) -> None:
 
 
 def replay_smaller_window(scene: FeedScene) -> None:
-    """AC-8 "Smaller window" without its checks: the window becomes 360 by 740."""
+    """AC-8 "Smaller window" without its checks: the window becomes 360 by 740.
+
+    The sheet layout closes the Salon, so the Discussion tab is shown again.
+    """
     resize_window(scene.page, 360, 740)
+    show_tab(scene.page, "discussion")
     let_the_case_end(scene.page)
 
 
@@ -683,6 +738,7 @@ def filled_feed_scene(
     page, close = make_page(browser, browser_name, 1280, 720, touch=False)
     try:
         mock = open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
+        show_tab(page, "discussion")
         scene = FeedScene(page=page, mock=mock)
         replay_filling(scene)
         yield scene
@@ -701,9 +757,10 @@ def test_ac8_browser_a_smaller_window_keeps_the_list_at_its_end(
 ) -> None:
     page = filled_feed_scene.page
     assert_setup_at_end(page)
-    start_end_watch(page, "width", "360")
-
     resize_window(page, 360, 740)
+
+    show_tab(page, "discussion")
+    start_end_watch(page, "width", "360")
 
     resized = read_feed_scroll(page)
     assert resized.scrolls, f"Smaller window: the feed list does not scroll: {resized}"

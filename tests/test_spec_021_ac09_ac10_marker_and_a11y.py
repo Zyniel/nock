@@ -18,6 +18,13 @@ the square's side (`s` the clue cell's side, 0.5 px) instead of a font size and
 drops the check that NAVAL's marker is clear of its text (the design draws the
 flag over the text's corner); the scans of AC-9 and AC-10 no longer meet the
 marker's glyph.
+
+Spec 043 (the design's room layout) refines AC-10: the button shows no text, so the
+scans meet its `aria-label` and no longer `Je bloque` (`flag.button` is removed);
+its focus ring is the white ring of the navy clue bar, which spec 035 AC-2 now
+measures against the surface behind it (`tests/colour_contrast.js`); and spec 035
+AC-9's checker flags the sample `Salle` where it flagged `Salon`, which is now
+`fr.json["topbar.salon"]`.
 """
 
 from __future__ import annotations
@@ -31,7 +38,7 @@ from nock.catalogue import Catalogue
 from nock.grid import ClueCell, Grid
 from nock.protocol import ClueRef, Flag, FlagView, grid_view, parse_client_message
 from spec021_harness import (
-    FLAG_BUTTON_TEXT,
+    FLAG_BUTTON_LABEL,
     IDES,
     MIME,
     NAVAL,
@@ -212,7 +219,7 @@ def assert_scans_pass_with_the_flag_texts(page: Page, live_server: str) -> None:
     Spec 042: the marker shows no glyph any more, so the scans do not meet it.
     """
     texts = language_texts(page)
-    for expected in (FLAG_BUTTON_TEXT, flag_label(["Bob"])):
+    for expected in (FLAG_BUTTON_LABEL, flag_label(["Bob"])):
         assert expected in texts, expected
     data = language_data(live_server, NICKNAMES)
     assert language_problems(page, data) == []
@@ -287,12 +294,12 @@ def test_ac9_browser_the_marker_of_a_second_clue_sits_just_under_the_separator(
 def test_ac10_fr_json_holds_the_three_flag_texts() -> None:
     fr = load_fr()
 
-    assert fr.get("flag.button") == "Je bloque"
+    assert "flag.button" not in fr
     assert fr.get("flag.button_label") == "Je bloque sur ce mot"
     # Spec 042: the marker is a drawn icon, so `flag.marker` is removed.
     assert "flag.marker" not in fr
     assert fr.get("flag.marker_label") == "Bloqué : {names}"
-    english = ["Loading…", "Salon", "Check word"]
+    english = ["Loading…", "Salle", "Check word"]
     assert unknown_texts(english, set()) == english
 
 

@@ -20,6 +20,11 @@ Readings that the spec leaves open:
   `first_gradient_argument`, `is_diagonal` and `is_ink_or_white`, as for its
   departed author's band: the hatch is ink and white since spec 041, which
   removed the departed greys.
+
+Refined by spec 043 (the design's room layout): `recap-open` sits inside
+`grid-status` (`data-state="solved"`), after its text, where it sat in
+`room-toolbar` right after `chat-toggle`; the dialog comes after the top bar and
+the play area in document order (spec 043's "Document order").
 """
 
 from __future__ import annotations
@@ -527,21 +532,31 @@ def test_ac7_an_unsolved_page_has_no_recap_button(
 ) -> None:
     open_solved_page(page, live_server, fx01_grid, recap_body(), solved=False)
 
-    expect(page.get_by_test_id("room-toolbar")).to_be_visible()
+    expect(page.get_by_test_id("room-topbar")).to_be_visible()
     expect(page.get_by_test_id("recap-open")).to_have_count(0)
 
 
-TOOLBAR_IDS_SCRIPT = """
+# Spec 043: `recap-open` inside `grid-status`, after the status's text.
+STATUS_PLACE_SCRIPT = """
 () => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
-  const ids = [];
-  for (const element of toolbar.querySelectorAll('[data-testid]')) {
-    ids.push(element.getAttribute('data-testid'));
-  }
+  const status = document.querySelector('[data-testid="grid-status"]');
   const button = document.querySelector('[data-testid="recap-open"]');
+  let afterText = false;
+  if (status !== null && button !== null) {
+    const walker = document.createTreeWalker(status, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (button.contains(node) || node.textContent.trim() === '') {
+        continue;
+      }
+      const position = node.compareDocumentPosition(button);
+      afterText = Boolean(position & Node.DOCUMENT_POSITION_FOLLOWING);
+      break;
+    }
+  }
   return {
-    ids: ids,
-    inside: button !== null && toolbar.contains(button),
+    state: status === null ? null : status.getAttribute('data-state'),
+    inside: status !== null && button !== null && status.contains(button),
+    afterText: afterText,
     tag: button === null ? null : button.tagName,
     type: button === null ? null : button.getAttribute('type'),
   };
@@ -549,7 +564,7 @@ TOOLBAR_IDS_SCRIPT = """
 """
 
 
-def test_ac7_the_button_shows_after_the_solve_right_after_the_chat_toggle(
+def test_ac7_the_button_shows_after_the_solve_inside_the_end_band(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     opened = open_solved_page(page, live_server, fx01_grid, recap_body(), solved=False)
@@ -559,11 +574,11 @@ def test_ac7_the_button_shows_after_the_solve_right_after_the_chat_toggle(
 
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-solved", "true")
     expect(page.get_by_test_id("recap-open")).to_have_text("Voir le bilan")
-    reading = page.evaluate(TOOLBAR_IDS_SCRIPT)
-    assert reading["inside"] is True
+    reading = page.evaluate(STATUS_PLACE_SCRIPT)
+    assert reading["state"] == "solved", reading
+    assert reading["inside"] is True, reading
+    assert reading["afterText"] is True, reading
     assert (reading["tag"], reading["type"]) == ("BUTTON", "button")
-    ids = reading["ids"]
-    assert ids.index("recap-open") == ids.index("chat-toggle") + 1, ids
 
 
 def test_ac7_the_dialog_does_not_open_by_itself_and_the_grid_stays_usable(
@@ -686,18 +701,23 @@ def test_ac7_a_late_joiner_s_own_row_shows_no_letter_and_no_word(
     expect(mine.get_by_test_id("recap-words")).to_have_text("0 mots complétés")
 
 
-def test_ac7_the_dialog_comes_after_the_toolbar_in_document_order(
+def test_ac7_the_dialog_comes_after_the_top_bar_and_the_status_in_document_order(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_solved_page(page, live_server, fx01_grid, recap_body())
     open_recap(page)
 
     follows = page.evaluate("""() => {
-          const toolbar = document.querySelector('[data-testid="room-toolbar"]');
           const dialog = document.querySelector('[data-testid="recap"]');
-          return Boolean(
-            toolbar.compareDocumentPosition(dialog) & Node.DOCUMENT_POSITION_FOLLOWING
-          );
+          const found = [];
+          for (const id of ['room-topbar', 'grid-status', 'salon']) {
+            const element = document.querySelector(`[data-testid="${id}"]`);
+            found.push(element !== null && Boolean(
+              element.compareDocumentPosition(dialog)
+                & Node.DOCUMENT_POSITION_FOLLOWING
+            ));
+          }
+          return found;
         }""")
 
-    assert follows is True
+    assert follows == [True, True, True]

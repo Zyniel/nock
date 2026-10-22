@@ -5,10 +5,11 @@ The page is driven with a mocked socket. "An error answering a reveal changes
 nothing on the page" (Client: reveal controls) is tested here too. The shared
 setup is in `spec024_harness`.
 
-Not tested: whether `reveal-panel` is the very next element after `check-panel`.
-"right after check-panel" could mean that, but the toolbar section says other
-controls may sit between the tools (see the report). The test checks that the
-panel comes after `check-panel` in the toolbar, which both readings require.
+Refined by spec 043 (the design's room layout): `reveal-panel` is inside
+`aide-menu`, after `check-panel` and a `nock-menu-separator`, a group labelled by
+`reveal-heading` (`fr.json["reveal.label"]`); the clicks are made with the Aide
+menu open (spec 043's `open_aide`), each closing it. It read "inside `room-toolbar`
+right after `check-panel`, ... and the `aria-label` `fr.json["reveal.label"]`".
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from nock.protocol import (
     Reveal,
     WordTarget,
 )
+from room_panels import open_aide
 from spec024_harness import (
     DEFAULT_BUDGET,
     MIME_CELLS,
@@ -61,18 +63,28 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
 
 PANEL_SCRIPT = """
 () => {
-  const toolbar = document.querySelector('[data-testid="room-toolbar"]');
+  const menu = document.querySelector('[data-testid="aide-menu"]');
   const checks = document.querySelector('[data-testid="check-panel"]');
   const panel = document.querySelector('[data-testid="reveal-panel"]');
   const buttons = [];
   for (const button of panel.querySelectorAll('button')) {
     buttons.push(button.getAttribute('data-testid'));
   }
+  let separator = false;
+  if (checks !== null) {
+    for (let node = checks.nextElementSibling; node !== null && node !== panel;
+         node = node.nextElementSibling) {
+      if (node.classList.contains('nock-menu-separator')) {
+        separator = true;
+      }
+    }
+  }
   return {
-    inToolbar: toolbar !== null && toolbar.contains(panel),
+    inAideMenu: menu !== null && menu.contains(panel),
     afterChecks: checks !== null && Boolean(
       checks.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING
     ),
+    separatorBetween: separator,
     buttons: buttons,
   };
 }
@@ -115,18 +127,24 @@ def test_ac7_the_new_fr_json_key_of_the_panel() -> None:
     assert load_fr()["reveal.label"] == "Révéler"
 
 
-def test_ac7_the_panel_is_a_labelled_group_in_the_toolbar_after_the_checks(
+def test_ac7_the_panel_is_a_labelled_group_in_the_aide_menu_after_the_checks(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid)
+    open_aide(page)
 
     panel = page.get_by_test_id("reveal-panel")
+    heading = page.get_by_test_id("reveal-heading")
     expect(panel).to_be_visible()
     expect(panel).to_have_attribute("role", "group")
-    expect(panel).to_have_attribute("aria-label", load_fr()["reveal.label"])
+    heading_id = heading.get_attribute("id")
+    assert heading_id
+    expect(panel).to_have_attribute("aria-labelledby", heading_id)
+    expect(heading).to_have_text(load_fr()["reveal.label"])
     layout = page.evaluate(PANEL_SCRIPT)
-    assert layout["inToolbar"] is True, layout
+    assert layout["inAideMenu"] is True, layout
     assert layout["afterChecks"] is True, layout
+    assert layout["separatorBetween"] is True, layout
     assert layout["buttons"] == ["reveal-letter", "reveal-word"], layout
 
 
@@ -147,8 +165,10 @@ def test_ac7_the_buttons_send_the_selected_cell_and_word_once_each(
     expect(page.get_by_test_id("reveal-letter")).to_be_enabled()
     expect(page.get_by_test_id("reveal-word")).to_be_enabled()
 
+    open_aide(page)
     page.get_by_test_id("reveal-letter").click()
     wait_until_page(page, lambda: len(mock.reveals()) >= 1, "the letter reveal")
+    open_aide(page)
     page.get_by_test_id("reveal-word").click()
     wait_until_page(page, lambda: len(mock.reveals()) >= 2, "the word reveal")
     page.wait_for_timeout(SETTLE_MS)
@@ -174,7 +194,9 @@ def test_ac7_no_cell_changes_until_the_server_answers(
     tap_mime(page)
     before = page.evaluate(CELL_STATES_SCRIPT)
 
+    open_aide(page)
     page.get_by_test_id("reveal-letter").click()
+    open_aide(page)
     page.get_by_test_id("reveal-word").click()
     wait_until_page(page, lambda: len(mock.reveals()) >= 2, "the two reveals")
     page.wait_for_timeout(SETTLE_MS)
@@ -229,6 +251,7 @@ def test_ac7_help_mode_none_hides_the_panel_and_settings_changed_toggles_it(
     mock.send(settings_changed_frame(6, HelpMode.FREE, DEFAULT_BUDGET, DEFAULT_BUDGET))
     expect_seq(page, 6)
     expect(panel).to_have_count(1)
+    open_aide(page)
     expect(panel).to_be_visible()
 
     mock.send(settings_changed_frame(7, HelpMode.NONE, DEFAULT_BUDGET, DEFAULT_BUDGET))
@@ -245,7 +268,7 @@ def test_ac7_an_error_answering_a_reveal_leaves_the_pending_edit_alone(
     page: Page, live_server: str, fx01_grid: Grid, code: ErrorCode
 ) -> None:
     mock = open_room(page, live_server, fx01_grid)
-    expect(page.get_by_test_id("reveal-panel")).to_be_visible()
+    expect(page.get_by_test_id("reveal-panel")).to_have_count(1)
     cell = cell_at(page, 1, 1)
     cell.click()
     page.keyboard.press("b")

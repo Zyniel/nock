@@ -25,6 +25,7 @@ from playwright.sync_api import Browser, Page, Response, WebSocket, expect
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import parse_client_message
+from room_panels import open_aide
 from spec011_harness import EnterRoom
 from spec024_harness import make_catalogue
 from spec032_harness import grid_from_text
@@ -139,6 +140,7 @@ def guest_solves(
             type_letter(page, row, column, key)
         expect(cell_at(page, 4, 4)).to_have_attribute("data-letter", "T")
         select_mime(page)
+        open_aide(page)  # spec 043: the item is in a panel, opened first
         page.get_by_test_id("check-word").click()
         expect(cell_at(page, 2, 2)).to_have_attribute(
             "data-wrong", "true", timeout=WAIT_TIMEOUT_MS

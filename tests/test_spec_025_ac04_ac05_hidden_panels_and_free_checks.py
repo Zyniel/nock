@@ -5,6 +5,11 @@ mocked socket; the server's `help_disabled` of specs 023 and 024). AC-5: in vote
 mode a check of a letter or of a word needs no vote (the rule on
 `handle_message`, then the page while a vote is open). The shared setup is in
 `spec025_harness`.
+
+Refined by spec 043 (the design's room layout): the two panels are groups of the
+Aide menu, which stays in `none` mode (`aide-button` and `aide-menu` exist where
+`room-toolbar` did); a test that checks the panels show, or clicks an item, opens
+the menu first with spec 043's `open_aide`.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ from nock.protocol import (
     WordTarget,
 )
 from nock.room import new_room
+from room_panels import open_aide
 from spec025_harness import (
     FIVE_AND_ONE,
     MIME,
@@ -72,6 +78,7 @@ def expect_no_help_controls(page: Page) -> None:
 
 
 def expect_help_controls(page: Page) -> None:
+    open_aide(page)
     for test_id in (*PANELS, *HELP_BUTTONS):
         expect(page.get_by_test_id(test_id)).to_be_visible()
 
@@ -79,12 +86,13 @@ def expect_help_controls(page: Page) -> None:
 # ---- AC-4: in none mode, the check and reveal controls are hidden ----
 
 
-def test_ac4_a_none_snapshot_shows_neither_panel_but_the_toolbar_and_undo(
+def test_ac4_a_none_snapshot_shows_neither_panel_but_the_aide_menu_and_undo(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid, help_mode=HelpMode.NONE)
 
-    expect(page.get_by_test_id("room-toolbar")).to_be_visible()
+    expect(page.get_by_test_id("aide-button")).to_be_visible()
+    expect(page.get_by_test_id("aide-menu")).to_have_count(1)
     expect(page.get_by_test_id("undo-button")).to_be_visible()
     expect_no_help_controls(page)
 
@@ -281,7 +289,9 @@ def test_ac5_browser_during_a_vote_only_the_letter_and_word_checks_are_enabled(
     for test_id in ("check-grid", "reveal-letter", "reveal-word"):
         expect(page.get_by_test_id(test_id)).to_be_disabled()
 
+    open_aide(page)
     page.get_by_test_id("check-letter").click()
+    open_aide(page)
     page.get_by_test_id("check-word").click()
 
     expected_checks = [

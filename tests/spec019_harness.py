@@ -12,8 +12,12 @@ are in `tests/test_spec_019_*.py`, one file per criterion group:
   letter's baseline and the drawing order at three window sizes);
 - `test_spec_019_ac03_authorship_kept.py`: AC-3 (rules, WebSocket, live browser);
 - `test_spec_019_ac04_author_in_words.py`: AC-4 (`clue-bar-author`);
-- `test_spec_019_ac05_switch_in_toolbar.py`: AC-5 (the switch in `room-toolbar`,
+- `test_spec_019_ac05_switch_in_menu.py`: AC-5 (the switch in `room-menu`,
   keyboard, contrast and language).
+
+Refined by spec 043 (the design's room layout): `authors-switch` is the first item
+of the room Menu, so the helpers that press it open the Menu first (spec 043's
+`open_menu`) and close it after.
 
 The spec adds no Python name and no server change, so the browser tests drive the
 room page through a mocked socket (spec 023's "browser with mocked socket") or the
@@ -93,6 +97,7 @@ from nock.protocol import (
     grid_view,
     parse_client_message,
 )
+from room_panels import open_menu
 from spec024_harness import COLOUR_CONTRAST_JS
 from spec041_harness import INK, WHITE
 
@@ -202,18 +207,29 @@ def press(locator: Locator, touch: bool) -> None:
         locator.click(timeout=TAP_TIMEOUT_MS)
 
 
+def press_authors_switch(page: Page, touch: bool = False) -> None:
+    """Press `authors-switch` once, in the room Menu (spec 043).
+
+    The Menu is opened first with spec 043's `open_menu`, and closed after with a
+    second press of `menu-button`, so that it covers nothing the test reads next.
+    """
+    open_menu(page)
+    press(authors_switch(page), touch)
+    menu = page.get_by_test_id("room-menu")
+    press(page.get_by_test_id("menu-button"), touch)
+    expect(menu).to_be_hidden()
+
+
 def turn_switch_on(page: Page, touch: bool = False) -> None:
     """Press `authors-switch` once and wait until it reads `aria-pressed="true"`."""
-    switch = authors_switch(page)
-    press(switch, touch)
-    expect(switch).to_have_attribute("aria-pressed", "true")
+    press_authors_switch(page, touch)
+    expect(authors_switch(page)).to_have_attribute("aria-pressed", "true")
 
 
 def turn_switch_off(page: Page) -> None:
     """Click `authors-switch` once and wait until it reads `aria-pressed="false"`."""
-    switch = authors_switch(page)
-    switch.click(timeout=TAP_TIMEOUT_MS)
-    expect(switch).to_have_attribute("aria-pressed", "false")
+    press_authors_switch(page)
+    expect(authors_switch(page)).to_have_attribute("aria-pressed", "false")
 
 
 def wait_until(page: Page, condition: Callable[[], bool]) -> None:

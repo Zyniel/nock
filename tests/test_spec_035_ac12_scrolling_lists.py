@@ -2,19 +2,32 @@
 
 The setup the test files of spec 035 share is in `tests/spec035_harness.py`.
 
+Refined by spec 043 (the design's room layout): the feed list is the Salon's
+stream list (`chat-list`, inside `activity-feed`, named « Discussion »), and the
+players' list never scrolls on its own. In each case the Discussion tab is shown
+first (`show_tab`, setup), and the Tab walk starts with `focus()` on
+`salon-tab-discussion` and stops at `chat-input`. The roster's cases (its Tab
+stop, its `tabindex="-1"`, its `ArrowRight`, its resize, the host-role changes and
+"Focus kept") are gone.
+
 Choices where the spec leaves room:
 
-- AC-12, setups: where the criterion says a list does not scroll, the test also
-  checks that from the list's measures, as it does where it says a list scrolls,
-  so that a changed layout is reported as such.
-- AC-12, "No `fr.json` key is added": not observable as such. The test checks that
-  each list's name is the text of its section's `h2`, through `aria-labelledby`.
-- AC-12, visible focus: the "Not clipped" and "Not covered" measures run on both
-  lists; for the feed list they repeat AC-2's check.
+- AC-12, setups: where the criterion says the stream list does not scroll, the
+  test also checks that from the list's measures, as it does where it says the
+  list scrolls, so that a changed layout is reported as such.
+- AC-12, "Name": a tab panel that is not selected has the `hidden` attribute
+  (spec 043), so it is out of the accessibility tree. Each list's name is read
+  with its own tab shown: the players' list with the Joueurs tab, the stream list
+  with the Discussion tab.
+- AC-12, "a Tab walk from `salon-tab-players`": `focus()` on that tab, then `Tab`
+  until the focus leaves the Salon (or reaches `document.body`), at most 60
+  presses.
+- AC-12, visible focus: the "Not clipped" and "Not covered" measures run on the
+  stream list; they repeat AC-2's check.
 - AC-12, arrow keys: after a key scrolled the list, the test lets the scroll stand
   still before the next key, since a smooth scroll may still be moving.
-- AC-12, new feed lines: after each event, the test also waits for the feed to
-  hold the new line before it reads the list.
+- AC-12, new lines: after each event, the test also waits for the stream to hold
+  the new line before it reads the list.
 """
 
 from __future__ import annotations
@@ -27,10 +40,10 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
-from nock.protocol import CheckResult, HostChanged, PlayerState, PlayerView, WordTarget
+from nock.protocol import CheckResult, PlayerState, PlayerView, WordTarget
+from room_panels import Tab, show_tab
 from spec035_harness import (
     EPSILON,
-    FEED_LIST_SELECTOR,
     FEED_SIZES,
     FOCUS_BAND_SCRIPT,
     FOCUS_OUTLINE_SCRIPT,
@@ -71,15 +84,18 @@ def new_page(browser: Browser) -> Iterator[Callable[[int, int], Page]]:
 
 # ---- AC-12: a list that scrolls with no control inside is a Tab stop -------------
 
+STREAM_LIST_SELECTOR = '[data-testid="activity-feed"] [data-testid="chat-list"]'
 ROSTER_LIST_SELECTOR = '[data-testid="roster"] ul'
-LIST_SELECTORS = {"roster": ROSTER_LIST_SELECTOR, "feed": FEED_LIST_SELECTOR}
+LIST_SELECTORS = {"stream": STREAM_LIST_SELECTOR, "players": ROSTER_LIST_SELECTOR}
 LIST_FOLLOW_MS = 300  # the attribute follows every change within 300 ms
 POLL_MS = 25
 NO_CUT = {"top": 0, "right": 0, "bottom": 0, "left": 0}
+FIRST_LIVE_SEQ = 11
+MAX_LIVE_EVENTS = 20
 
 # One list of "Scrolling lists": whether it scrolls (the spec's terms), its
-# `tabindex` attribute, whether it has the focus, where it is scrolled to, how
-# many remove buttons it holds, and the measures behind "scrolls".
+# `tabindex` attribute, whether it has the focus, where it is scrolled to, and the
+# measures behind "scrolls".
 LIST_STATE_SCRIPT = """
 selector => {
   const list = document.querySelector(selector);
@@ -92,11 +108,8 @@ selector => {
   return {
     scrolls: scrollsSideways || scrollsDown,
     tabindex: list.getAttribute('tabindex'),
-    tabIndex: list.tabIndex,
     focused: document.activeElement === list,
     scrollTop: list.scrollTop,
-    scrollLeft: list.scrollLeft,
-    removeButtons: list.querySelectorAll('[data-testid="remove-player"]').length,
     measures: {
       overflowX: style.overflowX,
       overflowY: style.overflowY,
@@ -109,25 +122,27 @@ selector => {
 }
 """
 
-# What has the focus: its test id, which list of AC-12 it is (or null), and the
-# player of the roster row that holds it (or null).
+# What has the focus: its test id, which list of AC-12 it is (or null), the player
+# of the roster row that holds it (or null), and whether it is inside the Salon.
 FOCUS_STEP_SCRIPT = """
-() => {
+([streamSelector, rosterSelector]) => {
   const element = document.activeElement;
-  if (element === null) {
-    return {testId: null, list: null, playerId: null};
+  if (element === null || element === document.body) {
+    return {testId: null, list: null, playerId: null, inSalon: false};
   }
   let list = null;
-  if (element === document.querySelector('[data-testid="roster"] ul')) {
-    list = 'roster';
-  } else if (element === document.querySelector('[data-testid="activity-feed"] ul')) {
-    list = 'feed';
+  if (element === document.querySelector(streamSelector)) {
+    list = 'stream';
+  } else if (element === document.querySelector(rosterSelector)) {
+    list = 'players';
   }
   const row = element.closest('[data-testid="roster-player"]');
+  const salon = document.querySelector('[data-testid="salon"]');
   return {
     testId: element.getAttribute('data-testid'),
     list: list,
     playerId: row === null ? null : row.getAttribute('data-player-id'),
+    inSalon: salon !== null && salon.contains(element),
   };
 }
 """
@@ -165,11 +180,8 @@ class ListState(NamedTuple):
 
     scrolls: bool
     tabindex: str | None  # the attribute
-    tab_index: int  # the `tabIndex` property
     focused: bool
     scroll_top: float
-    scroll_left: float
-    remove_buttons: int
     measures: dict[str, Any]
 
     @property
@@ -186,6 +198,7 @@ class FocusStep(NamedTuple):
     test_id: str | None
     list_name: str | None
     player_id: str | None
+    in_salon: bool
 
 
 def read_list_state(page: Page, list_name: str) -> ListState:
@@ -193,48 +206,40 @@ def read_list_state(page: Page, list_name: str) -> ListState:
     return ListState(
         scrolls=raw["scrolls"],
         tabindex=raw["tabindex"],
-        tab_index=raw["tabIndex"],
         focused=raw["focused"],
         scroll_top=raw["scrollTop"],
-        scroll_left=raw["scrollLeft"],
-        remove_buttons=raw["removeButtons"],
         measures=raw["measures"],
     )
 
 
 def read_focus_step(page: Page) -> FocusStep:
-    raw = page.evaluate(FOCUS_STEP_SCRIPT)
+    raw = page.evaluate(FOCUS_STEP_SCRIPT, [STREAM_LIST_SELECTOR, ROSTER_LIST_SELECTOR])
     return FocusStep(
-        test_id=raw["testId"], list_name=raw["list"], player_id=raw["playerId"]
+        test_id=raw["testId"],
+        list_name=raw["list"],
+        player_id=raw["playerId"],
+        in_salon=raw["inSalon"],
     )
 
 
-def assert_scrolls(state: ListState, list_name: str) -> None:
-    """Fail when a list that the setup must make scroll does not."""
+def assert_scrolls(state: ListState) -> None:
+    """Fail when the stream list, which the setup must make scroll, does not."""
     assert state.scrolls, (
-        f"the {list_name} list does not scroll ({state.measures}): the setup no"
+        f"the stream list does not scroll ({state.measures}): the setup no"
         " longer shows what it should"
     )
 
 
-def assert_does_not_scroll(state: ListState, list_name: str) -> None:
-    """Fail when a list that the setup must leave still scrolls."""
+def assert_does_not_scroll(state: ListState) -> None:
+    """Fail when the stream list, which the setup must leave still, scrolls."""
     assert not state.scrolls, (
-        f"the {list_name} list scrolls ({state.measures}): the setup no longer"
+        f"the stream list scrolls ({state.measures}): the setup no longer"
         " shows what it should"
     )
 
 
-def has_tab_stop(state: ListState) -> bool:
-    return state.tabindex == "0"
-
-
 def has_no_tabindex(state: ListState) -> bool:
     return state.tabindex is None
-
-
-def has_tabindex_minus_one(state: ListState) -> bool:
-    return state.tabindex == "-1"
 
 
 def tabindex_follows_scroll(state: ListState) -> bool:
@@ -262,43 +267,60 @@ def wait_for_list(
     return state
 
 
-def start_tab_walk(page: Page) -> None:
-    """Put the focus on `share-link`, where every Tab walk of AC-12 starts."""
-    share_link = page.get_by_test_id("share-link")
-    share_link.evaluate("element => element.focus()")
-    expect(share_link).to_be_focused()
+def focus_on(page: Page, test_id: str) -> None:
+    """Put the focus on an element with `focus()` (setup of a Tab walk)."""
+    element = page.get_by_test_id(test_id)
+    element.evaluate("element => element.focus()")
+    expect(element).to_be_focused()
 
 
-def tab_walk_to_the_grid(page: Page) -> list[FocusStep]:
-    """The Tab walk of the harness: from `share-link`, Tab until the grid.
+def tab_walk_to_the_chat_input(page: Page) -> list[FocusStep]:
+    """The Tab walk of AC-12: from `salon-tab-discussion`, Tab until `chat-input`.
 
     Returns:
-        What had the focus after each press, the grid last.
+        What had the focus after each press, `chat-input` last.
     """
-    start_tab_walk(page)
+    focus_on(page, "salon-tab-discussion")
     steps: list[FocusStep] = []
     for _ in range(MAX_TABS):
         page.keyboard.press("Tab")
         step = read_focus_step(page)
         steps.append(step)
-        if step.test_id == "grid":
+        if step.test_id == "chat-input":
             return steps
-    pytest.fail(f"the Tab walk did not reach the grid in {MAX_TABS} presses: {steps}")
+    pytest.fail(f"the Tab walk did not reach chat-input in {MAX_TABS} presses: {steps}")
 
 
-def tab_walk_to_the_list(page: Page, list_name: str) -> None:
-    """The Tab walk of the harness, stopped as soon as the list has the focus."""
-    start_tab_walk(page)
+def tab_walk_to_the_stream_list(page: Page) -> None:
+    """The Tab walk of AC-12, stopped as soon as the stream list has the focus."""
+    focus_on(page, "salon-tab-discussion")
     steps: list[FocusStep] = []
     for _ in range(MAX_TABS):
         page.keyboard.press("Tab")
         step = read_focus_step(page)
         steps.append(step)
-        if step.list_name == list_name:
+        if step.list_name == "stream":
             return
-        if step.test_id == "grid":
+        if step.test_id == "chat-input":
             break
-    pytest.fail(f"the Tab walk never focused the {list_name} list: {steps}")
+    pytest.fail(f"the Tab walk never focused the stream list: {steps}")
+
+
+def tab_walk_through_the_players_tab(page: Page) -> list[FocusStep]:
+    """From `salon-tab-players`, Tab until the focus leaves the Salon.
+
+    Returns:
+        What had the focus after each press inside the Salon.
+    """
+    focus_on(page, "salon-tab-players")
+    steps: list[FocusStep] = []
+    for _ in range(MAX_TABS):
+        page.keyboard.press("Tab")
+        step = read_focus_step(page)
+        if not step.in_salon:
+            return steps
+        steps.append(step)
+    pytest.fail(f"the Tab walk did not leave the Salon in {MAX_TABS} presses")
 
 
 def times_focused(steps: list[FocusStep], list_name: str) -> int:
@@ -320,17 +342,24 @@ def s1_players() -> list[PlayerView]:
 
 
 def open_s1(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
-    """State S1 of the harness: the room page of a guest, with an empty feed."""
+    """State S1 with the Discussion tab shown: a guest's room, an empty stream."""
     mock = open_room(page, live_server, grid, players=s1_players(), seq=10)
+    show_tab(page, "discussion")
     expect(page.get_by_test_id("feed-item")).to_have_count(0)
     expect(page.get_by_test_id("remove-player")).to_have_count(0)
-    expect(page.get_by_test_id("host-panel")).to_have_count(0)
+    return mock
+
+
+def open_k2_on_discussion(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
+    """State K2 with the Discussion tab shown."""
+    mock = open_k2(page, live_server, grid)
+    show_tab(page, "discussion")
     return mock
 
 
 def open_s2(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
-    """State S2 of the harness: K2, then 40 more feed lines (`seq` 14 to 53)."""
-    mock = open_k2(page, live_server, grid)
+    """State S2 with the Discussion tab shown: K2, then lines `seq` 14 to 53."""
+    mock = open_k2_on_discussion(page, live_server, grid)
     fill_feed_and_check_it_scrolls(page, mock)
     return mock
 
@@ -338,7 +367,7 @@ def open_s2(page: Page, live_server: str, grid: Grid) -> MockRoomSocket:
 SCROLL_STATES: dict[str, Callable[[Page, str, Grid], MockRoomSocket]] = {
     "s1": open_s1,
     "s2": open_s2,
-    "k2": open_k2,
+    "k2": open_k2_on_discussion,
 }
 
 
@@ -354,10 +383,6 @@ def check_result_frame(seq: int) -> str:
     return result.model_dump_json()
 
 
-def host_changed_frame(seq: int, player_id: str) -> str:
-    return HostChanged(seq=seq, player_id=player_id).model_dump_json()
-
-
 def resize_to(page: Page, width: int, height: int) -> None:
     """Resize the window, then wait until the page reads the new width."""
     page.set_viewport_size({"width": width, "height": height})
@@ -366,94 +391,70 @@ def resize_to(page: Page, width: int, height: int) -> None:
     )
 
 
-def size_ids(cases: list[tuple[str, str, int, int]]) -> list[str]:
-    return [f"{state}-{name}-{width}x{height}" for state, name, width, height in cases]
+def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
+    return [f"{width}x{height}" for width, height in sizes]
 
 
-# (state, list, width, height): a list that scrolls with no control inside.
-SCROLLING_LIST_CASES = [
-    ("s2", "feed", 360, 740),
-    ("s2", "feed", 568, 320),
-    ("s2", "feed", 1280, 720),
-    ("s1", "roster", 568, 320),
-    ("s1", "roster", 320, 568),
-]
-SCROLLING_LIST_IDS = size_ids(SCROLLING_LIST_CASES)
-# In S1: a list that does not scroll.
-STILL_LIST_CASES = [
-    ("s1", "feed", 568, 320),
-    ("s1", "feed", 320, 568),
-    ("s1", "feed", 1280, 720),
-    ("s1", "roster", 1280, 720),
-]
-STILL_LIST_IDS = size_ids(STILL_LIST_CASES)
+S2_SIZES = FEED_SIZES  # 360 by 740, 568 by 320 and 1280 by 720
+S1_STILL_SIZES = [(568, 320), (320, 568), (1280, 720)]
 SMALL_WINDOWS = [(568, 320), (320, 568)]
 NAME_CASES = [("s1", 568, 320), ("s1", 1280, 720), ("k2", 568, 320), ("k2", 1280, 720)]
-# (list, section, heading id, fr.json key, the name it gives).
-LIST_NAMES = [
-    ("roster", "roster", "roster-heading", "roster.heading", "Joueurs"),
-    ("feed", "activity-feed", "feed-heading", "feed.heading", "Activité"),
+# (list, tab, heading id, fr.json key, the name it gives).
+LIST_NAMES: list[tuple[str, Tab, str, str, str]] = [
+    ("players", "players", "roster-heading", "roster.heading", "Joueurs"),
+    ("stream", "discussion", "chat-heading", "chat.heading", "Discussion"),
 ]
-# The arrow keys of each list, in order: the key, the scroll position it changes
-# ("top" or "left") and the sign of the change.
-LIST_ARROWS = {
-    "feed": [("ArrowUp", "top", -1), ("ArrowDown", "top", 1)],
-    "roster": [("ArrowRight", "left", 1), ("ArrowLeft", "left", -1)],
-}
+PANEL_OF_TAB: dict[Tab, str] = {"players": "roster", "discussion": "chat-panel"}
+# The arrow keys of the stream list, in order, and the sign of `scrollTop`'s change.
+STREAM_ARROWS = [("ArrowUp", -1), ("ArrowDown", 1)]
 
 
-@pytest.mark.parametrize(
-    ("state", "list_name", "width", "height"),
-    SCROLLING_LIST_CASES,
-    ids=SCROLLING_LIST_IDS,
-)
-def test_ac12_a_scrolling_list_with_no_control_inside_is_a_tab_stop(
+@pytest.mark.parametrize(("width", "height"), S2_SIZES, ids=size_ids(S2_SIZES))
+def test_ac12_the_scrolling_stream_list_is_a_tab_stop(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
-    state: str,
-    list_name: str,
     width: int,
     height: int,
 ) -> None:
     page = new_page(width, height)
-    SCROLL_STATES[state](page, live_server, fx01_grid)
+    open_s2(page, live_server, fx01_grid)
     page.wait_for_timeout(LIST_FOLLOW_MS)
-    shown = read_list_state(page, list_name)
-    assert_scrolls(shown, list_name)
+    shown = read_list_state(page, "stream")
+    assert_scrolls(shown)
 
-    steps = tab_walk_to_the_grid(page)
+    steps = tab_walk_to_the_chat_input(page)
 
     assert shown.tabindex == "0", shown
-    assert times_focused(steps, list_name) == 1, steps
+    assert times_focused(steps, "stream") == 1, steps
 
 
 @pytest.mark.parametrize(
-    ("state", "list_name", "width", "height"), STILL_LIST_CASES, ids=STILL_LIST_IDS
+    ("width", "height"), S1_STILL_SIZES, ids=size_ids(S1_STILL_SIZES)
 )
-def test_ac12_a_list_that_does_not_scroll_is_not_a_tab_stop(
+def test_ac12_the_empty_stream_list_is_not_a_tab_stop(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
-    state: str,
-    list_name: str,
     width: int,
     height: int,
 ) -> None:
     page = new_page(width, height)
-    SCROLL_STATES[state](page, live_server, fx01_grid)
+    open_s1(page, live_server, fx01_grid)
     page.wait_for_timeout(LIST_FOLLOW_MS)
-    shown = read_list_state(page, list_name)
-    assert_does_not_scroll(shown, list_name)
+    shown = read_list_state(page, "stream")
+    assert_does_not_scroll(shown)
 
-    steps = tab_walk_to_the_grid(page)
+    steps = tab_walk_to_the_chat_input(page)
 
     assert shown.tabindex is None, shown
-    assert times_focused(steps, list_name) == 0, steps
+    assert times_focused(steps, "stream") == 0, steps
 
 
-@pytest.mark.parametrize(("width", "height"), SMALL_WINDOWS, ids=["568x320", "320x568"])
-def test_ac12_the_hosts_roster_list_with_remove_buttons_is_not_a_tab_stop(
+@pytest.mark.parametrize(
+    ("width", "height"), SMALL_WINDOWS, ids=size_ids(SMALL_WINDOWS)
+)
+def test_ac12_the_players_list_never_scrolls_and_its_remove_buttons_are_tab_stops(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
@@ -462,20 +463,21 @@ def test_ac12_the_hosts_roster_list_with_remove_buttons_is_not_a_tab_stop(
 ) -> None:
     page = new_page(width, height)
     open_k2(page, live_server, fx01_grid)
+    show_tab(page, "players")
     page.wait_for_timeout(LIST_FOLLOW_MS)
-    shown = read_list_state(page, "roster")
-    assert_scrolls(shown, "roster")
+    shown = read_list_state(page, "players")
+    measures = shown.measures
 
-    assert shown.remove_buttons == 4, shown
-    assert shown.tabindex == "-1", shown
-    assert shown.tab_index == -1, shown
-    steps = tab_walk_to_the_grid(page)
+    assert measures["scrollHeight"] <= measures["clientHeight"] + EPSILON, shown
+    assert measures["scrollWidth"] <= measures["clientWidth"] + EPSILON, shown
+    assert shown.tabindex is None, shown
+    steps = tab_walk_through_the_players_tab(page)
     button_owners: list[str] = []
     for step in steps:
         if step.test_id == "remove-player" and step.player_id is not None:
             button_owners.append(step.player_id)
     assert sorted(button_owners) == ["p2", "p3", "p4", "p5"], steps
-    assert times_focused(steps, "roster") == 0, steps
+    assert times_focused(steps, "players") == 0, steps
 
 
 @pytest.mark.parametrize(
@@ -483,7 +485,7 @@ def test_ac12_the_hosts_roster_list_with_remove_buttons_is_not_a_tab_stop(
     NAME_CASES,
     ids=[f"{state}-{width}x{height}" for state, width, height in NAME_CASES],
 )
-def test_ac12_each_list_is_named_by_the_heading_of_its_section(
+def test_ac12_each_list_is_named_by_the_hidden_heading_of_its_tab_panel(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
@@ -495,7 +497,8 @@ def test_ac12_each_list_is_named_by_the_heading_of_its_section(
     SCROLL_STATES[state](page, live_server, fx01_grid)
     fr_json = load_fr()
 
-    for list_name, section, heading_id, key, name in LIST_NAMES:
+    for list_name, tab, heading_id, key, name in LIST_NAMES:
+        show_tab(page, tab)
         assert fr_json[key] == name
         by_role = page.get_by_role("list", name=name, exact=True)
         expect(by_role, name).to_have_count(1)
@@ -504,87 +507,68 @@ def test_ac12_each_list_is_named_by_the_heading_of_its_section(
         named_list = page.locator(selector)
         expect(named_list).to_have_attribute("role", "list")
         expect(named_list).to_have_attribute("aria-labelledby", heading_id)
-        heading = page.get_by_test_id(section).locator("h2")
-        expect(heading).to_have_attribute("id", heading_id)
+        heading = page.get_by_test_id(PANEL_OF_TAB[tab]).locator(f"h2#{heading_id}")
+        expect(heading).to_have_count(1)
         expect(heading).to_have_text(fr_json[key])
 
 
-def press_and_expect_a_scroll(
-    page: Page, list_name: str, key: str, axis: str, sign: int
-) -> None:
-    """Press an arrow key; fail unless the focused list scrolls that way in 300 ms.
+def press_and_expect_a_scroll(page: Page, key: str, sign: int) -> None:
+    """Press an arrow key; fail unless the focused stream list scrolls in 300 ms.
 
     Args:
-        page: The room page, with the focus on the list.
-        list_name: `roster` or `feed`.
+        page: The room page, with the focus on the stream list.
         key: The arrow key to press.
-        axis: `top` for `scrollTop`, `left` for `scrollLeft`.
-        sign: 1 when the position must grow, -1 when it must shrink.
+        sign: 1 when `scrollTop` must grow, -1 when it must shrink.
     """
-    before = read_list_state(page, list_name)
+    before = read_list_state(page, "stream")
     page.keyboard.press(key)
     waited_ms = 0
     while True:
-        now = read_list_state(page, list_name)
+        now = read_list_state(page, "stream")
         assert now.focused, (key, now)
-        if axis == "top":
-            change = now.scroll_top - before.scroll_top
-        else:
-            change = now.scroll_left - before.scroll_left
+        change = now.scroll_top - before.scroll_top
         if change * sign > 0:
             break
         if waited_ms >= LIST_FOLLOW_MS:
             pytest.fail(
-                f"{key} did not scroll the {list_name} list within"
+                f"{key} did not scroll the stream list within"
                 f" {LIST_FOLLOW_MS} ms: {before} then {now}"
             )
         page.wait_for_timeout(POLL_MS)
         waited_ms += POLL_MS
-    page.evaluate(SCROLL_SETTLED_SCRIPT, LIST_SELECTORS[list_name])
-    assert read_list_state(page, list_name).focused, key
+    page.evaluate(SCROLL_SETTLED_SCRIPT, STREAM_LIST_SELECTOR)
+    assert read_list_state(page, "stream").focused, key
 
 
-@pytest.mark.parametrize(
-    ("state", "list_name", "width", "height"),
-    SCROLLING_LIST_CASES,
-    ids=SCROLLING_LIST_IDS,
-)
-def test_ac12_the_arrow_keys_scroll_the_focused_list(
+@pytest.mark.parametrize(("width", "height"), S2_SIZES, ids=size_ids(S2_SIZES))
+def test_ac12_the_arrow_keys_scroll_the_focused_stream_list(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
-    state: str,
-    list_name: str,
     width: int,
     height: int,
 ) -> None:
     page = new_page(width, height)
-    SCROLL_STATES[state](page, live_server, fx01_grid)
-    assert_scrolls(read_list_state(page, list_name), list_name)
-    tab_walk_to_the_list(page, list_name)
+    open_s2(page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, "stream"))
+    tab_walk_to_the_stream_list(page)
 
-    for key, axis, sign in LIST_ARROWS[list_name]:
-        press_and_expect_a_scroll(page, list_name, key, axis, sign)
+    for key, sign in STREAM_ARROWS:
+        press_and_expect_a_scroll(page, key, sign)
 
 
-@pytest.mark.parametrize(
-    ("state", "list_name", "width", "height"),
-    SCROLLING_LIST_CASES,
-    ids=SCROLLING_LIST_IDS,
-)
-def test_ac12_a_focused_scrolling_list_shows_its_whole_focus_outline(
+@pytest.mark.parametrize(("width", "height"), S2_SIZES, ids=size_ids(S2_SIZES))
+def test_ac12_the_focused_stream_list_shows_its_whole_focus_outline(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
-    state: str,
-    list_name: str,
     width: int,
     height: int,
 ) -> None:
     page = new_page(width, height)
-    SCROLL_STATES[state](page, live_server, fx01_grid)
-    assert_scrolls(read_list_state(page, list_name), list_name)
-    tab_walk_to_the_list(page, list_name)
+    open_s2(page, live_server, fx01_grid)
+    assert_scrolls(read_list_state(page, "stream"))
+    tab_walk_to_the_stream_list(page)
     page.wait_for_timeout(LIST_FOLLOW_MS)
 
     outline = page.evaluate(FOCUS_OUTLINE_SCRIPT)
@@ -597,74 +581,30 @@ def test_ac12_a_focused_scrolling_list_shows_its_whole_focus_outline(
     assert band["coveredBy"] == {}, band
 
 
-def test_ac12_the_roster_list_tab_stop_follows_a_resize(
-    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
-) -> None:
-    page = new_page(568, 320)
-    open_s1(page, live_server, fx01_grid)
-    assert_scrolls(read_list_state(page, "roster"), "roster")
-    wait_for_list(page, "roster", has_tab_stop)
-
-    resize_to(page, 1280, 720)
-    wait_for_list(page, "roster", has_no_tabindex)
-
-    resize_to(page, 568, 320)
-    wait_for_list(page, "roster", has_tab_stop)
-
-
-def test_ac12_the_feed_list_tab_stop_follows_new_lines(
+def test_ac12_the_stream_list_tab_stop_follows_new_lines_and_a_resize(
     new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
 ) -> None:
     page = new_page(568, 320)
     mock = open_s1(page, live_server, fx01_grid)
-    wait_for_list(page, "feed", has_no_tabindex)
+    wait_for_list(page, "stream", has_no_tabindex)
 
-    for line_count, seq in enumerate((11, 12, 13), start=1):
+    scrolls = False
+    line_count = 0
+    while not scrolls and line_count < MAX_LIVE_EVENTS:
+        seq = FIRST_LIVE_SEQ + line_count
+        line_count += 1
         mock.send(check_result_frame(seq))
         expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq))
         expect(page.get_by_test_id("feed-item")).to_have_count(line_count)
-        shown = wait_for_list(page, "feed", tabindex_follows_scroll)
-        if line_count >= 2:
-            assert_scrolls(shown, "feed")
+        shown = wait_for_list(page, "stream", tabindex_follows_scroll)
+        scrolls = shown.scrolls
+    assert scrolls, f"{MAX_LIVE_EVENTS} new lines do not make the stream list scroll"
 
+    resize_to(page, 1280, 720)
+    wait_for_list(page, "stream", tabindex_follows_scroll)
 
-def test_ac12_the_roster_list_tab_stop_follows_the_host_role(
-    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
-) -> None:
-    page = new_page(568, 320)
-    mock = open_s1(page, live_server, fx01_grid)
-    remove_buttons = page.get_by_test_id("remove-player")
-
-    mock.send(host_changed_frame(11, "p1"))
-    expect(remove_buttons.first).to_be_visible()
-    assert_scrolls(read_list_state(page, "roster"), "roster")
-    wait_for_list(page, "roster", has_tabindex_minus_one)
-
-    mock.send(host_changed_frame(12, "p2"))
-    expect(remove_buttons).to_have_count(0)
-    assert_scrolls(read_list_state(page, "roster"), "roster")
-    wait_for_list(page, "roster", has_tab_stop)
-
-
-def test_ac12_a_focused_list_keeps_its_tab_stop_until_the_focus_leaves(
-    new_page: Callable[[int, int], Page], live_server: str, fx01_grid: Grid
-) -> None:
-    page = new_page(568, 320)
-    mock = open_s1(page, live_server, fx01_grid)
-    assert_scrolls(read_list_state(page, "roster"), "roster")
-    tab_walk_to_the_list(page, "roster")
-
-    mock.send(host_changed_frame(11, "p1"))
-    expect(page.get_by_test_id("remove-player").first).to_be_visible()
-    page.wait_for_timeout(LIST_FOLLOW_MS)
-    kept = read_list_state(page, "roster")
-    page.keyboard.press("Tab")
-    step = read_focus_step(page)
-
-    assert kept.focused, kept
-    assert kept.tabindex == "0", kept
-    assert (step.test_id, step.player_id) == ("remove-player", "p2"), step
-    wait_for_list(page, "roster", has_tabindex_minus_one)
+    resize_to(page, 568, 320)
+    wait_for_list(page, "stream", tabindex_follows_scroll)
 
 
 STILL_READ_MS = 100
@@ -673,20 +613,20 @@ NEW_LINE_SEQ = 54
 FEED_ITEMS_AFTER_NEW_LINE = 44
 
 
-def wait_for_a_still_scroll_top(page: Page, list_name: str) -> ListState:
-    """Read the list every 100 ms until two reads in a row give one `scrollTop`."""
-    previous = read_list_state(page, list_name)
+def wait_for_a_still_scroll_top(page: Page) -> ListState:
+    """Read the stream list every 100 ms until two reads give one `scrollTop`."""
+    previous = read_list_state(page, "stream")
     for _ in range(STILL_READ_LIMIT):
         page.wait_for_timeout(STILL_READ_MS)
-        current = read_list_state(page, list_name)
+        current = read_list_state(page, "stream")
         if current.scroll_top == previous.scroll_top:
             return current
         previous = current
-    pytest.fail(f"the {list_name} list kept scrolling for 2 s: {previous}")
+    pytest.fail(f"the stream list kept scrolling for 2 s: {previous}")
 
 
-@pytest.mark.parametrize(("width", "height"), FEED_SIZES)
-def test_ac12_a_new_line_leaves_the_focused_feed_list_where_the_keys_put_it(
+@pytest.mark.parametrize(("width", "height"), S2_SIZES, ids=size_ids(S2_SIZES))
+def test_ac12_a_new_line_leaves_the_focused_stream_list_where_the_keys_put_it(
     new_page: Callable[[int, int], Page],
     live_server: str,
     fx01_grid: Grid,
@@ -695,10 +635,10 @@ def test_ac12_a_new_line_leaves_the_focused_feed_list_where_the_keys_put_it(
 ) -> None:
     page = new_page(width, height)
     mock = open_s2(page, live_server, fx01_grid)
-    assert_scrolls(read_list_state(page, "feed"), "feed")
-    tab_walk_to_the_list(page, "feed")
+    assert_scrolls(read_list_state(page, "stream"))
+    tab_walk_to_the_stream_list(page)
     page.keyboard.press("ArrowUp")
-    before = wait_for_a_still_scroll_top(page, "feed")
+    before = wait_for_a_still_scroll_top(page)
     assert before.distance_to_end > 1, f"ArrowUp left the list at its end: {before}"
 
     mock.send(check_result_frame(NEW_LINE_SEQ))
@@ -706,7 +646,7 @@ def test_ac12_a_new_line_leaves_the_focused_feed_list_where_the_keys_put_it(
         "data-seq", str(NEW_LINE_SEQ)
     )
     page.wait_for_timeout(LIST_FOLLOW_MS)
-    after = read_list_state(page, "feed")
+    after = read_list_state(page, "stream")
 
     expect(page.get_by_test_id("feed-item")).to_have_count(FEED_ITEMS_AFTER_NEW_LINE)
     assert abs(after.scroll_top - before.scroll_top) <= EPSILON, (before, after)

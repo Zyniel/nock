@@ -19,6 +19,7 @@ from playwright.sync_api import Browser, BrowserContext, Page, expect
 from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
+from room_panels import open_aide
 from spec034_harness import (
     catch_up_marks,
     cell_at,
@@ -102,6 +103,7 @@ def play_while_ana_is_away(
         bob_page.keyboard.press(letter)
     expect_confirmed_letter(bob_page, 2, 4, "E")
     if bob_checks:
+        open_aide(bob_page)  # spec 043: the item is in a panel, opened first
         bob_page.get_by_test_id("check-word").click()
         expect(feed_item_locator(bob_page).last).to_have_text("Bob a vérifié un mot")
 

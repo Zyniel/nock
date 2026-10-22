@@ -13,6 +13,11 @@ the separators U+001C to U+001F or U+0085) is tested on the WebSocket: such a te
 gets `invalid_message`, as spec 039's refined `ChatText` (its AC-8, decision 14)
 strips as `str.strip()` does.
 
+Refined by spec 043 (the design's room layout): each page shows the Salon's
+Discussion tab (the harness's `open_panel` calls spec 043's `show_tab`), where it
+read "each opens the chat with `chat-toggle`", which in the column layout, open by
+default, would close it.
+
 The shared setup is in `spec022_harness`.
 """
 

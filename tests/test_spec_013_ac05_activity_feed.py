@@ -3,6 +3,10 @@
 The feed lines for checks, reveals, flags, lock, settings and host changes are
 tested with mocked events only: the server does not produce them yet (specs 014,
 021, 023 and 024). The shared setup is in `spec013_harness`.
+
+Refined by spec 043 (the design's room layout): the feed is the Salon's stream,
+whose list is named by the Discussion tab's hidden heading (`chat-heading`); the
+feed's own heading (`feed.heading`) is gone. The other checks are unchanged.
 """
 
 from __future__ import annotations
@@ -166,14 +170,14 @@ def test_ac5_browser_events_sent_out_of_order_are_listed_by_seq(
     assert feed_items(page) == SPEC_EXAMPLE_ITEMS
 
 
-def test_ac5_browser_the_feed_has_its_heading_and_no_item_from_the_snapshot(
+def test_ac5_browser_the_feed_is_named_by_the_discussion_heading_and_starts_empty(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid, feed_snapshot_players(), seq=5)
 
-    feed = page.get_by_test_id("activity-feed")
-    expect(feed).to_contain_text("Activité")
-    expect(feed).to_contain_text(load_fr()["feed.heading"])
+    feed_list = page.get_by_test_id("activity-feed").locator("ul")
+    expect(feed_list).to_have_attribute("aria-labelledby", "chat-heading")
+    expect(page.locator("#chat-heading")).to_have_text(load_fr()["chat.heading"])
     expect(feed_locator(page)).to_have_count(0)
     settle(page)
     assert feed_items(page) == []

@@ -83,6 +83,7 @@ from nock.room import (
     join_room,
     new_room,
 )
+from room_panels import open_aide
 
 INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
@@ -570,4 +571,5 @@ def play_ana_checks_the_word(
     page.keyboard.press("t")
     page.keyboard.press("x")
     expect(cell_at(bob_page, 1, 1)).to_have_attribute("data-letter", "X")
+    open_aide(page)  # spec 043: the check items are in the Aide menu
     page.get_by_test_id("check-word").click()

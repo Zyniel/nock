@@ -28,6 +28,11 @@ Choices where the spec leaves room:
   that AC-8 names, filled as `t` fills it.
 - The Greek and Devanagari letters, the sharp s, U+2019 and the combining marks
   are written as named escapes, never as raw characters.
+
+Spec 043 (the design's room layout) moves what these tests reach: the chat panel
+is the Salon's Discussion tab (`show_tab`), the authors switch is an item of the
+room Menu (`open_menu`), and the mute buttons are in the Joueurs rows, named by
+each row's `roster-nickname`.
 """
 
 from __future__ import annotations
@@ -59,6 +64,7 @@ from nock.protocol import (
     grid_view,
 )
 from nock.room import normalize_nickname
+from room_panels import open_menu, show_tab
 from spec012_harness import (
     FORM_TIMEOUT_MS,
     MOCK_TOKEN,
@@ -572,8 +578,8 @@ def clue_of(page: Page, clue: ClueRef) -> Locator:
 
 
 def open_chat_panel(page: Page) -> None:
-    page.get_by_test_id("chat-toggle").click()
-    expect(page.get_by_test_id("chat-panel")).to_be_visible()
+    """Show the Salon's Discussion tab (spec 043's `show_tab`)."""
+    show_tab(page, "discussion")
 
 
 def expected_mute_button(player_id: str, shown: str) -> tuple[str, str]:
@@ -620,8 +626,10 @@ def test_ac8_browser_the_author_line_shows_capitalised_words(
 ) -> None:
     open_places_room(page, live_server, fx01_grid)
     switch = page.get_by_test_id("authors-switch")
+    open_menu(page)  # spec 043: the switch is an item of the room Menu
     switch.click()
     expect(switch).to_have_attribute("aria-pressed", "true")
+    page.get_by_test_id("menu-button").click()
     author_line = page.get_by_test_id("clue-bar-author")
 
     for (row, column), expected_line in AUTHOR_LINES:
@@ -643,19 +651,19 @@ def test_ac8_browser_the_chat_authors_show_capitalised_words(
     expect(chat_list.get_by_test_id("chat-author")).to_have_text(SHOWN_NICKNAMES)
 
 
-def test_ac8_browser_the_mute_rows_show_capitalised_words(
+def test_ac8_browser_the_mute_buttons_show_capitalised_words(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    # Spec 043: the host's `mute-player` sits in each other player's row of the
+    # Joueurs tab, where the chat panel's `mute-row` (with its `mute-name`) was.
     open_places_room(page, live_server, fx01_grid)
 
-    open_chat_panel(page)
+    show_tab(page, "players")
 
-    rows = page.get_by_test_id("chat-moderation").get_by_test_id("mute-row")
-    expect(rows).to_have_count(len(OTHERS_SHOWN))
-    for position, (player_id, shown) in enumerate(OTHERS_SHOWN):
-        row = rows.nth(position)
-        expect(row).to_have_attribute("data-player-id", player_id)
-        expect(row.get_by_test_id("mute-name")).to_have_text(shown)
+    expect(page.get_by_test_id("mute-player")).to_have_count(len(OTHERS_SHOWN))
+    for player_id, shown in OTHERS_SHOWN:
+        row = roster_item(page, player_id)
+        expect(row.get_by_test_id("roster-nickname")).to_have_text(shown)
         button_text, button_label = expected_mute_button(player_id, shown)
         button = row.get_by_test_id("mute-player")
         expect(button).to_have_text(button_text)

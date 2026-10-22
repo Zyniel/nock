@@ -421,11 +421,16 @@ def test_ac3_browser_the_host_marker_is_on_the_host_item_only(
     expect(roster_item(page, "p3")).not_to_contain_text(load_fr()["roster.host"])
 
 
+# Refined by spec 043 (the design's room layout): the host's controls are the
+# Menu's `host-settings-open` (the host panel is gone) and the `remove-player`
+# buttons of the Joueurs rows.
+
+
 def test_ac3_browser_host_changed_moves_the_marker_and_gives_me_the_controls(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     room = joined_mock_room(page, live_server, fx01_grid, three_players("p1"), you="p3")
-    expect(page.get_by_test_id("host-panel")).to_have_count(0)
+    expect(page.get_by_test_id("host-settings-open")).to_have_count(0)
     expect(page.get_by_test_id("remove-player")).to_have_count(0)
 
     room.connections[0].send(host_frame(6, "p3"))
@@ -434,7 +439,7 @@ def test_ac3_browser_host_changed_moves_the_marker_and_gives_me_the_controls(
     expect(roster_item(page, "p1")).to_have_attribute("data-host", "false")
     expect(roster_item(page, "p3")).to_contain_text(load_fr()["roster.host"])
     expect(roster_item(page, "p1")).not_to_contain_text(load_fr()["roster.host"])
-    expect(page.get_by_test_id("host-panel")).to_be_visible()
+    expect(page.get_by_test_id("host-settings-open")).to_have_count(1)
     expect(page.get_by_test_id("remove-player")).to_have_count(2)
     expect(roster_item(page, "p3").get_by_test_id("remove-player")).to_have_count(0)
 
@@ -443,7 +448,7 @@ def test_ac3_browser_host_changed_takes_the_controls_away_from_the_old_host(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     room = joined_mock_room(page, live_server, fx01_grid, three_players("p1"), you="p1")
-    expect(page.get_by_test_id("host-panel")).to_be_visible()
+    expect(page.get_by_test_id("host-settings-open")).to_have_count(1)
     expect(page.get_by_test_id("remove-player")).to_have_count(2)
     page_errors: list[str] = []
     page.on("pageerror", lambda error: page_errors.append(str(error)))
@@ -452,7 +457,7 @@ def test_ac3_browser_host_changed_takes_the_controls_away_from_the_old_host(
 
     expect(roster_item(page, "p2")).to_have_attribute("data-host", "true")
     expect(roster_item(page, "p1")).to_have_attribute("data-host", "false")
-    expect(page.get_by_test_id("host-panel")).to_have_count(0)
+    expect(page.get_by_test_id("host-settings-open")).to_have_count(0)
     expect(page.get_by_test_id("remove-player")).to_have_count(0)
     settle(page)
     assert page_errors == []

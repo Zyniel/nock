@@ -1,11 +1,19 @@
 """Tests of spec 013, AC-6: the roster and the feed keep the grid's room.
 
 The page is tested at several window sizes, with a mouse and with a touch screen:
-with 100 feed items and a tapped cell, the grid keeps its room; and, without a
-tap, the first three feed lines never move `grid-viewport`, and the feed list is
-as tall with 3 items as with 100 ("Client: feed height"). The second check runs
-all its item counts on one page per window size and context, to keep the run
-short. The shared setup is in `spec013_harness`.
+with 100 feed items and a tapped cell, the grid keeps its room with the Salon
+closed and again with the Salon open on its Discussion tab, and in the sheet
+layout `grid-viewport` keeps one box in both; and, without a tap, with the Salon
+open on its Discussion tab, the first three feed lines never move
+`grid-viewport`, and the stream list is as tall with 3 items as with 100 ("Client:
+feed height"). The second check runs all its item counts on one page per window
+size and context, to keep the run short. The shared setup is in `spec013_harness`.
+
+Refined by spec 043 (the design's room layout): the roster and the feed rows are
+gone; the feed is the Salon's stream, whose one list (`chat-list` inside
+`activity-feed`) fills its tab panel. The Salon is closed with a click on
+`chat-toggle` when the column layout opened it at load, and opened with spec
+043's `show_tab(page, "discussion")`.
 """
 
 from __future__ import annotations
@@ -15,6 +23,7 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import GridTarget, PlayerView
+from room_panels import show_tab
 from spec013_harness import (
     FEED_LIMIT,
     MockRoomSocket,
@@ -69,6 +78,66 @@ def eight_players() -> list[PlayerView]:
     return players
 
 
+def close_the_salon(page: Page) -> None:
+    """Close the Salon when it is open (the column layout opens it at load)."""
+    salon = page.get_by_test_id("salon")
+    if salon.get_attribute("hidden", timeout=TAP_TIMEOUT_MS) is None:
+        page.get_by_test_id("chat-toggle").click(timeout=TAP_TIMEOUT_MS)
+    expect(salon).to_be_hidden()
+
+
+def grid_room_problems(page: Page, touch: bool) -> list[str]:
+    """How the page breaks AC-6's guarantees with 100 feed items (empty: none)."""
+    problems: list[str] = []
+    viewport = page.get_by_test_id("grid-viewport")
+    viewport_rect = viewport.bounding_box()
+    bar_box = page.get_by_test_id("clue-bar").bounding_box()
+    grid_box = page.get_by_test_id("grid").bounding_box()
+    assert viewport_rect is not None
+    assert bar_box is not None
+    assert grid_box is not None
+    sizes = page.evaluate(
+        "() => [document.documentElement.scrollWidth, window.innerWidth,"
+        " document.documentElement.scrollHeight, window.innerHeight]"
+    )
+    scroll_width, window_width, scroll_height, window_height = sizes
+    if viewport_rect["height"] < MIN_GRID_VIEWPORT_PX:
+        problems.append(f"grid-viewport is {viewport_rect['height']} px high")
+    if scroll_width > window_width:
+        problems.append(f"the page scrolls sideways: {scroll_width}")
+    if scroll_height > window_height:
+        problems.append(f"the page scrolls down: {scroll_height}")
+    if viewport.get_attribute("data-zoom") != "1":
+        problems.append(f"data-zoom is {viewport.get_attribute('data-zoom')}")
+    grid_right = grid_box["x"] + grid_box["width"]
+    grid_bottom = grid_box["y"] + grid_box["height"]
+    inside = (
+        grid_box["x"] >= viewport_rect["x"] - EPSILON
+        and grid_box["y"] >= viewport_rect["y"] - EPSILON
+        and grid_right <= viewport_rect["x"] + viewport_rect["width"] + EPSILON
+        and grid_bottom <= viewport_rect["y"] + viewport_rect["height"] + EPSILON
+    )
+    if not inside:
+        problems.append(f"the grid {grid_box} is not inside {viewport_rect}")
+    bar_bottom = bar_box["y"] + bar_box["height"]
+    bar_inside = (
+        bar_box["x"] >= -EPSILON
+        and bar_box["x"] + bar_box["width"] <= window_width + EPSILON
+        and bar_box["y"] >= -EPSILON
+        and bar_bottom <= window_height + EPSILON
+    )
+    if not bar_inside:
+        problems.append(f"clue-bar {bar_box} is not inside the window")
+    if touch:
+        keyboard_box = page.get_by_test_id("keyboard").bounding_box()
+        assert keyboard_box is not None
+        if bar_bottom > keyboard_box["y"] + EPSILON:
+            problems.append(f"clue-bar {bar_box} goes below the keyboard's top")
+        if keyboard_box["y"] + keyboard_box["height"] > window_height + EPSILON:
+            problems.append(f"the keyboard {keyboard_box} goes below the window")
+    return problems
+
+
 @pytest.mark.parametrize("context_kind", ["desktop", "touch"])
 @pytest.mark.parametrize(
     ("width", "height"), WINDOW_SIZES, ids=[f"{w}x{h}" for w, h in WINDOW_SIZES]
@@ -98,43 +167,20 @@ def test_ac6_browser_the_roster_and_the_feed_keep_the_grids_room(
             cell.tap(timeout=TAP_TIMEOUT_MS)
         else:
             cell.click(timeout=TAP_TIMEOUT_MS)
+        expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", "3,0,0")
 
-        bar = page.get_by_test_id("clue-bar")
-        expect(bar).to_have_attribute("data-word", "3,0,0")
-        viewport = page.get_by_test_id("grid-viewport")
-        viewport_box = viewport.bounding_box()
-        bar_box = bar.bounding_box()
-        assert viewport_box is not None
-        assert bar_box is not None
-        sizes = page.evaluate(
-            "() => [document.documentElement.scrollWidth, window.innerWidth,"
-            " document.documentElement.scrollHeight, window.innerHeight]"
-        )
-        scroll_width, window_width, scroll_height, window_height = sizes
+        close_the_salon(page)
+        closed_problems = grid_room_problems(page, touch)
+        closed_box = viewport_box(page)
+        show_tab(page, "discussion")
+        open_problems = grid_room_problems(page, touch)
+        open_box = viewport_box(page)
+        layout = page.get_by_test_id("room-page").get_attribute("data-layout")
 
-        assert viewport_box["height"] >= MIN_GRID_VIEWPORT_PX
-        assert scroll_width <= window_width
-        assert scroll_height <= window_height
-        expect(viewport).to_have_attribute("data-zoom", "1")
-        grid_box = page.get_by_test_id("grid").bounding_box()
-        assert grid_box is not None
-        assert grid_box["x"] >= viewport_box["x"] - EPSILON
-        assert grid_box["y"] >= viewport_box["y"] - EPSILON
-        grid_right = grid_box["x"] + grid_box["width"]
-        grid_bottom = grid_box["y"] + grid_box["height"]
-        assert grid_right <= viewport_box["x"] + viewport_box["width"] + EPSILON
-        assert grid_bottom <= viewport_box["y"] + viewport_box["height"] + EPSILON
-        assert bar_box["x"] >= -EPSILON
-        assert bar_box["x"] + bar_box["width"] <= window_width + EPSILON
-        assert bar_box["y"] >= -EPSILON
-        bar_bottom = bar_box["y"] + bar_box["height"]
-        assert bar_bottom <= window_height + EPSILON
-        if touch:
-            keyboard_box = page.get_by_test_id("keyboard").bounding_box()
-            assert keyboard_box is not None
-            assert bar_bottom <= keyboard_box["y"] + EPSILON
-            keyboard_bottom = keyboard_box["y"] + keyboard_box["height"]
-            assert keyboard_bottom <= window_height + EPSILON
+        assert closed_problems == []
+        assert open_problems == []
+        if layout == "sheet":
+            assert boxes_unlike_the_first([closed_box, open_box]) == []
     finally:
         close()
 
@@ -225,6 +271,7 @@ def test_ac6_browser_new_feed_lines_never_move_the_grid_viewport(
             page, live_server, fx01_grid, eight_players(), seq=SNAPSHOT_SEQ
         )
         settle(page)
+        show_tab(page, "discussion")
         boxes = viewport_boxes_with_short_feeds(page, mock)
         short_feed_height = feed_list_height(page)
 

@@ -42,6 +42,7 @@ from nock.protocol import (
 )
 from nock.room import RoomConfig
 from nock.server import create_app
+from room_panels import open_aide
 from spec025_harness import (
     FIVE_AND_ONE,
     GRID_CHECK,
@@ -400,6 +401,7 @@ def test_ac2_browser_bob_votes_yes_and_both_pages_show_the_revealed_letter(
         assert question == "Ana propose de révéler une lettre."
 
         cell_at(page, 1, 0).click()
+        open_aide(page)  # spec 043: the reveal items are in the Aide menu
         page.get_by_test_id("reveal-letter").click()
 
         for watcher in (page, bob_page):
@@ -418,8 +420,8 @@ def test_ac2_browser_bob_votes_yes_and_both_pages_show_the_revealed_letter(
                 "data-revealed", "true", timeout=WITHIN_MS
             )
             expect(revealed).to_have_attribute("data-letter", "T", timeout=WITHIN_MS)
-            expect(watcher.get_by_test_id("reveal-letter")).to_have_text(
-                fr_text("reveal.letter", count=4), timeout=WITHIN_MS
+            expect(watcher.get_by_test_id("reveal-letter-detail")).to_have_text(
+                fr_text("reveal.letters_left", count=4), timeout=WITHIN_MS
             )
             expect(watcher.get_by_test_id("vote-result")).to_have_text(
                 fr_text("vote.result.passed"), timeout=WITHIN_MS

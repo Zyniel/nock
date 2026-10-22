@@ -4,6 +4,11 @@ The room starts in `free`; the host changes the mode in spec 014's settings form
 before anyone else joins (the real WebSocket, then the page opened from the
 catalogue with spec 010's one-tap start). The shared setup is in
 `spec025_harness`.
+
+Refined by spec 043 (the design's room layout): the settings form is in the
+host's settings sheet, and `help-mode-select` is a fieldset of three
+`help-mode-option` radios (the checked one is the room's mode); the check panel is
+a group of the Aide menu, opened with `open_aide` before it is looked at.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import ChangeSettings, HelpMode
 from nock.server import create_app
+from room_panels import open_aide
 from spec010_harness import ROOM_URL_PATTERN
 from spec025_harness import (
     FIVE_AND_ONE,
@@ -148,12 +154,14 @@ def test_ac1_browser_the_creator_finds_free_selected_among_three_modes(
     expect(roster).to_have_count(1)
     expect(roster).to_have_attribute("data-host", "true")
     select = page.get_by_test_id("help-mode-select")
-    expect(select).to_have_value("free")
-    options = select.locator("option")
+    options = select.get_by_test_id("help-mode-option")
     expect(options).to_have_count(3)
     for index, mode in enumerate(["free", "vote", "none"]):
         expect(options.nth(index)).to_have_attribute("value", mode)
-        expect(options.nth(index)).to_have_text(fr_text(f"settings.help_mode.{mode}"))
+        expect(options.nth(index)).to_have_accessible_name(
+            fr_text(f"settings.help_mode.{mode}")
+        )
+    expect(options.nth(0)).to_be_checked()
 
 
 def test_ac1_browser_none_chosen_before_anyone_joins_hides_both_help_panels(
@@ -164,6 +172,7 @@ def test_ac1_browser_none_chosen_before_anyone_joins_hides_both_help_panels(
 ) -> None:
     seed_nickname(page, "Ana")
     start_from_catalogue(page, live_server)
+    open_aide(page)
     expect(page.get_by_test_id("check-panel")).to_be_visible()
 
     host_sets_help_mode(page, "none")

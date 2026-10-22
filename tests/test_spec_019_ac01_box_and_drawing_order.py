@@ -3,7 +3,7 @@
 In the desktop context, with the switch on, on four mocked pages: FX-01 at 1280 by
 720 (the snapshot of AC-1 with `p3` to `p6` added, colours 1, 2, 4 and 5, and `p2`
 to `p6` selecting (1, 0) `across`), and FX-02 at 320 by 568, at 568 by 320 and at
-296 by 640 (spec 026's `FX02_FULL_WRONG` snapshot without its feed items or tap,
+283 by 640 (spec 026's `FX02_FULL_WRONG` snapshot without its feed items or tap,
 its row 1 letters by `p9` instead of `p2`, and `p2` to `p6` selecting (1, 6)
 `down`). Each test opens one page and checks, together:
 
@@ -14,7 +14,7 @@ its row 1 letters by `p9` instead of `p2`, and `p2` to `p6` selecting (1, 6)
   at most 0.5 px;
 - at 568 by 320, that FX-02's cells are under 20 px, so the small-cell rule is the
   one tested there (the spec says so, after spec 035 AC-11);
-- at 296 by 640, that FX-02's cells measure 20 to 21 px (the width of their
+- at 283 by 640, that FX-02's cells measure 20 to 21 px (the width of their
   bounding box), asserted before the box rules and the drawing order, so that the
   page keeps testing the cells closest to the letter rule's limit; the bands are
   then held to the full rules of a cell of 20 px or more;
@@ -23,6 +23,10 @@ its row 1 letters by `p9` instead of `p2`, and `p2` to `p6` selecting (1, 6)
   every triangle. (Spec 042, the design's grid cells: the cursors are corner
   triangles, at most four, in place of outlines with corner labels; the fifth
   cursor waits and is not drawn.)
+
+Refined by spec 043 (the design's room layout): the fourth page is 283 by 640
+(it was 296 by 640, where the new layout's cells measure about 21.5 px), and the
+switch is pressed in the room Menu (spec 019's harness opens it).
 
 Choices where the spec leaves room:
 
@@ -75,7 +79,7 @@ PROBE_SHIFT_MAX_PX = 0.5
 SMALL_CELL_WINDOW = (568, 320)
 # The window where FX-02's cells measure 20 to 21 px, and the range their side
 # must lie in.
-CLOSE_TO_LIMIT_WINDOW = (296, 640)
+CLOSE_TO_LIMIT_WINDOW = (283, 640)
 CLOSE_TO_LIMIT_SIDE_MIN_PX = 20.0
 CLOSE_TO_LIMIT_SIDE_MAX_PX = 21.0
 
@@ -88,7 +92,7 @@ BOX_PAGES = [
     ("fx01", 1280, 720),
     ("fx02", 320, 568),
     ("fx02", 568, 320),
-    ("fx02", 296, 640),
+    ("fx02", 283, 640),
 ]
 BOX_PAGE_IDS = [f"{name}-{width}x{height}" for name, width, height in BOX_PAGES]
 

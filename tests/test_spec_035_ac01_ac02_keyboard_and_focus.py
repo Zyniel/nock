@@ -3,6 +3,20 @@
 The keyboard walk (AC-1, AC-2) uses the live server and the real WebSocket; the
 other tests of AC-2 use a mocked socket. The setup the test files of spec 035
 share is in `tests/spec035_harness.py`.
+
+Refined by spec 043 (the design's room layout): an element inside the Aide menu,
+the Menu, the Salon or the host's settings sheet is reached by first opening it
+from the keyboard (`tab_to` its button, then `Enter`); the walk's actions do not
+change. So the walk also reaches `aide-button` (before each check item), the
+Salon's tabs (`salon-tab-discussion`, then `ArrowRight` to the Joueurs tab, before
+`copy-link` and `share-link`), `menu-button` and `host-settings-open` (before the
+sheet's controls). `help-mode-select` is a fieldset of radios now: the walk reaches
+its checked `help-mode-option`, the group's one Tab stop, then `ArrowDown` picks
+`vote`. A ring's contrast is measured against the surface behind it
+(`tests/colour_contrast.js`). The clue bar's buttons follow the grid, so `Escape`
+then `Tab` moves the focus from the grid to `clue-prev`, where it moved to the
+sentinel (the walk and the outline check read that place); the pointer-focus rule of
+the host panel is gone with the panel.
 """
 
 from __future__ import annotations
@@ -12,10 +26,11 @@ import re
 from typing import Any, NamedTuple
 
 import pytest
-from playwright.sync_api import Browser, BrowserContext, Page, WebSocket, expect
+from playwright.sync_api import Browser, Page, WebSocket, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
+from room_panels import show_tab
 from spec035_harness import (
     FEED_LIST_SELECTOR,
     FEED_SIZES,
@@ -27,11 +42,9 @@ from spec035_harness import (
     ROOM_TIMEOUT_MS,
     SETTLE_MS,
     Walker,
-    add_sentinel,
     build_fx01_grid,
     build_reference_catalogue,
     cell_at,
-    expect_focus_on_sentinel,
     expect_selected,
     expect_word,
     fill_feed_and_check_it_scrolls,
@@ -178,11 +191,10 @@ def walk_the_catalogue(walker: Walker, live_server: str) -> None:
 def walk_the_grid(walker: Walker, recorder: FrameRecorder) -> None:
     """In the room: select, type, move, erase, undo and leave the grid.
 
-    The room is `joined`, so the sentinel is added first: leaving the grid moves
-    the focus to it.
+    Leaving the grid moves the focus to `clue-prev`, the first focusable element
+    after it (spec 043).
     """
     page = walker.page
-    add_sentinel(page)
     walker.tab_to("grid")
     page.keyboard.press("Tab")
     expect_word(page, "0,0,0")
@@ -212,8 +224,15 @@ def walk_the_grid(walker: Walker, recorder: FrameRecorder) -> None:
 
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
-    expect_focus_on_sentinel(page)
+    expect(page.get_by_test_id("clue-prev")).to_be_focused()
     walker.outlines.append(letter_outlines(page))
+
+
+def open_from_the_keyboard(walker: Walker, button: str, opened: str) -> None:
+    """`tab_to` a popover's button and press `Enter` (spec 043)."""
+    walker.tab_to(button)
+    walker.page.keyboard.press("Enter")
+    expect(walker.page.get_by_test_id(opened)).to_be_visible()
 
 
 def walk_the_controls(walker: Walker, recorder: FrameRecorder) -> None:
@@ -225,6 +244,7 @@ def walk_the_controls(walker: Walker, recorder: FrameRecorder) -> None:
         ("check-grid", "grid"),
     ]
     for count, (test_id, scope) in enumerate(expected_scopes, start=1):
+        open_from_the_keyboard(walker, "aide-button", "aide-menu")
         walker.tab_to(test_id)
         frame = press_and_expect_sent(walker, recorder, "check", count)
         assert frame["target"]["scope"] == scope
@@ -232,9 +252,18 @@ def walk_the_controls(walker: Walker, recorder: FrameRecorder) -> None:
     walker.tab_to("undo-button")
     press_and_expect_sent(walker, recorder, "undo", 2)
 
+    # The Salon is open at load at 1280 by 720 (spec 043's column layout), on its
+    # Discussion tab: `ArrowRight` on that tab shows the Joueurs tab.
+    walker.tab_to("salon-tab-discussion")
+    page.keyboard.press("ArrowRight")
+    expect(page.get_by_test_id("roster")).to_be_visible()
     walker.tab_to("copy-link")
     walker.tab_to("share-link")
 
+    open_from_the_keyboard(walker, "menu-button", "room-menu")
+    walker.tab_to("host-settings-open")
+    page.keyboard.press("Enter")
+    expect(page.get_by_test_id("host-settings")).to_have_attribute("open", "")
     lock_room = page.get_by_test_id("lock-room")
     walker.tab_to("lock-room")
     page.keyboard.press("Enter")
@@ -244,7 +273,7 @@ def walk_the_controls(walker: Walker, recorder: FrameRecorder) -> None:
     locks = recorder.wait_for("lock_room", 2)
     assert [frame["locked"] for frame in locks] == [True, False]
 
-    walker.tab_to("help-mode-select")
+    walker.tab_to("help-mode-option", selector=":checked")
     page.keyboard.press("ArrowDown")
     walker.tab_to("settings-save")
     saved = press_and_expect_sent(walker, recorder, "change_settings", 1)
@@ -307,14 +336,20 @@ def test_ac1_every_action_is_reachable_from_the_keyboard(
         "force-filter",
         "catalogue-play",
         "grid",
+        "aide-button",
         "check-word",
+        "aide-button",
         "check-letter",
+        "aide-button",
         "check-grid",
         "undo-button",
+        "salon-tab-discussion",
         "copy-link",
         "share-link",
+        "menu-button",
+        "host-settings-open",
         "lock-room",
-        "help-mode-select",
+        "help-mode-option",
         "settings-save",
         "remove-player",
     ]
@@ -337,7 +372,7 @@ def test_ac2_every_element_reached_by_the_walk_shows_a_visible_focus(
     for outlines in result.ana.outlines:
         assert_only_selected_cell_is_outlined(outlines)
     steps = result.ana.reached + result.bob_walker.reached
-    assert len(steps) == 14
+    assert len(steps) == 20
     assert "grid" in [step.test_id for step in steps]
     for step in steps:
         assert step.outline_style not in ("none", "auto"), step
@@ -349,7 +384,6 @@ def test_ac2_the_selected_cell_keeps_its_outline_without_the_focus(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_room(page, live_server, fx01_grid)
-    add_sentinel(page)
     walker = Walker(page)
     walker.tab_to("grid")
     page.keyboard.press("Tab")
@@ -359,7 +393,7 @@ def test_ac2_the_selected_cell_keeps_its_outline_without_the_focus(
     page.keyboard.press("Escape")
     page.keyboard.press("Tab")
 
-    expect_focus_on_sentinel(page)
+    expect(page.get_by_test_id("clue-prev")).to_be_focused()
     expect_selected(page, 1, 0)
     assert_only_selected_cell_is_outlined(letter_outlines(page))
 
@@ -373,108 +407,7 @@ def test_ac2_no_cell_is_outlined_before_a_selection(
         assert outline["style"] == "none", outline
 
 
-# Pointer focus must not disturb the host panel's fade (spec 014 AC-7); a keyboard
-# focus on a panel control hides it. The probes run in K2 on a 320x568 phone.
-# On a pointer focus the page's own code never scrolls the panel, but the browser may
-# (WebKit scrolls a partly visible select into view), so the test spies on the
-# page's scroll calls instead of comparing the panel's `scrollLeft`.
-
-PHONE_SIZE = {"width": 320, "height": 568}
-PANEL_CONTROLS = [
-    "lock-room",
-    "help-mode-select",
-    "reveal-letters-input",
-    "reveal-words-input",
-]
-
-HOST_PANEL_STATE_SCRIPT = r"""
-() => {
-  const panel = document.querySelector('[data-testid="host-panel"]');
-  const fade = document.querySelector('[data-testid="host-panel-more"]');
-  const fadeStyle = fade === null ? null : getComputedStyle(fade);
-  return {
-    fade: fadeStyle === null ? null : fadeStyle.visibility,
-    fadeDisplay: fadeStyle === null ? null : fadeStyle.display,
-    moreToTheRight: panel.scrollLeft + panel.clientWidth < panel.scrollWidth - 1,
-  };
-}
-"""
-
-# Records in `window.panelScrollCalls` each scroll call that the page makes on the
-# host panel or on an element inside it: the scroll methods of `Element.prototype`
-# (`scrollIntoViewIfNeeded` where the engine has it) and the `scrollLeft` setter. A
-# scroll that the browser makes by itself does not go through them.
-SCROLL_SPY_SCRIPT = r"""
-() => {
-  const panel = document.querySelector('[data-testid="host-panel"]');
-  window.panelScrollCalls = [];
-  const record = (name, element) => {
-    if (element === panel || panel.contains(element)) {
-      window.panelScrollCalls.push(name);
-    }
-  };
-  const methods = [
-    'scrollIntoView', 'scrollIntoViewIfNeeded', 'scroll', 'scrollTo', 'scrollBy',
-  ];
-  for (const name of methods) {
-    const originalMethod = Element.prototype[name];
-    if (typeof originalMethod !== 'function') {
-      continue;
-    }
-    Element.prototype[name] = function (...args) {
-      record(name, this);
-      return originalMethod.apply(this, args);
-    };
-  }
-  const scrollLeft = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollLeft');
-  Object.defineProperty(Element.prototype, 'scrollLeft', {
-    configurable: true,
-    enumerable: scrollLeft.enumerable,
-    get: scrollLeft.get,
-    set(value) {
-      record('scrollLeft', this);
-      scrollLeft.set.call(this, value);
-    },
-  });
-}
-"""
-
-# Put the control in the panel so that it is fully shown ("full") or cut by the
-# right edge of the panel ("partial"), without any focus change.
-SCROLL_CONTROL_SCRIPT = r"""
-([testId, mode]) => {
-  const panel = document.querySelector('[data-testid="host-panel"]');
-  const control = document.querySelector(`[data-testid="${testId}"]`);
-  const panelBox = panel.getBoundingClientRect();
-  const box = control.getBoundingClientRect();
-  const left = box.left - panelBox.left + panel.scrollLeft;
-  panel.scrollLeft = mode === 'full'
-    ? left - 10
-    : left + box.width * 0.6 - panel.clientWidth;
-}
-"""
 FEED_LIST_TEST_ID = "feed list"
-
-
-def mobile_context(browser: Browser, touch: bool) -> BrowserContext:
-    """A 320x568 context; `touch` adds a touch screen like a phone has."""
-    is_mobile = touch and browser.browser_type.name != "firefox"
-    return browser.new_context(
-        viewport=PHONE_SIZE, has_touch=touch, is_mobile=is_mobile
-    )
-
-
-def visible_centre(page: Page, test_id: str) -> tuple[float, float] | None:
-    """The centre of the part of a host-panel control that the panel shows."""
-    box = page.get_by_test_id(test_id).bounding_box()
-    panel = page.get_by_test_id("host-panel").bounding_box()
-    assert box is not None
-    assert panel is not None
-    left = max(box["x"], panel["x"]) + 2
-    right = min(box["x"] + box["width"], panel["x"] + panel["width"]) - 2
-    if right <= left:
-        return None
-    return (left + right) / 2, box["y"] + box["height"] / 2
 
 
 def focused_test_id(page: Page) -> str | None:
@@ -493,63 +426,6 @@ def focused_test_id(page: Page) -> str | None:
     return found["testId"]
 
 
-@pytest.mark.parametrize("scroll_mode", ["partial", "full"])
-@pytest.mark.parametrize("target", PANEL_CONTROLS)
-@pytest.mark.parametrize("touch", [False, True], ids=["mouse", "touch"])
-def test_ac2_a_pointer_focus_keeps_the_host_panel_fade_and_makes_no_scroll_call(
-    browser: Browser,
-    live_server: str,
-    fx01_grid: Grid,
-    touch: bool,
-    target: str,
-    scroll_mode: str,
-) -> None:
-    context = mobile_context(browser, touch)
-    page = context.new_page()
-    open_k2(page, live_server, fx01_grid)
-    page.evaluate(SCROLL_CONTROL_SCRIPT, [target, scroll_mode])
-    page.wait_for_timeout(SETTLE_MS)
-    centre = visible_centre(page, target)
-    if centre is None:
-        context.close()
-        pytest.skip(f"{target} has no visible part in mode {scroll_mode}")
-
-    # The spy goes in after the set-up scroll above, which it must not record.
-    page.evaluate(SCROLL_SPY_SCRIPT)
-    # Raw coordinates: `.click()` scrolls the element into view and hides the bug.
-    x, y = centre
-    if touch:
-        page.touchscreen.tap(x, y)
-    else:
-        page.mouse.click(x, y)
-    page.wait_for_timeout(SETTLE_MS)
-    scroll_calls = page.evaluate("window.panelScrollCalls")
-    state = page.evaluate(HOST_PANEL_STATE_SCRIPT)
-    context.close()
-
-    assert scroll_calls == [], state
-    if state["moreToTheRight"]:
-        assert state["fade"] == "visible", state
-        assert state["fadeDisplay"] != "none", state
-
-
-@pytest.mark.parametrize("target", PANEL_CONTROLS)
-def test_ac2_a_keyboard_focus_in_the_host_panel_hides_the_fade(
-    browser: Browser, live_server: str, fx01_grid: Grid, target: str
-) -> None:
-    context = mobile_context(browser, touch=False)
-    page = context.new_page()
-    open_k2(page, live_server, fx01_grid)
-    page.evaluate("document.activeElement.blur()")
-    walker = Walker(page)
-    walker.tab_to(target)
-    page.wait_for_timeout(SETTLE_MS)
-    state = page.evaluate(HOST_PANEL_STATE_SCRIPT)
-    context.close()
-
-    assert state["fade"] == "hidden", state
-
-
 @pytest.mark.parametrize(("width", "height"), FEED_SIZES)
 def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
     browser: Browser,
@@ -561,6 +437,7 @@ def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
     context = browser.new_context(viewport={"width": width, "height": height})
     page = context.new_page()
     mock = open_k2(page, live_server, fx01_grid)
+    show_tab(page, "discussion")
     fill_feed_and_check_it_scrolls(page, mock)
     page.evaluate("document.activeElement.blur()")
     reached = False

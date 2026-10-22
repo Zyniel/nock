@@ -34,6 +34,7 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import CellLocked, CellTarget, EditLetter, Reveal
 from nock.server import create_app
+from room_panels import open_aide
 from spec024_harness import (
     KEY_PAUSE_MS,
     MIME,
@@ -713,11 +714,13 @@ def play_the_browser_game(
         enter_room(cy_page, url, "Cy")
 
         cell_at(page, 4, 4).click()
+        open_aide(page)  # spec 043: the item is in a panel, opened first
         page.get_by_test_id("reveal-letter").click(timeout=WAIT_TIMEOUT_MS)
         expect(cell_at(page, 4, 4)).to_have_attribute("data-revealed", "true")
         cell_at(page, 2, 2).click()
         cell_at(page, 2, 2).click()
         expect_selection(page, 2, 2, "down", "0,2,0")
+        open_aide(page)  # spec 043: the item is in a panel, opened first
         page.get_by_test_id("reveal-word").click(timeout=WAIT_TIMEOUT_MS)
         for watcher in (page, cy_page):
             expect(cell_at(watcher, 4, 2)).to_have_attribute("data-revealed", "true")

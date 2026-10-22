@@ -3,6 +3,12 @@
 AC-8 runs two browsers on the live server. AC-9 drives the room page with a
 mocked socket. Spec 026 adds to AC-9 the check buttons disabled once the grid is
 solved. The shared setup is in `spec023_harness`.
+
+Refined by spec 043 (the design's room layout): `check-panel` is inside
+`aide-menu`, labelled by its heading `check-heading` (`fr.json["check.label"]`),
+and its items have the visible texts « La lettre », « Le mot », « La grille » and
+no `aria-label` (the `check.*_label` keys are removed). Each click is made with the
+Aide menu open (spec 043's `open_aide`), and closes it.
 """
 
 from __future__ import annotations
@@ -30,6 +36,7 @@ from nock.protocol import (
     WordTarget,
     parse_client_message,
 )
+from room_panels import open_aide
 from spec023_harness import (
     MIME,
     EnterRoom,
@@ -133,7 +140,9 @@ def test_ac8_each_check_adds_a_feed_line_with_the_player_and_the_scope(
             expect(check_items(watcher).first).to_have_attribute("data-kind", "check")
 
         cell_at(bob_page, 2, 1).click()
+        open_aide(bob_page)
         bob_page.get_by_test_id("check-letter").click()
+        open_aide(bob_page)
         bob_page.get_by_test_id("check-grid").click()
 
         expected = [
@@ -154,12 +163,11 @@ def test_ac9_the_new_fr_json_keys_have_the_texts_of_the_spec() -> None:
     texts = load_fr()
 
     assert texts["check.label"] == "Vérifier"
-    assert texts["check.letter"] == "Lettre"
-    assert texts["check.word"] == "Mot"
-    assert texts["check.grid"] == "Grille"
-    assert texts["check.letter_label"] == "Vérifier la lettre"
-    assert texts["check.word_label"] == "Vérifier le mot"
-    assert texts["check.grid_label"] == "Vérifier la grille"
+    assert texts["check.letter"] == "La lettre"
+    assert texts["check.word"] == "Le mot"
+    assert texts["check.grid"] == "La grille"
+    for removed in ("check.letter_label", "check.word_label", "check.grid_label"):
+        assert removed not in texts, removed
 
 
 def test_ac9_the_panel_holds_three_labelled_buttons_in_order(
@@ -169,8 +177,14 @@ def test_ac9_the_panel_holds_three_labelled_buttons_in_order(
     texts = load_fr()
 
     panel = page.get_by_test_id("check-panel")
+    heading = page.get_by_test_id("check-heading")
     expect(panel).to_have_attribute("role", "group")
-    expect(panel).to_have_attribute("aria-label", texts["check.label"])
+    heading_id = heading.get_attribute("id")
+    assert heading_id
+    expect(panel).to_have_attribute("aria-labelledby", heading_id)
+    expect(heading).to_have_text(texts["check.label"])
+    in_aide = panel.evaluate("el => el.closest('[data-testid=\"aide-menu\"]') !== null")
+    assert in_aide is True
     identifiers = panel.evaluate(
         "el => Array.from(el.querySelectorAll('button'))"
         ".map(b => b.getAttribute('data-testid'))"
@@ -179,7 +193,7 @@ def test_ac9_the_panel_holds_three_labelled_buttons_in_order(
     for scope in ("letter", "word", "grid"):
         button = page.get_by_test_id(f"check-{scope}")
         expect(button).to_have_text(texts[f"check.{scope}"])
-        expect(button).to_have_attribute("aria-label", texts[f"check.{scope}_label"])
+        assert button.get_attribute("aria-label") is None, scope
 
 
 def test_ac9_with_nothing_selected_only_the_grid_button_is_enabled(
@@ -197,6 +211,7 @@ def test_ac9_the_grid_button_sends_one_grid_check(
 ) -> None:
     mock = open_fx01(page, live_server, fx01_grid)
 
+    open_aide(page)
     page.get_by_test_id("check-grid").click()
 
     wait_until_page(page, lambda: len(sent_checks(mock)) >= 1)
@@ -220,8 +235,10 @@ def test_ac9_the_letter_and_word_buttons_send_the_selected_cell_and_word(
     expect(page.get_by_test_id("check-letter")).to_be_enabled()
     expect(page.get_by_test_id("check-word")).to_be_enabled()
 
+    open_aide(page)
     page.get_by_test_id("check-letter").click()
     wait_until_page(page, lambda: len(sent_checks(mock)) >= 1)
+    open_aide(page)
     page.get_by_test_id("check-word").click()
     wait_until_page(page, lambda: len(sent_checks(mock)) >= 2)
     page.wait_for_timeout(SETTLE_MS)
@@ -255,6 +272,7 @@ def test_ac9_pressing_a_button_does_not_guess_the_result(
         changes=[(1, 1, {"letter": "X", "author": "p2"})],
     )
 
+    open_aide(page)
     page.get_by_test_id("check-grid").click()
     wait_until_page(page, lambda: len(sent_checks(mock)) >= 1)
     page.wait_for_timeout(SETTLE_MS)
@@ -309,6 +327,7 @@ def test_ac9_settings_changed_from_none_to_free_or_vote_shows_the_panel_again(
     mock.send(settings_frame(7, help_mode))
 
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "7")
+    open_aide(page)
     panel = page.get_by_test_id("check-panel")
     expect(panel).to_be_visible()
     identifiers = panel.evaluate(
@@ -340,6 +359,7 @@ def test_ac9_the_word_button_sends_the_clue_index_of_the_second_clue(
         cell_at(page, row, column).click()
     expect_selection(page, row, column, "down", word)
 
+    open_aide(page)
     page.get_by_test_id("check-word").click()
 
     wait_until_page(page, lambda: len(sent_checks(mock)) >= 1)
