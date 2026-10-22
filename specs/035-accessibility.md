@@ -162,9 +162,13 @@ Two lists of the room page can scroll with nothing focusable inside them:
 
 - The roster list: the `ul` element inside `roster` (`[data-testid="roster"] ul`,
   spec 014 "Small windows"). On a small window it scrolls sideways.
-- The feed list: the `ul` element inside `activity-feed`
-  (`[data-testid="activity-feed"] ul`) that holds the `feed-item` elements. It
-  scrolls vertically, and on a small window it shows one line.
+- The feed list, now the stream list: the `ul` element `chat-list` inside
+  `activity-feed` (`[data-testid="activity-feed"] ul`), in the Salon's Discussion
+  tab `chat-panel`, that holds the `chat-message` and `feed-item` elements. It
+  scrolls vertically. (Note from the lead, 2026-10-22: refined by spec 043, the
+  design's room layout, in line with AC-12; this read "the `ul` element inside
+  `activity-feed` (`[data-testid="activity-feed"] ul`) that holds the `feed-item`
+  elements. It scrolls vertically, and on a small window it shows one line.")
 
 Terms:
 
@@ -180,12 +184,18 @@ Terms:
 
 Rules:
 
-- The `h2` of `roster` has `id="roster-heading"`, and the `h2` of `activity-feed`
-  has `id="feed-heading"`.
+- The visually hidden `h2` of `roster` has `id="roster-heading"`, and the
+  visually hidden `h2` of `chat-panel` has `id="chat-heading"`.
 - In every state, each list has `role="list"` and an `aria-labelledby` equal to
-  the `id` of the `h2` of its own section. So the roster list is named
-  `t("roster.heading")` (`Joueurs`) and the feed list `t("feed.heading")`
-  (`Activité`). No new `fr.json` key is needed. The explicit role is there because
+  the `id` of the `h2` of its own tab panel. So the roster list is named
+  `t("roster.heading")` (`Joueurs`) and the stream list `t("chat.heading")`
+  (`Discussion`). No new `fr.json` key is needed. (Note from the lead, 2026-10-22:
+  refined by spec 043, the design's room layout, in line with AC-12; these two
+  rules read "The `h2` of `roster` has `id="roster-heading"`, and the `h2` of
+  `activity-feed` has `id="feed-heading"`" and "the `id` of the `h2` of its own
+  section. So the roster list is named `t("roster.heading")` (`Joueurs`) and the
+  feed list `t("feed.heading")` (`Activité`)". Spec 043 removes the feed's heading
+  and the key `feed.heading`.) The explicit role is there because
   WebKit does not expose a `ul` styled with `list-style: none` as a list.
 - While a list scrolls and holds no focusable element, it has `tabindex="0"`, so
   it is a Tab stop in every engine.
