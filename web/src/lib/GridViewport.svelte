@@ -733,11 +733,11 @@
 <div class="visually-hidden" id="grid-hint" data-testid="grid-hint">{t('a11y.grid_hint')}</div>
 
 <style>
-  /* A stacking context of its own (isolation), so the z-index of a reaction
-     or a flag below orders it inside the grid only, and never against the rest
-     of the page (the vote banner, the chat panel). */
   /* The grid is centred in it while it fits (spec 043); zoomed past the
-     viewport, its auto margins are 0 and it scrolls from its top left corner. */
+     viewport, its auto margins are 0 and it scrolls from its top left corner.
+     A stacking context of its own (isolation), so the z-index of a reaction
+     or a flag below orders it inside the grid only, and never against the rest
+     of the page (the vote banner). */
   .viewport {
     width: 100%;
     flex: 1 1 0;

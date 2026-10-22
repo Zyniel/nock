@@ -280,14 +280,12 @@
     margin-left: auto;
   }
 
+  /* The whole box takes a tap, its rounded corners included (spec 014 AC-8):
+     a square layer over the button (the ::before below) catches the pointer
+     there. */
   .small {
     padding: 6px 10px;
     font-size: 0.8rem;
-  }
-
-  /* The whole box takes a tap, its rounded corners included (spec 014 AC-8):
-     a square layer over the button catches the pointer there. */
-  .small {
     position: relative;
   }
 
