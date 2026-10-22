@@ -5,17 +5,34 @@ Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 wrote it (2026-10-12 to 2026-10-21), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-22)
+## Where things stand (2026-10-22, evening)
 
-- Phase 6 is complete (2026-10-22): its 13 specs are merged and `done`. The
-  last four went in one pull request each: 038 (#22), 034 (#24), 033 (#25) and
-  029 (#26). Next is the visual design (`_design.md`, from spec 041); Phase 7
-  (specs 030 and 031, competitive modes) is wanted and queued after it.
-- The work moved on 2026-10-21 from the cloud session to a session on the
-  human's Windows computer. The cloud session's worktrees are gone.
-- Local setup: section 1 of the README (`uv sync`, `npm --prefix web ci`,
-  `uv run playwright install chromium firefox webkit`). The session-start hook
-  and CI's fonts are for cloud sessions; the finish hook works in both.
+- **Phase 6 is complete** (tag `v1.0.0` on `main`, e805781).
+- **Phase 7, the visual design, is under way** (`docs/build-plan.md`, "Phase 7").
+  All eight of its specs are approved (human, 2026-10-22), with their open
+  questions recorded as decided:
+  - 041 Visual foundation: merged (#32), `done`.
+  - 042 Grid cells: built, in the pull request that carries this handoff.
+  - 043 Room layout (two pull requests, WP-1 then WP-2), 044 Keyboard, 045
+    Auteurs mode, 046 Catalogue and entry pages, 047 Room overlays and 048
+    Plain pages and states: approved, not built. Build them in that order,
+    one pull request each, each branch cut from `main` once the previous one
+    is merged.
+  - Then tag `v1.1.0`.
+- **Phase 8, the competitive modes** (030, 031), is wanted and waits for Phase
+  7. Both specs are 45-line stubs: a spec writer writes them in full first,
+  and the screens sheet draws them.
+- **The design reference** is `specs/_design.md`, drawn in
+  `docs/design/cell-sheet.html` and `docs/design/screens-sheet.html` (built by
+  `docs/design/screens_sheet/build.py`; the gate checks it is up to date).
+  Rule (human, 2026-10-22, in `CLAUDE.md`): any change of look updates
+  `_design.md` and its drawing in the same commit, before tests and code.
+- **The work runs on the human's Windows computer.** A fresh lead session
+  takes over from this handoff after spec 042 merges (human, 2026-10-22).
+- **Local setup:** section 1 of the README (`uv sync`, `npm --prefix web ci`,
+  `uv run playwright install chromium firefox webkit`). Section 2 says how to
+  add grids; the repository ships none, so make one from FX-01 to play
+  locally.
 
 - Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
   `main` after each merge (`git fetch origin main && git checkout -B
@@ -49,10 +66,13 @@ Update it at the end of each session.
   absence), PR #25 (spec 033, optional account, with its `link_identity` race
   fix), PR #26 (spec 029, game history), PR #27 (tooling: the finish hook also
   finds the agent's checkout from its Bash commands: `git -C`, `cd`,
-  `--directory`, and Git Bash `/k/...` paths read as `K:/...`). Tag `v0.1.0`
-  is on the remote.
-- Open: the pull request that closes specs 038, 034, 033 and 029 and carries
-  this handoff.
+  `--directory`, and Git Bash `/k/...` paths read as `K:/...`), PR #28 (specs
+  038, 034, 033, 029 closed), PR #29 (tooling: pyrefly checks the project
+  inside a git worktree), PR #31 (the README says how to add grids), PR #32
+  (spec 041, visual foundation), PR #33 (the Phase 7 design specs 042 to 048,
+  the screens sheet, and PR #30's visual-documentation rule). Tags `v0.1.0`
+  and `v1.0.0` are on the remote.
+- Open: spec 042's pull request, which carries this handoff.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only). Spec 033's
   open question 2 (players' addresses outside ASCII) is answered with (b), under
@@ -124,25 +144,45 @@ Update it at the end of each session.
 
 ## First tasks for the next session
 
-1. Phase 6's end in the build plan: tag `v1.0.0` on `main`, if the human wants
-   it.
-2. The visual design first (human, 2026-10-22: "I want the game now to be
-   implemented based on the full design system provided"): `_design.md`
-   section 14's build order. Step 1 is spec 041 (approved). Steps 2 to 5 get
-   specs drafted from `_design.md`, which the human approves one by one. Lead
-   decisions of 2026-10-22, for the human to override: the design's revealed
-   notch (0.22 by 0.11 of the side) wins over spec 024 AC-9's minimum, and the
-   spec writer's picks of section 15's "Still open" items are accepted.
-3. Phase 7 (competitive modes) is wanted (human, 2026-10-22: "E8 is wanted"),
-   and queued after the design ("Stop and queue 030 or any competitive
-   modes"): spec 030 (race mode), then 031 (team mode), one pull request each.
-   Both are 45-line stubs, approved before their public interface existed: a
-   spec writer writes them in full first.
+1. Check that spec 042's pull request is merged, and that `main`'s run after
+   it is green (`gh run list --branch main`): the run on `main` is the only
+   one that runs Firefox and WebKit.
+2. Build spec 043 (room layout), WP-1 then WP-2, one pull request each, then
+   044 to 048 in order, each through test-writer, implementer, and two review
+   rounds (human, 2026-10-22: "Keep as it is"; see `MEMORY.md`). Each build
+   gets its own worktree, cut from `main` once the previous pull request is
+   merged (`git worktree add -b spec-NNN .claude/worktrees/spec-NNN
+   origin/main`), with `npm --prefix web ci` and `uv sync` run there.
+3. After 048, tag `v1.1.0`, then write specs 030 and 031 in full (Phase 8).
 4. The small follow-up below ("Follow-up noted from spec 028's first review"),
    when a spec touches it.
 - **Models:** pass `model: "opus"` to the implementer and to the test-writer of
   a whole spec (their definitions default to Sonnet, at high effort). Use
   Sonnet for small spec notes and mechanical test edits.
+
+## Phase 7: what spec 041 and 042 taught
+
+- **A look the design does not draw is the spec writer's, not the
+  implementer's.** The implementer reports it, the spec and `_design.md`
+  change (and the sheet if it shows), then the tests, then the code.
+- **Other specs' tests change with each visual spec.** The test-writer updates
+  them in the same pull request, keeping their intent and citing the new spec;
+  the spec writer adds a dated note at each criterion the look changed. The
+  first review of 041 found 17 specs without notes: write them with the build,
+  not after it.
+- **Measure, then decide.** A layout effect of the new design (a font that
+  makes rows 1 px taller, long clue text spilling out of the grid) goes to the
+  lead, who settles it in the spec with the smallest rule that keeps the older
+  specs' promises (an explicit line height; the grid clipping at its outer
+  edge).
+- **Painting order needs pixels.** An `outline` paints under a cell's
+  positioned children in every engine: spec 042 needed a separate
+  `cell-selection` element at z 7, and its test reads a painted pixel.
+- **Run the gate in the foreground, in the worktree.** A background run once
+  checked the main checkout instead; its test count gave it away.
+- **Load flakes on this machine:** `net::ERR_NO_BUFFER_SPACE` after several
+  runs in a row, and a tap or click that waits past its timeout. Rerun a single
+  failure alone before trusting it.
 
 ## How a feature is built here
 
