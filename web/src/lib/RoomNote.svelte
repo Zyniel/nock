@@ -27,6 +27,7 @@
   let {
     note,
     layout,
+    bannerHeight,
     onOpen,
     onGone,
   }: {
@@ -35,6 +36,11 @@
     // 12 px at the top in the column); the note sits 8 px under the
     // viewport's top in both.
     layout: 'sheet' | 'column'
+    // The height of the vote banner over the viewport's top, 0 when it is not
+    // on the page. While it is, the note sits 8 px under the banner's bottom
+    // edge, where nothing covers it (spec 043, Decision 25); it follows the
+    // banner without restarting its 3 seconds.
+    bannerHeight: number
     // A tap or a click on a note of the room.
     onOpen: () => void
     // The note has faded out.
@@ -61,6 +67,7 @@
     class="nock-note room-note {layout}"
     data-testid="undo-message"
     role="status"
+    style:margin-top="{bannerHeight}px"
     data-off={isOff ? '' : null}
   >{note.text}</p>
 {:else}
@@ -72,6 +79,7 @@
     data-testid="room-note"
     tabindex="-1"
     aria-hidden="true"
+    style:margin-top="{bannerHeight}px"
     data-off={isOff ? '' : null}
     onclick={onOpen}
     >{#if note.kind !== null}<LinePictogram kind={note.kind} />{/if}{note.text}</button
@@ -79,7 +87,8 @@
 {/if}
 
 <style>
-  /* Centred on the grid viewport, 8 px under its top, on layer 6. A note
+  /* Centred on the grid viewport, 8 px under its top (and under the vote
+     banner by its margin), on layer 6. A note
      longer than the viewport is wide ends with an ellipsis, on its one line. */
   .room-note {
     position: absolute;

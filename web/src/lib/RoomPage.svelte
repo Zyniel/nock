@@ -1231,6 +1231,9 @@
   // ---- Focus when the banner changes (decision 19) ----
 
   let voteBanner: HTMLElement | null = $state(null)
+  // The banner's height, with its border: a note that shows while the banner
+  // is on the page sits under it (spec 043, Decision 25).
+  let voteBannerHeight = $state(0)
   let voteStatus: HTMLElement | null = $state(null)
 
   // What the banner holds: nothing, the question of one vote, or a result.
@@ -1987,6 +1990,7 @@
                 role="group"
                 aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
                 bind:this={voteBanner}
+                bind:offsetHeight={voteBannerHeight}
               >
                 {#if openVote !== null}
                   <p id="vote-question" class="vote-text" data-testid="vote-question">
@@ -2028,6 +2032,7 @@
                 <RoomNote
                   note={shownNote}
                   {layout}
+                  bannerHeight={isVoteBannerShown ? voteBannerHeight : 0}
                   onOpen={openSalonFromNote}
                   onGone={onNoteGone}
                 />
