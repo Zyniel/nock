@@ -1,21 +1,18 @@
-// The parts of the room page that scroll: the roster list, the feed list, the
-// chat list and the room toolbar.
+// The list of the room page that scrolls: the Salon's stream, which holds the
+// chat messages and the event lines (spec 043).
 //
-// - Any of them can follow its changes of size and content (watchListChanges).
-//   The room toolbar, a row that scrolls sideways, uses only this (spec 024).
+// - It follows its changes of size and content (watchListChanges).
 // - A list that scrolls with nothing focusable inside is a Tab stop in every
 //   engine, so that a keyboard player can scroll it with the arrow keys (spec
-//   035 AC-12). This is for the roster list, the feed list and the chat list.
-// - The feed list keeps the reader's place when a new line comes in, and a feed
-//   list at its end stays at its end (spec 013 AC-7, AC-8). The chat list
-//   follows the same rules (spec 022 AC-11).
+//   035 AC-12).
+// - It keeps the reader's place when a new line comes in, and a list at its end
+//   stays at its end (spec 013 AC-7, AC-8; spec 022 AC-11).
 
 // ---- Changes of a list ----
 
 // Call `onChange` after the list or one of its items changes size (a resize, a
 // rotation, a new root font), and after its content changes (an item comes or
 // goes, a button shows or goes, a text changes). Returns a function that stops.
-// The room toolbar, a row that scrolls sideways, uses it too (spec 024).
 export function watchListChanges(list: HTMLElement, onChange: () => void): () => void {
   const sizeObserver = new ResizeObserver(onChange)
   // The items come and go, so the size observer follows the items of the moment.
@@ -40,8 +37,7 @@ export function watchListChanges(list: HTMLElement, onChange: () => void): () =>
 
 // ---- Tab stop (spec 035 AC-12) ----
 
-// The elements that are Tab stops of their own. On the room page, only the
-// remove buttons of the host's roster list.
+// The elements that are Tab stops of their own.
 const TAB_STOP_SELECTOR = [
   'a[href]',
   'button:not(:disabled)',

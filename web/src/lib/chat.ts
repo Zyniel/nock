@@ -1,4 +1,4 @@
-// The chat and the reactions of a room page (spec 022): the lines the chat list
+// The chat and the reactions of a room page (spec 022): the lines the stream
 // shows, the unread count, the pacing of my own messages and what a clue shows
 // of a reaction. Plain functions: no DOM and no socket.
 
@@ -47,12 +47,14 @@ export function unreadBadgeText(count: number): string {
   return String(count)
 }
 
-// The accessible name of the chat toggle, with the exact unread count.
-export function chatToggleLabel(count: number): string {
+// The accessible name of the « Salon » button (spec 043): it names the unread
+// messages while the badge shows them; null otherwise, so the button is named by
+// its label.
+export function salonToggleLabel(count: number): string | null {
   if (count === 0) {
-    return t('chat.toggle')
+    return null
   }
-  return t('chat.toggle_label_unread', { count })
+  return t('topbar.salon_unread', { count })
 }
 
 // The send times that still count at `now`: those of the last PACE_WINDOW_MS.

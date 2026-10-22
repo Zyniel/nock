@@ -1,6 +1,6 @@
-// The Escape key of the room page's popovers: the chat panel and the reaction
-// picker each close when Escape is pressed while the focus is inside them
-// (spec 022).
+// The Escape key of the room page's overlays: the Aide menu, the Menu, the
+// Salon and the reaction picker each answer Escape pressed while the focus is
+// inside them (specs 022, 043).
 
 // Call `onEscape` when Escape is pressed while the focus is inside `element`.
 // Returns a function that stops listening.

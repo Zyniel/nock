@@ -1,95 +1,61 @@
 <script lang="ts">
-  import { tick } from 'svelte'
   import { t } from './i18n'
   import { nameOf } from './activityFeed'
-  import { shownChatLines } from './chat'
-  import { listenForEscape } from './escapeKey'
-  import { displayNickname } from './nickname'
+  import type { StreamEntry } from './activityFeed'
   import {
     followListTabStop,
     keepFeedEndOnResize,
     keepFeedPlace,
     noteFeedPlace,
-    scrollToEnd,
   } from './scrollingLists'
   import type { FeedPlace } from './scrollingLists'
-  import type { ChatLine, PlayerView } from './roomSession'
 
-  // The chat panel of spec 022. It is on the page only while it is open: the
-  // room page decides when, and this component handles what happens inside.
+  // The Salon's Discussion tab (spec 043, "Discussion: the stream"): one stream
+  // of the chat messages (spec 022) and the event lines (specs 013, 034), then
+  // the message box and the slot of the chat notes. It stays on the page while
+  // its tab is not selected, with the `hidden` attribute.
   let {
-    history,
-    players,
+    entries,
     names,
     you,
-    isHost,
+    isShown,
     isMuted,
     isPaced,
     isJoined,
-    isBelowPicker,
     text = $bindable(),
+    input = $bindable(null),
     onSend,
-    onMute,
-    onClose,
-    onFocusToggle,
+    onMuted,
   }: {
-    // The whole chat history of the snapshot, in seq order.
-    history: ChatLine[]
-    players: PlayerView[]
+    // The stream, oldest first.
+    entries: StreamEntry[]
     names: Map<string, string>
     you: string
-    isHost: boolean
+    // True while the tab is selected.
+    isShown: boolean
     // True while the host muted me.
     isMuted: boolean
     // True while the page holds back my own chat messages.
     isPaced: boolean
     // True while the page is joined to the room.
     isJoined: boolean
-    // True when the room is too narrow to put the panel beside the picker.
-    isBelowPicker: boolean
-    // What is typed in the input. The page keeps it while the panel is closed.
+    // What is typed in the input. The page keeps it while the Salon is closed.
     text: string
+    input?: HTMLInputElement | null
     // Send the trimmed text of a message.
     onSend: (text: string) => void
-    onMute: (playerId: string, isPlayerMuted: boolean) => void
-    // Close the panel and put the focus on the toggle.
-    onClose: () => void
-    onFocusToggle: () => void
+    // A mute is about to disable the input that has the focus: the room page
+    // puts the focus on « Salon ».
+    onMuted: () => void
   } = $props()
 
-  let panel: HTMLElement | null = $state(null)
-  let input: HTMLInputElement | null = $state(null)
   let list: HTMLUListElement | null = $state(null)
 
-  let lines = $derived(shownChatLines(history))
-  // The other players, in roster order: the host's mute buttons.
-  let otherPlayers = $derived(players.filter((player) => player.player_id !== you))
   let isSendDisabled = $derived(text.trim() === '' || !isJoined || isMuted || isPaced)
 
-  // `tick` resolves once the panel is on the page. A muted player's input is
-  // disabled: the focus then stays on the toggle.
-  async function focusInputAfterOpening(): Promise<void> {
-    await tick()
-    if (input !== null && !input.disabled) {
-      input.focus()
-    } else {
-      onFocusToggle()
-    }
-  }
-
-  void focusInputAfterOpening()
-
-  // Escape while the focus is inside the panel closes it.
-  $effect(() => {
-    if (panel === null) {
-      return
-    }
-    return listenForEscape(panel, onClose)
-  })
-
   // Runs before the page disables the chat controls at a mute: when the focus
-  // is on the input or the send button, it goes to the toggle instead of being
-  // lost. The panel stays open and the typed text stays in the input.
+  // is on the input or the send button, it goes to « Salon » instead of being
+  // lost. The typed text stays in the input.
   $effect.pre(() => {
     if (!isMuted) {
       return
@@ -97,7 +63,7 @@
     const focused = document.activeElement
     const chatForm = input?.form
     if (focused !== null && chatForm?.contains(focused)) {
-      onFocusToggle()
+      onMuted()
     }
   })
 
@@ -106,9 +72,7 @@
   //
   // Emptying the input disables the send button, and a focused button that
   // becomes disabled drops the focus to the page. So the focus goes to the
-  // input first, however the message was sent: Enter, the button from the
-  // keyboard, a click or a tap. Pacing never disables the input (spec 022
-  // AC-20).
+  // input first, however the message was sent (spec 022 AC-20).
   function submit(event: SubmitEvent): void {
     event.preventDefault()
     if (isSendDisabled) {
@@ -119,47 +83,33 @@
     input?.focus()
   }
 
-  // The chat list keeps the reader's place as the feed list does (spec 013
-  // AC-7): a new line brings the list to its newest line only if the list was
-  // at its end just before. The list starts at its newest line each time the
-  // panel opens. `placeList` is the list whose place is followed.
-  let newestSeq = $derived(lines.length === 0 ? null : lines[lines.length - 1].seq)
-  let placeList: HTMLUListElement | null = null
+  // The stream keeps the reader's place (spec 013 AC-7): new lines bring the
+  // list to its newest line only if it was at its end just before. Any item,
+  // message or event line, is a new line.
   let placeBeforeNewLine: FeedPlace | null = null
 
-  // Runs before the new line is on the page: note where the list is.
+  // Runs before the new lines are on the page: note where the list is.
   $effect.pre(() => {
-    const newest = newestSeq
-    const element = list
-    if (element === null || newest === null || element !== placeList) {
+    void entries
+    if (list === null) {
       return
     }
-    placeBeforeNewLine = noteFeedPlace(element)
+    placeBeforeNewLine = noteFeedPlace(list)
   })
 
-  // Runs once the new line is on the page, or once the list is on the page.
+  // Runs once the new lines are on the page.
   $effect(() => {
-    const newest = newestSeq
-    const element = list
-    if (element === null) {
-      placeList = null
+    void entries
+    if (list === null || placeBeforeNewLine === null) {
       return
     }
-    if (element !== placeList) {
-      placeList = element
-      placeBeforeNewLine = null
-      scrollToEnd(element)
-      return
-    }
-    if (newest === null || placeBeforeNewLine === null) {
-      return
-    }
-    keepFeedPlace(element, placeBeforeNewLine)
+    keepFeedPlace(list, placeBeforeNewLine)
     placeBeforeNewLine = null
   })
 
-  // The chat list is a Tab stop while it scrolls (spec 035 AC-12), and at its
-  // end it stays at its end through a resize or a new root font (spec 013 AC-8).
+  // The list is a Tab stop while it scrolls (spec 035 AC-12), and at its end it
+  // stays at its end through a resize, a new root font, or the tab shown again
+  // (spec 013 AC-8).
   $effect(() => {
     if (list === null) {
       return
@@ -173,63 +123,49 @@
   })
 </script>
 
-<section
+<div
   class="chat-panel"
-  class:below-picker={isBelowPicker}
   id="chat-panel"
   data-testid="chat-panel"
-  aria-labelledby="chat-heading"
-  bind:this={panel}
+  role="tabpanel"
+  aria-labelledby="salon-tab-discussion"
+  hidden={!isShown}
 >
-  <h2 id="chat-heading">{t('chat.heading')}</h2>
-  <!-- The tabindex is set from the script (spec 035 AC-12). -->
-  <ul
-    class="chat-list"
-    data-testid="chat-list"
-    role="list"
-    aria-labelledby="chat-heading"
-    bind:this={list}
-  >
-    {#each lines as line (line.seq)}
-      <li
-        data-testid="chat-message"
-        data-seq={String(line.seq)}
-        data-player-id={line.player_id}
-        data-you={String(line.player_id === you)}
-      >
-        <span class="chat-author" data-testid="chat-author">{nameOf(names, line.player_id)}</span
-        ><span class="chat-text" data-testid="chat-text">{line.text}</span>
-      </li>
-    {/each}
-  </ul>
-  {#if isHost}
-    <section
-      class="chat-moderation"
-      data-testid="chat-moderation"
-      aria-labelledby="chat-moderation-heading"
+  <h2 id="chat-heading" class="visually-hidden">{t('chat.heading')}</h2>
+  <div class="activity-feed" data-testid="activity-feed">
+    <!-- The explicit role: WebKit does not expose a list without bullets as a
+         list. The tabindex is set from the script (spec 035 AC-12). -->
+    <ul
+      class="stream"
+      data-testid="chat-list"
+      role="list"
+      aria-labelledby="chat-heading"
+      bind:this={list}
     >
-      <h3 id="chat-moderation-heading">{t('chat.moderation_heading')}</h3>
-      <div class="mute-rows">
-        {#each otherPlayers as player (player.player_id)}
-          {@const name = displayNickname(player.nickname)}
-          <div class="mute-row" data-testid="mute-row" data-player-id={player.player_id}>
-            <span data-testid="mute-name">{name}</span>
-            <button
-              type="button"
-              class="mute-player"
-              data-testid="mute-player"
-              data-muted={String(player.muted)}
-              aria-label={player.muted
-                ? t('chat.unmute_label', { name })
-                : t('chat.mute_label', { name })}
-              onclick={() => onMute(player.player_id, player.muted)}
-              >{player.muted ? t('chat.unmute') : t('chat.mute')}</button
-            >
-          </div>
-        {/each}
-      </div>
-    </section>
-  {/if}
+      {#each entries as entry (entry.key)}
+        {#if entry.kind === 'message'}
+          <li
+            class="message"
+            data-testid="chat-message"
+            data-seq={String(entry.line.seq)}
+            data-player-id={entry.line.player_id}
+            data-you={String(entry.line.player_id === you)}
+          >
+            <span class="chat-author" data-testid="chat-author"
+              >{nameOf(names, entry.line.player_id)}</span
+            ><span class="chat-text" data-testid="chat-text">{entry.line.text}</span>
+          </li>
+        {:else}
+          <li
+            class="event"
+            data-testid="feed-item"
+            data-kind={entry.item.kind}
+            data-seq={String(entry.item.seq)}
+          >{entry.item.text}</li>
+        {/if}
+      {/each}
+    </ul>
+  </div>
   <form class="chat-form" onsubmit={submit}>
     <label class="visually-hidden" for="chat-input">{t('chat.input_label')}</label>
     <input
@@ -250,8 +186,7 @@
   <!-- The slot of the chat notes: always present, empty when no note applies
        and one line high, so a note coming or going leaves the panel's box
        alone. It shows one note at a time: the mute note wins over the wait
-       note, which shows again after an unmute if the pacing still holds
-       (spec 022 AC-19). -->
+       note (spec 022 AC-19). -->
   <p class="chat-note">
     {#if isMuted}
       <span data-testid="chat-muted">{t('chat.muted')}</span>
@@ -259,136 +194,127 @@
       <span data-testid="chat-wait">{t('chat.wait')}</span>
     {/if}
   </p>
-</section>
+</div>
 
 <style>
-  /* Drawn over the page below the header, like the vote banner: absolutely
-     placed, so it moves nothing. The vote banner comes later in the document
-     with the same z-index, so it is drawn over the panel and its buttons always
-     stay uncovered. */
-  /* At the right, as wide as the room allows up to 22rem, and never past the
-     bottom of the window: the list gives up its height first. */
+  /* The panel fills the Salon's height left; the stream takes what the message
+     box and the notes leave. */
   .chat-panel {
-    position: absolute;
-    z-index: 1;
-    box-sizing: border-box;
-    top: var(--popover-top);
-    background: var(--nock-white);
-    border: 1px solid var(--nock-line);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px var(--nock-shadow);
-    /* The picker's height and the gap under it. */
-    --picker-row: calc(2.5rem + 2px);
-    right: 0.5rem;
-    width: min(22rem, 100% - 1rem);
-    max-height: calc(100% - var(--popover-top) - 0.5rem);
+    flex: 1 1 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    font-size: 0.875rem;
   }
 
-  /* On a narrow page the picker's row stays free above the panel, whether the
-     picker is open or not, so the two never overlap and the panel does not move
-     when the picker opens (spec 022 decision 15). */
-  .chat-panel.below-picker {
-    top: calc(var(--popover-top) + var(--picker-row));
-    max-height: calc(100% - var(--popover-top) - var(--picker-row) - 0.5rem);
+  .chat-panel[hidden] {
+    display: none;
   }
 
-  .chat-panel h2 {
-    flex: none;
+  .activity-feed {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* The page keeps the reader's place itself when lines come and go (spec 013
+     AC-7), the same way in every engine: no scroll anchoring from the browser
+     on top of it. Its focus ring is drawn inside it, so nothing around it
+     covers it (spec 035 AC-2). */
+  .stream {
+    flex: 1 1 0;
+    min-height: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     margin: 0;
-    font-size: 1rem;
-  }
-
-  /* About seven lines; the older ones scroll (spec 022 AC-11). The page keeps
-     the reader's place itself, as for the feed: no scroll anchoring. Room is
-     left around it for its focus outline, drawn outside (spec 035 AC-2). */
-  .chat-list {
-    flex: 0 1 auto;
-    height: 9rem;
-    min-height: 2.75rem;
+    padding: 10px 16px;
     overflow-y: auto;
     overflow-anchor: none;
     overflow-wrap: anywhere;
-    margin: 0.25rem 0;
-    padding: 0 0.25rem;
     list-style: none;
-    line-height: 1.3;
+  }
+
+  .stream:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .stream li {
+    flex: none;
+  }
+
+  .message {
+    font-size: 0.92rem;
+    color: var(--nock-ink);
   }
 
   .chat-author {
-    margin-right: 0.4em;
-    font-weight: bold;
+    margin-right: 6px;
+    font-weight: 700;
   }
 
-  /* The host's mute buttons. On a low window they give up height after the
-     list, and scroll; the focus outline is then drawn inside the buttons. */
-  .chat-moderation {
-    flex: 0 1 auto;
-    min-height: 2rem;
-    overflow-y: auto;
-  }
-
-  .chat-moderation h3 {
-    margin: 0 0 0.25rem;
-    font-size: 0.875rem;
-  }
-
-  .chat-moderation :focus-visible {
-    outline-offset: -3px;
-  }
-
-  .mute-rows {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem 0.75rem;
-  }
-
-  .mute-row {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .mute-player {
-    box-sizing: border-box;
-    min-width: 24px;
-    min-height: 24px;
-    padding: 0 0.4rem;
-    font-size: 0.8rem;
+  /* An event line (spec 013): muted, a little smaller and set in. */
+  .event {
+    padding-left: 16px;
+    font-size: 0.82rem;
+    color: var(--nock-muted);
   }
 
   .chat-form {
     flex: none;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
+    padding: 8px 12px 12px;
+    border-top: 1px solid var(--nock-line);
   }
 
   .chat-form input {
     flex: 1 1 auto;
     min-width: 0;
     box-sizing: border-box;
-    min-height: 28px;
-    font: inherit;
+    padding: 7px 12px;
+    border: 1px solid var(--nock-rule);
+    border-radius: 18px;
+    font: 400 0.9rem/1.2 var(--nock-font-ui);
+    color: var(--nock-ink);
+    background: var(--nock-white);
   }
 
+  .chat-form input::placeholder {
+    color: var(--nock-muted);
+  }
+
+  .chat-form input:disabled {
+    background: var(--nock-clue-bg);
+  }
+
+  /* The « Envoyer » pill (_design.md section 11). */
   .chat-send {
     flex: none;
     box-sizing: border-box;
-    min-width: 24px;
-    min-height: 28px;
+    min-height: 24px;
+    padding: 6px 12px;
+    border: 0;
+    border-radius: 14px;
+    font: 600 0.85rem/1.2 var(--nock-font-ui);
+    color: var(--nock-navy);
+    background: var(--nock-word);
+    cursor: pointer;
+  }
+
+  /* An empty message keeps the pill's look (spec 043 AC-18). */
+  .chat-send:disabled {
+    cursor: not-allowed;
   }
 
   .chat-note {
     flex: none;
     margin: 0;
-    min-height: 1.2em;
-    line-height: 1.2;
-    font-size: 0.8rem;
+    padding: 0 12px 8px;
+    min-height: 1.3em;
+    font: 500 0.85rem/1.3 var(--nock-font-ui);
     color: var(--nock-muted);
   }
 </style>
