@@ -62,6 +62,8 @@
     playerColours,
     legendNames,
     legendRoom,
+    isLegendOverGrid,
+    legendMaxWidth,
     legendHeight = $bindable(0),
     clueFlags,
     clueReactions,
@@ -98,8 +100,15 @@
     // The names the Auteurs legend shows while the mode is on.
     legendNames: LegendName[]
     // The height the grid gives the legend under it while the mode is on, in
-    // px; 0 while it is off.
+    // px; 0 while it is off, or while the legend lies over the grid.
     legendRoom: number
+    // True while the legend lies over the viewport's bottom, taking no room
+    // (spec 045, decision 8).
+    isLegendOverGrid: boolean
+    // The legend's largest width in px: the clue bar's width in the column
+    // layout (spec 045, decision 9); null in the sheet layout, where the grid
+    // area's content box, narrower than the clue bar, limits it.
+    legendMaxWidth: number | null
     // The legend's height as drawn, in px, for the room page.
     legendHeight?: number
     // The marker of each flagged clue, by clue key "row,column,clue_index"
@@ -308,7 +317,9 @@
   // height add up to legendRoom, the height the viewport gives it. Its top is
   // 8 px below the bottom of the part of the grid's box that shows: the grid
   // is centred in the viewport while it is shorter, so the room left under the
-  // grid is taken back from the legend's top margin.
+  // grid is taken back from the legend's top margin. While it lies over the
+  // grid, its margins and height add up to nothing: it is pulled up over the
+  // viewport's bottom, its bottom 8 px above it.
   //
   // That room is kept in quarter pixels, which every engine lays out exactly:
   // the two margins then add up to the same height as legendRoom, and the
@@ -316,9 +327,11 @@
   // (its height sets the room under the grid, which sets the margins).
   let gridHeight = $derived(cellSize * grid.height + GRID_LINE_PX)
   let roomUnderGrid = $derived(quarterPixels(Math.max(0, (viewportHeight - gridHeight) / 2)))
-  let legendMarginTop = $derived(LEGEND_GAP_PX - roomUnderGrid)
+  let legendMarginTop = $derived(
+    isLegendOverGrid ? -(legendHeight + LEGEND_GAP_PX) : LEGEND_GAP_PX - roomUnderGrid,
+  )
   let legendMarginBottom = $derived(
-    legendRoom - legendHeight - LEGEND_GAP_PX + roomUnderGrid,
+    isLegendOverGrid ? LEGEND_GAP_PX : legendRoom - legendHeight - LEGEND_GAP_PX + roomUnderGrid,
   )
 
   // A length in px, rounded down to a quarter of a pixel.
@@ -769,6 +782,8 @@
     names={legendNames}
     marginTop={legendMarginTop}
     marginBottom={legendMarginBottom}
+    isOverGrid={isLegendOverGrid}
+    maxWidth={legendMaxWidth}
     bind:height={legendHeight}
   />
 {/if}

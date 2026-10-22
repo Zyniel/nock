@@ -14,6 +14,11 @@ export const AUTHORS_VIEW_KEY = 'nock.authors'
 export const LEGEND_ONE_LINE_ROOM_PX = 38
 export const LEGEND_GAP_PX = 8
 
+// Spec 013 AC-6's floor: grid-viewport is never less high than this. Where
+// the legend's room would leave it less, the legend lies over the grid's
+// bottom and takes no room (spec 045, decision 8).
+export const MIN_GRID_VIEWPORT_PX = 100
+
 // One name of the legend: a player of the kept snapshot.
 export interface LegendName {
   playerId: string

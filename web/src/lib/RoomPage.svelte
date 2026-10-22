@@ -19,6 +19,7 @@
   import { nameOf, streamEntries } from './activityFeed'
   import {
     AUTHORS_VIEW_KEY,
+    MIN_GRID_VIEWPORT_PX,
     colourByPlayer,
     legendNames,
     legendRoom,
@@ -360,10 +361,10 @@
   let isAuthorsViewOn = $state(readAuthorsView())
   let playerColours = $derived(colourByPlayer(session.snapshot?.players ?? []))
   let authorsLegendNames = $derived(legendNames(session.snapshot?.players ?? []))
-  // The legend's height as the grid viewport draws it, and the room the grid
-  // gives it while the mode is on.
+  // The legend's height as the grid viewport draws it. The room the grid
+  // gives it, and whether it lies over the grid instead, are worked out with
+  // the play area below.
   let authorsLegendHeight = $state(0)
-  let authorsLegendRoom = $derived(isAuthorsViewOn ? legendRoom(authorsLegendHeight) : 0)
 
   function toggleAuthorsView(): void {
     isAuthorsViewOn = !isAuthorsViewOn
@@ -1541,6 +1542,38 @@
     flushSync()
   }
 
+  // The content box of the grid area. In the sheet layout its height is the
+  // viewport's height with the Auteurs mode off.
+  let gridAreaContent: DOMRectReadOnly | undefined = $state()
+
+  // ---- The Auteurs legend's room (spec 045, "The grid's room") ----
+
+  // The room the legend needs under the grid: 38 px, or its height and its gap
+  // when it wraps.
+  let wantedLegendRoom = $derived(legendRoom(authorsLegendHeight))
+  // True while the mode is on and that room would leave the viewport less than
+  // 100 px high: the legend then lies over the viewport's bottom and the grid
+  // gives it no room (decision 8). The legend's height does not depend on the
+  // grid's size, so the two places do not alternate.
+  let isLegendOverGrid = $derived(
+    isAuthorsViewOn && viewportHeightWithLegendRoom() < MIN_GRID_VIEWPORT_PX,
+  )
+  // The room the grid gives the legend: none while the mode is off or while
+  // the legend lies over the grid.
+  let authorsLegendRoom = $derived(isAuthorsViewOn && !isLegendOverGrid ? wantedLegendRoom : 0)
+
+  // The viewport's height if the grid gave the legend its room: in the sheet
+  // layout its height with the mode off less the room; in the column layout
+  // the height of the grid's box fitted to the height left less the room.
+  function viewportHeightWithLegendRoom(): number {
+    if (layout === 'column') {
+      const box = columnGridBoxFor(wantedLegendRoom)
+      return box === null ? 0 : box.height
+    }
+    const heightWithModeOff = gridAreaContent === undefined ? 0 : gridAreaContent.height
+    return heightWithModeOff - wantedLegendRoom
+  }
+
   // In the column layout the grid viewport is the grid's box at zoom 1, as large
   // as the room left after the clue bar, the status and, while the Auteurs mode
   // is on, the legend's room (spec 045); null in the sheet layout, where the
@@ -2005,6 +2038,7 @@
             style:height={columnGridBox === null
               ? null
               : `${columnGridBox.height + authorsLegendRoom}px`}
+            bind:contentRect={gridAreaContent}
           >
             <div
               class="visually-hidden"
@@ -2090,6 +2124,8 @@
               {playerColours}
               legendNames={authorsLegendNames}
               legendRoom={authorsLegendRoom}
+              {isLegendOverGrid}
+              legendMaxWidth={clueBarWidth}
               bind:legendHeight={authorsLegendHeight}
               {clueFlags}
               {clueReactions}

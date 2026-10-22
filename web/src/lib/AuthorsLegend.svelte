@@ -11,6 +11,8 @@
     names,
     marginTop,
     marginBottom,
+    isOverGrid,
+    maxWidth,
     height = $bindable(0),
   }: {
     names: LegendName[]
@@ -18,6 +20,12 @@
     // keep its room in the flow under the grid viewport, in px.
     marginTop: number
     marginBottom: number
+    // True while it lies over the bottom of the grid viewport (spec 045,
+    // decision 8): then it is drawn above the cells and lets taps through.
+    isOverGrid: boolean
+    // Its largest width in px, the clue bar's (decision 9); null: the width of
+    // the grid area's content box.
+    maxWidth: number | null
     // The legend's height, in px, as drawn.
     height?: number
   } = $props()
@@ -36,6 +44,8 @@
   class="authors-legend"
   data-testid="authors-legend"
   aria-hidden="true"
+  class:over-grid={isOverGrid}
+  style:max-width={maxWidth === null ? null : `${maxWidth}px`}
   style:margin-top="{marginTop}px"
   style:margin-bottom="{marginBottom}px"
   bind:borderBoxSize={borderBox}
@@ -53,14 +63,18 @@
 </div>
 
 <style>
-  /* A white pill in the flow under the grid viewport, centred, never wider
-     than the grid area's content box. Its items keep 8 px apart; when they do
-     not fit on one line it wraps, each line centred (as the screens sheet's
-     `.legend`). */
+  /* A white pill in the flow under the grid viewport, centred on the grid
+     area, never wider than the clue bar: in the column layout its largest
+     width is the clue bar's, set on the element, and it may reach past the
+     grid's sides; in the sheet layout the grid area's content box limits it.
+     Its items keep 8 px apart; when they do not fit on one line it wraps, each
+     line centred (as the screens sheet's `.legend`). */
   .authors-legend {
+    position: relative;
     flex: none;
     align-self: center;
     box-sizing: border-box;
+    width: max-content;
     max-width: 100%;
     display: flex;
     flex-wrap: wrap;
@@ -74,6 +88,13 @@
     font: 500 0.8rem/1.2 var(--nock-font-ui);
     color: var(--nock-muted);
     text-align: center;
+  }
+
+  /* Over the viewport's bottom, on the layer of the 3-second notes (spec 043);
+     a tap or a click on it reaches the cell under it. */
+  .over-grid {
+    z-index: 6;
+    pointer-events: none;
   }
 
   /* Each name in its player's ink, set on the element. */
