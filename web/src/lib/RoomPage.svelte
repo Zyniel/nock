@@ -141,7 +141,9 @@
   let isKeyboardHidden = $state(isKeyboardHiddenAtLoad)
   // The keyboard shows on a touch screen, unless the player hid it or the grid
   // is solved. The page shows it only once it has a snapshot.
-  let isKeyboardShown = $derived(isTouchScreen && !isKeyboardHidden && !session.solved)
+  let isKeyboardShown = $derived(
+    isTouchScreen && !isKeyboardHidden && !session.solved && session.snapshot !== null,
+  )
 
   // « Clavier »: hide or show the keyboard and remember the choice. The grid
   // refits at once to the room the keyboard gave or took.
@@ -219,11 +221,7 @@
 
   // A change of layout closes the popovers and the reaction picker; the Salon
   // takes the state it has in the new layout (the sheet starts closed).
-  let lastLayout: 'sheet' | 'column' = layoutOf(
-    window.innerWidth,
-    window.innerHeight,
-    isTouchScreen && !isKeyboardHiddenAtLoad,
-  )
+  let lastLayout: 'sheet' | 'column' = untrack(() => layout)
   $effect(() => {
     const current = layout
     if (current === lastLayout) {

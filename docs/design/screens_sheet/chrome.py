@@ -147,14 +147,12 @@ def status_band(text: str) -> str:
     return f'<div class="netband">{esc(text)}</div>'
 
 
-def row_status(state: str) -> str:
-    """Return the completion status in the clue bar's row (spec 043).
+def row_status() -> str:
+    """Return the full-but-wrong status in the clue bar's row (spec 043).
 
-    Args:
-        state: "notyet" (full but wrong); a solved page has no row status
-            since spec 044 (no in-app keyboard, so the status is the band).
+    A solved page has no row status since spec 044 (no in-app keyboard, so the
+    status is the band).
     """
-    del state
     return '<span class="rowstat">Grille complète, mais pas encore juste.</span>'
 
 
@@ -218,12 +216,12 @@ def phone_room(
     slot4: str = "kbd",
     band_lines: int = 1,
     final_status: str | None = None,
-    row_state: str | None = None,
+    row_state: bool = False,
 ) -> str:
     """Return a phone room, 360 x 720 by default (sheet layout).
 
     final_status: the text of the status band under the top bar (spec 043);
-    row_state: the completion status in the clue bar's row, "notyet" or "done".
+    row_state: True shows the full-but-wrong status in the clue bar's row.
     """
     width, height = size
     low = height <= 500
@@ -257,7 +255,7 @@ def phone_room(
         else:
             word = grid_opts.get("word", 5)
             text, glyph = clue if clue else (FX_CLUE_TEXT[word], FX_DIR[word])
-            status = row_status(row_state) if row_state else ""
+            status = row_status() if row_state else ""
             h += cluebar(text, glyph, flag_pressed, status=status)
     if band == "done":
         h += band_done()

@@ -1266,7 +1266,7 @@ def sec_end() -> str:
                 phone_room(
                     size=(568, 320),
                     grid_opts={"full": True, "sel": (3, 3), "word": 6},
-                    row_state="notyet",
+                    row_state=True,
                 ),
             ),
         ],
