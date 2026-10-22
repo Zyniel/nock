@@ -654,7 +654,15 @@ Top to bottom, filling the window, nothing scrolls:
 
 1. (Note from the lead, 2026-10-22: on a window at most 500 px high the column
    layout has the phone top bar of the section above instead; spec 044 Decision 8,
-   section 15.) Top bar, 56 px high, white, 1 px line-grey bottom border, padding 0 16 px, gap
+   section 15.) (Note from the lead, 2026-10-22, after spec 043 WP-1's first
+   review: that low column layout, a phone held sideways with its keyboard hidden
+   or a low desktop window such as 740 by 360: the phone top bar, 54 px, its
+   buttons 56 px wide, icons over labels, in the phone's slots and order (« Salon »
+   pressed while the column is open; its badge and dot at the phone's places), the
+   timer on the left and no brand; under it the body of item 3 below, the play area
+   with its 12 px padding and the 340 px Salon column, open by default. The menus
+   sit 58 px from the top, as on a phone. Drawn in the screens sheet, part 8
+   (« A phone held sideways, keyboard hidden »).) Top bar, 56 px high, white, 1 px line-grey bottom border, padding 0 16 px, gap
    4 px, items centred vertically, in this order: the Nock mark and « Nock »
    (gap 8 px); the grid name « Grille n° N · Force F » (14 px left margin, then
    `margin-right: auto`); the timer (10 px right margin), or « Chrono » while the
@@ -821,6 +829,17 @@ goes when the room is back. The band pushes the grid area down; nothing covers t
 grid. `room-status` (« Reconnexion… », spec 040) may then be visually hidden
 (class `visually-hidden`), read by screen readers only.
 
+The status band (Note from the lead, 2026-10-22: recorded after spec 043 WP-1's
+first review, as spec 043's code draws it; section 8 « States » named it only): a
+final status that comes once the room has shown (removed by the host, replaced by
+another tab, the connection closed for good (« Connexion perdue. »), and the other
+final statuses of specs 011, 012, 014
+and 040) is the connection band's look without the red dot: under the top bar,
+full width, `--nock-clue-bg`, 1 px line-grey bottom border, padding 8 px 12 px,
+the status text in ink 500 0.85rem/1.3, for example « Vous avez été retiré de ce
+salon. ». The room stays drawn under it as it was. Drawn in the screens sheet,
+part 3 (« A final status after the room showed »).
+
 ### Room sheets: host settings and account
 
 On a phone these open as a bottom sheet from under the top bar (scrim from 54 px),
@@ -973,9 +992,15 @@ that opened it.
 | --- | --- |
 | 3-second note | 6 |
 | Phone scrim | 7 |
-| Menus, popovers, sheets, vote banner, shown reaction | 8 |
-| Reaction picker | 9 |
+| Menus, popovers, sheets, shown reaction | 8 |
+| Vote banner, reaction picker | 9 |
 | Recap overlay (dialog or sheet with its scrim) | 20 |
+
+(Note from the lead, 2026-10-22: after spec 043 WP-1's first review, the vote banner
+moved from layer 8 to 9, as spec 043's code has it: the banner is drawn above the
+Salon sheet and the scrim (spec 022 decision 16, the vote wins), which come later in
+the page and would cover it on the same layer. The banner and the picker never show
+together: « Réagir » is disabled while a vote is open, spec 043 Decision 10.)
 
 ## 9. Overlays
 
@@ -983,7 +1008,9 @@ that opened it.
 
 A banner over the top of the grid area: 8 px from its top, left and right edges,
 white, 2 px navy border, radius 10 px, padding 10 px 12 px, gap 8 px, shadow
-`0 10px 24px -12px var(--nock-shadow)`, layer 8. Content: the question
+`0 10px 24px -12px var(--nock-shadow)`, layer 9, above the Salon sheet and the
+scrim (Note from the lead, 2026-10-22: this read "layer 8"; section 8 "Layers of
+the room page"). Content: the question
 (`vote.question.*`); a row with « Oui » (primary) and « Non » (secondary), both with
 padding 7 px 16 px, and on the right the seconds left (« 18 s »); then a progress
 bar 4 px high, radius 2 px, word-blue track, navy fill for the time left. No
@@ -1019,6 +1046,18 @@ A band under the clue bar, padding 8 px 12 px, gap 10 px, text 600 0.95rem/1.2:
   on one line (320 px), the text wraps onto a second line and the button keeps its
   whole label on one line, on the right, centred on the text; the band grows by the
   line.
+- In the clue bar's row (Note from the lead, 2026-10-22: recorded after spec 043
+  WP-1's first review, as spec 043's code draws it; spec 026's low-window place):
+  in the sheet layout on a touch screen on a window at most 500 px high, where the
+  in-app keyboard shows and a band would take the grid's last height, the status
+  is no band. It sits in the navy clue bar, after the clue text and before
+  « Réagir », on one line: white text 600 0.95rem/1.2, padding 0 8 px, gap 10 px,
+  no background; the clue text gives it its width (ellipsis). Full but wrong:
+  « Grille complète, mais pas encore juste. » in white. Solved, until spec 044 is
+  built (the keyboard then leaves a solved page, which takes the band): « ✓ Grille
+  terminée, bravo ! » in white, then « Voir le bilan » as a secondary button
+  (white, navy text and border; padding 7 px 12 px, 0.85rem). Drawn in the screens
+  sheet, part 5 (« The status in the clue bar's row »).
 
 ### Recap (spec 028)
 
@@ -1113,7 +1152,7 @@ sheet layout.
 | Quiet | word-blue background, navy text, transparent border |
 | Small button | any variant, padding 6 px 10 px, 0.8rem |
 | Disabled (any) | clue blue-grey background, muted text, line-grey border, `cursor: not-allowed`; text still 4.5:1 |
-| Focus ring | `outline: 2px solid var(--nock-navy)`, `outline-offset: 2px`, on `:focus-visible`. On a navy surface (the clue bar): white, offset −4 px |
+| Focus ring | `outline: 2px solid var(--nock-navy)`, `outline-offset: 2px`, on `:focus-visible`. On a navy surface (the clue bar): white, offset −4 px. Inside a container that scrolls or clips (a popover's items and the popover itself, the Salon's tabs, the stream list): navy, drawn inside at offset −2 px, so the container never cuts it (spec 024 AC-8's "not clipped"). On a segmented control's option: offset −4 px, navy on an option not chosen, white on the chosen (navy) one. (Note from the lead, 2026-10-22: the inside rings recorded after spec 043 WP-1's first review, as its code draws them; this read "On a navy surface (the clue bar): white, offset −4 px" as the only exception.) |
 | Menu / popover | white, radius 8 px, padding 6 px 0, min width 220 px, shadow `0 12px 30px -10px var(--nock-shadow)`, no border |
 | Menu item | full-width button, padding 10 px 16 px, 500 1rem/1.2, navy, left-aligned; detail on the right (gap 12 px), muted, not italic, tabular; hover: word-blue background |
 | Menu heading | margin 6 px 16 px 2 px, 600 0.7rem, uppercase, letter spacing 0.08em, muted |
@@ -1132,7 +1171,7 @@ sheet layout.
 | Error line | red, 500 0.85rem/1.3, under its field |
 | Confirmation line | green, 500 0.85rem/1.3 |
 | Switch | track 42 by 24 px, radius 12 px, rule grey when off, navy when on; knob 18 px white circle, 3 px from the top, left 3 px (off) or 21 px (on). In a switch row: label left (500 0.95rem/1.2), switch right, gap 10 px |
-| Segmented control | inline row with a 1 px navy border, radius 6 px, clipped; options padding 8 px 10 px, 600 0.85rem/1, navy, 1 px navy dividers; the chosen one navy background, white text |
+| Segmented control | inline row with a 1 px navy border, radius 6 px, clipped; options padding 8 px 10 px, 600 0.85rem/1, navy, 1 px navy dividers; the chosen one navy background, white text. When the row is wider than its place (a large root font size, a very narrow window), its options wrap onto a second line inside the same border rather than leave the sheet (Note from the lead, 2026-10-22: recorded after spec 043 WP-1's first review, as its code has it) |
 | Tag (« hôte ») | clue blue-grey background, navy 600 0.72rem/1.3, radius 10 px, padding 2 px 8 px |
 | Pill button (« Envoyer ») | word blue, navy, 600 0.85rem, radius 14 px, padding 6 px 12 px, no border |
 | Text link | navy, weight 600 |

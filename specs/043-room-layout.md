@@ -631,9 +631,16 @@ viewport's top, layer 6. It takes no room (no layout shift).
 ### Completion status and the recap button (specs 026, 028; `_design.md` section 9)
 
 - `grid-status` keeps spec 026's attributes, texts and its two places, with "a low
-  window" now meaning the sheet layout on a window at most 500 px high: there it
+  window" now meaning the sheet layout on a touch screen (`(pointer: coarse)`) on a
+  window at most 500 px high, where the in-app keyboard shows (Note from the lead,
+  2026-10-22: after spec 043 WP-1's first review; this read "the sheet layout on a
+  window at most 500 px high". A low portrait window off a touch screen, for example
+  480 by 480, is in the sheet layout with no keyboard: its status is the band, as
+  spec 044's rule and the code have it): there it
   sits in the clue bar's row, after `clue-bar-text`, in white 600 0.95rem/1.2, on
-  one line. Everywhere else it sits under the clue bar, as wide as the bar: the
+  one line (padding 0 8 px, gap 10 px; Note from the lead, 2026-10-22: this
+  parenthesis added after the same review, the code's values, which `_design.md`
+  section 9 now records). Everywhere else it sits under the clue bar, as wide as the bar: the
   end band of `_design.md` section 9 (padding 8 px 12 px, gap 10 px, 600
   0.95rem/1.2); solved: background `--nock-green-bg`, text `--nock-green` preceded by
   the ✓ pictogram; full but wrong: background `--nock-clue-bg`, navy text.
@@ -684,11 +691,15 @@ viewport's top, layer 6. It takes no room (no layout shift).
 
 ### Layers (`_design.md` section 8)
 
-Over the play area: `room-note` 6; `room-scrim` 7; popovers, the Salon sheet,
-`vote-banner` and `clue-reaction` 8; `reaction-picker` 9; the dialogs in the top
+Over the play area: `room-note` 6; `room-scrim` 7; popovers, the Salon sheet and
+`clue-reaction` 8; `vote-banner` and `reaction-picker` 9; the dialogs in the top
 layer (`showModal`). `vote-banner` is drawn above the Salon sheet and the scrim
 where they overlap (spec 022 decision 16: the vote wins); `vote-yes` and `vote-no`
-are never covered by anything of this spec.
+are never covered by anything of this spec. (Note from the lead, 2026-10-22: after
+spec 043 WP-1's first review; this read "popovers, the Salon sheet, `vote-banner`
+and `clue-reaction` 8; `reaction-picker` 9": on one layer the Salon sheet and the
+scrim, later in the page, would be drawn above the banner, so the banner is on 9,
+as the code has it. The banner and the picker never show together, Decision 10.)
 
 ### Removed
 
@@ -783,7 +794,7 @@ package that makes the change (see "Work packages").
 | 027 | AC-4, AC-8 | AC-4: hiding is the Menu's `timer-toggle` (no `aria-pressed`), showing is `timer-show`; AC-8 rewritten for the top bar | 1 |
 | 028 | AC-7 | `recap-open` is inside `grid-status` | 1 |
 | 033 | AC-9 | `account-open` is a `room-menu` item after `host-settings-open`, the layout checks are spec 043 AC-28's | 1 |
-| 035 | AC-2 (ring contrast), AC-3, AC-9 (samples), AC-12 | AC-2: a ring's contrast is measured against the surface behind it (navy for the clue bar's white ring), the walk's stream list check shows the Discussion tab first; AC-3: after the grid come the clue bar's buttons (no sentinel needed, no Firefox skip), before it `menu-button`; AC-9: the flagged sample `Salon` becomes `Salle`, and `Salon` (`topbar.salon`) is accepted; AC-12: the stream list (named « Discussion ») is the one scrolling list; the roster list never scrolls on its own | 1 |
+| 035 | AC-1 (leaving the grid), AC-2 (ring contrast, leaving the grid), AC-3, AC-9 (samples), AC-12 | AC-1 and AC-2: `Escape` then `Tab` from the grid moves the focus to `clue-prev`, not to the sentinel (Note from the lead, 2026-10-22: AC-1 and the second AC-2 item added after spec 043 WP-1's first review; the row read "AC-2 (ring contrast), AC-3, AC-9 (samples), AC-12", while the tests of AC-1 and AC-2 already expect `clue-prev`); AC-2: a ring's contrast is measured against the surface behind it (navy for the clue bar's white ring), the walk's stream list check shows the Discussion tab first; AC-3: after the grid come the clue bar's buttons (no sentinel needed, no Firefox skip), before it `menu-button`; AC-9: the flagged sample `Salon` becomes `Salle`, and `Salon` (`topbar.salon`) is accepted; AC-12: the stream list (named « Discussion ») is the one scrolling list; the roster list never scrolls on its own | 1 |
 | 042 | AC-19 | The two switches are `room-menu` items (spec 043 AC-11) | 1 |
 
 (Note from the lead, 2026-10-22: spec 044, the design's keyboard, refines this
@@ -956,7 +967,9 @@ The words in brackets say how each criterion is tested.
 - A note for a line that the player then opens (AC-26): the tap opens the Discussion
   tab; the stream keeps spec 013's scroll rules, so it shows the newest line when it
   was at its end.
-- Completion in the phone row (AC-27): on a sheet layout at most 500 px high, the
+- Completion in the phone row (AC-27): on a sheet layout at most 500 px high on a
+  touch screen (Note from the lead, 2026-10-22: "on a touch screen" added after spec
+  043 WP-1's first review, as "Completion status" and the code have it), the
   status and « Voir le bilan » share the clue bar's row, so they take no height
   from the grid while the in-app keyboard shows (spec 026 decision of 2026-10-15);
   step 4's « Clavier » and step 5's band remove this case. (Note from the lead,

@@ -154,6 +154,11 @@ page"):
 The e-mail form (`account-email-form`, spec 033, shared with spec 043's account
 sheet): the field `t("account.email_label")` with `account-email-input`, then
 `account-email-submit` (`nock-button nock-button-primary`), 12 px below the field.
+(Note from the lead, 2026-10-22: since spec 043's build, `account-email-submit` in
+`web/src/lib/AccountEmailForm.svelte` already has the classes `nock-button
+nock-button-primary`, on the account page as in the room's account sheet, as the
+screens sheet draws it; this spec keeps that class and adds the place and the
+states, it does not change the button's look.)
 After a 202, `account-sent` is a done line under the submit button; after a 422,
 `account-email-input` has `aria-invalid="true"` and the red border, and
 `account-error` is an error line under the field, above the button; after a 429 or

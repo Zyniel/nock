@@ -27,6 +27,7 @@ from chrome import (
     desk_room,
     host_settings,
     keyboard,
+    low_column_room,
     note,
     phone_dialog_sheet,
     phone_page,
@@ -37,6 +38,7 @@ from chrome import (
     recap_body,
     room_menu,
     salon_sheet,
+    stream,
     vote_banner,
 )
 from style import CSS, font_faces
@@ -818,6 +820,33 @@ def sec_room() -> str:
         ],
         [("ph", PH, phone_room(net=True)), ("pc", PC, desk_room(net=True))],
     )
+    out += screen(
+        "s-final",
+        "A final status after the room showed",
+        ["§8 Connection lost", "spec 043", "specs 014, 040"],
+        [
+            (
+                "Removed by the host, opened in another tab, or the connection "
+                "closed for good, once the room has shown: the status text in a "
+                "band under the top bar, the connection band's look without its "
+                "red dot. The room stays drawn under it. A refusal before the "
+                "room showed is the card of section 2 instead."
+            ),
+        ],
+        [
+            (
+                "ph",
+                PH + " · removed",
+                phone_room(final_status="Vous avez été retiré de ce salon."),
+            ),
+            (
+                "pc",
+                PC + " · another tab",
+                desk_room(final_status="Ce salon est ouvert dans un autre onglet."),
+            ),
+        ],
+    )
+    out += focus_rings()
     catch_items = [
         ("evt", "Ana a rejoint le salon", ""),
         ("evt", "✓ Bruno a vérifié la grille", ""),
@@ -891,6 +920,54 @@ def sec_room() -> str:
             "is permanently on screen; the rest opens on demand (§8)."
         ),
         out + extra,
+    )
+
+
+def focus_rings() -> str:
+    """Return the focus rings drawn inside a container (_design.md section 11)."""
+    items = (
+        '<div class="pop static"><span class="mi">Auteurs <em>désactivé</em></span>'
+        '<span class="mi ring-in">Mots des autres <em>teintés</em></span>'
+        '<span class="mi">Accessibilité <em>désactivée</em></span></div>'
+    )
+    tabs = (
+        '<div style="width:330px"><div class="tabs"><span aria-selected="true" '
+        'class="ring-in">Discussion</span><span aria-selected="false">Joueurs '
+        "(4)</span></div></div>"
+    )
+    lines = [
+        ("evt", "→ Bruno a rejoint le salon", ""),
+        ("msg", 1, "AMEN, je pense 👍"),
+        ("evt", "✓ Ana a vérifié le mot", "ok"),
+    ]
+    listed = stream(items=lines).replace('class="stream"', 'class="stream ring-in"', 1)
+    stream_box = f'<div style="width:330px;display:grid">{listed}</div>'
+    seg_on = (
+        '<span class="seg"><span class="on ring-in4">libre</span><span>par '
+        "vote</span><span>désactivée</span></span>"
+    )
+    seg_off = (
+        '<span class="seg"><span class="on">libre</span><span class="ring-in4">par '
+        "vote</span><span>désactivée</span></span>"
+    )
+    boxes = (
+        box(items, "A popover's item: navy ring inside, -2 px; the popover scrolls.")
+        + box(tabs, "The Salon's tab: navy ring inside, -2 px.")
+        + box(stream_box, "The stream list, a Tab stop while it scrolls: -2 px.")
+        + box(
+            seg_on + seg_off,
+            "Segmented control: -4 px, white on the chosen (navy) option, navy on "
+            "another.",
+        )
+    )
+    return (
+        '<article class="scr" id="s-rings"><h3>Focus rings drawn inside '
+        + marks(["§11 Focus ring", "spec 043", "spec 035 AC-2"])
+        + '</h3><p class="cap">The ring is 2 px navy, 2 px outside the control '
+        "(§11), except where a container that scrolls or clips would cut it: "
+        "there it is drawn inside. On the navy clue bar it is white at -4 px "
+        "(drawn with the clue bar).</p>"
+        f'<div class="mini">{boxes}</div></article>'
     )
 
 
@@ -1136,6 +1213,54 @@ def sec_end() -> str:
                 ),
             ),
             ("pc", PC, desk_room(solved=True)),
+        ],
+    )
+    low = "Phone sideways · 568 &times; 320"
+    out += screen(
+        "s-rowstat",
+        "The status in the clue bar's row",
+        ["§9 End of grid", "spec 026", "spec 043", "until spec 044"],
+        [
+            (
+                "On a touch screen in the sheet layout at most 500 px high, the "
+                "keyboard shows and a band would take the grid's last height: the "
+                "status sits in the navy clue bar, after the clue and before « "
+                "Réagir », in white on one line; the clue gives it its width."
+            ),
+            (
+                '<span class="m">Solved, until spec 044 is built: the keyboard '
+                "still shows on a solved page in spec 043's build, so the solved "
+                "status takes the row too, with « Voir le bilan » secondary; « "
+                "Crayon » holds the fourth slot, disabled. From spec 044 on, the "
+                "keyboard leaves a solved page and the status is the band; only "
+                "the full-but-wrong row stays.</span>"
+            ),
+        ],
+        [
+            (
+                "ph",
+                low + " · full but wrong",
+                phone_room(
+                    size=(568, 320),
+                    grid_opts={"full": True, "sel": (3, 3), "word": 6},
+                    row_state="notyet",
+                ),
+            ),
+            (
+                "ph",
+                low + " · solved (spec 043's build)",
+                phone_room(
+                    size=(568, 320),
+                    timer="12:34",
+                    grid_opts={"solved": True},
+                    off={"undo", "pen"},
+                    slot4="pen",
+                    pressed=set(),
+                    badge=None,
+                    clue=("Alourdit le ballon", "→"),
+                    row_state="done",
+                ),
+            ),
         ],
     )
     out += screen(
@@ -2395,6 +2520,32 @@ def specs_kbd() -> str:
                 "Phone sideways · 740 &times; 360",
                 phone_room(size=(740, 360), grid_opts={"sel": (2, 3)}),
             )
+        ],
+    )
+    out += screen(
+        "s-low-column",
+        "A phone held sideways, keyboard hidden",
+        ["§8 column layout", "spec 043", "spec 044 Decision 8"],
+        [
+            "With the keyboard hidden, a window at most 500 px high is in the column "
+            "layout, but keeps the phone top bar: the computer bar's brand and "
+            "labelled buttons need about 650 px. « Salon » is pressed while the "
+            "340 px column is open (open by default); the menus open 58 px from the "
+            "top, as on a phone. The clue bar is never narrower than 320 px.",
+            '<span class="m">The same frame is drawn for a low desktop window '
+            "(568 &times; 320), with « Crayon » in the fourth slot.</span>",
+        ],
+        [
+            (
+                "ph",
+                "Phone sideways · 740 &times; 360 · keyboard hidden",
+                low_column_room(),
+            ),
+            (
+                "ph",
+                "Low desktop window · 568 &times; 320",
+                low_column_room((568, 320), touch=False),
+            ),
         ],
     )
     bars = (
