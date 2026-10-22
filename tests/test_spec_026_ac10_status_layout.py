@@ -146,6 +146,9 @@ FX02_CELL_COUNT = 13 * 17
 LONGEST_CLUE = "On la glisse dans une enveloppe"
 LONGEST_CLUE_CELL: Cell = (0, 6)
 LONGEST_WORD = "0,6,0"
+# Spec 043's 3-second note for `p2`'s last check covers the top row while it
+# shows (a tap on it opens the Salon); it leaves 3.25 s after it appeared.
+NOTE_GONE_TIMEOUT_MS = 5000
 
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 # Their initials by spec 035's rule (one part: its first two characters).
@@ -372,6 +375,9 @@ def open_status_page(
     for seq in range(SNAPSHOT_SEQ + 1, LAST_FEED_SEQ + 1):
         mock.send(check_frame(seq, "p2", GridTarget()))
     expect(room_page).to_have_attribute("data-seq", str(LAST_FEED_SEQ))
+    expect(page.get_by_test_id("room-note")).to_have_count(
+        0, timeout=NOTE_GONE_TIMEOUT_MS
+    )
 
     row, column = LONGEST_CLUE_CELL
     clue = cell_at(page, row, column).get_by_test_id("clue")
