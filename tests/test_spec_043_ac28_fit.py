@@ -14,12 +14,13 @@ was.
 
 Choices where the spec leaves room:
 
-- In the sheet layout, `room-scrim` covers the whole page under the top bar while
-  a popover or the Salon is open ("Popovers: shared rules", layer 7, over the
-  play area), so the clue bar's buttons cannot be hit then. The hit tests of the
-  clue bar run in the sheet layout only in the "all closed" state; the criterion
-  names only "the open Salon sheet" as an exception, which is reported to the
-  lead as an inconsistency.
+- In the sheet layout, the clue bar's buttons cannot be hit while the Salon sheet
+  or a popover is open: the Salon sheet, or the popover's `room-scrim` from 54 px
+  below the window's top ("Popovers: shared rules"), covers the bar. These are the
+  exceptions the criterion names (refined 2026-10-22). They are read from the page
+  (the Salon or `aide-menu` or `room-menu` without `hidden`), not from the state's
+  name. In the column layout the clue bar's hit tests run in every state, and in
+  the sheet layout in the state where nothing is open.
 - "Each item of an open popover" is each `button` and `a` inside it.
 - The touch context with `nock.keyboard_hidden` is checked whatever its layout:
   spec 044, which reads that key, is built after this step.
@@ -196,15 +197,30 @@ def top_bar_buttons(page: Page) -> list[str]:
     return buttons
 
 
-def hit_problems(page: Page, state: str) -> list[str]:
+def clue_bar_is_covered(page: Page) -> bool:
+    """Tell whether the open Salon sheet or a popover's scrim covers the clue bar.
+
+    Only the sheet layout has them over the bar; the column layout's Salon is a
+    column beside the grid and its popovers leave the bar alone.
+    """
+    if layout_of(page) != "sheet":
+        return False
+    if is_open(page.get_by_test_id("salon")):
+        return True
+    for popover in POPOVER_OF_STATE.values():
+        if is_open(page.get_by_test_id(popover)):
+            return True
+    return False
+
+
+def hit_problems(page: Page) -> list[str]:
     """The hit tests of the top bar's and the clue bar's buttons."""
     problems: list[str] = []
     for test_id in top_bar_buttons(page):
         found = hit_problem(page, test_id)
         if found is not None:
             problems.append(found)
-    clue_bar_covered = layout_of(page) == "sheet" and state != "closed"
-    if not clue_bar_covered:
+    if not clue_bar_is_covered(page):
         for test_id in CLUE_BAR_BUTTONS:
             found = hit_problem(page, test_id)
             if found is not None:
@@ -251,7 +267,7 @@ def low_window_problems(page: Page) -> list[str]:
 def state_problems(page: Page, state: str, height: int) -> list[str]:
     problems = grid_room_problems(page)
     problems.extend(inside_window_problems(page, state))
-    problems.extend(hit_problems(page, state))
+    problems.extend(hit_problems(page))
     if state in POPOVER_OF_STATE:
         problems.extend(
             popover_item_problems(page.get_by_test_id(POPOVER_OF_STATE[state]))

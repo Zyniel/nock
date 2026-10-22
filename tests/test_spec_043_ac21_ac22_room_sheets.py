@@ -37,8 +37,10 @@ from spec019_harness import OpenWindow, window_opener
 from spec033_harness import AccountRoutes
 from spec042_harness import READERS_JS, box_of, colour_of, pixel_at
 from spec043_harness import (
+    INK,
     NAVY,
     RULE,
+    SPEC043_JS,
     WHITE,
     Box,
     Reading,
@@ -53,6 +55,7 @@ from spec043_harness import (
     open_room,
     padding_matches,
     players_up_to,
+    px,
     same_font_size,
     same_position,
     same_size,
@@ -288,7 +291,82 @@ def test_ac21_the_checked_mode_is_navy_and_the_others_clear(
         assert colour_matches(label["colour"], NAVY), (mode, label)
 
 
-def test_ac21_the_two_number_fields_are_64_px_centred_and_16_px_apart(
+def test_ac21_the_two_number_fields_are_64_px_wide_centred_and_hold_5_and_1(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_settings(page, live_server, fx01_grid)
+    letters = page.get_by_test_id("reveal-letters-input")
+    words = page.get_by_test_id("reveal-words-input")
+
+    for field in (letters, words):
+        assert same_size(box_of(field).width, 64.0), box_of(field)
+        assert style_of(field, "textAlign") == "center"
+    expect(letters).to_have_value("5")
+    expect(words).to_have_value("1")
+
+
+FIELD_LABEL_SCRIPT = "input => {" + SPEC043_JS + r"""
+const label = input.labels.length > 0 ? input.labels[0] : null;
+if (label === null) {
+  return null;
+}
+const range = document.createRange();
+range.selectNodeContents(label);
+const style = getComputedStyle(label);
+return {
+  text: label.textContent.trim(),
+  box: boxOf(label),
+  inputBox: boxOf(input),
+  lines: lineCount(range.getClientRects()),
+  fontWeight: style.fontWeight,
+  fontSize: style.fontSize,
+  colour: parseColour(style.color),
+};
+}"""
+
+
+def field_label(field: Locator) -> Reading:
+    """The first label of a number field: text, box, lines, font and colour."""
+    found = field.evaluate(FIELD_LABEL_SCRIPT)
+    assert isinstance(found, dict), "the number field has no label"
+    return found
+
+
+def field_label_problems(field: Locator, key: str) -> list[str]:
+    """How a number field's label differs from the field label style, above it."""
+    label = field_label(field)
+    label_box = to_box(label["box"])
+    input_box = to_box(label["inputBox"])
+    problems: list[str] = []
+    if label["text"] != fr_value(key):
+        problems.append(f"label reads {label['text']!r}, not {fr_value(key)!r}")
+    if label["fontWeight"] != "600":
+        problems.append(f"label weight {label['fontWeight']}")
+    if not same_font_size(px(str(label["fontSize"])), 13.6):
+        problems.append(f"label size {label['fontSize']}")
+    if not colour_matches(label["colour"], INK):
+        problems.append(f"label colour {label['colour']}")
+    if label["lines"] != 1:
+        problems.append(f"label on {label['lines']} lines")
+    if not same_position(input_box.top - label_box.bottom, 6.0):
+        problems.append(f"label {label_box} is not 6 px above the input {input_box}")
+    if not same_position(label_box.left, input_box.left):
+        problems.append(f"label {label_box} not on the input's left {input_box}")
+    return problems
+
+
+def test_ac21_each_number_field_has_its_label_above_it_in_the_field_label_style(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_settings(page, live_server, fx01_grid)
+    letters = page.get_by_test_id("reveal-letters-input")
+    words = page.get_by_test_id("reveal-words-input")
+
+    assert field_label_problems(letters, "settings.reveal_letters_label") == []
+    assert field_label_problems(words, "settings.reveal_words_label") == []
+
+
+def test_ac21_the_two_field_groups_are_16_px_apart(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_settings(page, live_server, fx01_grid)
@@ -296,16 +374,14 @@ def test_ac21_the_two_number_fields_are_64_px_centred_and_16_px_apart(
     words = page.get_by_test_id("reveal-words-input")
 
     letters_box = box_of(letters)
-    words_box = box_of(words)
+    letters_label_box = to_box(field_label(letters)["box"])
+    words_label_box = to_box(field_label(words)["box"])
 
-    for field in (letters, words):
-        assert same_size(box_of(field).width, 64.0), box_of(field)
-        assert style_of(field, "textAlign") == "center"
-    expect(letters).to_have_value("5")
-    expect(words).to_have_value("1")
-    assert same_position(words_box.left - letters_box.right, 16.0), (
+    first_group_right = max(letters_box.right, letters_label_box.right)
+    assert same_position(words_label_box.left - first_group_right, 16.0), (
         letters_box,
-        words_box,
+        letters_label_box,
+        words_label_box,
     )
 
 
