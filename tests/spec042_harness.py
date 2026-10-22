@@ -35,6 +35,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import zlib
 from collections.abc import Callable, Sequence
 from datetime import date
 from typing import Any, NamedTuple
@@ -618,17 +619,20 @@ HIT_SCRIPT = r"""
 
 HIT_STYLE_ID = "spec042-hit-test"
 # The test style of "Hit tests": `pointer-events: auto !important` on every
-# descendant of every `cell`, after `scrollIntoView` of the cell.
-START_HIT_TEST_SCRIPT = (
-    "([selector, styleId]) => {\n"
-    "  document.querySelector(selector).scrollIntoView();\n"
-    "  const style = document.createElement('style');\n"
-    "  style.id = styleId;\n"
-    "  style.textContent ="
-    " '[data-testid=\"cell\"] * { pointer-events: auto !important; }';\n"
-    "  document.head.appendChild(style);\n"
-    "}"
-)
+# descendant of every `cell`, after `scrollIntoView` of the cell. The
+# `cell-selection` element keeps its own `pointer-events: none` unless the test
+# asks for it (AC-17's "With pointer events on for the probe").
+START_HIT_TEST_SCRIPT = """
+([selector, styleId, withSelection]) => {
+  document.querySelector(selector).scrollIntoView();
+  const style = document.createElement('style');
+  style.id = styleId;
+  const skipped = withSelection ? '' : ':not([data-testid="cell-selection"])';
+  style.textContent = '[data-testid="cell"] *' + skipped
+    + ' { pointer-events: auto !important; }';
+  document.head.appendChild(style);
+}
+"""
 END_HIT_TEST_SCRIPT = "styleId => document.getElementById(styleId)?.remove()"
 
 
@@ -1001,14 +1005,60 @@ def arrow_of(arrows: list[Reading], row: int, column: int, index: int) -> Readin
     return matching[0]
 
 
-def start_hit_test(page: Page, row: int, column: int) -> None:
-    """`scrollIntoView` of the cell, then the test style of "Hit tests"."""
+def start_hit_test(
+    page: Page, row: int, column: int, *, with_selection: bool = False
+) -> None:
+    """`scrollIntoView` of the cell, then the test style of "Hit tests".
+
+    Args:
+        page: The page of the room.
+        row: The cell's row.
+        column: The cell's column.
+        with_selection: Also turn pointer events on for `cell-selection`; by
+            default it keeps `pointer-events: none`.
+    """
     selector = CELL_SELECTOR.format(row=row, column=column)
-    page.evaluate(START_HIT_TEST_SCRIPT, [selector, HIT_STYLE_ID])
+    page.evaluate(START_HIT_TEST_SCRIPT, [selector, HIT_STYLE_ID, with_selection])
 
 
 def end_hit_test(page: Page) -> None:
     page.evaluate(END_HIT_TEST_SCRIPT, HIT_STYLE_ID)
+
+
+def pixel_at(page: Page, x: float, y: float) -> Rgb:
+    """The painted colour of the screen pixel that holds the point (x, y).
+
+    The point is in CSS px of the viewport (the page is in a context with a
+    device scale factor of 1). It reads a 1 by 1 screenshot clip, a PNG, whose
+    one pixel is the pixel itself.
+    """
+    column = math.floor(x)
+    line = math.floor(y)
+    png = page.screenshot(clip={"x": column, "y": line, "width": 1, "height": 1})
+    return png_single_pixel(png)
+
+
+def png_single_pixel(png: bytes) -> Rgb:
+    """The colour of the one pixel of an 8-bit RGB or RGBA PNG of 1 by 1."""
+    data = b""
+    channels = 0
+    position = 8
+    while position < len(png):
+        length = int.from_bytes(png[position : position + 4], "big")
+        kind = png[position + 4 : position + 8]
+        body = png[position + 8 : position + 8 + length]
+        if kind == b"IHDR":
+            assert body[8] == 8, "not an 8-bit PNG"
+            channels = {2: 3, 6: 4}[body[9]]
+            assert int.from_bytes(body[0:4], "big") == 1, "not 1 px wide"
+            assert int.from_bytes(body[4:8], "big") == 1, "not 1 px high"
+        if kind == b"IDAT":
+            data += body
+        position += 12 + length
+    raw = zlib.decompress(data)
+    # One filter byte, then the pixel; a filter of a first pixel is the identity.
+    assert len(raw) == 1 + channels, raw
+    return (raw[1], raw[2], raw[3])
 
 
 def hit_chain(page: Page, x: float, y: float) -> list[Reading]:

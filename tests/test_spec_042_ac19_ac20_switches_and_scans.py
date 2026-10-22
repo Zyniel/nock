@@ -108,7 +108,8 @@ def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
 # ---- In-page scripts ------------------------------------------------------------
 
 # Where the three switches and `account-open` are: inside `room-toolbar`, and the
-# document order of each pair.
+# document order of each pair, and whether the two of the three switches follow
+# each other as next element siblings.
 ORDER_SCRIPT = r"""
 () => {
   const toolbar = document.querySelector('[data-testid="room-toolbar"]');
@@ -129,9 +130,17 @@ ORDER_SCRIPT = r"""
     }
     return (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
   };
+  const nextSibling = (first, second) => {
+    const a = document.querySelector(`[data-testid="${first}"]`);
+    const b = document.querySelector(`[data-testid="${second}"]`);
+    if (a === null || b === null) {
+      return null;
+    }
+    return a.nextElementSibling === b;
+  };
   found.order = {
-    authorsBeforeTint: before('authors-switch', 'others-tint-switch'),
-    tintBeforeAccess: before('others-tint-switch', 'access-switch'),
+    tintFollowsAuthors: nextSibling('authors-switch', 'others-tint-switch'),
+    accessFollowsTint: nextSibling('others-tint-switch', 'access-switch'),
     tintBeforeAccount: before('others-tint-switch', 'account-open'),
     accessBeforeAccount: before('access-switch', 'account-open'),
   };
@@ -251,8 +260,8 @@ def test_ac19_the_two_switches_follow_authors_switch_in_the_toolbar(
 
     for test_id in ("authors-switch", TINT_SWITCH, ACCESS_SWITCH):
         assert found[test_id] == {"count": 1, "inToolbar": True}, found
-    assert found["order"]["authorsBeforeTint"] is True, found
-    assert found["order"]["tintBeforeAccess"] is True, found
+    assert found["order"]["tintFollowsAuthors"] is True, found
+    assert found["order"]["accessFollowsTint"] is True, found
 
 
 @pytest.mark.parametrize("test_id", SWITCHES)

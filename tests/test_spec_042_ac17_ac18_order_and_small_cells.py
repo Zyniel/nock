@@ -58,6 +58,7 @@ from spec042_harness import (
     notch_size,
     open_caught_up_room,
     open_room,
+    pixel_at,
     player,
     point_inside,
     px,
@@ -243,6 +244,196 @@ def test_ac17_the_notch_is_drawn_over_the_ring_and_the_triangles(
         end_hit_test(page)
 
     assert hit_owner(chain) == "reveal-mark", chain
+
+
+# ---- AC-17: my selection border, the top layer ------------------------------------
+
+SELECTION = "cell-selection"
+SELECTION_Z_INDEX = "7"
+
+# The `cell-selection` of a cell, its computed style, and the cell's padding box
+# (its box less its borders) as `[left, top, right, bottom]`.
+SELECTION_SCRIPT = r"""
+cell => {
+  const elements = cell.querySelectorAll('[data-testid="cell-selection"]');
+  if (elements.length !== 1) {
+    return {count: elements.length};
+  }
+  const element = elements[0];
+  const style = getComputedStyle(element);
+  const box = element.getBoundingClientRect();
+  const cellBox = cell.getBoundingClientRect();
+  const left = cellBox.left + cell.clientLeft;
+  const top = cellBox.top + cell.clientTop;
+  const borders = {};
+  for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+    borders[side] = [
+      style['border' + side + 'Style'],
+      style['border' + side + 'Width'],
+      style['border' + side + 'Color'],
+    ];
+  }
+  return {
+    count: 1,
+    ariaHidden: element.getAttribute('aria-hidden'),
+    position: style.position,
+    boxSizing: style.boxSizing,
+    zIndex: style.zIndex,
+    pointerEvents: style.pointerEvents,
+    borders: borders,
+    box: [box.left, box.top, box.right, box.bottom],
+    paddingBox: [left, top, left + cell.clientWidth, top + cell.clientHeight],
+  };
+}
+"""
+NAVY_TEXT = f"rgb({NAVY[0]}, {NAVY[1]}, {NAVY[2]})"
+
+
+def read_selection(page: Page, row: int, column: int) -> Reading:
+    """The one `cell-selection` of a cell, with the cell's padding box."""
+    found = cell_at(page, row, column).evaluate(SELECTION_SCRIPT)
+    assert isinstance(found, dict), found
+    assert found["count"] == 1, found
+    return found
+
+
+def test_ac17_my_selected_cell_holds_one_cell_selection_hidden_from_assistive_tech(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+    cell = cell_at(page, 0, 1)
+
+    expect(cell.get_by_test_id(SELECTION)).to_have_count(1)
+    found = read_selection(page, 0, 1)
+    assert found["ariaHidden"] == "true"
+
+
+def test_ac17_cell_selection_is_absolute_on_top_and_takes_no_pointer_events(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    found = read_selection(page, 0, 1)
+
+    assert found["position"] == "absolute"
+    assert found["boxSizing"] == "border-box"
+    assert found["zIndex"] == SELECTION_Z_INDEX
+    assert found["pointerEvents"] == "none"
+
+
+def test_ac17_cell_selection_has_a_2px_solid_navy_border_on_every_side(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    found = read_selection(page, 0, 1)
+
+    for side in ("Top", "Right", "Bottom", "Left"):
+        assert found["borders"][side] == ["solid", "2px", NAVY_TEXT], (side, found)
+
+
+def test_ac17_cell_selection_box_is_the_cells_padding_box(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    found = read_selection(page, 0, 1)
+
+    selection_box = to_box(found["box"])
+    padding_box = to_box(found["paddingBox"])
+    differences = {
+        "left": selection_box.left - padding_box.left,
+        "top": selection_box.top - padding_box.top,
+        "right": selection_box.right - padding_box.right,
+        "bottom": selection_box.bottom - padding_box.bottom,
+    }
+    for edge, difference in differences.items():
+        assert abs(difference) <= 0.5, (edge, selection_box, padding_box)
+
+
+def test_ac17_a_cell_that_is_not_selected_holds_no_cell_selection(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    expect(page.get_by_test_id(SELECTION)).to_have_count(1)
+    expect(cell_at(page, 2, 2).get_by_test_id(SELECTION)).to_have_count(0)
+    # The cell of p2 to p5 is theirs too: their marks are not mine.
+    expect(cell_at(page, 0, 1).get_by_test_id(SELECTION)).to_have_count(1)
+
+
+def test_ac17_after_a_tap_on_another_cell_the_old_cell_holds_none(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    tap(page, 1, 1)
+
+    expect(cell_at(page, 0, 1).get_by_test_id(SELECTION)).to_have_count(0)
+    expect(cell_at(page, 1, 1).get_by_test_id(SELECTION)).to_have_count(1)
+    expect(page.get_by_test_id(SELECTION)).to_have_count(1)
+
+
+def test_ac17_the_selection_border_is_drawn_over_the_arrow_in_its_band(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    start_hit_test(page, 0, 1, with_selection=True)
+    try:
+        cell, _ = cursor_boxes(page)
+        arrow_box = to_box(arrow_of(read_arrows(page), 0, 0, 1)["box"])
+        a = arrow_box.width
+        # 1 px inside the padding box's left edge, on the ↴'s tail (M2 5H10).
+        x = cell.left + 1
+        y = arrow_box.top + 5 / 24 * a
+        if not arrow_box.left <= x <= arrow_box.right:
+            pytest.fail(f"({x:.1f}, {y:.1f}) is not inside the arrow {arrow_box}")
+        chain = hit_chain(page, x, y)
+    finally:
+        end_hit_test(page)
+
+    assert hit_owner(chain) == SELECTION, chain
+
+
+def test_ac17_the_selection_border_is_drawn_over_another_players_triangle(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+    assert corners_on(page, 0, 1) == AC17_CORNERS
+
+    start_hit_test(page, 0, 1, with_selection=True)
+    try:
+        cell, _ = cursor_boxes(page)
+        inner = inner_box(cell)
+        x, y = point_inside("top-right", inner, 1.0)
+        if not inside_triangle(inner, "top-right", triangle_side(cell.width), x, y):
+            pytest.fail(f"({x:.1f}, {y:.1f}) is not inside p3's triangle")
+        chain = hit_chain(page, x, y)
+    finally:
+        end_hit_test(page)
+
+    assert hit_owner(chain) == SELECTION, chain
+
+
+def test_ac17_the_caught_up_cell_shows_the_navy_band_over_the_ring(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_ac17(page, live_server, fx01_grid)
+
+    start_hit_test(page, 0, 1, with_selection=True)
+    try:
+        cell, _ = cursor_boxes(page)
+        x = cell.left + 1
+        y = (cell.top + inner_box(cell).bottom) / 2
+        chain = hit_chain(page, x, y)
+        painted = pixel_at(page, x, y)
+    finally:
+        end_hit_test(page)
+
+    assert hit_owner(chain) == SELECTION, chain
+    for channel, expected in zip(painted, NAVY, strict=True):
+        assert abs(channel - expected) <= 1, (painted, NAVY)
 
 
 # ---- AC-18: small cells keep the marks' minimum sizes ----------------------------
