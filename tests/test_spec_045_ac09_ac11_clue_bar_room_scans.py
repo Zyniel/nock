@@ -378,11 +378,36 @@ def legend_place_rule_problems(run: ModeRun) -> list[str]:
     return [f"not under the grid: {under}", f"not over the grid: {over}"]
 
 
+def room_given_problems(run: ModeRun) -> list[str]:
+    """How `grid-viewport` fails to give the legend its room (empty: it did).
+
+    In the sheet layout `grid-viewport` is less high than with the mode off by
+    `R = max(38, h + 8)` (1 px).
+    """
+    boxes = boxes_of(run.page, ["grid-viewport", "authors-legend"])
+    viewport = required_box(boxes, "grid-viewport")
+    legend = required_box(boxes, "authors-legend")
+    room = max(ONE_LINE_ROOM_PX, legend.height + LEGEND_GAP_PX)
+    lost = run.viewport_off.height - viewport.height
+    if abs(lost - room) <= POSITION_TOLERANCE_PX:
+        return []
+    return [
+        f"grid-viewport is {lost} px less high than with the mode off and R is"
+        f" {room} px (h {legend.height})"
+    ]
+
+
 def case_problems(run: ModeRun, over: bool) -> list[str]:
-    """How the legend breaks the one of AC-10's cases that `over` names."""
+    """How the legend breaks the one of AC-10's cases that `over` names.
+
+    Used in the sheet layout: when the grid gives the legend its room, the
+    viewport must have lost `R` as well as the legend lying under the grid.
+    """
     if over:
         return over_the_grid_problems(run)
-    return legend_under_problems(run.page)
+    problems = legend_under_problems(run.page)
+    problems.extend(room_given_problems(run))
+    return problems
 
 
 def room_rule_says_over(run: ModeRun) -> tuple[bool, str]:

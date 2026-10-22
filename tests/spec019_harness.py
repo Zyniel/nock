@@ -19,9 +19,9 @@ of the room Menu, so the helpers that press it open the Menu first (spec 043's
 Refined by spec 045 (the design's Auteurs mode): the band `author-mark` is gone,
 with its box, drawing-order and contrast runs, and the clue bar's
 `clue-bar-author`. The tests read the letters' inks and `authors-legend` with
-spec 045's readers (`spec045_harness`). The band's colour reader
-(`BAND_COLOURS_JS`) and its gradient helpers stay here for spec 028's recap
-swatch, which keeps spec 019's hatching until spec 047 replaces it.
+spec 045's readers (`spec045_harness`). The colour reader of the
+hatching (`SWATCH_COLOURS_JS`) and its gradient helpers stay here for spec 028's
+recap swatch, which keeps spec 019's hatching until spec 047 replaces it.
 
 The spec adds no Python name and no server change, so the browser tests drive the
 room page through a mocked socket (spec 023's "browser with mocked socket") or the
@@ -42,8 +42,7 @@ Choices where the spec leaves room:
 - The hatching's colours (spec 028's recap swatch) are read with spec 035's colour
   helpers, shared through spec 024's `COLOUR_CONTRAST_JS`: the computed
   `background-color` and the colour stops of the computed `background-image` of
-  the element and of each layer at least half the cell side wide and 1 px high
-  (`BAND_COLOURS_JS`).
+  the swatch (`SWATCH_COLOURS_JS`).
 """
 
 from __future__ import annotations
@@ -464,17 +463,12 @@ def box_of(locator: Locator) -> Box:
 
 ANGLE_TOLERANCE_DEGREES = 0.001
 
-# Declares `readBand(cell)`, after spec 035's colour helpers (`parseColour`,
-# `over`, `contrast`, `WHITE`). It returns the cell's computed background and,
-# for its one `author-mark`, the mark's computed background colour and image, the
-# images of its layers, the colour stops of the mark's own image and every colour
-# of the band with its ratio against the cell. A layer is an element inside the
-# mark, or the mark's `::before` or `::after` whose computed `content` is not
-# `none`, at least half the cell side wide and 1 px high. The colours are
-# measured against what is painted behind the band: the cell's background and,
-# while the cell flashes, its `cell-flash` overlay over it (spec 041, AC-16).
-BAND_COLOURS_JS = COLOUR_CONTRAST_JS + r"""
-const BAND_COLOUR_PATTERN = new RegExp(
+# The swatch reader of spec 028's recap. It declares `imageColours(image, style)`
+# after spec 035's colour helpers (`parseColour`, `over`, `contrast`, `WHITE`):
+# the colours written in a computed `background-image`, in order, with
+# `currentcolor` resolved to the element's computed `color`.
+SWATCH_COLOURS_JS = COLOUR_CONTRAST_JS + r"""
+const SWATCH_COLOUR_PATTERN = new RegExp(
   '(?:rgba?|hsla?|hwb|oklab|oklch|lab|lch|color)\\([^()]*\\)'
   + '|\\btransparent\\b|\\bcurrentcolor\\b',
   'gi'
@@ -484,76 +478,10 @@ function imageColours(image, style) {
     return [];
   }
   const found = [];
-  for (const text of image.match(BAND_COLOUR_PATTERN) || []) {
+  for (const text of image.match(SWATCH_COLOUR_PATTERN) || []) {
     found.push(text.toLowerCase() === 'currentcolor' ? style.color : text);
   }
   return found;
-}
-function bandLayers(cell, mark) {
-  const side = cell.getBoundingClientRect().width;
-  const layers = [{source: 'author-mark', style: getComputedStyle(mark)}];
-  for (const element of mark.querySelectorAll('*')) {
-    const box = element.getBoundingClientRect();
-    if (box.width >= side / 2 && box.height >= 1) {
-      layers.push({source: element.tagName.toLowerCase(),
-                   style: getComputedStyle(element)});
-    }
-  }
-  for (const pseudo of ['::before', '::after']) {
-    const style = getComputedStyle(mark, pseudo);
-    if (style.content === 'none') {
-      continue;
-    }
-    if (parseFloat(style.width) >= side / 2 && parseFloat(style.height) >= 1) {
-      layers.push({source: pseudo, style: style});
-    }
-  }
-  return layers;
-}
-function flashOver(cell, background) {
-  const overlay = cell.querySelector('[data-testid="cell-flash"]');
-  if (overlay === null) {
-    return background;
-  }
-  const style = getComputedStyle(overlay);
-  const colour = parseColour(style.backgroundColor);
-  colour[3] = colour[3] * parseFloat(style.opacity);
-  return over(colour, background);
-}
-function readBand(cell) {
-  const marks = cell.querySelectorAll('[data-testid="author-mark"]');
-  const backgroundText = getComputedStyle(cell).backgroundColor;
-  const reading = {
-    marks: marks.length, background: backgroundText, markBackground: '',
-    markImage: '', layerImages: [], markStops: [], colours: [],
-  };
-  if (marks.length !== 1) {
-    return reading;
-  }
-  const cellBackground = flashOver(cell, over(parseColour(backgroundText), WHITE));
-  const addColour = (source, text) => {
-    const rgba = parseColour(text);
-    const ratio = contrast(over(rgba, cellBackground), cellBackground);
-    reading.colours.push({source: source, text: text, rgba: rgba, ratio: ratio});
-  };
-  for (const layer of bandLayers(cell, marks[0])) {
-    const image = layer.style.backgroundImage;
-    const stops = imageColours(image, layer.style);
-    if (layer.source === 'author-mark') {
-      reading.markBackground = layer.style.backgroundColor;
-      reading.markImage = image;
-      for (const text of stops) {
-        reading.markStops.push(parseColour(text));
-      }
-    } else {
-      reading.layerImages.push([layer.source, image]);
-    }
-    addColour(layer.source + ' background-color', layer.style.backgroundColor);
-    for (const text of stops) {
-      addColour(layer.source + ' background-image', text);
-    }
-  }
-  return reading;
 }
 """
 

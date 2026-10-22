@@ -232,10 +232,26 @@ def open_page(
 
 
 def authors_switch(page: Page) -> Locator:
+    """The `authors-switch` of the room Menu (the Menu must be open to press it).
+
+    Args:
+        page: The room page.
+
+    Returns:
+        A locator on the switch.
+    """
     return page.get_by_test_id("authors-switch")
 
 
 def legend_of(page: Page) -> Locator:
+    """The `authors-legend` of the room page.
+
+    Args:
+        page: The room page.
+
+    Returns:
+        A locator on the legend, which exists only with the mode on.
+    """
     return page.get_by_test_id("authors-legend")
 
 
@@ -296,6 +312,16 @@ return colour;
 
 
 def cell_locator(page: Page, row: int, column: int) -> Locator:
+    """The grid cell at a row and a column.
+
+    Args:
+        page: The room page.
+        row: Row of the cell, from 0.
+        column: Column of the cell, from 0.
+
+    Returns:
+        A locator on the `cell` with these `data-row` and `data-column`.
+    """
     return page.locator(
         f'[data-testid="cell"][data-row="{row}"][data-column="{column}"]'
     )
@@ -486,10 +512,26 @@ def legend_names(reading: Reading) -> list[Reading]:
 
 
 def name_texts(reading: Reading) -> list[str]:
+    """The texts of the legend's names, in document order.
+
+    Args:
+        reading: A legend reading.
+
+    Returns:
+        The text of each `authors-legend-name`.
+    """
     return [str(name["text"]) for name in legend_names(reading)]
 
 
 def name_ids(reading: Reading) -> list[str]:
+    """The player ids of the legend's names, in document order.
+
+    Args:
+        reading: A legend reading.
+
+    Returns:
+        The `data-player-id` of each `authors-legend-name`.
+    """
     return [str(name["playerId"]) for name in legend_names(reading)]
 
 
@@ -553,6 +595,18 @@ def settle_layout(page: Page) -> None:
 
 
 def required_box(boxes: dict[str, Box | None], test_id: str) -> Box:
+    """The box of an element that must be on the page.
+
+    Args:
+        boxes: Boxes by test id, as `boxes_of` reads them.
+        test_id: The `data-testid` to take.
+
+    Returns:
+        Its box.
+
+    Raises:
+        AssertionError: The page has no such element.
+    """
     box = boxes[test_id]
     assert box is not None, f"no {test_id} on the page"
     return box

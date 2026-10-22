@@ -15,7 +15,7 @@ Readings that the spec leaves open:
   names an element whose text is that label.
 - "The swatch of a recap player" is read on the `recap-colour` element's own
   computed `background-color` and `background-image`. The colours of the image
-  are its colour stops as spec 019's band reader finds them (`BAND_COLOURS_JS`), and
+  are its colour stops as spec 019's swatch reader finds them (`SWATCH_COLOURS_JS`), and
   the gradient's line and the colours are judged with spec 019's
   `first_gradient_argument`, `is_diagonal` and `is_ink_or_white`, as for its
   departed author's band: the hatch is ink and white since spec 041, which
@@ -39,7 +39,7 @@ from playwright.sync_api import Browser, Locator, Page, Route, expect
 from nock.grid import Grid
 from nock.protocol import GridSolved, LeaveReason, PlayerLeft
 from spec019_harness import (
-    BAND_COLOURS_JS,
+    SWATCH_COLOURS_JS,
     Rgba,
     first_gradient_argument,
     is_diagonal,
@@ -271,8 +271,8 @@ def test_ac2_each_swatch_has_the_colour_of_the_roster_swatch(
 
 # The computed background of a `recap-colour` swatch: its colour, its image and the
 # colours of that image's stops, each colour as [red, green, blue, alpha]. The
-# helpers are spec 019's band reader's (`parseColour`, `imageColours`).
-SWATCH_SCRIPT = "swatch => {\n" + BAND_COLOURS_JS + r"""
+# helpers are spec 019's swatch reader's (`parseColour`, `imageColours`).
+SWATCH_SCRIPT = "swatch => {\n" + SWATCH_COLOURS_JS + r"""
   const style = getComputedStyle(swatch);
   const stops = [];
   for (const text of imageColours(style.backgroundImage, style)) {
