@@ -711,11 +711,23 @@ def test_ac7_browser_full_feed_the_items_in_view_keep_their_place(
     assert items_out_of_place(noted, item_tops(page)) == []
 
 
-def resize_window(page: Page, width: int, height: int) -> None:
-    """Resize the window, then wait until the page reads the new width."""
+def resize_window(page: Page, width: int, height: int, layout: str) -> None:
+    """Resize the window, then wait for its width and the room's new layout.
+
+    Args:
+        page: The room page.
+        width: The new window width in px.
+        height: The new window height in px.
+        layout: The `data-layout` of `room-page` this size gives, "sheet" or
+            "column". The layout change closes or keeps the Salon, so the
+            caller shows its tab only after it.
+    """
     page.set_viewport_size({"width": width, "height": height})
     page.wait_for_function(
         "width => window.innerWidth === width", arg=width, timeout=WAIT_TIMEOUT_MS
+    )
+    expect(page.get_by_test_id("room-page")).to_have_attribute(
+        "data-layout", layout, timeout=WAIT_TIMEOUT_MS
     )
 
 
@@ -735,7 +747,7 @@ def replay_smaller_window(scene: FeedScene) -> None:
 
     The sheet layout closes the Salon, so the Discussion tab is shown again.
     """
-    resize_window(scene.page, 360, 740)
+    resize_window(scene.page, 360, 740, "sheet")
     show_tab(scene.page, "discussion")
     let_the_case_end(scene.page)
 
@@ -773,7 +785,7 @@ def test_ac8_browser_a_smaller_window_keeps_the_list_at_its_end(
 ) -> None:
     page = filled_feed_scene.page
     assert_setup_at_end(page)
-    resize_window(page, 360, 740)
+    resize_window(page, 360, 740, "sheet")
 
     show_tab(page, "discussion")
     start_end_watch(page, "width", "360")
@@ -819,6 +831,6 @@ def test_ac8_browser_a_larger_window_keeps_the_list_at_its_end(
     )
     start_end_watch(page, "width", "1280")
 
-    resize_window(page, 1280, 720)
+    resize_window(page, 1280, 720, "column")
 
     assert_at_end_within_300_ms(page, "Larger window")

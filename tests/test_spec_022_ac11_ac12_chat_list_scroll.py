@@ -538,11 +538,23 @@ def test_ac11_browser_a_new_line_follows_the_end_and_never_moves_the_reader(
 # ---- AC-11: spec 013 AC-8's cases on the chat list ----
 
 
-def resize_window(page: Page, width: int, height: int) -> None:
-    """Resize the window, then wait until the page reads the new width."""
+def resize_window(page: Page, width: int, height: int, layout: str) -> None:
+    """Resize the window, then wait for its width and the room's new layout.
+
+    Args:
+        page: The room page.
+        width: The new window width in px.
+        height: The new window height in px.
+        layout: The `data-layout` of `room-page` this size gives, "sheet" or
+            "column". The layout change closes or keeps the Salon, so the
+            caller shows its tab only after it.
+    """
     page.set_viewport_size({"width": width, "height": height})
     page.wait_for_function(
         "width => window.innerWidth === width", arg=width, timeout=WAIT_TIMEOUT_MS
+    )
+    expect(page.get_by_test_id("room-page")).to_have_attribute(
+        "data-layout", layout, timeout=WAIT_TIMEOUT_MS
     )
 
 
@@ -569,7 +581,7 @@ def test_ac11_browser_a_chat_list_at_its_end_stays_there_when_the_layout_changes
         assert_case_starts(setup.at_end, "Setup", "the list is at its end", setup)
 
         # Smaller window: the sheet layout closes the Salon, shown again here.
-        resize_window(page, 360, 740)
+        resize_window(page, 360, 740, "sheet")
         show_tab(page, "discussion")
         start_end_watch(page, "width", "360")
         resized = read_list(page)
@@ -589,7 +601,7 @@ def test_ac11_browser_a_chat_list_at_its_end_stays_there_when_the_layout_changes
         start = read_list(page)
         assert_case_starts(start.at_end, "Larger window", "at its end", start)
         start_end_watch(page, "width", "1280")
-        resize_window(page, 1280, 720)
+        resize_window(page, 1280, 720, "column")
         assert_at_end_within_300_ms(page, "Larger window")
     finally:
         close()
