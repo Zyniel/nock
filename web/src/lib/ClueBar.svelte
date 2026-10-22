@@ -10,7 +10,6 @@
 
   let {
     activeWord,
-    authorLine,
     width,
     isPickerOpen,
     isReactDisabled,
@@ -24,8 +23,6 @@
     status,
   }: {
     activeWord: Word | null
-    // The author of the selected letter while the Auteurs view is on (spec 019).
-    authorLine: string | null
     // The bar's width in px in the column layout; null: as wide as its parent.
     width: number | null
     isPickerOpen: boolean
@@ -50,7 +47,6 @@
 
 <div
   class="clue-bar nock-on-navy"
-  class:with-author={authorLine !== null}
   data-testid="clue-bar"
   data-word={activeWord === null ? '' : wordKey(activeWord)}
   role="region"
@@ -73,9 +69,6 @@
         aria-hidden="true"
       ></span>{/if}</span
   >
-  {#if authorLine !== null}
-    <span class="clue-bar-author" data-testid="clue-bar-author">{authorLine}</span>
-  {/if}
   {@render status?.()}
   <button
     type="button"
@@ -195,24 +188,5 @@
 
   .clue-bar-direction[data-direction='down']::after {
     content: '↓';
-  }
-
-  /* The author of the selected letter (spec 019) follows the clue text in the
-     row. The clue text has priority (spec 019 decision 11): the author's flex
-     basis is 0, so it grows into the room the clue text leaves, up to its whole
-     text, and never goes under 6 times its font size. */
-  .with-author .clue-bar-text {
-    flex: 0 1 auto;
-  }
-
-  .clue-bar-author {
-    flex: 1 1 0;
-    max-width: max-content;
-    min-width: 6em;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font: 500 0.875rem/1.2 var(--nock-font-ui);
-    color: var(--nock-white);
   }
 </style>

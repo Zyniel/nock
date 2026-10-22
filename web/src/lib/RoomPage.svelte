@@ -17,7 +17,13 @@
   import { t } from './i18n'
   import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
   import { nameOf, streamEntries } from './activityFeed'
-  import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
+  import {
+    AUTHORS_VIEW_KEY,
+    colourByPlayer,
+    legendNames,
+    legendRoom,
+    readAuthorsView,
+  } from './authorsView'
   import {
     clueReactionMarkers,
     hasNewEventLines,
@@ -347,20 +353,21 @@
   let activeWord = $derived(selectedWord(words, selection))
   let remoteSelections = $derived(remoteSelectionsOf(session.snapshot, words, session.cursors))
 
-  // ---- The authors view (spec 019) ----
+  // ---- The Auteurs mode (spec 045) ----
 
-  // Off at each page load, and for this page only: the switch sends nothing.
-  let isAuthorsViewOn = $state(false)
+  // It starts from what this browser remembers (off by default) and remembers
+  // each change. It sends nothing.
+  let isAuthorsViewOn = $state(readAuthorsView())
   let playerColours = $derived(colourByPlayer(session.snapshot?.players ?? []))
-  // The clue bar's line naming the author of the selected letter, or null. It
-  // follows the known names too: a name that arrives while the cell stays
-  // selected (a player seated back, spec 032) shows at once (spec 019).
-  let selectedAuthorLine = $derived(
-    selectedAuthorLineOf(isAuthorsViewOn, selection, session.names),
-  )
+  let authorsLegendNames = $derived(legendNames(session.snapshot?.players ?? []))
+  // The legend's height as the grid viewport draws it, and the room the grid
+  // gives it while the mode is on.
+  let authorsLegendHeight = $state(0)
+  let authorsLegendRoom = $derived(isAuthorsViewOn ? legendRoom(authorsLegendHeight) : 0)
 
   function toggleAuthorsView(): void {
     isAuthorsViewOn = !isAuthorsViewOn
+    writeSwitch(AUTHORS_VIEW_KEY, isAuthorsViewOn)
   }
 
   // ---- The two display switches of the grid cells (spec 042) ----
@@ -378,28 +385,6 @@
   function toggleAccessibility(): void {
     isAccessibilityOn = !isAccessibilityOn
     writeSwitch(ACCESSIBILITY_KEY, isAccessibilityOn)
-  }
-
-  // The line naming the author of the selected cell's confirmed letter, while
-  // the view is on; null when it is off, when nothing is selected, or when the
-  // selected cell is empty or revealed.
-  function selectedAuthorLineOf(
-    isViewOn: boolean,
-    current: Selection | null,
-    names: Map<string, string>,
-  ): string | null {
-    if (!isViewOn || current === null) {
-      return null
-    }
-    const cell = letterCellAt(current.row, current.column)
-    if (cell === null) {
-      return null
-    }
-    const author = shownAuthorOf(cell)
-    if (author === null) {
-      return null
-    }
-    return authorLine(author, names)
   }
 
   // True while the page retries after a loss that happened with the form shown:
@@ -1557,32 +1542,41 @@
   }
 
   // In the column layout the grid viewport is the grid's box at zoom 1, as large
-  // as the room left after the clue bar and the status; null in the sheet
-  // layout, where the viewport fills its area.
-  let columnGridBox = $derived(
-    layout === 'column' && session.snapshot !== null
-      ? fittedGridBox(
-          playBlockWidth,
-          Math.max(
-            0,
-            playBlockHeight -
-              PLAY_AREA_PADDING_PX -
-              CLUE_BAR_HEIGHT_PX -
-              (isStatusUnderClueBar ? statusBandHeight : 0),
-          ),
-          session.snapshot.grid.width,
-          session.snapshot.grid.height,
-        )
-      : null,
-  )
-  // The clue bar is as wide as the grid, but never narrower than the smaller of
-  // CLUE_BAR_MIN_PX and the play area (Decision 12); the full width in the sheet
-  // layout.
+  // as the room left after the clue bar, the status and, while the Auteurs mode
+  // is on, the legend's room (spec 045); null in the sheet layout, where the
+  // viewport fills its area.
+  let columnGridBox = $derived(columnGridBoxFor(authorsLegendRoom))
+  // The grid's box with no legend under it: the clue bar keeps its width when
+  // the Auteurs mode turns on (spec 045, "The grid's room").
+  let columnGridBoxWithoutLegend = $derived(columnGridBoxFor(0))
+  // The clue bar is as wide as the grid with no legend, but never narrower than
+  // the smaller of CLUE_BAR_MIN_PX and the play area (Decision 12); the full
+  // width in the sheet layout.
   let clueBarWidth = $derived(
-    columnGridBox === null
+    columnGridBoxWithoutLegend === null
       ? null
-      : Math.max(columnGridBox.width, Math.min(CLUE_BAR_MIN_PX, playBlockWidth)),
+      : Math.max(columnGridBoxWithoutLegend.width, Math.min(CLUE_BAR_MIN_PX, playBlockWidth)),
   )
+
+  // The grid's box in the column layout when `legendRoomPx` is taken from the
+  // height left for it; null in the sheet layout.
+  function columnGridBoxFor(legendRoomPx: number): { width: number; height: number } | null {
+    if (layout !== 'column' || session.snapshot === null) {
+      return null
+    }
+    const heightLeft =
+      playBlockHeight -
+      PLAY_AREA_PADDING_PX -
+      CLUE_BAR_HEIGHT_PX -
+      (isStatusUnderClueBar ? statusBandHeight : 0) -
+      legendRoomPx
+    return fittedGridBox(
+      playBlockWidth,
+      Math.max(0, heightLeft),
+      session.snapshot.grid.width,
+      session.snapshot.grid.height,
+    )
+  }
 
   function roomSocketUrl(roomCode: string): string {
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -2008,7 +2002,9 @@
             class="grid-area"
             data-testid="grid-area"
             style:width={columnGridBox === null ? null : `${columnGridBox.width}px`}
-            style:height={columnGridBox === null ? null : `${columnGridBox.height}px`}
+            style:height={columnGridBox === null
+              ? null
+              : `${columnGridBox.height + authorsLegendRoom}px`}
           >
             <div
               class="visually-hidden"
@@ -2092,13 +2088,15 @@
               {isOthersTintOn}
               {isAccessibilityOn}
               {playerColours}
+              legendNames={authorsLegendNames}
+              legendRoom={authorsLegendRoom}
+              bind:legendHeight={authorsLegendHeight}
               {clueFlags}
               {clueReactions}
             />
           </div>
           <ClueBar
             {activeWord}
-            authorLine={selectedAuthorLine}
             width={clueBarWidth}
             isPickerOpen={isPickerOpen}
             {isReactDisabled}
@@ -2335,9 +2333,12 @@
   }
 
   /* The area of the grid: it holds the vote banner over the viewport's top
-     edge. In the sheet layout it takes the height left and the viewport is its
-     box less 8 px on each side; in the column layout it is the grid's box at
-     zoom 1 and its 12 px of top padding. */
+     edge, and the Auteurs legend under the viewport (spec 045). In the sheet
+     layout it takes the height left and the viewport is its box less 8 px on
+     each side; in the column layout it is the grid's box at zoom 1 and its
+     12 px of top padding. While the Auteurs mode is on, the legend's room is
+     taken from the viewport's height (sheet) or added under the grid's box
+     (column). */
   .grid-area {
     position: relative;
     box-sizing: content-box;

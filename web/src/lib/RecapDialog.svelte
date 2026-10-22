@@ -246,8 +246,8 @@
   }
 
   /* A player who is no longer in the room, whose colour may now be someone
-     else's: the hatching of a departed author's band (spec 019), a pattern no
-     player's swatch has. A player's swatch is a plain colour, with no pattern. */
+     else's: the departed hatching of app.css, a pattern no player's swatch
+     has. A player's swatch is a plain colour, with no pattern. */
   .recap-colour[data-colour=''] {
     background-image: var(--author-departed-hatching);
   }

@@ -85,7 +85,7 @@
   "reveal.word_none": "Plus de mot",
   "undo.nothing": "Rien à annuler.",
   "authors.switch": "Auteurs",
-  "authors.selected": "Lettre de {name}",
+  "authors.legend": "Auteurs :",
   "others_tint.switch": "Mots des autres",
   "access.switch": "Accessibilité",
   "pencil.toggle": "Crayon",
