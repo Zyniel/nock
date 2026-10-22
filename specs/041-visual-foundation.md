@@ -120,6 +120,18 @@ otherwise, and only four components set `font: inherit` today, so the controls o
 the other screens were drawn in a font that differs between Windows and Ubuntu.
 Checked by AC-21.)
 
+Header rows keep their heights: the room page's title row, share row and toolbar
+row each set an explicit `line-height` (the implementer picks the value that gives
+each row the height it had with the system font), not the font's `normal`, which
+is 1 px taller per row in Source Sans 3. The room page's header stays 48 px high
+at every width where it was 48 px. No new test: the 15 tests that require a grid
+viewport of at least 100 px at 568 by 320 with a touch pointer check it (spec 013,
+014, 019, 020, 021, 022, 024, 025, 026, 027, 028 and 033, the criteria that
+measure the grid viewport in that window). (Note from the lead, 2026-10-22, from
+its implementation: added. Source Sans 3's normal line height made the header 50 px
+and the grid viewport 98.8 px instead of 100.8 px, under those tests' 100 px. The
+goal is no change of layout.)
+
 ### Fonts
 
 The two families of `_design.md` section 4 are declared with `@font-face` under
@@ -254,6 +266,7 @@ border width, padding, position or element changes, except the flash overlay.
 | Pencil letter outside a flash | `color` | `--nock-pencil` |
 | Wrong letter (`data-wrong="true"`) | `text-decoration-color` | `--nock-red` |
 | Clue cell; its text; `clue-separator` | background; `color`; background | `--nock-clue-bg`; `--nock-clue-ink`; `--nock-clue-ink` |
+| Clue text | `line-height` | the smallest value that holds Source Sans 3 and IBM Plex Sans Condensed's ascent and descent (about 1.42 em) and keeps spec 006 AC-1 ("no clue text is cut off at full zoom") passing, picked by the implementer; the clue font size does not change. Spec 042 (the design's grid cells) sets the clue text's final type and replaces this line height. (Note from the lead, 2026-10-22, from its implementation: added. The 1.1 line height no longer held the new font and 19 clue texts overflowed at full zoom.) |
 | Clue of the selected word (`.clue.active`) | background | `--nock-selected` (decided by the human on 2026-10-16, `_design.md` section 6) |
 | Empty cell (`data-type="empty"`) | background | `--nock-rule` (decided by the human on 2026-10-16, `_design.md` section 6) |
 | `clue-arrow` | border colour | `--nock-ink` |
@@ -448,6 +461,15 @@ checks each test against it.
   how other specs' tests measure. See Decision 7.)
 - Author band of a departed author (spec 019): its hatch goes from #333333 and
   white to ink and white; ink keeps at least 3:1 on every cell background.
+  (Note from the lead, 2026-10-22, from its implementation: the tests that read
+  the hatch or its swatch change with it, since the hatch is ink and white, no
+  longer grey: spec 019 AC-1 and AC-2 (hatching tests), spec 028 AC-2 and spec 032
+  AC-7 (hatched swatches).)
+- Flash contrast tests (spec 019 AC-1, band contrast in each colour; spec 020 AC-7,
+  pencil letters flashed by colour; spec 024 AC-9, the mark while the cell
+  flashes): they now measure against the white cell with the 38 % overlay, per
+  AC-16, not a full player colour. (Note from the lead, 2026-10-22, from its
+  implementation: added to the list of tests that change.)
 - A font file that fails to load (offline, blocked): the browser uses the next
   family of the stack; nothing else changes. (AC-5)
 - `color-mix()` is supported by the current Chromium, Firefox and WebKit. (AC-15)
