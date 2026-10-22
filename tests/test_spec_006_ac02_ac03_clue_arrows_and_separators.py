@@ -309,6 +309,12 @@ def test_ac3_only_the_double_clue_cell_of_fx01_has_a_separator(
 def test_ac3_every_double_clue_cell_of_fx02_has_its_own_separator(
     page: Page, live_server: str, room_registry: RoomRegistry, fx02_grid: Grid
 ) -> None:
+    # The separator is required in every two-clue cell at any zoom; zoom 1 is read.
+    # The "each text on its own side" check is not made on FX-02 (spec 006 AC-3,
+    # note of 2026-10-22): measured at full zoom (`data-zoom == data-zoom-max`, 5),
+    # in a 360 px phone context, 4 of FX-02's 7 two-clue cells still do not fit
+    # their texts, a 3-line text of 61.1 px in a half cell of 59.5 px: the text
+    # spills 2 px over the separator, as in (1, 0), (6, 8) and (8, 0).
     page.set_viewport_size({"width": 1280, "height": 800})
     open_room(page, live_server, room_registry, fx02_grid)
     double_cells = []
@@ -322,9 +328,3 @@ def test_ac3_every_double_clue_cell_of_fx02_has_its_own_separator(
         separator = cell_locator.get_by_test_id("clue-separator")
         expect(separator).to_have_count(1)
         assert_separator_is_a_visible_line(separator)
-        first_text = box_of(cell_locator.get_by_test_id("clue-text").nth(0))
-        second_text = box_of(cell_locator.get_by_test_id("clue-text").nth(1))
-        separator_box = box_of(separator)
-        separator_center = separator_box["y"] + separator_box["height"] / 2
-        assert separator_center >= first_text["y"] + first_text["height"] - 0.5
-        assert separator_center <= second_text["y"] + 0.5

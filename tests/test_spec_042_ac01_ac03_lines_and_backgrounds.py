@@ -24,11 +24,12 @@ from playwright.sync_api import Locator, Page, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
-from nock.protocol import Direction, GridView, LetterChanged, PlayerView
+from nock.protocol import Direction, GridView, LetterChanged, PlayerView, grid_view
 from spec007_harness import note_view
 from spec019_harness import MockRoomSocket
 from spec042_harness import (
     LOCKED,
+    POSITION_TOLERANCE_PX,
     QUIET_MS,
     RULE,
     SELECTED,
@@ -66,6 +67,11 @@ from spec042_harness import (
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return Grid.model_validate_json(fx01_text)
+
+
+@pytest.fixture
+def fx02_grid(fx02_text: str) -> Grid:
+    return Grid.model_validate_json(fx02_text)
 
 
 @pytest.fixture
@@ -178,6 +184,105 @@ def test_ac1_letter_cells_clip_their_content_and_clue_cells_do_not(
             where = f"({cell['row']}, {cell['column']}) {cell['type']}"
             problems.append(f"{where}: overflow {cell['overflow']}")
     assert problems == []
+
+
+def test_ac1_the_grid_clips_at_its_outer_edge_on_both_axes(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(page, live_server, fx01_view(fx01_grid), [me()])
+    grid = page.get_by_test_id("grid")
+
+    assert style_of(grid, "overflow") == "clip"
+    assert style_of(grid, "overflowX") == "clip"
+    assert style_of(grid, "overflowY") == "clip"
+
+
+# What paints outside the grid's border box. For each descendant whose box reaches
+# more than `tolerance` px past the grid's box, a point in the part that lies
+# outside the grid (and inside the window) is hit-tested: a clipped descendant is
+# not hit there. The boxes are the layout boxes (`getBoundingClientRect` does not
+# apply the clip), so a hit on the grid's content outside its box means that the
+# content paints there.
+PAINTED_OUTSIDE_SCRIPT = r"""
+(tolerance) => {
+  const grid = document.querySelector('[data-testid="grid"]');
+  const edge = grid.getBoundingClientRect();
+  const reached = [];
+  const painted = [];
+  for (const element of grid.querySelectorAll('*')) {
+    const box = element.getBoundingClientRect();
+    if (box.width === 0 && box.height === 0) continue;
+    const sides = [];
+    if (box.bottom > edge.bottom + tolerance) sides.push('bottom');
+    if (box.right > edge.right + tolerance) sides.push('right');
+    if (box.top < edge.top - tolerance) sides.push('top');
+    if (box.left < edge.left - tolerance) sides.push('left');
+    if (sides.length === 0) continue;
+    const name = element.getAttribute('data-testid') || element.tagName;
+    reached.push(name + ' ' + sides.join('+'));
+    const insideLeft = Math.max(box.left, edge.left);
+    const insideRight = Math.min(box.right, edge.right);
+    const insideTop = Math.max(box.top, edge.top);
+    const insideBottom = Math.min(box.bottom, edge.bottom);
+    const middleX = (insideLeft + insideRight) / 2;
+    const middleY = (insideTop + insideBottom) / 2;
+    const points = [];
+    if (sides.includes('bottom')) {
+      points.push([middleX, (edge.bottom + Math.min(box.bottom, innerHeight)) / 2]);
+    }
+    if (sides.includes('right')) {
+      points.push([(edge.right + Math.min(box.right, innerWidth)) / 2, middleY]);
+    }
+    if (sides.includes('top')) {
+      points.push([middleX, (edge.top + Math.max(box.top, 0)) / 2]);
+    }
+    if (sides.includes('left')) {
+      points.push([(edge.left + Math.max(box.left, 0)) / 2, middleY]);
+    }
+    for (const [x, y] of points) {
+      if (x < 0 || y < 0 || x >= innerWidth || y >= innerHeight) continue;
+      const hit = document.elementFromPoint(x, y);
+      if (hit !== null && grid.contains(hit)) {
+        painted.push(name + ' hit at ' + x.toFixed(1) + ', ' + y.toFixed(1));
+      }
+    }
+  }
+  return { reached, painted };
+}
+"""
+DESKTOP_WINDOW = {"width": 1280, "height": 800}
+
+
+def open_fx02_on_desktop(page: Page, base_url: str, fx02_grid: Grid) -> None:
+    """A FX-02 room in a 1280 by 800 window, nothing selected."""
+    page.set_viewport_size(DESKTOP_WINDOW)
+    open_room(page, base_url, grid_view(fx02_grid), [me()])
+
+
+def test_ac1_nothing_of_fx02_paints_outside_the_grid_box_at_1280_by_800(
+    page: Page, live_server: str, fx02_grid: Grid
+) -> None:
+    open_fx02_on_desktop(page, live_server, fx02_grid)
+
+    found = page.evaluate(PAINTED_OUTSIDE_SCRIPT, POSITION_TOLERANCE_PX)
+
+    assert found["painted"] == [], found
+
+
+def test_ac1_the_fx02_viewport_has_nothing_to_scroll_at_1280_by_800(
+    page: Page, live_server: str, fx02_grid: Grid
+) -> None:
+    open_fx02_on_desktop(page, live_server, fx02_grid)
+    viewport = page.get_by_test_id("grid-viewport")
+
+    sizes = viewport.evaluate(
+        "element => ({scrollHeight: element.scrollHeight,"
+        " clientHeight: element.clientHeight, scrollWidth: element.scrollWidth,"
+        " clientWidth: element.clientWidth})"
+    )
+
+    assert sizes["scrollHeight"] <= sizes["clientHeight"] + 1, sizes
+    assert sizes["scrollWidth"] <= sizes["clientWidth"] + 1, sizes
 
 
 def test_ac1_an_empty_cell_is_rule_grey_clips_and_holds_no_element(
