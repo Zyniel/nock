@@ -1,7 +1,7 @@
 ---
 id: "042"
 title: Grid cells
-status: approved
+status: done
 ---
 
 # 042 - Grid cells
