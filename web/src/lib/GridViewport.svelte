@@ -1109,10 +1109,12 @@
   /* A clue cell (spec 042): its clues fill its content box, one alone or two
      in halves of equal height around the separator. It does not clip: at zoom
      1 a long clue may reach past its edges. The padding is 2px by 3px; only on
-     a cell of less than 12px (a large grid beside the in-app keyboard on a low
-     window) does it give way, so that the clues keep a box that takes taps. */
+     tiny cells (a large grid beside the in-app keyboard on a low window) does
+     it give way, the sides below 15px and the top and bottom below 12px, so
+     that the clues keep a box that takes taps (FX-02's 5.8px cells leave a
+     clue about 2.5px wide, which Firefox's taps reach). */
   .clue-cell {
-    --clue-padding-x: min(3px, calc(var(--cell) * 0.25));
+    --clue-padding-x: min(3px, calc(var(--cell) * 0.2));
     display: flex;
     flex-direction: column;
     padding: min(2px, calc(var(--cell) * 0.17)) var(--clue-padding-x);
