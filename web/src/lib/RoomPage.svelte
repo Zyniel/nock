@@ -549,12 +549,12 @@
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
   let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
-  // Where the status shows (spec 026 AC-10, spec 043): in the clue bar's row
-  // while the in-app keyboard shows on a low window, where a band would take
-  // the grid's height; a solved grid's status is always the band under the bar,
-  // with « Voir le bilan ».
+  // Where the status shows (spec 026 AC-10, spec 043 AC-27): in the clue bar's
+  // row while the in-app keyboard shows on a low window, where a band would take
+  // the grid's height; under the bar, as a band, everywhere else. Until spec 044
+  // hides the keyboard on a solved page, a solved status takes the row too.
   let isStatusInClueBar = $derived(
-    gridStatus === 'full_wrong' && layout === 'sheet' && isLowWindow && isTouchScreen,
+    gridStatus !== null && layout === 'sheet' && isLowWindow && isTouchScreen,
   )
   let isStatusUnderClueBar = $derived(gridStatus !== null && !isStatusInClueBar)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
@@ -1722,10 +1722,14 @@
   <span class="grid-status-text"
     >{gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}</span
   >
-  {#if gridStatus === 'solved' && !isInRow}
+  <!-- « Voir le bilan »: the primary button in the band, the secondary one in
+       the clue bar's row (spec 043 AC-27). -->
+  {#if gridStatus === 'solved'}
     <button
       type="button"
-      class="nock-button nock-button-primary recap-open"
+      class="nock-button recap-open"
+      class:nock-button-primary={!isInRow}
+      class:nock-button-secondary={isInRow}
       data-testid="recap-open"
       bind:this={recapOpenButton}
       onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
@@ -2338,6 +2342,9 @@
   /* In the clue bar's row: white text on one line, after the clue. */
   .grid-status.in-row {
     flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
     padding: 0 8px;
     white-space: nowrap;
     color: var(--nock-white);
