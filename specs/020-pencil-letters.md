@@ -156,7 +156,14 @@ spec 020).) While the cell flashes (`data-flash` is not `""`), its pencil letter
 takes the flash's text colour, the same `color` as a normal letter in that state,
 and the italics alone mark it as a pencil letter; its contrast against the flash
 colour is at least 4.5:1 (spec 035 AC-8, state K3). (Note from the lead,
-2026-10-15: added, decision 12 (review of spec 020).) The italics are the sign that
+2026-10-15: added, decision 12 (review of spec 020).) (Note from the lead,
+2026-10-22: since spec 041 AC-16, the flash is the replacer's colour at 38 % over
+white, drawn by a `cell-flash` overlay under a white cell background: the pencil
+letter has `font-style` `italic` and the ink `color` rgb(20, 24, 31), as a normal
+letter does, and its contrast is measured against the cell's background with the
+overlay composited over it, not against a full player colour. Outside a flash,
+the tint of another player's word is 16 % instead of 28 %, which keeps the pencil
+grey at 4.5:1 or more on all eight tints.) The italics are the sign that
 does not rely on colour (spec 035 AC-6 and AC-7). A cell with `data-pencil="false"`
 has the `font-style` `normal`.
 
