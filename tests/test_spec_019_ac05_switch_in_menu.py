@@ -19,6 +19,13 @@ every window size above, the legend lies inside the window and overlaps neither
 the `grid` nor `clue-bar`; the contrast and language scans run once the legend
 shows (they read `clue-bar-author` before, which is gone).
 
+Refined again by spec 045 (2026-10-23, its decisions 8 and 9): where giving the
+legend its room would leave `grid-viewport` under 100 px high (568 by 320 in the
+touch context, the keyboard shown), the grid keeps its room and the legend lies
+over the viewport's bottom, 8 px above it. So the legend overlaps the `grid` only
+in that case, and never the top bar, `clue-bar`, the status, the keyboard or the
+Salon; where the grid gives it its room, it sits 8 px under the grid, off its box.
+
 Choices where the spec leaves room:
 
 - "The first item of `room-menu`": the first `button` or `a` inside it.
@@ -61,12 +68,10 @@ from spec019_harness import (
     with_letter_cells,
 )
 from spec035_harness import unknown_texts
-from spec043_harness import box_inside, window_box
 from spec045_harness import (
-    boxes_of,
+    legend_cover_problems,
     legend_of,
-    overlap_area,
-    required_box,
+    legend_room_problems,
     settle_layout,
 )
 
@@ -233,16 +238,15 @@ def open_setup(page: Page, base_url: str, grid: Grid, touch: bool) -> None:
 
 
 def legend_problems(page: Page) -> list[str]:
-    """The legend inside the window, overlapping neither the grid nor clue-bar."""
-    boxes = boxes_of(page, ["authors-legend", "grid", "clue-bar"])
-    legend = required_box(boxes, "authors-legend")
-    problems: list[str] = []
-    if not box_inside(legend, window_box(page)):
-        problems.append(f"authors-legend {legend} is not inside the window")
-    for test_id in ("grid", "clue-bar"):
-        other = required_box(boxes, test_id)
-        if overlap_area(legend, other) > 0:
-            problems.append(f"authors-legend {legend} overlaps {test_id} {other}")
+    """How the legend covers what spec 045 keeps it off (empty: none).
+
+    It lies inside the window and overlaps none of the top bar, `clue-bar`,
+    `grid-status`, the keyboard and the Salon (spec 045's
+    `legend_cover_problems`); it overlaps the `grid` only when it lies over the
+    bottom of `grid-viewport`, 8 px above it (spec 045's `legend_room_problems`).
+    """
+    problems = legend_cover_problems(page)
+    problems.extend(legend_room_problems(page))
     return problems
 
 

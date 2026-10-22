@@ -30,6 +30,15 @@ Choices where the spec leaves room:
 - The legend's place is read once the layout has settled: the boxes of
   `grid-viewport`, the `grid` and the legend are read every 100 ms until two
   readings in a row are the same (the grid refits as on a resize, spec 006).
+- Which of its two places the legend takes is not read from its top against
+  `grid-viewport`'s bottom (AC-10's wording): in the sheet layout on a portrait
+  window the grid is centred in a viewport taller than itself, and the legend,
+  8 px under the grid (AC-7) in a viewport 38 px less high (AC-8), lies inside
+  the viewport's box with the room given. A test that does not know the case
+  accepts either place (`legend_room_problems`); one that knows it (the rule of
+  "The grid's room" from the height with the mode off) checks that place.
+- An element "shown" (`grid-status` when shown, `keyboard`, `salon` when open)
+  has no `hidden` attribute, a client rect and `visibility: visible`.
 """
 
 from __future__ import annotations
@@ -53,6 +62,7 @@ from spec043_harness import (
     colour_matches,
     fx01_view,
     open_room,
+    player,
     players_up_to,
     seed_value,
     snapshot_frame,
@@ -103,6 +113,18 @@ EIGHT_CELLS: list[tuple[int, int]] = [
 ]
 EIGHT_LETTERS = "TAMISVID"
 
+# Eight nicknames of 20 characters (AC-8, AC-10), as the server stores them.
+LONG_NICKNAMES = [
+    "BARTHOLOMEW LEFEBVRE",
+    "GENEVIEVE MONTAIGNES",
+    "ALEXANDRINE DUVERNAY",
+    "CHRISTOPHE BEAUCHAMP",
+    "MARIE-CLAIRE FONTANE",
+    "JEAN-BAPTISTE ROUSSY",
+    "PHILIPPINE ROCHEFORT",
+    "EMMANUELLE GRANDPRES",
+]
+
 # ---- Snapshots ---------------------------------------------------------------------
 
 
@@ -135,6 +157,15 @@ def eight_frame(
     """`EIGHT`'s snapshot: `seq` 5, `you` `p1`, players `p1` to `p8` by default."""
     shown_players = players_up_to(8) if players is None else players
     return snapshot_frame(eight_view(grid, replaced), shown_players)
+
+
+def long_name_players() -> list[PlayerView]:
+    """`p1` (host) to `p8`, each with one of the 20-character `LONG_NICKNAMES`."""
+    players: list[PlayerView] = []
+    for number, nickname in enumerate(LONG_NICKNAMES, start=1):
+        assert len(nickname) == 20, nickname
+        players.append(player(f"p{number}", nickname=nickname, host=number == 1))
+    return players
 
 
 AC3_SEQ = 7
@@ -242,6 +273,7 @@ return {
   background: parseColour(style.backgroundColor),
   fontStyle: style.fontStyle,
   fontWeight: style.fontWeight,
+  fontSize: parseFloat(style.fontSize),
   decorationLine: style.textDecorationLine,
   decorationColour: parseColour(style.textDecorationColor),
   decorationStyle: style.textDecorationStyle,
@@ -419,6 +451,8 @@ return {
   background: parseColour(style.backgroundColor),
   display: style.display,
   columnGap: style.columnGap,
+  zIndex: style.zIndex,
+  pointerEvents: style.pointerEvents,
   items: items,
   playerIcons: legend.querySelectorAll('[data-testid="player-icon"]').length,
 };
@@ -553,3 +587,151 @@ def legend_place_problems(page: Page) -> list[str]:
     if abs(gap - LEGEND_GAP_PX) > POSITION_TOLERANCE_PX:
         problems.append(f"legend top {legend.top} is {gap} px below the grid's bottom")
     return problems
+
+
+# ---- Under the grid, or over its bottom ("The grid's room") ----------------------
+
+# The box of the first element of each test id, or null when it is not shown: no
+# such element, a `hidden` attribute, no client rect, or not `visibility: visible`.
+SHOWN_BOXES_SCRIPT = r"""
+testIds => {
+  const found = {};
+  for (const testId of testIds) {
+    const element = document.querySelector(`[data-testid="${testId}"]`);
+    const shown = element !== null
+      && !element.hasAttribute('hidden')
+      && element.getClientRects().length > 0
+      && getComputedStyle(element).visibility === 'visible';
+    if (shown) {
+      const rect = element.getBoundingClientRect();
+      found[testId] = [rect.left, rect.top, rect.right, rect.bottom];
+    } else {
+      found[testId] = null;
+    }
+  }
+  return found;
+}
+"""
+
+# What the legend may never cover ("The legend", second "Place"; AC-10).
+UNCOVERED_IDS = ["room-topbar", "clue-bar", "grid-status", "keyboard", "salon"]
+
+# What `document.elementFromPoint` finds at the centre of the legend's box: its
+# test id (or tag name) and whether the `grid` holds it.
+LEGEND_HIT_SCRIPT = r"""
+() => {
+  const legend = document.querySelector('[data-testid="authors-legend"]');
+  const grid = document.querySelector('[data-testid="grid"]');
+  const box = legend.getBoundingClientRect();
+  const hit = document.elementFromPoint(
+    box.left + box.width / 2, box.top + box.height / 2
+  );
+  return {
+    inGrid: hit !== null && grid !== null && grid.contains(hit),
+    hit: hit === null ? null : (hit.getAttribute('data-testid') || hit.tagName),
+  };
+}
+"""
+
+
+def shown_boxes(page: Page, test_ids: Sequence[str]) -> dict[str, Box | None]:
+    """The box of each test id that shows, None for one that does not."""
+    found = page.evaluate(SHOWN_BOXES_SCRIPT, list(test_ids))
+    assert isinstance(found, dict), found
+    boxes: dict[str, Box | None] = {}
+    for test_id in test_ids:
+        raw = found[test_id]
+        boxes[test_id] = None if raw is None else to_box(raw)
+    return boxes
+
+
+def legend_cover_problems(page: Page) -> list[str]:
+    """How the legend breaks "it covers nothing it may not" (empty: none).
+
+    The legend lies inside the window, and its box overlaps none of `room-topbar`,
+    `clue-bar`, `grid-status`, `keyboard` and `salon` that show.
+    """
+    legend = required_box(boxes_of(page, ["authors-legend"]), "authors-legend")
+    size = page.evaluate("() => [innerWidth, innerHeight]")
+    assert isinstance(size, list), size
+    problems: list[str] = []
+    if (
+        legend.left < -POSITION_TOLERANCE_PX
+        or legend.top < -POSITION_TOLERANCE_PX
+        or legend.right > float(size[0]) + POSITION_TOLERANCE_PX
+        or legend.bottom > float(size[1]) + POSITION_TOLERANCE_PX
+    ):
+        problems.append(f"legend {legend} is not inside the window {size}")
+    others = shown_boxes(page, UNCOVERED_IDS)
+    for test_id in UNCOVERED_IDS:
+        other = others[test_id]
+        if other is not None and overlap_area(legend, other) > 0:
+            problems.append(f"legend {legend} overlaps {test_id} {other}")
+    return problems
+
+
+def legend_under_problems(page: Page) -> list[str]:
+    """How the legend breaks its place when the grid gives it its room.
+
+    Its top is 8 px below the bottom of the part of the `grid` that shows in
+    `grid-viewport` (1 px), and its box does not overlap the `grid`'s.
+    """
+    boxes = boxes_of(page, ["grid-viewport", "grid", "authors-legend"])
+    viewport = required_box(boxes, "grid-viewport")
+    grid = required_box(boxes, "grid")
+    legend = required_box(boxes, "authors-legend")
+    problems: list[str] = []
+    shown_bottom = min(grid.bottom, viewport.bottom)
+    gap = legend.top - shown_bottom
+    if abs(gap - LEGEND_GAP_PX) > POSITION_TOLERANCE_PX:
+        problems.append(f"legend top {legend.top} is {gap} px below the grid's bottom")
+    if overlap_area(legend, grid) > 0:
+        problems.append(f"legend {legend} overlaps the grid {grid}")
+    return problems
+
+
+def legend_over_problems(page: Page) -> list[str]:
+    """How the legend breaks its place when the grid gives it no room.
+
+    Its bottom is 8 px above `grid-viewport`'s bottom (1 px) and its top is not
+    above the viewport's top, so it covers only the viewport's bottom.
+    """
+    boxes = boxes_of(page, ["grid-viewport", "authors-legend"])
+    viewport = required_box(boxes, "grid-viewport")
+    legend = required_box(boxes, "authors-legend")
+    problems: list[str] = []
+    rise = viewport.bottom - legend.bottom
+    if abs(rise - LEGEND_GAP_PX) > POSITION_TOLERANCE_PX:
+        problems.append(
+            f"legend's bottom {legend.bottom} is {rise} px above grid-viewport's"
+            f" bottom {viewport.bottom}"
+        )
+    if legend.top < viewport.top - POSITION_TOLERANCE_PX:
+        problems.append(
+            f"legend's top {legend.top} is above grid-viewport's top {viewport.top}"
+        )
+    return problems
+
+
+def legend_room_problems(page: Page) -> list[str]:
+    """How the legend breaks both of its places (empty: it follows one of them).
+
+    Either it sits under the grid (`legend_under_problems`) or it lies over the
+    bottom of `grid-viewport` (`legend_over_problems`); this reads which from
+    neither the mode off nor the window, so a test that knows the case checks
+    the matching function instead.
+    """
+    under = legend_under_problems(page)
+    if under == []:
+        return []
+    over = legend_over_problems(page)
+    if over == []:
+        return []
+    return [f"not under the grid: {under}", f"not over its bottom: {over}"]
+
+
+def legend_hit(page: Page) -> Reading:
+    """What `elementFromPoint` finds at the legend's centre (`inGrid`, `hit`)."""
+    found = page.evaluate(LEGEND_HIT_SCRIPT)
+    assert isinstance(found, dict), found
+    return found

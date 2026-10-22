@@ -4,9 +4,16 @@ the scans.
 AC-9: the clue bar shows only the clue, in every mode, and no file under
 `web/src` names `clue-bar-author` or `author-mark`. AC-10: with spec 043's `H8`
 and the mode on, spec 013 AC-6's checks hold at every window size of spec 006
-AC-5 in desktop and touch contexts, and the legend lies in the window and in
-`grid-area`, 8 px under the grid, overlapping neither the grid nor `clue-bar`; the
-same on a FX-02 snapshot at 568 by 320. AC-11: spec 035's contrast and language
+AC-5 in desktop and touch contexts; the legend lies in the window, no wider than
+`clue-bar`, centred on `grid-area`'s content box, overlapping none of the top
+bar, the clue bar, the status, the keyboard and the Salon; it sits 8 px under the
+grid off its box when the grid gave it its room, or else over the viewport's
+bottom (8 px above it) with `grid-viewport` keeping its box of the mode off; in
+the sheet layout it lies over the grid exactly when `V - max(38, h + 8)` is
+under 100, as at 568 by 320 in the touch context. The same checks hold on a
+FX-02 snapshot at 568 by 320, and on a FX-02 snapshot with 8 players of
+20-character nicknames at 568 by 320 and 740 by 360 (desktop), where `clue-bar`
+also keeps its width of the mode off. AC-11: spec 035's contrast and language
 scans find no offending element with the mode on, and `fr.json` holds the
 mode's keys. The shared setup is in `spec045_harness`.
 
@@ -14,7 +21,23 @@ Choices where the spec leaves room:
 
 - AC-10's "letters by four of the players": (1, 0) `T` by `p1`, (1, 1) `A` by
   `p2`, (2, 1) `V` by `p3` and (3, 1) `A` by `p4`, as spec 019 AC-5's tests.
-- AC-10's FX-02 snapshot: FX-02 with no letter and `p1` to `p8`, nothing tapped.
+- AC-10's FX-02 snapshots: FX-02 with no letter, nothing tapped, the Salon open.
+- AC-10's checks that need no reading with the mode off (spec 013 AC-6's, the
+  width, the centre and the overlaps) run on `H8` opened with the mode seeded on;
+  the two cases and the sheet layout's rule run on `H8` read with the mode off,
+  then turned on in the Menu (once spec 043's 3-second note of the last line
+  event has gone, as it covers the Menu's button). The FX-02 runs all turn the
+  mode on in the Menu.
+- "In the sheet layout" is the windows of spec 006 AC-5 where spec 043 AC-1 sets
+  `data-layout="sheet"` (`SHEET_WINDOWS`); the test checks the attribute.
+- The case is not told by "the legend's top at or below `grid-viewport`'s
+  bottom": in the sheet layout on a portrait window the grid is centred in a
+  viewport taller than itself, so the legend, 8 px under the grid (AC-7) in a
+  viewport 38 px less high (AC-8), lies inside the viewport's box with the room
+  given. At every window the legend must follow one of the two cases (under the
+  grid, or over it with `grid-viewport` keeping its box of the mode off); in the
+  sheet layout the case is the one `V - max(38, h + 8)` names, as AC-10 states,
+  and the legend must follow that one.
 - AC-11 also computes, from the page's tokens, that each ink reaches 4.5:1 on
   each cell background the spec names (white, word blue, selected blue, locked
   grey and each other player's word tint, `--player-colour-M` at 16 % over
@@ -28,14 +51,17 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
-from nock.protocol import Direction, grid_view
+from nock.protocol import Direction, PlayerView, grid_view
+from room_panels import expect_open
 from spec019_harness import (
     CONTEXT_KINDS,
+    MIN_GRID_VIEWPORT_PX,
     WINDOW_IDS,
     WINDOW_SIZES,
     OpenWindow,
@@ -48,41 +74,51 @@ from spec042_harness import (
     PLAYER_COLOURS,
     SELECTED,
     WORD,
+    Box,
     ChangeList,
     contrast_ratio,
     mix_over_white,
+    to_box,
 )
 from spec043_harness import (
     COMPUTER,
     DISPLAY_NICKNAMES,
     PHONE,
+    POSITION_TOLERANCE_PX,
+    SIZE_TOLERANCE_PX,
     WHITE,
-    box_inside,
     fx01_view,
+    layout_of,
     load_fr,
     open_h8,
     open_room,
     player,
     players_up_to,
     press_cell,
+    same_box,
     seed_value,
     selecting,
     snapshot_frame,
-    window_box,
 )
 from spec045_harness import (
     AUTHORS_KEY,
     INKS,
+    LEGEND_GAP_PX,
+    ONE_LINE_ROOM_PX,
     ac3_frame,
     authors_switch,
     boxes_of,
     eight_frame,
     ink_probe,
+    legend_cover_problems,
     legend_of,
-    legend_place_problems,
+    legend_over_problems,
+    legend_reading,
+    legend_under_problems,
+    long_name_players,
     open_page,
-    overlap_area,
     required_box,
+    set_mode,
     settle_layout,
 )
 
@@ -96,6 +132,24 @@ SCAN_IDS = ["1280x720", "360x740"]
 MIN_TEXT_CONTRAST = 4.5
 TINT_SHARE = 0.16
 LOW_WINDOW = (568, 320)
+# Spec 043's 3-second note of H8's last line event covers the top bar while it
+# shows; it leaves the page 3,350 ms after it showed.
+NOTE_GONE_TIMEOUT_MS = 5000
+
+# The windows of spec 006 AC-5 where `room-page` has `data-layout="sheet"` (spec
+# 043 AC-1): the portrait ones, and the low touch ones with the keyboard shown.
+SHEET_WINDOWS = [
+    pytest.param(320, 568, "desktop", id="320x568-desktop"),
+    pytest.param(360, 740, "desktop", id="360x740-desktop"),
+    pytest.param(768, 1024, "desktop", id="768x1024-desktop"),
+    pytest.param(320, 568, "touch", id="320x568-touch"),
+    pytest.param(568, 320, "touch", id="568x320-touch"),
+    pytest.param(360, 740, "touch", id="360x740-touch"),
+    pytest.param(740, 360, "touch", id="740x360-touch"),
+    pytest.param(768, 1024, "touch", id="768x1024-touch"),
+]
+LONG_NAME_WINDOWS = [(568, 320), (740, 360)]
+LONG_NAME_IDS = ["568x320-desktop", "740x360-desktop"]
 
 # ---- Fixtures ----
 
@@ -209,6 +263,30 @@ def four_letters() -> ChangeList:
     ]
 
 
+class ModeRun(NamedTuple):
+    """A page turned from the mode off to the mode on, with what it showed off."""
+
+    page: Page
+    viewport_off: Box
+    bar_off: Box
+
+
+def turn_on_after_reading(page: Page, touch: bool) -> ModeRun:
+    """Note `grid-viewport`'s and `clue-bar`'s boxes, then turn the mode on.
+
+    Both readings are made once the layout has settled; the mode is turned on in
+    the Menu, which is closed again.
+    """
+    settle_layout(page)
+    found_off = boxes_of(page, ["grid-viewport", "clue-bar"])
+    set_mode(page, True, touch)
+    expect(legend_of(page)).to_be_visible()
+    settle_layout(page)
+    viewport_off = required_box(found_off, "grid-viewport")
+    bar_off = required_box(found_off, "clue-bar")
+    return ModeRun(page, viewport_off, bar_off)
+
+
 def open_h8_with_the_mode_on(
     window: OpenWindow, base_url: str, grid: Grid, width: int, height: int, touch: bool
 ) -> Page:
@@ -221,23 +299,102 @@ def open_h8_with_the_mode_on(
     return page
 
 
-def legend_guarantee_problems(page: Page) -> list[str]:
-    """The legend inside the window and `grid-area`, 8 px under the grid, alone."""
-    boxes = boxes_of(page, ["authors-legend", "grid-area", "grid", "clue-bar"])
-    legend = required_box(boxes, "authors-legend")
-    area = required_box(boxes, "grid-area")
-    grid = required_box(boxes, "grid")
-    bar = required_box(boxes, "clue-bar")
-    problems = legend_place_problems(page)
-    if not box_inside(legend, window_box(page)):
-        problems.append(f"legend {legend} is not inside the window")
-    if not box_inside(legend, area):
-        problems.append(f"legend {legend} is not inside grid-area {area}")
-    if overlap_area(legend, grid) > 0:
-        problems.append(f"legend {legend} overlaps the grid {grid}")
-    if overlap_area(legend, bar) > 0:
-        problems.append(f"legend {legend} overlaps clue-bar {bar}")
+def open_h8_off_then_on(
+    window: OpenWindow, base_url: str, grid: Grid, width: int, height: int, touch: bool
+) -> ModeRun:
+    """`H8` with letters by four players, read with the mode off, then turned on.
+
+    The page waits until spec 043's 3-second note of the last line event has
+    gone, since it covers the top bar, where the Menu's button is.
+    """
+    page = window(width, height, touch)
+    open_h8(page, base_url, grid, touch, view=fx01_view(grid, four_letters()))
+    expect(page.get_by_test_id("room-note")).to_have_count(
+        0, timeout=NOTE_GONE_TIMEOUT_MS
+    )
+    return turn_on_after_reading(page, touch)
+
+
+def legend_frame_problems(page: Page) -> list[str]:
+    """How the legend breaks AC-10's width and centre (empty: none).
+
+    It is at most as wide as `clue-bar` (0.5 px), and its horizontal centre is
+    within 1 px of the centre of `grid-area`'s content box.
+    """
+    reading = legend_reading(page)
+    legend = to_box(reading["box"])
+    bar = required_box(boxes_of(page, ["clue-bar"]), "clue-bar")
+    problems: list[str] = []
+    if legend.width > bar.width + SIZE_TOLERANCE_PX:
+        problems.append(f"legend {legend.width} px wide, clue-bar {bar.width} px")
+    if reading["areaContent"] is None:
+        problems.append("no grid-area")
+        return problems
+    content = to_box(reading["areaContent"])
+    if abs(legend.centre_x - content.centre_x) > POSITION_TOLERANCE_PX:
+        problems.append(
+            f"legend centre x {legend.centre_x}, grid-area's content centre x"
+            f" {content.centre_x}"
+        )
     return problems
+
+
+def viewport_kept_problems(run: ModeRun) -> list[str]:
+    """How `grid-viewport` differs from its box with the mode off (1 px)."""
+    boxes = boxes_of(run.page, ["grid-viewport"])
+    viewport = required_box(boxes, "grid-viewport")
+    if same_box(viewport, run.viewport_off):
+        return []
+    return [
+        f"grid-viewport is {viewport} with the mode on and was"
+        f" {run.viewport_off} with it off"
+    ]
+
+
+def over_the_grid_problems(run: ModeRun) -> list[str]:
+    """How the legend breaks AC-10's case "it lies over the grid" (empty: none).
+
+    Its bottom is 8 px above `grid-viewport`'s bottom (1 px), and `grid-viewport`
+    has its box of the mode off (1 px).
+    """
+    problems = legend_over_problems(run.page)
+    problems.extend(viewport_kept_problems(run))
+    return problems
+
+
+def legend_place_rule_problems(run: ModeRun) -> list[str]:
+    """How the legend breaks both of AC-10's cases (empty: it follows one).
+
+    Under the grid: its top 8 px below the grid's bottom, off the grid's box. Over
+    the grid: its bottom 8 px above `grid-viewport`'s bottom, `grid-viewport`
+    keeping its box of the mode off.
+    """
+    under = legend_under_problems(run.page)
+    if under == []:
+        return []
+    over = over_the_grid_problems(run)
+    if over == []:
+        return []
+    return [f"not under the grid: {under}", f"not over the grid: {over}"]
+
+
+def case_problems(run: ModeRun, over: bool) -> list[str]:
+    """How the legend breaks the one of AC-10's cases that `over` names."""
+    if over:
+        return over_the_grid_problems(run)
+    return legend_under_problems(run.page)
+
+
+def room_rule_says_over(run: ModeRun) -> tuple[bool, str]:
+    """Whether `V - max(38, h + 8)` is under 100, and the numbers, for messages."""
+    legend = required_box(boxes_of(run.page, ["authors-legend"]), "authors-legend")
+    room = max(ONE_LINE_ROOM_PX, legend.height + LEGEND_GAP_PX)
+    room_would_leave = run.viewport_off.height - room
+    numbers = (
+        f"V {run.viewport_off.height}, h {legend.height}: the room would leave"
+        f" {room_would_leave} px"
+    )
+    return room_would_leave < MIN_GRID_VIEWPORT_PX, numbers
 
 
 @pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
@@ -260,7 +417,7 @@ def test_ac10_spec_013_ac6_checks_hold_with_the_mode_on(
 
 @pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
-def test_ac10_the_legend_lies_in_the_window_under_the_grid_and_covers_nothing(
+def test_ac10_the_legend_is_centred_and_no_wider_than_the_clue_bar(
     window: OpenWindow,
     live_server: str,
     fx01_grid: Grid,
@@ -273,34 +430,168 @@ def test_ac10_the_legend_lies_in_the_window_under_the_grid_and_covers_nothing(
         window, live_server, fx01_grid, width, height, touch
     )
 
-    assert legend_guarantee_problems(page) == []
+    assert legend_frame_problems(page) == []
 
 
-def open_fx02_low(window: OpenWindow, base_url: str, grid: Grid) -> Page:
-    """FX-02 with `p1` to `p8` at 568 by 320, desktop context, the mode on."""
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
+@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
+def test_ac10_the_legend_lies_in_the_window_and_covers_no_bar_keyboard_or_salon(
+    window: OpenWindow,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    page = open_h8_with_the_mode_on(
+        window, live_server, fx01_grid, width, height, touch
+    )
+
+    assert legend_cover_problems(page) == []
+
+
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
+@pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=WINDOW_IDS)
+def test_ac10_the_legend_sits_under_the_grid_or_over_the_viewports_bottom(
+    window: OpenWindow,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    run = open_h8_off_then_on(window, live_server, fx01_grid, width, height, touch)
+
+    assert legend_place_rule_problems(run) == []
+
+
+@pytest.mark.parametrize(("width", "height", "context_kind"), SHEET_WINDOWS)
+def test_ac10_in_the_sheet_layout_the_legend_is_over_the_grid_when_room_leaves_lt_100(
+    window: OpenWindow,
+    live_server: str,
+    fx01_grid: Grid,
+    width: int,
+    height: int,
+    context_kind: str,
+) -> None:
+    touch = context_kind == "touch"
+    run = open_h8_off_then_on(window, live_server, fx01_grid, width, height, touch)
+
+    assert layout_of(run.page) == "sheet"
+    over, numbers = room_rule_says_over(run)
+    assert case_problems(run, over) == [], f"{numbers}; over the grid: {over}"
+
+
+def test_ac10_at_568_by_320_in_the_touch_context_the_legend_lies_over_the_grid(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
     width, height = LOW_WINDOW
+    run = open_h8_off_then_on(window, live_server, fx01_grid, width, height, True)
+
+    over, numbers = room_rule_says_over(run)
+    assert over is True, numbers
+    assert over_the_grid_problems(run) == []
+
+
+# ---- AC-10: FX-02 snapshots on a low desktop window ----
+
+
+def open_fx02_off_then_on(
+    window: OpenWindow,
+    base_url: str,
+    grid: Grid,
+    players: list[PlayerView],
+    size: tuple[int, int],
+) -> ModeRun:
+    """FX-02 (no letter) with `players` in the desktop context, the Salon open."""
+    width, height = size
     page = window(width, height, False)
-    seed_value(page, AUTHORS_KEY, "true")
-    open_room(page, base_url, snapshot_frame(grid_view(grid), players_up_to(8)))
-    expect(legend_of(page)).to_be_visible()
-    settle_layout(page)
-    return page
+    open_room(page, base_url, snapshot_frame(grid_view(grid), players))
+    expect_open(page.get_by_test_id("salon"))
+    return turn_on_after_reading(page, False)
+
+
+def open_fx02_low(window: OpenWindow, base_url: str, grid: Grid) -> ModeRun:
+    """FX-02 with `p1` to `p8` at 568 by 320, desktop context, the mode turned on."""
+    return open_fx02_off_then_on(window, base_url, grid, players_up_to(8), LOW_WINDOW)
 
 
 def test_ac10_fx02_at_568_by_320_spec_013_ac6_checks_hold_with_the_mode_on(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
-    page = open_fx02_low(window, live_server, fx02_grid)
+    run = open_fx02_low(window, live_server, fx02_grid)
 
-    assert layout_problems(page, False) == []
+    assert layout_problems(run.page, False) == []
 
 
-def test_ac10_fx02_at_568_by_320_the_legend_lies_under_the_grid_alone(
+def test_ac10_fx02_at_568_by_320_the_legend_is_centred_and_covers_nothing(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
-    page = open_fx02_low(window, live_server, fx02_grid)
+    run = open_fx02_low(window, live_server, fx02_grid)
 
-    assert legend_guarantee_problems(page) == []
+    problems = legend_frame_problems(run.page)
+    problems.extend(legend_cover_problems(run.page))
+    assert problems == []
+
+
+def test_ac10_fx02_at_568_by_320_the_legend_sits_under_the_grid_or_over_its_bottom(
+    window: OpenWindow, live_server: str, fx02_grid: Grid
+) -> None:
+    run = open_fx02_low(window, live_server, fx02_grid)
+
+    assert legend_place_rule_problems(run) == []
+
+
+def open_fx02_long_names(
+    window: OpenWindow, base_url: str, grid: Grid, size: tuple[int, int]
+) -> ModeRun:
+    """FX-02 with 8 players of 20-character nicknames, desktop, the mode turned on."""
+    return open_fx02_off_then_on(window, base_url, grid, long_name_players(), size)
+
+
+@pytest.mark.parametrize("size", LONG_NAME_WINDOWS, ids=LONG_NAME_IDS)
+def test_ac10_fx02_long_names_spec_013_ac6_checks_hold_with_the_mode_on(
+    window: OpenWindow, live_server: str, fx02_grid: Grid, size: tuple[int, int]
+) -> None:
+    run = open_fx02_long_names(window, live_server, fx02_grid, size)
+
+    assert layout_of(run.page) == "column"
+    assert layout_problems(run.page, False) == []
+
+
+@pytest.mark.parametrize("size", LONG_NAME_WINDOWS, ids=LONG_NAME_IDS)
+def test_ac10_fx02_long_names_the_legend_is_centred_and_covers_nothing(
+    window: OpenWindow, live_server: str, fx02_grid: Grid, size: tuple[int, int]
+) -> None:
+    run = open_fx02_long_names(window, live_server, fx02_grid, size)
+
+    problems = legend_frame_problems(run.page)
+    problems.extend(legend_cover_problems(run.page))
+    assert problems == []
+
+
+@pytest.mark.parametrize("size", LONG_NAME_WINDOWS, ids=LONG_NAME_IDS)
+def test_ac10_fx02_long_names_the_legend_sits_under_the_grid_or_over_its_bottom(
+    window: OpenWindow, live_server: str, fx02_grid: Grid, size: tuple[int, int]
+) -> None:
+    run = open_fx02_long_names(window, live_server, fx02_grid, size)
+
+    assert legend_place_rule_problems(run) == []
+
+
+@pytest.mark.parametrize("size", LONG_NAME_WINDOWS, ids=LONG_NAME_IDS)
+def test_ac10_fx02_long_names_the_clue_bar_keeps_its_width(
+    window: OpenWindow, live_server: str, fx02_grid: Grid, size: tuple[int, int]
+) -> None:
+    run = open_fx02_long_names(window, live_server, fx02_grid, size)
+
+    bar_on = required_box(boxes_of(run.page, ["clue-bar"]), "clue-bar")
+    assert abs(bar_on.width - run.bar_off.width) <= SIZE_TOLERANCE_PX, (
+        run.bar_off,
+        bar_on,
+    )
 
 
 # ---- AC-11: the scans and fr.json ----

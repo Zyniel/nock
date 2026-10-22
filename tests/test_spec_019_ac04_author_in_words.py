@@ -16,6 +16,14 @@ checks pass with the switch on, and at 568 by 320 and 740 by 360 `clue-bar` is a
 high with the switch on as with it off (1 px). The shared setup is in
 `spec019_harness`; the legend's readers are spec 045's (`spec045_harness`).
 
+Refined again by spec 045 (2026-10-23, its decisions 8 and 9): where giving the
+legend its room would leave `grid-viewport` under 100 px high (568 by 320 in the
+touch context; a long legend on a low desktop window), the grid keeps its room and
+the legend lies over the viewport's bottom; the legend is never wider than the
+clue bar. The last test so also checks the legend's place by spec 045's rule:
+8 px under the grid, off its box, when the grid gave it its room, else its bottom
+8 px above `grid-viewport`'s bottom.
+
 Choices where the spec leaves room:
 
 - Spec 026's page is built as its AC-10 tests build it: the eight players of
@@ -68,6 +76,7 @@ from spec045_harness import (
     legend_names,
     legend_of,
     legend_reading,
+    legend_room_problems,
     name_texts,
     names_within,
     settle_layout,
@@ -261,6 +270,7 @@ def test_ac4_fx02_the_grid_keeps_its_room_and_the_clue_bar_its_height(
     expect(legend_of(page)).to_be_visible()
     settle_layout(page)
     problems = layout_problems(page, touch)
+    problems.extend(legend_room_problems(page))
     expect(page.get_by_test_id("clue-bar-author")).to_have_count(0)
     if touch and (width, height) in KEYBOARD_WINDOWS:
         font_size = page.get_by_test_id("clue-bar-text").evaluate(

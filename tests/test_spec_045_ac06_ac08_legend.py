@@ -5,12 +5,15 @@ AC-6: while the mode is on, `authors-legend` follows `grid-viewport` in
 snapshot in their ink, in join order, following `player_left` and
 `player_joined` within 300 ms. AC-7: the legend has the design's look and sits
 8 px under the grid. AC-8: the grid gives the legend its room (38 px, or `h + 8`
-when it wraps), and nothing else moves. The shared setup is in `spec045_harness`.
+when it wraps), and nothing else moves; at 568 by 320 in the touch context, where
+the room would leave `grid-viewport` 68 px high, the grid gives it no room and the
+legend lies over the viewport's bottom, on layer 6, letting taps through to the
+grid. The shared setup is in `spec045_harness`.
 
 Also tested, from "Edge cases and errors" and "The legend": the Accessibilité
 mode (the names keep their inks, with no dot and no icon), a nickname inserted as
-text (spec 037), and a legend that wraps is never wider than `grid-area`'s
-content box.
+text (spec 037), and a legend that wraps is never wider than `clue-bar` nor than
+`grid-area`'s content box (the sheet layout).
 
 Choices where the spec leaves room:
 
@@ -22,7 +25,12 @@ Choices where the spec leaves room:
   5 px.
 - "The legend wraps onto more than one line" (AC-8): its items do not all have
   the same top (1 px).
-- AC-8's eight long nicknames have 20 characters each (`LONG_NICKNAMES`).
+- AC-8's eight long nicknames have 20 characters each (the harness's
+  `LONG_NICKNAMES`).
+- AC-8's 568 by 320 run reads the boxes as the 360 by 740 run does (the mode off,
+  then on in the Menu, each once settled); "its box lies inside
+  `grid-viewport`'s" and the overlaps are read on the settled boxes with the mode
+  on.
 """
 
 from __future__ import annotations
@@ -43,6 +51,7 @@ from spec043_harness import (
     PHONE,
     POSITION_TOLERANCE_PX,
     SIZE_TOLERANCE_PX,
+    Reading,
     RoomMock,
     border_problems,
     box_inside,
@@ -68,10 +77,12 @@ from spec045_harness import (
     ONE_LINE_ROOM_PX,
     boxes_of,
     eight_frame,
+    legend_hit,
     legend_names,
     legend_of,
     legend_place_problems,
     legend_reading,
+    long_name_players,
     name_ids,
     name_texts,
     names_within,
@@ -93,18 +104,6 @@ SIZE_IDS = ["360x740", "1280x720"]
 
 AC6_SHOWN = ["Ana", "Jean-Luc", "Cy", "Dee", "Eve", "Fay", "Gus", "Hal"]
 EIGHT_IDS = [f"p{number}" for number in range(1, 9)]
-
-# Eight nicknames of 20 characters (AC-8), as the server stores them.
-LONG_NICKNAMES = [
-    "BARTHOLOMEW LEFEBVRE",
-    "GENEVIEVE MONTAIGNES",
-    "ALEXANDRINE DUVERNAY",
-    "CHRISTOPHE BEAUCHAMP",
-    "MARIE-CLAIRE FONTANE",
-    "JEAN-BAPTISTE ROUSSY",
-    "PHILIPPINE ROCHEFORT",
-    "EMMANUELLE GRANDPRES",
-]
 
 # ---- Fixtures ----
 
@@ -294,6 +293,21 @@ def ac7_frame(grid: Grid) -> str:
     return snapshot_frame(fx01_view(grid), players_up_to(4))
 
 
+def legend_look_problems(page: Page, reading: Reading) -> list[str]:
+    """How the legend's background, border and radius differ from AC-7's."""
+    legend = legend_of(page)
+    problems: list[str] = []
+    if not colour_matches(reading["background"], LEGEND_BG, LEGEND_BG_ALPHA):
+        problems.append(f"background {reading['background']}")
+    for side in ("Top", "Right", "Bottom", "Left"):
+        problems.extend(border_problems(legend, side, "1px", "solid", LINE))
+    for corner in ("TopLeft", "TopRight", "BottomRight", "BottomLeft"):
+        radius = style_of(legend, f"border{corner}Radius")
+        if radius != "14px":
+            problems.append(f"border-{corner} radius {radius}")
+    return problems
+
+
 def open_ac7(
     window: OpenWindow, base_url: str, grid: Grid, size: tuple[int, int]
 ) -> Page:
@@ -308,20 +322,11 @@ def test_ac7_the_legend_has_its_background_border_radius_and_padding(
     window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
 ) -> None:
     page = open_ac7(window, live_server, fx01_grid, size)
-    legend = legend_of(page)
 
     reading = legend_reading(page)
 
-    problems: list[str] = []
-    if not colour_matches(reading["background"], LEGEND_BG, LEGEND_BG_ALPHA):
-        problems.append(f"background {reading['background']}")
-    for side in ("Top", "Right", "Bottom", "Left"):
-        problems.extend(border_problems(legend, side, "1px", "solid", LINE))
-    for corner in ("TopLeft", "TopRight", "BottomRight", "BottomLeft"):
-        radius = style_of(legend, f"border{corner}Radius")
-        if radius != "14px":
-            problems.append(f"border-{corner} radius {radius}")
-    if not padding_matches(legend, "4px 12px"):
+    problems = legend_look_problems(page, reading)
+    if not padding_matches(legend_of(page), "4px 12px"):
         problems.append("padding is not 4px 12px")
     assert problems == []
 
@@ -522,11 +527,7 @@ def test_ac8_on_a_computer_the_clue_bar_moves_by_5_px_at_most_vertically(
 
 def long_names_frame(grid: Grid) -> str:
     """FX-01 with 8 players whose nicknames have 20 characters each."""
-    players: list[PlayerView] = []
-    for number, nickname in enumerate(LONG_NICKNAMES, start=1):
-        assert len(nickname) == 20, nickname
-        players.append(player(f"p{number}", nickname=nickname, host=number == 1))
-    return snapshot_frame(fx01_view(grid), players)
+    return snapshot_frame(fx01_view(grid), long_name_players())
 
 
 def item_tops(page: Page) -> list[float]:
@@ -577,7 +578,7 @@ def test_ac8_a_long_legend_lies_in_grid_area_above_the_clue_bar_off_the_grid(
     assert problems == []
 
 
-def test_ac8_a_long_legend_is_never_wider_than_grid_areas_content_box(
+def test_ac8_a_long_legend_is_never_wider_than_the_clue_bar_nor_grid_areas_content(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = open_phone_touch(window, live_server, long_names_frame(fx01_grid))
@@ -587,8 +588,96 @@ def test_ac8_a_long_legend_is_never_wider_than_grid_areas_content_box(
     reading = legend_reading(page)
 
     legend = to_box(reading["box"])
+    bar = required_box(boxes_of(page, ["clue-bar"]), "clue-bar")
     assert reading["areaContent"] is not None, "no grid-area"
     content = to_box(reading["areaContent"])
+    assert legend.width <= bar.width + SIZE_TOLERANCE_PX, (legend, bar)
     assert legend.width <= content.width + SIZE_TOLERANCE_PX, (legend, content)
     assert legend.left >= content.left - POSITION_TOLERANCE_PX, (legend, content)
     assert legend.right <= content.right + POSITION_TOLERANCE_PX, (legend, content)
+
+
+# ---- AC-8: at 568 by 320 in the touch context, the legend over the grid ----
+
+LOW_TOUCH = (568, 320)
+LOW_TOUCH_IDS = ["room-topbar", "clue-bar", "keyboard", "grid-viewport"]
+LEGEND_LAYER = "6"
+
+
+def open_low_touch(window: OpenWindow, base_url: str, grid: Grid) -> Page:
+    """AC-7's snapshot at 568 by 320 in the touch context, the keyboard shown."""
+    page, _ = open_page(window, base_url, ac7_frame(grid), LOW_TOUCH, touch=True)
+    expect(page.get_by_test_id("keyboard")).to_be_visible()
+    return page
+
+
+def test_ac8_at_568_by_320_touch_the_grid_gives_no_room_and_nothing_moves(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = open_low_touch(window, live_server, fx01_grid)
+
+    off, on = boxes_off_then_on(page, LOW_TOUCH_IDS, touch=True)
+
+    moved: list[str] = []
+    for test_id in LOW_TOUCH_IDS:
+        if not same_box(off[test_id], on[test_id]):
+            moved.append(f"{test_id}: {off[test_id]} -> {on[test_id]}")
+    assert moved == []
+
+
+def test_ac8_at_568_by_320_touch_the_legend_lies_over_the_viewports_bottom(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = open_low_touch(window, live_server, fx01_grid)
+
+    _, on = boxes_off_then_on(page, LOW_TOUCH_IDS, touch=True)
+
+    viewport = on["grid-viewport"]
+    legend = required_box(boxes_of(page, ["authors-legend"]), "authors-legend")
+    rise = viewport.bottom - legend.bottom
+    assert abs(rise - LEGEND_GAP_PX) <= POSITION_TOLERANCE_PX, (legend, viewport)
+    assert abs(legend.centre_x - viewport.centre_x) <= POSITION_TOLERANCE_PX, (
+        legend,
+        viewport,
+    )
+    assert box_inside(legend, viewport), (legend, viewport)
+
+
+def test_ac8_at_568_by_320_touch_the_legend_is_on_layer_6_and_lets_taps_through(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = open_low_touch(window, live_server, fx01_grid)
+    boxes_off_then_on(page, LOW_TOUCH_IDS, touch=True)
+
+    reading = legend_reading(page)
+    hit = legend_hit(page)
+
+    assert reading["zIndex"] == LEGEND_LAYER
+    assert reading["pointerEvents"] == "none"
+    assert hit["inGrid"] is True, f"elementFromPoint found {hit['hit']}"
+
+
+def test_ac8_at_568_by_320_touch_the_legend_keeps_ac7s_background_border_and_radius(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = open_low_touch(window, live_server, fx01_grid)
+    boxes_off_then_on(page, LOW_TOUCH_IDS, touch=True)
+
+    reading = legend_reading(page)
+
+    assert legend_look_problems(page, reading) == []
+
+
+def test_ac8_at_568_by_320_touch_the_legend_overlaps_no_bar_nor_the_keyboard(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = open_low_touch(window, live_server, fx01_grid)
+
+    _, on = boxes_off_then_on(page, LOW_TOUCH_IDS, touch=True)
+
+    legend = required_box(boxes_of(page, ["authors-legend"]), "authors-legend")
+    overlapped: list[str] = []
+    for test_id in ("room-topbar", "clue-bar", "keyboard"):
+        if overlap_area(legend, on[test_id]) > 0:
+            overlapped.append(f"{test_id} {on[test_id]}")
+    assert overlapped == [], legend

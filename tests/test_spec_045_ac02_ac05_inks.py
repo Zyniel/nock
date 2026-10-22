@@ -24,6 +24,11 @@ Choices where the spec leaves room:
   every cell whose `data-author` is `p2`, and a separate run sends `player_left`
   of `p2` right after the snapshot, where (1, 1) holds `p2`'s `A`.
 - AC-4's strike is read on the `cell`, where spec 042's tests read it.
+- "Its line and thickness do not change with the mode" ("The letters"): the line
+  and style are the same strings with the mode off and on, and in both modes the
+  thickness follows spec 042's rule `max(2px, 0.07em)` for the cell's own
+  `font-size`. The px value itself may change, since spec 045 AC-8 makes the
+  grid, and so the cell's font, smaller at 1280 by 720 with the mode on.
 - AC-5's comparison: the mode is turned on and off once in the Menu before the
   first reading, so that both readings follow the same Menu clicks (the focus is
   then the same) and only the mode differs. The marks are counted among the
@@ -84,6 +89,12 @@ from spec045_harness import (
     read_until,
     set_mode,
 )
+
+# Spec 042's strike: `text-decoration-thickness: max(2px, 0.07em)`, read as its
+# AC-5 reads it (within 0.1 px of the larger of 2 px and 0.07 times `font-size`).
+MIN_STRIKE_PX = 2.0
+STRIKE_EM = 0.07
+STRIKE_TOLERANCE_PX = 0.1
 
 # ---- Fixtures ----
 
@@ -447,6 +458,22 @@ def test_ac4_with_the_mode_off_the_pencil_is_grey_and_the_strike_red(
     assert colour_matches(wrong["decorationColour"], RED), wrong
 
 
+def strike_rule_problems(where: str, reading: Reading) -> list[str]:
+    """How a strike's thickness breaks spec 042's `max(2px, 0.07em)` (0.1 px)."""
+    thickness = str(reading["decorationThickness"])
+    if not thickness.endswith("px"):
+        return [f"{where}: text-decoration-thickness {thickness!r} is not in px"]
+    font_size = float(reading["fontSize"])
+    expected = max(MIN_STRIKE_PX, STRIKE_EM * font_size)
+    actual = float(thickness.removesuffix("px"))
+    if abs(actual - expected) > STRIKE_TOLERANCE_PX:
+        return [
+            f"{where}: thickness {actual} px, not max(2, 0.07 x {font_size}) ="
+            f" {expected} px"
+        ]
+    return []
+
+
 def test_ac4_the_strikes_line_and_thickness_do_not_change_with_the_mode(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
@@ -459,7 +486,8 @@ def test_ac4_the_strikes_line_and_thickness_do_not_change_with_the_mode(
     assert colour_matches(on["decorationColour"], INK), on
     assert on["decorationLine"] == off["decorationLine"]
     assert on["decorationStyle"] == off["decorationStyle"]
-    assert on["decorationThickness"] == off["decorationThickness"]
+    assert strike_rule_problems("mode off", off) == []
+    assert strike_rule_problems("mode on", on) == []
 
 
 def test_ac4_a_revealed_letter_stays_ink_and_bold_with_its_notch(
