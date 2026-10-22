@@ -510,21 +510,24 @@ Proposed by the spec writer, each already part of the spec above:
 12. Locked beats "in my word", as the design's table says; today the word blue
     covers a locked cell of my word, and its bold letter is then the only sign.
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them):
+
+13. (Open question 1.) A fifth player on a crowded cell. Options: never drawn until
+    they move again; or take the first corner that frees, the longest-waiting
+    first. Answer: take the freed corner (Decision 4), so the cell always shows
+    four cursors while four or more are on it.
+14. (Open question 2.) Where the « Mots des autres » and « Accessibilité » switches
+    live before the Menu exists (step 3). Options: in today's room toolbar; or
+    only from step 3, with no way to turn them on until then. Answer: the toolbar
+    (Decision 11), as spec 019's `authors-switch`; without it the step would
+    remove the initials with no non-colour sign to replace them.
+15. (Open question 3.) A text for screen readers naming the players on a cell.
+    Options: keep a visually hidden list per cell; or none, the Joueurs list
+    saying where each player is. Answer: none, as the design's "no text, ever" and
+    spec 035's "Out of scope" (no announcement of other players' moves).
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change it at
-approval.
-
-1. A fifth player on a crowded cell. Options: never drawn until they move again;
-   or take the first corner that frees, the longest-waiting first. Pick: take the
-   freed corner (Decision 4), so the cell always shows four cursors while four or
-   more are on it.
-2. Where the « Mots des autres » and « Accessibilité » switches live before the
-   Menu exists (step 3). Options: in today's room toolbar; or only from step 3,
-   with no way to turn them on until then. Pick: the toolbar (Decision 11), as
-   spec 019's `authors-switch`; without it the step would remove the initials
-   with no non-colour sign to replace them.
-3. A text for screen readers naming the players on a cell. Options: keep a
-   visually hidden list per cell; or none, the Joueurs list saying where each
-   player is. Pick: none, as the design's "no text, ever" and spec 035's
-   "Out of scope" (no announcement of other players' moves).
+None left (all answered with the approval of 2026-10-22).

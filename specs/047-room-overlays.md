@@ -439,22 +439,26 @@ Proposed by the spec writer, each already part of the spec above:
    screens sheet draws them; in the sheet layout the button goes under the link, so
    the URL keeps the full width of a phone.
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them). The number in brackets is the question's number, which the text above cites:
+
+10. (Open question 1.) The end of a vote. Options: (a) the banner leaves at
+    `vote_closed`, the result is a note and a stream line; (b) the banner shows the
+    result for 3 seconds (spec 025), then the note follows for 3 more. Answer: (a)
+    (Decision 1).
+11. (Open question 2.) The countdown of a vote known only from a snapshot (a reload,
+    a late joiner). Options: (a) no seconds and no bar for that vote; (b) a new
+    protocol field giving the time left in the snapshot's `open_vote` (a change of
+    spec 039, outside Phase 7); (c) no countdown at all, for every vote (the
+    design's seconds and bar go). Answer: (a) (Decision 2).
+12. (Open question 3.) A departed player in the recap. Options: (a) no dot, the slot
+    kept so names align; (b) keep spec 028's grey hatching (a pattern `_design.md`
+    does not have); (c) a neutral grey dot (a colour colour-blind players read as a
+    player's, spec 028 decision 13). Answer: (a) (Decision 4).
+13. (Open question 4.) The colour of the vote's stream line. Options: muted for every
+    outcome; green for a passed vote. Answer: muted (Decision 5).
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change any at
-approval.
-
-1. The end of a vote. Options: (a) the banner leaves at `vote_closed`, the result is a
-   note and a stream line; (b) the banner shows the result for 3 seconds (spec 025),
-   then the note follows for 3 more. Pick: (a) (Decision 1).
-2. The countdown of a vote known only from a snapshot (a reload, a late joiner).
-   Options: (a) no seconds and no bar for that vote; (b) a new protocol field giving
-   the time left in the snapshot's `open_vote` (a change of spec 039, outside Phase
-   7); (c) no countdown at all, for every vote (the design's seconds and bar go).
-   Pick: (a) (Decision 2).
-3. A departed player in the recap. Options: (a) no dot, the slot kept so names
-   align; (b) keep spec 028's grey hatching (a pattern `_design.md` does not have);
-   (c) a neutral grey dot (a colour colour-blind players read as a player's, spec 028
-   decision 13). Pick: (a) (Decision 4).
-4. The colour of the vote's stream line. Options: muted for every outcome; green for
-   a passed vote. Pick: muted (Decision 5).
+None left (all answered with the approval of 2026-10-22).

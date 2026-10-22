@@ -548,28 +548,31 @@ Proposed by the spec writer, each already part of the spec above:
    after a 422, spec 048 AC-5) is the same here; this spec adds no rule of its own
    for it.
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them). The number in brackets is the question's number, which the text above cites:
+
+10. (Open question 1.) What "a computer (and any window wider than a phone)" is, for
+    the entry pages' bar and padding and the catalogue's padding and « Compte »
+    height. Options: (a) the room's threshold for its computer top bar (landscape,
+    at least 900 px wide, more than 500 px high); (b) a width only, for example
+    600 px, so that a portrait tablet gets the computer form. Answer: (a), no new
+    number; a portrait tablet then has the phone's form in a centred 420 px column,
+    which the screens sheet does not draw.
+11. (Open question 2.) The catalogue's « Compte ». Options: (a) a button that opens
+    the account sheet or dialog, as drawn (P13); (b) a link to `/account`, as spec
+    033 has it today, with no sheet on the catalogue. Answer: (a), the design the
+    human decided; (b) would be simpler (no dialog on the catalogue) and P13 would
+    lapse. Either way, spec 033's catalogue item and its AC-11 are refined by the
+    lead or the spec-writer of specs 047 and 048.
+12. (Open question 3.) The room's top bar while it opens. Options: (a) drawn as once
+    joined and `inert`; (b) its buttons `disabled`, in spec 043's disabled look
+    (muted), until the snapshot; (c) no buttons until the snapshot, only the brand.
+    Answer: (a), which matches the screens sheet's drawing and changes no look when
+    the snapshot comes; (b) makes the bar flash from muted to navy at each opening.
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change it at approval.
-
-1. What "a computer (and any window wider than a phone)" is, for the entry pages'
-   bar and padding and the catalogue's padding and « Compte » height. Options: (a)
-   the room's threshold for its computer top bar (landscape, at least 900 px wide,
-   more than 500 px high); (b) a width only, for example 600 px, so that a portrait
-   tablet gets the computer form. Pick and recommendation: (a), no new number; a
-   portrait tablet then has the phone's form in a centred 420 px column, which the
-   screens sheet does not draw.
-2. The catalogue's « Compte ». Options: (a) a button that opens the account sheet or
-   dialog, as drawn (P13); (b) a link to `/account`, as spec 033 has it today, with
-   no sheet on the catalogue. Pick and recommendation: (a), the design the human
-   decided; (b) would be simpler (no dialog on the catalogue) and P13 would lapse.
-   Either way, spec 033's catalogue item and its AC-11 are refined by the lead or
-   the spec-writer of specs 047 and 048.
-3. The room's top bar while it opens. Options: (a) drawn as once joined and
-   `inert`; (b) its buttons `disabled`, in spec 043's disabled look (muted), until
-   the snapshot; (c) no buttons until the snapshot, only the brand. Pick and
-   recommendation: (a), which matches the screens sheet's drawing and changes no
-   look when the snapshot comes; (b) makes the bar flash from muted to navy at each
-   opening.
+None left (all answered with the approval of 2026-10-22).
 </content>
 </invoke>

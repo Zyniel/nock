@@ -303,24 +303,28 @@ Proposed by the spec writer, each already part of the spec above:
    047's, with the recap's look; this spec leaves the recap as it is, so spec 028's
    hatching (and the custom property it reads) stays until spec 047 replaces it.
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them). The number in brackets is the question's number, which the text above cites:
+
+6. (Open question 1.) A sign of authorship that does not rely on colour. Spec 019's
+   « Lettre de … » in the clue bar was that sign (spec 035's rule that colour is
+   never the only signal); `_design.md` section 7 removes it. Options: (a) follow
+   the design, the legend being the only key, and the Accessibilité mode changing
+   nothing for the inks; (b) keep « Lettre de … » in the clue bar while both
+   « Auteurs » and « Accessibilité » are on; (c) put the author's name in the
+   grid's screen-reader announcement (spec 035) in every mode. Answer: (a), the
+   design the human decided on 2026-10-16; (b) brings back spec 019's low-window
+   rules, and (c) is a new feature for players who do not see the inks.
+7. (Open question 2.) A legend that does not fit on one line (eight long nicknames
+   on a phone). Options: (a) it wraps and the grid gives it each further line; (b)
+   one line, clipped, the names past the edge not shown; (c) one line that scrolls
+   sideways. Answer: (a); (b) hides players silently and (c) adds a scrolling
+   region with its keyboard rules (spec 035 AC-12). The screens sheet draws one
+   line only.
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change it at approval.
-
-1. A sign of authorship that does not rely on colour. Spec 019's « Lettre de … » in
-   the clue bar was that sign (spec 035's rule that colour is never the only
-   signal); `_design.md` section 7 removes it. Options: (a) follow the design, the
-   legend being the only key, and the Accessibilité mode changing nothing for the
-   inks; (b) keep « Lettre de … » in the clue bar while both « Auteurs » and
-   « Accessibilité » are on; (c) put the author's name in the grid's screen-reader
-   announcement (spec 035) in every mode. Pick and recommendation: (a), the design
-   the human decided on 2026-10-16; (b) brings back spec 019's low-window rules,
-   and (c) is a new feature for players who do not see the inks.
-2. A legend that does not fit on one line (eight long nicknames on a phone).
-   Options: (a) it wraps and the grid gives it each further line; (b) one line,
-   clipped, the names past the edge not shown; (c) one line that scrolls sideways.
-   Pick and recommendation: (a); (b) hides players silently and (c) adds a
-   scrolling region with its keyboard rules (spec 035 AC-12). The screens sheet
-   draws one line only.
+None left (all answered with the approval of 2026-10-22).
 </content>
 </invoke>

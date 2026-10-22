@@ -355,23 +355,27 @@ of this spec and of spec 043.
    options being the phone top bar, the computer top bar without labels, or the
    brand and timer giving way.)
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them). The number in brackets is the question's number, which the text above cites:
+
+9. (Open question 1.) Key height on a low window. Options: 44 px everywhere, as the
+   design draws it, and spec 013 AC-6's 100 px floor relaxed for a phone held
+   sideways with the keyboard; or 28 px keys on a low window. Answer: 28 px
+   (Decision 3); `_design.md` section 8 carries a note on it.
+10. (Open question 2.) The phone top bar's fourth slot off a touch screen (a narrow
+    desktop window). Options: « Crayon », since there is no keyboard to hide;
+    « Clavier » disabled, as drawn. Answer: « Crayon » (Decision 4).
+11. (Open question 3.) A phone held sideways when the grid is solved. Options: the
+    column layout, by the one definition of Decision 1; or the sheet layout kept,
+    the layout reading only the player's choice. Answer: the column layout, which
+    shows the Salon for the end of the game.
+12. (Open question 4.) « Clavier » on a solved page. Options: disabled; removed.
+    Answer: disabled (Decision 5).
+13. (Open question 5.) The name of ⇄. Options: « Changer de sens »; « Changer de
+    direction »; « Inverser le sens ». Answer: « Changer de sens »
+    (`keyboard.swap`).
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change any at
-approval.
-
-1. Key height on a low window. Options: 44 px everywhere, as the design draws it,
-   and spec 013 AC-6's 100 px floor relaxed for a phone held sideways with the
-   keyboard; or 28 px keys on a low window. Pick: 28 px (Decision 3);
-   `_design.md` section 8 carries a note pending this approval.
-2. The phone top bar's fourth slot off a touch screen (a narrow desktop window).
-   Options: « Crayon », since there is no keyboard to hide; « Clavier » disabled, as
-   drawn. Pick: « Crayon » (Decision 4).
-3. A phone held sideways when the grid is solved. Options: the column layout, by the
-   one definition of Decision 1; or the sheet layout kept, the layout reading only
-   the player's choice. Pick: the column layout, which shows the Salon for the end
-   of the game.
-4. « Clavier » on a solved page. Options: disabled; removed. Pick: disabled
-   (Decision 5).
-5. The name of ⇄. Options: « Changer de sens »; « Changer de direction »; « Inverser
-   le sens ». Pick: « Changer de sens » (`keyboard.swap`).
+None left (all answered with the approval of 2026-10-22).

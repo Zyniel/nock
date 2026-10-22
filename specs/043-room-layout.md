@@ -1070,52 +1070,61 @@ Proposed by the spec writer, each already part of the spec above:
     design's "as wide as the grid" would leave no room for the clue text beside four
     buttons on a small grid.
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them). The number in brackets is the question's number, which the text above cites:
+
+13. (Open question 1.) One pull request or two. Options: one; the two work packages
+    above. Answer: two (WP-1 the frame, WP-2 the feedback).
+14. (Open question 2.) Where the host mutes a player. Spec 022 decision 11 (the
+    human's, 2026-10-14) put the mute buttons in the chat panel because the old
+    roster had no room. Options: keep a moderation block in the Discussion tab,
+    under the stream; or « Couper » beside « Retirer » in each Joueurs row. Answer:
+    the Joueurs row (Decision 5).
+15. (Open question 3.) The Joueurs row on one line, as drawn (state and clue on the
+    right of the name), or on two lines. Answer: two lines, state and clue under
+    the name (Decision 5); `_design.md` section 8 carries a note on it.
+16. (Open question 4.) Aide in help mode `none`: hidden, as `_design.md` section 12
+    suggested "to confirm", or kept with the pencil confirm and a muted line.
+    Answer: kept (Decision 7).
+17. (Open question 5.) The pencil toggle on touch screens before step 4. Options:
+    « Crayon » in the phone top bar's fourth slot; or no pencil mode on touch
+    screens until step 4. Answer: the fourth slot (Decision 6). (Note from the
+    lead, 2026-10-22: spec 044 settles what follows step 4: « Clavier » on touch
+    screens, « Crayon » kept off them; its Open question 2.)
+18. (Open question 6.) The grid name « Grille n° N · Force F » of the computer top
+    bar. The client knows the grid number only for rooms started on this device
+    (spec 010's room record) and never the force. Options: leave it out in this
+    step; show « Grille n° N » when known; add the number and force to the snapshot
+    (a protocol change, a new spec). Answer: leave it out now, and a later spec
+    adds them to the snapshot.
+19. (Open question 7.) The timer: a button with no border (the sheet), or text.
+    Nothing is said to happen on a press. Answer: text, as spec 027 has it, never
+    a Tab stop.
+20. (Open question 8.) The completion status on a phone held sideways. Options: the
+    design's band under the clue bar now (the grid then falls under spec 013 AC-6's
+    100 px at 568 by 320 with the in-app keyboard); or spec 026's place in the clue
+    bar's row there until step 4 can hide the keyboard. Answer: the row there, the
+    band elsewhere (Decision 9). (Note from the lead, 2026-10-22: spec 044 keeps
+    the row only while the keyboard shows on a low window; a solved page has no
+    keyboard, so its status is always the band.)
+21. (Open question 9.) Reactions during a vote. Options: `react-button` disabled
+    while the banner shows; the picker drawn under the banner (against the design's
+    layers). Answer: disabled (Decision 10).
+22. (Open question 10.) A disabled icon on the navy clue bar. `_design.md` section 2
+    asks 4.5:1 for disabled controls too, and no token has that job on navy.
+    Options: `--nock-rule` (5.22:1 on navy, a new job for the rule grey); hide the
+    disabled buttons. Answer: `--nock-rule`; `_design.md` section 2 carries a note
+    on it.
+23. (Open question 11.) Spec 034's `word_completed` catch-up lines against the
+    design's dropped « a rempli » line. Options: keep them (spec 034 was approved
+    after the design, for the catch-up only) and add no live line; drop them.
+    Answer: keep them, no live line.
+24. (Open question 12.) A tap on a note "opens the Salon on that line". Options:
+    open the Discussion tab and leave the stream to spec 013's scroll rules; or
+    also scroll the line into view. Answer: the first; a scroll would break the
+    rule that the page never moves a list the player is reading.
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change it at approval.
-
-1. One pull request or two. Options: one; the two work packages above. Pick: two
-   (WP-1 the frame, WP-2 the feedback).
-2. Where the host mutes a player. Spec 022 decision 11 (the human's, 2026-10-14) put
-   the mute buttons in the chat panel because the old roster had no room. Options:
-   keep a moderation block in the Discussion tab, under the stream; or « Couper »
-   beside « Retirer » in each Joueurs row. Pick: the Joueurs row (Decision 5).
-3. The Joueurs row on one line, as drawn (state and clue on the right of the name),
-   or on two lines. Pick: two lines, state and clue under the name (Decision 5);
-   `_design.md` section 8 carries a note pending this approval.
-4. Aide in help mode `none`: hidden, as `_design.md` section 12 suggested "to confirm",
-   or kept with the pencil confirm and a muted line. Pick: kept (Decision 7).
-5. The pencil toggle on touch screens before step 4. Options: « Crayon » in the
-   phone top bar's fourth slot; or no pencil mode on touch screens until step 4.
-   Pick: the fourth slot (Decision 6). (Note from the lead, 2026-10-22: spec 044
-   settles what follows step 4: « Clavier » on touch screens, « Crayon » kept off
-   them; its Open question 2.)
-6. The grid name « Grille n° N · Force F » of the computer top bar. The client knows
-   the grid number only for rooms started on this device (spec 010's room record)
-   and never the force. Options: leave it out in this step; show « Grille n° N »
-   when known; add the number and force to the snapshot (a protocol change, a new
-   spec). Pick: leave it out now, and a later spec adds them to the snapshot.
-7. The timer: a button with no border (the sheet), or text. Nothing is said to
-   happen on a press. Pick: text, as spec 027 has it, never a Tab stop.
-8. The completion status on a phone held sideways. Options: the design's band under
-   the clue bar now (the grid then falls under spec 013 AC-6's 100 px at 568 by 320
-   with the in-app keyboard); or spec 026's place in the clue bar's row there until
-   step 4 can hide the keyboard. Pick: the row there, the band elsewhere (Decision
-   9). (Note from the lead, 2026-10-22: spec 044 keeps the row only while the
-   keyboard shows on a low window; a solved page has no keyboard, so its status is
-   always the band.)
-9. Reactions during a vote. Options: `react-button` disabled while the banner shows;
-   the picker drawn under the banner (against the design's layers). Pick: disabled
-   (Decision 10).
-10. A disabled icon on the navy clue bar. `_design.md` section 2 asks 4.5:1 for
-    disabled controls too, and no token has that job on navy. Options: `--nock-rule`
-    (5.22:1 on navy, a new job for the rule grey); hide the disabled buttons. Pick:
-    `--nock-rule`; `_design.md` section 2 carries a note pending this approval.
-11. Spec 034's `word_completed` catch-up lines against the design's dropped « a
-    rempli » line. Options: keep them (spec 034 was approved after the design, for
-    the catch-up only) and add no live line; drop them. Pick: keep them, no live
-    line.
-12. A tap on a note "opens the Salon on that line". Options: open the Discussion tab
-    and leave the stream to spec 013's scroll rules; or also scroll the line into
-    view. Pick: the first; a scroll would break the rule that the page never moves a
-    list the player is reading.
+None left (all answered with the approval of 2026-10-22).

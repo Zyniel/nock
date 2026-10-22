@@ -604,7 +604,7 @@ Top to bottom, filling the window, nothing scrolls:
    Annuler, Aide, Salon, Clavier, Menu. Each holds its 22 px icon over its label
    (gap 2 px), navy, radius 6 px. Pressed (Aide, Salon, Menu while open; Clavier
    while the keyboard shows): word-blue background. (Note from the spec writer,
-   2026-10-22: spec 044 proposes, pending the human's approval, that « Clavier »
+   2026-10-22: decided by the human on 2026-10-22, with the approval of spec 044, that « Clavier »
    takes this slot on touch screens only; on a narrow window that is not a touch
    screen, which has no in-app keyboard, the slot holds « Crayon » (section 15).)
    - Unread badge on Salon (messages): top 5 px, right 8 px (section 11).
@@ -641,8 +641,8 @@ Top to bottom, filling the window, nothing scrolls:
      ⌫ (decided by the human on 2026-10-16).
    - « Clavier » hides and shows the keyboard; the choice is remembered per
      browser. The grid takes the space back.
-   - (Note from the spec writer, 2026-10-22: spec 044 proposes, pending the
-     human's approval, keys 28 px high on a window at most 500 px high, so that a
+   - (Note from the spec writer, 2026-10-22: decided by the human on
+     2026-10-22, with the approval of spec 044: keys 28 px high on a window at most 500 px high, so that a
      phone held sideways keeps 100 px of grid with the keyboard shown (section
      15). Once the grid is solved the keyboard goes away (section 9) and
      « Clavier » is disabled.)
@@ -763,8 +763,8 @@ Content, top to bottom:
    copy the green confirmation line « Lien copié ». « Inviter » in the Menu opens
    the Salon on this tab. (Note from the spec writer, 2026-10-22: spec 043 draws
    each row on two lines, the state and the current clue under the name, and puts
-   the host's « Couper » (spec 022's mute) beside « Retirer »; pending the human's
-   approval of spec 043, section 15.) (Note from the lead, 2026-10-22: the host's
+   the host's « Couper » (spec 022's mute) beside « Retirer »; decided by the human
+   on 2026-10-22, with the approval of spec 043, section 15.) (Note from the lead, 2026-10-22: the host's
    « Couper » / « Rétablir » beside « Retirer », as small secondary buttons, is
    decided by the human on 2026-10-22, screens sheet P5; spec 022's separate
    « Sourdine » block goes. The row's two lines are spec 043's, decided by the
@@ -909,8 +909,8 @@ screens sheet, parts 5 to 7.
   sur m » (card secondary text). On a computer the edits sit left of the grid, gap
   20 px; on a phone the grid, the slider, then the edits.
 
-(Note from the spec writer, 2026-10-22: spec 048 proposes, pending the human's
-approval, section 15:)
+(Note from the spec writer, 2026-10-22: decided by the human on 2026-10-22, with
+the approval of spec 048, section 15:)
 
 - Shared recap: while it loads, the card holds only the muted line « Chargement du
   bilan… »; « Voir les grilles » is a link drawn as a primary button.
@@ -950,8 +950,8 @@ something failed, a confirmation line when done. No spinner, no skeleton.
   is an error line under its heading.
 - Recap (P10): inside its sheet or dialog, the title, then « Chargement du bilan… »
   muted or « Le bilan n'est pas disponible. » as an error line, and « Fermer ».
-- (Note from the spec writer, 2026-10-22: spec 048 proposes, pending the human's
-  approval, section 15:) the kinds of state line and their looks: waiting and empty
+- (Note from the spec writer, 2026-10-22: decided by the human on 2026-10-22, with
+  the approval of spec 048, section 15:) the kinds of state line and their looks: waiting and empty
   lines 400 0.95rem muted (the card text size), error lines and confirmation lines
   as section 11; a waiting or done line is announced politely (`role="status"`), an
   error line at once (`role="alert"`), an empty line not at all. No CSS animation
@@ -992,8 +992,8 @@ seconds kept on the right; the player who asked sees « En attente des autres
 joueurs… » there from the start. The result is a 3-second note when the banner
 goes (section 8) and a line in the stream (decided by the human on 2026-10-22, screens sheet P6).
 
-(Note from the spec writer, 2026-10-22: spec 047 proposes, pending the human's
-approval, section 15:) the banner goes as soon as the vote closes and never shows
+(Note from the spec writer, 2026-10-22: decided by the human on 2026-10-22, with
+the approval of spec 047, section 15:) the banner goes as soon as the vote closes and never shows
 the result itself; the result line in the stream is muted, with no pictogram, for
 every outcome. The seconds and the bar count from the moment the page learned that
 the vote opened, updated at least every 250 ms with no transition; a page that
@@ -1011,8 +1011,8 @@ A band under the clue bar, padding 8 px 12 px, gap 10 px, text 600 0.95rem/1.2:
 - Full but wrong: background `--nock-clue-bg`, navy text « Grille complète, mais
   pas encore juste. ». No red, no cell changes look. It sits between the clue bar
   and the keyboard, which stays.
-- (Note from the spec writer, 2026-10-22: spec 047 proposes, pending the human's
-  approval, section 15:) on a window too narrow for the text and « Voir le bilan »
+- (Note from the spec writer, 2026-10-22: decided by the human on 2026-10-22, with
+  the approval of spec 047, section 15:) on a window too narrow for the text and « Voir le bilan »
   on one line (320 px), the text wraps onto a second line and the button keeps its
   whole label on one line, on the right, centred on the text; the band grows by the
   line.
@@ -1040,8 +1040,8 @@ copié » shows under the URL box, as in the Joueurs tab (section 8); spec 028
 changes the button's text today and is refined (decided by the human on 2026-10-22, screens sheet P16). Loading and
 unavailable: section 8 « States ».
 
-(Note from the spec writer, 2026-10-22: spec 047 proposes, pending the human's
-approval, section 15:) the URL box and « Copier le lien » share one row on a
+(Note from the spec writer, 2026-10-22: decided by the human on 2026-10-22, with
+the approval of spec 047, section 15:) the URL box and « Copier le lien » share one row on a
 computer (the box takes the width left, gap 8 px), and on a phone the button goes
 under the full-width box; « Lien copié » shows under that row. A player the page no
 longer knows (who left before the recap opened) has no dot in « Qui a fait quoi »:
@@ -1135,7 +1135,7 @@ sheet layout.
 | Text link | navy, weight 600 |
 | Player dot | 10 px circle, player colour, ring `0 0 0 1px var(--nock-dot-ring)` |
 | Reaction picker, shown reaction | section 8 |
-| Slider | a native range input styled: track 6 px high, radius 3 px, `--nock-word`; the part before the knob `--nock-navy`; knob 18 px navy circle; the focus ring of this table on the knob. Full width of its field (decided by the human on 2026-10-22, screens sheet P15). (Note from the spec writer, 2026-10-22: spec 048 proposes, pending the human's approval, section 15: the native input, 18 px high and transparent, lies over three drawn parts, the track, the fill and the knob, so the look is the same in the three engines; the input stays the control, with its role, name and keys.) |
+| Slider | a native range input styled: track 6 px high, radius 3 px, `--nock-word`; the part before the knob `--nock-navy`; knob 18 px navy circle; the focus ring of this table on the knob. Full width of its field (decided by the human on 2026-10-22, screens sheet P15). (Note from the spec writer, 2026-10-22: decided by the human on 2026-10-22, with the approval of spec 048, section 15: the native input, 18 px high and transparent, lies over three drawn parts, the track, the fill and the knob, so the look is the same in the three engines; the input stays the control, with its role, name and keys.) |
 | Destructive action | no variant of its own: a primary or secondary button after a confirmation step in place, never red (red means "look here", section 2) (decided by the human on 2026-10-22, screens sheet D1) |
 | State line | section 8 « States » |
 
@@ -1347,11 +1347,19 @@ day.)
   10.
 - The « ← » pictogram for departures (section 5). Formerly item 11.
 
-### Proposed by spec 043, pending the human's approval
+### Decided by the human on 2026-10-22, with the approval of specs 042 to 048
 
-(Note from the spec writer, 2026-10-22: this list is new. Each item is the pick of
-an open question of spec 043, the room layout; the human confirms or changes it
-when approving that spec.)
+(Note from the lead, 2026-10-22: this list replaces the lists "Proposed by spec
+043", "Proposed by spec 044" and "Proposed by specs 047 and 048", which waited for
+the human's approval. The human approved specs 042 and 043, then specs 044 to 048
+"with their recommended answers", on 2026-10-22; each item below is the
+recommended answer of an open question or decision of those specs, now decided.
+Spec 042's three answers (a fifth player takes a freed corner; the two switches in
+today's room toolbar until the Menu; no screen-reader text naming the players on a
+cell) and spec 045's two (the legend is the only key to the inks; the legend wraps)
+are decided with them and already stand in sections 6 and 7.)
+
+From spec 043, the room layout:
 
 - Joueurs rows on two lines, the state and the current clue under the name, and
   the host's « Couper » beside « Retirer » (section 8, "Salon"; spec 043 Open
@@ -1370,10 +1378,7 @@ when approving that spec.)
 - The clue bar in the column layout is never narrower than the smaller of 320 px
   and the play area (spec 043 Decision 12).
 
-### Proposed by spec 044, pending the human's approval
-
-(Note from the spec writer, 2026-10-22: this list is new. Each item is the pick of
-an open question of spec 044, the keyboard.)
+From spec 044, the keyboard:
 
 - Keys 28 px high instead of 44 px on a window at most 500 px high (section 8; spec
   044 Open question 1): with 44 px keys a phone held sideways keeps about 58 px of
@@ -1392,12 +1397,8 @@ is wider than those windows (568 to 740 px). Spec 044 Decision 8; spec 043 is
 refined. Section 8's "Computer and landscape tablet" top bar applies only to a
 column layout more than 500 px high.)
 
-### Proposed by specs 047 and 048, pending the human's approval
-
-(Note from the spec writer, 2026-10-22: this list is new. Each item is the pick of an
-open question or a decision of spec 047 (room overlays) or spec 048 (plain pages and
-states); the human confirms or changes it when approving those specs. None is drawn
-in the screens sheet yet.)
+From specs 047 (room overlays) and 048 (plain pages and states), none of them
+drawn in the screens sheet yet:
 
 - The vote banner goes as soon as the vote closes and never shows the result; the
   result is the note and a muted stream line with no pictogram, for every outcome

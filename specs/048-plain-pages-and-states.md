@@ -426,22 +426,27 @@ Proposed by the spec writer, each already part of the spec above:
 9. `account-home` reuses `share.home` (« Voir les grilles »), so no new key holds the
    same text.
 
+Decided by the human on 2026-10-22, with the spec's approval (these were the Open
+questions, answered with their recommended answer; the text above already follows
+them). The number in brackets is the question's number, which the text above cites:
+
+10. (Open question 1.) The account page while its first request runs. Options: (a)
+    the card's title only; (b) a muted line « Chargement… » (a new key,
+    `account.loading`). Answer: (a) (Decision 3).
+11. (Open question 2.) A replay with no edit. Options: (a) its empty line only; (b)
+    the line plus the empty grid and the slider, as spec 038 has them. Answer: (a)
+    (Decision 5).
+12. (Open question 3.) Where the replay goes from one column to two. Options: a
+    window 900 px wide (the room's threshold); spec 046's phone split; the card's
+    own width (a container query). Answer: 900 px (Decision 6).
+13. (Open question 4.) Marks in the replay's grid. Options: (a) pencil, locked and
+    revealed, as drawn; (b) letters only, as spec 038 has it. Answer: (a)
+    (Decision 7).
+14. (Open question 5.) How the slider is drawn. Options: (a) drawn elements under a
+    transparent native input; (b) the engines' range pseudo-elements, which cannot
+    draw the navy fill in WebKit without a script-set gradient. Answer: (a)
+    (Decision 8); `_design.md` section 11 carries a note on it.
+
 ## Open questions
 
-The pick of each is already in the spec above; the human may change any at
-approval.
-
-1. The account page while its first request runs. Options: (a) the card's title
-   only; (b) a muted line « Chargement… » (a new key, `account.loading`). Pick: (a)
-   (Decision 3).
-2. A replay with no edit. Options: (a) its empty line only; (b) the line plus the
-   empty grid and the slider, as spec 038 has them. Pick: (a) (Decision 5).
-3. Where the replay goes from one column to two. Options: a window 900 px wide (the
-   room's threshold); spec 046's phone split; the card's own width (a container
-   query). Pick: 900 px (Decision 6).
-4. Marks in the replay's grid. Options: (a) pencil, locked and revealed, as drawn;
-   (b) letters only, as spec 038 has it. Pick: (a) (Decision 7).
-5. How the slider is drawn. Options: (a) drawn elements under a transparent native
-   input; (b) the engines' range pseudo-elements, which cannot draw the navy fill in
-   WebKit without a script-set gradient. Pick: (a) (Decision 8); `_design.md`
-   section 11 carries a note pending this approval.
+None left (all answered with the approval of 2026-10-22).
