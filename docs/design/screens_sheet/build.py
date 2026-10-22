@@ -526,6 +526,9 @@ def sec_entry() -> str:
 # ---------------------------------------------------------------- room
 
 NOTE_MSG = "Bruno : AMEN, je pense 👍"
+NOTE_LONG = (
+    "Céline : Je crois que le mot du bas à droite est faux, " "on le reprend ensemble ?"
+)
 
 
 def sec_room() -> str:
@@ -756,7 +759,10 @@ def sec_room() -> str:
                 "bar; a shown reaction is a white pill over its clue for "
                 "3 s (on a two-clue cell, over its own half: decided 2026-10-22). "
                 "Notes: one line on ink, over the top of the grid, 3 s, never "
-                "while the stream is visible."
+                "while the stream is visible. A long note ends with an ellipsis "
+                "on its one line, never wider than the grid's viewport (spec 043 "
+                "WP-2, 2026-10-22). A tap on a note opens the Salon on "
+                "Discussion, the focus in the message box."
             ),
         ],
         [
@@ -774,6 +780,11 @@ def sec_room() -> str:
                     grid_opts={"reaction": ((0, 0), 1, "👏")},
                     stage_extra=note(f"{FLAG_ICO} Dédé bloque sur « Flaire »"),
                 ),
+            ),
+            (
+                "ph",
+                PH + " · long note",
+                phone_room(stage_extra=note(esc(NOTE_LONG))),
             ),
             (
                 "pc",

@@ -741,9 +741,12 @@ Content, top to bottom:
 3. Discussion: one stream, oldest first, padding 10 px 16 px, items 8 px apart,
    then the message box.
    - A message: a player dot (section 11) and the name in weight 700 ink, gap
-     6 px, then the text.
+     6 px, then the text. The dot is centred vertically on the line
+     (`vertical-align: middle`). (Note from the lead, 2026-10-22: the dot's
+     alignment recorded after spec 043 WP-2's build.)
    - An event: one line, 0.82rem, 16 px left padding, one line per event of spec
-     013 (no grouping):
+     013 (no grouping). Its pictogram is followed by a 0.25em gap before the text
+     (note from the lead, 2026-10-22: recorded after spec 043 WP-2's build):
 
      | `data-kind` (spec 013) | Pictogram | Colour |
      | --- | --- | --- |
@@ -787,13 +790,27 @@ Content, top to bottom:
 - One line, ink background, white text (section 4), padding 8 px 12 px, radius
   6 px, shadow `0 6px 18px -8px var(--nock-shadow-strong)`, centred over the top
   edge of the grid area, 8 px down, layer 6 of the grid area. No layout shift.
-- A line may start with its pictogram (the inline flag icon for a flag, ▲, →).
+- A long note stays on its one line and ends with an ellipsis: at most the grid
+  viewport's width in the sheet layout, that width less 16 px in the column layout,
+  `overflow: hidden`, `text-overflow: ellipsis`. (Note from the lead, 2026-10-22:
+  recorded after spec 043 WP-2's build, which draws it so; this section gave no
+  rule for a long note. The screens sheet's « Reactions and 3-second notes »
+  screen draws one.)
+- A line may start with its pictogram (the inline flag icon for a flag, ▲, →),
+  followed by a 0.25em gap, as in the stream. (Note from the lead, 2026-10-22: the
+  gap recorded after spec 043 WP-2's build.)
 - One at a time; a new note replaces the current one. It shows for 3 s, then fades
-  out in 0.25 s (opacity only, no slide). With `prefers-reduced-motion: reduce` it
+  out in 0.25 s (opacity only, no slide), and leaves the page 100 ms after the
+  fade's end (3,350 ms after it showed; note from the lead, 2026-10-22, after spec
+  043 WP-2's build). With `prefers-reduced-motion: reduce` it
   appears and goes without transition.
-- A tap opens the Salon on that line.
+- A tap opens the Salon on that line, as « Salon » does: the focus goes to the
+  message box. (Note from the lead, 2026-10-22: the focus recorded after spec 043
+  WP-2's build; spec 043 adds no scroll to the line.)
 - Not shown while the stream is visible (Salon open on Discussion), and held back
-  while the vote banner shows; they come after it goes.
+  while the vote banner shows; they come after it goes. (Note from the lead,
+  2026-10-22, after spec 043 WP-2's build: only the newest waits, and it is
+  dropped if the stream shows when the banner goes.)
 - Which events: others' messages (« Bruno : … »), « Je bloque », reveals, others'
   checks, joins and departures, and my own reaction. Never typed letters. Also two
   short answers of the room: « Rien à annuler. » after « Annuler » with nothing to

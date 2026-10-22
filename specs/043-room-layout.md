@@ -595,14 +595,26 @@ the secondary « Fermer » right-aligned).
   white pill, 1 px solid `--nock-line` border, radius 12 px, padding 2 px 6 px,
   emoji 16 px with line height 1.2, shadow `0 4px 10px -4px var(--nock-shadow-soft)`,
   layer 8, centred on its `clue` element (one half of a two-clue cell, the whole
-  cell for a lone clue), drawn over the neighbouring cells.
+  cell for a lone clue), drawn over the neighbouring cells. The pill takes the
+  pointer (no `pointer-events: none`) and lies inside its `clue` element, so a tap
+  or click on it, also on a part drawn over a neighbouring cell, selects that clue
+  as a tap on the clue does (spec 007). (Note from the lead, 2026-10-22: recorded
+  after spec 043 WP-2's build, which draws it so; AC-25's `elementFromPoint` at the
+  pill's centre returns it.)
 
 ### 3-second notes (`_design.md` section 8)
 
 `data-testid="room-note"`: a `nock-note` (spec 041), a `<button type="button">` with
 `tabindex="-1"` and `aria-hidden="true"` (other players' actions are not announced,
 spec 022), centred horizontally on `grid-viewport`, its top 8 px below the
-viewport's top, layer 6. It takes no room (no layout shift).
+viewport's top, layer 6. It takes no room (no layout shift). A note longer than
+the viewport is wide stays on its one line and ends with an ellipsis: `max-width`
+the grid area's width less 16 px (the viewport's width in the sheet layout, where
+the grid area has 8 px of padding on each side; 8 px in from each side of the
+viewport in the column layout), `overflow: hidden`, `text-overflow: ellipsis`, with
+the `white-space: nowrap` of `nock-note`. (Note from the lead, 2026-10-22: recorded
+after spec 043 WP-2's build, which draws it so; the design gave no rule for a long
+note.)
 
 - A note is made, with its text, for: a `chat_message` whose player is not `you`
   (`t("note.message", { name, text })`); an added event line (spec 013) of kind
@@ -618,12 +630,21 @@ viewport's top, layer 6. It takes no room (no layout shift).
   vote.)
 - One at a time: a new note replaces the shown one at once. A note shows for
   3,000 ms, then gets `data-off` (spec 041's fade, 0.25 s, none under
-  `prefers-reduced-motion: reduce`) and leaves the page once faded.
+  `prefers-reduced-motion: reduce`) and leaves the page 3,350 ms after it showed,
+  100 ms after the fade's end, so that it has been drawn fully faded. (Note from the
+  lead, 2026-10-22: this read "and leaves the page once faded"; the 3,350 ms are
+  spec 043 WP-2's build, inside AC-26's bounds of 3,400 and 3,700 ms.)
 - While the stream is shown, no note is made. While `vote-banner` is on the page,
   the newest note waits (it replaces any older waiting note) and shows once the
-  banner has gone.
+  banner has gone, unless the stream shows by then: the note that waited is then
+  dropped, as the player reads its line in the stream. (Note from the lead,
+  2026-10-22: the "unless" clause added after spec 043 WP-2's build, which does so.)
 - A tap or click on a note opens the Salon on its Discussion tab (no scroll is
-  added to spec 013's rules, Open question 12) and removes the note.
+  added to spec 013's rules, Open question 12) and removes the note. It opens the
+  Salon as `chat-toggle` (« Salon ») does, so the focus moves to `chat-input` (to
+  `salon-tab-discussion` while `chat-input` is disabled, "Salon" above). (Note
+  from the lead, 2026-10-22: the focus added after spec 043 WP-2's build, which
+  moves it so.)
 - `undo-message` (spec 018, `role="status"`, `t("undo.nothing")`, 3 seconds) has the
   note's look and place. It replaces any shown note, and shows also while the
   stream is shown and while the vote banner is on the page.

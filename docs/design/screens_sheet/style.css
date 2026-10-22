@@ -177,7 +177,7 @@ ol.decisions li .alt { color: var(--nock-muted); font-size: .88rem; }
 .tb[aria-pressed="true"] { background: var(--nock-word); }
 .stage { flex: 1; min-height: 0; position: relative; display: grid; place-items: center; background: var(--nock-white); }
 .gwrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--nock-ink); color: var(--nock-white); font: 500 .85rem/1.2 var(--nock-font-ui); padding: 8px 12px; border-radius: 6px; white-space: nowrap; z-index: 6; box-shadow: 0 6px 18px -8px var(--nock-shadow-strong); }
+.toast { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); background: var(--nock-ink); color: var(--nock-white); font: 500 .85rem/1.2 var(--nock-font-ui); padding: 8px 12px; border-radius: 6px; white-space: nowrap; max-width: calc(100% - 16px); box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; z-index: 6; box-shadow: 0 6px 18px -8px var(--nock-shadow-strong); }
 .legend { background: var(--nock-legend-bg); border: 1px solid var(--nock-line); border-radius: 14px; padding: 4px 12px; font: 500 .8rem/1.2 var(--nock-font-ui); color: var(--nock-muted); display: flex; flex-wrap: wrap; justify-content: center; column-gap: 8px; row-gap: 2px; max-width: calc(100% - 16px); text-align: center; }
 .legend b { font-weight: 700; }
 .cluebar { flex: none; background: var(--nock-navy); color: var(--nock-white); height: 34px; display: flex; align-items: center; }
