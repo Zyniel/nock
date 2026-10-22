@@ -1,7 +1,7 @@
 ---
 id: "029"
 title: Game history
-status: approved
+status: done
 ---
 
 # 029 - Game history

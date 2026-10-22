@@ -1,7 +1,7 @@
 ---
 id: "033"
 title: Optional account
-status: approved
+status: done
 ---
 
 # 033 - Optional account

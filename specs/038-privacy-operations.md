@@ -1,7 +1,7 @@
 ---
 id: "038"
 title: Privacy and operations
-status: approved
+status: done
 ---
 
 # 038 - Privacy and operations

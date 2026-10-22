@@ -7,9 +7,10 @@ Update it at the end of each session.
 
 ## Where things stand (2026-10-22)
 
-- All 13 Phase 6 specs are built. Specs 038 (PR #22), 034 (PR #24) and 033
-  (PR #25) are merged; spec 029, the last one, is in review in the pull request
-  that carries this handoff ("Spec 029, the last pull request" below).
+- Phase 6 is complete (2026-10-22): its 13 specs are merged and `done`. The
+  last four went in one pull request each: 038 (#22), 034 (#24), 033 (#25) and
+  029 (#26). Next is the visual design (`_design.md`, from spec 041); Phase 7
+  (specs 030 and 031, competitive modes) is wanted and queued after it.
 - The work moved on 2026-10-21 from the cloud session to a session on the
   human's Windows computer. The cloud session's worktrees are gone.
 - Local setup: section 1 of the README (`uv sync`, `npm --prefix web ci`,
@@ -46,10 +47,12 @@ Update it at the end of each session.
   038, privacy and operations, with the `utc_datetime` fix for Windows), PR #23
   (tooling: the new CI workflow, below), PR #24 (spec 034, catching up after an
   absence), PR #25 (spec 033, optional account, with its `link_identity` race
-  fix). Tag `v0.1.0` exists locally on #6's merge commit but could not be
-  pushed from the cloud session (tag pushes are refused): the human pushes it
-  from a clone.
-- Open: spec 029's pull request (game history), which carries this handoff.
+  fix), PR #26 (spec 029, game history), PR #27 (tooling: the finish hook also
+  finds the agent's checkout from its Bash commands: `git -C`, `cd`,
+  `--directory`, and Git Bash `/k/...` paths read as `K:/...`). Tag `v0.1.0`
+  is on the remote.
+- Open: the pull request that closes specs 038, 034, 033 and 029 and carries
+  this handoff.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only). Spec 033's
   open question 2 (players' addresses outside ASCII) is answered with (b), under
@@ -61,29 +64,18 @@ Update it at the end of each session.
   merged. CI runs only on pull requests, so a local check comes first.
 - The human was asked to require the `Quality gate` check in `main`'s ruleset;
   a pull request whose CI runs should then show as "blocked", not "unstable".
-- Phase 6 specs: 019, 020, 021, 022, 024, 025, 027, 028, 032, 038, 034 and 033
-  are merged; 029 is in review (human decision of 2026-10-16: 038, then 034,
-  033, 029, one pull request each).
+- Phase 6 specs: all 13 merged and `done` (019, 020, 021, 022, 024, 025, 027,
+  028, 029, 032, 033, 034, 038).
 
-## Spec 029, the last pull request
+## Left open from Phase 6
 
-- **Branch:** spec 029's 10 commits and this handoff, rebased onto `main` after
-  PR #25's merge (local branch `pr-029`, worktree `.claude/worktrees/pr-029`).
-  Its code and tests are the same as on `specs-chain`, where they were
-  reviewed. Turn Auto-fix on when the human says so (they asked for it on #22,
-  #24 and #25).
-- **How the spec pull requests were opened:** `specs-chain` (a local branch)
-  keeps the whole reviewed chain. Each spec was cherry-picked onto `main` in a
-  worktree `pr-NNN` once the previous one was merged. Cherry-pick ranges and
-  single commits in separate calls: one call with both walks the whole history
-  between them.
-- **Local gate on `pr-029`, 2026-10-22 (Chromium):** the static checks and
-  5,911 of 5,913 parallel tests passed, and the serial pass. The two failures
-  were load flakes (`net::ERR_NO_BUFFER_SPACE`, Windows out of local ports
-  after four gates in a row; and a click on a cell "not visible" at 320 by
-  568). Both files and spec 029's tests then passed in parallel (301 tests).
-- **Spec 029 (game history):** approved by its second review (2026-10-21).
-  - **Commits:** spec d1f3388; tests 4239b0b; code 27fa970 (server) and
+- **How the last spec pull requests were opened:** `specs-chain` (a local
+  branch) keeps the whole reviewed chain. Each spec was cherry-picked onto
+  `main` in a worktree `pr-NNN` once the previous one was merged. Cherry-pick
+  ranges and single commits in separate calls: one call with both walks the
+  whole history between them. Those worktrees and `specs-chain` can go.
+- **Spec 029 (game history), merged in PR #26:**
+  - **Commits (their `specs-chain` hashes):** spec d1f3388; tests 4239b0b; code 27fa970 (server) and
     ce383c6 (client); the first review's fix round: spec 6402495, tests
     822bddb, code a2b65d3, spec 032 note 28768fc.
   - **Also in its pull request:** 2272dda (two spec 032 AC-4 tests compare
@@ -95,7 +87,7 @@ Update it at the end of each session.
     of its solved rooms had expired but was not swept left the nickname in
     another account's history and in the files. The route now runs
     `AccountStore.erase_players_from_history` after the rooms are erased.
-  - **For the human, in its pull request:**
+  - **For the human (in PR #26; nothing decided yet):**
     - One race is left: a history save that read the room before the erasure
       and writes after it keeps the nickname. Very unlikely (the other thread
       must stall through `erase_player` and two commits). Closing it: the
@@ -107,10 +99,6 @@ Update it at the end of each session.
       rooms" writes the record on the next visit.
     - `peek_room` re-reads the log of a room solved before spec 029 at each
       call (correct, slower on old rooms).
-- **Tooling, ready on branch `feat/hook-bash-paths` (db88bed, from `main`, not pushed):** the
-  finish hook also finds the agent's checkout from the directories its Bash
-  commands name (`git -C`, `cd`, `--directory`; Git Bash `/k/...` paths read as
-  `K:/...`). Its own pull request; worktree `.claude/worktrees/hook-bash-paths`.
 - **Local environment, 2026-10-21:** the `.venv` launchers failed with "uv
   trampoline failed to canonicalize script path" (black, playwright,
   uvicorn); `uv sync --reinstall` fixed it.
@@ -136,10 +124,22 @@ Update it at the end of each session.
 
 ## First tasks for the next session
 
-1. Follow spec 029's pull request to its merge ("Spec 029, the last pull
-   request").
-2. The finish hook's tooling pull request (`feat/hook-bash-paths`).
-3. Phase 6 is then complete; Phase 7 (030, 031) is next, untouched so far.
+1. Phase 6's end in the build plan: tag `v1.0.0` on `main`, if the human wants
+   it.
+2. The visual design first (human, 2026-10-22: "I want the game now to be
+   implemented based on the full design system provided"): `_design.md`
+   section 14's build order. Step 1 is spec 041 (approved). Steps 2 to 5 get
+   specs drafted from `_design.md`, which the human approves one by one. Lead
+   decisions of 2026-10-22, for the human to override: the design's revealed
+   notch (0.22 by 0.11 of the side) wins over spec 024 AC-9's minimum, and the
+   spec writer's picks of section 15's "Still open" items are accepted.
+3. Phase 7 (competitive modes) is wanted (human, 2026-10-22: "E8 is wanted"),
+   and queued after the design ("Stop and queue 030 or any competitive
+   modes"): spec 030 (race mode), then 031 (team mode), one pull request each.
+   Both are 45-line stubs, approved before their public interface existed: a
+   spec writer writes them in full first.
+4. The small follow-ups below ("Follow-up noted from spec 028's first review",
+   the README's missing word on how to add grids), when a spec touches them.
 - **Models:** pass `model: "opus"` to the implementer and to the test-writer of
   a whole spec (their definitions default to Sonnet, at high effort). Use
   Sonnet for small spec notes and mechanical test edits.
