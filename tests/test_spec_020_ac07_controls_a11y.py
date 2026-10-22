@@ -7,8 +7,10 @@ Four parts, all on the page with a mocked socket:
   contexts, with spec 013 AC-6's setup and (1, 0) holding a pencil letter: spec
   013 AC-6's layout checks with `pencil-toggle` in `room-topbar` (right after
   `undo-button` in the computer top bar, right after `chat-toggle` in the phone
-  top bar), and, with (1, 0) selected, `confirm-pencil` the first item of the
-  open `aide-menu`; spec 043 AC-28's checks for both (inside the window,
+  top bar of the desktop context) or, in the touch context's sheet layout,
+  `key-pencil` in `keyboard` and no `pencil-toggle`, and, with (1, 0) selected,
+  `confirm-pencil` the first item of the open `aide-menu`; spec 043 AC-28's checks
+  for the pencil control and `confirm-pencil` (inside the window,
   `elementFromPoint` at their centre returns them). One page per size and context,
   so that the suite stays lean;
 - the keyboard-only run at 1280 by 720 (spec 035's walker), which reaches
@@ -26,10 +28,13 @@ Refined by spec 043 (the design's room layout): this read "both are in
 `room-toolbar` right after `undo-button`, and spec 024 AC-8's toolbar rules hold
 for them" and "`tab_to` `confirm-pencil` and `Enter`"; `confirm-pencil` is now
 present only while it applies, with the text `fr.json["pencil.confirm"]` (« Confirmer
-la lettre au crayon ») and no `aria-label`. Spec 044 (the design's keyboard) refines
-the touch context's sheet layout once more (`key-pencil` in place of
-`pencil-toggle`); until it is built, `pencil-toggle` holds the phone top bar's
-fourth slot there too (spec 043, Decision 6).
+la lettre au crayon ») and no `aria-label`. Refined by spec 044 (the design's
+keyboard): in the touch context's sheet layout (the windows that are not landscape,
+at least 900 px wide and more than 500 px high) the pencil toggle is `key-pencil`,
+the ✎ key of `keyboard`, and there is no `pencil-toggle` (the phone top bar's
+fourth slot is `keyboard-toggle`); spec 043 AC-28's checks hold for `key-pencil`
+there. The touch context's column layout keeps `pencil-toggle` after
+`undo-button`.
 
 The shared setup is in `spec020_harness`, `spec024_harness` and `spec043_harness`.
 """
@@ -218,7 +223,8 @@ def open_top_bar_room(
         else:
             cell.click(timeout=WAIT_TIMEOUT_MS)
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", WORD_W7)
-        expect(pencil_toggle(page)).to_be_visible()
+        control = page.get_by_test_id(pencil_control(width, height, touch))
+        expect(control).to_be_visible()
     except BaseException:
         close()
         raise
@@ -285,6 +291,37 @@ def spec013_layout_problems(page: Page, touch: bool) -> list[str]:
 # ---- The top bar's place and the Aide menu's first item ----
 
 
+def is_touch_sheet(width: int, height: int, touch: bool) -> bool:
+    """Whether the page is the touch context's sheet layout (spec 044).
+
+    The keyboard shows on these pages (no `nock.keyboard_hidden`, not solved), so
+    the window is in the column layout only when it is landscape, at least 900 px
+    wide and more than 500 px high (spec 044's "Which layout").
+    """
+    column = width > height and width >= 900 and height > 500
+    return touch and not column
+
+
+def pencil_control(width: int, height: int, touch: bool) -> str:
+    """The pencil toggle that shows: `key-pencil` in the touch context's sheet
+    layout (spec 044), `pencil-toggle` everywhere else."""
+    if is_touch_sheet(width, height, touch):
+        return "key-pencil"
+    return "pencil-toggle"
+
+
+def key_pencil_place_problems(page: Page) -> list[str]:
+    """Spec 044: `key-pencil` in `keyboard`, and no `pencil-toggle` on the page."""
+    problems: list[str] = []
+    in_keyboard = page.get_by_test_id("keyboard").get_by_test_id("key-pencil")
+    if in_keyboard.count() != 1:
+        problems.append(f"{in_keyboard.count()} key-pencil in keyboard")
+    toggles = pencil_toggle(page).count()
+    if toggles != 0:
+        problems.append(f"{toggles} pencil-toggle on the page")
+    return problems
+
+
 def top_bar_place_problems(page: Page) -> list[str]:
     """`pencil-toggle` right after `undo-button` (computer top bar) or right after
     `chat-toggle` (phone top bar, the one without `topbar-brand`)."""
@@ -344,13 +381,17 @@ def test_ac7_the_pencil_controls_keep_the_grid_room_in_the_top_bar_and_the_aide_
     context_kind: str,
 ) -> None:
     touch = context_kind == "touch"
+    control = pencil_control(width, height, touch)
     page, close = open_top_bar_room(
         browser, browser_name, live_server, fx01_grid, width, height, touch
     )
     try:
         layout = spec013_layout_problems(page, touch)
-        place = top_bar_place_problems(page)
-        toggle = reach_problems(page, "pencil-toggle")
+        if control == "key-pencil":
+            place = key_pencil_place_problems(page)
+        else:
+            place = top_bar_place_problems(page)
+        toggle = reach_problems(page, control)
         confirm = confirm_problems(page, touch)
     finally:
         close()

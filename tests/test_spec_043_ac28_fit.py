@@ -22,8 +22,10 @@ Choices where the spec leaves room:
   name. In the column layout the clue bar's hit tests run in every state, and in
   the sheet layout in the state where nothing is open.
 - "Each item of an open popover" is each `button` and `a` inside it.
-- The touch context with `nock.keyboard_hidden` is checked whatever its layout:
-  spec 044, which reads that key, is built after this step.
+- The touch context with `nock.keyboard_hidden`: refined by spec 044 (the
+  design's keyboard), which reads that key, so the page there is in the column
+  layout (checked) with the phone top bar, whose `keyboard-toggle` is among the
+  top-bar buttons that the hit tests read.
 - Spec 013 AC-6's keyboard check runs whenever `keyboard` is on the page.
 """
 
@@ -52,6 +54,7 @@ from spec043_harness import (
     box_inside,
     check_frame,
     expect_closed,
+    expect_layout,
     hit_problem,
     is_open,
     layout_of,
@@ -310,6 +313,9 @@ def test_ac28_everything_stays_in_the_window_in_the_four_states(
     if keyboard_hidden:
         seed_value(page, "nock.keyboard_hidden", "true")
     mock = open_h8(page, live_server, fx01_grid, touch)
+    if keyboard_hidden:
+        # Spec 044: with the keyboard hidden, a low window is the column layout.
+        expect_layout(page, "column")
     layout = layout_of(page)
 
     problems: list[str] = []

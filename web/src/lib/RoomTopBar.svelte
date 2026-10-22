@@ -1,8 +1,10 @@
 <script lang="ts">
-  // The room's top bar (spec 043, "Top bar"): the timer slot and five buttons.
-  // The phone top bar (54 px) draws each icon above its label; the computer top
-  // bar (56 px) starts with the brand and draws each icon beside its label. The
-  // room page decides which form shows and what each button does.
+  // The room's top bar (spec 043, "Top bar"): the timer slot and five or six
+  // buttons. The phone top bar (54 px) draws each icon above its label; the
+  // computer top bar (56 px) starts with the brand and draws each icon beside
+  // its label. On a touch screen « Clavier » shows and hides the in-app
+  // keyboard (spec 044). The room page decides which form shows and what each
+  // button does.
   import RoomTimer from './RoomTimer.svelte'
   import TopBarButton from './TopBarButton.svelte'
   import { unreadBadgeText } from './chat'
@@ -17,6 +19,8 @@
     timerAnchor,
     isSolved,
     isPencilMode,
+    isTouchScreen,
+    isKeyboardShown,
     isAideOpen,
     isMenuOpen,
     isSalonOpen,
@@ -29,6 +33,7 @@
     onShowTimer,
     onUndo,
     onTogglePencil,
+    onToggleKeyboard,
     onToggleAide,
     onToggleSalon,
     onToggleMenu,
@@ -38,9 +43,14 @@
     timerBaseMs: number
     isTimerRunning: boolean
     timerAnchor: number
-    // Once the grid is solved, « Annuler » and « Crayon » are disabled.
+    // Once the grid is solved, « Annuler », « Crayon » and « Clavier » are
+    // disabled.
     isSolved: boolean
     isPencilMode: boolean
+    // « Clavier » shows on a touch screen only, pressed while the in-app
+    // keyboard shows.
+    isTouchScreen: boolean
+    isKeyboardShown: boolean
     isAideOpen: boolean
     isMenuOpen: boolean
     isSalonOpen: boolean
@@ -58,6 +68,7 @@
     onShowTimer: () => void
     onUndo: () => void
     onTogglePencil: () => void
+    onToggleKeyboard: () => void
     onToggleAide: () => void
     onToggleSalon: () => void
     onToggleMenu: () => void
@@ -82,6 +93,17 @@
     ariaPressed={isPencilMode}
     disabled={isSolved}
     onclick={onTogglePencil}
+  />
+{/snippet}
+
+{#snippet keyboardButton()}
+  <TopBarButton
+    testId="keyboard-toggle"
+    icon="clavier"
+    label={t('keyboard.label')}
+    ariaPressed={isKeyboardShown}
+    disabled={isSolved}
+    onclick={onToggleKeyboard}
   />
 {/snippet}
 
@@ -156,16 +178,25 @@
   </div>
   <div class="topbar-buttons">
     {#if form === 'phone'}
+      <!-- The fourth slot: « Clavier » on a touch screen, where ✎ is the
+           pencil toggle; « Crayon » elsewhere. -->
       {@render undoButton()}
       {@render aideMenuButton()}
       {@render salonButton()}
-      {@render pencilButton()}
+      {#if isTouchScreen}
+        {@render keyboardButton()}
+      {:else}
+        {@render pencilButton()}
+      {/if}
       {@render roomMenuButton()}
     {:else}
       {@render undoButton()}
       {@render pencilButton()}
       {@render aideMenuButton()}
       {@render salonButton()}
+      {#if isTouchScreen}
+        {@render keyboardButton()}
+      {/if}
       {@render roomMenuButton()}
     {/if}
   </div>

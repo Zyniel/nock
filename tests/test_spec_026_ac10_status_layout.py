@@ -31,12 +31,15 @@ Refined by spec 043 (the design's room layout): the in-row checks at 568 by 320
 and 740 by 360 run in the touch context, spec 043's sheet layout; in the desktop
 context these two windows are the column layout, where `grid-status` sits under
 the clue bar, as at 1280 by 720. The edge case of a resize across 500 px runs in
-the touch context, where the status changes its place. Spec 044 (the design's
-keyboard, built after this step) refines the touch context's solved page once more
-(no keyboard, the column layout, the status under the bar); until then the in-app
-keyboard stays on a solved page (spec 026 AC-5), so the place of the solved status
-in the touch context of a low window is not checked here, and the in-row checks
-and the resize run with `FX02_FULL_WRONG`. Its layout checks and scans still run.
+the touch context, where the status changes its place.
+
+Refined by spec 044 (the design's keyboard): the in-app keyboard goes away once
+the grid is solved, so the in-row checks and the resize run with `FX02_FULL_WRONG`
+only; with `FX02_SOLVED` at 568 by 320 and 740 by 360 in the touch context the page
+has no `keyboard` and `data-layout="column"`, and `grid-status` is under the clue
+bar, as at 1280 by 720 (its layout checks and, at 568 by 320, its scans still run).
+Spec 013 AC-6's keyboard check runs on the pages where the keyboard shows: the
+touch context with `FX02_FULL_WRONG`.
 """
 
 from __future__ import annotations
@@ -384,7 +387,8 @@ def open_status_page(
     tap(clue.filter(has_text=LONGEST_CLUE), touch)
     expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", LONGEST_WORD)
     expect(page.get_by_test_id("clue-bar-text")).to_have_text(LONGEST_CLUE)
-    if touch:
+    # Spec 044: the keyboard shows in the touch context until the grid is solved.
+    if touch and not solved:
         expect(page.get_by_test_id("keyboard")).to_be_visible()
     page.evaluate(SETTLE_LAYOUT_SCRIPT)
     wait_for_fonts(page)
@@ -502,8 +506,12 @@ def font_size_px(page: Page, test_id: str) -> float:
 # ---- The checks of AC-10, each returning the problems it found ----
 
 
-def room_layout_problems(page: Page, touch: bool) -> list[str]:
-    """Spec 013 AC-6's checks, as "Status snapshots (AC-10)" lists them."""
+def room_layout_problems(page: Page, keyboard_shows: bool) -> list[str]:
+    """Spec 013 AC-6's checks, as "Status snapshots (AC-10)" lists them.
+
+    The keyboard's check runs when `keyboard_shows`: in the touch context, on a
+    page that is not solved (spec 044).
+    """
     problems: list[str] = []
     window = window_measures(page)
     viewport = box_of(page, "grid-viewport")
@@ -524,7 +532,7 @@ def room_layout_problems(page: Page, touch: bool) -> list[str]:
     window_box = Box(0.0, 0.0, window.inner_width, window.inner_height)
     if not is_inside(bar, window_box):
         problems.append(f"clue-bar {bar} is not inside the window {window_box}")
-    if touch:
+    if keyboard_shows:
         keyboard = box_of(page, "keyboard")
         if bar.bottom > keyboard.top + EPSILON:
             problems.append(f"clue-bar {bar} goes below the keyboard's top {keyboard}")
@@ -745,19 +753,23 @@ def test_ac10_on_a_low_touch_window_the_status_sits_in_the_clue_bar_row(
 @pytest.mark.parametrize(
     ("width", "height"), LOW_WINDOW_SIZES, ids=size_ids(LOW_WINDOW_SIZES)
 )
-def test_ac10_on_a_low_touch_window_the_solved_status_shows_and_keeps_the_room(
+def test_ac10_on_a_low_touch_window_the_solved_page_has_the_status_under_the_bar(
     new_page: NewPage,
     live_server: str,
     fx02_grid: Grid,
     width: int,
     height: int,
 ) -> None:
+    # Spec 044: no keyboard once solved, so the column layout and the band.
     state = "solved"
     page = new_page(width, height, True)
     open_status_page(page, live_server, status_view(fx02_grid, state), True, True)
 
     expect_status_shows(page, state)
-    problems = room_layout_problems(page, True)
+    expect(page.get_by_test_id("keyboard")).to_have_count(0)
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-layout", "column")
+    problems = room_layout_problems(page, False)
+    problems.extend(under_the_clue_bar_problems(page))
     if (width, height) == SCAN_WINDOW:
         problems.extend(scan_problems(page, live_server, fx02_grid))
 
@@ -809,7 +821,7 @@ def test_ac10_on_a_tall_window_the_status_shows_and_the_grid_keeps_its_room(
     )
 
     expect_status_shows(page, state)
-    problems = room_layout_problems(page, touch)
+    problems = room_layout_problems(page, touch and state == "full_wrong")
 
     assert problems == [], f"{width}x{height} {context_kind} {state}: {problems}"
 

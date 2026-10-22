@@ -100,15 +100,19 @@
   const MAX_REVEAL_COUNT = 99
   // The performance mark set once the grid takes taps and keys (spec 036).
   const INTERACTIVE_MARK = 'nock:interactive'
-  // The two layouts of the room (spec 043, "Which layout"): the column layout
-  // needs a landscape window at least COLUMN_MIN_WIDTH_PX wide and more than
-  // LOW_WINDOW_PX high, or a landscape window at most LOW_WINDOW_PX high with no
-  // in-app keyboard.
+  // The two layouts of the room (spec 043, spec 044, "Which layout"): the
+  // column layout needs a landscape window at least COLUMN_MIN_WIDTH_PX wide and
+  // more than LOW_WINDOW_PX high, or a landscape window at most LOW_WINDOW_PX
+  // high on which the in-app keyboard does not show.
   const COLUMN_MIN_WIDTH_PX = 900
   const LOW_WINDOW_PX = 500
   // The Salon column closed by the player, for every room of this browser.
   const SALON_CLOSED_KEY = 'nock.salon_closed'
   const SALON_CLOSED_VALUE = 'true'
+  // The in-app keyboard hidden by the player, for every room of this browser
+  // (spec 044).
+  const KEYBOARD_HIDDEN_KEY = 'nock.keyboard_hidden'
+  const KEYBOARD_HIDDEN_VALUE = 'true'
   // The column layout's play area: its padding, and the smallest width of the
   // clue bar when the play area has that much room (spec 043, Decision 12).
   const PLAY_AREA_PADDING_PX = 12
@@ -129,6 +133,38 @@
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
 
+  // ---- The in-app keyboard (spec 044) ----
+
+  // The player's choice, read when the page loads. When the storage throws, a
+  // hide holds for the page's life only.
+  const isKeyboardHiddenAtLoad = readItem(KEYBOARD_HIDDEN_KEY) === KEYBOARD_HIDDEN_VALUE
+  let isKeyboardHidden = $state(isKeyboardHiddenAtLoad)
+  // The keyboard shows on a touch screen, unless the player hid it or the grid
+  // is solved. The page shows it only once it has a snapshot.
+  let isKeyboardShown = $derived(
+    isTouchScreen && !isKeyboardHidden && !session.solved && session.snapshot !== null,
+  )
+
+  // « Clavier »: hide or show the keyboard and remember the choice. The grid
+  // refits at once to the room the keyboard gave or took.
+  function toggleKeyboard(): void {
+    isKeyboardHidden = !isKeyboardHidden
+    if (isKeyboardHidden) {
+      writeItem(KEYBOARD_HIDDEN_KEY, KEYBOARD_HIDDEN_VALUE)
+    } else {
+      removeItem(KEYBOARD_HIDDEN_KEY)
+    }
+    refitNow()
+  }
+
+  // ⇄: what a second tap on the selected cell does (spec 007). With nothing
+  // selected, nothing changes.
+  function swapDirection(): void {
+    if (selection !== null) {
+      onCellTap(selection.row, selection.column)
+    }
+  }
+
   // ---- The layout (spec 043) ----
 
   // The window's size, followed through each resize and rotation
@@ -138,7 +174,7 @@
 
   // A low window: at most 500 px high, a phone on its side.
   let isLowWindow = $derived(windowHeight <= LOW_WINDOW_PX)
-  let layout = $derived(layoutOf(windowWidth, windowHeight))
+  let layout = $derived(layoutOf(windowWidth, windowHeight, isKeyboardShown))
   // The phone top bar is the sheet layout's, and the column layout's on a low
   // window, where the computer top bar would not fit.
   let topBarForm: 'phone' | 'computer' = $derived(
@@ -146,14 +182,14 @@
   )
 
   // "column" for a landscape window that is wide enough and not low, or low
-  // with no in-app keyboard; "sheet" otherwise.
-  function layoutOf(width: number, height: number): 'sheet' | 'column' {
+  // while the in-app keyboard does not show; "sheet" otherwise.
+  function layoutOf(width: number, height: number, isKeyboardOn: boolean): 'sheet' | 'column' {
     const isLandscape = width > height
     if (!isLandscape) {
       return 'sheet'
     }
     const isWideWindow = width >= COLUMN_MIN_WIDTH_PX && height > LOW_WINDOW_PX
-    const isLowWithoutKeyboard = height <= LOW_WINDOW_PX && !isTouchScreen
+    const isLowWithoutKeyboard = height <= LOW_WINDOW_PX && !isKeyboardOn
     if (isWideWindow || isLowWithoutKeyboard) {
       return 'column'
     }
@@ -185,7 +221,7 @@
 
   // A change of layout closes the popovers and the reaction picker; the Salon
   // takes the state it has in the new layout (the sheet starts closed).
-  let lastLayout: 'sheet' | 'column' = layoutOf(window.innerWidth, window.innerHeight)
+  let lastLayout: 'sheet' | 'column' = untrack(() => layout)
   $effect(() => {
     const current = layout
     if (current === lastLayout) {
@@ -535,13 +571,11 @@
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
   let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
-  // Where the status shows (spec 026 AC-10, spec 043 AC-27): in the clue bar's
-  // row while the in-app keyboard shows on a low window, where a band would take
-  // the grid's height; under the bar, as a band, everywhere else. Until spec 044
-  // hides the keyboard on a solved page, a solved status takes the row too.
-  let isStatusInClueBar = $derived(
-    gridStatus !== null && layout === 'sheet' && isLowWindow && isTouchScreen,
-  )
+  // Where the status shows (spec 026 AC-10, spec 044): in the clue bar's row
+  // while the in-app keyboard shows on a low window, where a band would take the
+  // grid's height; under the bar, as a band, everywhere else. A solved page has
+  // no keyboard, so a solved status is always the band.
+  let isStatusInClueBar = $derived(gridStatus !== null && isKeyboardShown && isLowWindow)
   let isStatusUnderClueBar = $derived(gridStatus !== null && !isStatusInClueBar)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
@@ -1793,25 +1827,22 @@
 
 <svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 
-<!-- The completion status (spec 026, spec 043): its text, after the ✓
-     pictogram once solved, and « Voir le bilan » in the band of a solved grid.
+<!-- The completion status (spec 026, spec 043, spec 044): its text, after the
+     ✓ pictogram once solved, and « Voir le bilan » in the band of a solved grid.
      The page shows it in one of two places, never both: see isStatusInClueBar
-     and isStatusUnderClueBar. -->
-{#snippet gridStatusContent(isInRow: boolean)}
+     and isStatusUnderClueBar. Only the full-but-wrong status sits in the clue
+     bar's row, since a solved page has no keyboard. -->
+{#snippet gridStatusContent()}
   {#if gridStatus === 'solved'}
     <span class="status-check" aria-hidden="true"></span>
   {/if}
   <span class="grid-status-text"
     >{gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}</span
   >
-  <!-- « Voir le bilan »: the primary button in the band, the secondary one in
-       the clue bar's row (spec 043 AC-27). -->
   {#if gridStatus === 'solved'}
     <button
       type="button"
-      class="nock-button recap-open"
-      class:nock-button-primary={!isInRow}
-      class:nock-button-secondary={isInRow}
+      class="nock-button nock-button-primary recap-open"
       data-testid="recap-open"
       bind:this={recapOpenButton}
       onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
@@ -1821,7 +1852,7 @@
 
 {#snippet statusInRow()}
   <p class="grid-status in-row" data-testid="grid-status" data-state={gridStatus} role="status">
-    {@render gridStatusContent(true)}
+    {@render gridStatusContent()}
   </p>
 {/snippet}
 
@@ -1850,6 +1881,8 @@
       timerAnchor={session.timerAnchor}
       isSolved={session.solved}
       {isPencilMode}
+      {isTouchScreen}
+      {isKeyboardShown}
       isAideOpen={openPopover === 'aide'}
       isMenuOpen={openPopover === 'menu'}
       {isSalonOpen}
@@ -1862,6 +1895,7 @@
       onShowTimer={() => setTimerShown(true)}
       {onUndo}
       onTogglePencil={togglePencilMode}
+      onToggleKeyboard={toggleKeyboard}
       onToggleAide={() => togglePopover('aide')}
       onToggleSalon={toggleSalon}
       onToggleMenu={() => togglePopover('menu')}
@@ -2098,12 +2132,19 @@
               style:width={clueBarWidth === null ? null : `${clueBarWidth}px`}
               bind:offsetHeight={statusBandHeight}
             >
-              {@render gridStatusContent(false)}
+              {@render gridStatusContent()}
             </p>
           {/if}
         </div>
-        {#if isTouchScreen}
-          <InAppKeyboard {onLetter} {onErase} onKeyUsed={() => gridViewport?.focusGrid()} />
+        {#if isKeyboardShown}
+          <InAppKeyboard
+            {isPencilMode}
+            {onLetter}
+            {onErase}
+            onTogglePencil={togglePencilMode}
+            onSwap={swapDirection}
+            onKeyUsed={() => gridViewport?.focusGrid()}
+          />
         {/if}
       </div>
       <Salon

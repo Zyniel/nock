@@ -323,7 +323,10 @@ confirmation on a solved grid's normal letter.)
 - The in-app keyboard (AC-1): its keys follow pencil mode; it gets no pencil key,
   since the toolbar's toggle serves touch screens too. (Note from the lead,
   2026-10-22: refined by spec 044, the design's keyboard: it gets the ✎ key
-  `key-pencil`, which is the pencil toggle of a touch screen in the sheet layout.)
+  `key-pencil`, which is the pencil toggle of a touch screen in the sheet layout.
+  Note from the lead, 2026-10-22: the test of this edge case runs in a touch
+  context, where the touch sheet layout has no `pencil-toggle`, and taps
+  `key-pencil`.)
 - Solved grid (AC-3, AC-7): `pencil-toggle` and `confirm-pencil` are disabled, and
   spec 026's input lock sends nothing. (Note from the lead, 2026-10-15: spec 017's
   heartbeat `ping` frames are not counted.)

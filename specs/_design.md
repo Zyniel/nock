@@ -1082,11 +1082,15 @@ A band under the clue bar, padding 8 px 12 px, gap 10 px, text 600 0.95rem/1.2:
   is no band. It sits in the navy clue bar, after the clue text and before
   « Réagir », on one line: white text 600 0.95rem/1.2, padding 0 8 px, gap 10 px,
   no background; the clue text gives it its width (ellipsis). Full but wrong:
-  « Grille complète, mais pas encore juste. » in white. Solved, until spec 044 is
-  built (the keyboard then leaves a solved page, which takes the band): « ✓ Grille
-  terminée, bravo ! » in white, then « Voir le bilan » as a secondary button
-  (white, navy text and border; padding 7 px 12 px, 0.85rem). Drawn in the screens
-  sheet, part 5 (« The status in the clue bar's row »).
+  « Grille complète, mais pas encore juste. » in white. (Note from the lead,
+  2026-10-22: spec 044 is built; removed the case that read "Solved, until spec 044
+  is built (the keyboard then leaves a solved page, which takes the band): « ✓
+  Grille terminée, bravo ! » in white, then « Voir le bilan » as a secondary
+  button (white, navy text and border; padding 7 px 12 px, 0.85rem)." A solved page
+  has no in-app keyboard, so its status is always the band above, with the primary
+  « Voir le bilan »; only full but wrong takes the row, while the keyboard shows on
+  a low window.) Drawn in the screens sheet, part 5 (« The status in the clue bar's
+  row »).
 
 ### Recap (spec 028)
 

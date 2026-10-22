@@ -7,6 +7,11 @@ typed in either mode (decision 10), a locked cell, an erase, a lock over a pendi
 pencil edit, the in-app keyboard, the flash of a pencil edit over my letter
 (decision 11), and the checks and reveals of a pencil letter ("Unchanged" in the
 server rule). The shared setup is in `spec020_harness` and `spec024_harness`.
+
+Refined by spec 044 (the design's keyboard): in the touch context's sheet layout
+the pencil toggle is the ✎ key `key-pencil` of the in-app keyboard, and there is no
+`pencil-toggle`; the edge case "The in-app keyboard" turns pencil mode on with
+`key-pencil` there.
 """
 
 from __future__ import annotations
@@ -552,8 +557,10 @@ def test_ac1_page_the_in_app_keyboard_follows_pencil_mode(
     page, close = make_page(browser, browser_name, 360, 740, True)
     try:
         mock = open_room(page, live_server, fx01_grid)
-        pencil_toggle(page).tap(timeout=WAIT_TIMEOUT_MS)
-        expect(pencil_toggle(page)).to_have_attribute("aria-pressed", "true")
+        # Spec 044: on a touch screen in the sheet layout, ✎ is the pencil toggle.
+        key_pencil = page.get_by_test_id("key-pencil")
+        key_pencil.tap(timeout=WAIT_TIMEOUT_MS)
+        expect(key_pencil).to_have_attribute("aria-pressed", "true")
         cell_at(page, 1, 0).tap(timeout=WAIT_TIMEOUT_MS)
 
         key = page.locator('[data-testid="key"][data-key="T"]')
