@@ -206,6 +206,9 @@ CELL_SIDES_SCRIPT = r"""
 # must return the band. Points in between, and points inside the box of a mark
 # that the design draws over the triangles (`reveal-mark`, `clue-arrow`), are not
 # judged.
+# `cell-selection` (my selection border, spec 042 AC-17) keeps its own
+# `pointer-events: none`: it is drawn over the triangles by design, so a probe in
+# its 2 px band would return it.
 DRAWING_ORDER_SCRIPT = r"""
 ([row, column]) => {
   const cell = document.querySelector(
@@ -213,7 +216,8 @@ DRAWING_ORDER_SCRIPT = r"""
   );
   cell.scrollIntoView();
   const style = document.createElement('style');
-  style.textContent = '[data-testid="cell"] * { pointer-events: auto !important; }';
+  style.textContent = '[data-testid="cell"] *:not([data-testid="cell-selection"])'
+    + ' { pointer-events: auto !important; }';
   document.head.appendChild(style);
   const describe = element => {
     if (element === null) {

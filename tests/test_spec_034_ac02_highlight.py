@@ -93,6 +93,9 @@ RING_SCRIPT = "cell => {\n" + COLOUR_CONTRAST_JS + r"""
 # ring's band (3 px) and inside the triangle (`dx + dy < t - 1.5`, `t` the
 # triangle's side, spec 042's "Test harness") before the hit. The style is
 # removed afterwards.
+# `cell-selection` (my selection border, spec 042 AC-17) keeps its own
+# `pointer-events: none`: it is drawn over the triangles by design, so a probe in
+# its 2 px band would return it.
 TRIANGLE_HIT_SCRIPT = r"""
 cell => {
   const triangle = cell.querySelector(
@@ -103,7 +106,8 @@ cell => {
   }
   cell.scrollIntoView();
   const style = document.createElement('style');
-  style.textContent = '[data-testid="cell"] * { pointer-events: auto !important; }';
+  style.textContent = '[data-testid="cell"] *:not([data-testid="cell-selection"])'
+    + ' { pointer-events: auto !important; }';
   document.head.appendChild(style);
   try {
     const corner = triangle.getAttribute('data-corner') || '';
