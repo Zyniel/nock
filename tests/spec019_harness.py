@@ -66,6 +66,7 @@ from playwright.sync_api import (
     expect,
 )
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid, LetterCell
 from nock.protocol import (
     CellLocked,
@@ -360,6 +361,7 @@ def open_room(
     mock.send(snapshot_frame(view, seq, players, solved=solved))
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(cell_count)
+    wait_for_fonts(page)
     return mock
 
 

@@ -58,6 +58,7 @@ from httpx2 import Response
 from playwright.sync_api import Browser, BrowserContext, Locator, Page, Route, expect
 
 import nock.room
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -640,6 +641,7 @@ def open_catalogue(page: Page, base_url: str, route: object) -> None:
     expect(page.get_by_test_id("catalogue-page")).to_have_attribute(
         "data-state", "ready", timeout=WAIT_TIMEOUT_MS
     )
+    wait_for_fonts(page)
 
 
 def my_rooms(page: Page) -> Locator:

@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
@@ -133,6 +134,7 @@ def start_from_catalogue(page: Page, base_url: str) -> None:
     expect(page.get_by_test_id("room-page")).to_have_attribute(
         "data-status", "joined", timeout=JOIN_TIMEOUT_MS
     )
+    wait_for_fonts(page)
 
 
 def test_ac1_browser_the_creator_finds_free_selected_among_three_modes(

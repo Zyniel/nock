@@ -16,6 +16,7 @@ from typing import Protocol
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from spec034_harness import (
@@ -107,6 +108,7 @@ def play_while_ana_is_away(
     back_page = ana_context.new_page()
     back_page.goto(url)
     expect(room_page(back_page)).to_have_attribute("data-status", "joined")
+    wait_for_fonts(back_page)
     return back_page
 
 

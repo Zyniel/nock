@@ -56,6 +56,7 @@ from fastapi import FastAPI
 from httpx2 import Response
 from playwright.sync_api import Locator, Page, Route, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -513,6 +514,7 @@ def open_ops_page(page: Page, base_url: str) -> None:
     """Open `<base>/ops` and wait for the ops page."""
     page.goto(f"{base_url}{OPS_PAGE_PATH}")
     expect(ops_page(page)).to_be_visible(timeout=OPS_TIMEOUT_MS)
+    wait_for_fonts(page)
 
 
 def expect_ops_state(page: Page, state: str) -> None:

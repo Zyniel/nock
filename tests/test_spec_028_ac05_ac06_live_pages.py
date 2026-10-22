@@ -31,6 +31,7 @@ from playwright.sync_api import (
 )
 from playwright.sync_api import Error as PlaywrightError
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.store import RoomStore
@@ -377,6 +378,7 @@ def open_share_page(page: Page, live_server: str, team: list[str]) -> None:
     share_route(page, SHARE_TOKEN, body)
     page.goto(f"{live_server}/recap/{SHARE_TOKEN}")
     expect(page.get_by_test_id("share-team")).to_be_visible()
+    wait_for_fonts(page)
 
 
 @pytest.mark.parametrize(

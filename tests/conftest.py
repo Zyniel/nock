@@ -14,6 +14,8 @@ import pytest
 import uvicorn
 from playwright.sync_api import Page, expect
 
+from fonts_ready import wait_for_fonts
+
 if TYPE_CHECKING:
     from nock.catalogue import Catalogue
     from nock.server import RoomRegistry
@@ -90,6 +92,7 @@ def _enter_room(page: Page, url: str, nickname: str = "Ana") -> None:
         expect(room).to_have_attribute(
             "data-status", "joined", timeout=ENTER_ROOM_TIMEOUT_MS
         )
+    wait_for_fonts(page)
 
 
 @pytest.fixture

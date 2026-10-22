@@ -33,6 +33,7 @@ from typing import Any
 
 from playwright.sync_api import Locator, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.protocol import (
     ClueRef,
     Flag,
@@ -244,6 +245,7 @@ def open_with_snapshot(
     mock.send(snapshot_text)
     expect_seq(page, seq)
     expect(page.get_by_test_id("cell")).to_have_count(cell_count)
+    wait_for_fonts(page)
     return mock
 
 

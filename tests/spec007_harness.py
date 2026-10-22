@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Locator, Page, WebSocketRoute, expect
 
+from fonts_ready import wait_for_fonts
 from nock.grid import Arrow, Grid
 from nock.protocol import (
     ClueCellView,
@@ -186,6 +187,7 @@ def show_snapshot(page: Page, mock: MockRoomSocket, view: GridView, seq: int) ->
     mock.send(snapshot_frame(view, seq))
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-seq", str(seq))
+    wait_for_fonts(page)
 
 
 def open_fx01(
@@ -201,6 +203,7 @@ def open_fx01(
         view = with_letter_cells(view, changes)
     show_snapshot(page, mock, view, 0)
     expect(page.get_by_test_id("cell")).to_have_count(25)
+    wait_for_fonts(page)
     return mock
 
 
