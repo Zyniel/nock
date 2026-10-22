@@ -71,6 +71,11 @@ project-includes = ["src", "tests", "scripts"]
 # shared harness module, e.g. `from spec035_harness import ...` (2026-10-14).
 search-path = ["src", "tests"]
 python-version = "3.13"
+# The includes above are the whole project, so the ignore files are not read:
+# .gitignore and .git/info/exclude list .claude/worktrees/, and with them a
+# checkout inside a git worktree matched no file and checked nothing
+# (2026-10-22).
+use-ignore-files = false
 
 # --- pytest -------------------------------------------------------------------
 [tool.pytest.ini_options]
