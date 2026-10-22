@@ -21,6 +21,7 @@ rule).
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 
 from playwright.sync_api import Locator, Page, expect
@@ -202,9 +203,10 @@ def expect_no_keyboard(page: Page, timeout: int = 5000) -> None:
     expect(keyboard_of(page)).to_have_count(0, timeout=timeout)
 
 
-def tap_toggle(page: Page) -> None:
-    """Tap `keyboard-toggle`."""
+def tap_toggle(page: Page) -> float:
+    """Tap `keyboard-toggle`; return the moment the tap was done (`time.monotonic`)."""
     page.get_by_test_id("keyboard-toggle").tap()
+    return time.monotonic()
 
 
 def cell_side(page: Page, row: int, column: int) -> float:
@@ -219,24 +221,35 @@ def height_of(page: Page, test_id: str) -> float:
     return box_of(page.get_by_test_id(test_id)).height
 
 
+FOLLOW_MS = 300  # "within 300 ms" (AC-2, AC-3: the layout and the grid's fit)
 POLL_MS = 50
-POLL_LIMIT_MS = 5000
 
 
 def settled_value(
-    page: Page, read: Callable[[], float], accept: Callable[[float], bool]
+    page: Page,
+    read: Callable[[], float],
+    accept: Callable[[float], bool],
+    tapped_at: float,
 ) -> float:
-    """Read a measure until `accept` takes it, for at most 5 s; return the last.
+    """Read a measure until `accept` takes it, up to 300 ms after the tap.
 
     The grid refits as on a resize (spec 006), a moment after the layout changes,
-    so a measure of the grid is read again until it settles. The caller asserts
-    on the value returned, so a measure that never settles fails there.
+    so a measure of the grid is read again until it settles, which keeps the check
+    from depending on a synchronous refit. `tapped_at` is the `time.monotonic()`
+    that `tap_toggle` returned; the last reading is made when the 300 ms of AC-2
+    and AC-3 are over. The caller asserts on the value returned, so a measure that
+    has not settled by then fails there.
+
+    Returns:
+        The first reading that `accept` takes, else the last reading.
     """
+    deadline = tapped_at + FOLLOW_MS / 1000
     value = read()
-    waited_ms = 0
-    while not accept(value) and waited_ms < POLL_LIMIT_MS:
-        page.wait_for_timeout(POLL_MS)
-        waited_ms += POLL_MS
+    while not accept(value):
+        remaining_ms = (deadline - time.monotonic()) * 1000
+        if remaining_ms <= 0:
+            break
+        page.wait_for_timeout(min(POLL_MS, remaining_ms))
         value = read()
     return value
 

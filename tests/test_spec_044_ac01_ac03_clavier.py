@@ -53,6 +53,7 @@ from spec043_harness import (
 )
 from spec044_harness import (
     COMPUTER,
+    FOLLOW_MS,
     KEYBOARD_HIDDEN_KEY,
     LOW_TOUCH_IDS,
     LOW_TOUCH_WINDOWS,
@@ -74,7 +75,6 @@ from spec044_harness import (
     window_height,
 )
 
-FOLLOW_MS = 300  # "within 300 ms"
 SALON_WIDTH = 340.0
 
 # ---- Fixtures ----
@@ -103,10 +103,13 @@ def open_touch(
     return page
 
 
-def larger_side(page: Page, side_before: float) -> float:
-    """The side of (1, 1) once the grid has refitted to a larger side (5 s at most)."""
+def larger_side(page: Page, side_before: float, tapped_at: float) -> float:
+    """The side of (1, 1) once the grid has refitted (300 ms after the tap at most)."""
     return settled_value(
-        page, lambda: cell_side(page, 1, 1), lambda side: side > side_before
+        page,
+        lambda: cell_side(page, 1, 1),
+        lambda side: side > side_before,
+        tapped_at,
     )
 
 
@@ -196,7 +199,21 @@ def test_ac2_a_tap_on_clavier_hides_the_keyboard_and_gives_its_room_to_the_grid(
     keyboard_height = height_of(page, "keyboard")
     viewport_height = height_of(page, "grid-viewport")
 
-    sent = frames_sent_after(page, mock, lambda: tap_toggle(page))
+    heights: list[float] = []
+
+    def hide_and_measure() -> None:
+        tapped_at = tap_toggle(page)
+        heights.append(
+            settled_value(
+                page,
+                lambda: height_of(page, "grid-viewport"),
+                lambda value: same_position(value, expected_height),
+                tapped_at,
+            )
+        )
+
+    expected_height = viewport_height + keyboard_height
+    sent = frames_sent_after(page, mock, hide_and_measure)
 
     expect_no_keyboard(page, timeout=FOLLOW_MS)
     assert sent == []
@@ -204,16 +221,10 @@ def test_ac2_a_tap_on_clavier_hides_the_keyboard_and_gives_its_room_to_the_grid(
     assert stored_value(page, KEYBOARD_HIDDEN_KEY) == "true"
     bar_box = box_of(page.get_by_test_id("clue-bar"))
     assert same_position(bar_box.bottom, window_height(page)), bar_box
-    expected_height = viewport_height + keyboard_height
-    new_height = settled_value(
-        page,
-        lambda: height_of(page, "grid-viewport"),
-        lambda value: same_position(value, expected_height),
-    )
-    assert same_position(new_height, expected_height), (
+    assert same_position(heights[0], expected_height), (
         viewport_height,
         keyboard_height,
-        new_height,
+        heights[0],
     )
 
 
@@ -246,7 +257,7 @@ def test_ac2_a_second_tap_shows_the_keyboard_again_and_removes_the_choice(
     reload_room(page, mock, frame)
     expect_no_keyboard(page)
 
-    tap_toggle(page)
+    tapped_at = tap_toggle(page)
 
     expect(page.locator('[data-testid="keyboard"]')).to_be_visible(timeout=FOLLOW_MS)
     expect(page.get_by_test_id("keyboard-toggle")).to_have_attribute(
@@ -257,6 +268,7 @@ def test_ac2_a_second_tap_shows_the_keyboard_again_and_removes_the_choice(
         page,
         lambda: height_of(page, "grid-viewport"),
         lambda value: same_position(value, viewport_height),
+        tapped_at,
     )
     assert same_position(new_height, viewport_height), (viewport_height, new_height)
 
@@ -360,7 +372,7 @@ def test_ac3_a_phone_held_sideways_goes_to_the_column_layout_when_it_hides_the_k
     expect_layout(page, "sheet")
     side_before = cell_side(page, 1, 1)
 
-    tap_toggle(page)
+    tapped_at = tap_toggle(page)
 
     expect_layout(page, "column", timeout=FOLLOW_MS)
     expect_no_keyboard(page, timeout=FOLLOW_MS)
@@ -370,7 +382,7 @@ def test_ac3_a_phone_held_sideways_goes_to_the_column_layout_when_it_hides_the_k
     salon_box = box_of(salon)
     assert same_size(salon_box.width, SALON_WIDTH), salon_box
     assert same_position(salon_box.right, float(width)), salon_box
-    assert larger_side(page, side_before) > side_before
+    assert larger_side(page, side_before, tapped_at) > side_before
 
 
 @pytest.mark.parametrize(("width", "height"), LOW_TOUCH_WINDOWS, ids=LOW_TOUCH_IDS)
@@ -414,8 +426,8 @@ def test_ac3_on_a_touch_tablet_hiding_the_keyboard_keeps_the_column_and_grows_th
     expect_layout(page, "column")
     side_before = cell_side(page, 1, 1)
 
-    tap_toggle(page)
+    tapped_at = tap_toggle(page)
     expect_no_keyboard(page, timeout=FOLLOW_MS)
 
     expect_layout(page, "column")
-    assert larger_side(page, side_before) > side_before
+    assert larger_side(page, side_before, tapped_at) > side_before
