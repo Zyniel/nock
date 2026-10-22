@@ -1006,11 +1006,15 @@
     justify-content: center;
   }
 
+  /* The line height holds Source Sans 3's ascent and descent (1.424 em; IBM
+     Plex Sans Condensed's is 1.3 em), so no line overflows its box and no clue
+     text is cut off at full zoom (spec 006 AC-1, spec 041). Spec 042 sets the
+     clue text's final type. */
   .clue-text {
     display: block;
     max-width: 100%;
     font-size: calc(var(--cell) * 0.11);
-    line-height: 1.1;
+    line-height: 1.424;
     color: var(--nock-clue-ink);
     text-align: center;
     overflow-wrap: anywhere;

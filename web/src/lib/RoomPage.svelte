@@ -2147,6 +2147,17 @@
     gap: 0.25rem 0.75rem;
   }
 
+  /* The title, status, share and toolbar rows set their line height rather
+     than take the font's normal one, which is 1px taller per row in Source
+     Sans 3 than in the system font: each row keeps the height it had, and the
+     grid its room (spec 041). */
+  .room-header h1,
+  .room-header p,
+  .share-panel,
+  .room-toolbar {
+    line-height: 1.33;
+  }
+
   .room-header h1 {
     margin: 0;
     font-size: 1.25rem;
