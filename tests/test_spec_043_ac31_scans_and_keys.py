@@ -3,19 +3,25 @@ holds the keys of this spec.
 
 The scans run at 1280 by 720 and 360 by 740 on `H8` with `p2`'s flag on IDES,
 (1, 1) holding `X` wrong and a `clap` reaction of `p2` shown on IDES, in the states
-of the criterion except a shown `room-note`, which work package WP-2 builds ("Work
-packages"): all closed; the Salon on Discussion; the Salon on Joueurs; `aide-menu`
-open; `room-menu` open; `host-settings` open; `connection-banner` shown; and
-`grid-status` solved, on the solved snapshot of AC-27.
+of the criterion: all closed; the Salon on Discussion; the Salon on Joueurs;
+`aide-menu` open; `room-menu` open; `host-settings` open; a `room-note` shown
+(work package WP-2); `connection-banner` shown; and `grid-status` solved, on the
+solved snapshot of AC-27.
 
 Choices where the spec leaves room:
 
 - The language scan's data are the nicknames as the page shows them and their two
   first letters, the room code, its link and FX-01's clue texts (spec 024's
-  `language_data`); `H8` has no chat line.
+  `language_data`), plus the one chat text of the `room-note` state.
 - The reaction is sent once the state is set, so that it shows during the scan;
   in the `connection-banner` state it is sent just before the socket closes, since
-  a closed socket delivers nothing.
+  a closed socket delivers nothing, and in the `room-note` state just before the
+  note's message, so that both are as fresh as can be (each shows 3 seconds).
+- The `room-note` state: the Salon closed (with `chat-toggle` in the column
+  layout, where it is open at load), then a `chat_message` from `p2` (seq 106,
+  after `H8`'s lines) makes the note, `Bob : IDES ?`. After each scan the test
+  checks that the note is still on the page, so that a scan that outlasts the
+  note's 3 seconds fails rather than checking a page without it.
 """
 
 from __future__ import annotations
@@ -32,9 +38,12 @@ from spec019_harness import OpenWindow, window_opener
 from spec024_harness import contrast_problems, language_data, language_problems
 from spec043_harness import (
     DISPLAY_NICKNAMES,
+    H8_LAST_SEQ,
     IDES,
     RoomMock,
+    chat_frame,
     expect_closed,
+    fr_format,
     fx01_view,
     is_open,
     load_fr,
@@ -42,6 +51,7 @@ from spec043_harness import (
     open_room,
     players_up_to,
     reaction_frame,
+    send_and_wait,
     snapshot_frame,
     solved_view,
 )
@@ -54,9 +64,14 @@ STATES = [
     "aide",
     "menu",
     "host-settings",
+    "note",
     "banner",
     "solved",
 ]
+# The states whose reaction is sent before the state is set.
+REACTION_FIRST_STATES = ("banner", "note")
+NOTE_CHAT_TEXT = "IDES ?"
+NOTE_CHAT_SEQ = H8_LAST_SEQ + 1
 SCAN_CASES = [(size, state) for size in SIZES for state in STATES]
 SCAN_IDS = [f"{width}x{height}-{state}" for (width, height), state in SCAN_CASES]
 
@@ -158,10 +173,10 @@ def open_scan_state(
         flags = [FlagView(player_id="p2", clue=IDES)]
         view = fx01_view(grid, changes)
         mock = open_h8(page, base_url, grid, False, view=view, flags=flags)
-        if state == "banner":
+        if state in REACTION_FIRST_STATES:
             send_the_reaction(page, mock)
         set_state(page, mock, state)
-    if state != "banner":
+    if state not in REACTION_FIRST_STATES:
         send_the_reaction(page, mock)
     expect(page.get_by_test_id("clue-reaction")).to_have_count(1)
     return page
@@ -171,6 +186,20 @@ def send_the_reaction(page: Page, mock: RoomMock) -> None:
     """Send `p2`'s `clap` on IDES and wait until it shows."""
     mock.send(reaction_frame("p2", IDES, Reaction.CLAP))
     expect(page.get_by_test_id("clue-reaction")).to_have_count(1)
+
+
+def show_a_note(page: Page, mock: RoomMock) -> None:
+    """Close the Salon, then make `p2`'s message show as a `room-note`."""
+    salon = page.get_by_test_id("salon")
+    if is_open(salon):
+        page.get_by_test_id("chat-toggle").click()
+    expect_closed(salon)
+    send_and_wait(page, mock, chat_frame(NOTE_CHAT_SEQ, "p2", NOTE_CHAT_TEXT))
+    note = page.get_by_test_id("room-note")
+    expect(note).to_have_count(1)
+    expect(note).to_have_text(
+        fr_format("note.message", name="Bob", text=NOTE_CHAT_TEXT)
+    )
 
 
 def set_state(page: Page, mock: RoomMock, state: str) -> None:
@@ -189,9 +218,21 @@ def set_state(page: Page, mock: RoomMock, state: str) -> None:
         open_menu(page)
     elif state == "host-settings":
         open_host_settings(page)
+    elif state == "note":
+        show_a_note(page, mock)
     elif state == "banner":
         mock.close(1011)
         expect(page.get_by_test_id("connection-banner")).to_be_visible()
+
+
+def expect_note_outlasted_the_scan(page: Page, state: str) -> None:
+    """In the `note` state, fail unless `room-note` is still on the page.
+
+    A scan that outlasts the note's 3 seconds would check a page without it.
+    """
+    if state == "note":
+        count = page.get_by_test_id("room-note").count()
+        assert count == 1, "the room-note left before the scan ended"
 
 
 # ---- AC-31: the scans --------------------------------------------------------------
@@ -207,7 +248,10 @@ def test_ac31_the_contrast_scan_finds_no_offender(
 ) -> None:
     page = open_scan_state(window, live_server, fx01_grid, size, state)
 
-    assert contrast_problems(page) == []
+    problems = contrast_problems(page)
+
+    expect_note_outlasted_the_scan(page, state)
+    assert problems == []
 
 
 @pytest.mark.parametrize(("size", "state"), SCAN_CASES, ids=SCAN_IDS)
@@ -222,8 +266,11 @@ def test_ac31_the_language_scan_finds_no_offender(
     expect(page.locator("html")).to_have_attribute("lang", "fr")
 
     data = language_data(live_server, DISPLAY_NICKNAMES)
+    data.add(NOTE_CHAT_TEXT)
+    problems = language_problems(page, data)
 
-    assert language_problems(page, data) == []
+    expect_note_outlasted_the_scan(page, state)
+    assert problems == []
 
 
 # ---- AC-31: the keys of fr.json ------------------------------------------------------

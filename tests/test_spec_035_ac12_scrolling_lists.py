@@ -21,7 +21,9 @@ Choices where the spec leaves room:
   with the Discussion tab.
 - AC-12, "a Tab walk from `salon-tab-players`": `focus()` on that tab, then `Tab`
   until the focus leaves the Salon (or reaches `document.body`), at most 60
-  presses.
+  presses. It also stops when a press leaves the focus on the element it was
+  on: past the page's last Tab stop, Firefox under automation keeps the focus
+  there.
 - AC-12, visible focus: the "Not clipped" and "Not covered" measures run on the
   stream list; they repeat AC-2's check.
 - AC-12, arrow keys: after a key scrolled the list, the test lets the scroll stand
@@ -309,6 +311,11 @@ def tab_walk_to_the_stream_list(page: Page) -> None:
 def tab_walk_through_the_players_tab(page: Page) -> list[FocusStep]:
     """From `salon-tab-players`, Tab until the focus leaves the Salon.
 
+    The walk also ends when a press leaves the focus where it was. The Salon's
+    last Tab stop (`copy-link`) is the page's last one, and past it Firefox under
+    automation keeps the focus there, where Chromium and WebKit move it out of
+    the document (spec 035, "Nothing focusable after the grid").
+
     Returns:
         What had the focus after each press inside the Salon.
     """
@@ -318,6 +325,8 @@ def tab_walk_through_the_players_tab(page: Page) -> list[FocusStep]:
         page.keyboard.press("Tab")
         step = read_focus_step(page)
         if not step.in_salon:
+            return steps
+        if steps != [] and step == steps[-1]:
             return steps
         steps.append(step)
     pytest.fail(f"the Tab walk did not leave the Salon in {MAX_TABS} presses")

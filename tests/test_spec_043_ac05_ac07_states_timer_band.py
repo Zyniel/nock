@@ -1,11 +1,19 @@
 """Tests of spec 043, AC-5 to AC-7: the top-bar buttons' states, the timer, and the
 connection and status bands.
 
-AC-5 is tested without its new-events dot (`salon-dot`), which work package WP-2
-builds ("Work packages"): the expanded and pressed looks, and the unread badge
-`chat-unread` with `chat-toggle`'s `aria-label`, in both top bars.
+AC-5: the expanded and pressed looks, the unread badge `chat-unread` and the
+new-events dot `salon-dot` (work package WP-2) with `chat-toggle`'s `aria-label`,
+in both top bars. Also tested, from "Edge cases and errors" (AC-5, AC-17): a
+message wins over the dot both ways, and catch-up lines (spec 034) count as new
+events.
 
 Choices where the spec leaves room:
+
+- "Makes no `salon-dot`" is read 300 ms after the page applied the event (its
+  `data-seq`), as spec 043's other "sends nothing" checks wait.
+- The catch-up case runs at 360 by 740 (the Salon closed at load), with spec 034's
+  mocked socket and route: `seen_seq` 5 stored, a snapshot at 9 and one check line
+  by `p2` (seq 8) in the catch-up.
 
 - A button's pressed look is read with the pointer moved off the top bar, so that
   no hover style is read in its place.
@@ -32,17 +40,28 @@ from nock.grid import Grid
 from nock.protocol import ErrorCode
 from room_panels import open_menu, show_tab
 from spec019_harness import OpenWindow, window_opener
+from spec034_harness import (
+    BOB,
+    CatchUpRoute,
+    catch_up_json,
+    check_line,
+    expect_catch_up_applied,
+    open_mocked_room,
+    record_with,
+)
 from spec042_harness import box_of, colour_of
 from spec043_harness import (
     CLUE_BG,
     INK,
     LINE,
+    QUIET_MS,
     RED,
     WHITE,
     WORD,
     RoomMock,
     border_problems,
     chat_frame,
+    check_frame,
     colour_matches,
     error_frame,
     expect_closed,
@@ -69,6 +88,7 @@ from spec043_harness import (
     shown_test_ids,
     snapshot_frame,
     stored_value,
+    style_of,
 )
 
 POPOVER_BUTTONS = {
@@ -217,6 +237,166 @@ def test_ac5_in_the_computer_bar_the_badge_sits_2_px_down_and_24_px_in(
     assert same_position(badge_box.left, toggle_box.left + 24.0), (
         badge_box,
         toggle_box,
+    )
+
+
+# ---- AC-5: the new-events dot ---------------------------------------------------
+
+
+DOT_SCRIPT = r"""
+dot => {
+  let textNodes = 0;
+  const walker = document.createTreeWalker(dot, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    if (node.textContent.trim() !== '') {
+      textNodes += 1;
+    }
+  }
+  return {ariaHidden: dot.getAttribute('aria-hidden'), textNodes: textNodes};
+}
+"""
+
+
+def expect_no_dot(page: Page) -> None:
+    """Wait QUIET_MS, then check that no `salon-dot` is on the page."""
+    page.wait_for_timeout(QUIET_MS)
+    expect(page.get_by_test_id("salon-dot")).to_have_count(0)
+
+
+def test_ac5_an_event_line_by_another_player_shows_the_red_dot_in_the_phone_bar(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+    toggle = page.get_by_test_id("chat-toggle")
+
+    send_and_wait(page, mock, check_frame(6, "p2"))
+
+    dot = page.get_by_test_id("salon-dot")
+    expect(dot).to_be_visible()
+    found = dot.evaluate(DOT_SCRIPT)
+    dot_box = box_of(dot)
+    toggle_box = box_of(toggle)
+    assert same_size(dot_box.width, 8.0), dot_box
+    assert same_size(dot_box.height, 8.0), dot_box
+    assert style_of(dot, "borderTopLeftRadius") == "50%"
+    expect_colour(dot, "backgroundColor", RED)
+    assert found == {"ariaHidden": "true", "textNodes": 0}
+    assert same_position(dot_box.top, toggle_box.top + 8.0), (dot_box, toggle_box)
+    assert same_position(dot_box.right, toggle_box.right - 15.0), (dot_box, toggle_box)
+    expect(toggle).to_have_attribute("aria-label", fr_value("topbar.salon_events"))
+
+
+def test_ac5_a_message_then_hides_the_dot_and_shows_the_badge(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+    toggle = page.get_by_test_id("chat-toggle")
+    send_and_wait(page, mock, check_frame(6, "p2"))
+    expect(page.get_by_test_id("salon-dot")).to_be_visible()
+
+    send_and_wait(page, mock, chat_frame(7, "p2", "IDES ?"))
+
+    expect(page.get_by_test_id("salon-dot")).to_have_count(0)
+    expect(toggle.get_by_test_id("chat-unread")).to_have_text("1")
+    expect(toggle).to_have_attribute(
+        "aria-label", fr_format("topbar.salon_unread", count=1)
+    )
+
+
+def test_ac5_showing_the_stream_removes_the_dot_the_badge_and_the_label(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+    toggle = page.get_by_test_id("chat-toggle")
+    send_and_wait(page, mock, check_frame(6, "p2"))
+    expect(page.get_by_test_id("salon-dot")).to_be_visible()
+    send_and_wait(page, mock, chat_frame(7, "p2", "IDES ?"))
+
+    show_tab(page, "discussion")
+
+    expect(page.get_by_test_id("salon-dot")).to_have_count(0)
+    expect(page.get_by_test_id("chat-unread")).to_have_count(0)
+    assert toggle.get_attribute("aria-label") is None
+
+
+def test_ac5_showing_the_stream_removes_the_dot_alone(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+    send_and_wait(page, mock, check_frame(6, "p2"))
+    expect(page.get_by_test_id("salon-dot")).to_be_visible()
+
+    show_tab(page, "discussion")
+    page.get_by_test_id("chat-toggle").click()
+    expect_closed(page.get_by_test_id("salon"))
+
+    expect(page.get_by_test_id("salon-dot")).to_have_count(0)
+    assert page.get_by_test_id("chat-toggle").get_attribute("aria-label") is None
+
+
+def test_ac5_my_own_check_makes_no_dot(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+
+    send_and_wait(page, mock, check_frame(6, "p1"))
+
+    expect_no_dot(page)
+    assert page.get_by_test_id("chat-toggle").get_attribute("aria-label") is None
+
+
+def test_ac5_an_event_line_while_a_message_is_unread_makes_no_dot(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+    toggle = page.get_by_test_id("chat-toggle")
+    send_and_wait(page, mock, chat_frame(6, "p2", "Salut"))
+
+    send_and_wait(page, mock, check_frame(7, "p2"))
+
+    expect_no_dot(page)
+    expect(toggle.get_by_test_id("chat-unread")).to_have_text("1")
+    expect(toggle).to_have_attribute(
+        "aria-label", fr_format("topbar.salon_unread", count=1)
+    )
+
+
+def test_ac5_in_the_computer_bar_the_dot_sits_at_the_badges_place(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    seed_value(page, "nock.salon_closed", "true")
+    mock = open_room(page, live_server, fx01_frame(fx01_grid))
+    toggle = page.get_by_test_id("chat-toggle")
+
+    send_and_wait(page, mock, check_frame(6, "p2"))
+
+    dot = page.get_by_test_id("salon-dot")
+    expect(dot).to_be_visible()
+    dot_box = box_of(dot)
+    toggle_box = box_of(toggle)
+    assert same_position(dot_box.top, toggle_box.top + 2.0), (dot_box, toggle_box)
+    assert same_position(dot_box.left, toggle_box.left + 24.0), (dot_box, toggle_box)
+    expect(toggle).to_have_attribute("aria-label", fr_value("topbar.salon_events"))
+
+
+def test_ac5_catch_up_lines_by_another_player_count_as_new_events(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(360, 740, False)
+    route = CatchUpRoute(answer=catch_up_json(5, 9, lines=[check_line(8, BOB)]))
+    open_mocked_room(page, live_server, fx01_grid, route, record=record_with(5), seq=9)
+
+    expect_catch_up_applied(page, "5-9")
+
+    expect(page.get_by_test_id("salon-dot")).to_be_visible()
+    expect(page.get_by_test_id("chat-toggle")).to_have_attribute(
+        "aria-label", fr_value("topbar.salon_events")
     )
 
 

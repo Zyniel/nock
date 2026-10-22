@@ -1,8 +1,10 @@
 // The chat and the reactions of a room page (spec 022): the lines the stream
-// shows, the unread count, the pacing of my own messages and what a clue shows
-// of a reaction. Plain functions: no DOM and no socket.
+// shows, the unread count and the new-events dot of « Salon » (spec 043), the
+// pacing of my own messages and what a clue shows of a reaction. Plain
+// functions: no DOM and no socket.
 
 import { nameOf } from './activityFeed'
+import type { KeptFeedItem } from './activityFeed'
 import { clueKey } from './clueFlags'
 import { t } from './i18n'
 import type { ChatLine, ReactionValue, ShownReaction } from './roomSession'
@@ -48,13 +50,45 @@ export function unreadBadgeText(count: number): string {
 }
 
 // The accessible name of the « Salon » button (spec 043): it names the unread
-// messages while the badge shows them; null otherwise, so the button is named by
-// its label.
-export function salonToggleLabel(count: number): string | null {
-  if (count === 0) {
-    return null
+// messages while the badge shows them, the new activity while the new-events
+// dot shows; null otherwise, so the button is named by its label.
+export function salonToggleLabel(count: number, hasNewEvents: boolean): string | null {
+  if (count > 0) {
+    return t('topbar.salon_unread', { count })
   }
-  return t('topbar.salon_unread', { count })
+  if (hasNewEvents) {
+    return t('topbar.salon_events')
+  }
+  return null
+}
+
+// True when the feed holds a line about another player newer than
+// `lastSeenItemId`, the newest line of the last time the stream showed. The
+// page gives each line a larger id than the lines before it, catch-up lines
+// included.
+export function hasNewEventLines(
+  feed: KeptFeedItem[],
+  lastSeenItemId: number,
+  you: string,
+): boolean {
+  for (const item of feed) {
+    if (item.id > lastSeenItemId && item.playerId !== you) {
+      return true
+    }
+  }
+  return false
+}
+
+// The id of the newest line of the feed, or 0 when it is empty. Catch-up lines
+// are put in seq order, so the newest is not always the last.
+export function newestFeedItemId(feed: KeptFeedItem[]): number {
+  let newest = 0
+  for (const item of feed) {
+    if (item.id > newest) {
+      newest = item.id
+    }
+  }
+  return newest
 }
 
 // The send times that still count at `now`: those of the last PACE_WINDOW_MS.

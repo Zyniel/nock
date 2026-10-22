@@ -29,6 +29,7 @@ from chrome import (
     keyboard,
     low_column_room,
     note,
+    note_under_vote,
     phone_dialog_sheet,
     phone_page,
     phone_pop,
@@ -526,6 +527,9 @@ def sec_entry() -> str:
 # ---------------------------------------------------------------- room
 
 NOTE_MSG = "Bruno : AMEN, je pense 👍"
+NOTE_LONG = (
+    "Céline : Je crois que le mot du bas à droite est faux, on le reprend ensemble ?"
+)
 
 
 def sec_room() -> str:
@@ -756,7 +760,10 @@ def sec_room() -> str:
                 "bar; a shown reaction is a white pill over its clue for "
                 "3 s (on a two-clue cell, over its own half: decided 2026-10-22). "
                 "Notes: one line on ink, over the top of the grid, 3 s, never "
-                "while the stream is visible."
+                "while the stream is visible. A long note ends with an ellipsis "
+                "on its one line, never wider than the grid's viewport (spec 043 "
+                "WP-2, 2026-10-22). A tap on a note opens the Salon on "
+                "Discussion, the focus in the message box."
             ),
         ],
         [
@@ -774,6 +781,11 @@ def sec_room() -> str:
                     grid_opts={"reaction": ((0, 0), 1, "👏")},
                     stage_extra=note(f"{FLAG_ICO} Dédé bloque sur « Flaire »"),
                 ),
+            ),
+            (
+                "ph",
+                PH + " · long note",
+                phone_room(stage_extra=note(esc(NOTE_LONG))),
             ),
             (
                 "pc",
@@ -1079,6 +1091,12 @@ def sec_help() -> str:
                 "», « Temps écoulé, vote annulé. ») comes as a 3-second note "
                 "when the banner goes."
             ),
+            (
+                "« Rien à annuler. » does not wait: during a vote it sits 8 px "
+                "under the banner's bottom edge, same look, layer 6, so the "
+                "banner never covers it (spec 043 Decision 25, the lead, "
+                "2026-10-22)."
+            ),
         ],
         [
             ("ph", PH + " · asked", phone_room(stage_extra=vote_banner())),
@@ -1086,6 +1104,15 @@ def sec_help() -> str:
                 "ph",
                 PH + " · voted",
                 phone_room(stage_extra=vote_banner("cast", secs="11 s", pct=55)),
+            ),
+            (
+                "ph",
+                PH + " · undo during the vote",
+                phone_room(
+                    stage_extra=note_under_vote(
+                        vote_banner("cast", secs="9 s", pct=45), "Rien à annuler."
+                    )
+                ),
             ),
             (
                 "pc",
@@ -2531,7 +2558,8 @@ def specs_kbd() -> str:
             "layout, but keeps the phone top bar: the computer bar's brand and "
             "labelled buttons need about 650 px. « Salon » is pressed while the "
             "340 px column is open (open by default); the menus open 58 px from the "
-            "top, as on a phone. The clue bar is never narrower than 320 px.",
+            "top, as on a phone. The clue bar is as wide as the smaller of 320 px "
+            "and the play area (about 203 px at 568 &times; 320).",
             '<span class="m">The same frame is drawn for a low desktop window '
             "(568 &times; 320), with « Crayon » in the fourth slot.</span>",
         ],

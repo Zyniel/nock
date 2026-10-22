@@ -4,9 +4,9 @@ AC-23: `clue-bar` is a 34 px navy bar holding `clue-prev`, the clue on one line
 with its direction pictogram, « Réagir », « Je bloque » and `clue-next`, with
 its widths in each layout. AC-24: the chevrons move to the previous and the
 next unfinished word as `Shift+Tab` and `Tab` do, and a pointer press keeps the
-focus on the grid. AC-25 is tested for its picker part only ("Work packages": the
-reaction pill is WP-2's): `reaction-picker` floats over the bottom of
-`grid-viewport`.
+focus on the grid. AC-25: `reaction-picker` floats over the bottom of
+`grid-viewport` (work package WP-1), and a shown reaction is a white pill centred
+on its `clue` element, drawn over its neighbours (WP-2).
 
 Also tested, from "Edge cases and errors": with no unfinished word the chevrons
 change nothing and send nothing (AC-24).
@@ -17,6 +17,9 @@ Choices where the spec leaves room:
   window's left edge to the Salon column's left edge, with 12 px of padding each
   side ("Play area and fit"), so its content is the Salon's left less 24 px wide.
 - A focus ring is read on `document.activeElement` after spec 035's `tab_to`.
+- AC-25's pill: its look is read on `clue-reaction` itself, with the shadow of
+  "Reactions" (`0 4px 10px -4px` in the soft shadow token); "the lower `clue`
+  element of (0, 0)" is the one of its two `clue` elements whose top is lower.
 """
 
 from __future__ import annotations
@@ -25,26 +28,34 @@ from collections.abc import Iterator
 from itertools import pairwise
 
 import pytest
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import (
+    ClueRef,
     Direction,
+    Reaction,
     SelectCell,
     grid_view,
     parse_client_message,
 )
 from spec019_harness import OpenWindow, window_opener
+from spec021_harness import clue_at
 from spec035_harness import Walker
+from spec041_harness import shadow_of
 from spec042_harness import box_of, colour_of, contrast_ratio
 from spec043_harness import (
     CLUE_BAR_BUTTONS,
     ICON_OF_CLUE_BAR_BUTTON,
+    IDES,
+    INK,
     LABEL_KEY_OF_CLUE_BAR_BUTTON,
     LINE,
     MIME,
+    NAVAL,
     NAVY,
     RULE,
+    SHADOW_SOFT_ALPHA,
     WHITE,
     WORD,
     Reading,
@@ -57,19 +68,24 @@ from spec043_harness import (
     expect_word,
     flag_frame,
     focused_test_id,
+    font_size_of,
     fr_value,
     frames_sent_after,
     full_wrong_view,
     fx01_view,
+    hit_problem,
     icon_problems,
     is_clear,
     letters_of,
     open_room,
     padding_matches,
+    padding_of,
     parts_of,
     pictogram_of,
     players_up_to,
     press_cell,
+    px,
+    reaction_frame,
     reading_box,
     same_font_size,
     same_position,
@@ -81,6 +97,7 @@ from spec043_harness import (
     snapshot_frame,
     stroke_width_problems,
     style_of,
+    to_box,
 )
 
 SIZES = [(360, 740), (1280, 720)]
@@ -510,3 +527,104 @@ def test_ac25_react_button_shows_the_open_picker_and_a_second_click_closes_it(
     button.click()
 
     expect(page.get_by_test_id("reaction-picker")).not_to_be_visible()
+
+
+# ---- AC-25: a shown reaction is a pill over its clue (WP-2) -------------------------
+
+
+def show_reaction(
+    window: OpenWindow,
+    base_url: str,
+    grid: Grid,
+    size: tuple[int, int],
+    clue: ClueRef,
+) -> Page:
+    """The FX-01 room at `size`, once `p2`'s `clap` on `clue` shows."""
+    page = window(size[0], size[1], False)
+    mock = open_room(page, base_url, snapshot_frame(fx01_view(grid), players_up_to(3)))
+    mock.send(reaction_frame("p2", clue, Reaction.CLAP))
+    expect(page.get_by_test_id("clue-reaction")).to_have_count(1)
+    return page
+
+
+def pill_look_problems(pill: Locator) -> list[str]:
+    """How a `clue-reaction` differs from the white pill of "Reactions"."""
+    problems: list[str] = []
+    background = colour_of(pill, "backgroundColor")
+    if not colour_matches(background, WHITE):
+        problems.append(f"background {background}")
+    problems.extend(border_problems(pill, "Top", "1px", "solid", LINE))
+    problems.extend(border_problems(pill, "Bottom", "1px", "solid", LINE))
+    if style_of(pill, "borderTopLeftRadius") != "12px":
+        problems.append(f"radius {style_of(pill, 'borderTopLeftRadius')}")
+    if not padding_matches(pill, "2px 6px"):
+        problems.append(f"padding {padding_of(pill)}")
+    if not same_font_size(font_size_of(pill), 16.0):
+        problems.append(f"font-size {font_size_of(pill)}")
+    line_height = style_of(pill, "lineHeight")
+    if not line_height.endswith("px") or not same_font_size(px(line_height), 19.2):
+        problems.append(f"line-height {line_height}")
+    if style_of(pill, "zIndex") != "8":
+        problems.append(f"z-index {style_of(pill, 'zIndex')}")
+    shadow = shadow_of(pill)
+    if (shadow.x, shadow.y, shadow.blur, shadow.spread) != (0, 4, 10, -4):
+        problems.append(f"box-shadow {shadow.text}")
+    if shadow.colour is None or not colour_matches(
+        shadow.colour, INK, SHADOW_SOFT_ALPHA
+    ):
+        problems.append(f"box-shadow colour {shadow.colour}")
+    return problems
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac25_a_shown_reaction_is_a_white_pill_with_a_line_grey_border(
+    window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
+) -> None:
+    page = show_reaction(window, live_server, fx01_grid, size, IDES)
+
+    assert pill_look_problems(page.get_by_test_id("clue-reaction")) == []
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac25_the_pill_is_centred_on_its_clue_and_drawn_on_top(
+    window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
+) -> None:
+    page = show_reaction(window, live_server, fx01_grid, size, IDES)
+
+    box = box_of(page.get_by_test_id("clue-reaction"))
+    clue_box = box_of(clue_at(page, IDES))
+
+    assert same_position(box.centre_x, clue_box.centre_x), (box, clue_box)
+    assert same_position(box.centre_y, clue_box.centre_y), (box, clue_box)
+    assert hit_problem(page, "clue-reaction") is None
+
+
+# The boxes of the two `clue` elements of a clue cell, in document order.
+CLUE_BOXES_SCRIPT = r"""
+cell => {
+  const found = [];
+  for (const clue of cell.querySelectorAll('[data-testid="clue"]')) {
+    const rect = clue.getBoundingClientRect();
+    found.push([rect.left, rect.top, rect.right, rect.bottom]);
+  }
+  return found;
+}
+"""
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac25_on_a_two_clue_cell_the_pill_is_centred_on_its_lower_clue(
+    window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
+) -> None:
+    page = show_reaction(window, live_server, fx01_grid, size, NAVAL)
+
+    found = cell_at(page, 0, 0).evaluate(CLUE_BOXES_SCRIPT)
+    assert isinstance(found, list), found
+    assert len(found) == 2, found
+    first_clue = to_box(found[0])
+    second_clue = to_box(found[1])
+    lower = second_clue if second_clue.top > first_clue.top else first_clue
+    box = box_of(page.get_by_test_id("clue-reaction"))
+
+    assert same_position(box.centre_x, lower.centre_x), (box, lower)
+    assert same_position(box.centre_y, lower.centre_y), (box, lower)

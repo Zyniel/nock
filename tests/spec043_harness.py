@@ -1,10 +1,10 @@
-"""Shared setup of the tests of spec 043: the room layout (work package WP-1).
+"""Shared setup of the tests of spec 043: the room layout (work packages WP-1, WP-2).
 
 Pytest does not collect this module (its name does not start with `test_`). It
 holds what more than one test file of spec 043 uses: the values of the spec, the
-mocked room, its snapshots and event frames, the heavy setup `H8`, and the readers
-of boxes, labels, icons and pictograms. The tests are in these files, one per group
-of criteria:
+mocked room, its snapshots and event frames, the heavy setup `H8`, the readers
+of boxes, labels, icons and pictograms, and the checks of a 3-second note's look
+and place. The tests are in these files, one per group of criteria:
 
 - `test_spec_043_ac01_layout.py`: AC-1.
 - `test_spec_043_ac02_ac04_top_bar.py`: AC-2 to AC-4.
@@ -16,16 +16,18 @@ of criteria:
 - `test_spec_043_ac19_ac20_players.py`: AC-19 and AC-20.
 - `test_spec_043_ac21_ac22_room_sheets.py`: AC-21 and AC-22.
 - `test_spec_043_ac23_ac25_clue_bar.py`: AC-23 to AC-25.
-- `test_spec_043_ac26_ac27_ac30_status.py`: AC-26, AC-27 and AC-30.
+- `test_spec_043_ac26_notes.py`: AC-26 (the notes and `undo-message`).
+- `test_spec_043_ac26_note_lifetime.py`: AC-26 (how long a note shows).
+- `test_spec_043_ac27_ac30_status.py`: AC-27 and AC-30.
 - `test_spec_043_ac28_fit.py`: AC-28.
 - `test_spec_043_ac29_focus_order.py`: AC-29.
 - `test_spec_043_ac31_scans_and_keys.py`: AC-31.
 
-Spec 043 is built in two work packages ("Work packages"). These files test WP-1,
-the frame. The parts that WP-2 builds (the new-events dot `salon-dot`, the stream's
-pictograms, colours and player dots, the reaction pill, the 3-second notes and
-`undo-message` as a note, AC-30's icons in the stream, AC-31's `room-note` state)
-are left to WP-2's test-writer; each file says which parts it leaves.
+Spec 043 is built in two work packages ("Work packages"): WP-1, the frame, then
+WP-2, the feedback (the new-events dot `salon-dot`, the stream's pictograms,
+colours and player dots, the reaction pill, the 3-second notes and `undo-message`
+as a note, AC-30's icons in the stream, AC-31's `room-note` state). The files
+test both.
 
 It reuses the harnesses of the specs it builds on: spec 019's mocked socket (whose
 `send` uses the newest socket) and its desktop and touch windows, spec 042's box,
@@ -53,6 +55,7 @@ from nock.grid import Grid
 from nock.protocol import (
     CellRef,
     ChatMessage,
+    Check,
     CheckResult,
     CheckTarget,
     ClueRef,
@@ -80,12 +83,15 @@ from nock.protocol import (
     SelectionMoved,
     SettingsChanged,
     Snapshot,
+    VoteClosed,
     VoteOpened,
+    VoteOutcome,
     grid_view,
     parse_client_message,
 )
 from spec019_harness import MockRoomSocket, with_letter_cells
 from spec035_harness import load_fr
+from spec041_harness import shadow_of
 from spec042_harness import (
     READERS_JS,
     Box,
@@ -140,10 +146,13 @@ CLUE_BG: Rgb = (238, 242, 248)
 GREEN: Rgb = (30, 123, 69)
 GREEN_BG: Rgb = (230, 242, 234)
 HANDLE: Rgb = (197, 204, 216)
-# The translucent tokens: their channels, then their alpha.
+REVEAL: Rgb = (194, 65, 12)
+# The translucent tokens: their channels (INK's), then their alpha.
 SCRIM_ALPHA = 0.35
 SHADOW_ALPHA = 0.45
 DOT_RING_ALPHA = 0.55
+SHADOW_SOFT_ALPHA = 0.35
+SHADOW_STRONG_ALPHA = 0.5
 
 # The players of "Test harness": `p1` is `you`, `ANA`, colour 0 and host.
 NICKNAMES = {
@@ -531,6 +540,35 @@ def reaction_frame(player_id: str, clue: ClueRef, reaction: Reaction) -> str:
 
 def error_frame(code: ErrorCode) -> str:
     return ErrorMessage(code=code, message="refused").model_dump_json()
+
+
+VOTE_ID = 1
+VOTE_VOTERS = 3
+
+
+def vote_opened_frame(seq: int, player_id: str = "p2") -> str:
+    """A `vote_opened` (vote 1) by `player_id` asking for a grid check, 3 voters."""
+    vote = VoteOpened(
+        seq=seq,
+        vote_id=VOTE_ID,
+        player_id=player_id,
+        request=Check(target=GridTarget()),
+        timeout_seconds=60,
+        eligible_voters=VOTE_VOTERS,
+    )
+    return vote.model_dump_json()
+
+
+def vote_closed_frame(seq: int, outcome: VoteOutcome = VoteOutcome.PASSED) -> str:
+    """The `vote_closed` of vote 1 (2 yes votes of 3)."""
+    closed = VoteClosed(
+        seq=seq,
+        vote_id=VOTE_ID,
+        outcome=outcome,
+        yes_votes=2,
+        eligible_voters=VOTE_VOTERS,
+    )
+    return closed.model_dump_json()
 
 
 # ---- The mocked room ---------------------------------------------------------------
@@ -1187,3 +1225,64 @@ def hit_problem(page: Page, test_id: str) -> str | None:
     if found["hits"] is True:
         return None
     return f"{test_id}: elementFromPoint at its centre is {found['hit']}"
+
+
+# ---- 3-second notes (WP-2) -------------------------------------------------------
+
+NOTE_TOP_GAP_PX = 8.0  # "its top 8 px below the viewport's top"
+
+
+def note_look_problems(note: Locator) -> list[str]:
+    """How an element differs from spec 041's `nock-note` look (its AC-14).
+
+    White 500 13.6 px text with a 16.32 px line height on ink, padding 8 px 12 px,
+    radius 6 px, on one line, and the shadow `0 6px 18px -8px` in the strong
+    shadow token.
+    """
+    problems: list[str] = []
+    background = colour_of(note, "backgroundColor")
+    if not colour_matches(background, INK):
+        problems.append(f"background {background}")
+    text_colour = colour_of(note, "color")
+    if not colour_matches(text_colour, WHITE):
+        problems.append(f"colour {text_colour}")
+    if style_of(note, "fontWeight") != "500":
+        problems.append(f"font-weight {style_of(note, 'fontWeight')}")
+    if not same_font_size(px(style_of(note, "fontSize")), 13.6):
+        problems.append(f"font-size {style_of(note, 'fontSize')}")
+    line_height = style_of(note, "lineHeight")
+    if not line_height.endswith("px") or not same_font_size(px(line_height), 16.32):
+        problems.append(f"line-height {line_height}")
+    if not padding_matches(note, "8px 12px"):
+        problems.append(f"padding {padding_of(note)}")
+    if style_of(note, "borderTopLeftRadius") != "6px":
+        problems.append(f"radius {style_of(note, 'borderTopLeftRadius')}")
+    if style_of(note, "whiteSpace") != "nowrap":
+        problems.append(f"white-space {style_of(note, 'whiteSpace')}")
+    shadow = shadow_of(note)
+    if (shadow.x, shadow.y, shadow.blur, shadow.spread) != (0, 6, 18, -8):
+        problems.append(f"box-shadow {shadow.text}")
+    if shadow.colour is None or not colour_matches(
+        shadow.colour, INK, SHADOW_STRONG_ALPHA
+    ):
+        problems.append(f"box-shadow colour {shadow.colour}")
+    return problems
+
+
+def note_place_problems(page: Page, note: Locator, viewport_before: Box) -> list[str]:
+    """How a note's place differs from "3-second notes".
+
+    Centred horizontally on `grid-viewport` (1 px), its top 8 px below the
+    viewport's top (1 px), and taking no room: `grid-viewport` keeps the box it
+    had before the note (`viewport_before`, 1 px).
+    """
+    box = box_of(note)
+    viewport_box = box_of(page.get_by_test_id("grid-viewport"))
+    problems: list[str] = []
+    if not same_position(box.centre_x, viewport_box.centre_x):
+        problems.append(f"note centre x {box.centre_x}, viewport {viewport_box}")
+    if not same_position(box.top, viewport_box.top + NOTE_TOP_GAP_PX):
+        problems.append(f"note top {box.top}, viewport top {viewport_box.top}")
+    if not same_box(viewport_box, viewport_before):
+        problems.append(f"grid-viewport moved: {viewport_before} -> {viewport_box}")
+    return problems

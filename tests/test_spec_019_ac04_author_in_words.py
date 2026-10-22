@@ -91,6 +91,9 @@ LAST_FEED_SEQ = 105
 LONGEST_CLUE = "On la glisse dans une enveloppe"
 LONGEST_CLUE_CELL = (0, 6)
 LONGEST_WORD = "0,6,0"
+# Spec 043's 3-second note for `p2`'s last check covers the top row while it
+# shows (a tap on it opens the Salon); it leaves the page 3,350 ms after it showed.
+NOTE_GONE_TIMEOUT_MS = 5000
 SELECTED_CELL = (1, 6)
 
 # The author line's minimum width: the smaller of its scrollWidth and 6 times its
@@ -378,6 +381,9 @@ def open_fx02_status_page(page: Page, base_url: str, grid: Grid, touch: bool) ->
     for seq in range(SNAPSHOT_SEQ + 1, LAST_FEED_SEQ + 1):
         mock.send(check_frame(seq, "p2", GridTarget()))
     expect_seq(page, LAST_FEED_SEQ)
+    expect(page.get_by_test_id("room-note")).to_have_count(
+        0, timeout=NOTE_GONE_TIMEOUT_MS
+    )
     clue = cell_at(page, *LONGEST_CLUE_CELL).get_by_test_id("clue")
     press(clue.filter(has_text=LONGEST_CLUE), touch)
     expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", LONGEST_WORD)

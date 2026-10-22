@@ -2,8 +2,9 @@
 // Plain functions: no socket and no DOM, so the rules are easy to read.
 
 import { SvelteMap } from 'svelte/reactivity'
-import { feedItemFor, trimFeed } from './activityFeed'
-import type { KeptFeedItem } from './activityFeed'
+import { feedItemFor, nameOf, trimFeed } from './activityFeed'
+import type { FeedItem, KeptFeedItem } from './activityFeed'
+import { t } from './i18n'
 import { cursorPositionsOf, nextCursors } from './remoteSelections'
 import type { CellCursor } from './remoteSelections'
 import { timerValueMs } from './timer'
@@ -160,6 +161,28 @@ export interface ShownReaction {
   reaction: ReactionValue
 }
 
+// A 3-second note (spec 043): what a live event of the room says over the
+// grid. `kind` is the kind of the event line it repeats (its pictogram comes
+// first), or null for a message or my own reaction. The page decides whether
+// and when it shows.
+export interface RoomNote {
+  id: number
+  kind: string | null
+  text: string
+}
+
+// The kinds of event line that make a note; a check makes one only when it is
+// another player's.
+const NOTED_LINE_KINDS: string[] = [
+  'flag',
+  'reveal',
+  'check',
+  'player_joined',
+  'player_left',
+  'player_removed',
+  'player_timed_out',
+]
+
 // Only what the client reads from a snapshot (later specs read more).
 export interface Snapshot {
   type: 'snapshot'
@@ -250,6 +273,11 @@ export interface RoomSession {
   // The other players' cursors, in the order they arrived on their cells, with
   // the corner each holds (spec 042). Brought up to date after every frame.
   cursors: CellCursor[]
+  // The newest 3-second note a live event made (spec 043), null before one;
+  // each new note has a new id. The snapshot and a catch-up make none.
+  latestNote: RoomNote | null
+  // The id given to the next note.
+  nextNoteId: number
 }
 
 // A cell that a catch-up highlights, as a cell that changed while the page was
@@ -317,6 +345,8 @@ export function newSession(): RoomSession {
     nextCaughtUpId: 1,
     catchUpLabel: '',
     cursors: [],
+    latestNote: null,
+    nextNoteId: 1,
   }
 }
 
@@ -682,16 +712,40 @@ function toChatLine(value: unknown): ChatLine | null {
 }
 
 // A chat_message adds its line at the end of the history, unless a line with
-// its seq is already there (spec 022).
-function applyChatMessage(snapshot: Snapshot, event: RoomEvent): void {
+// its seq is already there (spec 022). A new line of another player makes a
+// note (spec 043).
+function applyChatMessage(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
   const line = toChatLine(event.message)
   if (line === null) {
     return
   }
   const isKnown = snapshot.chat.some((kept) => kept.seq === line.seq)
-  if (!isKnown) {
-    snapshot.chat.push(line)
+  if (isKnown) {
+    return
   }
+  snapshot.chat.push(line)
+  if (line.player_id !== snapshot.you) {
+    const name = nameOf(session.names, line.player_id)
+    makeNote(session, null, t('note.message', { name, text: line.text }))
+  }
+}
+
+// Make the newest 3-second note.
+function makeNote(session: RoomSession, kind: string | null, text: string): void {
+  session.latestNote = { id: session.nextNoteId, kind, text }
+  session.nextNoteId += 1
+}
+
+// The line of a live event makes a note when its kind is one of
+// NOTED_LINE_KINDS, except my own check (spec 043, "3-second notes").
+function makeLineNote(session: RoomSession, snapshot: Snapshot, item: FeedItem): void {
+  if (!NOTED_LINE_KINDS.includes(item.kind)) {
+    return
+  }
+  if (item.kind === 'check' && item.playerId === snapshot.you) {
+    return
+  }
+  makeNote(session, item.kind, item.text)
 }
 
 function toPlayers(value: unknown): PlayerView[] | null {
@@ -919,7 +973,8 @@ function applyLetterChanged(session: RoomSession, snapshot: Snapshot, event: Roo
   }
 }
 
-// Add the feed line of an event, before the event changes the snapshot.
+// Add the feed line of an event, before the event changes the snapshot. The
+// line may make a note.
 function addFeedItem(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
   if (event.type === 'player_joined') {
     const player = toPlayer(event.message.player)
@@ -935,6 +990,7 @@ function addFeedItem(session: RoomSession, snapshot: Snapshot, event: RoomEvent)
   session.nextFeedItemId += 1
   trimFeed(session.feed)
   session.feedChanges += 1
+  makeLineNote(session, snapshot, item)
 }
 
 function applyEvent(session: RoomSession, event: RoomEvent): void {
@@ -972,7 +1028,7 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
     applyFlagChanged(session.snapshot, event)
   }
   if (event.type === 'chat_message' && session.snapshot !== null) {
-    applyChatMessage(session.snapshot, event)
+    applyChatMessage(session, session.snapshot, event)
   }
   if (event.type === 'letter_changed') {
     startTimerOnLetter(session, event)
@@ -1133,7 +1189,8 @@ function isClueOfGrid(grid: GridView, clue: ClueRefView): boolean {
 
 // A reaction has no seq: it is shown at once, once the page has a snapshot, and
 // only on a clue of the grid. A newer reaction on the same clue replaces the
-// older one, so a clue shows at most one (spec 022).
+// older one, so a clue shows at most one (spec 022). My own reaction makes a
+// note (spec 043).
 function receiveReaction(session: RoomSession, message: Record<string, unknown>): void {
   if (session.snapshot === null || typeof message.player_id !== 'string') {
     return
@@ -1155,6 +1212,9 @@ function receiveReaction(session: RoomSession, message: Record<string, unknown>)
   others.push({ id: session.nextReactionId, player_id: message.player_id, clue, reaction })
   session.nextReactionId += 1
   session.reactions = others
+  if (message.player_id === session.snapshot.you) {
+    makeNote(session, null, t('note.own_reaction', { reaction: t(`reaction.${reaction}`) }))
+  }
 }
 
 // Stop showing a reaction: used when its REACTION_MS are over.

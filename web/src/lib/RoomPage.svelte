@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flushSync, onMount, tick } from 'svelte'
+  import { flushSync, onMount, tick, untrack } from 'svelte'
   import AccountDialog from './AccountDialog.svelte'
   import AideMenu from './AideMenu.svelte'
   import ClueBar from './ClueBar.svelte'
@@ -9,6 +9,8 @@
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
   import RoomMenu from './RoomMenu.svelte'
+  import RoomNote from './RoomNote.svelte'
+  import type { ShownNote } from './RoomNote.svelte'
   import RoomPopover from './RoomPopover.svelte'
   import RoomTopBar from './RoomTopBar.svelte'
   import Salon from './Salon.svelte'
@@ -18,8 +20,10 @@
   import { authorLine, colourByPlayer, shownAuthorOf } from './authorsView'
   import {
     clueReactionMarkers,
+    hasNewEventLines,
     isPaced,
     msUntilNextExpiry,
+    newestFeedItemId,
     salonToggleLabel,
     sendsInWindow,
     shownChatLines,
@@ -93,7 +97,6 @@
   } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
-  const UNDO_MESSAGE_MS = 3000
   const MAX_REVEAL_COUNT = 99
   // The performance mark set once the grid takes taps and keys (spec 036).
   const INTERACTIVE_MARK = 'nock:interactive'
@@ -298,25 +301,8 @@
   // Leaving the page must not leave the timers to fire on a destroyed page.
   $effect(() => {
     return () => {
-      clearTimeout(undoMessageTimer)
       clearTimeout(pacingTimer)
     }
-  })
-
-  // "Nothing to undo" shows for UNDO_MESSAGE_MS after each refusal of the server.
-  let isUndoMessageShown = $state(false)
-  let undoMessageTimer: ReturnType<typeof setTimeout> | undefined
-  let shownUndoRefusals = 0
-  $effect(() => {
-    if (session.undoRefusals === shownUndoRefusals) {
-      return
-    }
-    shownUndoRefusals = session.undoRefusals
-    isUndoMessageShown = true
-    clearTimeout(undoMessageTimer)
-    undoMessageTimer = setTimeout(() => {
-      isUndoMessageShown = false
-    }, UNDO_MESSAGE_MS)
   })
 
   let words = $derived(session.snapshot === null ? [] : computeWords(session.snapshot.grid))
@@ -1068,7 +1054,6 @@
       ? 0
       : unreadCount(chatHistory, lastSeenChatSeq, you),
   )
-  let salonLabel = $derived(salonToggleLabel(unreadLines))
   // While the stream shows, every line of the history is read.
   $effect(() => {
     if (!isStreamShown || chatHistory.length === 0) {
@@ -1077,6 +1062,25 @@
     const newestSeq = chatHistory[chatHistory.length - 1].seq
     if (lastSeenChatSeq === null || newestSeq > lastSeenChatSeq) {
       lastSeenChatSeq = newestSeq
+    }
+  })
+
+  // The new-events dot (spec 043): the event lines up to this feed item id were
+  // there the last time the stream showed. A line about another player added
+  // since then shows the dot, while no message is unread; showing the stream
+  // removes it.
+  let lastSeenFeedItemId = $state(0)
+  let hasNewEvents = $derived(
+    !isStreamShown && unreadLines === 0 && hasNewEventLines(session.feed, lastSeenFeedItemId, you),
+  )
+  let salonLabel = $derived(salonToggleLabel(unreadLines, hasNewEvents))
+  $effect(() => {
+    if (!isStreamShown) {
+      return
+    }
+    const newestId = newestFeedItemId(session.feed)
+    if (newestId > lastSeenFeedItemId) {
+      lastSeenFeedItemId = newestId
     }
   })
 
@@ -1227,6 +1231,9 @@
   // ---- Focus when the banner changes (decision 19) ----
 
   let voteBanner: HTMLElement | null = $state(null)
+  // The banner's height, with its border: a note that shows while the banner
+  // is on the page sits under it (spec 043, Decision 25).
+  let voteBannerHeight = $state(0)
   let voteStatus: HTMLElement | null = $state(null)
 
   // What the banner holds: nothing, the question of one vote, or a result.
@@ -1266,6 +1273,81 @@
     }, VOTE_RESULT_MS)
     return () => clearTimeout(timer)
   })
+
+  // ---- The 3-second notes (spec 043) ----
+
+  // The note over the grid, one at a time, and the newest note of the room
+  // that waits for the vote banner to go.
+  let shownNote: ShownNote | null = $state(null)
+  let waitingNote: ShownNote | null = $state(null)
+  // Each shown note gets its own id, so a newer one replaces the older at once.
+  let nextShownNoteId = 1
+  let handledRoomNoteId = 0
+  let shownUndoRefusals = 0
+
+  function newShownNote(isUndo: boolean, kind: string | null, text: string): ShownNote {
+    const note = { id: nextShownNoteId, isUndo, kind, text }
+    nextShownNoteId += 1
+    return note
+  }
+
+  // A new note of the room: none while the stream shows; while the vote banner
+  // is on the page it waits, replacing any older waiting note.
+  $effect(() => {
+    const latest = session.latestNote
+    if (latest === null || latest.id === handledRoomNoteId) {
+      return
+    }
+    handledRoomNoteId = latest.id
+    if (untrack(() => isStreamShown)) {
+      return
+    }
+    const note = newShownNote(false, latest.kind, latest.text)
+    if (untrack(() => isVoteBannerShown)) {
+      waitingNote = note
+      return
+    }
+    shownNote = note
+  })
+
+  // Once the banner has gone, the note that waited shows, unless the stream
+  // shows by then: the player reads the same line there.
+  $effect(() => {
+    if (isVoteBannerShown || waitingNote === null) {
+      return
+    }
+    const note = waitingNote
+    waitingNote = null
+    if (!untrack(() => isStreamShown)) {
+      shownNote = note
+    }
+  })
+
+  // "Nothing to undo" (spec 018) has the note's look and place: it replaces
+  // any shown note, and shows whatever else shows.
+  $effect(() => {
+    if (session.undoRefusals === shownUndoRefusals) {
+      return
+    }
+    shownUndoRefusals = session.undoRefusals
+    shownNote = newShownNote(true, null, t('undo.nothing'))
+  })
+
+  // A note leaves once it has faded, unless a newer one replaced it.
+  function onNoteGone(noteId: number): void {
+    if (shownNote !== null && shownNote.id === noteId) {
+      shownNote = null
+    }
+  }
+
+  // A tap or a click on a note opens the Salon on its Discussion tab, as
+  // « Salon » does, and removes the note.
+  function openSalonFromNote(): void {
+    shownNote = null
+    salonTab = 'discussion'
+    setSalonOpen(true)
+    void salon?.focusInside()
+  }
 
   function onCellTap(row: number, column: number): void {
     select(selectionAfterCellTap(words, selection, row, column))
@@ -1772,6 +1854,7 @@
       isMenuOpen={openPopover === 'menu'}
       {isSalonOpen}
       {unreadLines}
+      {hasNewEvents}
       {salonLabel}
       bind:aideButton
       bind:menuButton
@@ -1907,6 +1990,7 @@
                 role="group"
                 aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
                 bind:this={voteBanner}
+                bind:offsetHeight={voteBannerHeight}
               >
                 {#if openVote !== null}
                   <p id="vote-question" class="vote-text" data-testid="vote-question">
@@ -1943,10 +2027,16 @@
                 {/if}
               </div>
             {/if}
-            {#if isUndoMessageShown}
-              <p class="undo-message" data-testid="undo-message" role="status">
-                {t('undo.nothing')}
-              </p>
+            {#if shownNote !== null}
+              {#key shownNote.id}
+                <RoomNote
+                  note={shownNote}
+                  {layout}
+                  bannerHeight={isVoteBannerShown ? voteBannerHeight : 0}
+                  onOpen={openSalonFromNote}
+                  onGone={onNoteGone}
+                />
+              {/key}
             {/if}
             <GridViewport
               bind:this={gridViewport}
@@ -2025,6 +2115,7 @@
         totalWords={words.length}
         entries={stream}
         names={session.names}
+        colours={playerColours}
         players={session.snapshot.players}
         {you}
         {isHost}
@@ -2227,21 +2318,6 @@
   /* The in-app keyboard spans the column layout's play area at its bottom. */
   .column .play-area > :global(.keyboard) {
     margin: 10px -12px -12px;
-  }
-
-  /* Until the 3-second notes (spec 043 WP-2), the undo message keeps its plain
-     look, over the top of the grid area: it moves nothing. */
-  .undo-message {
-    position: absolute;
-    z-index: 6;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    margin: 0;
-    padding: 2px 8px;
-    white-space: nowrap;
-    color: var(--nock-ink);
-    background: var(--nock-white);
   }
 
   /* Over the grid (spec 025 decision 9): absolutely placed, so it takes no

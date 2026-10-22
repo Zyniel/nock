@@ -1,18 +1,11 @@
-"""Tests of spec 043, AC-26, AC-27 and AC-30: the parts of these criteria that work
-package WP-1 builds.
+"""Tests of spec 043, AC-27 and AC-30: the completion status, and the players'
+icons in the Accessibilité mode.
 
-AC-26 and AC-30 belong to WP-2 ("Work packages": the 3-second notes and
-`undo-message` as a note; the Accessibilité icons in the stream). WP-2's
-test-writer writes their tests. What this step already guarantees is tested here,
-so that the gate's coverage check has a real test for each criterion:
-
-- AC-26: a click on `undo-button` answered by `nothing_to_undo` shows
-  `undo-message` (`role="status"`, `fr.json["undo.nothing"]`) also with the Salon
-  open on Discussion. Its note's look and place are WP-2's; until then it keeps
-  today's look inside `grid-area` ("Work packages").
-- AC-30: with `access-switch` on, each `roster-colour` holds its player's icon
-  (spec 042's rule, which the Joueurs rows of AC-19 keep); the `chat-dot` part is
-  WP-2's.
+AC-30: with `access-switch` on, each player dot, `roster-colour` in the Joueurs
+rows (work package WP-1, spec 042's rule) and `chat-dot` in the stream (WP-2),
+holds its player's 12 px icon on no background and no ring; with it off again,
+the dots have their colours back. (AC-26, the notes, is in
+`test_spec_043_ac26_notes.py` and `test_spec_043_ac26_note_lifetime.py`.)
 
 AC-27: the completion status is a band under the clue bar, holding « Voir le
 bilan » once solved, and sits in the clue bar's row only in the sheet layout of a
@@ -27,6 +20,9 @@ Choices where the spec leaves room:
 - The band's text is its text outside `recap-open`; its colour and font are those
   of the element holding it.
 - "The band's content right edge" is its box less its right padding (12 px).
+- AC-30: a `roster-colour`'s colour index is its row's `data-colour`, a
+  `chat-dot`'s its own `data-colour`; "no ring" (spec 043's "Discussion") is a
+  computed `box-shadow` of `none`, checked on the `chat-dot` elements.
 """
 
 from __future__ import annotations
@@ -37,7 +33,7 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
-from nock.protocol import ErrorCode, GridFullWrong, Undo
+from nock.protocol import GridFullWrong
 from room_panels import open_menu, show_tab
 from spec019_harness import OpenWindow, window_opener
 from spec042_harness import (
@@ -56,7 +52,6 @@ from spec043_harness import (
     RoomMock,
     chat_line,
     colour_matches,
-    error_frame,
     expect_closed,
     expect_colour,
     expect_layout,
@@ -75,7 +70,6 @@ from spec043_harness import (
     solved_view,
     style_of,
     to_box,
-    wait_until,
 )
 
 SIZES = [(1280, 720), (360, 740)]
@@ -93,33 +87,6 @@ def fx01_grid(fx01_text: str) -> Grid:
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     """Return `window(width, height, touch)`: a page in a context of that size."""
     yield from window_opener(browser, browser_name)
-
-
-# ---- AC-26 (WP-1 part): the undo message shows with the stream shown -----------------
-
-
-def test_ac26_undo_message_shows_its_status_also_with_the_stream_shown(
-    page: Page, live_server: str, fx01_grid: Grid
-) -> None:
-    mock = open_room(
-        page, live_server, snapshot_frame(fx01_view(fx01_grid), players_up_to(3))
-    )
-    show_tab(page, "discussion")
-    before = len(mock.frames_without_pings())
-
-    page.get_by_test_id("undo-button").click()
-    wait_until(
-        page,
-        lambda: Undo() in mock.parsed_frames_after(before),
-        "the undo frame",
-    )
-    mock.send(error_frame(ErrorCode.NOTHING_TO_UNDO))
-
-    message = page.get_by_test_id("undo-message")
-    expect(message).to_be_visible()
-    expect(message).to_have_attribute("role", "status")
-    expect(message).to_have_text(fr_value("undo.nothing"))
-    expect(page.get_by_test_id("chat-panel")).to_be_visible()
 
 
 # ---- AC-27: the completion status ----------------------------------------------------
@@ -381,27 +348,72 @@ def test_ac27_on_a_low_desktop_window_the_status_is_under_the_bar(
     assert box.bottom <= 320.0 + 1.0, box
 
 
-# ---- AC-30 (WP-1 part): the Joueurs dots show the players' icons ---------------------
+# ---- AC-30: the player dots show the players' icons ---------------------------------
 
-SWATCHES_SCRIPT = "() => {\n" + READERS_JS + r"""
+# Each player dot of one kind: its colour index, background, ring and icons.
+# `roster`: each `roster-colour`, its index on its `roster-player` row; `chat`: each
+# `chat-dot`, its index on itself.
+SWATCHES_SCRIPT = "kind => {\n" + READERS_JS + r"""
+const dots = [];
+if (kind === 'roster') {
+  for (const row of document.querySelectorAll('[data-testid="roster-player"]')) {
+    dots.push([row.querySelector('[data-testid="roster-colour"]'),
+      row.getAttribute('data-colour')]);
+  }
+} else {
+  for (const dot of document.querySelectorAll('[data-testid="chat-dot"]')) {
+    dots.push([dot, dot.getAttribute('data-colour')]);
+  }
+}
 const found = [];
-for (const row of document.querySelectorAll('[data-testid="roster-player"]')) {
-  const dot = row.querySelector('[data-testid="roster-colour"]');
+for (const [dot, colour] of dots) {
   const icons = [];
   for (const svg of dot.querySelectorAll('[data-testid="player-icon"]')) {
     icons.push(svgOf(svg));
   }
-  found.push({colour: row.getAttribute('data-colour'),
-    background: parseColour(getComputedStyle(dot).backgroundColor), icons: icons});
+  const style = getComputedStyle(dot);
+  found.push({colour: colour, background: parseColour(style.backgroundColor),
+    ring: style.boxShadow, icons: icons});
 }
 return found;
 }"""
 
 
-def swatches(page: Page) -> list[Reading]:
-    found = page.evaluate(SWATCHES_SCRIPT)
+def swatches(page: Page, kind: str) -> list[Reading]:
+    """The player dots of `kind`: `"roster"` (`roster-colour`) or `"chat"`."""
+    found = page.evaluate(SWATCHES_SCRIPT, kind)
     assert isinstance(found, list), found
     return found
+
+
+def icon_swatch_problems(swatch: Reading) -> list[str]:
+    """How a dot differs from its player's 12 px icon on no background."""
+    colour = str(swatch["colour"])
+    problems: list[str] = []
+    if not is_clear(swatch["background"]):
+        problems.append(f"colour {colour}: background {swatch['background']}")
+    if len(swatch["icons"]) != 1:
+        problems.append(f"colour {colour}: {len(swatch['icons'])} icons")
+        return problems
+    icon = swatch["icons"][0]
+    box = to_box(icon["box"])
+    if abs(box.width - 12.0) > 0.5 or abs(box.height - 12.0) > 0.5:
+        problems.append(f"colour {colour}: icon {box.width} by {box.height}")
+    if icon["dataIcon"] != colour:
+        problems.append(f"colour {colour}: data-icon {icon['dataIcon']}")
+    problems.extend(icon_shape_problems(icon, int(colour)))
+    return problems
+
+
+def colour_swatch_problems(swatch: Reading) -> list[str]:
+    """How a dot differs from its player's colour, with no icon."""
+    index = int(str(swatch["colour"]))
+    problems: list[str] = []
+    if swatch["icons"] != []:
+        problems.append(f"colour {index}: still {len(swatch['icons'])} icons")
+    if not colour_matches(swatch["background"], PLAYER_COLOURS[index]):
+        problems.append(f"colour {index}: background {swatch['background']}")
+    return problems
 
 
 def flip_access(page: Page, pressed: str) -> None:
@@ -432,21 +444,27 @@ def test_ac30_with_access_on_each_players_dot_holds_their_12_px_icon(
     show_tab(page, "players")
 
     problems: list[str] = []
-    for swatch in swatches(page):
-        colour = str(swatch["colour"])
-        if not is_clear(swatch["background"]):
-            problems.append(f"colour {colour}: background {swatch['background']}")
-        if len(swatch["icons"]) != 1:
-            problems.append(f"colour {colour}: {len(swatch['icons'])} icons")
-            continue
-        icon = swatch["icons"][0]
-        box = to_box(icon["box"])
-        if abs(box.width - 12.0) > 0.5 or abs(box.height - 12.0) > 0.5:
-            problems.append(f"colour {colour}: icon {box.width} by {box.height}")
-        if icon["dataIcon"] != colour:
-            problems.append(f"colour {colour}: data-icon {icon['dataIcon']}")
-        problems.extend(icon_shape_problems(icon, int(colour)))
-    assert len(swatches(page)) == 3
+    for swatch in swatches(page, "roster"):
+        problems.extend(icon_swatch_problems(swatch))
+    assert len(swatches(page, "roster")) == 3
+    assert problems == []
+
+
+def test_ac30_with_access_on_each_chat_dot_holds_its_players_icon_and_no_ring(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(page, live_server, ac30_frame(fx01_grid))
+
+    flip_access(page, "true")
+    show_tab(page, "discussion")
+
+    found = swatches(page, "chat")
+    problems: list[str] = []
+    for swatch in found:
+        problems.extend(icon_swatch_problems(swatch))
+        if swatch["ring"] != "none":
+            problems.append(f"colour {swatch['colour']}: ring {swatch['ring']}")
+    assert [swatch["colour"] for swatch in found] == ["1", "2"]
     assert problems == []
 
 
@@ -459,10 +477,22 @@ def test_ac30_with_access_off_again_the_dots_have_their_colours_back(
     flip_access(page, "false")
 
     problems: list[str] = []
-    for swatch in swatches(page):
-        index = int(str(swatch["colour"]))
-        if swatch["icons"] != []:
-            problems.append(f"colour {index}: still {len(swatch['icons'])} icons")
-        if not colour_matches(swatch["background"], PLAYER_COLOURS[index]):
-            problems.append(f"colour {index}: background {swatch['background']}")
+    for swatch in swatches(page, "roster"):
+        problems.extend(colour_swatch_problems(swatch))
+    assert problems == []
+
+
+def test_ac30_with_access_off_again_the_chat_dots_have_their_colours_back(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_room(page, live_server, ac30_frame(fx01_grid))
+    flip_access(page, "true")
+
+    flip_access(page, "false")
+
+    found = swatches(page, "chat")
+    problems: list[str] = []
+    for swatch in found:
+        problems.extend(colour_swatch_problems(swatch))
+    assert [swatch["colour"] for swatch in found] == ["1", "2"]
     assert problems == []

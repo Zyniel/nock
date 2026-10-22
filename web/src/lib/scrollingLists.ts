@@ -174,21 +174,59 @@ export function keepFeedPlace(list: HTMLElement, place: FeedPlace): void {
   }
 }
 
+// True while the list is not drawn, for example while a parent of it is hidden.
+// A hidden list measures 0, so it always looks at its end.
+function isHidden(list: HTMLElement): boolean {
+  return list.getClientRects().length === 0
+}
+
+// The two heights that say where the end of a list is.
+interface ListSize {
+  clientHeight: number
+  scrollHeight: number
+}
+
+function sizeOf(list: HTMLElement): ListSize {
+  return { clientHeight: list.clientHeight, scrollHeight: list.scrollHeight }
+}
+
+function sameSize(first: ListSize, second: ListSize): boolean {
+  return (
+    first.clientHeight === second.clientHeight && first.scrollHeight === second.scrollHeight
+  )
+}
+
 // Keep a feed list that is at its end at its end when its size or the height of
-// its lines changes: a resize, a rotation, a new root font. A list that is not
-// at its end is left where it is. Returns a function that stops.
+// its lines changes: a resize, a rotation, a new root font, the list hidden and
+// shown again. A list that is not at its end is left where it is. Returns a
+// function that stops.
 export function keepFeedEndOnResize(list: HTMLElement): () => void {
-  // Whether the list was at its end after its last scroll. A change of size
-  // does not scroll the list, unless the browser has to bring scrollTop back
-  // into the new range, and that puts the list at its end.
+  // Whether the list was at its end after the reader's last scroll.
   let wasAtEnd = isAtEnd(list)
+  // The size of the list when it was last brought back to its end (or not).
+  let notedSize = sizeOf(list)
   function noteScroll(): void {
-    wasAtEnd = isAtEnd(list)
+    // A hidden list measures 0 and looks at its end: keep what was true before.
+    if (isHidden(list)) {
+      return
+    }
+    // A scroll that comes with a change of size is the browser's, not the
+    // reader's: Firefox puts back the old scrollTop of a list shown again before
+    // the size observer runs, and the browser brings scrollTop back into the
+    // new range of a list that got smaller, which puts it at its end. Such a
+    // scroll may put the list at its end, but it does not take it away from it;
+    // backToEnd runs next.
+    const nowAtEnd = isAtEnd(list)
+    if (!sameSize(sizeOf(list), notedSize) && !nowAtEnd) {
+      return
+    }
+    wasAtEnd = nowAtEnd
   }
   function backToEnd(): void {
     if (wasAtEnd) {
       scrollToEnd(list)
     }
+    notedSize = sizeOf(list)
   }
   list.addEventListener('scroll', noteScroll)
   const stopWatching = watchListChanges(list, backToEnd)

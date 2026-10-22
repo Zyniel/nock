@@ -1,7 +1,7 @@
 ---
 id: "043"
 title: Room layout
-status: approved
+status: done
 ---
 
 # 043 - Room layout
@@ -595,14 +595,39 @@ the secondary « Fermer » right-aligned).
   white pill, 1 px solid `--nock-line` border, radius 12 px, padding 2 px 6 px,
   emoji 16 px with line height 1.2, shadow `0 4px 10px -4px var(--nock-shadow-soft)`,
   layer 8, centred on its `clue` element (one half of a two-clue cell, the whole
-  cell for a lone clue), drawn over the neighbouring cells.
+  cell for a lone clue), drawn over the neighbouring cells. The pill takes the
+  pointer (no `pointer-events: none`) and lies inside its `clue` element, so a tap
+  or click on it, also on a part drawn over a neighbouring cell, selects that clue
+  as a tap on the clue does (spec 007). (Note from the lead, 2026-10-22: recorded
+  after spec 043 WP-2's build, which draws it so; AC-25's `elementFromPoint` at the
+  pill's centre returns it.)
 
 ### 3-second notes (`_design.md` section 8)
 
 `data-testid="room-note"`: a `nock-note` (spec 041), a `<button type="button">` with
 `tabindex="-1"` and `aria-hidden="true"` (other players' actions are not announced,
 spec 022), centred horizontally on `grid-viewport`, its top 8 px below the
-viewport's top, layer 6. It takes no room (no layout shift).
+viewport's top, layer 6. It takes no room (no layout shift). A note longer than
+the viewport is wide stays on its one line and ends with an ellipsis: `max-width`
+the grid area's width less 16 px (the viewport's width in the sheet layout, where
+the grid area has 8 px of padding on each side; 8 px in from each side of the
+viewport in the column layout), `overflow: hidden`, `text-overflow: ellipsis`, with
+the `white-space: nowrap` of `nock-note`. (Note from the lead, 2026-10-22: recorded
+after spec 043 WP-2's build, which draws it so; the design gave no rule for a long
+note.)
+
+While `vote-banner` is on the page, a note that shows (today only `undo-message`,
+since the other notes wait during a vote, below) has its top 8 px below the
+banner's bottom edge instead of 8 px below the viewport's top: the same look, the
+same layer 6, still centred horizontally on `grid-viewport`, and nothing covers it.
+It follows the banner: when the banner comes, changes height or goes while the note
+shows, the note takes the matching place at once, and its 3 seconds are not
+restarted. (Note from the lead, 2026-10-22: added after spec 043 WP-2's first
+review, the lead's decision, Decision 25. Before it, `undo-message` had "the note's
+place" also while the banner was on the page, 8 px under the viewport's top on
+layer 6, where `vote-banner`, on layer 9 over the top of `grid-viewport`, covered
+it fully: a probe found `vote-question` at its centre at 360 by 740 and 1280 by
+720.)
 
 - A note is made, with its text, for: a `chat_message` whose player is not `you`
   (`t("note.message", { name, text })`); an added event line (spec 013) of kind
@@ -618,15 +643,36 @@ viewport's top, layer 6. It takes no room (no layout shift).
   vote.)
 - One at a time: a new note replaces the shown one at once. A note shows for
   3,000 ms, then gets `data-off` (spec 041's fade, 0.25 s, none under
-  `prefers-reduced-motion: reduce`) and leaves the page once faded.
+  `prefers-reduced-motion: reduce`) and leaves the page 3,350 ms after it showed,
+  100 ms after the fade's end, so that it has been drawn fully faded. (Note from the
+  lead, 2026-10-22: this read "and leaves the page once faded"; the 3,350 ms are
+  spec 043 WP-2's build: the fade ends before AC-26's 3,400 ms and the note is gone
+  before its 3,700 ms.) (Note from the lead, 2026-10-22: after spec 043 WP-2's
+  first review, the note before this one read "the 3,350 ms are spec 043 WP-2's
+  build, inside AC-26's bounds of 3,400 and 3,700 ms", which 3,350 ms is not.)
 - While the stream is shown, no note is made. While `vote-banner` is on the page,
   the newest note waits (it replaces any older waiting note) and shows once the
-  banner has gone.
+  banner has gone, unless the stream shows by then: the note that waited is then
+  dropped, as the player reads its line in the stream. (Note from the lead,
+  2026-10-22: the "unless" clause added after spec 043 WP-2's build, which does so.)
+  This rule is about making notes: a note already showing when the player opens
+  the stream (« Salon » or a Discussion tab, not a tap on the note) stays until its
+  3 seconds end and fades as usual. (Note from the lead, 2026-10-22: added after
+  spec 043 WP-2's first review, the lead's decision, Decision 26; the text did not
+  say what happens to a shown note when the stream opens.)
 - A tap or click on a note opens the Salon on its Discussion tab (no scroll is
-  added to spec 013's rules, Open question 12) and removes the note.
+  added to spec 013's rules, Open question 12) and removes the note. It opens the
+  Salon as `chat-toggle` (« Salon ») does, so the focus moves to `chat-input` (to
+  `salon-tab-discussion` while `chat-input` is disabled, "Salon" above). (Note
+  from the lead, 2026-10-22: the focus added after spec 043 WP-2's build, which
+  moves it so.)
 - `undo-message` (spec 018, `role="status"`, `t("undo.nothing")`, 3 seconds) has the
   note's look and place. It replaces any shown note, and shows also while the
-  stream is shown and while the vote banner is on the page.
+  stream is shown and while the vote banner is on the page, then 8 px under the
+  banner's bottom edge (above). (Note from the lead, 2026-10-22: ", then 8 px under
+  the banner's bottom edge (above)" added after spec 043 WP-2's first review; this
+  read "and while the vote banner is on the page." with the note's usual place,
+  which the banner covers.)
 
 ### Completion status and the recap button (specs 026, 028; `_design.md` section 9)
 
@@ -905,7 +951,7 @@ The words in brackets say how each criterion is tested.
 - **AC-23** (new; refines spec 007's clue bar, spec 021's and spec 022's buttons) (browser with mocked socket) The clue bar is navy, one line, with its four buttons. On a FX-01 snapshot at 360 by 740 and at 1280 by 720, after a tap on (2, 2) twice (`down`, MIME): `clue-bar` has the class `nock-on-navy`, `background-color` rgb(27, 47, 85), height 34 px, and holds in document order `clue-prev`, `clue-bar-text`, `react-button`, `flag-button`, `clue-next`, left to right, their vertical centres within 1 px of the bar's; `clue-prev` and `clue-next` are 36 px wide, `react-button` and `flag-button` 40 px wide with `border-radius` `6px`, each a `BUTTON` with no text and an `aria-label`: `fr.json["clue_bar.previous"]`, `fr.json["reaction.button_label"]`, `fr.json["flag.button_label"]`, `fr.json["clue_bar.next"]`, each holding a 20 by 20 px `svg` with `aria-hidden="true"`, `stroke-width` 2 and the shapes of `chevron-left`, `smile`, `flag`, `chevron-right`. `clue-bar-text` has the text content `Artiste muet`, colour rgb(255, 255, 255), `font-size` 15.2 px, weight 500, `white-space` `nowrap`, `overflow` `hidden`, `text-overflow` `ellipsis`, and holds `clue-bar-direction` (`aria-hidden="true"`, no text node, pictogram `content` `"↓"`, `opacity` 0.8, `margin-left` `6px`); after a tap on (2, 2) it is `"→"` (VIDE). `flag-button` not pressed: its flag's `stroke` rgb(255, 255, 255), `fill` none or alpha 0, the button's background alpha 0; after the mock's `flag_changed` for `p1` on MIME: `aria-pressed="true"`, background rgb(255, 255, 255), the flag shape's `fill` rgb(27, 47, 85). With nothing selected (a fresh page), `react-button` and `flag-button` are disabled, their icons' `stroke` rgb(154, 163, 178), with a contrast of at least 4.5:1 against the bar. Keyboard: `tab_to` `flag-button` gives it a `2px` `solid` rgb(255, 255, 255) outline with `outline-offset` `-4px`. Width: at 360 by 740 the bar is 360 px wide; at 1280 by 720 it is as wide as the `grid`'s box (1 px) and its left edge is the grid's left edge (1 px); on a FX-02 snapshot at 568 by 320 (desktop, column layout), it is as wide as the play area's content box (1 px), which is narrower than 320 px.
 - **AC-24** (new) (browser with mocked socket) ‹ and › move to the previous and the next unfinished word, and a pointer press keeps the focus on the grid. On a FX-01 snapshot where TAMIS is full and every other cell empty, at 1280 by 720: with nothing selected, a click on `clue-next` selects `0,0,1` (NAVAL, TAMIS being finished) on its first unfilled cell (spec 009's `Tab`), sends `select_cell`, and `clue-bar` has `data-word="0,0,1"`; a second click selects `0,2,0`; a click on `clue-prev` selects `0,0,1` again. After a tap on the clue cell (2, 0) (VIDE; the grid has the focus), a `page.mouse.click` on `clue-next` selects AMEN on (3, 1) and leaves `document.activeElement` on the `grid`, and the key `I` then shows `I` in (3, 1). Keyboard only: `tab_to` `clue-next` and `Enter` move the selection and leave the focus on `clue-next`.
 - **AC-25** (new; refines spec 022 AC-5's picker place and AC-4's look) (browser with mocked socket) The picker floats over the bottom of the grid, and a shown reaction is a pill over its clue. At 360 by 740 and 1280 by 720, after a tap on the clue cell (0, 3) and a click on `react-button`: `reaction-picker` is centred on `grid-viewport` (its centre x within 1 px of the viewport's), its bottom 8 px above the viewport's bottom (1 px), `z-index` 9, background rgb(255, 255, 255), a `1px` `solid` rgb(221, 226, 234) border, `border-radius` `24px`, padding `5px`; each `reaction-option` is 40 by 40 px with `border-radius` `20px`, a background alpha 0 and `font-size` 22 px, and after `page.hover` on the first, its background is rgb(230, 237, 249); `react-button` has `aria-expanded="true"` and a background rgb(255, 255, 255); a second click closes the picker. When the mock sends a `reaction` of `p2` with `clap` on IDES (0, 3, 0), the `clue-reaction` has `background-color` rgb(255, 255, 255), a `1px` `solid` rgb(221, 226, 234) border, `border-radius` `12px`, padding `2px 6px`, `font-size` 16 px, `line-height` 19.2 px, `z-index` 8, its centre within 1 px of the centre of the `clue` element of IDES, and `elementFromPoint` at its centre returns it; a `reaction` on NAVAL (0, 0, 1) shows its pill centred on the lower `clue` element of (0, 0).
-- **AC-26** (new) (browser with mocked socket) Others' actions show as a 3-second note while the stream is not shown. At 360 by 740 (Salon closed) on a FX-01 snapshot: `chat_message` seq 6 from `p2` with `IDES ?` shows within 300 ms one `room-note` reading `Bob : IDES ?` (built from `fr.json["note.message"]`), with spec 041's `nock-note` look, `aria-hidden="true"`, `tabindex="-1"`, its centre x within 1 px of `grid-viewport`'s, its top 8 px below the viewport's top (1 px), `z-index` 6, and `grid-viewport`'s box unchanged (1 px). It still shows 2,700 ms after it appeared, has `data-off` and `opacity` 0 by 3,400 ms, and is gone by 3,700 ms. A `reveal_result` seq 7 by `p2` (scope letter) shows the note `Bob a révélé une lettre` whose first child has the pictogram `content` `"▲"`; a `flag_changed` seq 8 by `p2` on IDES, 1,000 ms later, replaces it at once by `Bob bloque sur « Fatales à César »` with the flag icon first. A `check_result` by `p1` and a `chat_message` of `p1` make no note; a `check_result` by `p2` makes one; a `reaction` of `p1` with `wow` makes `Vous avez réagi : 😮`; a `reaction` of `p2` makes none. A click on a shown note opens the Salon on `salon-tab-discussion` and removes the note. With the Salon open on Discussion, a `chat_message` from `p2` makes no note. While the mock's `vote_opened` (by `p2`, a grid check) keeps `vote-banner` on the page, two `chat_message` from `p2` (`un`, `deux`) make no note; once the mock's `vote_closed` (`passed`) comes, the banner is gone within 300 ms and one note shows, reading `fr.json["vote.result.passed"]`, the newest, and no note `Bob : deux` shows. (Note from the lead, 2026-10-22: refined by spec 047, the design's room overlays; this read "once the banner has gone (after `vote_closed` and spec 025's result time), one note `Bob : deux` shows": the banner leaves at `vote_closed`, and the vote's result is a note.) Under `page.emulate_media(reduced_motion="reduce")` the note's `transition-duration` is `0s`. A click on `undo-button` answered by `error` `nothing_to_undo` shows `undo-message` (`role="status"`, `fr.json["undo.nothing"]`) with the note's look and place, also with the Salon open on Discussion.
+- **AC-26** (new) (browser with mocked socket) Others' actions show as a 3-second note while the stream is not shown. At 360 by 740 (Salon closed) on a FX-01 snapshot: `chat_message` seq 6 from `p2` with `IDES ?` shows within 300 ms one `room-note` reading `Bob : IDES ?` (built from `fr.json["note.message"]`), with spec 041's `nock-note` look, `aria-hidden="true"`, `tabindex="-1"`, its centre x within 1 px of `grid-viewport`'s, its top 8 px below the viewport's top (1 px), `z-index` 6, and `grid-viewport`'s box unchanged (1 px). It still shows 2,700 ms after it appeared, has `data-off` and `opacity` 0 by 3,400 ms, and is gone by 3,700 ms. A `reveal_result` seq 7 by `p2` (scope letter) shows the note `Bob a révélé une lettre` whose first child has the pictogram `content` `"▲"`; a `flag_changed` seq 8 by `p2` on IDES, 1,000 ms later, replaces it at once by `Bob bloque sur « Fatales à César »` with the flag icon first. A `check_result` by `p1` and a `chat_message` of `p1` make no note; a `check_result` by `p2` makes one; a `reaction` of `p1` with `wow` makes `Vous avez réagi : 😮`; a `reaction` of `p2` makes none. A click on a shown note opens the Salon on `salon-tab-discussion` and removes the note. With the Salon open on Discussion, a `chat_message` from `p2` makes no note. While the mock's `vote_opened` (by `p2`, a grid check) keeps `vote-banner` on the page, two `chat_message` from `p2` (`un`, `deux`) make no note; once the mock's `vote_closed` (`passed`) comes, the banner is gone within 300 ms and one note shows, reading `fr.json["vote.result.passed"]`, the newest, and no note `Bob : deux` shows. (Note from the lead, 2026-10-22: refined by spec 047, the design's room overlays; this read "once the banner has gone (after `vote_closed` and spec 025's result time), one note `Bob : deux` shows": the banner leaves at `vote_closed`, and the vote's result is a note.) (Note from the lead, 2026-10-22: the reading spec 043's build meets, as AC-27 does for spec 044. Until spec 047 is built, the vote part reads as follows: the banner keeps spec 025's result time and there is no `vote` line, so no `vote.result.passed` note and no 300 ms; no note shows while `vote-banner` is on the page, and once it is gone exactly one note shows, the latest one that waited (`Bob : deux`, never `Bob : un`). Spec 047's build then checks the rest, the banner gone within 300 ms at `vote_closed` and the note reading `fr.json["vote.result.passed"]`; its "Refined specs" row for 043 AC-26 says so.) Under `page.emulate_media(reduced_motion="reduce")` the note's `transition-duration` is `0s`. A click on `undo-button` answered by `error` `nothing_to_undo` shows `undo-message` (`role="status"`, `fr.json["undo.nothing"]`) with the note's look and place, also with the Salon open on Discussion. At 360 by 740 and at 1280 by 720, while the mock's `vote_opened` (by `p2`, a grid check) keeps `vote-banner` on the page, the same click shows `undo-message` with its centre x within 1 px of `grid-viewport`'s, its top 8 px below `vote-banner`'s bottom (1 px) and `z-index` 6, and `elementFromPoint` at its centre returns `undo-message` or an element inside it. (Note from the lead, 2026-10-22: the sentence before this note was added after spec 043 WP-2's first review, the lead's decision, Decision 25; the criterion only read "with the note's look and place", and at that place the banner covered the message.) A note that shows when the player opens the stream with a click on `chat-toggle` stays: it still shows 300 ms after the click, and is gone by 3,700 ms after it appeared. (Note from the lead, 2026-10-22: the sentence before this note was added after the same review, Decision 26.)
 - **AC-27** (new; refines spec 026 AC-10 and spec 028 AC-7) (browser with mocked socket) The completion status is a band under the clue bar, except in the phone row, and holds « Voir le bilan ». On a FX-01 snapshot whose 18 cells hold their solution and `solved` true, at 1280 by 720 and 360 by 740: `grid-status` (`data-state="solved"`) has its top on `clue-bar`'s bottom and its left and right on the bar's (1 px), `background-color` rgb(230, 242, 234), padding `8px 12px`, its text `fr.json["completion.solved"]` in rgb(30, 123, 69), weight 600, `font-size` 15.2 px, after a pictogram whose `content` is `"✓"`; `recap-open` is inside it, after its text, its right edge on the band's content right edge (1 px), with the primary button's colours, padding `7px 12px` and `font-size` 13.6 px; a click on it opens `recap` (spec 028). On a full and wrong grid (`grid_full_wrong`), `grid-status` (`data-state="full_wrong"`) has `background-color` rgb(238, 242, 248), text colour rgb(27, 47, 85), and no `recap-open`. At 568 by 320 in the touch context, before spec 044 is built (the solved page still shows `keyboard`, in the sheet layout, `data-layout="sheet"`), the solved `grid-status` lies inside `clue-bar`'s box, right of `clue-bar-text` and left of `react-button`, its text colour rgb(255, 255, 255), and `recap-open` inside it has the secondary button's colours (spec 041 AC-10); on the full-and-wrong snapshot there (sheet layout, the keyboard shown), `grid-status` lies inside `clue-bar`'s box the same way, its text colour rgb(255, 255, 255), with no `recap-open`; at 568 by 320 in the desktop context (column layout), `grid-status` is under the bar. Spec 044 replaces the solved touch case at 568 by 320: from its build on, the solved page there has no `keyboard` and `data-layout="column"`, and `grid-status` is under the bar with the primary `recap-open` (spec 044 AC-9, and its "Refined specs" row for this criterion, whose test spec 044's test-writer updates). The full-and-wrong case holds before and after spec 044. (Note from the lead, 2026-10-22: changed after spec 043 WP-1's implementer's report. The criterion read here "At 568 by 320 in the touch context, the solved page has no `keyboard` and `data-layout="column"` (spec 044), and `grid-status` is under the bar with the primary `recap-open`; on the full-and-wrong snapshot there [...]", followed by "Build order: spec 043 is built before spec 044, so the solved page at 568 by 320 in the touch context (no `keyboard`, `data-layout="column"`, the band under the bar) is not checked by spec 043's build, whose page there still shows the keyboard in the sheet layout; spec 044's build checks it [...]. Spec 043's build checks the rest [...]". Until spec 044 is built the keyboard stays on a solved page on a low touch window and the grid needs its 100 px (AC-28, spec 028 AC-10's `test_ac10_spec_013_layout_holds_on_the_solved_page[568x320-touch]`), so spec 043's build puts the solved status in the clue bar's row, as this criterion read before spec 044's refinement, and its test checks it; spec 044's build replaces the check.) (Note from the lead, 2026-10-22: refined by spec 044, the design's keyboard; this read "At 568 by 320 in the touch context (sheet layout), the solved `grid-status` lies inside `clue-bar`'s box, right of `clue-bar-text` and left of `react-button`, its text colour rgb(255, 255, 255), and `recap-open` has the secondary button's colours". The note above restores that reading for spec 043's build.)
 - **AC-28** (new) (browser with mocked socket) Everything stays inside the window and the grid keeps its room, whatever is open. With `H8`, at each window size of spec 006 AC-5, in desktop and touch contexts, in four states (all closed, the column layout's Salon closed by a click on `chat-toggle`; the Salon open on Discussion; `aide-menu` open; `room-menu` open): spec 013 AC-6's checks hold (`grid-viewport` at least 100 px high, no vertical or horizontal page scroll, the grid inside the viewport at zoom 1, `clue-bar` inside the window and, in the touch context, at or above the top of `keyboard`); `room-topbar`, `clue-bar` and, when open, the popover and the Salon lie inside the window (1 px); `elementFromPoint` at the centre of each top-bar button and each clue-bar button returns it, except where the open Salon sheet or an open popover's scrim covers the clue bar (sheet layout) (Note from the lead, 2026-10-22: this read "except where the open Salon sheet covers the clue bar (sheet layout)"; in the sheet layout an open `aide-menu` or `room-menu` shows `room-scrim` from 54 px below the window's top (AC-12, "Popovers: shared rules", `_design.md` section 8), which covers the clue bar's buttons as the Salon sheet does); at the centre of each item of an open popover, after `scrollIntoView({block: "nearest"})` of the item, it returns that item; `grid-viewport`'s box is the same in the four states in the sheet layout (1 px); and the timer's text `10:00:00` is on one line. On the same page, with the Salon open in the column layout, the `grid` box is the same before and after the mock sends 3 more line events (1 px). At 568 by 320 and 740 by 360, in the desktop context and in the touch context with `nock.keyboard_hidden` seeded `"true"` (spec 044's column layout), `room-topbar` is the phone top bar (54 px high, no `topbar-brand` shown) and the checks above hold in the four states. (Note from the lead, 2026-10-22: added, the lead's decision recorded as spec 044's Decision 8; with the computer top bar these windows were narrower than the bar.)
 - **AC-29** (new; refines spec 035 AC-3's order) (browser with mocked socket, keyboard only after the setup) The page reads in the design's order and every control shows its ring. At 1280 by 720 on a FX-01 snapshot with `you` host, the focusable elements that show come in this document order: `undo-button`, `pencil-toggle`, `aide-button`, `chat-toggle`, `menu-button`, the `grid`, `clue-prev`, `react-button`, `flag-button`, `clue-next`, then the Salon's `salon-tab-discussion` and its later controls. With the grid focused and (1, 0) selected, `Escape` then `Tab` puts the focus on `clue-prev` with the selection unchanged; `Escape` then `Shift+Tab` from the grid puts it on `menu-button`. Each top-bar button reached by `tab_to` has a `2px` `solid` rgb(27, 47, 85) outline with `outline-offset` `2px`, inside the window; each clue-bar button the white ring of AC-23. At 360 by 740 the order is `undo-button`, `aide-button`, `chat-toggle`, `pencil-toggle`, `menu-button`, the `grid`, then the clue bar's four buttons.
@@ -961,7 +1007,12 @@ The words in brackets say how each criterion is tested.
   Salon stays open under it.
 - Notes and the stream (AC-26): a note is never made while the stream shows, so a
   player reading the stream is not shown the same line twice; `undo-message`
-  answers the player's own action and always shows.
+  answers the player's own action and always shows. A note already showing when
+  the stream opens stays for the rest of its 3 seconds (Decision 26; note from the
+  lead, 2026-10-22, added after spec 043 WP-2's first review).
+- `undo-message` during a vote (AC-26, Decision 25): it sits 8 px under the
+  banner's bottom edge, so the banner never covers it. (Note from the lead,
+  2026-10-22: added after spec 043 WP-2's first review.)
 - Notes during a vote (AC-26): only the newest waiting note shows after the banner,
   so a vote never builds a queue of notes.
 - A note for a line that the player then opens (AC-26): the tap opens the Discussion
@@ -1166,6 +1217,30 @@ them). The number in brackets is the question's number, which the text above cit
     also scroll the line into view. Answer: the first; a scroll would break the
     rule that the page never moves a list the player is reading.
 
+Decided by the lead on 2026-10-22, after spec 043 WP-2's first review (note from
+the lead, 2026-10-22: this group is new; the text above already follows it):
+
+25. A note that shows while `vote-banner` is on the page (today only
+    `undo-message`) sits 8 px under the banner's bottom edge, with the note's look,
+    layer 6 and horizontal centre, so that nothing covers it ("3-second notes",
+    AC-26). The banner, on layer 9 over the top of `grid-viewport`, covered it at
+    the note's usual place.
+26. A note already showing when the player opens the stream stays until its 3
+    seconds end; "while the stream is shown, no note is made" is about making
+    notes. Only a tap on the note itself removes it.
+27. (Open question 13.) Decision 25 on a short grid area. On a low window (568 by
+    320, 740 by 360) the vote banner may take most of `grid-viewport`'s height, so
+    `undo-message` under it may reach past the viewport's bottom and be clipped by
+    the grid area. Options: accept the clipping in this rare case; or lay the
+    message over the banner's bottom edge when it would not fit under it, which
+    brings back the covering. Answer: the clipping is accepted (rare, and the
+    banner already tells the vote's state); no criterion changes, and AC-26 checks
+    the place at 360 by 740 and 1280 by 720 only.
+
 ## Open questions
 
-None left (all answered with the approval of 2026-10-22).
+None left: questions 1 to 12 were answered with the approval of 2026-10-22
+(Decisions 13 to 24), and question 13 by the lead on 2026-10-22 (Decision 27).
+(Note from the lead, 2026-10-22: after spec 043 WP-2's first review, question 13
+was raised and answered the same day; this read "None left (all answered with the
+approval of 2026-10-22).")
