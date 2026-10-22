@@ -54,7 +54,6 @@ from spec043_harness import (
     WHITE,
     Reading,
     RoomMock,
-    any_pictogram,
     chat_line,
     colour_matches,
     error_frame,
@@ -151,6 +150,54 @@ return {text: text.trim(), colour: parseColour(style.color),
 }"""
 
 
+# Where the status's check mark is drawn against its text, in reading order: for
+# each element of `grid-status` (outside `recap-open`) whose `::before` or `::after`
+# draws `glyph`, whether that pictogram comes before the first text node. A
+# `::before` comes before the text when its element holds the text or precedes it;
+# an `::after` only when its element precedes the text without holding it.
+PICTOGRAM_PLACE_SCRIPT = r"""
+(status, glyph) => {
+  const walker = document.createTreeWalker(status, NodeFilter.SHOW_TEXT);
+  let first = null;
+  for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+    const inButton = node.parentElement.closest('[data-testid="recap-open"]');
+    if (inButton === null && node.textContent.trim() !== '') {
+      first = node;
+      break;
+    }
+  }
+  if (first === null) {
+    return [];
+  }
+  const drawn = `"${glyph}"`;
+  const precedes = element => (element.compareDocumentPosition(first)
+    & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  const places = [];
+  for (const element of [status, ...status.querySelectorAll('*')]) {
+    if (element.closest('[data-testid="recap-open"]') !== null) {
+      continue;
+    }
+    const holds = element.contains(first);
+    if (getComputedStyle(element, '::before').content === drawn) {
+      places.push(holds || precedes(element) ? 'before' : 'after');
+    }
+    if (getComputedStyle(element, '::after').content === drawn) {
+      places.push(!holds && precedes(element) ? 'before' : 'after');
+    }
+  }
+  return places;
+}
+"""
+
+
+def pictogram_places(page: Page, glyph: str) -> list[str]:
+    """Where each `glyph` pictogram of `grid-status` is, `before` or `after` text."""
+    status = page.get_by_test_id("grid-status")
+    found = status.evaluate(PICTOGRAM_PLACE_SCRIPT, glyph)
+    assert isinstance(found, list), found
+    return [str(place) for place in found]
+
+
 def status_text(page: Page) -> Reading:
     found = page.get_by_test_id("grid-status").evaluate(STATUS_TEXT_SCRIPT)
     assert isinstance(found, dict), "grid-status holds no text"
@@ -205,7 +252,7 @@ def test_ac27_the_solved_text_is_green_after_its_check_pictogram(
     assert colour_matches(text["colour"], GREEN), text
     assert text["fontWeight"] == "600"
     assert same_font_size(float(str(text["fontSize"]).removesuffix("px")), 15.2)
-    assert any_pictogram(page.get_by_test_id("grid-status"), "\N{CHECK MARK}")
+    assert pictogram_places(page, "\N{CHECK MARK}") == ["before"]
 
 
 @pytest.mark.parametrize(("width", "height"), SIZES, ids=SIZE_IDS)

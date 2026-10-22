@@ -93,6 +93,42 @@ def grid_centre(page: Page) -> float:
     return box_of(page.get_by_test_id("grid")).centre_x
 
 
+GRID_SETTLE_MS = 2000
+GRID_POLL_MS = 50
+
+
+def wait_for_the_grid(
+    page: Page, min_side: float, side: float | None, centre: float
+) -> None:
+    """Wait until the grid has refitted after the Salon opened or closed.
+
+    The page may refit the grid a frame or more after the click, so the test reads
+    the cell side `s` of (1, 1) and the grid's centre until they match, within
+    2 s, and fails with the last reading otherwise.
+
+    Args:
+        page: The room page.
+        min_side: The smallest `s` allowed.
+        side: The `s` expected (1 px), or `None` when only `min_side` applies.
+        centre: The horizontal centre of `grid` expected (1 px).
+    """
+    found_side = 0.0
+    found_centre = 0.0
+    for _ in range(GRID_SETTLE_MS // GRID_POLL_MS):
+        found_side = cell_side(page)
+        found_centre = grid_centre(page)
+        side_ok = found_side >= min_side
+        if side is not None:
+            side_ok = same_position(found_side, side)
+        if side_ok and same_position(found_centre, centre):
+            return
+        page.wait_for_timeout(GRID_POLL_MS)
+    raise AssertionError(
+        f"s {found_side} (min {min_side}, expected {side}), grid centre"
+        f" {found_centre} (expected {centre})"
+    )
+
+
 def salon_inside_focus(page: Page) -> bool:
     found = page.evaluate(
         "() => document.querySelector('[data-testid=\"salon\"]')"
@@ -152,8 +188,7 @@ def test_ac13_closing_the_column_is_remembered_and_gives_its_room_to_the_grid(
     assert stored_value(page, SALON_KEY) == "true"
     # Decision of 2026-10-22: `s` does not shrink and the grid's centre moves right
     # by half the column's 340 px.
-    assert cell_side(page) >= noted_side - 1.0
-    assert same_position(grid_centre(page), noted_centre + 170.0)
+    wait_for_the_grid(page, noted_side - 1.0, None, noted_centre + 170.0)
 
     reload_room(page, mock, frame)
     expect_closed(salon)
@@ -175,8 +210,7 @@ def test_ac13_opening_the_column_again_forgets_the_key_and_focuses_the_input(
     expect(page.get_by_test_id("salon")).to_be_visible()
     assert stored_value(page, SALON_KEY) is None
     expect(page.get_by_test_id("chat-input")).to_be_focused()
-    assert same_position(cell_side(page), noted_side)
-    assert same_position(grid_centre(page), noted_centre)
+    wait_for_the_grid(page, noted_side - 1.0, noted_side, noted_centre)
 
 
 def test_ac13_escape_in_the_column_focuses_chat_toggle_and_leaves_it_open(

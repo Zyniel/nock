@@ -58,6 +58,7 @@ from nock.protocol import (
     HelpMode,
     Join,
     PencilEdit,
+    PlayerView,
     RemovePlayer,
     Reveal,
     RevealBudget,
@@ -88,6 +89,7 @@ from spec024_harness import (
     Peer,
     join_peers,
     ping_and_wait,
+    player_view,
     with_letter_cells,
 )
 
@@ -95,6 +97,7 @@ SHARE_TOKEN = "tok_ABCDEFGHIJKLMNOP"
 UNKNOWN_TOKEN = "tok_unknown_0123456789"
 TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 THIRD_TOKEN = "third-token-number-0003"
+EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 QUIET_MS = 400
 TAMIS = WordTarget(row=0, column=0, clue_index=0)
 LEST = WordTarget(row=4, column=0, clue_index=0)
@@ -601,3 +604,12 @@ class RunningAfterPlayR:
 
     def __call__(self) -> float:
         return time.time() - self._offset
+
+
+def eight_players() -> list[PlayerView]:
+    """`p1` (Ana, `you`, host) among 8 players (spec 013 AC-6's snapshot)."""
+    players = [player_view("p1", "Ana", 0, is_host=True)]
+    for number in range(2, 9):
+        nickname = EIGHT_NICKNAMES[number - 1]
+        players.append(player_view(f"p{number}", nickname, number - 1))
+    return players

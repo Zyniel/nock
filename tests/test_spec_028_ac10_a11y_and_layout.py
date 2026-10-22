@@ -31,6 +31,7 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
+from spec019_harness import CONTEXT_KINDS, WINDOW_SIZES, layout_problems
 from spec024_harness import (
     LANGUAGE_SCAN_SCRIPT,
     cell_at,
@@ -43,22 +44,14 @@ from spec024_harness import (
     player_view,
 )
 from spec027_harness import open_timer_room
-from spec027_toolbar_harness import (
-    CONTEXTS,
-    MAX_TABS,
-    TEN_HOURS_MS,
-    WINDOW_SIZES,
-    check_frame,
-    eight_players,
-    size_ids,
-    spec013_layout_problems,
-)
 from spec028_harness import (
+    eight_players,
     recap_body,
     recap_player,
     serve_recap,
 )
 from spec035_harness import (
+    MAX_TABS,
     WAIT_TIMEOUT_MS,
     Walker,
     contrast_offenders,
@@ -67,7 +60,9 @@ from spec035_harness import (
 from spec042_harness import box_of
 from spec043_harness import (
     CLUE_BAR_BUTTONS,
+    H8_TIMER_MS,
     box_inside,
+    check_frame,
     hit_problem,
     shown_items,
     window_box,
@@ -77,6 +72,13 @@ SHARE_PATH = "/recap/tok_ABCDEFGHIJKLMNOP"
 FEED_ITEMS = 100
 EPSILON = 1.0
 SCAN_SIZES = [(1280, 720), (360, 740)]
+
+
+def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
+    """Readable ids of window sizes for `parametrize`."""
+    return [f"{width}x{height}" for width, height in sizes]
+
+
 HOSTILE_NAMES = ["<b>Eve</b>", "<img src=x>"]
 FR_KEYS = {
     "recap.open": "Voir le bilan",
@@ -121,7 +123,7 @@ def open_solved_toolbar_room(
             page,
             live_server,
             grid,
-            elapsed_ms=TEN_HOURS_MS,
+            elapsed_ms=H8_TIMER_MS,
             running=False,
             solved=True,
             players=eight_players(),
@@ -129,7 +131,7 @@ def open_solved_toolbar_room(
         expect(page.get_by_test_id("recap-open")).to_be_visible()
         last_seq = 5 + FEED_ITEMS
         for seq in range(6, last_seq + 1):
-            mock.send(check_frame(seq))
+            mock.send(check_frame(seq, "p2"))
         expect_seq(page, last_seq)
         cell = cell_at(page, 3, 1)
         if touch:
@@ -210,7 +212,7 @@ IN_DIALOG_SCRIPT = """
 """
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_the_open_dialog_lies_inside_the_window(
     browser: Browser,
@@ -243,7 +245,7 @@ def test_ac10_the_open_dialog_lies_inside_the_window(
     assert bottom <= window_height + EPSILON, reading
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_close_copy_and_the_share_link_take_the_focus_with_tab(
     browser: Browser,
@@ -286,7 +288,7 @@ def test_ac10_close_copy_and_the_share_link_take_the_focus_with_tab(
 # ---- The solved page: spec 013 AC-6 and spec 024 AC-8 with recap-open ----
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_spec_013_layout_holds_on_the_solved_page(
     browser: Browser,
@@ -303,7 +305,7 @@ def test_ac10_spec_013_layout_holds_on_the_solved_page(
     )
     try:
         expect(page.get_by_test_id("recap-open")).to_be_visible()
-        problems = spec013_layout_problems(page, touch)
+        problems = layout_problems(page, touch)
     finally:
         close()
 
@@ -336,7 +338,7 @@ def solved_page_reach_problems(page: Page) -> list[str]:
     return problems
 
 
-@pytest.mark.parametrize("context_kind", CONTEXTS)
+@pytest.mark.parametrize("context_kind", CONTEXT_KINDS)
 @pytest.mark.parametrize(("width", "height"), WINDOW_SIZES, ids=size_ids(WINDOW_SIZES))
 def test_ac10_on_the_solved_page_every_button_and_recap_open_can_be_hit(
     browser: Browser,
