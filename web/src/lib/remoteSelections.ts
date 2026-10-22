@@ -1,11 +1,28 @@
-// The selections of the other players, ready to draw (spec 013).
+// The selections of the other players, ready to draw (spec 013), and the corner
+// each one holds on its cell (spec 042, "Other players on a cell").
 // Plain functions: no DOM and no socket.
 
 import type { Snapshot } from './roomSession'
 import { positionKey, wordAt } from './wordSelection'
 import type { Word } from './wordSelection'
 
-// One other player's selection: where it is and which cells their word holds.
+// The four corners of a cell, in the order arriving players take them.
+export type Corner = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left'
+
+export const CORNERS: readonly Corner[] = ['top-left', 'top-right', 'bottom-right', 'bottom-left']
+
+// One other player's cursor on a cell. A list of them is kept in the order the
+// players arrived on their cells; `corner` is null while the four corners of
+// the cell are held by players who came first.
+export interface CellCursor {
+  playerId: string
+  row: number
+  column: number
+  corner: Corner | null
+}
+
+// One other player's selection: where it is, which cells their word holds and
+// the corner of the cell they hold (null: not drawn, all four are held).
 export interface RemoteSelection {
   playerId: string
   colour: number
@@ -13,33 +30,111 @@ export interface RemoteSelection {
   column: number
   // The "row,column" of each cell of their selected word.
   wordPositions: Set<string>
-  // The initials of their nickname, drawn in their cursor (spec 035).
-  initials: string
+  corner: Corner | null
 }
 
-// The initials of a nickname: split on spaces, hyphens, apostrophes (' and ’)
-// and underscores; with two or more parts, the first character of each of the
-// first two parts; with one part, its first two characters. Upper-cased with
-// toLocaleUpperCase('fr'). Characters are code points.
-export function initialsOf(nickname: string): string {
-  const parts: string[] = []
-  for (const part of nickname.split(/[ \-'’_]+/)) {
-    if (part !== '') {
-      parts.push(part)
+// Where the other players' cursors are now, in roster order, with no corner
+// yet. Never mine, never a disconnected player's; an idle player keeps theirs.
+export function cursorPositionsOf(snapshot: Snapshot | null): CellCursor[] {
+  const positions: CellCursor[] = []
+  if (snapshot === null) {
+    return positions
+  }
+  for (const player of snapshot.players) {
+    if (player.player_id === snapshot.you || player.state === 'disconnected') {
+      continue
+    }
+    if (player.selection === null) {
+      continue
+    }
+    positions.push({
+      playerId: player.player_id,
+      row: player.selection.row,
+      column: player.selection.column,
+      corner: null,
+    })
+  }
+  return positions
+}
+
+// The first corner of the cell, in the order of CORNERS, that no cursor holds;
+// null when all four are held.
+function firstFreeCorner(cursors: CellCursor[], row: number, column: number): Corner | null {
+  for (const corner of CORNERS) {
+    let isHeld = false
+    for (const cursor of cursors) {
+      if (cursor.row === row && cursor.column === column && cursor.corner === corner) {
+        isHeld = true
+      }
+    }
+    if (!isHeld) {
+      return corner
     }
   }
-  let letters: string[] = []
-  if (parts.length >= 2) {
-    letters = [[...parts[0]][0], [...parts[1]][0]]
-  } else if (parts.length === 1) {
-    letters = [...parts[0]].slice(0, 2)
+  return null
+}
+
+// The cursors after a change of the room, from the cursors before it (in order
+// of arrival) and where the cursors are now (in roster order).
+//
+// A player still on the cell they had keeps their place and their corner. A
+// player who moved to another cell, or who is gone, leaves their cell; each
+// corner freed goes to the player who has waited longest on that cell. Then
+// the players who arrived on a cell, in roster order, take its first free
+// corner, or wait when all four are held.
+export function nextCursors(before: CellCursor[], now: CellCursor[]): CellCursor[] {
+  const cellOfPlayer = new Map<string, string>()
+  for (const position of now) {
+    cellOfPlayer.set(position.playerId, positionKey(position.row, position.column))
   }
-  return letters.join('').toLocaleUpperCase('fr')
+
+  const kept: CellCursor[] = []
+  for (const cursor of before) {
+    const isOnTheSameCell =
+      cellOfPlayer.get(cursor.playerId) === positionKey(cursor.row, cursor.column)
+    if (isOnTheSameCell) {
+      kept.push({ ...cursor })
+    }
+  }
+
+  // The waiting players, longest first, take the corners that were freed.
+  for (const cursor of kept) {
+    if (cursor.corner === null) {
+      cursor.corner = firstFreeCorner(kept, cursor.row, cursor.column)
+    }
+  }
+
+  const keptPlayers = new Set<string>()
+  for (const cursor of kept) {
+    keptPlayers.add(cursor.playerId)
+  }
+  for (const position of now) {
+    if (keptPlayers.has(position.playerId)) {
+      continue
+    }
+    const corner = firstFreeCorner(kept, position.row, position.column)
+    kept.push({ ...position, corner })
+  }
+  return kept
+}
+
+// The corner a player holds on the cell (row, column), or null.
+function cornerOf(cursors: CellCursor[], playerId: string, row: number, column: number): Corner | null {
+  for (const cursor of cursors) {
+    if (cursor.playerId === playerId && cursor.row === row && cursor.column === column) {
+      return cursor.corner
+    }
+  }
+  return null
 }
 
 // The selections to draw, in roster order. Never mine, never a disconnected
-// player's; an idle player keeps theirs.
-export function remoteSelectionsOf(snapshot: Snapshot | null, words: Word[]): RemoteSelection[] {
+// player's; an idle player keeps theirs. `cursors` gives each one its corner.
+export function remoteSelectionsOf(
+  snapshot: Snapshot | null,
+  words: Word[],
+  cursors: CellCursor[],
+): RemoteSelection[] {
   const remotes: RemoteSelection[] = []
   if (snapshot === null) {
     return remotes
@@ -65,7 +160,7 @@ export function remoteSelectionsOf(snapshot: Snapshot | null, words: Word[]): Re
       row: selection.row,
       column: selection.column,
       wordPositions,
-      initials: initialsOf(player.nickname),
+      corner: cornerOf(cursors, player.player_id, selection.row, selection.column),
     })
   }
   return remotes
