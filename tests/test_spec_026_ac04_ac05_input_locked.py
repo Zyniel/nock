@@ -5,6 +5,11 @@ the room page with a mocked socket. The shared setup is in `spec026_harness`.
 
 Reading of AC-5: tapping a cell sends a `select_cell` frame (selection is not
 locked), so "sends no frame" is checked as "sends no frame after the tap".
+
+Refined by spec 044 (the design's keyboard): the in-app keyboard goes away once
+the grid is solved (spec 044 AC-9), so the touch page of AC-5 has no `keyboard` to
+type with; its test checks that the solved touch page shows none and that the keys
+of a hardware keyboard still send nothing there.
 """
 
 from __future__ import annotations
@@ -330,7 +335,7 @@ def test_ac5_control_an_unsolved_page_sends_the_same_keys(
 
 @pytest.fixture
 def touch_page(browser: Browser, browser_name: str) -> Iterator[Page]:
-    """A 360 by 740 touch page; its pointer is coarse, so the keyboard shows."""
+    """A 360 by 740 touch page; its pointer is coarse (spec 009's touch screen)."""
     viewport = {"width": 360, "height": 740}
     if browser_name == "firefox":
         context = browser.new_context(viewport=viewport, has_touch=True)
@@ -344,7 +349,7 @@ def touch_page(browser: Browser, browser_name: str) -> Iterator[Page]:
         context.close()
 
 
-def test_ac5_the_in_app_keyboard_sends_nothing_once_solved(
+def test_ac5_the_solved_touch_page_has_no_in_app_keyboard_and_sends_nothing(
     touch_page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_fx01(
@@ -352,12 +357,13 @@ def test_ac5_the_in_app_keyboard_sends_nothing_once_solved(
     )
     cell_at(touch_page, 1, 0).tap()
     expect_selection(touch_page, 1, 0)
-    expect(touch_page.get_by_test_id("keyboard")).to_be_visible()
+    # Spec 044 AC-9: a solved page has no in-app keyboard.
+    expect(touch_page.get_by_test_id("keyboard")).to_have_count(0)
     touch_page.wait_for_timeout(SETTLE_MS)
     already_sent = len(mock.frames_without_pings())
 
-    touch_page.locator('[data-testid="key"][data-key="B"]').tap()
-    touch_page.get_by_test_id("key-delete").tap()
+    touch_page.keyboard.press("b")
+    touch_page.keyboard.press("Backspace")
     touch_page.wait_for_timeout(QUIET_MS)
 
     assert mock.frames_without_pings()[already_sent:] == []

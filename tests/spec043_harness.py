@@ -242,6 +242,16 @@ ICON_SHAPES: dict[str, list[tuple[str, dict[str, str]]]] = {
         ("path", {"d": "M8.5 14.5c1.8 2 5.2 2 7 0"}),
         ("path", {"d": "M9 9.5h.01M15 9.5h.01"}),
     ],
+    # The icons of spec 044's keyboard: « Clavier », ⇄ and ⌫.
+    "clavier": [
+        ("rect", {"x": "2", "y": "6", "width": "20", "height": "12", "rx": "2"}),
+        ("path", {"d": "M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"}),
+    ],
+    "swap": [("path", {"d": "M4 8h14l-3-3M20 16H6l3 3"})],
+    "effacer": [
+        ("path", {"d": "M9 5h11v14H9l-6-7 6-7z"}),
+        ("path", {"d": "M13 9l4 6M17 9l-4 6"}),
+    ],
 }
 NUMBER_ATTRIBUTES = {"cx", "cy", "r", "x", "y", "width", "height", "rx"}
 

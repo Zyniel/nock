@@ -9,11 +9,15 @@ the dots have their colours back. (AC-26, the notes, is in
 
 AC-27: the completion status is a band under the clue bar, holding « Voir le
 bilan » once solved, and sits in the clue bar's row only in the sheet layout of a
-low window while the in-app keyboard shows. AC-27's case "at 568 by 320 in the
-touch context, the solved page has no `keyboard` and `data-layout="column"`" is
-not tested here: it is spec 044's (the keyboard goes away once solved, "in step 4"
-says the note of "Completion status"), and this step keeps the keyboard on a
-solved page (spec 026 AC-5).
+low window while the in-app keyboard shows.
+
+Refined by spec 044 (the design's keyboard, its "Refined specs" row for AC-27): the
+keyboard goes away once the grid is solved, so at 568 by 320 (and 740 by 360) in
+the touch context the solved page has no `keyboard` and the column layout, and
+`grid-status` is the band under the bar with the primary `recap-open`; the check
+of spec 043's build (the solved status in the clue bar's row with a secondary
+`recap-open`) is replaced. The in-row check runs on the full-and-wrong snapshot,
+which has no `recap-open`.
 
 Choices where the spec leaves room:
 
@@ -299,35 +303,26 @@ LOW_TOUCH_SIZES = [(568, 320), (740, 360)]
 @pytest.mark.parametrize(
     ("width", "height"), LOW_TOUCH_SIZES, ids=["568x320", "740x360"]
 )
-def test_ac27_until_spec_044_a_solved_low_touch_window_sits_in_the_clue_bars_row(
+def test_ac27_a_solved_low_touch_window_has_no_keyboard_and_the_band_under_the_bar(
     window: OpenWindow, live_server: str, fx01_grid: Grid, width: int, height: int
 ) -> None:
-    # Decision of 2026-10-22: until spec 044 hides the keyboard on a solved page,
-    # the solved status sits in the clue bar's row like the full-and-wrong one,
-    # with `recap-open` in the secondary button's colours.
+    # Refined by spec 044 (AC-9, "Refined specs"): the keyboard leaves a solved
+    # page, which takes the column layout and the band with the primary button.
     page = window(width, height, True)
     open_solved(page, live_server, fx01_grid)
-    expect_layout(page, "sheet")
-    expect(page.get_by_test_id("keyboard")).to_be_visible()
+    expect_layout(page, "column")
+    expect(page.get_by_test_id("keyboard")).to_have_count(0)
     button = page.get_by_test_id("grid-status").get_by_test_id("recap-open")
     expect(button).to_have_count(1)
 
     box = box_of(page.get_by_test_id("grid-status"))
     bar_box = box_of(page.get_by_test_id("clue-bar"))
-    text_box = box_of(page.get_by_test_id("clue-bar-text"))
-    react_box = box_of(page.get_by_test_id("react-button"))
-    text = status_text(page)
+    window_height = page.evaluate("() => innerHeight")
 
-    assert box.left >= bar_box.left - 1.0, (box, bar_box)
-    assert box.right <= bar_box.right + 1.0, (box, bar_box)
-    assert box.top >= bar_box.top - 1.0, (box, bar_box)
-    assert box.bottom <= bar_box.bottom + 1.0, (box, bar_box)
-    assert box.left >= text_box.right - 1.0, (box, text_box)
-    assert box.right <= react_box.left + 1.0, (box, react_box)
-    assert colour_matches(text["colour"], WHITE), text
-    expect_colour(button, "backgroundColor", WHITE)
-    expect_colour(button, "color", NAVY)
-    expect_colour(button, "borderTopColor", NAVY)
+    assert same_position(box.top, bar_box.bottom), (box, bar_box)
+    assert box.bottom <= float(window_height) + 1.0, box
+    expect_colour(button, "backgroundColor", NAVY)
+    expect_colour(button, "color", WHITE)
 
 
 @pytest.mark.parametrize("state", ["solved", "full_wrong"])

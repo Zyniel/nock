@@ -13,6 +13,11 @@ AC-28's checks hold (`room-topbar` and `clue-bar` inside the window, each of the
 buttons hit at its centre) and `elementFromPoint` at the centre of `recap-open`
 returns it.
 
+Refined by spec 044 (the design's keyboard): the in-app keyboard goes away once
+the grid is solved (spec 044 AC-9), so on the solved page spec 013 AC-6's checks
+run without the keyboard's check, in the touch context too, and the disabled
+`keyboard-toggle` is among the top-bar buttons that the hit tests read.
+
 Readings the spec leaves open:
 
 - Every measure and scan of the open dialog waits for `recap-time`, so that it
@@ -308,7 +313,10 @@ def test_ac10_spec_013_layout_holds_on_the_solved_page(
     )
     try:
         expect(page.get_by_test_id("recap-open")).to_be_visible()
-        problems = layout_problems(page, touch)
+        # Spec 044 AC-9: a solved page has no keyboard, in the touch context too,
+        # so spec 013 AC-6's keyboard check has no keyboard to read.
+        expect(page.get_by_test_id("keyboard")).to_have_count(0)
+        problems = layout_problems(page, touch=False)
     finally:
         close()
 

@@ -19,9 +19,10 @@ Choices where the spec leaves room:
   that range: all its rectangles have the same top (1 px).
 - "The icon's bottom at or above the label's top" and "the icon's right at or left
   of the label's left" have the position tolerance of 1 px.
-- AC-4's touch context with `nock.keyboard_hidden` seeded `"true"`: the checks of
-  the criterion are made whatever the layout (spec 044, which hides the keyboard,
-  is built after this step; the phone top bar is used in both layouts there).
+- AC-4's touch context with `nock.keyboard_hidden` seeded `"true"`: refined by
+  spec 044 (the design's keyboard), which reads that key: the page there is in
+  the column layout with the phone top bar (`keyboard-toggle` in its fourth slot),
+  and the test checks that layout before the criterion's checks.
 """
 
 from __future__ import annotations
@@ -503,6 +504,9 @@ def test_ac4_no_top_bar_button_overflows_and_the_page_never_scrolls_sideways(
     if keyboard_hidden:
         seed_value(page, "nock.keyboard_hidden", "true")
     open_fx01(page, live_server, fx01_grid, timer_ms=timer_ms, running=running)
+    if keyboard_hidden:
+        # Spec 044: with the keyboard hidden, a low window is the column layout.
+        expect_layout(page, "column")
     timer = page.get_by_test_id("timer")
 
     problems = overflow_problems(page)
