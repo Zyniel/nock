@@ -364,6 +364,43 @@ a.nock-button {
   color: var(--nock-muted);
 }
 
+/* The text of a card, wherever it sits in the card. */
+.nock-card-text {
+  margin: 0;
+  font: 400 0.95rem var(--nock-font-ui);
+  color: var(--nock-ink);
+}
+
+/* The heading of a page in the catalogue frame: the catalogue's and the
+   operator page's. */
+.nock-page-heading {
+  margin: 0;
+  font: 700 1.7rem/1.1 var(--nock-font-ui);
+  color: var(--nock-navy);
+}
+
+/* The time of a recap (_design.md section 4): the recap dialog's and the
+   shared recap page's. */
+.nock-recap-time {
+  margin: 0;
+  font: 700 2.1rem/1 var(--nock-font-ui);
+  color: var(--nock-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A row of buttons side by side, wrapping when they do not fit one line. */
+.nock-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* A text link: navy, weight 600. */
+.nock-text-link {
+  font-weight: 600;
+  color: var(--nock-navy);
+}
+
 /* A field: its label above its input. */
 .nock-field {
   display: grid;
@@ -371,7 +408,10 @@ a.nock-button {
   width: 100%;
 }
 
-.nock-field label {
+/* The label of a field; a field whose input is a group of buttons has its
+   label in another element, with the class nock-field-label. */
+.nock-field label,
+.nock-field-label {
   font: 600 0.85rem/1.2 var(--nock-font-ui);
   color: var(--nock-ink);
 }
@@ -407,12 +447,29 @@ a.nock-button {
   overflow-wrap: anywhere;
 }
 
+/* The confirmation line, under what was done. */
+.nock-done-line {
+  margin: 0;
+  font: 500 0.85rem/1.3 var(--nock-font-ui);
+  color: var(--nock-green);
+  overflow-wrap: anywhere;
+}
+
 /* A state line (_design.md section 8, "States"): one muted line where the
-   content will be, while waiting or when empty. */
+   content will be, while waiting or when empty. The catalogue's lines are in
+   the page's text size; those of a card, and of the plain pages of spec 048,
+   in the card text size (nock-muted-line below). */
 .nock-state-line {
   margin: 0;
   font: 400 1rem/1.5 var(--nock-font-ui);
   color: var(--nock-muted);
+}
+
+.nock-muted-line {
+  margin: 0;
+  font: 400 0.95rem var(--nock-font-ui);
+  color: var(--nock-muted);
+  overflow-wrap: anywhere;
 }
 
 /* The heading of a catalogue section: "My rooms" and the history. Its 6 px
@@ -504,4 +561,22 @@ a.nock-button {
 .nock-chip[aria-pressed='true'] {
   border-color: var(--nock-navy);
   background: var(--nock-word);
+}
+
+/* ---- Grid cells (spec 042, _design.md section 6) -----------------------------
+   The marks a grid cell shares with the operator's replay (spec 048). The cell
+   sets --cell, its side. */
+
+/* The revealed notch: an orange-red triangle pointing up, centred on the
+   bottom edge of the cell (which is positioned). */
+.nock-reveal-notch {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max(7px, calc(var(--cell) * 0.22));
+  height: max(4px, calc(var(--cell) * 0.11));
+  background-color: var(--nock-reveal);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  pointer-events: none;
 }

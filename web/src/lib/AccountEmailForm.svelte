@@ -4,7 +4,9 @@
   import type { RoomKey } from './myRooms'
 
   // The e-mail form of spec 033: it asks a sign-in link for the address typed.
-  // The room's account dialog and the account page both show it.
+  // The room's account dialog and the account page both show it. Its parts are
+  // in a column, 12 px apart (spec 048): the field, the error line when the
+  // request failed, the button, and the confirmation line once the link is sent.
   let {
     room,
     input = $bindable(null),
@@ -21,9 +23,15 @@
   // The address of the last request sent, which `account-sent` names.
   let sentEmail = $state('')
 
+  // Only a refused address is the address's fault: its border turns red. A
+  // refusal for too many requests or a failed send leaves it as it is.
+  const isAddressRefused = $derived(answer === 'invalid')
+
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault()
     const typed = email
+    // A new submit clears the answer to the last one.
+    answer = null
     isSending = true
     answer = await askSignInLink(typed, room)
     sentEmail = typed
@@ -44,49 +52,43 @@
 <!-- `novalidate`: the server judges the address, so that a refused one shows
      `account-error` rather than the browser's own bubble (spec 046 AC-23). -->
 <form class="account-email-form" data-testid="account-email-form" novalidate onsubmit={submit}>
-  <label for="account-email-input">{t('account.email_label')}</label>
-  <input
-    id="account-email-input"
-    data-testid="account-email-input"
-    type="email"
-    autocomplete="email"
-    bind:this={input}
-    bind:value={email}
-  />
+  <div class="nock-field">
+    <label for="account-email-input">{t('account.email_label')}</label>
+    <input
+      id="account-email-input"
+      class="nock-text-input"
+      data-testid="account-email-input"
+      type="email"
+      autocomplete="email"
+      aria-invalid={isAddressRefused ? 'true' : undefined}
+      bind:this={input}
+      bind:value={email}
+    />
+  </div>
+  {#if answer !== null && answer !== 'sent'}
+    <p class="nock-error-line" data-testid="account-error" role="alert">{errorText(answer)}</p>
+  {/if}
   <button
     type="submit"
     class="nock-button nock-button-primary"
-    data-testid="account-email-submit" disabled={isSending}
-    >{t('account.send')}</button
+    data-testid="account-email-submit"
+    disabled={isSending}>{t('account.send')}</button
   >
+  {#if answer === 'sent'}
+    <p class="nock-done-line" data-testid="account-sent" role="status">
+      {t('account.sent', { email: sentEmail })}
+    </p>
+  {/if}
 </form>
-{#if answer === 'sent'}
-  <p data-testid="account-sent" role="status">{t('account.sent', { email: sentEmail })}</p>
-{:else if answer !== null}
-  <p data-testid="account-error" role="alert">{errorText(answer)}</p>
-{/if}
 
 <style>
+  /* As wide as the card or the sheet that holds it; its button keeps its own
+     width. */
   .account-email-form {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .account-email-form label {
-    flex-basis: 100%;
-  }
-
-  /* The input never widens the page on a small window (spec 006 AC-5). */
-  .account-email-form input {
-    flex: 1 1 12rem;
+    display: grid;
+    gap: 12px;
+    justify-items: start;
+    justify-self: stretch;
     min-width: 0;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
-  p {
-    overflow-wrap: anywhere;
   }
 </style>

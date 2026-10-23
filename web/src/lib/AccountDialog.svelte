@@ -106,7 +106,7 @@
     <h2 class="room-sheet-title" id="account-dialog-heading">{t('account.signed_in_heading')}</h2>
     <p>{t('account.signed_in_as', { email: status.email ?? '' })}</p>
     <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-    <a data-testid="account-page-link" href="/account" tabindex="0">{t('account.manage')}</a>
+    <a class="nock-text-link" data-testid="account-page-link" href="/account" tabindex="0">{t('account.manage')}</a>
   {:else}
     <h2 class="room-sheet-title" id="account-dialog-heading">{t('account.dialog_heading')}</h2>
     <p class="intro">
@@ -136,11 +136,9 @@
     color: var(--nock-muted);
   }
 
-  /* The text link « Gérer mon compte » (_design.md section 11). */
+  /* The text link to the account page (app.css), as wide as its text. */
   .account-dialog a {
     align-self: flex-start;
-    font-weight: 600;
-    color: var(--nock-navy);
   }
 
   /* « Fermer », right-aligned. */

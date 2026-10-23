@@ -653,7 +653,7 @@
                   data-testid="catch-up-mark"
                   aria-hidden="true"
                 ></span>{/if}{#if cell.revealed}<span
-                  class="reveal-mark"
+                  class="reveal-mark nock-reveal-notch"
                   data-testid="reveal-mark"
                   aria-hidden="true"
                 ></span><span class="visually-hidden" data-testid="reveal-label"
@@ -974,19 +974,10 @@
     text-decoration-color: var(--nock-ink);
   }
 
-  /* A revealed letter (spec 024, spec 042): an orange-red notch pointing up,
-     centred on the bottom edge, drawn over the triangles and the ring. */
+  /* A revealed letter (spec 024, spec 042): the orange-red notch of app.css
+     (nock-reveal-notch), drawn over the triangles and the ring. */
   .reveal-mark {
-    position: absolute;
     z-index: 3;
-    bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: max(7px, calc(var(--cell) * 0.22));
-    height: max(4px, calc(var(--cell) * 0.11));
-    background-color: var(--nock-reveal);
-    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
-    pointer-events: none;
   }
 
   /* During a flash the notch is ink, which keeps 3:1 on every flash colour

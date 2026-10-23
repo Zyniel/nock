@@ -150,7 +150,7 @@
 
 <main class="nock-plain-page catalogue-page" data-testid="catalogue-page" data-state={pageState}>
   <CatalogueFrame topBarEnd={accountStatus === null ? undefined : accountOpen} bind:isWide>
-    <h1 class="catalogue-heading">{t('catalogue.heading')}</h1>
+    <h1 class="nock-page-heading">{t('catalogue.heading')}</h1>
     {#if myRoomKeys.length > 0}
       <MyRooms keys={myRoomKeys} onloaded={recordSolvedRooms} />
     {/if}
@@ -211,12 +211,6 @@
 <style>
   .catalogue-page {
     background: var(--nock-white);
-  }
-
-  .catalogue-heading {
-    margin: 0;
-    font: 700 1.7rem/1.1 var(--nock-font-ui);
-    color: var(--nock-navy);
   }
 
   .catalogue-filters {
