@@ -9,6 +9,11 @@ before `page.goto`, and every context has `timezone_id="Europe/Paris"`, so
 identities whose code and token match their patterns, so an odd stored token
 neither shows the section nor spoils the request. The live part of AC-5 is in
 `test_spec_032_ac03_ac05_live_pages.py`.
+
+Refined by spec 046 (the design's catalogue, screens sheet P4): "My rooms" has the
+`hidden` attribute and shows no text while it loads and when the answer is empty,
+so `my_rooms.loading` and `my_rooms.empty` leave `fr.json`; a failed request
+shows `my-rooms-error` with `my_rooms.error`.
 """
 
 from __future__ import annotations
@@ -50,14 +55,17 @@ SIZE_5_BY_5 = "5 \N{MULTIPLICATION SIGN} 5"
 SIZE_13_BY_17 = "13 \N{MULTIPLICATION SIGN} 17"
 NEW_KEYS = {
     "my_rooms.heading": "Mes salons",
-    "my_rooms.loading": "Chargement de vos salons\N{HORIZONTAL ELLIPSIS}",
-    "my_rooms.empty": "Aucun salon ouvert.",
     "my_rooms.error": "Impossible de charger vos salons.",
     "my_rooms.unnumbered": "Grille hors catalogue",
     "my_rooms.players": "Joueurs : {names}",
     "my_rooms.last_activity": "Dernière activité : {date} à {time}",
     "my_rooms.open": "Reprendre",
     "my_rooms.open_label": "Reprendre le salon {code}",
+}
+# Spec 046 removed these two keys: nothing shows them any more.
+REMOVED_KEYS = {
+    "my_rooms.loading": "Chargement de vos salons\N{HORIZONTAL ELLIPSIS}",
+    "my_rooms.empty": "Aucun salon ouvert.",
 }
 HOSTILE_NAMES = ["<b>Eve</b>", "<img src=x>"]
 MANY_ROOMS = 101
@@ -88,6 +96,14 @@ def test_ac5_fr_json_has_the_my_rooms_keys() -> None:
     found = {key: fr.get(key) for key in NEW_KEYS}
 
     assert found == NEW_KEYS
+
+
+def test_ac5_fr_json_has_no_loading_or_empty_text_for_my_rooms() -> None:
+    fr = load_fr()
+
+    present = [key for key in REMOVED_KEYS if key in fr]
+
+    assert present == []
 
 
 # ---- The request ---------------------------------------------------------------
@@ -321,7 +337,7 @@ def test_ac5_nicknames_are_shown_as_text(page_1280: Page, live_server: str) -> N
 # ---- Loading, empty, error -----------------------------------------------------
 
 
-def test_ac5_while_the_summaries_load_the_section_says_so(
+def test_ac5_while_the_summaries_load_the_section_is_hidden(
     page_1280: Page, live_server: str
 ) -> None:
     route = HeldSummariesRoute()
@@ -332,12 +348,18 @@ def test_ac5_while_the_summaries_load_the_section_says_so(
 
     section = my_rooms(page_1280)
     expect(section).to_have_attribute("data-state", "loading")
-    expect(section).to_contain_text(load_fr()["my_rooms.loading"])
+    # Spec 046 (P4): nothing shows while it loads.
+    assert section.get_attribute("hidden") is not None
+    expect(section).to_be_hidden()
+    expect(page_1280.locator("body")).not_to_contain_text(
+        REMOVED_KEYS["my_rooms.loading"]
+    )
     route.release([xyz_summary()])
     expect_my_rooms_ready(page_1280, 1)
+    expect(section).to_be_visible()
 
 
-def test_ac5_an_empty_answer_shows_the_empty_text(
+def test_ac5_an_empty_answer_leaves_the_section_hidden_with_no_text(
     page_1280: Page, live_server: str
 ) -> None:
     route = SummariesRoute(body=[])
@@ -346,7 +368,13 @@ def test_ac5_an_empty_answer_shows_the_empty_text(
     open_catalogue(page_1280, live_server, route)
 
     expect_my_rooms_ready(page_1280, 0)
-    expect(my_rooms(page_1280)).to_contain_text(load_fr()["my_rooms.empty"])
+    # Spec 046 (P4): an empty answer shows no section.
+    section = my_rooms(page_1280)
+    assert section.get_attribute("hidden") is not None
+    expect(section).to_be_hidden()
+    expect(page_1280.locator("body")).not_to_contain_text(
+        REMOVED_KEYS["my_rooms.empty"]
+    )
 
 
 def test_ac5_a_failed_request_shows_the_error_while_the_catalogue_loads(
@@ -359,7 +387,10 @@ def test_ac5_a_failed_request_shows_the_error_while_the_catalogue_loads(
 
     section = my_rooms(page_1280)
     expect(section).to_have_attribute("data-state", "error", timeout=WAIT_TIMEOUT_MS)
-    expect(section).to_contain_text(load_fr()["my_rooms.error"])
+    # Spec 046: the error is the line `my-rooms-error`, under the heading.
+    expect(section.get_by_test_id("my-rooms-error")).to_have_text(
+        load_fr()["my_rooms.error"]
+    )
     expect(page_1280.get_by_test_id("catalogue-page")).to_have_attribute(
         "data-state", "ready"
     )
@@ -380,7 +411,9 @@ def test_ac5_an_answer_that_is_not_an_array_of_summaries_shows_the_error(
 
     section = my_rooms(page_1280)
     expect(section).to_have_attribute("data-state", "error", timeout=WAIT_TIMEOUT_MS)
-    expect(section).to_contain_text(load_fr()["my_rooms.error"])
+    expect(section.get_by_test_id("my-rooms-error")).to_have_text(
+        load_fr()["my_rooms.error"]
+    )
 
 
 def test_ac5_a_room_left_out_is_not_listed_and_its_identity_stays(

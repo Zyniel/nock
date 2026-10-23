@@ -12,8 +12,10 @@ stores Ana's identity of the room, opens the room as Ana without the nickname
 form, and device 1's page is `replaced` (spec 012).
 
 AC-11 (browser): device 2, once signed in, lists Ana's room in "My rooms" on `/`,
-whose `account-link` points to `/account`; its room page sends one
-`PUT /api/account/rooms` with its code and token after its first snapshot.
+whose « Compte » opens the account dialog with `account-page-link` to `/account`
+(refined by spec 046: the catalogue's `account-link` became the top-bar button
+`account-open`); its room page sends one `PUT /api/account/rooms` with its code
+and token after its first snapshot.
 
 Edge case checked as well: an identity already stored on a device is never
 replaced, neither by the sign-in nor by the catalogue page.
@@ -403,9 +405,17 @@ def test_ac11_the_catalogue_links_to_the_account_page(
 
     second.goto(f"{account_server.base_url}/")
 
-    link = second.get_by_test_id("account-link")
-    expect(link).to_have_attribute("href", ACCOUNT_PAGE_PATH, timeout=WAIT_TIMEOUT_MS)
-    expect(link).to_have_text("Compte")
+    # Spec 046: « Compte » is the top-bar button `account-open`, which opens the
+    # account dialog; signed in, its `account-page-link` leads to `/account`.
+    button = second.get_by_test_id("page-topbar").get_by_test_id("account-open")
+    expect(button).to_have_text("Compte", timeout=WAIT_TIMEOUT_MS)
+    expect(second.get_by_test_id("account-link")).to_have_count(0)
+    button.click()
+    dialog = second.get_by_test_id("account-dialog")
+    expect(dialog).to_have_attribute("open", "", timeout=WAIT_TIMEOUT_MS)
+    expect(dialog.get_by_test_id("account-page-link")).to_have_attribute(
+        "href", ACCOUNT_PAGE_PATH
+    )
 
 
 class PageTraffic:
