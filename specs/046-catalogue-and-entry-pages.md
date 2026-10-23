@@ -1,7 +1,7 @@
 ---
 id: "046"
 title: Catalogue and entry pages
-status: approved
+status: done
 ---
 
 # 046 - Catalogue and entry pages
