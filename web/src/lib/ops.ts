@@ -372,6 +372,12 @@ export interface ReplayCellState {
   pencil: boolean
 }
 
+// A cell that no edit has reached: no letter and no mark. A new object each
+// time, since cellStatesAtStep changes the one it keeps for a cell.
+export function emptyCellState(): ReplayCellState {
+  return { letter: '', locked: false, revealed: false, pencil: false }
+}
+
 // What each cell shows after the first `position` edits, by positionKey (spec
 // 048, refining spec 038): the letter of the last of those edits on the cell;
 // locked when one of them locked or revealed it, revealed when one revealed
@@ -385,7 +391,7 @@ export function cellStatesAtStep(
   const states = new Map<string, ReplayCellState>()
   for (const edit of edits.slice(0, position)) {
     const key = positionKey(edit.row, edit.column)
-    const state = states.get(key) ?? { letter: '', locked: false, revealed: false, pencil: false }
+    const state = states.get(key) ?? emptyCellState()
     state.letter = edit.letter ?? ''
     if (edit.kind === 'locked' || edit.kind === 'revealed') {
       state.locked = true

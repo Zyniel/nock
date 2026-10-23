@@ -3,6 +3,7 @@
   import {
     cellStatesAtStep,
     editText,
+    emptyCellState,
     fetchReplay,
     type LockReason,
     type ReplayCellState,
@@ -30,8 +31,6 @@
   const ONE_COLUMN_CELL_PX = 36
   const EDITS_GAP_PX = 20
   const EDITS_MIN_WIDTH_PX = 240
-
-  const NO_LETTER: ReplayCellState = { letter: '', locked: false, revealed: false, pencil: false }
 
   let replayState: ReplayState = $state('idle')
   let typedCode = $state('')
@@ -61,7 +60,9 @@
       room = bodyWidth - EDITS_GAP_PX - EDITS_MIN_WIDTH_PX
     }
     const fitting = Math.floor((room - 1) / columns)
-    // At least 1 px before the body is first measured.
+    // At least 1 px before the body is first measured. That measure runs in
+    // the same task as the first drawing of the grid, before the browser
+    // paints it, so no frame shows these 1 px cells.
     return Math.max(1, Math.min(widest, fitting))
   }
 
@@ -88,7 +89,7 @@
 
   // What a letter cell of the replay's grid shows at the chosen step.
   function stateAt(row: number, column: number): ReplayCellState {
-    return cellStates.get(positionKey(row, column)) ?? NO_LETTER
+    return cellStates.get(positionKey(row, column)) ?? emptyCellState()
   }
 
   // Where the edit of index `index` (from 0) stands against the chosen step.

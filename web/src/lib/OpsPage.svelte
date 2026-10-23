@@ -122,11 +122,17 @@
             type="password"
             autocomplete="off"
             aria-invalid={tokenError !== null ? 'true' : undefined}
+            aria-describedby={tokenError !== null ? 'ops-token-error' : undefined}
             bind:value={typedToken}
           />
         </div>
         {#if tokenError !== null}
-          <p class="nock-error-line" data-testid="ops-token-error" role="alert">{t(tokenError)}</p>
+          <p
+            id="ops-token-error"
+            class="nock-error-line"
+            data-testid="ops-token-error"
+            role="alert"
+          >{t(tokenError)}</p>
         {/if}
         <button type="submit" class="nock-button nock-button-primary" data-testid="ops-token-submit"
           >{t('ops.token_submit')}</button

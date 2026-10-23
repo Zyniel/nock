@@ -26,6 +26,13 @@
   // Only a refused address is the address's fault: its border turns red. A
   // refusal for too many requests or a failed send leaves it as it is.
   const isAddressRefused = $derived(answer === 'invalid')
+  // Whether the error line shows: the input is then described by it.
+  const isErrorShown = $derived(answer !== null && answer !== 'sent')
+
+  // The error line's id. A page holds one e-mail form at most (the account
+  // page, or the account sheet of a room or of the catalogue), as the input's
+  // own id already assumes.
+  const ERROR_ID = 'account-email-error'
 
   async function submit(event: SubmitEvent): Promise<void> {
     event.preventDefault()
@@ -61,12 +68,15 @@
       type="email"
       autocomplete="email"
       aria-invalid={isAddressRefused ? 'true' : undefined}
+      aria-describedby={isErrorShown ? ERROR_ID : undefined}
       bind:this={input}
       bind:value={email}
     />
   </div>
   {#if answer !== null && answer !== 'sent'}
-    <p class="nock-error-line" data-testid="account-error" role="alert">{errorText(answer)}</p>
+    <p id={ERROR_ID} class="nock-error-line" data-testid="account-error" role="alert">
+      {errorText(answer)}
+    </p>
   {/if}
   <button
     type="submit"

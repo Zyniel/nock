@@ -26,6 +26,7 @@
   // Whether the deletion is asked: `account-delete` is a disclosure that shows
   // and hides the panel with the warning and the confirmation.
   let isDeleteAsked = $state(false)
+  let deleteButton: HTMLButtonElement | null = $state(null)
 
   async function signInWithLink(token: string): Promise<void> {
     pageState = 'signing_in'
@@ -91,6 +92,14 @@
     isDeleteAsked = !isDeleteAsked
   }
 
+  // `account-delete-cancel`: the question closes and the focus goes back to
+  // `account-delete`, as a disclosure does, rather than drop to the page with
+  // the hidden panel.
+  function keepAccount(): void {
+    isDeleteAsked = false
+    deleteButton?.focus()
+  }
+
   async function leave(): Promise<void> {
     isDeleteAsked = false
     if (await signOut()) {
@@ -150,6 +159,7 @@
             data-testid="account-delete"
             aria-expanded={isDeleteAsked ? 'true' : 'false'}
             aria-controls="account-delete-panel"
+            bind:this={deleteButton}
             onclick={toggleDeletion}>{t('account.delete')}</button
           >
         </div>
@@ -173,7 +183,7 @@
               type="button"
               class="nock-button nock-button-secondary"
               data-testid="account-delete-cancel"
-              onclick={() => (isDeleteAsked = false)}>{t('account.delete_cancel')}</button
+              onclick={keepAccount}>{t('account.delete_cancel')}</button
             >
           </div>
         </div>
