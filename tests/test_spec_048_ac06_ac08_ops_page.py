@@ -16,7 +16,9 @@ Readings of the spec's wording:
   input's top, 6 px (1 px); the label is the element of the card that reads
   `fr.json["ops.token_label"]`.
 - "Between the input and `ops-token-submit`": the error line's top is not above
-  the input's bottom and its bottom not under the button's top (1 px).
+  the input's bottom and its bottom not under the button's top (1 px). Since
+  the lead's second-review note, its top is also 6 px under the input's bottom
+  (1 px), as the screens sheet draws it.
 - "The periods' group names [the label] in its `aria-labelledby`": the label's
   `id` is one of the ids of that attribute, on the element of role `group` that
   holds the three `ops-period` buttons.
@@ -254,6 +256,10 @@ def test_ac6_a_refused_token_turns_the_input_red_with_an_error_line_under_it(
     submit = box_of(page.get_by_test_id("ops-token-submit"))
     if line.top < box_of(field).bottom - 1.0 or line.bottom > submit.top + 1.0:
         problems.append("ops-token-error is not between the input and the button")
+    # Spec 048 AC-6 after its second review: 6 px under the input, as drawn.
+    gap = line.top - box_of(field).bottom
+    if not same_position(gap, 6.0):
+        problems.append(f"ops-token-error is {gap} px under the input, not 6")
 
     assert problems == []
 
