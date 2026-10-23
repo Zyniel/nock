@@ -2,26 +2,20 @@
 
 Read this first in a new session, then `CLAUDE.md`, `specs/_reference.md` and
 `docs/build-plan.md`. It replaces the long conversations of the sessions that
-wrote it (2026-10-12 to 2026-10-21), so a fresh session can continue cheaply.
+wrote it (2026-10-12 to 2026-10-23), so a fresh session can continue cheaply.
 Update it at the end of each session.
 
-## Where things stand (2026-10-22, evening)
+## Where things stand (2026-10-23)
 
 - **Phase 6 is complete** (tag `v1.0.0` on `main`, e805781).
-- **Phase 7, the visual design, is under way** (`docs/build-plan.md`, "Phase 7").
-  All eight of its specs are approved (human, 2026-10-22), with their open
-  questions recorded as decided:
-  - 041 Visual foundation: merged (#32), `done`.
-  - 042 Grid cells: built, in the pull request that carries this handoff.
-  - 043 Room layout (two pull requests, WP-1 then WP-2), 044 Keyboard, 045
-    Auteurs mode, 046 Catalogue and entry pages, 047 Room overlays and 048
-    Plain pages and states: approved, not built. Build them in that order,
-    one pull request each, each branch cut from `main` once the previous one
-    is merged.
-  - Then tag `v1.1.0`.
-- **Phase 8, the competitive modes** (030, 031), is wanted and waits for Phase
-  7. Both specs are 45-line stubs: a spec writer writes them in full first,
-  and the screens sheet draws them.
+- **Phase 7, the visual design, is complete** once spec 048's pull request (the
+  one carrying this handoff) merges: specs 041 to 048 are `done` (#32, #34,
+  #35 and #36, #38, #39, #40, #42, and 048's). Tooling pull requests #37 and
+  #41 put two timed test files in the serial pass. Then the human is asked
+  before `v1.1.0` is tagged and pushed (`docs/build-plan.md`).
+- **Phase 8, the competitive modes** (030, 031), is next. Both specs are
+  45-line stubs: a spec writer writes them in full first, the screens sheet
+  draws them, and only the human approves them.
 - **The design reference** is `specs/_design.md`, drawn in
   `docs/design/cell-sheet.html` and `docs/design/screens-sheet.html` (built by
   `docs/design/screens_sheet/build.py`; the gate checks it is up to date).
@@ -34,9 +28,13 @@ Update it at the end of each session.
   add grids; the repository ships none, so make one from FX-01 to play
   locally.
 
-- Branch `feat/phase5-mvp-ldddid` (the designated branch). It is restarted from
-  `main` after each merge (`git fetch origin main && git checkout -B
-  feat/phase5-mvp-ldddid origin/main`), keeping unmerged commits.
+- **Branches (human, 2026-10-23):** each spec's pull request goes out on a
+  branch named after it (`feat/spec-NNN-short-name`), cut from `main` in its
+  worktree and pushed with `git push -u origin HEAD`; tooling keeps its own
+  `feat/...` branch. Delete the branch and the worktree after the merge. The
+  old shared branch `feat/phase5-mvp-ldddid` carried Phase 5 to 7 (up to #42)
+  and is fully merged; ask the human before deleting it on the remote. Propose
+  git habits that cost fewer tokens (the human asked for it).
 - Merged: PR #6 (Phase 5, MVP), PR #7 (Phase 6: specs 024, 025, first version of
   019, the spec 026 AC-10 fix), PR #8 (019 refinements, 020, 021, 022 with both
   of its review rounds, the CI speed-up), PR #9 (tooling: the implementer's quick
@@ -70,9 +68,12 @@ Update it at the end of each session.
   038, 034, 033, 029 closed), PR #29 (tooling: pyrefly checks the project
   inside a git worktree), PR #31 (the README says how to add grids), PR #32
   (spec 041, visual foundation), PR #33 (the Phase 7 design specs 042 to 048,
-  the screens sheet, and PR #30's visual-documentation rule). Tags `v0.1.0`
-  and `v1.0.0` are on the remote.
-- Open: spec 042's pull request, which carries this handoff.
+  the screens sheet, and PR #30's visual-documentation rule), PR #34 (spec
+  042), PR #35 and #36 (spec 043, WP-1 then WP-2), PR #37 (tooling: spec 043's
+  note lifetime runs serially), PR #38 (spec 044), PR #39 (spec 045), PR #40
+  (spec 046), PR #41 (tooling: spec 047's copied line runs serially), PR #42
+  (spec 047). Tags `v0.1.0` and `v1.0.0` are on the remote.
+- Open: spec 048's pull request, which carries this handoff.
 - Questions left to the human from PR #12: the reading of the rule for
   `NOCK_DATABASE` (control, separator and format characters only). Spec 033's
   open question 2 (players' addresses outside ASCII) is answered with (b), under
@@ -144,18 +145,19 @@ Update it at the end of each session.
 
 ## First tasks for the next session
 
-1. Check that spec 042's pull request is merged, and that `main`'s run after
-   it is green (`gh run list --branch main`): the run on `main` is the only
-   one that runs Firefox and WebKit.
-2. Build spec 043 (room layout), WP-1 then WP-2, one pull request each, then
-   044 to 048 in order, each through test-writer, implementer, and two review
-   rounds (human, 2026-10-22: "Keep as it is"; see `MEMORY.md`). Each build
-   gets its own worktree, cut from `main` once the previous pull request is
-   merged (`git worktree add -b spec-NNN .claude/worktrees/spec-NNN
-   origin/main`), with `npm --prefix web ci` and `uv sync` run there.
-3. After 048, tag `v1.1.0`, then write specs 030 and 031 in full (Phase 8).
-4. The small follow-up below ("Follow-up noted from spec 028's first review"),
-   when a spec touches it.
+1. Check that spec 048's pull request is merged, that `v1.1.0` is tagged (ask
+   the human first), and that `main`'s run after the merge is green
+   (`gh run list --branch main`): the run on `main` is the only one that runs
+   Firefox and WebKit, and a later merge cancels it.
+2. Phase 8: have a spec writer write specs 030 and 031 in full, with the
+   screens sheet drawing them; the human approves each. Then build them as
+   Phase 7 was: each in its own worktree cut from `main`
+   (`git worktree add -b feat/spec-NNN-name .claude/worktrees/spec-NNN
+   origin/main`, then `npm --prefix web ci` and `uv sync` there), through
+   test-writer, implementer and two review rounds (human, 2026-10-22: "Keep as
+   it is"; see `MEMORY.md`).
+3. The small follow-ups below ("Follow-up noted from spec 028's first review";
+   "Left open from Phase 7"), when a spec touches them.
 - **Models:** pass `model: "opus"` to the implementer and to the test-writer of
   a whole spec (their definitions default to Sonnet, at high effort). Use
   Sonnet for small spec notes and mechanical test edits.
@@ -184,12 +186,50 @@ Update it at the end of each session.
   runs in a row, and a tap or click that waits past its timeout. Rerun a single
   failure alone before trusting it.
 
+## Phase 7: what specs 043 to 048 taught
+
+- **The drawing wins where the spec's words and the screens sheet disagree**
+  (lead, every time it came up): the spec gets a dated note, the tests follow,
+  then the code. Examples: a wrapped recap row's values on the right (047), the
+  account page's buttons one per line on a phone (048), error lines 6 px under
+  their field (046, 048).
+- **Agents stall "waiting on background work"** after finishing. If a worktree
+  shows no change for 30 minutes and no python or node process runs
+  (`tasklist`), run its tests, stop the agent and commit what it left. Briefs
+  say: run tests in the foreground only, never end a turn while a run is going.
+- **Firefox under load:** fill-then-submit steps check the field's value before
+  submitting, and no helper passes a short explicit timeout that overrides the
+  page's 10 s action timeout (`spec043_harness.open_room` did, 5 s).
+- **Known flakes:** spec 036 AC-8
+  `test_ac8_a_join_on_the_room_of_nock_database_gets_a_snapshot_first` fails
+  under load and passes alone; spec 046 AC-22's nickname-error case failed once
+  on `main`'s Firefox job after #40 and never reproduced (its step now says
+  what happened if it fails again).
+- **CI time:** `main`'s WebKit job took 66 to 74 minutes after #36 and #38.
+- **CRLF warnings** from agents' files are harmless: git stores LF. When a
+  script rewrites a file, keep LF.
+- **A local test run needs `npm --prefix web ci` in that checkout first**: a
+  stale `node_modules` builds a client that never starts (a bare `@fontsource`
+  import), and every browser test then fails in the same way.
+
+## Left open from Phase 7
+
+- Spec 045: no zoom test with the legend shown; the column-layout case where the
+  legend lies over the grid is not drawn in the screens sheet.
+- Spec 048: AC-13's no-animation rule is a text scan; it cannot see an animation
+  started at run time (Svelte `transition:`, `element.animate()`). None exist
+  today. A later spec can add a `document.getAnimations()` check, as spec 046
+  AC-9 does.
+- Tooling: `test_spec_025_ac07_vote_banner.py` no longer measures a window
+  (spec 047) and can leave `SERIAL_TEST_FILES`.
+
 ## How a feature is built here
 
 1. Spec answers and refinements first (spec-writer), then tests (test-writer),
    then code (implementer), then review (reviewer). One commit per phase.
-2. Each spec is built in a worktree of its own (`git worktree add -b spec-NNN
-   .claude/worktrees/spec-NNN <base>`), based on the previous spec's branch.
+2. Each spec is built in a worktree of its own (`git worktree add -b
+   feat/spec-NNN-name .claude/worktrees/spec-NNN origin/main`), cut once the
+   previous spec's pull request is merged.
    Agents work there with `git -C` and absolute paths. A phase that runs no
    tests (spec-writer) overlaps another spec's phases. Two test runs at once
    slow each other down, so a test-writer waits while another gate runs
@@ -206,7 +246,7 @@ Update it at the end of each session.
    `git commit-tree -S` (`-S` signs it: plain `commit-tree` ignores
    `commit.gpgsign`, and GitHub then shows the commit as Unverified; a few
    pushed commits of 2026-10-15 are unsigned for that reason) and pushes up to
-   the green commit with `git push origin <sha>:refs/heads/feat/phase5-mvp-ldddid`.
+   the green commit with `git push origin <sha>:refs/heads/<the spec's branch>`.
    Never rewrite pushed history.
 5. Turn limits: 250 for test-writers and implementers since 2026-10-17 (60 and
    80 before, which stopped them 19 times in two days). A stopped agent resumes
