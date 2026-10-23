@@ -1131,7 +1131,10 @@ m:ss » (recap time style); the lines « Vérifications : n », « Révélations
 « Lettres révélées : n » (gap 4 px); heading « Qui a fait quoi »; one row per player
 (dot, name, « (vous) » in muted after mine, and on the right « n lettres · n mots
 complétés »), rows 8 px apart (on the phone the value wraps under the name, 18 px
-in); heading « Lien à partager »; the URL box and « Copier le lien » (secondary,
+in; on a computer, when a long name leaves no room, it wraps under the name and
+stays on the right, its right edge on the list's. Note from the lead, 2026-10-23:
+the computer case is added, as the screens sheet's CSS already draws it, after spec
+047's first review); heading « Lien à partager »; the URL box and « Copier le lien » (secondary,
 padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
 After a copy, « Copier le lien » keeps its label and the confirmation line « Lien
 copié » shows under the URL box, as in the Joueurs tab (section 8); spec 028
