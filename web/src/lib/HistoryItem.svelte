@@ -47,14 +47,17 @@
 >
   <div class="nock-row-text">
     <h3 class="nock-row-title" data-testid="history-title">
-      {record.grid === null
-        ? t('my_rooms.unnumbered')
-        : t('catalogue.item.number', { number: record.grid })}<MetaSep />{t(
-        'catalogue.item.size',
-        { width: record.width, height: record.height },
-      )}
+      <span
+        >{record.grid === null
+          ? t('my_rooms.unnumbered')
+          : t('catalogue.item.number', { number: record.grid })}<MetaSep />{t(
+          'catalogue.item.size',
+          { width: record.width, height: record.height },
+        )}</span
+      >
     </h3>
-    <p class="nock-row-line history-line" data-testid="history-line">
+    <!-- One run of text, which wraps when it must. -->
+    <p class="nock-row-line" data-testid="history-line">
       <span data-testid="history-date">{finishedText(record)}</span><MetaSep /><span
         data-testid="history-time">{timeText(record)}</span
       ><MetaSep /><span data-testid="history-teammates">{teammatesText(record)}</span>
@@ -77,17 +80,3 @@
     >
   {/if}
 </li>
-
-<style>
-  /* One line of texts 6 px apart, that wraps when it must. */
-  .history-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 6px;
-  }
-
-  .history-line span {
-    min-width: 0;
-  }
-</style>

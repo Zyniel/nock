@@ -10,15 +10,18 @@
 
   let { children }: { children: Snippet } = $props()
 
-  // The window's size, followed through each resize and rotation.
-  let windowWidth = $state(window.innerWidth)
-  let windowHeight = $state(window.innerHeight)
-  let isWide = $derived(isWideWindow(windowWidth, windowHeight))
+  // Whether the window is wide, worked out here once for the bar and the body,
+  // and again after each resize or rotation.
+  let isWide = $state(isWideWindow(window.innerWidth, window.innerHeight))
+
+  function followWindow(): void {
+    isWide = isWideWindow(window.innerWidth, window.innerHeight)
+  }
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
+<svelte:window onresize={followWindow} />
 
-<PageTopBar form="entry" />
+<PageTopBar form="entry" {isWide} />
 <div class="page-body" class:narrow={!isWide} data-testid="page-body">
   <div class="page-column" data-testid="page-column">
     {@render children()}

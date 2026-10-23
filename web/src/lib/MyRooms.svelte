@@ -70,10 +70,12 @@
         >
           <div class="nock-row-text">
             <h3 class="nock-row-title" data-testid="my-room-title">
-              {gridLabel(summary)}<MetaSep />{t('catalogue.item.size', {
-                width: summary.width,
-                height: summary.height,
-              })}
+              <span
+                >{gridLabel(summary)}<MetaSep />{t('catalogue.item.size', {
+                  width: summary.width,
+                  height: summary.height,
+                })}</span
+              >
               {#if summary.solved}
                 <span
                   class="nock-status-pill nock-status-pill-finished"

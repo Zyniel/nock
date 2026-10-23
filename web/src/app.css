@@ -424,9 +424,11 @@ a.nock-button {
   color: var(--nock-muted);
 }
 
-/* The heading of a catalogue section: "My rooms" and the history. */
+/* The heading of a catalogue section: "My rooms" and the history. Its 6 px
+   top margin (the screens sheet's) lies inside its section, which is a grid,
+   so the section's own box does not move. */
 .nock-section-heading {
-  margin: 0;
+  margin: 6px 0 0;
   font: 700 1.15rem/1.2 var(--nock-font-ui);
   color: var(--nock-navy);
 }
@@ -456,7 +458,8 @@ a.nock-button {
   gap: 3px;
 }
 
-/* A row's title: its texts on one line when they fit, 8 px apart. */
+/* A row's title: its texts (one inline group, so that their separators keep
+   their own 4 px) and its pill, 8 px apart. */
 .nock-row-title {
   margin: 0;
   display: flex;

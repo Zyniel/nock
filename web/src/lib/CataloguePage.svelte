@@ -27,7 +27,6 @@
   } from './history'
   import { t } from './i18n'
   import { storedRoomKeys, type RoomKey, type RoomSummary } from './myRooms'
-  import { isWideWindow } from './windowForm'
 
   type State = 'loading' | 'ready' | 'error'
   type ForceFilter = 'all' | 1 | 2 | 3 | 4
@@ -116,12 +115,10 @@
 
   // ---- "Compte" and its dialog (spec 046, spec 033) ----
 
-  // The window's size: the dialog is a bottom sheet on a narrow window.
-  let windowWidth = $state(window.innerWidth)
-  let windowHeight = $state(window.innerHeight)
-  let dialogLayout: 'sheet' | 'column' = $derived(
-    isWideWindow(windowWidth, windowHeight) ? 'column' : 'sheet',
-  )
+  // Whether the window is wide, as the catalogue frame works it out: the
+  // dialog is a bottom sheet on a narrow window.
+  let isWide = $state(false)
+  let dialogLayout: 'sheet' | 'column' = $derived(isWide ? 'column' : 'sheet')
 
   let accountDialog: AccountDialog | null = $state(null)
   let accountOpenButton: HTMLButtonElement | null = $state(null)
@@ -140,8 +137,6 @@
   }
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
-
 {#snippet accountOpen()}
   <TopBarButton
     testId="account-open"
@@ -154,7 +149,7 @@
 {/snippet}
 
 <main class="nock-plain-page catalogue-page" data-testid="catalogue-page" data-state={pageState}>
-  <CatalogueFrame topBarEnd={accountStatus === null ? undefined : accountOpen}>
+  <CatalogueFrame topBarEnd={accountStatus === null ? undefined : accountOpen} bind:isWide>
     <h1 class="catalogue-heading">{t('catalogue.heading')}</h1>
     {#if myRoomKeys.length > 0}
       <MyRooms keys={myRoomKeys} onloaded={recordSolvedRooms} />
@@ -231,7 +226,9 @@
     gap: 8px;
   }
 
+  /* "Force", 12 px before the first chip, as the screens sheet draws it. */
   .filter-label {
+    margin-right: 4px;
     font: 600 0.85rem/1 var(--nock-font-ui);
     color: var(--nock-muted);
   }

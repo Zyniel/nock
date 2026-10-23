@@ -4,27 +4,22 @@
   // right. On the catalogue and the grid page it is 56 px high on every
   // window; on the entry pages and the page not found it is the phone's 54 px
   // bar on a narrow window. Its buttons are 38 px high on a wide window and
-  // 34 px on a narrow one.
+  // 34 px on a narrow one. The frame around it says which the window is.
   import type { Snippet } from 'svelte'
   import TopBarBrand from './TopBarBrand.svelte'
-  import { isWideWindow } from './windowForm'
 
   let {
     form,
+    isWide,
     end,
   }: {
     form: 'catalogue' | 'entry'
+    // Whether the window is wide (windowForm.ts).
+    isWide: boolean
     // What sits on the right of the bar, if anything.
     end?: Snippet
   } = $props()
-
-  // The window's size, followed through each resize and rotation.
-  let windowWidth = $state(window.innerWidth)
-  let windowHeight = $state(window.innerHeight)
-  let isWide = $derived(isWideWindow(windowWidth, windowHeight))
 </script>
-
-<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 
 <header
   class="page-topbar"

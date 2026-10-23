@@ -119,10 +119,12 @@
             ><polygon points={NOCK_MARK_POINTS} /></svg
           >
         {/each}
-      </span>{t('catalogue.item.force', { force: summary.force })}<MetaSep />{t(
-        'catalogue.item.size',
-        { width: summary.width, height: summary.height },
-      )}<MetaSep />{t('catalogue.item.words', { count: summary.word_count })}
+      </span><span
+        >{t('catalogue.item.force', { force: summary.force })}<MetaSep />{t(
+          'catalogue.item.size',
+          { width: summary.width, height: summary.height },
+        )}<MetaSep />{t('catalogue.item.words', { count: summary.word_count })}</span
+      >
     </p>
     {#if hasFailed}
       <p class="nock-error-line" data-testid="catalogue-error" role="alert">
@@ -187,6 +189,8 @@
     overflow-wrap: anywhere;
   }
 
+  /* The marks, then the texts 6 px after them (their separators keep their
+     own 4 px). */
   .force-line {
     display: flex;
     flex-wrap: wrap;

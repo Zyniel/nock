@@ -9,22 +9,29 @@
 
   let {
     topBarEnd,
+    isWide = $bindable(false),
     children,
   }: {
     // What sits on the right of the top bar: the catalogue's "Compte".
     topBarEnd?: Snippet
+    // Whether the window is wide. The frame works it out; a page that needs it
+    // too (the catalogue, for its account dialog) reads it with `bind:isWide`.
+    isWide?: boolean
     children: Snippet
   } = $props()
 
-  // The window's size, followed through each resize and rotation.
-  let windowWidth = $state(window.innerWidth)
-  let windowHeight = $state(window.innerHeight)
-  let isWide = $derived(isWideWindow(windowWidth, windowHeight))
+  // Worked out once here for the bar and the column, and again after each
+  // resize or rotation.
+  function followWindow(): void {
+    isWide = isWideWindow(window.innerWidth, window.innerHeight)
+  }
+
+  followWindow()
 </script>
 
-<svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
+<svelte:window onresize={followWindow} />
 
-<PageTopBar form="catalogue" end={topBarEnd} />
+<PageTopBar form="catalogue" {isWide} end={topBarEnd} />
 <div class="catalogue-column" class:narrow={!isWide} data-testid="catalogue-column">
   {@render children()}
 </div>
