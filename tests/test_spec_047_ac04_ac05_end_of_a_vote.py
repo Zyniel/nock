@@ -27,6 +27,14 @@ Readings where the spec leaves room:
   missed. The 3,500 ms after the close are an observation window, not a
   measured duration: a slow machine can only make it longer, so the file runs in
   the parallel pass.
+- A result the page did not see (added after spec 047's second review,
+  2026-10-23) runs at 1280 by 720, the harness's default size (the criterion
+  names none). Its last check reads "the stream holds no `feed-item` with
+  `data-kind="vote"`", but vote 1's `vote_closed` (seq 7) was applied live, and
+  the rest of AC-4 gives every closed vote the page applies one line, which a
+  reconnection keeps (spec 034). The test checks what both readings agree on: no
+  `vote` line other than seq 7's, so none for vote 2. Whether seq 7's line stays
+  is a question for the spec.
 """
 
 from __future__ import annotations
@@ -74,6 +82,7 @@ from spec047_harness import (
 )
 
 WATCH_AFTER_CLOSE_MS = 3500  # "in the 3,500 ms that follow"
+NO_RESULT_NOTE_MS = 1000  # "in the 1,000 ms that follow" the rejoin
 SETTLE_AFTER_MESSAGES_MS = 500
 EVENT_FONT_SIZE_PX = 13.12  # spec 043's event look, 0.82rem
 
@@ -280,6 +289,44 @@ def test_ac4_a_snapshot_with_no_vote_after_a_reconnection_adds_no_vote_line(
     show_tab(page, "discussion")
     page.wait_for_timeout(QUIET_MS)
     expect(vote_lines(page)).to_have_count(0)
+
+
+# ---- AC-4: a result the page did not see ---------------------------------------
+
+
+def test_ac4_a_result_the_page_did_not_see_is_never_announced(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    """Added after spec 047's second review (2026-10-23): vote 2 is dropped by the
+    reconnection's snapshot, whose page never saw it close."""
+    page = window(COMPUTER[0], COMPUTER[1], False)
+    mock = open_vote_room(page, live_server, fx01_grid)
+    show_vote(page, mock)
+    send_and_wait(page, mock, closed(VoteOutcome.PASSED).model_dump_json())
+    second_vote = VOTE.model_copy(update={"seq": 8, "vote_id": 2})
+    send_and_wait(page, mock, second_vote.model_dump_json())
+    expect(page.get_by_test_id("vote-banner")).to_be_visible()
+    frames_before = len(mock.received)
+
+    mock.close(1011)
+    wait_until(page, lambda: mock.has_join_after(frames_before), "the second join")
+    mock.send(vote_room_frame(fx01_grid, seq=9))
+
+    expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joined")
+    expect_seq(page, 9)
+    start_recording_notes(page)
+    expect(page.get_by_test_id("vote-announcement")).to_have_text("")
+    page.wait_for_timeout(NO_RESULT_NOTE_MS)
+    results = [result_text(outcome) for outcome in OUTCOMES]
+    result_notes = [text for text in recorded_notes(page) if text in results]
+    assert result_notes == []
+    show_tab(page, "discussion")
+    # No line for vote 2. Vote 1's line (seq 7), seen live, is not checked: see the
+    # module docstring.
+    unseen = page.locator(
+        '[data-testid="feed-item"][data-kind="vote"]:not([data-seq="7"])'
+    )
+    expect(unseen).to_have_count(0)
 
 
 # ---- AC-4: a vote closed after the solve ---------------------------------------

@@ -652,13 +652,21 @@ def open_room(page: Page, base_url: str, frame: str) -> RoomMock:
     set_timeouts(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/{ROOM_CODE}")
+    # Fix after spec 047's second review (2026-10-23): the fill, the check and the
+    # press each had an explicit 5 s (`WAIT_TIMEOUT_MS`), shorter than the page's
+    # 10 s action timeout (`set_timeouts`), and a press in Firefox under parallel
+    # load once ran out of it. They now wait for the nickname form first, then use
+    # the page's action timeout, as the suite's other actions do.
+    expect(page.get_by_test_id("room-page")).to_have_attribute(
+        "data-status", "nickname", timeout=ACTION_TIMEOUT_MS
+    )
     nickname_input = page.get_by_test_id("nickname-input")
-    nickname_input.fill("Ana", timeout=WAIT_TIMEOUT_MS)
+    nickname_input.fill("Ana")
     # Fix after #40's CI: the field must hold the nickname before the submit, so
     # that a fill lost to a race fails here rather than joining with the default
     # nickname (spec 046's `show_nickname_error` met it in Firefox).
-    expect(nickname_input).to_have_value("Ana", timeout=WAIT_TIMEOUT_MS)
-    nickname_input.press("Enter", timeout=WAIT_TIMEOUT_MS)
+    expect(nickname_input).to_have_value("Ana", timeout=ACTION_TIMEOUT_MS)
+    nickname_input.press("Enter")
     wait_until(page, lambda: mock.has_join_after(0), "the join")
     show_snapshot(page, mock, frame)
     return mock
