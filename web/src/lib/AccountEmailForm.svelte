@@ -41,7 +41,9 @@
   }
 </script>
 
-<form class="account-email-form" data-testid="account-email-form" onsubmit={submit}>
+<!-- `novalidate`: the server judges the address, so that a refused one shows
+     `account-error` rather than the browser's own bubble (spec 046 AC-23). -->
+<form class="account-email-form" data-testid="account-email-form" novalidate onsubmit={submit}>
   <label for="account-email-input">{t('account.email_label')}</label>
   <input
     id="account-email-input"

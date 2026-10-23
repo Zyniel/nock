@@ -4,15 +4,17 @@
   // computer top bar (56 px) starts with the brand and draws each icon beside
   // its label. On a touch screen « Clavier » shows and hides the in-app
   // keyboard (spec 044). The room page decides which form shows and what each
-  // button does.
+  // button does. While the room opens (spec 046) the bar is drawn as once
+  // joined, with an empty timer slot, and `inert`: nothing in it acts yet.
   import RoomTimer from './RoomTimer.svelte'
+  import TopBarBrand from './TopBarBrand.svelte'
   import TopBarButton from './TopBarButton.svelte'
   import { unreadBadgeText } from './chat'
   import { t } from './i18n'
-  import { NOCK_MARK_POINTS } from './icons'
 
   let {
     form,
+    isOpening,
     isTimerShown,
     timerBaseMs,
     isTimerRunning,
@@ -39,6 +41,8 @@
     onToggleMenu,
   }: {
     form: 'phone' | 'computer'
+    // True before the first snapshot (spec 046, "Opening the room").
+    isOpening: boolean
     isTimerShown: boolean
     timerBaseMs: number
     isTimerRunning: boolean
@@ -156,15 +160,14 @@
   />
 {/snippet}
 
-<header class="room-topbar {form}" data-testid="room-topbar">
+<header class="room-topbar {form}" data-testid="room-topbar" inert={isOpening}>
   {#if form === 'computer'}
-    <span class="topbar-brand" data-testid="topbar-brand"
-      ><svg viewBox="0 0 10 14" aria-hidden="true"><polygon points={NOCK_MARK_POINTS} /></svg
-      >{t('app.title')}</span
-    >
+    <TopBarBrand />
   {/if}
   <div class="timer-slot">
-    {#if isTimerShown}
+    {#if isOpening}
+      <!-- The timer slot stays empty until the room exists (spec 046). -->
+    {:else if isTimerShown}
       <RoomTimer baseMs={timerBaseMs} isRunning={isTimerRunning} anchor={timerAnchor} />
     {:else}
       <TopBarButton
@@ -214,41 +217,8 @@
     border-bottom: 1px solid var(--nock-line);
   }
 
-  /* ---- Every top-bar button (_design.md section 11) ---- */
-
-  .room-topbar :global(.topbar-button) {
-    position: relative;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-    border: 0;
-    border-radius: 6px;
-    color: var(--nock-navy);
-    background: transparent;
-    cursor: pointer;
-  }
-
-  .room-topbar :global(.topbar-button.pressed) {
-    background: var(--nock-word);
-  }
-
-  .room-topbar :global(.topbar-button:disabled) {
-    color: var(--nock-muted);
-    background: transparent;
-    cursor: not-allowed;
-  }
-
-  .room-topbar :global(.topbar-label) {
-    font-weight: 500;
-    line-height: 1;
-    white-space: nowrap;
-  }
-
-  .room-topbar :global(.icon) {
-    stroke-width: 1.8;
-  }
+  /* Every top-bar button has its look in TopBarButton.svelte; each form of
+     the bar gives it its size. */
 
   .timer-slot {
     flex: none;
@@ -329,20 +299,8 @@
     gap: 4px;
   }
 
-  .topbar-brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .computer :global(.topbar-brand) {
     margin-right: auto;
-    font: 700 1.3rem/1 var(--nock-font-ui);
-    letter-spacing: 0.01em;
-    color: var(--nock-navy);
-  }
-
-  .topbar-brand svg {
-    width: 12px;
-    height: 18px;
-    fill: var(--nock-navy);
   }
 
   .computer .timer-slot {

@@ -772,6 +772,11 @@ Room page (once `data-status="joined"`, accounts on):
   `t("account.error.too_many")`; anything else with `t("account.error.send")`.
   (Note from the lead, 2026-10-21: ", `email` being the value sent" was added; the
   text did not say which address it shows.)
+  (Note from the lead, 2026-10-23: per spec 046 (AC-23, Decision 9), the shared
+  e-mail form has `novalidate`, so an address the browser thinks invalid (e.g.
+  `ana@`) is sent, and the server's 422 shows `account.error.email` in
+  `account-error`: in the room's account sheet, on the catalogue's account dialog
+  and on the account page. Spec 048 AC-5 relies on the same. No criterion changes.)
 - Signed in, it shows `t("account.signed_in_heading")`,
   `t("account.signed_in_as", {email})` and a link
   `data-testid="account-page-link"` to `/account` (`t("account.manage")`).

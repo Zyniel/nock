@@ -4,10 +4,12 @@
   import { t } from './i18n'
   import type { RoomKey } from './myRooms'
 
-  // The account dialog of the room page (spec 033), a modal dialog with the
-  // look of a room sheet (spec 043): centred in the column layout, a bottom
-  // sheet in the sheet layout. The room page keeps it on the page while
-  // accounts are on and opens it with `open`.
+  // The account dialog of spec 033, a modal dialog with the look of a room
+  // sheet (spec 043): centred in the column layout, a bottom sheet in the sheet
+  // layout. The room page, and the catalogue's "Compte" (spec 046), keep it
+  // on the page while accounts are on and open it with `open`. Outside a room
+  // the signed-out intro does not speak of a room, the link is asked with no
+  // room, and the bottom sheet leaves the 56 px page top bar uncovered.
   let {
     layout,
     status,
@@ -17,8 +19,8 @@
     layout: 'sheet' | 'column'
     // What GET /api/account answered.
     status: AccountStatus
-    // The room the link is asked from.
-    room: RoomKey
+    // The room the link is asked from, or null outside a room.
+    room: RoomKey | null
     // The dialog closed, by its close button or by Escape.
     onClosed: () => void
   } = $props()
@@ -93,6 +95,7 @@
   bind:this={dialog}
   class="room-sheet account-dialog"
   class:bottom={layout === 'sheet'}
+  class:under-page-topbar={room === null}
   data-testid="account-dialog"
   aria-labelledby="account-dialog-heading"
   onclick={closeOnBackdrop}
@@ -106,7 +109,9 @@
     <a data-testid="account-page-link" href="/account" tabindex="0">{t('account.manage')}</a>
   {:else}
     <h2 class="room-sheet-title" id="account-dialog-heading">{t('account.dialog_heading')}</h2>
-    <p class="intro">{t('account.dialog_intro')}</p>
+    <p class="intro">
+      {room === null ? t('account.signed_out_intro') : t('account.dialog_intro')}
+    </p>
     <AccountEmailForm {room} bind:input={emailInput} />
   {/if}
   <div class="dialog-end">

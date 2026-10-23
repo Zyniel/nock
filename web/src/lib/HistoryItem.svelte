@@ -1,9 +1,12 @@
 <script lang="ts">
+  import MetaSep from './MetaSep.svelte'
   import { finishedText, teammatesText, timeText, type HistoryRecord } from './history'
   import { t } from './i18n'
   import { playGrid } from './playGrid'
 
-  // One finished grid of the history list (spec 029).
+  // One finished grid of the history list (spec 029), a list row (spec 046):
+  // its title and its one line of date, time and team-mates, then "Rejouer"
+  // on the right when the grid has a number.
   let { record }: { record: HistoryRecord } = $props()
 
   let isStarting = $state(false)
@@ -35,51 +38,45 @@
 <svelte:window onpageshow={onPageShow} />
 
 <li
+  class="nock-list-row"
   data-testid="history-item"
   data-code={record.code}
   data-grid={record.grid === null ? '' : String(record.grid)}
   data-finished-at={record.finished_at}
   data-elapsed-ms={String(record.elapsed_ms)}
 >
-  <h3>
-    {record.grid === null
-      ? t('my_rooms.unnumbered')
-      : t('catalogue.item.number', { number: record.grid })}
-  </h3>
-  <p>{t('catalogue.item.size', { width: record.width, height: record.height })}</p>
-  <p data-testid="history-date">{finishedText(record)}</p>
-  <p data-testid="history-time">{timeText(record)}</p>
-  <p data-testid="history-teammates">{teammatesText(record)}</p>
+  <div class="nock-row-text">
+    <h3 class="nock-row-title" data-testid="history-title">
+      <span
+        >{record.grid === null
+          ? t('my_rooms.unnumbered')
+          : t('catalogue.item.number', { number: record.grid })}<MetaSep />{t(
+          'catalogue.item.size',
+          { width: record.width, height: record.height },
+        )}</span
+      >
+    </h3>
+    <!-- One run of text, which wraps when it must. -->
+    <p class="nock-row-line" data-testid="history-line">
+      <span data-testid="history-date">{finishedText(record)}</span><MetaSep /><span
+        data-testid="history-time">{timeText(record)}</span
+      ><MetaSep /><span data-testid="history-teammates">{teammatesText(record)}</span>
+    </p>
+    {#if hasFailed}
+      <p class="nock-error-line" data-testid="history-error" role="alert">
+        {t('catalogue.play_failed')}
+      </p>
+    {/if}
+  </div>
   {#if record.grid !== null}
     {@const number = record.grid}
     <button
       type="button"
+      class="nock-button nock-button-secondary"
       data-testid="history-replay"
       aria-label={t('history.replay_label', { number })}
       disabled={isStarting}
       onclick={() => replay(number)}>{t('history.replay')}</button
     >
   {/if}
-  {#if hasFailed}
-    <p data-testid="history-error" role="alert">{t('catalogue.play_failed')}</p>
-  {/if}
 </li>
-
-<style>
-  li {
-    padding: 0.75rem;
-    border: 1px solid var(--nock-line);
-    border-radius: 0.5rem;
-  }
-
-  h3 {
-    margin: 0 0 0.25rem;
-    font-size: 1rem;
-  }
-
-  /* A long list of nicknames wraps rather than widen the page (spec 006 AC-5). */
-  p {
-    margin: 0.15rem 0;
-    overflow-wrap: anywhere;
-  }
-</style>

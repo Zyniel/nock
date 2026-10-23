@@ -1,5 +1,8 @@
 <script lang="ts">
-  import CatalogueItem from './CatalogueItem.svelte'
+  // The grid page `/g/<number>` (spec 004), in the catalogue's frame (spec
+  // 046): the grid's one card, or one state line in its place.
+  import CatalogueFrame from './CatalogueFrame.svelte'
+  import CatalogueList from './CatalogueList.svelte'
   import { isGridSummary, type GridSummary } from './catalogue'
   import { t } from './i18n'
 
@@ -38,14 +41,22 @@
   })
 </script>
 
-<main data-testid="grid-page" data-state={pageState}>
-  {#if pageState === 'loading'}
-    <p>{t('catalogue.loading')}</p>
-  {:else if pageState === 'error'}
-    <p>{t('catalogue.error')}</p>
-  {:else if pageState === 'not_found'}
-    <h1>{t('not_found.heading')}</h1>
-  {:else if summary !== null}
-    <CatalogueItem {summary} />
-  {/if}
+<main class="nock-plain-page grid-page" data-testid="grid-page" data-state={pageState}>
+  <CatalogueFrame>
+    {#if pageState === 'loading'}
+      <p class="nock-state-line" data-testid="catalogue-status">{t('catalogue.loading')}</p>
+    {:else if pageState === 'error'}
+      <p class="nock-error-line" data-testid="catalogue-status">{t('catalogue.error')}</p>
+    {:else if pageState === 'not_found'}
+      <p class="nock-state-line" data-testid="catalogue-status">{t('not_found.heading')}</p>
+    {:else if summary !== null}
+      <CatalogueList grids={[summary]} />
+    {/if}
+  </CatalogueFrame>
 </main>
+
+<style>
+  .grid-page {
+    background: var(--nock-white);
+  }
+</style>

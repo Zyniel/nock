@@ -1,7 +1,7 @@
 ---
 id: "046"
 title: Catalogue and entry pages
-status: approved
+status: done
 ---
 
 # 046 - Catalogue and entry pages
@@ -477,8 +477,13 @@ The words in brackets say how each criterion is tested.
 - `replaced` after a snapshot (spec 043): the room keeps its frame and shows the
   status band; this spec's card is only for a page that never had a snapshot.
 - The opening (AC-20): its top bar is `inert`, so a tap there does nothing and no
-  button takes the focus; the page announces nothing new, `room-status` being the
-  same element whose text screen readers already read (spec 040). The opening may
+  button takes the focus; the page announces nothing new. The opening's
+  `room-status` (inside the opening's grid area) and the room's `room-status` after
+  the snapshot are two different elements; each keeps the test id and the text of
+  spec 040, and neither is a live region, so nothing is announced either way.
+  (Note from the lead, 2026-10-23: this read "`room-status` being the same element
+  whose text screen readers already read (spec 040)", which is not what is built.
+  No criterion changes.) The opening may
   last only a few hundred milliseconds; its top bar does not change look when the
   snapshot comes, except the timer that appears and the pressed state of « Clavier »
   on a touch screen.

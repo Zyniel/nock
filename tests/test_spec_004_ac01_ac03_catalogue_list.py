@@ -3,6 +3,11 @@
 AC-1 is the data of each listed grid, AC-2 the filter by force and the order
 (newest first), AC-3 the progress kept on this device. The shared setup is in
 `spec004_harness`.
+
+Refined by spec 046 (the design's catalogue, screens sheet P4): with an empty
+catalogue the page shows `catalogue-status` with `catalogue.empty` and no
+`force-filter` (the chips are not shown), and the filter group is labelled by its
+visible label through `aria-labelledby`, not by an `aria-label`.
 """
 
 from __future__ import annotations
@@ -277,7 +282,11 @@ class TestEmptyCatalogue:
         expect(catalogue_page).to_have_attribute("data-state", "ready")
         expect(catalogue_page).to_contain_text(load_fr()["catalogue.empty"])
         expect(page.get_by_test_id("catalogue-item")).to_have_count(0)
-        expect(page.get_by_test_id("force-filter")).to_have_count(5)
+        # Spec 046 (P4): the empty text is `catalogue-status`, and no chip shows.
+        expect(page.get_by_test_id("catalogue-status")).to_have_text(
+            load_fr()["catalogue.empty"]
+        )
+        expect(page.get_by_test_id("force-filter")).to_have_count(0)
 
 
 # ---- AC-2: filter by force, newest first -------------------------------------
@@ -407,8 +416,13 @@ def test_ac2_browser_filter_buttons_are_five_in_order_and_labelled(
 def test_ac2_browser_filter_group_is_labelled(page: Page, live_server: str) -> None:
     page.goto(f"{live_server}/")
 
-    group = page.get_by_label(load_fr()["catalogue.filter.label"], exact=True)
+    # Spec 046: the group is labelled by its visible label (`aria-labelledby`).
+    label = load_fr()["catalogue.filter.label"]
+    group = page.get_by_role("group", name=label, exact=True)
     expect(group).to_be_visible()
+    expect(group).to_have_attribute("aria-labelledby", "catalogue-filter-label")
+    assert group.get_attribute("aria-label") is None
+    expect(page.locator("#catalogue-filter-label")).to_have_text(label)
     expect(group.get_by_test_id("force-filter")).to_have_count(5)
 
 
