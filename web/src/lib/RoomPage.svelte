@@ -65,6 +65,7 @@
   } from './roomRecord'
   import { readItem, removeItem, writeItem } from './storage'
   import { readTimerHidden, writeTimerHidden } from './timer'
+  import { VOTE_TICK_MS, voteCountdown } from './voteCountdown'
   import { LOW_WINDOW_PX, isWideWindow } from './windowForm'
   import type {
     LetterCellView,
@@ -72,6 +73,7 @@
     ReactionValue,
     RoomStatus,
     Snapshot,
+    VoteClock,
     VoteView,
   } from './roomSession'
   import {
@@ -80,7 +82,6 @@
     PING_INTERVAL_MS,
     REACTION_MS,
     SILENCE_LIMIT_MS,
-    VOTE_RESULT_MS,
     addPendingEdit,
     endFlash,
     endReaction,
@@ -1219,11 +1220,9 @@
   // ---- Votes (spec 025) ----
 
   let openVote = $derived(session.snapshot === null ? null : session.snapshot.open_vote)
-  // The banner shows the open vote, or for VOTE_RESULT_MS how the last one
-  // ended; never once the grid is solved.
-  let isVoteBannerShown = $derived(
-    !session.solved && (openVote !== null || session.closedVote !== null),
-  )
+  // The banner shows the open vote, never once the grid is solved; it leaves
+  // as soon as the vote closes and never shows a result (spec 047).
+  let isVoteBannerShown = $derived(!session.solved && openVote !== null)
   // « Réagir » is disabled while the vote banner shows, so the picker never
   // covers the vote's buttons (spec 043, Decision 10).
   let isReactDisabled = $derived(activeWord === null || isMuted || isVoteBannerShown)
@@ -1233,11 +1232,42 @@
   let hasVoted = $derived(openVote !== null && session.votedIds.includes(openVote.vote_id))
   let voteQuestionText = $derived(openVote === null ? '' : voteQuestion(openVote))
   let voteResultText = $derived(
-    session.closedVote === null ? '' : t(`vote.result.${session.closedVote.outcome}`),
+    session.lastVoteOutcome === null ? '' : t(`vote.result.${session.lastVoteOutcome}`),
   )
   // What a screen reader hears: the question when a vote opens, the result
   // when it closes.
   let voteAnnouncement = $derived(openVote !== null ? voteQuestionText : voteResultText)
+
+  // ---- The countdown of the open vote (spec 047) ----
+
+  // The countdown of the open vote when this page saw it open, else null: a
+  // vote known only from a snapshot shows no seconds and no bar.
+  let voteClock = $derived(openVote === null ? null : clockOfVote(openVote))
+  // The page's clock (performance.now()), read again every VOTE_TICK_MS while
+  // the banner counts.
+  let voteNowMs = $state(0)
+  let countdown = $derived(voteClock === null ? null : voteCountdown(voteClock, voteNowMs))
+
+  $effect(() => {
+    if (voteClock === null || !isVoteBannerShown) {
+      return
+    }
+    voteNowMs = performance.now()
+    const ticker = setInterval(() => {
+      voteNowMs = performance.now()
+    }, VOTE_TICK_MS)
+    return () => clearInterval(ticker)
+  })
+
+  // The countdown the session keeps for `vote`, or null when it keeps none for
+  // that vote.
+  function clockOfVote(vote: VoteView): VoteClock | null {
+    const clock = session.voteClock
+    if (clock === null || clock.vote_id !== vote.vote_id) {
+      return null
+    }
+    return clock
+  }
 
   // The question of a vote, with the requester's nickname (spec 013's known
   // names). The page inserts it as text.
@@ -1274,9 +1304,9 @@
   let voteBannerHeight = $state(0)
   let voteStatus: HTMLElement | null = $state(null)
 
-  // What the banner holds: nothing, the question of one vote, or a result.
+  // What the banner holds: nothing, or the question of one vote.
   let bannerContent = $derived(
-    !isVoteBannerShown ? 'none' : openVote !== null ? `vote-${openVote.vote_id}` : 'result',
+    !isVoteBannerShown || openVote === null ? 'none' : `vote-${openVote.vote_id}`,
   )
   let lastBannerContent = 'none'
 
@@ -1300,18 +1330,6 @@
     gridViewport?.focusGrid()
   }
 
-  // The result of a closed vote shows for VOTE_RESULT_MS. A new vote, or a
-  // newer result, cancels the timer of the old one.
-  $effect(() => {
-    if (session.closedVote === null) {
-      return
-    }
-    const timer = setTimeout(() => {
-      session.closedVote = null
-    }, VOTE_RESULT_MS)
-    return () => clearTimeout(timer)
-  })
-
   // ---- The 3-second notes (spec 043) ----
 
   // The note over the grid, one at a time, and the newest note of the room
@@ -1329,37 +1347,50 @@
     return note
   }
 
-  // A new note of the room: none while the stream shows; while the vote banner
-  // is on the page it waits, replacing any older waiting note.
+  // The notes of the room, in one place so that the newest always wins. A new
+  // note: none while the stream shows; while the vote banner is on the page it
+  // waits, replacing any older waiting note; otherwise it shows, and a note
+  // that waited is dropped (the result of a vote, made once the banner has
+  // left, replaces the notes that waited during it, spec 047). With no new
+  // note, once the banner has gone, the note that waited shows, unless the
+  // stream shows by then: the player reads the same line there.
   $effect(() => {
     const latest = session.latestNote
-    if (latest === null || latest.id === handledRoomNoteId) {
+    const isBannerShown = isVoteBannerShown
+    if (latest !== null && latest.id !== handledRoomNoteId) {
+      handledRoomNoteId = latest.id
+      receiveRoomNote(latest.kind, latest.text, isBannerShown)
       return
     }
-    handledRoomNoteId = latest.id
+    if (!isBannerShown) {
+      showWaitingNote()
+    }
+  })
+
+  function receiveRoomNote(kind: string | null, text: string, isBannerShown: boolean): void {
     if (untrack(() => isStreamShown)) {
+      waitingNote = null
       return
     }
-    const note = newShownNote(false, latest.kind, latest.text)
-    if (untrack(() => isVoteBannerShown)) {
+    const note = newShownNote(false, kind, text)
+    if (isBannerShown) {
       waitingNote = note
       return
     }
+    waitingNote = null
     shownNote = note
-  })
+  }
 
-  // Once the banner has gone, the note that waited shows, unless the stream
-  // shows by then: the player reads the same line there.
-  $effect(() => {
-    if (isVoteBannerShown || waitingNote === null) {
+  function showWaitingNote(): void {
+    const note = untrack(() => waitingNote)
+    if (note === null) {
       return
     }
-    const note = waitingNote
     waitingNote = null
     if (!untrack(() => isStreamShown)) {
       shownNote = note
     }
-  })
+  }
 
   // "Nothing to undo" (spec 018) has the note's look and place: it replaces
   // any shown note, and shows whatever else shows.
@@ -1878,11 +1909,11 @@
      and isStatusUnderClueBar. Only the full-but-wrong status sits in the clue
      bar's row, since a solved page has no keyboard. -->
 {#snippet gridStatusContent()}
-  {#if gridStatus === 'solved'}
-    <span class="status-check" aria-hidden="true"></span>
-  {/if}
-  <span class="grid-status-text"
-    >{gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}</span
+  {@const statusText =
+    gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
+  <span class="grid-status-text" data-testid="grid-status-text"
+    >{#if gridStatus === 'solved'}<span class="status-check" aria-hidden="true"></span
+      >{/if}{statusText}</span
   >
   {#if gridStatus === 'solved'}
     <button
@@ -2119,46 +2150,60 @@
               aria-atomic="true"
             >{voteAnnouncement}</div>
             {#if isVoteBannerShown}
+              <!-- The question, the row of the ballot (or the line that takes
+                   its place) with the seconds left on its right, then the bar
+                   of the time left (spec 047). -->
               <div
-                class="vote-banner"
+                class="vote-banner {layout}"
                 data-testid="vote-banner"
                 role="group"
-                aria-labelledby={openVote !== null ? 'vote-question' : 'vote-result'}
+                aria-labelledby="vote-question"
                 bind:this={voteBanner}
                 bind:offsetHeight={voteBannerHeight}
               >
-                {#if openVote !== null}
-                  <p id="vote-question" class="vote-text" data-testid="vote-question">
-                    {voteQuestionText}
-                  </p>
-                  <div class="vote-actions">
-                    {#if isMyRequest || hasVoted}
-                      <!-- Not a Tab stop, but it takes the focus after a ballot. -->
-                      <span
-                        data-testid="vote-status"
-                        tabindex="-1"
-                        bind:this={voteStatus}
-                        >{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
-                      >
-                    {:else}
-                      <button
-                        type="button"
-                        data-testid="vote-yes"
-                        disabled={isVotingOffline}
-                        onclick={() => castVote(true)}>{t('vote.yes')}</button
-                      >
-                      <button
-                        type="button"
-                        data-testid="vote-no"
-                        disabled={isVotingOffline}
-                        onclick={() => castVote(false)}>{t('vote.no')}</button
-                      >
-                    {/if}
+                <p id="vote-question" class="vote-question" data-testid="vote-question">
+                  {voteQuestionText}
+                </p>
+                <div class="vote-row" data-testid="vote-row">
+                  {#if isMyRequest || hasVoted}
+                    <!-- Not a Tab stop, but it takes the focus after a ballot. -->
+                    <span
+                      class="vote-status"
+                      data-testid="vote-status"
+                      tabindex="-1"
+                      bind:this={voteStatus}
+                      >{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
+                    >
+                  {:else}
+                    <button
+                      type="button"
+                      class="nock-button nock-button-primary vote-button"
+                      data-testid="vote-yes"
+                      disabled={isVotingOffline}
+                      onclick={() => castVote(true)}>{t('vote.yes')}</button
+                    >
+                    <button
+                      type="button"
+                      class="nock-button nock-button-secondary vote-button"
+                      data-testid="vote-no"
+                      disabled={isVotingOffline}
+                      onclick={() => castVote(false)}>{t('vote.no')}</button
+                    >
+                  {/if}
+                  {#if countdown !== null}
+                    <span class="vote-seconds" data-testid="vote-seconds"
+                      >{t('vote.seconds_left', { count: countdown.seconds })}</span
+                    >
+                  {/if}
+                </div>
+                {#if countdown !== null}
+                  <div class="vote-timebar" data-testid="vote-timebar" aria-hidden="true">
+                    <div
+                      class="vote-timebar-fill"
+                      data-testid="vote-timebar-fill"
+                      style:width="{countdown.share * 100}%"
+                    ></div>
                   </div>
-                {:else}
-                  <p id="vote-result" class="vote-text" data-testid="vote-result">
-                    {voteResultText}
-                  </p>
                 {/if}
               </div>
             {/if}
@@ -2313,7 +2358,14 @@
     {/if}
   {/if}
   {#if isRecapOpen}
-    <RecapDialog {code} {you} {playerColours} onClose={closeRecap} />
+    <RecapDialog
+      {code}
+      {you}
+      {playerColours}
+      {layout}
+      {isAccessibilityOn}
+      onClose={closeRecap}
+    />
   {/if}
 </main>
 
@@ -2474,71 +2526,87 @@
     margin: 10px -12px -12px;
   }
 
-  /* Over the grid (spec 025 decision 9): absolutely placed, so it takes no
+  /* ---- The vote banner (spec 025, spec 047; _design.md section 9) ----
+
+     Over the grid (spec 025 decision 9): absolutely placed, so it takes no
      height from the grid. The vote wins over the Salon sheet and the scrim
      (spec 022 decision 16), which come later in the page on layer 8: it is
-     drawn one layer above them. */
+     drawn one layer above them. Its top, left and right edges are 8 px inside
+     the grid area: `grid-area` in the sheet layout (its 8 px padding, so the
+     banner lies on the viewport's edges), the viewport in the column layout
+     (under the grid area's 12 px top padding). */
   .vote-banner {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    left: 8px;
+    right: 8px;
     z-index: 9;
     box-sizing: border-box;
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.25rem 0.75rem;
-    /* Room for the focus outline of the buttons (2px, 2px away). */
-    padding: 0.375rem 0.5rem;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 2px solid var(--nock-navy);
+    border-radius: 10px;
     background: var(--nock-white);
-    border-bottom: 1px solid var(--nock-navy);
-    font-size: 0.9rem;
+    box-shadow: 0 10px 24px -12px var(--nock-shadow);
   }
 
-  /* It lies over the top of the grid viewport, inside the grid area's
-     padding. */
-  .sheet .vote-banner {
+  .vote-banner.sheet {
     top: 8px;
-    left: 8px;
-    right: 8px;
   }
 
-  .column .vote-banner {
-    top: 12px;
+  .vote-banner.column {
+    top: 20px;
   }
 
-  .vote-text {
-    flex: 1 1 10rem;
+  .vote-question {
     margin: 0;
+    font: 600 0.95rem/1.3 var(--nock-font-ui);
+    color: var(--nock-ink);
   }
 
-  .vote-actions {
-    flex: none;
+  /* The ballot, or the line that takes its place, then the seconds on the
+     right. */
+  .vote-row {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 8px;
+    min-height: 31px;
   }
 
-  /* A disabled ballot button (offline) keeps a readable text. */
-  .vote-actions button:disabled {
+  .vote-button {
+    flex: none;
+    padding: 7px 16px;
+  }
+
+  .vote-status {
+    min-width: 0;
+    font: 500 0.85rem/1.3 var(--nock-font-ui);
     color: var(--nock-muted);
-    background-color: var(--nock-clue-bg);
-    border-style: dashed;
-    cursor: not-allowed;
   }
 
-  /* At least 24 by 24 CSS px, whatever the engine's button style. */
-  .vote-actions button {
-    box-sizing: border-box;
-    min-width: 3rem;
-    min-height: 28px;
-    padding: 0 0.75rem;
-    font: inherit;
-    color: var(--nock-ink);
-    background: var(--nock-white);
-    border: 1px solid var(--nock-rule);
-    border-radius: 4px;
+  .vote-seconds {
+    flex: none;
+    margin-left: auto;
+    font: 500 0.85rem/1 var(--nock-font-ui);
+    color: var(--nock-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* The time left: a word-blue track and its navy fill, which moves in steps
+     with no transition (spec 047, Decision 3). */
+  .vote-timebar {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--nock-word);
+    overflow: hidden;
+  }
+
+  .vote-timebar-fill {
+    height: 100%;
+    background: var(--nock-navy);
+    transition: none;
   }
 
   /* ---- The completion status (spec 026; _design.md section 9) ---- */
@@ -2580,16 +2648,31 @@
     color: var(--nock-white);
   }
 
-  /* The ✓ of a solved grid: a pictogram drawn by CSS, never read. */
+  /* The text of the band, after its pictogram: it wraps when the band is too
+     narrow for it and "Voir le bilan" on one line (spec 047). */
+  .grid-status.band .grid-status-text {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  /* The check mark of a solved grid: a pictogram drawn by CSS, never read, a space
+     before the text. */
   .status-check::before {
     content: '✓';
   }
 
+  .status-check {
+    margin-right: 0.25em;
+  }
+
+  /* "Voir le bilan" keeps its whole label on one line, on the band's
+     right. */
   .recap-open {
     flex: none;
     margin-left: auto;
     padding: 7px 12px;
     font-size: 0.85rem;
+    white-space: nowrap;
   }
 
   /* ---- The scrim of the sheet layout (layer 7) ---- */

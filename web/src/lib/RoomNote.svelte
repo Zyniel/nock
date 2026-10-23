@@ -5,6 +5,8 @@
   const NOTE_SHOWN_MS = 3000
   const NOTE_FADE_MS = 250
   const NOTE_LEAVE_MS = NOTE_FADE_MS + 100
+  // How far under the viewport's top the vote banner lies in the column layout.
+  const COLUMN_BANNER_INSET_PX = 8
 
   // What the note over the grid shows (spec 043, "3-second notes"): a note of
   // the room, which starts with the pictogram of its line kind when it has
@@ -49,6 +51,14 @@
 
   let isOff = $state(false)
 
+  // The banner lies on the viewport's top edge in the sheet layout and 8 px
+  // under it in the column layout (spec 047), as the note does with no banner:
+  // the note moves down by the banner's height, plus those 8 px in the column
+  // layout, so that it stays 8 px under the banner's bottom edge.
+  let marginTop = $derived(
+    bannerHeight === 0 ? 0 : bannerHeight + (layout === 'column' ? COLUMN_BANNER_INSET_PX : 0),
+  )
+
   $effect(() => {
     const noteId = note.id
     const offTimer = setTimeout(() => {
@@ -67,7 +77,7 @@
     class="nock-note room-note {layout}"
     data-testid="undo-message"
     role="status"
-    style:margin-top="{bannerHeight}px"
+    style:margin-top="{marginTop}px"
     data-off={isOff ? '' : null}
   >{note.text}</p>
 {:else}
@@ -79,7 +89,7 @@
     data-testid="room-note"
     tabindex="-1"
     aria-hidden="true"
-    style:margin-top="{bannerHeight}px"
+    style:margin-top="{marginTop}px"
     data-off={isOff ? '' : null}
     onclick={onOpen}
     >{#if note.kind !== null}<LinePictogram kind={note.kind} />{/if}{note.text}</button

@@ -128,6 +128,16 @@ export interface VoteView {
 // How a vote ended (spec 025).
 type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
 
+// The countdown of a vote this page saw open (spec 047): the performance.now()
+// reading of the moment the page applied its vote_opened, and how long the vote
+// lasts. A vote known only from a snapshot has none: the snapshot does not say
+// when it opened.
+export interface VoteClock {
+  vote_id: number
+  openedMs: number
+  durationMs: number
+}
+
 // A word, named by its clue: the clue cell and the clue's index in it.
 export interface ClueRefView {
   row: number
@@ -174,6 +184,7 @@ export interface RoomNote {
 // The kinds of event line that make a note; a check makes one only when it is
 // another player's.
 const NOTED_LINE_KINDS: string[] = [
+  'vote',
   'flag',
   'reveal',
   'check',
@@ -251,8 +262,11 @@ export interface RoomSession {
   // The vote ids this page voted on, kept while the page is open
   // (reconnections included).
   votedIds: number[]
-  // The vote that closed last, and how, shown for VOTE_RESULT_MS.
-  closedVote: { vote_id: number; outcome: VoteOutcome } | null
+  // How the vote that closed last ended, for the page's announcement; null
+  // before one closes.
+  lastVoteOutcome: VoteOutcome | null
+  // The countdown of the open vote, when this page saw it open (spec 047).
+  voteClock: VoteClock | null
   // The reactions shown on clues, at most one per clue (spec 022).
   reactions: ShownReaction[]
   // The id given to the next shown reaction.
@@ -311,9 +325,6 @@ export const SILENCE_LIMIT_MS = 4000
 export const EDIT_SEND_INTERVAL_MS = 100
 export const RECONNECT_DELAYS_MS: number[] = [1000, 2000, 4000, 8000]
 
-// How long the banner shows the result of a vote that closed.
-export const VOTE_RESULT_MS = 3000
-
 const PLAYER_STATES: string[] = ['active', 'idle', 'disconnected']
 const MAX_COLOUR = 7
 
@@ -335,7 +346,8 @@ export function newSession(): RoomSession {
     feedChanges: 0,
     names: new SvelteMap<string, string>(),
     votedIds: [],
-    closedVote: null,
+    lastVoteOutcome: null,
+    voteClock: null,
     reactions: [],
     nextReactionId: 1,
     timerBaseMs: 0,
@@ -614,17 +626,46 @@ function toVoteView(value: unknown): VoteView | null {
 
 const VOTE_OUTCOMES: string[] = ['passed', 'rejected', 'timed_out']
 
-// A vote_closed clears the open vote and keeps how it ended, for the banner.
+// A vote_opened opens the vote and starts its countdown, from the moment the
+// page applies it (spec 047). A new vote replaces any earlier one at once.
+function applyVoteOpened(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
+  const vote = toVoteView(event.message)
+  snapshot.open_vote = vote
+  session.voteClock = null
+  const timeoutSeconds = event.message.timeout_seconds
+  if (vote === null || typeof timeoutSeconds !== 'number' || timeoutSeconds <= 0) {
+    return
+  }
+  session.voteClock = {
+    vote_id: vote.vote_id,
+    openedMs: performance.now(),
+    durationMs: timeoutSeconds * 1000,
+  }
+}
+
+// A vote_closed clears the open vote and its countdown, and keeps how it ended
+// for the page's announcement. Its line in the stream comes from the feed.
 function applyVoteClosed(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
   snapshot.open_vote = null
-  const { vote_id, outcome } = event.message
-  if (typeof vote_id !== 'number' || typeof outcome !== 'string') {
+  session.voteClock = null
+  const { outcome } = event.message
+  if (typeof outcome !== 'string' || !VOTE_OUTCOMES.includes(outcome)) {
     return
   }
-  if (!VOTE_OUTCOMES.includes(outcome)) {
+  session.lastVoteOutcome = outcome as VoteOutcome
+}
+
+// A snapshot keeps the countdown of a vote this page saw open while it still
+// holds that vote (a reconnection, spec 017); otherwise there is none.
+function keepVoteClock(session: RoomSession, snapshot: Snapshot): void {
+  const clock = session.voteClock
+  if (clock === null) {
     return
   }
-  session.closedVote = { vote_id, outcome: outcome as VoteOutcome }
+  const vote = snapshot.open_vote
+  if (vote === null || vote.vote_id !== clock.vote_id) {
+    session.voteClock = null
+  }
 }
 
 // Returns null when the value is not a clue reference of three integers.
@@ -1017,9 +1058,7 @@ function applyEvent(session: RoomSession, event: RoomEvent): void {
     session.snapshot.reveal_budget = toRevealBudget(event.message.reveal_budget)
   }
   if (event.type === 'vote_opened' && session.snapshot !== null) {
-    // A new vote replaces the result of the last one at once.
-    session.snapshot.open_vote = toVoteView(event.message)
-    session.closedVote = null
+    applyVoteOpened(session, session.snapshot, event)
   }
   if (event.type === 'vote_closed' && session.snapshot !== null) {
     applyVoteClosed(session, session.snapshot, event)
@@ -1093,6 +1132,7 @@ function drainPending(session: RoomSession): void {
 
 function receiveSnapshot(session: RoomSession, snapshot: Snapshot): void {
   session.snapshot = snapshot
+  keepVoteClock(session, snapshot)
   for (const player of snapshot.players) {
     session.names.set(player.player_id, player.nickname)
   }

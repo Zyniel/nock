@@ -67,15 +67,6 @@
   /* The focus ring (spec 035, spec 041). It is a variable for the controls
      that draw it on :focus instead of :focus-visible. */
   --focus-outline: 2px solid var(--nock-navy);
-
-  /* The hatching of a player who is no longer in the room: diagonal stripes of
-     ink and white, 2px each, a pattern no player colour has. The swatch of the
-     recap (spec 028) uses it, until spec 047 replaces it (spec 045). */
-  --author-departed-hatching: repeating-linear-gradient(
-    45deg,
-    var(--nock-ink) 0 2px,
-    var(--nock-white) 2px 4px
-  );
 }
 
 body {
