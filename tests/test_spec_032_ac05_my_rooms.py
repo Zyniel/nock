@@ -13,7 +13,9 @@ neither shows the section nor spoils the request. The live part of AC-5 is in
 Refined by spec 046 (the design's catalogue, screens sheet P4): "My rooms" has the
 `hidden` attribute and shows no text while it loads and when the answer is empty,
 so `my_rooms.loading` and `my_rooms.empty` leave `fr.json`; a failed request
-shows `my-rooms-error` with `my_rooms.error`.
+shows `my-rooms-error` with `my_rooms.error`. Spec 046 also shows no force filter
+on an empty catalogue (its "States"), so the test of the section's place between
+the title and the force filter serves spec 004's reference catalogue `CAT`.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from nock.catalogue import Catalogue
 from spec032_harness import (
     ABC,
     ABC_TOKEN,
@@ -49,6 +52,7 @@ from spec032_harness import (
     two_identities,
     xyz_summary,
 )
+from spec035_harness import build_fx01_grid, build_reference_catalogue
 
 GRID_2 = "Grille n\N{DEGREE SIGN} 2"
 SIZE_5_BY_5 = "5 \N{MULTIPLICATION SIGN} 5"
@@ -233,20 +237,32 @@ PLACE_SCRIPT = """
 """
 
 
-def test_ac5_my_rooms_is_a_section_between_the_title_and_the_force_filter(
-    page_1280: Page, live_server: str
-) -> None:
-    open_two_summaries(page_1280, live_server)
+class TestWithGrids:
+    """The live server of spec 004's reference catalogue `CAT`.
 
-    place = page_1280.evaluate(PLACE_SCRIPT)
+    Spec 046 shows the force filter only when the catalogue has grids, so the
+    place of the section is checked on a catalogue that shows it.
+    """
 
-    assert place == {
-        "tag": "SECTION",
-        "heading": "Mes salons",
-        "inPage": True,
-        "afterTitle": True,
-        "beforeFilter": True,
-    }
+    @pytest.fixture
+    def catalogue(self, fx01_text: str) -> Catalogue:
+        return build_reference_catalogue(build_fx01_grid(fx01_text))
+
+    def test_ac5_my_rooms_is_a_section_between_the_title_and_the_force_filter(
+        self, page_1280: Page, live_server: str
+    ) -> None:
+        open_two_summaries(page_1280, live_server)
+        expect(page_1280.get_by_test_id("force-filter")).to_have_count(5)
+
+        place = page_1280.evaluate(PLACE_SCRIPT)
+
+        assert place == {
+            "tag": "SECTION",
+            "heading": "Mes salons",
+            "inPage": True,
+            "afterTitle": True,
+            "beforeFilter": True,
+        }
 
 
 def test_ac5_my_rooms_lists_the_summaries_in_the_order_received(
