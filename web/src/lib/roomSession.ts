@@ -262,8 +262,9 @@ export interface RoomSession {
   // The vote ids this page voted on, kept while the page is open
   // (reconnections included).
   votedIds: number[]
-  // How the vote that closed last ended, for the page's announcement; null
-  // before one closes.
+  // How the vote that closed last ended, for the page's announcement, when the
+  // page applied its vote_closed; null before one closes and from the next
+  // vote_opened on (spec 047).
   lastVoteOutcome: VoteOutcome | null
   // The countdown of the open vote, when this page saw it open (spec 047).
   voteClock: VoteClock | null
@@ -627,10 +628,13 @@ function toVoteView(value: unknown): VoteView | null {
 const VOTE_OUTCOMES: string[] = ['passed', 'rejected', 'timed_out']
 
 // A vote_opened opens the vote and starts its countdown, from the moment the
-// page applies it (spec 047). A new vote replaces any earlier one at once.
+// page applies it (spec 047). A new vote replaces any earlier one at once, and
+// the previous result is forgotten: if a snapshot later drops this vote without
+// the page seeing it close, nothing announces an earlier vote's result.
 function applyVoteOpened(session: RoomSession, snapshot: Snapshot, event: RoomEvent): void {
   const vote = toVoteView(event.message)
   snapshot.open_vote = vote
+  session.lastVoteOutcome = null
   session.voteClock = null
   const timeoutSeconds = event.message.timeout_seconds
   if (vote === null || typeof timeoutSeconds !== 'number' || timeoutSeconds <= 0) {
