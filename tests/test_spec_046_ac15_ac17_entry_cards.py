@@ -248,6 +248,8 @@ def test_ac16_while_joining_the_card_stays_with_a_disabled_button_until_the_room
     show_nickname_error(page)
     field = page.get_by_test_id("nickname-input")
     field.fill("Ana")
+    # Fix after #40's CI: the field holds the text before the submit (no race).
+    expect(field).to_have_value("Ana")
 
     page.get_by_test_id("nickname-submit").click()
 

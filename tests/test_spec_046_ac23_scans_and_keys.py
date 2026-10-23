@@ -160,7 +160,10 @@ def open_dialog(page: Page, base_url: str, status: dict[str, object]) -> None:
     page.get_by_test_id("account-open").click()
     expect(page.get_by_test_id("account-dialog")).to_have_attribute("open", "")
     if not signed_in:
-        page.get_by_test_id("account-email-input").fill("ana@")
+        email_input = page.get_by_test_id("account-email-input")
+        email_input.fill("ana@")
+        # Fix after #40's CI: the field holds the text before the submit (no race).
+        expect(email_input).to_have_value("ana@")
         page.get_by_test_id("account-email-submit").click()
         expect(page.get_by_test_id("account-error")).to_be_visible()
 

@@ -654,6 +654,10 @@ def open_room(page: Page, base_url: str, frame: str) -> RoomMock:
     page.goto(f"{base_url}/r/{ROOM_CODE}")
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana", timeout=WAIT_TIMEOUT_MS)
+    # Fix after #40's CI: the field must hold the nickname before the submit, so
+    # that a fill lost to a race fails here rather than joining with the default
+    # nickname (spec 046's `show_nickname_error` met it in Firefox).
+    expect(nickname_input).to_have_value("Ana", timeout=WAIT_TIMEOUT_MS)
     nickname_input.press("Enter", timeout=WAIT_TIMEOUT_MS)
     wait_until(page, lambda: mock.has_join_after(0), "the join")
     show_snapshot(page, mock, frame)

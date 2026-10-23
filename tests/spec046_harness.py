@@ -563,10 +563,34 @@ def open_nickname_card(page: Page, base_url: str) -> RoomMock:
 
 
 def show_nickname_error(page: Page) -> None:
-    """Type `A` and submit: spec 012 refuses it with `nickname-error`."""
-    page.get_by_test_id("nickname-input").fill("A")
+    """Type `A` and submit: spec 012 refuses it with `nickname-error`.
+
+    Fix after #40's CI (Firefox, 2026-10-23): `nickname-error` once never showed,
+    most likely because the submit saw an empty field and the page joined with
+    the default nickname. The field must now hold `A` before the click, and a
+    page that leaves the `nickname` status instead of refusing fails with a
+    message that says so, rather than a bare timeout.
+    """
+    field = page.get_by_test_id("nickname-input")
+    field.fill("A")
+    expect(field).to_have_value("A")
     page.get_by_test_id("nickname-submit").click()
-    expect(page.get_by_test_id("nickname-error")).to_be_visible()
+    error = page.get_by_test_id("nickname-error")
+    room = page.get_by_test_id("room-page")
+    waited_ms = 0
+    while not error.is_visible():
+        status = room.get_attribute("data-status")
+        if status != "nickname":
+            held = field.input_value() if field.count() == 1 else "no field"
+            raise AssertionError(
+                f"the submit of `A` was not refused: data-status became {status!r}"
+                f" (the field holds {held!r}); the page most likely joined with"
+                " the default nickname"
+            )
+        if waited_ms >= WAIT_TIMEOUT_MS:
+            raise AssertionError("nickname-error did not show after submitting `A`")
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
     wait_for_fonts(page)
 
 

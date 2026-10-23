@@ -209,7 +209,10 @@ def test_ac3_the_link_request_has_no_room_and_its_answer_shows_account_sent(
     page, link_bodies = open_with_accounts(window, live_server, WIDE, SIGNED_OUT)
     open_dialog(page)
 
-    page.get_by_test_id("account-email-input").fill(EMAIL)
+    email_input = page.get_by_test_id("account-email-input")
+    email_input.fill(EMAIL)
+    # Fix after #40's CI: the field holds the text before the submit (no race).
+    expect(email_input).to_have_value(EMAIL)
     page.get_by_test_id("account-email-submit").click()
 
     expect(page.get_by_test_id("account-sent")).to_be_visible()
