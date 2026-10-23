@@ -8,9 +8,10 @@ the replay's grid. The readings and tolerances of `spec048_harness.py` hold here
 
 Readings:
 
-- `REPLAY_FX02`'s one typed edit is at (0, 2), the first letter cell of FX-02,
-  since (1, 0), which the spec names, is a clue cell of FX-02 (reported to the
-  lead). Each edit of a replay is made 5 seconds after the one before.
+- `REPLAY_FX02`'s one typed edit is at (0, 2), FX-02's first letter cell, as the
+  spec's "Test harness" says since the lead's note of 2026-10-23 (it read
+  (1, 0), a clue cell of FX-02); the spec names no letter, so it is `A` by `p1`.
+  Each edit of a replay is made 5 seconds after the one before.
 - The replay's cells are placed by their boxes: a cell's row and column are its
   offset from the first cell, divided by the cell's side, rounded.
 """

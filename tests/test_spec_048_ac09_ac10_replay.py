@@ -13,9 +13,14 @@ Readings of the spec's wording:
 
 - "On one row, the button's bottom on the input's bottom": the bottoms within
   1 px and the button right of the input.
-- "`ops-replay-position-field` and `ops-replay-step` are under the grid, as wide
-  as it": each one's top is not above the grid's bottom (1 px) and its width is
-  the grid's (1 px).
+- "`ops-replay-position-field` is under the grid, as wide as it": its top is not
+  above the grid's bottom (1 px) and its width is the grid's (1 px).
+- "`ops-replay-step` is under it, its left edge on the grid's left edge (1 px)
+  and no wider than the grid (1 px), as wide as its text" (refined by the lead on
+  2026-10-23, after the first version of these tests, which wanted it as wide as
+  the grid): its top is not above the field's bottom (1 px), its left edge on the
+  grid's (1 px), its width at most the grid's plus 1 px, and its width that of
+  its text plus its horizontal paddings and borders (1 px).
 - "Seven `ops-edit` items 4 px apart": from one item's bottom to the next one's
   top, 4 px (1 px).
 - "Top to bottom ... each as wide as the card's content or narrower": each
@@ -63,6 +68,7 @@ from spec043_harness import (
     style_of,
 )
 from spec046_harness import (
+    SUBPIXEL_PX,
     OpenWindow,
     button_colour_problems,
     card_problems,
@@ -88,6 +94,7 @@ from spec048_harness import (
     radius_padding_problems,
     role_problems,
     text_problems,
+    text_width,
 )
 from spec048_ops_harness import (
     REPLAY_COUNT,
@@ -281,14 +288,39 @@ def test_ac9_on_a_wide_window_the_edits_are_left_of_the_grid(
         problems.append(f"the grid is {grid.left - edits.right} px right of the list")
     if not same_position(grid.top, edits.top):
         problems.append(f"the tops {grid.top} and {edits.top} differ")
-    for test_id in ("ops-replay-position-field", "ops-replay-step"):
-        box = column_of(page, test_id)
-        if box.top < grid.bottom - 1.0:
-            problems.append(f"{test_id} is not under the grid")
-        if not same_position(box.width, grid.width):
-            problems.append(f"{test_id} is {box.width} px wide, the grid {grid.width}")
+    field = column_of(page, "ops-replay-position-field")
+    if field.top < grid.bottom - 1.0:
+        problems.append("ops-replay-position-field is not under the grid")
+    if not same_position(field.width, grid.width):
+        problems.append(f"the field is {field.width} px wide, the grid {grid.width}")
+    problems.extend(step_line_problems(page, grid, field))
 
     assert problems == []
+
+
+def step_line_problems(page: Page, grid: Box, field: Box) -> list[str]:
+    """`ops-replay-step` under the field, on the grid's left edge, as wide as its
+    text and no wider than the grid (spec 048 AC-9, refined on 2026-10-23)."""
+    step = page.get_by_test_id("ops-replay-step")
+    box = box_of(step)
+    problems: list[str] = []
+    if box.top < field.bottom - 1.0:
+        problems.append("ops-replay-step is not under ops-replay-position-field")
+    if not same_position(box.left, grid.left):
+        problems.append(
+            f"ops-replay-step's left edge {box.left}, the grid's {grid.left}"
+        )
+    if box.width > grid.width + 1.0 + SUBPIXEL_PX:
+        problems.append(
+            f"ops-replay-step is {box.width} px wide, the grid {grid.width}"
+        )
+    sides = 0.0
+    for part in ("paddingLeft", "paddingRight", "borderLeftWidth", "borderRightWidth"):
+        sides += float(style_of(step, part).removesuffix("px"))
+    expected = text_width(step) + sides
+    if not same_position(box.width, expected):
+        problems.append(f"ops-replay-step is {box.width} px wide, its text {expected}")
+    return problems
 
 
 def test_ac9_the_edits_are_a_plain_list_of_lines_4_px_apart(
