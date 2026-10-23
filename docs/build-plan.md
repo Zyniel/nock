@@ -332,8 +332,8 @@ so their tests change in the same pull request.
 | 1 | 041 Visual foundation | tokens, player colours, fonts, icons, buttons, focus ring, menus, badge, note; today's screens take the colours, no layout change | done (#32) |
 | 2 | 042 Grid cells | every cell: letters, marks, players' corners, clues, arrows, flag, the « Accessibilité » and « Mots des autres » switches | done (#34) |
 | 3 | 043 Room layout | top bar, Aide and Menu, Salon (column or sheet), Joueurs, clue bar, notes, completion band; two pull requests (WP-1 the frame, WP-2 the feedback) | done (#35, #36) |
-| 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | done |
-| 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | approved |
+| 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | done (#38) |
+| 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | done |
 | 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | approved |
 | 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | approved |
 | 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | approved |
@@ -348,7 +348,7 @@ so their tests change in the same pull request.
   - [x] `/feature specs/042-grid-cells.md`
   - [x] `/feature specs/043-room-layout.md` (WP-1, then WP-2)
   - [x] `/feature specs/044-keyboard.md`
-  - [ ] `/feature specs/045-auteurs-mode.md`
+  - [x] `/feature specs/045-auteurs-mode.md`
   - [ ] `/feature specs/046-catalogue-and-entry-pages.md`
   - [ ] `/feature specs/047-room-overlays.md`
   - [ ] `/feature specs/048-plain-pages-and-states.md`

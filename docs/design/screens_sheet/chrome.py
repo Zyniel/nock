@@ -183,13 +183,20 @@ def note_under_vote(banner: str, text: str) -> str:
     return f'<div class="vstack">{banner}{note(text)}</div>'
 
 
-def legend(players: list[int], names_of: list[str] | None = None) -> str:
-    """Return the Auteurs legend; it wraps onto more lines (spec 045)."""
+def legend(
+    players: list[int], names_of: list[str] | None = None, over: bool = False
+) -> str:
+    """Return the Auteurs legend; it wraps onto more lines (spec 045).
+
+    over: True lays it over the bottom of the grid's viewport, where its room
+    would leave the grid under 100 px (spec 045 Decision 8).
+    """
     who = names_of or FOUR
     names = " ".join(
         (f'<b style="color:var(--player-ink-{p})">{who[p]}' "</b>") for p in players
     )
-    return f'<div class="legend">Auteurs : {names}</div>'
+    cls = "legend over" if over else "legend"
+    return f'<div class="{cls}">Auteurs : {names}</div>'
 
 
 def phone_room(
@@ -212,6 +219,7 @@ def phone_room(
     size: tuple[int, int] = (360, 720),
     legend_names: list[str] | None = None,
     legend_lines: int = 1,
+    legend_over: bool = False,
     off: set | None = None,
     slot4: str = "kbd",
     band_lines: int = 1,
@@ -221,7 +229,9 @@ def phone_room(
     """Return a phone room, 360 x 720 by default (sheet layout).
 
     final_status: the text of the status band under the top bar (spec 043);
-    row_state: True shows the full-but-wrong status in the clue bar's row.
+    row_state: True shows the full-but-wrong status in the clue bar's row;
+    legend_over: True lays the Auteurs legend over the grid's bottom and gives
+    it no room (spec 045 Decision 8).
     """
     width, height = size
     low = height <= 500
@@ -232,7 +242,7 @@ def phone_room(
     band_h = {"done": 46, "notyet": 35}.get(band or "", 0) + 19 * (band_lines - 1)
     net_h = (52 if net else 0) + (35 if final_status else 0)
     stage_h = height - 2 - 54 - 34 - kb_h - band_h - net_h
-    leg_h = (38 + 15 * (legend_lines - 1)) if authors else 0
+    leg_h = (38 + 15 * (legend_lines - 1)) if authors and not legend_over else 0
     s = floor(min((width - 2 - 16 - 1) / 5, (stage_h - 16 - leg_h - 1) / 5))
     h = phone_top(timer, pressed, badge, newdot, aide, off, slot4)
     if net:
@@ -242,10 +252,13 @@ def phone_room(
     if stage_html is None:
         g = grid(fx_rows(s, authors=authors, **grid_opts), s)
         if authors and legend_names:
-            leg = legend(list(range(len(legend_names))), legend_names)
+            leg = legend(list(range(len(legend_names))), legend_names, legend_over)
         else:
-            leg = legend([0, 1, 2, 3]) if authors else ""
-        inner = f'<div class="gwrap">{g}{leg}</div>'
+            leg = legend([0, 1, 2, 3], over=legend_over) if authors else ""
+        if legend_over:
+            inner = f'<div class="gwrap">{g}</div>{leg}'
+        else:
+            inner = f'<div class="gwrap">{g}{leg}</div>'
     else:
         inner = stage_html
     h += f'<div class="stage">{inner}{stage_extra}</div>'

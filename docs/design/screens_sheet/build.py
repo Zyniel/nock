@@ -1719,7 +1719,7 @@ def sec_modes() -> str:
     out = screen(
         "s-authors",
         "« Auteurs » mode",
-        ["§7", "spec 019"],
+        ["§7", "spec 019", "spec 045"],
         [
             (
                 "Menu « Auteurs ». Each letter in its finder's ink; revealed "
@@ -1727,8 +1727,24 @@ def sec_modes() -> str:
                 "strike turns ink. The legend sits under the grid, which "
                 "shrinks by 38 px so nothing else moves."
             ),
+            (
+                "Where that room would leave the grid's viewport under 100 px "
+                "(a phone held sideways with the keyboard shown: 68 px at 568 "
+                "&times; 320), the grid keeps its size and the legend lies over "
+                "its bottom, 8 px above the viewport's edge, on layer 6, letting "
+                "taps through; hiding the keyboard gives the room back (decided "
+                "by the lead on 2026-10-23, spec 045 Decision 8)."
+            ),
         ],
-        [("ph", PH, phone_room(authors=True)), ("pc", PC, desk_room(authors=True))],
+        [
+            ("ph", PH, phone_room(authors=True)),
+            ("pc", PC, desk_room(authors=True)),
+            (
+                "ph",
+                "Phone sideways · 568 &times; 320 · keyboard shown",
+                phone_room(size=(568, 320), authors=True, legend_over=True),
+            ),
+        ],
     )
     access_items = [
         ("evt", "→ Bruno a rejoint le salon", ""),
@@ -2593,9 +2609,12 @@ def specs_modes() -> str:
         "« Auteurs » with eight long names",
         ["§7", "spec 045", "decided spec 045 OQ2"],
         [
-            "The legend wraps onto more lines, each centred, never wider than the "
-            "grid area; the grid gives it the room of each further line, so nothing "
-            "else moves (Open question 2). Spec 045 Open question 1 (no sign of "
+            "The legend wraps onto more lines, each centred, 2 px apart, never "
+            "wider than the clue bar (nor, on a phone, the grid area less its 8 px "
+            "sides), so its wrapping never narrows the grid; the grid gives it the "
+            "room of each further line, so nothing else moves (Open question 2), "
+            "unless that would leave the grid under 100 px: it then lies over the "
+            "grid's bottom (Decision 8). Spec 045 Open question 1 (no sign of "
             "authorship beyond colour and the legend) changes nothing drawn.",
         ],
         [

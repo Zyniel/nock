@@ -1,7 +1,7 @@
 ---
 id: "045"
 title: Auteurs mode
-status: approved
+status: done
 ---
 
 # 045 - Auteurs mode
@@ -84,8 +84,11 @@ On each letter `cell` (spec 006):
   - during a flash (spec 016) the letter keeps its finder's ink, the replacer being
     the new finder once the server confirms the letter.
 - Wrong after a check (spec 042's strike): `text-decoration-color` is `--nock-ink`
-  while the mode is on, `--nock-red` while it is off. Its line and thickness do not
-  change.
+  while the mode is on, `--nock-red` while it is off. Its line and style are the
+  same in both modes, and its thickness follows spec 042's rule `max(2px, 0.07em)`
+  in both (the px value can differ, as AC-8 shrinks the grid and its font at 1280
+  by 720). (Note from the lead, 2026-10-23: this read "Its line and thickness do
+  not change.")
 - Nothing else of the cell changes with the mode: its background, its outline, the
   triangles or icons, the notch, the catch-up ring and the arrows are spec 042's.
 - The colours follow the confirmed grid within 300 ms of each event the page
@@ -113,15 +116,51 @@ screen reader does not show). While the mode is off there is no `authors-legend`
   14 px, padding 4 px 12 px; a flex row, gap 8 px between its items, centred; the
   label in 500 0.8rem/1.2 `--nock-font-ui`, `--nock-muted`; each name in weight 700,
   the same size, in its player's ink `var(--player-ink-N)`. It wraps onto more
-  lines, each centred, when its items do not fit on one line; it is never wider
-  than `grid-area`'s content box.
-- Place: horizontally centred on the `grid`'s box; its top 8 px below the bottom of
-  the part of the `grid`'s box that shows in `grid-viewport` (the grid's bottom at
-  zoom 1, `grid-viewport`'s bottom when the zoomed grid fills it).
+  lines, each centred, when its items do not fit on one line, its items 8 px apart
+  on a line and its lines 2 px apart (`row-gap`, the screens sheet's `.legend`).
+  It is never wider than `clue-bar`'s width, nor, in the sheet layout, than
+  `grid-area`'s content box (`grid-viewport`'s width); neither width changes with
+  the mode, so the legend's lines, and its height `h`, do not depend on the grid's
+  size. (Note from the lead, 2026-10-23: the implementation found that in the
+  column layout, where `grid-area` is the grid's box (spec 043), a wrapping legend
+  made the grid narrower, which made the legend wrap more, until the grid
+  collapsed (FX-02, 8 players with 20-character nicknames, at 568 by 320 and 740
+  by 360 on a desktop); this read "It wraps onto more lines, each centred, when its
+  items do not fit on one line; it is never wider than `grid-area`'s content
+  box.", and the 2 px and 8 px are the implementer's values, recorded.)
+- Place, when the grid gives it its room (see "The grid's room"): in the flow
+  after `grid-viewport`, 8 px under the grid's shown bottom (in the sheet layout,
+  where the grid is centred in a `grid-viewport` taller than itself, that can lie
+  inside `grid-viewport`'s box; the Note below), horizontally centred on
+  `grid-area`'s content box, which is the `grid`'s centre at zoom 1; when the
+  grid is zoomed it stays centred
+  on `grid-viewport`, wherever the grid is panned. Its top is 8 px below the bottom
+  of the part of the `grid`'s box that shows in `grid-viewport` (the grid's bottom
+  at zoom 1, `grid-viewport`'s bottom when the zoomed grid fills it). The space
+  between the grid's bottom and `grid-viewport`'s bottom is rounded down to a
+  quarter pixel when the legend is placed, so the gap is at least 8 px and less
+  than 8.25 px. (Note from the lead, 2026-10-23: "right under `grid-viewport`"
+  became "after `grid-viewport`, 8 px under the grid's shown bottom", which in the
+  sheet layout can lie inside the viewport's box. The implementer's decisions,
+  recorded; this read "Place: horizontally centred on the `grid`'s box; its top
+  8 px below the bottom of the part of the `grid`'s box that shows in
+  `grid-viewport` (the grid's bottom at zoom 1, `grid-viewport`'s bottom when the
+  zoomed grid fills it).")
+- Place, when the grid gives it no room (see "The grid's room"): over the bottom
+  of `grid-viewport`, horizontally centred on `grid-area`'s content box as above,
+  its bottom 8 px above `grid-viewport`'s bottom edge, on layer 6 (as the 3-second
+  notes, `_design.md` section 8, "Layers of the room page"), with its own
+  background and border (the look above), and `pointer-events: none`, so a tap or
+  a click on it reaches the cell under it. It then covers only the bottom of
+  `grid-viewport` (and, in the column layout when it is wider than the grid, the
+  empty play area beside it), never `clue-bar`, `room-topbar`, `grid-status`,
+  `keyboard` or `salon`. (Note from the lead, 2026-10-23: new; see "The grid's
+  room".)
 
 ### The grid's room (`_design.md` section 7)
 
-While the mode is on, the height that spec 043's play area gives `grid-viewport` is
+While the mode is on, unless the rule at the end of this section applies, the
+height that spec 043's play area gives `grid-viewport` is
 `R` px less, `R = max(38, h + 8)`, where `h` is the legend's height (38 px when the
 legend is one line, as drawn); the room it frees holds the 8 px gap and the legend.
 `grid-viewport` keeps its width and its top; the grid fits the smaller viewport as on
@@ -131,7 +170,31 @@ and the Salon keep theirs, except that the block of `grid-viewport`, the legend,
 `clue-bar` and `grid-status`, centred in the play area (spec 043), may move by less
 than the height of one row of cells when the grid's rounding changes. Spec 013
 AC-6's guarantees keep holding with the mode on (`grid-viewport` at least 100 px
-high).
+high). (Note from the lead, 2026-10-23: "unless the rule at the end of this
+section applies" is added; the paragraph read "While the mode is on, the height
+that spec 043's play area gives `grid-viewport` is `R` px less".)
+
+`clue-bar` keeps its box in the column layout too: its width is the one spec 043
+(Decision 12) gives it from the grid's box with no legend under it, the mode off
+or on. (Note from the lead, 2026-10-23: the implementer's decision, recorded; spec
+043 Decision 12 alone would make the clue bar narrower with the mode on, as the
+grid gives the legend its room, against "nothing else moves" above.)
+
+When giving the legend its room `R` would leave `grid-viewport` under 100 px high,
+the grid gives it no room: `grid-viewport` keeps the box it has with the mode off,
+and the legend lies over its bottom ("The legend", second "Place"). The height
+compared with 100 px is the one `grid-viewport` would have with the room given: in
+the sheet layout its height with the mode off less `R`; in the column layout the
+height of the grid's box fitted to the height left less `R`. The rule holds in
+both layouts and is read again whenever the window, the keyboard, the Salon, the
+status or the legend's height `h` changes; since `h` does not depend on the grid's
+size ("The legend", its width), the two placements do not alternate. For example,
+at 568 by 320 in the touch context (sheet layout, keyboard shown), `grid-viewport`
+is 106 px high with the mode off, and `R` = 38 would leave 68 px: the legend lies
+over the grid's bottom. The player gets the room back by hiding the keyboard (spec
+044). (Note from the lead, 2026-10-23: new. The implementation found that at 568
+by 320 in the touch context the room left 68 px, against spec 013 AC-6's 100 px
+floor, and nothing else may move to make room.)
 
 ### The clue bar (refines spec 019's "Client: the author in words")
 
@@ -184,7 +247,10 @@ under the marks that remain (spec 042's), and spec 041's hatch row and spec 042'
 drawing-order line name a band that is gone. Specs 035 and 043 need no criterion
 change either (spec 035's AC-6 never read the author line; spec 043's Menu item
 keeps its id, label and detail, with the storage it now has); they carry the notes
-of specs 047 and 048, and the lead adds this spec's line to them.
+of specs 047 and 048, and the lead adds this spec's line to them. Spec 043's
+Decision 12 also gets a note, with no criterion change: with the mode on, the
+clue bar's width in the column layout is this spec's ("The grid's room"). (Note
+from the lead, 2026-10-23: the sentence on spec 043's Decision 12 is new.)
 
 ### Test harness
 
@@ -225,9 +291,9 @@ The words in brackets say how each criterion is tested.
 - **AC-5** (new) (browser with mocked socket) The mode changes the letters only, and a flash keeps the inks. On `EIGHT`, with `p2` selecting (3, 2) `down` and after a tap on (1, 0) (`across`, TAMIS): for every cell, the computed `background-color`, `outline-style`, and the number of its `remote-selection`, `reveal-mark`, `catch-up-mark` and `clue-arrow` children are the same with the mode on as with it off. With the mode on, when the mock sends `letter_changed` (seq 6) at (1, 0) with `Y` by `p4` (colour 3, replacing `p1`'s letter, so spec 016 flashes the cell): within 300 ms (1, 0) has `data-flash="3"`, a `cell-flash` overlay (spec 041), the background rgb(255, 255, 255) and the ink of colour 3.
 - **AC-6** (new; refines spec 019 AC-4) (browser with mocked socket) The legend names each player in their ink, in join order. On `EIGHT` with `p2` named `JEAN-LUC` and `p3` disconnected, with the mode on: `authors-legend` is inside `grid-area`, right after `grid-viewport`, has `aria-hidden="true"`, and holds `authors-legend-label` reading `fr.json["authors.legend"]`, then eight `authors-legend-name` with `data-player-id` `p1` to `p8` in that order, reading `Ana`, `Jean-Luc`, `Cy` and the other nicknames through `displayNickname`, each with `data-colour` its player's index, `font-weight` 700 and the computed `color` of that player's ink. Within 300 ms of a `player_left` (seq 6) of `p4`, there are seven names, without `p4`; within 300 ms of a `player_joined` (seq 7) of `p9` (`ZOÉ`, colour 3), `Zoé` is the last name, with the ink of colour 3. With the mode off there is no `authors-legend`.
 - **AC-7** (new) (browser with mocked socket) The legend has the design's look and sits 8 px under the grid. On a FX-01 snapshot with players `p1` to `p4` (short nicknames), with the mode on, at 360 by 740 and at 1280 by 720: `authors-legend` has the computed `background-color` with channels 255, 255, 255 and alpha 0.96, a `1px` `solid` rgb(221, 226, 234) border, `border-radius` `14px` on each corner, padding `4px 12px`, `display` `flex`, `column-gap` `8px`; `authors-legend-label` has `font-size` 12.8 px, `font-weight` 500, `line-height` 15.36 px and `color` rgb(94, 101, 115); each name has `font-size` 12.8 px; the legend is one line (its height is at most 26 px); its horizontal centre is within 1 px of the `grid`'s; its top is 8 px below the `grid`'s bottom (1 px); and it lies inside `grid-area`.
-- **AC-8** (new) (browser with mocked socket) The grid gives the legend its room, and nothing else moves. On the snapshot of AC-7, at 360 by 740 in the touch context (sheet layout, keyboard shown) and at 1280 by 720 in the desktop context (column layout, Salon open): the test notes the boxes of `room-topbar`, `clue-bar`, `keyboard` (touch) and `salon` (desktop), and the height of `grid-viewport` and of the `grid`, with the mode off; with the mode on, `room-topbar`, `keyboard` and `salon` have the same boxes, `clue-bar` the same box at 360 by 740 and the same box within 5 px vertically at 1280 by 720; at 360 by 740 `grid-viewport` is 38 px less high (1 px); at 1280 by 720 (where the height limits the grid) the `grid` is between 35 and 40 px less high (38 px, rounded to whole cells). With 8 players whose nicknames have 20 characters each, at 360 by 740 in the touch context, the legend wraps onto more than one line, and `grid-viewport` is `h + 8` px less high than with the mode off (1 px), `h` the legend's height; the legend lies inside `grid-area`, above `clue-bar`'s top, and does not overlap the `grid`'s box.
+- **AC-8** (new) (browser with mocked socket) The grid gives the legend its room, and nothing else moves. On the snapshot of AC-7, at 360 by 740 in the touch context (sheet layout, keyboard shown) and at 1280 by 720 in the desktop context (column layout, Salon open): the test notes the boxes of `room-topbar`, `clue-bar`, `keyboard` (touch) and `salon` (desktop), and the height of `grid-viewport` and of the `grid`, with the mode off; with the mode on, `room-topbar`, `keyboard` and `salon` have the same boxes, `clue-bar` the same box at 360 by 740 and the same box within 5 px vertically at 1280 by 720; at 360 by 740 `grid-viewport` is 38 px less high (1 px); at 1280 by 720 (where the height limits the grid) the `grid` is between 35 and 40 px less high (38 px, rounded to whole cells). With 8 players whose nicknames have 20 characters each, at 360 by 740 in the touch context, the legend wraps onto more than one line, and `grid-viewport` is `h + 8` px less high than with the mode off (1 px), `h` the legend's height; the legend lies inside `grid-area`, above `clue-bar`'s top, and does not overlap the `grid`'s box. At 568 by 320 in the touch context (sheet layout, keyboard shown), where the room would leave `grid-viewport` 68 px high, the grid gives the legend no room: with the mode on, `grid-viewport`, `room-topbar`, `clue-bar` and `keyboard` have the boxes they have with the mode off (1 px); the legend's bottom is 8 px above `grid-viewport`'s bottom (1 px), its horizontal centre is within 1 px of `grid-viewport`'s, and its box lies inside `grid-viewport`'s; it has the computed `z-index` `6`, `pointer-events` `none`, and AC-7's background, border and radius; `document.elementFromPoint` at the centre of its box returns an element inside the `grid`; and its box overlaps none of `room-topbar`, `clue-bar` and `keyboard`. (Note from the lead, 2026-10-23: the 568 by 320 run is added for the rule of "The grid's room" on a grid that would fall under 100 px; the criterion ended at "and does not overlap the `grid`'s box.")
 - **AC-9** (new; refines spec 019 AC-4) (browser with mocked socket; static) The clue bar shows only the clue. On the snapshot of AC-3 with the mode on, at 1280 by 720 and at 568 by 320 in the touch context: after a tap on (1, 1), `clue-bar` holds no `clue-bar-author` and `clue-bar-text` has the text content `Passoire fine`; the same after a tap on (1, 2) and with the mode off. Static: no file under `web/src` contains `clue-bar-author` or `author-mark`.
-- **AC-10** (new; refines spec 019 AC-5) (browser with mocked socket) The mode keeps the room page's guarantees at every window size. With spec 043's `H8` (spec 013 AC-6's setup: FX-01, `you` host among 8 players, 100 line events, (3, 1) tapped) with letters by four of the players and the mode on, at each window size of spec 006 AC-5, in desktop and touch contexts: spec 013 AC-6's checks pass (`grid-viewport` at least 100 px high, no page scroll, the grid inside the viewport at zoom 1, `clue-bar` inside the window and, in the touch context, at or above the top of `keyboard`); `authors-legend` lies inside the window and inside `grid-area`, its top 8 px below the `grid`'s bottom (1 px), and its box overlaps neither the `grid`'s nor `clue-bar`'s. On a FX-02 snapshot at 568 by 320 in the desktop context with the mode on, the same checks hold.
+- **AC-10** (new; refines spec 019 AC-5) (browser with mocked socket) The mode keeps the room page's guarantees at every window size. With spec 043's `H8` (spec 013 AC-6's setup: FX-01, `you` host among 8 players, 100 line events, (3, 1) tapped) with letters by four of the players and the mode on, at each window size of spec 006 AC-5, in desktop and touch contexts: spec 013 AC-6's checks pass (`grid-viewport` at least 100 px high, no page scroll, the grid inside the viewport at zoom 1, `clue-bar` inside the window and, in the touch context, at or above the top of `keyboard`); `authors-legend` lies inside the window, is at most as wide as `clue-bar` (0.5 px), has its horizontal centre within 1 px of the centre of `grid-area`'s content box, and its box overlaps none of `room-topbar`, `clue-bar`, `grid-status` (when shown), `keyboard` (touch) and `salon` (when open). The test notes, with the mode off, `grid-viewport`'s box and its height `V`, and with the mode on the legend's height `h`. When `grid-viewport` is less high than with the mode off (the grid gave the legend its room; in the sheet layout by `R = max(38, h + 8)` (1 px), in the column layout by 35 px or more, as AC-8 allows, the box being the grid's rounded to whole cells), the legend's top is 8 px below the `grid`'s bottom (1 px) and its box does not overlap the `grid`'s; when `grid-viewport` keeps its box of the mode off (1 px) (the legend lies over the grid), the legend's bottom is 8 px above `grid-viewport`'s bottom (1 px). (Note from the lead, 2026-10-23: the first case read "less high ... by `R = max(38, h + 8)` (1 px)" in every layout, which cannot hold in the column layout, where `grid-viewport` is the grid's box rounded to whole cells.) (Note from the lead, 2026-10-23: the two cases are told apart by `grid-viewport`'s height, not by the legend's position; this read "When the legend's top is at or below `grid-viewport`'s bottom (the grid gave it its room), ... otherwise (it lies over the grid), `grid-viewport` has its box of the mode off". In the sheet layout on portrait windows (360 by 740, 320 by 568, 768 by 1024) the grid is centred in a `grid-viewport` taller than itself, so with the room given the legend, 8 px under the grid, lies inside the viewport's box, and the old test called it "over the grid".) In the sheet layout, the legend lies over the grid exactly when `V - max(38, h + 8)` is under 100; at 568 by 320 in the touch context it does. On a FX-02 snapshot at 568 by 320 in the desktop context with the mode on, the same checks hold. On a FX-02 snapshot with 8 players whose nicknames have 20 characters each, at 568 by 320 and at 740 by 360 in the desktop context (column layout, Salon open), with the mode on, the same checks hold (`grid-viewport` at least 100 px high among them), and `clue-bar` has the width it has with the mode off (0.5 px). (Note from the lead, 2026-10-23: refined for the rule of "The grid's room" on a grid that would fall under 100 px and for the legend's width; this read "`authors-legend` lies inside the window and inside `grid-area`, its top 8 px below the `grid`'s bottom (1 px), and its box overlaps neither the `grid`'s nor `clue-bar`'s. On a FX-02 snapshot at 568 by 320 in the desktop context with the mode on, the same checks hold.")
 - **AC-11** (new) (browser with mocked socket; static) The mode passes spec 035's scans, and `fr.json` holds its keys. With the mode on, at 1280 by 720 and at 360 by 740, on `EIGHT` with `p2` selecting (3, 2) `down`, (1, 3) locked by a check, (2, 3) a pencil letter, (4, 4) holding `X` by `p1` with `wrong` true, and after a tap on (1, 0): spec 035's contrast scan (its AC-8) finds no offending element (every ink reaches 4.5:1 on white, word blue, selected blue, locked grey and every other player's tint), and its language scan (its AC-9, with the nicknames and the clue texts as test data) finds no offending element. Static: `web/src/i18n/fr.json` holds `authors.legend` with the value `Auteurs :`, still holds `authors.switch`, `authors.on` and `authors.off`, and has no key `authors.selected`.
 
 ## Edge cases and errors
@@ -250,8 +316,16 @@ The words in brackets say how each criterion is tested.
   more the Joueurs list of the Salon is the reference for who plays (`_design.md`
   section 3). Nothing on the grid names a letter's author in words (Open question
   1).
-- A long legend (AC-8): it wraps, and the grid gives it the room of each further
-  line, so it never covers the grid or the clue bar.
+- A long legend (AC-8, AC-10): it wraps, never wider than the clue bar, and the
+  grid gives it the room of each further line, so it never covers the grid or the
+  clue bar, unless that room would leave `grid-viewport` under 100 px high.
+- A low window (AC-8, AC-10): where the room would leave `grid-viewport` under
+  100 px high (568 by 320 with the keyboard shown, or a long legend on a low
+  desktop window), the legend lies over the grid's bottom, which the player can
+  still tap through it; hiding the keyboard (spec 044) gives the room back. (Note
+  from the lead, 2026-10-23: this item is new, and the item above read "A long
+  legend (AC-8): it wraps, and the grid gives it the room of each further line, so
+  it never covers the grid or the clue bar.")
 - A solved grid (AC-1): the mode keeps working, so the group can look at who wrote
   what at the end (spec 019).
 - The Accessibilité mode (AC-6): it changes the player marks (spec 042), not the
@@ -298,7 +372,9 @@ Proposed by the spec writer, each already part of the spec above:
    names, which only the eye uses.
 4. The legend's room is `max(38, h + 8)` px: 38 px as drawn for one line, and the
    room of every further line when eight long names wrap (Open question 2), so the
-   legend never covers the grid or the clue bar.
+   legend never covers the grid or the clue bar. (Note from the lead, 2026-10-23:
+   except where that room would leave `grid-viewport` under 100 px high; see
+   decision 8.)
 5. The recap's player marks, which spec 042's report left to step 5, are spec
    047's, with the recap's look; this spec leaves the recap as it is, so spec 028's
    hatching (and the custom property it reads) stays until spec 047 replaces it.
@@ -322,6 +398,29 @@ them). The number in brackets is the question's number, which the text above cit
    sideways. Answer: (a); (b) hides players silently and (c) adds a scrolling
    region with its keyboard rules (spec 035 AC-12). The screens sheet draws one
    line only.
+
+Decided by the lead on 2026-10-23, after the implementation found two layout
+conflicts (the text above follows them, each change with its dated note):
+
+8. Where giving the legend its room would leave `grid-viewport` under 100 px high
+   (spec 013 AC-6's floor), in either layout, the legend takes no room and lies
+   over the bottom of `grid-viewport`, on layer 6, with its own background and
+   `pointer-events: none`; nothing else moves. At 568 by 320 with the keyboard
+   shown the room left 68 px, and the top bar, the clue bar, the status and the
+   keyboard may not give any; the player gets the room back by hiding the keyboard.
+9. The legend is never wider than `clue-bar`'s width (nor, in the sheet layout,
+   than `grid-area`'s content box), a width that does not change with the mode. It
+   was "never wider than `grid-area`'s content box", which in the column layout is
+   the grid's box: a wrapping legend narrowed the grid, which made it wrap more,
+   until the grid collapsed (FX-02, 8 players with 20-character nicknames, at 568
+   by 320 and 740 by 360 on a desktop).
+10. The implementer's decisions, recorded: in the column layout the clue bar's
+    width comes from the grid's box without the legend's room (spec 043 Decision
+    12 would make it narrower with the mode on); wrapped legend lines are 2 px
+    apart and items 8 px apart on a line; the space under the grid is rounded down
+    to a quarter pixel when the legend is placed (at most 0.25 px); the legend is
+    centred on `grid-area`'s content box, the grid's centre at zoom 1, and stays
+    centred on the viewport when the grid is zoomed.
 
 ## Open questions
 

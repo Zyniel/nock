@@ -13,6 +13,13 @@ player's then undone (so the undoer becomes the author, spec 018 decision 5), an
 erase, a check that locks a cell, and last a reveal (spec 024). Each behaviour is
 its own test, so that the reveal, which needs spec 024, fails on its own. The
 shared setup of the browser test is in `spec019_harness`.
+
+Refined by spec 045 (the design's Auteurs mode): the browser part reads the
+letters' inks, not a band. Ana turns the switch on, her page is reloaded, and the
+switch is still on (`localStorage["nock.authors"]`): (1, 0) has the ink of Ana's
+colour index and (1, 1) the ink of Bob's, each index read from that player's
+`roster-player` `data-colour`, as before the reload. The inks are read with spec
+045's readers (`spec045_harness`).
 """
 
 from __future__ import annotations
@@ -67,13 +74,12 @@ from spec019_harness import (
     EnterRoom,
     ana_types_t_and_bob_types_a,
     authors_switch,
+    cell_at,
     grid_from_text,
-    marks_in,
-    only_mark_of,
     room_page,
-    swatch_colour,
     turn_switch_on,
 )
+from spec045_harness import INKS, finder_problems, read_cell
 
 ROOM_CODE = "ABCDEF"
 START_TIME = 1_000_000.0
@@ -580,7 +586,31 @@ def test_ac3_websocket_after_a_restart_bob_gets_the_same_two_authors(
 # ---- AC-3, browser with live server -----------------------------------------
 
 
-def test_ac3_browser_marks_keep_their_colours_after_a_reload(
+def roster_colour_index(page: Page, player_id: str) -> int:
+    """A player's colour index, read from their `roster-player`'s `data-colour`."""
+    row = page.locator(f'[data-testid="roster-player"][data-player-id="{player_id}"]')
+    found = row.get_attribute("data-colour")
+    assert found is not None, f"no data-colour for {player_id}"
+    return int(found)
+
+
+def ink_problems_of_t_and_a(page: Page, ana_id: str, bob_id: str) -> list[str]:
+    """(1, 0) in the ink of Ana's colour index, (1, 1) in the ink of Bob's."""
+    ana_colour = roster_colour_index(page, ana_id)
+    bob_colour = roster_colour_index(page, bob_id)
+    expect(cell_at(page, 1, 0)).to_have_attribute("data-author-colour", str(ana_colour))
+    problems = finder_problems(
+        "(1, 0)", read_cell(page, 1, 0), str(ana_colour), INKS[ana_colour]
+    )
+    problems.extend(
+        finder_problems(
+            "(1, 1)", read_cell(page, 1, 1), str(bob_colour), INKS[bob_colour]
+        )
+    )
+    return problems
+
+
+def test_ac3_browser_the_inks_and_the_switch_survive_a_reload(
     page: Page,
     browser: Browser,
     live_server: str,
@@ -596,24 +626,14 @@ def test_ac3_browser_marks_keep_their_colours_after_a_reload(
             page, bob_page, f"{live_server}/r/{code}", enter_room
         )
         turn_switch_on(page)
-        expect(marks_in(page, 1, 0)).to_have_count(1)
-        colour_of_t_before = only_mark_of(page, 1, 0).background
-        colour_of_a_before = only_mark_of(page, 1, 1).background
-        assert colour_of_t_before == swatch_colour(page, ana_id)
-        assert colour_of_a_before == swatch_colour(page, bob_id)
+        assert ink_problems_of_t_and_a(page, ana_id, bob_id) == []
 
         page.reload()
 
         expect(room_page(page)).to_have_attribute("data-status", "joined")
         expect(room_page(page)).to_have_attribute("data-you", ana_id)
-        expect(authors_switch(page)).to_have_count(1)
-        turn_switch_on(page)
-        expect(marks_in(page, 1, 0)).to_have_count(1)
-        expect(marks_in(page, 1, 1)).to_have_count(1)
-        colour_of_t = only_mark_of(page, 1, 0).background
-        colour_of_a = only_mark_of(page, 1, 1).background
-        assert colour_of_t == swatch_colour(page, ana_id)
-        assert colour_of_a == swatch_colour(page, bob_id)
-        assert (colour_of_t, colour_of_a) == (colour_of_t_before, colour_of_a_before)
+        expect(authors_switch(page)).to_have_attribute("aria-pressed", "true")
+        expect(cell_at(page, 1, 1)).to_have_attribute("data-letter", "A")
+        assert ink_problems_of_t_and_a(page, ana_id, bob_id) == []
     finally:
         bob_context.close()

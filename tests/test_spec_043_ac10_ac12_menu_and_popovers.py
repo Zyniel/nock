@@ -327,11 +327,12 @@ def ac11_frame(grid: Grid) -> str:
 
 
 # Each switch: what a click makes of its `aria-pressed` and detail, and the key and
-# value it stores (None: nothing is checked in storage).
+# value it stores. Since spec 045 AC-1 the Auteurs mode is remembered too: turning
+# it on writes "true" under `nock.authors`.
 SWITCH_CLICKS = {
     "access-switch": ("true", "access.on", "nock.accessibility", "true"),
     "others-tint-switch": ("false", "others_tint.off", "nock.others_tint", "false"),
-    "authors-switch": ("true", "authors.on", None, None),
+    "authors-switch": ("true", "authors.on", "nock.authors", "true"),
 }
 
 
@@ -349,8 +350,7 @@ def test_ac11_a_switch_flips_in_place_and_the_menu_stays_open_on_it(
 
     expect(switch).to_have_attribute("aria-pressed", pressed)
     assert details_of(page, test_id)[0]["text"] == fr_value(detail_key)
-    if storage_key is not None:
-        assert stored_value(page, storage_key) == stored
+    assert stored_value(page, storage_key) == stored
     expect(page.get_by_test_id("room-menu")).to_be_visible()
     assert focused_test_id(page) == test_id
 

@@ -573,6 +573,23 @@ by each player, off by default (decided by the human on 2026-10-16).
   8 px gap); the grid shrinks by 38 px of height while the mode is on, so nothing
   else moves. Background `--nock-legend-bg`, 1 px line-grey border, radius 14 px,
   padding 4 px 12 px, gap 8 px, one line.
+  (Note from the lead, 2026-10-23, spec 045: a long legend wraps, its lines 2 px
+  apart, and the grid gives it `max(38, h + 8)` px, `h` its height; it is never
+  wider than the clue bar (nor, on a phone, than the grid area less its 8 px
+  sides), a width the mode does not change, where it read "never wider than the
+  grid area" in spec 045, which made a wrapping legend narrow the grid in the
+  column layout until the grid collapsed. It is centred on the grid area, the
+  grid's centre at zoom 1, and on the viewport when the grid is zoomed.)
+- Where giving the legend its room would leave the grid's viewport under 100 px
+  high (the floor of spec 013 AC-6), on a phone or a computer, for example at
+  568 by 320 with the keyboard shown, the legend takes no room: the grid keeps its
+  size, and the legend lies over the bottom of the grid's viewport, centred, its
+  bottom 8 px above the viewport's bottom edge, on layer 6 (as the 3-second
+  notes), with its own background and border, and lets taps through to the cells
+  under it. It covers only the grid's bottom, never the clue bar, the top bar, the
+  status, the keyboard or the Salon. Hiding the keyboard gives the room back.
+  (Note from the lead, 2026-10-23: new, spec 045's Decision 8; drawn in the
+  screens sheet, part 9, « Auteurs » mode, the 568 by 320 frame.)
 - The clue bar shows only the clue; the « Lettre de … » of spec 019 AC-4 goes.
 - During a flash the letter colours keep their inks; their contrast on the flash
   is not guaranteed (section 15).
@@ -620,7 +637,9 @@ Top to bottom, filling the window, nothing scrolls:
    lost" below.
 3. The grid area: all the height left, white, the grid centred, cells as large as
    fit with 8 px around (the sheet keeps 16 px in total on each axis), and the
-   Auteurs legend under the grid while that mode is on.
+   Auteurs legend under the grid while that mode is on (over the grid's bottom
+   where its room would leave the grid under 100 px, section 7). (Note from the
+   lead, 2026-10-23: the words in brackets are new, spec 045.)
 4. Clue bar, 34 px high, navy, white text, in this order: ‹ button (36 px wide,
    chevron-left icon), the clue text centred with its direction glyph (→ or ↓, 80 %
    opacity, 6 px left margin), on one line with an ellipsis when too long; then
@@ -1018,6 +1037,7 @@ that opened it.
 | Layer | z-index |
 | --- | --- |
 | 3-second note | 6 |
+| Auteurs legend lying over the grid (section 7) | 6 |
 | Phone scrim | 7 |
 | Menus, popovers, sheets, shown reaction | 8 |
 | Vote banner, reaction picker | 9 |
@@ -1028,6 +1048,9 @@ moved from layer 8 to 9, as spec 043's code has it: the banner is drawn above th
 Salon sheet and the scrim (spec 022 decision 16, the vote wins), which come later in
 the page and would cover it on the same layer. The banner and the picker never show
 together: « Réagir » is disabled while a vote is open, spec 043 Decision 10.)
+
+(Note from the lead, 2026-10-23: the row of the Auteurs legend lying over the grid
+is new, spec 045 Decision 8; under the grid it is in the flow and has no layer.)
 
 ## 9. Overlays
 
@@ -1451,7 +1474,9 @@ From spec 043, the room layout:
 - The computer top bar shows no grid name until the client knows the grid's number
   and force (spec 043 Open question 6).
 - The clue bar in the column layout is never narrower than the smaller of 320 px
-  and the play area (spec 043 Decision 12).
+  and the play area (spec 043 Decision 12). (Note from the lead, 2026-10-23: with
+  the Auteurs mode on, its width comes from the grid's box without the legend's
+  room, so it keeps its width; spec 045, "The grid's room".)
 
 From spec 044, the keyboard:
 
@@ -1563,6 +1588,24 @@ wait for the human, who settles them when approving spec 043".)
 3. Réagir and Je bloque while nothing is selected: drawn disabled, their icon in
    `--nock-rule` (5.22:1 on navy; spec 043 Open question 10), so the clue bar keeps
    its shape. Not P8's hidden buttons.
+
+### Decided by the lead on 2026-10-23, from spec 045's implementation
+
+(Note from the lead, 2026-10-23: this list is new. Spec 045's implementation
+found two layout conflicts of the Auteurs legend; the lead decided them, and
+recorded the implementer's own choices. Spec 045 Decisions 8 to 10.)
+
+- A legend whose room would leave the grid's viewport under 100 px high lies over
+  the viewport's bottom, on layer 6, its bottom 8 px above the viewport's bottom
+  edge, and lets taps through; the grid keeps its size (section 7; drawn in the
+  screens sheet, part 9, « Auteurs » mode, 568 by 320).
+- The legend is never wider than the clue bar (nor, on a phone, than the grid
+  area's content box), so its wrapping never narrows the grid (section 7).
+- In the column layout the clue bar's width comes from the grid's box without the
+  legend's room (spec 043 Decision 12, above).
+- Wrapped legend lines 2 px apart, items 8 px apart on a line; the space under
+  the grid rounded down to a quarter pixel when placing the legend; the legend
+  centred on the grid area, on the viewport when the grid is zoomed (section 7).
 
 ### Deferred, high importance
 

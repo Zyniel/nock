@@ -3,6 +3,7 @@
   import { t } from './i18n'
   import {
     ARROW_GLYPHS,
+    GRID_LINE_PX,
     ZOOM_MAX,
     ZOOM_MIN,
     arrowSide,
@@ -14,7 +15,9 @@
   } from './gridLayout'
   import type { PlacedArrow } from './gridLayout'
   import { actionForKey } from './letterEntry'
-  import { authorMarkColour } from './authorsView'
+  import { LEGEND_GAP_PX, finderColour } from './authorsView'
+  import type { LegendName } from './authorsView'
+  import AuthorsLegend from './AuthorsLegend.svelte'
   import { ICONS } from './icons'
   import IconShapes from './IconShapes.svelte'
   import PlayerIcon from './PlayerIcon.svelte'
@@ -57,6 +60,11 @@
     isOthersTintOn,
     isAccessibilityOn,
     playerColours,
+    legendNames,
+    legendRoom,
+    isLegendOverGrid,
+    legendMaxWidth,
+    legendHeight = $bindable(0),
     clueFlags,
     clueReactions,
   }: {
@@ -79,7 +87,7 @@
     // The other players' selections, in roster order (spec 013), each with the
     // corner it holds on its cell (spec 042).
     remoteSelections: RemoteSelection[]
-    // The authors view of spec 019: true while its switch is on.
+    // The Auteurs mode of spec 045: true while its switch is on.
     isAuthorsViewOn: boolean
     // « Mots des autres » (spec 042): true while the other players' words are
     // tinted.
@@ -87,8 +95,22 @@
     // « Accessibilité » (spec 042): true while the other players' cursors are
     // their icons rather than plain triangles.
     isAccessibilityOn: boolean
-    // The colour index of each player now in the room, by player id.
+    // The colour index of each player of the kept snapshot, by player id.
     playerColours: Map<string, number>
+    // The names the Auteurs legend shows while the mode is on.
+    legendNames: LegendName[]
+    // The height the grid gives the legend under it while the mode is on, in
+    // px; 0 while it is off, or while the legend lies over the grid.
+    legendRoom: number
+    // True while the legend lies over the viewport's bottom, taking no room
+    // (spec 045, decision 8).
+    isLegendOverGrid: boolean
+    // The legend's largest width in px: the clue bar's width in the column
+    // layout (spec 045, decision 9); null in the sheet layout, where the grid
+    // area's content box, narrower than the clue bar, limits it.
+    legendMaxWidth: number | null
+    // The legend's height as drawn, in px, for the room page.
+    legendHeight?: number
     // The marker of each flagged clue, by clue key "row,column,clue_index"
     // (spec 021). A clue nobody flagged has no entry.
     clueFlags: Map<string, ClueFlagMarker>
@@ -112,18 +134,26 @@
     corner: Corner
   }
 
-  // From this cell side up, an author mark keeps clear of the selected cell's
-  // outline and has its full size (spec 019); on a smaller cell it only stays
-  // inside the cell.
-  const FULL_AUTHOR_MARK_MIN_CELL_PX = 20
+  // The colour index of a letter cell's finder (see finderColour), or '' while
+  // the Auteurs mode is off: then no cell has a finder.
+  function finderOf(cell: LetterCellView): string {
+    if (!isAuthorsViewOn) {
+      return ''
+    }
+    return finderColour(cell, playerColours)
+  }
 
-  // The colour of a letter cell's author mark (see authorMarkColour), or null
-  // while the authors view is off: then no cell has a mark.
-  function authorMarkOf(cell: LetterCellView): string | null {
+  // The colour of a letter while the Auteurs mode is on: its finder's ink, or
+  // ink when it has no finder; null while the mode is off, so that the cell's
+  // own rules (pencil grey, ink) apply.
+  function letterColourOf(finder: string): string | null {
     if (!isAuthorsViewOn) {
       return null
     }
-    return authorMarkColour(cell, playerColours)
+    if (finder === '') {
+      return 'var(--nock-ink)'
+    }
+    return `var(--player-ink-${finder})`
   }
 
   // The DOM id of a cell, used by aria-activedescendant.
@@ -258,6 +288,9 @@
   let viewport: HTMLDivElement | undefined = $state()
   let areaWidth = $state(0)
   let areaHeight = $state(0)
+  // The viewport's height as drawn, not rounded: where the grid's box ends in
+  // it (the Auteurs legend sits under that).
+  let viewportHeight = $state(0)
   let zoom = $state(ZOOM_MIN)
 
   let fitSize = $derived(fitCellSize(areaWidth, areaHeight, grid.width, grid.height))
@@ -274,7 +307,36 @@
       const box = viewport.getBoundingClientRect()
       areaWidth = Math.floor(box.width)
       areaHeight = Math.floor(box.height)
+      viewportHeight = box.height
     }
+  }
+
+  // ---- The Auteurs legend (spec 045) ----
+
+  // The legend is in the flow right under the viewport, and its margins and
+  // height add up to legendRoom, the height the viewport gives it. Its top is
+  // 8 px below the bottom of the part of the grid's box that shows: the grid
+  // is centred in the viewport while it is shorter, so the room left under the
+  // grid is taken back from the legend's top margin. While it lies over the
+  // grid, its margins and height add up to nothing: it is pulled up over the
+  // viewport's bottom, its bottom 8 px above it.
+  //
+  // That room is kept in quarter pixels, which every engine lays out exactly:
+  // the two margins then add up to the same height as legendRoom, and the
+  // viewport's height does not move by a fraction of a pixel at each frame
+  // (its height sets the room under the grid, which sets the margins).
+  let gridHeight = $derived(cellSize * grid.height + GRID_LINE_PX)
+  let roomUnderGrid = $derived(quarterPixels(Math.max(0, (viewportHeight - gridHeight) / 2)))
+  let legendMarginTop = $derived(
+    isLegendOverGrid ? -(legendHeight + LEGEND_GAP_PX) : LEGEND_GAP_PX - roomUnderGrid,
+  )
+  let legendMarginBottom = $derived(
+    isLegendOverGrid ? LEGEND_GAP_PX : legendRoom - legendHeight - LEGEND_GAP_PX + roomUnderGrid,
+  )
+
+  // A length in px, rounded down to a quarter of a pixel.
+  function quarterPixels(length: number): number {
+    return Math.floor(length * 4) / 4
   }
 
   // Follow the size of the viewport (the area the grid must fit in at zoom 1).
@@ -527,7 +589,7 @@
     data-selected-column={selection === null ? '' : String(selection.column)}
     data-direction={selection === null ? '' : selection.direction}
     data-word={activeKey}
-    class:small-cells={cellSize < FULL_AUTHOR_MARK_MIN_CELL_PX}
+    class:authors-view={isAuthorsViewOn}
     style:--cell="{cellSize}px"
     style:grid-template-columns="repeat({grid.width}, var(--cell))"
     style:grid-auto-rows="var(--cell)"
@@ -540,15 +602,14 @@
             {@const cursors = cursorsOn(cell.row, cell.column)}
             {@const tints = tintsOn(cell.row, cell.column)}
             {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
-            {@const authorMark = authorMarkOf(cell)}
+            {@const finder = finderOf(cell)}
             {@const caughtUp = isCaughtUp(cell.row, cell.column)}
             {@const flash = flashOf(cell.row, cell.column)}
             {@const letter = shown.letter ?? ''}
             <!-- The cell's marks, in the drawing order of spec 042: the letter,
                  then the flash overlay (under it, z-index -1), the catch-up ring
-                 (1), the author band (spec 019, over the ring), the revealed
-                 notch (3), the other players' triangles or icons (2) and the
-                 arrows (6); last, my selection border (7). -->
+                 (1), the revealed notch (3), the other players' triangles or
+                 icons (2) and the arrows (6); last, my selection border (7). -->
             <div
               class="cell letter"
               class:locked={cell.locked}
@@ -563,7 +624,7 @@
               data-unconfirmed={String(shown.unconfirmed)}
               data-pencil={String(shown.pencil)}
               data-author={cell.author ?? ''}
-              data-author-colour={authorMark ?? ''}
+              data-author-colour={finder}
               data-locked={String(cell.locked)}
               data-revealed={String(cell.revealed)}
               data-wrong={String(cell.wrong && !shown.unconfirmed)}
@@ -576,6 +637,7 @@
               class:in-word={isInWord}
               class:tinted={tints.length > 0 && isOthersTintOn}
               style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
+              style:--finder-ink={letterColourOf(finder)}
               style:--triangle="{triangleSide(cellSize)}px"
               style:grid-row={cell.row + 1}
               style:grid-column={cell.column + 1}
@@ -590,14 +652,6 @@
                   class="catch-up-mark"
                   data-testid="catch-up-mark"
                   aria-hidden="true"
-                ></span>{/if}{#if authorMark !== null}<span
-                  class="author-mark"
-                  data-testid="author-mark"
-                  data-colour={authorMark}
-                  aria-hidden="true"
-                  style:background-color={authorMark === ''
-                    ? null
-                    : `var(--player-colour-${authorMark})`}
                 ></span>{/if}{#if cell.revealed}<span
                   class="reveal-mark"
                   data-testid="reveal-mark"
@@ -723,6 +777,16 @@
     {/each}
   </div>
 </div>
+{#if isAuthorsViewOn}
+  <AuthorsLegend
+    names={legendNames}
+    marginTop={legendMarginTop}
+    marginBottom={legendMarginBottom}
+    isOverGrid={isLegendOverGrid}
+    maxWidth={legendMaxWidth}
+    bind:height={legendHeight}
+  />
+{/if}
 <div
   class="visually-hidden"
   data-testid="grid-announcement"
@@ -897,64 +961,17 @@
     pointer-events: none;
   }
 
-  /* The authors view (spec 019): a band along the bottom of the cell, above
-     the ring (it comes later in the cell) and under the other players'
-     triangles. Its sides keep 3px inside the cell's padding box and its bottom
-     2px, so the selected cell's outline (2px, drawn inside the cell) never
-     covers it. Its height is 11% of the cell side and at least 4px, but at most
-     a quarter of the side less 2px. That cap only acts on cells of 20 to 24px,
-     where the letter's baseline can be as little as 6px above the cell's
-     bottom: it keeps the band's top at or below the baseline, within the
-     spec's 1px tolerance (spec 019 decision 13), and the band still at least
-     3px high (the box rules of spec 019). */
-  .author-mark {
-    position: absolute;
-    z-index: 1;
-    left: 3px;
-    right: 3px;
-    bottom: 2px;
-    height: min(max(4px, calc(var(--cell) * 0.11)), calc(var(--cell) * 0.25 - 2px));
-    pointer-events: none;
+  /* The Auteurs mode (spec 045): each letter in its finder's ink, or ink when
+     it has no finder (--finder-ink, set on the cell), on every background of
+     the cell, the flash included. It replaces the pencil grey (the italics
+     stay) and the ink of a flash. The strike of a wrong letter turns ink, so
+     that it still shows on a red letter. */
+  .grid.authors-view .letter {
+    color: var(--finder-ink);
   }
 
-  /* A small cell (a large grid on a small window) has no room for those gaps:
-     the band only stays inside the cell, on its bottom edge, and below the
-     letter's baseline. */
-  .small-cells .author-mark {
-    left: 1px;
-    right: 1px;
-    bottom: 0;
-    height: calc(var(--cell) * 0.25);
-  }
-
-  /* A player's band is in the author's colour (set on the element), between
-     two 1px edges in the cell's text colour, one along its top and one along
-     its bottom. The text colour keeps at least 4.5:1 on every background of the
-     cell, the flash included, so the band always keeps 3:1 thanks to its edges
-     while its main colour stays the author's. */
-  .author-mark:not([data-colour=''])::before,
-  .author-mark:not([data-colour=''])::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    width: 100%;
-    height: 1px;
-    background-color: currentColor;
-  }
-
-  .author-mark:not([data-colour=''])::before {
-    top: 0;
-  }
-
-  .author-mark:not([data-colour=''])::after {
-    bottom: 0;
-  }
-
-  /* The band of an author who is no longer in the room (their colour may now
-     be someone else's): the departed hatching of app.css, diagonal stripes of
-     ink and white, a pattern no player's band has. */
-  .author-mark[data-colour=''] {
-    background-image: var(--author-departed-hatching);
+  .grid.authors-view .letter[data-wrong='true'] {
+    text-decoration-color: var(--nock-ink);
   }
 
   /* A revealed letter (spec 024, spec 042): an orange-red notch pointing up,
@@ -1019,7 +1036,7 @@
 
   /* A triangle is a triangle for the pointer too: its box is clipped to the
      drawn shape, so a point of the box outside the shape reaches what is under
-     it (the author band of spec 019, the ring). */
+     it (the cell). */
   .remote-selection[data-shape='triangle'][data-corner='top-left'] {
     clip-path: polygon(0% 0%, 100% 0%, 0% 100%);
   }

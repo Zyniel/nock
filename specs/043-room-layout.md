@@ -1163,7 +1163,10 @@ Proposed by the spec writer, each already part of the spec above:
     and `Escape`.
 12. The clue bar is never narrower than the smaller of 320 px and the play area: the
     design's "as wide as the grid" would leave no room for the clue text beside four
-    buttons on a small grid.
+    buttons on a small grid. (Note from the lead, 2026-10-23: refined by spec 045,
+    "The grid's room": while the Auteurs mode is on, the grid the clue bar's width
+    comes from is the grid's box with no legend under it, so the clue bar keeps
+    the width it has with the mode off; this decision is otherwise unchanged.)
 
 Decided by the human on 2026-10-22, with the spec's approval (these were the Open
 questions, answered with their recommended answer; the text above already follows
