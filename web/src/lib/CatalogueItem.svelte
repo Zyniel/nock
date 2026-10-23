@@ -1,9 +1,21 @@
 <script lang="ts">
+  // One grid card of the catalogue and of the grid page (spec 004, spec 010,
+  // spec 046 "Grid cards"): the generic drawing when the list has room for it,
+  // the text column (number and progress, publication, force line), then
+  // "Jouer" on the right.
+  import MetaSep from './MetaSep.svelte'
   import { formatPublishedOn, progressOf, type GridSummary } from './catalogue'
+  import { THUMB_HEIGHT_PX, gridThumbOf } from './gridThumb'
   import { t } from './i18n'
+  import { NOCK_MARK_POINTS } from './icons'
   import { playGrid } from './playGrid'
 
-  let { summary }: { summary: GridSummary } = $props()
+  let { summary, isThumbShown }: { summary: GridSummary; isThumbShown: boolean } = $props()
+
+  // The force line draws one Nock mark per force level, navy up to the grid's.
+  const FORCE_LEVELS = [1, 2, 3, 4]
+
+  const thumb = $derived(gridThumbOf(summary.width, summary.height))
 
   let isStarting = $state(false)
   let hasFailed = $state(false)
@@ -41,6 +53,7 @@
 <svelte:window onpageshow={onPageShow} />
 
 <article
+  class="catalogue-item"
   data-testid="catalogue-item"
   data-number={String(summary.number)}
   data-published-on={summary.published_on}
@@ -50,20 +63,155 @@
   data-word-count={String(summary.word_count)}
   data-progress={progress}
 >
-  <h2>{t('catalogue.item.number', { number: summary.number })}</h2>
-  <p>{t('catalogue.item.published', { date: formatPublishedOn(summary.published_on) })}</p>
-  <p>{t('catalogue.item.force', { force: summary.force })}</p>
-  <p>{t('catalogue.item.size', { width: summary.width, height: summary.height })}</p>
-  <p>{t('catalogue.item.words', { count: summary.word_count })}</p>
-  {#if progress === 'started'}
-    <p data-testid="catalogue-progress">{t('catalogue.progress.started')}</p>
-  {:else if progress === 'finished'}
-    <p data-testid="catalogue-progress">{t('catalogue.progress.finished')}</p>
+  {#if isThumbShown}
+    <svg
+      class="catalogue-thumb"
+      data-testid="catalogue-thumb"
+      aria-hidden="true"
+      width={thumb.widthPx}
+      height={THUMB_HEIGHT_PX}
+      viewBox="0 0 {thumb.viewWidth} {thumb.viewHeight}"
+    >
+      <rect width={thumb.viewWidth} height={thumb.viewHeight} fill="var(--nock-white)" />
+      {#each thumb.clueCells as cell (`${cell.x},${cell.y}`)}
+        <rect
+          data-testid="thumb-clue"
+          x={cell.x}
+          y={cell.y}
+          width="10"
+          height="10"
+          fill="var(--nock-thumb)"
+        />
+      {/each}
+      {#each thumb.lines as line (`${line.x1},${line.y1},${line.x2},${line.y2}`)}
+        <line
+          data-testid="thumb-line"
+          x1={line.x1}
+          y1={line.y1}
+          x2={line.x2}
+          y2={line.y2}
+          stroke="var(--nock-line)"
+          stroke-width="1"
+        />
+      {/each}
+    </svg>
   {/if}
-  <button type="button" data-testid="catalogue-play" disabled={isStarting} onclick={play}
-    >{t('catalogue.play')}</button
+  <div class="card-text">
+    <div class="number-line">
+      <h2>{t('catalogue.item.number', { number: summary.number })}</h2>
+      {#if progress === 'started'}
+        <span class="nock-status-pill nock-status-pill-started" data-testid="catalogue-progress"
+          >{t('catalogue.progress.started')}</span
+        >
+      {:else if progress === 'finished'}
+        <span class="nock-status-pill nock-status-pill-finished" data-testid="catalogue-progress"
+          >{t('catalogue.progress.finished')}</span
+        >
+      {/if}
+    </div>
+    <p class="card-line">
+      {t('catalogue.item.published', { date: formatPublishedOn(summary.published_on) })}
+    </p>
+    <p class="card-line force-line">
+      <span class="force-marks" data-testid="catalogue-force-marks" aria-hidden="true">
+        {#each FORCE_LEVELS as level (level)}
+          <svg viewBox="0 0 10 14" class:reached={level <= summary.force}
+            ><polygon points={NOCK_MARK_POINTS} /></svg
+          >
+        {/each}
+      </span>{t('catalogue.item.force', { force: summary.force })}<MetaSep />{t(
+        'catalogue.item.size',
+        { width: summary.width, height: summary.height },
+      )}<MetaSep />{t('catalogue.item.words', { count: summary.word_count })}
+    </p>
+    {#if hasFailed}
+      <p class="nock-error-line" data-testid="catalogue-error" role="alert">
+        {t('catalogue.play_failed')}
+      </p>
+    {/if}
+  </div>
+  <button
+    type="button"
+    class="nock-button nock-button-primary play"
+    data-testid="catalogue-play"
+    disabled={isStarting}
+    onclick={play}>{t('catalogue.play')}</button
   >
-  {#if hasFailed}
-    <p data-testid="catalogue-error" role="alert">{t('catalogue.play_failed')}</p>
-  {/if}
 </article>
+
+<style>
+  .catalogue-item {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--nock-line);
+    border-radius: 8px;
+    background: var(--nock-white);
+  }
+
+  .catalogue-thumb {
+    display: block;
+    flex: none;
+    border: 1px solid var(--nock-rule);
+  }
+
+  /* The text column: all the width left, lines 3 px apart. */
+  .card-text {
+    flex: 1 1 0;
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+
+  /* The grid's number, then its status pill on its line. */
+  .number-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  h2 {
+    margin: 0;
+    font: 700 1.05rem/1.2 var(--nock-font-ui);
+    color: var(--nock-ink);
+  }
+
+  .card-line {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--nock-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .force-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .force-marks {
+    display: inline-flex;
+    gap: 2px;
+  }
+
+  .force-marks svg {
+    display: block;
+    width: 8px;
+    height: 11px;
+    fill: var(--nock-thumb);
+  }
+
+  .force-marks svg.reached {
+    fill: var(--nock-navy);
+  }
+
+  .play {
+    flex: none;
+    padding: 9px 16px;
+  }
+</style>

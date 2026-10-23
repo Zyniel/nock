@@ -3,6 +3,7 @@
   import AccountDialog from './AccountDialog.svelte'
   import AideMenu from './AideMenu.svelte'
   import ClueBar from './ClueBar.svelte'
+  import EntryFrame from './EntryFrame.svelte'
   import GridViewport from './GridViewport.svelte'
   import HostSettings from './HostSettings.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
@@ -64,10 +65,12 @@
   } from './roomRecord'
   import { readItem, removeItem, writeItem } from './storage'
   import { readTimerHidden, writeTimerHidden } from './timer'
+  import { LOW_WINDOW_PX, isWideWindow } from './windowForm'
   import type {
     LetterCellView,
     PendingEdit,
     ReactionValue,
+    RoomStatus,
     Snapshot,
     VoteView,
   } from './roomSession'
@@ -107,12 +110,6 @@
   const MAX_REVEAL_COUNT = 99
   // The performance mark set once the grid takes taps and keys (spec 036).
   const INTERACTIVE_MARK = 'nock:interactive'
-  // The two layouts of the room (spec 043, spec 044, "Which layout"): the
-  // column layout needs a landscape window at least COLUMN_MIN_WIDTH_PX wide and
-  // more than LOW_WINDOW_PX high, or a landscape window at most LOW_WINDOW_PX
-  // high on which the in-app keyboard does not show.
-  const COLUMN_MIN_WIDTH_PX = 900
-  const LOW_WINDOW_PX = 500
   // The Salon column closed by the player, for every room of this browser.
   const SALON_CLOSED_KEY = 'nock.salon_closed'
   const SALON_CLOSED_VALUE = 'true'
@@ -188,16 +185,16 @@
     layout === 'sheet' || isLowWindow ? 'phone' : 'computer',
   )
 
-  // "column" for a landscape window that is wide enough and not low, or low
-  // while the in-app keyboard does not show; "sheet" otherwise.
+  // The two layouts of the room (spec 043, spec 044, "Which layout"): "column"
+  // for a wide window, or for a landscape window at most LOW_WINDOW_PX high on
+  // which the in-app keyboard does not show; "sheet" otherwise.
   function layoutOf(width: number, height: number, isKeyboardOn: boolean): 'sheet' | 'column' {
     const isLandscape = width > height
     if (!isLandscape) {
       return 'sheet'
     }
-    const isWideWindow = width >= COLUMN_MIN_WIDTH_PX && height > LOW_WINDOW_PX
     const isLowWithoutKeyboard = height <= LOW_WINDOW_PX && !isKeyboardOn
-    if (isWideWindow || isLowWithoutKeyboard) {
+    if (isWideWindow(width, height) || isLowWithoutKeyboard) {
       return 'column'
     }
     return 'sheet'
@@ -398,6 +395,27 @@
   )
   // A nickname refused by the server is shown as a characters error.
   let shownError = $derived(formError ?? (session.nicknameRefused ? 'characters' : null))
+
+  // ---- The page before the first snapshot (spec 046) ----
+
+  // The statuses that refuse entry: before any snapshot each shows its card.
+  const ENTRY_CARD_STATUSES: RoomStatus[] = [
+    'full',
+    'locked',
+    'removed',
+    'replaced',
+    'throttled',
+    'not_found',
+  ]
+  let isEntryCardShown = $derived(
+    session.snapshot === null && ENTRY_CARD_STATUSES.includes(session.status),
+  )
+  // An entry page, the nickname card or a status card, shows in the entry
+  // frame, with no room top bar and no layout.
+  let isEntryPage = $derived(isEntryCardShown || (session.snapshot === null && isFormShown))
+  // Before the first snapshot, with no entry page, the room opens: its top bar
+  // is in place and inert, and one line says what happens.
+  let isOpening = $derived(session.snapshot === null && !isEntryPage)
 
   // `selection` is already null once its word is gone; this also drops the stale
   // `rawSelection`, so the old selection cannot come back with a later snapshot.
@@ -1883,13 +1901,77 @@
   </p>
 {/snippet}
 
+<!-- The entry pages (spec 046, "Entry pages"): the room code line, then the
+     nickname card or the card of a status that refuses entry. -->
+{#snippet entryPage()}
+  <EntryFrame>
+    <h1 class="room-code-line">{t('room.heading', { code })}</h1>
+    {#if isEntryCardShown}
+      <div class="nock-card" data-testid="entry-card">
+        <p class="nock-card-title" data-testid="room-status">
+          {t(`room.status.${session.status}`)}
+        </p>
+        {#if session.status === 'not_found'}
+          <!-- An expired room is deleted (spec 032), so it reads as one that
+               never existed: the line says why a room may be gone (P3). -->
+          <p class="nock-card-detail" data-testid="entry-detail">
+            {t('room.status.not_found_detail')}
+          </p>
+        {/if}
+        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1).
+             "Voir les grilles" is primary where it is the only way on. -->
+        <a
+          class="nock-button"
+          class:nock-button-primary={session.status === 'not_found'}
+          class:nock-button-secondary={session.status !== 'not_found'}
+          data-testid="entry-home"
+          href="/"
+          tabindex="0">{t('share.home')}</a
+        >
+      </div>
+    {:else}
+      <form class="nock-card" data-testid="nickname-form" onsubmit={submitNickname}>
+        <h2 class="nock-card-title">{t('join.heading')}</h2>
+        <div class="nock-field">
+          <label for="nickname-input">{t('join.nickname_label')}</label>
+          <input
+            id="nickname-input"
+            class="nock-text-input nickname-input"
+            data-testid="nickname-input"
+            type="text"
+            autocomplete="nickname"
+            placeholder={t('room.default_nickname')}
+            aria-invalid={shownError !== null ? 'true' : undefined}
+            bind:value={nicknameText}
+          />
+        </div>
+        {#if shownError !== null}
+          <p class="nock-error-line nickname-error" data-testid="nickname-error" role="alert">
+            {shownError === 'length' ? t('join.error.length') : t('join.error.characters')}
+          </p>
+        {/if}
+        <button
+          type="submit"
+          class="nock-button nock-button-primary"
+          data-testid="nickname-submit"
+          disabled={session.status === 'joining'}>{t('join.submit')}</button
+        >
+      </form>
+    {/if}
+  </EntryFrame>
+  {#if !isEntryCardShown}
+    <!-- The status beside the nickname card: read but not seen. -->
+    <p class="visually-hidden" data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+  {/if}
+{/snippet}
+
 <main
   class="room-page"
-  class:with-snapshot={session.snapshot !== null}
+  class:entry-page={isEntryPage}
   data-testid="room-page"
   data-room-code={code}
   data-status={session.status}
-  data-layout={session.snapshot === null ? undefined : layout}
+  data-layout={isEntryPage ? undefined : layout}
   data-you={session.snapshot === null ? '' : session.snapshot.you}
   data-seq={session.seq === null ? '' : String(session.seq)}
   data-catch-up={session.catchUpLabel}
@@ -1897,11 +1979,15 @@
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
-  <!-- The room's heading: read but not seen once the room shows (spec 043). -->
-  <h1 class:visually-hidden={session.snapshot !== null}>{t('room.heading', { code })}</h1>
-  {#if session.snapshot !== null}
+  {#if isEntryPage}
+    {@render entryPage()}
+  {:else}
+    <!-- The room's heading: read but not seen while the room opens and once it
+         shows (spec 043, spec 046). -->
+    <h1 class="visually-hidden">{t('room.heading', { code })}</h1>
     <RoomTopBar
       form={topBarForm}
+      {isOpening}
       {isTimerShown}
       timerBaseMs={session.timerBaseMs}
       isTimerRunning={session.timerRunning}
@@ -1927,6 +2013,8 @@
       onToggleSalon={toggleSalon}
       onToggleMenu={() => togglePopover('menu')}
     />
+  {/if}
+  {#if session.snapshot !== null}
     <RoomPopover
       testId="aide-menu"
       label={t('topbar.aide')}
@@ -1989,40 +2077,23 @@
       >
     </p>
   {/if}
-  <!-- Once the room shows, a joined or reconnecting status is read but not
-       seen; any other status is a band under the top bar (spec 043). -->
-  <p
-    class="room-status"
-    class:visually-hidden={session.snapshot !== null &&
-      (session.status === 'joined' || session.status === 'reconnecting')}
-    class:room-band={session.snapshot !== null &&
-      session.status !== 'joined' &&
-      session.status !== 'reconnecting'}
-    data-testid="room-status"
-  >
-    {t(`room.status.${session.status}`)}
-  </p>
-  {#if isFormShown}
-    <form data-testid="nickname-form" class="nickname-form" onsubmit={submitNickname}>
-      <h2>{t('join.heading')}</h2>
-      <label for="nickname-input">{t('join.nickname_label')}</label>
-      <input
-        id="nickname-input"
-        data-testid="nickname-input"
-        type="text"
-        autocomplete="nickname"
-        placeholder={t('room.default_nickname')}
-        bind:value={nicknameText}
-      />
-      {#if shownError !== null}
-        <p class="nickname-error" data-testid="nickname-error" role="alert">
-          {shownError === 'length' ? t('join.error.length') : t('join.error.characters')}
-        </p>
-      {/if}
-      <button type="submit" data-testid="nickname-submit" disabled={session.status === 'joining'}
-        >{t('join.submit')}</button
-      >
-    </form>
+  {#if isOpening}
+    <!-- While the room opens, the grid area holds only its status, one muted
+         line (spec 046, P2). -->
+    <div class="opening-area" data-testid="grid-area">
+      <p class="nock-state-line" data-testid="room-status">{t(`room.status.${session.status}`)}</p>
+    </div>
+  {:else if session.snapshot !== null}
+    <!-- Once the room shows, a joined or reconnecting status is read but not
+         seen; any other status is a band under the top bar (spec 043). -->
+    <p
+      class="room-status"
+      class:visually-hidden={session.status === 'joined' || session.status === 'reconnecting'}
+      class:room-band={session.status !== 'joined' && session.status !== 'reconnecting'}
+      data-testid="room-status"
+    >
+      {t(`room.status.${session.status}`)}
+    </p>
   {/if}
   {#if session.snapshot !== null}
     <div class="room-body {layout}">
@@ -2247,53 +2318,58 @@
 </main>
 
 <style>
-  /* Before the first snapshot the page keeps its plain look: the heading, the
-     status and the nickname form. */
+  /* The room fills the window: the top bar, the bands, then the play area and
+     the Salon (spec 043); while it opens, the top bar and the opening area
+     (spec 046). Nothing scrolls. */
   .room-page {
     position: relative;
     box-sizing: border-box;
-    padding: 0.5rem 1rem;
+    max-width: none;
+    margin: 0;
+    padding: 0;
     height: 100vh;
     height: 100dvh;
     display: flex;
     flex-direction: column;
-  }
-
-  /* Once the room shows, it fills the window: the top bar, the bands, then the
-     play area and the Salon (spec 043). Nothing scrolls. */
-  .room-page.with-snapshot {
-    max-width: none;
-    margin: 0;
-    padding: 0;
     overflow: hidden;
   }
 
-  .room-page h1 {
-    margin: 0;
-    font-size: 1.25rem;
+  /* An entry page is a plain page: the entry frame, at least the window's
+     height, scrolling when its card is higher. */
+  .room-page.entry-page {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
   }
 
   .room-status {
     margin: 0;
   }
 
-  .nickname-form {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 24rem;
-  }
-
   /* The nickname shows in capitals, the placeholder too, while the value keeps
      the text as typed, so input methods and the caret work as usual (spec 012,
      room page flow step 3). */
-  .nickname-form input {
+  .nickname-input {
     text-transform: uppercase;
   }
 
+  /* The refused nickname's reason, right under the field. */
   .nickname-error {
-    margin: 0;
-    color: var(--nock-red);
+    margin-top: -6px;
+  }
+
+  /* While the room opens (spec 046): all the height under the top bar, its
+     status line centred in it. */
+  .opening-area {
+    flex: 1 1 0;
+    min-height: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    text-align: center;
   }
 
   /* ---- The bands under the top bar (spec 043) ---- */

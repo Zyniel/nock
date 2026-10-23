@@ -302,9 +302,212 @@ main {
   top: 54px;
 }
 
+/* Outside a room (the catalogue's account sheet, spec 046) the bar the sheet
+   leaves uncovered is the page top bar, 56 px high. */
+.room-sheet.bottom.under-page-topbar {
+  max-height: calc(100dvh - 56px);
+}
+
+.room-sheet.bottom.under-page-topbar::backdrop {
+  top: 56px;
+}
+
 /* The title of a room sheet: 700 1.2rem/1.2, navy. */
 .room-sheet-title {
   margin: 0;
   font: 700 1.2rem/1.2 var(--nock-font-ui);
   color: var(--nock-navy);
+}
+
+/* ---- Plain pages (spec 046, _design.md sections 8, 10 and 11) -----------------
+   The catalogue, the grid page, the entry pages and the page not found, and
+   the components they share. */
+
+/* A plain page fills the window: its top bar, then its body. */
+.nock-plain-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* A link drawn as a button: "Voir les grilles", "Reprendre". */
+a.nock-button {
+  display: inline-block;
+  text-decoration: none;
+}
+
+/* A card: white, a line-grey border, its content in a column, each item
+   keeping its own width. */
+.nock-card {
+  box-sizing: border-box;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  min-width: 0;
+  margin: 0;
+  padding: 18px 16px;
+  border: 1px solid var(--nock-line);
+  border-radius: 10px;
+  background: var(--nock-white);
+}
+
+.nock-card > * {
+  max-width: 100%;
+  margin: 0;
+}
+
+.nock-card-title {
+  font: 700 1.25rem/1.2 var(--nock-font-ui);
+  color: var(--nock-navy);
+  overflow-wrap: anywhere;
+}
+
+/* The muted line of a card. */
+.nock-card-detail {
+  font-size: 0.85rem;
+  color: var(--nock-muted);
+}
+
+/* A field: its label above its input. */
+.nock-field {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.nock-field label {
+  font: 600 0.85rem/1.2 var(--nock-font-ui);
+  color: var(--nock-ink);
+}
+
+/* A text input; its border turns red while its error line shows. */
+.nock-text-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--nock-rule);
+  border-radius: 6px;
+  font: 400 1rem/1.2 var(--nock-font-ui);
+  color: var(--nock-ink);
+  background: var(--nock-white);
+}
+
+.nock-text-input::placeholder {
+  color: var(--nock-muted);
+  opacity: 1;
+}
+
+.nock-text-input[aria-invalid='true'] {
+  border-color: var(--nock-red);
+}
+
+/* The error line, under what failed. */
+.nock-error-line {
+  margin: 0;
+  font: 500 0.85rem/1.3 var(--nock-font-ui);
+  color: var(--nock-red);
+  overflow-wrap: anywhere;
+}
+
+/* A state line (_design.md section 8, "States"): one muted line where the
+   content will be, while waiting or when empty. */
+.nock-state-line {
+  margin: 0;
+  font: 400 1rem/1.5 var(--nock-font-ui);
+  color: var(--nock-muted);
+}
+
+/* The heading of a catalogue section: "My rooms" and the history. */
+.nock-section-heading {
+  margin: 0;
+  font: 700 1.15rem/1.2 var(--nock-font-ui);
+  color: var(--nock-navy);
+}
+
+/* A list row: a text column, then its button on the right. */
+.nock-list-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--nock-line);
+  border-radius: 8px;
+  background: var(--nock-white);
+}
+
+.nock-list-row > .nock-button {
+  flex: none;
+}
+
+/* The text column of a list row: all the width left, lines 3 px apart. */
+.nock-row-text {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+/* A row's title: its texts on one line when they fit, 8 px apart. */
+.nock-row-title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--nock-ink);
+  overflow-wrap: anywhere;
+}
+
+/* A muted line of a row; a long text wraps rather than widen the page. */
+.nock-row-line {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--nock-muted);
+  overflow-wrap: anywhere;
+}
+
+/* A status pill: a grid started or finished. */
+.nock-status-pill {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font: 600 0.75rem/1.2 var(--nock-font-ui);
+}
+
+.nock-status-pill-started {
+  color: var(--nock-navy);
+  background: var(--nock-word);
+}
+
+.nock-status-pill-finished {
+  color: var(--nock-green);
+  background: var(--nock-green-bg);
+}
+
+/* A filter chip, pressed while its filter applies. */
+.nock-chip {
+  margin: 0;
+  padding: 7px 14px;
+  border: 1px solid var(--nock-line);
+  border-radius: 16px;
+  font: 600 0.9rem/1 var(--nock-font-ui);
+  color: var(--nock-navy);
+  background: var(--nock-white);
+  cursor: pointer;
+}
+
+.nock-chip[aria-pressed='true'] {
+  border-color: var(--nock-navy);
+  background: var(--nock-word);
 }
