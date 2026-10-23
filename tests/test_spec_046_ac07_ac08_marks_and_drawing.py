@@ -19,6 +19,12 @@ Choices where the spec leaves room:
   each inner row edge from the left to the right, in viewBox units.
 - "The drawings are gone within 300 ms": no `catalogue-thumb` within 300 ms of
   the resize, and back within 300 ms of the resize back.
+- Edge case "The drawing's threshold": on narrow windows whose list is at least
+  812 px wide (880 by 600, 1280 by 480) the drawing shows, and on one whose list
+  is under it (830 by 600) it does not; a catalogue of one grid on a computer
+  still has its drawing. A wide window whose list is under 812 px does not
+  exist: a wide window is at least 900 px wide, so its list is at least
+  900 - 48 = 852 px wide.
 """
 
 from __future__ import annotations
@@ -34,15 +40,19 @@ from spec042_harness import box_of, to_box
 from spec043_harness import LINE, MUTED, NAVY, WHITE, Reading, colour_matches, px
 from spec046_harness import (
     FOLLOW_MS,
+    GRIDS_ROUTE,
     NOCK_MARK_POINTS,
     SEP,
     THUMB,
     WIDE,
     OpenWindow,
     answer_big,
+    answer_json,
+    big_grids,
     border_problems,
     content_box,
     font_problems,
+    is_wide,
     item_of,
     near,
     same_position,
@@ -56,6 +66,14 @@ from spec046_harness import (
 
 TIMES = "\N{MULTIPLICATION SIGN}"
 SMALL_WINDOWS = [(360, 740), (768, 1024)]
+THUMB_MIN_LIST_WIDTH = 812.0  # "at least 812 px wide" (two 400 px columns, a gap)
+# Narrow windows (not "wide" by "Terms"), so `catalogue-column` has 16 px of
+# padding and is at most 920 px wide: its list is 880 - 32 = 848 px wide at 880 by
+# 600 (landscape, under 900 px wide) and 920 - 32 = 888 px at 1280 by 480 (500 px
+# high at most), so the drawing shows; at 830 by 600 it is 798 px, so it does not.
+# Each margin exceeds a scrollbar's width, should an engine draw one.
+LIST_WIDTH_WINDOWS = [((880, 600), True), ((1280, 480), True), ((830, 600), False)]
+LIST_WIDTH_SIZES = [size for size, _ in LIST_WIDTH_WINDOWS]
 
 
 @pytest.fixture
@@ -357,6 +375,32 @@ def test_ac8_the_drawing_holds_the_background_then_the_clue_cells_then_the_lines
     assert kinds[0] == "", kinds
     assert kinds[1:first_line] == ["thumb-clue"] * 15, kinds
     assert kinds[first_line:] == ["thumb-line"] * 28, kinds
+
+
+@pytest.mark.parametrize(
+    ("size", "shown"), LIST_WIDTH_WINDOWS, ids=size_ids(LIST_WIDTH_SIZES)
+)
+def test_ac8_the_drawing_follows_the_lists_width_not_the_windows(
+    window: OpenWindow, live_server: str, size: tuple[int, int], shown: bool
+) -> None:
+    page = open_big(window, live_server, size)
+
+    list_width = content_box(page.get_by_test_id("catalogue-list")).width
+
+    assert not is_wide(*size), size
+    assert (list_width >= THUMB_MIN_LIST_WIDTH) == shown, list_width
+    expect(page.get_by_test_id("catalogue-thumb")).to_have_count(2 if shown else 0)
+
+
+def test_ac8_a_lone_card_on_a_computer_still_has_its_drawing(
+    window: OpenWindow, live_server: str
+) -> None:
+    page = window(*WIDE)
+    answer_json(page, GRIDS_ROUTE, 200, big_grids()[:1])
+    page.goto(f"{live_server}/")
+    expect(page.get_by_test_id("catalogue-item")).to_have_count(1)
+
+    expect(item_of(page, 12).get_by_test_id("catalogue-thumb")).to_have_count(1)
 
 
 @pytest.mark.parametrize(

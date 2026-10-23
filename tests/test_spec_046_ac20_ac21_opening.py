@@ -280,6 +280,11 @@ def test_ac20_a_click_on_menu_opens_nothing_and_sends_nothing(
 
     assert sent == []
     expect(page.get_by_test_id("room-menu")).not_to_be_visible()
+    # The popovers render only once a snapshot came, so the button itself shows
+    # that the click did nothing: it stays closed and never takes the focus.
+    menu = page.get_by_test_id("menu-button")
+    expect(menu).to_have_attribute("aria-expanded", "false")
+    expect(menu).not_to_be_focused()
 
 
 @pytest.mark.parametrize("opening", OPENINGS, ids=OPENING_IDS)
