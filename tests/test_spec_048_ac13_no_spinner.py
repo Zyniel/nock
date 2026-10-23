@@ -9,13 +9,17 @@ samples of the criterion check the checker itself.
 
 Readings of the spec's wording:
 
-- `@keyframes` is matched without regard to case (CSS at-rules are not case
-  sensitive).
-- "A CSS declaration whose property is `animation` or starts with
-  `animation-`": the word `animation`, alone or followed by `-` and more letters,
-  not preceded by a letter, a digit, `-`, `_` or `.`, then optional spaces and a
-  colon. So `animation:` and `animation-name:` are flagged, and a vendor prefix
-  such as `-webkit-animation:` is not (the spec names no prefix). In a script
+- `@keyframes` and `@-<vendor>-keyframes` (any letters as the vendor, such as
+  `@-webkit-keyframes`) are matched without regard to case (CSS at-rules are not
+  case sensitive).
+- "A CSS declaration whose property, once a leading vendor prefix (`-webkit-`,
+  `-moz-`, `-ms-`, `-o-`) is removed, is `animation` or starts with
+  `animation-`" (the prefixes were added by the lead after review round 1): one
+  of those prefixes or none, then the word `animation`, alone or followed by `-`
+  and more letters, the whole not preceded by a letter, a digit, `-`, `_` or
+  `.`, then optional spaces and a colon. So `animation:`, `animation-name:`,
+  `-webkit-animation:` and `-moz-animation:` are flagged, and
+  `-webkit-transition:` is not. In a script
   the same text is flagged too, wherever it is, since a style may be written
   there; a `.ts` name such as `animation: Animation` would be flagged as well.
 - "The text `<progress`": `<progress` not followed by a letter, a digit, `-` or
@@ -39,22 +43,28 @@ from spec041_harness import (
     split_svelte,
 )
 
-KEYFRAMES = re.compile(r"@keyframes\b", re.IGNORECASE)
+KEYFRAMES = re.compile(r"@(?:-[A-Za-z]+-)?keyframes\b", re.IGNORECASE)
 ANIMATION_DECLARATION = re.compile(
-    r"(?<![A-Za-z0-9_.\-])animation(?:-[A-Za-z-]+)?\s*:", re.IGNORECASE
+    r"(?<![A-Za-z0-9_.\-])(?:-(?:webkit|moz|ms|o)-)?animation(?:-[A-Za-z-]+)?\s*:",
+    re.IGNORECASE,
 )
 PROGRESS_ELEMENT = re.compile(r"<progress(?![A-Za-z0-9_\-])", re.IGNORECASE)
 PROGRESSBAR_ROLE = re.compile(r"""role\s*=\s*(?:"progressbar"|'progressbar')""")
 
 FLAGGED_SAMPLES = [
     "@keyframes spin{}",
+    "@-webkit-keyframes spin{}",
     "a{animation:spin 1s}",
     "a{animation-name:spin}",
+    "a{-webkit-animation:spin 1s}",
+    "a{-moz-animation:spin 1s}",
+    "a{-webkit-animation-name:spin}",
     '<progress value="1">',
     '<div role="progressbar">',
 ]
 ACCEPTED_SAMPLES = [
     "a{transition:opacity .25s}",
+    "a{-webkit-transition:opacity .25s}",
     "a{transition-duration:0s}",
     '<div role="status">',
     "<p>progression</p>",

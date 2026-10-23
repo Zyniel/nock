@@ -287,6 +287,41 @@ COLOURED_SCRIPT = "(container, wanted) => {\n" + READERS_JS + r"""
 """
 
 
+# The ids of an element's `aria-describedby`, each with whether an element of
+# the page has that id.
+DESCRIBED_BY_SCRIPT = r"""
+element => {
+  const value = element.getAttribute('aria-describedby') || '';
+  const ids = value.split(/\s+/).filter(id => id !== '');
+  return ids.map(id => [id, document.getElementById(id) !== null]);
+}
+"""
+
+
+def described_by(field: Locator) -> list[tuple[str, bool]]:
+    """The ids of `field`'s `aria-describedby`, each with whether it names an
+    element of the page."""
+    found = field.evaluate(DESCRIBED_BY_SCRIPT)
+    assert isinstance(found, list), found
+    pairs: list[tuple[str, bool]] = []
+    for item in found:
+        assert isinstance(item, list), item
+        pairs.append((str(item[0]), item[1] is True))
+    return pairs
+
+
+def described_by_problems(field: Locator, line: Locator, name: str) -> list[str]:
+    """`line` has an id that is one of the ids of `field`'s `aria-describedby`
+    (spec 048 AC-5 and AC-6, added after review round 1)."""
+    line_id = line.get_attribute("id")
+    if line_id is None or line_id == "":
+        return [f"{name} has no id"]
+    ids = [found_id for found_id, _ in described_by(field)]
+    if line_id not in ids:
+        return [f"{name}'s id {line_id!r} is not in aria-describedby {ids}"]
+    return []
+
+
 def background_at(page: Page, x: float, y: float) -> tuple[float, ...] | None:
     found = page.evaluate(BACKGROUND_AT_SCRIPT, [x, y])
     if found is None:

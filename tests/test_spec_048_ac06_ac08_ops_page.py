@@ -23,6 +23,9 @@ Readings of the spec's wording:
 - "Each about 272.7 px wide (1 px)": 272.7 px within 1 px; "10 px apart": from
   one tile's right edge to the next one's left edge (1 px).
 - "A border rgb(27, 47, 85)": the four sides have that colour.
+- `aria-describedby` (added by the lead after review round 1): after the 401,
+  `ops-token-error`'s `id` is one of `ops-token-input`'s whitespace-separated
+  ids, at 1280 by 720 and at 360 by 740.
 """
 
 from __future__ import annotations
@@ -62,6 +65,7 @@ from spec048_harness import (
     border_colour_problems,
     box_inside,
     card_title_problems,
+    described_by_problems,
     error_line_problems,
     field_label_problems,
     header_box,
@@ -252,6 +256,19 @@ def test_ac6_a_refused_token_turns_the_input_red_with_an_error_line_under_it(
         problems.append("ops-token-error is not between the input and the button")
 
     assert problems == []
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac6_the_refusal_describes_the_token_input(
+    window: OpenWindow, server: OpsServer, size: tuple[int, int]
+) -> None:
+    page = locked_page(window, server, size)
+
+    refuse_token(page)
+
+    field = page.get_by_test_id("ops-token-input")
+    error = page.get_by_test_id("ops-token-error")
+    assert described_by_problems(field, error, "ops-token-error") == []
 
 
 # ---- AC-7: the page's waiting and failed lines -------------------------------------

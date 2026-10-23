@@ -23,6 +23,10 @@ Readings of the spec's wording:
   border is `--nock-rule` again and `aria-invalid` is no longer `"true"`.
 - A 429 leaves the address unblamed: the border stays `--nock-rule` and
   `aria-invalid` is not `"true"`.
+- `aria-describedby` (added by the lead after review round 1): after a 422 and
+  after a 429, `account-error`'s `id` is one of the input's whitespace-separated
+  ids; after the 202 that follows a 422, every id there names an element of the
+  page and none is the `id` `account-error` had.
 - Each field is filled, then its value is checked, then the form is submitted
   with `account-email-submit`.
 """
@@ -53,6 +57,8 @@ from spec048_harness import (
     AccountMock,
     account_card,
     border_colour_problems,
+    described_by,
+    described_by_problems,
     done_line_problems,
     error_line_problems,
     expect_account_state,
@@ -304,6 +310,48 @@ def test_ac5_too_many_requests_shows_its_line_and_keeps_the_normal_border(
     problems.extend(error_line_problems(error, "account-error"))
     problems.extend(between_problems(page, "account-error"))
 
+    assert problems == []
+
+
+@pytest.mark.parametrize("status", [422, 429], ids=["422", "429"])
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac5_the_error_line_describes_the_input(
+    window: OpenWindow,
+    account_server: AccountServer,
+    size: tuple[int, int],
+    status: int,
+) -> None:
+    page, _ = signed_out_page(window, account_server, size, (status,))
+    field = page.get_by_test_id("account-email-input")
+
+    submit_address(page, SHORT_ADDRESS)
+
+    error = page.get_by_test_id("account-error")
+    expect(error).to_be_visible()
+    assert described_by_problems(field, error, "account-error") == []
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac5_after_the_202_the_input_is_described_by_no_gone_line(
+    window: OpenWindow, account_server: AccountServer, size: tuple[int, int]
+) -> None:
+    page, _ = signed_out_page(window, account_server, size, (422, 202))
+    field = page.get_by_test_id("account-email-input")
+    submit_address(page, SHORT_ADDRESS)
+    error = page.get_by_test_id("account-error")
+    expect(error).to_be_visible()
+    error_id = error.get_attribute("id")
+
+    submit_address(page, SHORT_ADDRESS)
+
+    expect(page.get_by_test_id("account-sent")).to_be_visible()
+    expect(error).to_have_count(0)
+    problems: list[str] = []
+    for found_id, exists in described_by(field):
+        if not exists:
+            problems.append(f"aria-describedby names {found_id!r}, which is absent")
+        if error_id is not None and found_id == error_id:
+            problems.append(f"aria-describedby still names account-error {found_id!r}")
     assert problems == []
 
 

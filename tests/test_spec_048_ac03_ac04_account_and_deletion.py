@@ -25,6 +25,10 @@ Readings of the spec's wording:
   (1 px); "as wide as the card's content": the card's width less its borders and
   paddings (1 px).
 - The panel "hides": `account-delete-panel` is hidden or gone.
+- The focus checks after a cancel (added by the lead after review round 1):
+  after a click on `account-delete-cancel`, and after `Enter` on it once the
+  panel is shown again (the test focuses it with `focus()`), `account-delete`
+  has the focus.
 - "No element inside `account-page` is red" is read with the panel shown, the
   state where a destructive button could be red.
 - The edge cases of AC-3 and AC-4 are checked as well: a long address wraps in
@@ -359,6 +363,40 @@ def test_ac4_cancel_hides_the_panel_and_delete_is_secondary_again(
     expect(page.get_by_test_id("account-delete-panel")).to_be_hidden()
     expect(delete).to_have_attribute("aria-expanded", "false")
     assert button_colour_problems(delete, "secondary") == []
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac4_after_a_click_on_cancel_the_focus_is_on_account_delete(
+    window: OpenWindow, account_server: AccountServer, size: tuple[int, int]
+) -> None:
+    page, _ = signed_in_page(window, account_server, size)
+    ask_deletion(page)
+
+    page.get_by_test_id("account-delete-cancel").click()
+
+    expect(page.get_by_test_id("account-delete-panel")).to_be_hidden()
+    expect(page.get_by_test_id("account-delete")).to_be_focused()
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac4_after_enter_on_cancel_the_focus_is_on_account_delete(
+    window: OpenWindow, account_server: AccountServer, size: tuple[int, int]
+) -> None:
+    page, _ = signed_in_page(window, account_server, size)
+    delete = page.get_by_test_id("account-delete")
+    ask_deletion(page)
+    page.get_by_test_id("account-delete-cancel").click()
+    expect(page.get_by_test_id("account-delete-panel")).to_be_hidden()
+    ask_deletion(page)
+    cancel = page.get_by_test_id("account-delete-cancel")
+    cancel.focus()
+    expect(cancel).to_be_focused()
+
+    page.keyboard.press("Enter")
+
+    expect(page.get_by_test_id("account-delete-panel")).to_be_hidden()
+    expect(delete).to_have_attribute("aria-expanded", "false")
+    expect(delete).to_be_focused()
 
 
 def test_ac4_account_delete_shows_then_hides_the_panel_and_sends_nothing(
