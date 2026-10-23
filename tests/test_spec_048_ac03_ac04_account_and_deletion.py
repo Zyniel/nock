@@ -15,6 +15,12 @@ Readings of the spec's wording:
   least 12 px (1 px).
 - "On one line ... 8 px apart": the vertical centres within 1 px, and the gap
   from the first button's right edge to the second's left edge 8 px (1 px).
+- "One button per line" (at 360 by 740 and 320 by 568, refined by the lead on
+  2026-10-23 after the code, as the screens sheet draws it): the second button's
+  top 8 px under the first one's bottom (1 px; for AC-4, cancel 8 px under
+  confirm and confirm 12 px under the warning), each inside the card's content
+  box (1 px). At 320 by 568, "the row wraps the same way" is read with the same
+  8 px gap.
 - "Below `account-actions`": the panel's top is not above the row's bottom
   (1 px); "as wide as the card's content": the card's width less its borders and
   paddings (1 px).
@@ -32,7 +38,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.catalogue import Catalogue
 from spec033_harness import ANA_EMAIL, AccountServer, account_live_server
@@ -108,6 +114,25 @@ def side_by_side_problems(first_id: str, second_id: str, page: Page) -> list[str
     return problems
 
 
+def stacked_problems(
+    first_id: str, second_id: str, page: Page, card: Locator
+) -> list[str]:
+    """One button per line: the second 8 px under the first (1 px), each inside
+    the card's content box (1 px)."""
+    first = box_of(page.get_by_test_id(first_id))
+    second = box_of(page.get_by_test_id(second_id))
+    inner = content_box(card)
+    problems: list[str] = []
+    if not same_position(second.top - first.bottom, 8.0):
+        problems.append(
+            f"{second_id} is {second.top - first.bottom} px under {first_id}"
+        )
+    for test_id, box in ((first_id, first), (second_id, second)):
+        if not box_inside(box, inner):
+            problems.append(f"{test_id} {box} is not inside the card's content {inner}")
+    return problems
+
+
 # ---- AC-3: the signed-in card -------------------------------------------------------
 
 
@@ -173,7 +198,7 @@ def test_ac3_the_title_address_and_room_link_have_their_texts_and_looks(
 
 
 @pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
-def test_ac3_the_two_actions_are_secondary_buttons_side_by_side_8_px_apart(
+def test_ac3_the_two_actions_are_secondary_buttons_side_by_side_or_stacked(
     window: OpenWindow, account_server: AccountServer, size: tuple[int, int]
 ) -> None:
     page, _ = signed_in_page(window, account_server, size)
@@ -183,9 +208,13 @@ def test_ac3_the_two_actions_are_secondary_buttons_side_by_side_8_px_apart(
     expect(sign_out).to_have_count(1)
     expect(delete).to_have_count(1)
 
-    problems = side_by_side_problems("account-sign-out", "account-delete", page)
-    if box_of(sign_out).left > box_of(delete).left:
-        problems.append("account-delete comes before account-sign-out")
+    if size == (1280, 720):
+        problems = side_by_side_problems("account-sign-out", "account-delete", page)
+        if box_of(sign_out).left > box_of(delete).left:
+            problems.append("account-delete comes before account-sign-out")
+    else:
+        card = account_card(page)
+        problems = stacked_problems("account-sign-out", "account-delete", page, card)
     problems.extend(secondary_button_problems(sign_out, "account-sign-out"))
     problems.extend(secondary_button_problems(delete, "account-delete"))
 
@@ -210,17 +239,15 @@ def test_ac3_account_delete_is_a_closed_disclosure_naming_the_panel(
     assert controls == panel_id
 
 
-def test_ac3_at_320_by_568_both_buttons_lie_inside_the_card_and_nothing_scrolls(
+def test_ac3_at_320_by_568_the_buttons_stack_inside_the_card_and_nothing_scrolls(
     window: OpenWindow, account_server: AccountServer
 ) -> None:
     page, _ = signed_in_page(window, account_server, SMALL)
-    card = box_of(account_card(page))
+    card = account_card(page)
 
-    sign_out = box_of(page.get_by_test_id("account-sign-out"))
-    delete = box_of(page.get_by_test_id("account-delete"))
+    problems = stacked_problems("account-sign-out", "account-delete", page, card)
 
-    assert box_inside(sign_out, card)
-    assert box_inside(delete, card)
+    assert problems == []
     assert no_horizontal_scroll(page)
 
 
@@ -273,7 +300,7 @@ def test_ac4_a_click_on_delete_presses_it_quietly_and_shows_the_panel(
 
 
 @pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
-def test_ac4_the_panel_holds_the_warning_then_confirm_and_cancel_side_by_side(
+def test_ac4_the_panel_holds_the_warning_then_confirm_and_cancel(
     window: OpenWindow, account_server: AccountServer, size: tuple[int, int]
 ) -> None:
     page, _ = signed_in_page(window, account_server, size)
@@ -291,11 +318,15 @@ def test_ac4_the_panel_holds_the_warning_then_confirm_and_cancel_side_by_side(
     problems.extend(font_problems(warning, "warning", 15.2, colour=INK))
     problems.extend(button_colour_problems(confirm, "primary"))
     problems.extend(button_colour_problems(cancel, "secondary"))
-    problems.extend(
-        side_by_side_problems("account-delete-confirm", "account-delete-cancel", page)
-    )
+    pair = ("account-delete-confirm", "account-delete-cancel")
     warning_bottom = box_of(warning).bottom
-    for name, button in (("confirm", confirm), ("cancel", cancel)):
+    if size == (1280, 720):
+        problems.extend(side_by_side_problems(*pair, page))
+        lined_up = [("confirm", confirm), ("cancel", cancel)]
+    else:
+        problems.extend(stacked_problems(*pair, page, account_card(page)))
+        lined_up = [("confirm", confirm)]
+    for name, button in lined_up:
         gap = box_of(button).top - warning_bottom
         if not same_position(gap, 12.0):
             problems.append(f"{name}'s top {gap} px under the warning")

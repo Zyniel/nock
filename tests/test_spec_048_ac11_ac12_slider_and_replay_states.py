@@ -134,6 +134,10 @@ def test_ac11_the_position_is_a_transparent_native_range_as_wide_as_its_field(
     assert same_size(box.height, KNOB), box
     assert same_position(box.width, field.width), (box, field)
     assert style_of(position, "opacity") == "0"
+    # At 1280 by 720 the slider lies below the window's bottom: scrolled into view
+    # first, so that `elementFromPoint` reaches it (the coordinator's fix of
+    # 2026-10-23, after the code).
+    position.scroll_into_view_if_needed()
     assert hit_problem(page, "ops-replay-position") is None
 
 
