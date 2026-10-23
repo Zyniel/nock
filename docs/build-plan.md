@@ -335,15 +335,15 @@ so their tests change in the same pull request.
 | 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | done (#38) |
 | 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | done (#39) |
 | 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | done (#40) |
-| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | done |
-| 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | approved |
+| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | done (#42) |
+| 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | done |
 
 - [x] Draft and approve: specs 044 to 048 are drafted from `_design.md` and the
   screens sheet; the human approves each (only the human sets `approved`).
 - [x] Merge the design specs: one pull request of `specs/` and `docs/design/`
   only (branch `design-specs`), so every build starts from the approved text.
   Then the tooling rule that keeps the visual documentation current (PR #30).
-- [ ] Build, in the order of the table, one pull request each:
+- [x] Build, in the order of the table, one pull request each:
   - [x] `/feature specs/041-visual-foundation.md`
   - [x] `/feature specs/042-grid-cells.md`
   - [x] `/feature specs/043-room-layout.md` (WP-1, then WP-2)
@@ -351,7 +351,7 @@ so their tests change in the same pull request.
   - [x] `/feature specs/045-auteurs-mode.md`
   - [x] `/feature specs/046-catalogue-and-entry-pages.md`
   - [x] `/feature specs/047-room-overlays.md`
-  - [ ] `/feature specs/048-plain-pages-and-states.md`
+  - [x] `/feature specs/048-plain-pages-and-states.md`
 
 ```bash
 git tag v1.1.0

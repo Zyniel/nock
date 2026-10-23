@@ -361,18 +361,52 @@ export function editText(edit: RoomEdit): string {
   })
 }
 
-// The letter of each cell after the first `position` edits, by positionKey: the
-// letter of the last of those edits on the cell. A cell that none of them
-// reached, or whose last one left it empty, is not in the map.
-export function lettersAtStep(edits: RoomEdit[], position: number): Map<string, string> {
-  const letters = new Map<string, string>()
+// What a letter cell of the replay's grid shows after some of the edits.
+export interface ReplayCellState {
+  // The letter, "" for none.
+  letter: string
+  // Checked right or revealed (spec 023, spec 024).
+  locked: boolean
+  revealed: boolean
+  // A pencil letter (spec 020); never on a locked cell.
+  pencil: boolean
+}
+
+// A cell that no edit has reached: no letter and no mark. A new object each
+// time, since cellStatesAtStep changes the one it keeps for a cell.
+export function emptyCellState(): ReplayCellState {
+  return { letter: '', locked: false, revealed: false, pencil: false }
+}
+
+// What each cell shows after the first `position` edits, by positionKey (spec
+// 048, refining spec 038): the letter of the last of those edits on the cell;
+// locked when one of them locked or revealed it, revealed when one revealed
+// it; a pencil letter when the last of them typed or put back a pencil letter
+// and the cell is not locked. A cell that none of them reached is not in the
+// map.
+export function cellStatesAtStep(
+  edits: RoomEdit[],
+  position: number,
+): Map<string, ReplayCellState> {
+  const states = new Map<string, ReplayCellState>()
   for (const edit of edits.slice(0, position)) {
     const key = positionKey(edit.row, edit.column)
-    if (edit.letter === null) {
-      letters.delete(key)
-    } else {
-      letters.set(key, edit.letter)
+    const state = states.get(key) ?? emptyCellState()
+    state.letter = edit.letter ?? ''
+    if (edit.kind === 'locked' || edit.kind === 'revealed') {
+      state.locked = true
+    }
+    if (edit.kind === 'revealed') {
+      state.revealed = true
+    }
+    const putsALetter = edit.kind === 'typed' || edit.kind === 'undone'
+    state.pencil = putsALetter && edit.pencil
+    states.set(key, state)
+  }
+  for (const state of states.values()) {
+    if (state.locked) {
+      state.pencil = false
     }
   }
-  return letters
+  return states
 }

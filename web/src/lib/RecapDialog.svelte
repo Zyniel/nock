@@ -128,7 +128,7 @@
 >
   <h2 class="room-sheet-title" id="recap-heading">{t('recap.heading')}</h2>
   {#if recap !== null}
-    <p class="recap-time" data-testid="recap-time">
+    <p class="nock-recap-time" data-testid="recap-time">
       {t('recap.time', { time: timerText(recap.elapsed_ms) })}
     </p>
     <div class="recap-lines" data-testid="recap-lines">
@@ -218,7 +218,7 @@
         >
       </div>
       {#if copied}
-        <p class="recap-copied" data-testid="recap-copied" role="status">
+        <p class="nock-done-line recap-copied" data-testid="recap-copied" role="status">
           {t('room.share.copied')}
         </p>
       {/if}
@@ -226,7 +226,7 @@
   {:else if dialogState === 'error'}
     <p class="nock-error-line" data-testid="recap-error" role="alert">{t('recap.error')}</p>
   {:else}
-    <p class="recap-loading" data-testid="recap-loading" role="status">{t('recap.loading')}</p>
+    <p class="nock-muted-line" data-testid="recap-loading" role="status">{t('recap.loading')}</p>
   {/if}
   <button
     type="button"
@@ -244,13 +244,6 @@
   dialog.recap::backdrop {
     top: 0;
     background: var(--nock-scrim-dialog);
-  }
-
-  .recap-time {
-    margin: 0;
-    font: 700 2.1rem/1 var(--nock-font-ui);
-    color: var(--nock-navy);
-    font-variant-numeric: tabular-nums;
   }
 
   /* The checks, the reveals and the revealed letters, 4 px apart. */
@@ -390,18 +383,10 @@
     padding: 8px 12px;
   }
 
-  /* The confirmation line (_design.md section 11), 8 px under the share row
-     as the screens sheet draws it. */
+  /* The confirmation line (app.css), 8 px under the share row as the screens
+     sheet draws it. */
   .recap-copied {
     margin: -6px 0 0;
-    font: 500 0.85rem/1.3 var(--nock-font-ui);
-    color: var(--nock-green);
-  }
-
-  .recap-loading {
-    margin: 0;
-    font: 400 0.95rem var(--nock-font-ui);
-    color: var(--nock-muted);
   }
 
   .recap-close {
