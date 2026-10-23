@@ -2,8 +2,14 @@
 
 The rule on `handle_message` (the room `V3` and rooms of 2 to 8 players), the real
 WebSocket, two browsers on the live server, and the activity feed on a page with a
-mocked socket (votes add no line; a passed vote's reveal names its requester). The
-shared setup is in `spec025_harness`.
+mocked socket (an opened vote adds no line; a passed vote's reveal names its
+requester). The shared setup is in `spec025_harness`.
+
+Refined by spec 047 (the design's room overlays): the banner leaves when the vote
+closes and never shows a result (`vote-result` is gone); the result is a line of
+the stream, `data-kind="vote"`, one per closed vote, before the lines of its
+request. The live run reads it in the stream, which the Salon column shows at
+1280 by 720 (so no note is made).
 """
 
 from __future__ import annotations
@@ -423,7 +429,12 @@ def test_ac2_browser_bob_votes_yes_and_both_pages_show_the_revealed_letter(
             expect(watcher.get_by_test_id("reveal-letter-detail")).to_have_text(
                 fr_text("reveal.letters_left", count=4), timeout=WITHIN_MS
             )
-            expect(watcher.get_by_test_id("vote-result")).to_have_text(
+            # Spec 047: the banner leaves at `vote_closed` and the result is a
+            # line of the stream (the Salon column shows it at 1280 by 720).
+            expect(watcher.get_by_test_id("vote-banner")).to_have_count(
+                0, timeout=WITHIN_MS
+            )
+            expect(feed_lines(watcher, "vote")).to_have_text(
                 fr_text("vote.result.passed"), timeout=WITHIN_MS
             )
     finally:
@@ -433,23 +444,30 @@ def test_ac2_browser_bob_votes_yes_and_both_pages_show_the_revealed_letter(
 # ---- AC-2: votes and the activity feed (browser with mocked socket) ----
 
 
-def test_ac2_browser_vote_events_add_no_feed_line(
+def test_ac2_browser_a_closed_vote_adds_one_vote_line_and_an_opened_one_none(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    """Spec 047 refines the edge case "Votes and the feed": a closed vote adds one
+    `vote` line with its result; an opened vote still adds none."""
     mock = open_room(page, live_server, fx01_grid)
     items = feed_items(page)
     lines_before = items.count()
 
     send_event(page, mock, opened(6, 1, "p2", REVEAL_1_0, 3))
+    settle(page)
+    expect(items).to_have_count(lines_before)
     send_event(page, mock, closed(7, 1, VoteOutcome.REJECTED, 1, 3))
     send_event(page, mock, opened(8, 2, "p3", GRID_CHECK, 3))
     send_event(page, mock, closed(9, 2, VoteOutcome.TIMED_OUT, 1, 3))
 
-    expect(page.get_by_test_id("vote-result")).to_have_text(
-        fr_text("vote.result.timed_out")
-    )
     settle(page)
-    expect(items).to_have_count(lines_before)
+    expect(items).to_have_count(lines_before + 2)
+    vote_lines = feed_lines(page, "vote")
+    expect(vote_lines).to_have_count(2)
+    expect(vote_lines.nth(0)).to_have_attribute("data-seq", "7")
+    expect(vote_lines.nth(0)).to_have_text(fr_text("vote.result.rejected"))
+    expect(vote_lines.nth(1)).to_have_attribute("data-seq", "9")
+    expect(vote_lines.nth(1)).to_have_text(fr_text("vote.result.timed_out"))
 
 
 def test_ac2_browser_a_passed_votes_reveal_line_names_the_requester(
@@ -466,7 +484,9 @@ def test_ac2_browser_a_passed_votes_reveal_line_names_the_requester(
         page, mock, CellLocked(seq=9, row=1, column=0, letter="T", revealed=True)
     )
 
-    expect(items).to_have_count(lines_before + 1)
+    # Spec 047: the closed vote adds its `vote` line before the reveal's line.
+    expect(items).to_have_count(lines_before + 2)
+    expect(feed_lines(page, "vote")).to_have_attribute("data-seq", "7")
     reveal_line = feed_lines(page, "reveal")
     expect(reveal_line).to_have_count(1)
     expect(reveal_line).to_have_attribute("data-seq", "8")
@@ -489,7 +509,9 @@ def test_ac2_browser_the_reveal_line_names_a_requester_who_left_during_the_vote(
         page, mock, CellLocked(seq=10, row=1, column=0, letter="T", revealed=True)
     )
 
-    expect(items).to_have_count(lines_before + 2)
+    # Spec 047: the closed vote adds its `vote` line too.
+    expect(items).to_have_count(lines_before + 3)
+    expect(feed_lines(page, "vote")).to_have_attribute("data-seq", "8")
     expect(feed_lines(page, "player_removed")).to_have_count(1)
     reveal_line = feed_lines(page, "reveal")
     expect(reveal_line).to_have_count(1)

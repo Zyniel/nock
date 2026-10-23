@@ -14,17 +14,17 @@ Readings that the spec leaves open:
 - "described by a `t("recap.share_label")` label": the link's `aria-describedby`
   names an element whose text is that label.
 - "The swatch of a recap player" is read on the `recap-colour` element's own
-  computed `background-color` and `background-image`. The colours of the image
-  are its colour stops as spec 019's swatch reader finds them (`SWATCH_COLOURS_JS`), and
-  the gradient's line and the colours are judged with spec 019's
-  `first_gradient_argument`, `is_diagonal` and `is_ink_or_white`, as for its
-  departed author's band: the hatch is ink and white since spec 041, which
-  removed the departed greys.
+  computed `background-color`, `background-image` and `box-shadow`.
 
 Refined by spec 043 (the design's room layout): `recap-open` sits inside
 `grid-status` (`data-state="solved"`), after its text, where it sat in
 `room-toolbar` right after `chat-toggle`; the dialog comes after the top bar and
 the play area in document order (spec 043's "Document order").
+
+Refined by spec 047 (the design's room overlays): `recap-revealed` comes with the
+other counts, before the players' heading (AC-1's order); a player the page no
+longer knows has a swatch that draws nothing, no hatching (AC-2); after a copy,
+`recap-copy` keeps its text and `recap-copied` reads « Lien copié » (AC-5).
 """
 
 from __future__ import annotations
@@ -38,14 +38,7 @@ from playwright.sync_api import Browser, Locator, Page, Route, expect
 
 from nock.grid import Grid
 from nock.protocol import GridSolved, LeaveReason, PlayerLeft
-from spec019_harness import (
-    SWATCH_COLOURS_JS,
-    Rgba,
-    first_gradient_argument,
-    is_diagonal,
-    is_ink_or_white,
-    rgba_from,
-)
+from spec019_harness import SWATCH_COLOURS_JS, Rgba, rgba_from
 from spec024_harness import (
     cell_at,
     expect_seq,
@@ -62,12 +55,14 @@ from spec028_harness import (
 )
 
 SHARE_PATH = "/recap/tok_ABCDEFGHIJKLMNOP"
+ALPHA_TOLERANCE = 0.01  # "a background with alpha 0" (spec 047 AC-9)
+# Spec 047: `recap-revealed` comes with the other counts, before the players.
 PART_IDS = [
     "recap-time",
     "recap-checks",
     "recap-reveals",
-    "recap-players",
     "recap-revealed",
+    "recap-players",
     "recap-share-link",
     "recap-copy",
     "recap-close",
@@ -170,8 +165,8 @@ ids => {
     found.push([id, dialog.querySelector(`[data-testid="${id}"]`)]);
   }
   const missing = found.filter(([, element]) => element === null).map(([id]) => id);
-  const order = ['h2', 'recap-time', 'recap-checks', 'recap-reveals', 'h3',
-    'recap-players', 'recap-revealed', 'recap-share-link', 'recap-copy',
+  const order = ['h2', 'recap-time', 'recap-checks', 'recap-reveals',
+    'recap-revealed', 'h3', 'recap-players', 'recap-share-link', 'recap-copy',
     'recap-close'];
   const byId = Object.fromEntries(found);
   const outOfOrder = [];
@@ -269,63 +264,51 @@ def test_ac2_each_swatch_has_the_colour_of_the_roster_swatch(
         expect(swatch).to_have_attribute("data-colour", colour)
 
 
-# The computed background of a `recap-colour` swatch: its colour, its image and the
-# colours of that image's stops, each colour as [red, green, blue, alpha]. The
-# helpers are spec 019's swatch reader's (`parseColour`, `imageColours`).
+# The computed background and shadow of a `recap-colour` swatch: its colour, its
+# image and its `box-shadow`, the colour as [red, green, blue, alpha] (spec 019's
+# `parseColour`).
 SWATCH_SCRIPT = "swatch => {\n" + SWATCH_COLOURS_JS + r"""
   const style = getComputedStyle(swatch);
-  const stops = [];
-  for (const text of imageColours(style.backgroundImage, style)) {
-    stops.push(parseColour(text));
-  }
   return {
     colour: parseColour(style.backgroundColor),
     image: style.backgroundImage,
-    stops: stops,
+    shadow: style.boxShadow,
   };
 }
 """
 
 
 class SwatchLook(NamedTuple):
-    """How a `recap-colour` swatch is drawn: its computed background."""
+    """How a `recap-colour` swatch is drawn: its computed background and shadow."""
 
     colour: Rgba
     image: str
-    stops: list[Rgba]
+    shadow: str
 
 
 def swatch_look(swatch: Locator) -> SwatchLook:
-    """Read the computed background of one `recap-colour` swatch."""
+    """Read the computed background and shadow of one `recap-colour` swatch."""
     raw = swatch.evaluate(SWATCH_SCRIPT)
-    stops: list[Rgba] = []
-    for stop in raw["stops"]:
-        stops.append(rgba_from(stop))
-    return SwatchLook(colour=rgba_from(raw["colour"]), image=raw["image"], stops=stops)
+    return SwatchLook(
+        colour=rgba_from(raw["colour"]), image=raw["image"], shadow=raw["shadow"]
+    )
 
 
-def hatched_swatch_problems(look: SwatchLook) -> list[str]:
-    """How a swatch fails to be hatched in ink and white (empty: none).
+def drawn_swatch_problems(look: SwatchLook) -> list[str]:
+    """How a swatch fails to draw nothing (empty: it draws nothing).
 
-    "The swatch of a recap player": its computed `background-image` is a
-    `repeating-linear-gradient` whose line is diagonal and whose colour stops hold
-    at least two different colours, and each colour of the swatch (its
-    `background-color` and those stops) whose alpha is not 0 is ink or white
-    (spec 041, which removed the departed greys).
+    Spec 047 (its Decision 4) refines "The swatch of a recap player": with
+    `data-colour=""` the swatch draws nothing, a transparent background with
+    alpha 0, no `background-image` and no `box-shadow`, in place of spec 028's
+    hatching.
     """
     problems: list[str] = []
-    image = look.image
-    if not image.startswith("repeating-linear-gradient("):
-        problems.append(f"background-image {image!r} is no repeating-linear-gradient")
-    else:
-        direction = first_gradient_argument(image)
-        if not is_diagonal(direction):
-            problems.append(f"the gradient's line {direction!r} is not diagonal")
-    if len(set(look.stops)) < 2:
-        problems.append(f"the colour stops of {image!r} hold under two colours")
-    for colour in [look.colour, *look.stops]:
-        if colour[3] > 0 and not is_ink_or_white(colour):
-            problems.append(f"the colour {colour} is neither ink nor white")
+    if abs(look.colour[3]) > ALPHA_TOLERANCE:
+        problems.append(f"background-color {look.colour} is not transparent")
+    if look.image != "none":
+        problems.append(f"background-image {look.image!r}")
+    if look.shadow != "none":
+        problems.append(f"box-shadow {look.shadow!r}")
     return problems
 
 
@@ -342,7 +325,7 @@ def test_ac2_the_swatches_of_the_players_in_the_room_have_no_pattern(
         assert swatch_look(swatch).image == "none", player_id
 
 
-def test_ac2_a_player_who_left_gets_a_hatched_ink_and_white_swatch(
+def test_ac2_a_player_who_left_gets_a_swatch_that_draws_nothing(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_solved_page(page, live_server, fx01_grid, recap_body()).mock
@@ -357,10 +340,10 @@ def test_ac2_a_player_who_left_gets_a_hatched_ink_and_white_swatch(
     mine = row_of(page, "p1").get_by_test_id("recap-colour")
     expect(mine).to_have_attribute("data-colour", "0")
     assert swatch_look(mine).image == "none"
-    assert hatched_swatch_problems(swatch_look(departed)) == []
+    assert drawn_swatch_problems(swatch_look(departed)) == []
 
 
-def test_ac2_a_player_unknown_to_the_page_gets_the_hatched_ink_and_white_swatch(
+def test_ac2_a_player_unknown_to_the_page_gets_a_swatch_that_draws_nothing(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     players = [recap_player("p1", "Ana", 8, 4), recap_player("p9", "Zoe", 2, 1)]
@@ -370,7 +353,7 @@ def test_ac2_a_player_unknown_to_the_page_gets_the_hatched_ink_and_white_swatch(
 
     swatch = row_of(page, "p9").get_by_test_id("recap-colour")
     expect(swatch).to_have_attribute("data-colour", "")
-    assert hatched_swatch_problems(swatch_look(swatch)) == []
+    assert drawn_swatch_problems(swatch_look(swatch)) == []
 
 
 def test_ac2_a_player_without_nickname_is_written_as_someone(
@@ -476,9 +459,11 @@ def clipboard_page(browser: Browser) -> Iterator[Page]:
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac5_the_copy_button_reads_copied_for_two_seconds(
+def test_ac5_a_copy_shows_lien_copie_for_two_seconds_and_the_button_keeps_its_text(
     clipboard_page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    """Spec 047 (the human's decision P16): « Lien copié » is the line
+    `recap-copied` under the share row; `recap-copy` keeps « Copier le lien »."""
     open_solved_page(
         clipboard_page, live_server, fx01_grid, recap_body(share_path=SHARE_PATH)
     )
@@ -488,10 +473,12 @@ def test_ac5_the_copy_button_reads_copied_for_two_seconds(
 
     copy_button.click()
 
-    expect(copy_button).to_have_text(fr["room.share.copied"])
+    copied_line = clipboard_page.get_by_test_id("recap-copied")
+    expect(copied_line).to_have_text(fr["room.share.copied"])
+    expect(copy_button).to_have_text(fr["room.share.copy"])
     copied = clipboard_page.evaluate("navigator.clipboard.readText()")
     assert copied == f"{live_server}{SHARE_PATH}"
-    expect(copy_button).to_have_text(fr["room.share.copy"], timeout=4000)
+    expect(copied_line).to_be_hidden(timeout=4000)
 
 
 @pytest.mark.parametrize(
@@ -520,6 +507,8 @@ def test_ac5_copy_changes_nothing_without_a_usable_clipboard(
         page.wait_for_timeout(QUIET_MS)
 
         expect(copy_button).to_have_text(load_fr()["room.share.copy"])
+        # Spec 047: nor does the « Lien copié » line show.
+        expect(page.get_by_test_id("recap-copied")).to_have_count(0)
     finally:
         context.close()
 

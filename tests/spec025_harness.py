@@ -38,7 +38,6 @@ import contextlib
 import json
 import re
 import threading
-import time
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -540,8 +539,6 @@ MOCK_CODE = "ABC123"
 SNAPSHOT_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 WAIT_TIMEOUT_MS = 5000
 SETTLE_MS = 400
-VOTE_RESULT_MIN_SECONDS = 2.5  # "the banner is gone between 2,500 and 4,500 ms"
-VOTE_RESULT_MAX_SECONDS = 4.5
 
 # Makes `matchMedia("(pointer: coarse)")` report a match, other queries unchanged
 # (the script of spec 009, for the touch contexts of Firefox and WebKit).
@@ -832,18 +829,6 @@ def expect_selection(page: Page, row: int, column: int, word: str) -> None:
     expect(grid).to_have_attribute("data-selected-row", str(row))
     expect(grid).to_have_attribute("data-selected-column", str(column))
     expect(grid).to_have_attribute("data-word", word)
-
-
-def seconds_until_hidden(page: Page, locator: Locator, started: float) -> float:
-    """Seconds from `started` (time.monotonic) until `locator` is hidden.
-
-    Fails when it is still visible 6 seconds after `started`.
-    """
-    while locator.is_visible():
-        if time.monotonic() - started > 6.0:
-            pytest.fail("still visible 6 s later")
-        page.wait_for_timeout(50)
-    return time.monotonic() - started
 
 
 def make_page(

@@ -22,6 +22,12 @@ on its Discussion tab (the harness's `open_panel`), and the panel's box in the
 checks is `salon`'s; in the column layout the banner and the Salon do not overlap,
 and the checks hold as written.
 
+Refined by spec 047 (the design's room overlays): the banner leaves within 300 ms
+of the `vote_closed`, and the closed vote adds a `vote` line to the stream, which
+moves a list that was at its end to its new end; so after the vote the test
+checks the panel's points and box, the window's scroll and the focus, and no
+longer the list's `scrollTop`, which the criterion does not read after the vote.
+
 The shared setup is in `spec022_harness`.
 """
 
@@ -64,7 +70,7 @@ SNAPSHOT_SEQ = FIRST_CHAT_SEQ + CHAT_LINES - 1  # the snapshot holds lines 6 to 
 LAST_FEED_SEQ = SNAPSHOT_SEQ + FEED_ITEMS
 EIGHT_VOTERS = 8
 BANNER_STAYS_MS = 1000  # "and again 1,000 ms later"
-BANNER_GONE_MS = 5500  # spec 025: gone between 2,500 and 4,500 ms after the result
+BANNER_GONE_MS = 5500  # an upper bound; spec 047: gone within 300 ms
 TOLERANCE_PX = 1.0
 
 # The measures of the page that the criterion compares before and during the vote.
@@ -236,8 +242,19 @@ def read_state(page: Page) -> PageState:
     )
 
 
-def state_problems(page: Page, before: PageState, active: str, label: str) -> list[str]:
-    """How the panel, the list, the scroll and the focus differ from `before`."""
+def state_problems(
+    page: Page,
+    before: PageState,
+    active: str,
+    label: str,
+    check_scroll_top: bool = True,
+) -> list[str]:
+    """How the panel, the list, the scroll and the focus differ from `before`.
+
+    `check_scroll_top` is False after the vote: spec 047 adds the closed vote's
+    line to the stream, which brings a list that was at its end to its new end
+    (spec 022 AC-11), and the criterion reads no `scrollTop` after the vote.
+    """
     now = read_state(page)
     if now.panel_box is None or before.panel_box is None:
         return [f"{label}: salon is not on the page"]
@@ -250,7 +267,7 @@ def state_problems(page: Page, before: PageState, active: str, label: str) -> li
             problems.append(f"{label}: panel {name} {was} -> {is_now}")
     if before.scroll_top is None or now.scroll_top is None:
         problems.append(f"{label}: chat-list is not on the page")
-    elif abs(before.scroll_top - now.scroll_top) > TOLERANCE_PX:
+    elif check_scroll_top and abs(before.scroll_top - now.scroll_top) > TOLERANCE_PX:
         problems.append(f"{label}: scrollTop {before.scroll_top} -> {now.scroll_top}")
     if now.scroll_x != 0 or now.scroll_y != 0:
         problems.append(f"{label}: window scrolled {now.scroll_x}, {now.scroll_y}")
@@ -279,7 +296,9 @@ def after_the_vote(
     )
     expect(page.get_by_test_id("vote-banner")).to_have_count(0, timeout=BANNER_GONE_MS)
     problems = point_problems(page, "salon", "after the vote")
-    problems += state_problems(page, before, active, "after the vote")
+    problems += state_problems(
+        page, before, active, "after the vote", check_scroll_top=False
+    )
     return problems
 
 

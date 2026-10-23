@@ -25,6 +25,9 @@ Choices where the spec leaves room:
 - "A player of the kept snapshot" follows the events: after `player_left`, the
   player is no longer one, so their lines lose their dot.
 - "Makes no `salon-dot`" is read 300 ms after the page applied the event.
+- AC-18's `chat-send` colours are those of the enabled button, read after the test
+  typed a message: spec 047 AC-12 gives a `chat-send` that spec 022 disables (an
+  empty input) spec 041's disabled look.
 """
 
 from __future__ import annotations
@@ -709,6 +712,11 @@ def test_ac18_the_send_button_is_the_word_blue_pill_beside_the_input(
 ) -> None:
     page = open_discussion(window, live_server, fx01_grid, size)
     send = page.get_by_test_id("chat-send")
+    # Spec 047 AC-12: an empty input disables `chat-send`, which then takes spec
+    # 041's disabled look; the word-blue pill is the enabled button's look, so
+    # the test types a message first.
+    page.get_by_test_id("chat-input").press_sequentially("salut")
+    expect(send).to_be_enabled()
 
     send_box = box_of(send)
     input_box = box_of(page.get_by_test_id("chat-input"))

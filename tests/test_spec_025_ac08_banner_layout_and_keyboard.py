@@ -14,6 +14,12 @@ Refined by spec 043 (the design's room layout): "the room header" reads
 `room-topbar` (it was the `header` element that holds `share-panel`); the focus
 outside the banner is put on `copy-link` once the Salon's Joueurs tab shows
 (spec 043's `show_tab`), since `copy-link` is in that tab.
+
+Refined by spec 047 (the design's room overlays): after the `vote_closed` the
+banner is gone within 300 ms and there is no `vote-result`; the focus that was on
+`vote-status` is on the `grid`, and a focus outside the banner stays where it
+is. The boxes compared are those of `room-topbar` (already read so since spec
+043), `grid-viewport`, `clue-bar` and `keyboard`.
 """
 
 from __future__ import annotations
@@ -53,7 +59,7 @@ from spec035_harness import (
 )
 
 TAP_TIMEOUT_MS = 3000
-BANNER_GONE_TIMEOUT_MS = 6000  # the result stays 2.5 to 4.5 s (AC-3, AC-7)
+BANNER_GONE_MS = 300  # spec 047: "within 300 ms" of the `vote_closed`
 EPSILON = 1.0
 MIN_GRID_VIEWPORT_PX = 100.0
 MIN_TARGET_PX = 24.0
@@ -76,8 +82,6 @@ NEXT_SEQ = VOTE_SEQ + 1  # the seq of the event after the `vote_opened`
 EIGHT_ELIGIBLE = 8
 FIVE_YES = 5  # the majority of 8 eligible voters
 
-# What can take the focus inside an element, `tabindex="-1"` included.
-FOCUSABLE_SELECTOR = "a[href], button, input, select, textarea, [tabindex]"
 
 # Whether `document.elementFromPoint` at the centre of the element returns it.
 ELEMENT_AT_CENTRE_SCRIPT = (
@@ -390,12 +394,11 @@ def test_ac8_keyboard_a_vote_closed_moves_the_focus_from_vote_status_to_the_grid
         passed = closed(NEXT_SEQ, 1, VoteOutcome.PASSED, FIVE_YES, EIGHT_ELIGIBLE)
         mock.send(passed.model_dump_json())
 
+        # Spec 047: the banner is gone within 300 ms, with no `vote-result`.
         banner = page.get_by_test_id("vote-banner")
-        result = banner.get_by_test_id("vote-result")
-        expect(result).to_be_visible()
-        expect(result).to_have_text(fr_text("vote.result.passed"))
+        expect(banner).to_have_count(0, timeout=BANNER_GONE_MS)
+        expect(page.get_by_test_id("vote-result")).to_have_count(0)
         expect(page.get_by_test_id("grid")).to_be_focused()
-        expect(banner.locator(FOCUSABLE_SELECTOR)).to_have_count(0)
     finally:
         close()
 
@@ -417,13 +420,12 @@ def test_ac8_a_focus_outside_the_banner_stays_where_it_is(
         passed = closed(NEXT_SEQ, 1, VoteOutcome.PASSED, FIVE_YES, EIGHT_ELIGIBLE)
         mock.send(passed.model_dump_json())
 
+        # Spec 047: the banner leaves at the `vote_closed`, with no result.
         banner = page.get_by_test_id("vote-banner")
-        result = banner.get_by_test_id("vote-result")
-        expect(result).to_be_visible()
-        expect(result).to_have_text(fr_text("vote.result.passed"))
-        assert active_test_id(page) == "copy-link"
-
-        expect(banner).to_be_hidden(timeout=BANNER_GONE_TIMEOUT_MS)
+        expect(banner).to_have_count(0, timeout=BANNER_GONE_MS)
+        expect(page.get_by_test_id("vote-announcement")).to_have_text(
+            fr_text("vote.result.passed")
+        )
         assert active_test_id(page) == "copy-link"
     finally:
         close()
