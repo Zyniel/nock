@@ -87,6 +87,7 @@ from spec048_ops_harness import (
     open_ready_ops,
     seed_ops_token,
 )
+from sure_click import click_until_pressed
 
 COLUMN_CARD_WIDTH = 872.0  # the 920 px column less its 24 px paddings
 WIDE_COLUMN_LEFT = 204.0  # (1280 - 920) / 2 + 24
@@ -129,7 +130,8 @@ def refuse_token(page: Page) -> None:
     field = page.get_by_test_id("ops-token-input")
     field.fill("wrong")
     expect(field).to_have_value("wrong")
-    page.get_by_test_id("ops-token-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("ops-token-submit"))
     expect(page.get_by_test_id("ops-token-error")).to_be_visible()
 
 

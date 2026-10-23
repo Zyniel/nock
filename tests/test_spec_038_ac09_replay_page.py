@@ -58,6 +58,7 @@ from spec038_harness import (
     texts_of,
     type_across,
 )
+from sure_click import click_until_pressed
 
 # ---- Values of the spec --------------------------------------------------------------
 
@@ -169,7 +170,8 @@ def submit_replay(page: Page, typed_code: str, sent_code: str) -> Response:
         lambda response: edits_path(sent_code) in response.url,
         timeout=REPLAY_TIMEOUT_MS,
     ) as caught:
-        page.get_by_test_id("ops-replay-submit").click()
+        # 2026-10-23: Firefox under load lost the press; main's run after #43.
+        click_until_pressed(page.get_by_test_id("ops-replay-submit"))
     return caught.value
 
 

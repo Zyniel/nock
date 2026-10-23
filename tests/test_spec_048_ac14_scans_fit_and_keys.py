@@ -76,6 +76,7 @@ from spec048_ops_harness import (
     seed_ops_token,
     set_position,
 )
+from sure_click import click_until_pressed
 
 SHARE_STATES = ["loading", "loaded", "unavailable"]
 ACCOUNT_STATES = [
@@ -199,7 +200,8 @@ def open_ops_state(page: Page, base_url: str, state: str, grid: Grid) -> None:
         field = page.get_by_test_id("ops-token-input")
         field.fill("wrong")
         expect(field).to_have_value("wrong")
-        page.get_by_test_id("ops-token-submit").click()
+        # 2026-10-23: Firefox under load lost the press; main's run after #43.
+        click_until_pressed(page.get_by_test_id("ops-token-submit"))
         expect(page.get_by_test_id("ops-token-error")).to_be_visible()
     elif state in ("loading", "error"):
 

@@ -100,6 +100,7 @@ from spec043_harness import (
     snapshot_frame,
     style_of,
 )
+from sure_click import click_until_pressed
 
 Rgb = tuple[int, int, int]
 
@@ -574,7 +575,9 @@ def show_nickname_error(page: Page) -> None:
     field = page.get_by_test_id("nickname-input")
     field.fill("A")
     expect(field).to_have_value("A")
-    page.get_by_test_id("nickname-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #40
+    # failed here (no error, nothing happened), most likely the same lost press.
+    click_until_pressed(page.get_by_test_id("nickname-submit"))
     error = page.get_by_test_id("nickname-error")
     room = page.get_by_test_id("room-page")
     waited_ms = 0

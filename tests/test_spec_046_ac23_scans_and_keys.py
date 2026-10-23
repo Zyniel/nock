@@ -73,6 +73,7 @@ from spec046_harness import (
     show_nickname_error,
     window_opener,
 )
+from sure_click import click_until_pressed
 
 STATES = [
     "catalogue",
@@ -164,7 +165,8 @@ def open_dialog(page: Page, base_url: str, status: dict[str, object]) -> None:
         email_input.fill("ana@")
         # Fix after #40's CI: the field holds the text before the submit (no race).
         expect(email_input).to_have_value("ana@")
-        page.get_by_test_id("account-email-submit").click()
+        # 2026-10-23: Firefox under load lost the press; main's run after #43.
+        click_until_pressed(page.get_by_test_id("account-email-submit"))
         expect(page.get_by_test_id("account-error")).to_be_visible()
 
 

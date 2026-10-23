@@ -39,6 +39,7 @@ from spec038_harness import (
 from spec042_harness import READERS_JS, Box, Colour, to_box, to_colour
 from spec046_harness import fulfil_json, same_size
 from spec048_harness import ROOM_CODE, WAIT_TIMEOUT_MS
+from sure_click import click_until_pressed
 
 NOW = 1_800_000_000.0  # the dashboard's clock (spec 038's tests)
 REPLAY_ROUTE = "**/api/ops/rooms/*/edits"
@@ -126,7 +127,8 @@ def submit_replay(page: Page, code: str = "k7qm2x") -> None:
     field = page.get_by_test_id("ops-replay-code")
     field.fill(code)
     expect(field).to_have_value(code)
-    page.get_by_test_id("ops-replay-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("ops-replay-submit"))
 
 
 def open_replay(

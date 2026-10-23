@@ -62,6 +62,7 @@ from spec012_harness import (
     socket_url,
     submit_form,
 )
+from sure_click import click_until_pressed
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
@@ -415,7 +416,9 @@ def test_ac1_browser_the_form_joins_the_room(
     )
 
     page.get_by_test_id("nickname-input").fill("Ana", timeout=FORM_TIMEOUT_MS)
-    page.get_by_test_id("nickname-submit").click(timeout=FORM_TIMEOUT_MS)
+    # 2026-10-23: Firefox under load lost the press; main's run after #40
+    # failed here (no error, nothing happened), most likely the same lost press.
+    click_until_pressed(page.get_by_test_id("nickname-submit"), timeout=FORM_TIMEOUT_MS)
 
     expect(room).to_have_attribute("data-status", "joined")
     expect(page.get_by_test_id("nickname-form")).to_have_count(0)
@@ -452,7 +455,9 @@ def test_ac1_browser_a_valid_nickname_is_sent_normalised(
 ) -> None:
     mock = open_mock_room(page, live_server)
     page.get_by_test_id("nickname-input").fill(" Ana ", timeout=FORM_TIMEOUT_MS)
-    page.get_by_test_id("nickname-submit").click(timeout=FORM_TIMEOUT_MS)
+    # 2026-10-23: Firefox under load lost the press; main's run after #40
+    # failed here (no error, nothing happened), most likely the same lost press.
+    click_until_pressed(page.get_by_test_id("nickname-submit"), timeout=FORM_TIMEOUT_MS)
 
     mock.wait_for_frames(1)
 

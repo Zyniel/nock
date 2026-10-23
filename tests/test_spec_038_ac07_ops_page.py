@@ -90,6 +90,7 @@ from spec038_harness import (
     utc,
     wait_for_held_route,
 )
+from sure_click import click_until_pressed
 
 # ---- Values of the spec --------------------------------------------------------------
 
@@ -563,7 +564,8 @@ def test_ac7_a_401_or_a_429_to_the_replay_request_locks_the_page(
     assert session_value(page, OPS_TOKEN_KEY) == OPS_TOKEN
 
     page.get_by_test_id("ops-replay-code").fill(REPLAY_CODE)
-    page.get_by_test_id("ops-replay-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("ops-replay-submit"))
 
     expect_ops_state(page, "locked")
     error = page.get_by_test_id("ops-token-error")

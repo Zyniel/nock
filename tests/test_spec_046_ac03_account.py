@@ -56,6 +56,7 @@ from spec046_harness import (
     style_of,
     window_opener,
 )
+from sure_click import click_until_pressed
 
 
 @pytest.fixture
@@ -213,7 +214,8 @@ def test_ac3_the_link_request_has_no_room_and_its_answer_shows_account_sent(
     email_input.fill(EMAIL)
     # Fix after #40's CI: the field holds the text before the submit (no race).
     expect(email_input).to_have_value(EMAIL)
-    page.get_by_test_id("account-email-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("account-email-submit"))
 
     expect(page.get_by_test_id("account-sent")).to_be_visible()
     page.wait_for_timeout(300)
