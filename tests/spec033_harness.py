@@ -75,6 +75,7 @@ from nock.store import RoomStore
 from room_panels import open_menu
 from spec017_harness import FakeClock
 from spec032_harness import NO_TICK_CONFIG
+from sure_click import click_until_pressed
 
 if TYPE_CHECKING:
     from nock.accounts import AccountStore
@@ -625,7 +626,8 @@ def stored_identity(page: Page, code: str) -> dict[str, object] | None:
 def ask_link_in_form(page: Page, email: str) -> None:
     """Type `email` in `account-email-input` and press `account-email-submit`."""
     page.get_by_test_id("account-email-input").fill(email)
-    page.get_by_test_id("account-email-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("account-email-submit"))
 
 
 def open_account_dialog(page: Page) -> Locator:

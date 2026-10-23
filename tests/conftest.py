@@ -23,11 +23,11 @@ if TYPE_CHECKING:
 # The harness modules (`specNNN_harness.py`) hold helpers with plain `assert`s.
 # pytest rewrites the asserts of test files and conftests only, so every harness
 # module is registered here: the call has to come before the first test module
-# imports them.
+# imports them. `sure_click` (2026-10-23) is a shared helper with a plain `assert`.
 HARNESS_MODULES = sorted(
     path.stem for path in Path(__file__).parent.glob("spec*_harness.py")
 )
-pytest.register_assert_rewrite(*HARNESS_MODULES)
+pytest.register_assert_rewrite(*HARNESS_MODULES, "sure_click")
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

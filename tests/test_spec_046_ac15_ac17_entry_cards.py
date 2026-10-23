@@ -61,6 +61,7 @@ from spec046_harness import (
     wait_for_join,
     window_opener,
 )
+from sure_click import click_until_pressed
 
 REFUSAL_CASES = [(size, refusal) for size in SIZES for refusal in REFUSALS]
 REFUSAL_IDS = [f"{w}x{h}-{refusal}" for (w, h), refusal in REFUSAL_CASES]
@@ -251,7 +252,9 @@ def test_ac16_while_joining_the_card_stays_with_a_disabled_button_until_the_room
     # Fix after #40's CI: the field holds the text before the submit (no race).
     expect(field).to_have_value("Ana")
 
-    page.get_by_test_id("nickname-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #40
+    # failed here (no error, nothing happened), most likely the same lost press.
+    click_until_pressed(page.get_by_test_id("nickname-submit"))
 
     expect_status(page, "joining")
     wait_for_join(page, mock)

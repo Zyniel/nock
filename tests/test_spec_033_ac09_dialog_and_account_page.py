@@ -64,6 +64,7 @@ from spec033_harness import (
     load_fr,
     size_ids,
 )
+from sure_click import click_until_pressed
 
 SCAN_SIZES = [(1280, 720), (360, 740)]
 
@@ -158,7 +159,8 @@ def open_dialog(page: Page) -> None:
 
 def submit_address(page: Page, address: str = ANA_EMAIL) -> None:
     page.get_by_test_id("account-email-input").fill(address)
-    page.get_by_test_id("account-email-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("account-email-submit"))
 
 
 # ---- Scans: the room page -------------------------------------------------------

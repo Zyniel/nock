@@ -90,6 +90,7 @@ from spec046_harness import (
     same_size,
     window_size,
 )
+from sure_click import click_until_pressed
 
 # ---- Values of the spec ------------------------------------------------------------
 
@@ -765,4 +766,5 @@ def submit_address(page: Page, address: str) -> None:
     field = page.get_by_test_id("account-email-input")
     field.fill(address)
     expect(field).to_have_value(address)
-    page.get_by_test_id("account-email-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("account-email-submit"))

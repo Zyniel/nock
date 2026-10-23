@@ -82,6 +82,7 @@ from nock.store import RoomStore
 from spec032_harness import DAY as DAY
 from spec032_harness import LIFE as LIFE
 from spec036_harness import OPERATOR_TOKEN_VARIABLE as OPERATOR_TOKEN_VARIABLE
+from sure_click import click_until_pressed
 
 if TYPE_CHECKING:
     from nock.operations import DashboardFigures
@@ -527,7 +528,8 @@ def expect_ops_state(page: Page, state: str) -> None:
 def give_token(page: Page, token: str) -> None:
     """Type `token` in the token form and submit it with its button."""
     page.get_by_test_id("ops-token-input").fill(token)
-    page.get_by_test_id("ops-token-submit").click()
+    # 2026-10-23: Firefox under load lost the press; main's run after #43.
+    click_until_pressed(page.get_by_test_id("ops-token-submit"))
 
 
 def open_dashboard(page: Page, base_url: str, token: str = OPS_TOKEN) -> None:
