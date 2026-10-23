@@ -334,8 +334,8 @@ so their tests change in the same pull request.
 | 3 | 043 Room layout | top bar, Aide and Menu, Salon (column or sheet), Joueurs, clue bar, notes, completion band; two pull requests (WP-1 the frame, WP-2 the feedback) | done (#35, #36) |
 | 4 | 044 Keyboard | the in-app keyboard, ✎, ⇄, « Clavier » | done (#38) |
 | 5 | 045 Auteurs mode | the authorship view of the grid, replacing spec 019's band | done (#39) |
-| 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | done |
-| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | approved |
+| 6 | 046 Catalogue and entry pages | the catalogue and its sections (« Mes salons », the history), the nickname form, joining, a room not found or expired, the opening room | done (#40) |
+| 7 | 047 Room overlays | the help-mode vote, the end of the game, the recap dialog | done |
 | 8 | 048 Plain pages and states | the account page and deletion, the shared recap page, the operator page, the loading, empty and error states | approved |
 
 - [x] Draft and approve: specs 044 to 048 are drafted from `_design.md` and the
@@ -350,7 +350,7 @@ so their tests change in the same pull request.
   - [x] `/feature specs/044-keyboard.md`
   - [x] `/feature specs/045-auteurs-mode.md`
   - [x] `/feature specs/046-catalogue-and-entry-pages.md`
-  - [ ] `/feature specs/047-room-overlays.md`
+  - [x] `/feature specs/047-room-overlays.md`
   - [ ] `/feature specs/048-plain-pages-and-states.md`
 
 ```bash
