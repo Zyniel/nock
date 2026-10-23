@@ -6,12 +6,13 @@ On `SOLVED` (spec 044's) with the recap route answering `RECAP` (`p1` Ana 8 lett
 
 Readings where the spec leaves room:
 
-- "`recap-values`, whose text content is `8 lettres · 4 mots complétés`": the
-  spec also says `recap-sep` holds no text node and draws « · » as a pictogram, so
-  the DOM text content cannot hold the « · ». The test reads the row as it is
-  drawn: the texts of `recap-values`' children in order, `recap-sep` standing for
-  its pictogram « · », joined with single spaces, and requires that reading to be
-  `8 lettres · 4 mots complétés`, with nothing else in `recap-values`.
+- `recap-values` is read element by element (the spec's note of 2026-10-23):
+  its children in order, `recap-sep` standing for its pictogram « · », joined
+  with single spaces, must read `8 lettres · 4 mots complétés`, with no other
+  text in `recap-values`.
+- The long name (added after spec 047's first review, 2026-10-23): `RECAP` with
+  `p2` nicknamed 20 `W` (`WWWWWWWWWWWWWWWWWWWW`); "a line of its own" is the
+  values' top at or below the name's bottom (1 px), as the criterion says.
 - "Left to right": the parts of the row that show, in document order, have
   increasing left edges.
 - "The list's right edge": the right edge of `recap-players`' box.
@@ -35,6 +36,7 @@ from nock.grid import Grid
 from nock.protocol import LeaveReason
 from room_panels import open_menu
 from spec019_harness import OpenWindow, window_opener
+from spec028_harness import recap_body, recap_player
 from spec041_harness import shadow_of
 from spec042_harness import READERS_JS, box_of, colour_of, expect_seq, to_box
 from spec043_harness import (
@@ -57,6 +59,8 @@ from spec047_harness import (
     DOT_RING_ALPHA,
     MUTED,
     PHONE,
+    RECAP,
+    SHARE_PATH,
     open_loaded_recap,
     open_solved,
     parts_of,
@@ -66,6 +70,7 @@ from spec047_harness import (
 )
 
 MIDDLE_DOT = "\N{MIDDLE DOT}"
+LONG_NICKNAME = "WWWWWWWWWWWWWWWWWWWW"  # 20 W: spec 012's longest, among its widest
 ROW_PARTS = ["recap-colour", "recap-name", "recap-you", "recap-values"]
 VALUE_PARTS = ["recap-letters", "recap-sep", "recap-words"]
 
@@ -130,8 +135,9 @@ def open_rows(
     *,
     bob_left: bool = False,
     access_on: bool = False,
+    body: object = RECAP,
 ) -> Page:
-    """`SOLVED` with `RECAP`; the recap open and loaded.
+    """`SOLVED` with `RECAP` (or `body`); the recap open and loaded.
 
     Args:
         window: The `window` fixture.
@@ -140,12 +146,13 @@ def open_rows(
         size: The window (desktop context).
         bob_left: Whether `p2` leaves (`timed_out`, seq 6) before the opening.
         access_on: Whether `access-switch` is turned on before the opening.
+        body: What the recap route answers (`RECAP` by default).
 
     Returns:
         The page, with the recap's rows shown.
     """
     page = window(size[0], size[1], False)
-    mock, _ = open_solved(page, base_url, solved_frame(grid))
+    mock, _ = open_solved(page, base_url, solved_frame(grid), body=body)
     if bob_left:
         mock.send(left_frame(6, "p2", LeaveReason.TIMED_OUT))
         expect_seq(page, 6)
@@ -327,6 +334,27 @@ def test_ac9_at_360_the_values_go_under_the_name_18_px_in(
             problems.append(f"{player_id}: values {values_box.left - row_box.left} in")
 
     assert problems == []
+
+
+# ---- A long name -------------------------------------------------------------------
+
+
+def test_ac9_a_long_name_puts_the_values_on_a_line_of_their_own_on_the_right(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    players = [
+        recap_player("p1", "Ana", 8, 4),
+        recap_player("p2", LONG_NICKNAME, 5, 3),
+    ]
+    body = recap_body(players=players, share_path=SHARE_PATH)
+    page = open_rows(window, live_server, fx01_grid, body=body)
+
+    name_box = box_of(part_of_row(page, "p2", "recap-name"))
+    values_box = box_of(part_of_row(page, "p2", "recap-values"))
+    list_box = box_of(page.get_by_test_id("recap-players"))
+
+    assert values_box.top >= name_box.bottom - 1.0, (name_box, values_box)
+    assert same_position(values_box.right, list_box.right), (values_box, list_box)
 
 
 # ---- A player who left -------------------------------------------------------------
