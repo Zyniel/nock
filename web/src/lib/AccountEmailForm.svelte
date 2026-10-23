@@ -45,11 +45,12 @@
     isSending = false
   }
 
-  function errorText(failure: LinkAnswer): string {
-    if (failure === 'invalid') {
+  // The text of the error line, for the failed answer shown.
+  function errorText(): string {
+    if (answer === 'invalid') {
       return t('account.error.email')
     }
-    if (failure === 'too_many') {
+    if (answer === 'too_many') {
       return t('account.error.too_many')
     }
     return t('account.error.send')
@@ -73,9 +74,9 @@
       bind:value={email}
     />
   </div>
-  {#if answer !== null && answer !== 'sent'}
+  {#if isErrorShown}
     <p id={ERROR_ID} class="nock-error-line" data-testid="account-error" role="alert">
-      {errorText(answer)}
+      {errorText()}
     </p>
   {/if}
   <button

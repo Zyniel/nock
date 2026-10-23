@@ -60,9 +60,10 @@
       room = bodyWidth - EDITS_GAP_PX - EDITS_MIN_WIDTH_PX
     }
     const fitting = Math.floor((room - 1) / columns)
-    // At least 1 px before the body is first measured. That measure runs in
-    // the same task as the first drawing of the grid, before the browser
-    // paints it, so no frame shows these 1 px cells.
+    // At least 1 px before the body is first measured. That measure comes in
+    // the same rendering update as the grid's first drawing (a ResizeObserver
+    // callback, then Svelte's flush), before the browser paints, so no frame
+    // shows these 1 px cells.
     return Math.max(1, Math.min(widest, fitting))
   }
 

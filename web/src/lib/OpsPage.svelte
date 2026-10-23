@@ -129,7 +129,7 @@
         {#if tokenError !== null}
           <p
             id="ops-token-error"
-            class="nock-error-line"
+            class="nock-error-line ops-token-error"
             data-testid="ops-token-error"
             role="alert"
           >{t(tokenError)}</p>
@@ -189,6 +189,12 @@
 <style>
   .ops-page {
     background: var(--nock-page);
+  }
+
+  /* The refusal 6 px under the input, as the screens sheet draws it (the
+     card's gap is 12 px). */
+  .ops-token-error {
+    margin-top: -6px;
   }
 
   /* One tile per figure, as many per row as 270 px fit, one per row on a
