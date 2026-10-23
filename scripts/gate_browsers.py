@@ -54,7 +54,8 @@ WARM_UP_TIMEOUT_MS = 60_000
 # relay, spec 025's banner window (2.5 to 4.5 s), spec 026's solve budget and
 # spec 034's highlight window (on at 4.5 s, gone at 6 s) and feed scroll
 # measure durations too, as does spec 043's note lifetime (fading from 2.7 s,
-# gone by 3.7 s; 2026-10-22).
+# gone by 3.7 s; 2026-10-22) and spec 047's « Lien copié » line (gone 2 s after
+# the copy; 2026-10-23).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
         "test_spec_013_ac02_selections.py",
@@ -70,6 +71,7 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_spec_036_ac01_time_budgets.py",
         "test_spec_038_ac11_relay_time.py",
         "test_spec_043_ac26_note_lifetime.py",
+        "test_spec_047_ac10_copied_line.py",
     }
 )
 
