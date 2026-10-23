@@ -782,7 +782,10 @@ Content, top to bottom:
      the input with a 1 px rule-grey border, radius 18 px, padding 7 px 12 px; the
      « Envoyer » pill (section 11). Spec 022's chat notes (« Patientez avant
      d'envoyer. », « L'hôte a coupé votre discussion. ») show as one muted line
-     under the input (500 0.85rem/1.3, 12 px left padding), one at a time; while I
+     under the input (500 0.85rem/1.3, 12 px left padding) (Note from the lead,
+     2026-10-23: the screens sheet drew this line at 0.82rem (`.chatnote` in
+     `screens_sheet/style.css`); the sheet was aligned to this 0.85rem, which spec
+     047 AC-12 and the code follow), one at a time; while I
      am muted, the input and « Envoyer » are disabled (section 11) (decided by the human on 2026-10-22, screens sheet P5).
 4. Joueurs (specs 011, 013, 014): padding 10 px 16 px, rows 8 px apart, 0.95rem.
    Each row: player dot; name, « (vous) » after my own (my name weight 700); the
@@ -1131,7 +1134,10 @@ m:ss » (recap time style); the lines « Vérifications : n », « Révélations
 « Lettres révélées : n » (gap 4 px); heading « Qui a fait quoi »; one row per player
 (dot, name, « (vous) » in muted after mine, and on the right « n lettres · n mots
 complétés »), rows 8 px apart (on the phone the value wraps under the name, 18 px
-in); heading « Lien à partager »; the URL box and « Copier le lien » (secondary,
+in; on a computer, when a long name leaves no room, it wraps under the name and
+stays on the right, its right edge on the list's. Note from the lead, 2026-10-23:
+the computer case is added, as the screens sheet's CSS already draws it, after spec
+047's first review); heading « Lien à partager »; the URL box and « Copier le lien » (secondary,
 padding 8 px 12 px); « Fermer » (primary), right-aligned. Échap closes it.
 After a copy, « Copier le lien » keeps its label and the confirmation line « Lien
 copié » shows under the URL box, as in the Joueurs tab (section 8); spec 028

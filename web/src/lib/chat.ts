@@ -65,14 +65,15 @@ export function salonToggleLabel(count: number, hasNewEvents: boolean): string |
 // True when the feed holds a line about another player newer than
 // `lastSeenItemId`, the newest line of the last time the stream showed. The
 // page gives each line a larger id than the lines before it, catch-up lines
-// included.
+// included. A line by no player (a closed vote, spec 047) does not count.
 export function hasNewEventLines(
   feed: KeptFeedItem[],
   lastSeenItemId: number,
   you: string,
 ): boolean {
   for (const item of feed) {
-    if (item.id > lastSeenItemId && item.playerId !== you) {
+    const isOtherPlayers = item.playerId !== null && item.playerId !== you
+    if (item.id > lastSeenItemId && isOtherPlayers) {
       return true
     }
   }

@@ -4,6 +4,11 @@ The rule on `handle_message` and `tick` (the room `V3`), the real WebSocket with
 fake clock, and the page with a mocked socket. A vote that passes when its request
 can no longer apply also closes `rejected` (the edge cases of the spec). The shared
 setup is in `spec025_harness`.
+
+Refined by spec 047 (the design's room overlays): in the browser run, the banner
+is gone within 300 ms of the `vote_closed` (it no longer shows `vote-result` for
+2,500 to 4,500 ms), and `vote-announcement` and a `feed-item` with
+`data-kind="vote"` read the result.
 """
 
 from __future__ import annotations
@@ -47,8 +52,6 @@ from spec025_harness import (
     FIVE_AND_ONE,
     NOW,
     REVEAL_1_0,
-    VOTE_RESULT_MAX_SECONDS,
-    VOTE_RESULT_MIN_SECONDS,
     FakeClock,
     Peer,
     Play,
@@ -66,7 +69,6 @@ from spec025_harness import (
     open_vote_of,
     opened,
     refusal_code,
-    seconds_until_hidden,
     set_vote_mode,
     v3,
     vote_room,
@@ -76,6 +78,7 @@ from spec025_harness import (
 
 WS_DETECTION_SECONDS = 1.0  # "within 1 second of real time"
 SETTLE_SECONDS = 0.3
+BANNER_GONE_SECONDS = 0.3  # spec 047: "within 300 ms" of the `vote_closed`
 
 # ---- Fixtures ----
 
@@ -532,17 +535,21 @@ def test_ac3_browser_a_failed_vote_shows_its_result_and_changes_nothing(
     mock.send(opened(6, 1, "p2", request, 3).model_dump_json())
     expect(banner).to_be_visible()
 
-    started = time.monotonic()
+    deadline = time.monotonic() + BANNER_GONE_SECONDS
     mock.send(closed(7, 1, outcome, 1, 3).model_dump_json())
 
-    expect(page.get_by_test_id("vote-result")).to_have_text(
-        fr_text(f"vote.result.{outcome.value}")
-    )
+    # Spec 047: the banner is gone within 300 ms of the `vote_closed`, and the
+    # result is announced and is a `vote` line of the stream (no `vote-result`).
+    left_ms = max(1.0, (deadline - time.monotonic()) * 1000)
+    expect(banner).to_have_count(0, timeout=left_ms)
+    result = fr_text(f"vote.result.{outcome.value}")
+    expect(page.get_by_test_id("vote-announcement")).to_have_text(result)
+    vote_line = page.locator('[data-testid="feed-item"][data-kind="vote"]')
+    expect(vote_line).to_have_count(1)
+    expect(vote_line).to_have_text(result)
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", "7")
     cell = cell_at(page, 1, 0)
     expect(cell).to_have_attribute("data-letter", "")
     expect(cell).to_have_attribute("data-locked", "false")
     expect(cell).to_have_attribute("data-revealed", "false")
     expect(reveal_letter).to_have_text(fr_text("reveal.letters_left", count=5))
-    elapsed = seconds_until_hidden(page, banner, started)
-    assert VOTE_RESULT_MIN_SECONDS <= elapsed <= VOTE_RESULT_MAX_SECONDS, elapsed

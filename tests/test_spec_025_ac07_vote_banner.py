@@ -4,12 +4,17 @@ It shows the question to everyone, and the buttons to those who can still vote.
 The page is driven with a mocked socket: a FX-01 snapshot in vote mode with `p1`
 (`you`, `Ana`), `p2` (`Bob`) and `p3` (`Cy`), and vote frames built with
 `VoteOpened` and `VoteClosed`. The shared setup is in `spec025_harness`.
+
+Refined by spec 047 (the design's room overlays): `vote.cast` reads « Vote
+enregistré. En attente des autres joueurs… »; when the vote closes the banner is
+gone within 300 ms and never shows `vote-result` (the result time of 2,500 to
+4,500 ms is gone), while `vote-announcement` reads the result; a new vote after a
+closed one shows a new banner with its own question and buttons.
 """
 
 from __future__ import annotations
 
 import re
-import time
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -26,8 +31,6 @@ from nock.protocol import (
     WordTarget,
 )
 from spec025_harness import (
-    VOTE_RESULT_MAX_SECONDS,
-    VOTE_RESULT_MIN_SECONDS,
     MockRoomSocket,
     closed,
     fr_text,
@@ -36,12 +39,12 @@ from spec025_harness import (
     open_room,
     opened,
     player_view,
-    seconds_until_hidden,
     settle,
     snapshot_frame,
 )
 
 VISUALLY_HIDDEN = re.compile(r"(^|\s)visually-hidden(\s|$)")
+BANNER_GONE_MS = 300  # spec 047: "within 300 ms" of the `vote_closed`
 WORD_REVEAL = Reveal(target=WordTarget(row=0, column=2, clue_index=0))
 NEW_KEYS = {
     "vote.question.check_grid": "{name} propose de vérifier la grille.",
@@ -50,7 +53,8 @@ NEW_KEYS = {
     "vote.yes": "Oui",
     "vote.no": "Non",
     "vote.waiting": "En attente des autres joueurs…",
-    "vote.cast": "Vote enregistré.",
+    # Spec 047 (the human's decision P6) changed this value.
+    "vote.cast": "Vote enregistré. En attente des autres joueurs…",
     "vote.result.passed": "Vote accepté.",
     "vote.result.rejected": "Vote refusé.",
     "vote.result.timed_out": "Temps écoulé, vote annulé.",
@@ -130,7 +134,7 @@ def test_ac7_clicking_yes_sends_one_ballot_and_the_buttons_give_way_to_vote_cast
     assert mock.raw_votes() == [{"type": "vote", "vote_id": 1, "yes": True}]
 
 
-def test_ac7_a_closed_vote_shows_its_result_then_the_banner_goes(
+def test_ac7_a_closed_vote_is_announced_and_the_banner_goes_within_300_ms(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_with_bobs_word_vote(page, live_server, fx01_grid)
@@ -138,15 +142,13 @@ def test_ac7_a_closed_vote_shows_its_result_then_the_banner_goes(
     expect(page.get_by_test_id("vote-status")).to_have_text(fr_text("vote.cast"))
     banner = page.get_by_test_id("vote-banner")
 
-    started = time.monotonic()
     mock.send(closed(7, 1, VoteOutcome.PASSED, 2, 3).model_dump_json())
 
+    # Spec 047: the banner leaves at once and never shows a result.
+    expect(banner).to_have_count(0, timeout=BANNER_GONE_MS)
     result = fr_text("vote.result.passed")
-    expect(banner.get_by_test_id("vote-result")).to_have_text(result)
     expect(page.get_by_test_id("vote-announcement")).to_have_text(result)
-    labelled_by(page, "vote-result")
-    elapsed = seconds_until_hidden(page, banner, started)
-    assert VOTE_RESULT_MIN_SECONDS <= elapsed <= VOTE_RESULT_MAX_SECONDS, elapsed
+    expect(page.get_by_test_id("vote-result")).to_have_count(0)
 
 
 def test_ac7_the_announcement_region_is_on_the_page_once_it_has_a_snapshot(
@@ -314,15 +316,15 @@ def test_ac7_the_buttons_are_disabled_while_reconnecting_and_enabled_once_joined
     assert mock.votes() == []
 
 
-def test_ac7_a_new_vote_in_the_result_time_replaces_the_result_at_once(
+def test_ac7_a_new_vote_after_a_closed_one_shows_its_own_banner(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    """Spec 047: there is no result time any more; the closed vote's banner is
+    gone, and the next vote shows a new banner with its question and buttons."""
     mock = open_with_bobs_word_vote(page, live_server, fx01_grid)
     page.get_by_test_id("vote-yes").click()
     mock.send(closed(7, 1, VoteOutcome.REJECTED, 1, 3).model_dump_json())
-    expect(page.get_by_test_id("vote-result")).to_have_text(
-        fr_text("vote.result.rejected")
-    )
+    expect(page.get_by_test_id("vote-banner")).to_have_count(0, timeout=BANNER_GONE_MS)
 
     mock.send(opened(8, 2, "p3", Check(target=GridTarget()), 3).model_dump_json())
 

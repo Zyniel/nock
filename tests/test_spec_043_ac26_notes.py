@@ -13,11 +13,13 @@ the note's look and place, whatever shows; while the banner is on the page it si
 8 px under the banner, uncovered (Decision 25). How long a note shows is tested in
 `test_spec_043_ac26_note_lifetime.py`.
 
-The end of a vote is tested in the reading spec 043's build meets (AC-26's note
-"until spec 047 is built"): the banner keeps spec 025's result time, then exactly
-one note shows, the latest that waited (`Bob : deux`, never `Bob : un`). Spec
-047's build checks the banner leaving within 300 ms and the note of the vote's
-result.
+The end of a vote is tested as spec 047 refines it (AC-26's note "Spec 047's
+build then checks the rest", and spec 047's "Refined specs" row for this
+criterion): once the mock's `vote_closed` comes, `vote-banner` is gone within 300
+ms and exactly one note shows, reading `fr.json["vote.result.passed"]` (the
+newest); neither `Bob : un` nor `Bob : deux` shows. It replaces the reading spec
+043's build met (the banner kept spec 025's result time, then the one note was
+`Bob : deux`).
 
 Also tested, from "3-second notes" and "Edge cases and errors": each kind of
 event line that makes a note (joins, the three departures, a flag and a reveal,
@@ -115,7 +117,6 @@ from spec043_harness import (
 PHONE = (360, 740)
 COMPUTER = (1280, 720)
 REPLACE_AFTER_MS = 1000  # "a flag_changed ... 1,000 ms later"
-BANNER_GONE_TIMEOUT_MS = 10_000  # spec 025's result shows up to 4.5 s
 SETTLE_AFTER_NOTE_MS = 500
 FLAG_GLYPH = "flag"  # the note starts with the flag icon, not a text pictogram
 IDES_CLUE = FX01_CLUE_TEXTS[3]  # « Fatales à César »
@@ -593,23 +594,25 @@ def test_ac26_while_the_vote_banner_shows_messages_make_no_note(
     assert recorded_notes(page) == []
 
 
-def test_ac26_after_the_vote_one_note_shows_and_never_the_older_waiting_one(
+def test_ac26_after_the_vote_one_note_shows_the_result_and_never_a_waiting_one(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
+    """Spec 047 refines the vote part: the banner is gone within 300 ms of the
+    `vote_closed`, and the one note is the vote's result, the newest; neither
+    waiting message shows as a note."""
     page, mock = open_vote(window, live_server, fx01_grid)
     send_and_wait(page, mock, chat_frame(7, "p2", "un"))
     send_and_wait(page, mock, chat_frame(8, "p2", "deux"))
     start_recording_notes(page)
 
-    send_and_wait(page, mock, vote_closed_frame(9))
-    expect(page.get_by_test_id("vote-banner")).to_have_count(
-        0, timeout=BANNER_GONE_TIMEOUT_MS
-    )
+    mock.send(vote_closed_frame(9))
+    expect(page.get_by_test_id("vote-banner")).to_have_count(0, timeout=FOLLOW_MS)
     expect(notes(page)).to_have_count(1)
+    expect(notes(page)).to_have_text(fr_value("vote.result.passed"))
     page.wait_for_timeout(SETTLE_AFTER_NOTE_MS)
 
     texts = recorded_notes(page)
-    assert texts == [fr_format("note.message", name="Bob", text="deux")]
+    assert texts == [fr_value("vote.result.passed")]
 
 
 # ---- Reduced motion --------------------------------------------------------------

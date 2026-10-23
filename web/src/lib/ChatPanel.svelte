@@ -335,7 +335,10 @@
     color: var(--nock-muted);
   }
 
+  /* While I am muted (spec 047): the disabled look, muted text on clue
+     blue-grey. */
   .chat-form input:disabled {
+    color: var(--nock-muted);
     background: var(--nock-clue-bg);
   }
 
@@ -353,8 +356,11 @@
     cursor: pointer;
   }
 
-  /* An empty message keeps the pill's look (spec 043 AC-18). */
+  /* Whenever spec 022 disables it (an empty message, the pacing, a page not
+     joined, a muted player): spec 041's disabled look (spec 047). */
   .chat-send:disabled {
+    color: var(--nock-muted);
+    background: var(--nock-clue-bg);
     cursor: not-allowed;
   }
 

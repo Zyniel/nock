@@ -236,6 +236,15 @@ function settingsLine(snapshot: Snapshot, event: RoomEvent, name: string): LineT
   return { kind: 'settings_changed', text }
 }
 
+// The line of a closed vote (spec 047): how it ended. It names no player.
+function voteLine(event: RoomEvent): LineText | null {
+  const { outcome } = event.message
+  if (outcome === 'passed' || outcome === 'rejected' || outcome === 'timed_out') {
+    return { kind: 'vote', text: t(`vote.result.${outcome}`) }
+  }
+  return null
+}
+
 // The player an event is about: the player who joined, or the event's
 // player_id; null when it names none.
 function playerOfEvent(event: RoomEvent): string | null {
@@ -287,6 +296,9 @@ function lineOf(snapshot: Snapshot, names: Map<string, string>, event: RoomEvent
   }
   if (event.type === 'host_changed') {
     return { kind: 'host_changed', text: t('feed.host_changed', { name }) }
+  }
+  if (event.type === 'vote_closed') {
+    return voteLine(event)
   }
   return null
 }

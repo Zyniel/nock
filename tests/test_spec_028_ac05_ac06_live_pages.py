@@ -10,7 +10,9 @@ Where a test needs a public recap that the stored room does not give (no grid
 number, nicknames with markup), the stored room's share page is opened with its API
 route answered by `page.route`.
 
-The clipboard check is Chromium only (`only_browser("chromium")`).
+The clipboard check is Chromium only (`only_browser("chromium")`). Refined by spec
+047 (the design's room overlays): after the copy, `recap-copied` reads « Lien
+copié » while `recap-copy` still reads « Copier le lien ».
 """
 
 from __future__ import annotations
@@ -194,7 +196,11 @@ def test_ac5_the_copy_button_puts_the_share_url_in_the_clipboard(
 
         copy_button.click()
 
-        expect(copy_button).to_have_text(load_fr()["room.share.copied"])
+        # Spec 047 (the human's decision P16): the line `recap-copied` reads
+        # « Lien copié » while the button keeps « Copier le lien ».
+        fr = load_fr()
+        expect(ana.get_by_test_id("recap-copied")).to_have_text(fr["room.share.copied"])
+        expect(copy_button).to_have_text(fr["room.share.copy"])
         copied = ana.evaluate("navigator.clipboard.readText()")
         assert copied == f"{live_server}/recap/{token}"
     finally:
