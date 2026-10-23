@@ -782,7 +782,10 @@ Content, top to bottom:
      the input with a 1 px rule-grey border, radius 18 px, padding 7 px 12 px; the
      « Envoyer » pill (section 11). Spec 022's chat notes (« Patientez avant
      d'envoyer. », « L'hôte a coupé votre discussion. ») show as one muted line
-     under the input (500 0.85rem/1.3, 12 px left padding), one at a time; while I
+     under the input (500 0.85rem/1.3, 12 px left padding) (Note from the lead,
+     2026-10-23: the screens sheet drew this line at 0.82rem (`.chatnote` in
+     `screens_sheet/style.css`); the sheet was aligned to this 0.85rem, which spec
+     047 AC-12 and the code follow), one at a time; while I
      am muted, the input and « Envoyer » are disabled (section 11) (decided by the human on 2026-10-22, screens sheet P5).
 4. Joueurs (specs 011, 013, 014): padding 10 px 16 px, rows 8 px apart, 0.95rem.
    Each row: player dot; name, « (vous) » after my own (my name weight 700); the
