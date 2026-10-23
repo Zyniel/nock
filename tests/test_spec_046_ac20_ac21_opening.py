@@ -284,6 +284,8 @@ def test_ac20_a_click_on_menu_opens_nothing_and_sends_nothing(
     # that the click did nothing: it stays closed and never takes the focus.
     menu = page.get_by_test_id("menu-button")
     expect(menu).to_have_attribute("aria-expanded", "false")
+    # WebKit never focuses a button on a click, so this check cannot fail there;
+    # the `aria-expanded` check above is the one that does the work in WebKit.
     expect(menu).not_to_be_focused()
 
 
