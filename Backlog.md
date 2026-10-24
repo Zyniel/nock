@@ -95,6 +95,19 @@ an item that must be done first.
 - Out of scope: other new kinds of line.
 - Screens: the stream's line, as the catch-up already draws it.
 
+### B-005 Grid progress on the account
+
+- Status: approved (spec 004's decision 8, approved by the human on
+  2026-10-10: progress shows "on my device or account", the account part
+  waiting for spec 033; never built)
+- Domains: content/library, account/account
+- Waits for: B-001
+- Problem: a grid's « Commencée » or « Terminée » comes only from this
+  device's storage; a signed-in player on another device sees none.
+- In scope: progress read from the account for a signed-in player.
+- Out of scope: progress of guests across devices.
+- Screens: the catalogue's progress pills, as drawn today.
+
 ## Small follow-ups
 
 Taken when a change touches them.

@@ -37,8 +37,8 @@ history.)
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
 | client | `client/hud.md` | the room's top bar, menus, sheets and popover rules | room | 043 |
 
-`product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without criteria goes whole to
-its row; a criterion may be cited by more than one domain (047 AC-13 is cited by
+`product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
+criteria goes whole to its row; a criterion may be cited by more than one domain (047 AC-13 is cited by
 `hints` and `results`, 047 AC-14 by `hints`, `results` and `chat`), and each of them
 states the part its own screens hold.
 
