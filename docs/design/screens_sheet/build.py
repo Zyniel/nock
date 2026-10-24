@@ -1,8 +1,8 @@
 """Build docs/design/screens-sheet.html, the screens sheet of the visual design.
 
 Run `uv run python docs/design/screens_sheet/build.py` after any change of look
-(specs/_design.md section 1, rule 3). The page is static: no script, and the
-width switch is CSS. Never edit the HTML by hand.
+(specs/_design/foundation.md, « Authority », rule 3). The page is static: no
+script, and the width switch is CSS. Never edit the HTML by hand.
 """
 
 from __future__ import annotations
@@ -51,17 +51,11 @@ SHEET = HERE.parent / "screens-sheet.html"
 
 
 def marks(ms: list[str]) -> str:
-    """Return the labels of a screen: citations, decisions, pending."""
+    """Return the labels of a screen: citations, and what is still pending."""
     out = ""
     for m in ms:
         if m.startswith("pending"):
             out += f'<span class="prop">{m}</span>'
-        elif m.startswith("decided spec"):
-            out += f'<a class="dec" href="#p-pending">{m}</a>'
-        elif m == "spec 043 approved":
-            out += f'<a class="dec" href="#d-043">{m}</a>'
-        elif m[0] in "PD" and m[1:].isdigit():
-            out += f'<a class="dec" href="#d-{m}">Decided {m}</a>'
         else:
             out += f'<span class="dec">{m}</span>'
     return out
@@ -105,6 +99,12 @@ def box(inner: str, cap: str) -> str:
 
 PH = "Phone · 360 &times; 720"
 PC = "Computer · 1280 &times; 800"
+
+# Labels citing a design file (specs/_design/) and the full heading of a section.
+L_ENTRY = "pages · Entry and not-found pages"
+L_PLAIN = "pages · Plain pages: account, shared recap, operator"
+L_STATES = "pages · States: opening, loading, empty, error"
+L_SHEETS = "room · Room sheets: host settings and account"
 
 # ---------------------------------------------------------------- catalogue
 
@@ -221,12 +221,12 @@ def catalogue(
         return (
             f'<div class="phone" style="height:auto">'
             f'<div class="dtop">{_brand()}<span '
-            f'class="gname"></span>{right}</div>{main}</'
+            f'class="spacer"></span>{right}</div>{main}</'
             "div>"
         )
     return (
         '<div class="desk" style="height:auto;min-height:800px"><div '
-        f'class="dtop">{_brand()}<span class="gname"></span>{dbtn(None, "Compte")}</di'
+        f'class="dtop">{_brand()}<span class="spacer"></span>{dbtn(None, "Compte")}</di'
         f"v>{main}</div>"
     )
 
@@ -247,7 +247,7 @@ def cat_with_sheet(phone: bool, inner: str) -> str:
     if phone:
         return (
             f'<div class="phone"><div class="dtop">{_brand()}<span '
-            'class="gname"></span><s'
+            'class="spacer"></span><s'
             'pan class="dbtn small" aria-pressed="true">Compte</span></div>'
             f'{body}<div class="ov bottom" style="top:56px;backgroun'
             'd:var(--nock-scrim)"><'
@@ -255,7 +255,7 @@ def cat_with_sheet(phone: bool, inner: str) -> str:
         )
     return (
         f'<div class="desk"><div class="dtop">{_brand()}<span '
-        f'class="gname"></span>{dbtn(None, "Compte", True)}'
+        f'class="spacer"></span>{dbtn(None, "Compte", True)}'
         "</div>"
         f"{body}{desk_dialog(inner)}</div>"
     )
@@ -266,20 +266,19 @@ def sec_catalogue() -> str:
     s = screen(
         "s-cat",
         "Catalogue: « Mes salons », the grids, « Grilles terminées »",
-        ["§10", "specs 004, 029, 032, 033"],
+        ["pages · Catalogue", "specs 004, 029, 032, 033"],
         [
             "The home page <code>/</code>. Drawn unrolled: the page scrolls "
             "as a whole. « Mes salons » appears only when the device "
             "or the account has open rooms; « Grilles terminées » only "
             "when the history holds finished grids. "
             "The generic grid drawing shows on wide windows only (two "
-            "cards per row); a phone has one card per row and no drawing "
-            "(decided 2026-10-17).",
+            "cards per row); a phone has one card per row and no drawing.",
             (
                 '<span class="m">« Jouer » opens a room of one at once (spec '
                 "010); « Reprendre » is secondary once the room is solved; "
                 "« Rejouer » starts the same grid in a new room. Nothing "
-                "else is on this page: no credits (decision D2).</span>"
+                "else is on this page: no credits.</span>"
             ),
         ],
         [
@@ -331,7 +330,7 @@ def sec_catalogue() -> str:
             '<article class="scr" id="s-cat-states"><h3>Catalogue: loading, '
             "empty and error "
         )
-        + marks(["P4"])
+        + marks([L_STATES])
         + (
             '</h3><p class="cap">Strings are fr.json\'s (<code>catalogue.*</code>, '
             "<code>my_rooms.*</code>). The rule for every page of Nock: "
@@ -414,7 +413,7 @@ def sec_entry() -> str:
     a = screen(
         "s-nick",
         "Nickname form",
-        ["§8 Entry pages", "spec 012", "P1"],
+        [L_ENTRY, "spec 012"],
         [
             (
                 "Shown on <code>/r/K7QM2X</code> to a player the room does "
@@ -424,8 +423,7 @@ def sec_entry() -> str:
             ),
             (
                 '<span class="m">On a computer, the phone\'s column is centred, '
-                "420 px wide, 48 px under the top bar: _design.md draws these "
-                "pages on a phone only.</span>"
+                "420 px wide, 48 px under the top bar.</span>"
             ),
         ],
         [("ph", PH + " · error", phone_page(NICK)), ("pc", PC, desk_page(NICK_OK))],
@@ -452,7 +450,7 @@ def sec_entry() -> str:
         screen(
             "s-status",
             "A room that refuses entry",
-            ["§8 Entry pages", "specs 011, 012, 040"],
+            [L_ENTRY, "specs 011, 012, 040"],
             [
                 (
                     "Every refusal uses one card: the status text as its title "
@@ -484,13 +482,12 @@ def sec_entry() -> str:
     c = screen(
         "s-gone",
         "A room that is not found or has expired",
-        ["spec 032", "P3"],
+        [L_ENTRY, "spec 032"],
         [
             (
                 "An expired room is deleted (spec 032) and reads as not found, "
-                "so both share one card. Decided: one muted line explaining "
-                "expiry (a new string), and « Voir les grilles » primary "
-                "since it is the only way on."
+                "so both share one card: one muted line explaining expiry, "
+                "and « Voir les grilles » primary since it is the only way on."
             ),
         ],
         [("ph", PH, phone_page(gone)), ("pc", PC, desk_page(gone))],
@@ -502,13 +499,8 @@ def sec_entry() -> str:
     d = screen(
         "s-404",
         "Page not found",
-        ["§8 Entry pages", "spec 040"],
-        [
-            (
-                "Any other path. No room code line. « Voir les grilles » "
-                "is the addition _design.md already decided."
-            )
-        ],
+        [L_ENTRY, "spec 040"],
+        ["Any other path. No room code line; « Voir les grilles » is primary."],
         [("ph", PH, phone_page(nf)), ("pc", PC, desk_page(nf))],
     )
     extra = specs_entry()
@@ -518,7 +510,7 @@ def sec_entry() -> str:
         "Before the room",
         (
             "Pages shown instead of the room, on the page grey behind "
-            "one white card (§8 « Entry and not-found pages »)."
+            "one white card (pages.md, « Entry and not-found pages »)."
         ),
         a + b + c + d + extra,
     )
@@ -538,13 +530,13 @@ def sec_room() -> str:
     out += screen(
         "s-room",
         "The room in play",
-        ["§8", "§6 cells"],
+        ["room", "cells"],
         [
             "Phone: top bar (timer, Annuler, Aide, Salon with its unread "
             "badge, Clavier pressed, Menu), the grid as large as fits, "
             "the clue bar, the keyboard. A 3-second note from Bruno sits "
             "over the top of the grid. "
-            "Computer: the brand and the grid name, the timer, the buttons "
+            "Computer: the brand, the timer, the buttons "
             "with their labels; the Salon side column open by default, "
             "on Discussion.",
             (
@@ -563,7 +555,7 @@ def sec_room() -> str:
     out += screen(
         "s-salon",
         "Salon: Discussion",
-        ["§8 Salon", "spec 022", "spec 013"],
+        ["room · Salon", "spec 022", "spec 013"],
         [
             (
                 "Phone: a bottom sheet over a scrim, 62 % of the height, "
@@ -577,7 +569,7 @@ def sec_room() -> str:
                 '<span class="m">Computer: the same content is the side column '
                 "(drawn in the room above). Here, the column with Bruno typing "
                 "a message, and the phone with the chat paced (« Patientez "
-                "avant d'envoyer. », P5).</span>"
+                "avant d'envoyer. »).</span>"
             ),
         ],
         [
@@ -601,7 +593,7 @@ def sec_room() -> str:
     out += screen(
         "s-players",
         "Salon: Joueurs, invitation, host's moderation",
-        ["§8 Salon", "specs 011, 013, 014", "P5", "spec 043 approved"],
+        ["room · Salon", "specs 011, 013, 014", "spec 043"],
         [
             (
                 "Each row: dot, name (mine bold with « (vous) »), the « hôte "
@@ -612,18 +604,10 @@ def sec_room() -> str:
                 "» in the Menu opens this tab."
             ),
             (
-                "Host only: « Retirer » and « Couper » / « Rétablir » (spec "
-                "022's chat mute, until now a separate « Sourdine » block "
-                "in the chat panel) as small secondary buttons (P5). A muted "
-                "player sees the message box disabled and « L'hôte a coupé "
-                "votre discussion. »"
-            ),
-            (
-                '<span class="m">The row on two lines (state and clue under '
-                "the name, buttons on the right) is spec 043's, decided by "
-                "the human's approval of spec 043 on 2026-10-22; the sheet's "
-                "P5 had the buttons on a second line (_design.md §15 « Where "
-                "the screens sheet met spec 043 »).</span>"
+                "Host only: « Couper » / « Rétablir » (the chat mute) and « "
+                "Retirer » as small secondary buttons on the right of the "
+                "first line. A muted player sees the message box disabled and "
+                "« L'hôte a coupé votre discussion. »"
             ),
         ],
         [
@@ -649,7 +633,7 @@ def sec_room() -> str:
     out += screen(
         "s-aide",
         "Aide (help menu)",
-        ["§8 Aide menu", "specs 020, 023, 024", "P7"],
+        ["room · Aide menu", "specs 020, 023, 024"],
         [
             (
                 "A popover under « Aide ». The pencil confirm heads the menu "
@@ -659,9 +643,9 @@ def sec_room() -> str:
             (
                 "An item whose budget is spent stays in place, muted, with "
                 "« Plus de lettre » / « Plus de mot » as the detail and does "
-                "nothing (P7). In « par vote » mode the items are the same "
+                "nothing. In « par vote » mode the items are the same "
                 "and start a vote; in « désactivée » mode the menu holds "
-                "the pencil confirm or one muted line (section 4)."
+                "the pencil confirm or one muted line (part 4)."
             ),
         ],
         [
@@ -687,7 +671,7 @@ def sec_room() -> str:
     out += screen(
         "s-menu",
         "Menu",
-        ["§8 Menu", "specs 019, 027, 033"],
+        ["room · Menu", "specs 019, 027, 033"],
         [
             (
                 "Anchored to the right. The three switches with their state "
@@ -695,10 +679,6 @@ def sec_room() -> str:
                 "»), « Inviter », « Réglages de l'hôte » for the host only, "
                 "« Compte », a separator, « Masquer le chrono » and « Retour "
                 "aux grilles ». The hovered item takes word blue."
-            ),
-            (
-                '<span class="m">« Compte » after « Réglages de l\'hôte '
-                "» : the lead's decision of 2026-10-22 (_design.md §15).</span>"
             ),
         ],
         [
@@ -723,7 +703,7 @@ def sec_room() -> str:
     out += screen(
         "s-host",
         "Host settings",
-        ["§8 Room sheets", "spec 014"],
+        [L_SHEETS, "spec 014"],
         [
             (
                 "Menu « Réglages de l'hôte ». Phone: a sheet from under the "
@@ -753,16 +733,16 @@ def sec_room() -> str:
     out += screen(
         "s-react",
         "Reactions and 3-second notes",
-        ["§8 Reactions", "§8 3-second notes", "spec 022"],
+        ["room · Reactions", "room · 3-second notes", "spec 022"],
         [
             (
                 "« Réagir » in the clue bar opens the picker above the clue "
                 "bar; a shown reaction is a white pill over its clue for "
-                "3 s (on a two-clue cell, over its own half: decided 2026-10-22). "
+                "3 s (on a two-clue cell, over its own half). "
                 "Notes: one line on ink, over the top of the grid, 3 s, never "
                 "while the stream is visible. A long note ends with an ellipsis "
-                "on its one line, never wider than the grid's viewport (spec 043 "
-                "WP-2, 2026-10-22). A tap on a note opens the Salon on "
+                "on its one line, never wider than the grid's viewport. "
+                "A tap on a note opens the Salon on "
                 "Discussion, the focus in the message box."
             ),
         ],
@@ -801,13 +781,13 @@ def sec_room() -> str:
     out += screen(
         "s-timer",
         "Timer hidden, new events",
-        ["§8 top bar", "spec 027"],
+        ["room · Phone top bar", "room · Computer top bar", "spec 027"],
         [
             (
                 "« Masquer le chrono » puts « Chrono » in the timer's slot; "
                 "a press shows the timer again. With the Salon closed, new "
                 "events with no unread message light the 8 px red dot on "
-                "« Salon » (on a computer at the badge's place, decided 2026-10-22)."
+                "« Salon » (on a computer at the badge's place)."
             ),
         ],
         [
@@ -822,7 +802,7 @@ def sec_room() -> str:
     out += screen(
         "s-net",
         "Connection lost",
-        ["§8 Connection lost", "spec 017"],
+        ["room · Connection lost", "spec 017"],
         [
             (
                 "A band under the top bar pushes the grid down; the grid "
@@ -835,14 +815,14 @@ def sec_room() -> str:
     out += screen(
         "s-final",
         "A final status after the room showed",
-        ["§8 Connection lost", "spec 043", "specs 014, 040"],
+        ["room · Connection lost", "spec 043", "specs 014, 040"],
         [
             (
                 "Removed by the host, opened in another tab, or the connection "
                 "closed for good, once the room has shown: the status text in a "
                 "band under the top bar, the connection band's look without its "
                 "red dot. The room stays drawn under it. A refusal before the "
-                "room showed is the card of section 2 instead."
+                "room showed is the card of part 2 instead."
             ),
         ],
         [
@@ -877,7 +857,7 @@ def sec_room() -> str:
     out += screen(
         "s-catch",
         "Catch-up after being away",
-        ["§6 catch-up ring", "§8 stream", "spec 034"],
+        ["cells · Catch-up ring", "room · Salon", "spec 034"],
         [
             (
                 "Cells changed while I was away get a 3 px ink ring for 5 "
@@ -909,15 +889,14 @@ def sec_room() -> str:
     out += screen(
         "s-loading",
         "Opening the room",
-        ["P2"],
+        [L_STATES],
         [
             (
-                "Decided: while the room connects or joins (« Connexion… "
+                "While the room connects or joins (« Connexion… "
                 "», « Entrée dans le salon… », the <code>room-status</code> "
                 "strings), the top bar is in place, the grid area holds one "
                 "muted line, no clue bar and no keyboard yet. No spinner, "
-                "no skeleton grid. A refusal then becomes the card of section "
-                "2."
+                "no skeleton grid. A refusal then becomes the card of part 2."
             ),
         ],
         [("ph", PH, loading_ph), ("pc", PC, loading_pc)],
@@ -929,14 +908,14 @@ def sec_room() -> str:
         "Top bar, grid, clue bar, Salon, menus",
         (
             "The core of the game. Nothing but the grid and its bars "
-            "is permanently on screen; the rest opens on demand (§8)."
+            "is permanently on screen; the rest opens on demand (room.md)."
         ),
         out + extra,
     )
 
 
 def focus_rings() -> str:
-    """Return the focus rings drawn inside a container (_design.md section 11)."""
+    """Return the focus rings drawn inside a container (foundation.md)."""
     items = (
         '<div class="pop static"><span class="mi">Auteurs <em>désactivé</em></span>'
         '<span class="mi ring-in">Mots des autres <em>teintés</em></span>'
@@ -974,9 +953,9 @@ def focus_rings() -> str:
     )
     return (
         '<article class="scr" id="s-rings"><h3>Focus rings drawn inside '
-        + marks(["§11 Focus ring", "spec 043", "spec 035 AC-2"])
+        + marks(["foundation · Components", "spec 043", "spec 035 AC-2"])
         + '</h3><p class="cap">The ring is 2 px navy, 2 px outside the control '
-        "(§11), except where a container that scrolls or clips would cut it: "
+        "(foundation.md), except where a container that scrolls or clips would cut it: "
         "there it is drawn inside. On the navy clue bar it is white at -4 px "
         "(drawn with the clue bar).</p>"
         f'<div class="mini">{boxes}</div></article>'
@@ -988,7 +967,7 @@ def desk_room_loading() -> str:
     from chrome import desk_top
 
     return (
-        f'<div class="desk">{desk_top(timer="", pressed=set(), gname="")}'
+        f'<div class="desk">{desk_top(timer="", pressed=set())}'
         '<div class="dbody"><div class="dmain"><p class="loadline">Connexion…</p></di'
         "v></div></div>"
     )
@@ -1028,7 +1007,7 @@ def sec_help() -> str:
     out += screen(
         "s-check",
         "Check",
-        ["§6 letter marks", "§8 stream", "spec 023"],
+        ["cells · Letter marks", "room · Salon", "spec 023"],
         [
             (
                 "Aide &rsaquo; Vérifier &rsaquo; Le mot on « Fin de prière "
@@ -1059,13 +1038,12 @@ def sec_help() -> str:
     out += screen(
         "s-reveal",
         "Reveal",
-        ["§6 revealed notch", "§8 stream", "spec 024"],
+        ["cells · Letter marks", "room · Salon", "spec 024"],
         [
             (
                 "A revealed letter is locked (bold, grey) with the orange-red "
                 "notch at the bottom centre; the stream line is orange-red "
-                "with ▲. The budget left shows in the Aide menu (section "
-                "3)."
+                "with ▲. The budget left shows in the Aide menu (part 3)."
             ),
         ],
         [
@@ -1076,7 +1054,7 @@ def sec_help() -> str:
     out += screen(
         "s-vote",
         "Help by vote",
-        ["§9 Vote", "spec 025", "P6"],
+        ["overlays · Vote", "spec 025"],
         [
             (
                 "A banner over the top of the grid area, with « Oui » / « "
@@ -1084,7 +1062,7 @@ def sec_help() -> str:
                 "notes wait until it goes."
             ),
             (
-                "Decided: once I have voted, the two buttons give way to "
+                "Once I have voted, the two buttons give way to "
                 "a muted « Vote enregistré. En attente des autres joueurs… "
                 "»; the player who asked sees only « En attente des autres "
                 "joueurs… ». The result (« Vote accepté. », « Vote refusé. "
@@ -1094,8 +1072,7 @@ def sec_help() -> str:
             (
                 "« Rien à annuler. » does not wait: during a vote it sits 8 px "
                 "under the banner's bottom edge, same look, layer 6, so the "
-                "banner never covers it (spec 043 Decision 25, the lead, "
-                "2026-10-22)."
+                "banner never covers it."
             ),
         ],
         [
@@ -1128,16 +1105,14 @@ def sec_help() -> str:
     out += screen(
         "s-nohelp",
         "Help switched off",
-        ["spec 025", "spec 043 approved"],
+        ["room · Aide menu", "spec 025", "spec 043"],
         [
             (
                 "Host setting « Aide : désactivée ». « Aide » stays in the "
                 "top bar; its menu holds the pencil confirm when it applies, "
                 "otherwise one muted line « L'aide est désactivée dans ce "
-                "salon. ». Spec 043's version, decided by its approval on "
-                "2026-10-22: the sheet's P7 hid the button, which would leave no way "
-                "to confirm a pencil letter on a computer (_design.md §15). "
-                "The vote result notes are drawn here too."
+                "salon. », so a pencil letter can still be confirmed on a "
+                "computer. The vote result notes are drawn here too."
             ),
         ],
         [
@@ -1195,7 +1170,7 @@ def sec_end() -> str:
     out += screen(
         "s-full",
         "Full but not right",
-        ["§9 End of grid", "spec 026"],
+        ["overlays · End of grid", "spec 026"],
         [
             (
                 "A neutral band between the clue bar and the keyboard, which "
@@ -1217,7 +1192,7 @@ def sec_end() -> str:
     out += screen(
         "s-done",
         "Grid solved",
-        ["§9 End of grid", "spec 026"],
+        ["overlays · End of grid", "spec 026"],
         [
             (
                 "A green band under the clue bar with « Voir le bilan ». "
@@ -1246,7 +1221,7 @@ def sec_end() -> str:
     out += screen(
         "s-rowstat",
         "The status in the clue bar's row",
-        ["§9 End of grid", "spec 026", "spec 043", "spec 044"],
+        ["overlays · End of grid", "spec 026", "spec 043", "spec 044"],
         [
             (
                 "On a touch screen in the sheet layout at most 500 px high, the "
@@ -1274,7 +1249,7 @@ def sec_end() -> str:
     out += screen(
         "s-recap",
         "Recap",
-        ["§9 Recap", "spec 028", "P16"],
+        ["overlays · Recap", "spec 028"],
         [
             (
                 "Opens only when asked. Phone: a sheet over the whole window; "
@@ -1282,9 +1257,9 @@ def sec_end() -> str:
                 "Qui a fait quoi » (no ranking: join order), the share link."
             ),
             (
-                "Decided: after « Copier le lien » the button keeps its label "
+                "After « Copier le lien » the button keeps its label "
                 "and the green « Lien copié » line appears under it, as in "
-                "the Joueurs tab (spec 028 today changes the button's text)."
+                "the Joueurs tab."
             ),
         ],
         [
@@ -1326,14 +1301,14 @@ def sec_end() -> str:
                 '<div class="dialog" style="width:330px;box-shadow:none;border:1px '
                 f'solid var(--nock-line)">{rl}</div>'
             ),
-            "Recap loading (P10).",
+            "Recap loading.",
         )
         + box(
             (
                 '<div class="dialog" style="width:330px;box-shadow:none;border:1px '
                 f'solid var(--nock-line)">{re}</div>'
             ),
-            "Recap unavailable (P10).",
+            "Recap unavailable.",
         )
         + "</div>"
     )
@@ -1341,11 +1316,11 @@ def sec_end() -> str:
     out += screen(
         "s-share",
         "Shared recap page",
-        ["spec 028", "P11"],
+        [L_PLAIN, "spec 028"],
         [
             (
                 "<code>/recap/&lt;token&gt;</code>, opened by anyone with "
-                "the link; no room, no socket. Decided: an entry page (page "
+                "the link; no room, no socket. An entry page (page "
                 "grey, one card) with the time in the recap's large style "
                 "and the team; « Voir les grilles » leads to the catalogue. "
                 "The unavailable recap uses the same card."
@@ -1425,7 +1400,7 @@ def sec_account() -> str:
     out += screen(
         "s-acc-room",
         "Sign-in link, from the room",
-        ["§8 Room sheets", "spec 033"],
+        [L_SHEETS, "spec 033"],
         [
             (
                 "Menu « Compte ». Signed out: e-mail field, « Recevoir le "
@@ -1452,11 +1427,11 @@ def sec_account() -> str:
     out += screen(
         "s-acc-cat",
         "Sign-in link, from the catalogue",
-        ["§10", "spec 033", "P13"],
+        ["pages · Catalogue", L_SHEETS, "spec 033"],
         [
             (
                 "« Compte » in the catalogue's top bar, pressed while open. "
-                "Decided: outside a room the intro "
+                "Outside a room the intro "
                 "is <code>account.signed_out_intro</code> "
                 "(« Recevez par e-mail un lien pour vous connecter. »), since "
                 "<code>account.dialog_intro</code> speaks of « ce salon ». "
@@ -1475,11 +1450,11 @@ def sec_account() -> str:
     out += screen(
         "s-acc-page",
         "Account page and deletion",
-        ["spec 033", "P12"],
+        [L_PLAIN, "spec 033"],
         [
             (
                 "<code>/account</code>, reached by « Gérer mon compte » or "
-                "the e-mailed link. Decided: an entry page with one card "
+                "the e-mailed link. An entry page with one card "
                 "« Mon compte ». Signed in: the address, a link back to the "
                 "last room, « Se déconnecter » and « Supprimer mon compte "
                 "», both secondary."
@@ -1488,7 +1463,7 @@ def sec_account() -> str:
                 "Deletion asks once more in the same card: the warning in "
                 "ink, then « Supprimer définitivement » (primary) and « Garder "
                 "mon compte » (secondary). No red button: red means « look "
-                "here », not « danger » (decision D1)."
+                "here », not « danger »."
             ),
         ],
         [
@@ -1623,23 +1598,23 @@ def sec_ops() -> str:
     )
     dash_ph = (
         f'<div class="phone" style="height:auto"><div class="dtop">{_brand()}<span '
-        'class="gname"></span></div><main class="cat-main" style="background:var(--no'
+        'class="spacer"></span></div><main class="cat-main" style="background:var(--no'
         f'ck-page)">{ops_body(True)}</main></div>'
     )
     dash_pc = (
         '<div class="desk" style="height:auto;min-height:800px"><div '
-        f'class="dtop">{_brand()}<span class="gname"></span></div><main '
+        f'class="dtop">{_brand()}<span class="spacer"></span></div><main '
         'class="cat-main" style="background:var(--nock-page);max-width:none;padding:2'
         f'4px max(24px, calc(50% - 460px))">{ops_body(False)}</main></div>'
     )
     out = screen(
         "s-ops",
         "Operator dashboard and room replay",
-        ["spec 038", "P14", "P15"],
+        [L_PLAIN, "spec 038"],
         [
             (
                 "<code>/ops</code>, for the operator only, with the operator "
-                "token. Decided: the catalogue's frame (top bar with the "
+                "token. The catalogue's frame (top bar with the "
                 "brand only, 920 px column) on the page grey. The token form "
                 "is one card (password field, « Ouvrir », « Jeton refusé. "
                 "» in red)."
@@ -1679,7 +1654,7 @@ def sec_keyboard() -> str:
     out = screen(
         "s-kbd",
         "The in-app keyboard",
-        ["§8 keyboard", "specs 009, 020"],
+        ["room · In-app keyboard", "specs 009, 020"],
         [
             (
                 "AZERTY, three rows: ✎ (pencil), W X C V B N, ⇄ (switch direction), "
@@ -1719,7 +1694,7 @@ def sec_modes() -> str:
     out = screen(
         "s-authors",
         "« Auteurs » mode",
-        ["§7", "spec 019", "spec 045"],
+        ["cells · Auteurs mode", "spec 019", "spec 045"],
         [
             (
                 "Menu « Auteurs ». Each letter in its finder's ink; revealed "
@@ -1732,8 +1707,7 @@ def sec_modes() -> str:
                 "(a phone held sideways with the keyboard shown: 68 px at 568 "
                 "&times; 320), the grid keeps its size and the legend lies over "
                 "its bottom, 8 px above the viewport's edge, on layer 6, letting "
-                "taps through; hiding the keyboard gives the room back (decided "
-                "by the lead on 2026-10-23, spec 045 Decision 8)."
+                "taps through; hiding the keyboard gives the room back."
             ),
         ],
         [
@@ -1756,7 +1730,7 @@ def sec_modes() -> str:
     out += screen(
         "s-access",
         "« Accessibilité » mode",
-        ["§6 player icons", "spec 035"],
+        ["cells · Player icons", "spec 035"],
         [
             (
                 "Menu « Accessibilité ». Each corner triangle becomes the "
@@ -1819,7 +1793,8 @@ def sec_modes() -> str:
                 )
             )
             + "</div>",
-            "One icon per join index, in the player's colour (§6 « Player icons »).",
+            "One icon per join index, in the player's colour (cells.md, « Player "
+            "icons »).",
         )
         + "</div>"
     )
@@ -1849,16 +1824,13 @@ def sec_states() -> str:
             (f"{FLAG_ICO} Dédé bloque sur « Flaire »", "Je bloque."),
             ("▲ Dédé a révélé une lettre", "A reveal."),
             ("→ Bruno a rejoint le salon", "A join; departures with ←."),
-            ("Rien à annuler.", "Annuler with nothing to undo (P9)."),
-            ("Vote accepté.", "A vote's result (P6)."),
+            ("Rien à annuler.", "Annuler with nothing to undo."),
+            ("Vote accepté.", "A vote's result."),
         ]
     )
     bars = box(
         f'<div style="width:330px">{cluebar("", empty=True)}</div>',
-        (
-            "No cell selected yet (P8): the hint; Réagir and Je bloque "
-            "disabled in rule grey (spec 043, approved 2026-10-22)."
-        ),
+        "No cell selected yet: the hint; Réagir and Je bloque disabled in rule grey.",
     ) + box(
         f'<div style="width:330px">{cluebar("Flaire", "↓", pressed=True)}</div>',
         "Je bloque pressed: white button, navy filled flag.",
@@ -1901,7 +1873,7 @@ def sec_states() -> str:
             'style="width:40%"></i><b style="left:40%"></b></div>'
             '<div class="prog" style="padding:0"><span>31 / 54 mots</span><div '
             'class="bar"><i style="width:57%"></i></div></div></div>',
-            "The slider (P15) next to the progress bar it is built from.",
+            "The slider next to the progress bar it is built from.",
         )
     )
     return part(
@@ -1909,8 +1881,9 @@ def sec_states() -> str:
         "10 · Small states",
         "Notes, bars, controls",
         (
-            "The pieces the screens above use, one by one. All from _design.md "
-            "§11 and §8 « States »."
+            "The pieces the screens above use, one by one. All from "
+            "foundation.md, « Components », and pages.md, « States: opening, "
+            "loading, empty, error »."
         ),
         (
             f'<div class="mini">{notes}</div><div class="mini">{bars}</div><div '
@@ -1919,248 +1892,8 @@ def sec_states() -> str:
     )
 
 
-# ---------------------------------------------------------------- later + decisions
-
-
-DECISIONS = [
-    (
-        "P1",
-        "Plain pages on a computer (entry, not found, account page, shared recap)",
-        "_design.md draws these pages at phone width only.",
-        (
-            "The phone's column, centred, at most 420 px wide, 48 px "
-            "under a 56 px top bar (the catalogue's), on the page grey. "
-            "One layout, no new breakpoint."
-        ),
-        "A wide two-column page (more design, more edge cases).",
-    ),
-    (
-        "P2",
-        "The room while it connects and joins",
-        (
-            "<code>room-status</code> strings exist (« Connexion… », "
-            "« Entrée dans le salon… ») but no look."
-        ),
-        (
-            "Top bar in place, one muted line where the grid will be, "
-            "no clue bar or keyboard yet; no spinner, no skeleton."
-        ),
-        "A skeleton grid (would need the grid's size before the snapshot).",
-    ),
-    (
-        "P3",
-        "A room that has expired",
-        "Spec 032 deletes it, so it reads « Ce salon n'existe pas. ».",
-        (
-            "Same card as not found, plus one muted line « Un salon est "
-            "effacé 30 jours après sa dernière modification. » (a new "
-            "fr.json key), with « Voir les grilles » primary."
-        ),
-        "No extra line (no new string; the player may think the link is wrong).",
-    ),
-    (
-        "P4",
-        "Loading, empty and error states of the catalogue and « Mes salons »",
-        (
-            "Strings exist (<code>catalogue.*</code>, <code>my_rooms.*</code>), "
-            "looks do not."
-        ),
-        (
-            "One line where the content will be: muted while loading "
-            "or empty, red on error; a failed « Jouer » puts the red "
-            "line inside its card. « Mes salons » shows nothing while "
-            "it loads and has no section when there is no room."
-        ),
-        "Skeleton cards (more motion, more states to test).",
-    ),
-    (
-        "P5",
-        "Chat moderation and chat notes",
-        (
-            "Spec 022's « Sourdine » block (Couper / Rétablir per player) "
-            "and the notes « Patientez avant d'envoyer. », « L'hôte a "
-            "coupé votre discussion. » have no place in _design.md."
-        ),
-        (
-            "Host's « Couper » / « Rétablir » as small secondary buttons "
-            "beside « Retirer », on a line under each other player's "
-            "row in Joueurs; the notes as one muted line under the message "
-            "box; a muted player's box disabled (clue blue-grey, muted). "
-            "Spec 022 is refined to drop the Sourdine block."
-        ),
-        (
-            "Keep a « Sourdine » block at the bottom of the Discussion "
-            "tab (two places for host tools)."
-        ),
-    ),
-    (
-        "P6",
-        "The vote after one has voted, and its result",
-        "§9 draws the question only.",
-        (
-            "After my vote, « Oui » / « Non » give way to a muted « Vote "
-            "enregistré. En attente des autres joueurs… »; the asker "
-            "sees « En attente des autres joueurs… »; the result is a "
-            "3-second note when the banner goes, and a line in the stream."
-        ),
-        (
-            "Keep the buttons with the chosen one pressed (needs a pressed "
-            "style for buttons)."
-        ),
-    ),
-    (
-        "P7",
-        "Help with no budget left, and help switched off",
-        "_design.md §12 says « Aide » is hidden in « désactivée » mode « to confirm ».",
-        (
-            "Spent items stay, muted and inert, with « Plus de lettre "
-            "» / « Plus de mot » as the detail; in « désactivée » mode "
-            "the Aide button is not drawn."
-        ),
-        (
-            "Hide spent items (the menu changes shape); show Aide disabled "
-            "(a button that does nothing)."
-        ),
-    ),
-    (
-        "P8",
-        "The clue bar before any cell is selected",
-        "<code>clue_bar.empty</code> exists, no look.",
-        (
-            "White hint text « Touchez une case ou une définition. », "
-            "the &lsaquo; &rsaquo; chevrons only; Réagir and Je bloque "
-            "are not drawn until a word is selected."
-        ),
-        "Show them disabled (needs a disabled look on navy, which _design.md lacks).",
-    ),
-    (
-        "P9",
-        "« Rien à annuler. »",
-        "No place for it.",
-        "A 3-second note, as every short message of the room.",
-        "Disable « Annuler » (the top bar would need a disabled look).",
-    ),
-    (
-        "P10",
-        "Recap loading and unavailable",
-        "Strings exist, no look.",
-        (
-            "Inside the sheet or dialog: the title, then a muted « Chargement "
-            "du bilan… », or the red « Le bilan n'est pas disponible. "
-            "», and « Fermer »."
-        ),
-        "",
-    ),
-    (
-        "P11",
-        "The shared recap page <code>/recap/&lt;token&gt;</code>",
-        "Not drawn.",
-        (
-            "An entry page with one card: « Grille terminée », « Grille "
-            "n° 12 » muted, the time in the recap's large style, « Équipe "
-            ": … », primary « Voir les grilles ». The unavailable recap "
-            "uses the same card."
-        ),
-        "",
-    ),
-    (
-        "P12",
-        "Account page <code>/account</code> and deletion",
-        "Not drawn; no « danger » button exists.",
-        (
-            "An entry page with one card « Mon compte »; « Se déconnecter "
-            "» and « Supprimer mon compte » both secondary; the confirmation "
-            "in the same card with « Supprimer définitivement » primary "
-            "and « Garder mon compte » secondary. No red button: red "
-            "keeps its one job (« look here »)."
-        ),
-        (
-            "A red « danger » button variant (a new component and a second "
-            "meaning for red)."
-        ),
-    ),
-    (
-        "P13",
-        "Account sheet outside a room",
-        "<code>account.dialog_intro</code> says « dans ce salon ».",
-        (
-            "On the catalogue, use <code>account.signed_out_intro</code> "
-            "as the intro; keep the dialog's title."
-        ),
-        "",
-    ),
-    (
-        "P14",
-        "Operator page <code>/ops</code>",
-        "Not drawn.",
-        (
-            "The catalogue's frame and column; token form in one card; "
-            "periods as the catalogue's filter chips; one tile per figure "
-            "with fr.json's line as it is; the replay as a list of edits "
-            "beside the grid (reusing the cell styles, no clue text) "
-            "and a step slider."
-        ),
-        "Leave it with browser defaults (it is for one operator).",
-    ),
-    (
-        "P15",
-        "A slider (the replay's step)",
-        "No range control in §11.",
-        (
-            "Built from the progress bar: word-blue track 6 px, navy "
-            "fill, 18 px navy knob, the focus ring of §11. Added to §11 "
-            "as a component."
-        ),
-        "",
-    ),
-    (
-        "P16",
-        "« Lien copié » in the recap",
-        (
-            "Spec 028 changes the button's text; §8 uses a green line "
-            "under the invite button."
-        ),
-        (
-            "One pattern: the button keeps « Copier le lien » and the "
-            "green line « Lien copié » appears, as in Joueurs (spec 028 "
-            "refined)."
-        ),
-        "",
-    ),
-]
-
-OTHER_DECISIONS = [
-    ("D1", "Is a destructive action ever red?", "No. See P12.", ""),
-    (
-        "D2",
-        "Grid credits (spec 005)",
-        (
-            "Credits are not sent to players today, and _design.md §12 "
-            "lists the gap. Recommended: leave them out of the screens "
-            "until a spec sends them; then one muted line on the catalogue "
-            "card (« Auteur : Équipe Nock »)."
-        ),
-        "",
-    ),
-    (
-        "D3",
-        "The sheet's fonts",
-        (
-            "This sheet loads the app's own font "
-            "files from <code>web/node_modules/@fonts"
-            "ource</code> once spec 041's packages are installed, else "
-            "a local copy, else the fallback stack (Segoe UI). Recommended: "
-            "keep it so, never Google."
-        ),
-        "",
-    ),
-]
-
-
 # ---------------------------------------------------------------- specs 044 to 048
-# Screens specs 044 to 048 decide (approved by the human on 2026-10-22, with the
-# recommended answer of each open question). Each answer carries a « decided spec
-# NNN OQn » label and an item in part 13.
+# The screens of specs 044 to 048, drawn at the end of the parts they belong to.
 
 FX02 = HERE.parent.parent.parent / "tests" / "fixtures" / "fx02.json"
 LONG_NAMES = [
@@ -2180,18 +1913,18 @@ def specs_cat() -> str:
     card = cat_card(ITEMS[0], True)
     ph = (
         '<div class="phone" style="height:auto"><div class="dtop">'
-        f'{_brand()}<span class="gname"></span></div><main class="cat-main">'
+        f'{_brand()}<span class="spacer"></span></div><main class="cat-main">'
         f'<div class="clist">{card}</div></main></div>'
     )
     pc = (
-        f'<div class="desk"><div class="dtop">{_brand()}<span class="gname"></span>'
+        f'<div class="desk"><div class="dtop">{_brand()}<span class="spacer"></span>'
         f'</div><main class="cat-main bare"><div class="clist">'
         f"{cat_card(ITEMS[0], False)}</div></main></div>"
     )
     out = screen(
         "s-gridpage",
         "Grid page <code>/g/12</code>",
-        ["§10", "spec 046", "spec 004"],
+        ["pages · Catalogue", "spec 046", "spec 004"],
         [
             "One grid's card in the catalogue's frame: the 56 px brand bar with no "
             "« Compte », no heading, the card alone. On a computer the list keeps "
@@ -2219,13 +1952,13 @@ def specs_cat() -> str:
     out += screen(
         "s-cat-tablets",
         "Catalogue on tablets",
-        ["§10", "spec 046", "decided spec 046 OQ1"],
+        ["pages · Catalogue", "spec 046"],
         [
             "A landscape tablet (1024 &times; 768) is a wide window: two cards per "
             "row, with their drawings, 24 px padding. A portrait tablet (768 &times; "
             "1024) is narrow: one card per row, no drawing, 16 px padding, « Compte » "
             "34 px high.",
-            '<span class="m">Decided (spec 046 Open question 1): « wide » is the '
+            '<span class="m">« Wide » is the '
             "room's threshold for its computer top bar (landscape, at least 900 px "
             "wide, more than 500 px high), so a portrait tablet takes the phone's "
             "form.</span>",
@@ -2243,7 +1976,7 @@ def specs_entry() -> str:
     return screen(
         "s-portrait",
         "Entry pages on a portrait tablet",
-        ["§8 Entry pages", "spec 046", "decided spec 046 OQ1"],
+        [L_ENTRY, "spec 046"],
         [
             "768 &times; 1024 is a narrow window: the phone's 54 px bar (padding "
             "0 14 px) and the phone's page padding (20 px 16 px), the card in a "
@@ -2272,7 +2005,7 @@ def specs_room() -> str:
                 '<div style="width:330px;border:1px '
                 f'solid var(--nock-line)">{compose()}</div>'
             ),
-            "Empty input: « Envoyer » disabled (spec 041's disabled look).",
+            "Empty input: « Envoyer » disabled (the disabled look).",
         )
         + box(
             '<div style="width:330px;border:1px solid var(--nock-line)">'
@@ -2289,7 +2022,7 @@ def specs_room() -> str:
     )
     return (
         '<article class="scr" id="s-send"><h3>Message box '
-        + marks(["§8 Salon", "spec 047"])
+        + marks(["room · Salon", "spec 047"])
         + '</h3><p class="cap">« Envoyer » takes the disabled look whenever spec 022 '
         "disables it: an empty input, pacing, a page not joined, a muted player.</p>"
         f'<div class="mini">{boxes}</div></article>'
@@ -2310,19 +2043,13 @@ def specs_help() -> str:
     return screen(
         "s-vote-end",
         "A vote learned from a snapshot, and the end of a vote",
-        [
-            "§9 Vote",
-            "spec 047",
-            "decided spec 047 OQ1",
-            "decided spec 047 OQ2",
-            "decided spec 047 OQ4",
-        ],
+        ["overlays · Vote", "spec 047"],
         [
             "After a reload or a late join, the page knows the vote but not when it "
-            "opened: the banner has no seconds and no bar (Open question 2).",
+            "opened: the banner has no seconds and no bar.",
             "When the vote closes, the banner leaves at once and never shows the "
-            "result (Open question 1). The result is a muted stream line with no "
-            "pictogram, whatever the outcome (Open question 4), and a 3-second note "
+            "result. The result is a muted stream line with no "
+            "pictogram, whatever the outcome, and a 3-second note "
             "when the stream is not shown.",
         ],
         [
@@ -2350,23 +2077,22 @@ def specs_end() -> str:
     band = box(
         f'<div style="width:320px">{band_done()}</div>',
         "Solved at 320 px: the text wraps, « Voir le bilan » stays whole on the "
-        "right (spec 047 Decision 7).",
+        "right.",
     )
     solved = {"grid_opts": {"solved": True}, "band": "done", "kbd": None, "badge": None}
     out = (
         '<article class="scr" id="s-band320"><h3>The end band on the narrowest '
-        "window " + marks(["§9 End of grid", "spec 047"]) + "</h3>"
+        "window " + marks(["overlays · End of grid", "spec 047"]) + "</h3>"
         f'<div class="mini">{band}</div></article>'
     )
     out += screen(
         "s-recap-left",
         "Recap with a player who left",
-        ["§9 Recap", "spec 047", "decided spec 047 OQ3"],
+        ["overlays · Recap", "spec 047"],
         [
             "A player the page no longer knows keeps their row, name and counts, with "
-            "no dot: an empty slot keeps the names aligned (Open question 3; spec "
-            "028's hatching goes). On a phone the URL box takes the full width and "
-            "« Copier le lien » goes under it, on the left (Decision 9).",
+            "no dot: an empty slot keeps the names aligned. On a phone the URL box "
+            "takes the full width and « Copier le lien » goes under it, on the left.",
         ],
         [
             (
@@ -2405,8 +2131,7 @@ def specs_account() -> str:
             '<div style="width:330px;background:var(--nock-page);pa'
             f'dding:16px;border-radius:6px">{acc}</div>'
         ),
-        "Account page while its first request runs: the title only (decided, spec "
-        "048 Open question 1).",
+        "Account page while its first request runs: the title only.",
     ) + box(
         (
             '<div style="width:330px;background:var(--nock-page);pa'
@@ -2416,7 +2141,7 @@ def specs_account() -> str:
     )
     return (
         '<article class="scr" id="s-loading-pages"><h3>Plain pages while they load '
-        + marks(["§8 States", "spec 048", "decided spec 048 OQ1"])
+        + marks([L_STATES, "spec 048"])
         + f'</h3><div class="mini">{boxes}</div></article>'
     )
 
@@ -2477,26 +2202,19 @@ def specs_ops() -> str:
     )
     ph = (
         f'<div class="phone" style="height:auto"><div class="dtop">{_brand()}<span '
-        'class="gname"></span></div><main class="cat-main" '
+        'class="spacer"></span></div><main class="cat-main" '
         'style="background:var(--nock-page)">'
         f'<h1 class="cat-h">Exploitation</h1>{rep}</main></div>'
     )
     out = screen(
         "s-ops-fx02",
         "Replay of a full-size grid, one column",
-        [
-            "§8 Plain pages",
-            "spec 048",
-            "decided spec 048 OQ3",
-            "decided spec 048 OQ4",
-            "decided spec 048 OQ5",
-        ],
+        [L_PLAIN, "spec 048"],
         [
             "Under 900 px wide the replay is one column: the grid, the slider, the "
-            "step, then the edits (Open question 3). FX-02's 13 columns get 22 px "
-            "cells at 360 px. The cells show pencil, locked and revealed marks (Open "
-            "question 4); the slider is drawn under a transparent native input (Open "
-            "question 5).",
+            "step, then the edits. FX-02's 13 columns get 22 px cells at 360 px. "
+            "The cells show pencil, locked and revealed marks; the slider is drawn "
+            "under a transparent native input.",
         ],
         [("ph", PH + " (unrolled)", ph)],
     )
@@ -2509,18 +2227,17 @@ def specs_ops() -> str:
         + box(
             f'<div style="width:330px" class="card">{form}<p class="loadline" '
             'style="margin:0">Aucune modification dans ce salon.</p></div>',
-            "A room with no edit: the muted line only, no grid, no slider (decided, "
-            "spec 048 Open question 2).",
+            "A room with no edit: the muted line only, no grid, no slider.",
         )
         + box(
             '<div style="width:300px;padding:8px"><div class="range focus"><i '
             'style="width:40%"></i><b style="left:40%"></b></div></div>',
-            "The slider focused with the keyboard: §11's focus ring on the knob.",
+            "The slider focused with the keyboard: the focus ring on the knob.",
         )
     )
     out += (
         '<article class="scr" id="s-ops-states"><h3>Replay states '
-        + marks(["spec 048", "decided spec 048 OQ2"])
+        + marks([L_PLAIN, "spec 048"])
         + f'</h3><div class="mini">{states}</div></article>'
     )
     return out
@@ -2531,11 +2248,11 @@ def specs_kbd() -> str:
     out = screen(
         "s-kbd-low",
         "A phone held sideways, keyboard shown",
-        ["§8 keyboard", "spec 044", "decided spec 044 OQ1"],
+        ["room · In-app keyboard", "spec 044"],
         [
             "A window at most 500 px high with the keyboard shown keeps the sheet "
             "layout; its keys are 28 px high instead of 44 px, so the grid keeps "
-            "about 106 px at 740 &times; 360 (Open question 1). Hidden, the keyboard "
+            "about 106 px at 740 &times; 360. Hidden, the keyboard "
             "gives the window to the column layout.",
         ],
         [
@@ -2549,7 +2266,7 @@ def specs_kbd() -> str:
     out += screen(
         "s-low-column",
         "A phone held sideways, keyboard hidden",
-        ["§8 column layout", "spec 043", "spec 044 Decision 8"],
+        ["room · Low column layout", "spec 043", "spec 044"],
         [
             "With the keyboard hidden, a window at most 500 px high is in the column "
             "layout, but keeps the phone top bar: the computer bar's brand and "
@@ -2580,23 +2297,21 @@ def specs_kbd() -> str:
                 f'solid var(--nock-line)">{phone_top(slot4="pen")}</div>'
             ),
             "A narrow window without touch: no keyboard, « Crayon » in the fourth "
-            "slot (decided, spec 044 Open question 2).",
+            "slot.",
         )
         + box(
             '<div style="width:360px;border:1px solid var(--nock-line)">'
             f'{phone_top(timer="12:34", off={"undo", "kbd"})}</div>',
-            "Solved: « Annuler » and « Clavier » disabled, not removed (decided, "
-            "spec 044 Open question 4).",
+            "Solved: « Annuler » and « Clavier » disabled, not removed.",
         )
         + box(
             f'<div style="width:360px">{keyboard()}</div>',
-            "The keys: ✎ « Crayon », ⇄ « Changer de sens » (decided, spec 044 Open "
-            "question 5), ⌫ « Effacer ».",
+            "The keys: ✎ « Crayon », ⇄ « Changer de sens », ⌫ « Effacer ».",
         )
     )
     out += (
         '<article class="scr" id="s-kbd-slots"><h3>The fourth slot and the keys '
-        + marks(["spec 044", "decided spec 044 OQ2", "decided spec 044 OQ4"])
+        + marks(["room · Phone top bar", "room · In-app keyboard", "spec 044"])
         + f'</h3><div class="mini">{bars}</div></article>'
     )
     return out
@@ -2607,15 +2322,14 @@ def specs_modes() -> str:
     return screen(
         "s-legend-wrap",
         "« Auteurs » with eight long names",
-        ["§7", "spec 045", "decided spec 045 OQ2"],
+        ["cells · Auteurs mode", "spec 045"],
         [
             "The legend wraps onto more lines, each centred, 2 px apart, never "
             "wider than the clue bar (nor, on a phone, the grid area less its 8 px "
             "sides), so its wrapping never narrows the grid; the grid gives it the "
-            "room of each further line, so nothing else moves (Open question 2), "
+            "room of each further line, so nothing else moves, "
             "unless that would leave the grid under 100 px: it then lies over the "
-            "grid's bottom (Decision 8). Spec 045 Open question 1 (no sign of "
-            "authorship beyond colour and the legend) changes nothing drawn.",
+            "grid's bottom. The legend is the only key to the inks.",
         ],
         [
             (
@@ -2627,222 +2341,21 @@ def specs_modes() -> str:
     )
 
 
-DRAFT_OQS = [
-    ("044", "1", "Keys 28 px high on a window at most 500 px high.", "s-kbd-low"),
-    (
-        "044",
-        "2",
-        "Off a touch screen, « Crayon » in the phone top bar's fourth slot.",
-        "s-kbd-slots",
-    ),
-    (
-        "044",
-        "3",
-        "A phone held sideways goes to the column layout once solved.",
-        "s-kbd-low",
-    ),
-    ("044", "4", "« Clavier » disabled, not removed, once solved.", "s-kbd-slots"),
-    ("044", "5", "⇄ is named « Changer de sens ».", "s-kbd-slots"),
-    (
-        "045",
-        "1",
-        (
-            "No sign of authorship beyond the inks "
-            "and the legend (the design of 2026-10-16)."
-        ),
-        "s-legend-wrap",
-    ),
-    (
-        "045",
-        "2",
-        "A long legend wraps, and the grid gives it each further line.",
-        "s-legend-wrap",
-    ),
-    (
-        "046",
-        "1",
-        (
-            "« Wide » is the room's computer threshold; "
-            "a portrait tablet takes the phone's "
-            "form."
-        ),
-        "s-portrait",
-    ),
-    (
-        "046",
-        "2",
-        "The catalogue's « Compte » opens the account sheet or dialog (P13).",
-        "s-acc-cat",
-    ),
-    (
-        "046",
-        "3",
-        "The room's top bar while it opens is drawn as once joined, inert.",
-        "s-loading",
-    ),
-    (
-        "047",
-        "1",
-        (
-            "The banner leaves when the vote closes; "
-            "the result is a note and a stream "
-            "line."
-        ),
-        "s-vote-end",
-    ),
-    (
-        "047",
-        "2",
-        "No seconds and no bar for a vote known only from a snapshot.",
-        "s-vote-end",
-    ),
-    (
-        "047",
-        "3",
-        "A player who left has no dot in the recap, an empty slot kept.",
-        "s-recap-left",
-    ),
-    ("047", "4", "The vote's stream line is muted for every outcome.", "s-vote-end"),
-    (
-        "048",
-        "1",
-        "The account page shows its title only while it loads.",
-        "s-loading-pages",
-    ),
-    ("048", "2", "A replay with no edit shows its muted line only.", "s-ops-states"),
-    (
-        "048",
-        "3",
-        "The replay goes to two columns at a window 900 px wide.",
-        "s-ops-fx02",
-    ),
-    (
-        "048",
-        "4",
-        "The replay's cells show pencil, locked and revealed marks.",
-        "s-ops-fx02",
-    ),
-    (
-        "048",
-        "5",
-        "The slider is drawn by three parts under a transparent native input.",
-        "s-ops-fx02",
-    ),
-]
-
-
-def sec_pending() -> str:
-    """Return part 13: the open questions of specs 044 to 048, decided."""
-    items = "".join(
-        f'<li><span class="q"><span class="dec">decided spec {spec} OQ{q}</span> '
-        f'{text}</span><span class="alt">Drawn: '
-        f'<a href="#{where}">{where}</a></span></li>'
-        for spec, q, text, where in DRAFT_OQS
-    )
-    return part(
-        "p-pending",
-        "13 · Specs 044 to 048",
-        "Their open questions, decided",
-        "The human approved specs 044 to 048 on 2026-10-22 with the recommended "
-        "answer of each open question; each answer is drawn as decided "
-        "(_design.md section 15).",
-        f'<ol class="decisions">{items}</ol>',
-    )
-
-
 def sec_later() -> str:
     """Return part 11, the competitive modes to come."""
     return part(
         "p-later",
         "11 · Later",
-        "Competitive modes (specs 030 and 031)",
-        "Race mode and team mode are approved but queued after the "
-        "design (human, 2026-10-22). They are not drawn here. When "
+        "Competitive modes (B-002)",
+        "Race mode and team mode are not drawn here. When "
         "they come, they reuse the same pieces: "
         "the room's top bar and Salon, a team's colour taken from "
-        "the player colours of §3 (never a new hue), and the recap. "
+        "the player colours of foundation.md (never a new hue), and the recap. "
         "Their new screens (choosing a mode before « Jouer », a score "
         "or "
         "progress per team) will need a page of their own in this sheet.",
         "",
     )
-
-
-def sec_decisions() -> str:
-    """Return the record of the decisions, with the three spec 043 settled."""
-    items = ""
-    for pid, title, now, rec, alt in DECISIONS:
-        a = f'<span class="alt">Not chosen: {alt}</span>' if alt else ""
-        items += (
-            f'<li id="d-{pid}"><span class="q"><span class="dec">{pid}</span> '
-            f"{title}</span>"
-            f'<span class="alt">Before: {now}</span><span class="rec"><b>Decided:</b> '
-            f"{rec}</span>{a}</li>"
-        )
-    for pid, title, rec, _ in OTHER_DECISIONS:
-        items += (
-            f'<li id="d-{pid}"><span class="q"><span class="dec">{pid}</span> '
-            f'{title}</span><span class="rec"><b>Decided:</b> {rec}</span></li>'
-        )
-    pending = ""
-    for title, sheet, spec in MEETS_043:
-        pending += (
-            '<li><span class="q"><span class="dec">spec 043 approved</span> '
-            f"{title}</span>"
-            f'<span class="alt">Set aside: {sheet}</span><span class="rec">'
-            f"<b>Decided:</b> {spec}</span></li>"
-        )
-    return part(
-        "p-decisions",
-        "12 · Decisions",
-        "What this sheet added to _design.md",
-        (
-            "The human accepted every recommended answer of version 1.0 "
-            "on 2026-10-22; _design.md §15 lists them and the sections "
-            "that now carry them."
-        ),
-        f'<ol class="decisions">{items}</ol>'
-        '<h3 id="d-043" style="margin:8px 0 0;font:700 1.1rem/1.3 '
-        'var(--nock-font-ui)">Where the sheet met spec 043</h3>'
-        '<p class="lead">The sheet was drawn from <code>main</code>, before '
-        "spec 043 (room layout) was drafted. On three points the accepted "
-        "answer and spec 043's pick differed; the human approved spec 043 on "
-        "2026-10-22, so its version is decided on all three.</p>"
-        f'<ol class="decisions">{pending}</ol>',
-    )
-
-
-MEETS_043 = [
-    (
-        "The Joueurs row",
-        (
-            "P5: the state and clue on the right of the name, the host's "
-            "buttons on a second line."
-        ),
-        (
-            "spec 043's: the state and clue on a second line under the "
-            "name, the buttons on the right of the first, so the current "
-            "clue never ends in an ellipsis at 340 px."
-        ),
-    ),
-    (
-        "Help mode « désactivée »",
-        "P7: the « Aide » button is not drawn.",
-        (
-            "spec 043's: « Aide » stays and its menu holds the pencil "
-            "confirm or « L'aide est désactivée dans ce salon. »; hiding "
-            "it would leave no way to confirm a pencil letter on a computer."
-        ),
-    ),
-    (
-        "Réagir and Je bloque while nothing is selected",
-        "P8: not drawn.",
-        (
-            "spec 043's: drawn disabled, the icon in rule grey (5.22:1 "
-            "on navy), so the clue bar keeps its shape."
-        ),
-    ),
-]
 
 
 # ---------------------------------------------------------------- page
@@ -2863,7 +2376,6 @@ def header() -> str:
             ("p-kbd", "Keyboard"),
             ("p-modes", "Modes"),
             ("p-states", "States"),
-            ("p-decisions", "Decisions"),
         ]
     )
     routes = [
@@ -2902,8 +2414,6 @@ def build_page() -> str:
         + sec_modes()
         + sec_states()
         + sec_later()
-        + sec_decisions()
-        + sec_pending()
     )
     page = (
         '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'

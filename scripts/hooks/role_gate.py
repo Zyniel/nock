@@ -9,7 +9,9 @@ The test-writer must pass the gate's "tests" stage. The implementer must pass
 a quick gate that fits the hook's time (human decision, 2026-10-16): the static
 checks, every test without a browser, and the browser tests in Chromium of the
 specs the branch changed since `main` (found from the names of the changed
-spec, test and harness files). CI runs everything else.
+spec, test and harness files). CI runs everything else. Since 2026-10-24 a
+changed domain spec, or a changed test or harness file of a domain, names that
+domain (specs/_map.md), and the gate adds the numbered specs it points to.
 
 Exit codes understood by Claude Code:
     0: the agent may stop.
@@ -62,13 +64,19 @@ GATE_TIMEOUT_SECONDS = 1140
 GIT_TIMEOUT_SECONDS = 30
 # The branch the changes are measured from, first the remote one.
 BASE_REFS: tuple[str, ...] = ("origin/main", "main")
-# The paths that name a spec: specs/027-shared-timer.md,
-# tests/test_spec_027_ac05_display.py, tests/spec027_harness.py.
+# The paths that name a numbered spec: specs/027-shared-timer.md, the same in
+# specs/_archive/v1.1.0/, tests/test_spec_027_ac05_display.py,
+# tests/spec027_harness.py.
 SPEC_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^specs/(\d{3})-"),
+    re.compile(r"^specs/_archive/v1\.1\.0/(\d{3})-"),
     re.compile(r"^tests/test_spec_(\d{3})_"),
     re.compile(r"^tests/spec(\d{3})_"),
 )
+# A numbered spec's file name, which is not a domain spec: 027-shared-timer.md.
+NUMBERED_SPEC_NAME_PATTERN = re.compile(r"^\d{3}-")
+# A file kept next to a domain spec, which names no tests.
+NOTES_SUFFIX = ".notes.md"
 # Where the hook keeps, per agent, the fingerprint of the checkout it last
 # blocked (one small file per agent, removed when the gate passes).
 BLOCK_STATE_DIRECTORY = Path(tempfile.gettempdir()) / "nock-role-gate"
@@ -191,21 +199,75 @@ def changed_paths(project_root: Path) -> list[str]:
     return paths
 
 
+def domain_spec_paths(project_root: Path) -> dict[str, str]:
+    """Return the checkout's domain specs: their paths, by domain name.
+
+    A domain spec is a .md file under specs/, except the numbered specs, the
+    notes files and every file or folder whose name starts with "_" (as the
+    gate reads them); its name is the file name without .md.
+
+    Args:
+        project_root: The checkout to read.
+
+    Returns:
+        Repository-relative paths written with "/", by domain name.
+    """
+    specs_directory = project_root / "specs"
+    paths: dict[str, str] = {}
+    if not specs_directory.is_dir():
+        return paths
+    for path in sorted(specs_directory.rglob("*.md")):
+        relative_parts = path.relative_to(specs_directory).parts
+        if any(part.startswith("_") for part in relative_parts):
+            continue
+        if path.name.endswith(NOTES_SUFFIX):
+            continue
+        if len(relative_parts) == 1 and NUMBERED_SPEC_NAME_PATTERN.match(path.name):
+            continue
+        paths[path.stem] = path.relative_to(project_root).as_posix()
+    return paths
+
+
+def names_domain(path: str, domain_name: str, spec_path: str) -> bool:
+    """Tell whether a changed path is a domain's spec, test or harness file.
+
+    Args:
+        path: A repository-relative changed path.
+        domain_name: The domain's name, for example "co-op".
+        spec_path: The domain spec's repository-relative path.
+    """
+    if path == spec_path:
+        return True
+    directory, _, file_name = path.rpartition("/")
+    if directory != "tests":
+        return False
+    prefix = domain_name.replace("-", "_")
+    if file_name == f"test_{prefix}.py":
+        return True
+    return file_name.startswith((f"test_{prefix}_", f"{prefix}_harness"))
+
+
 def changed_specs(project_root: Path) -> list[str]:
-    """Return the numbers of the specs whose spec, tests or harness changed.
+    """Return the numbered specs and domains whose spec, tests or harness changed.
 
     Args:
         project_root: The checkout whose changes are wanted.
 
     Returns:
-        Three-digit spec numbers, sorted; empty when none changed.
+        Three-digit spec numbers, then domain names, sorted; empty when none
+        changed.
     """
+    paths = changed_paths(project_root)
     specs: set[str] = set()
-    for path in changed_paths(project_root):
+    for path in paths:
         for pattern in SPEC_PATH_PATTERNS:
             match = pattern.match(path)
             if match is not None:
                 specs.add(match.group(1))
+    for domain_name, spec_path in domain_spec_paths(project_root).items():
+        for path in paths:
+            if names_domain(path, domain_name, spec_path):
+                specs.add(domain_name)
     return sorted(specs)
 
 

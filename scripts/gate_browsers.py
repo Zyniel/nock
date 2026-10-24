@@ -20,7 +20,9 @@ It also marks every test, so the gate can pick them with `-m` (2026-10-15):
 
 It warms each browser up once, before the first test that uses it (see
 `warm_up_browser`). And with `--nock-specs 027,028` (the gate's `--specs`) it
-leaves out the browser tests of every other spec (2026-10-16).
+leaves out the browser tests of every other spec (2026-10-16). A selector that
+is not a number is a domain's test prefix: `--nock-specs grids,co_op` keeps
+`test_grids_*.py` and `test_co_op_*.py` (2026-10-24, specs/_map.md).
 """
 
 from __future__ import annotations
@@ -96,7 +98,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption(
         "--nock-specs",
         default="",
-        help="Comma-separated spec numbers: run only their browser tests.",
+        help="Comma-separated spec numbers and domain test prefixes: run only "
+        "their browser tests.",
     )
 
 
@@ -180,6 +183,26 @@ def spec_of(item: pytest.Item) -> str | None:
     return match.group(1)
 
 
+def is_selected(item: pytest.Item, selectors: set[str]) -> bool:
+    """Tell whether a test's file belongs to a selected spec or domain.
+
+    Args:
+        item: The test.
+        selectors: Spec numbers, and domain test prefixes: a domain's test files
+            are `test_<prefix>.py` and `test_<prefix>_*.py`.
+    """
+    spec_number = spec_of(item)
+    if spec_number is not None:
+        return spec_number in selectors
+    file_name = item.path.name
+    for selector in selectors:
+        if file_name == f"test_{selector}.py":
+            return True
+        if file_name.startswith(f"test_{selector}_"):
+            return True
+    return False
+
+
 def deselect_other_specs(config: pytest.Config, items: list[pytest.Item]) -> None:
     """Leave out the browser tests of the specs not named in --nock-specs."""
     specs_text = str(config.getoption("--nock-specs"))
@@ -189,7 +212,7 @@ def deselect_other_specs(config: pytest.Config, items: list[pytest.Item]) -> Non
     kept: list[pytest.Item] = []
     deselected: list[pytest.Item] = []
     for item in items:
-        if engine_of(item) is not None and spec_of(item) not in wanted_specs:
+        if engine_of(item) is not None and not is_selected(item, wanted_specs):
             deselected.append(item)
         else:
             kept.append(item)

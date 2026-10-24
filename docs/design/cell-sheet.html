@@ -369,9 +369,9 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       <div>
         <h3>Still open</h3>
         <ul>
-          <li><b>Decided 2026-10-16:</b> tint on other players' words kept, switchable (« Mots des autres »); Auteurs switchable, off by default; Accessibilité mode (icons) switchable, off by default; corners by arrival; a closed column stays closed; no long press on ⌫; grid lines #9AA3B2.</li>
+          <li><b>Settled:</b> tint on other players' words kept, switchable (« Mots des autres »); Auteurs switchable, off by default; Accessibilité mode (icons) switchable, off by default; corners by arrival; a closed column stays closed; no long press on ⌫; grid lines #9AA3B2.</li>
           <li class="new"><b>Deferred, high:</b> the revealed notch is smaller than spec 024 allows.</li>
-          <li><b>Decided:</b> fonts as npm dependencies (@fontsource, self-hosted); letters of a player who has left are drawn in ink.</li>
+          <li><b>Settled:</b> fonts as npm dependencies (@fontsource, self-hosted); letters of a player who has left are drawn in ink.</li>
           <li><b>Open:</b> notch in ink during a flash (applied here, to approve); catalogue thumbnails need clue positions from the API, or go.</li>
         </ul>
       </div>
@@ -540,7 +540,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     <div class="board" style="background:transparent;border:0;padding:0" id="rest-phones"></div>
     <h3 style="margin:8px 0 0;font:600 1.05rem/1.2 var(--f-ui);color:var(--navy)">Catalogue for a returning player (specs 029, 032, 033)</h3>
     <div class="frame-wrap" data-w="1280" data-h="1180"><div class="frame" id="cat-return"></div></div>
-    <p class="note"><strong>Grid drawing on cards (decided 2026-10-17).</strong> A generic grid drawn only from the size the catalogue already sends (width × height): the usual frame of clue cells along the top row and the first column. It shows the grid's proportions, not its real layout, so the API (spec 004) does not change. Shown on wide windows (two cards per row); no drawing on phones, where the card keeps its text only.</p>
+    <p class="note"><strong>Grid drawing on cards.</strong> A generic grid drawn only from the size the catalogue already sends (width × height): the usual frame of clue cells along the top row and the first column. It shows the grid's proportions, not its real layout, so the API (spec 004) does not change. Shown on wide windows (two cards per row); no drawing on phones, where the card keeps its text only.</p>
   </section>
 
   <section>
@@ -660,7 +660,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   /* Auteurs mode: each letter in a darker "ink" of its finder's colour, darkened until it
      reaches 4.5:1 on the darkest background a letter can have (my selected cell). */
   var AUTHORS = false;
-  /* letters of a player who has left: plain ink, like letters with no finder (human, 2026-10-16) */
+  /* letters of a player who has left: plain ink, like letters with no finder */
   var DEPARTED = "#14181F";
   function inkOf(hex) {
     var h = hex.replace("#", ""), rgb = [0, 1, 2].map(function (i) { return parseInt(h.slice(i * 2, i * 2 + 2), 16); });
@@ -1228,7 +1228,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     }
     return rows;
   }
-  /* Generic grid drawing for catalogue cards (human, 2026-10-17): built only from the grid's
+  /* Generic grid drawing for catalogue cards: built only from the grid's
      width and height, which the catalogue already sends; the usual frame of clue cells
      (row 0 and column 0, every other cell) on a white grid. Not the grid's real layout. */
   function genericThumb(W, H, h) {
