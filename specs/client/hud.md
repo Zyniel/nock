@@ -1,0 +1,308 @@
+---
+area: client
+file: hud
+status: draft
+---
+
+# client/hud - The room's frame: top bar, menus, Salon, sheets, notes
+
+## Purpose
+
+Every room page frames the grid with the top bar, two menus, the Salon, the
+room sheets, the clue bar and notes of what the others do, on a phone or a
+computer, never taking the grid's room.
+
+## Depends on
+
+- `product.md`: the supported windows and the accessibility baselines.
+- `gameplay/board.md`: the grid, its fit, the selection, the in-app keyboard.
+- `social/chat.md`: the stream's lines, messages, reactions, the message box.
+
+## Rules
+
+### Layout
+
+1. Once the room shows (from its opening, `client/shell.md`), the page has the
+   column layout when the window is landscape and either at least 900 px wide
+   and more than 500 px high, or at most 500 px high while the in-app keyboard
+   does not show; the sheet layout otherwise. It follows each resize, rotation
+   and change of the keyboard within 300 ms. A change of layout closes the
+   menus and the reaction picker; the Salon takes the new layout's state.
+2. The phone top bar is used in the sheet layout and in the column layout at
+   most 500 px high; the computer top bar otherwise.
+3. Document order: the heading `room.heading` (« Salon <code> »), read but not
+   seen; the top bar; the Aide menu and the Menu; the connection band; the
+   status; the play area (vote banner, notes, grid, clue bar, reaction picker,
+   end band, in-app keyboard); the Salon; the scrim; the sheets and the recap.
+
+### Top bar
+
+4. Phone top bar: the timer slot, « Annuler », « Aide », « Salon », a fourth
+   button, « Menu ». On any touch screen the fourth is « Clavier » and the bar
+   has no « Crayon »; elsewhere it is « Crayon ». There the ✎ key of the in-app
+   keyboard (`gameplay/board.md`) toggles pencil mode, only while the keyboard
+   shows: with the keyboard hidden by « Clavier », the player has no way to
+   change the mode. Computer top bar: the brand, the timer slot, « Annuler »,
+   « Crayon », « Aide », « Salon », « Clavier » on a touch screen only,
+   « Menu ».
+5. A button is named by its label (`room.undo`, `pencil.toggle`, `topbar.aide`,
+   `topbar.salon`, `keyboard.label`, `topbar.menu`), « Salon » as rule 7 says.
+   « Aide », « Salon » and « Menu » expose whether what they control is open,
+   « Crayon » and « Clavier » whether they are pressed. Short of room, the
+   phone bar's buttons shrink equally, never the timer; labels stay whole on
+   one line and the page never scrolls sideways.
+6. Once the room shows, the timer slot holds the timer or, while the player
+   hides it, « Chrono » (`gameplay/rules.md` rule 13).
+7. « Salon » carries the count of unread messages (`social/chat.md` rule 11).
+   With none unread, it shows the new-events dot once an event line about
+   another player was added to the stream since it last showed, a catch-up line
+   (`social/catch-up.md`) included; one's own lines and a closed vote's line
+   never count. Showing the stream clears both. « Salon » is named
+   `topbar.salon_unread` with the count while the badge shows,
+   `topbar.salon_events` (« Salon, nouvelle activité ») while the dot shows,
+   else by its label.
+8. While reconnecting, the connection band `room.banner.offline` shows under the
+   top bar and pushes the play area down. The status line is read but not seen
+   while joined or reconnecting; once the room has shown, any other status is a
+   band under the top bar, without the connection band's dot.
+
+### Menus
+
+9. The Aide menu, a group named `topbar.aide`, holds the pencil confirm and a
+   separator while it applies (`gameplay/co-op.md`); then, unless the help mode
+   is `none`, « Vérifier » and « Révéler » (`gameplay/hints.md`), each a group
+   named by its heading, a separator between; else, when empty, the line
+   `aide.empty` (« L'aide est désactivée dans ce salon. »). « Aide » never
+   leaves the bar. An item that appears while the menu is open moves no focus.
+10. An enabled Aide item closes the menu, focuses « Aide », then sends its
+    request once. A disabled item sends nothing and leaves the menu open, as
+    does an item disabled while it is open.
+11. The Menu, a group named `topbar.menu`, holds in order: the switches
+    « Auteurs », « Mots des autres », « Accessibilité » (`social/presence.md`,
+    `gameplay/board.md`), each with the detail of its state; « Inviter »
+    (`menu.invite`, detail `menu.invite_detail`); « Réglages de l'hôte », for
+    the host only (`lobby/rooms.md`); « Compte » (`account.open`), while
+    accounts are on (`account/account.md`); a separator; `timer.hide` or
+    `timer.toggle_label`; « Retour aux grilles » (`menu.back`), a link to `/`.
+    Details are hidden from screen readers.
+12. A switch flips in place, the Menu open and focused on it. Every other item
+    closes the Menu: « Inviter » opens the Salon on « Joueurs » focused on
+    « Copier le lien »; « Réglages de l'hôte » and « Compte » open their sheet;
+    the timer item hides or shows the timer and focuses « Menu ».
+
+### Popovers
+
+13. A menu's button opens and closes it; opening focuses its first enabled item,
+    else the menu; Escape inside closes it and focuses the button. Column
+    layout: a pointer press outside closes it. Sheet layout: while a menu or
+    the Salon is open a scrim covers the page under the top bar; a tap on it
+    closes them, moving no focus and selecting nothing. At most one of the
+    menus, the Salon sheet and the reaction picker is open; the Salon column is
+    apart. A closed menu stays in the page, hidden, with its items' states. A
+    menu's place follows the top bar's form; its content scrolls inside it.
+
+### Salon
+
+14. The Salon is an aside (a complementary landmark) named `topbar.salon`,
+    hidden while closed; « Salon » opens and closes it and Escape inside
+    focuses « Salon ». Sheet layout: a bottom sheet over the play area, moving
+    nothing, closed at each load; Escape closes it. Column layout: a column
+    right of the play area, which gives or takes its width; open at load unless
+    `nock.salon_closed` is `"true"`, which closing it writes and opening it
+    removes (storage that throws: open at each load); Escape leaves it open.
+15. Opened from « Salon » or a note, it focuses the message box when
+    « Discussion » is selected and the box enabled, else the selected tab; the
+    column opened at load takes no focus.
+16. It holds the progress `salon.progress`: words whose every cell shows a
+    letter, pending edits included, over the grid's words. Then the tabs
+    « Discussion » (`chat.heading`) and `salon.players_tab` (« Joueurs (n) »,
+    n players): only the selected one is a Tab stop, the arrow keys switch;
+    « Discussion » at load, the choice kept for the page's life. The stream
+    shows while the Salon is open on « Discussion ».
+17. « Discussion » holds the stream list, the message box and the chat notes
+    (`social/chat.md`). « Joueurs » holds a row per player in snapshot order,
+    on two lines (colour, name, tags, the host's buttons; state, then the clue
+    of the player's word, `social/presence.md`), then the invitation link
+    (`lobby/rooms.md`). A message starts with its author's player dot only
+    while the author is a player of the room: a message of someone who left,
+    or who never was a player, has none. While « Accessibilité » is on, every
+    player dot, in the stream and in the rows, holds that player's icon
+    (`product.md` rule 15).
+
+### Sheets, clue bar, notes
+
+18. The host's settings and the account are modal sheets named by their title;
+    in the sheet layout the top bar stays seen and inert above. Escape or a
+    press on the backdrop closes one and focuses « Menu »; so does
+    « Enregistrer » once it has sent the settings (`lobby/rooms.md`).
+19. The clue bar holds ‹ `clue_bar.previous`, the clue on one line with its
+    direction, « Réagir », « Je bloque », › `clue_bar.next`. › does what Tab
+    does in the grid, ‹ what Shift+Tab does (`gameplay/board.md`), grid focused
+    or not; a pointer press moves no focus. The reaction picker floats over
+    the grid's bottom; a reaction pill lies on its clue, and a tap on it
+    selects that clue.
+20. While the stream is not shown, a note over the grid tells of another
+    player's message (`note.message`); a live line of a flag, a reveal, a
+    closed vote, a player joining, leaving, removed or timed out, or another
+    player's check (its text after its pictogram); one's own reaction
+    (`note.own_reaction`). Nothing else: no snapshot, no catch-up line. Notes
+    take no room and are hidden from screen readers.
+21. A new note replaces the shown one. A note shows 3 seconds, fades (at once
+    under reduced motion) and leaves; one showing when the stream opens stays
+    its time. A tap on it opens the Salon on « Discussion » and removes it.
+    While the vote banner shows, the newest note waits, then shows once the
+    banner has gone, unless the stream shows by then or the closed vote's note
+    (rule 20) replaces it.
+22. `undo.nothing` (« Rien à annuler. ») has a note's look and place, replaces
+    any note and shows even with the stream shown; under the vote banner while
+    it shows.
+
+### Play area
+
+23. The play area takes what the top bar, bands and Salon column leave: the grid
+    viewport, the clue bar, the end band (`gameplay/rules.md` rule 7) and the
+    in-app keyboard while it shows. In the sheet layout a menu or the Salon
+    moves none of it. Whatever is open, the grid keeps 100 px of height, the
+    page never scrolls, and the top bar and the clue bar stay in the window.
+    The vote banner is drawn over the Salon sheet and the scrim.
+
+### Look
+
+`_design/room.md` (today `specs/_design.md` §8): « Which layout »; « Phone and
+upright tablet (sheet layout) » and « Computer and landscape tablet (column
+layout) » for the top bars and play areas; « Aide menu (« Aide ») »; « Menu
+(« Menu ») »; « Salon »; « 3-second notes »; « Reactions (spec 022) »;
+« Connection lost (spec 017) »; « Room sheets: host settings and account »;
+« Focus and keyboard »; « Layers of the room page ». The end band:
+`_design/overlays.md` (today §9 « End of grid (spec 026) »). Menus, badge,
+buttons, switches: `_design/foundation.md` (today §11 « Components »).
+
+## Acceptance criteria
+
+- **AC-1** On a computer 900 by 600 is the column layout, 899 by 600, 800 by
+  800 and 360 by 740 the sheet; 740 by 360 is the column, but the sheet on a
+  touch screen with its keyboard. Resized from 1280 by 720 to 360 by 740 and
+  back, the layout follows within 300 ms each way, an open Menu closes and the
+  Salon takes each layout's state. (← 043 AC-1)
+- **AC-2** On a computer at 360 by 740 the phone top bar reads « Annuler »,
+  « Aide », « Salon », « Crayon », « Menu » after the timer; at 1280 by 720 the
+  computer one starts with the brand, « Crayon » second; 740 by 360 on a
+  computer has the phone one. Each follows its design section ("Look").
+  (← 043 AC-2, 043 AC-3)
+- **AC-3** At 320 by 568 with the timer at `10:00:00`, at 283 by 640, 568 by
+  320 and 740 by 360, every button lies in the bar, 40 px wide at least, its
+  label whole on one line, the timer on one line clear of « Annuler », with no
+  sideways scroll. Joined, « Salon ABC123 » and the status are read but not
+  seen. (← 043 AC-4)
+- **AC-4** Salon closed, Bob's two messages show the badge `2` and name
+  « Salon » « Salon, 2 messages non lus »; on a new page his check shows the
+  dot, named « Salon, nouvelle activité », then his message the badge instead;
+  showing the stream clears both. On « Joueurs » his lines count the same, on
+  « Discussion » never, nor Ana's own. A return whose catch-up holds Bob's
+  check shows the dot. (← 043 AC-5, 043 AC-17)
+- **AC-5** The socket closes: within 5 s the connection band shows under the top
+  bar and the grid area moves down; rejoined, both are back. After `removed`,
+  « Vous avez été retiré de ce salon. » is a band under the top bar with no
+  dot. Both follow « Connection lost ». (← 043 AC-7)
+- **AC-6** With 5 letters and 1 word left, the Aide menu holds « Vérifier »
+  (« La lettre », « Le mot », « La grille »), a separator, « Révéler » (« La
+  lettre » « 5 restantes », « Le mot » « 1 restant »); with Bob's pencil `T`
+  at (1, 0) selected, « Confirmer la lettre au crayon » and a separator come
+  first; in mode `none` on an empty cell, only « L'aide est désactivée dans ce
+  salon. ». (← 043 AC-8)
+- **AC-7** MIME selected, « Le mot » sends one check of MIME, closes the menu,
+  focuses « Aide » and keeps the selection; so does each item with its request.
+  A disabled « La lettre », or items a vote disables while it is open, send
+  nothing and leave it open. (← 043 AC-9)
+- **AC-8** The host's Menu reads « Auteurs » « désactivé », « Mots des autres »
+  « teintés », « Accessibilité » « désactivée », « Inviter » « lien »,
+  « Réglages de l'hôte », a separator, « Masquer le chrono », « Retour aux
+  grilles » to `/`; a guest has no « Réglages de l'hôte »; with accounts on
+  « Compte » follows it, or « Inviter » for a guest. It hangs where its top bar
+  form's design puts it. (← 043 AC-10)
+- **AC-9** « Accessibilité » turns to « activée », the Menu open and focused on
+  it; by keyboard, Enter on « Menu » focuses « Auteurs » and Enter flips each
+  switch. « Inviter » opens « Joueurs » focused on « Copier le lien ».
+  « Masquer le chrono » puts « Chrono » at the timer's place and focuses
+  « Menu ». (← 043 AC-6, 043 AC-11)
+- **AC-10** « Aide » or « Menu » opens expanded, with the pressed look, focused
+  on its first enabled item; Escape focuses the button; a second press closes.
+  At 1280 by 720 a click on (2, 2) closes the Menu and selects (2, 2), the
+  Salon column staying open. At 360 by 740 a tap on the scrim closes « Aide »,
+  sending and selecting nothing; opening the Menu closes « Aide », opening the
+  Salon the Menu or the picker. A closed « Aide » still holds « La grille ».
+  (← 043 AC-5, 043 AC-12)
+- **AC-11** At 1280 by 720 the Salon is open, unfocused. Closing it writes
+  `nock.salon_closed`, keeps the cells' size and moves the grid right by half
+  the column; reloaded it stays closed; reopened, the key is gone, the message
+  box focused, the grid back. Escape in the box focuses « Salon » and leaves it
+  open. (← 043 AC-13)
+- **AC-12** At 360 by 740 the Salon is closed at load whatever
+  `nock.salon_closed` holds; « Salon » opens the sheet focused on the message
+  box, grid and clue bar unmoved; Escape closes it and focuses « Salon ».
+  (← 043 AC-14)
+- **AC-13** With TAMIS and VIDE full and 3 players the Salon reads « 2 / 8
+  mots », then « 3 / 8 mots » once AMEN is typed, unanswered; « Discussion »
+  is selected beside « Joueurs (3) »; ArrowRight shows « Joueurs », ArrowLeft
+  « Discussion »; a join reads « Joueurs (4) ». (← 043 AC-15)
+- **AC-14** « Discussion » shows messages and event lines in seq order in one
+  list named « Discussion », then the message box and the chat notes. With
+  host Ana on MIME, « Joueurs » shows her row with « (vous) », « hôte » and
+  « Artiste muet », Bob's with « Couper » and « Retirer » inside it, then the
+  link. A message of a player who left has no dot; « Accessibilité » on puts
+  each player's icon in every dot. Each follows « Salon ». (← 043 AC-16, 043 AC-18, 043 AC-19, 043 AC-20,
+  043 AC-30)
+- **AC-15** « Réglages de l'hôte » is a modal sheet named by its title, centred
+  at 1280 by 720, a bottom sheet at 360 by 740 that a tap above closes;
+  « Enregistrer » sends, closes it and focuses « Menu ». « Compte » opens the
+  account sheet alike; Escape focuses « Menu ». Both follow « Room sheets ».
+  (← 043 AC-21, 043 AC-22)
+- **AC-16** MIME selected, the clue bar reads ‹, « Artiste muet » ↓,
+  « Réagir », « Je bloque », ›; with nothing selected the middle two are
+  disabled. With TAMIS full, › selects NAVAL then MIME, ‹ NAVAL; a click on ›
+  while typing leaves the focus on the grid. The picker floats over the grid's
+  bottom; Bob's reaction is a pill drawn on top of IDES's clue.
+  (← 043 AC-23, 043 AC-24, 043 AC-25)
+- **AC-17** At 360 by 740, Bob's `IDES ?` shows « Bob : IDES ? » within
+  300 ms, still at 2.7 s, gone by 3.7 s; his reveal, then his flag 1 s later,
+  replace it; his check makes a note; Ana's message or check, Bob's reaction, a
+  snapshot or catch-up lines make none; Ana's `wow` makes « Vous avez réagi :
+  😮 ». With the stream shown no message or event line makes one.
+  (← 043 AC-26)
+- **AC-18** A tap on a note opens « Discussion » and removes it; a note showing
+  when « Salon » opens the stream stays its time; reduced motion drops the
+  fade. Bob's two messages during a vote make no note; after it only the vote's
+  note shows. « Rien à annuler. » shows with the stream shown, and under the
+  vote banner, uncovered. (← 043 AC-26)
+- **AC-19** With 8 players, at every window of `product.md` on a computer and a
+  touch screen, all closed, the Salon open or a menu open: the grid keeps
+  100 px, nothing scrolls, the top bar, clue bar and what is open lie in the
+  window, each of their buttons is hit at its centre unless the scrim or the
+  Salon sheet covers it, and in the sheet layout the grid viewport stays put.
+  Solved, the end band under the clue bar holds « Voir le bilan », which opens
+  the recap. (← 043 AC-27, 043 AC-28)
+- **AC-20** At 1280 by 720 Tab walks « Annuler », « Crayon », « Aide »,
+  « Salon », « Menu », the grid, the clue bar's buttons, then the Salon, each
+  with its ring; at 360 by 740 in the phone bar's order. From the grid Escape
+  then Tab reaches ‹, Escape then Shift+Tab « Menu ». Every state of the frame
+  passes the scans of `product.md`. (← 043 AC-29, 043 AC-31)
+
+## Edge cases
+
+- A square window is a sheet (AC-1); help mode `none` keeps « Aide » (AC-6).
+- A message wins over the dot (AC-4); a vote never queues notes (AC-18).
+
+## Out of scope
+
+- Dragging the Salon sheet, scrolling to a tapped note's line, announcing
+  other players' actions to screen readers.
+- What items, sheets, lines and rows do: the domains each rule names. The page
+  before the room shows: `client/shell.md`.
+
+## Code
+
+- `web/src/lib/RoomPage.svelte` (layout, overlays, dot, notes, play area) and
+  its parts: `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `Salon`,
+  `PlayersPanel`, `ClueBar`, `RoomNote` (`.svelte`); `windowForm.ts`;
+  `chat.ts` (badge, dot); `roomSession.ts` (what makes a note).
+- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`.
