@@ -180,7 +180,9 @@ Taken when a change touches them.
   tap selects that clue; 043 AC-25 checks only where the pill is drawn).
 - Untested account behaviour the code has: a link token arriving in the URL
   fragment while `/account` already shows signs in; another method on an
-  account route answers 405 while accounts are on (`account/account.md`).
+  account route answers 405 while accounts are on, and 404 while they are off
+  for a method no route has; a failed purge is logged and the sweep goes on
+  (`account/account.md`).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 
