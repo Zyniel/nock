@@ -43,7 +43,7 @@ an item that must be done first.
 
 - Status: building
 - Domains: all (`specs/_map.md`)
-- Branch: feat/rebaseline-content-grids · PR: none yet
+- Branch: feat/b-001-rebaseline · PR: none yet
 - Problem: the numbered specs (2 MB) mix the contract with its history, and a
   role reads about 60k tokens before it starts; the domain specs state the
   current truth.
