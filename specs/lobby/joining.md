@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: done
+status: draft
 ---
 
 # lobby/joining - Joining, resuming and « Mes salons »
@@ -74,24 +74,27 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
    2. else, for a room created from the catalogue on this device (a room record
       whose `grid` is a JSON number), joins at once as a new player with the
       remembered nickname, sent as stored when it passes rule 1's checks after
-      the capitals, else
-      `room.default_nickname` (« Invité »);
-   3. else shows the nickname form, prefilled with the remembered nickname.
+      the capitals, else `room.default_nickname` (« Invité »);
+   3. else shows the nickname form, prefilled with the remembered nickname, as a
+      card under the room code line `room.heading` (« Salon <code> »).
 
    A valid identity is a JSON object whose `player_id`, `resume_token` and
    `nickname` are non-empty strings; anything else counts as absent.
-9. The form applies rule 1's checks after the capitals before it sends: a
-   length break shows
-   `join.error.length`, any other `join.error.characters`, and nothing is sent.
-   The field shows capitals and keeps its value as typed. Submit is disabled while
-   joining; Enter submits. An `invalid_nickname` from the server, whatever sent the
-   join, shows the form again with `join.error.characters`.
+9. The form applies rule 1's checks after the capitals before it sends: a length
+   break shows `join.error.length`, any other `join.error.characters`, announced
+   as an alert, and nothing is sent. The status `room.status.nickname` is read
+   but not seen. The field shows capitals and keeps its value as typed. Submit is
+   disabled while joining; Enter submits. An `invalid_nickname` from the server,
+   whatever sent the join, shows the form again with `join.error.characters`.
 10. Every snapshot stores the identity, `nock.identity.<CODE>`: id, token and the
     nickname the server holds. A join sent from the form, once a snapshot answers
     it, also stores `nock.nickname`, the nickname as sent; a join sent at once
     never does.
 11. `room_full` ends on `room.status.full`, a 4001 close on
-    `room.status.replaced`. Once joined, the roster lists the players in snapshot
+    `room.status.replaced`. Before any snapshot, such a refusal, like those of
+    `lobby/rooms.md`, is the card's title, under the room code line
+    `room.heading` (« Salon <code> »), with one link, `share.home` (« Voir les
+    grilles »), to `/`. Once joined, the roster lists the players in snapshot
     order with their colour, marks one's own row with `roster.you`, and follows
     `player_joined`, `player_state_changed` and `player_left`.
 
@@ -149,10 +152,13 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 
 ### Look
 
-`_design/pages.md`, entry pages and catalogue (today `specs/_design.md` §8
-« Entry and not-found pages » and §10 « Catalogue »); the roster,
-`_design/room.md`, Salon (today §8 « Salon »); player colours,
-`_design/foundation.md` (today §3).
+- The nickname form, its refused field and the refusal card: `_design/pages.md`,
+  entry pages (today `specs/_design.md` §8 « Entry and not-found pages »).
+- « Mes salons » rows: `_design/pages.md`, catalogue (today §10 « Catalogue »);
+  its error line: `_design/pages.md`, states (today §8 « States: opening,
+  loading, empty, error »).
+- The roster: `_design/room.md`, Salon (today §8 « Salon »). Player colours:
+  `_design/foundation.md` (today §3).
 
 ## Acceptance criteria
 
@@ -169,8 +175,9 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
   succeeds. (← 012 AC-1)
 - **AC-4** On the form, `Ana` enters the room and one's own roster row reads
   `Ana`, while `A` shows « Le pseudo doit faire de 2 à 20 caractères. » and sends
-  nothing; typed `ana` shows in capitals and keeps the value `ana`.
-  (← 012 AC-1, 012 AC-8)
+  nothing; typed `ana` shows in capitals and keeps the value `ana`. The form, and
+  its field once refused, follow the entry pages design ("Look").
+  (← 012 AC-1, 012 AC-8, 046 AC-15, 046 AC-16)
 - **AC-5** Joins as `Ana`, `ana`, `Ana`, `Bob`, `Cy`, `Di`, `Ed`, `Flo` give
   colours 0 to 7 and `ANA`, `ANA 2`, `ANA 3`, `BOB`, `CY`, `DI`, `ED`, `FLO`, with
   only the first host; beside `STRAẞE`, `Strasse` is stored `STRASSE`.
@@ -180,7 +187,9 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
   budget and a timer at 0, stopped. (← 012 AC-3)
 - **AC-7** A ninth join gets `room_full`, its socket closes, nobody hears of it
   and the room keeps 8 players; the page shows « Ce salon est complet (8
-  joueurs). ». (← 012 AC-4)
+  joueurs). » as its card's title under « Salon <code> », with one link « Voir
+  les grilles » to `/`, as for `room_locked`, `removed`, too many wrong codes or
+  a 4001 close before any snapshot. (← 012 AC-4, 046 AC-17)
 - **AC-8** After Ana's socket closes, a join with her token and the nickname
   `Autre` is Ana again (same id, `ANA`, colour 0, host), and a reload of her page
   joins without the form as the same player. (← 012 AC-5)
@@ -220,11 +229,13 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
   15-character token, « Mes salons » sends the two valid keys and lists `Grille n°
   2`, `5 × 5`, « Joueurs : Ana, Bob », « Dernière activité : 14 octobre 2026 à
   10:30 » in a browser set to Paris time, and « Reprendre », whose link resumes
-  the room without the form. (← 032 AC-5)
+  the room without the form. While its request waits, or after `[]`, it takes no
+  space and shows no text; a 500 shows « Impossible de charger vos salons. » and
+  the grids still load. (← 032 AC-5, 046 AC-12)
 - **AC-19** « Mes salons » keeps the baselines of `product.md` (today specs 035
   and 006 AC-5): no contrast or language offender, every link reached by Tab with
-  a visible focus, and no horizontal scroll with 8 players of 20 characters.
-  (← 032 AC-6)
+  a visible focus, and no horizontal scroll with 8 players of 20 characters. Its
+  rows follow the catalogue design ("Look"). (← 032 AC-6, 046 AC-11)
 - **AC-20** Ana, timed out, joins with her token as `Autre`: one `player_joined`
   gives back her id, `ANA`, colour 0, her letters and her mute, not the host role;
   if `ana` joined meanwhile she is `ANA 2`, and if Dan took colour 0 she gets 3;
@@ -246,7 +257,6 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 - A socket to an expired code counts as a wrong code (AC-15).
 - More than 100 identities go in several requests, listed in the server's order
   (AC-18).
-
 ## Out of scope
 
 - Changing one's nickname or colour, choosing a colour, keeping the typed case
