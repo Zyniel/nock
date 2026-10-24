@@ -26,8 +26,8 @@ history.)
 | gameplay | `gameplay/hints.md` | check, reveal, the group vote on help | room, overlays | 023, 024, 025; 047 AC-1 to AC-5, AC-13, AC-14 |
 | gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029; 046 AC-13; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
 | gameplay | `gameplay/modes.md` | race, teams (B-002) | | 030, 031 |
-| social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013, 019, 045 |
-| social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 047 AC-12, AC-14 |
+| social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
+| social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 013 AC-7, AC-8; 047 AC-12, AC-14 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
 | content | `content/grids.md` | grid model, grid files, import checks, credits, withdrawal | | 002, 003, 005; 004 AC-5, AC-7 |
 | content | `content/library.md` | what players browse: list, filter, grid page | pages | 004 AC-1 to AC-4, AC-6, AC-7; 046 AC-2, AC-4 to AC-10, AC-14 |
