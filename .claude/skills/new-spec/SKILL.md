@@ -23,17 +23,26 @@ them.
 2. Read `specs/_map.md` and pick the domain files the request touches. More than
    three means it is several changes: say so and propose how to split it.
 3. Read the Purpose and Rules of those files, enough to write the brief.
-4. Add the item to `Backlog.md`, in the format at its top, with status `brief`:
-   the problem in one or two lines, in scope, out of scope, the domain files, the
-   screens it touches, and the open questions. When it changes what a screen
-   looks like, give two or three options with your pick.
-5. Show the user the brief and stop. When they approve it (and pick an option),
+4. Decide whether the request is an architecture decision (CLAUDE.md, "Models
+   and effort"). If it is, delegate the options to the `Plan` agent with
+   `model: "fable"` and `effort: "high"` (Opus at `high` when Fable is not
+   available): the request word for word, the domain files, and "two or three
+   options with their trade-offs and the one you would pick". Its options go in
+   the brief.
+5. Add the item to `Backlog.md`, in the format at its top, with status `brief`:
+   the problem in one or two lines, in scope, out of scope, the domain files,
+   whether it is an architecture decision, the screens it touches, and the open
+   questions. When it changes what a screen looks like, or when it is an
+   architecture decision, give two or three options with your pick.
+6. Show the user the brief and stop. When they approve it (and pick an option),
    set the item to `approved`.
 
 ## 2. Spec change
 
 1. Delegate to the `spec-writer` agent: the item id, its brief word for word, and
-   the user's answers. It does not see this conversation.
+   the user's answers. It does not see this conversation. For an architecture
+   decision, pass `model: "fable"` and `effort: "high"` (Opus at `high` when
+   Fable is not available); otherwise its definition applies.
 2. When it returns, show the user the diff of the specs (`git diff -- specs`), the
    criteria it added, changed or deleted, and its open questions. Send the user's
    answers back to the same spec-writer, then show the result again.

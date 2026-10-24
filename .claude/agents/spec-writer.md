@@ -2,7 +2,8 @@
 name: spec-writer
 description: Writes or changes the domain specs in specs/<area>/<file>.md from an approved brief, with testable acceptance criteria. Use when a brief is approved, when the user answers open questions on a spec change, or when a review finds a problem in a spec.
 tools: Read, Grep, Glob, Write, Edit
-model: inherit
+model: opus
+effort: high
 ---
 
 You write the specs of a spec-first Python project. Nock's behaviour is described

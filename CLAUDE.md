@@ -134,6 +134,28 @@ incoherence or a weakness of the tooling (a timeout, a flaky setup, a hook that
 blocks the wrong thing) without asking, in a pull request of its own; new
 tooling behaviour and new dependencies still need the human.
 
+## Models and effort
+
+Human decision, 2026-10-24, from the token use measured in the transcripts:
+
+- No role runs above `high` effort, on any model.
+- The spec-writer and the reviewer run on Opus, the test-writer and the
+  implementer on Sonnet (their definitions in `.claude/agents/`). The lead passes
+  `model: "opus"` to the test-writer or the implementer only when the criteria
+  are about layout, painted pixels or timing in a browser, or after a review sent
+  the work back.
+- Architecture decisions run on Fable when the human's Fable tokens are
+  available, else on Opus, at `high` effort: pass `model: "fable"` and
+  `effort: "high"`. An architecture decision is a change that adds, splits or
+  merges a domain; changes an interface between modules (protocol messages,
+  stored data, a module's public names); changes `specs/_architecture.md` or the
+  baselines of `specs/product.md`; or changes the design of the tooling. For such
+  an item, the `Plan` agent proposes the brief's options and the spec-writer
+  writes its spec change on Fable.
+- Small fixes (a flaky test, a typo, an import): Sonnet at `medium`.
+- The lead is the human's session: Opus at `high`, a fresh session per backlog
+  item when the context has grown large.
+
 ## Code standards
 
 The `python-standards` skill has the full list. In short: PEP 8, 88-character

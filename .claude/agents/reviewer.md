@@ -2,7 +2,8 @@
 name: reviewer
 description: Read-only review of a finished change against its domain spec. Checks that every acceptance criterion of the change is really tested and really implemented, and runs the quality gate. Use after the implementer reports the tests pass.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: opus
+effort: high
 skills:
   - python-standards
 ---

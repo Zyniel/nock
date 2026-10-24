@@ -27,6 +27,11 @@ should hold only what that agent needs, which is also what keeps a run cheap:
 
 Never ask an agent to read the whole `specs/` folder or the numbered specs.
 
+Models (CLAUDE.md, "Models and effort"): the definitions apply, and no agent runs
+above `high` effort. Pass `model: "opus"` to the test-writer or the implementer
+only when the item's criteria are about layout, painted pixels or timing in a
+browser, or when a review round sent that agent's work back.
+
 ## 1. Check before starting
 
 - The item must be `ready` and each of its domain files `approved`. If not, stop

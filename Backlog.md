@@ -24,6 +24,7 @@ An item looks like this:
 
 - Status: brief
 - Domains: content/grids, content/library
+- Architecture decision: no (or yes: options from the Plan agent on Fable)
 - Criteria: grids AC-20 (new), grids AC-7 (changed), library AC-3 (deleted)
 - Branch: feat/b-NNN-short-name · PR: none yet
 - Problem: one or two lines.
