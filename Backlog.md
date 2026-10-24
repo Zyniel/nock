@@ -42,7 +42,7 @@ an item that must be done first.
 
 ### B-001 Rebaseline v1.1.0 into domain specs
 
-- Status: building
+- Status: done (the human approved every domain file, 2026-10-24)
 - Domains: all (`specs/_map.md`)
 - Branch: feat/b-001-rebaseline · PR: none yet
 - Problem: the numbered specs (2 MB) mix the contract with its history, and a

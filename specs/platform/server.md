@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: draft
+status: done
 ---
 
 # platform/server - Durable rooms, undo, serving and settings

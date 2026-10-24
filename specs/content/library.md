@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: draft
+status: done
 ---
 
 # content/library - The catalogue « Grilles » and the grid page

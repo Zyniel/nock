@@ -1,7 +1,7 @@
 ---
 area: social
 file: presence
-status: draft
+status: done
 ---
 
 # social/presence - Who is here, where, and who wrote what

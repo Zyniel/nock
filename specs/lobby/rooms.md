@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: draft
+status: done
 ---
 
 # lobby/rooms - Solo start, room creation, invitation and host controls

@@ -1,7 +1,7 @@
 ---
 area: content
 file: grids
-status: draft
+status: done
 ---
 
 # content/grids - Grids: model, files, import checks and rights

@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: hints
-status: draft
+status: done
 ---
 
 # gameplay/hints - Check, reveal and the vote on help

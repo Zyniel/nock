@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: draft
+status: done
 ---
 
 # platform/realtime - Room events, reconnection and fair play

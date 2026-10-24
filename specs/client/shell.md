@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: draft
+status: done
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation

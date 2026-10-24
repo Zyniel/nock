@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: draft
+status: done
 ---
 
 # client/hud - The room's frame: top bar, menus, Salon, sheets, notes

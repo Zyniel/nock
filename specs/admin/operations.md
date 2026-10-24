@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: draft
+status: done
 ---
 
 # admin/operations - Logs, retention and the operator pages

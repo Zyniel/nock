@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: board
-status: draft
+status: done
 ---
 
 # gameplay/board - The grid, selection, typing and the in-app keyboard

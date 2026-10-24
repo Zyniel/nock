@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: draft
+status: done
 ---
 
 # lobby/joining - Joining, resuming and « Mes salons »
