@@ -82,6 +82,19 @@ an item that must be done first.
 - Out of scope: the code; what the tests prove.
 - Screens: none.
 
+### B-004 Live "word completed" lines in the Salon's stream
+
+- Status: approved (the human's pick (b) of spec 034's decision 7: add the live
+  line as a later refinement of spec 013; never built)
+- Domains: social/chat, social/catch-up
+- Waits for: B-001
+- Problem: a player who comes back reads « … a complété … » lines in the
+  catch-up, but a player who stayed never sees them: live play adds no such line.
+- In scope: the same word-completed line, added live when a letter completes a
+  word.
+- Out of scope: other new kinds of line.
+- Screens: the stream's line, as the catch-up already draws it.
+
 ## Small follow-ups
 
 Taken when a change touches them.
