@@ -17,7 +17,7 @@ history.)
 
 | Area | File | What it covers | Look | From the v1.1.0 specs |
 | --- | --- | --- | --- | --- |
-| account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033; 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
+| account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033; 029 AC-3, AC-6, AC-7 (server side); 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
 | lobby | `lobby/rooms.md` | solo start, room creation, invitation, host controls | room | 010, 011, 014; 040 AC-7 |
 | lobby | `lobby/joining.md` | guest join, room resume, « Mes salons » | pages | 012, 032; 046 AC-11, AC-12, AC-15 to AC-17 |
 | gameplay | `gameplay/board.md` | grid display, word selection, letter entry, navigation, in-app keyboard | cells, room | 006, 007, 008, 009, 042, 044 |

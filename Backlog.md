@@ -128,6 +128,19 @@ an item that must be done first.
   the current design until the human decides.
 - Open questions: build it, or drop it from the design for good?
 
+### B-007 Pencil mode on a touch phone with the keyboard hidden
+
+- Status: brief (found by the rebaseline's review of `client/hud.md`)
+- Domains: gameplay/co-op, client/hud, gameplay/board
+- Waits for: B-001
+- Problem: the phone top bar has no « Crayon », and the ✎ key lives in the
+  in-app keyboard; once « Clavier » hides the keyboard, a touch phone has no
+  way to turn pencil mode on or off.
+- In scope: a way to change pencil mode with the keyboard hidden.
+- Out of scope: the computer top bar.
+- Screens: the phone top bar or the Aide menu; options to draw.
+- Open questions: is it worth fixing, or is hiding the keyboard rare enough?
+
 ## Small follow-ups
 
 Taken when a change touches them.
@@ -152,6 +165,15 @@ Taken when a change touches them.
   summaries; the force filter makes no new request; the grid page's loading
   line and its non-summary answer; after a chip, only that chip pressed
   (`content/library.md` rules 8, 10, 16 and AC-6).
+- The room page's `closed` status can no longer be reached (a socket lost is
+  `reconnecting` or `connecting`, `platform/realtime.md`), yet
+  `room.status.closed` (« Connexion perdue. ») is still a required key of 040
+  AC-22's test: drop the key and that test entry (`client/shell.md`).
+- No test taps the reaction pill on a clue (`client/hud.md` rule 19 says a
+  tap selects that clue; 043 AC-25 checks only where the pill is drawn).
+- Untested account behaviour the code has: a link token arriving in the URL
+  fragment while `/account` already shows signs in; another method on an
+  account route answers 405 while accounts are on (`account/account.md`).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 
