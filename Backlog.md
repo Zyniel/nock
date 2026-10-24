@@ -168,7 +168,14 @@ Taken when a change touches them.
 - The room page's `closed` status can no longer be reached (a socket lost is
   `reconnecting` or `connecting`, `platform/realtime.md`), yet
   `room.status.closed` (« Connexion perdue. ») is still a required key of 040
-  AC-22's test: drop the key and that test entry (`client/shell.md`).
+  AC-22's test: drop the key and that test entry (`client/shell.md`). Likewise
+  046 AC-23's test still checks that `my_rooms.loading`, `my_rooms.empty` and
+  `account-link` are absent, and 043 AC-31's that 043's removed keys are:
+  history no spec states; drop those entries once the numbered specs are
+  archived.
+- Untested client details: binary frames ignored by the room page; `t()`
+  placeholders; a `{"seq": 6}` frame without type cannot be told from event 6
+  in 040 AC-19's test (`client/shell.md` rules 2, 3 and 5).
 - No test taps the reaction pill on a clue (`client/hud.md` rule 19 says a
   tap selects that clue; 043 AC-25 checks only where the pill is drawn).
 - Untested account behaviour the code has: a link token arriving in the URL
