@@ -4,7 +4,7 @@ Not a spec. The gate traces the domain specs and the numbered specs; it never
 reads a file or folder whose name starts with `_`.
 
 Nock's behaviour is described by domain specs: one file per domain, grouped in
-eight areas, each saying what is true now. Every role reads this file first, then
+areas (eight today), each saying what is true now. Every role reads this file first, then
 only the files its task names, their `Depends on` files and the design file they
 cite.
 
@@ -12,6 +12,12 @@ cite.
 design files only, accessibility and performance as baselines in `product.md`,
 operations as their own domain, and specs that state the current truth with no
 history.)
+
+The eight areas fit Nock as it is now; they are not a closed list. When a change
+brings a coherent group of behaviour that no area holds, a new area or domain
+file is added, and an area or file that grows apart may be split. Adding,
+splitting or merging is an architecture decision: the human approves it, and the
+table, the naming rules and the glossary follow in the same change.
 
 ## Areas
 
@@ -129,8 +135,8 @@ then nothing of race or teams is built.
 
 - Specs are written in English with the usual terms of online games; the UI is in
   French. The glossary below maps them.
-- An area is a lowercase singular noun: `account`, `lobby`, `gameplay`, `social`,
-  `content`, `admin`, `platform`, `client`.
+- An area is a lowercase singular noun: today `account`, `lobby`, `gameplay`,
+  `social`, `content`, `admin`, `platform`, `client`.
 - A domain file is a kebab-case noun: `co-op.md`, `catch-up.md`.
 - A criterion is named by its file and number: `grids AC-3`.
 
