@@ -25,7 +25,7 @@ history.)
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
 | gameplay | `gameplay/hints.md` | check, reveal, the group vote on help | room, overlays | 023, 024, 025; 047 AC-1 to AC-5, AC-13, AC-14 |
 | gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029; 046 AC-13; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
-| gameplay | `gameplay/modes.md` | race, teams (B-002) | | 030, 031 |
+| gameplay | `gameplay/modes.md` | race, teams (B-002, not written yet) | | 030, 031 (untested stubs) |
 | social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
 | social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 013 AC-7, AC-8; 047 AC-12, AC-14 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
@@ -38,12 +38,12 @@ history.)
 | client | `client/hud.md` | the room's top bar, menus, sheets and popover rules | room | 043 |
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
-criteria goes whole to its row; a criterion may be cited by more than one domain (047 AC-13 is cited by
-`hints` and `results`, 047 AC-14 by `hints`, `results` and `chat`), and each of them
-states the part its own screens hold.
+criteria goes whole to its row; a criterion may be cited by more than one domain
+(047 AC-13 is cited by `hints` and `results`, 047 AC-14 by `hints`, `results` and
+`chat`), and each of them states the part its own screens hold.
 
-A file of the table that does not exist yet is pending: until it is written, the
-numbered specs it lists are the truth for that domain.
+Every file of the table exists but `gameplay/modes.md`, which B-002 writes; until
+then nothing of race or teams is built.
 
 ## Shared files
 
@@ -108,12 +108,11 @@ numbered specs it lists are the truth for that domain.
 
 ### The numbered specs of v1.1.0
 
-- `002-...` to `048-...` are the build record of v1.1.0 and are never edited
-  again. While one sits in `specs/`, the gate checks it as before.
-- Once every criterion of it that has a test is cited by a domain spec, it moves
-  to `specs/_archive/v1.1.0/`. From then the gate fails when a criterion of an
-  archived spec that has a test is cited by no domain spec: no tested behaviour
-  may lose its owner. An archived criterion with no test left is retired.
+- `002-...` to `048-...`, in `specs/_archive/v1.1.0/`, are the build record of
+  v1.1.0 and are never edited again.
+- The gate fails when a criterion of an archived spec that has a test is cited by
+  no domain spec: no tested behaviour may lose its owner. An archived criterion
+  with no test left is retired.
 
 ### What a spec holds
 

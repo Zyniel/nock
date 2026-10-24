@@ -188,6 +188,7 @@ Taken when a change touches them.
 - Comments in `tests/spec04[2346]_harness.py` and in `web/src` (`app.css`,
   `RoomTopBar.svelte` and others) still cite `specs/_design.md` by section;
   point them to `specs/_design/<file>.md` when a change touches them.
+  `README.md` (its workflow section, `/feature specs/NNN-name.md`),
   `docs/build-plan.md` and `docs/handoff.md` describe the old workflow: archive
   or rewrite them (implementer's area).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
