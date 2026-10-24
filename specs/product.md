@@ -81,7 +81,7 @@ every `/api/ops` path 404 whatever the method.
     the gate and CI run each engine: `CLAUDE.md`.
 11. The windows are phones from 300 by 480, upright and sideways, tablets upright
     and landscape, and computers up to 1920 by 1080. Which layout each gets:
-    `_design/room.md` (today `specs/_design.md` §8 « Which layout »).
+    `_design/room.md`, « Which layout ».
 
 ### Accessibility baselines
 
@@ -172,8 +172,9 @@ every `/api/ops` path 404 whatever the method.
 
 ### Look
 
-The focus ring, colour pairs, fonts and icons: `_design/foundation.md` (today
-`specs/_design.md` §1 to §5 and §13).
+The focus ring, colour pairs, fonts and icons: `_design/foundation.md`
+(« Components », « Focus », « Colour tokens », « Typography », « Icons », « How
+conformance is checked »).
 
 ## Acceptance criteria
 
@@ -275,7 +276,8 @@ The focus ring, colour pairs, fonts and icons: `_design/foundation.md` (today
 
 - Real screen readers, an accessibility engine such as axe-core, other
   languages, right-to-left layouts, keyboard shortcuts beyond the grid's (Ctrl+Z
-  undo). Reduced motion: `_design/foundation.md`, `client/shell.md`.
+  undo). Reduced motion: `_design/room.md` (« 3-second notes »),
+  `client/shell.md`.
 - Real phones and networks; Firefox and WebKit timings; load beyond 8 players a
   room or many rooms at once; bundle size budgets.
 - Limits per address: `lobby/rooms.md`, `admin/operations.md`. The environment

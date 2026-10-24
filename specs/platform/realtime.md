@@ -176,8 +176,7 @@ earns it.
 
 ### Look
 
-The connection band follows `_design/room.md`, « Connection lost » (today
-`specs/_design.md` §8 « Connection lost (spec 017) »).
+The connection band follows `_design/room.md`, « Connection lost ».
 
 ## Acceptance criteria
 

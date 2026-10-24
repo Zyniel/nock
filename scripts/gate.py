@@ -95,8 +95,8 @@ CRITERION_END_PATTERN = re.compile(r"^\s*$|^\s*[-*]\s|^#")
 STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("ruff (lint)", ["ruff", "check", "."]),
     ("black (format)", ["black", "--check", "--diff", "--quiet", "."]),
-    # The visual reference stays what its sources build (specs/_design.md
-    # section 1, rule 3; human decision, 2026-10-22).
+    # The visual reference stays what its sources build (specs/_design/
+    # foundation.md, « Authority »; human decision, 2026-10-22).
     (
         "screens sheet (up to date)",
         ["python", "docs/design/screens_sheet/build.py", "--check"],

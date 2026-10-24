@@ -1,4 +1,4 @@
-"""The sheet's style: _design.md tokens, fonts and components, and the sheet chrome."""
+"""The sheet's style: the design files' tokens, fonts and components, and chrome."""
 
 from __future__ import annotations
 

@@ -54,12 +54,14 @@ an item that must be done first.
   numbered specs to `specs/_archive/v1.1.0/`.
 - Out of scope: any change of behaviour or code; compacting the tests (B-003).
 - Screens: none (the screens sheet's captions follow the design split).
-- The design split also: aligns `_design.md` §8 « States »'s note on state
-  lines with v1.1.0 (16 px; no role on a waiting line, nor on the catalogue's
-  and « Mes salons »'s load-error lines; `role="alert"` only on the error line
-  of a failed action); takes the clue bar's minimum width (320 px) into
-  `_design/room.md`; takes the grid's name in the computer top bar out of the
-  current design (B-006).
+- The design split also: states the state lines as v1.1.0 draws them (a line
+  standing for a page is 16 px with no role, the catalogue's and « Mes
+  salons »'s load errors included; inside a card, sheet or dialog, waiting and
+  done lines are `role="status"`, error lines `role="alert"`; a failed
+  action's error line is `role="alert"`); takes the phone top bar's 40 px
+  buttons and the clue bar's minimum width (320 px) into `_design/room.md`;
+  takes the grid's name in the computer top bar out of the current design
+  (B-006).
 
 ### B-002 Phase 8: race and team modes
 
@@ -183,6 +185,11 @@ Taken when a change touches them.
   account route answers 405 while accounts are on, and 404 while they are off
   for a method no route has; a failed purge is logged and the sweep goes on
   (`account/account.md`).
+- Comments in `tests/spec04[2346]_harness.py` and in `web/src` (`app.css`,
+  `RoomTopBar.svelte` and others) still cite `specs/_design.md` by section;
+  point them to `specs/_design/<file>.md` when a change touches them.
+  `docs/build-plan.md` and `docs/handoff.md` describe the old workflow: archive
+  or rewrite them (implementer's area).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 

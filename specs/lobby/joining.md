@@ -153,12 +153,11 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 ### Look
 
 - The nickname form, its refused field and the refusal card: `_design/pages.md`,
-  entry pages (today `specs/_design.md` §8 « Entry and not-found pages »).
-- « Mes salons » rows: `_design/pages.md`, catalogue (today §10 « Catalogue »);
-  its error line: `_design/pages.md`, states (today §8 « States: opening,
-  loading, empty, error »).
-- The roster: `_design/room.md`, Salon (today §8 « Salon »). Player colours:
-  `_design/foundation.md` (today §3).
+  « Entry and not-found pages ».
+- « Mes salons » rows: `_design/pages.md`, « Catalogue »; its error line:
+  « States: opening, loading, empty, error ».
+- The roster: `_design/room.md`, « Salon ». Player colours:
+  `_design/foundation.md`, « Player colours ».
 
 ## Acceptance criteria
 

@@ -42,7 +42,7 @@ ROLE_WRITE_PATHS: dict[str, list[str]] = {
 # files and folders such as .npmrc, .gitignore and .vscode/ (fnmatch's "*" also
 # matches "/").
 ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
-    # docs/design/ is the visual reference, drawn with specs/_design.md by the
+    # docs/design/ is the visual reference, drawn with specs/_design/ by the
     # spec-writer before tests and code (human decision, 2026-10-22).
     "implementer": [
         "docs/design/*",

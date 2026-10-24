@@ -158,13 +158,11 @@ help is wanted. The host can mute a player's chat and reactions.
 
 ### Look
 
-- `_design/cells.md`, « Clue cells » (today `specs/_design.md` §6): the
-  marker. `_design/foundation.md`: the flag icon (today §5), the disabled
-  « Envoyer » (today §11).
-- `_design/room.md` (today §8): the clue bar of « Phone and upright tablet
-  (sheet layout) » for « Réagir » and « Je bloque »; « Salon » for the stream,
-  the message box, the notes and « Couper »; « Reactions (spec 022) » and
-  « Layers of the room page » for the picker and a shown reaction.
+- `_design/cells.md`, « Clue cells »: the marker. `_design/foundation.md`: the
+  flag icon (« Icons »), the disabled « Envoyer » (« Components »).
+- `_design/room.md`: « Clue bar » for « Réagir » and « Je bloque »; « Salon »
+  for the stream, the message box, the notes and « Couper »; « Reactions » and
+  « Layers » for the picker and a shown reaction.
 
 ## Acceptance criteria
 

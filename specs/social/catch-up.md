@@ -102,9 +102,8 @@ their players.
 
 ### Look
 
-A highlighted cell, `_design/cells.md`, « Catch-up ring » and « Drawing order »
-(today `specs/_design.md` §6 « Catch-up ring (spec 034) » and « Drawing order »);
-the stream's event lines, `_design/room.md`, Salon (today §8 « Salon »).
+A highlighted cell, `_design/cells.md`, « Catch-up ring » and « Drawing order »;
+the stream's event lines, `_design/room.md`, « Salon ».
 
 ## Acceptance criteria
 

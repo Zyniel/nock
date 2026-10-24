@@ -127,17 +127,15 @@ fonts, focus ring, shared components, state lines).
 
 ### Look
 
-- Tokens, player colours and inks: `_design/foundation.md` (today
-  `specs/_design.md` §2 « Colour tokens », §3 « Player colours »). Fonts: §4
-  « Typography ». Icons: §5 « Icons ». Components and focus ring: §11
-  « Components ». The scans: §13 « How conformance is secured ».
-- Grid cells in token colours and the flash: `_design/cells.md` (today §6
-  « Letter cell backgrounds », « Letter marks », « Clue cells », « Direction
-  arrows »).
-- Entry frame, cards and page not found: `_design/pages.md` (today §8 « Entry
-  and not-found pages »); the opening and state lines: today §8 « States:
-  opening, loading, empty, error »; the plain pages: today §8 « Plain pages:
-  account, shared recap, operator ».
+- Tokens, player colours and inks: `_design/foundation.md`, « Colour tokens »,
+  « Player colours ». Fonts: « Typography ». Icons: « Icons ». Components and
+  focus ring: « Components ». The scans: « How conformance is checked ».
+- Grid cells in token colours and the flash: `_design/cells.md`, « Letter cell
+  backgrounds », « Letter marks », « Clue cells », « Direction arrows ».
+- Entry frame, cards and page not found: `_design/pages.md`, « Entry and
+  not-found pages »; the opening and state lines: « States: opening, loading,
+  empty, error »; the plain pages: « Plain pages: account, shared recap,
+  operator ».
 
 ## Acceptance criteria
 

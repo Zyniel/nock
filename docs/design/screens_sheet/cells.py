@@ -47,7 +47,7 @@ def mix(hexv: str, pct: float) -> str:
     return out
 
 
-# ---------- icons (_design.md section 5) ----------
+# ---------- icons (foundation.md, « Icons ») ----------
 def svg(inner: str, cls: str = "") -> str:
     """Return a 24-unit outline icon."""
     c = f' class="{cls}"' if cls else ""
@@ -124,7 +124,7 @@ def dot(p: int, access: bool = False) -> str:
     return f'<i class="pdot" style="background:var(--player-colour-{p})"></i>'
 
 
-# ---------- arrows (_design.md section 6) ----------
+# ---------- arrows (cells.md, « Direction arrows ») ----------
 ARROWS = {
     "right": '<path d="M2 12H15"/><polygon points="14,7.5 22,12 14,16.5"/>',
     "down": '<path d="M12 2V15"/><polygon points="7.5,14 12,22 16.5,14"/>',
@@ -143,7 +143,7 @@ def fmt(v: float) -> str:
 
 
 def arrow_svg(kind: str, style: str) -> str:
-    """Return a direction arrow (section 6) with its box style."""
+    """Return a direction arrow (cells.md) with its box style."""
     return (
         '<svg class="arw" viewBox="0 0 24 24" '
         f'style="{style}" aria-hidden="true">{ARROWS[kind]}'
@@ -254,7 +254,7 @@ FLAG_CELL = (
 
 
 def cell(o: dict, s: float) -> str:
-    """Return one grid cell (section 6)."""
+    """Return one grid cell (cells.md)."""
     cls = ["c", *list(o.get("cls", []))]
     style = ""
     tint = o.get("tint")
@@ -607,7 +607,7 @@ def big_rows(s: int, **o: object) -> list[list[dict]]:
 
 
 def generic_thumb(w: int, h: int, px: int) -> str:
-    """Return the catalogue's generic grid drawing (section 10)."""
+    """Return the catalogue's generic grid drawing (pages.md, « Catalogue »)."""
     c = px / h
     wpx = round(c * w)
     out = (

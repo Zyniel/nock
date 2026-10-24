@@ -168,14 +168,14 @@ computer, never taking the grid's room.
 
 ### Look
 
-`_design/room.md` (today `specs/_design.md` §8): « Which layout »; « Phone and
-upright tablet (sheet layout) » and « Computer and landscape tablet (column
-layout) » for the top bars and play areas; « Aide menu (« Aide ») »; « Menu
-(« Menu ») »; « Salon »; « 3-second notes »; « Reactions (spec 022) »;
-« Connection lost (spec 017) »; « Room sheets: host settings and account »;
-« Focus and keyboard »; « Layers of the room page ». The end band:
-`_design/overlays.md` (today §9 « End of grid (spec 026) »). Menus, badge,
-buttons, switches: `_design/foundation.md` (today §11 « Components »).
+`_design/room.md`: « Which layout »; « Phone and upright tablet (sheet
+layout) » and « Computer and landscape tablet (column layout) » for the play
+areas, with « Phone top bar », « Clue bar », « Computer top bar » and « Low
+column layout »; « Aide menu »; « Menu »; « Salon »; « 3-second notes »;
+« Reactions »; « Connection lost »; « Room sheets: host settings and account »;
+« Layers ». The end band: `_design/overlays.md`, « End of grid ». Menus, badge,
+buttons, switches: `_design/foundation.md`, « Components »; the focus in menus
+and sheets, « Focus ».
 
 ## Acceptance criteria
 

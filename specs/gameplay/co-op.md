@@ -111,11 +111,10 @@ uncertain until any player confirms it.
 ### Look
 
 The flash, `_design/cells.md` « Letter cell backgrounds »; pencil, locked and
-revealed letters, `_design/cells.md` « Letter marks » (today `specs/_design.md`
-§6); the confirm item, `_design/room.md` « Aide menu »; the pencil toggle and the
-✎ key, `_design/room.md`'s top bars and in-app keyboard (today §8 « Phone and
-upright tablet (sheet layout) » and « Computer and landscape tablet (column
-layout) »).
+revealed letters, `_design/cells.md` « Letter marks »; the confirm item,
+`_design/room.md` « Aide menu »; the pencil toggle and the ✎ key,
+`_design/room.md` « Phone top bar », « Computer top bar » and « In-app
+keyboard ».
 
 ## Acceptance criteria
 

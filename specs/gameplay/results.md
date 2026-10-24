@@ -143,13 +143,10 @@ grids in « Grilles terminées », where a grid can be played again.
 
 ### Look
 
-The band: `_design/overlays.md`, « End of grid » (today `specs/_design.md` §9
-« End of grid (spec 026) »). The dialog: `_design/overlays.md`, « Recap » (today
-§9 « Recap (spec 028) »). The share page: `_design/pages.md`, plain pages and
-states (today §8 « Plain pages: account, shared recap, operator (specs 028, 033,
-038) », « States: opening, loading, empty, error »). « Grilles terminées »:
-`_design/pages.md`, « Catalogue » (today §10 « Catalogue (spec 004, with 029,
-032, 033) »).
+The band: `_design/overlays.md`, « End of grid ». The dialog:
+`_design/overlays.md`, « Recap ». The share page: `_design/pages.md`, « Plain
+pages: account, shared recap, operator » and « States: opening, loading, empty,
+error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
 
 ## Acceptance criteria
 

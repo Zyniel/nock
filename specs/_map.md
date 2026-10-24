@@ -61,8 +61,7 @@ numbered specs it lists are the truth for that domain.
   Auteurs mode), `room.md` (the room page: layouts, top bar, Aide, Menu, Salon,
   notes, reactions, connection lost, sheets, layers), `overlays.md` (vote, end of
   grid, recap), `pages.md` (catalogue, entry and not-found pages, plain pages,
-  loading, empty and error states). Until they exist, `_design.md` is the look.
-  The drawings are in `docs/design/`.
+  loading, empty and error states). The drawings are in `docs/design/`.
 - `_template.md`: the format of a domain spec.
 - `_archive/v1.1.0/`: the numbered specs once their domains are written.
 - `Backlog.md`, at the repository root: the work queue (briefs, the status of

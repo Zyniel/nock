@@ -147,11 +147,9 @@ a reveal budget and, in vote mode, a majority of the players.
 
 ### Look
 
-The Aide groups, `_design/room.md`, « Aide menu » (today `specs/_design.md` §8
-« Aide menu (« Aide ») »); the strike and the notch, `_design/cells.md`, « Letter
-marks » (today §6); the banner, `_design/overlays.md`, « Vote » (today §9 « Vote
-(spec 025) »), on its layer of `_design/room.md`, « Layers » (today §8 « Layers of
-the room page »).
+The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
+`_design/cells.md`, « Letter marks »; the banner, `_design/overlays.md`, « Vote »,
+on its layer of `_design/room.md`, « Layers ».
 
 ## Acceptance criteria
 

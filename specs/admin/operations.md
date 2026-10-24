@@ -171,12 +171,12 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 ### Look
 
 - The page frame, token form, dashboard, chips, tiles, replay and its two layouts:
-  `_design/pages.md`, plain pages (today `specs/_design.md` §8 « Plain pages:
-  account, shared recap, operator (specs 028, 033, 038) »).
-- The state lines: `_design/pages.md`, states (today §8 « States: opening,
-  loading, empty, error »).
-- The replay's cells: `_design/cells.md` (today §6 « Grid cells »); the slider and
-  buttons: `_design/foundation.md`, components (today §11 « Components »).
+  `_design/pages.md`, « Plain pages: account, shared recap, operator ».
+- The state lines: `_design/pages.md`, « States: opening, loading, empty,
+  error ».
+- The replay's cells: `_design/cells.md`, « Grid lines and empty cells » and
+  « Letter marks »; the slider and
+  buttons: `_design/foundation.md`, « Components ».
 
 ## Acceptance criteria
 

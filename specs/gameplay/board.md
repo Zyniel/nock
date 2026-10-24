@@ -145,17 +145,16 @@ AZERTY keyboard replaces the system one, and the player may hide it.
 
 ### Look
 
-- `_design/cells.md` (today `specs/_design.md` §6): « Grid lines and empty
-  cells »; « Letter cell backgrounds » (the first state that applies wins);
-  « Letter marks » (bold locked letter, strike, notch, ink during a flash);
-  « Catch-up ring (spec 034) »; « Other players on a cell », « Player icons »;
-  « Clue cells » (text, separator, active clue, flag); « Direction arrows »;
-  « Drawing order »; each mark's least size.
-- `_design/room.md` (today §8): the clue bar, keyboard (✎'s pencil look, low
-  keys) and « Clavier » in « Phone and upright tablet (sheet layout) » and
-  « Computer and landscape tablet (column layout) »; « Menu (« Menu ») ».
-- Fonts, focus ring: `_design/foundation.md` (today §4, §8 « Focus and
-  keyboard »).
+- `_design/cells.md`: « Grid lines and empty cells »; « Letter cell
+  backgrounds » (the first state that applies wins); « Letter marks » (bold
+  locked letter, strike, notch, ink during a flash); « Catch-up ring »; « Other
+  players on a cell », « Player icons »; « Clue cells » (text, separator, active
+  clue, flag); « Direction arrows »; « Drawing order »; each mark's least size.
+- `_design/room.md`: « Clue bar »; « In-app keyboard » (✎'s pencil look, low
+  keys, « Clavier »); « Phone top bar », « Computer top bar », « Low column
+  layout »; « Menu ».
+- Fonts, focus ring: `_design/foundation.md`, « Typography », « Components »,
+  « Focus ».
 
 ## Acceptance criteria
 

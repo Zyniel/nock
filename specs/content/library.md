@@ -124,11 +124,10 @@ answer.
 
 - The brand bar and column of both pages, the filter chips, the cards, their
   progress pills, force marks and drawing, and « Jouer »: `_design/pages.md`,
-  « Catalogue » (today `specs/_design.md` §10 « Catalogue (spec 004, with 029,
-  032, 033) »), with the components of `_design/foundation.md` (today §11
-  « Components »: card, list row, status pill, filter chip, error line).
-- The state lines: `_design/pages.md`, states (today §8 « States: opening,
-  loading, empty, error »).
+  « Catalogue », with `_design/foundation.md`, « Components » (card, list row,
+  error line).
+- The state lines: `_design/pages.md`, « States: opening, loading, empty,
+  error ».
 
 ## Acceptance criteria
 

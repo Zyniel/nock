@@ -140,14 +140,12 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 
 ### Look
 
-- Cursors: `_design/cells.md`, « Other players on a cell » (today
-  `specs/_design.md` §6 « Other players on a cell »); tints and my selection:
-  « Letter cell backgrounds » (today §6 « Letter cell backgrounds »).
+- Cursors: `_design/cells.md`, « Other players on a cell » and « Player
+  icons »; tints and my selection: « Letter cell backgrounds ».
 - Inks, the legend, its room and its place over the grid: `_design/cells.md`,
-  « Auteurs mode » (today §7 « Auteurs mode »); its layer: `_design/room.md`,
-  « Layers » (today §8 « Layers of the room page »).
-- Roster rows and state words: `_design/room.md`, Salon (today §8 « Salon »).
-  Player colours and inks: `_design/foundation.md` (today §3).
+  « Auteurs mode »; its layer: `_design/room.md`, « Layers ».
+- Roster rows and state words: `_design/room.md`, « Salon ». Player colours and
+  inks: `_design/foundation.md`, « Player colours ».
 
 ## Acceptance criteria
 

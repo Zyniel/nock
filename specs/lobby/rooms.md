@@ -141,14 +141,11 @@ its help; the role passes on when the host stays away.
 
 ### Look
 
-« Jouer » and its error: `_design/pages.md`, « Catalogue » (today
-`specs/_design.md` §10). Joueurs rows, host buttons and link: `_design/room.md`,
-« Salon » (today §8 « Salon »); the Menu entry, « Menu » (today §8 « Menu
-(« Menu ») »); the host sheet, « Room sheets » (today §8 « Room sheets: host
-settings and account »); a final status once the room has shown, the status band
-of « Connection lost » (today §8 « Connection lost (spec 017) »); before, the entry
-card of `lobby/joining.md` rule 11, `_design/pages.md` (today §8 « Entry and
-not-found pages »).
+« Jouer » and its error: `_design/pages.md`, « Catalogue ». Joueurs rows, host
+buttons and link: `_design/room.md`, « Salon »; the Menu entry, « Menu »; the
+host sheet, « Room sheets: host settings and account »; a final status once the
+room has shown, the status band of « Connection lost »; before, the entry card of
+`lobby/joining.md` rule 11, `_design/pages.md`, « Entry and not-found pages ».
 
 ## Acceptance criteria
 

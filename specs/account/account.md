@@ -173,14 +173,11 @@ and turns the player into « Ancien joueur » in every room.
 
 ### Look
 
-- The sheet: `_design/room.md` (today `specs/_design.md` §8 « Room sheets:
-  host settings and account »).
-- The catalogue's « Compte »: `_design/pages.md` (today §10 « Catalogue (spec
-  004, with 029, 032, 033) »).
-- The account page and its deletion: `_design/pages.md` (today §8 « Plain
-  pages: account, shared recap, operator (specs 028, 033, 038) »).
-- Its lines: `_design/pages.md` (today §8 « States: opening, loading, empty,
-  error »).
+- The sheet: `_design/room.md` « Room sheets: host settings and account ».
+- The catalogue's « Compte »: `_design/pages.md` « Catalogue ».
+- The account page and its deletion: `_design/pages.md` « Plain pages:
+  account, shared recap, operator ».
+- Its lines: `_design/pages.md` « States: opening, loading, empty, error ».
 
 ## Acceptance criteria
 

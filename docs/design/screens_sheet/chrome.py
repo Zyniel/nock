@@ -189,7 +189,7 @@ def legend(
     """Return the Auteurs legend; it wraps onto more lines (spec 045).
 
     over: True lays it over the bottom of the grid's viewport, where its room
-    would leave the grid under 100 px (spec 045 Decision 8).
+    would leave the grid under 100 px (cells.md, « Auteurs mode »).
     """
     who = names_of or FOUR
     names = " ".join(
@@ -231,7 +231,7 @@ def phone_room(
     final_status: the text of the status band under the top bar (spec 043);
     row_state: True shows the full-but-wrong status in the clue bar's row;
     legend_over: True lays the Auteurs legend over the grid's bottom and gives
-    it no room (spec 045 Decision 8).
+    it no room (cells.md, « Auteurs mode »).
     """
     width, height = size
     low = height <= 500
@@ -420,7 +420,7 @@ def salon_sheet(**kw: object) -> str:
 def aide_menu(
     pencil: bool = False, letters: int = 4, words: int = 1, none: bool = False
 ) -> str:
-    """Return the Aide menu's items (_design.md section 8)."""
+    """Return the Aide menu's items (room.md, « Aide menu »)."""
     h = ""
     if pencil:
         h += (
@@ -658,9 +658,8 @@ def desk_top(
     newdot: bool = False,
     aide: bool = True,
     kbd: bool = False,
-    gname: str = "Grille n° 12 · Force 3",
 ) -> str:
-    """Return the computer top bar of the room."""
+    """Return the computer top bar of the room: no grid name (room.md)."""
     pressed = pressed if pressed is not None else {"salon"}
     extra = (
         f'<span class="badge">{badge}</span>'
@@ -672,7 +671,7 @@ def desk_top(
         if timer is not None
         else dbtn("chrono", "Chrono")
     )
-    h = f'<div class="dtop">{brand()}<span class="gname">{gname}</span>{t}'
+    h = f'<div class="dtop">{brand()}<span class="spacer"></span>{t}'
     h += dbtn("undo", "Annuler", off="undo" in pressed) + dbtn(
         "pen", "Crayon", "pen" in pressed, off="pen-off" in pressed
     )
@@ -703,7 +702,7 @@ def desk_room(
     clue: tuple = ("Fin de journée", "→"),
     final_status: str | None = None,
 ) -> str:
-    """A computer room, 1280 x 800 (_design.md section 8, column layout).
+    """A computer room, 1280 x 800 (room.md, column layout).
 
     final_status: the text of the status band under the top bar (spec 043).
     """
@@ -815,7 +814,6 @@ def desk_page(
     right: str = "",
     layer: str = "",
     page: bool = True,
-    extra_top: str = "",
     size: tuple[int, int] = (1280, 800),
     narrow: bool = False,
 ) -> str:
@@ -826,7 +824,6 @@ def desk_page(
         right: The top bar's right side.
         layer: An overlay over the page.
         page: The page grey (else white).
-        extra_top: Text after the brand.
         size: The frame's width and height.
         narrow: The narrow form (54 px bar, phone padding), spec 046.
     """
@@ -840,10 +837,7 @@ def desk_page(
             f'<div class="desk"{st}>{bar}<div class="dscreen narrow">{body}</div>'
             f"{layer}</div>"
         )
-    bar = (
-        f'<div class="dtop">{brand()}<span class="gname">{extra_top}</span>{right}</di'
-        "v>"
-    )
+    bar = f'<div class="dtop">{brand()}<span class="spacer"></span>{right}</div>'
     cls = "dscreen" if page else "dscreen white"
     st = f' style="width:{size[0]}px;height:{size[1]}px"' if size != (1280, 800) else ""
     return f'<div class="desk"{st}>{bar}<div class="{cls}">{body}</div>{layer}</div>'

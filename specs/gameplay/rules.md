@@ -114,11 +114,10 @@ for every player, measures the room's playing time from the first letter typed.
 
 ### Look
 
-The status, `_design/overlays.md`, « End of grid » (today `specs/_design.md` §9
-« End of grid (spec 026) »). The timer and « Chrono », `_design/room.md`, the top
-bar of each layout and « Menu » (today §8 « Phone and upright tablet (sheet
-layout) », « Computer and landscape tablet (column layout) », « Menu (« Menu ») »);
-its figures and the chrono icon, `_design/foundation.md` (today §4 and §5).
+The status, `_design/overlays.md`, « End of grid ». The timer and « Chrono »,
+`_design/room.md`, « Phone top bar », « Computer top bar » and « Menu »; its
+figures and the chrono icon, `_design/foundation.md`, « Typography » and
+« Icons ».
 
 ## Acceptance criteria
 
