@@ -17,25 +17,29 @@ history.)
 
 | Area | File | What it covers | Look | From the v1.1.0 specs |
 | --- | --- | --- | --- | --- |
-| account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033, 048 (account page), 038 (player data) |
-| lobby | `lobby/rooms.md` | solo start, room creation, invitation, host controls | room | 010, 011, 014 |
-| lobby | `lobby/joining.md` | guest join, room resume, « Mes salons » | pages | 012, 032 |
+| account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033; 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
+| lobby | `lobby/rooms.md` | solo start, room creation, invitation, host controls | room | 010, 011, 014; 040 AC-7 |
+| lobby | `lobby/joining.md` | guest join, room resume, « Mes salons » | pages | 012, 032; 046 AC-11, AC-12, AC-15 to AC-17 |
 | gameplay | `gameplay/board.md` | grid display, word selection, letter entry, navigation, in-app keyboard | cells, room | 006, 007, 008, 009, 042, 044 |
 | gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, pencil letters | cells | 015, 016, 020 |
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
-| gameplay | `gameplay/hints.md` | check, reveal, the group vote on help | room, overlays | 023, 024, 025 |
-| gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029, 047, 048 (shared recap) |
-| gameplay | `gameplay/modes.md` | race, teams | | 030, 031 |
+| gameplay | `gameplay/hints.md` | check, reveal, the group vote on help | room, overlays | 023, 024, 025; 047 AC-1 to AC-5, AC-13, AC-14 |
+| gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029; 046 AC-13; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
+| gameplay | `gameplay/modes.md` | race, teams (B-002) | | 030, 031 |
 | social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013, 019, 045 |
-| social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022 |
+| social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 047 AC-12 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
-| content | `content/grids.md` | grid model, grid files, import checks, credits, withdrawal | | 002, 003, 005, 004 (grid files) |
-| content | `content/library.md` | what players browse: list, filter, grid page | pages | 004, 046 |
-| admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038, 048 (`/ops`) |
-| platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037 |
-| platform | `platform/server.md` | durable state, serving, environment settings | | 018, 040 (server side) |
-| client | `client/shell.md` | client routing, loading, empty and error states | pages, foundation | 040 (client side), 048 (state lines) |
+| content | `content/grids.md` | grid model, grid files, import checks, credits, withdrawal | | 002, 003, 005; 004 AC-5, AC-7 |
+| content | `content/library.md` | what players browse: list, filter, grid page | pages | 004 AC-1 to AC-4, AC-6, AC-7; 046 AC-2, AC-4 to AC-10, AC-14 |
+| admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038 AC-3 to AC-11; 048 AC-6 to AC-12 |
+| platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
+| platform | `platform/server.md` | durable state, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29 |
+| client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
 | client | `client/hud.md` | the room's top bar, menus, sheets and popover rules | room | 043 |
+
+`product.md` takes 035 and 036. A numbered spec named without criteria goes whole to
+its row; a criterion may be cited by more than one domain (047 AC-13 and AC-14 are
+cited by `hints` and `results`).
 
 A file of the table that does not exist yet is pending: until it is written, the
 numbered specs it lists are the truth for that domain.
