@@ -64,10 +64,12 @@ uncertain until any player confirms it.
 
 ### Pencil mode and confirming
 
-7. Pencil mode is off at each page load. « Crayon » (`pencil.toggle`) in the top
-   bar, except on a touch screen in the sheet layout, and the ✎ key of the in-app
-   keyboard wherever the keyboard shows (`gameplay/board.md`) flip the one mode
-   and show it pressed. « Crayon » is disabled once the grid is solved.
+7. Pencil mode is off at each page load. « Crayon » (`pencil.toggle`) in the
+   top bar, absent from the phone top bar on any touch screen
+   (`client/hud.md` rule 4; B-007 in `Backlog.md`), and the ✎ key of the
+   in-app keyboard wherever the keyboard shows (`gameplay/board.md`) flip the
+   one mode and show it pressed. « Crayon » is disabled once the grid is
+   solved.
 8. Typing L on a cell that is not locked: if the cell already shows L with the
    mode's pencil flag, nothing is sent; else the cell shows L with that flag at
    once and the page sends `pencil_edit` (mode on) or `edit_letter` (mode off).
@@ -145,19 +147,19 @@ keyboard ».
   each round's two events in one seq order, and the server and both hold the
   higher seq's letter. On the page with my `A` pending, my `A` at seq 6 then p2's
   `B` at seq 7 shows `B`; p2's `B` then my `A` shows `A`. (← 016 AC-1)
-- **AC-7** With my `T` at (1, 0), me colour 0 and p2 colour 3, p2's `A` flashes the
-  cell in colour 3 for about a second; an erase or the same `T` by p2 flashes,
-  and a gone player flashes in colour 0; none flashes when p3 replaces p2's
-  letter, on an empty cell, on my own letter or my still pending one, or on a
-  `cell_locked`. (← 016 AC-1, 016 AC-2)
+- **AC-7** With my `T` at (1, 0), me colour 0 and p2 colour 3, p2's `A`
+  flashes the cell in colour 3 for about a second; an erase or the same `T` by
+  p2 flashes, and a gone player flashes in colour 0; none flashes when p3
+  replaces p2's letter, on an empty cell, on my own letter or my still pending
+  one, or on a `cell_locked`. (← 016 AC-1, 016 AC-2)
 - **AC-8** With (1, 2) holding a locked `M`, `X`, `M` and an erase there from
   either player each get `cell_locked`, ahead of a stale or solved check; the
   seq and cell stay as they were, nobody receives a `letter_changed`, and (1, 1)
   still takes edits. (← 016 AC-3)
-- **AC-9** On the page, a `cell_locked` `M` at (1, 2) over my pending `X` shows `M`
-  locked; `e`, Backspace and Delete there send nothing; the `cell_locked` error
-  answering `X` leaves `M`, confirmed. A revealed lock clears the author, a
-  checked one keeps it. (← 016 AC-3)
+- **AC-9** On the page, a `cell_locked` `M` at (1, 2) over my pending `X`
+  shows `M` locked; `e`, Backspace and Delete there send nothing; the
+  `cell_locked` error answering `X` leaves `M`, confirmed. A revealed lock
+  clears the author, a checked one keeps it. (← 016 AC-3)
 - **AC-10** p1's `pencil_edit` `T` at (1, 0) sends both `letter_changed` seq 3
   with pencil and the cell holds a pencil `T` by p1, as a later joiner's snapshot
   shows; over p2's normal `T` it makes a pencil `T` by p1, and p1's `edit_letter`
@@ -186,14 +188,15 @@ keyboard ».
   solved the item is gone, the toggle disabled, and pencil typing sends nothing.
   Live, Bob confirms Ana's pencil `T` and both pages show a normal `T`.
   (← 020 AC-2, 020 AC-7)
-- **AC-15** A `pencil_edit` or `confirm_pencil` at (0, 0) gets `not_a_letter_cell`,
-  on a locked cell `cell_locked`, older than another player's change `stale_edit`
-  (never for one's own change), on a solved grid `grid_solved`; from a sender who
-  is not idle, each leaves the room and the edit rate as they were. The rate comes before the lock, a clue cell
-  before the solved grid, the lock before the stale rule, the stale rule before
-  the solved grid, the solved grid before the missing pencil letter. Both kinds
-  share one edit rate with `edit_letter`; a refused one is answered to its sender
-  only. (← 020 AC-4)
+- **AC-15** A `pencil_edit` or `confirm_pencil` at (0, 0) gets
+  `not_a_letter_cell`, on a locked cell `cell_locked`, older than another
+  player's change `stale_edit` (never for one's own change), on a solved grid
+  `grid_solved`; from a sender who is not idle, each leaves the room and the
+  edit rate as they were. The rate comes before the lock, a clue cell before
+  the solved grid, the lock before the stale rule, the stale rule before the
+  solved grid, the solved grid before the missing pencil letter. Both kinds
+  share one edit rate with `edit_letter`; a refused one is answered to its
+  sender only. (← 020 AC-4)
 - **AC-16** With 17 right letters, p2's pencil `T` at (4, 4) gives its
   `letter_changed` then `grid_solved`; a pencil `X` gives `grid_full_wrong`, and
   confirming it only its `letter_changed`; 18 right pencil letters give one
@@ -236,8 +239,9 @@ keyboard ».
 
 - Merging or voting on conflicting letters, a cell lock while someone types,
   unlocking.
-- Several candidates in a cell, confirming a word or every pencil letter, shortcuts
-  for pencil mode or confirming, remembering pencil mode across reloads.
+- Several candidates in a cell, confirming a word or every pencil letter,
+  shortcuts for pencil mode or confirming, remembering pencil mode across
+  reloads.
 - Typing, selection and the in-app keyboard: `gameplay/board.md`. The top bar and
   the Aide menu: `client/hud.md`. Messages, the stale rule, the edit rate,
   reconnection: `platform/realtime.md`. Undo, the log and the store:
@@ -255,4 +259,5 @@ keyboard ».
 - `web/src/lib/RoomPage.svelte`: pencil mode, typing, confirming, flash timers;
   `GridViewport.svelte`: cell marks and the flash; `RoomTopBar.svelte`,
   `AideMenu.svelte`, `InAppKeyboard.svelte`: the pencil controls.
-- Tests: `tests/test_spec_015_*`, `tests/test_spec_016_*`, `tests/test_spec_020_*`.
+- Tests: `tests/test_spec_015_*`, `tests/test_spec_016_*`,
+  `tests/test_spec_020_*`.

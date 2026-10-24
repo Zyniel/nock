@@ -50,8 +50,8 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
    4. 8 players: `room_full`;
    5. a past player's token: seat back (rule 13);
    6. a nickname that breaks rule 1: `invalid_nickname`;
-   7. a new player: the lowest colour index 0 to 7 that no player has, host when no
-      player is host, appended last.
+   7. a new player: the lowest colour index 0 to 7 that no player has, host
+      when no player is host, appended last.
 
    `removed`, `room_locked` and `room_full` close the socket; `invalid_nickname`
    leaves it open for another join. A token that matches nobody is ignored.
@@ -101,10 +101,10 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 ### Past players and seat back
 
 12. A player who times out, or leaves with reason `left`, leaves the players and
-    becomes a past player, with their id, token, nickname, colour and mute. The 100
-    latest are kept. A removed player never is one. A host can neither remove nor
-    mute a past player: `invalid_target`, and the record stays as it is. The
-    members of a room are its players and past players.
+    becomes a past player, with their id, token, nickname, colour and mute.
+    The 100 latest are kept. A removed player never is one. A host can neither
+    remove nor mute a past player: `invalid_target`, and the record stays as it
+    is. The members of a room are its players and past players.
 13. A seat back brings the past player back as a player, appended last, in one
     `player_joined`: same id, token, letters and mute; nickname made unique by
     rule 2 (an erased player's `--` keeps no suffix); colour kept unless a player
@@ -140,15 +140,16 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
     out; it is not counted by the wrong-code throttle, makes no room live and
     writes nothing. An invalid body answers 422.
 18. The catalogue page sends the identities whose code matches `^[A-Z0-9]{6}$`
-    and whose token matches `^[A-Za-z0-9_-]{16,128}$`, in requests of at most 100
-    keys, and lists the summaries in the server's order. With none to send it has
-    no « Mes salons »; while loading and with no summary it shows nothing; a failed
-    request, or an answer that is not a list of summaries, shows `my_rooms.error`.
-    The rest of the page never waits for it. A row shows the grid label
-    (`my_rooms.unnumbered` without a grid number), size, players, last activity in
-    the browser's time zone, `catalogue.progress.finished` when solved, and the
-    link `my_rooms.open` to `/r/<code>`, named `my_rooms.open_label`. A room left
-    out is not listed, and its identity stays on the device.
+    and whose token matches `^[A-Za-z0-9_-]{16,128}$`, in requests of at most
+    100 keys, and lists the summaries in the server's order. With none to send
+    it has no « Mes salons »; while loading and with no summary it shows
+    nothing; a failed request, or an answer that is not a list of summaries,
+    shows `my_rooms.error`. The rest of the page never waits for it. A row
+    shows the grid label (`my_rooms.unnumbered` without a grid number), size,
+    players, last activity in the browser's time zone,
+    `catalogue.progress.finished` when solved, and the link `my_rooms.open` to
+    `/r/<code>`, named `my_rooms.open_label`. A room left out is not listed,
+    and its identity stays on the device.
 
 ### Look
 
@@ -231,10 +232,10 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
   the room without the form. While its request waits, or after `[]`, it takes no
   space and shows no text; a 500 shows « Impossible de charger vos salons. » and
   the grids still load. (← 032 AC-5, 046 AC-12)
-- **AC-19** « Mes salons » keeps the baselines of `product.md` (today specs 035
-  and 006 AC-5): no contrast or language offender, every link reached by Tab with
-  a visible focus, and no horizontal scroll with 8 players of 20 characters. Its
-  rows follow the catalogue design ("Look"). (← 032 AC-6, 046 AC-11)
+- **AC-19** « Mes salons » keeps the baselines of `product.md`: no contrast
+  or language offender, every link reached by Tab with a visible focus, and
+  no horizontal scroll with 8 players of 20 characters. Its rows follow the
+  catalogue design ("Look"). (← 032 AC-6, 046 AC-11)
 - **AC-20** Ana, timed out, joins with her token as `Autre`: one `player_joined`
   gives back her id, `ANA`, colour 0, her letters and her mute, not the host role;
   if `ana` joined meanwhile she is `ANA 2`, and if Dan took colour 0 she gets 3;
@@ -276,6 +277,7 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 - `src/nock/store.py`: last edit time, expired codes, deletion.
 - `src/nock/hub.py`: the sweep, lookups and their deletions, summaries.
 - `src/nock/server.py`: the summaries route and the app's sweep.
-- `web/src/lib/joinRules.ts`, `roomSession.ts`, `RoomPage.svelte`: the room page's
-  join; `nickname.ts`: the display; `myRooms.ts`, `MyRooms.svelte`: « Mes salons ».
+- `web/src/lib/joinRules.ts`, `roomSession.ts`, `RoomPage.svelte`: the room
+  page's join; `nickname.ts`: the display; `myRooms.ts`, `MyRooms.svelte`:
+  « Mes salons ».
 - Tests: `tests/test_spec_012_*`, `tests/test_spec_032_*`.

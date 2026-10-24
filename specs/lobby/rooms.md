@@ -24,17 +24,19 @@ its help; the role passes on when the host stays away.
 
 1. A solo game is a room created from the catalogue with one player; inviting is
    sending its link, and nothing converts when others come.
-2. Each catalogue item, on the catalogue page and on `/g/<number>`, has « Jouer »
-   (`catalogue.play`). A tap marks the grid `started` in `nock.progress` unless it
-   is `finished`, then asks for a room (rule 6). On success it writes the room
-   record `{"grid": <number>, "selection": null}` and loads `/r/<code>`. On a
-   network error, any other status or an answer without a code, it stays, shows
-   `catalogue.play_failed` in that item and enables the button again. The button is
-   disabled while the request runs. Each tap makes a new room.
-3. The room record `nock.room.<CODE>` is a JSON object with `grid` (the catalogue
-   number or null) and `selection`; anything else reads as no record, and a
-   rewrite keeps unknown fields. The room page writes the selection at each change,
-   creating the record with `grid: null` when there is none.
+2. Each catalogue item, on the catalogue page and on `/g/<number>`, has
+   « Jouer » (`catalogue.play`). A tap marks the grid `started` in
+   `nock.progress` unless it is `finished`, then asks for a room (rule 6). On
+   success it writes the room record `{"grid": <number>, "selection": null}`
+   and loads `/r/<code>`. On a network error, any other status or an answer
+   without a code, it stays, shows `catalogue.play_failed` in that item and
+   enables the button again. The button is disabled while the request runs.
+   Each tap makes a new room.
+3. The room record `nock.room.<CODE>` is a JSON object with `grid` (the
+   catalogue number or null) and `selection`; anything else reads as no
+   record, and a rewrite keeps unknown fields. The room page writes the
+   selection at each change, creating the record with `grid: null` when there
+   is none.
 4. After a page load's first snapshot, a saved selection on a letter cell with a
    word in its direction is restored as a tap (it sends `select_cell`); else
    nothing is selected or sent.
@@ -69,8 +71,9 @@ its help; the role passes on when the host stays away.
 11. Once joined, the Salon's Joueurs tab holds, under `room.share.label`, the link
     `<origin>/r/<code>` and « Copier le lien » (`room.share.copy`). A copy writes
     the link to the clipboard and shows `room.share.copied` as a status for 2
-    seconds; the button keeps its text. Without a usable clipboard nothing changes.
-    Before any snapshot (`not_found`, `throttled`, a refused join) no link shows.
+    seconds; the button keeps its text. Without a usable clipboard nothing
+    changes. Before any snapshot (`not_found`, `throttled`, a refused join) no
+    link shows.
 
 ### Room engine
 
@@ -105,13 +108,13 @@ its help; the role passes on when the host stays away.
     One `settings_changed` carries both. Their effect: `gameplay/hints.md`.
 17. Muting sets the player's `muted` with one `player_muted`, kept across a
     restart. Its effect: `social/chat.md`.
-18. When the host has been disconnected more than 60 seconds, a tick gives the role
-    to the player not disconnected (idle counts) with the smallest join seq, in one
-    `host_changed`; with none, the host stays and the next tick tries again. A host
-    who times out hands the role at once, after the `player_left`, to the remaining
-    player with the smallest join seq, connected first; with nobody left the next
-    joiner is host. A resume keeps one's join seq. A host back after a hand-over is
-    an ordinary player.
+18. When the host has been disconnected more than 60 seconds, a tick gives the
+    role to the player not disconnected (idle counts) with the smallest join
+    seq, in one `host_changed`; with none, the host stays and the next tick
+    tries again. A host who times out hands the role at once, after the
+    `player_left`, to the remaining player with the smallest join seq,
+    connected first; with nobody left the next joiner is host. A resume keeps
+    one's join seq. A host back after a hand-over is an ordinary player.
 19. The room refuses with `not_joined`, changing nothing, any message from an id
     that is not one of its players (removed, timed out, unknown). On a socket,
     before its join, every message but `join` and `ping` gets `not_joined`
@@ -154,15 +157,15 @@ room has shown, the status band of « Connection lost »; before, the entry card
   form; tapping (1, 0) and typing `t` then shows `T`. (← 010 AC-1)
 - **AC-2** With the creation answered 500, 409 or not at all, the tap stays on
   `/`, shows « Impossible de lancer la partie. Réessayez. », enables « Jouer »
-  again and keeps grid 1 `started`; the next tap, once the server answers, enters a
-  room. (← 010 AC-1)
-- **AC-3** Ana starts FX-01 and types `T`, `A` from (1, 0) across; Bob opens her
-  room's link in another browser, phone or computer: his grid shows `T` at (1, 0)
-  and `A` at (1, 1), and Ana's page keeps its code and letters, not reloaded.
-  (← 010 AC-2, 011 AC-2)
-- **AC-4** After Ana types `T`, `A` and taps (2, 2) twice, a reload first sends a
-  join with her stored token and is the same player, alone in the roster, with `T`,
-  `A` and (2, 2) selected down. (← 010 AC-3)
+  again and keeps grid 1 `started`; the next tap, once the server answers,
+  enters a room. (← 010 AC-1)
+- **AC-3** Ana starts FX-01 and types `T`, `A` from (1, 0) across; Bob opens
+  her room's link in another browser, phone or computer: his grid shows `T` at
+  (1, 0) and `A` at (1, 1), and Ana's page keeps its code and letters, not
+  reloaded. (← 010 AC-2, 011 AC-2)
+- **AC-4** After Ana types `T`, `A` and taps (2, 2) twice, a reload first sends
+  a join with her stored token and is the same player, alone in the roster,
+  with `T`, `A` and (2, 2) selected down. (← 010 AC-3)
 - **AC-5** After « Jouer » on grid 1, `nock.progress` holds `{"1": "started"}`
   (other grids and a `finished` kept), the record has `grid` 1 and the catalogue
   shows item 1 started; a `grid_solved` or solved snapshot then gives
@@ -179,55 +182,59 @@ room has shown, the status band of « Connection lost »; before, the entry card
   422, unpublished 4 and unknown 99 answer 404 `{"detail": "Not Found"}`, as does
   `POST /api/rooms/`, and none creates a room. (← 011 AC-1)
 - **AC-9** Once joined, the Joueurs tab shows « Lien d'invitation » and links to
-  `<origin>/r/<code>` with that text; « Copier le lien » puts it in the clipboard and shows « Lien copié » for 2
-  seconds while the button still reads « Copier le lien »; an unknown room shows no
-  link. (← 011 AC-1)
-- **AC-10** 1,000 codes from one registry are distinct and in the alphabet, use at
-  least 20 characters at each position, and none is the previous one plus 1 in base
-  32; two registered rooms find their grid, `abc123` finds nothing. (← 011 AC-3,
-  040 AC-7)
+  `<origin>/r/<code>` with that text; « Copier le lien » puts it in the
+  clipboard and shows « Lien copié » for 2 seconds while the button still
+  reads « Copier le lien »; an unknown room shows no link. (← 011 AC-1)
+- **AC-10** 1,000 codes from one registry are distinct and in the alphabet,
+  use at least 20 characters at each position, and none is the previous one
+  plus 1 in base 32; two registered rooms find their grid, `abc123` finds
+  nothing. (← 011 AC-3, 040 AC-7)
 - **AC-11** From one address, ten sockets to `ZZZZZZ` close with 4404; the
-  eleventh, to an existing room, closes with 4429 before any message, and its page
-  ends on « Trop de codes erronés. Réessayez dans une minute. »; 60 seconds later it
-  joins. Forty sockets at once to `ZZZZZZ` get ten 4404 and thirty 4429.
+  eleventh, to an existing room, closes with 4429 before any message, and its
+  page ends on « Trop de codes erronés. Réessayez dans une minute. »; 60
+  seconds later it joins. Forty sockets at once to `ZZZZZZ` get ten 4404 and
+  thirty 4429.
   (← 011 AC-3)
 - **AC-12** With rules that answer Ana's `select_cell` with two `letter_changed`,
   a `pong` reply and a relayed `selection_moved`: Ana gets the two events in seq
-  order then her `pong`, Bob and Cy the two events then the `selection_moved`; ticks
-  run while a socket is attached and stop after the last leaves, and a new socket
-  gets one tick before its first input; a raising `handle_message`, `tick` or
-  `disconnect_player` is logged, leaves the state, and ticks and inputs go on; two
+  order then her `pong`, Bob and Cy the two events then the `selection_moved`;
+  ticks run while a socket is attached and stop after the last leaves, and a
+  new socket gets one tick before its first input; a raising `handle_message`,
+  `tick` or `disconnect_player` is logged, leaves the state, and ticks and
+  inputs go on; two
   sockets of one player both get each event, and closing either keeps the other;
   after `close()` the engine thread stops and no input runs a rule. (← 011 AC-4)
 - **AC-13** Host Ana removes Bob: Ana and Cy get `player_left` (Bob, `removed`),
-  Bob gets `error` `removed` then a close 1000, and his page shows « Vous avez été
-  retiré de ce salon. », after a reload too, with no form; Bob's removal of Cy gets
-  `not_host`, Ana's of herself or `zz` `invalid_target`. (← 014 AC-1)
-- **AC-14** Ana locks: she and Bob get `settings_changed` locked; a new socket gets
-  `room_locked` and its page « Ce salon est verrouillé. », the room keeps 2 players
-  and Bob's token resumes; locking again gives nothing, Bob's unlock `not_host`;
-  once Ana unlocks, a newcomer joins. (← 014 AC-2)
-- **AC-15** Host p1 disconnected at t, p2 active, p3 idle: a tick at t + 60 changes
-  nothing, at t + 60.5 p2 is host; with p2 away too p3, with both away p1 stays; p1
-  back is no host and gets `not_host`; the new host's page gains « Retirer » and
-  « Réglages de l'hôte », the old host's loses them. (← 014 AC-3)
-- **AC-16** Ana sets vote, 3 letters, 0 words: both get `settings_changed` with
-  these and remaining 3 and 0, and both feeds read « Ana a modifié les réglages :
-  aide par vote, 3 lettres et 0 mots à révéler »; the same again gives nothing; with
-  3 letters and 1 word used, 1 and 1 leave 0 and 0, then 10 and 5 leave 7 and 4.
-  (← 014 AC-4)
+  Bob gets `error` `removed` then a close 1000, and his page shows « Vous avez
+  été retiré de ce salon. », after a reload too, with no form; Bob's removal of
+  Cy gets `not_host`, Ana's of herself or `zz` `invalid_target`. (← 014 AC-1)
+- **AC-14** Ana locks: she and Bob get `settings_changed` locked; a new socket
+  gets `room_locked` and its page « Ce salon est verrouillé. », the room keeps
+  2 players and Bob's token resumes; locking again gives nothing, Bob's unlock
+  `not_host`; once Ana unlocks, a newcomer joins. (← 014 AC-2)
+- **AC-15** Host p1 disconnected at t, p2 active, p3 idle: a tick at t + 60
+  changes nothing, at t + 60.5 p2 is host; with p2 away too p3, with both away
+  p1 stays; p1 back is no host and gets `not_host`; the new host's page gains
+  « Retirer » and « Réglages de l'hôte », the old host's loses them.
+  (← 014 AC-3)
+- **AC-16** Ana sets vote, 3 letters, 0 words: both get `settings_changed`
+  with these and remaining 3 and 0, and both feeds read « Ana a modifié les
+  réglages : aide par vote, 3 lettres et 0 mots à révéler »; the same again
+  gives nothing; with 3 letters and 1 word used, 1 and 1 leave 0 and 0, then
+  10 and 5 leave 7 and 4. (← 014 AC-4)
 - **AC-17** Just after Ana removes Bob, 40 `edit_letter` from Bob's socket are
   neither applied nor sent and no cell has Bob as author; a message from a
   timed-out or unknown id, or an `edit_letter` before any join, gets `not_joined`.
   (← 014 AC-5)
 - **AC-18** Ana mutes Bob: one `player_muted` reaches everyone and his snapshot
-  shows him muted, after a restart too; muting again gives nothing; Bob's mute gets
-  `not_host`, Ana's of herself, `zz` or a removed player `invalid_target`.
+  shows him muted, after a restart too; muting again gives nothing; Bob's mute
+  gets `not_host`, Ana's of herself, `zz` or a removed player `invalid_target`.
   (← 014 AC-6)
-- **AC-19** With the host among 8 players, in the windows of `product.md` rule 11
-  and from 300 px wide with root fonts of 12 to 24 px, each « Retirer » and
-  « Couper » is at least 24 px square and hit on every pixel once scrolled into the
-  Joueurs tab, which never scrolls sideways, while the grid keeps its room; each
+- **AC-19** With the host among 8 players, in the windows of `product.md` rule
+  11 and from 300 px wide with root fonts of 12 to 24 px, each « Retirer » and
+  « Couper » is at least 24 px square and hit on every pixel once scrolled
+  into the Joueurs tab, which never scrolls sideways, while the grid keeps its
+  room; each
   « Retirer » reads so, shows whole with its focus ring from the keyboard, and
   keeps the baselines of `product.md`. (← 014 AC-7, 014 AC-8, 014 AC-9)
 - **AC-20** In the same windows and fonts, the host sheet lies inside the window
@@ -257,11 +264,14 @@ room has shown, the status band of « Connection lost »; before, the entry card
 ## Out of scope
 
 - Handing the host role on by hand, co-hosts, banning by address or browser,
-  un-banning; throttling creation or any HTTP route, `X-Forwarded-For` (behind a
-  proxy all players share one address); Web Share, QR codes, offline play.
+  un-banning; throttling creation or any other HTTP route than the ops API and
+  the recap route, `X-Forwarded-For` (behind a proxy all players share one
+  address); Web Share, QR codes, offline play.
 - Reconnection and fair play: `platform/realtime.md`. Durable state:
-  `platform/server.md`. Feed lines: `social/presence.md`. « Couper » and muting's
-  effect: `social/chat.md`. The Menu, sheets and top bar: `client/hud.md`.
+  `platform/server.md`. Feed lines of joins and departures:
+  `social/presence.md`; of host, lock and settings changes: `social/chat.md`.
+  « Couper » and muting's effect: `social/chat.md`. The Menu, sheets and top
+  bar: `client/hud.md`.
 
 ## Code
 
@@ -271,5 +281,5 @@ room has shown, the status band of « Connection lost »; before, the entry card
 - `web/src/lib/playGrid.ts`, `CatalogueItem.svelte`: « Jouer »; `roomRecord.ts`:
   the record; `PlayersPanel.svelte`, `HostSettings.svelte`: host controls and
   link; `RoomPage.svelte`, `roomSession.ts`: final statuses.
-- Tests: `tests/test_spec_010_*`, `test_spec_011_*`, `test_spec_014_*`, and AC-7 of
-  `tests/test_spec_040_*`.
+- Tests: `tests/test_spec_010_*`, `test_spec_011_*`, `test_spec_014_*`, and
+  AC-7 of `tests/test_spec_040_*`.

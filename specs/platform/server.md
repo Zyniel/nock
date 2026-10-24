@@ -129,7 +129,7 @@ address and with the database its environment gives.
     `NOCK_OPERATOR_TOKEN` first (`admin/operations.md` rule 4), then
     `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE`, each only when set and not
     empty, then the account variables by their own rules (`account/account.md`
-    rule 3). What it runs: `product.md` rule 27.
+    rule 2). What it runs: `product.md` rule 27.
 16. `NOCK_HOST`, unset or empty `127.0.0.1`: only ASCII letters, ASCII digits,
     `.`, `-` and `:`. With `:` it is an IPv6 address that
     `ipaddress.IPv6Address` accepts, without brackets; else a name whose dots

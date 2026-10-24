@@ -109,8 +109,9 @@ for every player, measures the room's playing time from the first letter typed.
     chrono »), takes its place and shows it again, and the Menu item reads
     `timer.toggle_label` and shows it too. Hidden, `localStorage` holds
     `nock.timer_hidden` = `true`; shown, the key is absent; any other value
-    counts as absent. The choice holds for every room of the browser and changes
-    nothing for the others or for `elapsed_ms`.
+    counts as absent. When storage throws, the page starts with the timer
+    shown. The choice holds for every room of the browser and changes nothing
+    for the others or for `elapsed_ms`.
 
 ### Look
 
@@ -143,7 +144,8 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
   then exactly `{"type": "grid_full_wrong", "seq": n + 1}` to every player and the
   room is not solved; `Y` there then adds no event; an erase then `X` again adds a
   new one. Typed in order with `N` at (1, 2), the 18th letter gives
-  `grid_full_wrong`, then `M` at (1, 2) gives `grid_solved`. (← 026 AC-6, 026 AC-8)
+  `grid_full_wrong`, then `M` at (1, 2) gives `grid_solved`.
+  (← 026 AC-6, 026 AC-8)
 - **AC-7** A page with 17 letters and (4, 4) empty shows no status; after `X` at
   (4, 4) and `grid_full_wrong` it shows « Grille complète, mais pas encore
   juste. », no cell marked wrong, and is not solved; erasing (4, 4) removes it. A
@@ -158,14 +160,14 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
   FX-02 page full but wrong, or solved, shows its status, its grid area keeps at
   least 100 px of height and the page does not scroll; at 1280 by 720 the status
   lies under the clue bar inside the window. (← 026 AC-10)
-- **AC-10** On a touch screen at 568 by 320, with the in-app keyboard and the clue
-  « On la glisse dans une enveloppe » selected, the full-but-wrong status follows
-  rule 7 in the clue bar's row, the bar as high as with no status; solved, the page
-  has no keyboard and the band; both pass the contrast and language scans of
-  `product.md` (today spec 035). (← 026 AC-10)
+- **AC-10** On a touch screen at 568 by 320, with the in-app keyboard and the
+  clue « On la glisse dans une enveloppe » selected, the full-but-wrong status
+  follows rule 7 in the clue bar's row, the bar as high as with no status;
+  solved, the page has no keyboard and the band; both pass the contrast and
+  language scans of `product.md`. (← 026 AC-10)
 - **AC-11** Ana and Bob join at t0; Ana's erase at t0 + 5 leaves a timer at 0,
-  stopped; her `T` at (1, 0) at t0 + 10 starts it, and a snapshot at t0 + 40, Bob's
-  or a newcomer's, says 30000, running. (← 027 AC-1)
+  stopped; her `T` at (1, 0) at t0 + 10 starts it, and a snapshot at t0 + 40,
+  Bob's or a newcomer's, says 30000, running. (← 027 AC-1)
 - **AC-12** Two pages read `0:00`, still 2 s later; once Ana types `T`, both run
   within 1 s, and 3 s after her key both read about 3 s, at most 1 s apart; Cy,
   joining then, reads within 1 s of Ana. (← 027 AC-2)
@@ -177,10 +179,10 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
   from what it showed, the 4 s away not counted; a page whose socket drops at
   `1:10` keeps counting, and its next snapshot of 62,000 makes it read `1:02`.
   (← 027 AC-3)
-- **AC-15** On one of two pages at `1:05`, « Masquer le chrono » removes the timer,
-  shows « Chrono » and sends nothing; the other page keeps its timer. Reloaded, it
-  stays hidden with the key set; « Chrono » shows `1:05` or later and removes the
-  key. (← 027 AC-4)
+- **AC-15** On one of two pages at `1:05`, « Masquer le chrono » removes the
+  timer, shows « Chrono » and sends nothing; the other page keeps its timer.
+  Reloaded, it stays hidden with the key set; « Chrono » shows `1:05` or later
+  and removes the key. (← 027 AC-4)
 - **AC-16** Snapshots of 65,000 running read `1:05` then `1:06`; 3,725,000
   stopped and solved, `1:02:05` 2 s later still; 36,000,000, `10:00:00`. At 0
   stopped, a `letter_changed` with no letter changes nothing and one with `T`
@@ -200,8 +202,8 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
 - **AC-20** The timer is in the top bar before the undo button, named « Chrono »,
   not announced and no Tab stop; from the keyboard the Menu item hides it and
   « Chrono », reached by Tab, shows it again, both with the visible focus of
-  `product.md` (today spec 035). At `10:00:00` the scans find nothing, and at every
-  window size the timer, or « Chrono » of at least 24 by 24 px, lies in the top bar
+  `product.md`. At `10:00:00` the scans find nothing, and at every window
+  size the timer, or « Chrono » of at least 24 by 24 px, lies in the top bar
   on one line without overlap. (← 027 AC-8)
 
 ## Edge cases

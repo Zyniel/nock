@@ -169,9 +169,10 @@ on its layer of `_design/room.md`, « Layers ».
   unstruck while it waits for the server. (← 023 AC-5)
 - **AC-4** Bob types `X` at (1, 1), Ana reveals it: every player gets 4 letters
   and 1 word left, then `A` revealed, shown locked with no author, the stream
-  reads « Ana a révélé une lettre », and Bob's `B` there changes nothing; a reveal of TAMIS after a check locked (1, 0) locks the
-  other four; with the 17 other letters right, a reveal of (4, 4) is followed by
-  `grid_solved`, by `grid_full_wrong` if one is wrong. (← 024 AC-1, 024 AC-6)
+  reads « Ana a révélé une lettre », and Bob's `B` there changes nothing; a
+  reveal of TAMIS after a check locked (1, 0) locks the other four; with the
+  17 other letters right, a reveal of (4, 4) is followed by `grid_solved`, by
+  `grid_full_wrong` if one is wrong. (← 024 AC-1, 024 AC-6)
 - **AC-5** A new room has 5 letters and 1 word; a sixth letter reveal is
   `budget_exhausted`; a word reveal leaves the letters. After 3 letter reveals
   and MIME, the allowance set to 1 and 0 leaves 0 and 0, then 5 and 1 leaves 2
@@ -180,7 +181,7 @@ on its layer of `_design/room.md`, « Layers ».
 - **AC-6** With 5 letters and 1 word left the details read « 5 restantes » and
   « 1 restant », then « 4 restantes » after a reveal; at 0 letters « Révéler »
   letter is disabled, reads « Plus de lettre », sends nothing and keeps the text
-  contrast of `product.md` (today spec 035), and the word item stays enabled.
+  contrast of `product.md`, and the word item stays enabled.
   (← 024 AC-2, 024 AC-3)
 - **AC-7** In a full game with a grid check after three wrong letters and
   reveals of (4, 4) and MIME, no payload to a browser shows an unearned letter: a
@@ -273,8 +274,8 @@ on its layer of `_design/room.md`, « Layers ».
 - The host settings: `lobby/rooms.md`. The Aide menu's place, « Réagir » under
   the banner, the notes: `client/hud.md`. Cell marks and pending edits:
   `gameplay/board.md`. Completion: `gameplay/rules.md`. The stream and its
-  lines' look: `social/chat.md`. Protocol and fair play: `platform/realtime.md`. The recap's
-  counts: `gameplay/results.md`.
+  lines' look: `social/chat.md`. Protocol and fair play:
+  `platform/realtime.md`. The recap's counts: `gameplay/results.md`.
 
 ## Code
 

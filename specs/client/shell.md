@@ -77,8 +77,9 @@ fonts, focus ring, shared components, state lines).
    - else the opening: the room's top bar for the window (`client/hud.md`),
      inert and without timer, so a press on it opens nothing and sends
      nothing; the heading read but not seen; and where the grid will be, only
-     the status line `room.status.connecting` (« Connexion… ») or `room.status.joining`
-     (« Entrée dans le salon… »), seen. No grid, clue bar, keyboard or Salon.
+     the status line `room.status.connecting` (« Connexion… ») or
+     `room.status.joining` (« Entrée dans le salon… »), seen. No grid, clue bar,
+     keyboard or Salon.
 8. The first snapshot turns the opening into the room within 300 ms; a refusal
    turns it into its card, `invalid_nickname` into the nickname card. A loss
    keeps it. Once the room has shown, the status follows `client/hud.md` rule 8.
@@ -232,8 +233,8 @@ fonts, focus ring, shared components, state lines).
   041 AC-17)
 - **AC-20** The colour scan refuses `<rect fill="white"/>`, passes
   `:root{--nock-navy:#1b2f55}`, and finds nothing in `web/src` or the built
-  CSS, which declares each token once; `icons.ts` holds every shape of the design once;
-  no demo file or text is left. (← 041 AC-18, 041 AC-19, 041 AC-20,
+  CSS, which declares each token once; `icons.ts` holds every shape of the
+  design once; no demo file or text is left. (← 041 AC-18, 041 AC-19, 041 AC-20,
   040 AC-26)
 
 ## Edge cases

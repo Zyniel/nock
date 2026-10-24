@@ -99,7 +99,8 @@ computer, never taking the grid's room.
     closes them, moving no focus and selecting nothing. At most one of the
     menus, the Salon sheet and the reaction picker is open; the Salon column is
     apart. A closed menu stays in the page, hidden, with its items' states. A
-    menu's place follows the top bar's form; its content scrolls inside it.
+    menu's place follows the top bar's form; its content scrolls inside it, so
+    it stays in the window.
 
 ### Salon
 
@@ -250,8 +251,8 @@ and sheets, « Focus ».
   host Ana on MIME, « Joueurs » shows her row with « (vous) », « hôte » and
   « Artiste muet », Bob's with « Couper » and « Retirer » inside it, then the
   link. A message of a player who left has no dot; « Accessibilité » on puts
-  each player's icon in every dot. Each follows « Salon ». (← 043 AC-16, 043 AC-18, 043 AC-19, 043 AC-20,
-  043 AC-30)
+  each player's icon in every dot. Each follows « Salon ». (← 043 AC-16,
+  043 AC-18, 043 AC-19, 043 AC-20, 043 AC-30)
 - **AC-15** « Réglages de l'hôte » is a modal sheet named by its title, centred
   at 1280 by 720, a bottom sheet at 360 by 740 that a tap above closes;
   « Enregistrer » sends, closes it and focuses « Menu ». « Compte » opens the

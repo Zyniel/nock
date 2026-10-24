@@ -140,8 +140,7 @@ help is wanted. The host can mute a player's chat and reactions.
     a modifié les réglages : aide {help_mode}, {letters} lettres et {words} mots
     à révéler », the mode « libre », « par vote » or « désactivée »). A
     `host_changed` reads `feed.host_changed` (« {name} est maintenant l'hôte »).
-    A `letter_changed`, a `cell_locked`, a `player_state_changed` or a
-    `selection_moved` adds no line.
+    Any other event adds no line.
 19. A new item brings the stream to its end within 300 ms only when it was at
     its end (1 px or less hidden below) just before; otherwise the items in
     view keep their place, also when a cap drops the oldest. My own message or

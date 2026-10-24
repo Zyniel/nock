@@ -40,7 +40,8 @@ None. Every domain spec depends on this file.
    `social/catch-up.md`.
 8. The optional account: sign in by email, keep rooms and history across devices,
    erase one's data: `account/account.md`.
-9. The operator's page: figures, a room's replay, retention: `admin/operations.md`.
+9. The operator's page: figures, a room's replay, retention:
+   `admin/operations.md`.
 
 ### Stable routes
 
@@ -88,10 +89,10 @@ every `/api/ops` path 404 whatever the method.
 12. Keyboard reach. Every action of every page can be done with Tab, Shift+Tab,
     Enter, Space, Escape, Backspace, the arrow keys, the letters and Ctrl+Z; an
     element inside a menu, the Salon or a sheet is reached by opening it from the
-    keyboard first. The in-app keyboard
-    keys are buttons out of the Tab order (`tabindex` -1), named by their letter
-    or « Effacer », never hidden from the accessibility tree; a tap on one leaves
-    the focus on the grid.
+    keyboard first. The in-app keyboard keys are buttons out of the Tab order
+    (`tabindex` -1), named by their letter, « Effacer », « Crayon » (✎) or
+    « Changer de sens » (⇄) (`gameplay/board.md` rule 15), never hidden from
+    the accessibility tree; a tap on one leaves the focus on the grid.
 13. Leaving the grid. The grid is one Tab stop; inside it Tab and Shift+Tab move
     between words (`gameplay/board.md`). Escape releases it: the next Tab or
     Shift+Tab is left to the browser and moves the focus to the neighbouring
@@ -130,8 +131,9 @@ every `/api/ops` path 404 whatever the method.
     away from where the reader put it (`social/chat.md`). The Joueurs list never
     scrolls itself.
 19. Contrast. Every visible text reaches 4.5:1 against its background in every
-    state, flashes included, opacity folded in (the pairs of
-    `_design/foundation.md`).
+    state, opacity folded in (the pairs of `_design/foundation.md`); flashes
+    are included, except the Auteurs inks during a flash, whose contrast is not
+    guaranteed (`social/presence.md` rule 15).
 20. Language. `<html lang="fr">`; every interface string comes from
     `web/src/i18n/fr.json` through `t()`; the only texts outside it are data:
     nicknames as displayed, clues, letters, codes, URLs and numbers. Text meant
@@ -265,8 +267,8 @@ conformance is checked »).
   nothing becomes selected (AC-3).
 - Typing a letter moves the selection, so the announcement changes only by its
   position; letters are never announced (AC-4).
-- A disconnected player has no cursor and does not count on a cell (rules 15
-  and 16).
+- A disconnected player has no cursor and does not count among a cell's four
+  (`social/presence.md`, `gameplay/board.md`).
 - A connection closed with 4507 or 1008 reconnects and gets a fresh snapshot
   (AC-15).
 - An honest page never nears the bounds of rule 25: edits are capped at 20 a
@@ -280,7 +282,8 @@ conformance is checked »).
   `client/shell.md`.
 - Real phones and networks; Firefox and WebKit timings; load beyond 8 players a
   room or many rooms at once; bundle size budgets.
-- Limits per address: `lobby/rooms.md`, `admin/operations.md`. The environment
+- Limits per address: `lobby/rooms.md`, `admin/operations.md`,
+  `account/account.md`. The environment
   variables and their checks: `platform/server.md`.
 
 ## Code

@@ -17,8 +17,8 @@ their players.
 
 - `lobby/joining.md`: the stored identity, resume and seat back, the members of a
   room, room expiry.
-- `social/chat.md`: the Salon's stream, its event lines and their texts, its cap
-  of 100 event lines and its scroll rules.
+- `social/chat.md`: the Salon's stream (its order, its cap of 100 event lines
+  and its scroll rules), not the text of every event line.
 - `platform/realtime.md`: snapshots, `seq`, reconnection, the logged events.
 
 ## Rules

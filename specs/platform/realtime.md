@@ -101,10 +101,10 @@ earns it.
 12. A refusal is one `error` to the sender only and changes neither the room nor
     its seq, except that it wakes an idle sender first (`social/presence.md`).
     Chat and reactions over their limit, a muted player's reaction and an
-    invalid reaction are dropped with no answer (`social/chat.md`). The `room_full` or
-    `room_locked` of a join, and the `removed` of a removed token's join or of
-    the host's removal (sent to the removed player), are followed by a close with
-    1000.
+    invalid reaction are dropped with no answer (`social/chat.md`). The
+    `room_full` or `room_locked` of a join, and the `removed` of a removed
+    token's join or of the host's removal (sent to the removed player), are
+    followed by a close with 1000.
 13. Close codes: 4404 unknown or deleted room; 4429 throttled; 4001 replaced by
     the same player's newer socket (`lobby/joining.md`); 4408 silent; 1000 after
     rule 12's refusals; 1011 a join the store could not save
@@ -161,8 +161,9 @@ earns it.
     `answer` or `solution`, and no letter at a cell before it is earned there,
     by a player's accepted edit at that cell or by a reveal (`gameplay/hints.md`).
     An answer's letters reach a browser only where players put them (accepted
-    letters, chat texts, nicknames) or a reveal put them, or by chance in random ids, tokens and
-    codes. The snapshot's grid holds clue texts and arrows, never answers.
+    letters, chat texts, nicknames) or a reveal put them, or by chance in
+    random ids, tokens and codes. The snapshot's grid holds clue texts and
+    arrows, never answers.
 24. Edits (`edit_letter`, `erase`, `pencil_edit`, `confirm_pencil`) are limited
     to 20 per player in any sliding second; one more is `rate_limited`, and a
     refused edit does not count. The client stays connected. `undo` and

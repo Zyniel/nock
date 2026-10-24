@@ -128,7 +128,8 @@ AZERTY keyboard replaces the system one, and the player may hide it.
     keyboard shows, else the column one (`_design/room.md`, « Which layout »);
     its keys take the room design's low size, so the grid keeps 100 px. The
     status sits as `gameplay/rules.md` rule 7 says; on a window more than
-    500 px high in the sheet layout, between clue bar and keyboard.
+    500 px high in the sheet layout, between clue bar and keyboard, while the
+    keyboard shows.
 
 ### Display switches
 
@@ -209,7 +210,8 @@ AZERTY keyboard replaces the system one, and the player may hide it.
   turns p2, p3, p4 (colours 1, 2, 6) into a square, a triangle and a heart in
   their corners and in the Joueurs list, and a reload keeps it. Each is reached
   by Tab in the open Menu with the focus ring, Enter flipping it, and lies in
-  the window. (← 042 AC-3, 042 AC-11, 042 AC-19)
+  the window and takes a tap at every supported window.
+  (← 042 AC-3, 042 AC-11, 042 AC-19)
 - **AC-10** On FX-01 a tap on (2, 2) selects VIDE (`2,0,0`) across, its four
   cells, « Sans contenu » the only active clue, the focus on the grid. Taps on
   (1, 1), (1, 1), (0, 1), (0, 1) give TAMIS, NAVAL, (0, 1) down, nothing, and
