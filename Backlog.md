@@ -54,6 +54,12 @@ an item that must be done first.
   numbered specs to `specs/_archive/v1.1.0/`.
 - Out of scope: any change of behaviour or code; compacting the tests (B-003).
 - Screens: none (the screens sheet's captions follow the design split).
+- The design split also: aligns `_design.md` §8 « States »'s note on state
+  lines with v1.1.0 (16 px; no role on a waiting line, nor on the catalogue's
+  and « Mes salons »'s load-error lines; `role="alert"` only on the error line
+  of a failed action); takes the clue bar's minimum width (320 px) into
+  `_design/room.md`; takes the grid's name in the computer top bar out of the
+  current design (B-006).
 
 ### B-002 Phase 8: race and team modes
 
@@ -108,6 +114,20 @@ an item that must be done first.
 - Out of scope: progress of guests across devices.
 - Screens: the catalogue's progress pills, as drawn today.
 
+### B-006 The grid's name in the computer top bar
+
+- Status: brief (drawn in the design reference of 2026-10-16, « Grille n° N ·
+  Force F » in the computer top bar; spec 043 left it as an open question and
+  never built it)
+- Domains: client/hud
+- Waits for: B-001
+- Problem: on a computer, the room page does not say which grid is played.
+- In scope: the grid's number and force in the computer top bar.
+- Out of scope: the phone top bar.
+- Screens: the computer top bar; the design split takes the drawing out of
+  the current design until the human decides.
+- Open questions: build it, or drop it from the design for good?
+
 ## Small follow-ups
 
 Taken when a change touches them.
@@ -127,6 +147,11 @@ Taken when a change touches them.
   team-mates of one record show as one `--`; the room page asks its summary once
   and does not retry; `peek_room` re-reads the log of a room solved before spec
   029 at each call.
+- Rules stated but untested (the code does them; a test would catch a
+  regression): the catalogue asks once and refuses items that are not
+  summaries; the force filter makes no new request; the grid page's loading
+  line and its non-summary answer; after a chip, only that chip pressed
+  (`content/library.md` rules 8, 10, 16 and AC-6).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 
