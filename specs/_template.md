@@ -1,54 +1,50 @@
 ---
-id: "NNN"
-title: Short feature name
+area: area-name
+file: file-name
 status: draft
 ---
 
 <!--
-How to use this template
-- Copy it to specs/NNN-short-name.md (NNN = next free three-digit number).
-- status is draft, approved or done. Only a human sets "approved".
-- Keep the section headings and the "- **AC-n**" bullet format: the quality gate
-  reads them to check that every criterion has a test.
+How to use this template (the rules are in specs/_map.md, "How domain specs work")
+- Copy it to specs/<area>/<file>.md, the path specs/_map.md lists; `file` is the
+  file name without .md.
+- Say what is true now: no dated notes, no history, no decisions log.
+- No look (cite the design file), no test mechanics, no copied code.
+- Budget: about 15 KB and 20 criteria.
 - Delete this comment in the copy.
 -->
 
-# NNN - Short feature name
+# area/file - Short name
 
-## Goal
+## Purpose
 
-One or two sentences: who needs this, and what it lets them do.
+Two or three sentences: who it serves and what it lets them do.
 
-## Public interface
+## Depends on
 
-The exact module path, names and signatures the tests will import. The tests are
-written before the code, so this has to be precise.
+At most three files, each with the reason.
 
-```python
-# src/nock/<module>.py
-def function_name(argument: str) -> str: ...
-```
+## Rules
+
+The behaviour, as short numbered rules grouped by topic.
+
+## New interface
+
+Only while a change is being built: the names the tests must import before the
+code exists (module path, names, signatures). Deleted when the change is done.
 
 ## Acceptance criteria
 
-One observable behaviour per criterion, with a concrete example.
+- **AC-1** One observable behaviour, with one concrete example. (← NNN AC-n)
 
-- **AC-1** Given ..., when ..., then ...
-- **AC-2** Given ..., when ..., then ...
+## Edge cases
 
-## Edge cases and errors
-
-Inputs at the limits and what must happen. Say which criterion each one belongs to.
+One line each, naming its criterion.
 
 ## Out of scope
 
-What this feature deliberately does not do.
+What this domain deliberately does not do, and which file does it.
 
-## Work packages
+## Code
 
-Optional, only for a feature large enough for several implementers in an agent
-team. Each package lists the files it owns. No file may appear in two packages.
-
-## Open questions
-
-Anything the request left undecided, with the options. Empty once approved.
+The modules that implement it, and the test files that prove it.

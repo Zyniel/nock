@@ -13,6 +13,13 @@ Stages:
     full:  everything in "tests", then pyrefly, svelte-check and the vite build
            of web/, then pytest (browser tests included).
 
+Spec traceability (2026-10-24, the domain specs of specs/_map.md): every test
+points to a criterion that exists; a domain spec's criterion is proven by its own
+tests (tests/test_<name>_*.py) or by a pointer "(← NNN AC-n)" to tested criteria
+of the numbered specs of v1.1.0; a "done" spec has no criterion without proof;
+and a tested criterion of a numbered spec moved to specs/_archive/v1.1.0/ is
+cited by some domain spec.
+
 Options of the full stage (2026-10-15, so CI can run one job per engine):
     --browsers: the engines of the browser tests, comma-separated, or "all".
         Default: the NOCK_BROWSERS environment variable, else chromium (human
@@ -27,10 +34,11 @@ Options of the full stage (2026-10-15, so CI can run one job per engine):
         number; 0 runs everything in one serial pass. The tests marked
         `serial` (scripts/gate_browsers.py) always run after the parallel
         pass, on their own.
-    --specs: spec numbers, comma-separated (for example 027,028): the
-        browser tests run only for those specs; the static checks and the
-        tests without a browser run in full. The quick gate of an agent's
-        finish hook (2026-10-16).
+    --specs: spec numbers and domain names, comma-separated (for example
+        027,grids): the browser tests run only for those numbered specs, those
+        domains and the numbered specs the domains point to; the static checks
+        and the tests without a browser run in full. The quick gate of an
+        agent's finish hook (2026-10-16; domain names since 2026-10-24).
 
 Exit codes:
     0: every check passed.
@@ -45,12 +53,15 @@ import re
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SPECS_DIR = PROJECT_ROOT / "specs"
 TESTS_DIR = PROJECT_ROOT / "tests"
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+# Where the numbered specs of v1.1.0 go once their domains are written.
+ARCHIVE_DIR = SPECS_DIR / "_archive" / "v1.1.0"
 
 # A spec file is named NNN-short-name.md, for example 001-slugify.md.
 SPEC_FILE_PATTERN = re.compile(r"^(\d{3})-.+\.md$")
@@ -60,6 +71,26 @@ CRITERION_PATTERN = re.compile(r"^\s*[-*]\s+\*\*AC-(\d+)\*\*", re.MULTILINE)
 STATUS_PATTERN = re.compile(r"^status:\s*(\S+)\s*$", re.MULTILINE)
 # A test is linked to a criterion by its name: def test_ac1_lowercases_text(...)
 TEST_FUNCTION_PATTERN = re.compile(r"^\s*def\s+test_ac(\d+)_", re.MULTILINE)
+# The spec number in a numbered test file's name: test_spec_027_ac05_display.py.
+NUMBERED_TEST_FILE_PATTERN = re.compile(r"^test_spec_(\d{3})")
+
+# A domain spec (specs/<area>/<file>.md, or specs/product.md) opens with front
+# matter between two "---" lines, holding "name: value" fields.
+FRONT_MATTER_PATTERN = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+FRONT_MATTER_FIELD_PATTERN = re.compile(r"^(\w+):[ \t]*(.*?)[ \t]*$", re.MULTILINE)
+DOMAIN_STATUSES: tuple[str, ...] = ("draft", "approved", "done")
+# A domain name is the file name without .md, in kebab case: co-op, catch-up.
+DOMAIN_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+# The numbered tests are test_spec_NNN_..., so no domain may be called "spec".
+RESERVED_DOMAIN_NAMES: frozenset[str] = frozenset({"spec"})
+# A file kept next to a domain spec for reasons a later change needs.
+NOTES_SUFFIX = ".notes.md"
+# A criterion's pointer to the numbered criteria whose tests prove it:
+# (← 003 AC-1, 005 AC-2).
+POINTER_PATTERN = re.compile(r"\(←([^)]*)\)")
+NUMBERED_CRITERION_PATTERN = re.compile(r"(\d{3}) AC-(\d+)")
+# A line that ends a criterion's text: a blank line, a new bullet, a heading.
+CRITERION_END_PATTERN = re.compile(r"^\s*$|^\s*[-*]\s|^#")
 
 STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("ruff (lint)", ["ruff", "check", "."]),
@@ -95,6 +126,29 @@ TEST_SELECTIONS: dict[str, str] = {
 NO_TESTS_COLLECTED = 5
 # A spec number as --specs takes it: three digits, for example 027.
 SPEC_NUMBER_PATTERN = re.compile(r"^\d{3}$")
+
+
+@dataclass(frozen=True)
+class NumberedSpec:
+    """A numbered spec of v1.1.0, in specs/ or in the archive."""
+
+    number: str
+    path: Path
+    archived: bool
+    criterion_ids: frozenset[int]
+    tested_ids: frozenset[int]
+
+
+@dataclass(frozen=True)
+class DomainSpec:
+    """A domain spec, with its criteria and their pointers."""
+
+    name: str
+    path: Path
+    status: str
+    criterion_ids: frozenset[int]
+    # The numbered criteria each criterion points to, as (spec number, id).
+    pointers: dict[int, list[tuple[str, int]]]
 
 
 def run_tool(step_name: str, command: list[str]) -> int | None:
@@ -186,13 +240,13 @@ def run_pytest_passes(commands: list[tuple[str, list[str]]]) -> bool:
     return all_passed
 
 
-def find_spec_files() -> list[Path]:
-    """Return every numbered spec file, sorted by name."""
-    if not SPECS_DIR.is_dir():
+def find_spec_files(directory: Path = SPECS_DIR) -> list[Path]:
+    """Return every numbered spec file directly in a directory, sorted by name."""
+    if not directory.is_dir():
         return []
 
     spec_files: list[Path] = []
-    for candidate in sorted(SPECS_DIR.iterdir()):
+    for candidate in sorted(directory.iterdir()):
         if SPEC_FILE_PATTERN.match(candidate.name):
             spec_files.append(candidate)
     return spec_files
@@ -284,25 +338,403 @@ def check_one_spec(spec_file: Path) -> list[str]:
     return problems
 
 
-def check_traceability() -> bool:
-    """Check that every acceptance criterion has a test, for every spec.
+def project_path(path: Path) -> str:
+    """Return a path relative to the project root, written with "/"."""
+    return path.relative_to(PROJECT_ROOT).as_posix()
+
+
+def read_numbered_specs() -> tuple[dict[str, NumberedSpec], list[str]]:
+    """Return the numbered specs, in specs/ and in the archive, by number.
 
     Returns:
-        True when no problem was found.
+        The specs by number, and one problem per number found in both places.
+    """
+    numbered: dict[str, NumberedSpec] = {}
+    problems: list[str] = []
+    for directory, archived in ((SPECS_DIR, False), (ARCHIVE_DIR, True)):
+        for spec_file in find_spec_files(directory):
+            name_match = SPEC_FILE_PATTERN.match(spec_file.name)
+            if name_match is None:
+                continue
+            spec_number = name_match.group(1)
+            if spec_number in numbered:
+                problems.append(
+                    f"spec {spec_number} is both in specs/ and in "
+                    f"{project_path(ARCHIVE_DIR)}/: keep only one."
+                )
+                continue
+            spec_text = spec_file.read_text(encoding="utf-8")
+            tested_ids, _ = read_tested_criterion_ids(spec_number)
+            numbered[spec_number] = NumberedSpec(
+                number=spec_number,
+                path=spec_file,
+                archived=archived,
+                criterion_ids=frozenset(read_criterion_ids(spec_text)),
+                tested_ids=frozenset(tested_ids),
+            )
+    return numbered, problems
+
+
+def check_numbered_test_files(numbered: dict[str, NumberedSpec]) -> list[str]:
+    """Return one problem per numbered test file whose spec does not exist."""
+    problems: list[str] = []
+    known_numbers = set(numbered)
+    for test_file in sorted(TESTS_DIR.glob("test_spec_*.py")):
+        name_match = NUMBERED_TEST_FILE_PATTERN.match(test_file.name)
+        if name_match is None:
+            continue
+        spec_number = name_match.group(1)
+        if spec_number not in known_numbers:
+            problems.append(
+                f"tests/{test_file.name}: spec {spec_number} is neither in specs/ "
+                f"nor in {project_path(ARCHIVE_DIR)}/."
+            )
+    return problems
+
+
+def read_front_matter(spec_text: str) -> dict[str, str] | None:
+    """Return the fields of a spec's front matter, or None when it has none."""
+    match = FRONT_MATTER_PATTERN.match(spec_text)
+    if match is None:
+        return None
+    fields: dict[str, str] = {}
+    for field_match in FRONT_MATTER_FIELD_PATTERN.finditer(match.group(1)):
+        fields[field_match.group(1)] = field_match.group(2)
+    return fields
+
+
+def read_pointers(text: str) -> list[tuple[str, int]]:
+    """Return the numbered criteria named by the pointers "(← ...)" of a text."""
+    pointers: list[tuple[str, int]] = []
+    for pointer_match in POINTER_PATTERN.finditer(text):
+        named = NUMBERED_CRITERION_PATTERN.finditer(pointer_match.group(1))
+        for criterion_match in named:
+            pointers.append((criterion_match.group(1), int(criterion_match.group(2))))
+    return pointers
+
+
+def read_domain_criteria(
+    spec_text: str,
+) -> tuple[dict[int, list[tuple[str, int]]], list[int]]:
+    """Return a domain spec's criteria with their pointers, and repeated ids.
+
+    A criterion's text runs from its bullet to the next blank line, bullet or
+    heading; its pointers are read from that text.
+
+    Args:
+        spec_text: The text of the domain spec.
+
+    Returns:
+        The numbered criteria each criterion points to, by criterion id, and
+        the ids declared more than once.
+    """
+    criteria: dict[int, list[tuple[str, int]]] = {}
+    repeated_ids: list[int] = []
+    current_id: int | None = None
+    current_lines: list[str] = []
+    # A last empty line closes the last criterion.
+    for line in [*spec_text.splitlines(), ""]:
+        start_match = CRITERION_PATTERN.match(line)
+        if start_match is not None or CRITERION_END_PATTERN.match(line):
+            if current_id is not None:
+                criteria[current_id] = read_pointers(" ".join(current_lines))
+            current_id = None
+            current_lines = []
+        if start_match is not None:
+            current_id = int(start_match.group(1))
+            if current_id in criteria:
+                repeated_ids.append(current_id)
+            current_lines = [line]
+        elif current_id is not None:
+            current_lines.append(line)
+    return criteria, repeated_ids
+
+
+def find_domain_spec_files() -> list[Path]:
+    """Return the domain spec files, sorted by path.
+
+    They are the .md files under specs/, except the numbered specs, the notes
+    files, and every file or folder whose name starts with "_".
+    """
+    if not SPECS_DIR.is_dir():
+        return []
+    spec_files: list[Path] = []
+    for path in sorted(SPECS_DIR.rglob("*.md")):
+        relative_parts = path.relative_to(SPECS_DIR).parts
+        hidden = any(part.startswith("_") for part in relative_parts)
+        if hidden or path.name.endswith(NOTES_SUFFIX):
+            continue
+        if len(relative_parts) == 1 and SPEC_FILE_PATTERN.match(path.name):
+            continue
+        spec_files.append(path)
+    return spec_files
+
+
+def read_domain_spec(spec_file: Path) -> tuple[DomainSpec | None, list[str]]:
+    """Read one domain spec and check its front matter.
+
+    Args:
+        spec_file: Path of the domain spec.
+
+    Returns:
+        The spec, or None when its front matter is not valid, and the problems
+        found.
+    """
+    spec_label = project_path(spec_file)
+    spec_text = spec_file.read_text(encoding="utf-8")
+    fields = read_front_matter(spec_text)
+    if fields is None:
+        return None, [
+            f"{spec_label}: no front matter (expected area, file and status "
+            "between two '---' lines, as in specs/_template.md)."
+        ]
+
+    problems: list[str] = []
+    name = spec_file.stem
+    if not DOMAIN_NAME_PATTERN.match(name) or name in RESERVED_DOMAIN_NAMES:
+        problems.append(
+            f"{spec_label}: '{name}' is not a domain name (kebab case, not 'spec')."
+        )
+    if fields.get("file") != name:
+        problems.append(
+            f"{spec_label}: the front matter must say 'file: {name}', the file "
+            "name without .md."
+        )
+    if not fields.get("area"):
+        problems.append(f"{spec_label}: the front matter has no 'area'.")
+    status = fields.get("status", "")
+    if status not in DOMAIN_STATUSES:
+        problems.append(
+            f"{spec_label}: status '{status}' is not one of "
+            f"{', '.join(DOMAIN_STATUSES)}."
+        )
+    if problems:
+        return None, problems
+
+    criteria, repeated_ids = read_domain_criteria(spec_text)
+    for criterion_id in repeated_ids:
+        problems.append(f"{spec_label}: AC-{criterion_id} is declared twice.")
+    domain = DomainSpec(
+        name=name,
+        path=spec_file,
+        status=status,
+        criterion_ids=frozenset(criteria),
+        pointers=criteria,
+    )
+    return domain, problems
+
+
+def domain_test_prefix(domain_name: str) -> str:
+    """Return the name a domain's test files start with after "test_"."""
+    return domain_name.replace("-", "_")
+
+
+def read_domain_specs() -> tuple[list[DomainSpec], list[str]]:
+    """Return every valid domain spec and the problems found reading them.
+
+    Besides each file's own problems, two domains may not share a name, and no
+    domain's test prefix followed by "_" may begin another's, so that a test
+    file always names one domain.
+    """
+    domains: list[DomainSpec] = []
+    problems: list[str] = []
+    paths_by_name: dict[str, Path] = {}
+    for spec_file in find_domain_spec_files():
+        domain, file_problems = read_domain_spec(spec_file)
+        problems.extend(file_problems)
+        if domain is None:
+            continue
+        if domain.name in paths_by_name:
+            problems.append(
+                f"{project_path(spec_file)}: the domain name '{domain.name}' is "
+                f"already used by {project_path(paths_by_name[domain.name])}."
+            )
+            continue
+        paths_by_name[domain.name] = spec_file
+        domains.append(domain)
+
+    names = sorted(paths_by_name)
+    for first_name in names:
+        first_prefix = domain_test_prefix(first_name) + "_"
+        for second_name in names:
+            if domain_test_prefix(second_name).startswith(first_prefix):
+                problems.append(
+                    f"domains '{first_name}' and '{second_name}': the test files "
+                    f"of '{second_name}' would also name '{first_name}'; rename "
+                    "one of them."
+                )
+    return domains, problems
+
+
+def read_domain_tested_ids(domain_name: str) -> set[int]:
+    """Return the criterion numbers covered by a domain's own test files."""
+    prefix = domain_test_prefix(domain_name)
+    test_files = sorted(TESTS_DIR.glob(f"test_{prefix}_*.py"))
+    single_file = TESTS_DIR / f"test_{prefix}.py"
+    if single_file.is_file():
+        test_files.append(single_file)
+    tested_ids: set[int] = set()
+    for test_file in test_files:
+        test_text = test_file.read_text(encoding="utf-8")
+        for match in TEST_FUNCTION_PATTERN.finditer(test_text):
+            tested_ids.add(int(match.group(1)))
+    return tested_ids
+
+
+def check_domain_spec(
+    domain: DomainSpec, numbered: dict[str, NumberedSpec]
+) -> tuple[list[str], list[str], set[tuple[str, int]]]:
+    """Check that the criteria of one domain spec are proven.
+
+    Args:
+        domain: The domain spec to check.
+        numbered: The numbered specs, by number.
+
+    Returns:
+        The problems, the criteria still waiting for a test (a problem only
+        when the spec is "done"), and the numbered criteria its pointers cite
+        with success.
+    """
+    spec_label = project_path(domain.path)
+    test_label = f"tests/test_{domain_test_prefix(domain.name)}_*.py"
+    problems: list[str] = []
+    pending: list[str] = []
+    cited: set[tuple[str, int]] = set()
+
+    if domain.status != "draft" and not domain.criterion_ids:
+        problems.append(
+            f"{spec_label}: status is '{domain.status}' but no acceptance "
+            "criterion was found (expected bullets like '- **AC-1** ...')."
+        )
+
+    tested_ids = read_domain_tested_ids(domain.name)
+    for criterion_id in sorted(tested_ids - domain.criterion_ids):
+        problems.append(
+            f"{test_label}: test_ac{criterion_id}_... points to AC-{criterion_id}, "
+            f"which does not exist in {spec_label}."
+        )
+
+    for criterion_id in sorted(domain.criterion_ids):
+        proven = criterion_id in tested_ids
+        for spec_number, numbered_id in domain.pointers[criterion_id]:
+            pointer = f"{spec_number} AC-{numbered_id}"
+            numbered_spec = numbered.get(spec_number)
+            if numbered_spec is None:
+                problems.append(
+                    f"{spec_label}: AC-{criterion_id} points to {pointer}, but "
+                    f"spec {spec_number} does not exist."
+                )
+            elif numbered_id not in numbered_spec.criterion_ids:
+                problems.append(
+                    f"{spec_label}: AC-{criterion_id} points to {pointer}, which "
+                    f"does not exist in {project_path(numbered_spec.path)}."
+                )
+            elif numbered_id not in numbered_spec.tested_ids:
+                problems.append(
+                    f"{spec_label}: AC-{criterion_id} points to {pointer}, which "
+                    f"no test proves (expected 'def test_ac{numbered_id}_...' in "
+                    f"tests/test_spec_{spec_number}*.py)."
+                )
+            else:
+                proven = True
+                cited.add((spec_number, numbered_id))
+        if not proven:
+            # Plain ASCII: a Windows console or pipe may not print an arrow.
+            message = (
+                f"{spec_label}: AC-{criterion_id} has no test (expected "
+                f"'def test_ac{criterion_id}_...' in {test_label}, or a pointer "
+                "to tested criteria of a numbered spec, see specs/_map.md)."
+            )
+            if domain.status == "done":
+                problems.append(message)
+            else:
+                pending.append(message)
+    return problems, pending, cited
+
+
+def check_archived_spec(
+    numbered_spec: NumberedSpec, cited: set[tuple[str, int]]
+) -> list[str]:
+    """Check that the tested criteria of an archived numbered spec have an owner.
+
+    Args:
+        numbered_spec: The archived spec.
+        cited: The numbered criteria the domain specs point to.
+
+    Returns:
+        One problem per test that points nowhere and per tested criterion that
+        no domain spec points to.
+    """
+    spec_label = project_path(numbered_spec.path)
+    test_glob = f"tests/test_spec_{numbered_spec.number}*.py"
+    problems: list[str] = []
+    dangling_ids = numbered_spec.tested_ids - numbered_spec.criterion_ids
+    for criterion_id in sorted(dangling_ids):
+        problems.append(
+            f"{test_glob}: test_ac{criterion_id}_... points to AC-{criterion_id}, "
+            f"which does not exist in {spec_label}."
+        )
+    owned_ids = numbered_spec.tested_ids & numbered_spec.criterion_ids
+    for criterion_id in sorted(owned_ids):
+        if (numbered_spec.number, criterion_id) not in cited:
+            problems.append(
+                f"{spec_label}: AC-{criterion_id} has tests but no domain spec "
+                f"points to it (point to {numbered_spec.number} AC-{criterion_id} "
+                "from the domain criterion that keeps this behaviour, or delete "
+                "its tests)."
+            )
+    return problems
+
+
+def check_traceability() -> bool:
+    """Check that every acceptance criterion is proven, for every spec.
+
+    The numbered specs still in specs/ are checked as before the domain specs:
+    each criterion has a test and each test a criterion. The domain specs and
+    the archived numbered specs are checked as specs/_map.md describes.
+
+    Returns:
+        True when no problem was found. Criteria of a domain spec that is not
+        "done" and that wait for a test are listed, not failed.
     """
     print("\n=== spec traceability ===", flush=True)
 
-    all_problems: list[str] = []
-    spec_files = find_spec_files()
-    for spec_file in spec_files:
-        all_problems.extend(check_one_spec(spec_file))
+    numbered, problems = read_numbered_specs()
+    problems.extend(check_numbered_test_files(numbered))
+    active_count = 0
+    archived_specs: list[NumberedSpec] = []
+    for spec_number in sorted(numbered):
+        numbered_spec = numbered[spec_number]
+        if numbered_spec.archived:
+            archived_specs.append(numbered_spec)
+        else:
+            active_count += 1
+            problems.extend(check_one_spec(numbered_spec.path))
 
-    if all_problems:
-        for problem in all_problems:
+    domains, domain_problems = read_domain_specs()
+    problems.extend(domain_problems)
+    pending: list[str] = []
+    cited: set[tuple[str, int]] = set()
+    for domain in domains:
+        spec_problems, spec_pending, spec_cited = check_domain_spec(domain, numbered)
+        problems.extend(spec_problems)
+        pending.extend(spec_pending)
+        cited.update(spec_cited)
+
+    for numbered_spec in archived_specs:
+        problems.extend(check_archived_spec(numbered_spec, cited))
+
+    for message in pending:
+        print(f"PENDING: {message}")
+    if problems:
+        for problem in problems:
             print(f"FAIL: {problem}")
         return False
 
-    print(f"OK: spec traceability ({len(spec_files)} spec file(s) checked)")
+    print(
+        f"OK: spec traceability ({active_count} numbered spec(s), "
+        f"{len(archived_specs)} archived, {len(domains)} domain spec(s) checked)"
+    )
     return True
 
 
@@ -343,25 +775,63 @@ def parse_workers(workers_text: str) -> str:
 
 
 def parse_specs(specs_text: str) -> list[str]:
-    """Return the spec numbers of a comma-separated list, each three digits.
+    """Return the spec numbers and domain names of a comma-separated list.
 
     Raises:
-        argparse.ArgumentTypeError: When a part is not a three-digit number.
+        argparse.ArgumentTypeError: When a part is neither a three-digit number
+            nor a domain name.
     """
     specs: list[str] = []
     for part in specs_text.split(","):
-        spec_number = part.strip()
-        if not spec_number:
+        spec_name = part.strip()
+        if not spec_name:
             continue
-        if not SPEC_NUMBER_PATTERN.match(spec_number):
+        is_number = SPEC_NUMBER_PATTERN.match(spec_name) is not None
+        if not is_number and not DOMAIN_NAME_PATTERN.match(spec_name):
             raise argparse.ArgumentTypeError(
-                f"'{spec_number}' is not a spec number (three digits, e.g. 027)"
+                f"'{spec_name}' is neither a spec number (three digits, e.g. 027) "
+                "nor a domain name (e.g. grids)"
             )
-        if spec_number not in specs:
-            specs.append(spec_number)
+        if spec_name not in specs:
+            specs.append(spec_name)
     if not specs:
-        raise argparse.ArgumentTypeError("no spec number given")
+        raise argparse.ArgumentTypeError("no spec number or domain name given")
     return specs
+
+
+def expand_specs(specs: list[str]) -> tuple[list[str], list[str]]:
+    """Return what selects the browser tests of --specs, and the unknown domains.
+
+    A spec number stays as it is. A domain name gives its test prefix (co-op
+    gives co_op) and the numbers of the specs its criteria point to.
+
+    Args:
+        specs: The spec numbers and domain names given to --specs.
+
+    Returns:
+        The selectors for gate_browsers' --nock-specs, sorted, and the names
+        that no domain spec has.
+    """
+    domains, _ = read_domain_specs()
+    domains_by_name: dict[str, DomainSpec] = {}
+    for domain in domains:
+        domains_by_name[domain.name] = domain
+
+    selectors: set[str] = set()
+    unknown_names: list[str] = []
+    for spec_name in specs:
+        if SPEC_NUMBER_PATTERN.match(spec_name):
+            selectors.add(spec_name)
+            continue
+        domain = domains_by_name.get(spec_name)
+        if domain is None:
+            unknown_names.append(spec_name)
+            continue
+        selectors.add(domain_test_prefix(domain.name))
+        for pointers in domain.pointers.values():
+            for spec_number, _ in pointers:
+                selectors.add(spec_number)
+    return sorted(selectors), unknown_names
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -403,8 +873,8 @@ def parse_arguments() -> argparse.Namespace:
         "--specs",
         type=parse_specs,
         default=None,
-        help="Run the browser tests of these specs only (comma-separated, "
-        "e.g. 027,028); the tests without a browser all run.",
+        help="Run the browser tests of these numbered specs and domains only "
+        "(comma-separated, e.g. 027,grids); the tests without a browser all run.",
     )
     return parser.parse_args()
 
@@ -424,7 +894,8 @@ def pytest_commands(
         engines: The engines of the browser tests.
         selection: The `-m` expression of the --tests choice ("" for all).
         workers: The pytest-xdist workers, "auto" or a number ("0": serial).
-        specs: The specs whose browser tests run, or None for every spec.
+        specs: What selects the browser tests that run (spec numbers and
+            domain test prefixes, from `expand_specs`), or None for all.
 
     Returns:
         One run when `workers` is "0", else the parallel run of the tests not
@@ -458,6 +929,14 @@ def main() -> int:
     """Run the requested stage and return the process exit code."""
     arguments = parse_arguments()
 
+    selected_specs: list[str] | None = None
+    if arguments.specs is not None:
+        selected_specs, unknown_names = expand_specs(arguments.specs)
+        if unknown_names:
+            names = ", ".join(unknown_names)
+            print(f"FAIL: --specs names no domain spec: {names} (see specs/_map.md)")
+            return 1
+
     results: list[bool] = []
     run_static = not arguments.skip_static or arguments.stage == "tests"
     if run_static:
@@ -474,7 +953,7 @@ def main() -> int:
         if results[-1]:
             selection = TEST_SELECTIONS[arguments.tests]
             commands = pytest_commands(
-                arguments.browsers, selection, arguments.workers, arguments.specs
+                arguments.browsers, selection, arguments.workers, selected_specs
             )
             results.append(run_pytest_passes(commands))
 

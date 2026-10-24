@@ -1,31 +1,56 @@
 ---
 name: new-spec
-description: Create a numbered draft spec in specs/ from a feature description, then stop for human approval.
-argument-hint: [feature description and acceptance criteria]
+description: Turn a feature request into a brief in Backlog.md, then into a change of the domain specs, stopping for the human's approval of each.
+argument-hint: [feature or change description]
 disable-model-invocation: true
 ---
 
-# Create a spec
+# Brief, then spec change
 
-The user wants a new spec for this feature:
+The user wants this feature or change:
 
 $ARGUMENTS
 
-You are the lead. The spec-writer agent writes the file; you carry messages
-between it and the user, because the agent cannot ask the user anything itself.
+You are the lead. You write the brief, the spec-writer agent writes the spec
+change, and the human approves both. Keep both short: every agent after you reads
+them.
 
-1. Delegate to the `spec-writer` agent. Pass it the feature description above word
-   for word, including any acceptance criteria the user already wrote. It does not
-   see this conversation, so do not summarise.
-2. When it returns, show the user the path of the new spec, the acceptance
-   criteria and the open questions.
-3. If there are open questions, ask the user. Send the answers back to the same
-   `spec-writer` agent so it updates the spec, then show the result again.
-4. If the spec-writer redrew screens (its report says so), rebuild the screens
-   sheet with `uv run python docs/design/screens_sheet/build.py` and check that
+## 1. Brief
+
+1. If you are on the default branch, create the item's branch from `origin/main`
+   with `git switch -c feat/b-NNN-<short-name>` (NNN is the next free item number
+   in `Backlog.md`).
+2. Read `specs/_map.md` and pick the domain files the request touches. More than
+   three means it is several changes: say so and propose how to split it.
+3. Read the Purpose and Rules of those files, enough to write the brief.
+4. Add the item to `Backlog.md`, in the format at its top, with status `brief`:
+   the problem in one or two lines, in scope, out of scope, the domain files, the
+   screens it touches, and the open questions. When it changes what a screen
+   looks like, give two or three options with your pick.
+5. Show the user the brief and stop. When they approve it (and pick an option),
+   set the item to `approved`.
+
+## 2. Spec change
+
+1. Delegate to the `spec-writer` agent: the item id, its brief word for word, and
+   the user's answers. It does not see this conversation.
+2. When it returns, show the user the diff of the specs (`git diff -- specs`), the
+   criteria it added, changed or deleted, and its open questions. Send the user's
+   answers back to the same spec-writer, then show the result again.
+3. If the spec-writer redrew screens, rebuild the sheet with
+   `uv run python docs/design/screens_sheet/build.py` and check that
    `uv run python docs/design/screens_sheet/build.py --check` passes.
-5. Stop here. The spec stays `status: draft` until the user has read it and tells
-   you it is approved. When they do, change the status line to `status: approved`
-   and tell them the next step: `/feature specs/<file>`.
 
-Do not start writing tests or code from this command.
+## 3. Stop for approval
+
+The changed domain files stay `status: draft` until the user has read the change
+and says it is approved. Then:
+
+- set `status: approved` in each changed domain file;
+- fill the item's "Criteria" line (for example `grids AC-20 (new), grids AC-7
+  (changed), library AC-3 (deleted)`) and set the item to `ready`;
+- commit the brief and the spec change, `docs: spec change for B-NNN`, with the
+  reasons of the spec-writer's report in the message body;
+- tell the user the next step: `/feature B-NNN`.
+
+Do not write tests or code from this command.

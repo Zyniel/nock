@@ -2,7 +2,6 @@
 area: content
 file: grids
 status: draft
-baseline: v1.1.0
 ---
 
 # content/grids - Grids: model, files, import checks and rights
