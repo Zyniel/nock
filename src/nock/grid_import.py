@@ -6,7 +6,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from nock.grid import Arrow, ClueCell, Grid, LetterCell, Position
+from nock.grid import Arrow, ClueCell, Edge, Grid, LetterCell, Position
 
 
 class GridImportError(ValueError):
@@ -32,12 +32,9 @@ class _PlacedClue(NamedTuple):
     text: str
     answer: str  # as written, for messages
     letters: str
-    breaks: tuple[int, ...]
     word: list[Position]
+    clue_index: int  # index of the clue in its clue cell
 
-
-# An edge between two neighbouring cells of a word, the first one first.
-Edge = tuple[Position, Position]
 
 # Offset of the word's first cell from the clue cell: (rows, columns).
 _START_OFFSETS = {
@@ -116,8 +113,8 @@ def _place_clues(grid: Grid) -> list[_PlacedClue]:
                 text=clue.text,
                 answer=clue.answer,
                 letters=clue.letters,
-                breaks=clue.breaks,
                 word=word,
+                clue_index=clue_index,
             )
             placed_clues.append(placed_clue)
     return placed_clues
@@ -230,27 +227,26 @@ def _check_crossing_letters(grid: Grid, placed_clues: list[_PlacedClue]) -> None
                 )
 
 
-def _edges_of(clue: _PlacedClue) -> list[tuple[Edge, bool]]:
+def _edges_of(grid: Grid, clue: _PlacedClue) -> list[tuple[Edge, bool]]:
     """Return the edges between a word's cells, each with whether it is a break.
 
-    The edge after the word's k-th cell (from one) is a break when the answer has
-    a hyphen after k letters.
+    Only call this once the answer lengths have been checked.
     """
+    hyphen_edges = grid.hyphen_edges(clue.row, clue.column, clue.clue_index)
     edges: list[tuple[Edge, bool]] = []
     for index in range(len(clue.word) - 1):
         edge = (clue.word[index], clue.word[index + 1])
-        letters_before_edge = index + 1
-        is_break = letters_before_edge in clue.breaks
+        is_break = edge in hyphen_edges
         edges.append((edge, is_break))
     return edges
 
 
-def _check_shared_hyphens(placed_clues: list[_PlacedClue]) -> None:
+def _check_shared_hyphens(grid: Grid, placed_clues: list[_PlacedClue]) -> None:
     """Check that two words sharing an edge agree on its hyphen."""
     first_clue_of_edge: dict[Edge, _PlacedClue] = {}
     first_break_of_edge: dict[Edge, bool] = {}
     for clue in placed_clues:
-        for edge, is_break in _edges_of(clue):
+        for edge, is_break in _edges_of(grid, clue):
             if edge not in first_clue_of_edge:
                 first_clue_of_edge[edge] = clue
                 first_break_of_edge[edge] = is_break
@@ -290,7 +286,7 @@ def import_grid(text: str) -> ImportReport:
     _check_letters_in_a_word(grid, placed_clues)
     _check_runs_have_a_clue(grid, placed_clues)
     _check_crossing_letters(grid, placed_clues)
-    _check_shared_hyphens(placed_clues)
+    _check_shared_hyphens(grid, placed_clues)
 
     return ImportReport(
         grid=grid,

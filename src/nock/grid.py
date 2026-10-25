@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 Position = tuple[int, int]  # (row, column), from zero
+Edge = tuple[Position, Position]  # two neighbouring cells of a word, first one first
 
 _LIGATURES = {"Œ": "OE", "œ": "oe", "Æ": "AE", "æ": "ae"}
 _RIGHT_SINGLE_QUOTE = chr(0x2019)
@@ -316,6 +317,38 @@ class Grid(BaseModel):
             current_row += word_start.row_step
             current_column += word_start.column_step
         return positions
+
+    def hyphen_edges(self, row: int, column: int, clue_index: int) -> list[Edge]:
+        """Return the edges where a clue's answer has a hyphen.
+
+        The clue is clue `clue_index` of the clue cell at (row, column). Its word
+        must have as many cells as the answer has letters.
+
+        Args:
+            row: Row of the clue cell.
+            column: Column of the clue cell.
+            clue_index: Index of the clue in that cell.
+
+        Returns:
+            One (cell before, cell after) pair per hyphen, in reading order.
+
+        Raises:
+            IndexError: if (row, column) is outside the grid, clue_index is not a
+                valid index into that cell's clues, or the word is shorter than
+                the answer.
+            ValueError: if the cell at (row, column) is not a clue cell, or the
+                word's start cell is outside the grid or is not a letter cell.
+        """
+        word = self.word_cells(row, column, clue_index)
+        clue_cell = self.cell_at(row, column)
+        if not isinstance(clue_cell, ClueCell):
+            raise ValueError(f"cell at {_format_position(row, column)} is not a clue")
+        edges: list[Edge] = []
+        for letters_before in clue_cell.clues[clue_index].breaks:
+            cell_before = word[letters_before - 1]
+            cell_after = word[letters_before]
+            edges.append((cell_before, cell_after))
+        return edges
 
     @staticmethod
     def _start_and_step(row: int, column: int, arrow: Arrow) -> _WordStart:

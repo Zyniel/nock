@@ -452,11 +452,11 @@ def _hyphen_marks(grid: Grid) -> tuple[set[Position], set[Position]]:
         for clue_index, clue in enumerate(cell.clues):
             if not clue.breaks:
                 continue
-            word = grid.word_cells(cell.row, cell.column, clue_index)
-            for letters_before in clue.breaks:
-                cell_before = word[letters_before - 1]
-                cell_after = word[letters_before]
-                if cell_after[0] == cell_before[0]:
+            for cell_before, cell_after in grid.hyphen_edges(
+                cell.row, cell.column, clue_index
+            ):
+                is_across = cell_after[0] == cell_before[0]
+                if is_across:
                     right_marks.add(cell_before)
                 else:
                     down_marks.add(cell_before)
