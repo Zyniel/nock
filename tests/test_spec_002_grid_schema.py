@@ -426,7 +426,7 @@ def test_ac3_normalize_answer_error_shows_the_original_text_with_ligature() -> N
         normalize_answer("CŒUR2")
 
 
-def test_ac3_clue_answer_is_normalized() -> None:
+def test_ac3_clue_answer_keeps_its_text() -> None:
     # The answer keeps its text; its letters are the normalised form.
     clue = Clue(text="Etre", arrow="down", answer="être")
     assert clue.answer == "être"
@@ -474,7 +474,7 @@ def test_ac3_clue_with_digit_in_answer_is_rejected() -> None:
         Clue(text="Indice", arrow="down", answer="R2D2")
 
 
-def test_ac3_answer_is_normalized_when_loading_a_grid() -> None:
+def test_ac3_a_loaded_grid_keeps_its_answer_text() -> None:
     # Loaded, the answer stays as written; letters and breaks are derived.
     clue = {"text": "Indice", "arrow": "right", "answer": "arc-en-ciel"}
     cell = {"type": "clue", "row": 0, "column": 0, "clues": [clue]}

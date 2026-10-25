@@ -18,7 +18,9 @@ Choices where the spec leaves room:
   side while the pixels count whole lines. "On a whole pixel": every pixel the
   dashes cover is `--nock-hyphen` or the background, none blended.
 - The crossing grid lines stay plain: their pixels at the ends of the edge are
-  rule grey across the dashes' thickness.
+  rule grey across the dashes' thickness. Rule 20's "whatever the state of the
+  two cells" includes a cell with both marks: FX-01 with `TA-MIS` and `NA-VAL`,
+  where both edges of (1, 1) end at its bottom right corner pixel.
 - "The same in every state": the same look by the formula for the cell's
   current size. Before and after the state, the dashes match the formula at the
   side read then (Auteurs mode shows its legend under the grid, which refits it
@@ -33,7 +35,10 @@ Choices where the spec leaves room:
   and their top pixel row is the bottom row of (1, 1).
 - AC-22, my selection border: the rows of its top and bottom sides (2 px at each
   end of the right side) belong to those sides and are not read as the dashed
-  side; its three other sides are read 3 px away from the corners.
+  side; its three other sides are read 3 px away from the corners. Rule 20's
+  "whatever the state of the two cells" also reads the band with my selected
+  cell after the edge ((2, 3), and (2, 1) below `NA-VAL`), where the line's
+  pixel is in the cell before, and on the down hyphen with (1, 1) selected.
 - AC-22, the tap and the letters: the same tap and keys on FX-01 as published
   give the same cells and letters.
 """
@@ -45,11 +50,13 @@ from typing import NamedTuple
 
 import pytest
 from playwright.sync_api import Page, ViewportSize, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from board_harness import (
     HYPHEN,
     INTERIOR_OFFSET,
     EdgeReading,
+    Run,
     Side,
     dash_count,
     dash_thickness,
@@ -80,6 +87,7 @@ from spec019_harness import (
     turn_switch_on,
 )
 from spec042_harness import (
+    CELL_SELECTOR,
     NAVY,
     RULE,
     SELECTED,
@@ -123,6 +131,20 @@ def fx02_hyphen_grid(fx02_text: str) -> Grid:
 
 
 @pytest.fixture
+def both_marks_grid(fx01_text: str) -> Grid:
+    """FX-01 with `TA-MIS` and `NA-VAL`: (1, 1) has both marks."""
+    return grid_with_answers(fx01_text, {"TAMIS": "TA-MIS", "NAVAL": "NA-VAL"})
+
+
+@pytest.fixture
+def case_grids(
+    hyphen_grid: Grid, fx02_hyphen_grid: Grid, both_marks_grid: Grid
+) -> dict[str, Grid]:
+    """The grids of the edge cases, by the name a case gives."""
+    return {"fx01": hyphen_grid, "fx02": fx02_hyphen_grid, "both": both_marks_grid}
+
+
+@pytest.fixture
 def catalogue(fx01_grid: Grid) -> Catalogue:
     """FX-01 as published entry 1 (the live server serves it)."""
     return make_catalogue(fx01_grid)
@@ -142,16 +164,40 @@ LARGE_SIDES: SideRange = (72.0, 200.0)
 
 VIDE_EDGE: Cell = (2, 2)  # its right edge
 NAVAL_EDGE: Cell = (1, 1)  # its bottom edge
+TAMIS_EDGE: Cell = (1, 1)  # its right edge
 FX02_EDGE: Cell = (1, 4)  # its right edge
 
 
+# True once the cell's side is fractional and in [low, high).
+SIDE_SCRIPT = """
+([selector, low, high]) => {
+  const cell = document.querySelector(selector);
+  if (cell === null) {
+    return false;
+  }
+  const side = cell.getBoundingClientRect().width;
+  return low <= side && side < high && side !== Math.trunc(side);
+}
+"""
+
+
 def require_side(page: Page, cell: Cell, sides: SideRange) -> float:
-    """The cell's side; the test fails unless it is fractional and in `sides`."""
-    side = box_of(cell_at(page, *cell)).width
+    """The cell's side, once it is fractional and in `sides`.
+
+    The grid fits its area after the snapshot shows, so the side is polled; the
+    test fails, naming the side, when it is not such a side in time.
+    """
+    row, column = cell
     low, high = sides
-    if not low <= side < high or side == int(side):
+    selector = CELL_SELECTOR.format(row=row, column=column)
+    try:
+        page.wait_for_function(
+            SIDE_SCRIPT, arg=[selector, low, high], timeout=WAIT_TIMEOUT_MS
+        )
+    except PlaywrightTimeoutError:
+        side = box_of(cell_at(page, *cell)).width
         pytest.fail(f"cells of {side} px, expected a fractional side in {sides}")
-    return side
+    return box_of(cell_at(page, *cell)).width
 
 
 def open_fx01(page: Page, base_url: str, view: GridView, window: ViewportSize) -> None:
@@ -186,12 +232,23 @@ EDGE_CASES = {
     ),
 }
 
+# (1, 1) with both marks: its two hyphen edges meet at its bottom right corner,
+# the pixel where the crossing lines of both edges end.
+CORNER_CASES = EDGE_CASES | {
+    "ta-mis-right-beside-na-val": EdgeCase(
+        "both", MEDIUM_WINDOW, MEDIUM_SIDES, TAMIS_EDGE, Side.RIGHT, (2, 1)
+    ),
+    "na-val-bottom-beside-ta-mis": EdgeCase(
+        "both", MEDIUM_WINDOW, MEDIUM_SIDES, NAVAL_EDGE, Side.BOTTOM, (1, 2)
+    ),
+}
+
 
 def read_case(
-    page: Page, base_url: str, case: EdgeCase, fx01: Grid, fx02: Grid
+    page: Page, base_url: str, case: EdgeCase, grids: dict[str, Grid]
 ) -> EdgeReading:
     """Open a case's grid, no one on it, and read its hyphen edge."""
-    grid = fx01 if case.grid_name == "fx01" else fx02
+    grid = grids[case.grid_name]
     page.set_viewport_size(case.window)
     open_room(page, base_url, grid_view(grid), [me()])
     require_side(page, case.cell, case.sides)
@@ -203,12 +260,11 @@ def read_case(
 def test_ac21_a_hyphen_edge_has_the_dashes_of_the_design(
     page: Page,
     live_server: str,
-    hyphen_grid: Grid,
-    fx02_hyphen_grid: Grid,
+    case_grids: dict[str, Grid],
     case_name: str,
 ) -> None:
     case = EDGE_CASES[case_name]
-    reading = read_case(page, live_server, case, hyphen_grid, fx02_hyphen_grid)
+    reading = read_case(page, live_server, case, case_grids)
 
     found = runs_of(reading.inner(0), HYPHEN)
 
@@ -216,16 +272,15 @@ def test_ac21_a_hyphen_edge_has_the_dashes_of_the_design(
     assert run_problems(found, expected_runs(reading.cell_side)) == []
 
 
-@pytest.mark.parametrize("case_name", list(EDGE_CASES))
+@pytest.mark.parametrize("case_name", list(CORNER_CASES))
 def test_ac21_a_hyphen_edge_leaves_its_corners_open_and_the_crossing_lines_plain(
     page: Page,
     live_server: str,
-    hyphen_grid: Grid,
-    fx02_hyphen_grid: Grid,
+    case_grids: dict[str, Grid],
     case_name: str,
 ) -> None:
-    case = EDGE_CASES[case_name]
-    reading = read_case(page, live_server, case, hyphen_grid, fx02_hyphen_grid)
+    case = CORNER_CASES[case_name]
+    reading = read_case(page, live_server, case, case_grids)
     covered = thickness_offsets(dash_thickness(reading.cell_side))
 
     found = runs_of(reading.inner(0), HYPHEN)
@@ -243,12 +298,11 @@ def test_ac21_a_hyphen_edge_leaves_its_corners_open_and_the_crossing_lines_plain
 def test_ac21_a_hyphen_edge_has_its_thickness_in_hyphen_grey_none_blended(
     page: Page,
     live_server: str,
-    hyphen_grid: Grid,
-    fx02_hyphen_grid: Grid,
+    case_grids: dict[str, Grid],
     case_name: str,
 ) -> None:
     case = EDGE_CASES[case_name]
-    reading = read_case(page, live_server, case, hyphen_grid, fx02_hyphen_grid)
+    reading = read_case(page, live_server, case, case_grids)
     covered = thickness_offsets(dash_thickness(reading.cell_side))
     dashes = hyphen_positions(reading)
 
@@ -512,30 +566,107 @@ def open_selected_vide(page: Page, base_url: str, grid: Grid) -> None:
     expect(page.get_by_test_id("grid")).to_have_attribute("data-direction", "across")
 
 
-def test_ac22_my_selected_cells_border_is_dashed_navy_on_its_hyphen_side(
-    page: Page, live_server: str, hyphen_grid: Grid
-) -> None:
-    open_selected_vide(page, live_server, hyphen_grid)
+class BorderCase(NamedTuple):
+    """My selected cell beside a hyphen edge, and where the edge's pixels lie.
 
-    reading = read_vide_edge(page)
+    Attributes:
+        tapped: My selected cell, selected across by a tap.
+        cell: The cell whose right or bottom edge is the hyphen edge.
+        side: That edge.
+        reference: The cell whose plain line finds the edge's line pixel.
+        band: The offsets of the dashed band: the border's 2 px and the line's
+            pixel.
+        beside: The offset of the next pixel in the other cell of the edge.
+        background: That cell's background.
+    """
 
-    side = reading.cell_side
-    hyphen_runs = runs_of(reading.inner(1), HYPHEN)
-    assert run_problems(hyphen_runs, expected_runs(side)) == []
+    tapped: Cell
+    cell: Cell
+    side: Side
+    reference: Cell
+    band: tuple[int, ...]
+    beside: int
+    background: Rgb
+
+
+BEFORE_BAND = (-2, -1, 0)
+AFTER_BAND = (0, 1, 2)
+
+BORDER_CASES = {
+    "before-vi-de": BorderCase(
+        VIDE_EDGE, VIDE_EDGE, Side.RIGHT, (3, 2), BEFORE_BAND, 1, WORD
+    ),
+    "after-vi-de": BorderCase(
+        (2, 3), VIDE_EDGE, Side.RIGHT, (3, 2), AFTER_BAND, -1, WORD
+    ),
+    "above-na-val": BorderCase(
+        NAVAL_EDGE, NAVAL_EDGE, Side.BOTTOM, (1, 2), BEFORE_BAND, 1, WHITE
+    ),
+    "below-na-val": BorderCase(
+        (2, 1), NAVAL_EDGE, Side.BOTTOM, (1, 2), AFTER_BAND, -1, WHITE
+    ),
+}
+
+
+def band_dashes(reading: EdgeReading) -> list[Run]:
+    """The navy dashes of the band on the line's pixel.
+
+    A navy run that lies wholly in the rows of the border's top and bottom
+    sides (`BORDER_PX` at each end) belongs to those sides and is left out.
+    """
+    dashes: list[Run] = []
+    for start, end in runs_of(reading.inner(0), NAVY):
+        in_first_side = end <= BORDER_PX
+        in_last_side = start >= reading.length - BORDER_PX
+        if not in_first_side and not in_last_side:
+            dashes.append((start, end))
+    return dashes
+
+
+def border_problems(reading: EdgeReading, case: BorderCase) -> list[str]:
+    """How the band and the pixels beside it differ from « Hyphen edges ».
+
+    The line's pixel holds the formula's dashes in navy; every offset of the
+    band holds the same dashes, with gaps in the selected blue, between the rows
+    of the border's top and bottom sides. The next pixel in the other cell is
+    that cell's background, with the same dashes in hyphen grey when the
+    hyphen's thickness reaches it.
+    """
+    dashes = band_dashes(reading)
+    problems = run_problems(dashes, expected_runs(reading.cell_side))
     dash_rows: set[int] = set()
-    for start, end in hyphen_runs:
+    for start, end in dashes:
         dash_rows.update(range(start, end))
-    problems: list[str] = []
-    for index, colour in enumerate(reading.inner(1)):
-        if index not in dash_rows and colour != WORD:
-            problems.append(f"offset 1, pixel {index}: {colour}")
-    for offset in (-2, -1, 0):
+    for offset in case.band:
         pixels = reading.inner(offset)
         for index in range(BORDER_PX, reading.length - BORDER_PX):
             expected = NAVY if index in dash_rows else SELECTED
             if pixels[index] != expected:
                 problems.append(f"offset {offset}, pixel {index}: {pixels[index]}")
-    assert problems == []
+    covered = thickness_offsets(dash_thickness(reading.cell_side))
+    for index, colour in enumerate(reading.inner(case.beside)):
+        expected = case.background
+        if case.beside in covered and index in dash_rows:
+            expected = HYPHEN
+        if colour != expected:
+            problems.append(f"offset {case.beside}, pixel {index}: {colour}")
+    return problems
+
+
+@pytest.mark.parametrize("case_name", list(BORDER_CASES))
+def test_ac22_my_selected_cells_border_is_dashed_navy_on_its_hyphen_side(
+    page: Page, live_server: str, hyphen_grid: Grid, case_name: str
+) -> None:
+    case = BORDER_CASES[case_name]
+    open_fx01(page, live_server, grid_view(hyphen_grid), MEDIUM_WINDOW)
+    require_side(page, case.cell, MEDIUM_SIDES)
+    tap(page, *case.tapped)
+    expect(page.get_by_test_id("grid")).to_have_attribute("data-direction", "across")
+
+    picture = grid_picture(page)
+    reading = read_edge(page, picture, case.cell, case.side, case.reference)
+
+    assert border_problems(reading, case) == []
 
 
 def solid_problems(reading: EdgeReading, offsets: tuple[int, ...]) -> list[str]:
