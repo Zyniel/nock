@@ -144,7 +144,7 @@
 </dialog>
 
 <style>
-  /* The switch row (_design.md section 11): the label left, the switch right. */
+  /* The switch row (specs/_design/foundation.md « Components »): the label left, the switch right. */
   .switch-row {
     display: flex;
     align-items: center;
@@ -201,7 +201,7 @@
     border: 0;
   }
 
-  /* The field label style (_design.md section 4). */
+  /* The field label style (specs/_design/foundation.md « Typography »). */
   .field-label {
     padding: 0;
     font: 600 0.85rem/1.2 var(--nock-font-ui);
@@ -213,7 +213,7 @@
     margin-bottom: 6px;
   }
 
-  /* The segmented control (_design.md section 11). It wraps rather than leave
+  /* The segmented control (specs/_design/foundation.md « Components »). It wraps rather than leave
      the sheet on a very narrow window. */
   .segments {
     display: inline-flex;

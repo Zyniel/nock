@@ -331,7 +331,7 @@
     color: var(--nock-muted);
   }
 
-  /* The grid's lines (_design.md section 6): its left and top line, then each
+  /* The grid's lines (specs/_design/cells.md « Grid lines and empty cells »): its left and top line, then each
      cell's right and bottom line inside its side. */
   .ops-replay-grid {
     display: grid;

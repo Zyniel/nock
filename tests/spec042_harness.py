@@ -98,7 +98,8 @@ ChangeList = list[tuple[int, int, dict[str, object]]]
 # lists, objects and nulls mixed), so their type is not known here.
 Reading = dict[str, Any]
 
-# The colours of the criteria (`_design.md` section 2, spec 041's tokens).
+# The colours of the criteria (`specs/_design/foundation.md` « Colour tokens »,
+# spec 041's tokens).
 RULE: Rgb = (154, 163, 178)
 WHITE: Rgb = (255, 255, 255)
 SELECTED: Rgb = (207, 221, 243)
@@ -164,8 +165,8 @@ TRIANGLE_POINTS = {
     "bottom-right": "10,0 10,10 0,10",
     "bottom-left": "0,0 10,10 0,10",
 }
-# The shapes of `PLAYER_ICONS[N]` (spec 041, `_design.md` section 6): per index,
-# each shape's tag and the attributes the design gives it.
+# The shapes of `PLAYER_ICONS[N]` (spec 041, `specs/_design/cells.md`
+# « Player icons »): per index, each shape's tag and the attributes the design gives it.
 PLAYER_ICON_SHAPES: list[list[tuple[str, dict[str, str]]]] = [
     [("circle", {"cx": "5", "cy": "5", "r": "4.4"})],
     [("rect", {"x": "0.9", "y": "0.9", "width": "8.2", "height": "8.2"})],

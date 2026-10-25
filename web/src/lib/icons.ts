@@ -1,7 +1,7 @@
-// The icons of Nock (specs/_design.md sections 5 and 6, spec 041), as shapes.
+// The icons of Nock (specs/_design/foundation.md « Icons » and specs/_design/cells.md « Player icons », spec 041), as shapes.
 //
-// A component draws them in an SVG with the stroke attributes of _design.md
-// section 5 (fill none, stroke currentColor, round caps and joins,
+// A component draws them in an SVG with the stroke attributes of specs/_design/foundation.md « Icons »
+// (fill none, stroke currentColor, round caps and joins,
 // aria-hidden). The grid draws the flag on a flagged clue and the player icons
 // of the Accessibilité mode (spec 042, IconShapes.svelte).
 
@@ -27,7 +27,7 @@ export type IconShape =
   | { kind: 'circle'; cx: number; cy: number; r: number }
   | { kind: 'polygon'; points: string }
 
-// The shapes of _design.md section 5, in its order, in a 24 by 24 box.
+// The shapes of specs/_design/foundation.md « Icons », in its order, in a 24 by 24 box.
 export const ICONS: Record<IconName, readonly IconShape[]> = {
   undo: [
     { kind: 'path', d: 'M9 14 4 9l5-5' },
@@ -72,7 +72,7 @@ export const ICONS: Record<IconName, readonly IconShape[]> = {
   ],
 }
 
-// The player icons of the Accessibilité mode (_design.md section 6), by join
+// The player icons of the Accessibilité mode (specs/_design/cells.md « Player icons »), by join
 // index 0 to 7, in a 10 by 10 box. A rect here has rx 0.
 export const PLAYER_ICONS: readonly (readonly IconShape[])[] = [
   // 0, Rond.

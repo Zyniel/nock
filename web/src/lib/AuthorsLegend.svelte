@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The legend of the Auteurs mode (spec 045, _design.md sections 4 and 7):
+  // The legend of the Auteurs mode (spec 045, specs/_design/foundation.md « Typography » and specs/_design/cells.md « Auteurs mode »):
   // « Auteurs : », then each player's name in their ink, in join order. It is
   // a key to colours, which a screen reader does not show, so it is hidden from
   // screen readers. The grid viewport places it under the grid and reports its

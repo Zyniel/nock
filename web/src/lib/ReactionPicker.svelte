@@ -133,7 +133,7 @@
 </div>
 
 <style>
-  /* Over the bottom of the grid, layer 9 (_design.md section 8): drawn over the
+  /* Over the bottom of the grid, layer 9 (specs/_design/room.md « Layers »): drawn over the
      page, so it moves nothing. */
   .reaction-picker {
     position: fixed;

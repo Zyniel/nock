@@ -259,7 +259,7 @@
     color: var(--nock-ink);
   }
 
-  /* The dialog section heading (_design.md section 4). */
+  /* The dialog section heading (specs/_design/foundation.md « Typography »). */
   .recap-section-heading {
     margin: 0;
     font: 600 0.78rem/1.2 var(--nock-font-ui);
@@ -287,7 +287,7 @@
     font-size: 0.95rem;
   }
 
-  /* The player dot (_design.md section 11). */
+  /* The player dot (specs/_design/foundation.md « Components »). */
   .recap-colour {
     flex: none;
     box-sizing: border-box;
@@ -358,7 +358,7 @@
     flex-wrap: wrap;
   }
 
-  /* The URL box (_design.md section 11): one line with an ellipsis. */
+  /* The URL box (specs/_design/foundation.md « Components »): one line with an ellipsis. */
   .recap-share-link {
     flex: 1 1 0;
     display: block;

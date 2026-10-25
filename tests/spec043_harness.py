@@ -133,7 +133,8 @@ Cell = tuple[int, int]
 # lists, objects and nulls mixed), so their type is not known here.
 Reading = dict[str, Any]
 
-# The colours of the criteria (`_design.md` section 2, spec 041's tokens).
+# The colours of the criteria (`specs/_design/foundation.md` « Colour tokens »,
+# spec 041's tokens).
 NAVY: Rgb = (27, 47, 85)
 WHITE: Rgb = (255, 255, 255)
 INK: Rgb = (20, 24, 31)
@@ -203,8 +204,8 @@ IDES = ClueRef(row=0, column=3, clue_index=0)
 MIME = ClueRef(row=0, column=2, clue_index=0)
 NAVAL = ClueRef(row=0, column=0, clue_index=1)
 
-# The shapes of `ICONS` (spec 041's "Icons", `_design.md` section 5): per name,
-# each shape's tag and its attributes.
+# The shapes of `ICONS` (spec 041's "Icons", `specs/_design/foundation.md`
+# « Icons »): per name, each shape's tag and its attributes.
 ICON_SHAPES: dict[str, list[tuple[str, dict[str, str]]]] = {
     "undo": [
         ("path", {"d": "M9 14 4 9l5-5"}),

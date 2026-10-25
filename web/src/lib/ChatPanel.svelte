@@ -268,7 +268,7 @@
     color: var(--nock-ink);
   }
 
-  /* The player dot (_design.md section 11), 6 px before the name. */
+  /* The player dot (specs/_design/foundation.md « Components »), 6 px before the name. */
   .chat-dot {
     display: inline-block;
     box-sizing: border-box;
@@ -342,7 +342,7 @@
     background: var(--nock-clue-bg);
   }
 
-  /* The « Envoyer » pill (_design.md section 11). */
+  /* The « Envoyer » pill (specs/_design/foundation.md « Components »). */
   .chat-send {
     flex: none;
     box-sizing: border-box;

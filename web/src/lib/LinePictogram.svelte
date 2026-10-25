@@ -1,6 +1,6 @@
 <script lang="ts">
   // The pictogram that starts an event line (spec 043, "Discussion: the
-  // stream"; _design.md section 5): → for a join, ← for a departure, ✓ for a
+  // stream"; specs/_design/foundation.md « Icons »): → for a join, ← for a departure, ✓ for a
   // check, ▲ for a reveal, drawn by CSS so that they are never read as text;
   // the filled flag icon for a flag. A kind with no pictogram draws nothing.
   // It takes the colour of its line.

@@ -35,7 +35,7 @@
   } = $props()
 
   // The space kept between a popover and the window's edges, and between the
-  // top bar and a popover (_design.md section 8).
+  // top bar and a popover (specs/_design/room.md « Layers »).
   const EDGE_PX = 6
   const UNDER_BAR_PX = 4
 
@@ -130,7 +130,7 @@
 </div>
 
 <style>
-  /* Over the play area, layer 8 (_design.md section 8). Its content scrolls
+  /* Over the play area, layer 8 (specs/_design/room.md « Layers »). Its content scrolls
      inside it when the window is too low for it. */
   .room-popover {
     position: fixed;

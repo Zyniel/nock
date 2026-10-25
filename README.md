@@ -2,9 +2,9 @@
 
 Nock is an online collaborative arrowword (mots fléchés) game, named after the
 notch at the back of an arrow. It is a spec-first Python project where a small
-team of Claude Code agents does the building: you write or approve a spec, and
-the agents write the tests, then the code, then review it. `CLAUDE.md` is the short version the agents read; this file
-is for you.
+team of Claude Code agents does the building: you approve a brief and a spec
+change, and the agents write the tests, then the code, then review it.
+`CLAUDE.md` is the short version the agents read; this file is for you.
 
 ## 1. One-time setup (Windows, PowerShell)
 
@@ -31,6 +31,11 @@ claude                               # log in with your Claude account, accept t
 
 Accepting the trust prompt matters: the hooks in `.claude/settings.json` only run
 in a folder you have trusted.
+
+The browser tests need the web client's dependencies and the test browsers; run
+`npm --prefix web ci` first in every checkout (a stale `node_modules` builds a
+client that never starts, and every browser test then fails the same way), and
+`uv run playwright install chromium firefox webkit` once.
 
 ## 2. Adding grids
 
@@ -132,31 +137,34 @@ clue, and `/g/<number>` opens a grid.
 
 ## 3. Building a feature
 
-Inside `claude`, in this folder:
+The work queue is `Backlog.md`: one item per change, moving through `brief`,
+`approved`, `ready`, `building` and `done`. The behaviour lives in the domain
+specs, `specs/<area>/<file>.md`; `specs/_map.md` lists them and explains how they
+work. Inside `claude`, in this folder:
 
-1. **Write the spec.** `/new-spec` followed by the feature and your acceptance
-   criteria in plain words. The spec-writer creates `specs/NNN-name.md` and lists
-   its open questions. You can also copy `specs/_template.md` and write it yourself.
-2. **Approve it.** Read the spec. Fix what is wrong, then tell Claude it is
-   approved (or set `status: approved` yourself). Nothing gets built from a draft.
-3. **Build it.** `/feature specs/NNN-name.md`. The lead runs three agents in
-   order and commits after each one:
+1. **Write the brief.** `/new-spec` followed by the feature or change in plain
+   words. The lead writes a brief in `Backlog.md` (`B-NNN`) and waits for you.
+   Approve it, or correct it.
+2. **Approve the spec change.** The spec-writer changes the domain specs of the
+   item (and, for a change of look, `specs/_design/` and `docs/design/`) and
+   lists its open questions. Read the change, fix what is wrong, then tell Claude
+   it is approved: the item becomes `ready`. Nothing gets built from a draft.
+3. **Build it.** `/feature B-NNN`. The lead works on a `feat/b-NNN-...` branch,
+   runs three agents in order and commits after each one:
 
    | Phase | Agent | Result | Blocked until |
    | --- | --- | --- | --- |
-   | Tests | test-writer | `tests/test_spec_NNN_*.py`, failing | lint is clean and every AC has a test |
-   | Code | implementer | code under `src/nock/` | the full gate passes |
+   | Tests | test-writer | `tests/test_<name>_*.py` of the domain (`co-op` gives `test_co_op_*`), failing | lint is clean and every AC has a test |
+   | Code | implementer | code under `src/nock/` and `web/` | the quick gate passes |
    | Review | reviewer | `APPROVE` or `CHANGES REQUESTED` | read-only, reports to you |
 
 4. **Publish it.** Claude stops before pushing. You run
    `git push -u origin <branch>` and `gh pr create --fill`; GitHub Actions then
    runs the same gate.
 
-Spec `002-grid-schema` shows the three files a feature produces: the spec, its
-tests (`tests/test_spec_002_grid_schema.py`) and its code (`src/nock/grid.py`).
-`specs/_archive/` keeps what is no longer used: the starter example
-`001-slugify` and the original backlog, `complete.md`, that specs 002 to 038 were
-split from. The gate, pytest and pyrefly ignore it.
+`specs/_archive/v1.1.0/` holds the numbered specs (`002-...` to `048-...`), the
+build record of v1.1.0; they are never edited again, and the domain specs point
+to their tests. The look is in `specs/_design/`, drawn in `docs/design/`.
 
 ## 4. Where things go
 
@@ -190,7 +198,7 @@ Then decide who uses it:
 
 The kit ships three skills: `python-standards` (the coding rules, preloaded into
 the test-writer, implementer and reviewer), `new-spec` and `feature` (the two
-commands above).
+commands above). The four roles are in `.claude/agents/`.
 
 ### Running the server with a database
 
@@ -282,8 +290,9 @@ the password.
 
 1. `ruff check .` (PEP 8, naming, docstrings, annotations, import order)
 2. `black --check .` (formatting)
-3. spec traceability: every `- **AC-n**` in a spec has a `test_acn_...` test, and
-   no test points to a criterion that does not exist
+3. spec traceability: every `- **AC-n**` of a domain spec has a `test_acn_...`
+   test (or a pointer to the tests of v1.1.0), and no test points to a
+   criterion that does not exist
 4. `pyrefly check` (types), `svelte-check` and the vite build of `web/`
 5. `pytest`, in parallel (pytest-xdist), then the timing-sensitive test files
    on their own
@@ -298,8 +307,9 @@ the tests with or without a browser, and `--skip-static` skips steps 1 to 4
 except the build. CI uses them: each pull request runs Chromium on Ubuntu, and a
 merge into `main` (or a run started by hand from the Actions tab) adds one job
 each for Firefox and WebKit, on Ubuntu.
-`--specs 027,028` keeps the browser tests of those specs only (the tests without
-a browser all run): the quick gate an implementer passes before it finishes.
+`--specs grids,027` keeps the browser tests of those domains and numbered specs
+only (the tests without a browser all run): the quick gate an implementer passes
+before it finishes.
 
 The same script runs in three places:
 
@@ -307,7 +317,7 @@ The same script runs in three places:
 - **The agents:** `scripts/hooks/role_gate.py` runs it when the test-writer or the
   implementer tries to finish, and sends the failures back until it is green.
   The test-writer passes `--stage tests`; the implementer passes the quick gate
-  of the specs its branch changed (`--specs`, Chromium only), which fits in the
+  of the domains and numbered specs its branch changed (`--specs`, Chromium only), which fits in the
   hook's time. CI runs everything. An agent held by a failure it may not fix
   (a test only the test-writer changes) reports it and finishes again without
   changing anything; the hook then lets it stop.
@@ -356,9 +366,9 @@ usage.
 To use it:
 
 1. In `.claude/settings.json`, set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` to `"1"`.
-2. In a large spec, fill the "Work packages" section so each implementer owns
+2. In the item's brief in `Backlog.md`, split the work so each implementer owns
    different files.
-3. Run `/feature specs/NNN-name.md team`.
+3. Run `/feature B-NNN team`.
 
 Known limits of teams today: they need an interactive session, resuming a session
 does not bring teammates back, and split panes do not work in Windows Terminal
@@ -377,7 +387,7 @@ does not bring teammates back, and split panes do not work in Windows Terminal
   a new `name` and `description`, and add a step to
   `.claude/skills/feature/SKILL.md`.
 
-## 8. Credits
+## 9. Credits
 
 The web client uses two font families, served by Nock itself from its own origin
 (the npm packages `@fontsource/source-sans-3` and
