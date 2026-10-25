@@ -339,7 +339,7 @@ def test_ac3_the_brand_is_the_link_accueil_to_home_with_no_aria_current(
 ) -> None:
     open_fx01(page, live_server, fx01_grid)
 
-    expect_brand_link(page.get_by_test_id("topbar-brand"), current=False)
+    expect_brand_link(page.get_by_test_id("topbar-brand"))
 
 
 def test_ac3_a_click_on_the_brand_loads_home_with_no_question(

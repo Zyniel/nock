@@ -310,7 +310,7 @@ def test_ac20_a_click_on_the_computer_brand_loads_nothing_and_sends_nothing(
             navigations.append(request.url)
 
     page.on("request", record)
-    problems = brand_dom_problems(brand, current=False)
+    problems = brand_dom_problems(brand)
     sent = frames_after(
         page, mock, lambda: page.mouse.click(brand_box.centre_x, brand_box.centre_y)
     )

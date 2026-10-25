@@ -3,9 +3,10 @@
 Pytest does not collect this module (its name does not start with `test_`). It
 holds what more than one test file of spec 043 uses: the values of the spec, the
 mocked room, its snapshots and event frames, the heavy setup `H8`, the readers
-of boxes, labels, icons and pictograms, the checks of the brand link (shared with
-the tests of spec 046 and of `content/library.md`), and the checks of a 3-second
-note's look and place. The tests are in these files, one per group of criteria:
+of boxes, labels, icons and pictograms, the checks of the brand, a link or plain
+text on `/` (shared with the tests of spec 046 and of `content/library.md`), and
+the checks of a 3-second note's look and place. The tests are in these files, one
+per group of criteria:
 
 - `test_spec_043_ac01_layout.py`: AC-1.
 - `test_spec_043_ac02_ac04_top_bar.py`: AC-2 to AC-4.
@@ -1251,50 +1252,59 @@ def hit_problem(page: Page, test_id: str) -> str | None:
     return f"{test_id}: elementFromPoint at its centre is {found['hit']}"
 
 
-# ---- The brand link (client/shell.md rule 17) -------------------------------------
+# ---- The brand (client/shell.md rule 17) ------------------------------------------
 
 HOME_NAME = "Accueil"  # `topbar.home`, the brand link's name
 
-# The brand's tag, `href` and `aria-current`, its Nock marks (each hidden from
-# assistive technology by itself or an ancestor) and its text.
-BRAND_LINK_SCRIPT = r"""
+# The brand's tag, `href`, `aria-current` and `aria-label`, whether it is or holds
+# a link, its Nock marks (each hidden from assistive technology by itself or an
+# ancestor), its text and the part of its text not hidden from assistive
+# technology.
+BRAND_DOM_SCRIPT = r"""
 brand => {
   const marks = [];
   for (const svg of brand.querySelectorAll('svg')) {
     marks.push({hidden: svg.closest('[aria-hidden="true"]') !== null});
   }
+  const spoken = [];
+  const texts = document.createTreeWalker(brand, NodeFilter.SHOW_TEXT);
+  while (texts.nextNode()) {
+    const node = texts.currentNode;
+    if (node.parentElement.closest('[aria-hidden="true"]') === null) {
+      spoken.push(node.textContent);
+    }
+  }
   return {
     tag: brand.tagName,
     href: brand.getAttribute('href'),
     ariaCurrent: brand.getAttribute('aria-current'),
+    ariaLabel: brand.getAttribute('aria-label'),
+    inLink: brand.closest('a[href]') !== null
+      || brand.querySelector('a[href]') !== null,
     marks: marks,
     text: brand.textContent.trim(),
+    spoken: spoken.join('').trim(),
   };
 }
 """
 
 
-def brand_dom_problems(brand: Locator, current: bool) -> list[str]:
-    """How `topbar-brand`'s markup differs from the link of shell rule 17.
-
-    An `A` to `/`, holding one Nock mark hidden from assistive technology and the
-    text `app.title`; `aria-current="page"` when `current`, else no
-    `aria-current` at all.
-    """
-    found = brand.evaluate(BRAND_LINK_SCRIPT)
+def read_brand(brand: Locator) -> dict[str, object]:
+    """The markup of `topbar-brand` that `BRAND_DOM_SCRIPT` reads."""
+    found = brand.evaluate(BRAND_DOM_SCRIPT)
     assert isinstance(found, dict), found
+    return found
+
+
+def brand_content_problems(found: dict[str, object]) -> list[str]:
+    """How the brand's content differs from one hidden Nock mark, then `app.title`.
+
+    Args:
+        found: The brand's markup, as `read_brand` returns it.
+    """
     problems: list[str] = []
-    if found["tag"] != "A":
-        problems.append(f"topbar-brand is a {found['tag']}, not an A")
-    if found["href"] != "/":
-        problems.append(f"topbar-brand href {found['href']!r}, not '/'")
-    expected_current = "page" if current else None
-    if found["ariaCurrent"] != expected_current:
-        problems.append(
-            f"topbar-brand aria-current {found['ariaCurrent']!r},"
-            f" not {expected_current!r}"
-        )
     marks = found["marks"]
+    assert isinstance(marks, list), marks
     if len(marks) != 1:
         problems.append(f"topbar-brand holds {len(marks)} svg elements, not 1")
     elif marks[0]["hidden"] is not True:
@@ -1304,18 +1314,67 @@ def brand_dom_problems(brand: Locator, current: bool) -> list[str]:
     return problems
 
 
-def expect_brand_link(brand: Locator, current: bool) -> None:
+def brand_dom_problems(brand: Locator) -> list[str]:
+    """How `topbar-brand`'s markup differs from the link of shell rule 17.
+
+    An `A` to `/` with no `aria-current`, holding one Nock mark hidden from
+    assistive technology and the text `app.title`.
+    """
+    found = read_brand(brand)
+    problems: list[str] = []
+    if found["tag"] != "A":
+        problems.append(f"topbar-brand is a {found['tag']}, not an A")
+    if found["href"] != "/":
+        problems.append(f"topbar-brand href {found['href']!r}, not '/'")
+    if found["ariaCurrent"] is not None:
+        problems.append(f"topbar-brand aria-current {found['ariaCurrent']!r}")
+    problems.extend(brand_content_problems(found))
+    return problems
+
+
+def plain_brand_problems(brand: Locator) -> list[str]:
+    """How `topbar-brand`'s markup differs from the plain brand of the catalogue.
+
+    No link (neither an `A` with an `href`, inside one nor holding one), no
+    `aria-current` and no `aria-label`; one Nock mark hidden from assistive
+    technology, then the text `app.title`, which is all assistive technology
+    reads of it.
+    """
+    found = read_brand(brand)
+    problems: list[str] = []
+    if found["inLink"] is not False:
+        problems.append(f"topbar-brand is or holds a link ({found['tag']})")
+    if found["ariaCurrent"] is not None:
+        problems.append(f"topbar-brand aria-current {found['ariaCurrent']!r}")
+    if found["ariaLabel"] is not None:
+        problems.append(f"topbar-brand aria-label {found['ariaLabel']!r}")
+    problems.extend(brand_content_problems(found))
+    if found["spoken"] != fr_value("app.title"):
+        problems.append(f"assistive technology reads {found['spoken']!r}")
+    return problems
+
+
+def expect_brand_link(brand: Locator) -> None:
     """Fail unless `topbar-brand` is the link « Accueil » to `/` of shell rule 17.
 
     Args:
-        brand: The `topbar-brand` element of a top bar that is not inert.
-        current: Whether the page is `/`, where the link carries
-            `aria-current="page"`.
+        brand: The `topbar-brand` element of a top bar that is not inert, on a
+            page other than `/`, so with no `aria-current`.
     """
-    assert brand_dom_problems(brand, current) == []
+    assert brand_dom_problems(brand) == []
     expect(brand).to_have_role("link")
     expect(brand).to_have_accessible_name(HOME_NAME)
     assert fr_value("topbar.home") == HOME_NAME
+
+
+def expect_plain_brand(brand: Locator) -> None:
+    """Fail unless `topbar-brand` is the plain text « Nock » of shell rule 17 on `/`.
+
+    Args:
+        brand: The `topbar-brand` element of the catalogue's top bar.
+    """
+    assert plain_brand_problems(brand) == []
+    expect(brand).not_to_have_role("link")
 
 
 # ---- 3-second notes (WP-2) -------------------------------------------------------

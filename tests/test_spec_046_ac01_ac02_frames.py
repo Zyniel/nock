@@ -18,8 +18,9 @@ Choices where the spec leaves room:
   `A` with `href="/"`, role link and name `topbar.home`, its Nock mark hidden from
   assistive technology; on the entry page it has no `aria-current`.
 - "The brand alone in it while accounts are off" (AC-2): the live server has
-  accounts off (`GET /api/account` answers 404), and the one `button`, `a`,
-  `input`, `select` or `textarea` of `page-topbar` is `topbar-brand`.
+  accounts off (`GET /api/account` answers 404), `page-topbar` holds one
+  `topbar-brand`, the plain text « Nock » of `client/shell.md` rule 17 (B-011),
+  and no `button`, `a`, `input`, `select` or `textarea` at all.
 - "`catalogue-page` holds `page-topbar` then `catalogue-column`" and "its children
   are, in order" read the element children that show (a box).
 - Edge case "Wide or narrow": a resize from 1280 by 720 to 360 by 740 gives the
@@ -167,7 +168,7 @@ def test_ac1_the_brand_is_the_link_accueil_to_home_with_no_aria_current(
 
     brand = page.get_by_test_id("page-topbar").get_by_test_id("topbar-brand")
 
-    expect_brand_link(brand, current=False)
+    expect_brand_link(brand)
 
 
 @pytest.mark.parametrize(("width", "height"), ENTRY_SIZES, ids=size_ids(ENTRY_SIZES))
@@ -244,12 +245,13 @@ def test_ac2_with_accounts_off_the_bar_holds_no_other_control(
     page = window(width, height)
     open_catalogue(page, live_server)
     bar = page.get_by_test_id("page-topbar")
-    expect(bar.get_by_test_id("topbar-brand")).to_have_count(1)
+    brand = bar.get_by_test_id("topbar-brand")
+    expect(brand).to_have_count(1)
 
     controls = bar.locator("button, a, input, select, textarea")
 
-    expect(controls).to_have_count(1)
-    expect(controls).to_have_attribute("data-testid", "topbar-brand")
+    expect(controls).to_have_count(0)
+    expect(brand).to_have_text(fr_value("app.title"))
     expect(page.get_by_test_id("account-open")).to_have_count(0)
 
 

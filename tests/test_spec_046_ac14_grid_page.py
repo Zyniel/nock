@@ -21,9 +21,8 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, expect
 
-from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec035_harness import build_fx01_grid, build_reference_catalogue
@@ -31,7 +30,6 @@ from spec043_harness import LINE, RED, WHITE, fr_value
 from spec046_harness import (
     SIGNED_OUT,
     SIZES,
-    WAIT_TIMEOUT_MS,
     WIDE_BAR_HEIGHT,
     WIDE_BAR_INSET,
     OpenWindow,
@@ -42,6 +40,7 @@ from spec046_harness import (
     child_tags,
     colour_problem,
     is_wide,
+    open_grid_page,
     padding_matches,
     page_topbar_problems,
     size_ids,
@@ -63,14 +62,6 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
 @pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     yield from window_opener(browser, browser_name)
-
-
-def open_grid_page(page: Page, base_url: str, state: str = "ready") -> None:
-    page.goto(f"{base_url}/g/2")
-    expect(page.get_by_test_id("grid-page")).to_have_attribute(
-        "data-state", state, timeout=WAIT_TIMEOUT_MS
-    )
-    wait_for_fonts(page)
 
 
 @pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids(SIZES))
