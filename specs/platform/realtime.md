@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: approved
+status: done
 ---
 
 # platform/realtime - Room events, reconnection and fair play
@@ -181,11 +181,6 @@ earns it.
 ### Look
 
 The connection band follows `_design/room.md`, « Connection lost ».
-
-## New interface
-
-- `nock.protocol.LetterCellView.hyphen_right` and `hyphen_down`: strict
-  booleans, `False` by default, set by `grid_view`.
 
 ## Acceptance criteria
 

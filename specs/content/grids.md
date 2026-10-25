@@ -1,7 +1,7 @@
 ---
 area: content
 file: grids
-status: approved
+status: done
 ---
 
 # content/grids - Grids: model, files, import checks and rights
@@ -99,12 +99,6 @@ described here, and the product never fetches content from a third party.
 15. Both checks are static scans, a guard against accidental use and not a
     sandbox: names or URLs built at run time are not flagged. The samples each
     scan must and must not flag are in its tests.
-
-## New interface
-
-- `nock.grid.Clue.letters: str` and `Clue.breaks: tuple[int, ...]`, read-only,
-  derived from `answer` by rule 4; `answer` holds the text as written.
-  `normalize_answer` keeps its name and gives the letters.
 
 ## Acceptance criteria
 

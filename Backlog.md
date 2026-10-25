@@ -229,8 +229,8 @@ an item that must be done first.
 
 ### B-012 Compound words: a dashed line where the hyphen falls
 
-- Status: building (the human approved look E′ and the spec change, 2026-10-25;
-  model option A, the lead's pick)
+- Status: done (the human approved look E′ and the spec change, 2026-10-25;
+  model option A, the lead's pick; review approved in round 1)
 - Domains: content/grids, platform/realtime, gameplay/board
 - Architecture decision: yes (grid file, stored grid and the snapshot's grid;
   options from the Plan agent on Fable)
@@ -306,6 +306,13 @@ an item that must be done first.
 
 Taken when a change touches them.
 
+- `gameplay/board.md` is over the size guideline (about 20 KB, 22 criteria
+  after B-012): split the grid's look (rules 1 to 4 and 20, AC-4 to AC-8,
+  AC-21, AC-22) into its own domain file, an architecture decision.
+- `_design/cells.md` « Hyphen edges » does not say how two hyphen edges meet:
+  a cell with both marks (the code draws a 1 px rule-grey corner pixel), and,
+  at 3 px thickness, an across edge ending where a down edge starts (the outer
+  pixel can fall in the other edge's gap); neither is drawn in the cell sheet.
 - Spec 025's vote banner test (`test_spec_025_ac07_vote_banner.py`) no longer
   measures a window (spec 047) and can leave `SERIAL_TEST_FILES`.
 - Spec 045: no zoom test with the legend shown; the column layout with the legend
