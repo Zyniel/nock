@@ -163,7 +163,10 @@ earns it.
     An answer's letters reach a browser only where players put them (accepted
     letters, chat texts, nicknames) or a reveal put them, or by chance in
     random ids, tokens and codes. The snapshot's grid holds clue texts and
-    arrows, never answers.
+    arrows, never answers. Its letter cells carry two hyphen marks,
+    `hyphen_right` and `hyphen_down`, false unless a word of the grid has a
+    break (`content/grids.md` rule 4) right after that cell, across or down;
+    a mark names an edge between two letters and never a letter.
 24. Edits (`edit_letter`, `erase`, `pencil_edit`, `confirm_pencil`) are limited
     to 20 per player in any sliding second; one more is `rate_limited`, and a
     refused edit does not count. The client stays connected. `undo` and
@@ -256,6 +259,11 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - **AC-19** With 30 letters typed offline, the reconnect snapshot is followed by
   the 30 edits in order over about 3 seconds, never more than 10 in a second, and
   none before it; an `online` event opens a socket at once. (← 017 AC-5)
+- **AC-20** On FX-01 with `VI-DE` and `NA-VAL`, the view's (2, 2) has
+  `hyphen_right` true and (1, 1) `hyphen_down` true, every other mark false;
+  on FX-01 as published every mark is false; a letter cell written without the
+  marks parses with both false, and one with `"hyphen_right": "yes"` is
+  refused.
 
 ## Edge cases
 
@@ -272,6 +280,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - A typed letter replaced later stays earned at that cell, never at another
   (AC-13); a revealed letter is earned when its `cell_locked` is sent, not
   before (`gameplay/hints.md`).
+- A room stored while answers held letters only (`VIDE`) snapshots with every
+  mark false (AC-20).
 
 ## Out of scope
 

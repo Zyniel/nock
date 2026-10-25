@@ -304,8 +304,97 @@ def cell(o: dict, s: float) -> str:
     return f'<div class="{" ".join(cls)}"{st}>{h}</div>'
 
 
-def grid(rows: list[list[dict]], s: int, extra_style: str = "") -> str:
-    """Return a grid of cells at side s."""
+def hyphen_runs(length: int, thickness: int) -> list[tuple[int, int]]:
+    """Return the dash runs of a hyphen edge (cells.md, « Hyphen edges »).
+
+    n = max(3, round(length / p)) dashes, p = 5, 8, 11 px for a thickness of
+    1, 2, 3; dash i runs from round((i + 0.2) length / n) to
+    round((i + 0.8) length / n): 60 % dash, half a gap at each end, whole pixels.
+    """
+    target = {1: 5, 2: 8, 3: 11}[thickness]
+    count = max(3, round(length / target))
+    period = length / count
+    runs = []
+    for i in range(count):
+        start = math.floor(period * (i + 0.2) + 0.5)
+        end = math.floor(period * (i + 0.8) + 0.5)
+        runs.append((start, end))
+    return runs
+
+
+def _stripes(runs: list[tuple[int, int]], length: int, on: str, off: str) -> str:
+    """Return the colour stops of a dashed gradient along an edge."""
+    stops = []
+    at = 0
+    for start, end in runs:
+        stops.append(f"{off} {at}px {start}px")
+        stops.append(f"{on} {start}px {end}px")
+        at = end
+    stops.append(f"{off} {at}px {length}px")
+    return ", ".join(stops)
+
+
+def hyphen_edges(rows: list[list[dict]], s: int, hyphens: list[tuple]) -> str:
+    """Return the dashed hyphen edges of a grid, drawn over the cells.
+
+    hyphens: (row, column, "right" | "down"), the cell before the hyphen.
+    Positions are in the grid's padding box: cell (r, c) starts at (c s, r s),
+    its right line is at (c + 1) s - 1 and its bottom line at (r + 1) s - 1.
+    """
+    thickness = 1 if s < 36 else 2 if s < 72 else 3
+    length = s - 1
+    runs = hyphen_runs(length, thickness)
+    out = ""
+    for r, c, kind in hyphens:
+        across = kind == "right"
+        edge = (c + 1) * s if across else (r + 1) * s
+        line = edge - 1 - (thickness - 1) // 2
+        along = "to bottom" if across else "to right"
+        if across:
+            box = f"left:{line}px;top:{r * s}px;width:{thickness}px;height:{length}px"
+        else:
+            box = f"left:{c * s}px;top:{line}px;width:{length}px;height:{thickness}px"
+        dashes = _stripes(runs, length, "var(--nock-hyphen)", "transparent")
+        out += (
+            f'<span class="hy" style="{box};background:linear-gradient({along}, '
+            f'{dashes})"></span>'
+        )
+        # My selected cell beside the edge: a 3 px band (the border's 2 px and
+        # the line's pixel) of navy dashes, its gaps in selected blue.
+        before = "sel" in rows[r][c].get("cls", [])
+        if across:
+            nxt = rows[r][c + 1] if c + 1 < len(rows[r]) else {}
+        else:
+            nxt = rows[r + 1][c] if r + 1 < len(rows) else {}
+        after = "sel" in nxt.get("cls", [])
+        if not before and not after:
+            continue
+        start = edge - (3 if before else 1)
+        if across:
+            band = f"left:{start}px;top:{r * s}px;width:3px;height:{length}px"
+        else:
+            band = f"left:{c * s}px;top:{start}px;width:{length}px;height:3px"
+        navy = _stripes(runs, length, "var(--nock-navy)", "var(--nock-selected)")
+        out += (
+            f'<span class="hy band" style="{band};background:linear-gradient({along}, '
+            f'{navy})"></span>'
+        )
+    return out
+
+
+def grid(
+    rows: list[list[dict]],
+    s: int,
+    extra_style: str = "",
+    hyphens: list[tuple] | None = None,
+) -> str:
+    """Return a grid of cells at side s.
+
+    hyphens: the hyphen edges to draw, as `hyphen_edges` takes them.
+    """
+    for r, c, kind in hyphens or []:
+        o = rows[r][c]
+        o["cls"] = [*o.get("cls", []), "hy-r" if kind == "right" else "hy-b"]
     out = (
         f'<div class="g" style="--s:{s}px;grid-template-columns:repeat({len(rows[0])},'
         f'{s}px);{extra_style}">'
@@ -313,6 +402,8 @@ def grid(rows: list[list[dict]], s: int, extra_style: str = "") -> str:
     for r in rows:
         for o in r:
             out += cell(o, s)
+    if hyphens:
+        out += hyphen_edges(rows, s, hyphens)
     return out + "</div>"
 
 

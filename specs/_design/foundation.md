@@ -75,6 +75,7 @@ Ratios are WCAG 2.x contrast against white (#FFFFFF).
 | `--nock-selected` | #CFDDF3 | My selected cell, and the half of the clue cell that holds my selected word's clue | Anything else | 1.37:1 |
 | `--nock-locked` | #E3E7EE | Locked letter cells (with bold letters) | Disabled states | 1.24:1 |
 | `--nock-rule` | #9AA3B2 | Grid lines, empty cells, input borders, border of the catalogue's grid drawing, switch track when off, the icon of a disabled button on the navy clue bar | Text | 2.54:1 (below 3:1, accepted) |
+| `--nock-hyphen` | #5E6573 | The dashed edge of a compound word's hyphen (`cells.md`, « Hyphen edges »), and nothing else | Text, grid lines | 5.86:1 |
 | `--nock-line` | #DDE2EA | Dividers in menus, panels and cards; card and list-row borders; filter chip borders; disabled button border; reaction pill and picker borders; inner lines of the catalogue's generic grid drawing | Grid lines of the playing grid | 1.30:1 |
 | `--nock-red` | #B42318 | "Look here": wrong-letter strike, flag, unread badge, new-events dot, the connection band's dot, error text and the border of a field in error | Decoration | 6.57:1 |
 | `--nock-reveal` | #C2410C | "Revealed", and nothing else: the revealed notch, the reveal line in the stream | Anything else | 5.18:1 |
@@ -108,7 +109,8 @@ Rules:
 - Text and icons reach 4.5:1 against their background, disabled buttons included.
   Marks, borders that carry meaning and the focus ring reach 3:1, except the rule
   grey of grid lines, input borders and the switch track when off (2.54:1,
-  accepted).
+  accepted) and the hyphen edge on the darkest flash (2.93:1, accepted for the
+  flash's 1 s).
 - No pure black (#000000) and no neutral grey: the neutrals lean toward the navy.
 - No dark mode for now. Every colour is a named token, so one can be added later
   by redefining the tokens.
@@ -139,6 +141,10 @@ Measured pairs (WCAG 2.x):
 | Navy on word blue (pressed top-bar button) | 11.27:1 | 4.5 |
 | Revealed notch on white / selected / locked / word | 5.18 / 3.77 / 4.17 / 4.40:1 | 3 |
 | Navy selection border on selected | 9.65:1 | 3 |
+| Hyphen edge on white / word / locked / selected | 5.86 / 4.98 / 4.72 / 4.26:1 | 3 |
+| Hyphen edge on a word tint (16 %), the darkest (Magenta) | 4.42:1 | 3 |
+| Hyphen edge on the darkest flash (Magenta at 38 %) | 2.93:1 | 3 (accepted, 1 s) |
+| Navy dashes of my selection border on selected | 9.65:1 | 3 |
 
 ## Player colours
 

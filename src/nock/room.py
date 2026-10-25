@@ -391,7 +391,8 @@ def grid_state(state: RoomState) -> GridView:
 
     Returns:
         `grid_view(state.grid)` with the letter, pencil, author, locked,
-        revealed and wrong values of each letter cell taken from `state.cells`.
+        revealed and wrong values of each letter cell taken from `state.cells`,
+        and its hyphen marks kept.
         It never holds an answer.
     """
     cells_by_position: dict[tuple[int, int], CellState] = {}
@@ -412,6 +413,8 @@ def grid_state(state: RoomState) -> GridView:
                 locked=cell_state.locked,
                 revealed=cell_state.revealed,
                 wrong=cell_state.wrong,
+                hyphen_right=cell_view.hyphen_right,
+                hyphen_down=cell_view.hyphen_down,
             )
         cell_views.append(cell_view)
     return GridView(
@@ -2177,7 +2180,7 @@ def _solution_letter(grid: Grid, row: int, column: int) -> str | None:
         for clue_index, clue in enumerate(clue_cell.clues):
             positions = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
             if (row, column) in positions:
-                return clue.answer[positions.index((row, column))]
+                return clue.letters[positions.index((row, column))]
     return None
 
 

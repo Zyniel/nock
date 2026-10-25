@@ -8,7 +8,7 @@
   --nock-word: #E6EDF9; --nock-selected: #CFDDF3; --nock-locked: #E3E7EE; --nock-rule: #9AA3B2;
   --nock-line: #DDE2EA; --nock-red: #B42318; --nock-reveal: #C2410C; --nock-green: #1E7B45;
   --nock-green-bg: #E6F2EA; --nock-key: #E9ECF1; --nock-keyboard-bg: #D9DEE6; --nock-handle: #C5CCD8;
-  --nock-thumb: #C9D2E0;
+  --nock-thumb: #C9D2E0; --nock-hyphen: #5E6573;
   --nock-scrim: rgb(20 24 31 / 35%); --nock-scrim-dialog: rgb(20 24 31 / 38%);
   --nock-dot-ring: rgb(20 24 31 / 55%); --nock-key-shadow: rgb(20 24 31 / 25%);
   --nock-shadow-soft: rgb(20 24 31 / 35%); --nock-shadow: rgb(20 24 31 / 45%);
@@ -86,8 +86,13 @@ td code, .cap code, .lead code { font-size: .85em; }
 
 /* ======== the app's look (specs/_design/) ======== */
 /* cells (cells.md), ported from the cell sheet */
-.g { display: inline-grid; border-left: 1px solid var(--nock-rule); border-top: 1px solid var(--nock-rule); background: var(--nock-rule); flex: none; }
+.g { display: inline-grid; position: relative; border-left: 1px solid var(--nock-rule); border-top: 1px solid var(--nock-rule); background: var(--nock-rule); flex: none; }
 .c { position: relative; width: var(--s); height: var(--s); background: var(--nock-white); border-right: 1px solid var(--nock-rule); border-bottom: 1px solid var(--nock-rule); overflow: hidden; }
+/* a compound word's hyphen (cells.md, « Hyphen edges »): the plain line of that edge goes, dashes take its place under every mark; my selection border turns dashed there */
+.c.hy-r { border-right-color: transparent; }
+.c.hy-b { border-bottom-color: transparent; }
+.hy { position: absolute; pointer-events: none; }
+.hy.band { z-index: 7; }
 .c.word { background: var(--nock-word); }
 .c.locked { background: var(--nock-locked); }
 .c.sel { background: var(--nock-selected); }

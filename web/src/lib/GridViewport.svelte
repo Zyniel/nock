@@ -11,9 +11,14 @@
     clampZoom,
     distanceBetween,
     fitCellSize,
+    hyphenDashes,
+    hyphenDrawings,
+    hyphenThickness,
+    hyphensByCell,
     triangleSide,
   } from './gridLayout'
-  import type { PlacedArrow } from './gridLayout'
+  import type { CellHyphens, EdgeDrawing, PlacedArrow } from './gridLayout'
+  import HyphenEdge from './HyphenEdge.svelte'
   import { actionForKey } from './letterEntry'
   import { LEGEND_GAP_PX, finderColour } from './authorsView'
   import type { LegendName } from './authorsView'
@@ -200,9 +205,28 @@
     return arrowsOfCells.get(positionKey(row, column)) ?? []
   }
 
+  // The hyphen edges that touch a letter cell (gameplay/board.md rule 20),
+  // or null when it touches none.
+  function hyphensOn(row: number, column: number): CellHyphens | null {
+    return hyphensOfCells.get(positionKey(row, column)) ?? null
+  }
+
+  // What a letter cell draws for the hyphen edges that touch it, at the
+  // current cell size.
+  function hyphenDrawingsOn(hyphens: CellHyphens, row: number, column: number): EdgeDrawing[] {
+    return hyphenDrawings(
+      hyphens,
+      hyphenThickness(cellSize),
+      isSelected(row, column),
+      isSelected(row, column + 1),
+      isSelected(row + 1, column),
+    )
+  }
+
   let gridElement: HTMLDivElement | undefined = $state()
 
   let arrowsOfCells = $derived(arrowsByCell(grid))
+  let hyphensOfCells = $derived(hyphensByCell(grid))
 
   // The cells of each row, in column order: the grid is drawn row by row.
   let rows = $derived(rowsOf(grid))
@@ -295,6 +319,9 @@
 
   let fitSize = $derived(fitCellSize(areaWidth, areaHeight, grid.width, grid.height))
   let cellSize = $derived(fitSize * zoom)
+  // The dashes of every hyphen edge at the current cell size: they read the
+  // cell's side, as « Hyphen edges » gives them.
+  let dashes = $derived(hyphenDashes(cellSize))
 
   // The exact size of the viewport, rounded down. clientWidth and clientHeight
   // round to the nearest pixel, sometimes up, and a grid fitted to them then
@@ -606,10 +633,14 @@
             {@const caughtUp = isCaughtUp(cell.row, cell.column)}
             {@const flash = flashOf(cell.row, cell.column)}
             {@const letter = shown.letter ?? ''}
+            {@const hyphens = hyphensOn(cell.row, cell.column)}
+            {@const edges = hyphens === null ? [] : hyphenDrawingsOn(hyphens, cell.row, cell.column)}
             <!-- The cell's marks, in the drawing order of spec 042: the letter,
-                 then the flash overlay (under it, z-index -1), the catch-up ring
-                 (1), the revealed notch (3), the other players' triangles or
-                 icons (2) and the arrows (6); last, my selection border (7). -->
+                 then the flash overlay (under it, z-index -1), the dashes of a
+                 hyphen edge (over the flash, under the letter), the catch-up
+                 ring (1), the revealed notch (3), the other players' triangles
+                 or icons (2) and the arrows (6); last, my selection border (7)
+                 and its dashed side along a hyphen edge. -->
             <div
               class="cell letter"
               class:locked={cell.locked}
@@ -636,6 +667,8 @@
               class:selected={isSelected(cell.row, cell.column)}
               class:in-word={isInWord}
               class:tinted={tints.length > 0 && isOthersTintOn}
+              class:hyphen-right={hyphens?.right === true}
+              class:hyphen-bottom={hyphens?.bottom === true}
               style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
               style:--finder-ink={letterColourOf(finder)}
               style:--triangle="{triangleSide(cellSize)}px"
@@ -648,6 +681,12 @@
                   data-testid="cell-flash"
                   aria-hidden="true"
                   style:background-color={`var(--player-colour-${flash})`}
+                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'hyphen'}<HyphenEdge
+                    drawing={edge}
+                    {dashes}
+                  />{/if}{/each}{#if hyphens?.right === true && hyphens.bottom}<span
+                  class="hyphen-corner"
+                  aria-hidden="true"
                 ></span>{/if}{#if caughtUp}<span
                   class="catch-up-mark"
                   data-testid="catch-up-mark"
@@ -695,7 +734,10 @@
                   class="cell-selection"
                   data-testid="cell-selection"
                   aria-hidden="true"
-                ></span>{/if}</div>
+                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'band'}<HyphenEdge
+                    drawing={edge}
+                    {dashes}
+                  />{/if}{/each}</div>
           {:else if cell.type === 'clue'}
             <div
               class="cell clue-cell"
@@ -852,6 +894,8 @@
      the rest of the page (the vote banner). It clips its marks, and holds the
      letter's font, which `cell-letter` inherits (spec 042). */
   .letter {
+    --line-right: 0px;
+    --line-bottom: 0px;
     position: relative;
     isolation: isolate;
     overflow: hidden;
@@ -864,6 +908,36 @@
     line-height: 1;
     color: var(--nock-ink);
     text-transform: uppercase;
+  }
+
+  /* A hyphen edge (gameplay/board.md rule 20): the cell's own grid line along
+     it is taken away, and the dashes of HyphenEdge.svelte are drawn in its
+     place. The 1px padding keeps the letter where it was, and --line-right and
+     --line-bottom keep the marks drawn against the cell's sides where they
+     were, off the line's pixel. The line across the edge's end stays plain:
+     the cell's other line runs to the corner, or, when both of its lines are
+     hyphen edges, the corner pixel is drawn in rule grey. */
+  .letter.hyphen-right {
+    --line-right: 1px;
+    border-right-width: 0;
+    padding-right: 1px;
+  }
+
+  .letter.hyphen-bottom {
+    --line-bottom: 1px;
+    border-bottom-width: 0;
+    padding-bottom: 1px;
+  }
+
+  .hyphen-corner {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    z-index: -1;
+    width: 1px;
+    height: 1px;
+    background: var(--nock-rule);
+    pointer-events: none;
   }
 
   /* The capital is centred on its own cap height and baseline, not on the line
@@ -924,7 +998,7 @@
      on the cell's padding box, over the arrows (6) and every other mark. */
   .cell-selection {
     position: absolute;
-    inset: 0;
+    inset: 0 var(--line-right) var(--line-bottom) 0;
     z-index: 7;
     box-sizing: border-box;
     border: 2px solid var(--nock-navy);
@@ -954,7 +1028,7 @@
      cell's inner edge, under the other marks. */
   .catch-up-mark {
     position: absolute;
-    inset: 0;
+    inset: 0 var(--line-right) var(--line-bottom) 0;
     z-index: 1;
     box-sizing: border-box;
     border: 3px solid var(--nock-ink);
@@ -978,6 +1052,8 @@
      (nock-reveal-notch), drawn over the triangles and the ring. */
   .reveal-mark {
     z-index: 3;
+    bottom: var(--line-bottom);
+    left: calc((100% - var(--line-right)) / 2);
   }
 
   /* During a flash the notch is ink, which keeps 3:1 on every flash colour
@@ -1012,16 +1088,16 @@
 
   .remote-selection[data-corner='top-right'] {
     top: var(--inset);
-    right: var(--inset);
+    right: calc(var(--inset) + var(--line-right));
   }
 
   .remote-selection[data-corner='bottom-right'] {
-    bottom: var(--inset);
-    right: var(--inset);
+    bottom: calc(var(--inset) + var(--line-bottom));
+    right: calc(var(--inset) + var(--line-right));
   }
 
   .remote-selection[data-corner='bottom-left'] {
-    bottom: var(--inset);
+    bottom: calc(var(--inset) + var(--line-bottom));
     left: var(--inset);
   }
 

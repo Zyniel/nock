@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from grids_harness import FX01_HYPHENS, with_answers
 from nock.grid import (
     Arrow,
     Clue,
@@ -17,6 +18,9 @@ from nock.grid import (
     LetterCell,
     normalize_answer,
 )
+from nock.grid_import import import_grid
+from nock.protocol import CheckResult, WordTarget
+from spec023_harness import check, refs, two_player_room, write_letter
 
 # Raw JSON can hold anything, so these values are typed Any.
 JsonData = dict[str, Any]
@@ -382,7 +386,7 @@ def test_ac2_arrow_values() -> None:
     assert Arrow.RIGHT_THEN_DOWN == "right_then_down"
 
 
-# AC-3: answer normalisation
+# AC-3: an answer as written, its letters and its breaks
 
 
 @pytest.mark.parametrize(
@@ -422,9 +426,42 @@ def test_ac3_normalize_answer_error_shows_the_original_text_with_ligature() -> N
         normalize_answer("CŒUR2")
 
 
-def test_ac3_clue_answer_is_normalized() -> None:
+def test_ac3_clue_answer_keeps_its_text() -> None:
+    # The answer keeps its text; its letters are the normalised form.
     clue = Clue(text="Etre", arrow="down", answer="être")
-    assert clue.answer == "ETRE"
+    assert clue.answer == "être"
+    assert clue.letters == "ETRE"
+
+
+@pytest.mark.parametrize(
+    ("answer", "letters", "breaks"),
+    [
+        ("ÊTRE", "ETRE", ()),
+        ("ARC-EN-CIEL", "ARCENCIEL", (3, 5)),
+        ("AUJOURD'HUI", "AUJOURDHUI", ()),
+        ("aujourd" + chr(0x2019) + "hui", "AUJOURDHUI", ()),
+        ("CŒUR", "COEUR", ()),
+        ("Fatales à César", "FATALESACESAR", ()),
+        ("VI-DE", "VIDE", (2,)),
+        ("ARCENCIEL", "ARCENCIEL", ()),
+    ],
+)
+def test_ac3_clue_keeps_its_answer_and_derives_letters_and_breaks(
+    answer: str, letters: str, breaks: tuple[int, ...]
+) -> None:
+    clue = Clue(text="Indice", arrow="right", answer=answer)
+    assert clue.answer == answer
+    assert clue.letters == letters
+    assert clue.breaks == breaks
+
+
+@pytest.mark.parametrize("name", ["letters", "breaks"])
+def test_ac3_letters_and_breaks_are_read_only(name: str) -> None:
+    clue = Clue(text="Indice", arrow="right", answer="ARC-EN-CIEL")
+    with pytest.raises((AttributeError, ValidationError)):
+        setattr(clue, name, "ARC")
+    assert clue.letters == "ARCENCIEL"
+    assert clue.breaks == (3, 5)
 
 
 def test_ac3_clue_with_empty_answer_is_rejected() -> None:
@@ -437,13 +474,59 @@ def test_ac3_clue_with_digit_in_answer_is_rejected() -> None:
         Clue(text="Indice", arrow="down", answer="R2D2")
 
 
-def test_ac3_answer_is_normalized_when_loading_a_grid() -> None:
+def test_ac3_a_loaded_grid_keeps_its_answer_text() -> None:
+    # Loaded, the answer stays as written; letters and breaks are derived.
     clue = {"text": "Indice", "arrow": "right", "answer": "arc-en-ciel"}
     cell = {"type": "clue", "row": 0, "column": 0, "clues": [clue]}
     grid = build_grid({"width": 2, "height": 1, "cells": [cell, letter_cell(0, 1)]})
     loaded = grid.cell_at(0, 0)
     assert isinstance(loaded, ClueCell)
-    assert loaded.clues[0].answer == "ARCENCIEL"
+    assert loaded.clues[0].answer == "arc-en-ciel"
+    assert loaded.clues[0].letters == "ARCENCIEL"
+    assert loaded.clues[0].breaks == (3, 5)
+
+
+def test_ac3_a_saved_grid_holds_the_answer_as_written_and_nothing_derived() -> None:
+    clue = {"text": "Indice", "arrow": "right", "answer": "ARC-EN-CIEL"}
+    cell = {"type": "clue", "row": 0, "column": 0, "clues": [clue]}
+    grid = build_grid({"width": 2, "height": 1, "cells": [cell, letter_cell(0, 1)]})
+
+    saved = json.loads(grid.model_dump_json())
+
+    assert saved["cells"][0]["clues"] == [clue]
+    assert Grid.model_validate_json(grid.model_dump_json()) == grid
+
+
+def test_ac3_a_hyphenated_answer_fits_as_many_cells_as_it_has_letters(
+    fx01_text: str,
+) -> None:
+    report = import_grid(with_answers(fx01_text, FX01_HYPHENS))
+
+    assert report.word_count == 8
+    assert report.letter_cell_count == 18
+    vide = report.grid.cell_at(2, 0)
+    naval = report.grid.cell_at(0, 0)
+    assert isinstance(vide, ClueCell)
+    assert isinstance(naval, ClueCell)
+    assert (vide.clues[0].answer, vide.clues[0].breaks) == ("VI-DE", (2,))
+    assert (naval.clues[1].answer, naval.clues[1].breaks) == ("NA-VAL", (2,))
+
+
+def test_ac3_a_room_checks_a_hyphenated_word_against_its_letters(
+    fx01_text: str,
+) -> None:
+    grid = Grid.model_validate_json(with_answers(fx01_text, FX01_HYPHENS))
+    state = two_player_room(grid)
+    for column, letter in zip((1, 2, 3, 4), "VIDE", strict=True):
+        state = write_letter(state, "p1", 2, column, letter)
+    target = WordTarget(row=2, column=0, clue_index=0)
+
+    events = check(state, target)
+
+    result = events[0]
+    assert isinstance(result, CheckResult)
+    assert result.correct == refs((2, 1), (2, 2), (2, 3), (2, 4))
+    assert result.wrong == ()
 
 
 def test_ac3_fx01_answers_are_the_reference_answers(fx01: Grid) -> None:

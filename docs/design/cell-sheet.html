@@ -13,6 +13,7 @@
   --ink: #14181F;
   --cell: #FFFFFF;
   --rule: #9AA3B2;
+  --hyphen: #5E6573;
   --clue-bg: #EEF2F8;
   --clue-ink: #1B2230;
   --word: #E6EDF9;
@@ -77,8 +78,14 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .switch button:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
 
 /* ---------- cells ---------- */
-.g { display: inline-grid; border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); background: var(--rule); gap: 0; }
+.g { display: inline-grid; position: relative; border-left: 1px solid var(--rule); border-top: 1px solid var(--rule); background: var(--rule); gap: 0; }
 .c { position: relative; width: var(--s); height: var(--s); background: var(--cell); border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; }
+/* a compound word's hyphen: the plain line of that edge goes (the cell's own background shows through),
+   dashes in hyphen grey take its place, under every mark (hyEdges); my selection border turns dashed there */
+.c.hy-r { border-right-color: transparent; }
+.c.hy-b { border-bottom-color: transparent; }
+.hy { position: absolute; pointer-events: none; }
+.hy.band { z-index: 7; }
 .c.word { background: var(--word); }
 .c.locked { background: var(--locked); }
 .c.sel { background: var(--sel); }
@@ -345,6 +352,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
           <li>Other players: plain colour triangles, never any name or initials, no outline, 30 % of the cell side.</li>
           <li class="new"><b>New:</b> no author band. An « Auteurs » mode colours each letter in a darker ink of its finder's colour.</li>
           <li class="new"><b>New:</b> a revealed letter has an orange-red notch at the middle of the bottom edge, pointing up.</li>
+          <li class="new"><b>New:</b> a compound word's hyphen takes no cell: the edge between its two letters is dashed in a grey of its own, the same in every state (section 4b).</li>
         </ul>
       </div>
       <div>
@@ -449,6 +457,13 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     <h2><small>4 · Letter cells</small>One state at a time, at 56 px</h2>
     <p class="lead">Bold always means locked: a normal letter is weight 500, a locked one 700. A letter is locked when a check finds it right or when a reveal fills it in. Colour is never the only sign: pencil is italic, wrong is struck through, revealed has an orange-red notch at the bottom.</p>
     <div class="board static" id="states"></div>
+  </section>
+
+  <section>
+    <h2><small>4b · Compound words</small>A dashed edge where the hyphen falls</h2>
+    <p class="lead">A hyphen takes no cell, as in printed grids: the edge between the two letters it joins is dashed instead of the plain grid line (across, the right edge of the letter before it; down, its bottom edge). Dashes in hyphen grey <code>#5E6573</code>, darker than the grid lines: a whole number per edge, at least 3, about 5 px of period per pixel of thickness, 60 % dash, half a gap at each end so the corners stay open; 1 px thick under 36 px cells, 2 px from 36, 3 px from 72; every dash end on a whole pixel. The same in every state. Beside my selected cell, my navy border turns dashed on that side, so the hyphen never hides under it.</p>
+    <div class="board static" id="hyphen"></div>
+    <p class="note"><strong>Layers.</strong> The dashes sit where the grid line sat, under every mark: the ring, the triangles and the arrows keep their places, and the notch of a revealed letter above a down hyphen sits over its dashes. No arrow ever lies on a hyphen edge. The drawing is EX-AMI (« Ancien copain »), hyphen between X and A, crossed by AS (« Champion »).</p>
   </section>
 
   <section>
@@ -715,9 +730,52 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     return '<div class="' + cls.join(" ") + '" style="' + style + '">' + h + "</div>";
   }
 
-  function grid(rows, s) {
+  /* hyphen edges (section 4b): the dash runs along an edge of length L at thickness t,
+     n = max(3, round(L / p)) dashes with p = 5, 8, 11 px for t = 1, 2, 3; dash i runs from
+     round((i + .2) L / n) to round((i + .8) L / n): 60 % dash, half a gap at each end, whole pixels */
+  function hyRuns(L, t) {
+    var n = Math.max(3, Math.round(L / [0, 5, 8, 11][t])), period = L / n, runs = [];
+    for (var i = 0; i < n; i++) runs.push([Math.round(period * (i + 0.2)), Math.round(period * (i + 0.8))]);
+    return runs;
+  }
+  function hyStripes(runs, L, on, off) {
+    var stops = [], at = 0;
+    runs.forEach(function (r) { stops.push(off + " " + at + "px " + r[0] + "px", on + " " + r[0] + "px " + r[1] + "px"); at = r[1]; });
+    stops.push(off + " " + at + "px " + L + "px");
+    return stops.join(", ");
+  }
+  /* hy: [{r, c, dir: "right" | "down"}], the cell before the hyphen. Positions are in the grid's
+     padding box: cell (r, c) starts at (c s, r s), its right line at (c + 1) s - 1, its bottom at (r + 1) s - 1. */
+  function hyEdges(rows, s, hy) {
+    var t = s < 36 ? 1 : s < 72 ? 2 : 3, L = s - 1, runs = hyRuns(L, t), h = "";
+    hy.forEach(function (e) {
+      var across = e.dir === "right";
+      var line = (across ? (e.c + 1) * s : (e.r + 1) * s) - 1 - Math.floor((t - 1) / 2);
+      var along = across ? "to bottom" : "to right";
+      var box = across ? "left:" + line + "px;top:" + e.r * s + "px;width:" + t + "px;height:" + L + "px"
+                       : "left:" + e.c * s + "px;top:" + line + "px;width:" + L + "px;height:" + t + "px";
+      h += '<span class="hy" style="' + box + ";background:linear-gradient(" + along + ", " + hyStripes(runs, L, "var(--hyphen)", "transparent") + ')"></span>';
+      /* my selected cell beside the edge: a 3 px band (the border's 2 px and the line's pixel) of navy dashes, gaps in selected blue */
+      var before = (rows[e.r][e.c].cls || []).indexOf("sel") >= 0;
+      var next = across ? (rows[e.r][e.c + 1] || {}) : ((rows[e.r + 1] || [])[e.c] || {});
+      var after = (next.cls || []).indexOf("sel") >= 0;
+      if (!before && !after) return;
+      var from = (across ? (e.c + 1) * s : (e.r + 1) * s) - (before ? 3 : 1);
+      var band = across ? "left:" + from + "px;top:" + e.r * s + "px;width:3px;height:" + L + "px"
+                        : "left:" + e.c * s + "px;top:" + from + "px;width:" + L + "px;height:3px";
+      h += '<span class="hy band" style="' + band + ";background:linear-gradient(" + along + ", " + hyStripes(runs, L, "var(--navy)", "var(--sel)") + ')"></span>';
+    });
+    return h;
+  }
+
+  function grid(rows, s, hy) {
     var h = '<div class="g" style="--s:' + s + "px;grid-template-columns:repeat(" + rows[0].length + "," + s + 'px)">';
+    (hy || []).forEach(function (e) {
+      var o = rows[e.r][e.c];
+      o.cls = (o.cls || []).concat([e.dir === "right" ? "hy-r" : "hy-b"]);
+    });
     rows.forEach(function (r) { r.forEach(function (o) { h += cell(o, s); }); });
+    if (hy && hy.length) h += hyEdges(rows, s, hy);
     return h + "</div>";
   }
   function spec(gridHtml, title, sub) {
@@ -739,6 +797,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["sel", "Selected blue", "My selected cell and my selected word's clue", "Anything else"],
       ["locked", "Locked grey", "Locked letters (with bold)", "Disabled states"],
       ["rule", "Rule grey", "Grid lines, input borders, empty cells, switch track when off", "Text"],
+      ["hyphen", "Hyphen grey", "The dashed edge of a compound word's hyphen, and nothing else", "Text, grid lines"],
       ["line", "Line grey", "Dividers in menus, panels, cards", "Grid lines"],
       ["wrong", "Red", "Wrong letters (strike), the flag, unread badge and new-events dot, field errors, connection dot", "Decoration"],
       ["reveal", "Orange-red", "The revealed notch, the reveal line in the stream", "Anything else"],
@@ -836,6 +895,49 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     one({ letter: "N", cls: ["locked", "rev"] }, "Revealed", "orange-red notch at the bottom; locked, so bold");
     one({ letter: "E", flash: P[3] }, "Flash", "1 s in the colour of whoever replaced my letter");
     set("states", h);
+
+    /* 4b: EX-AMI across, hyphen right of X (1, 2); AS down from A (1, 3) */
+    h = "";
+    function exami(sz, mod, down) {
+      var rows;
+      if (down) {
+        rows = [[{ type: "clue", clues: [{ text: "Ancien copain" }] }], [{ letter: "E", arrows: [arrowFor("down", sz)] }], [{ letter: "X" }], [{ letter: "A" }], [{ letter: "M" }], [{ letter: "I" }]];
+      } else {
+        rows = [
+          [{ type: "empty" }, {}, {}, { type: "clue", clues: [{ text: "Champion" }] }, {}, {}],
+          [{ type: "clue", clues: [{ text: "Ancien copain" }] }, { letter: "E", arrows: [arrowFor("right", sz)] }, { letter: "X" }, { letter: "A", arrows: [arrowFor("down", sz)] }, { letter: "M" }, { letter: "I" }],
+          [{ type: "empty" }, {}, {}, { letter: "S" }, {}, {}]
+        ];
+      }
+      (mod || function () {})(rows);
+      return grid(rows, sz, [down ? { r: 2, c: 0, dir: "down" } : { r: 1, c: 2, dir: "right" }]);
+    }
+    function word(rows, cls) { for (var c = 1; c <= 5; c++) rows[1][c].cls = (rows[1][c].cls || []).concat(cls); }
+    h += spec(exami(56), "At rest, 56 px", "7 dashes of about 5 px, 2 px thick, in hyphen grey; nobody on the word");
+    h += spec(exami(56, function (r) { word(r, ["word"]); r[1][2].cls = ["sel"]; }), "My word, my cell before the edge", "the border's right side is dashed: navy dashes, gaps in selected blue");
+    h += spec(exami(56, function (r) { word(r, ["word"]); r[1][3].cls = ["sel"]; r[1][2].cursors = [2, 4]; }), "My cell after the edge, two players on X", "the top-right triangle meets the edge; the dashes keep their colour");
+    h += spec(exami(56, function (r) { word(r, []); for (var c = 1; c <= 5; c++) r[1][c].tint = 2; r[1][4].cursors = [2]; }), "Another player's word", "Sarcelle's tint at 16 %: 4.4:1 at least on every tint");
+    h += spec(exami(56, function (r) { r[1][3].cls = ["sel"]; r[2][3].cls = ["word"]; }), "A crossing word selected", "AS down: the hyphen belongs to EX-AMI, nobody's; my border there is solid");
+    h += spec(exami(56, function (r) { r[1][1].cls = ["locked"]; r[1][2].cls = ["locked"]; r[1][3].cls = ["locked"]; }), "Locked", "checked right on both sides: 4.72:1 on locked grey");
+    h += spec(exami(56, function (r) { r[1][2].cls = ["wrong"]; r[1][3].cls = ["wrong"]; }), "Checked wrong", "the strike stays red; the edge does not change");
+    h += spec(exami(56, function (r) { r[1][2].caught = true; r[1][3].caught = true; }), "Catch-up ring", "the 3 px ink ring is inside the cell; the dashes stay on the line");
+    h += spec(exami(56, function (r) { r[1][3].flash = P[5]; }), "Flash", "Magenta, the darkest: 2.93:1 for 1 s, accepted");
+    h += spec(exami(56, function (r) { r[1][1].author = 1; r[1][2].author = 1; r[1][3].author = 3; r[1][4].author = 3; r[1][5].author = 3; for (var c = 1; c <= 5; c++) r[1][c].forceAuthors = true; }), "Auteurs mode", "E, X by Bruno, A, M, I by Dédé: a hyphen has no author");
+    h += spec(exami(56, function (r) { r[1][2].cls = ["pencil"]; r[1][3].cls = ["pencil"]; }), "Pencil letters", "italic grey letters; the edge does not change");
+    h += '<div style="flex-basis:100%;height:0"></div>';
+    h += spec(exami(56, null, true), "Down hyphen, 56 px", "EX-AMI down: the bottom edge of X is dashed");
+    h += spec(exami(56, function (r) { r[2][0].cls = ["locked", "rev"]; }, true), "Down hyphen, X revealed", "the notch's base sits on the edge, over the dashes");
+    h += spec(exami(56, function (r) { for (var i = 1; i <= 5; i++) r[i][0].cls = ["word"]; r[2][0].cls = ["sel"]; }, true), "Down hyphen, my cell above", "the border's bottom side is dashed");
+    h += '<div style="flex-basis:100%;height:0"></div>';
+    /* the sizes, on the bare letters of EX-AMI (clue text would spill at 18 px) */
+    function bare(sz, mine) {
+      var row = ["E", "X", "A", "M", "I"].map(function (l, i) { return { letter: l, cls: mine ? [i === 1 ? "sel" : "word"] : [] }; });
+      return grid([row], sz, [{ r: 0, c: 1, dir: "right" }]);
+    }
+    h += spec(bare(18, true), "18 px (FX-02 on a 320 by 568 phone)", "1 px thick, 3 dashes of 3 to 4 px; still a dashed border on my cell");
+    h += spec(bare(36, false), "36 px", "2 px thick from 36 px: 4 dashes");
+    h += spec(bare(90, true), "90 px (a phone at zoom 5)", "3 px thick, 8 dashes of about 7 px, one pixel into each cell");
+    set("hyphen", h);
 
     h = "";
     h += spec(grid([[{ letter: "V", cls: ["word"] }, { cls: ["sel"] }, { letter: "D", cls: ["word", "pencil"] }, { letter: "E", cls: ["word"] }]], s), "My word, my cell", "word light blue, cell blue with a solid navy border");
@@ -1454,6 +1556,13 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       ["▲", tok("reveal"), tok("sel"), "Revealed notch on selected", 3],
       ["▲", tok("reveal"), tok("locked"), "Revealed notch on locked grey", 3],
       ["▢", tok("navy"), tok("sel"), "Selected border on selected fill", 3],
+      ["┆", tok("hyphen"), tok("cell"), "Hyphen edge on white", 3],
+      ["┆", tok("hyphen"), tok("word"), "Hyphen edge on my word", 3],
+      ["┆", tok("hyphen"), tok("locked"), "Hyphen edge on locked grey", 3],
+      ["┆", tok("hyphen"), tok("sel"), "Hyphen edge on my selected cell", 3],
+      ["┆", tok("hyphen"), mix(P[5], 0.16), "Hyphen edge on the darkest word tint (Magenta, 16 %)", 3],
+      ["┆", tok("hyphen"), mix(P[5], 0.38), "Hyphen edge on the darkest flash (Magenta, 38 %): below, accepted for the flash's 1 s", 3],
+      ["┆", tok("navy"), tok("sel"), "Navy dashes of my border on a hyphen edge", 3],
       ["▢", tok("navy"), tok("cell"), "Focus outline on white", 3],
       ["A", tok("ink"), tok("key"), "Key letter", 4.5],
       ["A", tok("pencil"), tok("key"), "Key letter, pencil mode", 4.5],

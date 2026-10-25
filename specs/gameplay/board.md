@@ -144,10 +144,19 @@ AZERTY keyboard replaces the system one, and the player may hide it.
     open. A `localStorage` that throws leaves them and the keyboard choice at
     their default, flipping for the page's life.
 
+### Hyphen edges
+
+20. A letter cell's `hyphen_right` or `hyphen_down` mark (`platform/realtime.md`
+    rule 23; absent reads false) draws that edge, its right or its bottom, as
+    the dashed hyphen edge of `_design/cells.md` « Hyphen edges » in place of
+    the grid line, whatever the state of the two cells and at every zoom; no
+    other edge is dashed. Words, selection, typing, navigation, check and
+    reveal read no mark: `VI-DE` is the four cells of VIDE.
+
 ### Look
 
-- `_design/cells.md`: « Grid lines and empty cells »; « Letter cell
-  backgrounds » (the first state that applies wins); « Letter marks » (bold
+- `_design/cells.md`: « Grid lines and empty cells »; « Hyphen edges »; « Letter
+  cell backgrounds » (the first state that applies wins); « Letter marks » (bold
   locked letter, strike, notch, ink during a flash); « Catch-up ring »; « Other
   players on a cell », « Player icons »; « Clue cells » (text, separator, active
   clue, flag); « Direction arrows »; « Drawing order »; each mark's least size.
@@ -276,16 +285,34 @@ AZERTY keyboard replaces the system one, and the player may hide it.
   `others_tint.switch` and `access.switch` with the texts of the rules, and
   none of `grid.remote_overflow`, `a11y.remote_overflow`, `flag.marker`.
   (← 042 AC-20, 044 AC-11)
+- **AC-21** On FX-01 with `VI-DE` and `NA-VAL`, the right edge of (2, 2) and
+  the bottom edge of (1, 1) are the dashed edges of « Hyphen edges », in
+  `--nock-hyphen`, with the dash count, thickness and open corners the section
+  gives at about 56 px cells and, on a 13 by 17 grid with one hyphen at 568 by
+  320 on a computer, at about 12 px; every dash end on a whole pixel at a
+  fractional cell size, and every other edge the plain line; the dashes read
+  the same with no one on VIDE, with p2's tint on it, with (2, 2) locked,
+  wrong, flashing, or in Auteurs mode; a revealed (1, 1) puts its notch over
+  the down hyphen's dashes.
+- **AC-22** With (2, 2) my selected cell, its border is dashed on its right
+  side in navy, as « Hyphen edges » says, and solid on its three others; a tap
+  on (2, 2) selects VIDE's four cells, and `v`, `i`, `d`, `e` give the same
+  cells and letters as on FX-01 as published.
 
 ## Edge cases
 
 - Locked cells are selectable and count as filled (AC-11, AC-15).
 - A stored keyboard choice changes nothing off a touch screen (AC-18).
+- A snapshot of a room stored before answers kept their hyphens has no mark:
+  no edge is dashed (AC-21).
 
 ## Out of scope
 
 - Zoom buttons, Ctrl+wheel; Home, End, Page, Delete keys; shortcuts for ⇄ or ✎;
   QWERTY, accent or digit keys; erasing a word with ⌫, key repeat.
+- The hyphen in the clue bar, the announcement or a length pattern; marks for
+  spaces and apostrophes; the dashed edge in the operator's replay
+  (`admin/operations.md`) and the catalogue's generic grid drawing.
 - The selection after a reload: `lobby/rooms.md`. Others' selections:
   `social/presence.md`. Edits, pencil letters: `gameplay/co-op.md`. Top bar,
   Menu, clue bar buttons: `client/hud.md`. Grid roles: `product.md`.
@@ -293,7 +320,9 @@ AZERTY keyboard replaces the system one, and the player may hide it.
 ## Code
 
 - `web/src/lib/`: `GridViewport.svelte` (cells, taps, keys, pinch),
-  `gridLayout.ts`, `wordSelection.ts`, `navigation.ts`, `letterEntry.ts`,
-  `remoteSelections.ts`, `cellDisplaySwitches.ts`, `RoomPage.svelte` (typing,
-  keyboard, layout), `roomSession.ts`, `ClueBar.svelte`, `InAppKeyboard.svelte`.
-- Tests: `tests/test_spec_006_*` to `009_*`, `042_*`, `044_*`.
+  `gridLayout.ts`, `HyphenEdge.svelte`, `wordSelection.ts`, `navigation.ts`,
+  `letterEntry.ts`, `remoteSelections.ts`, `cellDisplaySwitches.ts`,
+  `RoomPage.svelte` (typing, keyboard, layout), `roomSession.ts`,
+  `ClueBar.svelte`, `InAppKeyboard.svelte`.
+- Tests: `tests/test_board_*`, `tests/test_spec_006_*` to `009_*`, `042_*`,
+  `044_*`.

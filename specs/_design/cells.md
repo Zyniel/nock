@@ -13,6 +13,65 @@ may spill over neighbouring cells, never past the grid's box.
 
 An empty cell (the grid's `empty` type) is filled with `--nock-rule`.
 
+The one edge that is not a plain line is the hyphen of a compound word
+(« Hyphen edges »).
+
+## Hyphen edges
+
+A compound word's hyphen takes no cell (`content/grids.md`, rule 4): the edge
+between the two letters it joins is dashed instead of the plain grid line. Across,
+it is the right edge of the letter before the hyphen (the cell's `hyphen_right`
+mark, `platform/realtime.md`); down, its bottom edge (`hyphen_down`). The rule-grey
+line of that edge is not drawn; in its place, dashes in `--nock-hyphen`, the same
+in every state of the two cells: no one selecting the word, my word, another
+player's tint, my word beside another's triangles, a crossing word selected,
+locked, revealed, checked wrong, catch-up ring, flash, Auteurs mode, pencil
+letters.
+
+Geometry, along the edge of length L = s − 1 px (the cell's inner side, up to the
+crossing grid line, which stays plain), with s the cell side at the current zoom:
+
+- thickness t: 1 px while s < 36, 2 px from 36, 3 px from 72. Centred on the grid
+  line's pixel: t = 1 on it; t = 2 on it and the next pixel into the following
+  cell; t = 3 one pixel on each side of it;
+- n dashes, n = max(3, round(L / p)) with p = 5, 8, 11 px for t = 1, 2, 3; the
+  period is L / n. Dash i (from 0) runs from round((i + 0.2) · L / n) to
+  round((i + 0.8) · L / n) from the edge's start: each dash is about 60 % of its
+  period, with half a gap at each end, so the corners stay open and the edge
+  never merges into the crossing lines;
+- the edge's start and every dash end lie on whole CSS pixels, whatever the cell
+  size (fractional at zoom 1, `gameplay/board.md`) or the pinch zoom: along the
+  edge every pixel is `--nock-hyphen` or the cells' background, none blended.
+
+| Cell side | t | Dashes | Each about |
+| --- | --- | --- | --- |
+| about 6 px (FX-02 at 568 by 320 on a touch phone, keyboard shown) | 1 px | 3 | 1 px, 1 px gaps |
+| about 12 px (FX-02 at 568 by 320 on a computer) | 1 px | 3 | 2 px |
+| 18 px (FX-02 on a 320 by 568 phone) | 1 px | 3 | 3 px |
+| 56 px (a computer) | 2 px | 7 | 5 px |
+| 90 px (a phone at zoom 5) | 3 px | 8 | 7 px |
+
+Contrast (`foundation.md`, « Colour tokens »): 5.86:1 on white, 4.26:1 on my
+selected cell, at least 4.4:1 on every word, tint and locked background; 2.93:1 on
+the darkest flash, accepted for the flash's 1 s.
+
+My selected cell beside the edge: my selection border turns dashed on that side.
+The band from the border's inner edge to the grid line, 3 px (the border's 2 px
+plus the line's pixel), carries the same dashes in `--nock-navy` (9.65:1 on
+selected), its gaps in `--nock-selected`; the three other sides stay solid. So the
+hyphen never hides under the border, which is drawn over every mark.
+
+Layers: the dashes replace the grid line and sit where it sat, over the
+backgrounds and the flash overlay, under every mark of the two cells (« Drawing
+order »): the catch-up ring, the triangles and icons, the arrows keep their places,
+and the revealed notch of the cell above a down hyphen sits over its dashes, its
+base on the edge. No arrow ever lies on a hyphen edge: an arrow's edge faces its
+clue cell. The dashed side of my selection border is on top, like the rest of the
+border.
+
+Drawn in the cell sheet, « 4b · Compound words », and in the screens sheet, part 3,
+« Compound words ».
+
 ## Letter cell backgrounds
 
 Exactly one background applies, the first that matches in this list:
@@ -34,7 +93,8 @@ one who comes first in join order.
 My selection border: 2 px solid navy drawn inside the cell, over every other mark
 of the cell. It is the cell's own outline (`outline: 2px solid var(--nock-navy)`,
 `outline-offset: -2px`), which the visible-focus baseline of `product.md` reads.
-It is the only cell border besides the grid lines and the catch-up ring.
+It is the only cell border besides the grid lines and the catch-up ring. Its side
+on a hyphen edge is dashed (« Hyphen edges »).
 
 ## Letter marks
 
@@ -185,7 +245,8 @@ Top first, inside one cell (the sheet's z-index in brackets):
 4. Player triangles (2), and in clue cells the flag (2).
 5. Catch-up ring (1).
 6. The letter, or the clue text.
-7. The flash overlay, then the background.
+7. The dashes of a hyphen edge (« Hyphen edges »), in place of the grid line.
+8. The flash overlay, then the background.
 
 A shown reaction (8) sits over its clue cell and the cells around it (`room.md`,
 « Reactions »).

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from string import Template
 
-from cells import FLAG_ICO, esc, fx_rows, generic_thumb, grid, picon
+from cells import FLAG_ICO, FX_L, esc, fx_rows, generic_thumb, grid, picon
 from chrome import (
     account_in,
     account_out,
@@ -588,6 +588,54 @@ def sec_room() -> str:
         [
             ("ph", PH, phone_room(stage_extra=note(esc(NOTE_MSG)))),
             ("pc", PC, desk_room()),
+        ],
+    )
+    hy_letters = dict(FX_L)
+    hy_letters[(1, 1)] = {"l": "A", "a": 0, "locked": True, "rev": True}
+    hy_phone = {
+        "letters": hy_letters,
+        "hyphens": [(2, 2, "right"), (1, 1, "down")],
+    }
+    out += screen(
+        "s-hyphen",
+        "Compound words: the hyphen edge",
+        ["cells · Hyphen edges", "foundation · Colour tokens"],
+        [
+            (
+                "A hyphen takes no cell: the edge between the two letters it "
+                "joins is dashed in hyphen grey in place of the grid line, the "
+                "same in every state, and my selection border turns dashed on "
+                "that side. Phone: FX-01 with VI-DE (the right edge of my "
+                "selected cell) and NA-VAL (the bottom edge of the revealed A, "
+                "whose notch sits over the dashes). Sideways, 568 by 320: 1 px "
+                "dashes on 20 px cells."
+            ),
+            (
+                '<span class="m">Computer: a hyphen in my word beside my selected '
+                "cell, in the locked word, in Bruno's and Dédé's tinted words, "
+                "and below the revealed O.</span>"
+            ),
+        ],
+        [
+            ("ph", PH, phone_room(grid_opts=hy_phone)),
+            (
+                "ph",
+                "Phone sideways · 568 &times; 320",
+                phone_room(size=(568, 320), grid_opts=hy_phone),
+            ),
+            (
+                "pc",
+                PC,
+                desk_room(
+                    hyphens=[
+                        (4, 3, "right"),
+                        (1, 2, "right"),
+                        (8, 4, "right"),
+                        (12, 8, "right"),
+                        (10, 6, "down"),
+                    ]
+                ),
+            ),
         ],
     )
     out += screen(

@@ -47,6 +47,11 @@ export interface LetterCellView {
   wrong: boolean
   // True while the letter in place is a pencil letter (spec 020).
   pencil: boolean
+  // True when a word of the grid has a hyphen right after this cell, across
+  // (its right edge) or down (its bottom edge); false when the server sent
+  // no mark (gameplay/board.md rule 20).
+  hyphen_right: boolean
+  hyphen_down: boolean
 }
 
 // An edit this page sent and that has no answer yet (spec 015).
@@ -441,7 +446,21 @@ function toCell(value: unknown): CellView | null {
     const revealed = cell.revealed === true
     const wrong = cell.wrong === true
     const pencil = cell.pencil === true
-    return { type: 'letter', row, column, letter, locked, revealed, author, wrong, pencil }
+    const hyphenRight = cell.hyphen_right === true
+    const hyphenDown = cell.hyphen_down === true
+    return {
+      type: 'letter',
+      row,
+      column,
+      letter,
+      locked,
+      revealed,
+      author,
+      wrong,
+      pencil,
+      hyphen_right: hyphenRight,
+      hyphen_down: hyphenDown,
+    }
   }
   return null
 }
