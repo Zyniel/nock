@@ -132,11 +132,11 @@ an item that must be done first.
 
 ### B-009 Run Nock in a Docker container, dev and prod
 
-- Status: building (the human approved option A, 2026-10-25)
+- Status: done (the human approved option A, 2026-10-25)
 - Domains: none (deployment files and README; no behaviour of the app)
 - Architecture decision: yes (options from the Plan agent on Fable; the human
   picked A: files and docs, checked once by hand; a CI check is a later item)
-- Branch: feat/b-009-docker · PR: none yet
+- Branch: feat/b-009-docker
 - Problem: a maintainer cannot run Nock in a container. The two local attempts
   put `.env*`, `data/` and `.git` into the image (no `.dockerignore`), run as
   root on Python 3.13 (the project pins 3.14) with Node and dev dependencies
@@ -205,6 +205,10 @@ Taken when a change touches them.
   load and passes alone; 046 AC-22's nickname error failed once on Firefox,
   never reproduced; on Windows, `net::ERR_NO_BUFFER_SPACE` after several
   gates in a row (rerun alone).
+- B-009's option B, once Docker is how Nock deploys: a domain
+  `platform/deployment.md` and a CI job that builds the image and checks the
+  running container (serves `/`, a room survives a restart, no `.env*` or
+  `data/` inside, not root). Needs the human's approval of the CI actions.
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 
