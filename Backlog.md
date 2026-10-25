@@ -522,29 +522,12 @@ same concept, and the rooms, the protocol and the browser never see ipuz.
 - The length pattern in the clue bar: « (3-2-5) » after the clue text, from
   the letters and breaks the model already has (ipuz's `showenumerations` is
   the file's switch). B-012 left it out of scope.
-- A mystery word (« mot mystère »), common in French arrowwords: marked cells
-  whose letters, in order, spell a final answer. ipuz has a top-level `answer`
-  and `enumeration` and cell styles (`shapebg` `circle`, `highlight`). Model:
-  the marked cells and the final answer; checked at completion
-  (`gameplay/rules.md`), drawn as a circle in the cell.
-- Graded help before a reveal: ipuz's clue `hints`, easier clue texts shown in
-  turn. Model: `Clue.hints`; a new help kind in the group vote of
-  `gameplay/hints.md`.
-- An explanation after the grid is solved: ipuz's clue and top-level
-  `explanation`, shown in the recap (`gameplay/results.md`). Model:
-  `Clue.explanation`, never sent before the grid is solved.
-- Near misses: ipuz's `misses` maps a wrong entry to a nudge (« presque »).
-  Model: per-clue misses, read by the check of `gameplay/hints.md`; the nudge
-  must not give the answer away (`platform/realtime.md`, fair play).
-- The title on the card and the grid page: B-013 records `title`, `intro` and
-  `notes` without showing them. Showing them changes the summary
-  (`content/library.md` rule 2), an interface change.
+- The title on the card and the grid page: B-013 records `title` without
+  showing it (`intro` and `notes` are read and ignored). Showing it changes
+  the summary (`content/library.md` rule 2), an interface change.
 - One grid imported twice: B-013 records `uniqueid`; refusing two index
   entries whose files share one would stop the same grid entering twice
   (`content/grid-files.md`).
-- Export of a room's letters: ipuz's `saved` holds a partial solve, so a group
-  could take its grid to another ipuz tool. Low value; listed for
-  completeness.
 
 Not taken from ipuz: its `checksum` (the server needs the answers for check
 and reveal), `references` and `continued` (rare in arrowwords), image clues
