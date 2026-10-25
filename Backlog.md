@@ -208,7 +208,7 @@ an item that must be done first.
 - Architecture decision: no
 - Criteria: library AC-19, AC-20 (changed), AC-21 (new); shell rule 17
   (changed, no criterion)
-- Branch: feat/b-011-catalogue-brand · PR: none yet
+- Branch: feat/b-011-catalogue-brand · PR: #50 (merged)
 - Problem: B-010 made the brand a link to `/` on every top bar that shows it,
   the catalogue included (with `aria-current="page"`). The human decided: the
   Nock mark and « Nock » bring back to the catalogue on any page other than
@@ -285,7 +285,7 @@ an item that must be done first.
     open and the edge never merges into the crossing lines; dash ends on
     whole pixels, so fractional cell sizes and pinch zoom never blur them;
   - thickness 1 px under 36 px cells, 2 px from 36 px, 3 px from 72 px: 3
-    dashes of about 3 px at FX-02's 18 px cells (568 by 320), about 7 of 5 px
+    dashes of about 3 px at 18 px cells (a 320 by 568 phone), about 7 of 5 px
     at a computer's 56 px, 8 of about 7 px at zoom 5 (90 px);
   - contrast 4.26:1 on my selected cell to 5.86:1 on white, 3:1 or more on
     every word, tint and locked background; 2.93:1 on the darkest flash,
@@ -301,6 +301,48 @@ an item that must be done first.
   the word's state (C), short ink dashes (D), the first E in rule grey (1.27
   to 2.54:1, hidden under my selection border, blurred at fractional sizes).
 - Open questions: none left.
+
+### B-014 Tests for the brand link on `/ops`, the recap and the account page
+
+- Status: done (the human picked option A and one state per page, and
+  approved the spec change, 2026-10-25; review approved in round 1; no
+  implementation step: the tests passed as written)
+- Domains: client/shell, admin/operations
+- Architecture decision: no (criteria and tests only; no behaviour, code or
+  look changes)
+- Criteria: shell AC-10 (changed), operations AC-13 (changed)
+- Branch: feat/b-014-brand-link-tests · PR: none yet
+- Problem: `client/shell.md` rule 17 makes the brand the link « Accueil » to
+  `/` on every top bar that shows it but the catalogue's. Criteria prove it on
+  the entry frame of a room (shell AC-10), the room's computer top bar (hud
+  AC-2) and the grid page (library AC-21), but not on the shared recap
+  `/recap/<token>`, the account page `/account` or the operator page `/ops`.
+  All use `TopBarBrand` today, so nothing is broken, but a brand drawn another
+  way there would go unseen.
+- In scope: the link, its name « Accueil », its target `/` and no
+  `aria-current`, on those three pages, at a computer and a phone window. The
+  recap and account pages share the entry frame (shell rule 9), whose page
+  frame `gameplay/results.md` and `account/account.md` leave to
+  `client/shell.md`; `/ops` uses the catalogue's frame, and its page belongs
+  to `admin/operations.md`.
+- Out of scope: any change of behaviour or look; the brand's name (the
+  label-in-name follow-up); following the link (B-010 and B-011 test that it
+  loads `/`).
+- Screens: none.
+- Options (the three files are at 20 criteria and over 15 KB, so no new
+  criterion is wanted):
+  - A. Extend two criteria in place: shell AC-10 names the recap and account
+    pages besides `/r/ZZZZZZ`; operations AC-13 says the `/ops` bar's brand is
+    the link « Accueil » to `/`. The tests behind their pointers (046 AC-1,
+    048 AC-6) are edited in place.
+  - B. One new criterion per page's domain (results, account, operations).
+    Puts each check by its page, but takes all three files over their budget.
+  - C. One new criterion in `client/shell.md`, rule 17's owner, for all
+    three pages. Puts shell at 21 criteria and over 16 KB.
+  - Lead's pick: A. The checks sit with the criteria that already prove each
+    frame, and no file grows.
+- Answers (the human, 2026-10-25): option A; one state per page: the recap
+  loaded, the account page signed out, `/ops` locked.
 
 ## Small follow-ups
 
@@ -333,16 +375,16 @@ Taken when a change touches them.
   summaries; the force filter makes no new request; the grid page's loading
   line and its non-summary answer; after a chip, only that chip pressed
   (`content/library.md` rules 8, 10, 16 and AC-6).
-- The brand as the link « Accueil » on `/ops`, the shared recap and the
-  account page (`client/shell.md` rule 17) has no criterion: only the
-  catalogue, the entry frame and the room's computer top bar are tested. All
-  use `TopBarBrand`, so a brand drawn elsewhere would go unseen. (The grid
-  page: B-011.)
 - The brand's name « Accueil » does not contain its visible text « Nock »
   (WCAG 2.5.3, label in name): a voice-control user saying "Nock" misses it.
   The human chose « Accueil »; « Nock, accueil » would meet both.
 - WebKit reaching the brand by Tab (`tabindex="0"`, hud AC-20) is proven only
   once CI runs WebKit after the merge.
+- `client/shell.md` (about 16.4 KB, 20 criteria) and `admin/operations.md`
+  (about 18 KB, 20 criteria) are past the size budget of `specs/_map.md`; the
+  next criterion in either needs a split first (an architecture item). For
+  shell, the B-010 spec-writer proposed `client/foundation.md` taking rules 13
+  to 17 and their criteria.
 - The room page's `closed` status can no longer be reached (a socket lost is
   `reconnecting` or `connecting`, `platform/realtime.md`), yet
   `room.status.closed` (« Connexion perdue. ») is still a required key of 040
