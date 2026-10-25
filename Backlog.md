@@ -181,17 +181,11 @@ Taken when a change touches them.
 
 ## Decisions waiting for the human
 
-- Grid source for real content (commission, licence, or generate and review):
-  before launch.
 - Le Parisien baseline: confirm it from screenshots, if the comparison is still
   wanted.
 - Hosting (Fly.io, Render or a VPS) and a domain, before the first public test.
   A cloud session drafts `docs/hosting.md` on the branch `docs/hosting-plan`.
-- GitHub: protect `main` (require the "Quality gate" check, no force push).
-  Repository settings are the human's.
 - Tag `v1.1.0` on `main` (never tagged).
-- The reading of the `NOCK_DATABASE` rule (refused: control, separator and
-  format characters only), left open since PR #12: confirm it.
 
 ## Release checklist
 
