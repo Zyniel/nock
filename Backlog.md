@@ -181,8 +181,6 @@ Taken when a change touches them.
 
 ## Decisions waiting for the human
 
-- Grid source for real content (commission, licence, or generate and review):
-  before launch.
 - Le Parisien baseline: confirm it from screenshots, if the comparison is still
   wanted.
 - Hosting (Fly.io, Render or a VPS) and a domain, before the first public test.
