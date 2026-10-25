@@ -355,7 +355,10 @@ def sec_catalogue() -> str:
 
 
 def brand_states() -> str:
-    """Return the brand link at rest, hovered and focused (foundation.md)."""
+    """Return the brand link at rest, hovered and focused, and the plain brand.
+
+    The plain brand is the catalogue's, which is no link (foundation.md).
+    """
 
     def bar(state: str, right: str = "") -> str:
         return (
@@ -366,20 +369,24 @@ def brand_states() -> str:
     entry = f'<div class="topbar brandbar" style="width:330px">{brand("focus")}</div>'
     room = bar("hover", '<span class="dtimer">12:34</span>')
     boxes = (
-        box(bar(""), "At rest: plain text, no underline.")
+        box(bar(""), "The grid page's bar at rest: plain text, no underline.")
         + box(bar("hover"), "Hovered: word blue; the mark and « Nock » stay put.")
         + box(bar("focus"), "Focused by the keyboard: the ring.")
         + box(entry, "The entry frame's 54 px bar, focused.")
         + box(room, "The room's computer top bar, hovered.")
+        + box(
+            bar("", dbtn(None, "Compte")),
+            "The catalogue's bar: plain text, as at rest; no hover, no focus.",
+        )
     )
     return (
         '<article class="scr" id="s-brand"><h3>Brand link « Accueil » '
         + marks(["foundation · Components", "pages", "room · Computer top bar"])
-        + '</h3><p class="cap">On every top bar that shows it, the Nock mark and '
-        "« Nock » are one link to <code>/</code>, named « Accueil »; on the "
-        "catalogue it is the current page. From a room it leaves as « Retour aux "
-        "grilles » does, with no question. The room's phone top bar has no brand: "
-        "the Menu leads home there.</p>"
+        + '</h3><p class="cap">On every top bar that shows it but the catalogue\'s, '
+        "the Nock mark and « Nock » are one link to <code>/</code>, named "
+        "« Accueil ». On the catalogue they are plain text. From a room the link "
+        "leaves as « Retour aux grilles » does, with no question. The room's phone "
+        "top bar has no brand: the Menu leads home there.</p>"
         f'<div class="mini">{boxes}</div></article>'
     )
 

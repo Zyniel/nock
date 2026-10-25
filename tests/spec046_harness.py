@@ -456,6 +456,15 @@ def open_catalogue(page: Page, base_url: str) -> None:
     wait_for_fonts(page)
 
 
+def open_grid_page(page: Page, base_url: str, state: str = "ready") -> None:
+    """Open `/g/2` and wait until `grid-page` is in `state` and its fonts load."""
+    page.goto(f"{base_url}/g/2")
+    expect(page.get_by_test_id("grid-page")).to_have_attribute(
+        "data-state", state, timeout=WAIT_TIMEOUT_MS
+    )
+    wait_for_fonts(page)
+
+
 def open_catalogue_loading(page: Page, base_url: str) -> None:
     """Open `/` and wait until `catalogue-page` shows (any state)."""
     page.goto(f"{base_url}/")

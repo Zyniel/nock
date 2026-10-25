@@ -2,7 +2,7 @@
 shows its ring.
 
 At 1280 by 720 the focusable elements that show come in the order: the brand link
-(`client/hud.md` AC-20, B-010), the computer top bar's five buttons, the grid, the
+(`client/hud.md` AC-20), the computer top bar's five buttons, the grid, the
 clue bar's four buttons, then the Salon. From the grid, `Escape` then `Tab` reaches
 `clue-prev` and `Escape` then `Shift+Tab` reaches `menu-button`. The brand and each
 top-bar button have the navy ring outside them, each clue bar button the white ring

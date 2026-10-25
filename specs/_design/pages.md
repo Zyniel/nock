@@ -12,10 +12,11 @@ column layout included.
 
 ## Catalogue
 
-- Top bar 56 px as the computer room's, with the brand link (`foundation.md`,
-  « Components »), and on the right « Compte »: a computer top-bar button with no
-  icon, pressed while its sheet is open (`room.md`, « Room sheets: host settings
-  and account »), 38 px high on a wide window and 34 px high on a narrow one.
+- Top bar 56 px as the computer room's, with the brand, plain here
+  (`foundation.md`, « Components », « Brand link »), and on the right « Compte »:
+  a computer top-bar button with no icon, pressed while its sheet is open
+  (`room.md`, « Room sheets: host settings and account »), 38 px high on a wide
+  window and 34 px high on a narrow one.
 - Main column: max width 920 px, centred, padding 24 px (16 px on a narrow
   window), gap 16 px, in this order:
   1. heading « Grilles » (`foundation.md`, « Typography »);
