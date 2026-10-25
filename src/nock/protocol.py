@@ -19,7 +19,7 @@ from pydantic import (
     TypeAdapter,
 )
 
-from nock.grid import Arrow, ClueCell, EmptyCell, Grid, LetterCell
+from nock.grid import Arrow, ClueCell, EmptyCell, Grid, LetterCell, Position
 
 
 class ProtocolModel(BaseModel):
@@ -400,6 +400,9 @@ class LetterCellView(ProtocolModel):
     locked: StrictBool
     revealed: StrictBool
     wrong: StrictBool
+    # A word of the grid has a break right after this cell, across or down.
+    hyphen_right: StrictBool = False
+    hyphen_down: StrictBool = False
 
 
 class ClueCellView(ProtocolModel):
@@ -432,8 +435,38 @@ class GridView(ProtocolModel):
     cells: tuple[CellView, ...]
 
 
-def _view_of_letter_cell(cell: LetterCell) -> LetterCellView:
-    """Return the empty view of a letter cell."""
+def _hyphen_marks(grid: Grid) -> tuple[set[Position], set[Position]]:
+    """Return the letter cells with a break right after them, across and down.
+
+    Args:
+        grid: A grid whose clues resolve to their words.
+
+    Returns:
+        The cells marked `hyphen_right`, then the cells marked `hyphen_down`.
+    """
+    right_marks: set[Position] = set()
+    down_marks: set[Position] = set()
+    for cell in grid.cells:
+        if not isinstance(cell, ClueCell):
+            continue
+        for clue_index, clue in enumerate(cell.clues):
+            if not clue.breaks:
+                continue
+            word = grid.word_cells(cell.row, cell.column, clue_index)
+            for letters_before in clue.breaks:
+                cell_before = word[letters_before - 1]
+                cell_after = word[letters_before]
+                if cell_after[0] == cell_before[0]:
+                    right_marks.add(cell_before)
+                else:
+                    down_marks.add(cell_before)
+    return right_marks, down_marks
+
+
+def _view_of_letter_cell(
+    cell: LetterCell, hyphen_right: bool, hyphen_down: bool
+) -> LetterCellView:
+    """Return the empty view of a letter cell, with its hyphen marks."""
     return LetterCellView(
         row=cell.row,
         column=cell.column,
@@ -443,6 +476,8 @@ def _view_of_letter_cell(cell: LetterCell) -> LetterCellView:
         locked=False,
         revealed=False,
         wrong=False,
+        hyphen_right=hyphen_right,
+        hyphen_down=hyphen_down,
     )
 
 
@@ -463,12 +498,21 @@ def grid_view(grid: Grid) -> GridView:
         grid: An imported grid.
 
     Returns:
-        The grid layout with every letter cell empty and no clue answer.
+        The grid layout with every letter cell empty and no clue answer. A
+        letter cell is marked `hyphen_right` or `hyphen_down` when a word has a
+        break right after it, across or down.
     """
+    right_marks, down_marks = _hyphen_marks(grid)
     cell_views: list[CellView] = []
     for cell in grid.cells:
         if isinstance(cell, LetterCell):
-            cell_views.append(_view_of_letter_cell(cell))
+            position = (cell.row, cell.column)
+            letter_view = _view_of_letter_cell(
+                cell,
+                hyphen_right=position in right_marks,
+                hyphen_down=position in down_marks,
+            )
+            cell_views.append(letter_view)
         elif isinstance(cell, ClueCell):
             cell_views.append(_view_of_clue_cell(cell))
         elif isinstance(cell, EmptyCell):

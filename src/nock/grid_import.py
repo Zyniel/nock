@@ -30,9 +30,14 @@ class _PlacedClue(NamedTuple):
     row: int
     column: int
     text: str
-    answer: str
+    answer: str  # as written, for messages
+    letters: str
+    breaks: tuple[int, ...]
     word: list[Position]
 
+
+# An edge between two neighbouring cells of a word, the first one first.
+Edge = tuple[Position, Position]
 
 # Offset of the word's first cell from the clue cell: (rows, columns).
 _START_OFFSETS = {
@@ -106,7 +111,13 @@ def _place_clues(grid: Grid) -> list[_PlacedClue]:
         for clue_index, clue in enumerate(clue_cell.clues):
             word = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
             placed_clue = _PlacedClue(
-                clue_cell.row, clue_cell.column, clue.text, clue.answer, word
+                row=clue_cell.row,
+                column=clue_cell.column,
+                text=clue.text,
+                answer=clue.answer,
+                letters=clue.letters,
+                breaks=clue.breaks,
+                word=word,
             )
             placed_clues.append(placed_clue)
     return placed_clues
@@ -115,10 +126,10 @@ def _place_clues(grid: Grid) -> list[_PlacedClue]:
 def _check_answer_lengths(placed_clues: list[_PlacedClue]) -> None:
     """Check that every answer has as many letters as its word has cells."""
     for clue in placed_clues:
-        if len(clue.answer) != len(clue.word):
+        if len(clue.letters) != len(clue.word):
             raise GridImportError(
                 f"clue {_format_clue(clue)} has answer {clue.answer} with "
-                f"{len(clue.answer)} letters, but its word has "
+                f"{len(clue.letters)} letters, but its word has "
                 f"{len(clue.word)} cells"
             )
 
@@ -208,7 +219,7 @@ def _check_crossing_letters(grid: Grid, placed_clues: list[_PlacedClue]) -> None
         for clue in placed_clues:
             if position not in clue.word:
                 continue
-            letter = clue.answer[clue.word.index(position)]
+            letter = clue.letters[clue.word.index(position)]
             if first_clue is None:
                 first_clue = clue
                 first_letter = letter
@@ -217,6 +228,42 @@ def _check_crossing_letters(grid: Grid, placed_clues: list[_PlacedClue]) -> None
                     f"words {first_clue.answer} and {clue.answer} disagree at "
                     f"{_format_position(position)}: {first_letter} against {letter}"
                 )
+
+
+def _edges_of(clue: _PlacedClue) -> list[tuple[Edge, bool]]:
+    """Return the edges between a word's cells, each with whether it is a break.
+
+    The edge after the word's k-th cell (from one) is a break when the answer has
+    a hyphen after k letters.
+    """
+    edges: list[tuple[Edge, bool]] = []
+    for index in range(len(clue.word) - 1):
+        edge = (clue.word[index], clue.word[index + 1])
+        letters_before_edge = index + 1
+        is_break = letters_before_edge in clue.breaks
+        edges.append((edge, is_break))
+    return edges
+
+
+def _check_shared_hyphens(placed_clues: list[_PlacedClue]) -> None:
+    """Check that two words sharing an edge agree on its hyphen."""
+    first_clue_of_edge: dict[Edge, _PlacedClue] = {}
+    first_break_of_edge: dict[Edge, bool] = {}
+    for clue in placed_clues:
+        for edge, is_break in _edges_of(clue):
+            if edge not in first_clue_of_edge:
+                first_clue_of_edge[edge] = clue
+                first_break_of_edge[edge] = is_break
+                continue
+            if is_break == first_break_of_edge[edge]:
+                continue
+            first_clue = first_clue_of_edge[edge]
+            before, after = edge
+            raise GridImportError(
+                f"words {first_clue.answer} and {clue.answer} disagree on the "
+                f"hyphen of the edge {_format_position(before)}, "
+                f"{_format_position(after)}"
+            )
 
 
 def import_grid(text: str) -> ImportReport:
@@ -243,6 +290,7 @@ def import_grid(text: str) -> ImportReport:
     _check_letters_in_a_word(grid, placed_clues)
     _check_runs_have_a_clue(grid, placed_clues)
     _check_crossing_letters(grid, placed_clues)
+    _check_shared_hyphens(placed_clues)
 
     return ImportReport(
         grid=grid,

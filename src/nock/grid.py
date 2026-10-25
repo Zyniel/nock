@@ -1,4 +1,4 @@
-"""Grid schema: cells, clues, answer normalisation and clue resolution."""
+"""Grid schema: cells, clues, answer letters and breaks, and clue resolution."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ Position = tuple[int, int]  # (row, column), from zero
 
 _LIGATURES = {"Œ": "OE", "œ": "oe", "Æ": "AE", "æ": "ae"}
 _RIGHT_SINGLE_QUOTE = chr(0x2019)
-_REMOVED_CHARACTERS = {" ", "-", "'", _RIGHT_SINGLE_QUOTE}
+_HYPHEN = "-"
+_REMOVED_CHARACTERS = {" ", _HYPHEN, "'", _RIGHT_SINGLE_QUOTE}
 _ALLOWED_LETTERS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 
@@ -41,8 +42,29 @@ def _format_position(row: int, column: int) -> str:
     return f"({row}, {column})"
 
 
+def _letters_of(text: str) -> str:
+    """Return the letters of a text, uppercased, without checking them.
+
+    Ligatures are expanded, accents folded, and spaces, hyphens and apostrophes
+    removed.
+    """
+    expanded_text = text
+    for ligature, expansion in _LIGATURES.items():
+        expanded_text = expanded_text.replace(ligature, expansion)
+
+    decomposed = unicodedata.normalize("NFD", expanded_text)
+    kept_characters = []
+    for character in decomposed:
+        if unicodedata.category(character) == "Mn":
+            continue
+        if character in _REMOVED_CHARACTERS:
+            continue
+        kept_characters.append(character)
+    return "".join(kept_characters).upper()
+
+
 def normalize_answer(text: str) -> str:
-    """Normalise an answer to uppercase A to Z only.
+    """Normalise an answer to uppercase A to Z only: its letters.
 
     Ligatures are expanded, accents folded, and spaces, hyphens and apostrophes
     removed.
@@ -56,40 +78,101 @@ def normalize_answer(text: str) -> str:
     Raises:
         ValueError: if the result is empty or holds a character outside A to Z.
     """
-    original_text = text
-    expanded_text = text
-    for ligature, expansion in _LIGATURES.items():
-        expanded_text = expanded_text.replace(ligature, expansion)
-
-    decomposed = unicodedata.normalize("NFD", expanded_text)
-    kept_characters = []
-    for character in decomposed:
-        if unicodedata.category(character) == "Mn":
-            continue
-        if character in _REMOVED_CHARACTERS:
-            continue
-        kept_characters.append(character)
-    result = "".join(kept_characters).upper()
-
+    result = _letters_of(text)
     if result == "":
-        raise ValueError(f"answer {original_text!r} is empty once normalised")
+        raise ValueError(f"answer {text!r} is empty once normalised")
     for character in result:
         if character not in _ALLOWED_LETTERS:
             raise ValueError(
-                f"answer {original_text!r} holds {character!r}, "
-                "expected only letters A to Z"
+                f"answer {text!r} holds {character!r}, expected only letters A to Z"
             )
     return result
 
 
+def _check_hyphens(text: str) -> None:
+    """Check that every hyphen of an answer has a letter right before and after.
+
+    Args:
+        text: The answer as written.
+
+    Raises:
+        ValueError: if a hyphen starts or ends the answer, or sits beside another
+            hyphen, a space or an apostrophe.
+    """
+    last_index = len(text) - 1
+    for index, character in enumerate(text):
+        if character != _HYPHEN:
+            continue
+        if index == 0 or index == last_index:
+            raise ValueError(
+                f'answer "{text}" starts or ends with a hyphen, '
+                "expected each hyphen between two letters"
+            )
+        before = text[index - 1]
+        after = text[index + 1]
+        if before in _REMOVED_CHARACTERS or after in _REMOVED_CHARACTERS:
+            raise ValueError(
+                f'answer "{text}" has a hyphen beside a hyphen, a space or an '
+                "apostrophe, expected each hyphen between two letters"
+            )
+
+
+def _breaks_of(text: str) -> tuple[int, ...]:
+    """Return the breaks of an answer: the number of letters before each hyphen.
+
+    Args:
+        text: The answer as written.
+
+    Returns:
+        One count per hyphen, in reading order.
+    """
+    breaks: list[int] = []
+    for index, character in enumerate(text):
+        if character == _HYPHEN:
+            letters_before = _letters_of(text[:index])
+            breaks.append(len(letters_before))
+    return tuple(breaks)
+
+
+def _check_answer(text: str) -> str:
+    """Check an answer as written: it has letters, and its hyphens are well placed.
+
+    Args:
+        text: The answer as written.
+
+    Returns:
+        The same text, unchanged.
+
+    Raises:
+        ValueError: if the answer breaks rule 4 of the grid model.
+    """
+    normalize_answer(text)
+    _check_hyphens(text)
+    return text
+
+
 class Clue(BaseModel):
-    """A clue: its text, its arrow and the answer of its word."""
+    """A clue: its text, its arrow and the answer of its word.
+
+    The answer is kept as written; its letters and breaks are derived from it
+    and never stored.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     text: str = Field(min_length=1)
     arrow: Arrow
-    answer: Annotated[str, AfterValidator(normalize_answer)]
+    answer: Annotated[str, AfterValidator(_check_answer)]
+
+    @property
+    def letters(self) -> str:
+        """The answer's letters, A to Z: the solution of the clue's word."""
+        return normalize_answer(self.answer)
+
+    @property
+    def breaks(self) -> tuple[int, ...]:
+        """The answer's hyphens, each counted as the number of letters before it."""
+        return _breaks_of(self.answer)
 
 
 class LetterCell(BaseModel):

@@ -152,6 +152,170 @@ export function triangleSide(cellSide: number): number {
   return Math.max(6, Math.round(cellSide * 0.3))
 }
 
+// ---- Hyphen edges (specs/_design/cells.md « Hyphen edges ») ----
+
+// The hyphen edges that touch one letter cell. A hyphen edge is the right or
+// bottom edge of the letter before the hyphen (its `hyphen_right` or
+// `hyphen_down` mark), and so the left or top edge of the letter after it.
+export interface CellHyphens {
+  right: boolean
+  bottom: boolean
+  left: boolean
+  top: boolean
+}
+
+// The hyphen edges of each letter cell that touches one, by the "row,column"
+// of the cell. A cell that touches none has no entry.
+export function hyphensByCell(grid: GridView): Map<string, CellHyphens> {
+  const hyphens = new Map<string, CellHyphens>()
+
+  function hyphensOf(row: number, column: number): CellHyphens {
+    const key = positionKey(row, column)
+    let found = hyphens.get(key)
+    if (found === undefined) {
+      found = { right: false, bottom: false, left: false, top: false }
+      hyphens.set(key, found)
+    }
+    return found
+  }
+
+  for (const cell of grid.cells) {
+    if (cell.type !== 'letter') {
+      continue
+    }
+    if (cell.hyphen_right) {
+      hyphensOf(cell.row, cell.column).right = true
+      hyphensOf(cell.row, cell.column + 1).left = true
+    }
+    if (cell.hyphen_down) {
+      hyphensOf(cell.row, cell.column).bottom = true
+      hyphensOf(cell.row + 1, cell.column).top = true
+    }
+  }
+  return hyphens
+}
+
+// One dash of a hyphen edge, in whole px from the edge's start: from `start`
+// to just before `end`.
+export interface DashRun {
+  start: number
+  end: number
+}
+
+// The dashes' thickness on cells of side s: 1 px under 36 px, 2 px from 36,
+// 3 px from 72.
+export function hyphenThickness(cellSide: number): number {
+  if (cellSide >= 72) {
+    return 3
+  }
+  if (cellSide >= 36) {
+    return 2
+  }
+  return 1
+}
+
+// The period the dashes aim at for each thickness, in px.
+const HYPHEN_PERIOD_PX: Record<number, number> = { 1: 5, 2: 8, 3: 11 }
+
+// The fewest dashes an edge has.
+const HYPHEN_LEAST_DASHES = 3
+
+// The dashes along an edge of a cell of side s: the edge is L = s - 1 long (up
+// to the crossing line, which stays plain), it holds n = max(3, round(L / p))
+// dashes, and dash i runs from round((i + 0.2) L / n) to round((i + 0.8) L / n).
+// Every end is a whole number, so that every dash lies on whole pixels.
+export function hyphenDashes(cellSide: number): DashRun[] {
+  const length = cellSide - GRID_LINE_PX
+  const period = HYPHEN_PERIOD_PX[hyphenThickness(cellSide)]
+  const count = Math.max(HYPHEN_LEAST_DASHES, Math.round(length / period))
+  const dashes: DashRun[] = []
+  for (let index = 0; index < count; index += 1) {
+    const start = Math.round(((index + 0.2) * length) / count)
+    const end = Math.round(((index + 0.8) * length) / count)
+    dashes.push({ start, end })
+  }
+  return dashes
+}
+
+// How the dashes' thickness is shared between the two cells of the edge, in
+// px. The dashes are centred on the grid line's pixel, which is the last pixel
+// of the cell before: t = 1 is that pixel; t = 2 adds the first pixel of the
+// cell after; t = 3 adds a pixel on each side.
+export function hyphenWidthBefore(thickness: number): number {
+  return thickness === 3 ? 2 : 1
+}
+
+export function hyphenWidthAfter(thickness: number): number {
+  return thickness >= 2 ? 1 : 0
+}
+
+// A side of a letter cell that a hyphen edge runs along.
+export type EdgeSide = 'right' | 'bottom' | 'left' | 'top'
+
+// What one cell draws along one side for a hyphen edge, `width` px across:
+// - 'hyphen': its share of the dashes in hyphen grey, under every mark;
+// - 'band': its share of my selection border's dashed side, navy dashes with
+//   gaps in the selected blue, over every mark.
+export interface EdgeDrawing {
+  side: EdgeSide
+  width: number
+  kind: 'hyphen' | 'band'
+}
+
+// My selection border is 2 px; beside a hyphen edge its dashed side is 3 px,
+// the border and the grid line's pixel.
+const SELECTION_BORDER_PX = 2
+const SELECTION_BAND_PX = SELECTION_BORDER_PX + GRID_LINE_PX
+
+// What a letter cell draws for the hyphen edges that touch it. On my selected
+// cell, the side along a hyphen edge is the dashed band; the grid line's pixel
+// of that band lies in the cell before the edge, which draws it when the cell
+// after is my selected one.
+export function hyphenDrawings(
+  hyphens: CellHyphens,
+  thickness: number,
+  isSelected: boolean,
+  isRightSelected: boolean,
+  isBelowSelected: boolean,
+): EdgeDrawing[] {
+  const drawings: EdgeDrawing[] = []
+  const widthBefore = hyphenWidthBefore(thickness)
+  const widthAfter = hyphenWidthAfter(thickness)
+
+  const sidesBefore: { side: EdgeSide; isAfterSelected: boolean }[] = []
+  if (hyphens.right) {
+    sidesBefore.push({ side: 'right', isAfterSelected: isRightSelected })
+  }
+  if (hyphens.bottom) {
+    sidesBefore.push({ side: 'bottom', isAfterSelected: isBelowSelected })
+  }
+  for (const { side, isAfterSelected } of sidesBefore) {
+    drawings.push({ side, width: widthBefore, kind: 'hyphen' })
+    if (isSelected) {
+      drawings.push({ side, width: SELECTION_BAND_PX, kind: 'band' })
+    } else if (isAfterSelected) {
+      drawings.push({ side, width: GRID_LINE_PX, kind: 'band' })
+    }
+  }
+
+  const sidesAfter: EdgeSide[] = []
+  if (hyphens.left) {
+    sidesAfter.push('left')
+  }
+  if (hyphens.top) {
+    sidesAfter.push('top')
+  }
+  for (const side of sidesAfter) {
+    if (widthAfter > 0) {
+      drawings.push({ side, width: widthAfter, kind: 'hyphen' })
+    }
+    if (isSelected) {
+      drawings.push({ side, width: SELECTION_BORDER_PX, kind: 'band' })
+    }
+  }
+  return drawings
+}
+
 // Keep a zoom inside the limits and at 2 decimals, as `data-zoom` shows it.
 export function clampZoom(zoom: number): number {
   const limited = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, zoom))
