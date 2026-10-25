@@ -130,11 +130,11 @@ fonts, focus ring, shared components, state lines).
 
 17. The brand, the Nock mark (hidden from assistive technology) then
     `app.title`, is a link to `/` named `topbar.home` (« Accueil ») on every top
-    bar that shows it: the catalogue's and the grid page's
+    bar that shows it but the catalogue's: the grid page's
     (`content/library.md`), the frame's (rule 9), the operator page's and the
     room's computer top bar (`client/hud.md`). Following it loads the page `/`,
-    as any link does. Only on `/` does it carry `aria-current="page"`; there it
-    loads the catalogue again. The room's phone top bar has no brand.
+    as any link does. On `/` it is plain text, read « Nock »: no link, no Tab
+    stop, no `aria-current`. The room's phone top bar has no brand.
 
 ### Look
 

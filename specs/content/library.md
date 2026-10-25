@@ -78,9 +78,8 @@ answer.
     (`catalogue.filter.force`). Exactly one is pressed (`aria-pressed`),
     « Toutes » on load. Pressing « Force N » shows the loaded grids of force N
     in the same order, with no new request; « Toutes » shows them all again.
-11. The top bar holds the brand only (`client/shell.md` rule 17), with
-    `aria-current="page"` here, plus « Compte » while accounts are on
-    (`account/account.md`).
+11. The top bar holds the brand only (`client/shell.md` rule 17), plain text
+    here, plus « Compte » while accounts are on (`account/account.md`).
 
 ### Grid cards
 
@@ -126,7 +125,7 @@ answer.
 - The brand bar and column of both pages, the filter chips, the cards, their
   progress pills, force marks and drawing, and « Jouer »: `_design/pages.md`,
   « Catalogue », with `_design/foundation.md`, « Components » (card, list row,
-  error line, brand link).
+  error line, brand link, plain on the catalogue).
 - The state lines: `_design/pages.md`, « States: opening, loading, empty,
   error ».
 
@@ -209,12 +208,15 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-18** When `GET /api/grids/2` answers 404, `/g/2` shows « Page
   introuvable » and no card; when it answers 500, « Impossible de charger les
   grilles. » as an error line. (← 004 AC-6, 046 AC-14)
-- **AC-19** On `/` the brand is the link « Accueil » to `/` with
-  `aria-current="page"`; following it loads the catalogue again, which asks
-  `GET /api/grids` a second time.
-- **AC-20** On `/` on a computer, the hovered brand takes the hover look of
+- **AC-19** On `/` the brand is plain text read « Nock »: the top bar holds no
+  link, Tab never stops on the brand, nothing on the page carries
+  `aria-current`, and on a computer the hovered brand keeps its look at rest.
+- **AC-20** On `/g/2` on a computer, the hovered brand takes the hover look of
   « Brand link » (`_design/foundation.md`, « Components »), its Nock mark and
   « Nock » where they are at rest.
+- **AC-21** On `/g/2` the brand is the link « Accueil » to `/` with no
+  `aria-current`; following it loads the catalogue, which asks
+  `GET /api/grids`.
 
 ## Edge cases
 

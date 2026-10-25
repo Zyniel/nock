@@ -19,7 +19,7 @@ Choices where the spec leaves room:
   that range: all its rectangles have the same top (1 px).
 - "The icon's bottom at or above the label's top" and "the icon's right at or left
   of the label's left" have the position tolerance of 1 px.
-- The brand is the link « Accueil » to `/` (B-010, `client/hud.md` AC-2): an `A`
+- The brand is the link « Accueil » to `/` (`client/hud.md` AC-2): an `A`
   with `href="/"`, role link and name `topbar.home`, no `aria-current`, its Nock
   mark hidden from assistive technology. Its box is larger than its content
   (`foundation.md`, « Brand link »), so "the brand 16 px in" is read on its Nock
@@ -339,7 +339,7 @@ def test_ac3_the_brand_is_the_link_accueil_to_home_with_no_aria_current(
 ) -> None:
     open_fx01(page, live_server, fx01_grid)
 
-    expect_brand_link(page.get_by_test_id("topbar-brand"), current=False)
+    expect_brand_link(page.get_by_test_id("topbar-brand"))
 
 
 def test_ac3_a_click_on_the_brand_loads_home_with_no_question(
