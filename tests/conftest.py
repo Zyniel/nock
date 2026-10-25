@@ -20,12 +20,13 @@ if TYPE_CHECKING:
     from nock.catalogue import Catalogue
     from nock.server import RoomRegistry
 
-# The harness modules (`specNNN_harness.py`) hold helpers with plain `assert`s.
-# pytest rewrites the asserts of test files and conftests only, so every harness
-# module is registered here: the call has to come before the first test module
-# imports them. `sure_click` (2026-10-23) is a shared helper with a plain `assert`.
+# The harness modules (`specNNN_harness.py` and the domains' `<name>_harness.py`)
+# hold helpers with plain `assert`s. pytest rewrites the asserts of test files and
+# conftests only, so every harness module is registered here: the call has to come
+# before the first test module imports them. `sure_click` (2026-10-23) is a shared
+# helper with a plain `assert`.
 HARNESS_MODULES = sorted(
-    path.stem for path in Path(__file__).parent.glob("spec*_harness.py")
+    path.stem for path in Path(__file__).parent.glob("*_harness.py")
 )
 pytest.register_assert_rewrite(*HARNESS_MODULES, "sure_click")
 
