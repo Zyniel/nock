@@ -1,6 +1,5 @@
 <script lang="ts">
-  // The in-app keyboard of a touch screen (spec 009, spec 044, _design.md
-  // section 8): three AZERTY rows, with ✎ (pencil mode), ⇄ (the other
+  // The in-app keyboard of a touch screen (spec 009, spec 044, specs/_design/room.md « In-app keyboard »): three AZERTY rows, with ✎ (pencil mode), ⇄ (the other
   // direction of the selected cell) and ⌫ (erase) in the last one. The room
   // page decides when it shows and what each key does.
   import Icon from './Icon.svelte'

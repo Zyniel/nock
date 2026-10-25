@@ -22,7 +22,7 @@ export function arrowSide(arrow: Arrow): ArrowSide {
   return 'bottom'
 }
 
-// The glyph of an arrow in its 24 by 24 box (_design.md section 6): the
+// The glyph of an arrow in its 24 by 24 box (specs/_design/cells.md « Direction arrows »): the
 // stroked path and the filled head.
 export interface ArrowGlyph {
   path: string
@@ -71,7 +71,7 @@ function targetOf(row: number, column: number, arrow: Arrow): { row: number; col
 }
 
 // The place of one arrow among the arrows of its target cell, by the collision
-// rules of _design.md section 6.
+// rules of specs/_design/cells.md.
 function placeOf(arrow: PlacedArrow, arrowsOfCell: PlacedArrow[]): ArrowPlace {
   let hasRightThenDown = false
   let rightCount = 0
@@ -147,7 +147,7 @@ export function arrowsByCell(grid: GridView): Map<string, PlacedArrow[]> {
 }
 
 // The side of a corner triangle of another player, t = max(6, round(0.3 s)),
-// in whole pixels (_design.md section 6).
+// in whole pixels (specs/_design/cells.md « Grid lines and empty cells »).
 export function triangleSide(cellSide: number): number {
   return Math.max(6, Math.round(cellSide * 0.3))
 }

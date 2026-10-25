@@ -1,5 +1,5 @@
 <script lang="ts">
-  // One icon of icons.ts (_design.md section 5): a 24 by 24 outline drawn in
+  // One icon of icons.ts (specs/_design/foundation.md « Icons »): a 24 by 24 outline drawn in
   // the current colour, hidden from screen readers (the control around it
   // carries the name). Its size and stroke width come from the caller's styles.
   import { ICONS } from './icons'

@@ -1221,7 +1221,7 @@
     stroke-linejoin: round;
   }
 
-  /* A shown reaction (spec 022): the white pill of _design.md section 8,
+  /* A shown reaction (spec 022): the white pill of specs/_design/room.md « Reactions »,
      centred on its own clue (one half of a two-clue cell). Positioned against
      the clue, so it adds no layout, and on layer 8, above the flag and the
      cells around it, since it may reach past the cell's edges. It lies inside

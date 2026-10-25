@@ -1,6 +1,5 @@
 <script lang="ts">
-  // A player's own icon of the Accessibilité mode (spec 042, _design.md section
-  // 6): the shapes of PLAYER_ICONS for the player's colour index, filled with
+  // A player's own icon of the Accessibilité mode (spec 042, specs/_design/cells.md « Player icons »): the shapes of PLAYER_ICONS for the player's colour index, filled with
   // that player's colour, with no outline. It fills its parent's box unless a
   // side is given.
   import { PLAYER_ICONS } from './icons'

@@ -237,7 +237,7 @@
     position: absolute;
   }
 
-  /* The new-events dot (_design.md section 11): an 8 px red circle. */
+  /* The new-events dot (specs/_design/foundation.md « Components »): an 8 px red circle. */
   .salon-dot {
     position: absolute;
     width: 8px;
@@ -328,8 +328,7 @@
     font-size: 0.92rem;
   }
 
-  /* The dot takes the badge's place on a computer (_design.md section 15,
-     item 9). */
+  /* The dot takes the badge's place on a computer (specs/_design/room.md « Computer top bar »). */
   .computer .chat-unread,
   .computer .salon-dot {
     top: 2px;

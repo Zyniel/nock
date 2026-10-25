@@ -1,8 +1,8 @@
-/* The token block (spec 041, specs/_design.md sections 2 to 4): every colour of
+/* The token block (spec 041, specs/_design/foundation.md « Colour tokens » to « Typography »): every colour of
    the client is declared here, once, and used everywhere else through var().
    No other rule of the client writes a colour value. */
 :root {
-  /* Colour tokens (_design.md section 2). */
+  /* Colour tokens (specs/_design/foundation.md « Colour tokens »). */
   --nock-navy: #1b2f55;
   --nock-ink: #14181f;
   --nock-muted: #5e6573;
@@ -36,8 +36,7 @@
   --nock-legend-bg: rgb(255 255 255 / 96%);
   --nock-pen-fill: rgb(255 255 255 / 35%);
 
-  /* One colour per player, by join index 0 to 7 (spec 012, _design.md
-     section 3): corner triangles, word tints, flashes, dots and swatches. */
+  /* One colour per player, by join index 0 to 7 (spec 012, specs/_design/foundation.md « Player colours »): corner triangles, word tints, flashes, dots and swatches. */
   --player-colour-0: #604800;
   --player-colour-1: #608838;
   --player-colour-2: #008878;
@@ -58,7 +57,7 @@
   --player-ink-6: #904f00;
   --player-ink-7: #784030;
 
-  /* Font tokens (_design.md section 4). The faces are served by Nock itself
+  /* Font tokens (specs/_design/foundation.md « Typography »). The faces are served by Nock itself
      (the @fontsource imports of main.ts). */
   --nock-font-ui: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
   --nock-font-clue:
@@ -99,7 +98,7 @@ main {
   outline-offset: 2px;
 }
 
-/* A navy surface (the clue bar of _design.md section 8 will be one). Its focus
+/* A navy surface (the clue bar of specs/_design/room.md « Clue bar » will be one). Its focus
    ring is white and drawn inside the element. */
 .nock-on-navy {
   background: var(--nock-navy);
@@ -124,7 +123,7 @@ main {
   border: 0;
 }
 
-/* ---- Styling primitives (_design.md section 11) ------------------------------
+/* ---- Styling primitives (specs/_design/foundation.md « Components ») ------------------------------
    Global classes that later specs put on controls. */
 
 /* A button: every variant has this shape. */
@@ -252,7 +251,7 @@ main {
   }
 }
 
-/* ---- Room sheets (spec 043, _design.md section 8) -----------------------------
+/* ---- Room sheets (spec 043, specs/_design/room.md « Room sheets: host settings and account ») -----------------------------
    The host's settings and the account dialog: modal dialogs, centred in the
    column layout; with the class `bottom`, bottom sheets in the sheet layout,
    whose backdrop leaves the top bar uncovered. */
@@ -310,7 +309,7 @@ main {
   color: var(--nock-navy);
 }
 
-/* ---- Plain pages (spec 046, _design.md sections 8, 10 and 11) -----------------
+/* ---- Plain pages (spec 046, specs/_design/pages.md « Plain pages: account, shared recap, operator », specs/_design/pages.md « Catalogue » and specs/_design/foundation.md « Components ») -----------------
    The catalogue, the grid page, the entry pages and the page not found, and
    the components they share. */
 
@@ -379,7 +378,7 @@ a.nock-button {
   color: var(--nock-navy);
 }
 
-/* The time of a recap (_design.md section 4): the recap dialog's and the
+/* The time of a recap (specs/_design/foundation.md « Typography »): the recap dialog's and the
    shared recap page's. */
 .nock-recap-time {
   margin: 0;
@@ -455,7 +454,7 @@ a.nock-button {
   overflow-wrap: anywhere;
 }
 
-/* A state line (_design.md section 8, "States"): one muted line where the
+/* A state line (specs/_design/pages.md « States: opening, loading, empty, error »): one muted line where the
    content will be, while waiting or when empty. The catalogue's lines are in
    the page's text size; those of a card, and of the plain pages of spec 048,
    in the card text size (nock-muted-line below). */
@@ -563,7 +562,7 @@ a.nock-button {
   background: var(--nock-word);
 }
 
-/* ---- Grid cells (spec 042, _design.md section 6) -----------------------------
+/* ---- Grid cells (spec 042, specs/_design/cells.md) -----------------------------
    The marks a grid cell shares with the operator's replay (spec 048). The cell
    sets --cell, its side. */
 

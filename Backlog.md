@@ -117,9 +117,9 @@ an item that must be done first.
 
 ### B-008 Docs and comments follow the domain specs
 
-- Status: building (the human asked for it, 2026-10-25)
+- Status: done (the human asked for it, 2026-10-25)
 - Domains: none (docs and comments only)
-- Branch: feat/b-008-workflow-docs · PR: none yet
+- Branch: feat/b-008-workflow-docs
 - Problem: after B-001, `README.md`, `docs/build-plan.md` and `docs/handoff.md`
   describe the numbered-spec workflow, and comments in `web/src` and four test
   harnesses cite `specs/_design.md` by section.
@@ -172,6 +172,10 @@ Taken when a change touches them.
   account route answers 405 while accounts are on, and 404 while they are off
   for a method no route has; a failed purge is logged and the sweep goes on
   (`account/account.md`).
+- Known flakes: 036 AC-8's join on the room of `NOCK_DATABASE` fails under
+  load and passes alone; 046 AC-22's nickname error failed once on Firefox,
+  never reproduced; on Windows, `net::ERR_NO_BUFFER_SPACE` after several
+  gates in a row (rerun alone).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 
@@ -185,6 +189,9 @@ Taken when a change touches them.
   A cloud session drafts `docs/hosting.md` on the branch `docs/hosting-plan`.
 - GitHub: protect `main` (require the "Quality gate" check, no force push).
   Repository settings are the human's.
+- Tag `v1.1.0` on `main` (never tagged).
+- The reading of the `NOCK_DATABASE` rule (refused: control, separator and
+  format characters only), left open since PR #12: confirm it.
 
 ## Release checklist
 

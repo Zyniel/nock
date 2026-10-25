@@ -265,7 +265,7 @@
     color: var(--nock-muted);
   }
 
-  /* The « hôte » tag (_design.md section 11). */
+  /* The « hôte » tag (specs/_design/foundation.md « Components »). */
   .roster-host {
     padding: 2px 8px;
     border-radius: 10px;
@@ -320,7 +320,7 @@
     margin-top: 14px;
   }
 
-  /* The dialog section heading style (_design.md section 4). */
+  /* The dialog section heading style (specs/_design/foundation.md « Typography »). */
   .share-label {
     font: 600 0.78rem/1.2 var(--nock-font-ui);
     text-transform: uppercase;
@@ -343,7 +343,7 @@
     text-overflow: ellipsis;
   }
 
-  /* The confirmation line (_design.md section 11). */
+  /* The confirmation line (specs/_design/foundation.md « Components »). */
   .share-copied {
     margin: 0;
     font: 500 0.85rem/1.3 var(--nock-font-ui);

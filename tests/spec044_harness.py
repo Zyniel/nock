@@ -69,7 +69,8 @@ COMPUTER = (1280, 720)
 LOW_TOUCH_WINDOWS = [(740, 360), (568, 320)]
 LOW_TOUCH_IDS = ["740x360", "568x320"]
 
-# The colours of the criteria (`_design.md` section 2, spec 041's tokens).
+# The colours of the criteria (`specs/_design/foundation.md` « Colour tokens »,
+# spec 041's tokens).
 KEYBOARD_BG = (217, 222, 230)
 KEY_BG = (233, 236, 241)
 PENCIL = (85, 91, 103)

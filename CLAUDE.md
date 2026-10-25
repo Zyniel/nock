@@ -162,6 +162,8 @@ The `python-standards` skill has the full list. In short: PEP 8, 88-character
 lines, full type annotations, Google-style docstrings, `from __future__ import
 annotations` in every module, and readable code (plain loops and named variables
 rather than clever one-liners). No `# noqa`, no `# type: ignore`.
+Write invisible characters as `\N{NAME}` escapes, never raw; keep LF line
+endings.
 
 ## Git
 

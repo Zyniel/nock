@@ -870,7 +870,10 @@ def section_heading_problems(locator: Locator) -> list[str]:
 
 
 def error_line_problems(locator: Locator) -> list[str]:
-    """The error line of `_design.md` section 11: red, 500, 13.6 px."""
+    """The error line of `specs/_design/foundation.md` « Components ».
+
+    Red, weight 500, 13.6 px.
+    """
     return font_problems(locator, "error line", 13.6, "500", RED)
 
 

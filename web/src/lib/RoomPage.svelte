@@ -1553,7 +1553,7 @@
 
   // ---- The play area (spec 043, "Play area and fit") ----
 
-  // The clue bar's height (_design.md section 8).
+  // The clue bar's height (specs/_design/room.md « Clue bar »).
   const CLUE_BAR_HEIGHT_PX = 34
 
   // The block of the grid, the clue bar and the status, as large as the play
@@ -2526,7 +2526,7 @@
     margin: 10px -12px -12px;
   }
 
-  /* ---- The vote banner (spec 025, spec 047; _design.md section 9) ----
+  /* ---- The vote banner (spec 025, spec 047; specs/_design/overlays.md « Vote ») ----
 
      Over the grid (spec 025 decision 9): absolutely placed, so it takes no
      height from the grid. The vote wins over the Salon sheet and the scrim
@@ -2609,7 +2609,7 @@
     transition: none;
   }
 
-  /* ---- The completion status (spec 026; _design.md section 9) ---- */
+  /* ---- The completion status (spec 026; specs/_design/overlays.md « End of grid ») ---- */
 
   .grid-status {
     margin: 0;

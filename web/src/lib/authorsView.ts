@@ -10,7 +10,7 @@ import { readItem } from './storage'
 export const AUTHORS_VIEW_KEY = 'nock.authors'
 
 // The legend's room under the grid when it is one line, as drawn, and the gap
-// between the grid and the legend (_design.md section 7).
+// between the grid and the legend (specs/_design/cells.md « Auteurs mode »).
 export const LEGEND_ONE_LINE_ROOM_PX = 38
 export const LEGEND_GAP_PX = 8
 

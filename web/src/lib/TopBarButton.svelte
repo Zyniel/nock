@@ -1,5 +1,5 @@
 <script lang="ts">
-  // A button of a top bar (spec 043, _design.md section 11): its icon, if any,
+  // A button of a top bar (spec 043, specs/_design/foundation.md « Components »): its icon, if any,
   // and its label, navy on a transparent background, word blue while pressed or
   // while what it opens is open. The top bar decides its size and whether the
   // icon sits above or beside the label. The page top bar's "Compte" (spec
