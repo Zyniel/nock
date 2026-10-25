@@ -304,8 +304,8 @@ an item that must be done first.
 
 ### B-013 Grid files in the ipuz ArrowWord format
 
-- Status: ready (the human picked option D and named the ipuz fields the
-  grids will carry, then approved the spec change with compound words in
+- Status: building (the human picked option D and named the ipuz fields
+  the grids will carry, then approved the spec change with compound words in
   ipuz's own notation, 2026-10-26)
 - Domains: content/grid-files (new, split from content/grids, which keeps
   the model and the import checks), content/grids, content/library (pointers
