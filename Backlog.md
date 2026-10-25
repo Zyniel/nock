@@ -60,8 +60,7 @@ an item that must be done first.
   done lines are `role="status"`, error lines `role="alert"`; a failed
   action's error line is `role="alert"`); takes the phone top bar's 40 px
   buttons and the clue bar's minimum width (320 px) into `_design/room.md`;
-  takes the grid's name in the computer top bar out of the current design
-  (B-006).
+  takes the grid's name in the computer top bar out of the design.
 
 ### B-002 Phase 8: race and team modes
 
@@ -79,7 +78,7 @@ an item that must be done first.
 
 ### B-003 Compact the tests
 
-- Status: brief
+- Status: brief (the human delays the decision)
 - Domains: none (tests only)
 - Waits for: B-001
 - Problem: 4.9 MB of tests for 875 KB of code; helpers are copied from file to
@@ -116,32 +115,20 @@ an item that must be done first.
 - Out of scope: progress of guests across devices.
 - Screens: the catalogue's progress pills, as drawn today.
 
-### B-006 The grid's name in the computer top bar
+### B-008 Docs and comments follow the domain specs
 
-- Status: brief (drawn in the design reference of 2026-10-16, « Grille n° N ·
-  Force F » in the computer top bar; spec 043 left it as an open question and
-  never built it)
-- Domains: client/hud
-- Waits for: B-001
-- Problem: on a computer, the room page does not say which grid is played.
-- In scope: the grid's number and force in the computer top bar.
-- Out of scope: the phone top bar.
-- Screens: the computer top bar; the design split takes the drawing out of
-  the current design until the human decides.
-- Open questions: build it, or drop it from the design for good?
-
-### B-007 Pencil mode on a touch phone with the keyboard hidden
-
-- Status: brief (found by the rebaseline's review of `client/hud.md`)
-- Domains: gameplay/co-op, client/hud, gameplay/board
-- Waits for: B-001
-- Problem: the phone top bar has no « Crayon », and the ✎ key lives in the
-  in-app keyboard; once « Clavier » hides the keyboard, a touch phone has no
-  way to turn pencil mode on or off.
-- In scope: a way to change pencil mode with the keyboard hidden.
-- Out of scope: the computer top bar.
-- Screens: the phone top bar or the Aide menu; options to draw.
-- Open questions: is it worth fixing, or is hiding the keyboard rare enough?
+- Status: building (the human asked for it, 2026-10-25)
+- Domains: none (docs and comments only)
+- Branch: feat/b-008-workflow-docs · PR: none yet
+- Problem: after B-001, `README.md`, `docs/build-plan.md` and `docs/handoff.md`
+  describe the numbered-spec workflow, and comments in `web/src` and four test
+  harnesses cite `specs/_design.md` by section.
+- In scope: README's workflow on `Backlog.md`, `/new-spec` and `/feature B-NNN`;
+  the two old docs removed, anything still current kept in README or the
+  backlog; every `_design.md` citation in a comment names its
+  `specs/_design/<file>.md` heading.
+- Out of scope: any change of behaviour, test or look.
+- Screens: none.
 
 ## Small follow-ups
 
@@ -185,12 +172,6 @@ Taken when a change touches them.
   account route answers 405 while accounts are on, and 404 while they are off
   for a method no route has; a failed purge is logged and the sweep goes on
   (`account/account.md`).
-- Comments in `tests/spec04[2346]_harness.py` and in `web/src` (`app.css`,
-  `RoomTopBar.svelte` and others) still cite `specs/_design.md` by section;
-  point them to `specs/_design/<file>.md` when a change touches them.
-  `README.md` (its workflow section, `/feature specs/NNN-name.md`),
-  `docs/build-plan.md` and `docs/handoff.md` describe the old workflow: archive
-  or rewrite them (implementer's area).
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
 

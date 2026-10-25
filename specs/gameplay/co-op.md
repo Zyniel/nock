@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: co-op
-status: done
+status: draft
 ---
 
 # gameplay/co-op - Shared letters, same-cell conflicts and pencil letters
@@ -66,10 +66,10 @@ uncertain until any player confirms it.
 
 7. Pencil mode is off at each page load. « Crayon » (`pencil.toggle`) in the
    top bar, absent from the phone top bar on any touch screen
-   (`client/hud.md` rule 4; B-007 in `Backlog.md`), and the ✎ key of the
-   in-app keyboard wherever the keyboard shows (`gameplay/board.md`) flip the
-   one mode and show it pressed. « Crayon » is disabled once the grid is
-   solved.
+   (`client/hud.md` rule 4), and the ✎ key of the in-app keyboard wherever
+   the keyboard shows (`gameplay/board.md`) flip the one mode and show it
+   pressed; on a touch phone with the keyboard hidden, nothing changes the
+   mode. « Crayon » is disabled once the grid is solved.
 8. Typing L on a cell that is not locked: if the cell already shows L with the
    mode's pencil flag, nothing is sent; else the cell shows L with that flag at
    once and the page sends `pencil_edit` (mode on) or `edit_letter` (mode off).
