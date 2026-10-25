@@ -202,7 +202,7 @@ an item that must be done first.
 
 ### B-012 Compound words: a dashed line where the hyphen falls
 
-- Status: ready (the human approved look E′ and the spec change, 2026-10-25;
+- Status: building (the human approved look E′ and the spec change, 2026-10-25;
   model option A, the lead's pick)
 - Domains: content/grids, platform/realtime, gameplay/board
 - Architecture decision: yes (grid file, stored grid and the snapshot's grid;
