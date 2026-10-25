@@ -3,8 +3,9 @@
 Pytest does not collect this module (its name does not start with `test_`). It
 holds what more than one test file of spec 043 uses: the values of the spec, the
 mocked room, its snapshots and event frames, the heavy setup `H8`, the readers
-of boxes, labels, icons and pictograms, and the checks of a 3-second note's look
-and place. The tests are in these files, one per group of criteria:
+of boxes, labels, icons and pictograms, the checks of the brand link (shared with
+the tests of spec 046 and of `content/library.md`), and the checks of a 3-second
+note's look and place. The tests are in these files, one per group of criteria:
 
 - `test_spec_043_ac01_layout.py`: AC-1.
 - `test_spec_043_ac02_ac04_top_bar.py`: AC-2 to AC-4.
@@ -1248,6 +1249,73 @@ def hit_problem(page: Page, test_id: str) -> str | None:
     if found["hits"] is True:
         return None
     return f"{test_id}: elementFromPoint at its centre is {found['hit']}"
+
+
+# ---- The brand link (client/shell.md rule 17) -------------------------------------
+
+HOME_NAME = "Accueil"  # `topbar.home`, the brand link's name
+
+# The brand's tag, `href` and `aria-current`, its Nock marks (each hidden from
+# assistive technology by itself or an ancestor) and its text.
+BRAND_LINK_SCRIPT = r"""
+brand => {
+  const marks = [];
+  for (const svg of brand.querySelectorAll('svg')) {
+    marks.push({hidden: svg.closest('[aria-hidden="true"]') !== null});
+  }
+  return {
+    tag: brand.tagName,
+    href: brand.getAttribute('href'),
+    ariaCurrent: brand.getAttribute('aria-current'),
+    marks: marks,
+    text: brand.textContent.trim(),
+  };
+}
+"""
+
+
+def brand_dom_problems(brand: Locator, current: bool) -> list[str]:
+    """How `topbar-brand`'s markup differs from the link of shell rule 17.
+
+    An `A` to `/`, holding one Nock mark hidden from assistive technology and the
+    text `app.title`; `aria-current="page"` when `current`, else no
+    `aria-current` at all.
+    """
+    found = brand.evaluate(BRAND_LINK_SCRIPT)
+    assert isinstance(found, dict), found
+    problems: list[str] = []
+    if found["tag"] != "A":
+        problems.append(f"topbar-brand is a {found['tag']}, not an A")
+    if found["href"] != "/":
+        problems.append(f"topbar-brand href {found['href']!r}, not '/'")
+    expected_current = "page" if current else None
+    if found["ariaCurrent"] != expected_current:
+        problems.append(
+            f"topbar-brand aria-current {found['ariaCurrent']!r},"
+            f" not {expected_current!r}"
+        )
+    marks = found["marks"]
+    if len(marks) != 1:
+        problems.append(f"topbar-brand holds {len(marks)} svg elements, not 1")
+    elif marks[0]["hidden"] is not True:
+        problems.append("the Nock mark is not hidden from assistive technology")
+    if found["text"] != fr_value("app.title"):
+        problems.append(f"topbar-brand reads {found['text']!r}")
+    return problems
+
+
+def expect_brand_link(brand: Locator, current: bool) -> None:
+    """Fail unless `topbar-brand` is the link « Accueil » to `/` of shell rule 17.
+
+    Args:
+        brand: The `topbar-brand` element of a top bar that is not inert.
+        current: Whether the page is `/`, where the link carries
+            `aria-current="page"`.
+    """
+    assert brand_dom_problems(brand, current) == []
+    expect(brand).to_have_role("link")
+    expect(brand).to_have_accessible_name(HOME_NAME)
+    assert fr_value("topbar.home") == HOME_NAME
 
 
 # ---- 3-second notes (WP-2) -------------------------------------------------------

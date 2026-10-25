@@ -937,7 +937,11 @@ def separator_problems(locator: Locator) -> list[str]:
 
 
 def page_topbar_problems(page: Page, height: float, inset: float) -> list[str]:
-    """`page-topbar`: a white `header` across the top, its brand `inset` px in."""
+    """`page-topbar`: a white `header` across the top, its brand `inset` px in.
+
+    The brand link's box is larger than its content (`foundation.md`, « Brand
+    link »), so its place is read on its Nock mark.
+    """
     width, _ = window_size(page)
     bar = page.get_by_test_id("page-topbar")
     problems: list[str] = []
@@ -954,10 +958,13 @@ def page_topbar_problems(page: Page, height: float, inset: float) -> list[str]:
     problems.extend(colour_problem(bar, "page-topbar", "backgroundColor", WHITE))
     problems.extend(border_side_problems(bar, "page-topbar", "Bottom", LINE))
     brand = bar.get_by_test_id("topbar-brand")
+    marks = brand.locator("svg")
     if brand.count() != 1:
         problems.append(f"{brand.count()} topbar-brand in page-topbar")
-    elif not same_position(box_of(brand).left - box.left, inset):
-        problems.append(f"topbar-brand {box_of(brand).left - box.left} px in")
+    elif marks.count() != 1:
+        problems.append(f"{marks.count()} svg elements in topbar-brand")
+    elif not same_position(box_of(marks).left - box.left, inset):
+        problems.append(f"the Nock mark {box_of(marks).left - box.left} px in")
     return problems
 
 

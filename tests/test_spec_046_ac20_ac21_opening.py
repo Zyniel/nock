@@ -19,6 +19,11 @@ Choices where the spec leaves room:
   `room-status` alone.
 - In the touch context, `keyboard-toggle` has `aria-pressed="false"` (spec 044's
   note of 2026-10-22: the keyboard does not show before a snapshot).
+- "A click on the brand opens nothing, loads nothing and sends nothing" (B-010,
+  `client/shell.md` AC-11): on a computer, `topbar-brand` is the `A` to `/` of
+  shell rule 17 (its markup only: the inert bar is out of the accessibility
+  tree), and after a click at its centre, within 300 ms, the page sent no frame,
+  started no navigation and is still on `/r/ABC123`.
 - AC-21's third run reads the page right after the close: spec 017 retries
   later, and the page keeps the opening meanwhile.
 """
@@ -28,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Page, Request, expect
 
 from fonts_ready import wait_for_fonts
 from nock.grid import Grid
@@ -40,12 +45,14 @@ from spec043_harness import (
     MUTED,
     NAVY,
     PHONE_BUTTONS,
+    brand_dom_problems,
     error_frame,
     label_of,
 )
 from spec044_harness import TOUCH_PHONE_BUTTONS
 from spec046_harness import (
     FOLLOW_MS,
+    ROOM_CODE,
     OpenWindow,
     code_line_problems,
     colour_matches,
@@ -287,6 +294,32 @@ def test_ac20_a_click_on_menu_opens_nothing_and_sends_nothing(
     # WebKit never focuses a button on a click, so this check cannot fail there;
     # the `aria-expanded` check above is the one that does the work in WebKit.
     expect(menu).not_to_be_focused()
+
+
+def test_ac20_a_click_on_the_computer_brand_loads_nothing_and_sends_nothing(
+    window: OpenWindow, live_server: str
+) -> None:
+    page = window(1280, 720)
+    mock = open_opening(page, live_server)
+    brand = page.get_by_test_id("room-topbar").get_by_test_id("topbar-brand")
+    brand_box = box_of(brand)
+    navigations: list[str] = []
+
+    def record(request: Request) -> None:
+        if request.is_navigation_request():
+            navigations.append(request.url)
+
+    page.on("request", record)
+    problems = brand_dom_problems(brand, current=False)
+    sent = frames_after(
+        page, mock, lambda: page.mouse.click(brand_box.centre_x, brand_box.centre_y)
+    )
+
+    assert problems == []
+    assert sent == []
+    assert navigations == []
+    assert page.url == f"{live_server}/r/{ROOM_CODE}"
+    expect_status(page, "joining")
 
 
 @pytest.mark.parametrize("opening", OPENINGS, ids=OPENING_IDS)

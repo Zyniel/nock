@@ -1,11 +1,12 @@
 """Tests of spec 043, AC-29: the page reads in the design's order and every control
 shows its ring.
 
-At 1280 by 720 the focusable elements that show come in the order: the computer
-top bar's five buttons, the grid, the clue bar's four buttons, then the Salon. From
-the grid, `Escape` then `Tab` reaches `clue-prev` and `Escape` then `Shift+Tab`
-reaches `menu-button`. Each top-bar button has the navy ring outside it, each clue
-bar button the white ring inside it. At 360 by 740 the phone top bar's order holds.
+At 1280 by 720 the focusable elements that show come in the order: the brand link
+(`client/hud.md` AC-20, B-010), the computer top bar's five buttons, the grid, the
+clue bar's four buttons, then the Salon. From the grid, `Escape` then `Tab` reaches
+`clue-prev` and `Escape` then `Shift+Tab` reaches `menu-button`. The brand and each
+top-bar button have the navy ring outside them, each clue bar button the white ring
+inside it. At 360 by 740 the phone top bar's order holds (it has no brand).
 
 Choices where the spec leaves room:
 
@@ -144,7 +145,13 @@ def test_ac29_on_a_computer_the_page_reads_top_bar_grid_clue_bar_then_salon(
 
     found = focusable(page)
     names = [str(item["name"]) for item in found]
-    expected = [*COMPUTER_BUTTONS, "grid", *CLUE_BAR_BUTTONS, "salon-tab-discussion"]
+    expected = [
+        "topbar-brand",
+        *COMPUTER_BUTTONS,
+        "grid",
+        *CLUE_BAR_BUTTONS,
+        "salon-tab-discussion",
+    ]
 
     assert names[: len(expected)] == expected
     for item in found[len(expected) - 1 :]:
@@ -187,7 +194,7 @@ def test_ac29_escape_then_shift_tab_leaves_the_grid_for_menu_button(
     expect(page.get_by_test_id("menu-button")).to_be_focused()
 
 
-@pytest.mark.parametrize("test_id", COMPUTER_BUTTONS)
+@pytest.mark.parametrize("test_id", ["topbar-brand", *COMPUTER_BUTTONS])
 def test_ac29_each_top_bar_button_shows_the_navy_ring_inside_the_window(
     window: OpenWindow, live_server: str, fx01_grid: Grid, test_id: str
 ) -> None:

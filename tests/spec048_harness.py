@@ -372,7 +372,8 @@ def header_problems(page: Page, height: float, links_allowed: bool = True) -> li
 
     It holds the Nock mark (an `svg` whose `polygon` has `NOCK_MARK_POINTS` and is
     filled navy), the text `fr.json["app.title"]` and no `button` (and no link
-    when `links_allowed` is False).
+    but the brand link `topbar-brand`, `client/shell.md` rule 17, when
+    `links_allowed` is False).
     """
     headers = page.locator("header")
     if headers.count() != 1:
@@ -401,8 +402,9 @@ def header_problems(page: Page, height: float, links_allowed: bool = True) -> li
         problems.append(f"header reads {text!r}")
     if header.locator("button").count() != 0:
         problems.append("the header holds a button")
-    if not links_allowed and header.locator("a").count() != 0:
-        problems.append("the header holds a link")
+    other_links = header.locator('a:not([data-testid="topbar-brand"])')
+    if not links_allowed and other_links.count() != 0:
+        problems.append("the header holds a link other than the brand")
     return problems
 
 
