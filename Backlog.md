@@ -185,8 +185,6 @@ Taken when a change touches them.
   wanted.
 - Hosting (Fly.io, Render or a VPS) and a domain, before the first public test.
   A cloud session drafts `docs/hosting.md` on the branch `docs/hosting-plan`.
-- GitHub: protect `main` (require the "Quality gate" check, no force push).
-  Repository settings are the human's.
 - Tag `v1.1.0` on `main` (never tagged).
 
 ## Release checklist
