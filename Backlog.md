@@ -190,8 +190,6 @@ Taken when a change touches them.
 - GitHub: protect `main` (require the "Quality gate" check, no force push).
   Repository settings are the human's.
 - Tag `v1.1.0` on `main` (never tagged).
-- The reading of the `NOCK_DATABASE` rule (refused: control, separator and
-  format characters only), left open since PR #12: confirm it.
 
 ## Release checklist
 
