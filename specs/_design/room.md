@@ -129,10 +129,10 @@ centred vertically, in this order: the brand link (`foundation.md`,
 « Components »), then `margin-right: auto`; the timer (10 px right margin), or
 « Chrono » while the timer is hidden; then buttons 38 px high, padding 0 12 px,
 radius 6 px, gap 6 px, icon 20 px beside its label: Annuler, Crayon, « Aide ▾ »,
-Salon, Clavier (touch screens only), Menu. Pressed: word-blue background. Unread badge on Salon: top 2 px, left
-24 px; the new-events dot, with no unread message, at the same place. The bar
-shows no grid name. `room-heading` is visually hidden in the room, on a computer
-and on a phone.
+Salon, Clavier (touch screens only), Menu. Pressed: word-blue background. Unread
+badge on Salon: top 2 px, left 24 px; the new-events dot, with no unread message,
+at the same place. The bar shows no grid name. `room-heading` is visually hidden
+in the room, on a computer and on a phone.
 
 ### Low column layout
 

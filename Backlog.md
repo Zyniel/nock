@@ -161,8 +161,8 @@ an item that must be done first.
 
 ### B-010 The brand in the top bar leads home
 
-- Status: ready (the human approved option A, 2026-10-25, and the spec
-  change, the same day)
+- Status: done (the human approved option A and the spec change,
+  2026-10-25; review approved in round 1)
 - Domains: client/shell, client/hud, content/library
 - Architecture decision: no (one new `fr.json` key; no protocol, data or
   module interface)
@@ -224,6 +224,15 @@ Taken when a change touches them.
   summaries; the force filter makes no new request; the grid page's loading
   line and its non-summary answer; after a chip, only that chip pressed
   (`content/library.md` rules 8, 10, 16 and AC-6).
+- The brand as the link « Accueil » on the grid page, `/ops`, the shared
+  recap and the account page (`client/shell.md` rule 17) has no criterion:
+  only the catalogue, the entry frame and the room's computer top bar are
+  tested. All use `TopBarBrand`, so a brand drawn elsewhere would go unseen.
+- The brand's name « Accueil » does not contain its visible text « Nock »
+  (WCAG 2.5.3, label in name): a voice-control user saying "Nock" misses it.
+  The human chose « Accueil »; « Nock, accueil » would meet both.
+- WebKit reaching the brand by Tab (`tabindex="0"`, hud AC-20) is proven only
+  once CI runs WebKit after the merge.
 - The room page's `closed` status can no longer be reached (a socket lost is
   `reconnecting` or `connecting`, `platform/realtime.md`), yet
   `room.status.closed` (« Connexion perdue. ») is still a required key of 040
