@@ -242,7 +242,8 @@ def phone_room(
     low = height <= 500
     if pressed is None:
         pressed = {"kbd"} if kbd else set()
-    grid_opts = grid_opts or {}
+    grid_opts = dict(grid_opts or {})
+    hyphens = grid_opts.pop("hyphens", None)
     kb_h = (110 if low else 158) if kbd else 0
     band_h = {"done": 46, "notyet": 35}.get(band or "", 0) + 19 * (band_lines - 1)
     net_h = (52 if net else 0) + (35 if final_status else 0)
@@ -255,7 +256,7 @@ def phone_room(
     if final_status:
         h += status_band(final_status)
     if stage_html is None:
-        g = grid(fx_rows(s, authors=authors, **grid_opts), s)
+        g = grid(fx_rows(s, authors=authors, **grid_opts), s, hyphens=hyphens)
         if authors and legend_names:
             leg = legend(list(range(len(legend_names))), legend_names, legend_over)
         else:
@@ -706,10 +707,12 @@ def desk_room(
     kbd: bool = False,
     clue: tuple = ("Fin de journée", "→"),
     final_status: str | None = None,
+    hyphens: list[tuple] | None = None,
 ) -> str:
     """A computer room, 1280 x 800 (room.md, column layout).
 
-    final_status: the text of the status band under the top bar (spec 043).
+    final_status: the text of the status band under the top bar (spec 043);
+    hyphens: the hyphen edges of the grid, (row, column, "right" | "down").
     """
     col_w = 340 if column else 0
     band_h = 46 if solved else (35 if notyet else 0)
@@ -734,7 +737,7 @@ def desk_room(
         h += netband()
     if final_status:
         h += status_band(final_status)
-    g = grid(big_rows(s, solved=solved, authors=authors), s)
+    g = grid(big_rows(s, solved=solved, authors=authors), s, hyphens=hyphens)
     if authors:
         g = f'<div class="gwrap">{g}{legend([0, 1, 2, 3])}</div>'
     main = f'<div class="dmain"><div class="dstage">{g}{main_extra}</div>'

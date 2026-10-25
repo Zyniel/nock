@@ -1,7 +1,7 @@
 ---
 area: content
 file: grids
-status: done
+status: approved
 ---
 
 # content/grids - Grids: model, files, import checks and rights
@@ -37,12 +37,20 @@ described here, and the product never fetches content from a third party.
 
    The word runs from the first cell to the cell before the first non-letter cell
    or the grid edge. The first cell must be a letter cell inside the grid.
-4. Answers are normalised, in this order: the ligatures Œ, œ, Æ, æ expanded to
-   OE, oe, AE, ae; accents dropped (Unicode NFD, combining marks removed); spaces,
-   hyphens and apostrophes (`'` and `’`) removed; uppercased. The result must be
-   one or more letters A to Z.
+4. An answer is kept as written. Two things are derived from it, never stored:
+   - its letters, normalised in this order: the ligatures Œ, œ, Æ, æ expanded to
+     OE, oe, AE, ae; accents dropped (Unicode NFD, combining marks removed);
+     spaces, hyphens and apostrophes (`'` and `’`) removed; uppercased. The
+     result must be one or more letters A to Z. The letters are the word's
+     solution: every check and the room's solution read them;
+   - its breaks, the hyphens `-` of a compound word, each counted as the number
+     of letters before it (`ARC-EN-CIEL`: after 3 and 5). A hyphen must have a
+     letter right before it and right after it, as written: an answer that
+     starts or ends with one, or holds two in a row, or one beside a space or an
+     apostrophe, is refused, naming the answer. Spaces and apostrophes leave no
+     break.
 5. Every message that names a position writes it `(row, column)`, for example
-   `(0, 5)`.
+   `(0, 5)`. An edge is named by its two cells, the first one first.
 
 ### Import checks
 
@@ -55,8 +63,12 @@ described here, and the product never fetches content from a third party.
    5. every letter cell belongs to some word;
    6. every run (two or more letter cells in a row or column, between non-letter
       cells or edges) is exactly one clue's word;
-   7. crossing words agree on their shared letter.
-7. A clue is named by its clue cell and its text, a word by its answer.
+   7. crossing words agree on their shared letter;
+   8. two words that share an edge (a word starting inside a longer run) agree
+      on its hyphen: a break of one after the cell before the edge is a break
+      of the other.
+7. A clue is named by its clue cell and its text, a word by its answer as
+   written.
 
 ### Grid files
 
@@ -88,6 +100,12 @@ described here, and the product never fetches content from a third party.
     sandbox: names or URLs built at run time are not flagged. The samples each
     scan must and must not flag are in its tests.
 
+## New interface
+
+- `nock.grid.Clue.letters: str` and `Clue.breaks: tuple[int, ...]`, read-only,
+  derived from `answer` by rule 4; `answer` holds the text as written.
+  `normalize_answer` keeps its name and gives the letters.
+
 ## Acceptance criteria
 
 - **AC-1** A grid declares its size and one type per cell. FX-01 loads with width
@@ -97,9 +115,11 @@ described here, and the product never fetches content from a third party.
   (0, 0) gives (1, 0) to (1, 4), its second clue (0, 1) to (4, 1), the clue of
   (0, 2) gives (1, 2) to (4, 2), and the clue of (2, 0) gives (2, 1) to (2, 4).
   (← 002 AC-2)
-- **AC-3** Answers are normalised by rule 4: `ÊTRE` gives `ETRE`, `ARC-EN-CIEL`
-  `ARCENCIEL`, `AUJOURD'HUI` `AUJOURDHUI`, `CŒUR` `COEUR`; `R2D2` and `- -` are
-  refused. (← 002 AC-3)
+- **AC-3** An answer keeps its text and derives its letters and breaks by rule 4:
+  `ÊTRE` gives the letters `ETRE`; `ARC-EN-CIEL` stays `ARC-EN-CIEL` once
+  loaded, with the letters `ARCENCIEL` and breaks after 3 and 5; `AUJOURD'HUI`
+  gives `AUJOURDHUI` and no break, `CŒUR` `COEUR`; `R2D2` and `- -` are refused.
+  (← 002 AC-3)
 - **AC-4** FX-01 survives load, save and load with no difference. (← 002 AC-4)
 - **AC-5** A grid without exactly one cell per position is refused, and the error
   names the position and the problem (`outside`, `duplicate`, `missing`, checked
@@ -142,6 +162,13 @@ described here, and the product never fetches content from a third party.
   (← 005 AC-4)
 - **AC-19** The client scan of rules 14 and 15 finds nothing in `web/src/` and
   `web/index.html`, and flags its forbidden samples. (← 005 AC-5)
+- **AC-20** A hyphen not between two letters is refused, naming the answer:
+  `-ARC`, `ARC-`, `ARC--EN` and `ARC- EN` each fail, while `ARC-EN CIEL` loads
+  with one break, after 3.
+- **AC-21** Two words sharing an edge that disagree on its hyphen are refused,
+  naming both answers and the edge: `VI-DE` across from (1, 0) with `IDE` across
+  from (1, 1) names `VI-DE`, `IDE` and `(1, 1)`, `(1, 2)`; with `I-DE` the grid
+  loads. The check comes last, after the crossing check.
 
 ## Edge cases
 
@@ -150,7 +177,13 @@ described here, and the product never fetches content from a third party.
 - A word starting mid-run does not give the run a clue (AC-10).
 - When one change causes several problems, the error is the first in rule 6's
   order: for example a too-short answer wins over the crossing check (AC-6 to
-  AC-11).
+  AC-11, AC-21).
+- An answer's length (AC-7) and its crossings (AC-11) are counted in letters:
+  `VI-DE` fits four cells (AC-3).
+- Crossing words never share an edge: an across hyphen and a down hyphen at
+  the same cell are both kept (AC-21).
+- A grid stored by a room before answers kept their hyphens holds letters only
+  (`ARCENCIEL`), so it loads with no break (AC-3).
 - Cells may be listed in any order in a file (AC-1).
 - `licence` is required; `license` is an unknown key (AC-15).
 - Credits keep accents, apostrophes, `n°` and line breaks; the 200 limit counts
@@ -166,6 +199,9 @@ described here, and the product never fetches content from a third party.
 - Reporting more than one problem per import.
 - Reloading grids or withdrawing one without a restart, and closing rooms already
   open on a withdrawn grid.
+- Breaks for spaces and apostrophes (`AUJOURD'HUI` draws nothing); the hyphen
+  in the clue bar or a length pattern. What a break looks like on the grid:
+  `gameplay/board.md`; how it reaches the browser: `platform/realtime.md`.
 - Showing credits to players.
 - Listing, filtering and the grid page: `content/library.md`.
 - Deleting stored rooms or history of a withdrawn grid: `admin/operations.md`.
@@ -173,10 +209,10 @@ described here, and the product never fetches content from a third party.
 
 ## Code
 
-- `src/nock/grid.py`: the model, normalisation and clue resolution.
+- `src/nock/grid.py`: the model, letters and breaks, clue resolution.
 - `src/nock/grid_import.py`: the import checks.
 - `src/nock/catalogue.py`: grid files, credits, withdrawal (`load_catalogue`,
   `find_published`).
 - `src/nock/mailer.py`: the one file allowed to send mail.
-- Tests: `tests/test_spec_002_*`, `test_spec_003_*`, `test_spec_005_*`, and the
-  grid-file tests of `test_spec_004_*`.
+- Tests: `tests/test_grids_*`, `tests/test_spec_002_*`, `test_spec_003_*`,
+  `test_spec_005_*`, and the grid-file tests of `test_spec_004_*`.
