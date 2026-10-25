@@ -1,0 +1,49 @@
+# Production: Nock behind Caddy, which serves https on the domain NOCK_DOMAIN.
+#
+#   docker compose up --build -d
+#
+# Settings of the server: .env.prod (copy .env.prod.example). The domain:
+# NOCK_DOMAIN in the shell or in a .env file, default nock.zyniel.com.
+name: nock
+
+services:
+  nock:
+    build: .
+    env_file: .env.prod
+    environment:
+      # Players keep their own address behind the proxy (uvicorn reads this
+      # variable). Only Caddy can reach the container (no published port, it is
+      # on this private network alone), so every sender is trusted here.
+      FORWARDED_ALLOW_IPS: "*"
+    expose:
+      - "8000"
+    volumes:
+      # The database. The grids are baked into the image: add one, then rebuild
+      # (`docker compose up --build -d`); the server reads them once at start.
+      - nock_data:/data
+    init: true
+    restart: unless-stopped
+    # One replica only: the rooms live in the memory of one process.
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      NOCK_DOMAIN: ${NOCK_DOMAIN:-nock.zyniel.com}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The certificates: keep them across restarts.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      nock:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  nock_data:
+  caddy_data:
+  caddy_config:

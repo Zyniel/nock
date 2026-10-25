@@ -1,0 +1,41 @@
+# Only what the image needs goes into the build context: src/, grids/, web/
+# (without node_modules and dist), pyproject.toml, uv.lock and README.md.
+
+# Secrets and data
+.env
+.env.*
+!.env.*.example
+data/
+
+# Version control, editors, agent tooling
+.git
+.gitattributes
+.gitignore
+.github/
+.claude/
+.idea/
+.vscode/
+
+# Built or installed on the host
+.venv
+**/node_modules
+web/dist
+**/__pycache__
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Not part of the running server
+tests/
+specs/
+docs/
+scripts/
+Backlog.md
+CLAUDE.md
+
+# The deployment files themselves
+Dockerfile
+.dockerignore
+compose*.yaml
+Caddyfile
+*.ps1

@@ -19,3 +19,8 @@ CLAUDE.local.md
 # Editors and IDEs
 .idea/
 .env
+
+# Docker: secrets and data stay out of git (the examples are tracked)
+.env.*
+!.env.*.example
+data/
