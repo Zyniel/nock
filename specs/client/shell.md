@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: approved
+status: done
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation
@@ -190,9 +190,9 @@ fonts, focus ring, shared components, state lines).
 - **AC-10** On `/r/ZZZZZZ` the entry frame has the brand bar, then « Salon
   ZZZZZZ » and the card, and no room top bar; it follows the entry pages design
   at a computer and a phone window, and takes the other form within 300 ms of a
-  resize. There, on the shared recap loaded and on `/account` signed out, at
-  both windows, the bar's Nock mark and « Nock » are the link « Accueil » to
-  `/` with no `aria-current`. (← 046 AC-1)
+  resize. On `/r/ZZZZZZ`, on the shared recap loaded and on `/account` signed
+  out, at both windows, the bar's Nock mark and « Nock » are the link
+  « Accueil » to `/` with no `aria-current`. (← 046 AC-1)
 - **AC-11** With an identity stored and the join unanswered, the page shows the
   inert room top bar of its window with no timer, and one seen line « Entrée
   dans le salon… » where the grid will be, with no grid, clue bar or progress

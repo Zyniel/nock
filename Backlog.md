@@ -229,8 +229,9 @@ an item that must be done first.
 
 ### B-014 Tests for the brand link on `/ops`, the recap and the account page
 
-- Status: building (the human picked option A and one state per page, and
-  approved the spec change, 2026-10-25)
+- Status: done (the human picked option A and one state per page, and
+  approved the spec change, 2026-10-25; review approved in round 1; no
+  implementation step: the tests passed as written)
 - Domains: client/shell, admin/operations
 - Architecture decision: no (criteria and tests only; no behaviour, code or
   look changes)
@@ -297,6 +298,11 @@ Taken when a change touches them.
   The human chose « Accueil »; « Nock, accueil » would meet both.
 - WebKit reaching the brand by Tab (`tabindex="0"`, hud AC-20) is proven only
   once CI runs WebKit after the merge.
+- `client/shell.md` (about 16.4 KB, 20 criteria) and `admin/operations.md`
+  (about 18 KB, 20 criteria) are past the size budget of `specs/_map.md`; the
+  next criterion in either needs a split first (an architecture item). For
+  shell, the B-010 spec-writer proposed `client/foundation.md` taking rules 13
+  to 17 and their criteria.
 - The room page's `closed` status can no longer be reached (a socket lost is
   `reconnecting` or `connecting`, `platform/realtime.md`), yet
   `room.status.closed` (« Connexion perdue. ») is still a required key of 040
