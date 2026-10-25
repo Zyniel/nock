@@ -19,8 +19,12 @@ Choices where the spec leaves room:
   dashes cover is `--nock-hyphen` or the background, none blended.
 - The crossing grid lines stay plain: their pixels at the ends of the edge are
   rule grey across the dashes' thickness.
-- "The same in every state": the pixels painted `--nock-hyphen` are the same
-  before and after the state, and each other pixel the dashes cover is the
+- "The same in every state": the same look by the formula for the cell's
+  current size. Before and after the state, the dashes match the formula at the
+  side read then (Auteurs mode shows its legend under the grid, which refits it
+  from about 57.4 to 49.8 px, 7 dashes to 6); every pixel row (or column) of the
+  thickness holds the same dashes; while the side is unchanged, the hyphen grey
+  pixels are exactly those of before. Each other pixel the dashes cover is the
   background of one of the two cells (read 4 px from the line), never the rule
   grey. The flash is read in the screenshot that shows its colour.
 - The revealed notch over a down hyphen: at 56 px the dashes (2 px, the line's
@@ -411,6 +415,27 @@ def gap_problems(reading: EdgeReading) -> list[str]:
     return problems
 
 
+def dash_problems(reading: EdgeReading) -> list[str]:
+    """How an edge's dashes differ from the formula at the side it was read at.
+
+    Each offset of the thickness holds the formula's dashes in hyphen grey, the
+    same at every offset, and no offset outside the thickness holds any.
+    """
+    covered = thickness_offsets(dash_thickness(reading.cell_side))
+    expected = expected_runs(reading.cell_side)
+    dashes = hyphen_positions(reading)
+    problems: list[str] = []
+    for offset in covered:
+        for problem in run_problems(runs_of(reading.inner(offset), HYPHEN), expected):
+            problems.append(f"offset {offset}: {problem}")
+        if dashes[offset] != dashes[0]:
+            problems.append(f"offset {offset}: dashes {dashes[offset]}")
+    for offset, indexes in dashes.items():
+        if offset not in covered and indexes:
+            problems.append(f"offset {offset} outside the thickness: {indexes}")
+    return problems
+
+
 @pytest.mark.parametrize("state", ["tint", "locked", "wrong", "flash", "authors"])
 def test_ac21_the_dashes_read_the_same_in_every_state_of_the_two_cells(
     page: Page, live_server: str, hyphen_grid: Grid, state: str
@@ -428,7 +453,10 @@ def test_ac21_the_dashes_read_the_same_in_every_state_of_the_two_cells(
     if state == "flash":
         inside = after.inner(-INTERIOR_OFFSET)[after.length // 2]
         assert close_to(inside, flash_composite(P2_COLOUR)), "read after the flash"
-    assert hyphen_positions(after) == hyphen_positions(before)
+    assert dash_problems(before) == []
+    assert dash_problems(after) == []
+    if after.cell_side == before.cell_side:
+        assert hyphen_positions(after) == hyphen_positions(before)
     assert gap_problems(after) == []
 
 
