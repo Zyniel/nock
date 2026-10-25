@@ -1,6 +1,6 @@
 <script lang="ts">
   // The top bar of a plain page (spec 046, "Page top bar"): white, across the
-  // top of the window, with the brand and, on the catalogue, "Compte" on its
+  // top of the window, with the brand link and, on the catalogue, "Compte" on its
   // right. On the catalogue and the grid page it is 56 px high on every
   // window; on the entry pages and the page not found it is the phone's 54 px
   // bar on a narrow window. Its buttons are 38 px high on a wide window and

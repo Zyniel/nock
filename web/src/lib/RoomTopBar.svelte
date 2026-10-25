@@ -1,7 +1,7 @@
 <script lang="ts">
   // The room's top bar (spec 043, "Top bar"): the timer slot and five or six
   // buttons. The phone top bar (54 px) draws each icon above its label; the
-  // computer top bar (56 px) starts with the brand and draws each icon beside
+  // computer top bar (56 px) starts with the brand link and draws each icon beside
   // its label. On a touch screen « Clavier » shows and hides the in-app
   // keyboard (spec 044). The room page decides which form shows and what each
   // button does. While the room opens (spec 046) the bar is drawn as once
