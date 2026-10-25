@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -15,7 +15,7 @@ answer.
 
 ## Depends on
 
-- `content/grids.md`: grid files, the number, published and withdrawn.
+- `content/grid-files.md`: the index, the number, published and withdrawn.
 - `lobby/rooms.md`: « Jouer » on each card, its failure's cause, and the writing
   of `nock.progress`.
 - `client/shell.md`: client routing, texts, the page not found.
@@ -24,8 +24,8 @@ answer.
 
 ### Listed grids and their summary
 
-1. A grid is listed when its file says published and not withdrawn
-   (`content/grids.md` rule 12); a publication date in the future is listed.
+1. A grid is listed when its index entry says published and not withdrawn
+   (`content/grid-files.md` rule 13); a publication date in the future is listed.
 2. A summary is exactly `number`, `published_on` (`YYYY-MM-DD`), `force`,
    `width`, `height` and `word_count` (the number of clues). No grid route sends
    anything else of a grid: no cell, clue, answer or credit.
@@ -231,9 +231,9 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 ## Out of scope
 
 - Other orders than newest first, searching, paging, filtering by size.
-- Showing grid credits (`content/grids.md` rule 11); a real thumbnail of the
+- Showing grid credits (`content/grid-files.md` rule 11); a real thumbnail of the
   grid's layout.
-- Reloading the grid list while the server runs: `content/grids.md`.
+- Reloading the grid list while the server runs: `content/grid-files.md`.
 - « Jouer », the room it creates and the writing of `nock.progress`:
   `lobby/rooms.md`. « Mes salons »: `lobby/joining.md`. « Grilles terminées »:
   `gameplay/results.md`. « Compte » and its dialog: `account/account.md`.

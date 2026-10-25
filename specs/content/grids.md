@@ -1,22 +1,23 @@
 ---
 area: content
 file: grids
-status: done
+status: approved
 ---
 
-# content/grids - Grids: model, files, import checks and rights
+# content/grids - Grids: model, import checks and no third-party content
 
 ## Purpose
 
-A grid enters Nock only as a file in `grids/`, checked at server start: it must be
-solvable and carry its credits. Every other domain reads grids through the model
-described here, and the product never fetches content from a third party.
+Every other domain reads grids through the model described here, and a grid is
+served only once the import checks found it solvable. How a grid reaches the
+server is `content/grid-files.md`; the product never fetches content from a third
+party.
 
 ## Depends on
 
 - `_reference.md`: the FX-01 and FX-02 grids used in the examples.
-- `content/library.md`: what players see of the grids loaded here.
-- `lobby/rooms.md`: a room keeps its own copy of its grid.
+- `content/grid-files.md`: the files a grid enters through, checked by rule 6.
+- `lobby/rooms.md`: a room keeps its own copy of its grid, in the model's JSON.
 
 ## Rules
 
@@ -56,7 +57,7 @@ described here, and the product never fetches content from a third party.
 
 6. An import stops at the first problem and reports it in one error, never in an
    unexpected exception. The checks run in this order:
-   1. the file parses into the model (rules 1 to 4);
+   1. the grid parses into the model (rules 1 to 4);
    2. every arrow points to a letter cell inside the grid;
    3. every answer has as many letters as its word has cells;
    4. no two clues resolve to the same word;
@@ -67,44 +68,36 @@ described here, and the product never fetches content from a third party.
    8. two words that share an edge (a word starting inside a longer run) agree
       on its hyphen: a break of one after the cell before the edge is a break
       of the other.
+
+   A `.ipuz` file adds the checks of `content/grid-files.md` rule 12 to this
+   order.
 7. A clue is named by its clue cell and its text, a word by its answer as
    written.
 
-### Grid files
+### The model's JSON
 
-8. `grids/` holds one JSON file per grid, read once at server start. A missing
-   directory is an empty catalogue. Only names ending in lower-case `.json` and
-   not starting with `.` are read, in code-point order of their names; other
-   files and sub-directories are ignored.
-9. A file holds exactly: `number` (1 to 999,999,999, unique), `published_on`
-   (exactly `YYYY-MM-DD`), `force` (1 to 4), `published` (boolean), `author`,
-   `source`, `licence` (each 1 to 200 characters once stripped), the optional
-   `withdrawn` (boolean, default false) and `grid` (the model's JSON). Values are
-   strict: `"2"` is not a force, `"yes"` is not a boolean.
-10. A file that fails rule 9 or the import checks stops the server from starting,
-    with an error naming the file.
-11. Credits are recorded, never shown to players and never interpreted.
-12. `published: false` hides a grid that was never released. `withdrawn: true`
-    marks a grid whose rights ended, applied at the next start: no new room may
-    start on it, and it wins over `published: true`. Rooms already open on it keep
-    working, since a room holds its own copy of the grid.
+8. The model has its own JSON: `width`, `height` and `cells`, each cell with its
+   `type` (`letter`, `clue` or `empty`), `row` and `column`, a clue cell with its
+   `clues` of `text`, `arrow` and `answer`. Rooms store a grid in it, and FX-01
+   and FX-02 exist in it. It is not a grid file: a grid enters the catalogue only
+   through `content/grid-files.md`.
 
 ### No third-party content
 
-13. No server code opens an outgoing connection or imports a network client. The
-    one exception is the sign-in e-mail (`account/account.md`): the file
-    `src/nock/mailer.py`, and no other, may use `smtplib` and `ssl`.
-14. No client file names a URL on another host (`http`, `https`, `ws`, `wss`,
+9. No server code opens an outgoing connection or imports a network client. The
+   one exception is the sign-in e-mail (`account/account.md`): the file
+   `src/nock/mailer.py`, and no other, may use `smtplib` and `ssl`.
+10. No client file names a URL on another host (`http`, `https`, `ws`, `wss`,
     protocol-relative `//host`, CSS `url(//...)` or `@import`).
-15. Both checks are static scans, a guard against accidental use and not a
+11. Both checks are static scans, a guard against accidental use and not a
     sandbox: names or URLs built at run time are not flagged. The samples each
     scan must and must not flag are in its tests.
 
 ## Acceptance criteria
 
-- **AC-1** A grid declares its size and one type per cell. FX-01 loads with width
-  and height 5, (0, 1) a letter cell and (0, 0) a clue cell; a cell of type
-  `"black"` is refused. (← 002 AC-1)
+- **AC-1** A grid declares its size and one type per cell. FX-01, in the model's
+  JSON, loads with width and height 5, (0, 1) a letter cell and (0, 0) a clue
+  cell; a cell of type `"black"` is refused. (← 002 AC-1)
 - **AC-2** Each clue resolves to its word by rule 3. On FX-01, the first clue of
   (0, 0) gives (1, 0) to (1, 4), its second clue (0, 1) to (4, 1), the clue of
   (0, 2) gives (1, 2) to (4, 2), and the clue of (2, 0) gives (2, 1) to (2, 4).
@@ -114,13 +107,17 @@ described here, and the product never fetches content from a third party.
   loaded, with the letters `ARCENCIEL` and breaks after 3 and 5; `AUJOURD'HUI`
   gives `AUJOURDHUI` and no break, `CŒUR` `COEUR`; `R2D2` and `- -` are refused.
   (← 002 AC-3)
-- **AC-4** FX-01 survives load, save and load with no difference. (← 002 AC-4)
+- **AC-4** FX-01, in the model's JSON, survives load, save and load with no
+  difference. (← 002 AC-4)
 - **AC-5** A grid without exactly one cell per position is refused, and the error
   names the position and the problem (`outside`, `duplicate`, `missing`, checked
-  in that order): FX-01 without (2, 3) names `(2, 3)` and `missing`. (← 002 AC-5)
+  in that order): FX-01, in the model's JSON, without (2, 3) names `(2, 3)` and
+  `missing`. (← 002 AC-5)
 - **AC-6** An arrow that points to a clue cell, an empty cell or outside the grid
   is refused, naming the clue cell and the target: FX-01 with the clue of (0, 4)
-  turned `right` names `(0, 4)` and `(0, 5)`. (← 003 AC-1)
+  turned `right` names `(0, 4)` and `(0, 5)`. A `.ipuz` file reaches this error
+  through the arrow its `cells` give (`content/grid-files.md` rule 8).
+  (← 003 AC-1)
 - **AC-7** An answer whose length differs from its word is refused, naming the
   clue cell and the answer: `MIME` changed to `MIM` names `(0, 2)` and `MIM`.
   (← 003 AC-5)
@@ -135,26 +132,10 @@ described here, and the product never fetches content from a third party.
   (← 003 AC-3)
 - **AC-12** FX-01 imports and reports 8 words, 18 letter cells and 7 clue cells;
   empty cells are counted nowhere. (← 003 AC-4)
-- **AC-13** `grids/` loads by rule 8: `b.json` (number 2) and `a.json` (number 1)
-  load as 1 then 2; `B.json` comes before `a.json`; `A.JSON`, `.x.json`,
-  `notes.txt` and `old/` are ignored. (← 004 AC-5, 004 AC-7)
-- **AC-14** A file that breaks rule 9 or fails the import is refused, naming the
-  file: a date `2026-1-1`, a force `"2"`, an extra key `"colour"`, a second file
-  with the same number, or a grid with `MIMA`. (← 004 AC-5, 004 AC-7)
-- **AC-15** A file without `author`, `source` or `licence`, or with one blank,
-  over 200 characters or not text, is refused, naming the file; credits are
-  stored stripped, and a non-boolean `withdrawn` is refused.
-  (← 005 AC-1, 005 AC-2, 005 AC-3)
-- **AC-16** A withdrawn grid is not listed, its grid page and summary answer 404,
-  and no new room starts on it, while a published one is served.
-  (← 005 AC-6)
-- **AC-17** A room opened before its grid was withdrawn keeps working: players
-  join it, type every letter and, after a server restart, get it back from the
-  store. (← 005 AC-7)
-- **AC-18** The server scan of rules 13 and 15 finds nothing in `src/`, flags its
+- **AC-18** The server scan of rules 9 and 11 finds nothing in `src/`, flags its
   forbidden samples, and allows `smtplib` and `ssl` in `src/nock/mailer.py` only.
   (← 005 AC-4)
-- **AC-19** The client scan of rules 14 and 15 finds nothing in `web/src/` and
+- **AC-19** The client scan of rules 10 and 11 finds nothing in `web/src/` and
   `web/index.html`, and flags its forbidden samples. (← 005 AC-5)
 - **AC-20** A hyphen not between two letters is refused, naming the answer:
   `-ARC`, `ARC-`, `ARC--EN` and `ARC- EN` each fail, while `ARC-EN CIEL` loads
@@ -178,12 +159,7 @@ described here, and the product never fetches content from a third party.
   the same cell are both kept (AC-21).
 - A grid stored by a room before answers kept their hyphens holds letters only
   (`ARCENCIEL`), so it loads with no break (AC-3).
-- Cells may be listed in any order in a file (AC-1).
-- `licence` is required; `license` is an unknown key (AC-15).
-- Credits keep accents, apostrophes, `n°` and line breaks; the 200 limit counts
-  code points (AC-15).
-- A withdrawn grid already open in a browser can still be joined by its room link
-  (AC-17).
+- Cells may be listed in any order in the model's JSON (AC-1).
 - `tests/` and `scripts/` are not scanned; `web/dist/`, `web/node_modules/` and
   `web/public/` are not scanned (AC-18, AC-19).
 
@@ -191,22 +167,17 @@ described here, and the product never fetches content from a third party.
 
 - A grid editor and grid generation.
 - Reporting more than one problem per import.
-- Reloading grids or withdrawing one without a restart, and closing rooms already
-  open on a withdrawn grid.
 - Breaks for spaces and apostrophes (`AUJOURD'HUI` draws nothing); the hyphen
   in the clue bar or a length pattern. What a break looks like on the grid:
   `gameplay/board.md`; how it reaches the browser: `platform/realtime.md`.
-- Showing credits to players.
+- The grid files, the index, credits and withdrawal: `content/grid-files.md`.
 - Listing, filtering and the grid page: `content/library.md`.
-- Deleting stored rooms or history of a withdrawn grid: `admin/operations.md`.
 - Where real grids come from (commission, licence, generation): an owner decision.
 
 ## Code
 
 - `src/nock/grid.py`: the model, letters and breaks, clue resolution.
 - `src/nock/grid_import.py`: the import checks.
-- `src/nock/catalogue.py`: grid files, credits, withdrawal (`load_catalogue`,
-  `find_published`).
 - `src/nock/mailer.py`: the one file allowed to send mail.
-- Tests: `tests/test_grids_*`, `tests/test_spec_002_*`, `test_spec_003_*`,
-  `test_spec_005_*`, and the grid-file tests of `test_spec_004_*`.
+- Tests: `tests/test_grids_*`, `tests/test_spec_002_*`, `test_spec_003_*`, and
+  the scan tests of `test_spec_005_*`.
