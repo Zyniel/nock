@@ -25,9 +25,14 @@ URL_ROOM = "https://nock.fr/r/K7QM2X"
 URL_RECAP = "https://nock.fr/recap/k7Qm2xTa9LpR4vWd"
 
 
-def brand() -> str:
-    """Return the Nock mark and name."""
-    return f'<span class="brand">{NOCK}Nock</span>'
+def brand(state: str = "") -> str:
+    """Return the brand link: the Nock mark and name (foundation.md, « Components »).
+
+    Args:
+        state: "hover" or "focus" draws that state; empty, the brand at rest.
+    """
+    cls = f"brand {state}" if state else "brand"
+    return f'<span class="{cls}">{NOCK}Nock</span>'
 
 
 # ---------- phone room ----------

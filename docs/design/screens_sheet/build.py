@@ -18,6 +18,7 @@ from chrome import (
     account_out,
     aide_menu,
     band_done,
+    brand,
     cluebar,
     compose,
     dbtn,
@@ -349,7 +350,37 @@ def sec_catalogue() -> str:
             "The page players open first. A computer gets the 920 px "
             "column; a phone the same content in one column."
         ),
-        s + s2 + extra,
+        s + s2 + brand_states() + extra,
+    )
+
+
+def brand_states() -> str:
+    """Return the brand link at rest, hovered and focused (foundation.md)."""
+
+    def bar(state: str, right: str = "") -> str:
+        return (
+            f'<div class="dtop" style="width:330px">{brand(state)}<span '
+            f'class="spacer"></span>{right}</div>'
+        )
+
+    entry = f'<div class="topbar brandbar" style="width:330px">{brand("focus")}</div>'
+    room = bar("hover", '<span class="dtimer">12:34</span>')
+    boxes = (
+        box(bar(""), "At rest: plain text, no underline.")
+        + box(bar("hover"), "Hovered: word blue; the mark and « Nock » stay put.")
+        + box(bar("focus"), "Focused by the keyboard: the ring.")
+        + box(entry, "The entry frame's 54 px bar, focused.")
+        + box(room, "The room's computer top bar, hovered.")
+    )
+    return (
+        '<article class="scr" id="s-brand"><h3>Brand link « Accueil » '
+        + marks(["foundation · Components", "pages", "room · Computer top bar"])
+        + '</h3><p class="cap">On every top bar that shows it, the Nock mark and '
+        "« Nock » are one link to <code>/</code>, named « Accueil »; on the "
+        "catalogue it is the current page. From a room it leaves as « Retour aux "
+        "grilles » does, with no question. The room's phone top bar has no brand: "
+        "the Menu leads home there.</p>"
+        f'<div class="mini">{boxes}</div></article>'
     )
 
 

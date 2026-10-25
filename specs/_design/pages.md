@@ -12,10 +12,10 @@ column layout included.
 
 ## Catalogue
 
-- Top bar 56 px as the computer room's, with the Nock mark and « Nock », and on the
-  right « Compte »: a computer top-bar button with no icon, pressed while its sheet
-  is open (`room.md`, « Room sheets: host settings and account »), 38 px high on a
-  wide window and 34 px high on a narrow one.
+- Top bar 56 px as the computer room's, with the brand link (`foundation.md`,
+  « Components »), and on the right « Compte »: a computer top-bar button with no
+  icon, pressed while its sheet is open (`room.md`, « Room sheets: host settings
+  and account »), 38 px high on a wide window and 34 px high on a narrow one.
 - Main column: max width 920 px, centred, padding 24 px (16 px on a narrow
   window), gap 16 px, in this order:
   1. heading « Grilles » (`foundation.md`, « Typography »);
@@ -57,9 +57,9 @@ column layout included.
 
 ## Entry and not-found pages
 
-Pages shown instead of the room: a top bar 54 px with the Nock mark and « Nock »
-only (padding 0 14 px), then the page on `--nock-page`, padding 20 px 16 px, gap
-14 px, holding:
+Pages shown instead of the room: a top bar 54 px with the brand link only
+(`foundation.md`, « Components »; padding 0 14 px), then the page on
+`--nock-page`, padding 20 px 16 px, gap 14 px, holding:
 
 - the room code line « Salon {code} » (muted, 600 0.85rem), above the card, on
   room pages;
@@ -112,8 +112,8 @@ Drawn in the screens sheet, parts 5 to 7.
   grilles » primary, the generic error as an error line. Only a refused address
   (not a refusal for too many requests or a failed send) turns the e-mail input's
   border red.
-- Operator page `/ops`: the catalogue's frame (top bar with the brand only, the
-  920 px column on `--nock-page`), heading « Exploitation » in the catalogue
+- Operator page `/ops`: the catalogue's frame (top bar with the brand link only,
+  the 920 px column on `--nock-page`), heading « Exploitation » in the catalogue
   heading style. The token form is one card: the field « Jeton d'opérateur » (a
   password input), the error line « Jeton refusé. » or « Trop d'essais… » under
   it, primary « Ouvrir ». Then a card « Tableau de bord » (card title): the field

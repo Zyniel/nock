@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: done
+status: approved
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation
@@ -75,19 +75,19 @@ fonts, focus ring, shared components, state lines).
      `room.status.not_found_detail` and the link is the primary way on; an
      expired room is deleted and closed with 4404, so it gives this card;
    - else the opening: the room's top bar for the window (`client/hud.md`),
-     inert and without timer, so a press on it opens nothing and sends
-     nothing; the heading read but not seen; and where the grid will be, only
-     the status line `room.status.connecting` (« Connexion… ») or
-     `room.status.joining` (« Entrée dans le salon… »), seen. No grid, clue bar,
-     keyboard or Salon.
+     inert and without timer, so a press on it, the brand included, opens
+     nothing, loads nothing and sends nothing; the heading read but not seen;
+     and where the grid will be, only the status line
+     `room.status.connecting` (« Connexion… ») or `room.status.joining`
+     (« Entrée dans le salon… »), seen. No grid, clue bar, keyboard or Salon.
 8. The first snapshot turns the opening into the room within 300 ms; a refusal
    turns it into its card, `invalid_nickname` into the nickname card. A loss
    keeps it. Once the room has shown, the status follows `client/hud.md` rule 8.
 9. The nickname card, the status cards, the page not found, the shared recap
    and the account page share one frame: a top bar holding only the brand
-   (the Nock mark and `app.title`), then one column of cards. Only room pages
-   put the room code line above the card. The frame takes its phone or
-   computer form from the window and follows a resize within 300 ms.
+   (rule 17), then one column of cards. Only room pages put the room code
+   line above the card. The frame takes its phone or computer form from the
+   window and follows a resize within 300 ms.
 10. The page not found is one card titled `not_found.heading` (« Page
     introuvable »), with `share.home` to `/` as its primary way on.
 
@@ -126,11 +126,22 @@ fonts, focus ring, shared components, state lines).
     colours those of « Components »; a hidden note lets pointers through.
     Nothing of the Vite template's demo is left.
 
+### The brand
+
+17. The brand, the Nock mark (hidden from assistive technology) then
+    `app.title`, is a link to `/` named `topbar.home` (« Accueil ») on every top
+    bar that shows it: the catalogue's and the grid page's
+    (`content/library.md`), the frame's (rule 9), the operator page's and the
+    room's computer top bar (`client/hud.md`). Following it loads the page `/`,
+    as any link does. Only on `/` does it carry `aria-current="page"`; there it
+    loads the catalogue again. The room's phone top bar has no brand.
+
 ### Look
 
 - Tokens, player colours and inks: `_design/foundation.md`, « Colour tokens »,
   « Player colours ». Fonts: « Typography ». Icons: « Icons ». Components and
-  focus ring: « Components ». The scans: « How conformance is checked ».
+  focus ring, brand link: « Components ». The scans: « How conformance is
+  checked ».
 - Grid cells in token colours and the flash: `_design/cells.md`, « Letter cell
   backgrounds », « Letter marks », « Clue cells », « Direction arrows ».
 - Entry frame, cards and page not found: `_design/pages.md`, « Entry and
@@ -176,15 +187,17 @@ fonts, focus ring, shared components, state lines).
   then « Un salon est effacé 30 jours après sa dernière modification. », then
   « Voir les grilles », primary, which loads the catalogue. (← 040 AC-17,
   046 AC-18)
-- **AC-10** On `/r/ZZZZZZ` the entry frame has the brand bar with the Nock
-  mark and « Nock », then « Salon ZZZZZZ » and the card, and no room top bar;
-  it follows the entry pages design at a computer and a phone window, and
-  takes the other form within 300 ms of a resize. (← 046 AC-1)
+- **AC-10** On `/r/ZZZZZZ` the entry frame has the brand bar, whose Nock mark
+  and « Nock » are the link « Accueil » to `/` with no `aria-current`, then
+  « Salon ZZZZZZ » and the card, and no room top bar; it follows the entry
+  pages design at a computer and a phone window, and takes the other form
+  within 300 ms of a resize. (← 046 AC-1)
 - **AC-11** With an identity stored and the join unanswered, the page shows the
   inert room top bar of its window with no timer, and one seen line « Entrée
   dans le salon… » where the grid will be, with no grid, clue bar or progress
-  bar; a click on « Menu » opens nothing and sends nothing; a snapshot brings
-  the timer, clue bar and grid within 300 ms. (← 046 AC-20)
+  bar; a click on « Menu », or on a computer on the brand, opens nothing,
+  loads nothing and sends nothing; a snapshot brings the timer, clue bar and
+  grid within 300 ms. (← 046 AC-20)
 - **AC-12** From the opening of a room created on this device, `room_full`
   gives the card « Ce salon est complet (8 joueurs). » within 300 ms with no
   room top bar; `invalid_nickname` the nickname card with
@@ -258,7 +271,8 @@ fonts, focus ring, shared components, state lines).
 - `web/src/App.svelte` (routing, title), `web/index.html`,
   `web/src/lib/i18n.ts`, `web/src/i18n/fr.json`.
 - `web/src/lib/roomSession.ts` (frames, seq, final closes), `RoomPage.svelte`
-  (socket, cards, opening), `EntryFrame.svelte`, `NotFoundPage.svelte`.
+  (socket, cards, opening), `EntryFrame.svelte`, `NotFoundPage.svelte`,
+  `PageTopBar.svelte`, `TopBarBrand.svelte`.
 - `web/src/app.css` (tokens, page base, focus ring, components),
   `web/src/main.ts` (fonts), `web/src/lib/icons.ts`.
 - Tests: `tests/test_spec_041_*` and the `tests/test_spec_040_*`,

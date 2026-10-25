@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -78,7 +78,8 @@ answer.
     (`catalogue.filter.force`). Exactly one is pressed (`aria-pressed`),
     « Toutes » on load. Pressing « Force N » shows the loaded grids of force N
     in the same order, with no new request; « Toutes » shows them all again.
-11. The top bar holds the brand only, plus « Compte » while accounts are on
+11. The top bar holds the brand only (`client/shell.md` rule 17), with
+    `aria-current="page"` here, plus « Compte » while accounts are on
     (`account/account.md`).
 
 ### Grid cards
@@ -125,7 +126,7 @@ answer.
 - The brand bar and column of both pages, the filter chips, the cards, their
   progress pills, force marks and drawing, and « Jouer »: `_design/pages.md`,
   « Catalogue », with `_design/foundation.md`, « Components » (card, list row,
-  error line).
+  error line, brand link).
 - The state lines: `_design/pages.md`, « States: opening, loading, empty,
   error ».
 
@@ -181,8 +182,8 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   a progress bar or an animation, and with cards shown there is no state line.
   (← 004 AC-1, 046 AC-9)
 - **AC-12** On a computer and on a phone, with accounts off, `/` holds the
-  brand bar with no control in it, then the column: « Grilles », the filter,
-  the cards, laid out by the catalogue design. (← 046 AC-2)
+  brand bar with the brand alone in it, then the column: « Grilles », the
+  filter, the cards, laid out by the catalogue design. (← 046 AC-2)
 - **AC-13** CAT's cards on a computer and on a phone, with their number,
   publication line and « Jouer », follow the catalogue design's card grid.
   (← 046 AC-5)
@@ -208,6 +209,12 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-18** When `GET /api/grids/2` answers 404, `/g/2` shows « Page
   introuvable » and no card; when it answers 500, « Impossible de charger les
   grilles. » as an error line. (← 004 AC-6, 046 AC-14)
+- **AC-19** On `/` the brand is the link « Accueil » to `/` with
+  `aria-current="page"`; following it loads the catalogue again, which asks
+  `GET /api/grids` a second time.
+- **AC-20** On `/` on a computer, the hovered brand takes the hover look of
+  « Brand link » (`_design/foundation.md`, « Components »), its Nock mark and
+  « Nock » where they are at rest.
 
 ## Edge cases
 

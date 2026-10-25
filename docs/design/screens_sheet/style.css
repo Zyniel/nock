@@ -275,8 +275,10 @@ td code, .cap code, .lead code { font-size: .85em; }
 /* computer frame (1280 x 800) */
 .desk { width: 1280px; height: 800px; position: relative; background: var(--nock-white); font-family: var(--nock-font-ui); display: flex; flex-direction: column; overflow: hidden; color: var(--nock-ink); }
 .dtop { height: 56px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 16px; border-bottom: 1px solid var(--nock-line); background: var(--nock-white); }
-.brand { display: flex; align-items: center; gap: 8px; font: 700 1.3rem/1 var(--nock-font-ui); color: var(--nock-navy); letter-spacing: .01em; }
+/* the brand link (foundation.md, « Components »): its padding sits inside a negative margin, so nothing moves */
+.brand { display: flex; align-items: center; gap: 8px; font: 700 1.3rem/1 var(--nock-font-ui); color: var(--nock-navy); letter-spacing: .01em; padding: 8px 10px; margin: -8px -10px; border-radius: 6px; }
 .brand svg { width: 12px; height: 18px; fill: var(--nock-navy); }
+.brand.hover { background: var(--nock-word); }
 .dtimer { font: 600 1.15rem/1 var(--nock-font-ui); color: var(--nock-navy); font-variant-numeric: tabular-nums; margin-right: 10px; }
 .dbtn { display: flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 6px; color: var(--nock-navy); font: 500 .92rem/1 var(--nock-font-ui); position: relative; margin-left: 2px; white-space: nowrap; }
 .dbtn svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
