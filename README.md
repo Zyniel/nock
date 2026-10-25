@@ -284,7 +284,64 @@ The accounts are kept in the `NOCK_DATABASE` file, with the rooms. A refused
 value stops the start with a message that names the variable; it never shows
 the password.
 
-## 5. The quality gate
+## 5. Running in Docker
+
+One image runs Nock in development and in production (`Dockerfile`: Node builds
+the web client, a Python 3.14 image runs the server as a non-root user). The
+settings are the `NOCK_*` variables of section 4, read from an env file that git
+ignores: `.env.dev` and `.env.prod`, never committed.
+
+**Development** (http on port 8000, with Mailpit for the e-mails):
+
+```bash
+cp .env.dev.example .env.dev          # then edit it
+docker compose -f compose.dev.yaml up --build
+```
+
+Open `http://localhost:8000`. Mailpit catches every e-mail, the sign-in links
+included, at `http://localhost:8025` (its SMTP port is 1025). The `grids/` folder
+is mounted read-only, so a new grid needs a restart, not a rebuild.
+
+**Production** (Caddy in front, https with a certificate it gets by itself):
+
+```bash
+cp .env.prod.example .env.prod        # then edit it
+docker compose up --build -d
+```
+
+Caddy serves the domain in `NOCK_DOMAIN` (shell variable or `.env` file; default
+`nock.zyniel.com`) on ports 80 and 443, which must reach the host, and the
+domain must point to it. In `.env.prod`, `NOCK_PUBLIC_URL` must be the public
+https address (`https://nock.zyniel.com`): the links of the sign-in e-mails
+start with it. The grids are part of the image: after adding one, run the same
+command again, which rebuilds the last layers only.
+
+- **One replica only.** The rooms live in the memory of one process; do not
+  scale `nock` above 1.
+- **The proxy setting.** Behind Caddy every connection comes from the proxy's
+  address. `compose.yaml` sets `FORWARDED_ALLOW_IPS` (uvicorn reads it) so that
+  the server trusts Caddy's `X-Forwarded-For` header and each player keeps their
+  own address, for the throttles of specs 028 and 038. Nothing else reaches the
+  `nock` container: it publishes no port.
+- **The database** is `/data/nock.sqlite3` in a named volume (`nock_dev_data` for
+  the development stack, `nock_data` for production, prefixed by the project
+  name, `nock-dev` or `nock`: see `docker volume ls`). It survives a rebuild and
+  `docker compose down`; `down -v` deletes it. To back it up, copy it out while
+  the server runs (the write-ahead log makes a plain file copy unsafe, so ask
+  SQLite for a snapshot):
+
+  ```bash
+  docker compose exec nock /app/.venv/bin/python -c     "import sqlite3; sqlite3.connect('/data/nock.sqlite3').backup(sqlite3.connect('/data/backup.sqlite3'))"
+  docker compose cp nock:/data/backup.sqlite3 ./nock-backup.sqlite3
+  docker compose exec nock rm /data/backup.sqlite3
+  ```
+
+  To restore, stop the stack, put the file back as `nock.sqlite3` in the volume,
+  and start it again.
+- **Logs and health.** `docker compose logs nock`; the container is `healthy`
+  when `/` answers 200 (it answers 503 without a web build).
+
+## 6. The quality gate
 
 `scripts/gate.py` is the single definition of "done". It runs:
 
@@ -341,7 +398,7 @@ play both sides from PowerShell:
   uv run --no-project python scripts/hooks/role_gate.py; $LASTEXITCODE
 ```
 
-## 6. GitHub
+## 7. GitHub
 
 ```powershell
 gh auth login
@@ -352,7 +409,7 @@ CI needs no secret and no configuration. To make it binding, protect `main` in t
 repository settings and require the `Quality gate` check before merging: it
 passes only when every job of CI passed.
 
-## 7. From subagents to an agent team
+## 8. From subagents to an agent team
 
 The default mode uses **subagents**: the three agents run one after the other
 inside your session and report to the lead. It is the cheaper mode and it fits a
@@ -374,7 +431,7 @@ Known limits of teams today: they need an interactive session, resuming a sessio
 does not bring teammates back, and split panes do not work in Windows Terminal
 (teammates show in a panel under the prompt instead).
 
-## 8. Changing the kit
+## 9. Changing the kit
 
 - **Package name:** the package is `nock` in `src/nock/`. To rename it, ask Claude:
   "rename the package nock to X everywhere, then run the gate".
@@ -387,7 +444,7 @@ does not bring teammates back, and split panes do not work in Windows Terminal
   a new `name` and `description`, and add a step to
   `.claude/skills/feature/SKILL.md`.
 
-## 9. Credits
+## 10. Credits
 
 The web client uses two font families, served by Nock itself from its own origin
 (the npm packages `@fontsource/source-sans-3` and

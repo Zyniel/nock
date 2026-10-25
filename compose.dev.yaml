@@ -1,0 +1,33 @@
+# Development: the same image over http on port 8000, with Mailpit catching the
+# e-mails of the sign-in links.
+#
+#   docker compose -f compose.dev.yaml up --build
+#
+# Settings of the server: .env.dev (copy .env.dev.example).
+# Mailpit's inbox: http://localhost:8025
+name: nock-dev
+
+services:
+  nock:
+    build: .
+    env_file: .env.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - nock_dev_data:/data
+      # Grids change without a rebuild; restart the server to read them.
+      - ./grids:/app/grids:ro
+    depends_on:
+      - mailpit
+    init: true
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.22
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+
+volumes:
+  nock_dev_data:
