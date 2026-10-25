@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: co-op
-status: draft
+status: done
 ---
 
 # gameplay/co-op - Shared letters, same-cell conflicts and pencil letters
