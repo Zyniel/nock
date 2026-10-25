@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: done
+status: approved
 ---
 
 # admin/operations - Logs, retention and the operator pages
@@ -238,8 +238,10 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   by it; the token reaches `ready`, sent in every request's header, kept only
   in `sessionStorage`, in no URL; a reload skips the form, a new tab asks
   again; a later 401 or 429 brings the form back with « Jeton refusé. » or
-  « Trop d'essais. Réessayez dans une minute. ». The page and form follow the
-  plain pages design ("Look"). (← 038 AC-7, 048 AC-6)
+  « Trop d'essais. Réessayez dans une minute. ». Locked, at a computer and a
+  phone window, the top bar's Nock mark and « Nock » are the link « Accueil »
+  to `/` with no `aria-current`. The page and form follow the plain pages
+  design ("Look"). (← 038 AC-7, 048 AC-6)
 - **AC-14** AC-3's 7-day figures read « Salons créés : 3 », « Joueurs par salon :
   2,0 », « Grilles terminées : 67 % », « Temps médian de résolution : 12 min 30
   s », « Latence du serveur : 30 ms (médiane), 50 ms (95e centile) », « Coupures
