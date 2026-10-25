@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: approved
+status: done
 ---
 
 # content/library - The catalogue « Grilles » and the grid page

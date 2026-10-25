@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: approved
+status: done
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation

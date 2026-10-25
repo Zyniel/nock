@@ -202,8 +202,8 @@ an item that must be done first.
 
 ### B-011 The catalogue's brand is plain text
 
-- Status: building (the human approved the brief, its answers and the spec
-  change, 2026-10-25; library keeps 21 criteria)
+- Status: done (the human approved the brief, its answers and the spec
+  change, 2026-10-25; library keeps 21 criteria; review approved in round 1)
 - Domains: client/shell, content/library
 - Architecture decision: no
 - Criteria: library AC-19, AC-20 (changed), AC-21 (new); shell rule 17
