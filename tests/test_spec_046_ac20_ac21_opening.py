@@ -19,8 +19,8 @@ Choices where the spec leaves room:
   `room-status` alone.
 - In the touch context, `keyboard-toggle` has `aria-pressed="false"` (spec 044's
   note of 2026-10-22: the keyboard does not show before a snapshot).
-- "A click on the brand opens nothing, loads nothing and sends nothing" (B-010,
-  `client/shell.md` AC-11): on a computer, `topbar-brand` is the `A` to `/` of
+- "A click on the brand opens nothing, loads nothing and sends nothing"
+  (`client/shell.md` AC-11): on a computer, `topbar-brand` is the `A` to `/` of
   shell rule 17 (its markup only: the inert bar is out of the accessibility
   tree), and after a click at its centre, within 300 ms, the page sent no frame,
   started no navigation and is still on `/r/ABC123`.

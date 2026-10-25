@@ -1290,7 +1290,17 @@ brand => {
 
 
 def read_brand(brand: Locator) -> dict[str, object]:
-    """The markup of `topbar-brand` that `BRAND_DOM_SCRIPT` reads."""
+    """Read the markup of `topbar-brand` with `BRAND_DOM_SCRIPT`.
+
+    Args:
+        brand: The `topbar-brand` element of a top bar.
+
+    Returns:
+        Its `tag`, `href`, `ariaCurrent` and `ariaLabel`, `inLink` (whether it
+        is, is inside or holds an `A` with an `href`), `marks` (one entry per
+        `svg`, with `hidden`), `text` (its trimmed text) and `spoken` (the
+        trimmed text not hidden from assistive technology).
+    """
     found = brand.evaluate(BRAND_DOM_SCRIPT)
     assert isinstance(found, dict), found
     return found

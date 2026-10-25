@@ -193,6 +193,15 @@ class BrandLook(NamedTuple):
 
 
 def brand_look(brand: Locator) -> BrandLook:
+    """Read what the brand looks like now.
+
+    Args:
+        brand: The `topbar-brand` element, holding a Nock mark and « Nock ».
+
+    Returns:
+        The brand's styles of `LOOK_PROPERTIES` in that order, its Nock mark's
+        fill, and the boxes of its mark and of its text « Nock ».
+    """
     styles: list[str] = []
     for property_name in LOOK_PROPERTIES:
         styles.append(style_of(brand, property_name))

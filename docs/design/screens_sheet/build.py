@@ -355,7 +355,10 @@ def sec_catalogue() -> str:
 
 
 def brand_states() -> str:
-    """Return the brand link at rest, hovered and focused (foundation.md)."""
+    """Return the brand link at rest, hovered and focused, and the plain brand.
+
+    The plain brand is the catalogue's, which is no link (foundation.md).
+    """
 
     def bar(state: str, right: str = "") -> str:
         return (
