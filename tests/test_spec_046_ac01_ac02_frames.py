@@ -11,11 +11,15 @@ and its 920 px column on white, with the heading, the filter row and the list
 
 Choices where the spec leaves room:
 
-- "The brand 16 px from its left edge" is read on the boxes: `topbar-brand`'s left
-  less `page-topbar`'s left.
-- "No other control while accounts are off" (AC-2): the live server has accounts
-  off (`GET /api/account` answers 404), and `page-topbar` holds no `button`, `a`,
-  `input`, `select` or `textarea`.
+- "The brand 16 px from its left edge" is read on the boxes: the left of
+  `topbar-brand`'s Nock mark less `page-topbar`'s left (the brand link's box is
+  larger than its content, `foundation.md`, « Brand link »).
+- The brand is the link « Accueil » to `/` (B-010, `client/shell.md` AC-10): an
+  `A` with `href="/"`, role link and name `topbar.home`, its Nock mark hidden from
+  assistive technology; on the entry page it has no `aria-current`.
+- "The brand alone in it while accounts are off" (AC-2): the live server has
+  accounts off (`GET /api/account` answers 404), and the one `button`, `a`,
+  `input`, `select` or `textarea` of `page-topbar` is `topbar-brand`.
 - "`catalogue-page` holds `page-topbar` then `catalogue-column`" and "its children
   are, in order" read the element children that show (a box).
 - Edge case "Wide or narrow": a resize from 1280 by 720 to 360 by 740 gives the
@@ -34,7 +38,7 @@ from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec042_harness import box_of
-from spec043_harness import NAVY, WHITE, fr_value, label_of, px
+from spec043_harness import NAVY, WHITE, expect_brand_link, fr_value, label_of, px
 from spec046_harness import (
     NARROW_BAR_HEIGHT,
     NARROW_SIZES,
@@ -154,6 +158,18 @@ def test_ac1_the_brand_holds_the_navy_nock_mark_and_the_app_title(
     assert same_font(px(str(label["fontSize"])), 20.8), label
 
 
+@pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids(SIZES))
+def test_ac1_the_brand_is_the_link_accueil_to_home_with_no_aria_current(
+    window: OpenWindow, live_server: str, width: int, height: int
+) -> None:
+    page = window(width, height)
+    open_unknown_room(page, live_server)
+
+    brand = page.get_by_test_id("page-topbar").get_by_test_id("topbar-brand")
+
+    expect_brand_link(brand, current=False)
+
+
 @pytest.mark.parametrize(("width", "height"), ENTRY_SIZES, ids=size_ids(ENTRY_SIZES))
 def test_ac1_the_column_holds_the_room_code_line_then_the_card(
     window: OpenWindow, live_server: str, width: int, height: int
@@ -232,7 +248,8 @@ def test_ac2_with_accounts_off_the_bar_holds_no_other_control(
 
     controls = bar.locator("button, a, input, select, textarea")
 
-    expect(controls).to_have_count(0)
+    expect(controls).to_have_count(1)
+    expect(controls).to_have_attribute("data-testid", "topbar-brand")
     expect(page.get_by_test_id("account-open")).to_have_count(0)
 
 

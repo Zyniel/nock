@@ -19,6 +19,12 @@ Choices where the spec leaves room:
   that range: all its rectangles have the same top (1 px).
 - "The icon's bottom at or above the label's top" and "the icon's right at or left
   of the label's left" have the position tolerance of 1 px.
+- The brand is the link « Accueil » to `/` (B-010, `client/hud.md` AC-2): an `A`
+  with `href="/"`, role link and name `topbar.home`, no `aria-current`, its Nock
+  mark hidden from assistive technology. Its box is larger than its content
+  (`foundation.md`, « Brand link »), so "the brand 16 px in" is read on its Nock
+  mark. "A click follows with no question": after the click the page is `/` with
+  `catalogue-page`, and no dialog (a `beforeunload` question included) showed.
 - AC-4's touch context with `nock.keyboard_hidden` seeded `"true"`: refined by
   spec 044 (the design's keyboard), which reads that key: the page there is in
   the column layout with the phone top bar (`keyboard-toggle` in its fourth slot),
@@ -31,7 +37,7 @@ from collections.abc import Iterator
 from itertools import pairwise
 
 import pytest
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Dialog, Page, expect
 
 from nock.grid import Grid
 from spec019_harness import OpenWindow, window_opener
@@ -53,6 +59,7 @@ from spec043_harness import (
     Reading,
     border_problems,
     colour_matches,
+    expect_brand_link,
     expect_colour,
     expect_layout,
     fr_format,
@@ -319,12 +326,38 @@ def test_ac3_the_computer_top_bar_is_56_px_high_and_starts_with_the_brand(
 
     box = box_of(top_bar)
     items = shown_items(top_bar)
-    brand_box = to_box(items[0]["box"])
+    mark_box = box_of(page.get_by_test_id("topbar-brand").locator("svg"))
 
     assert same_size(box.height, COMPUTER_TOP_BAR_HEIGHT), box
     assert same_size(box.width, 1280.0), box
     assert items[0]["testId"] == "topbar-brand", items
-    assert same_position(brand_box.left, box.left + 16.0), brand_box
+    assert same_position(mark_box.left, box.left + 16.0), mark_box
+
+
+def test_ac3_the_brand_is_the_link_accueil_to_home_with_no_aria_current(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_fx01(page, live_server, fx01_grid)
+
+    expect_brand_link(page.get_by_test_id("topbar-brand"), current=False)
+
+
+def test_ac3_a_click_on_the_brand_loads_home_with_no_question(
+    page: Page, live_server: str, fx01_grid: Grid
+) -> None:
+    open_fx01(page, live_server, fx01_grid)
+    dialogs: list[str] = []
+
+    def record(dialog: Dialog) -> None:
+        dialogs.append(dialog.type)
+        dialog.accept()
+
+    page.on("dialog", record)
+    page.get_by_test_id("topbar-brand").click()
+
+    page.wait_for_url(f"{live_server}/")
+    expect(page.get_by_test_id("catalogue-page")).to_be_visible()
+    assert dialogs == []
 
 
 BRAND_SCRIPT = "brand => {\n" + SPEC043_JS + r"""

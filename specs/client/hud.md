@@ -42,15 +42,16 @@ computer, never taking the grid's room.
    has no « Crayon »; elsewhere it is « Crayon ». There the ✎ key of the in-app
    keyboard (`gameplay/board.md`) toggles pencil mode, only while the keyboard
    shows: with the keyboard hidden by « Clavier », the player has no way to
-   change the mode. Computer top bar: the brand, the timer slot, « Annuler »,
-   « Crayon », « Aide », « Salon », « Clavier » on a touch screen only,
-   « Menu ».
+   change the mode. Computer top bar: the brand (`client/shell.md` rule 17),
+   the timer slot, « Annuler », « Crayon », « Aide », « Salon », « Clavier » on
+   a touch screen only, « Menu ».
 5. A button is named by its label (`room.undo`, `pencil.toggle`, `topbar.aide`,
-   `topbar.salon`, `keyboard.label`, `topbar.menu`), « Salon » as rule 7 says.
-   « Aide », « Salon » and « Menu » expose whether what they control is open,
-   « Crayon » and « Clavier » whether they are pressed. Short of room, the
-   phone bar's buttons shrink equally, never the timer; labels stay whole on
-   one line and the page never scrolls sideways.
+   `topbar.salon`, `keyboard.label`, `topbar.menu`), « Salon » as rule 7 says;
+   the brand is the link `topbar.home` (« Accueil »). « Aide », « Salon » and
+   « Menu » expose whether what they control is open, « Crayon » and
+   « Clavier » whether they are pressed. Short of room, the phone bar's buttons
+   shrink equally, never the timer; labels stay whole on one line and the page
+   never scrolls sideways.
 6. Once the room shows, the timer slot holds the timer or, while the player
    hides it, « Chrono » (`gameplay/rules.md` rule 13).
 7. « Salon » carries the count of unread messages (`social/chat.md` rule 11).
@@ -84,7 +85,10 @@ computer, never taking the grid's room.
     the host only (`lobby/rooms.md`); « Compte » (`account.open`), while
     accounts are on (`account/account.md`); a separator; `timer.hide` or
     `timer.toggle_label`; « Retour aux grilles » (`menu.back`), a link to `/`.
-    Details are hidden from screen readers.
+    Details are hidden from screen readers. Following « Retour aux grilles »
+    or the brand asks nothing: the page loads `/`, and the player,
+    disconnected, keeps the seat, to resume from « Mes salons »
+    (`lobby/joining.md`).
 12. A switch flips in place, the Menu open and focused on it. Every other item
     closes the Menu: « Inviter » opens the Salon on « Joueurs » focused on
     « Copier le lien »; « Réglages de l'hôte » and « Compte » open their sheet;
@@ -175,8 +179,8 @@ areas, with « Phone top bar », « Clue bar », « Computer top bar » and « L
 column layout »; « Aide menu »; « Menu »; « Salon »; « 3-second notes »;
 « Reactions »; « Connection lost »; « Room sheets: host settings and account »;
 « Layers ». The end band: `_design/overlays.md`, « End of grid ». Menus, badge,
-buttons, switches: `_design/foundation.md`, « Components »; the focus in menus
-and sheets, « Focus ».
+buttons, switches, the brand link: `_design/foundation.md`, « Components »; the
+focus in menus and sheets, « Focus ».
 
 ## Acceptance criteria
 
@@ -187,8 +191,9 @@ and sheets, « Focus ».
   Salon takes each layout's state. (← 043 AC-1)
 - **AC-2** On a computer at 360 by 740 the phone top bar reads « Annuler »,
   « Aide », « Salon », « Crayon », « Menu » after the timer; at 1280 by 720 the
-  computer one starts with the brand, « Crayon » second; 740 by 360 on a
-  computer has the phone one. Each follows its design section ("Look").
+  computer one starts with the brand, the link « Accueil » to `/`, which a
+  click follows with no question, « Crayon » second; 740 by 360 on a computer
+  has the phone one, with no brand. Each follows its design section ("Look").
   (← 043 AC-2, 043 AC-3)
 - **AC-3** At 320 by 568 with the timer at `10:00:00`, at 283 by 640, 568 by
   320 and 740 by 360, every button lies in the bar, 40 px wide at least, its
@@ -282,11 +287,11 @@ and sheets, « Focus ».
   Salon sheet covers it, and in the sheet layout the grid viewport stays put.
   Solved, the end band under the clue bar holds « Voir le bilan », which opens
   the recap. (← 043 AC-27, 043 AC-28)
-- **AC-20** At 1280 by 720 Tab walks « Annuler », « Crayon », « Aide »,
-  « Salon », « Menu », the grid, the clue bar's buttons, then the Salon, each
-  with its ring; at 360 by 740 in the phone bar's order. From the grid Escape
-  then Tab reaches ‹, Escape then Shift+Tab « Menu ». Every state of the frame
-  passes the scans of `product.md`. (← 043 AC-29, 043 AC-31)
+- **AC-20** At 1280 by 720 Tab walks the brand, « Annuler », « Crayon »,
+  « Aide », « Salon », « Menu », the grid, the clue bar's buttons, then the
+  Salon, each with its ring; at 360 by 740 in the phone bar's order. From the
+  grid Escape then Tab reaches ‹, Escape then Shift+Tab « Menu ». Every state
+  of the frame passes the scans of `product.md`. (← 043 AC-29, 043 AC-31)
 
 ## Edge cases
 
@@ -297,6 +302,8 @@ and sheets, « Focus ».
 
 - Dragging the Salon sheet, scrolling to a tapped note's line, announcing
   other players' actions to screen readers.
+- A question before leaving the room; a brand on the phone top bar, where
+  « Retour aux grilles » is the way home.
 - What items, sheets, lines and rows do: the domains each rule names. The page
   before the room shows: `client/shell.md`.
 

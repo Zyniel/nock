@@ -335,6 +335,7 @@ interface; reactions and chat text are user content.
 | Menu heading | margin 6 px 16 px 2 px, 600 0.7rem, uppercase, letter spacing 0.08em, muted |
 | Menu separator | 1 px line-grey top border, margin 4 px 0 |
 | Top-bar button | navy icon and label, transparent background; pressed: word blue |
+| Brand link | the Nock mark (« Icons ») and « Nock » (« Typography »), gap 8 px, no underline: at rest it looks as plain text. Padding 8 px 10 px inside a margin of −8 px −10 px, so its box is larger than its content and nothing moves; radius 6 px. Hover: word-blue background. Focus: the ring of this table. The same on the catalogue, where it is the current page |
 | Badge | red background, white 700 0.62rem/1 text, padding 2 px 4 px, radius 8 px |
 | New-events dot | 8 px red circle |
 | 3-second note | `room.md`, « 3-second notes » |
