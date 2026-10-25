@@ -168,7 +168,7 @@ an item that must be done first.
   module interface)
 - Criteria: shell AC-10, AC-11 (changed); hud AC-2, AC-20 (changed); library
   AC-12 (changed), AC-19, AC-20 (new)
-- Branch: feat/b-010-brand-home-link · PR: none yet
+- Branch: feat/b-010-brand-home-link · PR: #49 (merged)
 - Problem: the human asked: "On all displays extended displays, in the top
   bar, the Polygon + "Nock" should he a link back to the home page, grid
   selection." Today the brand (the Nock mark and « Nock », `TopBarBrand`) is
@@ -200,6 +200,33 @@ an item that must be done first.
   the mark at every phone width under the 40 px floor (breaks too much).
 - Open questions: none left.
 
+### B-011 The catalogue's brand is plain text
+
+- Status: building (the human approved the brief, its answers and the spec
+  change, 2026-10-25; library keeps 21 criteria)
+- Domains: client/shell, content/library
+- Architecture decision: no
+- Criteria: library AC-19, AC-20 (changed), AC-21 (new); shell rule 17
+  (changed, no criterion)
+- Branch: feat/b-011-catalogue-brand · PR: none yet
+- Problem: B-010 made the brand a link to `/` on every top bar that shows it,
+  the catalogue included (with `aria-current="page"`). The human decided: the
+  Nock mark and « Nock » bring back to the catalogue on any page other than
+  the catalogue, the grid page `/g/<n>` and the room included; on the
+  catalogue itself they are "simply a plain text + logo".
+- In scope: on `/` the brand is the mark and « Nock » as plain text: not a
+  link, not a Tab stop, no `aria-current`, no name of its own (it reads
+  « Nock »), no hover look. Everywhere else it stays the link « Accueil » to
+  `/` (B-010). A criterion that the grid page's brand is that link, which
+  B-010 left untested.
+- Out of scope: any other page's brand; the name « Accueil ».
+- Screens: the catalogue's top bar. The look at rest does not change; only
+  the hover and focus states go away there. One option, the human's: the
+  brand on `/` as it was before B-010 (`_design/foundation.md` « Brand link »
+  no longer applies on the catalogue; `_design/pages.md` « Catalogue »).
+- Answers (the human, 2026-10-25): library AC-20 checks the hover look on
+  the grid page `/g/<n>`; `/ops` keeps the link, as any page other than `/`.
+
 ## Small follow-ups
 
 Taken when a change touches them.
@@ -224,10 +251,11 @@ Taken when a change touches them.
   summaries; the force filter makes no new request; the grid page's loading
   line and its non-summary answer; after a chip, only that chip pressed
   (`content/library.md` rules 8, 10, 16 and AC-6).
-- The brand as the link « Accueil » on the grid page, `/ops`, the shared
-  recap and the account page (`client/shell.md` rule 17) has no criterion:
-  only the catalogue, the entry frame and the room's computer top bar are
-  tested. All use `TopBarBrand`, so a brand drawn elsewhere would go unseen.
+- The brand as the link « Accueil » on `/ops`, the shared recap and the
+  account page (`client/shell.md` rule 17) has no criterion: only the
+  catalogue, the entry frame and the room's computer top bar are tested. All
+  use `TopBarBrand`, so a brand drawn elsewhere would go unseen. (The grid
+  page: B-011.)
 - The brand's name « Accueil » does not contain its visible text « Nock »
   (WCAG 2.5.3, label in name): a voice-control user saying "Nock" misses it.
   The human chose « Accueil »; « Nock, accueil » would meet both.
