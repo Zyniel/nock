@@ -289,14 +289,14 @@ AZERTY keyboard replaces the system one, and the player may hide it.
   the bottom edge of (1, 1) are the dashed edges of « Hyphen edges », in
   `--nock-hyphen`, with the dash count, thickness and open corners the section
   gives at about 56 px cells and, on a 13 by 17 grid with one hyphen at 568 by
-  320, at 18 px; every dash end on a whole pixel at a fractional cell size, and
-  every other edge the plain line; the dashes read the same with no one on
+  320 on a computer, at about 12 px; every dash end on a whole pixel at a
+  fractional cell size, and every other edge the plain line; the dashes read the same with no one on
   VIDE, with p2's tint on it, with (2, 2) locked, wrong, flashing, or in
   Auteurs mode; a revealed (1, 1) puts its notch over the down hyphen's dashes.
 - **AC-22** With (2, 2) my selected cell, its border is dashed on its right
   side in navy, as « Hyphen edges » says, and solid on its three others; a tap
-  on (2, 2) selects VIDE's four cells and `v`, `i`, `d`, `e` fill them as on
-  FX-01 as published.
+  on (2, 2) selects VIDE's four cells, and `v`, `i`, `d`, `e` give the same
+  cells and letters as on FX-01 as published.
 
 ## Edge cases
 

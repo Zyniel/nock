@@ -934,7 +934,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
       var row = ["E", "X", "A", "M", "I"].map(function (l, i) { return { letter: l, cls: mine ? [i === 1 ? "sel" : "word"] : [] }; });
       return grid([row], sz, [{ r: 0, c: 1, dir: "right" }]);
     }
-    h += spec(bare(18, true), "18 px (FX-02 on a phone sideways)", "1 px thick, 3 dashes of 3 to 4 px; still a dashed border on my cell");
+    h += spec(bare(18, true), "18 px (FX-02 on a 320 by 568 phone)", "1 px thick, 3 dashes of 3 to 4 px; still a dashed border on my cell");
     h += spec(bare(36, false), "36 px", "2 px thick from 36 px: 4 dashes");
     h += spec(bare(90, true), "90 px (a phone at zoom 5)", "3 px thick, 8 dashes of about 7 px, one pixel into each cell");
     set("hyphen", h);

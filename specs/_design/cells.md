@@ -45,7 +45,9 @@ crossing grid line, which stays plain), with s the cell side at the current zoom
 
 | Cell side | t | Dashes | Each about |
 | --- | --- | --- | --- |
-| 18 px (FX-02 at 568 by 320) | 1 px | 3 | 3 px |
+| about 6 px (FX-02 at 568 by 320 on a touch phone, keyboard shown) | 1 px | 3 | 1 px, 1 px gaps |
+| about 12 px (FX-02 at 568 by 320 on a computer) | 1 px | 3 | 2 px |
+| 18 px (FX-02 on a 320 by 568 phone) | 1 px | 3 | 3 px |
 | 56 px (a computer) | 2 px | 7 | 5 px |
 | 90 px (a phone at zoom 5) | 3 px | 8 | 7 px |
 
