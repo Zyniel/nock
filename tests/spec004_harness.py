@@ -111,25 +111,6 @@ def fr_text(key: str, **values: object) -> str:
     return text
 
 
-def write_catalogue_file(
-    directory: Path, name: str, grid_text: str, **overrides: object
-) -> Path:
-    """Write a valid catalogue file (number 1) and apply `overrides` to its keys."""
-    payload: dict[str, object] = {
-        "number": 1,
-        "published_on": "2026-10-01",
-        "force": 2,
-        "published": True,
-        **credits(),
-        "grid": json.loads(grid_text),
-    }
-    for key, value in overrides.items():
-        payload[key] = value
-    path = directory / name
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return path
-
-
 def item_by_number(page: Page, number: int) -> Locator:
     return page.locator(f'[data-testid="catalogue-item"][data-number="{number}"]')
 

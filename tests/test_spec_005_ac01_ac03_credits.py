@@ -1,20 +1,28 @@
 """Tests of spec 005, AC-1 to AC-3: the credits of a catalogue entry.
 
-A grid file without author, source and licence is refused (AC-1), a credit that is
-blank, null, of the wrong type or too long is refused and the others are stripped
-(AC-2), and a complete file loads with its credits and its `withdrawn` flag (AC-3).
-The shared setup is in `spec005_harness`.
+These are the tests of grid-files AC-3. `source` and `licence` are in the index
+and `author` in the grid file. An entry or a file without them is refused (AC-1),
+a credit that is blank, null, of the wrong type or too long is refused and the
+others are stripped (AC-2), and a complete grid loads with its credits and its
+`withdrawn` flag (AC-3). The shared setup is in `spec005_harness` and
+`grid_files_harness`.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import date
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from grid_files_harness import (
+    fx01_ipuz_data,
+    index_entry,
+    write_grid_file,
+    write_index,
+    write_one_grid,
+)
 from nock.catalogue import (
     CatalogueEntry,
     CatalogueError,
@@ -29,6 +37,11 @@ AUTHOR = "Équipe Nock"
 SOURCE = "Commande Nock 2026"
 LICENCE = "Contrat d'auteur Nock n° 1"
 
+# The credits of the index are refused naming `catalogue.json`, the author of the
+# grid file naming the file.
+INDEX_CREDITS = ["source", "licence"]
+ALL_CREDITS = ["author", "source", "licence"]
+
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
@@ -38,74 +51,64 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-def write_grid_file(
-    directory: Path,
-    fx01_text: str,
-    drop: tuple[str, ...] = (),
-    overrides: dict[str, object] | None = None,
-) -> Path:
-    """Write `g1.json`: number 1, FX-01 and CREDITS, minus `drop`, plus `overrides`."""
-    payload: dict[str, object] = {
-        "number": 1,
-        "published_on": "2026-10-01",
-        "force": 2,
-        "published": True,
-        **credits(),
-        "grid": json.loads(fx01_text),
-    }
-    for key in drop:
-        del payload[key]
-    if overrides is not None:
-        payload.update(overrides)
-    path = directory / "g1.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return path
+def write_credit(directory: Path, field: str, value: object) -> str:
+    """Write grid number 1 with `value` as the credit `field`.
+
+    Returns:
+        The name the error of a refused credit must hold.
+    """
+    if field == "author":
+        data = fx01_ipuz_data()
+        data["author"] = value
+        write_one_grid(directory, data)
+        return "g1.ipuz"
+    write_one_grid(directory, **{field: value})
+    return "catalogue.json"
 
 
-def error_text(error: pytest.ExceptionInfo[CatalogueError]) -> ValidationError:
-    """Return the pydantic error behind a CatalogueError, failing when absent."""
-    cause = error.value.__cause__
-    assert isinstance(cause, ValidationError)
-    return cause
+def loaded_credit(directory: Path, field: str) -> str:
+    """Return the credit `field` of the only entry of the catalogue in `directory`."""
+    entry = load_catalogue(directory).entries[0]
+    return str(getattr(entry, field))
 
 
-# ---- AC-1: missing credits refuse the file ----------------------------------
+# ---- AC-1: missing credits refuse the grid ----------------------------------
 
 
-@pytest.mark.parametrize("field", ["author", "source", "licence"])
-def test_ac1_a_file_without_a_credit_key_is_refused(
-    tmp_path: Path, fx01_text: str, field: str
+@pytest.mark.parametrize("field", INDEX_CREDITS)
+def test_ac1_an_index_entry_without_a_credit_is_refused(
+    tmp_path: Path, field: str
 ) -> None:
-    write_grid_file(tmp_path, fx01_text, drop=(field,))
+    write_grid_file(tmp_path, "g1.ipuz")
+    entry = index_entry()
+    del entry[field]
+    write_index(tmp_path, [entry])
 
-    with pytest.raises(CatalogueError, match=r"g1\.json") as error_info:
-        load_catalogue(tmp_path)
-
-    cause = error_text(error_info)
-    assert field in str(cause)
-
-
-def test_ac1_the_american_spelling_license_is_an_unknown_key(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_grid_file(
-        tmp_path, fx01_text, drop=("licence",), overrides={"license": LICENCE}
-    )
-
-    with pytest.raises(CatalogueError, match=r"g1\.json"):
+    with pytest.raises(CatalogueError, match=r"catalogue\.json"):
         load_catalogue(tmp_path)
 
 
-def test_ac1_a_file_with_none_of_the_credits_is_refused(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_grid_file(tmp_path, fx01_text, drop=("author", "source", "licence"))
+def test_ac1_a_grid_file_without_an_author_is_refused(tmp_path: Path) -> None:
+    data = fx01_ipuz_data()
+    del data["author"]
+    write_one_grid(tmp_path, data)
 
-    with pytest.raises(CatalogueError, match=r"g1\.json"):
+    with pytest.raises(CatalogueError, match=r"g1\.ipuz"):
         load_catalogue(tmp_path)
 
 
-@pytest.mark.parametrize("field", ["author", "source", "licence"])
+def test_ac1_the_american_spelling_license_is_an_unknown_key(tmp_path: Path) -> None:
+    write_grid_file(tmp_path, "g1.ipuz")
+    entry = index_entry()
+    del entry["licence"]
+    entry["license"] = LICENCE
+    write_index(tmp_path, [entry])
+
+    with pytest.raises(CatalogueError, match=r"catalogue\.json"):
+        load_catalogue(tmp_path)
+
+
+@pytest.mark.parametrize("field", ALL_CREDITS)
 def test_ac1_an_entry_built_in_code_without_a_credit_is_refused(
     fx01_grid: Grid, field: str
 ) -> None:
@@ -126,7 +129,7 @@ def test_ac1_an_entry_built_in_code_without_a_credit_is_refused(
 # ---- AC-2: blank, null, wrong type or too long ------------------------------
 
 
-@pytest.mark.parametrize("field", ["author", "source", "licence"])
+@pytest.mark.parametrize("field", ALL_CREDITS)
 @pytest.mark.parametrize(
     "bad_value",
     [
@@ -142,93 +145,71 @@ def test_ac1_an_entry_built_in_code_without_a_credit_is_refused(
     ],
 )
 def test_ac2_a_blank_or_invalid_credit_is_refused(
-    tmp_path: Path, fx01_text: str, field: str, bad_value: object
+    tmp_path: Path, field: str, bad_value: object
 ) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={field: bad_value})
+    refused_name = write_credit(tmp_path, field, bad_value)
 
-    with pytest.raises(CatalogueError, match=r"g1\.json") as error_info:
+    with pytest.raises(CatalogueError, match=refused_name.replace(".", r"\.")):
         load_catalogue(tmp_path)
 
-    assert isinstance(error_info.value.__cause__, ValidationError)
+
+def test_ac2_a_credit_is_stripped_at_both_ends(tmp_path: Path) -> None:
+    write_credit(tmp_path, "author", "  Équipe Nock  ")
+
+    assert loaded_credit(tmp_path, "author") == "Équipe Nock"
 
 
-def test_ac2_a_credit_is_stripped_at_both_ends(tmp_path: Path, fx01_text: str) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"author": "  Équipe Nock  "})
+@pytest.mark.parametrize("field", ALL_CREDITS)
+def test_ac2_every_credit_is_stripped(tmp_path: Path, field: str) -> None:
+    write_credit(tmp_path, field, "\t texte \n")
 
-    loaded = load_catalogue(tmp_path)
-
-    assert loaded.entries[0].author == "Équipe Nock"
-
-
-@pytest.mark.parametrize("field", ["source", "licence"])
-def test_ac2_every_credit_is_stripped(
-    tmp_path: Path, fx01_text: str, field: str
-) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={field: "\t texte \n"})
-
-    loaded = load_catalogue(tmp_path)
-
-    assert getattr(loaded.entries[0], field) == "texte"
+    assert loaded_credit(tmp_path, field) == "texte"
 
 
-@pytest.mark.parametrize("field", ["author", "source", "licence"])
-def test_ac2_a_credit_of_200_characters_is_accepted(
-    tmp_path: Path, fx01_text: str, field: str
-) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={field: "a" * 200})
+@pytest.mark.parametrize("field", ALL_CREDITS)
+def test_ac2_a_credit_of_200_characters_is_accepted(tmp_path: Path, field: str) -> None:
+    write_credit(tmp_path, field, "a" * 200)
 
-    loaded = load_catalogue(tmp_path)
-
-    assert getattr(loaded.entries[0], field) == "a" * 200
+    assert loaded_credit(tmp_path, field) == "a" * 200
 
 
+@pytest.mark.parametrize("field", ALL_CREDITS)
 def test_ac2_the_limit_counts_the_characters_after_stripping(
-    tmp_path: Path, fx01_text: str
+    tmp_path: Path, field: str
 ) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"author": "  " + "a" * 200 + "  "})
+    write_credit(tmp_path, field, "  " + "a" * 200 + "  ")
 
-    loaded = load_catalogue(tmp_path)
-
-    assert loaded.entries[0].author == "a" * 200
+    assert loaded_credit(tmp_path, field) == "a" * 200
 
 
-def test_ac2_the_limit_counts_code_points_not_bytes(
-    tmp_path: Path, fx01_text: str
+@pytest.mark.parametrize("field", ALL_CREDITS)
+def test_ac2_the_limit_counts_code_points_not_bytes(tmp_path: Path, field: str) -> None:
+    write_credit(tmp_path, field, "é" * 200)
+
+    assert loaded_credit(tmp_path, field) == "é" * 200
+
+
+@pytest.mark.parametrize("field", ALL_CREDITS)
+def test_ac2_a_single_character_credit_is_accepted(tmp_path: Path, field: str) -> None:
+    write_credit(tmp_path, field, "x")
+
+    assert loaded_credit(tmp_path, field) == "x"
+
+
+@pytest.mark.parametrize("field", ALL_CREDITS)
+def test_ac2_line_breaks_inside_a_credit_are_kept(tmp_path: Path, field: str) -> None:
+    write_credit(tmp_path, field, "Contrat\nn° 1")
+
+    assert loaded_credit(tmp_path, field) == "Contrat\nn° 1"
+
+
+# ---- AC-3: a complete grid loads with its credits ---------------------------
+
+
+def test_ac3_a_complete_grid_loads_with_its_credits_and_is_not_withdrawn(
+    tmp_path: Path,
 ) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"source": "é" * 200})
-
-    loaded = load_catalogue(tmp_path)
-
-    assert loaded.entries[0].source == "é" * 200
-
-
-def test_ac2_a_single_character_credit_is_accepted(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"licence": "x"})
-
-    loaded = load_catalogue(tmp_path)
-
-    assert loaded.entries[0].licence == "x"
-
-
-def test_ac2_line_breaks_inside_a_credit_are_kept(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"licence": "Contrat\nn° 1"})
-
-    loaded = load_catalogue(tmp_path)
-
-    assert loaded.entries[0].licence == "Contrat\nn° 1"
-
-
-# ---- AC-3: a complete file loads with its credits ---------------------------
-
-
-def test_ac3_a_complete_file_loads_with_its_credits_and_is_not_withdrawn(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_grid_file(tmp_path, fx01_text)
+    write_one_grid(tmp_path)
 
     loaded = load_catalogue(tmp_path)
 
@@ -240,20 +221,13 @@ def test_ac3_a_complete_file_loads_with_its_credits_and_is_not_withdrawn(
     assert entry.withdrawn is False
 
 
-def test_ac3_withdrawn_true_is_read(tmp_path: Path, fx01_text: str) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"withdrawn": True})
+@pytest.mark.parametrize("withdrawn", [True, False])
+def test_ac3_withdrawn_is_read_from_the_index(tmp_path: Path, withdrawn: bool) -> None:
+    write_one_grid(tmp_path, withdrawn=withdrawn)
 
     loaded = load_catalogue(tmp_path)
 
-    assert loaded.entries[0].withdrawn is True
-
-
-def test_ac3_withdrawn_false_is_read(tmp_path: Path, fx01_text: str) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"withdrawn": False})
-
-    loaded = load_catalogue(tmp_path)
-
-    assert loaded.entries[0].withdrawn is False
+    assert loaded.entries[0].withdrawn is withdrawn
 
 
 @pytest.mark.parametrize(
@@ -266,11 +240,11 @@ def test_ac3_withdrawn_false_is_read(tmp_path: Path, fx01_text: str) -> None:
     ],
 )
 def test_ac3_withdrawn_must_be_a_strict_boolean(
-    tmp_path: Path, fx01_text: str, bad_value: object
+    tmp_path: Path, bad_value: object
 ) -> None:
-    write_grid_file(tmp_path, fx01_text, overrides={"withdrawn": bad_value})
+    write_one_grid(tmp_path, withdrawn=bad_value)
 
-    with pytest.raises(CatalogueError, match=r"g1\.json"):
+    with pytest.raises(CatalogueError, match=r"catalogue\.json"):
         load_catalogue(tmp_path)
 
 

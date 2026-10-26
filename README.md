@@ -39,93 +39,127 @@ client that never starts, and every browser test then fails the same way), and
 
 ## 2. Adding grids
 
-The repository holds no grid: a fresh server lists none. Grids enter the
-product only as files in a `grids/` folder (specs 004 and 005).
+The repository holds no grid: a fresh server lists none. A grid enters the
+product as a standard ipuz ArrowWord file in the `grids/` folder, named in an
+index that holds what Nock decides about it (`specs/content/grid-files.md`).
 
 **Where the server looks.** In the `grids/` folder at the root of the
 repository, next to `src/` and `web/` (`GRIDS_DIR` in `src/nock/catalogue.py`,
 worked out from the place of that module). No environment variable and no
-option changes it. The folder is not created for you: create it, and a missing
-folder gives an empty catalogue. The server reads it once, when it starts, so
-restart the server after any change.
+option changes it. The folder is not created for you: create it. A missing
+folder, or a folder without an index, gives an empty catalogue. The server reads
+the folder once, when it starts, so restart the server after any change.
 
-**Files.** One file per grid, directly inside `grids/`. Any name ending in
-lower-case `.json` is read (`grid-0001.json`); a name that starts with `.`, a
-name ending in `.JSON` or any other extension, and sub-folders, are ignored.
-The files are read in the order of their names, but the grid number comes from
-the `number` key inside the file, not from the name. Two files with the same
-number are refused.
+**To add a grid.** Drop its `.ipuz` file in `grids/`, then add an entry for it to
+the index `grids/catalogue.json`. A file the index does not name is ignored.
+Grids are read in the index's order, and the grid number comes from the entry,
+not from the file name.
 
-**File format.** A JSON object (UTF-8) with exactly these keys, and no other:
+**The index.** `grids/catalogue.json` is a JSON array of entries. Each one holds
+exactly these keys, and no other:
 
 | Key | Rule |
 | --- | --- |
-| `number` | Whole number from 1 to 999999999, unique in the folder. |
-| `published_on` | Text written `YYYY-MM-DD`. |
-| `force` | Whole number from 1 (easy) to 4 (hard). |
+| `number` | Whole number from 1 to 999999999, unique in the index. |
+| `file` | Name of the grid file, directly inside `grids/` (no `/` or `\`), ending in `.ipuz`. Two entries may not name the same file. |
 | `published` | `true` or `false`. A grid that is not published is not listed and its address answers "not found". |
-| `author`, `source`, `licence` | The credits, see below. |
+| `source`, `licence` | The rights, see below. |
 | `withdrawn` | Optional `true` or `false` (default `false`). A withdrawn grid is not listed and no new room can start on it; rooms already created on it keep working. |
-| `grid` | The grid itself, in the format of spec 002. |
 
-The example below is the file of grid 1, built from the FX-01 grid
-(`tests/fixtures/fx01.json`) and the credits of `tests/fixtures/credits.json`.
-The `...` stands for the other 20 cells of `fx01.json`, which must all be
-written out (a 5 by 5 grid has 25 cells):
+```json
+[
+  {
+    "number": 1,
+    "file": "grid-0001.ipuz",
+    "published": true,
+    "source": "Commande Nock 2026",
+    "licence": "Contrat d'auteur Nock n° 1"
+  }
+]
+```
+
+**The grid file.** A JSON object (UTF-8) of the ipuz v2 ArrowWord kind. It holds
+`version` (`http://ipuz.org/v2`), `kind` (`["http://ipuz.org/crossword/arrowword#1"]`),
+`clueplacement` (`"blocks"`), `dimensions`, `puzzle`, `clues`, `author`, `date`
+(`MM/DD/YYYY`) and `difficulty` (the force, 1 to 4), and optionally `solution` and
+the descriptive texts `title`, `editor`, `publisher`, `publication`, `url`,
+`uniqueid`, `origin` and `copyright` (kept with the grid, never shown to
+players). Every coordinate is `[column, row]`, counted from zero. In `puzzle`,
+`0` is a letter cell and `"#"` a block; a block with one or two clues at its
+`location` is a clue cell. Each clue holds `clue`, `location`, `cells` (its word,
+which gives the arrow), `answer` and optionally `enumeration`. The example is
+the FX-01 grid (`tests/fixtures/fx01.ipuz`), cut after its first clues:
 
 ```json
 {
-  "number": 1,
-  "published_on": "2026-10-01",
-  "force": 2,
-  "published": true,
+  "version": "http://ipuz.org/v2",
+  "kind": ["http://ipuz.org/crossword/arrowword#1"],
+  "clueplacement": "blocks",
+  "dimensions": {"width": 5, "height": 5},
   "author": "Équipe Nock",
-  "source": "Commande Nock 2026",
-  "licence": "Contrat d'auteur Nock n° 1",
-  "grid": {
-    "width": 5,
-    "height": 5,
-    "cells": [
-      {"type": "clue", "row": 0, "column": 0, "clues": [{"text": "Passoire fine", "arrow": "down_then_right", "answer": "TAMIS"},{"text": "De la marine", "arrow": "right_then_down", "answer": "NAVAL"}]},
-      {"type": "letter", "row": 0, "column": 1},
-      {"type": "clue", "row": 0, "column": 2, "clues": [{"text": "Artiste muet", "arrow": "down", "answer": "MIME"}]},
+  "date": "10/01/2026",
+  "difficulty": 2,
+  "puzzle": [
+    ["#", 0, "#", "#", "#"],
+    [0, 0, 0, 0, 0],
+    ...
+  ],
+  "clues": {
+    "Clues": [
+      {"clue": "Passoire fine", "location": [0, 0], "cells": [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]], "answer": "TAMIS", "enumeration": "5"},
+      {"clue": "De la marine", "location": [0, 0], "cells": [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4]], "answer": "NAVAL", "enumeration": "5"},
       ...
     ]
   }
 }
 ```
 
-In `grid`, `width` and `height` count the cells, and `cells` holds exactly one
-cell per position, with `row` and `column` counted from 0. A cell is
-`"letter"` (a letter of the solution), `"clue"` (one or two `clues`) or
-`"empty"`. A clue has a `text`, an `answer` and an `arrow`: `right`, `down`,
-`down_then_right` or `right_then_down`; the arrow says where the word starts and
-which way it runs. The answer is normalised to the letters A to Z (accents and
-the ligatures Œ and Æ are folded; spaces, hyphens and apostrophes are removed).
+A compound word (`ARC-EN-CIEL`) says where it breaks with its `enumeration`
+(`3-2-4`), with hyphens in its `answer`, and with `dashed` edges in `puzzle`;
+they must agree. The reader is strict: an unsupported key, a clue number, a
+`<` or `>` in a clue text or a `solution` that disagrees with the answers
+refuses the file. Any tool that reads and writes ipuz can open the file;
+`nock.ipuz.write_ipuz` writes one.
+
 A grid is refused when an arrow points outside the grid or to a cell that is not
 a letter, when an answer is not as long as its word, when two clues give the same
 word, when a letter belongs to no word, when a run of two or more letters has no
-clue, or when two crossing words disagree on their shared letter.
+clue, or when two crossing words disagree on their shared letter. The answer is
+normalised to the letters A to Z (accents and the ligatures Œ and Æ are folded;
+spaces, hyphens and apostrophes are removed).
 
-**Credits and licence.** Spec 005 requires `author`, `source` and `licence` in
-every file: the creator of the grid, where it comes from, and the licence or
-contract that lets you publish it. Each one is a text of 1 to 200 characters
-once the spaces at both ends are removed. A key that is missing, blank, too long
-or not a text refuses the file, so the server does not start with a grid whose
-rights are not written down.
+**Credits and licence.** `author` (in the grid file), `source` and `licence` (in
+the index) are required: the creator of the grid, where it comes from, and the
+licence or contract that lets you publish it. Each one is a text of 1 to 200
+characters once the spaces at both ends are removed. A key that is missing, blank,
+too long or not a text refuses the grid, so the server does not start with a grid
+whose rights are not written down.
 
-**An invalid file.** `load_catalogue` stops at the first bad file, in the order
-of the names, and raises `CatalogueError`; the server loads the folder when
-`nock.server` is imported, so `uv run python -m nock` stops with that error and
-its traceback instead of starting. The last line gives the file name and the
-reason, for example:
+**Converting former grid files.** Grids written in the former format (one
+`<name>.json` file per grid, with the listing data and the credits beside the
+grid) become ipuz files and an index with:
 
-```text
-nock.catalogue.CatalogueError: grid-0002.json: invalid catalogue file: words TAMIX and SENT disagree at (1, 4): X against S
-nock.catalogue.CatalogueError: grid-0003.json: duplicate grid number 1
+```bash
+uv run python -m nock.ipuz_convert SOURCE TARGET
 ```
 
-Fix or remove the file and start again.
+It writes `TARGET/<name>.ipuz` for each file of `SOURCE` and
+`TARGET/catalogue.json`. If a source file is refused, or the index or an `.ipuz`
+file already exists in `TARGET`, it writes nothing, names that file and exits
+with a non-zero code.
+
+**An invalid index or file.** `load_catalogue` stops at the first problem, in the
+order of the index, and raises `CatalogueError`; the server loads the folder when
+`nock.server` is imported, so `uv run python -m nock` stops with that error and
+its traceback instead of starting. The last line gives the file name (`catalogue.json`
+for the index) and the reason, for example:
+
+```text
+nock.catalogue.CatalogueError: grid-0002.ipuz: invalid grid file: words TAMIX and SENT disagree at (1, 4): X against S
+nock.catalogue.CatalogueError: catalogue.json: invalid index: duplicate grid number 1
+```
+
+Fix or remove the entry or the file and start again.
 
 **Checking the result.** Build the web client once (`npm --prefix web ci`, then
 `npm --prefix web run build`; without it, `/` answers 503 with "The web client
