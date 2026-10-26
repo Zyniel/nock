@@ -1,0 +1,35 @@
+{
+  "version": "http://ipuz.org/v2",
+  "kind": ["http://ipuz.org/crossword/arrowword#1"],
+  "clueplacement": "blocks",
+  "dimensions": {"width": 5, "height": 5},
+  "author": "Équipe Nock",
+  "date": "10/01/2026",
+  "difficulty": 2,
+  "puzzle": [
+    ["#", 0, "#", "#", "#"],
+    [0, 0, 0, 0, 0],
+    ["#", 0, 0, 0, 0],
+    ["#", 0, 0, 0, 0],
+    ["#", 0, 0, 0, 0]
+  ],
+  "solution": [
+    ["#", "N", "#", "#", "#"],
+    ["T", "A", "M", "I", "S"],
+    ["#", "V", "I", "D", "E"],
+    ["#", "A", "M", "E", "N"],
+    ["#", "L", "E", "S", "T"]
+  ],
+  "clues": {
+    "Clues": [
+      {"clue": "Passoire fine", "location": [0, 0], "cells": [[0, 1], [1, 1], [2, 1], [3, 1], [4, 1]], "answer": "TAMIS", "enumeration": "5"},
+      {"clue": "De la marine", "location": [0, 0], "cells": [[1, 0], [1, 1], [1, 2], [1, 3], [1, 4]], "answer": "NAVAL", "enumeration": "5"},
+      {"clue": "Artiste muet", "location": [2, 0], "cells": [[2, 1], [2, 2], [2, 3], [2, 4]], "answer": "MIME", "enumeration": "4"},
+      {"clue": "Fatales à César", "location": [3, 0], "cells": [[3, 1], [3, 2], [3, 3], [3, 4]], "answer": "IDES", "enumeration": "4"},
+      {"clue": "Flaire", "location": [4, 0], "cells": [[4, 1], [4, 2], [4, 3], [4, 4]], "answer": "SENT", "enumeration": "4"},
+      {"clue": "Sans contenu", "location": [0, 2], "cells": [[1, 2], [2, 2], [3, 2], [4, 2]], "answer": "VIDE", "enumeration": "4"},
+      {"clue": "Fin de prière", "location": [0, 3], "cells": [[1, 3], [2, 3], [3, 3], [4, 3]], "answer": "AMEN", "enumeration": "4"},
+      {"clue": "Alourdit le ballon", "location": [0, 4], "cells": [[1, 4], [2, 4], [3, 4], [4, 4]], "answer": "LEST", "enumeration": "4"}
+    ]
+  }
+}

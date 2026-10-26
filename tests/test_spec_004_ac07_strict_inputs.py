@@ -1,7 +1,9 @@
 """Tests of spec 004, AC-7: inputs are read strictly.
 
-Dates, the `force` parameter, file extensions and file order are read the same
-way on every platform. The shared setup is in `spec004_harness`.
+Dates (the `date` of a grid file) and the `force` parameter of the list route are
+read the same way on every platform. The date tests belong to grid-files AC-16 and
+the force tests to library rule 4. The shared setup is in `spec004_harness` and
+`grid_files_harness`.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from grid_files_harness import fx01_ipuz_data, write_one_grid
 from nock.catalogue import Catalogue, CatalogueError, load_catalogue
 from nock.grid import Grid
 from spec004_harness import (
@@ -20,7 +23,6 @@ from spec004_harness import (
     make_client,
     make_dist_dir,
     make_reference_catalogue,
-    write_catalogue_file,
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
@@ -50,40 +52,37 @@ def client(catalogue: Catalogue, dist_dir: Path) -> TestClient:
 # ---- AC-7: strict inputs -----------------------------------------------------
 
 
-def loaded_numbers(directory: Path) -> list[int]:
-    numbers: list[int] = []
-    for entry in load_catalogue(directory).entries:
-        numbers.append(entry.number)
-    return numbers
-
-
 @pytest.mark.parametrize(
     "bad_date",
     [
+        pytest.param("2026-10-01", id="year-month-day"),
         pytest.param("2026-10-01T00:00:00", id="datetime"),
-        pytest.param("2026-1-1", id="no-zero-padding"),
-        pytest.param("01/10/2026", id="slashes"),
-        pytest.param("20261001", id="compact-form"),
-        pytest.param(0, id="int-zero"),
-        pytest.param(1790035200, id="int-timestamp"),
+        pytest.param("1/1/2026", id="no-zero-padding"),
+        pytest.param("10/01/26", id="two-digit-year"),
+        pytest.param("10-01-2026", id="dashes"),
+        pytest.param("02/30/2026", id="no-such-day"),
+        pytest.param("13/01/2026", id="no-such-month"),
+        pytest.param(20261001, id="int"),
         pytest.param(1790035200.0, id="float-timestamp"),
         pytest.param(True, id="boolean"),
         pytest.param(None, id="null"),
     ],
 )
-def test_ac7_published_on_must_be_exactly_year_month_day(
-    tmp_path: Path, fx01_text: str, bad_date: object
+def test_ac7_the_date_of_a_file_must_be_exactly_month_day_year(
+    tmp_path: Path, bad_date: object
 ) -> None:
-    write_catalogue_file(tmp_path, "bad.json", fx01_text, published_on=bad_date)
+    data = fx01_ipuz_data()
+    data["date"] = bad_date
+    write_one_grid(tmp_path, data)
 
-    with pytest.raises(CatalogueError, match=r"bad\.json"):
+    with pytest.raises(CatalogueError, match=r"g1\.ipuz"):
         load_catalogue(tmp_path)
 
 
-def test_ac7_published_on_in_the_exact_form_is_read(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_catalogue_file(tmp_path, "ok.json", fx01_text, published_on="2026-01-09")
+def test_ac7_a_date_in_the_exact_form_is_read(tmp_path: Path) -> None:
+    data = fx01_ipuz_data()
+    data["date"] = "01/09/2026"
+    write_one_grid(tmp_path, data)
 
     loaded = load_catalogue(tmp_path)
 
@@ -107,42 +106,3 @@ def test_ac7_http_force_1_is_accepted(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert json_numbers(response.json()) == [3, 1]
-
-
-def test_ac7_upper_case_extension_is_ignored(tmp_path: Path, fx01_text: str) -> None:
-    write_catalogue_file(tmp_path, "A.JSON", fx01_text, number=7)
-    write_catalogue_file(tmp_path, "b.json", fx01_text, number=2)
-
-    assert loaded_numbers(tmp_path) == [2]
-
-
-def test_ac7_dot_files_are_ignored(tmp_path: Path, fx01_text: str) -> None:
-    write_catalogue_file(tmp_path, ".x.json", fx01_text, number=7)
-    write_catalogue_file(tmp_path, "b.json", fx01_text, number=2)
-
-    assert loaded_numbers(tmp_path) == [2]
-
-
-def test_ac7_only_ignored_files_give_an_empty_catalogue(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_catalogue_file(tmp_path, "A.JSON", fx01_text, number=7)
-    write_catalogue_file(tmp_path, ".x.json", fx01_text, number=8)
-
-    assert load_catalogue(tmp_path) == Catalogue()
-
-
-def test_ac7_ignored_files_are_not_parsed(tmp_path: Path) -> None:
-    (tmp_path / "A.JSON").write_text("not json", encoding="utf-8")
-    (tmp_path / ".x.json").write_text("not json", encoding="utf-8")
-
-    assert load_catalogue(tmp_path) == Catalogue()
-
-
-def test_ac7_files_load_in_code_point_order_of_their_names(
-    tmp_path: Path, fx01_text: str
-) -> None:
-    write_catalogue_file(tmp_path, "a.json", fx01_text, number=1)
-    write_catalogue_file(tmp_path, "B.json", fx01_text, number=2)
-
-    assert loaded_numbers(tmp_path) == [2, 1]
