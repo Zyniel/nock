@@ -95,10 +95,11 @@ decides about a grid stays in the index. Both are read once at server start.
      `5`), each count one or more, their total the answer's letters; its hyphens
      are the clue's breaks. Another separator (a space, `'`, `.`) is refused.
    - `answer` is written with its hyphens (`ARC-EN-CIEL`) or as letters
-     (`ARCENCIEL`). When both it and `enumeration` carry hyphens, they must
-     agree. The model's answer (rule 4 of `content/grids.md`) is the answer as
-     written, except that an answer without hyphen under an enumeration with
-     some becomes its letters with a hyphen at each break (`ARC-EN-CIEL`).
+     (`ARCENCIEL`). Under an enumeration, an answer with hyphens must place
+     them exactly where the enumeration does (`VI-DE` under `"4"` is refused),
+     and an answer without hyphens takes the enumeration's breaks: the model's
+     answer (rule 4 of `content/grids.md`) is then its letters with a hyphen at
+     each break (`ARC-EN-CIEL`); otherwise it is the answer as written.
      Without enumeration, the breaks are the answer's hyphens.
    - `dashed`, the drawing of a hyphen edge: a letter cell may be the object
      `{"cell": <empty>, "style": {"dashed": "<letters>"}}`, the letters among
@@ -257,8 +258,9 @@ decides about a grid stays in the index. Both are read once at server start.
   `"enumeration": "2-2"` loads with the answer `VI-DE`, a break after 2, as
   does `"answer": "VI-DE"` with no enumeration; `dashed` `R` at `[2, 2]` (or
   `L` at `[3, 2]`) agrees; `dashed` `R` at `[3, 2]` is refused naming `(2, 3)`,
-  `(2, 4)`; `"answer": "VID-E"` with `"2-2"` is refused naming `(2, 0)` and
-  `Sans contenu`; with `NA-VAL` down from (0, 1) as well and only `R` at
+  `(2, 4)`; `"answer": "VID-E"` with `"2-2"`, or `"answer": "VI-DE"` with
+  `"enumeration": "4"`, is refused naming `(2, 0)` and `Sans contenu`; with
+  `NA-VAL` down from (0, 1) as well and only `R` at
   `[2, 2]`, the file is refused naming `(1, 1)`, `(2, 1)`.
 
 ## Edge cases
