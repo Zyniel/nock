@@ -152,12 +152,15 @@ def convert(source: Path, target: Path) -> None:
         target: The directory to write into.
 
     Raises:
-        ValueError: A source file is refused, or `catalogue.json` or one of the
+        ValueError: `target` exists and is not a directory, a source file is
+            refused, or `catalogue.json` or one of the
             `.ipuz` files to write exists in `target`. The message names the
             file, and nothing is written.
     """
     if not source.is_dir():
         raise ValueError(f"{source} is not a directory")
+    if target.exists() and not target.is_dir():
+        raise ValueError(f"{target} exists and is not a directory")
     conversions = _convert_all(source)
     _check_nothing_is_overwritten(target, conversions)
 

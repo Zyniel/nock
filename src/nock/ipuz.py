@@ -657,11 +657,17 @@ def _check_enumerations(grid: Grid, facts_by_clue: dict[ClueKey, _ClueFacts]) ->
 
 
 def _hyphen_edges(grid: Grid) -> list[Edge]:
-    """Return the hyphen edges of every word of a grid."""
+    """Return the hyphen edges of every word of a grid, each one once.
+
+    Two words that share an edge agree on its hyphen, so it is listed once.
+    """
     edges: list[Edge] = []
     for clue_cell in _clue_cells(grid):
         for index in range(len(clue_cell.clues)):
-            edges.extend(grid.hyphen_edges(clue_cell.row, clue_cell.column, index))
+            word_edges = grid.hyphen_edges(clue_cell.row, clue_cell.column, index)
+            for edge in word_edges:
+                if edge not in edges:
+                    edges.append(edge)
     return edges
 
 
