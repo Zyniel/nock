@@ -16,7 +16,8 @@ Choices where the spec leaves room:
   larger than its content, `foundation.md`, « Brand link »).
 - The brand is the link « Accueil » to `/` (`client/shell.md` AC-10): an
   `A` with `href="/"`, role link and name `topbar.home`, its Nock mark hidden from
-  assistive technology; on the entry page it has no `aria-current`.
+  assistive technology; on the entry page, the loaded shared recap and the
+  signed-out account page, at both windows, it has no `aria-current`.
 - "The brand alone in it while accounts are off" (AC-2): the live server has
   accounts off (`GET /api/account` answers 404), `page-topbar` holds one
   `topbar-brand`, the plain text « Nock » of `client/shell.md` rule 17,
@@ -31,12 +32,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from itertools import pairwise
+from pathlib import Path
 
 import pytest
 from playwright.sync_api import Browser, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
+from spec033_harness import AccountServer, account_live_server
 from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec042_harness import box_of
 from spec043_harness import NAVY, WHITE, expect_brand_link, fr_value, label_of, px
@@ -72,6 +75,7 @@ from spec046_harness import (
     to_box,
     window_opener,
 )
+from spec048_harness import AccountMock, open_account, open_share
 
 ENTRY_SIZES = [*WIDE_SIZES, *NARROW_SIZES]
 
@@ -90,6 +94,13 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
 @pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     yield from window_opener(browser, browser_name)
+
+
+@pytest.fixture
+def account_server(tmp_path: Path, catalogue: Catalogue) -> Iterator[AccountServer]:
+    """The live server with accounts on, which serves `/account`."""
+    with account_live_server(tmp_path, catalogue) as server:
+        yield server
 
 
 # ---- AC-1: the entry frame -------------------------------------------------------
@@ -165,6 +176,30 @@ def test_ac1_the_brand_is_the_link_accueil_to_home_with_no_aria_current(
 ) -> None:
     page = window(width, height)
     open_unknown_room(page, live_server)
+
+    brand = page.get_by_test_id("page-topbar").get_by_test_id("topbar-brand")
+
+    expect_brand_link(brand)
+
+
+@pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids(SIZES))
+def test_ac1_the_loaded_recap_brand_is_the_link_accueil_to_home(
+    window: OpenWindow, live_server: str, width: int, height: int
+) -> None:
+    page = window(width, height)
+    open_share(page, live_server)
+
+    brand = page.get_by_test_id("page-topbar").get_by_test_id("topbar-brand")
+
+    expect_brand_link(brand)
+
+
+@pytest.mark.parametrize(("width", "height"), SIZES, ids=size_ids(SIZES))
+def test_ac1_the_signed_out_account_page_brand_is_the_link_accueil_to_home(
+    window: OpenWindow, account_server: AccountServer, width: int, height: int
+) -> None:
+    page = window(width, height)
+    open_account(page, account_server.base_url, AccountMock(), "signed_out")
 
     brand = page.get_by_test_id("page-topbar").get_by_test_id("topbar-brand")
 

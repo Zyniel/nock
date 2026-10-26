@@ -10,6 +10,8 @@ or held, or refused, as each criterion says. Where a criterion opens the page
 
 Readings of the spec's wording:
 
+- The brand is the link « Accueil » to `/` (`admin/operations.md` AC-13): the
+  `topbar-brand` of `page-topbar`, locked, at both windows.
 - "Its column holds the `h1` then `ops-state-line` only": everything `ops-page`
   shows outside its `header` is the `h1`, the line, inside them, or a wrapper.
 - "The label lies 6 px above `ops-token-input`": from the label's bottom to the
@@ -47,7 +49,16 @@ from spec038_harness import (
     texts_of,
 )
 from spec042_harness import box_of
-from spec043_harness import INK, LINE, NAVY, RED, WHITE, WORD, fr_value
+from spec043_harness import (
+    INK,
+    LINE,
+    NAVY,
+    RED,
+    WHITE,
+    WORD,
+    expect_brand_link,
+    fr_value,
+)
 from spec046_harness import (
     HeldRoute,
     OpenWindow,
@@ -164,6 +175,17 @@ def test_ac6_the_header_is_the_catalogue_bar_with_the_brand_only(
         problems.extend(page_colour_problems(page))
 
     assert problems == []
+
+
+@pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
+def test_ac6_locked_the_brand_is_the_link_accueil_to_home(
+    window: OpenWindow, server: OpsServer, size: tuple[int, int]
+) -> None:
+    page = locked_page(window, server, size)
+
+    brand = page.get_by_test_id("page-topbar").get_by_test_id("topbar-brand")
+
+    expect_brand_link(brand)
 
 
 def test_ac6_the_heading_is_in_the_catalogue_heading_style_in_the_column(
