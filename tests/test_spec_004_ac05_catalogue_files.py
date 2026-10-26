@@ -76,16 +76,19 @@ def test_ac5_an_index_entry_is_a_frozen_model_of_the_keys_of_rule_2() -> None:
     )
 
     assert entry.withdrawn is False
+    field_name = "number"
     with pytest.raises(ValidationError):
-        entry.number = 2
+        setattr(entry, field_name, 2)
     with pytest.raises(ValidationError):
-        IndexEntry(
-            number=1,
-            file="a.ipuz",
-            published=True,
-            source="Source",
-            licence="Licence",
-            colour="red",
+        IndexEntry.model_validate(
+            {
+                "number": 1,
+                "file": "a.ipuz",
+                "published": True,
+                "source": "Source",
+                "licence": "Licence",
+                "colour": "red",
+            }
         )
 
 
