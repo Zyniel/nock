@@ -120,3 +120,43 @@ def test_ac7_a_down_hyphen_is_written_as_dashed_b_on_the_letter_above() -> None:
 
     assert written["puzzle"][1][1]["style"] == {"dashed": "B"}
     assert read_ipuz(write_ipuz(first)) == first
+
+
+def shared_edge_data() -> JsonData:
+    """A 4 by 2 grid whose two words share one hyphen edge.
+
+    `AB-C` runs across from (1, 1) to (1, 3) (clue cell (1, 0)), and `B-C` across
+    from (1, 2) to (1, 3) (clue cell (0, 2)): both break between (1, 2) and (1, 3).
+    """
+    data = fx01_ipuz_data()
+    data["dimensions"] = {"width": 4, "height": 2}
+    data["puzzle"] = [["#", "#", "#", "#"], ["#", 0, 0, 0]]
+    data["solution"] = [["#", "#", "#", "#"], ["#", "A", "B", "C"]]
+    data["clues"] = {
+        "Clues": [
+            {
+                "clue": "Long",
+                "location": [0, 1],
+                "cells": [[1, 1], [2, 1], [3, 1]],
+                "answer": "AB-C",
+                "enumeration": "2-1",
+            },
+            {
+                "clue": "Court",
+                "location": [2, 0],
+                "cells": [[2, 1], [3, 1]],
+                "answer": "B-C",
+                "enumeration": "1-1",
+            },
+        ]
+    }
+    return data
+
+
+def test_ac7_a_hyphen_edge_shared_by_two_words_is_written_once() -> None:
+    first = read_data(shared_edge_data())
+
+    written = json.loads(write_ipuz(first))
+
+    assert written["puzzle"][1][2]["style"] == {"dashed": "R"}
+    assert read_ipuz(write_ipuz(first)) == first

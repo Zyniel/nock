@@ -76,6 +76,8 @@ def test_ac5_an_index_entry_is_a_frozen_model_of_the_keys_of_rule_2() -> None:
     )
 
     assert entry.withdrawn is False
+    # A direct assignment is refused statically by pyrefly, and `setattr` with a
+    # constant name by ruff B010: the name goes through a variable.
     field_name = "number"
     with pytest.raises(ValidationError):
         setattr(entry, field_name, 2)

@@ -112,6 +112,8 @@ def test_ac13_a_first_cell_outside_the_grid_gives_the_arrow_error_of_grids() -> 
 
     assert "(0, 4)" in message
     assert "(0, 5)" in message
+    assert "right" in message
+    assert "outside" in message
 
 
 @pytest.mark.parametrize(

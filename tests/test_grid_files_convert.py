@@ -244,3 +244,28 @@ def test_ac20_the_module_runs_as_a_command(
     assert file_names(target) == ["catalogue.json", "g1.ipuz"]
     assert second.returncode != 0
     assert "catalogue.json" in second.stdout + second.stderr
+
+
+def test_ac20_a_target_that_is_a_file_is_refused_without_a_traceback(
+    tmp_path: Path, source: Path, fx01_text: str
+) -> None:
+    write_former(source, "g1.json", former_payload(fx01_text))
+    target_file = tmp_path / "target.txt"
+    target_file.write_text("not a directory", encoding="utf-8")
+    command = [
+        sys.executable,
+        "-m",
+        "nock.ipuz_convert",
+        str(source),
+        str(target_file),
+    ]
+
+    result = subprocess.run(
+        command, capture_output=True, text=True, cwd=tmp_path, check=False
+    )
+
+    assert result.returncode != 0
+    assert "Traceback" not in result.stderr, result.stderr
+    assert "error:" in result.stderr
+    assert "target.txt" in result.stderr
+    assert target_file.read_text(encoding="utf-8") == "not a directory"
