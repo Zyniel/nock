@@ -153,9 +153,9 @@ def convert(source: Path, target: Path) -> None:
 
     Raises:
         ValueError: `target` exists and is not a directory, a source file is
-            refused, or `catalogue.json` or one of the
-            `.ipuz` files to write exists in `target`. The message names the
-            file, and nothing is written.
+            refused, or `catalogue.json` or one of the `.ipuz` files to write
+            exists in `target`. The message names the file, and nothing is
+            written.
     """
     if not source.is_dir():
         raise ValueError(f"{source} is not a directory")
