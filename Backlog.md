@@ -304,9 +304,10 @@ an item that must be done first.
 
 ### B-013 Grid files in the ipuz ArrowWord format
 
-- Status: building (the human picked option D and named the ipuz fields
-  the grids will carry, then approved the spec change with compound words in
-  ipuz's own notation, 2026-10-26)
+- Status: done (the human picked option D and named the ipuz fields the
+  grids will carry, then approved the spec change with compound words in
+  ipuz's own notation, 2026-10-26; review approved in round 1, its
+  suggestions checked in round 2)
 - Domains: content/grid-files (new, split from content/grids, which keeps
   the model and the import checks), content/grids, content/library (pointers
   only); `specs/_map.md` (table and glossary)
@@ -439,6 +440,20 @@ an item that must be done first.
 
 Taken when a change touches them.
 
+- `content/grid-files.md` is over the size guideline (about 18 KB, 21
+  criteria after B-013): the converter (rule 15, AC-20) could leave for its own
+  short section or file, or the sample lists of AC-9 and AC-18 shrink.
+- The converter does not refuse two former files with the same `number`; the
+  index it writes is then refused at server start. Refusing it there, naming
+  the second file, keeps its "writes nothing" promise
+  (`content/grid-files.md` rule 15 does not ask for it).
+- An index `file` may hold `:` (on Windows, `C:x.ipuz` resolves outside
+  `grids/`, `a:b.ipuz` opens an NTFS stream), and `A.ipuz` and `a.ipuz` are
+  one file on a case-insensitive disk (`content/grid-files.md` rule 2). The
+  operator writes the index and CI runs on Linux: hardening only.
+- A `grids/` still holding former `.json` files and no `catalogue.json`
+  starts with an empty catalogue and no error (`content/grid-files.md` rule
+  1): run `uv run python -m nock.ipuz_convert` on it once.
 - `gameplay/board.md` is over the size guideline (about 20 KB, 22 criteria
   after B-012): split the grid's look (rules 1 to 4 and 20, AC-4 to AC-8,
   AC-21, AC-22) into its own domain file, an architecture decision.

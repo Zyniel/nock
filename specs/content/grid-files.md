@@ -1,7 +1,7 @@
 ---
 area: content
 file: grid-files
-status: approved
+status: done
 ---
 
 # content/grid-files - Grid files: the index, the ipuz files, credits, withdrawal
@@ -150,22 +150,6 @@ decides about a grid stays in the index. Both are read once at server start.
     `TARGET/catalogue.json` or a `.ipuz` it would write exists (the index is
     checked first), it writes nothing, names that file and exits with a non-zero
     code. Nothing else reads the former format.
-
-## New interface
-
-- `src/nock/ipuz.py`: `IpuzError(ValueError)`, raised by the reader at the first
-  problem; `GridFile`, a frozen model: `grid: Grid`, `published_on: date`,
-  `force: int`, `author: str` and the eight fields of rule 11 as `str | None`
-  (default `None`); `read_ipuz(text: str) -> GridFile`;
-  `write_ipuz(grid_file: GridFile) -> str`.
-- `src/nock/catalogue.py`: `INDEX_FILE_NAME = "catalogue.json"`; `IndexEntry`, a
-  frozen model of rule 2's keys; `CatalogueEntry` gains the eight fields of
-  rule 11 (`str | None`, default `None`), its other fields unchanged;
-  `load_catalogue(directory: Path) -> Catalogue` and `CatalogueError` keep their
-  names.
-- `src/nock/ipuz_convert.py`: `convert(source: Path, target: Path) -> None`,
-  raising `ValueError` with the message of rule 15, and
-  `main(argv: list[str] | None = None) -> None` for `python -m nock.ipuz_convert`.
 
 ## Acceptance criteria
 

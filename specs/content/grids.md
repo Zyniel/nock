@@ -1,7 +1,7 @@
 ---
 area: content
 file: grids
-status: approved
+status: done
 ---
 
 # content/grids - Grids: model, import checks and no third-party content
