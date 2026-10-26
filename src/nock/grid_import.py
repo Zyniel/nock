@@ -75,8 +75,16 @@ def _letter_positions_in_order(grid: Grid) -> list[Position]:
     return sorted(positions)
 
 
-def _check_arrows(grid: Grid) -> None:
-    """Check that every arrow points to a letter cell."""
+def check_arrows(grid: Grid) -> None:
+    """Check that every arrow points to a letter cell (step 2 of the checks).
+
+    Args:
+        grid: A grid that parsed into the model.
+
+    Raises:
+        GridImportError: At the first arrow that points outside the grid or to
+            a cell that is not a letter cell.
+    """
     for clue_cell in _clue_cells_in_order(grid):
         for clue in clue_cell.clues:
             row_offset, column_offset = _START_OFFSETS[clue.arrow]
@@ -262,6 +270,34 @@ def _check_shared_hyphens(grid: Grid, placed_clues: list[_PlacedClue]) -> None:
             )
 
 
+def check_words(grid: Grid) -> ImportReport:
+    """Run the checks 3 to 8 on a grid whose arrows were checked.
+
+    Args:
+        grid: A grid for which `check_arrows` found nothing.
+
+    Returns:
+        The grid with its word, letter cell and clue cell counts.
+
+    Raises:
+        GridImportError: At the first problem found.
+    """
+    placed_clues = _place_clues(grid)
+    _check_answer_lengths(placed_clues)
+    _check_no_duplicate_words(placed_clues)
+    _check_letters_in_a_word(grid, placed_clues)
+    _check_runs_have_a_clue(grid, placed_clues)
+    _check_crossing_letters(grid, placed_clues)
+    _check_shared_hyphens(grid, placed_clues)
+
+    return ImportReport(
+        grid=grid,
+        word_count=len(placed_clues),
+        letter_cell_count=len(_letter_positions_in_order(grid)),
+        clue_cell_count=len(_clue_cells_in_order(grid)),
+    )
+
+
 def import_grid(text: str) -> ImportReport:
     """Parse and check a grid given as JSON text.
 
@@ -279,18 +315,5 @@ def import_grid(text: str) -> ImportReport:
     except ValidationError as error:
         raise GridImportError(f"invalid grid: {error}") from error
 
-    _check_arrows(grid)
-    placed_clues = _place_clues(grid)
-    _check_answer_lengths(placed_clues)
-    _check_no_duplicate_words(placed_clues)
-    _check_letters_in_a_word(grid, placed_clues)
-    _check_runs_have_a_clue(grid, placed_clues)
-    _check_crossing_letters(grid, placed_clues)
-    _check_shared_hyphens(grid, placed_clues)
-
-    return ImportReport(
-        grid=grid,
-        word_count=len(placed_clues),
-        letter_cell_count=len(_letter_positions_in_order(grid)),
-        clue_cell_count=len(_clue_cells_in_order(grid)),
-    )
+    check_arrows(grid)
+    return check_words(grid)

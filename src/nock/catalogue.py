@@ -1,14 +1,18 @@
-"""The grid catalogue: the grids this server knows and what players may see of them."""
+"""The grid catalogue: the grids this server knows and what players may see of them.
+
+A grid enters through the index `grids/catalogue.json` and the `.ipuz` file it
+names (`specs/content/grid-files.md`).
+"""
 
 from __future__ import annotations
 
 import json
-import re
 from datetime import date
 from pathlib import Path
 from typing import Annotated
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -18,7 +22,7 @@ from pydantic import (
 )
 
 from nock.grid import ClueCell, Grid
-from nock.grid_import import import_grid
+from nock.ipuz import read_ipuz
 
 GridNumber = Annotated[int, Field(ge=1, le=999_999_999, strict=True)]
 Force = Annotated[int, Field(ge=1, le=4, strict=True)]
@@ -27,13 +31,45 @@ CreditText = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
 ]
 
-PUBLISHED_ON_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+INDEX_FILE_NAME = "catalogue.json"
+GRID_FILE_SUFFIX = ".ipuz"
 
 GRIDS_DIR: Path = Path(__file__).resolve().parents[2] / "grids"
 
 
+def _check_file_name(name: str) -> str:
+    """Accept a name directly inside `grids/` that ends in ".ipuz".
+
+    Raises:
+        ValueError: The name holds a slash or a backslash, or does not end in
+            ".ipuz".
+    """
+    if "/" in name or "\\" in name:
+        raise ValueError("'file' must be a name directly inside grids/")
+    if not name.endswith(GRID_FILE_SUFFIX):
+        raise ValueError(f"'file' must end in {GRID_FILE_SUFFIX!r}")
+    return name
+
+
+class IndexEntry(BaseModel):
+    """One entry of the index: what Nock decides about a grid file."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    number: GridNumber
+    file: Annotated[str, Field(strict=True), AfterValidator(_check_file_name)]
+    published: StrictBool
+    source: CreditText
+    licence: CreditText
+    withdrawn: StrictBool = False
+
+
 class CatalogueEntry(BaseModel):
-    """One grid of the catalogue, its listing data and its rights."""
+    """One grid of the catalogue: the index entry joined to its grid file.
+
+    The eight optional texts are recorded as the file writes them. They are never
+    shown to players.
+    """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -46,6 +82,14 @@ class CatalogueEntry(BaseModel):
     licence: CreditText
     withdrawn: StrictBool = False
     grid: Grid
+    title: str | None = None
+    editor: str | None = None
+    publisher: str | None = None
+    publication: str | None = None
+    url: str | None = None
+    uniqueid: str | None = None
+    origin: str | None = None
+    copyright: str | None = None
 
 
 class GridSummary(BaseModel):
@@ -148,90 +192,98 @@ class Catalogue(BaseModel):
 
 
 class CatalogueError(ValueError):
-    """A catalogue directory holds a file that cannot be loaded."""
+    """The index or a grid file cannot be loaded. The message names the file."""
 
 
-def _check_published_on(value: object) -> None:
-    """Accept only a text written YYYY-MM-DD (no number, boolean or null).
-
-    Raises:
-        ValueError: The value is not a text matching that pattern.
-    """
-    # The JSON value can be of any type, which is why it is typed `object`.
-    if not isinstance(value, str) or PUBLISHED_ON_PATTERN.fullmatch(value) is None:
-        raise ValueError("'published_on' must be a text written YYYY-MM-DD")
-
-
-def _read_entry(path: Path) -> CatalogueEntry:
-    """Read one catalogue file.
+def _read_index(directory: Path) -> list[IndexEntry]:
+    """Read the index of `directory`.
 
     Raises:
-        OSError: The file cannot be read.
-        ValueError: The text is not valid JSON, or the file is not valid
-            (pydantic's ValidationError and GridImportError are ValueErrors).
+        OSError: The index cannot be read.
+        ValueError: The text is not valid JSON, an entry is not valid, or two
+            entries name the same number or the same file.
     """
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError("the file must hold a JSON object")
-    if "grid" not in payload:
-        raise ValueError("the key 'grid' is missing")
-    if "published_on" in payload:
-        _check_published_on(payload["published_on"])
-    report = import_grid(json.dumps(payload["grid"]))
-    payload["grid"] = report.grid
-    return CatalogueEntry.model_validate(payload)
+    text = (directory / INDEX_FILE_NAME).read_text(encoding="utf-8")
+    payload = json.loads(text)
+    if not isinstance(payload, list):
+        raise ValueError("the index must be a JSON array of entries")
+    index_entries: list[IndexEntry] = []
+    numbers_seen: set[int] = set()
+    files_seen: set[str] = set()
+    for item in payload:
+        index_entry = IndexEntry.model_validate(item)
+        if index_entry.number in numbers_seen:
+            raise ValueError(f"duplicate grid number {index_entry.number}")
+        if index_entry.file in files_seen:
+            raise ValueError(f"duplicate file {index_entry.file}")
+        numbers_seen.add(index_entry.number)
+        files_seen.add(index_entry.file)
+        index_entries.append(index_entry)
+    return index_entries
 
 
-def _catalogue_paths(directory: Path) -> list[Path]:
-    """List the catalogue files of `directory`, sorted by name in code-point order."""
-    names: list[str] = []
-    for path in directory.iterdir():
-        if path.name.startswith("."):
-            continue
-        if not path.name.endswith(".json"):
-            continue
-        names.append(path.name)
-    names.sort()
-    paths: list[Path] = []
-    for name in names:
-        paths.append(directory / name)
-    return paths
+def _read_grid_file(directory: Path, index_entry: IndexEntry) -> CatalogueEntry:
+    """Read the grid file an index entry names and join the two.
+
+    Raises:
+        OSError: The file is missing or cannot be read.
+        ValueError: The file is not valid (`IpuzError` is a ValueError).
+    """
+    text = (directory / index_entry.file).read_text(encoding="utf-8")
+    grid_file = read_ipuz(text)
+    return CatalogueEntry(
+        number=index_entry.number,
+        published_on=grid_file.published_on,
+        force=grid_file.force,
+        published=index_entry.published,
+        author=grid_file.author,
+        source=index_entry.source,
+        licence=index_entry.licence,
+        withdrawn=index_entry.withdrawn,
+        grid=grid_file.grid,
+        title=grid_file.title,
+        editor=grid_file.editor,
+        publisher=grid_file.publisher,
+        publication=grid_file.publication,
+        url=grid_file.url,
+        uniqueid=grid_file.uniqueid,
+        origin=grid_file.origin,
+        copyright=grid_file.copyright,
+    )
 
 
 def load_catalogue(directory: Path) -> Catalogue:
-    """Load every `*.json` file directly inside `directory`, in file-name order.
+    """Load the grids that the index of `directory` names, in the index's order.
 
-    Files are read in code-point order of their names. A missing directory gives
-    an empty catalogue. Sub-directories, dot files and names that do not end in
-    lower-case ".json" are ignored.
+    A missing directory or a missing index gives an empty catalogue. A file the
+    index does not name is ignored.
 
     Args:
-        directory: The directory holding one JSON file per grid.
+        directory: The directory holding `catalogue.json` and the `.ipuz` files.
 
     Returns:
-        The catalogue of those files.
+        The catalogue of those grids.
 
     Raises:
-        CatalogueError: At the first file that is not valid (including a
-            missing, blank or over-long credit: author, source or licence;
-            or a non-boolean `withdrawn`), or when two files hold the same
-            number. The message contains the file name.
+        CatalogueError: At the first problem. The message names
+            `catalogue.json` for an index problem, else the grid file (a missing
+            one included).
     """
-    if not directory.is_dir():
+    index_path = directory / INDEX_FILE_NAME
+    if not index_path.is_file():
         return Catalogue()
-    paths = _catalogue_paths(directory)
+    try:
+        index_entries = _read_index(directory)
+    except (OSError, ValueError) as error:
+        message = f"{INDEX_FILE_NAME}: invalid index: {error}"
+        raise CatalogueError(message) from error
+
     entries: list[CatalogueEntry] = []
-    numbers_seen: set[int] = set()
-    for path in paths:
-        if not path.is_file():
-            continue
+    for index_entry in index_entries:
         try:
-            entry = _read_entry(path)
+            entry = _read_grid_file(directory, index_entry)
         except (OSError, ValueError) as error:
-            message = f"{path.name}: invalid catalogue file: {error}"
+            message = f"{index_entry.file}: invalid grid file: {error}"
             raise CatalogueError(message) from error
-        if entry.number in numbers_seen:
-            raise CatalogueError(f"{path.name}: duplicate grid number {entry.number}")
-        numbers_seen.add(entry.number)
         entries.append(entry)
     return Catalogue(entries=tuple(entries))
