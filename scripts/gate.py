@@ -104,9 +104,19 @@ STATIC_STEPS: list[tuple[str, list[str]]] = [
 ]
 WEB_DIR = PROJECT_ROOT / "web"
 
+# The grids the repository ships load as the server reads them at start
+# (specs/content/grid-files.md, rule 1): a refused file fails the gate here, not
+# at the next deployment. No test reads grids/ itself.
+LOAD_GRIDS_CODE = (
+    "from nock.catalogue import GRIDS_DIR, load_catalogue; "
+    "catalogue = load_catalogue(GRIDS_DIR); "
+    "print(f'{len(catalogue.entries)} grid(s) in {GRIDS_DIR.name}/')"
+)
+
 RUNTIME_STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("pyrefly (types)", ["pyrefly", "check"]),
     ("svelte-check (web types)", ["npm", "--prefix", "web", "run", "check"]),
+    ("grids (the repository's own)", ["python", "-c", LOAD_GRIDS_CODE]),
 ]
 # pytest comes after the web build: browser tests load the built client.
 BUILD_STEP: tuple[str, list[str]] = (

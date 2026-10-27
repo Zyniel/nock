@@ -16,10 +16,10 @@ concurrency:
 
 jobs:
   # Whether a pull request changes anything a browser test can see. One that
-  # changes only files under specs/ or docs/ skips the browser jobs: no test
-  # reads those folders, and the static job still checks the specs against
-  # their tests (spec traceability). A push to main runs every job (human
-  # decision, 2026-10-21).
+  # changes only files under specs/, docs/ or grids/ skips the browser jobs: no
+  # test reads those folders, and the static job still checks the specs against
+  # their tests (spec traceability) and loads the grids the repository ships. A
+  # push to main runs every job (human decision, 2026-10-21).
   changes:
     name: Changed files
     runs-on: ubuntu-latest
@@ -41,7 +41,7 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             changed_files=$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA")
             echo "$changed_files"
-            other_files=$(echo "$changed_files" | grep -vE '^(specs|docs)/' || true)
+            other_files=$(echo "$changed_files" | grep -vE '^(specs|docs|grids)/' || true)
             if [ -n "$changed_files" ] && [ -z "$other_files" ]; then
               browsers=false
             fi
