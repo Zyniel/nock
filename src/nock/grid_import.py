@@ -240,17 +240,17 @@ def _edges_of(grid: Grid, clue: _PlacedClue) -> list[tuple[Edge, bool]]:
 
     Only call this once the answer lengths have been checked.
     """
-    hyphen_edges = grid.hyphen_edges(clue.row, clue.column, clue.clue_index)
+    break_edges = grid.hyphen_edges(clue.row, clue.column, clue.clue_index)
     edges: list[tuple[Edge, bool]] = []
     for index in range(len(clue.word) - 1):
         edge = (clue.word[index], clue.word[index + 1])
-        is_break = edge in hyphen_edges
+        is_break = edge in break_edges
         edges.append((edge, is_break))
     return edges
 
 
-def _check_shared_hyphens(grid: Grid, placed_clues: list[_PlacedClue]) -> None:
-    """Check that two words sharing an edge agree on its hyphen."""
+def _check_shared_breaks(grid: Grid, placed_clues: list[_PlacedClue]) -> None:
+    """Check that two words sharing an edge agree on its break."""
     first_clue_of_edge: dict[Edge, _PlacedClue] = {}
     first_break_of_edge: dict[Edge, bool] = {}
     for clue in placed_clues:
@@ -265,7 +265,7 @@ def _check_shared_hyphens(grid: Grid, placed_clues: list[_PlacedClue]) -> None:
             before, after = edge
             raise GridImportError(
                 f"words {first_clue.answer} and {clue.answer} disagree on the "
-                f"hyphen of the edge {_format_position(before)}, "
+                f"break of the edge {_format_position(before)}, "
                 f"{_format_position(after)}"
             )
 
@@ -288,7 +288,7 @@ def check_words(grid: Grid) -> ImportReport:
     _check_letters_in_a_word(grid, placed_clues)
     _check_runs_have_a_clue(grid, placed_clues)
     _check_crossing_letters(grid, placed_clues)
-    _check_shared_hyphens(grid, placed_clues)
+    _check_shared_breaks(grid, placed_clues)
 
     return ImportReport(
         grid=grid,
