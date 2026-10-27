@@ -477,8 +477,8 @@ an item that must be done first.
 
 ### B-015 Word breaks: abbreviations, spaces, apostrophes; ipuz reader review
 
-- Status: ready (the human answered the brief and approved the spec change,
-  2026-10-27)
+- Status: done (the human answered the brief and approved the spec change,
+  2026-10-27; review approved in round 1, its suggestions checked in round 2)
 - Domains: content/grids, content/grid-files; gameplay/board (one Out of
   scope line); `_design/cells.md` « Hyphen edges » and the captions of the
   cell sheet's « 4b » and the screens sheet's compound words (text only, no
@@ -601,8 +601,8 @@ an item that must be done first.
 
 Taken when a change touches them.
 
-- `content/grid-files.md` is over the size guideline (about 18 KB, 21
-  criteria after B-013): the converter (rule 15, AC-20) could leave for its own
+- `content/grid-files.md` is over the size guideline (about 18.7 KB, 21
+  criteria after B-015): the converter (rule 15, AC-20) could leave for its own
   short section or file, or the sample lists of AC-9 and AC-18 shrink.
 - The converter does not refuse two former files with the same `number`; the
   index it writes is then refused at server start. Refusing it there, naming
@@ -628,6 +628,10 @@ Taken when a change touches them.
   key written twice in one object keeps its last value silently; a file
   starting with a UTF-8 byte order mark is refused as "not valid JSON"; a
   clue's descriptive `explanation`, `tags` or `type` is refused.
+- B-015 left: `’` in an enumeration is refused while rule 4 of
+  `content/grids.md` makes it the same separator as `'` (`content/grid-files.md`
+  rule 9 lists `'` only; say which); no test locks in that an enumeration
+  with a leading zero (`"05"`, `"02-3"`) loads, as it does.
 - Spec 025's vote banner test (`test_spec_025_ac07_vote_banner.py`) no longer
   measures a window (spec 047) and can leave `SERIAL_TEST_FILES`.
 - Spec 045: no zoom test with the legend shown; the column layout with the legend
@@ -678,7 +682,8 @@ Taken when a change touches them.
   (`account/account.md`).
 - Known flakes: 036 AC-8's join on the room of `NOCK_DATABASE` fails under
   load and passes alone; 046 AC-22's nickname error failed once on Firefox,
-  never reproduced; on Windows, `net::ERR_NO_BUFFER_SPACE` after several
+  never reproduced; 019 AC-4's legend after Bob leaves failed once in the
+  full gate on Windows (B-015), passed alone; on Windows, `net::ERR_NO_BUFFER_SPACE` after several
   gates in a row (rerun alone).
 - B-009's option B, once Docker is how Nock deploys: a domain
   `platform/deployment.md` and a CI job that builds the image and checks the

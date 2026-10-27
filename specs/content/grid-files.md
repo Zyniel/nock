@@ -1,7 +1,7 @@
 ---
 area: content
 file: grid-files
-status: approved
+status: done
 ---
 
 # content/grid-files - Grid files: the index, the ipuz files, credits, withdrawal
