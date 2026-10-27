@@ -30,8 +30,8 @@ RIGHT_SINGLE_QUOTE = chr(0x2019)
 
 def names(message: str, answer: str) -> bool:
     """Tell whether a message names an answer as a whole, not inside another."""
-    before = r"(?<![A-Za-z\-])(?<![A-Za-z]\.)"
-    after = r"(?![A-Za-z\-])(?!\.[A-Za-z])"
+    before = r"(?<![A-Za-z\-'])(?<![A-Za-z]\.)"
+    after = r"(?![A-Za-z\-'])(?!\.[A-Za-z])"
     pattern = before + re.escape(answer) + after
     return re.search(pattern, message) is not None
 
