@@ -77,6 +77,7 @@ _MAX_AUTHOR_LENGTH = 200
 _DATE_PATTERN = re.compile(r"([0-9]{2})/([0-9]{2})/([0-9]{4})")
 _ENUMERATION_PATTERN = re.compile(r"[0-9]+(?:[-. '][0-9]+)*")
 _COUNT_PATTERN = re.compile(r"[0-9]+")
+_SEPARATOR_PATTERN = re.compile(r"[^0-9]")
 _DASHED_LETTERS = "TRBL"
 _FORCE_OF_TEXT = {"1": 1, "2": 2, "3": 3, "4": 4}
 
@@ -481,12 +482,21 @@ def _read_counts(enumeration: str, name: str) -> list[int]:
     return counts
 
 
-def _join_counts(counts: list[str], separators: tuple[str, ...]) -> str:
-    """Write counts one after the other, each pair joined by its separator."""
-    text = counts[0]
+def _join_counts(pieces: list[str], separators: tuple[str, ...]) -> str:
+    """Write pieces one after the other, each pair joined by its separator."""
+    text = pieces[0]
     for index, separator in enumerate(separators):
-        text += separator + counts[index + 1]
+        text += separator + pieces[index + 1]
     return text
+
+
+def _normalized_enumeration(enumeration: str) -> str:
+    """Write an enumeration by its counts and separators, without leading zeros."""
+    counts: list[str] = []
+    for part in _COUNT_PATTERN.findall(enumeration):
+        counts.append(str(int(part)))
+    separators = tuple(_SEPARATOR_PATTERN.findall(enumeration))
+    return _join_counts(counts, separators)
 
 
 def _separate(letters: str, counts: list[int], separators: tuple[str, ...]) -> str:
@@ -653,7 +663,9 @@ def _check_enumerations(grid: Grid, facts_by_clue: dict[ClueKey, _ClueFacts]) ->
         location = (clue_cell.row, clue_cell.column)
         for index, clue in enumerate(clue_cell.clues):
             enumeration = facts_by_clue[(location, index)].enumeration
-            if enumeration is None or enumeration == _written_enumeration(clue):
+            if enumeration is None:
+                continue
+            if _normalized_enumeration(enumeration) == _written_enumeration(clue):
                 continue
             name = _clue_name(location, clue.text)
             raise IpuzError(
