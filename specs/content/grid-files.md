@@ -1,7 +1,7 @@
 ---
 area: content
 file: grid-files
-status: done
+status: approved
 ---
 
 # content/grid-files - Grid files: the index, the ipuz files, credits, withdrawal
@@ -77,11 +77,11 @@ decides about a grid stays in the index. Both are read once at server start.
    "answer": "SENT", "enumeration": "4"}`.
 7. Reading is strict, as the standard asks of a reader: any other key without `:`
    at the top level, in `clues` or in a clue is refused (`saved`, `checksum`,
-   `styles`, `zones`, `showenumerations`, `Across`, a clue's `number`, another
-   `clueplacement`, a clue written as a text or a pair, ...). The descriptive
-   ipuz keys `notes`, `intro`, `explanation`, `annotation` and `charset` are
-   accepted at the top level and ignored. A key holding `:` (another tool's
-   namespace) is ignored wherever it stands.
+   `styles`, `zones`, `Across`, a clue's `number`, another `clueplacement`, a
+   clue written as a text or a pair, ...). The ipuz keys `notes`, `intro`,
+   `explanation`, `annotation`, `charset` and `showenumerations` are accepted
+   at the top level and ignored. A key holding `:` (another tool's namespace)
+   is ignored wherever it stands.
 8. The arrow comes from the clue cell (r, c) and the first cell of `cells`:
    (r, c + 1) starts right, (r + 1, c) starts below; any other first cell is
    refused, naming the clue cell and that cell. With two or more cells, the
@@ -90,24 +90,28 @@ decides about a grid stays in the index. Both are read once at server start.
    down is `down`, below and across is `down_then_right`, right and down is
    `right_then_down`; a one-cell word takes the straight arrow of its first
    cell. `cells` must then be the word rule 3 of `content/grids.md` resolves.
-9. A compound word uses ipuz's own means, all agreeing:
-   - `enumeration`, when present, is counts of letters joined by `-` (`3-2-5`,
-     `5`), each count one or more, their total the answer's letters; its hyphens
-     are the clue's breaks. Another separator (a space, `'`, `.`) is refused.
-   - `answer` is written with its hyphens (`ARC-EN-CIEL`) or as letters
-     (`ARCENCIEL`). Under an enumeration, an answer with hyphens must place
-     them exactly where the enumeration does (`VI-DE` under `"4"` is refused),
-     and an answer without hyphens takes the enumeration's breaks: the model's
-     answer (rule 4 of `content/grids.md`) is then its letters with a hyphen at
-     each break (`ARC-EN-CIEL`); otherwise it is the answer as written.
-     Without enumeration, the breaks are the answer's hyphens.
-   - `dashed`, the drawing of a hyphen edge: a letter cell may be the object
+9. A word's breaks use ipuz's own means, all agreeing:
+   - `enumeration`, when present, is counts of letters, each one or more, joined
+     by single separators of rule 4 of `content/grids.md` (`-`, `.`, ` `, `'`):
+     `5`, `3-2-5`, `1.1`, `1 1`, `7'3`, `1.1-3`. Their total is the answer's
+     letters and each separator is a break. Any other text is refused: `5-`,
+     `.5`, `1.1.`, `2  3`, `2,3`, `0`.
+   - `answer` is written with its separators (`ARC-EN-CIEL`, `A.I`) or as
+     letters (`ARCENCIEL`, `AI`). Under an enumeration, an answer holding a
+     separator must hold exactly the enumeration's, at the same places and of
+     the same kinds (`VI-DE` under `"4"`, `A I` or `A-I` under `"1.1"` are
+     refused); an answer of letters only takes them: the model's answer (rule 4
+     of `content/grids.md`) is then its letters written with the enumeration's
+     separators (`AI` under `"1.1"` is `A.I`); otherwise it is the answer as
+     written. Without enumeration, the answer's own separators give the breaks.
+   - `dashed`, the drawing of a break: a letter cell may be the object
      `{"cell": <empty>, "style": {"dashed": "<letters>"}}`, the letters among
      `T`, `R`, `B`, `L`, each naming the edge of that cell with its top, right,
      bottom or left neighbour (a line may be set from either of its cells). Each
      edge must lie between two letter cells. When any cell carries `dashed`, the
-     edges named must be exactly the grid's hyphen edges (`Grid.hyphen_edges`);
-     with none, nothing is checked.
+     edges named must be exactly the edges of the grid's breaks
+     (`Grid.hyphen_edges`), whatever their separators; with none, nothing is
+     checked.
 10. `difficulty` is the force: a whole number 1 to 4, or the same digit as a text
     (`3` or `"3"`). `date` is the publication date (`published_on`), exactly
     `MM/DD/YYYY` and a real date. `author` is 1 to 200 characters once stripped,
@@ -120,10 +124,10 @@ decides about a grid stays in the index. Both are read once at server start.
     checks added: in its step 1, the form and total of each `enumeration` (the
     model's answer is built from it); after its step 2, every clue's `cells` is
     its resolved word; after its step 8, `solution` agrees with the answers, then
-    `answer` and `enumeration` agree on their hyphens, then the `dashed` edges
-    are the hyphen edges. The first problem stops the import, naming the clue
-    (clue cell and text), the position, or the edge as two `(row, column)`
-    cells, the first one first.
+    `answer` and `enumeration` agree on their separators, then the `dashed`
+    edges are the edges of the breaks. The first problem stops the import,
+    naming the clue (clue cell and text), the position, or the edge as two
+    `(row, column)` cells, the first one first.
 
 ### Publication
 
@@ -136,10 +140,12 @@ decides about a grid stays in the index. Both are read once at server start.
 
 14. A writer turns a loaded grid file back into ipuz text: the fields of rule 5,
     `puzzle` with `#` and `0`, `solution`, each clue with `clue`, `location`,
-    `cells`, `answer` as written and `enumeration`, `difficulty` as a number, the
-    fields of rule 11 that are present, and for each hyphen edge `dashed` `R` on
-    the letter before an across hyphen, `B` on the letter above a down hyphen.
-    Reading what it wrote gives the same grid and fields.
+    `cells`, `answer` as written and `enumeration` derived from it (its counts
+    of letters joined by its separators, `’` written `'`: `A.I` gives `1.1`,
+    `A I` `1 1`), `difficulty` as a number, the fields of rule 11 that are
+    present, and for each break `dashed` `R` on the letter before an across
+    break, `B` on the letter above a down break. Reading what it wrote gives
+    the same grid and fields.
 15. `uv run python -m nock.ipuz_convert SOURCE TARGET` converts a directory of
     the former grid files: each file of SOURCE named `<name>.json` (lower-case,
     not starting with `.`), in code-point order of the names, an object of
@@ -183,7 +189,8 @@ decides about a grid stays in the index. Both are read once at server start.
   once written and read again, an equal grid, author, date, force, title and
   publisher. With `VI-DE` across from (2, 1), the written text carries
   `"answer": "VI-DE"`, `"enumeration": "2-2"` and `dashed` `R` on `[2, 2]`, and
-  reads back equal.
+  reads back equal; written `VI.DE` it carries `"enumeration": "2.2"`, written
+  `VI DE` `"2 2"`, and each reads back as written.
 - **AC-8** A file whose `version` is `http://ipuz.org/v1`, whose `kind` is
   `["http://ipuz.org/crossword#1"]` or holds two kinds, or whose
   `clueplacement` is `"after"`, is refused naming that key.
@@ -212,9 +219,10 @@ decides about a grid stays in the index. Both are read once at server start.
   `SE`, the error is still this one.
 - **AC-15** A `solution` that disagrees with the answers is refused after every
   check of rule 6: FX-01's solution with `X` at (1, 4) names `(1, 4)`; a letter
-  at (0, 0) names `(0, 0)`. An `enumeration` is counts joined by `-` totalling
-  the letters: `"5"` on `TAMIS` loads; `"4"`, `"2 3"`, `"2'3"` and `"5-"` are
-  refused naming `(0, 0)` and `Passoire fine`.
+  at (0, 0) names `(0, 0)`. An `enumeration` follows rule 9: `"5"` on `TAMIS`
+  loads; `"2 3"` loads with the answer `TA MIS` and a break after 2, `"2'3"`
+  with `TA'MIS`; `"4"`, `"5-"`, `"5."`, `"2  3"` and `"2,3"` are refused
+  naming `(0, 0)` and `Passoire fine`.
 - **AC-16** `difficulty` `3` and `"3"` load as force 3; `"Force 3"`, `5`, `"03"`
   and `3.0` are refused. `date` `10/01/2026` loads as `published_on`
   `2026-10-01`, kept `YYYY-MM-DD` in the summary; `2026-10-01`, `1/1/2026` and
@@ -227,8 +235,9 @@ decides about a grid stays in the index. Both are read once at server start.
 - **AC-18** A key the reader does not support is refused naming it, a namespace
   key is ignored: FX-01 with `"saved": []`, `"styles": {}` or `"rating": 3` at
   the top level, `clues` holding `"Across": []`, or W5 holding `"number": 5` is
-  refused; with `"notes": "x"` or `"com.example:rating": 3` at the top level,
-  or `"com.example:x": 1` on W5, it loads equal to AC-6.
+  refused; with `"notes": "x"`, `"showenumerations": true` or
+  `"com.example:rating": 3` at the top level, or `"com.example:x": 1` on W5,
+  it loads equal to AC-6.
 - **AC-19** A clue text is plain: `Fatales &amp; César` loads as
   `Fatales & César`; `<b>Flaire</b>` is refused naming `(0, 4)`.
 - **AC-20** The converter of rule 15, run on a directory holding `g1.json`
@@ -237,14 +246,15 @@ decides about a grid stays in the index. Both are read once at server start.
   with number 1, force 2, `published_on` `2026-10-01`, the same credits and a
   grid equal to FX-01; run again on the same target it writes nothing, names
   `catalogue.json` and exits with a non-zero code.
-- **AC-21** A compound word follows rule 9, on FX-01 with `VI-DE` across from
+- **AC-21** A word's breaks follow rule 9, on FX-01 with `VI-DE` across from
   (2, 1) (clue `Sans contenu` at (2, 0)): `"answer": "VIDE"` with
   `"enumeration": "2-2"` loads with the answer `VI-DE`, a break after 2, as
-  does `"answer": "VI-DE"` with no enumeration; `dashed` `R` at `[2, 2]` (or
-  `L` at `[3, 2]`) agrees; `dashed` `R` at `[3, 2]` is refused naming `(2, 3)`,
-  `(2, 4)`; `"answer": "VID-E"` with `"2-2"`, or `"answer": "VI-DE"` with
-  `"enumeration": "4"`, is refused naming `(2, 0)` and `Sans contenu`; with
-  `NA-VAL` down from (0, 1) as well and only `R` at
+  does `"answer": "VI-DE"` with no enumeration; `"VIDE"` with `"2.2"` loads
+  with the answer `VI.DE` and the same break; `dashed` `R` at `[2, 2]` (or `L`
+  at `[3, 2]`) agrees, with `VI-DE` as with `VI.DE`; `dashed` `R` at `[3, 2]`
+  is refused naming `(2, 3)`, `(2, 4)`; `"answer": "VID-E"` with `"2-2"`,
+  `"VI-DE"` with `"4"`, or `"VI DE"` with `"2.2"`, is refused naming `(2, 0)`
+  and `Sans contenu`; with `NA-VAL` down from (0, 1) as well and only `R` at
   `[2, 2]`, the file is refused naming `(1, 1)`, `(2, 1)`.
 
 ## Edge cases
@@ -264,8 +274,8 @@ decides about a grid stays in the index. Both are read once at server start.
 - A `dashed` letter naming an edge outside the grid or beside a block is
   refused naming that edge; `""` or a letter other than T, R, B, L is refused as
   a value (AC-9, AC-21).
-- An enumeration without hyphen leaves the answer as written (`ÊTRE` with `"4"`
-  stays `ÊTRE`) (AC-21).
+- An enumeration without separator leaves the answer as written (`ÊTRE` with
+  `"4"` stays `ÊTRE`) (AC-21).
 
 ## Out of scope
 
@@ -275,8 +285,8 @@ decides about a grid stays in the index. Both are read once at server start.
 - Showing credits or any field of rule 11 to players.
 - Reading another ipuz kind, a clue number, a cell style other than `dashed`,
   or a saved state.
-- Enumeration separators other than `-` (a space, `'`, `.`): `content/grids.md`
-  gives breaks to hyphens only, so they are refused for now.
+- ipuz's other enumeration marks (`,`, `;`, a trailing `.`, `0` for an unknown
+  length): refused by rule 9. Showing an enumeration to players.
 - Reloading grids, converting files or withdrawing a grid without a restart;
   closing rooms already open on a withdrawn grid.
 - Deleting stored rooms or history of a withdrawn grid: `admin/operations.md`.

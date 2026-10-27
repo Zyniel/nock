@@ -602,10 +602,12 @@ def sec_room() -> str:
         ["cells · Hyphen edges", "foundation · Colour tokens"],
         [
             (
-                "A hyphen takes no cell: the edge between the two letters it "
+                "A word's break (a hyphen, an abbreviation's dot, a space, an "
+                "apostrophe) takes no cell: the edge between the two letters it "
                 "joins is dashed in hyphen grey in place of the grid line, the "
-                "same in every state, and my selection border turns dashed on "
-                "that side. Phone: FX-01 with VI-DE (the right edge of my "
+                "same for every separator and in every state, and my selection "
+                "border turns dashed on that side. Phone: FX-01 with VI-DE (the "
+                "right edge of my "
                 "selected cell) and NA-VAL (the bottom edge of the revealed A, "
                 "whose notch sits over the dashes). Sideways, 568 by 320: 1 px "
                 "dashes on 20 px cells."

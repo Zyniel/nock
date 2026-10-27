@@ -18,9 +18,11 @@ The one edge that is not a plain line is the hyphen of a compound word
 
 ## Hyphen edges
 
-A compound word's hyphen takes no cell (`content/grids.md`, rule 4): the edge
-between the two letters it joins is dashed instead of the plain grid line. Across,
-it is the right edge of the letter before the hyphen (the cell's `hyphen_right`
+A word's break takes no cell (`content/grids.md`, rule 4): the edge between the
+two letters it joins is dashed instead of the plain grid line. Every break is
+drawn so, whatever its separator: a compound word's hyphen, an abbreviation's
+dot, a space or an apostrophe (`A.I`, `A I` and `A-I` look the same). Across,
+it is the right edge of the letter before the break (the cell's `hyphen_right`
 mark, `platform/realtime.md`); down, its bottom edge (`hyphen_down`). The rule-grey
 line of that edge is not drawn; in its place, dashes in `--nock-hyphen`, the same
 in every state of the two cells: no one selecting the word, my word, another

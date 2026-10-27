@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: board
-status: done
+status: approved
 ---
 
 # gameplay/board - The grid, selection, typing and the in-app keyboard
@@ -310,8 +310,8 @@ AZERTY keyboard replaces the system one, and the player may hide it.
 
 - Zoom buttons, Ctrl+wheel; Home, End, Page, Delete keys; shortcuts for ⇄ or ✎;
   QWERTY, accent or digit keys; erasing a word with ⌫, key repeat.
-- The hyphen in the clue bar, the announcement or a length pattern; marks for
-  spaces and apostrophes; the dashed edge in the operator's replay
+- The separator in the clue bar, the announcement or a length pattern; a look
+  of its own per separator; the dashed edge in the operator's replay
   (`admin/operations.md`) and the catalogue's generic grid drawing.
 - The selection after a reload: `lobby/rooms.md`. Others' selections:
   `social/presence.md`. Edits, pencil letters: `gameplay/co-op.md`. Top bar,
