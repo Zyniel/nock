@@ -99,8 +99,9 @@ out.
     other is an anonymous room and stays one, whoever signs in later. The creator
     is stored with the room, in `room_times` (`src/nock/store.py`) beside
     `last_edit_at`, as a nullable column that makes the schema's `user_version`
-    1; a stored room without one is anonymous. Nothing tells the creator apart:
-    no mark in the roster, the snapshot or the page.
+    1, added once at open to an older store; a stored room without one is
+    anonymous. Nothing tells the creator apart: no mark in the roster, the
+    snapshot or the page.
 12. The creator's player is the member of a creator room whose account is the
     creator; a time-out and a seat back keep them so. A stand-in host is a host
     of a creator room other than the creator's player.
@@ -184,17 +185,20 @@ not-found pages ».
   the sheet. (← 014 AC-7, 014 AC-10)
 - **AC-9** Accounts on, Lea's signed-in `POST /api/rooms` makes a room whose
   stored `room_times` row names her account as creator, and `PRAGMA
-  user_version` reads 1; a request with no cookie, an unknown or expired
+  user_version` reads 1; a database written before the column (`user_version`
+  0) opens with it added and `user_version` 1, its stored rooms anonymous rooms,
+  their other data kept; a request with no cookie, an unknown or expired
   session, or made while accounts are off with her cookie, makes a room with no
   creator; a host of such a room who signs in later, and sends `PUT
   /api/account/rooms` for it, gives it none.
 - **AC-10** Lea joined R signed out; her next join, signed in with her token,
   resumes her and links her member, so a device signed in as Lea and holding no
-  token then gets her seat. Bob's member, resumed with his token by a device
-  signed in as Zoé who has no member in R, stays Bob's: Zoé's next join without
-  a token is a new player. Lea's `PUT /api/account/rooms` for a room where her
-  member is unlinked links it not: a device signed in as Lea without a token
-  shows the nickname form and joins as a new player.
+  token then gets her seat. Bob's member, linked to Bob's account, resumed
+  with his token by a device signed in as Zoé who has no member in R, stays
+  Bob's: Zoé's next join without a token is a new player. Lea's `PUT
+  /api/account/rooms` for a room where her member is unlinked links it not: a
+  device signed in as Lea without a token shows the nickname form and joins as
+  a new player.
 - **AC-11** Lea creates R and Bob enters first by its link, host; Lea's join
   gives Bob `player_joined` (Lea) then `host_changed` (Lea), her snapshot shows
   her host, Bob's Menu loses « Réglages de l'hôte » and hers has it; her own
