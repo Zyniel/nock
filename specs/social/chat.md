@@ -17,7 +17,7 @@ help is wanted. The host can mute a player's chat and reactions.
 - `platform/realtime.md`: the messages `flag`, `chat`, `react`, `mute_player`,
   their events, seq order, delivery and error codes.
 - `lobby/rooms.md`: the host rules, `player_muted` (rule 17), the Joueurs rows.
-- `client/hud.md`: « Salon », its tabs, badge and dot, the 3-second notes.
+- `client/room.md`: « Salon », its tabs, badge and dot, the 3-second notes.
 
 ## Rules
 
@@ -82,8 +82,8 @@ help is wanted. The host can mute a player's chat and reactions.
     mine. The last seen seq is the first snapshot's, then, while the stream
     shows, the newest message's; a reconnection keeps it. While the stream is
     hidden, « Salon » carries the count (1 to 99, then `chat.unread_many`,
-    « 99+ »), hidden from assistive technology, named as `client/hud.md` rule
-    7 says; it keeps its height with or without the count.
+    « 99+ »), hidden from assistive technology, named as `client/room.md` rule
+    1 says; it keeps its height with or without the count.
 
 ### Reactions
 
@@ -290,7 +290,7 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 - A live « word completed » line: an approved later change, item B-004 of
   `Backlog.md`; today only a catch-up shows one (`social/catch-up.md`).
 - « Salon », its tabs and dot, the 3-second notes (messages, flags, my own
-  reaction): `client/hud.md`. Who may mute: `lobby/rooms.md`. Edit limits:
+  reaction): `client/room.md`. Who may mute: `lobby/rooms.md`. Edit limits:
   `platform/realtime.md`.
 
 ## Code
