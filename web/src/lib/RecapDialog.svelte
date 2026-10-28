@@ -118,7 +118,7 @@
 
 <dialog
   bind:this={dialog}
-  class="room-sheet recap"
+  class="room-sheet over-all recap"
   class:bottom={layout === 'sheet'}
   data-testid="recap"
   data-state={dialogState}
@@ -239,12 +239,8 @@
 <style>
   /* The frame is the room sheet's (app.css): 440 px and centred in the column
      layout, a bottom sheet with no handle in the sheet layout, its parts in a
-     column 14 px apart. Its scrim is the darker dialog scrim, over the whole
-     window, the top bar included. */
-  dialog.recap::backdrop {
-    top: 0;
-    background: var(--nock-scrim-dialog);
-  }
+     column 14 px apart. Its scrim, with the class `over-all`, is the darker
+     dialog scrim, over the whole window, the top bar included. */
 
   /* The checks, the reveals and the revealed letters, 4 px apart. */
   .recap-lines {

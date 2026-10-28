@@ -20,13 +20,29 @@
   let homeLink: HTMLAnchorElement | null = $state(null)
 
   onMount(() => {
+    showOverRoom()
+  })
+
+  // Opens the dialog as a modal over the room, the focus on the link.
+  function showOverRoom(): void {
     dialog?.showModal()
     homeLink?.focus()
-  })
+  }
 
   // Escape does not close the dialog: the browser's close request is refused.
   function refuseCancel(event: Event): void {
     event.preventDefault()
+  }
+
+  // A close request the browser does not let the page refuse (a second Android
+  // back gesture with no press in between) still closes the dialog: it opens
+  // again at once, so the room never shows without it. A dialog no longer in
+  // the page (the player left) stays closed.
+  function reopenAfterClose(): void {
+    if (dialog === null || !dialog.isConnected) {
+      return
+    }
+    showOverRoom()
   }
 
   // Escape changes nothing, and Tab and Shift+Tab stay on the link, the one
@@ -55,13 +71,14 @@
 
 <dialog
   bind:this={dialog}
-  class="room-sheet room-gone"
+  class="room-sheet over-all room-gone"
   class:bottom={layout === 'sheet'}
   data-testid="room-gone"
   role="alertdialog"
   aria-labelledby="room-gone-title"
   aria-describedby="room-gone-detail"
   oncancel={refuseCancel}
+  onclose={reopenAfterClose}
   onkeydown={keepFocusOnLink}
   onmousedown={keepFocusOnPress}
 >
@@ -78,13 +95,6 @@
 </dialog>
 
 <style>
-  /* The recap's scrim: the darker dialog scrim, over the whole window, the top
-     bar included. */
-  dialog.room-gone::backdrop {
-    top: 0;
-    background: var(--nock-scrim-dialog);
-  }
-
   /* « Voir les grilles », right-aligned. */
   .room-gone-home {
     align-self: flex-end;
