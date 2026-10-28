@@ -121,6 +121,7 @@ def open_fx01_room(page: Page, base_url: str, grid: Grid) -> RoomMock:
 
 
 def grid_area_top(page: Page) -> float:
+    """Return the top edge of the grid area, in page pixels."""
     return box_of(page.get_by_test_id("grid-area")).top
 
 
@@ -200,10 +201,12 @@ def delete_while_reconnecting_with_t_pending(
 
 
 def room_gone_dialog(page: Page) -> Locator:
+    """Return the locator of the alert dialog of the page."""
     return page.get_by_role("alertdialog")
 
 
 def home_link(page: Page) -> Locator:
+    """Return the locator of the link inside the alert dialog."""
     return room_gone_dialog(page).get_by_role("link")
 
 
@@ -215,6 +218,14 @@ def expect_room_gone_dialog(page: Page) -> None:
 
 
 def is_modal(dialog: Locator) -> bool:
+    """Tell whether the dialog is modal, as the browser computes it.
+
+    Args:
+        dialog: The locator of the dialog element.
+
+    Returns:
+        True when the dialog is modal.
+    """
     found = dialog.evaluate(MODAL_SCRIPT)
     assert isinstance(found, bool), found
     return found
@@ -290,6 +301,15 @@ def under_scrim(colour: Rgb) -> Rgb:
 
 
 def close_colours(first: Rgb, second: Rgb) -> bool:
+    """Tell whether two colours differ by at most `PIXEL_TOLERANCE` per channel.
+
+    Args:
+        first: One colour.
+        second: The other colour.
+
+    Returns:
+        True when every channel is within the tolerance.
+    """
     for one, other in zip(first, second, strict=True):
         if abs(one - other) > PIXEL_TOLERANCE:
             return False

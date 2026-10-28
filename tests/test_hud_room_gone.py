@@ -90,6 +90,7 @@ KEPT_ACTIONS = ["Escape", "scrim", "Tab", "Shift+Tab"]
 
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
+    """Return the fixture grid FX-01, parsed."""
     return Grid.model_validate_json(fx01_text)
 
 
