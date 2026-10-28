@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: done
+status: approved
 ---
 
 # account/account - Optional account
@@ -90,6 +90,10 @@ and turns the player into « Ancien joueur » in every room.
 11. `PUT /api/account/rooms` with a room key links that member (id and
     nickname from the room; again, it becomes newest): 204; no member's: 404;
     an account deleted since its session was checked: 401, nothing written.
+    It records an identity for the account and links no member to it: a member
+    is linked by a signed-in join, and an account is at most one player of a
+    room, whose seat its signed-in joins reach (`lobby/joining.md` rule 4,
+    `lobby/host.md` rule 10).
 12. `GET /api/account/rooms` lists the latest identity per room, newest first,
     leaving out any whose token is no member's of the room under that code.
     The account keeps an identity until it is deleted.
@@ -143,7 +147,9 @@ and turns the player into « Ancien joueur » in every room.
     `--` in the live state, the stored snapshots and the logged
     `player_joined`, with no event; ids, colours, seqs and letters stay. It
     answers 204, clearing the cookie, and no copy of the address or of those
-    nicknames is left in the database files. The player stays as a guest.
+    nicknames is left in the database files. The rooms it created lose their
+    creator and its members their account, live and stored, with no event
+    (`lobby/host.md` rule 14). The player stays, an anonymous player.
 19. No join can take `--`, and a past `--` is seated back as `--` with no
     suffix (`lobby/joining.md` rules 1 and 13); pages show it as « Ancien
     joueur » (`player.former`).
@@ -152,9 +158,9 @@ and turns the player into « Ancien joueur » in every room.
     the links older than 30 minutes and the sessions older than 90 days and
     empties the WAL; a failed purge is logged and the next sweep runs.
 21. No log record, traceback included, holds an address, a link token, a
-    session, a resume token or the SMTP password. A guest is stored as a
-    nickname and random identifiers, nothing of their browser; playing sets
-    no cookie.
+    session, a resume token or the SMTP password. An anonymous player is
+    stored as a nickname and random identifiers, nothing of their browser;
+    playing sets no cookie.
 
 ### History records
 
@@ -252,8 +258,8 @@ and turns the player into « Ancien joueur » in every room.
 - **AC-13** With accounts on, a browser with no cookie or storage solves
   FX-01 with a word check: no 401 or 403, no cookie, the sheet never opens,
   every frame parses as a client message; solving from the catalogue, nothing
-  sets a cookie and every request stays on the origin. A guest who plays
-  leaves only `ANA` and her id in the files, nothing of her browser's agent,
+  sets a cookie and every request stays on the origin. An anonymous player who
+  plays leaves only `ANA` and her id in the files, nothing of her browser's agent,
   headers, language or address. (← 033 AC-3, 038 AC-1, 038 AC-2)
 - **AC-14** Zoé, in R with Bob, writes `T`, signs in, linked S where she
   timed out, and deletes her account: 204; her cookie reads signed out, her

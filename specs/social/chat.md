@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: done
+status: approved
 ---
 
 # social/chat - Chat, reactions, the clue flag and mute
@@ -16,7 +16,7 @@ help is wanted. The host can mute a player's chat and reactions.
 
 - `platform/realtime.md`: the messages `flag`, `chat`, `react`, `mute_player`,
   their events, seq order, delivery and error codes.
-- `lobby/rooms.md`: the host rules, `player_muted` (rule 17), the Joueurs rows.
+- `lobby/host.md`: the host rules, `player_muted` (rule 5), the host's buttons.
 - `client/room.md`: « Salon », its tabs, badge and dot, the 3-second notes.
 
 ## Rules
@@ -111,7 +111,7 @@ help is wanted. The host can mute a player's chat and reactions.
 
 ### Mute
 
-15. A mute (`lobby/rooms.md` rule 17) stops chat and reactions only. While I am
+15. A mute (`lobby/host.md` rule 5) stops chat and reactions only. While I am
     muted, the message box and « Envoyer » are disabled, the note `chat.muted`
     (« L'hôte a coupé votre discussion. ») shows and « Réagir » is disabled; the
     typed text stays, and a focus on the box or « Envoyer » moves to « Salon ».
@@ -290,7 +290,7 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 - A live « word completed » line: an approved later change, item B-004 of
   `Backlog.md`; today only a catch-up shows one (`social/catch-up.md`).
 - « Salon », its tabs and dot, the 3-second notes (messages, flags, my own
-  reaction): `client/room.md`. Who may mute: `lobby/rooms.md`. Edit limits:
+  reaction): `client/room.md`. Who may mute: `lobby/host.md`. Edit limits:
   `platform/realtime.md`.
 
 ## Code

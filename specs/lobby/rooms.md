@@ -1,16 +1,16 @@
 ---
 area: lobby
 file: rooms
-status: done
+status: approved
 ---
 
-# lobby/rooms - Solo start, room creation, invitation and host controls
+# lobby/rooms - Solo start, room creation and invitation
 
 ## Purpose
 
 A player starts a grid alone in one tap and invites friends with the room's link.
-The room's first player is its host, who can remove players, lock the room and set
-its help; the role passes on when the host stays away.
+Each room runs as one task that applies its inputs in order; wrong codes are
+throttled per address.
 
 ## Depends on
 
@@ -49,9 +49,11 @@ its help; the role passes on when the host stays away.
    201 with only `code` and `share_url` (`<base URL>/r/<code>`) when N is
    published, 404 `{"detail": "Not Found"}` when it is unknown or unpublished, and
    422 for any other body. `GET` is 404 JSON, `PUT`, `PATCH` and `DELETE` are 405,
-   `POST /api/rooms/` is 404 with no redirect. Only a 201 creates a room.
+   `POST /api/rooms/` is 404 with no redirect. Only a 201 creates a room. A valid
+   session on the request makes its account the room's creator (`lobby/host.md`
+   rule 11).
 7. A new room has seq 0, no player, empty cells, help mode `free`, a budget of 5
-   letters and 1 word, no lock, and its catalogue number.
+   letters and 1 word, no lock, its catalogue number and its creator, if any.
 8. A code is 6 characters drawn with `secrets` from the 32 of
    `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, drawn again while a room has it.
 
@@ -88,66 +90,11 @@ its help; the role passes on when the host stays away.
     takes over the older one, `lobby/joining.md` rule 6). Once the registry is
     closed, its thread stops and no input runs a rule.
 
-### Host rules
-
-13. Host actions are remove, lock, change settings and mute. Another player gets
-    `not_host`. Removing or muting oneself, or anyone not a player of the room,
-    gets `invalid_target`. An action that would change nothing gives no event and
-    no reply.
-14. Removing t: `player_left` with reason `removed`; t's seat, colour and nickname
-    are freed, their letters keep their author, their token is banned (its join is
-    `removed`, `lobby/joining.md` rule 4); a connected t gets `error` `removed`,
-    then a close 1000. No confirmation. Another token, or none, is a new player.
-15. Locking or unlocking announces `settings_changed` with the settings and the
-    remaining budget. While locked, every join that is neither a resume nor a
-    removed token's (`removed` comes first), a seat back included, is
-    `room_locked`.
-16. Changing settings sets the help mode and the reveal allowance (any count from
-    0), never the lock; locking never changes them. The remaining budget is, for
-    letters and words apart, `max(0, new allowance - reveals of that kind used)`.
-    One `settings_changed` carries both. Their effect: `gameplay/hints.md`.
-17. Muting sets the player's `muted` with one `player_muted`, kept across a
-    restart. Its effect: `social/chat.md`.
-18. When the host has been disconnected more than 60 seconds, a tick gives the
-    role to the player not disconnected (idle counts) with the smallest join
-    seq, in one `host_changed`; with none, the host stays and the next tick
-    tries again. A host who times out hands the role at once, after the
-    `player_left`, to the remaining player with the smallest join seq,
-    connected first; with nobody left the next joiner is host. A resume keeps
-    one's join seq. A host back after a hand-over is an ordinary player.
-19. The room refuses with `not_joined`, changing nothing, any message from an id
-    that is not one of its players (removed, timed out, unknown). On a socket,
-    before its join, every message but `join` and `ping` gets `not_joined`
-    (`platform/realtime.md` rule 4). Frames from a socket the room closed (a
-    removal, a silence) reach nothing, from that step on; a new socket of that
-    player is heard again.
-
-### Host controls on the page
-
-20. The host's row shows `roster.host`. Only the host sees « Retirer » in each
-    other player's Joueurs row, named `host.remove_label`, which sends
-    `remove_player` at once; and « Réglages de l'hôte » in the Menu, opening the
-    host sheet (`settings.heading`): the switch `host.lock`; the help mode
-    (`settings.help_mode_label`) as three choices (`settings.help_mode.*`); the
-    counts `settings.reveal_letters_label` and `settings.reveal_words_label`
-    (whole, 0 to 99); « Enregistrer », which sends `change_settings`, never with a
-    count out of those bounds. The sheet shows the room's help mode and allowance,
-    not the remaining budget, and follows `settings_changed`; the switch sends the
-    opposite of the room's lock and shows the room's, not the click's. A
-    `host_changed` gives or takes these controls at once.
-21. `removed` or `room_locked`, on a join, during the game or a reconnection, ends
-    the page on `removed` or `locked` with `room.status.removed` or
-    `room.status.locked`, with no form, no reconnection band and no reconnection;
-    `throttled` is final too. Before any snapshot it shows on the entry card of
-    `lobby/joining.md` rule 11, after it on the status band. After `removed` the
-    identity stays, so a reload is refused again.
-
 ### Look
 
-« Jouer » and its error: `_design/pages.md`, « Catalogue ». Joueurs rows, host
-buttons and link: `_design/room.md`, « Salon »; the Menu entry, « Menu »; the
-host sheet, « Room sheets: host settings and account »; a final status once the
-room has shown, the status band of « Connection lost »; before, the entry card of
+« Jouer » and its error: `_design/pages.md`, « Catalogue ». Joueurs rows and
+link: `_design/room.md`, « Salon »; a final status once the room has shown, the
+status band of « Connection lost »; before, the entry card of
 `lobby/joining.md` rule 11, `_design/pages.md`, « Entry and not-found pages ».
 
 ## Acceptance criteria
@@ -204,45 +151,6 @@ room has shown, the status band of « Connection lost »; before, the entry card
   inputs go on; two
   sockets of one player both get each event, and closing either keeps the other;
   after `close()` the engine thread stops and no input runs a rule. (← 011 AC-4)
-- **AC-13** Host Ana removes Bob: Ana and Cy get `player_left` (Bob, `removed`),
-  Bob gets `error` `removed` then a close 1000, and his page shows « Vous avez
-  été retiré de ce salon. », after a reload too, with no form; Bob's removal of
-  Cy gets `not_host`, Ana's of herself or `zz` `invalid_target`. (← 014 AC-1)
-- **AC-14** Ana locks: she and Bob get `settings_changed` locked; a new socket
-  gets `room_locked` and its page « Ce salon est verrouillé. », the room keeps
-  2 players and Bob's token resumes; locking again gives nothing, Bob's unlock
-  `not_host`; once Ana unlocks, a newcomer joins. (← 014 AC-2)
-- **AC-15** Host p1 disconnected at t, p2 active, p3 idle: a tick at t + 60
-  changes nothing, at t + 60.5 p2 is host; with p2 away too p3, with both away
-  p1 stays; p1 back is no host and gets `not_host`; the new host's page gains
-  « Retirer » and « Réglages de l'hôte », the old host's loses them.
-  (← 014 AC-3)
-- **AC-16** Ana sets vote, 3 letters, 0 words: both get `settings_changed`
-  with these and remaining 3 and 0, and both feeds read « Ana a modifié les
-  réglages : aide par vote, 3 lettres et 0 mots à révéler »; the same again
-  gives nothing; with 3 letters and 1 word used, 1 and 1 leave 0 and 0, then
-  10 and 5 leave 7 and 4. (← 014 AC-4)
-- **AC-17** Just after Ana removes Bob, 40 `edit_letter` from Bob's socket are
-  neither applied nor sent and no cell has Bob as author; a message from a
-  timed-out or unknown id, or an `edit_letter` before any join, gets `not_joined`.
-  (← 014 AC-5)
-- **AC-18** Ana mutes Bob: one `player_muted` reaches everyone and his snapshot
-  shows him muted, after a restart too; muting again gives nothing; Bob's mute
-  gets `not_host`, Ana's of herself, `zz` or a removed player `invalid_target`.
-  (← 014 AC-6)
-- **AC-19** With the host among 8 players, in the windows of `product.md` rule
-  11 and from 300 px wide with root fonts of 12 to 24 px, each « Retirer » and
-  « Couper » is at least 24 px square and hit on every pixel once scrolled
-  into the Joueurs tab, which never scrolls sideways, while the grid keeps its
-  room; each
-  « Retirer » reads so, shows whole with its focus ring from the keyboard, and
-  keeps the baselines of `product.md`. (← 014 AC-7, 014 AC-8, 014 AC-9)
-- **AC-20** In the same windows and fonts, the host sheet lies inside the window
-  with no sideways scroll, and the switch, the three choices, both counts and
-  « Enregistrer » are each at least 24 px high, inside it and hit at their centre,
-  the counts as wide as « Room sheets » says; opened from the Menu by keyboard,
-  Tab reaches them in that order, each with the focus ring of `product.md` inside
-  the sheet. (← 014 AC-7, 014 AC-10)
 
 ## Edge cases
 
@@ -256,30 +164,23 @@ room has shown, the status band of « Connection lost »; before, the entry card
   reload keeps its record (AC-4).
 - Failures at T refuse at T + 59.9, not at T + 60.0; codes with 0, O, 1, I, small
   letters or another length count; another address or app is not held (AC-11).
-- A disconnected player can be removed, with no socket to close; removed again,
-  `invalid_target` (AC-13).
-- A player away within the resume window resumes in a locked room; one timed out
-  is refused, and seats back once it is unlocked (AC-14).
 
 ## Out of scope
 
-- Handing the host role on by hand, co-hosts, banning by address or browser,
-  un-banning; throttling creation or any other HTTP route than the ops API and
-  the recap route, `X-Forwarded-For` (behind a proxy all players share one
-  address); Web Share, QR codes, offline play.
+- The host role, its controls and the creator: `lobby/host.md`. Throttling
+  creation or any other HTTP route than the ops API and the recap route,
+  `X-Forwarded-For` (behind a proxy all players share one address); Web Share,
+  QR codes, offline play.
 - Reconnection and fair play: `platform/realtime.md`. Durable state:
   `platform/server.md`. Feed lines of joins and departures:
-  `social/presence.md`; of host, lock and settings changes: `social/chat.md`.
-  « Couper » and muting's effect: `social/chat.md`. The Menu, sheets and top
-  bar: `client/hud.md`.
+  `social/presence.md`. The Menu, sheets and top bar: `client/hud.md`.
 
 ## Code
 
-- `src/nock/room.py`: `new_room`, host actions, the hand-over in `tick`;
-  `RoomConfig` holds its delay. `src/nock/hub.py`: `RoomRegistry`, codes, room
-  tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle.
+- `src/nock/room.py`: `new_room`. `src/nock/hub.py`: `RoomRegistry`, codes,
+  room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle.
 - `web/src/lib/playGrid.ts`, `CatalogueItem.svelte`: « Jouer »; `roomRecord.ts`:
-  the record; `PlayersPanel.svelte`, `HostSettings.svelte`: host controls and
-  link; `RoomPage.svelte`, `roomSession.ts`: final statuses.
-- Tests: `tests/test_spec_010_*`, `test_spec_011_*`, `test_spec_014_*`, and
-  AC-7 of `tests/test_spec_040_*`.
+  the record; `PlayersPanel.svelte`: the link; `RoomPage.svelte`,
+  `roomSession.ts`: the throttled status.
+- Tests: `tests/test_spec_010_*`, `test_spec_011_*`, and AC-7 of
+  `tests/test_spec_040_*`.

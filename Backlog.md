@@ -661,22 +661,127 @@ an item that must be done first.
 
 ### B-022 Creator rooms and host return
 
-- Status: brief, not written yet (`/new-spec` writes it here)
+- Status: ready (the human approved the brief as written, with the lead's
+  calls, then the spec change as written, `invalid_target` included,
+  2026-10-28)
+- Domains: lobby/host (new: the host role, moved from `lobby/rooms.md` rules
+  13 to 21), lobby/rooms, lobby/joining, account/account, platform/realtime;
+  `specs/_map.md` (a table row, the glossary); "guest" reworded in product,
+  client/hud, admin/operations, `_reference.md`; citations of the host rules
+  repointed in client/hud (rules 10 and 13), client/room, and wherever else
+  `lobby/rooms.md` is cited for them
+- Architecture decision: yes (a new domain file; stored data: the room's
+  creator and each member's account; the room socket reads the session
+  cookie). The options were weighed by the Plan agent on Fable for the first
+  brief of this request; the human settled them, so no new Plan run.
+- Criteria: host AC-1 to AC-8 (moved from rooms AC-13 to AC-20, pointers to
+  014 kept), host AC-9 to AC-16 (new); rooms AC-13 to AC-20 (deleted, moved);
+  joining AC-21 (new); account AC-13, hud AC-8, product AC-1 (wording only)
 - Branch: feat/b-022-creator-rooms · PR: none yet
-- Request: the human's `/new-spec` of 2026-10-28 « Creator rooms and host
-  return », word for word in the request record kept with the lead's notes
-  (`nock-requests-2026-10-28.md`): the creator of a room, the creator's player
-  as host whenever connected, one player per account in a room, and the terms
-  of the glossary that go with them.
-- Already answered by the human: a new file `lobby/host.md` (A), the terms in
-  this item (A), the earlier Shape decisions as written.
-- B-023 waits for this item. It runs alongside B-025; both touch the glossary
-  of `specs/_map.md`.
+- Problem: the human asked: "Creator rooms and host return." Today the first
+  joiner is host, a host away 60 s loses the role for good, an account may
+  hold several members of one room, and "guest" means three things (an
+  invited player, a player with no account, a player who is not host).
+- In scope, the human's request as written:
+  - Terms, in the glossary of `specs/_map.md` and used the same way in every
+    domain; "guest" dropped as a spec term: account player (a member linked
+    to an account); anonymous player (a member linked to no account);
+    invited player (someone who enters by the room link and the nickname
+    form); connection (one socket of a player; "session" stays the sign-in
+    cookie); creator (the account whose session sent `POST /api/rooms`, set
+    once at creation and never changed; none without a valid session or
+    with accounts off); creator room and anonymous room (a room with and
+    without a creator; a room created without a session stays anonymous
+    even if its host signs in later); creator's player (the member of a
+    creator room linked to its creator); stand-in host (a host of a creator
+    room other than the creator's player); hand-over delay
+    (`host_handover_seconds`, 60 s).
+  - An account is at most one player in a room. A signed-in join to a room
+    where the account already has a member gets that member back (seat,
+    colour, letters, host role), and the older connection is closed with
+    4001 as in today's takeover. The room socket learns the account from
+    the session cookie.
+  - The creator's player is host whenever connected: their join, resume or
+    seat back gives them the role at once in one `host_changed`; while they
+    are away longer than the hand-over delay, the role passes on as today.
+  - A stand-in host cannot remove or mute the creator's player; a lock does
+    not keep the creator's player out; a full room still does.
+  - If the creator's account is erased, the room becomes an anonymous room.
+  - Every duration or limit is written as its name with its default, never
+    a bare number.
+- Out of scope: any mark of the creator in the roster, the snapshot or the
+  page; room lives (B-023); handing the role on by hand; co-hosts.
+- Screens: none.
+- Already decided by the human (on the first brief of this request and its
+  spec change, 2026-10-28):
+  - Where it lives: **A, a new file `lobby/host.md`**, "the host role: who
+    holds it, how it passes, what it may do; the creator". It takes
+    `rooms.md` rules 13 to 21 and AC-13 to AC-20 (pointers to 014 kept,
+    renumbered from AC-1) and adds about eight criteria; `rooms.md` falls to
+    12 criteria. The one-player-per-account rule changes in place in
+    `joining.md` and `account.md`; `realtime.md` gets a sentence on the
+    cookie and no criterion. Rejected: B, a `lobby/members.md`; C, edits in
+    place in four files already at their budget.
+  - Terms: **A, written in this item**, not in a wording-only item first.
+  - Shape:
+    - The room stores its creator's account id, set by `POST /api/rooms`
+      from a valid `nock_session` (none with accounts off), in a nullable
+      column of the store table `room_times`, beside `last_edit_at`, so that
+      B-023's sweep reads a room's kind from one table. Stored rooms without
+      it are anonymous rooms. The column makes `PRAGMA user_version` 1;
+      B-023 takes 2.
+    - Each member stores its account id, set at a signed-in join. The
+      creator's player is the member whose account is the creator, not a
+      stored member id, so a time-out and seat back keeps them.
+      `PUT /api/account/rooms` stays for pages already open and links no
+      member.
+    - The join's member is chosen once, before the steps: signed in, the
+      account's member of the room, player or past player, whatever token
+      the join carries; else the member whose token it carries. A token
+      that is not the join's member's is not used: its member is not
+      touched and their connection stays open. Steps: removed token; the
+      member a player: resume (older connection 4001), or time out and go
+      on; locked (skipped for a join from the creator's session, member or
+      not); full (for everyone); the member a past player: seat back;
+      nickname; new player.
+    - The hand-over tick also gives the role back to a connected creator's
+      player who lacks it, so "whenever connected" holds after a plain
+      reconnection; the tick never gives the role to a disconnected player.
+    - Erasure clears the room's creator and the member's account, live and
+      stored, with no event; a stand-in keeps the role. Its criterion lives
+      in `host.md`.
+    - Rooms where one account already holds several members get no
+      backfill: the member whose token the device sends is stamped at the
+      next signed-in join. A member linked to account A, joined with its
+      token by a device signed in as B with no member there, is resumed and
+      stays A's.
+    - Accounts turned off after creation: the room keeps its creator in the
+      store and plays as an anonymous room while accounts are off.
+    - A signed-in page with no stored identity still shows the nickname
+      form; a removed account player may come back from another device as a
+      new player, as today.
+- New since the first brief (the lead's calls; say if any should change):
+  - B-025 split `client/hud.md`: the host rules are cited from hud rule 10
+    (« Réglages de l'hôte » in the Menu) and rule 13 (the settings sheet),
+    and the remove and mute buttons from `client/room.md` (the Salon's
+    Joueurs tab). Those citations move to `lobby/host.md`.
+  - `joining.md` gains one criterion (the account's member wins over a
+    token) and goes to 21 criteria and about 17.5 KB, a little over the
+    budget of about 15 KB and 20; `account.md` is already at about 19 KB.
+    The lead keeps them there, since the rules belong there, and adds a
+    small follow-up to trim or split both.
+  - B-021 (room gone dialog) runs at the same time and may touch
+    `joining.md` and `hud.md`; whichever merges second merges `origin/main`
+    and resolves. B-023 waits for this item.
+- Open questions: none.
 
 ## Small follow-ups
 
 Taken when a change touches them.
 
+- `lobby/joining.md` (about 18.2 KB, 21 criteria after B-022) and
+  `account/account.md` (about 19.5 KB, 18 criteria) are over the size
+  guideline: trim them or split each, an architecture decision.
 - `content/grid-files.md` is over the size guideline (about 18.7 KB, 21
   criteria after B-015): the converter (rule 15, AC-20) could leave for its own
   short section or file, or the sample lists of AC-9 and AC-18 shrink.

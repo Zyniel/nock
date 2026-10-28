@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
@@ -26,8 +26,9 @@ None. Every domain spec depends on this file.
 1. Browse the grids on « Grilles », filter by force, open a grid page:
    `content/library.md`.
 2. Start alone: a room from a grid, straight into play: `lobby/rooms.md`.
-3. Invite and join: the host shares the room link; a guest enters a nickname and
-   gets a seat and a colour: `lobby/rooms.md`, `lobby/joining.md`.
+3. Invite and join: the host shares the room link; an invited player enters a
+   nickname and gets a seat and a colour: `lobby/rooms.md`, `lobby/joining.md`,
+   `lobby/host.md`.
 4. Play together: select a word, type letters everyone sees, see where the
    others are, chat: `gameplay/board.md`, `gameplay/co-op.md`,
    `social/presence.md`, `social/chat.md`.
@@ -184,8 +185,8 @@ conformance is checked »).
   and open a grid's room, joined; there, Tab reaches the grid, `T` and `A` fill
   (1, 0) and (1, 1), ArrowDown moves, Backspace erases, Ctrl+Z undoes; the Aide
   menu's checks and undo, the Salon's link, the lock, help mode and save of the
-  host settings sheet opened from the Menu, a guest's nickname form and the
-  host's remove button are each reached and worked, Bob ending removed.
+  host settings sheet opened from the Menu, an invited player's nickname form
+  and the host's remove button are each reached and worked, Bob ending removed.
   (← 035 AC-1)
 - **AC-2** Each element the walk of AC-1 reaches shows rule 14's outline; after
   Escape then Tab moved the focus to the clue bar, the selected cell keeps its

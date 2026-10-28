@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: done
+status: approved
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation
@@ -262,7 +262,8 @@ fonts, focus ring, shared components, state lines).
 - Other languages and a language switch; a dark mode, forced colours, print
   styles; screenshot comparison with the sheets.
 - The band, retries and resent edits: `platform/realtime.md`. The join, the
-  nickname card and refusals: `lobby/joining.md`, `lobby/rooms.md`. The
+  nickname card and refusals: `lobby/joining.md`, `lobby/host.md`,
+  `lobby/rooms.md`. The
   room's frame once shown: `client/hud.md`. The catalogue and its states:
   `content/library.md`. The plain pages' content: `account/account.md`,
   `gameplay/results.md`, `admin/operations.md`.
