@@ -15,7 +15,7 @@ Kept in `localStorage`, for every room of the browser; they send nothing.
 | « Accessibilité » (Menu) | off, on | `nock.accessibility`: `"true"` is on | `gameplay/board.md` 18 |
 | « Masquer le chrono » (Menu) | shown, hidden | `nock.timer_hidden` = `true` while hidden, else absent | `gameplay/rules.md` 13 |
 | « Clavier » (top bar, touch screen) | shown, hidden | `nock.keyboard_hidden` = `true` while hidden, else absent | `gameplay/board.md` 16 |
-| « Salon » (column layout) | open, closed | `nock.salon_closed` = `true` while closed, else absent | `client/hud.md` 14 |
+| « Salon » (column layout) | open, closed | `nock.salon_closed` = `true` while closed, else absent | `client/room.md` 2 |
 
 The other keys hold data, not settings: `nock.nickname` and
 `nock.identity.<CODE>` (`lobby/joining.md`), `nock.room.<CODE>`
