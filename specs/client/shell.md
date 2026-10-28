@@ -82,7 +82,7 @@ fonts, focus ring, shared components, state lines).
      (« Entrée dans le salon… »), seen. No grid, clue bar, keyboard or Salon.
 8. The first snapshot turns the opening into the room within 300 ms; a refusal
    turns it into its card, `invalid_nickname` into the nickname card. A loss
-   keeps it. Once the room has shown, the status follows `client/hud.md` rule 8.
+   keeps it. Once the room has shown, the status follows `client/hud.md` rule 7.
 9. The nickname card, the status cards, the page not found, the shared recap
    and the account page share one frame: a top bar holding only the brand
    (rule 17), then one column of cards. Only room pages put the room code
