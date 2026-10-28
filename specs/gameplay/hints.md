@@ -139,7 +139,7 @@ a reveal budget and, in vote mode, a majority of the players.
     announces the question when a vote opens, and `vote.result.<outcome>` when
     this page applies its close. The close adds one `vote` line to the stream
     (`social/chat.md`), before the lines of a passed request, and a 3-second note
-    of it while the stream is hidden (`client/hud.md`); that note replaces any
+    of it while the stream is hidden (`client/room.md`); that note replaces any
     note held back during the vote. The `vote` line lights neither the Salon dot
     nor the unread count; chat messages sent during the vote still count. A
     snapshot or a catch-up adds no `vote` line.
@@ -272,9 +272,9 @@ on its layer of `_design/room.md`, « Layers ».
 - Generated hints, revealing the whole grid, undoing a reveal, keyboard
   shortcuts, a tally of ballots, changing a ballot, votes on anything else.
 - The host settings: `lobby/rooms.md`. The Aide menu's place, « Réagir » under
-  the banner, the notes: `client/hud.md`. Cell marks and pending edits:
-  `gameplay/board.md`. Completion: `gameplay/rules.md`. The stream and its
-  lines' look: `social/chat.md`. Protocol and fair play:
+  the banner: `client/hud.md`; the notes: `client/room.md`. Cell marks and
+  pending edits: `gameplay/board.md`. Completion: `gameplay/rules.md`. The
+  stream and its lines' look: `social/chat.md`. Protocol and fair play:
   `platform/realtime.md`. The recap's counts: `gameplay/results.md`.
 
 ## Code

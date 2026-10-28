@@ -215,7 +215,7 @@ players (seq 22).
   by `social/chat.md`.
 - Resume and seat back: `lobby/joining.md`. The stream, its live lines and their
   texts: `social/chat.md`. The « Salon » dot and 3-second notes:
-  `client/hud.md`. Reconnection and the log: `platform/realtime.md`,
+  `client/room.md`. Reconnection and the log: `platform/realtime.md`,
   `platform/server.md`.
 
 ## Code
