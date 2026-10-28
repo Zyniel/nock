@@ -661,8 +661,9 @@ an item that must be done first.
 
 ### B-021 Room gone dialog
 
-- Status: building (the human approved the brief as written, then the spec
-  change as written, 2026-10-28)
+- Status: done (the human approved the brief as written, then the spec
+  change as written, 2026-10-28; built and reviewed in two rounds,
+  2026-10-28)
 - Domains: client/hud (a new rule and two criteria; rules 3 and 7 name the
   dialog), client/shell (rule 7, one line), lobby/joining (rule 16, one line);
   `_design/overlays.md` (a new section « Room gone »), `_design/room.md`
@@ -724,6 +725,12 @@ an item that must be done first.
 ## Small follow-ups
 
 Taken when a change touches them.
+
+- `client/hud.md` rule 16 closes the menus, the reaction picker, a room sheet
+  and the recap before the room-gone dialog shows, but AC-21 proves only the
+  Salon sheet (B-021's review); an open room sheet or the recap in AC-21's
+  second case would prove the native modals give way. The Android back
+  gesture's reopen is tested only through `close()`.
 
 - `content/grid-files.md` is over the size guideline (about 18.7 KB, 21
   criteria after B-015): the converter (rule 15, AC-20) could leave for its own
