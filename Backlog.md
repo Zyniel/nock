@@ -603,6 +603,21 @@ an item that must be done first.
   apostrophe draw the dashed edge too, not only the dot; the apostrophe stays
   in (asked in the first answer, not named in the second).
 
+### B-024 /ops overrides of the room lives
+
+- Status: brief, not written yet (`/new-spec` writes it here)
+- Waits for: B-023 (the room lives and the sweep interval it overrides)
+- Branch: feat/b-024-ops-overrides · PR: none yet
+- Request: the human's `/new-spec` of 2026-10-28 « /ops overrides of the room
+  lives », word for word in the request record kept with the lead's notes
+  (`nock-requests-2026-10-28.md`): the operator page shows each room life and
+  the sweep interval with its effective value and source, saves or resets an
+  override within the same bounds, and asks for confirmation with a dry run's
+  count before a shorter life.
+- Already answered by the human: the earlier brief with each pick A. Its open
+  questions were never answered (the INFO log, what the dry run counts and
+  needs, the 30-day text, the throttle and cache).
+
 ## Small follow-ups
 
 Taken when a change touches them.
