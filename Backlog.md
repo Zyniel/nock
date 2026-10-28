@@ -605,9 +605,9 @@ an item that must be done first.
 
 ### B-025 Split `client/hud.md`: the room panel and the notes
 
-- Status: building (the human approved the brief, option A and both of the
+- Status: done (the human approved the brief, option A and both of the
   lead's defaults, with the new file named `client/room.md`, then the spec
-  change as written, 2026-10-28)
+  change as written, 2026-10-28; built and reviewed in two rounds, 2026-10-28)
 - Domains: client/hud, client/room (new); citations repointed in social/chat,
   social/catch-up, social/presence, gameplay/hints, platform/server,
   client/shell, `_settings.md` and `_map.md`
