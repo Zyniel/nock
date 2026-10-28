@@ -2,7 +2,8 @@
 
 Each room also has its creation time and its last edit time (spec 032), which
 its 30-day life runs from, so that the expired rooms are found without loading
-them.
+them, and its creator, the account that created it (`lobby/host.md` rule 11),
+kept in `room_times` only: the snapshots hold no creator.
 
 One connection is shared by all threads and every call takes a lock, so the
 store is safe to call from several threads. Rooms are independent: the lock is
@@ -27,6 +28,7 @@ from nock.room import (
     entry_with_player_erased,
     is_edit,
     replay,
+    with_account_erased,
     with_player_erased,
 )
 
@@ -55,9 +57,14 @@ CREATE TABLE IF NOT EXISTS share_tokens (
 CREATE TABLE IF NOT EXISTS room_times (
     code TEXT PRIMARY KEY REFERENCES rooms (code),
     created_at REAL NOT NULL,
-    last_edit_at REAL NOT NULL
+    last_edit_at REAL NOT NULL,
+    creator_account_id TEXT
 );
 """
+
+# `PRAGMA user_version` of a database that has the creator column.
+_CREATOR_COLUMN_VERSION = 1
+_CREATOR_COLUMN = "creator_account_id"
 
 # What `delete_room` runs, in one transaction: every row of the room, in every
 # table, the rows that refer to the room before the room itself.
@@ -96,6 +103,7 @@ class RoomStore:
             self._connection.execute("PRAGMA synchronous = FULL")
         self._connection.execute("PRAGMA secure_delete = ON")
         self._connection.executescript(_TABLES)
+        self._add_creator_column()
 
     def create_room(
         self, state: RoomState, *, last_edit_at: float | None = None
@@ -127,9 +135,10 @@ class RoomStore:
                     "INSERT INTO rooms (code) VALUES (?)", (state.code,)
                 )
                 self._connection.execute(
-                    "INSERT INTO room_times (code, created_at, last_edit_at) "
-                    "VALUES (?, ?, ?)",
-                    (state.code, state.created_at, start),
+                    "INSERT INTO room_times "
+                    "(code, created_at, last_edit_at, creator_account_id) "
+                    "VALUES (?, ?, ?, ?)",
+                    (state.code, state.created_at, start, state.creator_account_id),
                 )
                 if token is not None:
                     self._connection.execute(
@@ -216,6 +225,57 @@ class RoomStore:
         for code, created_at in rows:
             pairs.append((str(code), float(created_at)))
         return pairs
+
+    def codes_created_by(self, account_id: str) -> list[str]:
+        """Return the codes of the rooms whose creator is the account.
+
+        Args:
+            account_id: The account.
+
+        Returns:
+            The codes, in code-point order.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT code FROM room_times WHERE creator_account_id = ? "
+                "ORDER BY code",
+                (account_id,),
+            ).fetchall()
+        codes: list[str] = []
+        for (code,) in rows:
+            codes.append(str(code))
+        return codes
+
+    def erase_account(self, code: str, account_id: str) -> None:
+        """Take a deleted account out of a room: its creator and its members.
+
+        The room's creator is cleared when it is the account, and so is the
+        account of each member linked to it in every stored snapshot, in one
+        transaction (`lobby/host.md` rule 14). Nothing is logged: the log holds
+        no account. In a file database the write-ahead log is then checkpointed
+        and emptied, as in `delete_room`.
+
+        Args:
+            code: The room. An unknown room changes nothing.
+            account_id: The account that was deleted.
+        """
+        with self._lock:
+            if not self._room_exists(code):
+                return
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._connection.execute(
+                    "UPDATE room_times SET creator_account_id = NULL "
+                    "WHERE code = ? AND creator_account_id = ?",
+                    (code, account_id),
+                )
+                self._erase_account_in_snapshots(code, account_id)
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
+            if self._is_file:
+                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
 
     def delete_room(self, code: str) -> bool:
         """Delete the room, its snapshots, its log and its share token, at once.
@@ -369,9 +429,11 @@ class RoomStore:
                 "ORDER BY seq DESC LIMIT 1",
                 (code,),
             ).fetchone()
+            creator = self._creator_of(code)
         if snapshot_row is None:
             return None
         state = RoomState.model_validate_json(snapshot_row[0])
+        state = state.model_copy(update={"creator_account_id": creator})
         for entry in self.read_log(code, after_seq=state.seq):
             state = replay(state, entry)
         return state
@@ -398,9 +460,11 @@ class RoomStore:
                 "ORDER BY seq DESC LIMIT 1",
                 (code, seq),
             ).fetchone()
+            creator = self._creator_of(code)
         if snapshot_row is None:
             return None
         state = RoomState.model_validate_json(snapshot_row[0])
+        state = state.model_copy(update={"creator_account_id": creator})
         for entry in self.read_log(code, after_seq=state.seq):
             if entry.event.seq > seq:
                 break
@@ -425,7 +489,20 @@ class RoomStore:
             erased = with_player_erased(state, player_id)
             self._connection.execute(
                 "UPDATE snapshots SET state_json = ? WHERE code = ? AND seq = ?",
-                (erased.model_dump_json(), code, seq),
+                (_snapshot_json(erased), code, seq),
+            )
+
+    def _erase_account_in_snapshots(self, code: str, account_id: str) -> None:
+        """Rewrite each snapshot of the room without the account. Caller locks."""
+        rows = self._connection.execute(
+            "SELECT seq, state_json FROM snapshots WHERE code = ?", (code,)
+        ).fetchall()
+        for seq, state_json in rows:
+            state = RoomState.model_validate_json(state_json)
+            erased = with_account_erased(state, account_id)
+            self._connection.execute(
+                "UPDATE snapshots SET state_json = ? WHERE code = ? AND seq = ?",
+                (_snapshot_json(erased), code, seq),
             )
 
     def _erase_in_log(self, code: str, player_id: str) -> None:
@@ -442,6 +519,40 @@ class RoomStore:
                 "UPDATE log SET entry_json = ? WHERE code = ? AND seq = ?",
                 (erased.model_dump_json(), code, seq),
             )
+
+    def _add_creator_column(self) -> None:
+        """Give `room_times` the creator column when the database lacks it.
+
+        A database whose `PRAGMA user_version` is below 1 comes from before the
+        column: the column is added once and the version set to 1. The rooms it
+        holds have no creator, and their other data stays.
+        """
+        version_row = self._connection.execute("PRAGMA user_version").fetchone()
+        if int(version_row[0]) >= _CREATOR_COLUMN_VERSION:
+            return
+        column_rows = self._connection.execute(
+            "PRAGMA table_info(room_times)"
+        ).fetchall()
+        column_names: list[str] = []
+        for column_row in column_rows:
+            column_names.append(str(column_row[1]))
+        if _CREATOR_COLUMN not in column_names:
+            self._connection.execute(
+                f"ALTER TABLE room_times ADD COLUMN {_CREATOR_COLUMN} TEXT"
+            )
+        self._connection.execute(f"PRAGMA user_version = {_CREATOR_COLUMN_VERSION}")
+
+    def _creator_of(self, code: str) -> str | None:
+        """Return the creator of a room, None for an anonymous or unknown room.
+
+        The caller holds the lock.
+        """
+        row = self._connection.execute(
+            "SELECT creator_account_id FROM room_times WHERE code = ?", (code,)
+        ).fetchone()
+        if row is None or row[0] is None:
+            return None
+        return str(row[0])
 
     def _room_exists(self, code: str) -> bool:
         """Tell whether the room is recorded. The caller holds the lock."""
@@ -479,8 +590,17 @@ class RoomStore:
         self._connection.execute(
             "INSERT OR REPLACE INTO snapshots (code, seq, state_json) "
             "VALUES (?, ?, ?)",
-            (state.code, state.seq, state.model_dump_json()),
+            (state.code, state.seq, _snapshot_json(state)),
         )
+
+
+def _snapshot_json(state: RoomState) -> str:
+    """Return the JSON of a snapshot: the state without its creator.
+
+    The creator is kept in `room_times` only, so that one place holds it.
+    """
+    anonymous = state.model_copy(update={"creator_account_id": None})
+    return anonymous.model_dump_json()
 
 
 def _latest_edit_time(entries: Sequence[LogEntry]) -> float | None:

@@ -13,6 +13,10 @@ A room lives 30 days from its last edit (spec 032). An expired room is deleted b
 Just before each deletion, the registry's delete hook gets the room's latest
 state (spec 029).
 
+A socket whose session signs an account in joins as that account
+(`lobby/host.md`): its connection carries the account, which the room's join
+rules read. A room has a creator, an account, while accounts are on.
+
 Each step made by a client message logs its relay time (spec 038): how long the
 server took from reading the message to handing the step's entries to the store.
 """
@@ -58,6 +62,7 @@ from nock.room import (
     new_room,
     room_summary,
     tick,
+    with_account_erased,
     with_last_seen,
     with_player_erased,
 )
@@ -155,6 +160,7 @@ class RoomConnection:
         post: Callable[[_Input], None],
         max_outbound: int = DEFAULT_CONFIG.max_outbound_messages,
         max_inbound: int = DEFAULT_CONFIG.max_inbound_pending,
+        account_id: str | None = None,
     ) -> None:
         """Create a connection owned by `owner_loop`, the loop of the socket.
 
@@ -165,8 +171,11 @@ class RoomConnection:
             post: Passes an input to the room task, from any thread.
             max_outbound: How many items may wait in the outbound queue.
             max_inbound: How many inputs may wait to be applied by the room.
+            account_id: The account that the socket's session signs in, which
+                the connection's join runs as; None for an anonymous join.
         """
         self.player_id: str | None = None
+        self.account_id = account_id
         self._owner_loop = owner_loop
         self._post = post
         self._max_outbound = max_outbound
@@ -473,19 +482,38 @@ class _RoomRunner:
         self.state = with_player_erased(self.state, player_id)
         self._store.erase_player(self.state.code, player_id)
 
+    def erase_account(self, account_id: str) -> None:
+        """Take a deleted account out of the room, between two of its steps.
+
+        Called on the engine's loop, so no step runs meanwhile. The live state
+        changes first, then the store: the room has no creator and its members
+        no account. No event is logged or sent. A deleted room changes nothing.
+        """
+        if self._is_deleted:
+            return
+        self.state = with_account_erased(self.state, account_id)
+        self._store.erase_account(self.state.code, account_id)
+
     def _close_open_connections(self) -> None:
         """Close each connection opened to the room with ROOM_NOT_FOUND_CLOSE_CODE."""
         for connection in self._open_connections:
             connection.deliver_close(ROOM_NOT_FOUND_CLOSE_CODE)
         self._open_connections = []
 
-    def save_snapshot(self) -> None:
+    def save_snapshot(self, *, force: bool = False) -> None:
         """Save a snapshot of the room unless the store has one at this seq.
 
         A failure is logged: the log alone is enough to rebuild the room. A
         deleted room saves nothing.
+
+        Args:
+            force: Save even when the store has a snapshot at this seq. The link
+                of a member to an account is in no log entry, so the snapshot is
+                the one place the store keeps it.
         """
-        if self._is_deleted or self._snapshot_seq == self.state.seq:
+        if self._is_deleted:
+            return
+        if self._snapshot_seq == self.state.seq and not force:
             return
         try:
             self._store.save_snapshot(self.state)
@@ -612,6 +640,8 @@ class _RoomRunner:
         `read_at` is when the server read the join (see `RoomConnection.submit`).
         """
         joined = list(self._connections)
+        account_id = connection.account_id
+        was_linked = _has_linked_player(self.state, account_id)
         try:
             outcome = join_room(
                 self.state,
@@ -620,6 +650,7 @@ class _RoomRunner:
                 secrets.token_urlsafe(8),
                 secrets.token_urlsafe(24),
                 self._config,
+                account_id=account_id,
             )
         except Exception:
             logger.exception("A join in room %s failed", self.state.code)
@@ -628,9 +659,14 @@ class _RoomRunner:
             # The player is not in the room: do not leave the joiner waiting.
             connection.deliver_close(_INTERNAL_ERROR_CLOSE_CODE)
             return
+        if not was_linked and _has_linked_player(self.state, account_id):
+            self.save_snapshot(force=True)
+        # A join with a token, or as an account that already had its player
+        # here, is a resume.
+        is_resume = message.resume_token is not None or was_linked
         for reply in outcome.reply:
             if isinstance(reply, Snapshot):
-                self._attach(connection, reply.you, message.resume_token is not None)
+                self._attach(connection, reply.you, is_resume)
 
     def _attach(
         self, connection: RoomConnection, player_id: str, is_resume: bool
@@ -789,6 +825,8 @@ class RoomRegistry:
         self._deletion_tasks: set[asyncio.Task[None]] = set()
         # Spec 029: called with a room's latest state just before its deletion.
         self._delete_hook: Callable[[RoomState], None] | None = None
+        # False while accounts are off: the rooms then play as anonymous rooms.
+        self._creators_active = True
 
     @property
     def config(self) -> RoomConfig:
@@ -817,12 +855,31 @@ class RoomRegistry:
         """
         self._delete_hook = hook
 
-    def register_room(self, grid: Grid, grid_number: int | None = None) -> str:
+    def set_creators_active(self, active: bool) -> None:
+        """Tell whether the rooms keep their creator (accounts on) or not.
+
+        While it is False, a room loaded from the store plays as an anonymous
+        room; the store keeps its creator for when accounts are on again
+        (`lobby/host.md` rule 15). It is True for a new registry.
+
+        Args:
+            active: False while accounts are off.
+        """
+        self._creators_active = active
+
+    def register_room(
+        self,
+        grid: Grid,
+        grid_number: int | None = None,
+        creator_account_id: str | None = None,
+    ) -> str:
         """Create a room on `grid` and return its code.
 
         Args:
             grid: The grid to solve.
             grid_number: Catalogue number of the grid, None for a bare grid.
+            creator_account_id: The account that creates the room, None for an
+                anonymous room (`lobby/host.md` rule 11).
 
         Returns:
             A code of ROOM_CODE_LENGTH characters of ROOM_CODE_ALPHABET, drawn
@@ -838,7 +895,14 @@ class RoomRegistry:
             while self._is_taken(code):
                 code = _draw_code()
             share_token = secrets.token_urlsafe(SHARE_TOKEN_BYTES)
-            state = new_room(code, grid, self._clock(), grid_number, share_token)
+            state = new_room(
+                code,
+                grid,
+                self._clock(),
+                grid_number,
+                share_token,
+                creator_account_id=creator_account_id,
+            )
             self._store.create_room(state)
             self._runners[code] = self._new_runner(state, state.seq)
             return code
@@ -903,7 +967,7 @@ class RoomRegistry:
         stored = self._store.load_room(code)
         if stored is None:
             return None
-        return self._with_solved_values(stored)
+        return self._with_solved_values(self._as_played(stored))
 
     def member_id(self, code: str, resume_token: str) -> str | None:
         """Return the id of the room's member whose resume token is `resume_token`.
@@ -1017,6 +1081,39 @@ class RoomRegistry:
         erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
         return True
 
+    def erase_account(self, account_id: str) -> None:
+        """Take a deleted account out of every room it created (spec 033).
+
+        Each such room loses its creator and its members their account, live
+        state included (`lobby/host.md` rule 14). For a live room, the room's
+        task does it between two steps, then the store; for a room only in the
+        store, the store. No event is logged or sent. Returns once it is done.
+
+        Args:
+            account_id: The account that was deleted.
+        """
+        for code in self._store.codes_created_by(account_id):
+            self._erase_account_in_room(code, account_id)
+
+    def _erase_account_in_room(self, code: str, account_id: str) -> None:
+        """Take the account out of room `code`, as `erase_account` says."""
+        with self._lock:
+            runner = self._runners.get(code)
+            loop = self._loop
+            if runner is None or loop is None or self._closed:
+                # No task runs the room, and none can start while the lock is
+                # held: the state can change here.
+                if runner is not None:
+                    runner.state = with_account_erased(runner.state, account_id)
+                self._store.erase_account(code, account_id)
+                return
+
+        async def erase_between_steps() -> None:
+            runner.erase_account(account_id)
+
+        erasing = asyncio.run_coroutine_threadsafe(erase_between_steps(), loop)
+        erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
+
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.
 
@@ -1054,7 +1151,9 @@ class RoomRegistry:
             return None
         return public_recap(recap)
 
-    def connect(self, code: str) -> RoomConnection | None:
+    def connect(
+        self, code: str, account_id: str | None = None
+    ) -> RoomConnection | None:
         """Open a connection to room `code` for a socket that has not joined.
 
         The connection receives the room's messages once the player's join is
@@ -1062,6 +1161,11 @@ class RoomRegistry:
         `max_outbound_messages` and `max_inbound_pending` (spec 036).
 
         Must be called from the event loop that serves the socket.
+
+        Args:
+            code: The room.
+            account_id: The account that the socket's session signs in, which
+                the connection's join runs as; None for an anonymous join.
 
         Returns:
             The connection, or None when there is no such room. An expired room
@@ -1087,6 +1191,7 @@ class RoomRegistry:
             post,
             max_outbound=self._config.max_outbound_messages,
             max_inbound=self._config.max_inbound_pending,
+            account_id=account_id,
         )
         # Scheduled before any input of the connection, so the room knows it
         # before its first frame.
@@ -1151,12 +1256,22 @@ class RoomRegistry:
             state = self._store.load_room(code)
             if state is None:
                 return None
-            outcome = after_restart(state, self._clock())
+            outcome = after_restart(self._as_played(state), self._clock())
             if len(outcome.entries) > 0:
                 self._store.append(code, outcome.entries)
             runner = self._new_runner(outcome.state, None)
             self._runners[code] = runner
             return runner
+
+    def _as_played(self, state: RoomState) -> RoomState:
+        """Return a room loaded from the store as it plays.
+
+        While accounts are off a stored creator stays in the store, but the room
+        plays as an anonymous room (`lobby/host.md` rule 15).
+        """
+        if self._creators_active:
+            return state
+        return state.model_copy(update={"creator_account_id": None})
 
     def _summary_for_members(self, code: str, tokens: list[str]) -> RoomSummary | None:
         """Return the summary of room `code` when one of `tokens` is a member's.
@@ -1322,6 +1437,13 @@ class RoomRegistry:
         await self._cancel_runners()
         self._finish()
         asyncio.get_running_loop().stop()
+
+
+def _has_linked_player(state: RoomState, account_id: str | None) -> bool:
+    """Tell whether a player of the room is linked to the account."""
+    if account_id is None:
+        return False
+    return any(player.account_id == account_id for player in state.players)
 
 
 def _with_relay_time(
