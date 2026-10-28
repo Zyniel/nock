@@ -661,7 +661,7 @@ an item that must be done first.
 
 ### B-021 Room gone dialog
 
-- Status: ready (the human approved the brief as written, then the spec
+- Status: building (the human approved the brief as written, then the spec
   change as written, 2026-10-28)
 - Domains: client/hud (a new rule and two criteria; rules 3 and 7 name the
   dialog), client/shell (rule 7, one line), lobby/joining (rule 16, one line);
