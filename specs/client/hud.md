@@ -255,6 +255,7 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 ## Code
 
 - `web/src/lib/RoomPage.svelte` (layout, overlays, play area) and its parts:
-  `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `ClueBar` (`.svelte`);
-  `windowForm.ts`.
-- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`, `tests/test_hud_*`.
+  `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `ClueBar`,
+  `RoomGoneDialog` (`.svelte`); `windowForm.ts`.
+- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
+  `tests/test_hud_*`, `tests/hud_harness.py`.
