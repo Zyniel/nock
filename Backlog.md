@@ -603,6 +603,22 @@ an item that must be done first.
   apostrophe draw the dashed edge too, not only the dot; the apostrophe stays
   in (asked in the first answer, not named in the second).
 
+### B-023 Room lives as variables
+
+- Status: brief, not written yet (`/new-spec` writes it here)
+- Waits for: B-021 (this item moves `lobby/joining.md` rule 16, which B-021
+  changes) and B-022 (the terms creator room and anonymous room)
+- Branch: feat/b-023-room-lives · PR: none yet
+- Request: the human's `/new-spec` of 2026-10-28 « Room lives as variables »,
+  word for word in the request record kept with the lead's notes
+  (`nock-requests-2026-10-28.md`): four room lives as environment variables in
+  hours (creator or anonymous, solved or not, default 720) and the sweep
+  interval in minutes (default 60), each with its bounds.
+- Already answered by the human: every pick A of the earlier brief (a new
+  `lobby/room-life.md`; the solve time and the creator in `room_times`; four
+  `int` hour fields in `RoomConfig`; the `/ops` dashboard names the periods it
+  offers; « Un salon est effacé après un certain temps sans modification. »).
+
 ## Small follow-ups
 
 Taken when a change touches them.
