@@ -605,7 +605,7 @@ an item that must be done first.
 
 ### B-025 Split `client/hud.md`: the room panel and the notes
 
-- Status: ready (the human approved the brief, option A and both of the
+- Status: building (the human approved the brief, option A and both of the
   lead's defaults, with the new file named `client/room.md`, then the spec
   change as written, 2026-10-28)
 - Domains: client/hud, client/room (new); citations repointed in social/chat,
@@ -735,7 +735,7 @@ Taken when a change touches them.
 - Untested client details: binary frames ignored by the room page; `t()`
   placeholders; a `{"seq": 6}` frame without type cannot be told from event 6
   in 040 AC-19's test (`client/shell.md` rules 2, 3 and 5).
-- No test taps the reaction pill on a clue (`client/hud.md` rule 19 says a
+- No test taps the reaction pill on a clue (`client/hud.md` rule 14 says a
   tap selects that clue; 043 AC-25 checks only where the pill is drawn).
 - Untested account behaviour the code has: a link token arriving in the URL
   fragment while `/account` already shows signs in; another method on an
