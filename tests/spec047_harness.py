@@ -450,9 +450,18 @@ def ring_problems(locator: Locator, name: str) -> list[str]:
 # ---- The recap's frame (AC-7, AC-11) -------------------------------------------------
 
 
-def column_frame_problems(page: Page) -> list[str]:
-    """The dialog of the column layout: 440 px, centred, its look (AC-7)."""
-    recap = page.get_by_test_id("recap")
+def column_frame_problems(page: Page, dialog: Locator | None = None) -> list[str]:
+    """The dialog of the column layout: 440 px, centred, its look (AC-7).
+
+    Args:
+        page: The page that shows the dialog.
+        dialog: The dialog to check: the recap unless given (the room-gone
+            dialog has the recap's frame, `client/hud.md` AC-21).
+
+    Returns:
+        How the dialog differs from the recap's frame (empty: not at all).
+    """
+    recap = page.get_by_test_id("recap") if dialog is None else dialog
     box = box_of(recap)
     window = window_box(page)
     problems: list[str] = []
@@ -471,9 +480,18 @@ def column_frame_problems(page: Page) -> list[str]:
     return problems
 
 
-def sheet_frame_problems(page: Page) -> list[str]:
-    """The bottom sheet of the sheet layout (AC-7)."""
-    recap = page.get_by_test_id("recap")
+def sheet_frame_problems(page: Page, dialog: Locator | None = None) -> list[str]:
+    """The bottom sheet of the sheet layout (AC-7).
+
+    Args:
+        page: The page that shows the sheet.
+        dialog: The sheet to check: the recap unless given (the room-gone
+            dialog has the recap's frame, `client/hud.md` AC-21).
+
+    Returns:
+        How the sheet differs from the recap's frame (empty: not at all).
+    """
+    recap = page.get_by_test_id("recap") if dialog is None else dialog
     box = box_of(recap)
     window = window_box(page)
     problems: list[str] = []
