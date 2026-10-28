@@ -618,6 +618,9 @@ an item that must be done first.
   `lobby/room-life.md`; the solve time and the creator in `room_times`; four
   `int` hour fields in `RoomConfig`; the `/ops` dashboard names the periods it
   offers; « Un salon est effacé après un certain temps sans modification. »).
+- Naming: B-025 adds the domain `client/room.md`, so this item's new file
+  cannot be called `room-...` (the gate: its test files would also name
+  `room`); the brief picks another name than `lobby/room-life.md`.
 
 ## Small follow-ups
 
