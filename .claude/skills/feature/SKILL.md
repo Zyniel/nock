@@ -37,9 +37,12 @@ browser, or when a review round sent that agent's work back.
 - The item must be `ready` and each of its domain files `approved`. If not, stop
   and tell the user: a spec that is not approved is not a contract yet.
 - Run `git status`. If there are uncommitted changes unrelated to the item, stop
-  and ask. If you are on the default branch, create `feat/b-NNN-<short-name>`
-  from `origin/main` with `git switch -c`. If the folder is not a git repository,
-  skip every git step and say so at the end.
+  and ask. Work in the item's worktree: `git worktree list` shows the folder of
+  the branch on the item's "Branch" line. An item without a branch gets one in
+  the main checkout with `git worktree add .claude/worktrees/b-NNN-<short-name>
+  -b feat/b-NNN-<short-name> origin/main`; never run `git switch` there, other
+  sessions share it. If the folder is not a git repository, skip every git step
+  and say so at the end.
 - Set the item to `building` and note its branch.
 
 ## 2. Tests first

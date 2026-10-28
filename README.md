@@ -177,8 +177,9 @@ specs, `specs/<area>/<file>.md`; `specs/_map.md` lists them and explains how the
 work. Inside `claude`, in this folder:
 
 1. **Write the brief.** `/new-spec` followed by the feature or change in plain
-   words. The lead writes a brief in `Backlog.md` (`B-NNN`) and waits for you.
-   Approve it, or correct it.
+   words. The lead claims the item's number, branch and worktree
+   (`scripts/claim_item.py`), writes a brief in `Backlog.md` (`B-NNN`) and waits
+   for you. Approve it, or correct it.
 2. **Approve the spec change.** The spec-writer changes the domain specs of the
    item (and, for a change of look, `specs/_design/` and `docs/design/`) and
    lists its open questions. Read the change, fix what is wrong, then tell Claude

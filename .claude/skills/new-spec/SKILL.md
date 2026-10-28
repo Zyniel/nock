@@ -17,11 +17,20 @@ them.
 
 ## 1. Brief
 
-1. If you are on the default branch, create the item's branch from `origin/main`
-   with `git switch -c feat/b-NNN-<short-name>` (NNN is the next free item number
-   in `Backlog.md`).
+1. Claim the item: `uv run python scripts/claim_item.py <short-name>`. It gives
+   the item its number B-NNN, the branch `feat/b-NNN-<short-name>` from
+   `origin/main` and the worktree that holds it, then lists the other items in
+   flight and the spec files each one changes. Work only in that worktree, by its
+   absolute path. The number is final: never take one by hand or from
+   `Backlog.md`, never rename a branch to another number, and never run
+   `git switch` or `git checkout` in the main checkout, which other sessions
+   share. If the script fails, stop and report. A session that starts other
+   sessions for new items claims each one first and passes on its number,
+   branch and folder.
 2. Read `specs/_map.md` and pick the domain files the request touches. More than
-   three means it is several changes: say so and propose how to split it.
+   three means it is several changes: say so and propose how to split it. An item
+   in flight that changes one of those files goes under "Waits for", or in the
+   open questions when the order is the human's call.
 3. Read the Purpose and Rules of those files, enough to write the brief.
 4. Decide whether the request is an architecture decision (CLAUDE.md, "Models
    and effort"). If it is, delegate the options to the `Plan` agent with
