@@ -603,6 +603,18 @@ an item that must be done first.
   apostrophe draw the dashed edge too, not only the dot; the apostrophe stays
   in (asked in the first answer, not named in the second).
 
+### B-021 Room gone dialog
+
+- Status: brief, not written yet (`/new-spec` writes it here)
+- Waits for: B-025 (the dialog goes into the `client/hud.md` the split leaves)
+- Branch: feat/b-021-room-gone · PR: none yet
+- Request (the human, 2026-10-28, word for word): "Players inside a room that
+  expires are displayed a "This room no longuer exists" popup (To translate in
+  French) and routed back to the menu."
+- Already answered by the human: a dialog with one way out (« Voir les
+  grilles »), the page changing only on the player's press; removed players
+  stay out of scope.
+
 ## Small follow-ups
 
 Taken when a change touches them.
