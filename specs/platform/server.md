@@ -151,8 +151,8 @@ address and with the database its environment gives.
 ### Look
 
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
-`client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two top bars (« Phone top bar »,
-« Computer top bar »).
+`client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two
+top bars (« Phone top bar », « Computer top bar »).
 
 ## Acceptance criteria
 

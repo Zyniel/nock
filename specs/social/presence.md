@@ -276,9 +276,8 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 - The stream's order, caps and scroll, and its host, lock and settings
   lines: `social/chat.md`. Its lines of checks, reveals and votes:
   `gameplay/hints.md`. The Joueurs tab's layout: `client/room.md`; the Menu:
-  `client/hud.md`.
-  Changes while away: `social/catch-up.md`. The recap's player marks:
-  `gameplay/results.md`.
+  `client/hud.md`. Changes while away: `social/catch-up.md`. The recap's
+  player marks: `gameplay/results.md`.
 - Cursor trails, typing indicators, avatars; a disconnected player's
   selection; a letter's author in words or for a screen reader; a filter on
   one player's letters; « Auteurs » kept on an account or across devices.
