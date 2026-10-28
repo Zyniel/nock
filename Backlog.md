@@ -603,6 +603,20 @@ an item that must be done first.
   apostrophe draw the dashed edge too, not only the dot; the apostrophe stays
   in (asked in the first answer, not named in the second).
 
+### B-022 Creator rooms and host return
+
+- Status: brief, not written yet (`/new-spec` writes it here)
+- Branch: feat/b-022-creator-rooms · PR: none yet
+- Request: the human's `/new-spec` of 2026-10-28 « Creator rooms and host
+  return », word for word in the request record kept with the lead's notes
+  (`nock-requests-2026-10-28.md`): the creator of a room, the creator's player
+  as host whenever connected, one player per account in a room, and the terms
+  of the glossary that go with them.
+- Already answered by the human: a new file `lobby/host.md` (A), the terms in
+  this item (A), the earlier Shape decisions as written.
+- B-023 waits for this item. It runs alongside B-025; both touch the glossary
+  of `specs/_map.md`.
+
 ## Small follow-ups
 
 Taken when a change touches them.
