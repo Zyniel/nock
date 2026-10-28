@@ -31,6 +31,8 @@ Everything runs through uv. Do not use `pip` or a bare `python`.
 | Web client type check | `npm --prefix web run check` |
 | Build the web client | `npm --prefix web run build` |
 | Install the browsers for browser tests | `uv run playwright install chromium firefox webkit` |
+| Claim a new backlog item: its number, branch and worktree | `uv run python scripts/claim_item.py <short-name>` |
+| List the items in flight and the spec files they change | `uv run python scripts/claim_item.py --list` |
 
 Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 
@@ -54,7 +56,8 @@ Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
   `tests/specNNN_harness.py`.
 - `src/nock/`: the package.
 - `web/`: the Svelte + TypeScript client, built by Vite into `web/dist`.
-- `scripts/gate.py`: the quality gate.
+- `scripts/gate.py`: the quality gate. `scripts/claim_item.py`: gives a backlog
+  item its number, branch and worktree.
 - `.claude/agents/`: the four roles. `.claude/skills/`: standards and workflows.
   `scripts/hooks/`: the scripts that enforce the rules below.
 - `.claude/hooks/session-start.sh`: in a Claude Code cloud session, installs the
@@ -62,8 +65,8 @@ Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
 
 ## How a feature gets built
 
-1. `/new-spec <description>`: the lead writes a brief in `Backlog.md` and the
-   human approves it; the spec-writer changes the domain specs and the human
+1. `/new-spec <description>`: the lead claims the item (`scripts/claim_item.py`),
+   writes a brief in `Backlog.md` and the human approves it; the spec-writer changes the domain specs and the human
    approves the change. Only a human approves.
 2. `/feature B-NNN` runs test-writer, then implementer, then reviewer (two rounds
    at most), with one commit per phase.
@@ -167,5 +170,8 @@ endings.
 
 ## Git
 
-Work on a `feat/...` branch, never directly on `main`. Do not push and do not open
-pull requests unless the human asks.
+Work on a `feat/...` branch in a worktree of its own under `.claude/worktrees/`,
+never directly on `main`. Never run `git switch` or `git checkout` in the main
+checkout: several sessions share it. A backlog item's number comes from
+`scripts/claim_item.py` and never changes; on a clash, stop and report instead of
+renumbering. Do not push and do not open pull requests unless the human asks.

@@ -17,6 +17,12 @@ with the reason.
 - `building`: on its branch, through tests, code and review.
 - `done`: closed by `/feature`; it ships when its pull request is merged.
 
+An item's number, branch and worktree come from
+`uv run python scripts/claim_item.py <short-name>` when its brief starts, never
+from this file: a brief reaches `main` only when its pull request merges. A
+number is final, and a dropped item leaves a gap. `--list` shows the items in
+flight and the spec files each one changes.
+
 An item looks like this:
 
 ```md
