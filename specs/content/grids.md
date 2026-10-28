@@ -38,18 +38,21 @@ party.
 
    The word runs from the first cell to the cell before the first non-letter cell
    or the grid edge. The first cell must be a letter cell inside the grid.
-4. An answer is kept as written. Two things are derived from it, never stored:
+4. An answer is kept as written. Its separators are the hyphen `-`, the dot `.`,
+   the space ` ` and the apostrophe (`'` and `’`, one and the same). Two things
+   are derived from it, never stored:
    - its letters, normalised in this order: the ligatures Œ, œ, Æ, æ expanded to
      OE, oe, AE, ae; accents dropped (Unicode NFD, combining marks removed);
-     spaces, hyphens and apostrophes (`'` and `’`) removed; uppercased. The
-     result must be one or more letters A to Z. The letters are the word's
-     solution: every check and the room's solution read them;
-   - its breaks, the hyphens `-` of a compound word, each counted as the number
-     of letters before it (`ARC-EN-CIEL`: after 3 and 5). A hyphen must have a
-     letter right before it and right after it, as written: an answer that
-     starts or ends with one, or holds two in a row, or one beside a space or an
-     apostrophe, is refused, naming the answer. Spaces and apostrophes leave no
-     break.
+     the separators removed; uppercased. The result must be one or more letters
+     A to Z. The letters are the word's solution: every check and the room's
+     solution read them;
+   - its breaks: each separator, counted as the number of letters before it:
+     `ARC-EN CIEL` breaks after 3 and 5; `A.I`, `A I` and `A-I` give the
+     letters `AI` and a break after 1; `AUJOURD'HUI` after 7. A separator must
+     have a letter right before it and right after it, as written: an answer
+     that starts or ends with one, or holds two in a row, is refused, naming
+     the answer: `.AI`, `A.I.`, `A..I`, `A.-I`, `A  I`, `-ARC`, `ARC-`,
+     `ARC- EN`.
 5. Every message that names a position writes it `(row, column)`, for example
    `(0, 5)`. An edge is named by its two cells, the first one first.
 
@@ -66,8 +69,8 @@ party.
       cells or edges) is exactly one clue's word;
    7. crossing words agree on their shared letter;
    8. two words that share an edge (a word starting inside a longer run) agree
-      on its hyphen: a break of one after the cell before the edge is a break
-      of the other.
+      on its break: a break of one after the cell before the edge is a break
+      of the other, whatever the separator of each.
 
    A `.ipuz` file adds the checks of `content/grid-files.md` rule 12 to this
    order.
@@ -105,8 +108,9 @@ party.
 - **AC-3** An answer keeps its text and derives its letters and breaks by rule 4:
   `ÊTRE` gives the letters `ETRE`; `ARC-EN-CIEL` stays `ARC-EN-CIEL` once
   loaded, with the letters `ARCENCIEL` and breaks after 3 and 5; `AUJOURD'HUI`
-  gives `AUJOURDHUI` and no break, `CŒUR` `COEUR`; `R2D2` and `- -` are refused.
-  (← 002 AC-3)
+  gives `AUJOURDHUI` and a break after 7; `A.I`, `A I` and `A-I` each stay as
+  written, with the letters `AI` and a break after 1; `CŒUR` `COEUR`; `R2D2`
+  and `- -` are refused. (← 002 AC-3)
 - **AC-4** FX-01, in the model's JSON, survives load, save and load with no
   difference. (← 002 AC-4)
 - **AC-5** A grid without exactly one cell per position is refused, and the error
@@ -137,13 +141,13 @@ party.
   (← 005 AC-4)
 - **AC-19** The client scan of rules 10 and 11 finds nothing in `web/src/` and
   `web/index.html`, and flags its forbidden samples. (← 005 AC-5)
-- **AC-20** A hyphen not between two letters is refused, naming the answer:
-  `-ARC`, `ARC-`, `ARC--EN` and `ARC- EN` each fail, while `ARC-EN CIEL` loads
-  with one break, after 3.
-- **AC-21** Two words sharing an edge that disagree on its hyphen are refused,
+- **AC-20** A separator not between two letters is refused, naming the answer:
+  `-ARC`, `ARC-`, `ARC--EN`, `ARC- EN`, `.AI`, `A.I.`, `A..I`, `A.-I` and
+  `A  I` each fail, while `ARC-EN CIEL` loads with breaks after 3 and 5.
+- **AC-21** Two words sharing an edge that disagree on its break are refused,
   naming both answers and the edge: `VI-DE` across from (1, 0) with `IDE` across
-  from (1, 1) names `VI-DE`, `IDE` and `(1, 1)`, `(1, 2)`; with `I-DE` the grid
-  loads. The check comes last, after the crossing check.
+  from (1, 1) names `VI-DE`, `IDE` and `(1, 1)`, `(1, 2)`; with `I-DE`, and
+  with `I DE`, the grid loads. The check comes last, after the crossing check.
 
 ## Edge cases
 
@@ -154,11 +158,12 @@ party.
   order: for example a too-short answer wins over the crossing check (AC-6 to
   AC-11, AC-21).
 - An answer's length (AC-7) and its crossings (AC-11) are counted in letters:
-  `VI-DE` fits four cells (AC-3).
-- Crossing words never share an edge: an across hyphen and a down hyphen at
-  the same cell are both kept (AC-21).
-- A grid stored by a room before answers kept their hyphens holds letters only
-  (`ARCENCIEL`), so it loads with no break (AC-3).
+  `VI-DE` fits four cells, `A.I` two (AC-3).
+- Crossing words never share an edge: an across break and a down break at the
+  same cell are both kept (AC-21).
+- A room holds its grid's answers as written, so their breaks follow rule 4 as
+  it stands; a room stored before answers were kept as written holds letters
+  only (`ARCENCIEL`), so it loads with no break (AC-3).
 - Cells may be listed in any order in the model's JSON (AC-1).
 - `tests/` and `scripts/` are not scanned; `web/dist/`, `web/node_modules/` and
   `web/public/` are not scanned (AC-18, AC-19).
@@ -167,7 +172,7 @@ party.
 
 - A grid editor and grid generation.
 - Reporting more than one problem per import.
-- Breaks for spaces and apostrophes (`AUJOURD'HUI` draws nothing); the hyphen
+- A look of its own per separator (every break is drawn alike), the separators
   in the clue bar or a length pattern. What a break looks like on the grid:
   `gameplay/board.md`; how it reaches the browser: `platform/realtime.md`.
 - The grid files, the index, credits and withdrawal: `content/grid-files.md`.

@@ -10,8 +10,9 @@ Choices where the spec leaves room:
   "2" too, so that only the length check of rule 6 can compete with the `cells`
   check. That the message is not the length check's is read from the answer `SE`
   not being quoted in it.
-- AC-15: "0-5" and "2--3" are refused like the criterion's samples, since
-  rule 9 asks for counts of one or more.
+- AC-15: ".5", "0", "0-5", "2--3" and "1.1." are refused like the criterion's
+  samples, since rule 9 asks for counts of one or more joined by single
+  separators.
 """
 
 from __future__ import annotations
@@ -218,7 +219,27 @@ def test_ac15_an_enumeration_that_counts_the_letters_loads(
     assert read_data(data) == read_data(fx01_ipuz_data())
 
 
-@pytest.mark.parametrize("enumeration", ["4", "2 3", "2'3", "5-", "0-5", "2--3"])
+@pytest.mark.parametrize(
+    ("enumeration", "answer", "breaks"),
+    [("2 3", "TA MIS", (2,)), ("2'3", "TA'MIS", (2,)), ("2.3", "TA.MIS", (2,))],
+)
+def test_ac15_an_enumeration_with_a_separator_gives_the_answer_its_break(
+    enumeration: str, answer: str, breaks: tuple[int, ...]
+) -> None:
+    data = fx01_ipuz_data()
+    clue_named(data, "Passoire fine")["enumeration"] = enumeration
+
+    clue = cell_with_clues(read_data(data).grid, 0, 0).clues[0]
+
+    assert clue.answer == answer
+    assert clue.letters == "TAMIS"
+    assert clue.breaks == breaks
+
+
+@pytest.mark.parametrize(
+    "enumeration",
+    ["4", "5-", "5.", ".5", "0", "0-5", "2--3", "2  3", "2,3", "1.1."],
+)
 def test_ac15_an_enumeration_that_is_not_the_letters_counted_is_refused(
     enumeration: str,
 ) -> None:

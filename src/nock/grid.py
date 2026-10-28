@@ -13,8 +13,7 @@ Edge = tuple[Position, Position]  # two neighbouring cells of a word, first one 
 
 _LIGATURES = {"Œ": "OE", "œ": "oe", "Æ": "AE", "æ": "ae"}
 _RIGHT_SINGLE_QUOTE = chr(0x2019)
-_HYPHEN = "-"
-_REMOVED_CHARACTERS = {" ", _HYPHEN, "'", _RIGHT_SINGLE_QUOTE}
+_SEPARATORS = {"-", ".", " ", "'", _RIGHT_SINGLE_QUOTE}
 _ALLOWED_LETTERS = set("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 
@@ -46,8 +45,7 @@ def _format_position(row: int, column: int) -> str:
 def _letters_of(text: str) -> str:
     """Return the letters of a text, uppercased, without checking them.
 
-    Ligatures are expanded, accents folded, and spaces, hyphens and apostrophes
-    removed.
+    Ligatures are expanded, accents folded, and the separators removed.
     """
     expanded_text = text
     for ligature, expansion in _LIGATURES.items():
@@ -58,7 +56,7 @@ def _letters_of(text: str) -> str:
     for character in decomposed:
         if unicodedata.category(character) == "Mn":
             continue
-        if character in _REMOVED_CHARACTERS:
+        if character in _SEPARATORS:
             continue
         kept_characters.append(character)
     return "".join(kept_characters).upper()
@@ -67,8 +65,8 @@ def _letters_of(text: str) -> str:
 def normalize_answer(text: str) -> str:
     """Normalise an answer to uppercase A to Z only: its letters.
 
-    Ligatures are expanded, accents folded, and spaces, hyphens and apostrophes
-    removed.
+    Ligatures are expanded, accents folded, and the separators (hyphen, dot,
+    space, apostrophe) removed.
 
     Args:
         text: The answer as written, possibly with accents or punctuation.
@@ -90,53 +88,73 @@ def normalize_answer(text: str) -> str:
     return result
 
 
-def _check_hyphens(text: str) -> None:
-    """Check that every hyphen of an answer has a letter right before and after.
+def _check_separators(text: str) -> None:
+    """Check that every separator of an answer has a letter right before and after.
 
     Args:
         text: The answer as written.
 
     Raises:
-        ValueError: if a hyphen starts or ends the answer, or sits beside another
-            hyphen, a space or an apostrophe.
+        ValueError: if a separator starts or ends the answer, or sits beside
+            another separator.
     """
     last_index = len(text) - 1
     for index, character in enumerate(text):
-        if character != _HYPHEN:
+        if character not in _SEPARATORS:
             continue
         if index == 0 or index == last_index:
             raise ValueError(
-                f'answer "{text}" starts or ends with a hyphen, '
-                "expected each hyphen between two letters"
+                f'answer "{text}" starts or ends with a separator, '
+                "expected each separator between two letters"
             )
         before = text[index - 1]
         after = text[index + 1]
-        if before in _REMOVED_CHARACTERS or after in _REMOVED_CHARACTERS:
+        if before in _SEPARATORS or after in _SEPARATORS:
             raise ValueError(
-                f'answer "{text}" has a hyphen beside a hyphen, a space or an '
-                "apostrophe, expected each hyphen between two letters"
+                f'answer "{text}" has two separators in a row, '
+                "expected each separator between two letters"
             )
 
 
-def _breaks_of(text: str) -> tuple[int, ...]:
-    """Return the breaks of an answer: the number of letters before each hyphen.
+def separators_of(text: str) -> tuple[str, ...]:
+    """Return the separators of an answer, one per break, in reading order.
 
     Args:
         text: The answer as written.
 
     Returns:
-        One count per hyphen, in reading order.
+        The separator of each break; the right single quote is given as `'`.
+    """
+    separators: list[str] = []
+    for character in text:
+        if character not in _SEPARATORS:
+            continue
+        if character == _RIGHT_SINGLE_QUOTE:
+            separators.append("'")
+        else:
+            separators.append(character)
+    return tuple(separators)
+
+
+def _breaks_of(text: str) -> tuple[int, ...]:
+    """Return the breaks of an answer: the number of letters before each separator.
+
+    Args:
+        text: The answer as written.
+
+    Returns:
+        One count per separator, in reading order.
     """
     breaks: list[int] = []
     for index, character in enumerate(text):
-        if character == _HYPHEN:
+        if character in _SEPARATORS:
             letters_before = _letters_of(text[:index])
             breaks.append(len(letters_before))
     return tuple(breaks)
 
 
 def _check_answer(text: str) -> str:
-    """Check an answer as written: it has letters, and its hyphens are well placed.
+    """Check an answer as written: it has letters, and its separators are well placed.
 
     Args:
         text: The answer as written.
@@ -148,7 +166,7 @@ def _check_answer(text: str) -> str:
         ValueError: if the answer breaks rule 4 of the grid model.
     """
     normalize_answer(text)
-    _check_hyphens(text)
+    _check_separators(text)
     return text
 
 
@@ -172,7 +190,7 @@ class Clue(BaseModel):
 
     @property
     def breaks(self) -> tuple[int, ...]:
-        """The answer's hyphens, each counted as the number of letters before it."""
+        """The answer's breaks: the letters before each separator."""
         return _breaks_of(self.answer)
 
 
@@ -319,7 +337,7 @@ class Grid(BaseModel):
         return positions
 
     def hyphen_edges(self, row: int, column: int, clue_index: int) -> list[Edge]:
-        """Return the edges where a clue's answer has a hyphen.
+        """Return the edges where a clue's answer has a break, whatever its separator.
 
         The clue is clue `clue_index` of the clue cell at (row, column). Its word
         must have as many cells as the answer has letters.
@@ -330,7 +348,7 @@ class Grid(BaseModel):
             clue_index: Index of the clue in that cell.
 
         Returns:
-            One (cell before, cell after) pair per hyphen, in reading order.
+            One (cell before, cell after) pair per break, in reading order.
 
         Raises:
             IndexError: if (row, column) is outside the grid, clue_index is not a

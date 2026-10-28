@@ -1,13 +1,14 @@
-"""Tests of grids AC-20 and AC-21: compound words.
+"""Tests of grids AC-20 and AC-21: separators and breaks.
 
-AC-20: a hyphen must sit between two letters of its answer. AC-21: two words
-that share an edge agree on its hyphen, a check that comes after the crossing
-check. The answers are read through `Clue` and `import_grid`.
+AC-20: a separator must sit between two letters of its answer. AC-21: two words
+that share an edge agree on its break, whatever the separator of each, a check
+that comes after the crossing check. The answers are read through `Clue` and
+`import_grid`.
 
 Choices where the spec leaves room:
 
-- AC-20, "one beside a space or an apostrophe" (rule 4): `ARC -EN`, `ARC-'EN` and
-  `ARC` + right single quote + `-EN` are refused like the criterion's four samples.
+- AC-20, rule 4: `ARC -EN`, `ARC-'EN` and `ARC` + right single quote + `-EN` hold
+  two separators in a row and are refused like the criterion's nine samples.
 - AC-21: the shared edge is tested both ways, a break in the longer word only and
   in the shorter word only; its two cells are named in reading order.
 """
@@ -29,7 +30,9 @@ RIGHT_SINGLE_QUOTE = chr(0x2019)
 
 def names(message: str, answer: str) -> bool:
     """Tell whether a message names an answer as a whole, not inside another."""
-    pattern = r"(?<![A-Za-z'\-])" + re.escape(answer) + r"(?![A-Za-z'\-])"
+    before = r"(?<![A-Za-z\-'])(?<![A-Za-z]\.)"
+    after = r"(?![A-Za-z\-'])(?!\.[A-Za-z])"
+    pattern = before + re.escape(answer) + after
     return re.search(pattern, message) is not None
 
 
@@ -56,13 +59,18 @@ def import_error(text: str) -> str:
     return str(error.value)
 
 
-# ---- AC-20: a hyphen sits between two letters -------------------------------------
+# ---- AC-20: a separator sits between two letters -------------------------------------
 
 REFUSED_ANSWERS = [
     "-ARC",
     "ARC-",
     "ARC--EN",
     "ARC- EN",
+    ".AI",
+    "A.I.",
+    "A..I",
+    "A.-I",
+    "A  I",
     "ARC -EN",
     "ARC-'EN",
     "ARC" + RIGHT_SINGLE_QUOTE + "-EN",
@@ -70,7 +78,7 @@ REFUSED_ANSWERS = [
 
 
 @pytest.mark.parametrize("answer", REFUSED_ANSWERS)
-def test_ac20_a_hyphen_not_between_two_letters_is_refused_naming_the_answer(
+def test_ac20_a_separator_not_between_two_letters_is_refused_naming_the_answer(
     answer: str,
 ) -> None:
     with pytest.raises(ValidationError) as error:
@@ -88,13 +96,18 @@ def run_grid(answer: str, length: int) -> str:
     return json.dumps({"width": length + 1, "height": 1, "cells": cells})
 
 
-def test_ac20_a_grid_file_with_a_misplaced_hyphen_is_refused_naming_it() -> None:
-    message = import_error(run_grid("ARC-", 3))
+@pytest.mark.parametrize(
+    ("answer", "length"), [("ARC-", 3), ("A.I.", 2), ("A  I", 2)], ids=str
+)
+def test_ac20_a_grid_with_a_misplaced_separator_is_refused_naming_it(
+    answer: str, length: int
+) -> None:
+    message = import_error(run_grid(answer, length))
 
-    assert names(message, "ARC-"), message
+    assert names(message, answer), message
 
 
-def test_ac20_a_hyphen_then_a_space_between_words_loads_with_one_break() -> None:
+def test_ac20_a_hyphen_then_a_space_between_words_loads_with_two_breaks() -> None:
     report = import_grid(run_grid("ARC-EN CIEL", 9))
 
     cell = report.grid.cell_at(0, 0)
@@ -102,10 +115,10 @@ def test_ac20_a_hyphen_then_a_space_between_words_loads_with_one_break() -> None
     clue = cell.clues[0]
     assert clue.answer == "ARC-EN CIEL"
     assert clue.letters == "ARCENCIEL"
-    assert clue.breaks == (3,)
+    assert clue.breaks == (3, 5)
 
 
-# ---- AC-21: words sharing an edge agree on its hyphen ------------------------------
+# ---- AC-21: words sharing an edge agree on its break ------------------------------
 
 
 def shared_edge_grid(long_answer: str, short_answer: str, down_answer: str) -> str:
@@ -134,10 +147,15 @@ def shared_edge_grid(long_answer: str, short_answer: str, down_answer: str) -> s
 
 @pytest.mark.parametrize(
     ("long_answer", "short_answer"),
-    [("VI-DE", "IDE"), ("VIDE", "I-DE")],
-    ids=["break-in-the-long-word", "break-in-the-short-word"],
+    [("VI-DE", "IDE"), ("VIDE", "I-DE"), ("VI DE", "IDE"), ("VIDE", "I.DE")],
+    ids=[
+        "break-in-the-long-word",
+        "break-in-the-short-word",
+        "space-in-the-long-word",
+        "dot-in-the-short-word",
+    ],
 )
-def test_ac21_words_sharing_an_edge_that_disagree_on_its_hyphen_are_refused(
+def test_ac21_words_sharing_an_edge_that_disagree_on_its_break_are_refused(
     long_answer: str, short_answer: str
 ) -> None:
     message = import_error(shared_edge_grid(long_answer, short_answer, "DO"))
@@ -151,9 +169,14 @@ def test_ac21_words_sharing_an_edge_that_disagree_on_its_hyphen_are_refused(
 
 @pytest.mark.parametrize(
     ("long_answer", "short_answer", "breaks"),
-    [("VI-DE", "I-DE", ((2,), (1,))), ("VIDE", "IDE", ((), ()))],
+    [
+        ("VI-DE", "I-DE", ((2,), (1,))),
+        ("VI-DE", "I DE", ((2,), (1,))),
+        ("VI.DE", "I'DE", ((2,), (1,))),
+        ("VIDE", "IDE", ((), ())),
+    ],
 )
-def test_ac21_words_that_agree_on_the_hyphen_of_their_edge_load(
+def test_ac21_words_that_agree_on_the_break_of_their_edge_load(
     long_answer: str, short_answer: str, breaks: tuple[tuple[int, ...], ...]
 ) -> None:
     report = import_grid(shared_edge_grid(long_answer, short_answer, "DO"))
@@ -167,7 +190,7 @@ def test_ac21_words_that_agree_on_the_hyphen_of_their_edge_load(
     assert report.word_count == 3
 
 
-def test_ac21_the_crossing_check_comes_before_the_hyphen_check() -> None:
+def test_ac21_the_crossing_check_comes_before_the_break_check() -> None:
     # XO disagrees with VI-DE and IDE at (1, 2), and IDE has no hyphen there.
     message = import_error(shared_edge_grid("VI-DE", "IDE", "XO"))
 
@@ -175,7 +198,7 @@ def test_ac21_the_crossing_check_comes_before_the_hyphen_check() -> None:
     assert "(1, 2)" in message, message
 
 
-def test_ac21_an_across_and_a_down_hyphen_after_one_cell_are_both_kept(
+def test_ac21_an_across_and_a_down_break_after_one_cell_are_both_kept(
     fx01_text: str,
 ) -> None:
     # TA-MIS breaks after (1, 1) across, NA-VAL after (1, 1) down.

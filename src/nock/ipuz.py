@@ -26,6 +26,7 @@ from nock.grid import (
     Grid,
     LetterCell,
     Position,
+    separators_of,
 )
 from nock.grid_import import GridImportError, check_arrows, check_words
 
@@ -60,16 +61,24 @@ _REQUIRED_KEYS = (
     "difficulty",
 )
 _OPTIONAL_KEYS = ("block", "empty", "solution", *OPTIONAL_TEXT_FIELDS)
-_IGNORED_KEYS = ("notes", "intro", "explanation", "annotation", "charset")
+_IGNORED_KEYS = (
+    "notes",
+    "intro",
+    "explanation",
+    "annotation",
+    "charset",
+    "showenumerations",
+)
 _TOP_LEVEL_KEYS = (*_REQUIRED_KEYS, *_OPTIONAL_KEYS, *_IGNORED_KEYS)
 _REQUIRED_CLUE_KEYS = ("clue", "location", "cells", "answer")
 _CLUE_KEYS = (*_REQUIRED_CLUE_KEYS, "enumeration")
 
 _MAX_AUTHOR_LENGTH = 200
 _DATE_PATTERN = re.compile(r"([0-9]{2})/([0-9]{2})/([0-9]{4})")
-_ENUMERATION_PATTERN = re.compile(r"[0-9]+(?:-[0-9]+)*")
+_ENUMERATION_PATTERN = re.compile(r"[0-9]+(?:[-. '][0-9]+)*")
+_COUNT_PATTERN = re.compile(r"[0-9]+")
+_SEPARATOR_PATTERN = re.compile(r"[^0-9]")
 _DASHED_LETTERS = "TRBL"
-_HYPHEN = "-"
 _FORCE_OF_TEXT = {"1": 1, "2": 2, "3": 3, "4": 4}
 
 
@@ -122,7 +131,7 @@ class _ClueFacts(NamedTuple):
     """What a file says about a clue that the model does not keep."""
 
     cells: list[Position]
-    breaks: tuple[int, ...] | None  # the enumeration's breaks, None without one
+    enumeration: str | None  # as written in the file, None without one
 
 
 ClueKey = tuple[Position, int]  # a clue cell and the index of the clue in it
@@ -455,14 +464,14 @@ def _arrow_of(raw: _RawClue) -> Arrow:
 
 
 def _read_counts(enumeration: str, name: str) -> list[int]:
-    """Read an enumeration: counts of one or more letters joined by hyphens."""
+    """Read an enumeration: counts of one or more letters joined by separators."""
     if _ENUMERATION_PATTERN.fullmatch(enumeration) is None:
         raise IpuzError(
             f"{name} has the enumeration {enumeration!r}, expected counts of "
-            "letters joined by hyphens, like 3-2-5"
+            "letters joined by single separators (- . space '), like 3-2-5"
         )
     counts: list[int] = []
-    for part in enumeration.split(_HYPHEN):
+    for part in _COUNT_PATTERN.findall(enumeration):
         count = int(part)
         if count < 1:
             raise IpuzError(
@@ -473,24 +482,31 @@ def _read_counts(enumeration: str, name: str) -> list[int]:
     return counts
 
 
-def _breaks_of_counts(counts: list[int]) -> tuple[int, ...]:
-    """Return the breaks of an enumeration: the letters before each hyphen."""
-    breaks: list[int] = []
-    letters_so_far = 0
-    for count in counts[:-1]:
-        letters_so_far += count
-        breaks.append(letters_so_far)
-    return tuple(breaks)
+def _join_counts(pieces: list[str], separators: tuple[str, ...]) -> str:
+    """Write pieces one after the other, each pair joined by its separator."""
+    text = pieces[0]
+    for index, separator in enumerate(separators):
+        text += separator + pieces[index + 1]
+    return text
 
 
-def _hyphenate(letters: str, counts: list[int]) -> str:
-    """Write letters with a hyphen after each count of an enumeration."""
+def _normalized_enumeration(enumeration: str) -> str:
+    """Write an enumeration by its counts and separators, without leading zeros."""
+    counts: list[str] = []
+    for part in _COUNT_PATTERN.findall(enumeration):
+        counts.append(str(int(part)))
+    separators = tuple(_SEPARATOR_PATTERN.findall(enumeration))
+    return _join_counts(counts, separators)
+
+
+def _separate(letters: str, counts: list[int], separators: tuple[str, ...]) -> str:
+    """Write letters with a separator after each count of an enumeration."""
     pieces: list[str] = []
     start = 0
     for count in counts:
         pieces.append(letters[start : start + count])
         start += count
-    return _HYPHEN.join(pieces)
+    return _join_counts(pieces, separators)
 
 
 def _make_clue(raw: _RawClue, text: str, arrow: Arrow) -> tuple[Clue, _ClueFacts]:
@@ -500,8 +516,9 @@ def _make_clue(raw: _RawClue, text: str, arrow: Arrow) -> tuple[Clue, _ClueFacts
         written_clue = Clue(text=text, arrow=arrow, answer=raw.answer)
     except ValidationError as error:
         raise IpuzError(f"{name} is invalid: {error}") from error
+    facts = _ClueFacts(raw.cells, raw.enumeration)
     if raw.enumeration is None:
-        return written_clue, _ClueFacts(raw.cells, None)
+        return written_clue, facts
 
     counts = _read_counts(raw.enumeration, name)
     letters = written_clue.letters
@@ -510,12 +527,11 @@ def _make_clue(raw: _RawClue, text: str, arrow: Arrow) -> tuple[Clue, _ClueFacts
             f"{name} has the enumeration {raw.enumeration!r}, which counts "
             f"{sum(counts)} letters, but the answer {raw.answer} has {len(letters)}"
         )
-    breaks = _breaks_of_counts(counts)
-    facts = _ClueFacts(raw.cells, breaks)
-    if _HYPHEN in raw.answer or len(breaks) == 0:
+    if len(written_clue.breaks) > 0 or len(counts) == 1:
         return written_clue, facts
-    hyphenated_answer = _hyphenate(letters, counts)
-    return Clue(text=text, arrow=arrow, answer=hyphenated_answer), facts
+    separators = separators_of(raw.enumeration)
+    separated_answer = _separate(letters, counts, separators)
+    return Clue(text=text, arrow=arrow, answer=separated_answer), facts
 
 
 # ---- Reading: building the model and checking it --------------------------------
@@ -642,24 +658,26 @@ def _check_solution(data: JsonObject, grid: Grid, block: str) -> None:
 
 
 def _check_enumerations(grid: Grid, facts_by_clue: dict[ClueKey, _ClueFacts]) -> None:
-    """Check that each answer and its enumeration agree on their hyphens."""
+    """Check that each answer and its enumeration agree on their separators."""
     for clue_cell in _clue_cells(grid):
         location = (clue_cell.row, clue_cell.column)
         for index, clue in enumerate(clue_cell.clues):
-            enumeration_breaks = facts_by_clue[(location, index)].breaks
-            if enumeration_breaks is None or clue.breaks == enumeration_breaks:
+            enumeration = facts_by_clue[(location, index)].enumeration
+            if enumeration is None:
+                continue
+            if _normalized_enumeration(enumeration) == _written_enumeration(clue):
                 continue
             name = _clue_name(location, clue.text)
             raise IpuzError(
-                f"{name} has the answer {clue.answer}, whose hyphens do not agree "
-                "with its enumeration"
+                f"{name} has the answer {clue.answer}, whose separators do not "
+                f"agree with its enumeration {enumeration!r}"
             )
 
 
-def _hyphen_edges(grid: Grid) -> list[Edge]:
-    """Return the hyphen edges of every word of a grid, each one once.
+def _break_edges(grid: Grid) -> list[Edge]:
+    """Return the edges of the breaks of every word of a grid, each one once.
 
-    Two words that share an edge agree on its hyphen, so it is listed once.
+    Two words that share an edge agree on its break, so it is listed once.
     """
     edges: list[Edge] = []
     for clue_cell in _clue_cells(grid):
@@ -695,23 +713,23 @@ def _dashed_edges(layout: _Layout) -> list[Edge]:
 
 
 def _check_dashed_edges(grid: Grid, layout: _Layout) -> None:
-    """Check that the dashed edges are the hyphen edges, when any is drawn."""
+    """Check that the dashed edges are the edges of the breaks, when any is drawn."""
     if len(layout.dashed_letters) == 0:
         return
-    hyphen_edges = _hyphen_edges(grid)
+    break_edges = _break_edges(grid)
     dashed_edges = _dashed_edges(layout)
     for edge in dashed_edges:
-        if edge in hyphen_edges:
+        if edge in break_edges:
             continue
         name = _format_edge(edge, grid)
         raise IpuzError(
-            f"the dashed edge {name} is not the edge of a hyphen between two letter "
+            f"the dashed edge {name} is not the edge of a break between two letter "
             "cells"
         )
-    for edge in hyphen_edges:
+    for edge in break_edges:
         if edge not in dashed_edges:
             raise IpuzError(
-                f"the hyphen edge {_format_edge(edge, grid)} is not dashed, while "
+                f"the break edge {_format_edge(edge, grid)} is not dashed, while "
                 "other edges are"
             )
 
@@ -778,9 +796,9 @@ def _written_position(position: Position) -> list[int]:
 
 
 def _written_dashed_letters(grid: Grid) -> dict[Position, str]:
-    """Return the `dashed` letters of each letter cell that starts a hyphen edge."""
+    """Return the `dashed` letters of each letter cell that starts a break edge."""
     letters_by_position: dict[Position, str] = {}
-    for cell_before, cell_after in _hyphen_edges(grid):
+    for cell_before, cell_after in _break_edges(grid):
         is_across = cell_before[0] == cell_after[0]
         letter = "R" if is_across else "B"
         already_written = letters_by_position.get(cell_before, "")
@@ -821,11 +839,12 @@ def _written_solution(grid: Grid) -> list[list[str]]:
 
 def _written_enumeration(clue: Clue) -> str:
     """Write the enumeration of a clue: the letters between its breaks."""
+    separators = separators_of(clue.answer)
     boundaries = [0, *clue.breaks, len(clue.letters)]
     counts: list[str] = []
     for index in range(len(boundaries) - 1):
         counts.append(str(boundaries[index + 1] - boundaries[index]))
-    return _HYPHEN.join(counts)
+    return _join_counts(counts, separators)
 
 
 def _written_clues(grid: Grid) -> list[JsonObject]:

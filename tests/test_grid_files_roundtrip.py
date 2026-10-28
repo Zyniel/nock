@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from grid_files_harness import (
     JsonData,
     clue_named,
     fx01_ipuz_data,
+    mini_data,
     read_data,
 )
 from nock.ipuz import read_ipuz, write_ipuz
@@ -29,12 +32,12 @@ def written_json(data: JsonData) -> JsonData:
     return json.loads(write_ipuz(read_data(data)))
 
 
-def vide_across_data() -> JsonData:
+def vide_across_data(answer: str = "VI-DE", enumeration: str = "2-2") -> JsonData:
     """FX-01 with `VI-DE` across from (2, 1), the clue `Sans contenu` at (2, 0)."""
     data = fx01_ipuz_data()
     clue = clue_named(data, "Sans contenu")
-    clue["answer"] = "VI-DE"
-    clue["enumeration"] = "2-2"
+    clue["answer"] = answer
+    clue["enumeration"] = enumeration
     return data
 
 
@@ -95,17 +98,47 @@ def test_ac7_the_writer_writes_the_fields_of_rule_11_that_are_present() -> None:
     assert "url" not in written
 
 
-def test_ac7_a_compound_word_is_written_with_its_hyphen_and_its_dashed_edge() -> None:
-    first = read_data(vide_across_data())
+@pytest.mark.parametrize(
+    ("answer", "enumeration"),
+    [("VI-DE", "2-2"), ("VI.DE", "2.2"), ("VI DE", "2 2")],
+)
+def test_ac7_a_word_is_written_with_its_separator_and_its_dashed_edge(
+    answer: str, enumeration: str
+) -> None:
+    first = read_data(vide_across_data(answer, enumeration))
 
     written = json.loads(write_ipuz(first))
 
     clue = clue_named(written, "Sans contenu")
-    assert clue["answer"] == "VI-DE"
-    assert clue["enumeration"] == "2-2"
+    assert clue["answer"] == answer
+    assert clue["enumeration"] == enumeration
     dashed_cell = written["puzzle"][2][2]
     assert dashed_cell["style"] == {"dashed": "R"}
     assert str(dashed_cell["cell"]) == "0"
+    assert read_ipuz(write_ipuz(first)) == first
+
+
+@pytest.mark.parametrize(
+    ("answer", "letters", "enumeration"),
+    [
+        ("A.I", "AI", "1.1"),
+        ("A I", "AI", "1 1"),
+        ("A-I", "AI", "1-1"),
+        ("AUJOURD'HUI", "AUJOURDHUI", "7'3"),
+        ("AUJOURD" + chr(0x2019) + "HUI", "AUJOURDHUI", "7'3"),
+        ("ARC-EN CIEL", "ARCENCIEL", "3-2 4"),
+    ],
+)
+def test_ac7_the_writer_derives_the_enumeration_from_the_answer(
+    answer: str, letters: str, enumeration: str
+) -> None:
+    first = read_data(mini_data(answer, letters))
+
+    written = json.loads(write_ipuz(first))
+
+    clue = clue_named(written, "Indice")
+    assert clue["answer"] == answer
+    assert clue["enumeration"] == enumeration
     assert read_ipuz(write_ipuz(first)) == first
 
 

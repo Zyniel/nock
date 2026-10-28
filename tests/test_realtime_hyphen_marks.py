@@ -76,10 +76,15 @@ def fx01_grid(fx01_text: str) -> Grid:
     return Grid.model_validate_json(fx01_text)
 
 
+@pytest.mark.parametrize(
+    "separator", ["-", ".", " ", "'"], ids=["hyphen", "dot", "space", "apostrophe"]
+)
 def test_ac20_grid_view_marks_the_edges_of_vi_de_and_na_val(
-    hyphen_grid: Grid,
+    fx01_text: str, separator: str
 ) -> None:
-    view = grid_view(hyphen_grid)
+    # Every break of content/grids.md rule 4 sets a mark, whatever its separator.
+    answers = {"VIDE": f"VI{separator}DE", "NAVAL": f"NA{separator}VAL"}
+    view = grid_view(grid_with_answers(fx01_text, answers))
 
     marks = marks_of(view)
 
