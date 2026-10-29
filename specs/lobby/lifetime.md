@@ -96,7 +96,7 @@ deletes it with all its data.
 
 - `src/nock/room.py`: `RoomConfig.creator_solved_room_hours`,
   `creator_room_hours`, `anonymous_solved_room_hours`, `anonymous_room_hours`
-  (`int`, 24 to 8760, default 720), replacing `room_life_seconds`;
+  (`int`, 24 to 8760, default 720);
   `expiry_sweep_seconds` stays a float in seconds.
 - `src/nock/settings.py`: `room_config_from_env(environ: Mapping[str, str]) ->
   RoomConfig`: the four lives and the sweep interval from the environment, the
@@ -177,8 +177,9 @@ deletes it with all its data.
 ## Out of scope
 
 - A warning before expiry, extending or restoring a room, a log of how many
-  rooms a sweep deletes; changing the lives from `/ops`; the other durations (resume window, idle state, votes, sign-in links), each a
-  constant of its domain.
+  rooms a sweep deletes; changing the lives from `/ops`; the other durations
+  (resume window, idle state, votes, sign-in links), each a constant of its
+  domain.
 - The deletion of a creator room at its creator's erasure: `lobby/host.md` rule
   14. What a deletion erases for privacy: `admin/operations.md`. Summaries and
   « Mes salons »: `lobby/joining.md`. The `/ops` periods a life allows:
@@ -188,7 +189,7 @@ deletes it with all its data.
 
 - `src/nock/room.py`: `RoomConfig`; the one function that decides expiry.
 - `src/nock/store.py`: `room_times` (last edit time, solve time, creator), the
-  migration, the expired codes, deletion.
+  migration, deletion. It does not decide expiry.
 - `src/nock/hub.py`: the sweep, the lookups and their deletions.
 - `src/nock/server.py`: the app's sweep and the purge it paces.
   `src/nock/settings.py`, `src/nock/__main__.py`: the variables.
