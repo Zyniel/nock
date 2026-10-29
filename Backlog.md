@@ -1020,7 +1020,7 @@ others, at the top of the list.
   new Plan run.
 - Criteria: overrides AC-1 to AC-20 (new); operations, lifetime, product:
   no criterion changed (rules only)
-- Branch: feat/b-024-ops-overrides · PR: none yet
+- Branch: feat/b-024-ops-overrides · PR: #64
 - Problem: the room lives and the sweep interval are environment variables
   (`lobby/lifetime.md` rules 4, 7), so changing one means a restart, and the
   operator cannot see how many rooms a shorter life would delete.
