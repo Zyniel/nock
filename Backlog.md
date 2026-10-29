@@ -1287,7 +1287,7 @@ Before the human tags a release on `main`:
 - Domains: none (no behaviour change: `src/nock/server.py` only)
 - Architecture decision: no (private names of `server.py`)
 - Criteria: none new; the tests of `admin/overrides.md` prove nothing changed
-- Branch: feat/b-027-overrides-holder-order · PR: none yet
+- Branch: feat/b-027-overrides-holder-order · PR: #65
 - Problem: in `server.py`, `_RoomsHolder.settings_set()` answers None both for
   a registry given to the app and before any registry exists, which mean
   different things. It works today only because the lifespan calls
