@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: approved
+status: done
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -137,12 +137,6 @@ never send a clue or an answer.
   error line, brand link, plain on the catalogue).
 - The state lines: `_design/pages.md`, « States: opening, loading, empty,
   error ».
-
-## New interface
-
-- `web/src/lib/catalogue.ts`: `fetchAccountProgress(): Promise<Record<string,
-  unknown> | null>` (null on any failure) and `progressOf(number,
-  accountProgress)`, the merge of rule 7.
 
 ## Acceptance criteria
 

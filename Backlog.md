@@ -111,9 +111,10 @@ others, at the top of the list.
 
 ### B-005 Grid progress on the account
 
-- Status: building (spec 004's decision 8, 2026-10-10: progress shows "on my
+- Status: done (spec 004's decision 8, 2026-10-10: progress shows "on my
   device or account"; the human approved this brief with option A,
-  2026-10-29, and the spec change, 2026-10-30)
+  2026-10-29, the spec change and AC-24's rewording, 2026-10-30; review
+  approved in rounds 1 and 2)
 - Domains: account/account (the route), content/library (rule 7, the merge)
 - Architecture decision: yes (a new account route): options from the Plan
   agent on Fable; the human picked A

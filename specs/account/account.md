@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: approved
+status: done
 ---
 
 # account/account - Optional account
@@ -198,13 +198,6 @@ the player into « Ancien joueur » in the other rooms.
 - The account page and its deletion: `_design/pages.md` « Plain pages:
   account, shared recap, operator ».
 - Its lines: `_design/pages.md` « States: opening, loading, empty, error ».
-
-## New interface
-
-- `GET /api/account/progress` (`src/nock/server.py`, beside the history
-  route); `AccountStore.progress(account_id: str, peek_room: Callable[[str],
-  RoomState | None], created_codes: list[str]) -> dict[str, str]` in
-  `src/nock/accounts.py`.
 
 ## Acceptance criteria
 
