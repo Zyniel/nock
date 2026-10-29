@@ -34,6 +34,11 @@
 
   let dialog: HTMLDialogElement | null = $state(null)
 
+  // Close the dialog if it is open (client/hud.md rule 16: the room is gone).
+  export function close(): void {
+    dialog?.close()
+  }
+
   // Show the dialog over the page; the browser moves the focus into it.
   export function open(): void {
     if (dialog !== null && !dialog.open) {

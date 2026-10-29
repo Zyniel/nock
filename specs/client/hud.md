@@ -34,7 +34,8 @@ gives the Salon (`client/room.md`) its column or its sheet.
 3. Document order: the heading `room.heading` (« Salon <code> »), read but not
    seen; the top bar; the Aide menu and the Menu; the connection band; the
    status; the play area (vote banner, notes, grid, clue bar, reaction picker,
-   end band, in-app keyboard); the Salon; the scrim; the sheets and the recap.
+   end band, in-app keyboard); the Salon; the scrim; the sheets and the recap;
+   the room-gone dialog (rule 16).
 
 ### Top bar
 
@@ -57,8 +58,9 @@ gives the Salon (`client/room.md`) its column or its sheet.
    hides it, « Chrono » (`gameplay/rules.md` rule 13).
 7. While reconnecting, the connection band `room.banner.offline` shows under the
    top bar and pushes the play area down. The status line is read but not seen
-   while joined or reconnecting; once the room has shown, any other status is a
-   band under the top bar, without the connection band's dot.
+   while joined or reconnecting. Once the room has shown, `not_found` is the
+   room-gone dialog (rule 16); any other status is a band under the top bar,
+   without the connection band's dot.
 
 ### Menus
 
@@ -121,6 +123,20 @@ gives the Salon (`client/room.md`) its column or its sheet.
     page never scrolls, and the top bar and the clue bar stay in the window.
     The vote banner is drawn over the Salon sheet and the scrim.
 
+### Room gone
+
+16. Once the room has shown, `not_found` (the 4404 of a deleted room,
+    `lobby/joining.md` rule 16), joined or reconnecting, closes the menus, the
+    Salon sheet, the reaction picker, a room sheet and the recap, takes the
+    connection band away and drops the letters waiting to be sent. A modal
+    alert dialog then covers the page, named by its title `room.gone.title`
+    (« Ce salon n'existe plus. ») and described by
+    `room.status.not_found_detail`, with one control, the link `share.home`
+    (« Voir les grilles ») to `/`, which takes the focus. The room stays drawn
+    under it and inert: Escape, a press outside the dialog and the keys change
+    nothing, and Tab and Shift+Tab stay on the link. The page stays until the
+    player follows it.
+
 ### Look
 
 `_design/room.md`: « Which layout »; « Phone and upright tablet (sheet
@@ -128,9 +144,9 @@ layout) » and « Computer and landscape tablet (column layout) » for the play
 areas, with « Phone top bar », « Clue bar », « Computer top bar » and « Low
 column layout »; « Aide menu »; « Menu »; « Reactions »; « Connection lost »;
 « Room sheets: host settings and account »; « Layers ». The end band:
-`_design/overlays.md`, « End of grid ». Menus, buttons, switches, the brand
-link: `_design/foundation.md`, « Components »; the focus in menus and sheets,
-« Focus ».
+`_design/overlays.md`, « End of grid »; the room-gone dialog, « Room gone ».
+Menus, buttons, switches, the brand link: `_design/foundation.md`,
+« Components »; the focus in menus and sheets, « Focus ».
 
 ## Acceptance criteria
 
@@ -206,15 +222,32 @@ link: `_design/foundation.md`, « Components »; the focus in menus and sheets,
   Salon, each with its ring; at 360 by 740 in the phone bar's order. From the
   grid Escape then Tab reaches ‹, Escape then Shift+Tab « Menu ». Every state
   of the frame passes the scans of `product.md`. (← 043 AC-29, 043 AC-31)
+- **AC-21** Joined at 360 by 740 with the Salon sheet open, the room is
+  deleted: the sheet closes, no band shows under the top bar, and a modal alert
+  dialog named « Ce salon n'existe plus. », described by « Un salon est effacé
+  30 jours après sa dernière modification. », holds the focus on « Voir les
+  grilles », a link to `/`. At 1280 by 720 while reconnecting, with `T` typed
+  at (1, 0) and not yet answered, the connection band goes, (1, 0) is empty
+  and the dialog shows alike. Both follow « Room gone » and pass the scans of
+  `product.md`.
+- **AC-22** Under the room-gone dialog, with (1, 0) selected, Escape, a press on
+  the scrim, Tab and Shift+Tab leave the focus on « Voir les grilles » and the
+  dialog open; a typed `A` leaves (1, 0) empty; a press on the link loads `/`.
 
 ## Edge cases
 
 - A square window is a sheet (AC-1); help mode `none` keeps « Aide » (AC-6).
+- Removed by the host after the room showed: the status band, never the
+  room-gone dialog (AC-5).
+- A 4404 before the first snapshot: the entry card (`client/shell.md` rule 7),
+  not the dialog (AC-21).
 
 ## Out of scope
 
 - A question before leaving the room; a brand on the phone top bar, where
   « Retour aux grilles » is the way home.
+- Room gone: leaving by itself after a delay; a dialog for a removed player or
+  another final status; forgetting the deleted room's stored identity.
 - The Salon, what « Salon » carries while it is closed, the 3-second notes:
   `client/room.md`. « Réagir », « Je bloque », the reactions: `social/chat.md`.
 - What items, sheets, lines and rows do: the domains each rule names. The page
@@ -223,6 +256,7 @@ link: `_design/foundation.md`, « Components »; the focus in menus and sheets,
 ## Code
 
 - `web/src/lib/RoomPage.svelte` (layout, overlays, play area) and its parts:
-  `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `ClueBar` (`.svelte`);
-  `windowForm.ts`.
-- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`.
+  `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `ClueBar`,
+  `RoomGoneDialog` (`.svelte`); `windowForm.ts`.
+- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
+  `tests/test_hud_*`, `tests/hud_harness.py`.

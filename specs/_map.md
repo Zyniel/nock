@@ -43,7 +43,7 @@ table, the naming rules and the glossary follow in the same change.
 | platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
 | platform | `platform/server.md` | durable state, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
-| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar and play area | room | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
+| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
@@ -70,8 +70,9 @@ then nothing of race or teams is built.
   components, focus, how conformance is checked), `cells.md` (grid cells,
   Auteurs mode), `room.md` (the room page: layouts, top bar, Aide, Menu, Salon,
   notes, reactions, connection lost, sheets, layers), `overlays.md` (vote, end of
-  grid, recap), `pages.md` (catalogue, entry and not-found pages, plain pages,
-  loading, empty and error states). The drawings are in `docs/design/`.
+  grid, recap, room gone), `pages.md` (catalogue, entry and not-found pages,
+  plain pages, loading, empty and error states). The drawings are in
+  `docs/design/`.
 - `_template.md`: the format of a domain spec.
 - `_archive/v1.1.0/`: the numbered specs once their domains are written.
 - `Backlog.md`, at the repository root: the work queue (briefs, the status of

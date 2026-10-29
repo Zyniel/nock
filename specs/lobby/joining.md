@@ -135,9 +135,11 @@ account. A room lives 30 days after its last edit.
     lookup that meets one (a socket, a summary) deletes it first. Deletion removes
     the room, its log, its snapshots and its share token, closes every socket
     opened to it, joined or not, with 4404 and nothing else, and writes no log
-    entry. The code may then be drawn again, where an old token matches nobody.
-    Until the deletion, a live room's open sockets keep working. A sweep that
-    fails is logged at WARNING or above, and the next one runs.
+    entry; a page that had shown the room then shows the room-gone dialog
+    (`client/hud.md` rule 16). The code may then be drawn again, where an old
+    token matches nobody. Until the deletion, a live room's open sockets keep
+    working. A sweep that fails is logged at WARNING or above, and the next one
+    runs.
 
 ### Summaries and « Mes salons »
 
