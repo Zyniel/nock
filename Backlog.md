@@ -905,7 +905,7 @@ others, at the top of the list.
   AC-15 (deleted, moved); operations AC-4, AC-14 (changed); host AC-9
   (changed); hud AC-21, shell AC-9 (changed: the card line); joining AC-17
   (wording only)
-- Branch: feat/b-023-room-lives · PR: none yet
+- Branch: feat/b-023-room-lives · PR: #63
 - Problem: a room lives a fixed 30 days after its last edit
   (`lobby/joining.md` rules 15, 16), a bare number in four specs, the
   expired-room card and the room-gone dialog, with no setting. The human wants
