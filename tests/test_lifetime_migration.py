@@ -109,7 +109,9 @@ def fx01_grid(fx01_text: str) -> Grid:
 
 def named(state: RoomState, code: str) -> RoomState:
     """The state as room `code`, with its own share token."""
-    return state.model_copy(update={"code": code, "share_token": f"share-{code}"})
+    return state.model_copy(
+        update={"code": code, "share_token": f"share-token-of-{code.lower()}"}
+    )
 
 
 def old_rooms(grid: Grid) -> list[OldRoom]:
@@ -268,7 +270,7 @@ def test_ac13_each_solved_room_expires_24_hours_after_its_solve_time(
 ) -> None:
     path = tmp_path / "old.sqlite3"
     write_old_database(path, fx01_grid, version)
-    config = config_with_lives(anonymous_solved=24)
+    config = config_with_lives(anonymous_solved=24, creator_solved=24)
     solved_rooms = [
         (SOLVED_ROOM, SOLVED_AT),
         (LOGGED_ROOM, LOGGED_SOLVED_AT),
