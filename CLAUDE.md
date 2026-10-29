@@ -107,6 +107,12 @@ write the implementation before its tests exist.
   bound for a change stays in the parallel pass unless it flakes there.
 - The gate's engines come from `--browsers` or the `NOCK_BROWSERS` environment
   variable (default `chromium`).
+- The gate's pytest workers come from `--workers` or the `NOCK_WORKERS`
+  environment variable (default `auto`, one per logical CPU, never more);
+  `.claude/settings.json` sets 10 for every session (human decision,
+  2026-10-29). The parallel pass runs at a low priority, and one gate at a time
+  runs its tests in a clone: another waits up to 10 minutes for the lock in
+  `.git/`, then fails naming the gate that holds it.
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: the
   test-writer's `--stage tests`, the implementer's quick gate (the domains and
   numbered specs whose spec, test or harness files the branch changed since
