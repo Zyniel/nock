@@ -74,6 +74,26 @@ others, at the top of the list.
 - A worktree gets it once its branch takes `main` after the merge: the hook
   runs the `gate.py` of the checkout it checks.
 
+### B-028 Review of the Python backend
+
+- Status: done (the human asked for it, 2026-10-29: « As the Code Reviewer
+  agent "code-reviewer.md", create a new branch and proceed to a full review
+  of the python backend. »; a review, built by the lead)
+- Domains: none (the report `claude_docs/backend-review.md`; no spec, test or
+  code changes)
+- Architecture decision: no
+- Branch: feat/b-028-backend-review · PR: none yet
+- Problem: no review had looked at `src/nock/` as a whole, across specs, for
+  security, capacity and maintainability.
+- In scope: every module of `src/nock/`, the gate without browser tests, and
+  measurements of the hot paths on the largest catalogue grid.
+- Out of scope: the web client, the tests themselves, the tooling.
+- Screens: none.
+- Findings: 2 High (unlimited room creation that stays in memory; grid checks
+  and full-grid edits that pin the one engine thread), 7 Medium, 11 Low. Each
+  fix is a later item; two need a spec change (a creation limit in
+  `lobby/rooms.md`, a rate limit on checks and reveals in `gameplay/hints.md`).
+
 ### B-001 Rebaseline v1.1.0 into domain specs
 
 - Status: done (the human approved every domain file, 2026-10-24)
