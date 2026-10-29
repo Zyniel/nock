@@ -63,7 +63,7 @@ from spec047_harness import (
 # The texts of rule 16, as `web/src/i18n/fr.json` holds them.
 GONE_TITLE = "Ce salon n'existe plus."  # `room.gone.title`
 # `room.status.not_found_detail`
-GONE_DETAIL = "Un salon est effacé 30 jours après sa dernière modification."
+GONE_DETAIL = "Un salon est effacé après un certain temps sans modification."
 HOME_LINK_NAME = "Voir les grilles"  # `share.home`
 
 NOT_FOUND_CLOSE_CODE = 4404

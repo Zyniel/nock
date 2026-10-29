@@ -4,7 +4,7 @@ It also answers a member's catch-up request: what changed in a room while their
 page was away (spec 034).
 
 While the app runs, it deletes the expired rooms of the registry it serves once
-when it starts, then every `expiry_sweep_seconds` (spec 032).
+when it starts, then every `expiry_sweep_seconds` (`lobby/lifetime.md` rule 6).
 
 With an operator token, it also serves the operator pages (spec 038): the page
 `/ops` and the ops API under `/api/ops/`, the dashboard and the replay of a room,
@@ -47,6 +47,7 @@ from fastapi import (
     WebSocket,
 )
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -86,6 +87,8 @@ from nock.operations import (
     RoomLog,
     RoomReplay,
     dashboard_figures,
+    default_period,
+    offered_periods,
     room_edits,
 )
 from nock.protocol import grid_view, parse_client_message
@@ -96,6 +99,7 @@ from nock.settings import (
     AccountSettings,
     account_settings_from_env,
     operator_token_from_env,
+    room_config_from_env,
 )
 from nock.store import RoomStore
 
@@ -269,10 +273,21 @@ class _RoomsHolder:
         self._is_created_here = False
 
     def get(self) -> RoomRegistry:
-        """Return the registry, creating it from NOCK_DATABASE the first time."""
+        """Return the registry, creating it from the environment the first time.
+
+        A registry created here has the room lives of the environment variables
+        and the store of NOCK_DATABASE.
+
+        Raises:
+            SettingsError: a room life or the sweep interval breaks its rule. The
+                database is not opened then.
+        """
         with self._lock:
             if self._registry is None:
-                self._registry = RoomRegistry(store=RoomStore(_database_path()))
+                config = room_config_from_env(os.environ)
+                self._registry = RoomRegistry(
+                    config=config, store=RoomStore(_database_path())
+                )
                 self._is_created_here = True
             return self._registry
 
@@ -460,6 +475,21 @@ def _database_path() -> str:
 def _not_found() -> HTTPException:
     """Return the 404 error with FastAPI's usual body."""
     return HTTPException(status_code=404, detail="Not Found")
+
+
+def _period_not_offered(days: str, offered_days: list[int]) -> RequestValidationError:
+    """Return the 422 for a dashboard period that the room lives do not offer.
+
+    It has the body FastAPI gives a wrong `days`: a list of validation errors.
+    """
+    offered_text = ", ".join(str(offered) for offered in offered_days)
+    error = {
+        "type": "literal_error",
+        "loc": ("query", "days"),
+        "msg": f"Input should be one of the offered periods: {offered_text}",
+        "input": days,
+    }
+    return RequestValidationError([error])
 
 
 def _too_many_requests() -> HTTPException:
@@ -1082,17 +1112,26 @@ def create_app(
 
     # Spec 038: the figures of the rooms created in the last `days` days, read
     # from the store without making any room live.
+    # A period that the room lives do not offer is refused as a wrong one.
     @web_app.get("/api/ops/dashboard", dependencies=[Depends(check_operator)])
     def get_dashboard(
-        days: Annotated[DashboardDays, Query()] = "7",
+        days: Annotated[DashboardDays | None, Query()] = None,
     ) -> dict[str, object]:
         room_registry = holder.get()
         now = room_registry.clock()
-        period_days = int(days)
+        offered_days = offered_periods(room_registry.config)
+        if days is None:
+            period_days = default_period(offered_days)
+        else:
+            period_days = int(days)
+            if period_days not in offered_days:
+                raise _period_not_offered(days, offered_days)
         since = now - period_days * DAY_SECONDS
         room_logs = _room_logs_since(room_registry.store, since)
         figures = dashboard_figures(room_logs, period_days, now)
-        return figures.model_dump(mode="json")
+        answer = figures.model_dump(mode="json")
+        answer["offered_days"] = offered_days
+        return answer
 
     # Spec 038: the empty grid and the ordered edits of one room, from its log.
     # A 404 here is no refusal: only wrong tokens count against the address.

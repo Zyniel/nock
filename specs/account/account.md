@@ -15,7 +15,8 @@ other rooms.
 
 ## Depends on
 
-- `lobby/joining.md`: identities, members, seat back, « Mes salons », the sweep.
+- `lobby/joining.md`: identities, members, seat back, « Mes salons »; the sweep
+  is `lobby/lifetime.md`.
 - `platform/server.md`: the database file, `main()`, `NOCK_HOST`, `NOCK_PORT`.
 - `gameplay/results.md`: « Grilles terminées », the history on screen.
 
@@ -155,7 +156,7 @@ other rooms.
     suffix (`lobby/joining.md` rules 1 and 13); pages show it as « Ancien
     joueur » (`player.former`).
 20. Links and sessions are stored as SHA-256 only. Each expiry sweep
-    (`lobby/joining.md` rule 16), the first at the app's start, then deletes
+    (`lobby/lifetime.md` rule 6), the first at the app's start, then deletes
     the links older than 30 minutes and the sessions older than 90 days and
     empties the WAL; a failed purge is logged and the next sweep runs.
 21. No log record, traceback included, holds an address, a link token, a

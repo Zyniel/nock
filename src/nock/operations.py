@@ -27,9 +27,17 @@ from nock.protocol import (
     PlayerStateChanged,
     Seq,
 )
-from nock.room import LogEntry, RoomCode, is_edit, utc_datetime
+from nock.room import (
+    LogEntry,
+    RoomCode,
+    RoomConfig,
+    is_edit,
+    shortest_room_life_hours,
+    utc_datetime,
+)
 
 DAY_SECONDS: float = 86_400.0
+HOURS_PER_DAY: int = 24
 # spec 036's p95: the ceil(0.95 * n)-th smallest of n values
 P95_PERCENT: int = 95
 
@@ -92,6 +100,34 @@ class RoomReplay(BaseModel):
 
 
 # ---- The dashboard ---------------------------------------------------------------
+
+
+def offered_periods(config: RoomConfig) -> list[int]:
+    """Return the dashboard periods that the room lives allow, rising.
+
+    A period is offered when it is no longer than the shortest room life
+    (`admin/operations.md` rule 12). One day always is, since a room life is at
+    least 24 hours.
+
+    Args:
+        config: The room lives.
+
+    Returns:
+        The offered periods, in days, among 1, 7 and 30.
+    """
+    shortest_life_days = shortest_room_life_hours(config) / HOURS_PER_DAY
+    offered: list[int] = []
+    for period in PERIOD_DAYS:
+        if period <= shortest_life_days:
+            offered.append(period)
+    return offered
+
+
+def default_period(offered_days: Sequence[int]) -> int:
+    """Return the period shown when none is asked: 7 days when offered, else 1."""
+    if 7 in offered_days:
+        return 7
+    return 1
 
 
 def dashboard_figures(

@@ -515,7 +515,7 @@ def sec_entry() -> str:
     )
     gone = entry_card(
         "Ce salon n'existe pas.",
-        "Un salon est effacé 30 jours après sa dernière modification.",
+        "Un salon est effacé après un certain temps sans modification.",
         button="primary",
     )
     c = screen(
@@ -937,7 +937,7 @@ def sec_room() -> str:
                 "joined or reconnecting: what was open closes, the connection "
                 "band goes, and the recap's frame (a sheet on a phone, the 440 "
                 "px dialog on a computer) says « Ce salon n'existe plus. » over "
-                "the 30-day line. Its one way on is « Voir les grilles », to the "
+                "the line. Its one way on is « Voir les grilles », to the "
                 "catalogue; Escape and the scrim do nothing, and the room under "
                 "it is inert."
             ),

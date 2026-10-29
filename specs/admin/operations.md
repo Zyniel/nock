@@ -14,7 +14,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 
 ## Depends on
 
-- `lobby/joining.md`: room expiry and what a deletion removes (rules 15, 16).
+- `lobby/lifetime.md`: room expiry, what a deletion removes and the shortest
+  room life (rules 4 to 6).
 - `lobby/rooms.md`: the wrong-code throttle (rule 9), whose second instance
   guards the ops API.
 - `platform/server.md`: the store, its room log, serving and the other settings.
@@ -32,7 +33,7 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 ### Retention
 
 2. A room's data (rows, snapshots, log, nicknames, resume tokens, chat texts)
-   lives until the room is deleted (`lobby/joining.md` rules 15, 16). The store
+   lives until the room is deleted (`lobby/lifetime.md` rules 5, 6). The store
    zeroes deleted rows and, on a file, ends each deletion with a write-ahead log
    checkpoint: none of the room's own rows stays in the database file or its
    WAL, the store open or closed. With accounts on, which share that database,
@@ -67,8 +68,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 
 ### Operator pages on: the ops API
 
-7. `GET /api/ops/dashboard?days=N`, `N` exactly `1`, `7` or `30` (`7` when
-   absent): 200, rule 12's figures; another `N`: 422.
+7. `GET /api/ops/dashboard?days=N`, `N` an offered period (rule 12), the
+   default one when absent: 200, rule 12's figures; another `N`, a period not
+   offered included: 422.
    `GET /api/ops/rooms/<code>/edits`: 200, rule 15's replay; 404 for an unknown
    or expired room or a code that is not 6 capitals or digits. Neither makes a
    room live.
@@ -89,9 +91,13 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 
 ### Dashboard figures
 
-12. The rooms of a period are those created at or after `now − days × 86 400 s`,
-    read with their whole logs from the store; within 30 days none has expired.
-    `since` is that start, in UTC. A figure with nothing to count is None, but
+12. The periods are 1, 7 and 30 days. A period is offered when it is no longer
+    than the shortest room life (`lobby/lifetime.md` rule 4), so 1 always is;
+    the default period is 7 when offered, else 1. The rooms of a period are
+    those created at or after `now − days × 86 400 s`, read with their whole
+    logs from the store; within an offered period none has expired. The answer
+    holds `days`, `offered_days` (the offered periods, rising), `since` (that
+    start, in UTC) and the figures. A figure with nothing to count is None, but
     `rooms_created` is 0:
     - `rooms_created`: how many rooms;
     - `players_per_room`: `player_joined` entries per room;
@@ -132,14 +138,16 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
     `localStorage`, a cookie or a URL). The form holds a password input with
     autocomplete off, `ops.token_label`, and the button `ops.token_submit`.
     Every ops request sends the token in its header. Then `loading`
-    (`ops.loading`) until the dashboard answers: 200 `ready`; any 401 or 429 of
+    (`ops.loading`) until the dashboard, asked with no period, answers: 200
+    `ready`; any 401 or 429 of
     the page, dashboard or replay, forgets the token and goes back to `locked`
     with `ops.token_refused` or `ops.throttled`; another dashboard answer (a 404
     or a malformed 200 too) or a network failure gives `error` (`ops.error`)
     until a reload.
 17. `ready` shows the card `ops.dashboard_heading`: the group `ops.period_label`
-    of `ops.period.one_day`, `ops.period.seven_days` (pressed on load) and
-    `ops.period.thirty_days`, then the six figures in rule 12's order (the
+    of one chip per offered period of the answer, `ops.period.one_day`,
+    `ops.period.seven_days`, `ops.period.thirty_days` in that order, the
+    answer's `days` pressed, then the six figures in rule 12's order (the
     latency as one), each its `ops.metric.*` line in French notation: players
     per room with one decimal; the rate rounded to whole percent
     (`ops.percent`, 0.126 reads « 13 % »); the latency `ops.latency_value`, both
@@ -197,9 +205,12 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   7 days give 3 rooms, 2.0, 2/3, 750000.0, 30.0, 50 and 0.5; 1 day only R2 (1,
   1.0, 1.0, 900000.0, 50.0, 50, 0.0); no room 0 and None; 2 days `ValueError`.
   (← 038 AC-5)
-- **AC-4** With the token, the dashboard answers 200 with the 7-day figures of the
-  rooms created 7 days and 1 day ago, not 8, none made live; `?days=30` gives
-  `days` 30 and `?days=2` 422. (← 038 AC-6)
+- **AC-4** With the token and the default lives, the dashboard answers 200 with
+  the 7-day figures of the rooms created 7 days and 1 day ago, not 8, none made
+  live, `days` 7 and `offered_days` `[1, 7, 30]`; `?days=30` gives `days` 30
+  and `?days=2` 422. With `NOCK_CREATOR_SOLVED_ROOM_HOURS` 168, no `days` gives
+  the 7-day figures with `[1, 7]` and `?days=30` 422; at 24, the 1-day figures
+  with `[1]`. (← 038 AC-6)
 - **AC-5** No header, a wrong token, `Basic <token>` or `?token=<token>` get
   rule 8's 401, as do `?days=2` and the edits of `abc` without the token.
   (← 038 AC-6)
@@ -245,9 +256,10 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 - **AC-14** AC-3's 7-day figures read « Salons créés : 3 », « Joueurs par salon :
   2,0 », « Grilles terminées : 67 % », « Temps médian de résolution : 12 min 30
   s », « Latence du serveur : 30 ms (médiane), 50 ms (95e centile) », « Coupures
-  par joueur : 0,50 », 7 days pressed; no room reads `0` then « aucune donnée »
-  five times. Chips named by « Période » and tiles follow the design ("Look").
-  (← 038 AC-7, 048 AC-8)
+  par joueur : 0,50 », 7 days pressed among three chips; with `[1, 7]` offered,
+  two chips and 7 pressed, with `[1]` one chip, pressed; no room reads `0` then
+  « aucune donnée » five times. Chips named by « Période » and tiles follow the
+  design ("Look"). (← 038 AC-7, 048 AC-8)
 - **AC-15** A replay shown, pressing 30 from the keyboard sends `days=30`, presses
   it, keeps the focus and the replay, `ready` while waiting; a 500 gives `error`,
   a 429 locks; a 200 arriving after a replay's 401 locked the page leaves it
@@ -293,7 +305,7 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   restart; editing a room's log.
 - An anonymous player's stored data, cookies, the player's own data:
   `account/account.md`.
-  The other environment variables: `platform/server.md`.
+  The other environment variables: `platform/server.md`, `lobby/lifetime.md`.
 
 ## Code
 

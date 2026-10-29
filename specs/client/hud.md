@@ -126,7 +126,7 @@ gives the Salon (`client/room.md`) its column or its sheet.
 ### Room gone
 
 16. Once the room has shown, `not_found` (the 4404 of a deleted room,
-    `lobby/joining.md` rule 16), joined or reconnecting, closes the menus, the
+    `lobby/lifetime.md` rule 6), joined or reconnecting, closes the menus, the
     Salon sheet, the reaction picker, a room sheet and the recap, takes the
     connection band away and drops the letters waiting to be sent. A modal
     alert dialog then covers the page, named by its title `room.gone.title`
@@ -225,7 +225,7 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 - **AC-21** Joined at 360 by 740 with the Salon sheet open, the room is
   deleted: the sheet closes, no band shows under the top bar, and a modal alert
   dialog named « Ce salon n'existe plus. », described by « Un salon est effacé
-  30 jours après sa dernière modification. », holds the focus on « Voir les
+  après un certain temps sans modification. », holds the focus on « Voir les
   grilles », a link to `/`. At 1280 by 720 while reconnecting, with `T` typed
   at (1, 0) and not yet answered, the connection band goes, (1, 0) is empty
   and the dialog shows alike. Both follow « Room gone » and pass the scans of

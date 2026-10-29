@@ -92,6 +92,11 @@ RoomCode = Annotated[str, Field(pattern=r"^[A-Z0-9]{6}$")]
 ShareToken = Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]{16,64}$")]
 
 RATE_WINDOW_SECONDS: float = 1.0  # spec 037 AC-3
+# The room lives, in whole hours (`lobby/lifetime.md` rule 4).
+MIN_ROOM_LIFE_HOURS: int = 24
+MAX_ROOM_LIFE_HOURS: int = 8760
+DEFAULT_ROOM_LIFE_HOURS: int = 720
+SECONDS_PER_HOUR: float = 3_600.0
 MAX_PLAYERS: int = 8  # spec 012 AC-4
 MAX_PAST_PLAYERS: int = 100  # spec 032 AC-4: past players a room keeps
 # Space, hyphen, apostrophe, right single quotation mark (U+2019), underscore.
@@ -156,9 +161,21 @@ class RoomConfig(RoomModel):
     chat_window_seconds: float = Field(default=10.0, gt=0)
     reaction_limit: int = Field(default=5, ge=1)  # spec 022: reactions per window
     reaction_window_seconds: float = Field(default=10.0, gt=0)
-    # spec 032 AC-1: a room expires this long after its last edit (30 days)
-    room_life_seconds: float = Field(default=2_592_000.0, gt=0)
-    # spec 032 AC-2: how often the app deletes the expired rooms
+    # `lobby/lifetime.md` rule 4: how many hours a room lasts after its starting
+    # point, one life per kind of room
+    creator_solved_room_hours: int = Field(
+        default=DEFAULT_ROOM_LIFE_HOURS, ge=MIN_ROOM_LIFE_HOURS, le=MAX_ROOM_LIFE_HOURS
+    )
+    creator_room_hours: int = Field(
+        default=DEFAULT_ROOM_LIFE_HOURS, ge=MIN_ROOM_LIFE_HOURS, le=MAX_ROOM_LIFE_HOURS
+    )
+    anonymous_solved_room_hours: int = Field(
+        default=DEFAULT_ROOM_LIFE_HOURS, ge=MIN_ROOM_LIFE_HOURS, le=MAX_ROOM_LIFE_HOURS
+    )
+    anonymous_room_hours: int = Field(
+        default=DEFAULT_ROOM_LIFE_HOURS, ge=MIN_ROOM_LIFE_HOURS, le=MAX_ROOM_LIFE_HOURS
+    )
+    # `lobby/lifetime.md` rule 6: how often the app deletes the expired rooms
     expiry_sweep_seconds: float = Field(default=3_600.0, gt=0)
 
 
@@ -437,10 +454,65 @@ def grid_state(state: RoomState) -> GridView:
 # ---- Room life and members (spec 032) -----------------------------------------
 
 
+class RoomTimes(RoomModel):
+    """What the store keeps of a room to decide when it expires."""
+
+    code: RoomCode
+    last_edit_at: float  # seconds since the epoch
+    solved_at: float | None  # the solve time; None while the room is unsolved
+    creator_account_id: str | None  # None for an anonymous room
+
+
+def shortest_room_life_hours(config: RoomConfig) -> int:
+    """Return the least of the four room lives of `config`, in hours."""
+    return min(
+        config.creator_solved_room_hours,
+        config.creator_room_hours,
+        config.anonymous_solved_room_hours,
+        config.anonymous_room_hours,
+    )
+
+
+def is_room_expired(
+    times: RoomTimes, now: float, config: RoomConfig, creators_active: bool
+) -> bool:
+    """Tell whether a room is expired at `now` (`lobby/lifetime.md` rule 5).
+
+    This one function decides it for the sweep and for every lookup. A room is
+    expired once more than its room life has passed since its starting point:
+    its solve time when solved, else its last edit time. At exactly its room
+    life it is open.
+
+    Args:
+        times: The room's stored times and creator.
+        now: The clock time, in seconds since the epoch.
+        config: The room lives.
+        creators_active: False while accounts are off: every room is then an
+            anonymous room, a stored creator included.
+
+    Returns:
+        True when the room is expired.
+    """
+    is_creator_room = creators_active and times.creator_account_id is not None
+    if times.solved_at is not None:
+        start = times.solved_at
+        if is_creator_room:
+            life_hours = config.creator_solved_room_hours
+        else:
+            life_hours = config.anonymous_solved_room_hours
+    else:
+        start = times.last_edit_at
+        if is_creator_room:
+            life_hours = config.creator_room_hours
+        else:
+            life_hours = config.anonymous_room_hours
+    return now > start + life_hours * SECONDS_PER_HOUR
+
+
 def is_edit(entry: LogEntry) -> bool:
     """Tell whether a logged entry is an edit: a letter_changed or a cell_locked.
 
-    Only edits move a room's last edit time, which its 30-day life runs from.
+    Only edits move a room's last edit time, which its room life runs from.
 
     Args:
         entry: A logged entry of a room.

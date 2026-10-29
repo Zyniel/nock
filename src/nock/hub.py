@@ -8,8 +8,9 @@ Each connection bounds what waits for it in both directions (spec 036): a client
 that never reads its socket is closed as stalled, and a client that sends faster
 than its room applies is closed as flooding.
 
-A room lives 30 days from its last edit (spec 032). An expired room is deleted by
-`expire_rooms`, which the app runs every hour, and by any lookup that meets it.
+A room lives its room life from its starting point (`lobby/lifetime.md`). An
+expired room is deleted by `expire_rooms`, which the app runs at its start and
+then every sweep interval, and by any lookup that meets it.
 Just before each deletion, the registry's delete hook gets the room's latest
 state (spec 029).
 
@@ -55,9 +56,11 @@ from nock.room import (
     RoomKey,
     RoomState,
     RoomSummary,
+    RoomTimes,
     after_restart,
     disconnect_player,
     handle_message,
+    is_room_expired,
     join_room,
     new_room,
     room_summary,
@@ -1020,16 +1023,18 @@ class RoomRegistry:
         return summaries
 
     def expire_rooms(self) -> list[str]:
-        """Delete every room that is expired at `clock()` (spec 032).
+        """Delete every room that is expired at `clock()` (`lobby/lifetime.md`).
 
-        A room is expired once more than `config.room_life_seconds` passed since
-        its last edit. A live room's task stops first, and each of its sockets is
-        closed with ROOM_NOT_FOUND_CLOSE_CODE.
+        A room is expired by `is_room_expired`. A live room's task stops first,
+        and each of its sockets is closed with ROOM_NOT_FOUND_CLOSE_CODE.
 
         Returns:
             The codes of the rooms deleted, in code-point order.
         """
-        expired_codes = self._store.expired_codes(self._expiry_limit())
+        expired_codes: list[str] = []
+        for times in self._store.read_room_times():
+            if self._is_expired(times):
+                expired_codes.append(times.code)
         for code in expired_codes:
             self._delete_room(code)
         return expired_codes
@@ -1288,12 +1293,11 @@ class RoomRegistry:
                 )
         return state
 
-    def _expiry_limit(self) -> float:
-        """Return the oldest last edit time a room may have at `clock()`.
-
-        A room whose last edit time is strictly less is expired (spec 032).
-        """
-        return self._clock() - self._config.room_life_seconds
+    def _is_expired(self, times: RoomTimes) -> bool:
+        """Tell whether the room of `times` is expired at `clock()`."""
+        return is_room_expired(
+            times, self._clock(), self._config, self._creators_active
+        )
 
     def _delete_if_expired(self, code: str) -> bool:
         """Delete room `code` when it is expired at `clock()`.
@@ -1301,8 +1305,8 @@ class RoomRegistry:
         Returns:
             True when the room was expired, and so is deleted now.
         """
-        last_edit_at = self._store.last_edit_at(code)
-        if last_edit_at is None or last_edit_at >= self._expiry_limit():
+        times = self._store.room_times(code)
+        if times is None or not self._is_expired(times):
             return False
         self._delete_room(code)
         return True

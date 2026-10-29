@@ -114,8 +114,7 @@ NEW_KEYS = {
     "share.home": "Voir les grilles",
     "room.status.not_found_detail": "Un salon est "
     "effac\N{LATIN SMALL LETTER E WITH ACUTE}"
-    " 30 jours apr\N{LATIN SMALL LETTER E WITH GRAVE}s sa derni"
-    "\N{LATIN SMALL LETTER E WITH GRAVE}re modification.",
+    " apr\N{LATIN SMALL LETTER E WITH GRAVE}s un certain temps sans modification.",
 }
 REMOVED_KEYS = ("my_rooms.loading", "my_rooms.empty")
 # Spec 035 AC-9's samples (as spec 032 AC-6's test lists them): the checker flags

@@ -269,20 +269,36 @@ uv run python -m nock
 
 (bash: `NOCK_DATABASE=data/nock.sqlite3 uv run python -m nock`)
 
-A room is deleted 30 days after its last edit (a letter written, erased or
-locked), with its log, its snapshots and its share link (spec 032). The server
-looks for such rooms when it starts and then every hour, and deletes a room at
-once when someone opens it after that time. A file written by an older version
-of the server is not supported: start with a new file. A deleted room leaves no
-copy in the database files: SQLite overwrites its rows with zeros, and the
-write-ahead log is emptied after each deletion (spec 038).
+A room is deleted when it has lasted longer than its room life (spec
+`lobby/lifetime`), with its log, its snapshots and its share link. The room life
+is a number of hours from 24 to 8760 (default 720, 30 days), one per kind of
+room, counted from the room's last edit (a letter written, erased or locked) or,
+once the grid is solved, from the time it was solved:
+
+| Variable | Room |
+| --- | --- |
+| `NOCK_CREATOR_SOLVED_ROOM_HOURS` | a solved room of a signed-in creator |
+| `NOCK_CREATOR_ROOM_HOURS` | an unsolved room of a signed-in creator |
+| `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS` | a solved room with no creator |
+| `NOCK_ANONYMOUS_ROOM_HOURS` | an unsolved room with no creator |
+
+While accounts are off every room is an anonymous room. The server looks for
+expired rooms when it starts and then every `NOCK_EXPIRY_SWEEP_MINUTES` minutes
+(1 to 1440, default 60), and deletes a room at once when someone opens it after
+its time. Each variable is a whole number written with the digits 0 to 9; an
+empty variable counts as unset, and a refused value stops the server with a
+one-line message. A database file of an older version of the server is
+migrated once when it opens. A deleted room leaves no copy in the database
+files: SQLite overwrites its rows with zeros, and the write-ahead log is emptied
+after each deletion (spec 038).
 
 ### The operator pages
 
 The `NOCK_OPERATOR_TOKEN` environment variable turns on the operator pages of
 spec 038: `/ops` shows a dashboard of the rooms created in the last 1, 7 or 30
-days (rooms, players, completion, solving time, server latency, dropped
-connections) and replays the edits of a room. Its value is a secret of 32 to 256
+days (only the periods no longer than the shortest room life; rooms, players,
+completion, solving time, server latency, dropped connections) and replays the
+edits of a room. Its value is a secret of 32 to 256
 characters, each one an ASCII letter, a digit 0 to 9, `_` or `-`; spec 038
 ("Operator access") gives the rule. To make one:
 

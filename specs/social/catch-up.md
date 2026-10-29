@@ -16,7 +16,7 @@ their players.
 ## Depends on
 
 - `lobby/joining.md`: the stored identity, resume and seat back, the members of a
-  room, room expiry.
+  room; room expiry is `lobby/lifetime.md`.
 - `social/chat.md`: the Salon's stream (its order, its cap of 100 event lines
   and its scroll rules), not the text of every event line.
 - `platform/realtime.md`: snapshots, `seq`, reconnection, the logged events.
@@ -56,7 +56,7 @@ their players.
    or the store holds no state of the room at or before `after_seq`. The answer
    never says which, and the wrong-code throttle does not count it. The request
    makes no room live and logs nothing; an expired room is deleted as by any
-   lookup (`lobby/joining.md`).
+   lookup (`lobby/lifetime.md`).
 8. A 200 answer holds the request's two seqs, `cells`, `lines` and `names`, and no
    letter of the grid. It covers the logged events with `after_seq` < `seq` <=
    `until_seq`: an `until_seq` past the room's `seq` reads to its last event, and

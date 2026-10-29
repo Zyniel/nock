@@ -1,10 +1,11 @@
-"""Tests of spec 032, AC-1: a room's life runs 30 days from its last edit.
+"""Tests of lifetime AC-1 (spec 032 AC-1): an unsolved anonymous room's life runs
+720 hours (the default of `NOCK_ANONYMOUS_ROOM_HOURS`) from its last edit.
 
 `RoomStore` keeps each room's last edit time, which only edits move (`is_edit`: a
-`letter_changed` or a `cell_locked`), and lists the rooms whose last edit time is
-older than a given time (`expired_codes`). A registry reads the room life from
-`RoomConfig.room_life_seconds`: exactly 30 days after the last edit a room is still
-open, and any later it is expired. The shared setup is in `spec032_harness`.
+`letter_changed` or a `cell_locked`). A registry reads the room life from the
+hour fields of `RoomConfig` (`anonymous_room_hours` for the rooms of these tests):
+exactly 720 hours after the last edit a room is still open, and any later it is
+expired. The shared setup is in `spec032_harness`.
 """
 
 from __future__ import annotations
@@ -60,6 +61,15 @@ from spec032_harness import (
     grid_from_text,
     registry_on_file,
 )
+
+HOUR = 3_600.0
+# The four hour fields of `RoomConfig` (`lobby/lifetime.md` rule 4).
+LIFE_FIELDS = [
+    "creator_solved_room_hours",
+    "creator_room_hours",
+    "anonymous_solved_room_hours",
+    "anonymous_room_hours",
+]
 
 
 @pytest.fixture
@@ -339,43 +349,41 @@ def test_ac1_flags_votes_reveal_results_and_departures_are_not_edits(
     assert nock.room.is_edit(entry) is False
 
 
-# ---- Expired codes -------------------------------------------------------------
-
-
-def test_ac1_expired_codes_holds_a_room_only_after_its_last_edit_time(
-    store: RoomStore, fx01_grid: Grid
-) -> None:
-    room_after_the_five_entries(store, fx01_grid)
-
-    assert store.expired_codes(T0 + 30) == []
-    assert store.expired_codes(T0 + 30.5) == [CODE_A]
-
-
-def test_ac1_expired_codes_are_in_code_point_order(
-    store: RoomStore, fx01_grid: Grid
-) -> None:
-    for code in ["BBBBBB", "AAAAAA", "AAAAA9"]:
-        store.create_room(new_room(code, fx01_grid, T0))
-    store.create_room(new_room("CCCCCC", fx01_grid, T0 + 500))
-
-    assert store.expired_codes(T0 + 100) == ["AAAAA9", "AAAAAA", "BBBBBB"]
-
-
 # ---- The room life on a registry -----------------------------------------------
 
 
-def test_ac1_the_room_life_is_30_days_by_default() -> None:
-    assert RoomConfig().room_life_seconds == 2_592_000.0
+def test_ac1_the_four_room_lives_are_720_hours_by_default() -> None:
+    config = RoomConfig()
+
+    assert config.creator_solved_room_hours == 720
+    assert config.creator_room_hours == 720
+    assert config.anonymous_solved_room_hours == 720
+    assert config.anonymous_room_hours == 720
 
 
-@pytest.mark.parametrize("seconds", [0.0, -1.0])
-def test_ac1_the_room_life_must_be_positive(seconds: float) -> None:
+@pytest.mark.parametrize("field", LIFE_FIELDS)
+@pytest.mark.parametrize(
+    ("hours", "bound"), [(23, "greater"), (0, "greater"), (8761, "less")]
+)
+def test_ac1_a_room_life_outside_24_to_8760_hours_is_refused(
+    field: str, hours: int, bound: str
+) -> None:
     # The message names the field and its bound, not an unknown field.
-    with pytest.raises(ValidationError, match=r"room_life_seconds\s+.*greater than 0"):
-        RoomConfig(room_life_seconds=seconds)
+    with pytest.raises(ValidationError, match=rf"{field}\s+.*{bound} than or equal"):
+        RoomConfig.model_validate({field: hours})
 
 
-def test_ac1_a_room_is_still_open_exactly_30_days_after_its_last_edit(
+@pytest.mark.parametrize("field", LIFE_FIELDS)
+@pytest.mark.parametrize("hours", [24, 8760])
+def test_ac1_a_room_life_of_24_or_8760_hours_is_accepted(
+    field: str, hours: int
+) -> None:
+    config = RoomConfig.model_validate({field: hours})
+
+    assert getattr(config, field) == hours
+
+
+def test_ac1_a_room_is_still_open_exactly_720_hours_after_its_last_edit(
     store_path: Path, fx01_grid: Grid, fake_clock: FakeClock
 ) -> None:
     writer = RoomStore(store_path)
@@ -391,7 +399,7 @@ def test_ac1_a_room_is_still_open_exactly_30_days_after_its_last_edit(
     assert expired == []
 
 
-def test_ac1_a_room_is_expired_any_later_than_30_days_after_its_last_edit(
+def test_ac1_a_room_is_expired_any_later_than_720_hours_after_its_last_edit(
     store_path: Path, fx01_grid: Grid, fake_clock: FakeClock
 ) -> None:
     writer = RoomStore(store_path)
@@ -407,7 +415,7 @@ def test_ac1_a_room_is_expired_any_later_than_30_days_after_its_last_edit(
     assert expired == [CODE_A]
 
 
-def test_ac1_a_room_never_edited_expires_30_days_after_its_creation(
+def test_ac1_a_room_never_edited_expires_720_hours_after_its_creation(
     store_path: Path, fx01_grid: Grid, fake_clock: FakeClock
 ) -> None:
     writer = RoomStore(store_path)
@@ -419,12 +427,12 @@ def test_ac1_a_room_never_edited_expires_30_days_after_its_creation(
 
     with registry_on_file(store_path, fake_clock, NO_TICK_CONFIG) as (registry, _):
         fake_clock.now = T0 + LIFE
-        at_30_days = registry.expire_rooms()
+        at_720_hours = registry.expire_rooms()
         fake_clock.now = T0 + LIFE + 0.5
-        after_30_days = registry.expire_rooms()
+        after_720_hours = registry.expire_rooms()
 
-    assert at_30_days == []
-    assert after_30_days == [CODE_A]
+    assert at_720_hours == []
+    assert after_720_hours == [CODE_A]
 
 
 def test_ac1_the_room_life_follows_the_configuration(
@@ -435,13 +443,13 @@ def test_ac1_the_room_life_follows_the_configuration(
         host_handover_seconds=1e9,
         silence_timeout_seconds=1e9,
         resume_window_seconds=1e9,
-        room_life_seconds=100.0,
+        anonymous_room_hours=24,
     )
     with registry_on_file(store_path, fake_clock, config) as (registry, _):
         registry.add_room(new_room(CODE_A, fx01_grid, T0))
-        fake_clock.now = T0 + 100
+        fake_clock.now = T0 + 24 * HOUR
         at_the_limit = registry.expire_rooms()
-        fake_clock.now = T0 + 100.5
+        fake_clock.now = T0 + 24 * HOUR + 0.5
         after_the_limit = registry.expire_rooms()
 
     assert at_the_limit == []

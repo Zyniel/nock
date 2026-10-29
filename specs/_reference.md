@@ -37,7 +37,7 @@ Terms used below: clue cell (case définition), letter cell (case lettre), arrow
 
 ## Epic map
 
-Six epics make the MVP: a group can open a link, fill one grid together and see it validated. Numeric thresholds in the criteria (300 ms sync, 30-day room life) are proposed defaults to adjust.
+Six epics make the MVP: a group can open a link, fill one grid together and see it validated. Numeric thresholds in the criteria (300 ms sync, the four room life variables, 720 hours by default) are proposed defaults to adjust.
 
 | ID | Epic | Outcome | Release | Stories | Depends on | Suggested agent |
 | --- | --- | --- | --- | --- | --- | --- |

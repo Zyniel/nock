@@ -26,7 +26,8 @@ table, the naming rules and the glossary follow in the same change.
 | account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033; 029 AC-3, AC-6, AC-7 (server side); 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
 | lobby | `lobby/rooms.md` | solo start, room creation, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
 | lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do; the creator | room | 014 |
-| lobby | `lobby/joining.md` | join by link, the account's one seat, room resume, « Mes salons » | pages | 012, 032; 046 AC-11, AC-12, AC-15 to AC-17 |
+| lobby | `lobby/joining.md` | join by link, the account's one seat, room resume, « Mes salons » | pages | 012; 032 AC-3 to AC-7; 046 AC-11, AC-12, AC-15 to AC-17 |
+| lobby | `lobby/lifetime.md` | room lifetime: the kinds of room and their lives, when a room expires, the sweep that deletes it, the five variables | | 032 AC-1, AC-2 |
 | gameplay | `gameplay/board.md` | grid display, word selection, letter entry, navigation, in-app keyboard | cells, room | 006, 007, 008, 009, 042, 044 |
 | gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, pencil letters | cells, room | 015, 016, 020 |
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
@@ -162,6 +163,12 @@ then nothing of race or teams is built.
 | creator, creator room, anonymous room | (not shown: the account whose session sent `POST /api/rooms`; a room with one, without) | `creator_account_id` |
 | creator's player | (not shown: the member linked to the creator) | `creator_account_id` = `account_id` |
 | resume list | « Mes salons » | `my_rooms` |
+| edit, last edit time | (not shown: a letter change or a cell lock; the latest one's time) | `is_edit`, `last_edit_at` |
+| solve time | (not shown: the time of the room's `grid_solved`) | `solved_at` |
+| room life | (not shown: how long a room lasts after its starting point, one per kind) | `RoomConfig.*_room_hours`, `NOCK_*_ROOM_HOURS` |
+| expired room | « Ce salon n'existe pas. » (more than its room life past its starting point; at exactly its room life it is open) | the expiry function (`lobby/lifetime.md`) |
+| sweep | (not shown: the deletion of the expired rooms at start, then at each interval) | `expire_rooms`, `NOCK_EXPIRY_SWEEP_MINUTES` |
+| shortest room life | (not shown: the least of the four room lives) | `offered_days` (the `/ops` periods it allows) |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |
