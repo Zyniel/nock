@@ -43,6 +43,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -62,6 +63,8 @@ MAX_OUTPUT_LINES = 80
 # changed 19 specs took about 510 s, close to the 540 s of then.
 GATE_TIMEOUT_SECONDS = 1140
 GIT_TIMEOUT_SECONDS = 30
+# How long a gate stopped at its timeout gets to close its output.
+STOP_WAIT_SECONDS = 30
 # The branch the changes are measured from, first the remote one.
 BASE_REFS: tuple[str, ...] = ("origin/main", "main")
 # The paths that name a numbered spec: specs/027-shared-timer.md, the same in
@@ -534,6 +537,29 @@ def checkout_to_check(hook_input: dict[str, object]) -> Path:
     return edited_root
 
 
+def stop_process_tree(process: subprocess.Popen[str]) -> None:
+    """Stop a process and every process it started.
+
+    On a timeout, `subprocess.run` stops only its own child, `uv`: on Windows
+    the gate, its pytest workers and their browsers then ran on with nobody
+    reading them, holding the gate lock (2026-10-29).
+
+    Args:
+        process: A process started in a session of its own on Linux and macOS.
+    """
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            capture_output=True,
+            check=False,
+        )
+    else:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+    with contextlib.suppress(subprocess.TimeoutExpired):
+        process.communicate(timeout=STOP_WAIT_SECONDS)
+
+
 def main() -> int:
     """Read the hook input from stdin, run the gate and decide."""
     try:
@@ -582,36 +608,40 @@ def main() -> int:
         str(gate_script),
         *arguments,
     ]
+    # A session of its own (Linux and macOS), so that a timeout stops the whole
+    # tree; on Windows taskkill follows the tree.
+    process = subprocess.Popen(
+        command,
+        cwd=project_root,
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        start_new_session=True,
+    )
     try:
-        completed = subprocess.run(
-            command,
-            cwd=project_root,
-            env=environment,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=GATE_TIMEOUT_SECONDS,
-            check=False,
-        )
+        stdout, stderr = process.communicate(timeout=GATE_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
+        stop_process_tree(process)
         print("role_gate: the quality gate timed out.", file=sys.stderr)
         return 1
 
-    if completed.returncode == 0:
+    if process.returncode == 0:
         clear_block_state(state_path)
         return 0
 
-    if completed.returncode != 1:
+    if process.returncode != 1:
         # gate.py only ever exits 0 or 1. Anything else is an environment problem.
         print("role_gate: the gate could not run.", file=sys.stderr)
-        print(completed.stderr[-2000:], file=sys.stderr)
+        print(stderr[-2000:], file=sys.stderr)
         return 1
 
     # Taken after the gate ran, so that files the run itself leaves behind do
     # not count as the agent's change at its next stop.
     write_block_state(state_path, checkout_fingerprint(project_root))
-    output_lines = completed.stdout.splitlines()
+    output_lines = stdout.splitlines()
     shown_lines = output_lines[-MAX_OUTPUT_LINES:]
     gate_description = " ".join(arguments)
     print(
