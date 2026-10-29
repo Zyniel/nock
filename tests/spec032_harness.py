@@ -97,7 +97,7 @@ FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "f
 # ---- Times ---------------------------------------------------------------------
 
 DAY = 86_400.0
-LIFE = 30 * DAY  # a room's life, RoomConfig.room_life_seconds (2,592,000 s)
+LIFE = 30 * DAY  # 720 hours: the default of RoomConfig's four room lives
 T0 = 1_000_000.0  # t0 of the criteria, where conftest's fake clock starts
 
 # ---- Rooms, players and tokens -------------------------------------------------

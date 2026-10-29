@@ -499,6 +499,51 @@ def test_ac7_mocked_the_dashboard_heading_and_period_buttons_come_from_fr_json(
         fr["ops.period.thirty_days"],
     ]
     assert texts_of(page.get_by_test_id("ops-period")) == expected_texts
+    assert pressed_periods(page) == ["false", "true", "false"]
+
+
+@pytest.mark.parametrize(
+    ("offered", "figures_days", "chip_names", "pressed"),
+    [
+        ((1, 7), 7, ["ops.period.one_day", "ops.period.seven_days"], ["false", "true"]),
+        ((1,), 1, ["ops.period.one_day"], ["true"]),
+    ],
+    ids=["one-and-seven-days", "one-day"],
+)
+def test_ac7_mocked_one_chip_per_offered_period_with_the_answers_days_pressed(
+    new_page: NewPage,
+    server: OpsServer,
+    offered: tuple[int, ...],
+    figures_days: int,
+    chip_names: list[str],
+    pressed: list[str],
+) -> None:
+    fr = load_fr()
+    figures = seven_day_figures(NOW) if figures_days == 7 else no_room_figures(NOW, 1)
+    page = new_page(1280, 720)
+    route = DashboardRoute([dashboard_answer(figures, offered)])
+
+    mocked_dashboard(page, server.base_url, route)
+
+    chips = page.get_by_test_id("ops-period")
+    expect(chips).to_have_count(len(offered))
+    expected_texts: list[str] = []
+    for chip_name in chip_names:
+        expected_texts.append(fr[chip_name])
+    assert texts_of(chips) == expected_texts
+    assert attributes_of(chips, "data-days") == [str(days) for days in offered]
+    assert pressed_periods(page) == pressed
+
+
+def test_ac7_mocked_with_one_day_offered_and_no_room_the_five_figures_read_no_data(
+    new_page: NewPage, server: OpsServer
+) -> None:
+    page = new_page(1280, 720)
+    route = DashboardRoute([dashboard_answer(no_room_figures(NOW, 1), (1,))])
+
+    mocked_dashboard(page, server.base_url, route)
+
+    assert texts_of(page.get_by_test_id("ops-metric")) == NO_ROOM_TEXTS
 
 
 def test_ac7_mocked_a_401_while_the_dashboard_is_shown_locks_the_page_again(

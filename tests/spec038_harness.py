@@ -605,6 +605,8 @@ def answer_held_routes(held: list[Route], answer: tuple[int, str]) -> None:
 
 # ---- The dashboard figures of AC-5 ---------------------------------------------------
 
+ALL_PERIODS = (1, 7, 30)  # `offered_days` with the default room lives
+
 # The six texts of AC-5's 7-day result, and of the result with no room, as AC-7
 # writes them.
 SEVEN_DAY_TEXTS = [
@@ -683,9 +685,17 @@ class DashboardRoute:
         route.fulfill(status=status, content_type="application/json", body=body)
 
 
-def dashboard_answer(figures: DashboardFigures) -> tuple[int, str]:
-    """A 200 answer whose body is `figures` as JSON."""
-    return (200, figures.model_dump_json())
+def dashboard_answer(
+    figures: DashboardFigures, offered_days: Sequence[int] = ALL_PERIODS
+) -> tuple[int, str]:
+    """A 200 answer whose body is `figures` as JSON, with its `offered_days`.
+
+    `offered_days` is what `admin/operations.md` rule 12 adds to the figures: the
+    periods the room lives allow, rising. All three by default.
+    """
+    body = figures.model_dump(mode="json")
+    body["offered_days"] = list(offered_days)
+    return (200, json.dumps(body))
 
 
 def mocked_dashboard(page: Page, base_url: str, route: DashboardRoute) -> None:
