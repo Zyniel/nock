@@ -329,7 +329,7 @@ others, at the top of the list.
 - Domains: account/account
 - Architecture decision: yes with option B (a new table, stored data)
 - Branch: feat/b-036-erasure-finishes · PR: none yet
-- Problem: `DELETE /api/account` (`server.py:1367`) deletes the account rows,
+- Problem: `DELETE /api/account` (`server.py:1379`) deletes the account rows,
   then erases its players from the live rooms, waiting up to 5 seconds on the
   engine for each (`hub.py:1106`, `hub.py:1377`). A timeout answers 500 once
   the account is gone; the remaining rooms and the history records keep the
@@ -384,7 +384,7 @@ others, at the top of the list.
 
 - Status: brief
 - Priority: last (maintainability; no player sees it)
-- Waits for: B-027 (closed, not merged yet; it changes `server.py`)
+- Waits for: nothing (B-027, which changed `server.py`, is merged)
 - Domains: platform/server, admin/overrides, admin/operations (the answers
   keep their JSON)
 - Architecture decision: yes (`nock.server`'s public names, how the app is
@@ -397,7 +397,7 @@ others, at the top of the list.
   public `NamedTuple`, against the modeling rules, and no route declares a
   `response_model`, so no answer is checked on its way out (B-028 L8).
   `nock.server` reads the catalogue and builds the app when it is imported
-  (`server.py:1451`), so one bad grid file fails every import, tests
+  (`server.py:1463`), so one bad grid file fails every import, tests
   included, and the data folders resolve only from the repository layout
   (L9).
 - In scope: a model per answer and `response_model` on each route, with the
@@ -431,20 +431,6 @@ others, at the top of the list.
   buttons and the clue bar's minimum width (320 px) into `_design/room.md`;
   takes the grid's name in the computer top bar out of the design.
 
-### B-002 Phase 8: race and team modes
-
-- Status: approved (the human, 2026-10-22: E8 is wanted, once the visual design
-  is built)
-- Domains: gameplay/modes
-- Waits for: B-001
-- Problem: specs 030 and 031 are 1.5 KB stubs approved before their interface
-  existed.
-- In scope: race on one grid; two teams racing. Answers already given: teams
-  differ in size by at most one player and no team is empty; the host cannot
-  start with fewer than 2 players.
-- Out of scope: other competitive modes.
-- Screens: to draw in the screens sheet with the spec change.
-
 ### B-003 Compact the tests
 
 - Status: brief (the human delays the decision)
@@ -457,19 +443,6 @@ others, at the top of the list.
   copies; the same criteria proven, no weaker check.
 - Out of scope: the code; what the tests prove.
 - Screens: none.
-
-### B-004 Live "word completed" lines in the Salon's stream
-
-- Status: approved (the human's pick (b) of spec 034's decision 7: add the live
-  line as a later refinement of spec 013; never built)
-- Domains: social/chat, social/catch-up
-- Waits for: B-001
-- Problem: a player who comes back reads « … a complété … » lines in the
-  catch-up, but a player who stayed never sees them: live play adds no such line.
-- In scope: the same word-completed line, added live when a letter completes a
-  word.
-- Out of scope: other new kinds of line.
-- Screens: the stream's line, as the catch-up already draws it.
 
 ### B-005 Grid progress on the account
 
@@ -1627,3 +1600,26 @@ Before the human tags a release on `main`:
    human.
 5. The human tags `vX.Y.Z` and pushes the tag; the done items then leave this
    file.
+
+### B-027 The order of the overrides holder
+
+- Status: done (the human approved the brief and picked A, 2026-10-29;
+  no spec change; built and reviewed in two rounds, 2026-10-29)
+- Waits for: nothing left (B-024 is merged and on this branch).
+- Domains: none (no behaviour change: `src/nock/server.py` only)
+- Architecture decision: no (private names of `server.py`)
+- Criteria: none new; the tests of `admin/overrides.md` prove nothing changed
+- Branch: feat/b-027-overrides-holder-order · PR: #65
+- Problem: in `server.py`, `_RoomsHolder.settings_set()` answers None both for
+  a registry given to the app and before any registry exists, which mean
+  different things. It works today only because the lifespan calls
+  `holder.get()` first (B-024 review round 2, a suggestion).
+- In scope: make that order impossible to break by accident. Options:
+  - A (the human's pick): `settings_set()` fails loudly when no registry exists
+    yet, so None means only "a registry was given".
+  - B: `get()` answers the registry and the set together, and
+    `settings_set()` goes.
+  - C: a comment at the call site only.
+- Out of scope: any change to the routes, the answers or the page.
+- Screens: none.
+- Open questions: none beyond the option.
