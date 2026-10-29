@@ -129,15 +129,21 @@ def creator_room(
     grid_number: int,
     *,
     solved: bool,
+    joined: bool = False,
 ) -> RoomState:
-    """Register a room that Ana created and never joined: only Bob plays in it."""
+    """Register a room that Ana created: only Bob plays in it, unless `joined`.
+
+    With `joined`, Ana is a member too, but her account is not linked to her member
+    yet: the caller links it (`link_room`) when the test needs it.
+    """
+    players = [ANA_PLAYER, BOB_PLAYER] if joined else [BOB_PLAYER]
     play = ana_play(
         grid,
         code,
         grid_number,
         solved=solved,
         start=app.clock(),
-        others=[BOB_PLAYER],
+        others=players,
     )
     state = play.state.model_copy(update={"creator_account_id": ana.account_id})
     app.registry.add_room(state)

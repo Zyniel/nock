@@ -15,6 +15,9 @@ Choices where the spec leaves room:
   grid 5 so that the answer is not empty by accident.
 - "Once S expires" is tried swept (`expire_rooms`), unswept (the request finds it
   expired) and swept with a new room of S's code (grid 2, Bob and Cy) registered.
+- "`finished` wins" between rooms is tried with no record saved (the stored history
+  is checked empty first): a solved creator room Ana joined, and a solved and an
+  unsolved room of one grid, in both orders.
 - "Saves no record" is read on `AccountStore.history`, which saves nothing, before
   `GET /api/account/history` is asked.
 """
@@ -37,6 +40,7 @@ from account_harness import (
     S_CODE,
     U_CODE,
     X_CODE,
+    add_and_link,
     add_control_room,
     ana_play,
     ask_progress,
@@ -50,8 +54,8 @@ from host_harness import host_app
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec017_harness import FakeClock
-from spec029_harness import history_body, play_fx01
-from spec032_harness import LIFE, T0, grid_from_text
+from spec029_harness import history_body, link_room, play_fx01
+from spec032_harness import LIFE, T0, TA, grid_from_text
 from spec033_harness import (
     NOT_AUTHORIZED,
     NOT_FOUND,
@@ -122,6 +126,35 @@ def test_ac19_a_solved_creator_room_the_account_never_joined_is_started(
         body = progress_body(app.client, ana.session)
 
     assert body == {"4": "started"}
+
+
+@pytest.mark.parametrize(
+    "case", ["joined creator room", "solved then unsolved", "unsolved then solved"]
+)
+def test_ac19_finished_wins_over_started_with_no_record_saved_yet(
+    tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid, case: str
+) -> None:
+    with account_app(tmp_path, fake_clock) as app:
+        ana = sign_in_ana_without_room(app)
+        if case == "joined creator room":
+            creator_room(app, ana, fx01_grid, U_CODE, 4, solved=True, joined=True)
+            link_room(app.client, ana.session, U_CODE, TA)
+        else:
+            solved_room = ana_play(fx01_grid, R_CODE, 4, solved=True, start=app.clock())
+            unsolved_room = ana_play(
+                fx01_grid, S_CODE, 4, solved=False, start=app.clock()
+            )
+            rooms = [solved_room, unsolved_room]
+            if case == "unsolved then solved":
+                rooms.reverse()
+            for room in rooms:
+                add_and_link(app, ana, room)
+        # No history was asked and no room swept: a record cannot give "finished".
+        assert app.accounts.history(ana.account_id) == []
+
+        body = progress_body(app.client, ana.session)
+
+    assert body == {"4": "finished"}
 
 
 # ---- AC-20: rooms that are gone, rooms with no grid number ----------------------
