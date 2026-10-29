@@ -14,6 +14,11 @@ Readings taken where the spec leaves room:
   `environment` and `value` read 0.5.
 - The bounds are inclusive on both sides (rule 4: "within the bounds"; the
   variable's own bounds are 24 to 8760 and 1 to 1440).
+- Rule 3's `environment` is null only when the variable is unset (the lead's
+  reading): on an app given no registry it is the variable's value whenever the
+  variable is set to a value `room_config_from_env` accepts, even one equal to
+  the default (a refused value counts as unset); on an app given a registry the
+  config's values are the environment values (`overrides_harness`).
 
 The shared setup is in `overrides_harness`.
 """
@@ -95,6 +100,30 @@ def test_ac1_an_override_equal_to_the_variable_is_still_an_override(
 
     assert row == expected_row(
         CREATOR_NAME, value=48, source="override", environment=48, override=48
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "variable", "text", "value"),
+    [
+        (CREATOR_NAME, CREATOR.variable, "720", 720),
+        (INTERVAL, SWEEP_VARIABLE, "60", 60),
+    ],
+    ids=["life-720", "interval-60"],
+)
+def test_ac1_a_variable_set_to_the_default_is_still_the_environment_value(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    variable: str,
+    text: str,
+    value: int,
+) -> None:
+    with env_app(tmp_path, monkeypatch, {variable: text}) as ops:
+        row = ops.row(name)
+
+    assert row == expected_row(
+        name, value=value, source="environment", environment=value
     )
 
 

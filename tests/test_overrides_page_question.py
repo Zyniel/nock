@@ -12,10 +12,27 @@ page test uses rooms that are all still open.)
 The question is found in the card by its text; its buttons by their names. Rule 13's
 other clauses are checked beside the criterion: a second press of the button that
 asked closes the question with nothing sent, and at most one question is open.
+Rule 12's reset to a shorter life, which no criterion names, is checked here too:
+« Rétablir » on an override of 96 over the variable's 48 sends the dry run of null
+and asks first.
 
-Reading taken where the spec leaves room: "under a divider" is read as a line or a
-rule above the question's block (`has_divider` of `overrides_harness`), and the
-question stands under the rows.
+Readings taken where the spec leaves room:
+
+- "Under a divider" is read as a top border of the question's own block, or an
+  `hr` or `role="separator"` right before it (`has_divider` of
+  `overrides_harness`), and the question stands under the rows.
+- "The account page's disclosure" (rule 13) is read as that page marks it
+  (`account/account.md` rule 17, `AccountPage.svelte`): the button that asked
+  has `aria-expanded` "true" while the question is open, "false" otherwise, and
+  `aria-controls` naming the question's block (`expect_asking`). "The button
+  pressed" is also checked as the account page's own tests check it: the quiet
+  look (`quiet_button_problems` of `spec048_harness`) on « Enregistrer » while
+  asked, the primary look once closed. « Rétablir » is quiet in both states, so
+  only its `aria-expanded` is read.
+- The focus after the question closes (the lead's reading after review round 1,
+  as the account page's cancel focuses its disclosure): after « Annuler », or
+  after « Confirmer » on a save, the button that asked has the focus; after
+  « Confirmer » on a reset, « Rétablir » is disabled, and the row's input has it.
 
 The shared setup is in `overrides_harness`.
 """
@@ -36,15 +53,19 @@ from nock.store import RoomStore
 from overrides_harness import (
     CANCEL,
     CONFIRM,
+    RESET,
     SAVE,
     RequestLog,
     SettingsServer,
     box_below,
     button_in,
     card_of,
+    expect_asking,
+    expect_not_asking,
     expect_row,
     has_divider,
     input_box,
+    input_of,
     open_card,
     question_of,
     row_line,
@@ -57,10 +78,12 @@ from overrides_harness import (
 from spec032_harness import grid_from_text
 from spec033_harness import DATABASE_FILE_NAME
 from spec042_harness import box_of
-from spec046_harness import OpenWindow, window_opener
+from spec046_harness import OpenWindow, button_colour_problems, window_opener
+from spec048_harness import quiet_button_problems
 
 ANONYMOUS_NAME = ANONYMOUS.field
 CURRENT_HOURS = 48
+OVERRIDE_HOURS = 96
 
 
 @pytest.fixture
@@ -114,13 +137,14 @@ def test_ac17_a_shorter_life_asks_with_the_count_and_saves_nothing(
     card = card_of(page)
     expect(card.get_by_role("button", name=CONFIRM, exact=True)).to_be_visible()
     expect(card.get_by_role("button", name=CANCEL, exact=True)).to_be_visible()
-    expect(button_in(row_of(page, ANONYMOUS_NAME), SAVE)).to_have_attribute(
-        "aria-pressed", "true"
-    )
+    save = button_in(row_of(page, ANONYMOUS_NAME), SAVE)
+    expect_asking(page, save, 2)
+    pressed_look = quiet_button_problems(save, SAVE)
     under_the_rows = box_below(box_of(question), input_box(page, ANONYMOUS_NAME))
     divided = has_divider(question)
     unchanged = row_text(page, ANONYMOUS_NAME)
 
+    assert pressed_look == []
     assert under_the_rows
     assert divided
     assert unchanged == row_line(ANONYMOUS_NAME, CURRENT_HOURS, "environment")
@@ -147,10 +171,12 @@ def test_ac17_closing_the_question_sends_nothing_and_leaves_the_row(
     expect(card_of(page).get_by_role("button", name=CONFIRM, exact=True)).to_have_count(
         0
     )
-    expect(button_in(row_of(page, ANONYMOUS_NAME), SAVE)).not_to_have_attribute(
-        "aria-pressed", "true"
-    )
+    save = button_in(row_of(page, ANONYMOUS_NAME), SAVE)
+    expect_not_asking(save)
     expect_row(page, ANONYMOUS_NAME, CURRENT_HOURS, "environment")
+    unpressed_look = button_colour_problems(save, "primary")
+
+    assert unpressed_look == []
     assert sent.saves() == []
 
 
@@ -196,9 +222,68 @@ def test_ac17_at_most_one_question_is_open(
     expect(card_of(page).get_by_role("button", name=CONFIRM, exact=True)).to_have_count(
         1
     )
-    expect(button_in(row_of(page, CREATOR.field), SAVE)).to_have_attribute(
-        "aria-pressed", "true"
-    )
-    expect(button_in(row_of(page, ANONYMOUS_NAME), SAVE)).not_to_have_attribute(
-        "aria-pressed", "true"
-    )
+    expect_asking(page, button_in(row_of(page, CREATOR.field), SAVE), 0)
+    expect_not_asking(button_in(row_of(page, ANONYMOUS_NAME), SAVE))
+
+
+@pytest.mark.parametrize("closer", ["cancel", "confirm"])
+def test_ac17_the_focus_goes_back_to_the_save_button_that_asked(
+    window: OpenWindow, server: SettingsServer, closer: str
+) -> None:
+    page = window(1280, 720)
+    open_card(page, server.base_url)
+    ask(page, "24")
+    expect(question_of(page, 2)).to_be_visible()
+    label = CANCEL if closer == "cancel" else CONFIRM
+
+    card_of(page).get_by_role("button", name=label, exact=True).click()
+
+    expect(question_of(page, 2)).to_have_count(0)
+    if closer == "confirm":
+        expect_row(page, ANONYMOUS_NAME, 24, "override")
+    expect(button_in(row_of(page, ANONYMOUS_NAME), SAVE)).to_be_focused()
+
+
+def override_the_life(page: Page) -> None:
+    """Save the override of 96 over the variable's 48 (longer: no question)."""
+    type_and_save(page, ANONYMOUS_NAME, str(OVERRIDE_HOURS))
+    expect_row(page, ANONYMOUS_NAME, OVERRIDE_HOURS, "override")
+
+
+def test_ac17_a_reset_to_a_shorter_life_asks_first_with_a_dry_run_of_null(
+    window: OpenWindow, server: SettingsServer
+) -> None:
+    page = window(1280, 720)
+    open_card(page, server.base_url)
+    override_the_life(page)
+    sent = RequestLog(page)
+    reset = button_in(row_of(page, ANONYMOUS_NAME), RESET)
+
+    reset.click()
+
+    expect(question_of(page, 0)).to_be_visible()
+    expect_asking(page, reset, 0)
+    expect_not_asking(button_in(row_of(page, ANONYMOUS_NAME), SAVE))
+    unchanged = row_text(page, ANONYMOUS_NAME)
+
+    assert unchanged == row_line(ANONYMOUS_NAME, OVERRIDE_HOURS, "override")
+    assert sent.dry_runs() == [{"name": ANONYMOUS_NAME, "value": None}]
+    assert sent.saves() == []
+
+
+def test_ac17_confirming_a_reset_moves_the_focus_to_the_rows_input(
+    window: OpenWindow, server: SettingsServer
+) -> None:
+    page = window(1280, 720)
+    open_card(page, server.base_url)
+    override_the_life(page)
+    sent = RequestLog(page)
+    button_in(row_of(page, ANONYMOUS_NAME), RESET).click()
+    expect(question_of(page, 0)).to_be_visible()
+
+    card_of(page).get_by_role("button", name=CONFIRM, exact=True).click()
+
+    expect_row(page, ANONYMOUS_NAME, CURRENT_HOURS, "environment")
+    expect(button_in(row_of(page, ANONYMOUS_NAME), RESET)).to_be_disabled()
+    expect(input_of(page, ANONYMOUS_NAME)).to_be_focused()
+    assert sent.saves() == [{"name": ANONYMOUS_NAME, "value": None}]

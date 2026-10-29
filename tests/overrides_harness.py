@@ -51,7 +51,7 @@ from urllib.parse import urlsplit
 import pytest
 from fastapi.testclient import TestClient
 from httpx2 import Response
-from playwright.sync_api import Locator, Page, Request, expect
+from playwright.sync_api import Locator, Page, Request, Route, expect
 
 from host_harness import HostApp, host_app
 from lifetime_harness import (
@@ -84,6 +84,7 @@ from spec038_harness import (
     shown_text,
 )
 from spec042_harness import Box, box_of
+from spec046_harness import fulfil_json
 from spec048_harness import WAIT_TIMEOUT_MS
 from spec048_ops_harness import expect_ops_state, open_ops, seed_ops_token
 
@@ -667,15 +668,9 @@ element => {
       return true;
     }
     const before = current.previousElementSibling;
-    if (before !== null) {
-      const beforeStyle = getComputedStyle(before);
-      if (before.tagName === 'HR' || before.getAttribute('role') === 'separator') {
-        return true;
-      }
-      if (parseFloat(beforeStyle.borderBottomWidth) > 0
-          && beforeStyle.borderBottomStyle !== 'none') {
-        return true;
-      }
+    if (before !== null
+        && (before.tagName === 'HR' || before.getAttribute('role') === 'separator')) {
+      return true;
     }
     current = current.parentElement;
   }
@@ -685,12 +680,69 @@ element => {
 
 
 def has_divider(question: Locator) -> bool:
-    """Whether a line, a rule or a separator stands above the question's block.
+    """Whether a divider stands right above the question's own block.
 
-    Walks up from the question while the block holds no number input.
+    Walks up from the question while the block holds no number input, so it never
+    reaches a row: a block on the way has a top border of its own, or an `hr` or
+    a `role="separator"` element is its previous sibling. The bottom border of an
+    element before the block does not count: every list row has a border on each
+    side, so a question with no divider of its own would pass.
     """
     found = question.evaluate(DIVIDER_SCRIPT)
     return found is True
+
+
+# ---- The question as a disclosure ----
+
+
+def question_block(page: Page, button: Locator) -> Locator:
+    """The element the button names with `aria-controls` (fails without one)."""
+    controlled = button.get_attribute("aria-controls")
+    assert controlled is not None, "the button has no aria-controls"
+    assert controlled.strip() != "", "the button's aria-controls is empty"
+    return page.locator(f'[id="{controlled}"]')
+
+
+def expect_asking(page: Page, button: Locator, count: int) -> None:
+    """The button that asked is an open disclosure of the question with `count`.
+
+    `aria-expanded` is "true" and `aria-controls` names the question's block, which
+    holds the question's line, « Confirmer » and « Annuler », as on the account page
+    (`account/account.md` rule 17).
+    """
+    expect(button).to_have_attribute("aria-expanded", "true")
+    block = question_block(page, button)
+    expect(block).to_be_visible()
+    expect(block.get_by_text(question_text(count), exact=True)).to_have_count(1)
+    expect(block.get_by_role("button", name=CONFIRM, exact=True)).to_have_count(1)
+    expect(block.get_by_role("button", name=CANCEL, exact=True)).to_have_count(1)
+
+
+def expect_not_asking(button: Locator) -> None:
+    """The button is a closed disclosure: `aria-expanded` is "false"."""
+    expect(button).to_have_attribute("aria-expanded", "false")
+
+
+# ---- A save the server refuses ----
+
+SETTINGS_ROUTE = "**/api/ops/settings"
+TOKEN_REFUSED = "Jeton refusé."
+THROTTLED = "Trop d'essais. Réessayez dans une minute."
+
+
+def answer_saves(page: Page, status: int, body: object) -> None:
+    """Answer every `PUT /api/ops/settings` with `body` as JSON and `status`.
+
+    The `GET` of the same path still reaches the real app.
+    """
+
+    def handle(route: Route) -> None:
+        if route.request.method == "PUT":
+            fulfil_json(route, status, body)
+        else:
+            route.fallback()
+
+    page.route(SETTINGS_ROUTE, handle)
 
 
 def box_below(lower: Box, upper: Box) -> bool:

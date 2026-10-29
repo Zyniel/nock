@@ -13,6 +13,9 @@ Readings taken where the spec leaves room:
 - The 401 and 429 of rule 11 lock the page as `admin/operations.md` rule 16 says:
   the token form comes back with « Jeton refusé. » or « Trop d'essais. Réessayez
   dans une minute. », and the tab's `sessionStorage` forgets the token.
+- Rule 12's 401 or 429 on a save, which no criterion names, is checked here
+  beside the card's own lock: the `PUT` alone is answered by `page.route`
+  (`answer_saves`), on the interval's row, which sends the `PUT` at once.
 
 The shared setup is in `overrides_harness`.
 """
@@ -29,24 +32,27 @@ from nock.catalogue import Catalogue
 from overrides_harness import (
     HEADING,
     IN_MEMORY,
+    INTERVAL,
     LOAD_ERROR,
     LOADING,
     SETTING_NAMES,
+    SETTINGS_ROUTE,
+    THROTTLED,
+    TOKEN_REFUSED,
+    RequestLog,
+    answer_saves,
     box_below,
     card_of,
     expect_node_text,
     input_box,
     open_card,
     settings_server,
+    type_and_save,
 )
 from spec038_harness import OPS_TOKEN_KEY, session_value
 from spec042_harness import box_of
 from spec046_harness import HeldRoute, OpenWindow, answer_json, window_opener
 from spec048_ops_harness import expect_ops_state, open_ops, seed_ops_token
-
-SETTINGS_ROUTE = "**/api/ops/settings"
-TOKEN_REFUSED = "Jeton refusé."
-THROTTLED = "Trop d'essais. Réessayez dans une minute."
 
 
 @pytest.fixture
@@ -156,3 +162,31 @@ def test_ac19_a_401_or_429_of_the_settings_locks_the_page(
         kept = session_value(page, OPS_TOKEN_KEY)
 
     assert kept is None
+
+
+@pytest.mark.parametrize(
+    ("status", "shown"), [(401, TOKEN_REFUSED), (429, THROTTLED)], ids=["401", "429"]
+)
+def test_ac19_a_401_or_429_of_a_save_locks_the_page(
+    window: OpenWindow,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    catalogue: Catalogue,
+    status: int,
+    shown: str,
+) -> None:
+    with settings_server(monkeypatch, tmp_path, catalogue) as server:
+        page = window(1280, 720)
+        open_card(page, server.base_url)
+        answer_saves(page, status, {"detail": "refused"})
+        sent = RequestLog(page)
+
+        type_and_save(page, INTERVAL, "30")
+
+        error = page.get_by_test_id("ops-token-error")
+        expect(error).to_have_text(shown)
+        expect_ops_state(page, "locked")
+        kept = session_value(page, OPS_TOKEN_KEY)
+
+    assert kept is None
+    assert sent.saves() == [{"name": INTERVAL, "value": 30}]

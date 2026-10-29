@@ -22,6 +22,12 @@ Readings taken where the spec leaves room:
   and an empty input.
 - The card sits between `ops-dashboard` and `ops-replay` (rule 11): its box starts
   under the dashboard's and ends above the replay's.
+- AC-16's edge case (a save equal to the row's effective value asks no question)
+  types 48 in the row whose variable is 48.
+- Rule 12's failed save, which no criterion names, is checked beside AC-18's
+  error line: a 500 or a 422 of the `PUT` alone (`answer_saves`) shows `ops.error`
+  « Impossible de charger les données. » as an alert under the input, on a life
+  above its effective value, so the `PUT` goes out with no question.
 
 The shared setup is in `overrides_harness`.
 """
@@ -39,6 +45,7 @@ from nock.catalogue import Catalogue
 from overrides_harness import (
     CONFIRM,
     INTERVAL,
+    LOAD_ERROR,
     ONE_DAY,
     RESET,
     SAVE,
@@ -46,6 +53,7 @@ from overrides_harness import (
     SETTING_NAMES,
     THREE_PERIODS,
     RequestLog,
+    answer_saves,
     bounds_text,
     box_below,
     button_in,
@@ -211,6 +219,28 @@ def test_ac16_a_shorter_life_shrinks_the_periods_and_its_reset_brings_them_back(
     assert sent.dashboards() == ["", ""]
 
 
+def test_ac16_a_save_equal_to_the_effective_value_asks_no_question(
+    window: OpenWindow,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    catalogue: Catalogue,
+) -> None:
+    variables = {CREATOR.variable: "48"}
+    with settings_server(monkeypatch, tmp_path, catalogue, variables) as server:
+        page = window(1280, 720)
+        open_card(page, server.base_url)
+        sent = RequestLog(page)
+
+        type_and_save(page, CREATOR.field, "48")
+
+        expect_row(page, CREATOR.field, 48, "override")
+        expect(page.get_by_text("Cela effacera")).to_have_count(0)
+        expect(card_of(page).get_by_role("button", name=CONFIRM)).to_have_count(0)
+
+    assert sent.saves() == [{"name": CREATOR.field, "value": 48}]
+    assert sent.dry_runs() == []
+
+
 # ---- AC-18: bounds ----
 
 
@@ -270,4 +300,33 @@ def test_ac18_the_interval_saves_at_once_with_no_question(
         expect(page.get_by_text("Cela effacera")).to_have_count(0)
 
     assert sent.saves() == [{"name": INTERVAL, "value": 30}]
+    assert sent.dry_runs() == []
+
+
+@pytest.mark.parametrize("status", [500, 422], ids=["500", "422"])
+def test_ac18_a_save_the_server_refuses_shows_the_error_line_under_the_input(
+    window: OpenWindow,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    catalogue: Catalogue,
+    status: int,
+) -> None:
+    name = CREATOR.field
+    with settings_server(monkeypatch, tmp_path, catalogue) as server:
+        page = window(1280, 720)
+        open_card(page, server.base_url)
+        answer_saves(page, status, {"detail": "refused"})
+        sent = RequestLog(page)
+
+        type_and_save(page, name, "800")
+
+        alert = row_of(page, name).get_by_role("alert")
+        expect(alert).to_have_text(LOAD_ERROR)
+        expect(alert).to_have_count(1)
+        under_the_input = box_below(box_of(alert), input_box(page, name))
+        row_after = row_text(page, name)
+
+    assert under_the_input
+    assert row_after.startswith(row_summary(name, 720, "default"))
+    assert sent.saves() == [{"name": name, "value": 800}]
     assert sent.dry_runs() == []
