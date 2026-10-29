@@ -24,6 +24,7 @@ from nock.hub import RoomRegistry
 from nock.room import RoomConfig, new_room
 from nock.server import create_app
 from spec017_harness import FakeClock
+from spec032_harness import make_dist_dir
 from spec038_harness import (
     DASHBOARD_PATH,
     DAY,
@@ -33,7 +34,6 @@ from spec038_harness import (
     seed_room,
 )
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 HOURS_PER_DAY = 24
 
 
@@ -44,8 +44,7 @@ def fx01_grid(fx01_text: str) -> Grid:
 
 @pytest.fixture
 def dist_dir(tmp_path: Path) -> Path:
-    (tmp_path / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return tmp_path
+    return make_dist_dir(tmp_path)
 
 
 def seed_three_rooms(registry: RoomRegistry, grid: Grid) -> None:
@@ -79,7 +78,7 @@ def dashboard_with_lives(
 
 
 @pytest.fixture
-def lives_app(
+def default_lives_registry(
     fake_clock: FakeClock, dist_dir: Path, fx01_grid: Grid
 ) -> Iterator[RoomRegistry]:
     """A registry on the default lives with the three rooms; closed afterwards."""
@@ -90,9 +89,11 @@ def lives_app(
 
 
 def test_ac6_with_the_default_lives_all_three_periods_are_offered(
-    lives_app: RoomRegistry, dist_dir: Path
+    default_lives_registry: RoomRegistry, dist_dir: Path
 ) -> None:
-    app = create_app(rooms=lives_app, dist_dir=dist_dir, operator_token=OPS_TOKEN)
+    app = create_app(
+        rooms=default_lives_registry, dist_dir=dist_dir, operator_token=OPS_TOKEN
+    )
 
     with TestClient(app) as client:
         response = client.get(DASHBOARD_PATH, headers=bearer(OPS_TOKEN))
@@ -105,12 +106,12 @@ def test_ac6_with_the_default_lives_all_three_periods_are_offered(
 
 
 @pytest.mark.parametrize(
-    ("variable", "hours"),
+    "variable",
     [
-        ("creator_solved_room_hours", 168),
-        ("creator_room_hours", 168),
-        ("anonymous_solved_room_hours", 168),
-        ("anonymous_room_hours", 168),
+        "creator_solved_room_hours",
+        "creator_room_hours",
+        "anonymous_solved_room_hours",
+        "anonymous_room_hours",
     ],
 )
 def test_ac6_a_life_of_168_hours_offers_1_and_7_days_whichever_life_it_is(
@@ -118,9 +119,8 @@ def test_ac6_a_life_of_168_hours_offers_1_and_7_days_whichever_life_it_is(
     dist_dir: Path,
     fx01_grid: Grid,
     variable: str,
-    hours: int,
 ) -> None:
-    config = RoomConfig.model_validate({variable: hours})
+    config = RoomConfig.model_validate({variable: 7 * HOURS_PER_DAY})
 
     status, body = dashboard_with_lives(fake_clock, dist_dir, fx01_grid, config)
 

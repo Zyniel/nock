@@ -2,8 +2,7 @@
 720 hours (the default of `NOCK_ANONYMOUS_ROOM_HOURS`) from its last edit.
 
 `RoomStore` keeps each room's last edit time, which only edits move (`is_edit`: a
-`letter_changed` or a `cell_locked`), and lists the rooms whose last edit time is
-older than a given time (`expired_codes`). A registry reads the room life from the
+`letter_changed` or a `cell_locked`). A registry reads the room life from the
 hour fields of `RoomConfig` (`anonymous_room_hours` for the rooms of these tests):
 exactly 720 hours after the last edit a room is still open, and any later it is
 expired. The shared setup is in `spec032_harness`.
@@ -348,28 +347,6 @@ def test_ac1_flags_votes_reveal_results_and_departures_are_not_edits(
     entry: LogEntry,
 ) -> None:
     assert nock.room.is_edit(entry) is False
-
-
-# ---- Expired codes -------------------------------------------------------------
-
-
-def test_ac1_expired_codes_holds_a_room_only_after_its_last_edit_time(
-    store: RoomStore, fx01_grid: Grid
-) -> None:
-    room_after_the_five_entries(store, fx01_grid)
-
-    assert store.expired_codes(T0 + 30) == []
-    assert store.expired_codes(T0 + 30.5) == [CODE_A]
-
-
-def test_ac1_expired_codes_are_in_code_point_order(
-    store: RoomStore, fx01_grid: Grid
-) -> None:
-    for code in ["BBBBBB", "AAAAAA", "AAAAA9"]:
-        store.create_room(new_room(code, fx01_grid, T0))
-    store.create_room(new_room("CCCCCC", fx01_grid, T0 + 500))
-
-    assert store.expired_codes(T0 + 100) == ["AAAAA9", "AAAAAA", "BBBBBB"]
 
 
 # ---- The room life on a registry -----------------------------------------------

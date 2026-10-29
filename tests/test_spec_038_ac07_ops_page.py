@@ -391,6 +391,8 @@ def test_ac7_mocked_the_six_texts_of_the_7_day_figures(
     mocked_dashboard(page, server.base_url, route)
 
     assert texts_of(page.get_by_test_id("ops-metric")) == SEVEN_DAY_TEXTS
+    # The first request asks for the default period: no `days` in its query.
+    assert parse_qs(urlparse(route.urls[0]).query) == {}
 
 
 def test_ac7_mocked_each_data_value_is_string_of_the_number_received(

@@ -5,8 +5,10 @@ The old databases are written by hand with the old schemas of `src/nock/store.py
 `user_version` 1), holding four rooms of FX-01:
 
 - `S`: solved at `s`; its stored state (the snapshot) says so (`solved_at`);
-- `V`: solved at `v`; its snapshot is older than the solving step, whose two log
-  entries (`letter_changed`, `grid_solved`) say so; it has a creator at version 1;
+  its last edit time is later than `s`;
+- `V`: solved at `v`, its last edit time later than `v`; its snapshot is older
+  than the solving step, whose two log entries (`letter_changed`, `grid_solved`)
+  say so; it has a creator at version 1;
 - `W`: solved, but its stored state has no `solved_at` and its log is empty, so
   nothing gives a solve time: it gets its last edit time `w`;
 - `U`: unsolved, last edited at `u`.
@@ -52,6 +54,8 @@ UNSOLVED_ROOM = "UNSOLV"
 
 SOLVED_AT = NOW + 754.0  # `solved_room`'s solving letter
 LOGGED_SOLVED_AT = NOW + 900.0
+SOLVED_LAST_EDIT_AT = SOLVED_AT + 300.0  # after the solve time, to tell them apart
+LOGGED_LAST_EDIT_AT = LOGGED_SOLVED_AT + 400.0
 NO_TIME_LAST_EDIT_AT = NOW + 1_234.0
 UNSOLVED_LAST_EDIT_AT = NOW + 500.0
 
@@ -128,8 +132,8 @@ def old_rooms(grid: Grid) -> list[OldRoom]:
     )
     unsolved = named(full17(grid), UNSOLVED_ROOM)
     return [
-        OldRoom(solved, (), SOLVED_AT, None),
-        OldRoom(logged, solving_step.entries, LOGGED_SOLVED_AT, LEA_ACCOUNT),
+        OldRoom(solved, (), SOLVED_LAST_EDIT_AT, None),
+        OldRoom(logged, solving_step.entries, LOGGED_LAST_EDIT_AT, LEA_ACCOUNT),
         OldRoom(named(without_time, NO_TIME_ROOM), (), NO_TIME_LAST_EDIT_AT, None),
         OldRoom(unsolved, (), UNSOLVED_LAST_EDIT_AT, None),
     ]
