@@ -1156,7 +1156,8 @@ Before the human tags a release on `main`:
 
 ### B-027 The order of the overrides holder
 
-- Status: brief
+- Status: ready (the human approved the brief and picked A, 2026-10-29;
+  no spec change)
 - Waits for: B-024 (#64), which brings the code this item touches.
 - Domains: none (no behaviour change: `src/nock/server.py` only)
 - Architecture decision: no (private names of `server.py`)
@@ -1167,7 +1168,7 @@ Before the human tags a release on `main`:
   different things. It works today only because the lifespan calls
   `holder.get()` first (B-024 review round 2, a suggestion).
 - In scope: make that order impossible to break by accident. Options:
-  - A (lead's pick): `settings_set()` fails loudly when no registry exists
+  - A (the human's pick): `settings_set()` fails loudly when no registry exists
     yet, so None means only "a registry was given".
   - B: `get()` answers the registry and the set together, and
     `settings_set()` goes.
