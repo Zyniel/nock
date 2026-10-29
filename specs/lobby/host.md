@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: host
-status: approved
+status: done
 ---
 
 # lobby/host - The host role and the creator
@@ -86,7 +86,8 @@ out; the room goes with the creator's account.
     member linked to none. A signed-in join (`lobby/joining.md` rule 4) links the
     new player it makes to the session's account, and links a member it resumes
     or seats back only when that member has none; a member's account never
-    changes otherwise (rule 14 apart). `PUT /api/account/rooms` links no member.
+    changes otherwise (`account/account.md` rule 18 apart). `PUT
+    /api/account/rooms` links no member.
     An account is at most one player of a room: its signed-in joins reach its
     member, whatever token they carry. The link is stored with the member and
     reaches no browser.
@@ -136,17 +137,6 @@ Joueurs rows and host buttons: `_design/room.md`, « Salon »; the Menu entry,
 status once the room has shown, the status band of « Connection lost »; before,
 the entry card of `lobby/joining.md` rule 11, `_design/pages.md`, « Entry and
 not-found pages ».
-
-## New interface
-
-- `src/nock/room.py`: `RoomState.creator_account_id: str | None` (None: an
-  anonymous room); `PlayerRecord.account_id` and `PastPlayer.account_id: str |
-  None`; `new_room(..., creator_account_id: str | None = None)`;
-  `join_room(..., account_id: str | None = None)`, the session's account.
-- `src/nock/hub.py`: `RoomRegistry.register_room(..., creator_account_id: str |
-  None = None)`.
-- `src/nock/store.py`: the nullable column `room_times.creator_account_id`;
-  `PRAGMA user_version` 1.
 
 ## Acceptance criteria
 

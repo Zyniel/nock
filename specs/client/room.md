@@ -1,7 +1,7 @@
 ---
 area: client
 file: room
-status: approved
+status: done
 ---
 
 # client/room - The room panel (« Salon ») and the notes

@@ -661,9 +661,11 @@ an item that must be done first.
 
 ### B-022 Creator rooms and host return
 
-- Status: building (the human approved the brief as written, with the
-  lead's calls, then the spec change as written, `invalid_target` included,
-  2026-10-28)
+- Status: done (the human approved the brief as written, with the lead's
+  calls, then the spec change as written, `invalid_target` included,
+  2026-10-28; in review round 1 the human made erasure delete the creator
+  rooms and approved that spec change, 2026-10-29; built and reviewed in two
+  rounds, 2026-10-29)
 - Domains: lobby/host (new: the host role, moved from `lobby/rooms.md` rules
   13 to 21), lobby/rooms, lobby/joining, account/account, platform/realtime;
   `specs/_map.md` (a table row, the glossary); "guest" reworded in product,
