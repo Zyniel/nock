@@ -25,12 +25,12 @@ The other keys hold data, not settings: `nock.nickname` and
 
 ## Host (per room)
 
-Set in « Réglages de l'hôte » (`lobby/rooms.md` rule 20), sent in
+Set in « Réglages de l'hôte » (`lobby/host.md` rule 8), sent in
 `settings_changed`; a new room's values: `lobby/rooms.md` rule 7.
 
 | Setting (UI) | Values, default first | Owner |
 | --- | --- | --- |
-| « Verrouiller le salon » | off, on | `lobby/rooms.md` 15 |
+| « Verrouiller le salon » | off, on | `lobby/host.md` 3 |
 | « Aide » | « libre » (`free`), « par vote » (`vote`), « désactivée » (`none`) | `gameplay/hints.md` 1 |
 | « Lettres à révéler » | 5; 0 to 99 on the page, any count from 0 on the server | `gameplay/hints.md` 8 |
 | « Mots à révéler » | 1; 0 to 99 on the page, any count from 0 on the server | `gameplay/hints.md` 8 |
@@ -46,6 +46,11 @@ empty variable counts as unset.
 | `NOCK_PORT` | port to listen on | 8000 | `platform/server.md` 17 |
 | `NOCK_DATABASE` | SQLite file of the rooms and accounts | in memory, no file | `platform/server.md` 1, 18 |
 | `NOCK_OPERATOR_TOKEN` | secret of the `/ops` pages | operator pages off | `admin/operations.md` 4 |
+| `NOCK_CREATOR_SOLVED_ROOM_HOURS` | life of a solved creator room, from its solve time (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
+| `NOCK_CREATOR_ROOM_HOURS` | life of an unsolved creator room, from its last edit (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
+| `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS` | life of a solved anonymous room, from its solve time (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
+| `NOCK_ANONYMOUS_ROOM_HOURS` | life of an unsolved anonymous room, from its last edit (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
+| `NOCK_EXPIRY_SWEEP_MINUTES` | how often the expired rooms are deleted (whole minutes, 1 to 1440) | 60 | `lobby/lifetime.md` 6, 7 |
 | `NOCK_PUBLIC_URL` | public URL of the sign-in links | accounts off | `account/account.md` 1, 2 |
 | `NOCK_SMTP_HOST` | mail server | accounts off | `account/account.md` 1, 2 |
 | `NOCK_SMTP_SECURITY` | `starttls`, `tls` or `none` | `starttls` | `account/account.md` 2 |

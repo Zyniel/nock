@@ -524,6 +524,16 @@ def recap_body(phone: bool = False, departed: bool = False) -> str:
     )
 
 
+def room_gone_body() -> str:
+    """Return the room-gone dialog's content (overlays.md, « Room gone »)."""
+    return (
+        "<h3>Ce salon n'existe plus.</h3>"
+        '<p class="dmuted">Un salon est effacé après un certain temps sans '
+        "modification.</p>"
+        '<div class="end"><span class="btn primary">Voir les grilles</span></div>'
+    )
+
+
 def phone_dialog_sheet(inner: str, top: int = 54, recap: bool = False) -> str:
     """Return a room sheet from under the top bar, or the recap over all."""
     cls = "ov bottom recap" if recap else "ov bottom"

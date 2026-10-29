@@ -91,7 +91,7 @@ Translucent tokens, all built on ink or white:
 | Token | Value | Job |
 | --- | --- | --- |
 | `--nock-scrim` | rgb(20 24 31 / 35%) | Scrim under a menu, a popover, the Salon sheet and the other room sheets |
-| `--nock-scrim-dialog` | rgb(20 24 31 / 38%) | Scrim under the recap |
+| `--nock-scrim-dialog` | rgb(20 24 31 / 38%) | Scrim under the recap and the room-gone dialog |
 | `--nock-dot-ring` | rgb(20 24 31 / 55%) | 1 px ring around a player dot |
 | `--nock-key-shadow` | rgb(20 24 31 / 25%) | 1 px shadow under a key |
 | `--nock-shadow-soft` | rgb(20 24 31 / 35%) | Shadow colour of a shown reaction |
@@ -345,8 +345,8 @@ interface; reactions and chat text are user content.
 | Badge | red background, white 700 0.62rem/1 text, padding 2 px 4 px, radius 8 px |
 | New-events dot | 8 px red circle |
 | 3-second note | `room.md`, « 3-second notes » |
-| Bottom sheet | white, radius 14 px top with grab handle (Salon) or 16 px top without (other room sheets, recap): `room.md`, « Salon » and « Room sheets: host settings and account »; `overlays.md`, « Recap » |
-| Scrim | `--nock-scrim` (menus, sheets) or `--nock-scrim-dialog` (recap) |
+| Bottom sheet | white, radius 14 px top with grab handle (Salon) or 16 px top without (other room sheets, recap, room gone): `room.md`, « Salon » and « Room sheets: host settings and account »; `overlays.md`, « Recap » and « Room gone » |
+| Scrim | `--nock-scrim` (menus, sheets) or `--nock-scrim-dialog` (recap, room gone) |
 | Card | white, 1 px line-grey border, radius 10 px, padding 18 px 16 px, gap 12 px |
 | List row | white, 1 px line-grey border, radius 8 px, padding 12 px 14 px, gap 12 px, items centred; text column gap 3 px (title 700, lines 0.85rem muted); its button on the right |
 | Field | label above its input, gap 6 px, label 600 0.85rem/1.2 ink |

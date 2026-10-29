@@ -73,7 +73,9 @@ fonts, focus ring, shared components, state lines).
      <code> »), then a card titled `room.status.<state>` with the link
      `share.home` (« Voir les grilles ») to `/`. For `not_found` the card adds
      `room.status.not_found_detail` and the link is the primary way on; an
-     expired room is deleted and closed with 4404, so it gives this card;
+     expired room is deleted and closed with 4404 (`lobby/lifetime.md`), so it
+     gives this card (once the room has shown, a 4404 gives the room-gone dialog,
+     `client/hud.md` rule 16);
    - else the opening: the room's top bar for the window (`client/hud.md`),
      inert and without timer, so a press on it, the brand included, opens
      nothing, loads nothing and sends nothing; the heading read but not seen;
@@ -184,7 +186,7 @@ fonts, focus ring, shared components, state lines).
   connecting with no seq and no band; a close 4404 makes it not found with no
   seq. (← 040 AC-21)
 - **AC-9** `/r/ZZZZZZ`, unknown, shows the card « Ce salon n'existe pas. »,
-  then « Un salon est effacé 30 jours après sa dernière modification. », then
+  then « Un salon est effacé après un certain temps sans modification. », then
   « Voir les grilles », primary, which loads the catalogue. (← 040 AC-17,
   046 AC-18)
 - **AC-10** On `/r/ZZZZZZ` the entry frame has the brand bar, then « Salon
@@ -262,7 +264,8 @@ fonts, focus ring, shared components, state lines).
 - Other languages and a language switch; a dark mode, forced colours, print
   styles; screenshot comparison with the sheets.
 - The band, retries and resent edits: `platform/realtime.md`. The join, the
-  nickname card and refusals: `lobby/joining.md`, `lobby/rooms.md`. The
+  nickname card and refusals: `lobby/joining.md`, `lobby/host.md`,
+  `lobby/rooms.md`. The
   room's frame once shown: `client/hud.md`. The catalogue and its states:
   `content/library.md`. The plain pages' content: `account/account.md`,
   `gameplay/results.md`, `admin/operations.md`.

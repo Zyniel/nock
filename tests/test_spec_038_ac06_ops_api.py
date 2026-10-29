@@ -199,10 +199,17 @@ def seeded(registry: RoomRegistry, fx01_grid: Grid) -> RoomRegistry:
 
 
 def figures_of(response: Response) -> DashboardFigures:
-    """The body of a dashboard answer, read as `DashboardFigures`."""
+    """The figures of a dashboard answer, read as `DashboardFigures`.
+
+    The answer also holds `offered_days` (`admin/operations.md` rule 12), which is
+    not a figure: it is checked in `test_spec_038_ac06_offered_periods.py`.
+    """
     from nock.operations import DashboardFigures
 
-    return DashboardFigures.model_validate_json(response.text)
+    body = response.json()
+    assert isinstance(body, dict), body
+    body.pop("offered_days", None)
+    return DashboardFigures.model_validate(body)
 
 
 def figures_from_the_store(registry: RoomRegistry, days: int) -> DashboardFigures:

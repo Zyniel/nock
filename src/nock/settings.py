@@ -1,11 +1,13 @@
 """Settings the server reads from its environment (specs 036, 038 and 033).
 
-Two groups of settings live here:
+Three groups of settings live here:
 
 - the operator token of NOCK_OPERATOR_TOKEN, which turns on the operator pages
   (spec 038);
 - the account settings (spec 033): the public URL of the server and how it sends
-  e-mail, from NOCK_PUBLIC_URL and the NOCK_SMTP_* variables.
+  e-mail, from NOCK_PUBLIC_URL and the NOCK_SMTP_* variables;
+- the room lives and the sweep interval (`lobby/lifetime.md`), from the four
+  NOCK_*_ROOM_HOURS variables and NOCK_EXPIRY_SWEEP_MINUTES.
 
 The rules of a host and of a port are those of NOCK_HOST and NOCK_PORT (spec 036),
 which `nock.__main__` checks with the same functions.
@@ -25,6 +27,12 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 from nock.accounts import normalize_email
+from nock.room import (
+    DEFAULT_ROOM_LIFE_HOURS,
+    MAX_ROOM_LIFE_HOURS,
+    MIN_ROOM_LIFE_HOURS,
+    RoomConfig,
+)
 
 OPERATOR_TOKEN_VARIABLE: str = "NOCK_OPERATOR_TOKEN"
 OPERATOR_TOKEN_MIN_LENGTH: int = 32
@@ -43,6 +51,17 @@ SMTP_SECURITY_VARIABLE: str = "NOCK_SMTP_SECURITY"
 SMTP_USER_VARIABLE: str = "NOCK_SMTP_USER"
 SMTP_PASSWORD_VARIABLE: str = "NOCK_SMTP_PASSWORD"
 SMTP_FROM_VARIABLE: str = "NOCK_SMTP_FROM"
+
+# The variables of the room lives and the sweep (`lobby/lifetime.md` rule 7).
+CREATOR_SOLVED_ROOM_HOURS_VARIABLE: str = "NOCK_CREATOR_SOLVED_ROOM_HOURS"
+CREATOR_ROOM_HOURS_VARIABLE: str = "NOCK_CREATOR_ROOM_HOURS"
+ANONYMOUS_SOLVED_ROOM_HOURS_VARIABLE: str = "NOCK_ANONYMOUS_SOLVED_ROOM_HOURS"
+ANONYMOUS_ROOM_HOURS_VARIABLE: str = "NOCK_ANONYMOUS_ROOM_HOURS"
+EXPIRY_SWEEP_MINUTES_VARIABLE: str = "NOCK_EXPIRY_SWEEP_MINUTES"
+MIN_SWEEP_MINUTES: int = 1
+MAX_SWEEP_MINUTES: int = 1440
+DEFAULT_SWEEP_MINUTES: int = 60
+SECONDS_PER_MINUTE: float = 60.0
 
 URL_SCHEMES: tuple[str, ...] = ("http://", "https://")
 # The usual port of each security mode, used when NOCK_SMTP_PORT is unset.
@@ -74,6 +93,14 @@ _HOST_RULE = (
 _PORT_RULE = (
     f"a whole number from {MIN_PORT} to {MAX_PORT}, written with the digits 0 to 9 "
     "only"
+)
+_ROOM_LIFE_RULE = (
+    f"a whole number of hours from {MIN_ROOM_LIFE_HOURS} to {MAX_ROOM_LIFE_HOURS}, "
+    "written with the digits 0 to 9 only"
+)
+_SWEEP_RULE = (
+    f"a whole number of minutes from {MIN_SWEEP_MINUTES} to {MAX_SWEEP_MINUTES}, "
+    "written with the digits 0 to 9 only"
 )
 _PRINTABLE_ASCII_RULE = "written with the printable ASCII characters only"
 
@@ -136,6 +163,44 @@ def operator_token_from_env(environ: Mapping[str, str]) -> str | None:
                 "and a to z, the digits 0 to 9, '_' and '-' only"
             )
     return token
+
+
+def room_config_from_env(environ: Mapping[str, str]) -> RoomConfig:
+    """Return the room lives and the sweep interval of `environ`.
+
+    Each of the five variables, unset or empty, takes its default. The other
+    fields of the config are at their defaults.
+
+    Args:
+        environ: The environment to read, such as `os.environ`.
+
+    Returns:
+        The config: the four lives in hours, and the sweep interval in seconds.
+
+    Raises:
+        SettingsError: a variable is not a whole number written with ASCII
+            digits, or is out of its bounds. The message is one line that names
+            the variable and shows the value as `repr()` writes it.
+    """
+    sweep_minutes = _read_whole_number(
+        environ,
+        EXPIRY_SWEEP_MINUTES_VARIABLE,
+        minimum=MIN_SWEEP_MINUTES,
+        maximum=MAX_SWEEP_MINUTES,
+        default=DEFAULT_SWEEP_MINUTES,
+        rule=_SWEEP_RULE,
+    )
+    return RoomConfig(
+        creator_solved_room_hours=_read_room_life(
+            environ, CREATOR_SOLVED_ROOM_HOURS_VARIABLE
+        ),
+        creator_room_hours=_read_room_life(environ, CREATOR_ROOM_HOURS_VARIABLE),
+        anonymous_solved_room_hours=_read_room_life(
+            environ, ANONYMOUS_SOLVED_ROOM_HOURS_VARIABLE
+        ),
+        anonymous_room_hours=_read_room_life(environ, ANONYMOUS_ROOM_HOURS_VARIABLE),
+        expiry_sweep_seconds=sweep_minutes * SECONDS_PER_MINUTE,
+    )
 
 
 def account_settings_from_env(environ: Mapping[str, str]) -> AccountSettings | None:
@@ -219,18 +284,73 @@ def port_number(text: str) -> int | None:
     Returns:
         The port, or None when NOCK_PORT would refuse `text`.
     """
+    return _bounded_number(text, MIN_PORT, MAX_PORT)
+
+
+def _bounded_number(text: str, minimum: int, maximum: int) -> int | None:
+    """Return the number written in `text`, or None when it is not acceptable.
+
+    The text is ASCII digits 0 to 9 only (leading zeros are allowed, however
+    many) and the number is from `minimum` to `maximum`.
+    """
     if not text.isascii() or not text.isdigit():
         return None
     significant_digits = text.lstrip("0")
-    if len(significant_digits) > len(str(MAX_PORT)):
+    if len(significant_digits) > len(str(maximum)):
         return None  # far too big, and int() refuses numbers of 4,300 digits
     if significant_digits == "":
-        significant_digits = "0"  # all zeros: the number 0, below MIN_PORT
+        significant_digits = "0"  # all zeros: the number 0
     # Convert without the leading zeros: int() also refuses 4,300 of them.
-    port = int(significant_digits)
-    if port < MIN_PORT or port > MAX_PORT:
+    number = int(significant_digits)
+    if number < minimum or number > maximum:
         return None
-    return port
+    return number
+
+
+def _read_room_life(environ: Mapping[str, str], variable: str) -> int:
+    """Return a room life in hours: the variable's value, else 720.
+
+    Raises:
+        SettingsError: the value is not 24 to 8760 in ASCII digits.
+    """
+    return _read_whole_number(
+        environ,
+        variable,
+        minimum=MIN_ROOM_LIFE_HOURS,
+        maximum=MAX_ROOM_LIFE_HOURS,
+        default=DEFAULT_ROOM_LIFE_HOURS,
+        rule=_ROOM_LIFE_RULE,
+    )
+
+
+def _read_whole_number(
+    environ: Mapping[str, str],
+    variable: str,
+    minimum: int,
+    maximum: int,
+    default: int,
+    rule: str,
+) -> int:
+    """Return the whole number in `variable`, or its default when unset or empty.
+
+    Args:
+        environ: The environment to read.
+        variable: The variable's name.
+        minimum: The least acceptable value.
+        maximum: The greatest acceptable value.
+        default: The value when the variable is unset or empty.
+        rule: What the variable must be, for the message of a refusal.
+
+    Raises:
+        SettingsError: the value is not acceptable (see `_bounded_number`).
+    """
+    text = environ.get(variable, "")
+    if text == "":
+        return default
+    number = _bounded_number(text, minimum, maximum)
+    if number is None:
+        raise _refused(variable, rule, text)
+    return number
 
 
 def _has_valid_labels(name: str) -> bool:

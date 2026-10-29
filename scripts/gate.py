@@ -30,15 +30,23 @@ Options of the full stage (2026-10-15, so CI can run one job per engine):
         (only the tests that run without a browser).
     --skip-static: skip ruff, black, traceability, pyrefly and svelte-check,
         for CI jobs whose static checks run in another job.
-    --workers: pytest-xdist workers, "auto" (default, one per CPU) or a
-        number; 0 runs everything in one serial pass. The tests marked
-        `serial` (scripts/gate_browsers.py) always run after the parallel
-        pass, on their own.
+    --workers: pytest-xdist workers, "auto" (one per CPU) or a number, never
+        more than the machine's logical CPUs; 0 runs everything in one serial
+        pass. Default: the NOCK_WORKERS environment variable, else auto. The
+        tests marked `serial` (scripts/gate_browsers.py) always run after the
+        parallel pass, on their own.
     --specs: spec numbers and domain names, comma-separated (for example
         027,grids): the browser tests run only for those numbered specs, those
         domains and the numbered specs the domains point to; the static checks
         and the tests without a browser run in full. The quick gate of an
         agent's finish hook (2026-10-16; domain names since 2026-10-24).
+
+The gate's load on the machine (2026-10-29: in a review round, 16 workers'
+Chromium processes and two gates at once froze a 16-thread desktop): the
+parallel pass runs at a low priority, the serial pass keeps the normal one for
+its timings, and one gate at a time runs its tests in a clone. A second gate
+waits for the lock in the clone's .git folder, shared by every worktree, and
+fails after GATE_LOCK_WAIT_SECONDS, naming the gate that holds it.
 
 Exit codes:
     0: every check passed.
@@ -53,8 +61,15 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
+
+if sys.platform == "win32":
+    import msvcrt
+else:
+    import fcntl
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SPECS_DIR = PROJECT_ROOT / "specs"
@@ -137,6 +152,18 @@ NO_TESTS_COLLECTED = 5
 # A spec number as --specs takes it: three digits, for example 027.
 SPEC_NUMBER_PATTERN = re.compile(r"^\d{3}$")
 
+# One gate at a time runs its tests in a clone (2026-10-29). The lock file and
+# the line naming its holder live in the clone's .git folder.
+GATE_LOCK_NAME = "nock-gate.lock"
+GATE_HOLDER_NAME = "nock-gate.holder"
+# Fits in the 1,140 s scripts/hooks/role_gate.py gives the gate, next to a quick
+# gate of about 510 s.
+GATE_LOCK_WAIT_SECONDS = 600
+GATE_LOCK_POLL_SECONDS = 5
+# How far a test pass at low priority lowers itself on Linux and macOS; on
+# Windows it runs below normal.
+LOW_PRIORITY_NICENESS = 10
+
 
 @dataclass(frozen=True)
 class NumberedSpec:
@@ -161,12 +188,35 @@ class DomainSpec:
     pointers: dict[int, list[tuple[str, int]]]
 
 
-def run_tool(step_name: str, command: list[str]) -> int | None:
+@dataclass(frozen=True)
+class PytestPass:
+    """One pytest run of the full stage."""
+
+    step_name: str
+    command: list[str]
+    # The parallel pass: its workers and their browsers load every CPU.
+    low_priority: bool
+
+
+@dataclass(frozen=True)
+class GateLock:
+    """The lock a gate holds while its tests run."""
+
+    folder: Path
+    descriptor: int
+
+
+def run_tool(
+    step_name: str, command: list[str], low_priority: bool = False
+) -> int | None:
     """Run one external tool and return its exit code.
 
     Args:
         step_name: Label printed before the tool output.
         command: Executable name followed by its arguments.
+        low_priority: Run the tool and every process it starts (pytest's
+            workers, their browsers) at a low priority, so that the machine
+            stays usable.
 
     Returns:
         The exit code, or None when the tool or its dependencies are missing.
@@ -192,8 +242,22 @@ def run_tool(step_name: str, command: list[str]) -> int | None:
     environment["PYTHONPATH"] = os.pathsep.join(
         part for part in (str(SCRIPTS_DIR), python_path) if part
     )
+    # The processes a tool starts inherit its priority.
+    creation_flags = 0
+    if low_priority:
+        if sys.platform == "win32":
+            creation_flags = subprocess.BELOW_NORMAL_PRIORITY_CLASS
+        else:
+            nice_path = shutil.which("nice")
+            if nice_path is not None:
+                niceness = str(LOW_PRIORITY_NICENESS)
+                full_command = [nice_path, "-n", niceness, *full_command]
     completed = subprocess.run(
-        full_command, cwd=PROJECT_ROOT, env=environment, check=False
+        full_command,
+        cwd=PROJECT_ROOT,
+        env=environment,
+        check=False,
+        creationflags=creation_flags,
     )
     return completed.returncode
 
@@ -218,7 +282,7 @@ def run_step(step_name: str, command: list[str]) -> bool:
     return True
 
 
-def run_pytest_passes(commands: list[tuple[str, list[str]]]) -> bool:
+def run_pytest_passes(passes: list[PytestPass]) -> bool:
     """Run the pytest passes and report whether they all succeeded.
 
     A pass that selects no test (pytest's exit code 5) is fine, such as the
@@ -226,15 +290,16 @@ def run_pytest_passes(commands: list[tuple[str, list[str]]]) -> bool:
     a test.
 
     Args:
-        commands: The passes, with their step names.
+        passes: The passes, in order.
 
     Returns:
         True when every pass passed or selected nothing, and one ran a test.
     """
     all_passed = True
     tests_ran = False
-    for step_name, command in commands:
-        exit_code = run_tool(step_name, command)
+    for pytest_pass in passes:
+        step_name = pytest_pass.step_name
+        exit_code = run_tool(step_name, pytest_pass.command, pytest_pass.low_priority)
         if exit_code == 0:
             tests_ran = True
             print(f"OK: {step_name}")
@@ -248,6 +313,110 @@ def run_pytest_passes(commands: list[tuple[str, list[str]]]) -> bool:
         print("FAIL: no pytest pass selected a test")
         return False
     return all_passed
+
+
+def gate_lock_folder() -> Path:
+    """Return the folder of the gate lock: the clone's .git folder.
+
+    Every worktree of the clone shares it, whatever the temporary folder of the
+    session that runs the gate. Outside a git clone, the temporary folder.
+    """
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return Path(tempfile.gettempdir())
+    folder = Path(completed.stdout.strip())
+    if completed.returncode != 0 or not folder.is_dir():
+        return Path(tempfile.gettempdir())
+    return folder
+
+
+def try_lock(lock_descriptor: int) -> bool:
+    """Take the lock on an open lock file without waiting.
+
+    The system lets the lock go when the process ends, however it ends, so a
+    gate that crashed or was stopped never leaves the lock behind.
+
+    Args:
+        lock_descriptor: The lock file, opened for reading and writing.
+
+    Returns:
+        True when the lock is now held by this process.
+    """
+    try:
+        if sys.platform == "win32":
+            os.lseek(lock_descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(lock_descriptor, msvcrt.LK_NBLCK, 1)
+        else:
+            fcntl.flock(lock_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False
+    return True
+
+
+def read_holder(folder: Path) -> str:
+    """Return the line naming the gate that holds the lock, or a placeholder."""
+    try:
+        holder = (folder / GATE_HOLDER_NAME).read_text(encoding="utf-8").strip()
+    except OSError:
+        return "a gate that has not named itself yet"
+    return holder or "a gate that has not named itself yet"
+
+
+def take_gate_lock() -> GateLock | None:
+    """Wait until no other gate of the clone runs its tests, then hold the lock.
+
+    Returns:
+        The lock, for `release_gate_lock`, or None when another gate still held
+        it after GATE_LOCK_WAIT_SECONDS.
+    """
+    print("\n=== gate lock (one gate's tests at a time) ===", flush=True)
+    folder = gate_lock_folder()
+    lock_descriptor = os.open(folder / GATE_LOCK_NAME, os.O_RDWR | os.O_CREAT)
+    wait_minutes = GATE_LOCK_WAIT_SECONDS // 60
+    deadline = time.monotonic() + GATE_LOCK_WAIT_SECONDS
+    waited = False
+    while not try_lock(lock_descriptor):
+        if time.monotonic() >= deadline:
+            os.close(lock_descriptor)
+            print(
+                f"FAIL: after {wait_minutes} minutes, the tests of another gate "
+                f"still run: {read_holder(folder)}. Let it finish, or stop it if "
+                "nothing reads its output, then run the gate again."
+            )
+            return None
+        if not waited:
+            print(
+                f"Waiting up to {wait_minutes} minutes: the tests of another gate "
+                f"run: {read_holder(folder)}.",
+                flush=True,
+            )
+            waited = True
+        time.sleep(GATE_LOCK_POLL_SECONDS)
+
+    started = time.strftime("%Y-%m-%d %H:%M:%S")
+    arguments = " ".join(sys.argv[1:]) or "(no option)"
+    holder = f"process {os.getpid()} in {PROJECT_ROOT}, since {started}: {arguments}"
+    (folder / GATE_HOLDER_NAME).write_text(holder + "\n", encoding="utf-8")
+    print(f"OK: gate lock held ({folder / GATE_LOCK_NAME})")
+    return GateLock(folder=folder, descriptor=lock_descriptor)
+
+
+def release_gate_lock(lock: GateLock) -> None:
+    """Let the next gate run its tests."""
+    (lock.folder / GATE_HOLDER_NAME).unlink(missing_ok=True)
+    if sys.platform == "win32":
+        os.lseek(lock.descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(lock.descriptor, msvcrt.LK_UNLCK, 1)
+    else:
+        fcntl.flock(lock.descriptor, fcntl.LOCK_UN)
+    os.close(lock.descriptor)
 
 
 def find_spec_files(directory: Path = SPECS_DIR) -> list[Path]:
@@ -776,12 +945,19 @@ def parse_engines(engines_text: str) -> list[str]:
 def parse_workers(workers_text: str) -> str:
     """Return the --workers value: "auto" or a number of workers.
 
+    A number above the machine's logical CPUs is lowered to that count: more
+    workers than CPUs only slow every test down, and NOCK_WORKERS in
+    .claude/settings.json holds one number for machines of every size.
+
     Raises:
         argparse.ArgumentTypeError: When it is neither "auto" nor a number.
     """
-    if workers_text == "auto" or workers_text.isdigit():
+    if workers_text == "auto":
         return workers_text
-    raise argparse.ArgumentTypeError("expected 'auto' or a number of workers")
+    if not workers_text.isdigit():
+        raise argparse.ArgumentTypeError("expected 'auto' or a number of workers")
+    cpu_count = os.cpu_count() or 1
+    return str(min(int(workers_text), cpu_count))
 
 
 def parse_specs(specs_text: str) -> list[str]:
@@ -875,9 +1051,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--workers",
         type=parse_workers,
-        default="auto",
-        help="pytest-xdist workers: 'auto' (default) or a number; 0 runs "
-        "the tests in one serial pass.",
+        default=os.environ.get("NOCK_WORKERS") or "auto",
+        help="pytest-xdist workers: 'auto' or a number, at most one per logical "
+        "CPU; 0 runs the tests in one serial pass. Default: $NOCK_WORKERS, else "
+        "auto.",
     )
     parser.add_argument(
         "--specs",
@@ -897,8 +1074,8 @@ def join_marks(*expressions: str) -> str:
 
 def pytest_commands(
     engines: list[str], selection: str, workers: str, specs: list[str] | None
-) -> list[tuple[str, list[str]]]:
-    """Return the pytest runs of the full stage, with their step names.
+) -> list[PytestPass]:
+    """Return the pytest runs of the full stage.
 
     Args:
         engines: The engines of the browser tests.
@@ -909,7 +1086,7 @@ def pytest_commands(
 
     Returns:
         One run when `workers` is "0", else the parallel run of the tests not
-        marked `serial`, then the serial run of the others.
+        marked `serial`, at a low priority, then the serial run of the others.
     """
     # gate_browsers marks the tests and leaves out the browser engines that are
     # not installed, with a warning; in CI it fails instead. It also leaves out
@@ -924,14 +1101,14 @@ def pytest_commands(
         command = list(base_command)
         if selection:
             command.extend(["-m", selection])
-        return [("pytest (tests)", command)]
+        return [PytestPass("pytest (tests)", command, low_priority=False)]
 
     parallel_command = [*base_command, "-n", workers, "--dist", "worksteal"]
     parallel_command.extend(["-m", join_marks(selection, "not serial")])
     serial_command = [*base_command, "-m", join_marks(selection, "serial")]
     return [
-        ("pytest (tests, parallel)", parallel_command),
-        ("pytest (tests, serial)", serial_command),
+        PytestPass("pytest (tests, parallel)", parallel_command, low_priority=True),
+        PytestPass("pytest (tests, serial)", serial_command, low_priority=False),
     ]
 
 
@@ -962,10 +1139,17 @@ def main() -> int:
         results.append(run_step(build_name, build_command))
         if results[-1]:
             selection = TEST_SELECTIONS[arguments.tests]
-            commands = pytest_commands(
+            passes = pytest_commands(
                 arguments.browsers, selection, arguments.workers, selected_specs
             )
-            results.append(run_pytest_passes(commands))
+            lock = take_gate_lock()
+            if lock is None:
+                results.append(False)
+            else:
+                try:
+                    results.append(run_pytest_passes(passes))
+                finally:
+                    release_gate_lock(lock)
 
     failed_count = results.count(False)
     print()

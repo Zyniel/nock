@@ -12,15 +12,18 @@ import { positionKey } from './wordSelection'
 // put in localStorage, a cookie or a URL.
 export const OPS_TOKEN_KEY = 'nock.ops_token'
 
-// The periods of the dashboard, in days, and the one shown when the page loads.
+// The periods of the dashboard, in days. The server offers those no longer than
+// the shortest room life, and picks the one shown when the page loads.
 export type Period = 1 | 7 | 30
 export const PERIODS: Period[] = [1, 7, 30]
-export const FIRST_PERIOD: Period = 7
 
 // The figures of one period, as the server sends them. A figure with no data is
 // null.
 export interface DashboardFigures {
+  // The period of these figures, one of `offered_days`.
   days: number
+  // The periods the server offers, rising.
+  offered_days: Period[]
   // An ISO 8601 time in UTC: the start of the period.
   since: string
   rooms_created: number
@@ -81,6 +84,11 @@ function isStringOrNull(value: unknown): boolean {
   return value === null || typeof value === 'string'
 }
 
+// Tell whether a parsed JSON value is a list of dashboard periods.
+function isPeriodList(value: unknown): value is Period[] {
+  return Array.isArray(value) && value.every((item) => PERIODS.some((period) => period === item))
+}
+
 // Tell whether a parsed JSON value looks like the figures of one period.
 function isDashboardFigures(value: unknown): value is DashboardFigures {
   if (typeof value !== 'object' || value === null) {
@@ -89,6 +97,7 @@ function isDashboardFigures(value: unknown): value is DashboardFigures {
   const record = value as Record<string, unknown>
   return (
     typeof record.days === 'number' &&
+    isPeriodList(record.offered_days) &&
     typeof record.since === 'string' &&
     typeof record.rooms_created === 'number' &&
     isNumberOrNull(record.players_per_room) &&
@@ -186,12 +195,14 @@ async function fetchOps<Body>(
   }
 }
 
-// The figures of the rooms created in the last `days` days.
+// The figures of the rooms created in the last `days` days, or of the server's
+// default period when `days` is null.
 export function fetchDashboard(
   token: string,
-  days: Period,
+  days: Period | null,
 ): Promise<OpsAnswer<DashboardFigures>> {
-  return fetchOps(`/api/ops/dashboard?days=${days}`, token, isDashboardFigures)
+  const path = days === null ? '/api/ops/dashboard' : `/api/ops/dashboard?days=${days}`
+  return fetchOps(path, token, isDashboardFigures)
 }
 
 // The replay of the room `code`, as given (the page sends it in upper case).

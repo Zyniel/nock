@@ -17,7 +17,8 @@ address and with the database its environment gives.
 
 - `platform/realtime.md`: the messages, delivery by seq, refusals, close codes
   and the resume window.
-- `lobby/joining.md`: resume and seat back, room expiry and deletion.
+- `lobby/joining.md`: resume and seat back; room expiry and deletion are
+  `lobby/lifetime.md`.
 - `gameplay/co-op.md`: the edits that undo reverses and the page's pending
   edits.
 
@@ -37,7 +38,7 @@ address and with the database its environment gives.
    undo flag, the relay time of `admin/operations.md`). Seqs follow one another
    with no gap: entries that skip or repeat a seq are refused and none is
    written. The log is only appended to, except when the room is deleted
-   (`lobby/joining.md`) or a deleted account's nickname is erased
+   (`lobby/lifetime.md`) or a deleted account's nickname is erased
    (`account/account.md`).
 3. A step's entries are committed before any of them reaches a socket. A step
    the store cannot commit is dropped: no event and no reply go out, the room
@@ -70,7 +71,7 @@ address and with the database its environment gives.
    read (summaries, catch-up, the account's rooms and history, the operator's
    edits) replays the room from the store without making it live, with no
    restart step and no log entry. A lookup that meets an expired room deletes
-   it instead (`lobby/joining.md`).
+   it instead (`lobby/lifetime.md`).
 
 ### Undo
 
@@ -128,8 +129,12 @@ address and with the database its environment gives.
     variables at each call and checks them before it builds a server:
     `NOCK_OPERATOR_TOKEN` first (`admin/operations.md` rule 4), then
     `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE`, each only when set and not
-    empty, then the account variables by their own rules (`account/account.md`
-    rule 2). What it runs: `product.md` rule 27.
+    empty, then the four room lives and the sweep interval
+    (`NOCK_CREATOR_SOLVED_ROOM_HOURS`, `NOCK_CREATOR_ROOM_HOURS`,
+    `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS`, `NOCK_ANONYMOUS_ROOM_HOURS`,
+    `NOCK_EXPIRY_SWEEP_MINUTES`, `lobby/lifetime.md` rule 7), then the account
+    variables by their own rules (`account/account.md` rule 2). What it runs:
+    `product.md` rule 27.
 16. `NOCK_HOST`, unset or empty `127.0.0.1`: only ASCII letters, ASCII digits,
     `.`, `-` and `:`. With `:` it is an IPv6 address that
     `ipaddress.IPv6Address` accepts, without brackets; else a name whose dots
@@ -142,9 +147,11 @@ address and with the database its environment gives.
     `main()` never changes it; the app reads it when it starts.
 19. A refused value stops `main()` before any server is built; `python -m
     nock` prints the message on stderr and exits with status 1. For
-    `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE` the message is one line naming
-    the variable and showing the value as `repr()` writes it, so it holds no
-    character of Cc, Cf, Zl or Zp; with several of them refused, it names one.
+    `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE` and the five variables of
+    `lobby/lifetime.md` the message is one line naming the variable and showing
+    the value as `repr()` writes it, so it holds no character of Cc, Cf, Zl or
+    Zp; with several of them refused, it names one, and a room-life variable
+    only when `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE` pass.
     The messages of the operator token and the account variables, which never
     show a secret: `admin/operations.md` rule 4, `account/account.md` rule 3.
 
@@ -251,7 +258,7 @@ top bars (« Phone top bar », « Computer top bar »).
 
 - Several processes on one database, replication, backups, a real kill or
   power cut in tests, repairing a damaged database, multi-level undo, redo.
-- Expiry, deletion and the sweep: `lobby/joining.md`. Logs, retention and the
+- Expiry, deletion and the sweep: `lobby/lifetime.md`. Logs, retention and the
   operator's replay of the log: `admin/operations.md`. What changed while away:
   `social/catch-up.md`. Client routing and its pages: `client/shell.md`.
 - The run configuration, frame size and connection bounds: `product.md`.

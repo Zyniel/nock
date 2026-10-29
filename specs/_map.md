@@ -24,8 +24,10 @@ table, the naming rules and the glossary follow in the same change.
 | Area | File | What it covers | Look | From the v1.1.0 specs |
 | --- | --- | --- | --- | --- |
 | account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033; 029 AC-3, AC-6, AC-7 (server side); 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
-| lobby | `lobby/rooms.md` | solo start, room creation, invitation, host controls | room | 010, 011, 014; 040 AC-7 |
-| lobby | `lobby/joining.md` | guest join, room resume, « Mes salons » | pages | 012, 032; 046 AC-11, AC-12, AC-15 to AC-17 |
+| lobby | `lobby/rooms.md` | solo start, room creation, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
+| lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do; the creator | room | 014 |
+| lobby | `lobby/joining.md` | join by link, the account's one seat, room resume, « Mes salons » | pages | 012; 032 AC-3 to AC-7; 046 AC-11, AC-12, AC-15 to AC-17 |
+| lobby | `lobby/lifetime.md` | room lifetime: the kinds of room and their lives, when a room expires, the sweep that deletes it, the five variables | | 032 AC-1, AC-2 |
 | gameplay | `gameplay/board.md` | grid display, word selection, letter entry, navigation, in-app keyboard | cells, room | 006, 007, 008, 009, 042, 044 |
 | gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, pencil letters | cells, room | 015, 016, 020 |
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
@@ -42,7 +44,7 @@ table, the naming rules and the glossary follow in the same change.
 | platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
 | platform | `platform/server.md` | durable state, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
-| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar and play area | room | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
+| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
@@ -69,8 +71,9 @@ then nothing of race or teams is built.
   components, focus, how conformance is checked), `cells.md` (grid cells,
   Auteurs mode), `room.md` (the room page: layouts, top bar, Aide, Menu, Salon,
   notes, reactions, connection lost, sheets, layers), `overlays.md` (vote, end of
-  grid, recap), `pages.md` (catalogue, entry and not-found pages, plain pages,
-  loading, empty and error states). The drawings are in `docs/design/`.
+  grid, recap, room gone), `pages.md` (catalogue, entry and not-found pages,
+  plain pages, loading, empty and error states). The drawings are in
+  `docs/design/`.
 - `_template.md`: the format of a domain spec.
 - `_archive/v1.1.0/`: the numbered specs once their domains are written.
 - `Backlog.md`, at the repository root: the work queue (briefs, the status of
@@ -151,7 +154,21 @@ then nothing of race or teams is built.
 | grid file | (not shown) | `grids/*.ipuz`, `GridFile` |
 | index | (not shown) | `grids/catalogue.json`, `IndexEntry`, `CatalogueEntry` |
 | room | « salon » | `room.py`, `/r/<code>` |
+| member | (a player or a past player of a room) | `PlayerRecord`, `PastPlayer` |
+| connection | (one socket of a player; "session" is the sign-in cookie) | `RoomConnection`, `nock_session` |
+| invited player | the nickname form under « Salon <code> » | `join` without token |
+| account player, anonymous player | (a member linked to an account, to none) | `PlayerRecord.account_id` |
+| host, stand-in host | « hôte » (a host who is not the creator's player) | `is_host`, `host_changed` |
+| hand-over delay | (not shown) | `host_handover_seconds` (60 s) |
+| creator, creator room, anonymous room | (not shown: the account whose session sent `POST /api/rooms`; a room with one, without) | `creator_account_id` |
+| creator's player | (not shown: the member linked to the creator) | `creator_account_id` = `account_id` |
 | resume list | « Mes salons » | `my_rooms` |
+| edit, last edit time | (not shown: a letter change or a cell lock; the latest one's time) | `is_edit`, `last_edit_at` |
+| solve time | (not shown: the time of the room's `grid_solved`) | `solved_at` |
+| room life | (not shown: how long a room lasts after its starting point, one per kind) | `RoomConfig.*_room_hours`, `NOCK_*_ROOM_HOURS` |
+| expired room | « Ce salon n'existe pas. » (more than its room life past its starting point; at exactly its room life it is open) | the expiry function (`lobby/lifetime.md`) |
+| sweep | (not shown: the deletion of the expired rooms at start, then at each interval) | `expire_rooms`, `NOCK_EXPIRY_SWEEP_MINUTES` |
+| shortest room life | (not shown: the least of the four room lives) | `offered_days` (the `/ops` periods it allows) |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |

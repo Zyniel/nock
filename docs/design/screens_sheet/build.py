@@ -38,6 +38,7 @@ from chrome import (
     phone_top,
     picker,
     recap_body,
+    room_gone_body,
     room_menu,
     salon_sheet,
     stream,
@@ -514,7 +515,7 @@ def sec_entry() -> str:
     )
     gone = entry_card(
         "Ce salon n'existe pas.",
-        "Un salon est effacé 30 jours après sa dernière modification.",
+        "Un salon est effacé après un certain temps sans modification.",
         button="primary",
     )
     c = screen(
@@ -924,6 +925,30 @@ def sec_room() -> str:
                 PC + " · another tab",
                 desk_room(final_status="Ce salon est ouvert dans un autre onglet."),
             ),
+        ],
+    )
+    out += screen(
+        "s-gone",
+        "The room deleted after it showed",
+        ["overlays · Room gone", "room · Layers"],
+        [
+            (
+                "The room expired and was deleted while the page showed it, "
+                "joined or reconnecting: what was open closes, the connection "
+                "band goes, and the recap's frame (a sheet on a phone, the 440 "
+                "px dialog on a computer) says « Ce salon n'existe plus. » over "
+                "the line. Its one way on is « Voir les grilles », to the "
+                "catalogue; Escape and the scrim do nothing, and the room under "
+                "it is inert."
+            ),
+        ],
+        [
+            (
+                "ph",
+                PH,
+                phone_room(layer=phone_dialog_sheet(room_gone_body(), recap=True)),
+            ),
+            ("pc", PC, desk_room(layer=desk_dialog(room_gone_body(), recap=True))),
         ],
     )
     out += focus_rings()

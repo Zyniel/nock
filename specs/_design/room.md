@@ -3,8 +3,8 @@
 The room page `/r/<code>` once the room has shown: its two layouts, top bars, clue
 bar, in-app keyboard, menus, Salon, notes, reactions, bands, sheets and layers.
 Tokens, type, icons and components: `foundation.md`. The cells: `cells.md`. The
-vote banner, the end-of-grid band and the recap: `overlays.md`. The room while it
-opens, and the entry cards: `pages.md`.
+vote banner, the end-of-grid band, the recap and the room-gone dialog:
+`overlays.md`. The room while it opens, and the entry cards: `pages.md`.
 
 ## Which layout
 
@@ -293,13 +293,15 @@ grid. `room-status` (« Reconnexion… ») is then visually hidden (class
 
 The status band: a final status that comes once the room has shown (removed by the
 host, replaced by another tab, the connection closed for good (« Connexion
-perdue. »), and the room's other final statuses) is the connection band's look
-without the red dot: under the top bar, full width, `--nock-clue-bg`, 1 px
-line-grey bottom border, padding 8 px 12 px, the status text in ink 500
+perdue. »), and the room's other final statuses but its deletion) is the connection
+band's look without the red dot: under the top bar, full width, `--nock-clue-bg`,
+1 px line-grey bottom border, padding 8 px 12 px, the status text in ink 500
 0.85rem/1.3, for example « Vous avez été retiré de ce salon. ». The room stays
 drawn under it as it was. Drawn in the screens sheet, part 3 (« A final status
-after the room showed »). A refusal before the room shows is an entry card
-(`pages.md`, « Entry and not-found pages »).
+after the room showed »). The room deleted once it has shown has no band: the
+connection band goes and the room-gone dialog shows (`overlays.md`, « Room
+gone »). A refusal before the room shows is an entry card (`pages.md`, « Entry
+and not-found pages »).
 
 ## Room sheets: host settings and account
 
@@ -331,8 +333,9 @@ computer as the recap's dialog (440 px, `overlays.md`, « Recap »).
 | Phone scrim | 7 |
 | Menus, popovers, sheets, shown reaction | 8 |
 | Vote banner, reaction picker | 9 |
-| Recap overlay (dialog or sheet with its scrim) | 20 |
+| Recap overlay, room-gone overlay (dialog or sheet with its scrim) | 20 |
 
 The vote banner is drawn above the Salon sheet and the scrim, which come later in
-the page. The banner and the picker never show together. The Auteurs legend under the grid is in the flow and has no
-layer.
+the page. The banner and the picker never show together. The room-gone overlay
+closes the recap, so the two never show together either. The Auteurs legend under
+the grid is in the flow and has no layer.

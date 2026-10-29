@@ -4,7 +4,7 @@ It also answers a member's catch-up request: what changed in a room while their
 page was away (spec 034).
 
 While the app runs, it deletes the expired rooms of the registry it serves once
-when it starts, then every `expiry_sweep_seconds` (spec 032).
+when it starts, then every `expiry_sweep_seconds` (`lobby/lifetime.md` rule 6).
 
 With an operator token, it also serves the operator pages (spec 038): the page
 `/ops` and the ops API under `/api/ops/`, the dashboard and the replay of a room,
@@ -26,7 +26,13 @@ import os
 import re
 import secrets
 import threading
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+)
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -41,6 +47,7 @@ from fastapi import (
     WebSocket,
 )
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -80,6 +87,8 @@ from nock.operations import (
     RoomLog,
     RoomReplay,
     dashboard_figures,
+    default_period,
+    offered_periods,
     room_edits,
 )
 from nock.protocol import grid_view, parse_client_message
@@ -90,6 +99,7 @@ from nock.settings import (
     AccountSettings,
     account_settings_from_env,
     operator_token_from_env,
+    room_config_from_env,
 )
 from nock.store import RoomStore
 
@@ -263,10 +273,21 @@ class _RoomsHolder:
         self._is_created_here = False
 
     def get(self) -> RoomRegistry:
-        """Return the registry, creating it from NOCK_DATABASE the first time."""
+        """Return the registry, creating it from the environment the first time.
+
+        A registry created here has the room lives of the environment variables
+        and the store of NOCK_DATABASE.
+
+        Raises:
+            SettingsError: a room life or the sweep interval breaks its rule. The
+                database is not opened then.
+        """
         with self._lock:
             if self._registry is None:
-                self._registry = RoomRegistry(store=RoomStore(_database_path()))
+                config = room_config_from_env(os.environ)
+                self._registry = RoomRegistry(
+                    config=config, store=RoomStore(_database_path())
+                )
                 self._is_created_here = True
             return self._registry
 
@@ -454,6 +475,21 @@ def _database_path() -> str:
 def _not_found() -> HTTPException:
     """Return the 404 error with FastAPI's usual body."""
     return HTTPException(status_code=404, detail="Not Found")
+
+
+def _period_not_offered(days: str, offered_days: list[int]) -> RequestValidationError:
+    """Return the 422 for a dashboard period that the room lives do not offer.
+
+    It has the body FastAPI gives a wrong `days`: a list of validation errors.
+    """
+    offered_text = ", ".join(str(offered) for offered in offered_days)
+    error = {
+        "type": "literal_error",
+        "loc": ("query", "days"),
+        "msg": f"Input should be one of the offered periods: {offered_text}",
+        "input": days,
+    }
+    return RequestValidationError([error])
 
 
 def _too_many_requests() -> HTTPException:
@@ -698,14 +734,18 @@ async def _read_frames(websocket: WebSocket, connection: RoomConnection) -> None
 
 
 async def _serve_socket(
-    websocket: WebSocket, room_registry: RoomRegistry, code: str
+    websocket: WebSocket,
+    room_registry: RoomRegistry,
+    code: str,
+    account_id: str | None,
 ) -> None:
     """Link the socket to the room and serve it until it closes.
 
     The writer sends what the room task queues for this connection, in order:
-    the snapshot of the join, the events, the errors and the closes.
+    the snapshot of the join, the events, the errors and the closes. The join
+    runs as the account that the socket's session signs in, if any.
     """
-    connection = room_registry.connect(code)
+    connection = room_registry.connect(code, account_id)
     if connection is None:
         # The room expired since the route looked it up (spec 032).
         await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
@@ -834,6 +874,8 @@ def create_app(
             account_store = account_service.store
             if account_store is not None:
                 room_registry.set_delete_hook(_history_saver(account_store))
+            # While accounts are off, the rooms play as anonymous rooms.
+            room_registry.set_creators_active(account_store is not None)
             try:
                 async with _expiry_sweeps(room_registry, account_service):
                     yield
@@ -901,13 +943,18 @@ def create_app(
             raise _not_found()
         return store
 
-    def signed_in_account(request: Request) -> Account | None:
-        """Return the account of the request's session cookie, or None."""
-        store = account_store_in_use()
-        session = request.cookies.get(SESSION_COOKIE)
-        if session is None:
+    def account_of_cookies(cookies: Mapping[str, str]) -> Account | None:
+        """Return the account of a session cookie, None while accounts are off."""
+        store = account_service.store
+        session = cookies.get(SESSION_COOKIE)
+        if store is None or session is None:
             return None
         return store.account_of_session(session, holder.get().clock())
+
+    def signed_in_account(request: Request) -> Account | None:
+        """Return the account of the request's session cookie, or None."""
+        account_store_in_use()
+        return account_of_cookies(request.cookies)
 
     def require_account(request: Request) -> Account:
         """Return the account of the session, or refuse the request (spec 033).
@@ -1005,7 +1052,13 @@ def create_app(
         entry = grid_catalogue.find_published(body.grid_number)
         if entry is None:
             raise _not_found()
-        code = holder.get().register_room(entry.grid, grid_number=body.grid_number)
+        creator = account_of_cookies(request.cookies)
+        creator_account_id = None if creator is None else creator.account_id
+        code = holder.get().register_room(
+            entry.grid,
+            grid_number=body.grid_number,
+            creator_account_id=creator_account_id,
+        )
         base_url = str(request.base_url).rstrip("/")
         return CreateRoomResponse(code=code, share_url=f"{base_url}/r/{code}")
 
@@ -1059,17 +1112,26 @@ def create_app(
 
     # Spec 038: the figures of the rooms created in the last `days` days, read
     # from the store without making any room live.
+    # A period that the room lives do not offer is refused as a wrong one.
     @web_app.get("/api/ops/dashboard", dependencies=[Depends(check_operator)])
     def get_dashboard(
-        days: Annotated[DashboardDays, Query()] = "7",
+        days: Annotated[DashboardDays | None, Query()] = None,
     ) -> dict[str, object]:
         room_registry = holder.get()
         now = room_registry.clock()
-        period_days = int(days)
+        offered_days = offered_periods(room_registry.config)
+        if days is None:
+            period_days = default_period(offered_days)
+        else:
+            period_days = int(days)
+            if period_days not in offered_days:
+                raise _period_not_offered(days, offered_days)
         since = now - period_days * DAY_SECONDS
         room_logs = _room_logs_since(room_registry.store, since)
         figures = dashboard_figures(room_logs, period_days, now)
-        return figures.model_dump(mode="json")
+        answer = figures.model_dump(mode="json")
+        answer["offered_days"] = offered_days
+        return answer
 
     # Spec 038: the empty grid and the ordered edits of one room, from its log.
     # A 404 here is no refusal: only wrong tokens count against the address.
@@ -1230,6 +1292,7 @@ def create_app(
         deleted_identities = store.delete_account(account.account_id)
         for identity in deleted_identities:
             room_registry.erase_player(identity.code, identity.player_id)
+        room_registry.delete_creator_rooms(account.account_id)
         # Erasing a player deletes an expired room, whose delete hook may have
         # saved a record with the nickname: erase it from the records once more.
         store.erase_players_from_history(deleted_identities)
@@ -1267,7 +1330,10 @@ def create_app(
             else:
                 await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        await _serve_socket(websocket, room_registry, code)
+        # In a worker thread: the session is read from the account database.
+        account = await asyncio.to_thread(account_of_cookies, websocket.cookies)
+        account_id = None if account is None else account.account_id
+        await _serve_socket(websocket, room_registry, code, account_id)
 
     return web_app
 

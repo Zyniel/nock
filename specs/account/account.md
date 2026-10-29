@@ -9,12 +9,14 @@ status: done
 ## Purpose
 
 A player who wants their rooms on every device signs in with a link sent by
-e-mail; nothing else needs an account. Deleting it erases the address at once
-and turns the player into « Ancien joueur » in every room.
+e-mail; nothing else needs an account. Deleting it erases the address at once,
+deletes the rooms it created and turns the player into « Ancien joueur » in the
+other rooms.
 
 ## Depends on
 
-- `lobby/joining.md`: identities, members, seat back, « Mes salons », the sweep.
+- `lobby/joining.md`: identities, members, seat back, « Mes salons »; the sweep
+  is `lobby/lifetime.md`.
 - `platform/server.md`: the database file, `main()`, `NOCK_HOST`, `NOCK_PORT`.
 - `gameplay/results.md`: « Grilles terminées », the history on screen.
 
@@ -90,6 +92,10 @@ and turns the player into « Ancien joueur » in every room.
 11. `PUT /api/account/rooms` with a room key links that member (id and
     nickname from the room; again, it becomes newest): 204; no member's: 404;
     an account deleted since its session was checked: 401, nothing written.
+    It records an identity for the account and links no member to it: a member
+    is linked by a signed-in join, and an account is at most one player of a
+    room, whose seat its signed-in joins reach (`lobby/joining.md` rule 4,
+    `lobby/host.md` rule 10).
 12. `GET /api/account/rooms` lists the latest identity per room, newest first,
     leaving out any whose token is no member's of the room under that code.
     The account keeps an identity until it is deleted.
@@ -138,34 +144,36 @@ and turns the player into « Ancien joueur » in every room.
 ### Erasure and what is kept
 
 18. `DELETE /api/account` deletes in one transaction the account, its
-    sessions, identities, history and its address's links. Then, for every
-    identity it held whose room exists, live or stored, the nickname becomes
-    `--` in the live state, the stored snapshots and the logged
-    `player_joined`, with no event; ids, colours, seqs and letters stay. It
-    answers 204, clearing the cookie, and no copy of the address or of those
-    nicknames is left in the database files. The player stays as a guest.
+    sessions, identities, history and its address's links, then deletes its
+    creator rooms, live and stored (`lobby/host.md` rule 14). Then, for every
+    identity it held whose room still exists, live or stored, its player stays
+    as an anonymous player named `--`: the member's account link is cleared and
+    the nickname becomes `--` in the live state, the stored snapshots and the
+    logged `player_joined`, with no event; ids, colours, seqs and letters stay.
+    Nothing else of a room changes. It answers 204, clearing the cookie, and no
+    copy of the address or of those nicknames is left in the database files.
 19. No join can take `--`, and a past `--` is seated back as `--` with no
     suffix (`lobby/joining.md` rules 1 and 13); pages show it as « Ancien
     joueur » (`player.former`).
 20. Links and sessions are stored as SHA-256 only. Each expiry sweep
-    (`lobby/joining.md` rule 16), the first at the app's start, then deletes
+    (`lobby/lifetime.md` rule 6), the first at the app's start, then deletes
     the links older than 30 minutes and the sessions older than 90 days and
     empties the WAL; a failed purge is logged and the next sweep runs.
 21. No log record, traceback included, holds an address, a link token, a
-    session, a resume token or the SMTP password. A guest is stored as a
-    nickname and random identifiers, nothing of their browser; playing sets
-    no cookie.
+    session, a resume token or the SMTP password. An anonymous player is
+    stored as a nickname and random identifiers, nothing of their browser;
+    playing sets no cookie.
 
 ### History records
 
 22. An account's record of a solved room is saved once, by the first of `GET
     /api/account/history` (for each room of its identities) and the delete
-    hook, which gets a room's latest state just before the sweep or a lookup
-    deletes it; a failing hook is logged and the deletion goes on. Only
-    identities whose token is a member's of that room count, so a room that
-    drew an old code saves nothing. A record: `code`, `grid_number`, `width`,
-    `height`, `finished_at`, `elapsed_ms` (`gameplay/results.md` rule 14) and
-    `teammates`, the other members in `team_nicknames` order, each once.
+    hook, which gets a room's latest state just before the sweep, a lookup or
+    an erasure (rule 18) deletes it; a failing hook is logged and the deletion
+    goes on. Only identities whose token is a member's of that room count, so a
+    room that drew an old code saves nothing. A record: `code`, `grid_number`,
+    `width`, `height`, `finished_at`, `elapsed_ms` (`gameplay/results.md` rule
+    14) and `teammates`, the other members in `team_nicknames` order, each once.
 23. `GET /api/account/history` lists the records, newest `finished_at` first,
     then by code. A deletion (rule 18) deletes the account's records and makes
     its players `--` among the others' team-mates, also in a record its own
@@ -252,8 +260,8 @@ and turns the player into « Ancien joueur » in every room.
 - **AC-13** With accounts on, a browser with no cookie or storage solves
   FX-01 with a word check: no 401 or 403, no cookie, the sheet never opens,
   every frame parses as a client message; solving from the catalogue, nothing
-  sets a cookie and every request stays on the origin. A guest who plays
-  leaves only `ANA` and her id in the files, nothing of her browser's agent,
+  sets a cookie and every request stays on the origin. An anonymous player who
+  plays leaves only `ANA` and her id in the files, nothing of her browser's agent,
   headers, language or address. (← 033 AC-3, 038 AC-1, 038 AC-2)
 - **AC-14** Zoé, in R with Bob, writes `T`, signs in, linked S where she
   timed out, and deletes her account: 204; her cookie reads signed out, her
@@ -295,6 +303,9 @@ and turns the player into « Ancien joueur » in every room.
 - A mail scanner uses nothing: the token is in the fragment (AC-12).
 - An erased player's open pages keep the old name until their next snapshot
   (AC-15).
+- A creator room is deleted whoever is host in it then; an anonymous room where
+  the account's player is host stays, that player `--` (`lobby/host.md`
+  AC-15).
 
 ## Out of scope
 
@@ -309,7 +320,8 @@ and turns the player into « Ancien joueur » in every room.
 - `src/nock/accounts.py`, `settings.py` (`account_settings_from_env`),
   `mailer.py`, `i18n.py`, `server.py` (routes, limits, purge).
 - `room.py` (`FORMER_PLAYER_NICKNAME`, `with_player_erased`, `member_id`),
-  `store.py` (`erase_player`), `hub.py` (`erase_player`, the delete hook).
+  `store.py` (`erase_player`), `hub.py` (`erase_player`, the creator rooms'
+  deletion, the delete hook).
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`.

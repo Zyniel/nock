@@ -78,7 +78,7 @@ Cards:
   line.
 - A room that is not found or has expired (an expired room is deleted, so both
   read « Ce salon n'existe pas. »): the status card with the muted line « Un salon
-  est effacé 30 jours après sa dernière modification. » and « Voir les grilles »
+  est effacé après un certain temps sans modification. » and « Voir les grilles »
   primary, the only way on.
 
 On a wide window these pages, and the plain pages below, use the 56 px top bar of
@@ -118,7 +118,8 @@ Drawn in the screens sheet, parts 5 to 7.
   heading style. The token form is one card: the field « Jeton d'opérateur » (a
   password input), the error line « Jeton refusé. » or « Trop d'essais… » under
   it, primary « Ouvrir ». Then a card « Tableau de bord » (card title): the field
-  « Période » with the three periods as the catalogue's filter chips, the label
+  « Période » with the offered periods (one to three; all three with the default
+  room lives, as drawn) as the catalogue's filter chips, the label
   naming the chips' group, then one tile per figure (white, 1 px line-grey border,
   radius 8 px, padding 12 px 14 px, in a grid of `repeat(auto-fill, minmax(min(100%,
   270px), 1fr))`, gap 10 px) holding the `fr.json` line as it is. Then a card

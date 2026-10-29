@@ -303,6 +303,14 @@ main {
   top: 56px;
 }
 
+/* The recap and the room-gone dialog (client/hud.md rule 16): with the class
+   `over-all`, the darker dialog scrim, over the whole window, the top bar
+   included, in both layouts. */
+.room-sheet.over-all::backdrop {
+  top: 0;
+  background: var(--nock-scrim-dialog);
+}
+
 /* The title of a room sheet: 700 1.2rem/1.2, navy. */
 .room-sheet-title {
   margin: 0;
