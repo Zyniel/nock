@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from collections.abc import Mapping
 from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict, StrictInt, model_validator
@@ -22,7 +23,12 @@ from nock.room import (
     RoomConfig,
 )
 from nock.settings import (
+    ANONYMOUS_ROOM_HOURS_VARIABLE,
+    ANONYMOUS_SOLVED_ROOM_HOURS_VARIABLE,
+    CREATOR_ROOM_HOURS_VARIABLE,
+    CREATOR_SOLVED_ROOM_HOURS_VARIABLE,
     DEFAULT_SWEEP_MINUTES,
+    EXPIRY_SWEEP_MINUTES_VARIABLE,
     MAX_SWEEP_MINUTES,
     MIN_SWEEP_MINUTES,
     SECONDS_PER_MINUTE,
@@ -34,34 +40,44 @@ SWEEP_MINUTES_NAME: str = "expiry_sweep_minutes"
 
 
 class Setting(NamedTuple):
-    """One setting: its name, its unit and its bounds (`admin/overrides.md` rule 1)."""
+    """One setting: its name, its unit, its bounds and its environment variable.
+
+    See `admin/overrides.md` rule 1 and `lobby/lifetime.md` rule 7.
+    """
 
     name: str
     unit: str  # "hours" or "minutes"
     minimum: int
     maximum: int
     default: int
+    variable: str
 
 
-def _room_life(name: str) -> Setting:
-    """Return the room life setting called `name`."""
+def _room_life(name: str, variable: str) -> Setting:
+    """Return the room life setting called `name`, read from `variable`."""
     return Setting(
-        name, "hours", MIN_ROOM_LIFE_HOURS, MAX_ROOM_LIFE_HOURS, DEFAULT_ROOM_LIFE_HOURS
+        name,
+        "hours",
+        MIN_ROOM_LIFE_HOURS,
+        MAX_ROOM_LIFE_HOURS,
+        DEFAULT_ROOM_LIFE_HOURS,
+        variable,
     )
 
 
 # The five settings, in the order the routes list them.
 SETTINGS: tuple[Setting, ...] = (
-    _room_life("creator_solved_room_hours"),
-    _room_life("creator_room_hours"),
-    _room_life("anonymous_solved_room_hours"),
-    _room_life("anonymous_room_hours"),
+    _room_life("creator_solved_room_hours", CREATOR_SOLVED_ROOM_HOURS_VARIABLE),
+    _room_life("creator_room_hours", CREATOR_ROOM_HOURS_VARIABLE),
+    _room_life("anonymous_solved_room_hours", ANONYMOUS_SOLVED_ROOM_HOURS_VARIABLE),
+    _room_life("anonymous_room_hours", ANONYMOUS_ROOM_HOURS_VARIABLE),
     Setting(
         SWEEP_MINUTES_NAME,
         "minutes",
         MIN_SWEEP_MINUTES,
         MAX_SWEEP_MINUTES,
         DEFAULT_SWEEP_MINUTES,
+        EXPIRY_SWEEP_MINUTES_VARIABLE,
     ),
 )
 SETTING_BY_NAME: dict[str, Setting] = {setting.name: setting for setting in SETTINGS}
@@ -96,6 +112,26 @@ class SettingChange(BaseModel):
     def is_room_life(self) -> bool:
         """Tell whether the setting is a room life (the interval is not)."""
         return self.name != SWEEP_MINUTES_NAME
+
+
+def settings_set_in(environ: Mapping[str, str]) -> frozenset[str]:
+    """Return the names of the settings whose variable is set in `environ`.
+
+    Call it only on an environment that `room_config_from_env` accepted: then a
+    variable that is set holds a value it accepted. An empty variable counts as
+    unset, as `room_config_from_env` reads it.
+
+    Args:
+        environ: The environment the config was read from, such as `os.environ`.
+
+    Returns:
+        The names, from `SETTINGS`, of the settings whose variable is not empty.
+    """
+    names: set[str] = set()
+    for setting in SETTINGS:
+        if environ.get(setting.variable, "") != "":
+            names.add(setting.name)
+    return frozenset(names)
 
 
 def _whole_if_possible(number: float) -> float:
@@ -156,11 +192,23 @@ class RoomLifeOverrides:
     when the app starts. Every method may be called from any thread.
     """
 
-    def __init__(self, registry: RoomRegistry) -> None:
-        """Keep the registry and its config as the environment values."""
+    def __init__(
+        self, registry: RoomRegistry, settings_set: frozenset[str] | None
+    ) -> None:
+        """Keep the registry and its config as the environment values.
+
+        Args:
+            registry: The registry whose config the overrides change.
+            settings_set: For a registry made from the variables, the names of
+                the settings whose variable is set (`settings_set_in`); the
+                others answer a null `environment`. None for a registry given
+                to the app: a value of its config that differs from the default
+                is an environment value, one equal to the default is not.
+        """
         self._registry = registry
         self._store = registry.store
         self._environment = registry.config
+        self._settings_set = settings_set
         self._overrides: dict[str, int] = {}
         self._lock = threading.Lock()
 
@@ -240,12 +288,18 @@ class RoomLifeOverrides:
         """Return the environment config with the overrides in place. Caller locks."""
         return _config_with(self._environment, self._overrides)
 
+    def _is_set_in_environment(self, setting: Setting, value: float) -> bool:
+        """Tell whether `value`, the setting's environment value, counts as set."""
+        if self._settings_set is None:
+            return value != setting.default
+        return setting.name in self._settings_set
+
     def _row(self, setting: Setting) -> dict[str, object]:
         """Return the nine fields of a setting's row. Caller locks."""
         name = setting.name
         environment_value = _values_of(self._environment)[name]
         environment: float | None = None
-        if environment_value != setting.default:
+        if self._is_set_in_environment(setting, environment_value):
             environment = environment_value
         override = self._overrides.get(name)
         if override is not None:

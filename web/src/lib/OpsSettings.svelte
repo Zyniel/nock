@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { t } from './i18n'
   import {
     fetchDryRun,
@@ -50,6 +50,8 @@
   let question = $state<Question | null>(null)
 
   const SHORT_UNITS = { hours: 'h', minutes: 'min' }
+  // The question's block, which « Enregistrer » and « Rétablir » disclose.
+  const QUESTION_ID = 'ops-settings-question'
 
   function showList(list: SettingsList): void {
     durable = list.durable
@@ -81,9 +83,24 @@
     return `ops-setting-${button}-${name}`
   }
 
+  function inputId(name: string): string {
+    return `ops-setting-${name}`
+  }
+
   // The focus goes back to the button that asked, as a disclosure does.
   function focusButton(name: string, button: Button): void {
     document.getElementById(buttonId(name, button))?.focus()
+  }
+
+  // After a confirmed question: back to the button that asked, unless it is now
+  // disabled (« Rétablir » with no override left), then to the row's input.
+  function focusAfterConfirm(name: string, button: Button): void {
+    const asking = document.getElementById(buttonId(name, button))
+    if (asking instanceof HTMLButtonElement && !asking.disabled) {
+      asking.focus()
+    } else {
+      document.getElementById(inputId(name))?.focus()
+    }
   }
 
   function boundsText(setting: Setting): string {
@@ -173,7 +190,9 @@
       return
     }
     await send(setting, value)
-    focusButton(name, button)
+    // Let the rows show the answer, so that « Rétablir » is disabled by now.
+    await tick()
+    focusAfterConfirm(name, button)
   }
 
   function valueText(setting: Setting): string {
@@ -209,16 +228,20 @@
     <!-- The explicit role: WebKit does not expose a list without bullets as a list. -->
     <ul class="ops-settings-rows" role="list">
       {#each settings as setting (setting.name)}
-        {@const inputId = `ops-setting-${setting.name}`}
+        {@const rowInputId = inputId(setting.name)}
         {@const errorId = `ops-setting-error-${setting.name}`}
         {@const hasError = errors[setting.name] !== undefined && errors[setting.name] !== ''}
         {@const isSavePressed =
           question !== null && question.name === setting.name && question.button === 'save'}
         {@const isResetPressed =
           question !== null && question.name === setting.name && question.button === 'reset'}
-        <li class="ops-setting-row" data-testid="ops-setting" data-name={setting.name}>
-          <div class="ops-setting-text">
-            <label class="ops-setting-title" for={inputId}
+        <li
+          class="nock-list-row ops-setting-row"
+          data-testid="ops-setting"
+          data-name={setting.name}
+        >
+          <div class="nock-row-text ops-setting-text">
+            <label class="ops-setting-title" for={rowInputId}
               >{t(SETTING_TITLE_KEYS[setting.name])}</label
             >
             <span class="ops-setting-value"
@@ -236,7 +259,7 @@
             }}
           >
             <input
-              id={inputId}
+              id={rowInputId}
               class="nock-text-input ops-setting-input"
               data-testid="ops-setting-input"
               type="number"
@@ -256,7 +279,8 @@
               class:nock-button-primary={!isSavePressed}
               class:nock-button-quiet={isSavePressed}
               data-testid="ops-setting-save"
-              aria-pressed={isSavePressed ? 'true' : 'false'}
+              aria-expanded={isSavePressed ? 'true' : 'false'}
+              aria-controls={QUESTION_ID}
               >{t('ops.setting_save')}</button
             >
             <button
@@ -264,7 +288,8 @@
               id={buttonId(setting.name, 'reset')}
               class="nock-button nock-button-quiet"
               data-testid="ops-setting-reset"
-              aria-pressed={isResetPressed ? 'true' : 'false'}
+              aria-expanded={isResetPressed ? 'true' : 'false'}
+              aria-controls={QUESTION_ID}
               disabled={setting.source !== 'override'}
               onclick={() => void press(setting, 'reset')}>{t('ops.setting_reset')}</button
             >
@@ -278,7 +303,7 @@
       {/each}
     </ul>
     {#if question !== null}
-      <div class="ops-settings-question" data-testid="ops-settings-question">
+      <div id={QUESTION_ID} class="ops-settings-question" data-testid="ops-settings-question">
         <p class="nock-card-text">{questionText(question.count)}</p>
         <div class="nock-button-row">
           <button
@@ -310,26 +335,15 @@
     list-style: none;
   }
 
-  /* A list row: the text column on the left, the form on the right; the error
-     line takes a full line under them. */
+  /* A list row (.nock-list-row) that wraps: the form goes under the text column
+     when they do not fit side by side, and the error line takes a full line. */
   .ops-setting-row {
-    box-sizing: border-box;
-    display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    padding: 12px 14px;
-    border: 1px solid var(--nock-line);
-    border-radius: 8px;
-    background: var(--nock-white);
   }
 
   .ops-setting-text {
-    flex: 1 1 160px;
+    flex-basis: 160px;
     min-width: 160px;
-    display: grid;
-    gap: 3px;
   }
 
   .ops-setting-title {

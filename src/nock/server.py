@@ -92,7 +92,7 @@ from nock.operations import (
     offered_periods,
     room_edits,
 )
-from nock.overrides import RoomLifeOverrides, SettingChange
+from nock.overrides import RoomLifeOverrides, SettingChange, settings_set_in
 from nock.protocol import grid_view, parse_client_message
 from nock.room import RoomKey, RoomState, RoomSummary
 from nock.room import member_id as room_member_id
@@ -273,6 +273,8 @@ class _RoomsHolder:
         self._lock = threading.Lock()
         self._registry = given
         self._is_created_here = False
+        # The settings whose variable was set, for a registry created here.
+        self._settings_set: frozenset[str] | None = None
 
     def get(self) -> RoomRegistry:
         """Return the registry, creating it from the environment the first time.
@@ -287,11 +289,22 @@ class _RoomsHolder:
         with self._lock:
             if self._registry is None:
                 config = room_config_from_env(os.environ)
+                self._settings_set = settings_set_in(os.environ)
                 self._registry = RoomRegistry(
                     config=config, store=RoomStore(_database_path())
                 )
                 self._is_created_here = True
             return self._registry
+
+    def settings_set(self) -> frozenset[str] | None:
+        """Return the settings whose variable was set when the registry was made.
+
+        Returns:
+            The setting names of `nock.overrides.settings_set_in`, for a registry
+            created here; None for a registry given, or before one is created.
+        """
+        with self._lock:
+            return self._settings_set
 
     def close_if_created(self) -> None:
         """Close the registry (and its store) when this holder created it."""
@@ -300,6 +313,7 @@ class _RoomsHolder:
                 self._registry.close()
                 self._registry = None
                 self._is_created_here = False
+                self._settings_set = None
 
 
 class _RunningOverrides:
@@ -309,9 +323,16 @@ class _RunningOverrides:
         """Create a holder with no overrides: the app has not started."""
         self._overrides: RoomLifeOverrides | None = None
 
-    def start(self, registry: RoomRegistry) -> None:
-        """Read the stored overrides of `registry` and apply them to its config."""
-        overrides = RoomLifeOverrides(registry)
+    def start(
+        self, registry: RoomRegistry, settings_set: frozenset[str] | None
+    ) -> None:
+        """Read the stored overrides of `registry` and apply them to its config.
+
+        Args:
+            registry: The registry the app serves.
+            settings_set: See `RoomLifeOverrides`.
+        """
+        overrides = RoomLifeOverrides(registry, settings_set)
         overrides.load()
         self._overrides = overrides
 
@@ -910,7 +931,7 @@ def create_app(
             # While accounts are off, the rooms play as anonymous rooms.
             room_registry.set_creators_active(account_store is not None)
             # `admin/overrides.md` rule 8: before the first sweep.
-            running_overrides.start(room_registry)
+            running_overrides.start(room_registry, holder.settings_set())
             try:
                 async with _expiry_sweeps(room_registry, account_service):
                     yield
