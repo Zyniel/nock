@@ -1153,3 +1153,25 @@ Before the human tags a release on `main`:
    human.
 5. The human tags `vX.Y.Z` and pushes the tag; the done items then leave this
    file.
+
+### B-027 The order of the overrides holder
+
+- Status: brief
+- Waits for: B-024 (#64), which brings the code this item touches.
+- Domains: none (no behaviour change: `src/nock/server.py` only)
+- Architecture decision: no (private names of `server.py`)
+- Criteria: none new; the tests of `admin/overrides.md` prove nothing changed
+- Branch: feat/b-027-overrides-holder-order · PR: none yet
+- Problem: in `server.py`, `_RoomsHolder.settings_set()` answers None both for
+  a registry given to the app and before any registry exists, which mean
+  different things. It works today only because the lifespan calls
+  `holder.get()` first (B-024 review round 2, a suggestion).
+- In scope: make that order impossible to break by accident. Options:
+  - A (lead's pick): `settings_set()` fails loudly when no registry exists
+    yet, so None means only "a registry was given".
+  - B: `get()` answers the registry and the set together, and
+    `settings_set()` goes.
+  - C: a comment at the call site only.
+- Out of scope: any change to the routes, the answers or the page.
+- Screens: none.
+- Open questions: none beyond the option.
