@@ -24,8 +24,11 @@ earns it.
 ### The socket
 
 1. A room's socket is `/api/rooms/<code>/ws`; the URL chooses the room, so no
-   message carries a code and no message reaches another room. A frame, text or
-   binary, is one JSON message.
+   message carries a code and no message reaches another room. With accounts on,
+   the `nock_session` cookie of the opening request (`account/account.md` rule
+   9) names the account of the socket's joins (`lobby/joining.md` rule 4);
+   nothing else of the handshake is read. A frame, text or binary, is one JSON
+   message.
 2. An address held by the wrong-code throttle is closed with 4429
    (`lobby/rooms.md`). An unknown, malformed or expired code is closed with 4404
    and no message, and counts as a wrong code.
@@ -65,7 +68,7 @@ earns it.
      (who is here, and how);
    - `social/chat.md`: `chat`, `react`, `flag`, `mute_player`, answered by
      `chat_message`, `reaction`, `flag_changed`, `player_muted`;
-   - `lobby/rooms.md`: `remove_player`, `lock_room`, `change_settings` (host
+   - `lobby/host.md`: `remove_player`, `lock_room`, `change_settings` (host
      controls; the help settings are `gameplay/hints.md`), answered by
      `settings_changed` and `host_changed` (the host role passed on);
    - `platform/server.md`: `undo` (take back one's last edit).
@@ -82,7 +85,7 @@ earns it.
     `invalid_message`, `not_joined`, `rate_limited`, `stale_edit`,
     `not_a_letter_cell` (this file); `room_full`, `invalid_nickname`
     (`lobby/joining.md`); `room_locked`, `removed`, `not_host`, `invalid_target`
-    (`lobby/rooms.md`); `cell_locked` (`gameplay/co-op.md`); `nothing_to_undo`
+    (`lobby/host.md`); `cell_locked` (`gameplay/co-op.md`); `nothing_to_undo`
     (`platform/server.md`); `grid_solved` (`gameplay/rules.md`);
     `help_disabled`, `budget_exhausted`, `vote_in_progress`, `no_open_vote`
     (`gameplay/hints.md`); `muted` (`social/chat.md`). An error's text is
@@ -129,7 +132,7 @@ earns it.
     resumes; past that they time out, at the next check or inside a join with
     their token: `player_left` with `timed_out`, then they are a past player whom
     the join seats back (`lobby/joining.md`). A host who times out hands over at
-    once (`lobby/rooms.md`). Time-outs due while a room was not running apply
+    once (`lobby/host.md`). Time-outs due while a room was not running apply
     first when it runs again.
 
 ### The page's connection
@@ -287,7 +290,7 @@ The connection band follows `_design/room.md`, « Connection lost ».
 
 - What each event does to the room: the gameplay and social domains. The join's
   steps, takeover with 4001 and past players: `lobby/joining.md`. Host hand-over
-  and the wrong-code throttle: `lobby/rooms.md`.
+  and the creator: `lobby/host.md`. The wrong-code throttle: `lobby/rooms.md`.
 - The page's seq buffer and its other connection states: `client/shell.md`.
   Presence states in the roster: `social/presence.md`.
 - Durable state across a restart, the log and undo: `platform/server.md`.

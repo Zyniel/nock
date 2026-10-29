@@ -135,8 +135,8 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
   other players' actions to screen readers.
 - The layouts, the top bar, the scrim and the play area: `client/hud.md`. What
   the stream, its lines and the message box do: `social/chat.md`. The Joueurs
-  rows' content: `social/presence.md`; the invitation link and the host's
-  buttons: `lobby/rooms.md`. The catch-up lines: `social/catch-up.md`. The
+  rows' content: `social/presence.md`; the invitation link: `lobby/rooms.md`;
+  the host's buttons: `lobby/host.md`. The catch-up lines: `social/catch-up.md`. The
   vote banner: `gameplay/hints.md`.
 
 ## Code

@@ -77,7 +77,7 @@ gives the Salon (`client/room.md`) its column or its sheet.
     « Auteurs », « Mots des autres », « Accessibilité » (`social/presence.md`,
     `gameplay/board.md`), each with the detail of its state; « Inviter »
     (`menu.invite`, detail `menu.invite_detail`); « Réglages de l'hôte », for
-    the host only (`lobby/rooms.md`); « Compte » (`account.open`), while
+    the host only (`lobby/host.md`); « Compte » (`account.open`), while
     accounts are on (`account/account.md`); a separator; `timer.hide` or
     `timer.toggle_label`; « Retour aux grilles » (`menu.back`), a link to `/`.
     Details are hidden from screen readers. Following « Retour aux grilles »
@@ -106,7 +106,7 @@ gives the Salon (`client/room.md`) its column or its sheet.
 13. The host's settings and the account are modal sheets named by their title;
     in the sheet layout the top bar stays seen and inert above. Escape or a
     press on the backdrop closes one and focuses « Menu »; so does
-    « Enregistrer » once it has sent the settings (`lobby/rooms.md`).
+    « Enregistrer » once it has sent the settings (`lobby/host.md`).
 14. The clue bar holds ‹ `clue_bar.previous`, the clue on one line with its
     direction, « Réagir », « Je bloque », › `clue_bar.next`. › does what Tab
     does in the grid, ‹ what Shift+Tab does (`gameplay/board.md`), grid focused
@@ -183,8 +183,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 - **AC-8** The host's Menu reads « Auteurs » « désactivé », « Mots des autres »
   « teintés », « Accessibilité » « désactivée », « Inviter » « lien »,
   « Réglages de l'hôte », a separator, « Masquer le chrono », « Retour aux
-  grilles » to `/`; a guest has no « Réglages de l'hôte »; with accounts on
-  « Compte » follows it, or « Inviter » for a guest. It hangs where its top bar
+  grilles » to `/`; a player who is not host has no « Réglages de l'hôte »;
+  with accounts on « Compte » follows it, or « Inviter » for a player who is
+  not host. It hangs where its top bar
   form's design puts it. (← 043 AC-10)
 - **AC-9** « Accessibilité » turns to « activée », the Menu open and focused on
   it; by keyboard, Enter on « Menu » focuses « Auteurs » and Enter flips each

@@ -26,7 +26,13 @@ import os
 import re
 import secrets
 import threading
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Mapping,
+)
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -698,14 +704,18 @@ async def _read_frames(websocket: WebSocket, connection: RoomConnection) -> None
 
 
 async def _serve_socket(
-    websocket: WebSocket, room_registry: RoomRegistry, code: str
+    websocket: WebSocket,
+    room_registry: RoomRegistry,
+    code: str,
+    account_id: str | None,
 ) -> None:
     """Link the socket to the room and serve it until it closes.
 
     The writer sends what the room task queues for this connection, in order:
-    the snapshot of the join, the events, the errors and the closes.
+    the snapshot of the join, the events, the errors and the closes. The join
+    runs as the account that the socket's session signs in, if any.
     """
-    connection = room_registry.connect(code)
+    connection = room_registry.connect(code, account_id)
     if connection is None:
         # The room expired since the route looked it up (spec 032).
         await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
@@ -834,6 +844,8 @@ def create_app(
             account_store = account_service.store
             if account_store is not None:
                 room_registry.set_delete_hook(_history_saver(account_store))
+            # While accounts are off, the rooms play as anonymous rooms.
+            room_registry.set_creators_active(account_store is not None)
             try:
                 async with _expiry_sweeps(room_registry, account_service):
                     yield
@@ -901,13 +913,18 @@ def create_app(
             raise _not_found()
         return store
 
-    def signed_in_account(request: Request) -> Account | None:
-        """Return the account of the request's session cookie, or None."""
-        store = account_store_in_use()
-        session = request.cookies.get(SESSION_COOKIE)
-        if session is None:
+    def account_of_cookies(cookies: Mapping[str, str]) -> Account | None:
+        """Return the account of a session cookie, None while accounts are off."""
+        store = account_service.store
+        session = cookies.get(SESSION_COOKIE)
+        if store is None or session is None:
             return None
         return store.account_of_session(session, holder.get().clock())
+
+    def signed_in_account(request: Request) -> Account | None:
+        """Return the account of the request's session cookie, or None."""
+        account_store_in_use()
+        return account_of_cookies(request.cookies)
 
     def require_account(request: Request) -> Account:
         """Return the account of the session, or refuse the request (spec 033).
@@ -1005,7 +1022,13 @@ def create_app(
         entry = grid_catalogue.find_published(body.grid_number)
         if entry is None:
             raise _not_found()
-        code = holder.get().register_room(entry.grid, grid_number=body.grid_number)
+        creator = account_of_cookies(request.cookies)
+        creator_account_id = None if creator is None else creator.account_id
+        code = holder.get().register_room(
+            entry.grid,
+            grid_number=body.grid_number,
+            creator_account_id=creator_account_id,
+        )
         base_url = str(request.base_url).rstrip("/")
         return CreateRoomResponse(code=code, share_url=f"{base_url}/r/{code}")
 
@@ -1230,6 +1253,7 @@ def create_app(
         deleted_identities = store.delete_account(account.account_id)
         for identity in deleted_identities:
             room_registry.erase_player(identity.code, identity.player_id)
+        room_registry.delete_creator_rooms(account.account_id)
         # Erasing a player deletes an expired room, whose delete hook may have
         # saved a record with the nickname: erase it from the records once more.
         store.erase_players_from_history(deleted_identities)
@@ -1267,7 +1291,10 @@ def create_app(
             else:
                 await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        await _serve_socket(websocket, room_registry, code)
+        # In a worker thread: the session is read from the account database.
+        account = await asyncio.to_thread(account_of_cookies, websocket.cookies)
+        account_id = None if account is None else account.account_id
+        await _serve_socket(websocket, room_registry, code, account_id)
 
     return web_app
 
