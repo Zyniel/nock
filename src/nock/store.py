@@ -202,26 +202,6 @@ class RoomStore:
             return None
         return float(row[0])
 
-    def expired_codes(self, before: float) -> list[str]:
-        """Return the codes of the rooms whose last edit time is less than `before`.
-
-        Args:
-            before: A clock time; a room whose last edit time equals it is left
-                out.
-
-        Returns:
-            The codes, in code-point order.
-        """
-        with self._lock:
-            rows = self._connection.execute(
-                "SELECT code FROM room_times WHERE last_edit_at < ? ORDER BY code",
-                (before,),
-            ).fetchall()
-        codes: list[str] = []
-        for (code,) in rows:
-            codes.append(str(code))
-        return codes
-
     def read_room_times(self) -> list[RoomTimes]:
         """Return the times and the creator of every room.
 
@@ -572,15 +552,16 @@ class RoomStore:
         the logged `grid_solved`, else the room's last edit time. An unsolved
         room keeps none.
 
-        The snapshot is read as plain JSON, without the checks of `RoomState`:
-        a migration must not fail on a field that a later rule tightened.
+        The snapshot and the log are read as plain JSON, without the checks of
+        `RoomState` and `LogEntry`: a migration must not fail on a field that a
+        later rule tightened.
         """
         rows = self._connection.execute(
             "SELECT code, last_edit_at FROM room_times"
         ).fetchall()
         for code, last_edit_at in rows:
             snapshot_is_solved, snapshot_solved_at = self._snapshot_solve_time(code)
-            logged_solved_at = _logged_solve_time(self.read_log(code))
+            logged_solved_at = self._logged_solved_at(code)
             if not snapshot_is_solved and logged_solved_at is None:
                 continue
             solved_at = snapshot_solved_at
@@ -592,6 +573,21 @@ class RoomStore:
                 "UPDATE room_times SET solved_at = ? WHERE code = ?",
                 (solved_at, code),
             )
+
+    def _logged_solved_at(self, code: str) -> float | None:
+        """Read the `at` of the room's first logged `grid_solved`, as plain JSON.
+
+        Returns:
+            The time, or None when the log holds no `grid_solved`.
+        """
+        rows = self._connection.execute(
+            "SELECT entry_json FROM log WHERE code = ? ORDER BY seq", (code,)
+        ).fetchall()
+        for (entry_json,) in rows:
+            stored = json.loads(entry_json)
+            if stored.get("event", {}).get("type") == "grid_solved":
+                return float(stored["at"])
+        return None
 
     def _snapshot_solve_time(self, code: str) -> tuple[bool, float | None]:
         """Read, in the room's latest snapshot, whether it is solved and when.

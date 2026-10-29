@@ -185,8 +185,10 @@ def room_config_from_env(environ: Mapping[str, str]) -> RoomConfig:
     sweep_minutes = _read_whole_number(
         environ,
         EXPIRY_SWEEP_MINUTES_VARIABLE,
-        (MIN_SWEEP_MINUTES, MAX_SWEEP_MINUTES, DEFAULT_SWEEP_MINUTES),
-        _SWEEP_RULE,
+        minimum=MIN_SWEEP_MINUTES,
+        maximum=MAX_SWEEP_MINUTES,
+        default=DEFAULT_SWEEP_MINUTES,
+        rule=_SWEEP_RULE,
     )
     return RoomConfig(
         creator_solved_room_hours=_read_room_life(
@@ -314,15 +316,19 @@ def _read_room_life(environ: Mapping[str, str], variable: str) -> int:
     return _read_whole_number(
         environ,
         variable,
-        (MIN_ROOM_LIFE_HOURS, MAX_ROOM_LIFE_HOURS, DEFAULT_ROOM_LIFE_HOURS),
-        _ROOM_LIFE_RULE,
+        minimum=MIN_ROOM_LIFE_HOURS,
+        maximum=MAX_ROOM_LIFE_HOURS,
+        default=DEFAULT_ROOM_LIFE_HOURS,
+        rule=_ROOM_LIFE_RULE,
     )
 
 
 def _read_whole_number(
     environ: Mapping[str, str],
     variable: str,
-    bounds_and_default: tuple[int, int, int],
+    minimum: int,
+    maximum: int,
+    default: int,
     rule: str,
 ) -> int:
     """Return the whole number in `variable`, or its default when unset or empty.
@@ -330,13 +336,14 @@ def _read_whole_number(
     Args:
         environ: The environment to read.
         variable: The variable's name.
-        bounds_and_default: The least value, the greatest, and the default.
+        minimum: The least acceptable value.
+        maximum: The greatest acceptable value.
+        default: The value when the variable is unset or empty.
         rule: What the variable must be, for the message of a refusal.
 
     Raises:
         SettingsError: the value is not acceptable (see `_bounded_number`).
     """
-    minimum, maximum, default = bounds_and_default
     text = environ.get(variable, "")
     if text == "":
         return default
