@@ -206,9 +206,11 @@ shorter life would delete before saving it.
   with `NOCK_CREATOR_ROOM_HOURS` 48, its row reads « 48 h » « variable ».
 - **AC-16** Typing 96 in that row and « Enregistrer » sends the `PUT`, with no
   question: the row reads « 96 h » « modifiée », the input is empty and
-  « Rétablir » enabled; with 100 in « Salon anonyme, résolu », the period chips
-  are then « Dernières 24 heures » alone, pressed; « Rétablir » there brings
-  the three chips back and the row to « 720 h » « par défaut ».
+  « Rétablir » enabled. With 100 in « Salon anonyme, résolu » (at 720) and
+  « Enregistrer », rule 12 asks « Cela effacera 0 salon maintenant. » first;
+  after « Confirmer » the period chips are « Dernières 24 heures » alone,
+  pressed. « Rétablir » there asks no question and brings the three chips
+  back and the row to « 720 h » « par défaut ».
 - **AC-17** With AC-6's rooms, 24 in « Salon anonyme, en cours » (at 48) and
   « Enregistrer » saves nothing and shows, under a divider, « Cela effacera 2
   salons maintenant. », « Confirmer » and « Annuler », the button pressed;
