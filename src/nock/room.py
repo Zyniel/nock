@@ -216,6 +216,10 @@ class PlayerRecord(RoomModel):
     recent_chat: tuple[float, ...] = ()
     # spec 022: times of the reactions relayed in the window (not logged)
     recent_reactions: tuple[float, ...] = ()
+    # `lobby/host.md` rule 10: the account this member is linked to, None for an
+    # anonymous player. Never sent to a browser. A snapshot stored before the link
+    # has no such key and loads with None.
+    account_id: str | None = None
 
 
 class PastPlayer(RoomModel):
@@ -230,6 +234,7 @@ class PastPlayer(RoomModel):
     colour: Colour
     # the record's mute (specs 014, 022), kept for a seat back (spec 032 decision 13)
     muted: StrictBool = False
+    account_id: str | None = None  # the record's account, kept for a seat back
 
 
 class OpenVote(RoomModel):
@@ -283,6 +288,9 @@ class RoomState(RoomModel):
     # stored before this spec has no such keys and loads with None, solved or not.
     solved_at: float | None = None
     solved_elapsed_ms: int | None = Field(default=None, ge=0, strict=True)
+    # `lobby/host.md` rule 11: the account that created the room, None for an
+    # anonymous room. The store keeps it in `room_times`, not in the snapshots.
+    creator_account_id: str | None = None
 
 
 class RoomKey(RoomModel):
@@ -350,6 +358,7 @@ def new_room(
     now: float,
     grid_number: int | None = None,
     share_token: str | None = None,
+    creator_account_id: str | None = None,
 ) -> RoomState:
     """Return a fresh room: seq 0, no player, every letter cell empty.
 
@@ -360,6 +369,8 @@ def new_room(
         grid_number: Catalogue number of the grid, None for a bare grid.
         share_token: The token of the room's public recap (spec 028), 16 to 64
             characters of A-Z, a-z, 0-9, "_" and "-"; None for no share link.
+        creator_account_id: The account that creates the room, None for an
+            anonymous room (`lobby/host.md` rule 11).
 
     Returns:
         The new state. `cells` holds one empty cell per letter cell of `grid`,
@@ -380,6 +391,7 @@ def new_room(
         created_at=now,
         cells=tuple(cells),
         share_token=share_token,
+        creator_account_id=creator_account_id,
     )
 
 
@@ -465,8 +477,8 @@ def member_id(state: RoomState, resume_token: str) -> str | None:
 def with_player_erased(state: RoomState, player_id: str) -> RoomState:
     """Return the room with FORMER_PLAYER_NICKNAME as the nickname of a player.
 
-    The player's record in `players` or `past_players` gets the nickname; the
-    rest of the room stays as it is (spec 033, erasing a player).
+    The player's record in `players` or `past_players` gets the nickname and no
+    account; the rest of the room stays as it is (spec 033, erasing a player).
 
     Args:
         state: The room.
@@ -475,7 +487,7 @@ def with_player_erased(state: RoomState, player_id: str) -> RoomState:
     Returns:
         The new state; the same content when the room has no such player.
     """
-    erased = {"nickname": FORMER_PLAYER_NICKNAME}
+    erased = {"nickname": FORMER_PLAYER_NICKNAME, "account_id": None}
     players: list[PlayerRecord] = []
     for player in state.players:
         if player.player_id == player_id:
@@ -777,16 +789,27 @@ def join_room(
     new_player_id: str,
     new_resume_token: str,
     config: RoomConfig = DEFAULT_CONFIG,
+    account_id: str | None = None,
 ) -> Outcome:
     """Apply a join on a connection that has not joined yet.
 
+    The join's member is chosen once, before the steps (`lobby/joining.md`
+    rule 4): signed in, the account's member of the room, player or past player,
+    whatever token the join carries; else the member whose token it carries. A
+    token that is not the member's is not used.
+
     The steps run in this order and the first that applies ends the join:
-    removed token, resume of a player of the room, room locked, room full, seat
-    back of a past player (spec 032), invalid nickname, new player. A token whose
-    player has been disconnected for more than the resume window does not
-    resume: that player times out in this same step and becomes a past player,
-    and the join goes on with the steps after the resume, so that the same token
-    seats them back. A refusal after such a time-out keeps the time-out.
+    removed token (the token used), resume of the member when a player, room
+    locked (not for the creator's session), room full, seat back of the member
+    when a past player (spec 032), invalid nickname, new player. A member who
+    has been disconnected for more than the resume window does not resume: they
+    time out in this same step and become a past player, and the join goes on
+    with the steps after the resume, so that the same member is seated back. A
+    refusal after such a time-out keeps the time-out.
+
+    A signed-in join links its member to the account when that member has none.
+    The creator's player is host at the end of their join (`lobby/host.md`
+    rule 13).
 
     Args:
         state: The room.
@@ -795,25 +818,63 @@ def join_room(
         new_player_id: Id given to a new player.
         new_resume_token: Token given to a new player.
         config: Thresholds of the room rules.
+        account_id: The account that the socket's session signs in; None for an
+            anonymous join.
 
     Returns:
         The outcome. A success replies with the snapshot of the player.
     """
-    if _is_removed_token(state, message.resume_token):
+    player, past_player = _join_member(state, account_id, message.resume_token)
+    has_member = player is not None or past_player is not None
+    if not has_member and _is_removed_token(state, message.resume_token):
         refusal = ErrorMessage(code=ErrorCode.REMOVED, message=_REMOVED_TEXT)
         return Outcome(state=state, reply=(refusal,), close_sender=True)
-    resumed = _find_by_token(state, message.resume_token)
     timeout_entries: tuple[LogEntry, ...] = ()
-    if resumed is not None and _has_timed_out(resumed, now, config):
-        timeout = _time_out_player(state, resumed, now)
+    if player is not None and _has_timed_out(player, now, config):
+        timeout = _time_out_player(state, player, now)
         state = timeout.state
         timeout_entries = timeout.entries
-        resumed = None
-    if resumed is not None:
-        return _resume_player(state, resumed, now)
-    outcome = _join_without_resume(state, message, now, new_player_id, new_resume_token)
-    all_entries = (*timeout_entries, *outcome.entries)
-    return outcome.model_copy(update={"entries": all_entries})
+        past_player = _find_past_player_by_id(state, player.player_id)
+        player = None
+    if player is not None:
+        outcome = _resume_player(state, player, now)
+    else:
+        is_creator_session = _is_creator_session(state, account_id)
+        outcome = _join_without_resume(
+            state,
+            message,
+            now,
+            new_player_id,
+            new_resume_token,
+            past_player,
+            is_creator_session,
+        )
+        all_entries = (*timeout_entries, *outcome.entries)
+        outcome = outcome.model_copy(update={"entries": all_entries})
+    return _with_account_and_creator_role(outcome, account_id, now)
+
+
+def _join_member(
+    state: RoomState, account_id: str | None, token: str | None
+) -> tuple[PlayerRecord | None, PastPlayer | None]:
+    """Choose the join's member: the account's, else the token's (rule 4).
+
+    Returns:
+        The member as a player or as a past player; both None when the join has
+        no member.
+    """
+    if account_id is not None:
+        account_player = _find_account_player(state, account_id)
+        account_past_player = _find_account_past_player(state, account_id)
+        if account_player is not None or account_past_player is not None:
+            return account_player, account_past_player
+    return _find_by_token(state, token), _find_past_player(state, token)
+
+
+def _is_creator_session(state: RoomState, account_id: str | None) -> bool:
+    """Tell whether the join is made by the session of the room's creator."""
+    creator = state.creator_account_id
+    return creator is not None and account_id == creator
 
 
 def _join_without_resume(
@@ -822,12 +883,15 @@ def _join_without_resume(
     now: float,
     new_player_id: str,
     new_resume_token: str,
+    past_player: PastPlayer | None,
+    is_creator_session: bool,
 ) -> Outcome:
     """Run the steps of a join that does not resume.
 
-    Locked, full, seat back (spec 012 step 4a, spec 032), nickname, new player.
+    Locked (not for the creator's session), full, seat back of `past_player`
+    (spec 012 step 4a, spec 032), nickname, new player.
     """
-    if state.settings.locked:
+    if state.settings.locked and not is_creator_session:
         refusal = ErrorMessage(
             code=ErrorCode.ROOM_LOCKED, message="The room is locked."
         )
@@ -835,7 +899,6 @@ def _join_without_resume(
     if len(state.players) >= MAX_PLAYERS:
         refusal = ErrorMessage(code=ErrorCode.ROOM_FULL, message="The room is full.")
         return Outcome(state=state, reply=(refusal,), close_sender=True)
-    past_player = _find_past_player(state, message.resume_token)
     if past_player is not None:
         return _seat_back(state, past_player, now)
     try:
@@ -844,6 +907,93 @@ def _join_without_resume(
         refusal = ErrorMessage(code=ErrorCode.INVALID_NICKNAME, message=str(error))
         return Outcome(state=state, reply=(refusal,))
     return _add_player(state, nickname, now, new_player_id, new_resume_token)
+
+
+def _find_account_player(state: RoomState, account_id: str) -> PlayerRecord | None:
+    """Return the player linked to the account, or None."""
+    for player in state.players:
+        if player.account_id == account_id:
+            return player
+    return None
+
+
+def _find_account_past_player(state: RoomState, account_id: str) -> PastPlayer | None:
+    """Return the past player linked to the account, or None."""
+    for past_player in state.past_players:
+        if past_player.account_id == account_id:
+            return past_player
+    return None
+
+
+def _find_past_player_by_id(state: RoomState, player_id: str) -> PastPlayer | None:
+    """Return the past player with this id, or None."""
+    for past_player in state.past_players:
+        if past_player.player_id == player_id:
+            return past_player
+    return None
+
+
+def _joined_player_id(outcome: Outcome) -> str | None:
+    """Return the id of the player that a join seated, from its snapshot reply.
+
+    None when the join was refused.
+    """
+    for reply in outcome.reply:
+        if isinstance(reply, Snapshot):
+            return reply.you
+    return None
+
+
+def _with_account_and_creator_role(
+    outcome: Outcome, account_id: str | None, now: float
+) -> Outcome:
+    """Link the joiner to the account, then give the creator's player the role.
+
+    A join that was refused changes nothing here. The joiner's snapshot is built
+    again when the role moves, so that it shows the new host.
+    """
+    joiner_id = _joined_player_id(outcome)
+    if joiner_id is None:
+        return outcome
+    linked_state = _with_account_linked(outcome.state, joiner_id, account_id)
+    role = _with_creator_as_host(linked_state, joiner_id, now)
+    if len(role.entries) == 0:
+        return outcome.model_copy(update={"state": linked_state})
+    reply = (snapshot_for(role.state, joiner_id, now),)
+    entries = (*outcome.entries, *role.entries)
+    return outcome.model_copy(
+        update={"state": role.state, "entries": entries, "reply": reply}
+    )
+
+
+def _with_account_linked(
+    state: RoomState, player_id: str, account_id: str | None
+) -> RoomState:
+    """Link the player to the account when they have no account yet.
+
+    A member's account never changes otherwise (`lobby/host.md` rule 10).
+    """
+    player = _find_player(state, player_id)
+    if account_id is None or player is None or player.account_id is not None:
+        return state
+    linked = player.model_copy(update={"account_id": account_id})
+    return _replace_player(state, linked)
+
+
+def _is_creators_player(state: RoomState, player: PlayerRecord) -> bool:
+    """Tell whether the player is the member linked to the room's creator."""
+    creator = state.creator_account_id
+    return creator is not None and player.account_id == creator
+
+
+def _with_creator_as_host(state: RoomState, player_id: str, now: float) -> Outcome:
+    """Give the host role to the player when they are the creator's and lack it."""
+    player = _find_player(state, player_id)
+    if player is None or player.is_host or not _is_creators_player(state, player):
+        return Outcome(state=state)
+    changed = HostChanged(seq=state.seq + 1, player_id=player_id)
+    entry = LogEntry(at=now, event=changed)
+    return Outcome(state=replay(state, entry), entries=(entry,))
 
 
 def _is_removed_token(state: RoomState, token: str | None) -> bool:
@@ -1404,7 +1554,11 @@ def _remove_player(
 ) -> Outcome:
     """Remove a player, ban their token and close their connection."""
     target = _find_player(state, target_id)
-    if target is None or target.player_id == host.player_id:
+    if (
+        target is None
+        or target.player_id == host.player_id
+        or _is_creators_player(state, target)
+    ):
         return _refuse(
             state, ErrorCode.INVALID_TARGET, "That player cannot be removed."
         )
@@ -1425,7 +1579,11 @@ def _mute_player(
 ) -> Outcome:
     """Mute or unmute a player's chat; nothing happens when it already is so."""
     target = _find_player(state, message.player_id)
-    if target is None or target.player_id == host.player_id:
+    if (
+        target is None
+        or target.player_id == host.player_id
+        or _is_creators_player(state, target)
+    ):
         return _refuse(state, ErrorCode.INVALID_TARGET, "That player cannot be muted.")
     if target.muted == message.muted:
         return Outcome(state=state)
@@ -2270,7 +2428,9 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     For each player, in `players` order: a joined player silent for too long is
     disconnected and their socket is to be closed; a player disconnected for
     more than the resume window leaves the room. Then each active player
-    without input for the idle delay becomes idle. Then a host disconnected for
+    without input for the idle delay becomes idle. Then the creator's player,
+    when not disconnected and without the host role, takes it back
+    (`lobby/host.md` rule 13). Then a host disconnected for
     more than the hand-over delay hands the host role to the longest-present
     connected player. Last, an open vote whose time is over closes `timed_out`
     (spec 025).
@@ -2300,7 +2460,9 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
             entries.extend(step.entries)
     idle_step = _idle_step(current, now, config)
     entries.extend(idle_step.entries)
-    handover_step = _handover_step(idle_step.state, now, config)
+    creator_step = _creator_step(idle_step.state, now)
+    entries.extend(creator_step.entries)
+    handover_step = _handover_step(creator_step.state, now, config)
     entries.extend(handover_step.entries)
     expiry_step = _expire_vote(handover_step.state, now)
     entries.extend(expiry_step.entries)
@@ -2327,6 +2489,16 @@ def _idle_step(state: RoomState, now: float, config: RoomConfig) -> Outcome:
         current = step.state
         entries.extend(step.entries)
     return Outcome(state=current, entries=tuple(entries))
+
+
+def _creator_step(state: RoomState, now: float) -> Outcome:
+    """Give the host role to the creator's player when they are connected."""
+    for player in state.players:
+        if player.state == PlayerState.DISCONNECTED:
+            continue
+        if _is_creators_player(state, player):
+            return _with_creator_as_host(state, player.player_id, now)
+    return Outcome(state=state)
 
 
 def _handover_step(state: RoomState, now: float, config: RoomConfig) -> Outcome:
@@ -2453,7 +2625,7 @@ def _replay_player_joined(
     """Append the player of a logged join.
 
     A past player with the same id is one no more: the join seated them back
-    (spec 032).
+    (spec 032), and the player keeps that past player's account.
     """
     if entry.resume_token is None:
         raise ValueError(f"The player_joined entry {event.seq} has no resume token")
@@ -2474,6 +2646,8 @@ def _replay_player_joined(
     for past_player in state.past_players:
         if past_player.player_id != view.player_id:
             still_past.append(past_player)
+        else:
+            player = player.model_copy(update={"account_id": past_player.account_id})
     return state.model_copy(
         update={"players": (*state.players, player), "past_players": tuple(still_past)}
     )
@@ -2528,6 +2702,7 @@ def _past_record_of(player: PlayerRecord) -> PastPlayer:
         nickname=player.nickname,
         colour=player.colour,
         muted=player.muted,
+        account_id=player.account_id,
     )
 
 

@@ -99,9 +99,16 @@ class RecordingRegistry(RoomRegistry):
         super().__init__(clock=clock)
         self.created: list[tuple[Grid, int | None]] = []
 
-    def register_room(self, grid: Grid, grid_number: int | None = None) -> str:
+    def register_room(
+        self,
+        grid: Grid,
+        grid_number: int | None = None,
+        creator_account_id: str | None = None,
+    ) -> str:
         self.created.append((grid, grid_number))
-        return super().register_room(grid, grid_number=grid_number)
+        return super().register_room(
+            grid, grid_number=grid_number, creator_account_id=creator_account_id
+        )
 
 
 @pytest.fixture

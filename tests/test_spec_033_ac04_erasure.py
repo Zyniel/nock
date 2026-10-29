@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from fastapi.testclient import TestClient
 from httpx2 import Response
 
 import nock.room
@@ -54,7 +55,7 @@ from nock.grid import Grid
 from nock.protocol import EditLetter, LetterChanged, PlayerJoined, PlayerState
 from nock.room import PastPlayer, RoomState
 from nock.store import RoomStore
-from spec017_harness import FakeClock, has_state_change, open_peer
+from spec017_harness import FakeClock, Peer, has_state_change, open_peer
 from spec032_harness import (
     BOB,
     CY,
@@ -225,6 +226,24 @@ def loaded(store: RoomStore, code: str) -> RoomState:
     return state
 
 
+def open_signed_out_peer(
+    stack: contextlib.ExitStack, client: TestClient, code: str, nickname: str
+) -> Peer:
+    """Open a socket that carries no cookie, though the client holds a session.
+
+    A signed-in join reaches the account's member (`lobby/joining.md` rule 4), so
+    a player who is not Zélie must join without her session. The client's cookies
+    are put back once the player has joined.
+    """
+    saved = list(client.cookies.jar)
+    client.cookies.clear()
+    try:
+        return open_peer(stack, client, code, nickname)
+    finally:
+        for cookie in saved:
+            client.cookies.jar.set_cookie(cookie)
+
+
 def play_up_to_the_deletion(
     app: AccountApp,
     store: SnapshotRecorder,
@@ -252,7 +271,7 @@ def play_up_to_the_deletion(
     # A room ticks only while someone is connected to it (specs 017 and 032):
     # Dan stays in S until Zélie's time-out, and sees her leave.
     with contextlib.ExitStack() as dan_stack:
-        dan_in_s = open_peer(dan_stack, app.client, s_code, "Dan")
+        dan_in_s = open_signed_out_peer(dan_stack, app.client, s_code, "Dan")
         with contextlib.ExitStack() as s_stack:
             zelie_s = open_peer(s_stack, app.client, s_code, ZELIE_NICKNAME)
             zelie_in_s = zelie_s.snapshot().you

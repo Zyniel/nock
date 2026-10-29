@@ -291,7 +291,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 - Backups, log retention, the host's own logs; latency measured in the browsers,
   charts, alerts, exports; operator accounts, rotating the token without a
   restart; editing a room's log.
-- A guest's stored data, cookies, the player's own data: `account/account.md`.
+- An anonymous player's stored data, cookies, the player's own data:
+  `account/account.md`.
   The other environment variables: `platform/server.md`.
 
 ## Code

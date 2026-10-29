@@ -25,12 +25,12 @@ The other keys hold data, not settings: `nock.nickname` and
 
 ## Host (per room)
 
-Set in « Réglages de l'hôte » (`lobby/rooms.md` rule 20), sent in
+Set in « Réglages de l'hôte » (`lobby/host.md` rule 8), sent in
 `settings_changed`; a new room's values: `lobby/rooms.md` rule 7.
 
 | Setting (UI) | Values, default first | Owner |
 | --- | --- | --- |
-| « Verrouiller le salon » | off, on | `lobby/rooms.md` 15 |
+| « Verrouiller le salon » | off, on | `lobby/host.md` 3 |
 | « Aide » | « libre » (`free`), « par vote » (`vote`), « désactivée » (`none`) | `gameplay/hints.md` 1 |
 | « Lettres à révéler » | 5; 0 to 99 on the page, any count from 0 on the server | `gameplay/hints.md` 8 |
 | « Mots à révéler » | 1; 0 to 99 on the page, any count from 0 on the server | `gameplay/hints.md` 8 |

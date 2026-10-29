@@ -15,7 +15,7 @@ a reveal budget and, in vote mode, a majority of the players.
 ## Depends on
 
 - `gameplay/board.md`: letter cells, the selection and its word, pending edits.
-- `lobby/rooms.md`: the host settings, which set the help mode and the allowance.
+- `lobby/host.md`: the host settings, which set the help mode and the allowance.
 - `platform/realtime.md`: the messages, their error codes, what a browser may
   receive.
 
@@ -271,7 +271,7 @@ on its layer of `_design/room.md`, « Layers ».
 
 - Generated hints, revealing the whole grid, undoing a reveal, keyboard
   shortcuts, a tally of ballots, changing a ballot, votes on anything else.
-- The host settings: `lobby/rooms.md`. The Aide menu's place, « Réagir » under
+- The host settings: `lobby/host.md`. The Aide menu's place, « Réagir » under
   the banner: `client/hud.md`; the notes: `client/room.md`. Cell marks and
   pending edits: `gameplay/board.md`. Completion: `gameplay/rules.md`. The
   stream and its lines' look: `social/chat.md`. Protocol and fair play:
