@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: approved
+status: done
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
@@ -91,16 +91,6 @@ deletes it with all its data.
    columns are added, and each solved room gets its solve time from its stored
    state or log, or its last edit time when neither gives one; the rooms' other
    data stays.
-
-## New interface
-
-- `src/nock/room.py`: `RoomConfig.creator_solved_room_hours`,
-  `creator_room_hours`, `anonymous_solved_room_hours`, `anonymous_room_hours`
-  (`int`, 24 to 8760, default 720);
-  `expiry_sweep_seconds` stays a float in seconds.
-- `src/nock/settings.py`: `room_config_from_env(environ: Mapping[str, str]) ->
-  RoomConfig`: the four lives and the sweep interval from the environment, the
-  other fields at their defaults; raises `SettingsError` on a refused value.
 
 ## Acceptance criteria
 

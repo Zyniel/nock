@@ -884,9 +884,9 @@ others, at the top of the list.
 
 ### B-023 Room lives as variables
 
-- Status: building (the human approved the brief as written, with the lead's
+- Status: done (the human approved the brief as written, with the lead's
   calls: `lobby/lifetime.md`, the erasure case dropped, then the spec change
-  as written, 2026-10-29)
+  as written, 2026-10-29; built and reviewed in two rounds, 2026-10-29)
 - Waits for: nothing left (B-021, B-022 and B-025 are merged and on this
   branch). B-024 (/ops overrides) waits for this item.
 - Domains: lobby/lifetime (new: joining rules 15, 16 and AC-14, AC-15 move
