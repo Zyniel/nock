@@ -4,8 +4,10 @@ The server listens on the address in NOCK_HOST and the port in NOCK_PORT, with
 the limits of `nock.server.server_config`. The rooms are stored in the SQLite
 file named by NOCK_DATABASE (spec 018), and NOCK_OPERATOR_TOKEN turns on the
 operator pages (spec 038). NOCK_PUBLIC_URL and the NOCK_SMTP_* variables turn
-on the accounts (spec 033). The variables are checked before the server is
-built, and a refused value stops the start (specs 036, 038 and 033).
+on the accounts (spec 033), and the four NOCK_*_ROOM_HOURS and
+NOCK_EXPIRY_SWEEP_MINUTES set the room lives and the sweep interval
+(`lobby/lifetime.md`). The variables are checked before the server is built,
+and a refused value stops the start (specs 036, 038 and 033).
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from nock.settings import (
     is_host,
     operator_token_from_env,
     port_number,
+    room_config_from_env,
 )
 
 HOST_VARIABLE: str = "NOCK_HOST"
@@ -55,7 +58,7 @@ def main() -> None:
     The host comes from NOCK_HOST (default 127.0.0.1) and the port from
     NOCK_PORT (default 8000), once NOCK_OPERATOR_TOKEN (checked first),
     NOCK_HOST, NOCK_PORT and NOCK_DATABASE have passed the checks below. The
-    four variables are read at each call. An unset or empty NOCK_HOST or
+    variables are read at each call. An unset or empty NOCK_HOST or
     NOCK_PORT takes its default. An unset or empty NOCK_DATABASE is not checked,
     and the app then keeps its rooms in memory. An unset or empty
     NOCK_OPERATOR_TOKEN is not checked either, and the operator pages are off.
@@ -80,6 +83,13 @@ def main() -> None:
       (format characters), Zl or Zp (line and paragraph separators), except
       U+200C and U+200D. Spaces, accents and path separators are allowed. The
       variable is not changed: the app reads it when it starts.
+    - NOCK_CREATOR_SOLVED_ROOM_HOURS, NOCK_CREATOR_ROOM_HOURS,
+      NOCK_ANONYMOUS_SOLVED_ROOM_HOURS, NOCK_ANONYMOUS_ROOM_HOURS and
+      NOCK_EXPIRY_SWEEP_MINUTES, checked after NOCK_DATABASE: the rule of
+      `nock.settings.room_config_from_env` (`lobby/lifetime.md` rule 7). A
+      room life is 24 to 8760 hours and the sweep interval 1 to 1440 minutes,
+      each in ASCII digits only. The variables are not changed: the app reads
+      them when it starts.
     - NOCK_PUBLIC_URL and the NOCK_SMTP_* variables, checked last: the rules of
       `nock.settings.account_settings_from_env` (spec 033). The app reads them
       again when it starts.
@@ -95,6 +105,7 @@ def main() -> None:
     host = _read_host()
     port = _read_port()
     _check_database()
+    _check_room_config()
     _check_account_settings()
     config = nock.server.server_config(nock.server.app, host=host, port=port)
     uvicorn.Server(config).run()
@@ -112,6 +123,21 @@ def _check_operator_token() -> None:
     """
     try:
         operator_token_from_env(os.environ)
+    except SettingsError as error:
+        raise SystemExit(str(error)) from error
+
+
+def _check_room_config() -> None:
+    """Stop the start when a room life or the sweep interval breaks its rule.
+
+    The variables are only read: the app reads them again when it starts.
+
+    Raises:
+        SystemExit: a variable breaks the rule of `room_config_from_env`. Its
+            code is the message of the SettingsError, which shows the value.
+    """
+    try:
+        room_config_from_env(os.environ)
     except SettingsError as error:
         raise SystemExit(str(error)) from error
 

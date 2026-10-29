@@ -4,8 +4,6 @@
   import OpsReplay from './OpsReplay.svelte'
   import { t, type MessageKey } from './i18n'
   import {
-    FIRST_PERIOD,
-    PERIODS,
     fetchDashboard,
     metricViews,
     readOpsToken,
@@ -39,7 +37,6 @@
   let pageState: PageState = $state(keptToken === null ? 'locked' : 'loading')
   let tokenError = $state<MessageKey | null>(null)
   let typedToken = $state('')
-  let shownPeriod: Period = $state(FIRST_PERIOD)
   let figures = $state<DashboardFigures | null>(null)
 
   const metrics = $derived(figures === null ? [] : metricViews(figures))
@@ -52,12 +49,11 @@
     pageState = 'locked'
   }
 
-  // The answer to a dashboard request of `days` days: its figures, the token
-  // form again after a 401 or a 429, or the error for any other answer.
-  function showDashboardAnswer(days: Period, answer: OpsAnswer<DashboardFigures>): void {
+  // The answer to a dashboard request: its figures, the token form again after
+  // a 401 or a 429, or the error for any other answer.
+  function showDashboardAnswer(answer: OpsAnswer<DashboardFigures>): void {
     if (answer.kind === 'ok') {
       figures = answer.body
-      shownPeriod = days
       pageState = 'ready'
     } else if (answer.kind === 'refused' || answer.kind === 'throttled') {
       lock(answer.kind)
@@ -67,15 +63,16 @@
   }
 
   // The first load, once the token is given or found in sessionStorage: the
-  // page shows `loading` until the answer comes.
-  async function loadDashboard(days: Period): Promise<void> {
+  // page shows `loading` until the answer comes. It asks for no period, so the
+  // server answers its default one.
+  async function loadDashboard(): Promise<void> {
     if (token === null) {
       pageState = 'locked'
       return
     }
     pageState = 'loading'
-    const answer = await fetchDashboard(token, days)
-    showDashboardAnswer(days, answer)
+    const answer = await fetchDashboard(token, null)
+    showDashboardAnswer(answer)
   }
 
   // A press of a period button. The page stays `ready` while the request is
@@ -89,7 +86,7 @@
     if (pageState !== 'ready') {
       return
     }
-    showDashboardAnswer(days, answer)
+    showDashboardAnswer(answer)
   }
 
   function submitToken(event: SubmitEvent): void {
@@ -97,13 +94,13 @@
     token = typedToken
     writeOpsToken(typedToken)
     tokenError = null
-    void loadDashboard(shownPeriod)
+    void loadDashboard()
   }
 
   // Once, when the page shows.
   onMount(() => {
     if (token !== null) {
-      void loadDashboard(shownPeriod)
+      void loadDashboard()
     }
   })
 </script>
@@ -152,13 +149,13 @@
         <div class="nock-field" data-testid="ops-period-field">
           <span class="nock-field-label" id="ops-period-label">{t('ops.period_label')}</span>
           <div class="nock-button-row" role="group" aria-labelledby="ops-period-label">
-            {#each PERIODS as days (days)}
+            {#each figures.offered_days as days (days)}
               <button
                 type="button"
                 class="nock-chip"
                 data-testid="ops-period"
                 data-days={String(days)}
-                aria-pressed={days === shownPeriod ? 'true' : 'false'}
+                aria-pressed={days === figures.days ? 'true' : 'false'}
                 onclick={() => void changePeriod(days)}
               >
                 {t(PERIOD_KEYS[days])}

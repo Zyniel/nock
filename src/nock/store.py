@@ -1,9 +1,10 @@
 """SQLite storage of the rooms: an append-only event log and state snapshots.
 
-Each room also has its creation time and its last edit time (spec 032), which
-its 30-day life runs from, so that the expired rooms are found without loading
-them, and its creator, the account that created it (`lobby/host.md` rule 11),
-kept in `room_times` only: the snapshots hold no creator.
+Each room also has its creation time, its last edit time and its solve time
+(`lobby/lifetime.md`), which its room life runs from, so that the expired rooms
+are found without loading them, and its creator, the account that created it
+(`lobby/host.md` rule 11), kept in `room_times` only: the snapshots hold no
+creator.
 
 One connection is shared by all threads and every call takes a lock, so the
 store is safe to call from several threads. Rooms are independent: the lock is
@@ -17,14 +18,17 @@ checkpoint that empties the write-ahead log. Erasing a player's nickname (spec
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from collections.abc import Sequence
 from pathlib import Path
 
+from nock.protocol import GridSolved
 from nock.room import (
     LogEntry,
     RoomState,
+    RoomTimes,
     entry_with_player_erased,
     is_edit,
     replay,
@@ -57,13 +61,19 @@ CREATE TABLE IF NOT EXISTS room_times (
     code TEXT PRIMARY KEY REFERENCES rooms (code),
     created_at REAL NOT NULL,
     last_edit_at REAL NOT NULL,
-    creator_account_id TEXT
+    creator_account_id TEXT,
+    solved_at REAL
 );
 """
 
-# `PRAGMA user_version` of a database that has the creator column.
-_CREATOR_COLUMN_VERSION = 1
-_CREATOR_COLUMN = "creator_account_id"
+# `PRAGMA user_version` of a database that has the creator column (1) and the
+# solve time column (2) in `room_times`.
+_SCHEMA_VERSION = 2
+# The columns a database below that version may lack, with their SQL types.
+_ADDED_COLUMNS: dict[str, str] = {"creator_account_id": "TEXT", "solved_at": "REAL"}
+
+# The columns `RoomTimes` is read from, in the order `_room_times_of` expects.
+_ROOM_TIMES_COLUMNS = "code, last_edit_at, solved_at, creator_account_id"
 
 # What `delete_room` runs, in one transaction: every row of the room, in every
 # table, the rows that refer to the room before the room itself.
@@ -102,7 +112,7 @@ class RoomStore:
             self._connection.execute("PRAGMA synchronous = FULL")
         self._connection.execute("PRAGMA secure_delete = ON")
         self._connection.executescript(_TABLES)
-        self._add_creator_column()
+        self._migrate()
 
     def create_room(
         self, state: RoomState, *, last_edit_at: float | None = None
@@ -110,7 +120,8 @@ class RoomStore:
         """Record a new room, its share token and `state` as its first snapshot.
 
         The share token (spec 028) is kept apart, so that `code_for_share_token`
-        finds the room. The room's creation time is `state.created_at`.
+        finds the room. The room's creation time is `state.created_at`. A room
+        that is already solved has its last edit time as its solve time.
 
         Args:
             state: The room's first state.
@@ -122,6 +133,9 @@ class RoomStore:
                 has the share token `state.share_token`.
         """
         start = state.created_at if last_edit_at is None else last_edit_at
+        # A solved room's solve time equals its last edit time (`lobby/lifetime.md`
+        # rule 2).
+        solved_at = start if state.solved else None
         with self._lock:
             if self._room_exists(state.code):
                 raise ValueError(f"A room with code {state.code} already exists")
@@ -135,9 +149,15 @@ class RoomStore:
                 )
                 self._connection.execute(
                     "INSERT INTO room_times "
-                    "(code, created_at, last_edit_at, creator_account_id) "
-                    "VALUES (?, ?, ?, ?)",
-                    (state.code, state.created_at, start, state.creator_account_id),
+                    "(code, created_at, last_edit_at, creator_account_id, solved_at) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (
+                        state.code,
+                        state.created_at,
+                        start,
+                        state.creator_account_id,
+                        solved_at,
+                    ),
                 )
                 if token is not None:
                     self._connection.execute(
@@ -164,7 +184,7 @@ class RoomStore:
             return self._code_of_token(token)
 
     def last_edit_at(self, code: str) -> float | None:
-        """Return the room's last edit time, which its 30-day life runs from.
+        """Return the room's last edit time, which its room life runs from.
 
         It starts when the room is created and only edits move it (spec 032).
 
@@ -201,6 +221,32 @@ class RoomStore:
         for (code,) in rows:
             codes.append(str(code))
         return codes
+
+    def read_room_times(self) -> list[RoomTimes]:
+        """Return the times and the creator of every room.
+
+        Returns:
+            One `RoomTimes` per room, in code-point order.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                f"SELECT {_ROOM_TIMES_COLUMNS} FROM room_times ORDER BY code"
+            ).fetchall()
+        all_times: list[RoomTimes] = []
+        for row in rows:
+            all_times.append(_room_times_of(row))
+        return all_times
+
+    def room_times(self, code: str) -> RoomTimes | None:
+        """Return the times and the creator of a room, None for an unknown room."""
+        with self._lock:
+            row = self._connection.execute(
+                f"SELECT {_ROOM_TIMES_COLUMNS} FROM room_times WHERE code = ?",
+                (code,),
+            ).fetchone()
+        if row is None:
+            return None
+        return _room_times_of(row)
 
     def codes_created_since(self, since: float) -> list[tuple[str, float]]:
         """Return the rooms created at `since` or later, with their creation times.
@@ -312,7 +358,8 @@ class RoomStore:
 
         In the same transaction, the room's last edit time becomes the largest of
         its current value and the time `at` of each edit among the entries
-        (`is_edit`, spec 032): it never goes down.
+        (`is_edit`, spec 032): it never goes down. A `grid_solved` among the
+        entries gives the room its solve time, its `at`, unless it has one.
 
         Raises:
             ValueError: unknown room, or the entries' seqs are not exactly
@@ -323,6 +370,7 @@ class RoomStore:
         if len(entries) == 0:
             return
         latest_edit_at = _latest_edit_time(entries)
+        solve_time = _logged_solve_time(entries)
         with self._lock:
             if not self._room_exists(code):
                 raise ValueError(f"Unknown room {code}")
@@ -347,6 +395,12 @@ class RoomStore:
                         "UPDATE room_times SET last_edit_at = MAX(last_edit_at, ?) "
                         "WHERE code = ?",
                         (latest_edit_at, code),
+                    )
+                if solve_time is not None:
+                    self._connection.execute(
+                        "UPDATE room_times SET solved_at = COALESCE(solved_at, ?) "
+                        "WHERE code = ?",
+                        (solve_time, code),
                     )
             except BaseException:
                 self._connection.execute("ROLLBACK")
@@ -475,38 +529,88 @@ class RoomStore:
                 (erased.model_dump_json(), code, seq),
             )
 
-    def _add_creator_column(self) -> None:
-        """Give `room_times` the creator column when the database lacks it.
+    def _migrate(self) -> None:
+        """Bring a database below `_SCHEMA_VERSION` to it, once, at open.
 
-        A database whose `PRAGMA user_version` is below 1 comes from before the
-        column: the column is added once and the version set to 1. The rooms it
-        holds have no creator, and their other data stays.
+        The missing columns of `room_times` are added, each solved room gets its
+        solve time (see `_store_solve_times`), and the version is set. The rooms'
+        other data stays.
         """
         # One transaction, so that two processes opening the same old file at
-        # once do not both run the ALTER: the second waits, then sees version 1.
+        # once do not both migrate it: the second waits, then sees the new version.
         self._connection.execute("BEGIN IMMEDIATE")
         try:
             version_row = self._connection.execute("PRAGMA user_version").fetchone()
-            if int(version_row[0]) < _CREATOR_COLUMN_VERSION:
-                self._add_creator_column_once()
+            if int(version_row[0]) < _SCHEMA_VERSION:
+                self._add_missing_columns()
+                self._store_solve_times()
+                self._connection.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
         except BaseException:
             self._connection.execute("ROLLBACK")
             raise
         self._connection.execute("COMMIT")
 
-    def _add_creator_column_once(self) -> None:
-        """Add the column if the table lacks it, then set the version to 1."""
+    def _add_missing_columns(self) -> None:
+        """Add to `room_times` each column of `_ADDED_COLUMNS` that it lacks."""
         column_rows = self._connection.execute(
             "PRAGMA table_info(room_times)"
         ).fetchall()
         column_names: list[str] = []
         for column_row in column_rows:
             column_names.append(str(column_row[1]))
-        if _CREATOR_COLUMN not in column_names:
+        for column, column_type in _ADDED_COLUMNS.items():
+            if column not in column_names:
+                self._connection.execute(
+                    f"ALTER TABLE room_times ADD COLUMN {column} {column_type}"
+                )
+
+    def _store_solve_times(self) -> None:
+        """Give each solved room its solve time, for a database being migrated.
+
+        A room is solved when its latest snapshot says so or its log holds a
+        `grid_solved`. The time is the snapshot's `solved_at`, else the `at` of
+        the logged `grid_solved`, else the room's last edit time. An unsolved
+        room keeps none.
+
+        The snapshot is read as plain JSON, without the checks of `RoomState`:
+        a migration must not fail on a field that a later rule tightened.
+        """
+        rows = self._connection.execute(
+            "SELECT code, last_edit_at FROM room_times"
+        ).fetchall()
+        for code, last_edit_at in rows:
+            snapshot_is_solved, snapshot_solved_at = self._snapshot_solve_time(code)
+            logged_solved_at = _logged_solve_time(self.read_log(code))
+            if not snapshot_is_solved and logged_solved_at is None:
+                continue
+            solved_at = snapshot_solved_at
+            if solved_at is None:
+                solved_at = logged_solved_at
+            if solved_at is None:
+                solved_at = float(last_edit_at)
             self._connection.execute(
-                f"ALTER TABLE room_times ADD COLUMN {_CREATOR_COLUMN} TEXT"
+                "UPDATE room_times SET solved_at = ? WHERE code = ?",
+                (solved_at, code),
             )
-        self._connection.execute(f"PRAGMA user_version = {_CREATOR_COLUMN_VERSION}")
+
+    def _snapshot_solve_time(self, code: str) -> tuple[bool, float | None]:
+        """Read, in the room's latest snapshot, whether it is solved and when.
+
+        Returns:
+            Whether the snapshot says the room is solved, and its `solved_at`
+            (None when it holds none, or when the room has no snapshot).
+        """
+        row = self._connection.execute(
+            "SELECT state_json FROM snapshots WHERE code = ? ORDER BY seq DESC LIMIT 1",
+            (code,),
+        ).fetchone()
+        if row is None:
+            return False, None
+        stored = json.loads(row[0])
+        solved_at = stored.get("solved_at")
+        if solved_at is not None:
+            solved_at = float(solved_at)
+        return stored.get("solved") is True, solved_at
 
     def _creator_of(self, code: str) -> str | None:
         """Return the creator of a room, None for an anonymous or unknown room.
@@ -578,3 +682,24 @@ def _latest_edit_time(entries: Sequence[LogEntry]) -> float | None:
         if latest is None or entry.at > latest:
             latest = entry.at
     return latest
+
+
+def _logged_solve_time(entries: Sequence[LogEntry]) -> float | None:
+    """Return the `at` of the first `grid_solved` among `entries`, None if none."""
+    for entry in entries:
+        if isinstance(entry.event, GridSolved):
+            return entry.at
+    return None
+
+
+def _room_times_of(row: Sequence[object]) -> RoomTimes:
+    """Build the `RoomTimes` of a row of `_ROOM_TIMES_COLUMNS`."""
+    code, last_edit_at, solved_at, creator = row
+    return RoomTimes.model_validate(
+        {
+            "code": code,
+            "last_edit_at": last_edit_at,
+            "solved_at": solved_at,
+            "creator_account_id": creator,
+        }
+    )

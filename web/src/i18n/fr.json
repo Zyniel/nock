@@ -66,7 +66,7 @@
   "room.status.replaced": "Ce salon est ouvert dans un autre onglet.",
   "room.status.joined": "Connecté",
   "room.status.not_found": "Ce salon n'existe pas.",
-  "room.status.not_found_detail": "Un salon est effacé 30 jours après sa dernière modification.",
+  "room.status.not_found_detail": "Un salon est effacé après un certain temps sans modification.",
   "room.status.throttled": "Trop de codes erronés. Réessayez dans une minute.",
   "room.status.closed": "Connexion perdue.",
   "room.status.reconnecting": "Reconnexion…",

@@ -884,7 +884,7 @@ others, at the top of the list.
 
 ### B-023 Room lives as variables
 
-- Status: ready (the human approved the brief as written, with the lead's
+- Status: building (the human approved the brief as written, with the lead's
   calls: `lobby/lifetime.md`, the erasure case dropped, then the spec change
   as written, 2026-10-29)
 - Waits for: nothing left (B-021, B-022 and B-025 are merged and on this
