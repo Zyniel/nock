@@ -236,12 +236,16 @@ def run_tool(
         return None
 
     full_command = [executable_path, *command[1:]]
-    # scripts/ on the import path, so that pytest can load the gate_browsers plugin.
     environment = dict(os.environ)
-    python_path = environment.get("PYTHONPATH", "")
-    environment["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(SCRIPTS_DIR), python_path) if part
-    )
+    # scripts/ on pytest's import path only, so that it can load the
+    # gate_browsers plugin. Pyrefly reads PYTHONPATH as a site-packages folder
+    # and leaves it out of the project, so with it scripts/ went unchecked
+    # (B-029).
+    if command[0] == "pytest":
+        python_path = environment.get("PYTHONPATH", "")
+        environment["PYTHONPATH"] = os.pathsep.join(
+            part for part in (str(SCRIPTS_DIR), python_path) if part
+        )
     # The processes a tool starts inherit its priority.
     creation_flags = 0
     if low_priority:
