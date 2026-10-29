@@ -56,7 +56,7 @@ others, at the top of the list.
 - Domains: none (tooling only: `scripts/gate.py`, `scripts/hooks/role_gate.py`,
   `.claude/settings.json`, `CLAUDE.md`)
 - Architecture decision: no (the human chose the fixes)
-- Branch: feat/b-026-gate-load · PR: none yet
+- Branch: feat/b-026-gate-load · PR: #62
 - Problem: review rounds froze the human's desktop. `--workers auto` started
   one pytest worker per logical CPU (16), each with its own Chromium: 64
   Chromium processes, about 10 GB and 94 % CPU on 2026-10-29, while the
