@@ -243,8 +243,9 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   on its card and no « Compte »; `/g/1` shows « Terminée ».
 - **AC-24** With AC-22's storage, when `GET /api/account/progress` answers
   401, 404, 500, `[1]` or `{"1": "done", "3": "started"}`, or the request
-  fails, `/` (signed in) and `/g/1` show « Commencée » on card 1, « Terminée »
-  on card 3 and are ready; signed out, `/` never asks the route.
+  fails, `/` (signed in) shows « Commencée » on card 1 and « Terminée » on card
+  3, `/g/1` shows « Commencée » and `/g/3` « Terminée », each page ready;
+  signed out, `/` never asks the route.
 
 ## Edge cases
 
