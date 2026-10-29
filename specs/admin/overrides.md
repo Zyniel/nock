@@ -54,8 +54,9 @@ shorter life would delete before saving it.
    `{"rooms": n}`, `n` the number of rooms the proposed value would delete now:
    the rooms the sweep reads, live or not, that `lobby/lifetime.md` rule 5 finds
    expired at the clock time with that life (for null, the value the reset
-   falls back to) and the other lives as they are, rooms already due under the
-   current value included. Nothing is saved or deleted and no socket closes.
+   falls back to) and the other lives as they are. A room due under the current
+   value that the proposed value keeps is not counted. Nothing is saved or
+   deleted and no socket closes.
    `expiry_sweep_minutes`, or a body rule 4 refuses: 422.
 6. The three routes follow `admin/operations.md` rules 6 (pages off: 404), 8
    and 9 (the throttle: a 401 counts, a 422 never) and 10 (`no-store` on every
@@ -166,7 +167,7 @@ shorter life would delete before saving it.
   `value` each answer 422, and the next `GET` is unchanged.
 - **AC-6** Anonymous rooms A (last edited 50 h ago, a socket open), B (30 h) and
   C (solved 30 h ago) under `anonymous_room_hours` 48: the dry run of 24 answers
-  `{"rooms": 2}`, of 96 `{"rooms": 1}`; A's socket stays open, no room is gone,
+  `{"rooms": 2}`, of 96 `{"rooms": 0}`; A's socket stays open, no room is gone,
   and the `GET` after shows no override.
 - **AC-7** With `NOCK_ANONYMOUS_ROOM_HOURS` 24 overridden to 720 and B of AC-6
   present, the dry run of `{"value": null}` answers `{"rooms": 1}`; the dry run
