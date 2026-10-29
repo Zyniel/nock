@@ -74,12 +74,13 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
    `GET /api/ops/rooms/<code>/edits`: 200, rule 15's replay; 404 for an unknown
    or expired room or a code that is not 6 capitals or digits. Neither makes a
    room live.
-8. On those two routes, in this order: an address with 10 refusals under 60
+8. On those two routes and the three settings routes (`admin/overrides.md`
+   rules 3 to 5), in this order: an address with 10 refusals under 60
    seconds old gets 429 `{"detail": "Too Many Requests"}`, whatever its token,
    not counted; a request without `Authorization: Bearer <token>` (compared in
    constant time; never read from the query, a cookie or the URL) gets 401
    `{"detail": "Not authorized"}` with `WWW-Authenticate: Bearer` and counts one
-   refusal; only then are its `days`, code and room read.
+   refusal; only then are its `days`, code, room or body read.
 9. The refusals are a second instance of the wrong-code throttle (`lobby/rooms.md`
    rule 9), per app, apart from wrong room codes. Only a 401 counts.
 10. Any other request under `/api/ops/` gets FastAPI's 404 (unknown path) or 405
@@ -92,8 +93,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 ### Dashboard figures
 
 12. The periods are 1, 7 and 30 days. A period is offered when it is no longer
-    than the shortest room life (`lobby/lifetime.md` rule 4), so 1 always is;
-    the default period is 7 when offered, else 1. The rooms of a period are
+    than the shortest room life (`lobby/lifetime.md` rule 4), read from the
+    effective lives at each request (`admin/overrides.md` rule 2), so 1 always
+    is; the default period is 7 when offered, else 1. The rooms of a period are
     those created at or after `now − days × 86 400 s`, read with their whole
     logs from the store; within an offered period none has expired. The answer
     holds `days`, `offered_days` (the offered periods, rising), `since` (that
@@ -140,11 +142,14 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
     Every ops request sends the token in its header. Then `loading`
     (`ops.loading`) until the dashboard, asked with no period, answers: 200
     `ready`; any 401 or 429 of
-    the page, dashboard or replay, forgets the token and goes back to `locked`
+    the page, dashboard, settings card (`admin/overrides.md`) or replay,
+    forgets the token and goes back to `locked`
     with `ops.token_refused` or `ops.throttled`; another dashboard answer (a 404
     or a malformed 200 too) or a network failure gives `error` (`ops.error`)
     until a reload.
-17. `ready` shows the card `ops.dashboard_heading`: the group `ops.period_label`
+17. `ready` shows the card `ops.dashboard_heading`, then the settings card
+    (`admin/overrides.md` rule 11), then the replay card (rule 19). The
+    dashboard card: the group `ops.period_label`
     of one chip per offered period of the answer, `ops.period.one_day`,
     `ops.period.seven_days`, `ops.period.thirty_days` in that order, the
     answer's `days` pressed, then the six figures in rule 12's order (the
@@ -179,7 +184,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 ### Look
 
 - The page frame, token form, dashboard, chips, tiles, replay and its two layouts:
-  `_design/pages.md`, « Plain pages: account, shared recap, operator ».
+  `_design/pages.md`, « Plain pages: account, shared recap, operator »; the
+  settings card between them: `admin/overrides.md`.
 - The state lines: `_design/pages.md`, « States: opening, loading, empty,
   error ».
 - The replay's cells: `_design/cells.md`, « Grid lines and empty cells » and
@@ -306,6 +312,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 - An anonymous player's stored data, cookies, the player's own data:
   `account/account.md`.
   The other environment variables: `platform/server.md`, `lobby/lifetime.md`.
+  Overriding the room lives and the sweep interval from `/ops`, the settings
+  routes and card: `admin/overrides.md`.
 
 ## Code
 

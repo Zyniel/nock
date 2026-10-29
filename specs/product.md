@@ -68,6 +68,7 @@ the path. Everything else under `/` is a file of the built client or 404
 | `GET`, `PUT /api/account/rooms`; `GET /api/account/history` | the account's rooms and history | `account/account.md` |
 | `DELETE /api/account` | erase the account, 204 | `account/account.md` |
 | `GET /api/ops/dashboard?days=`, `GET /api/ops/rooms/<code>/edits` | figures, a room's edits; token needed | `admin/operations.md` |
+| `GET`, `PUT /api/ops/settings`; `POST /api/ops/settings/dry-run` | the room lives and the sweep interval: read, override, count a value's deletions; token needed | `admin/overrides.md` |
 | `WS /api/rooms/<code>/ws` | the room socket: join, play, events | `platform/realtime.md` |
 
 While accounts are off, `/account` and every `/api/account` path answer 404

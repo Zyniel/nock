@@ -825,6 +825,18 @@ class RoomRegistry:
         """The thresholds of the rooms."""
         return self._config
 
+    def replace_config(self, config: RoomConfig) -> None:
+        """Swap the thresholds of the rooms for `config`, under the registry's lock.
+
+        The next lookup and the next sweep read the new config. Nothing is
+        deleted by the swap itself (`admin/overrides.md` rule 9).
+
+        Args:
+            config: The thresholds to use from now on.
+        """
+        with self._lock:
+            self._config = config
+
     @property
     def clock(self) -> Clock:
         """The clock of the rooms."""
@@ -1038,6 +1050,25 @@ class RoomRegistry:
         for code in expired_codes:
             self._delete_room(code)
         return expired_codes
+
+    def count_expired_rooms(self, config: RoomConfig) -> int:
+        """Count the rooms that `config` would find expired now, deleting none.
+
+        The rooms are those the sweep reads, live or not, and the decision is
+        `is_room_expired` at `clock()` (`admin/overrides.md` rule 5).
+
+        Args:
+            config: The room lives to try, in place of the registry's.
+
+        Returns:
+            How many rooms are expired under `config`.
+        """
+        count = 0
+        now = self._clock()
+        for times in self._store.read_room_times():
+            if is_room_expired(times, now, config, self._creators_active):
+                count += 1
+        return count
 
     def erase_player(self, code: str, player_id: str) -> bool:
         """Erase a player's nickname from a room, live state included (spec 033).

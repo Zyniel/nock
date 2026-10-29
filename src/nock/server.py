@@ -8,7 +8,8 @@ when it starts, then every `expiry_sweep_seconds` (`lobby/lifetime.md` rule 6).
 
 With an operator token, it also serves the operator pages (spec 038): the page
 `/ops` and the ops API under `/api/ops/`, the dashboard and the replay of a room,
-which only a request carrying the token reaches.
+which only a request carrying the token reaches, and the routes that save the
+overrides of the room lives (`admin/overrides.md`).
 
 With account settings, it also serves the optional accounts (spec 033): the page
 `/account` and the routes under `/api/account`, which sign a player in with a
@@ -91,6 +92,7 @@ from nock.operations import (
     offered_periods,
     room_edits,
 )
+from nock.overrides import RoomLifeOverrides, SettingChange, settings_set_in
 from nock.protocol import grid_view, parse_client_message
 from nock.room import RoomKey, RoomState, RoomSummary
 from nock.room import member_id as room_member_id
@@ -271,6 +273,8 @@ class _RoomsHolder:
         self._lock = threading.Lock()
         self._registry = given
         self._is_created_here = False
+        # The settings whose variable was set, for a registry created here.
+        self._settings_set: frozenset[str] | None = None
 
     def get(self) -> RoomRegistry:
         """Return the registry, creating it from the environment the first time.
@@ -285,11 +289,22 @@ class _RoomsHolder:
         with self._lock:
             if self._registry is None:
                 config = room_config_from_env(os.environ)
+                self._settings_set = settings_set_in(os.environ)
                 self._registry = RoomRegistry(
                     config=config, store=RoomStore(_database_path())
                 )
                 self._is_created_here = True
             return self._registry
+
+    def settings_set(self) -> frozenset[str] | None:
+        """Return the settings whose variable was set when the registry was made.
+
+        Returns:
+            The setting names of `nock.overrides.settings_set_in`, for a registry
+            created here; None for a registry given, or before one is created.
+        """
+        with self._lock:
+            return self._settings_set
 
     def close_if_created(self) -> None:
         """Close the registry (and its store) when this holder created it."""
@@ -298,6 +313,44 @@ class _RoomsHolder:
                 self._registry.close()
                 self._registry = None
                 self._is_created_here = False
+                self._settings_set = None
+
+
+class _RunningOverrides:
+    """The overrides of the registry an app serves, made when the app starts."""
+
+    def __init__(self) -> None:
+        """Create a holder with no overrides: the app has not started."""
+        self._overrides: RoomLifeOverrides | None = None
+
+    def start(
+        self, registry: RoomRegistry, settings_set: frozenset[str] | None
+    ) -> None:
+        """Read the stored overrides of `registry` and apply them to its config.
+
+        Args:
+            registry: The registry the app serves.
+            settings_set: See `RoomLifeOverrides`.
+        """
+        overrides = RoomLifeOverrides(registry, settings_set)
+        overrides.load()
+        self._overrides = overrides
+
+    def stop(self) -> None:
+        """Give the registry the environment values back, as the app stops."""
+        if self._overrides is not None:
+            self._overrides.unload()
+        self._overrides = None
+
+    def get(self) -> RoomLifeOverrides:
+        """Return the overrides of the running app.
+
+        Raises:
+            RuntimeError: the app has not started.
+        """
+        if self._overrides is None:
+            raise RuntimeError("The overrides are read when the app starts")
+        return self._overrides
 
 
 class _OperatorToken:
@@ -855,6 +908,7 @@ def create_app(
     """
     holder = _RoomsHolder(rooms)
     operator = _OperatorToken(operator_token)
+    running_overrides = _RunningOverrides()
     account_service = _AccountService(accounts, account_store, mailer)
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
@@ -876,10 +930,13 @@ def create_app(
                 room_registry.set_delete_hook(_history_saver(account_store))
             # While accounts are off, the rooms play as anonymous rooms.
             room_registry.set_creators_active(account_store is not None)
+            # `admin/overrides.md` rule 8: before the first sweep.
+            running_overrides.start(room_registry, holder.settings_set())
             try:
                 async with _expiry_sweeps(room_registry, account_service):
                     yield
             finally:
+                running_overrides.stop()
                 room_registry.set_delete_hook(None)
         finally:
             account_service.stop()
@@ -1148,6 +1205,29 @@ def create_app(
             code=code, grid=grid_view(state.grid), edits=room_edits(entries)
         )
         return replay.model_dump(mode="json")
+
+    # `admin/overrides.md` rule 3: the five settings with their sources.
+    @web_app.get("/api/ops/settings", dependencies=[Depends(check_operator)])
+    def get_settings() -> dict[str, object]:
+        return running_overrides.get().answer()
+
+    # Rule 4: save an override of one setting, or remove it with a null value.
+    @web_app.put("/api/ops/settings", dependencies=[Depends(check_operator)])
+    def save_setting(change: SettingChange) -> dict[str, object]:
+        overrides = running_overrides.get()
+        overrides.save(change.name, change.value)
+        return overrides.answer()
+
+    # Rule 5: how many rooms a proposed room life would delete now. Nothing is
+    # saved or deleted.
+    @web_app.post("/api/ops/settings/dry-run", dependencies=[Depends(check_operator)])
+    def dry_run_setting(change: SettingChange) -> dict[str, object]:
+        if not change.is_room_life():
+            raise HTTPException(
+                status_code=422, detail="The dry run is for a room life only"
+            )
+        rooms = running_overrides.get().dry_run(change.name, change.value)
+        return {"rooms": rooms}
 
     @web_app.get(ACCOUNT_API_ROOT)
     def get_account_status(request: Request) -> dict[str, object]:

@@ -123,7 +123,22 @@ Drawn in the screens sheet, parts 5 to 7.
   naming the chips' group, then one tile per figure (white, 1 px line-grey border,
   radius 8 px, padding 12 px 14 px, in a grid of `repeat(auto-fill, minmax(min(100%,
   270px), 1fr))`, gap 10 px) holding the `fr.json` line as it is. Then a card
-  « Relecture d'un salon »: the field « Code du salon » with « Relire » (primary)
+  « Durées de vie des salons » (card title; the muted line « Sans base de
+  données, ces réglages sont perdus au redémarrage. » under it when the server
+  has no database file), then five list rows (`foundation.md`, « Components »),
+  gap 10 px: left, the text column with the setting's name (title) and, under
+  it on one line (gap 8 px), the effective value « 720 h » or « 60 min » (card
+  text, tabular) and its source as a tag, « par défaut », « variable » or
+  « modifiée »; right, the number input (64 px) with « Enregistrer » (primary)
+  and « Rétablir » (quiet; disabled while there is no override), gap 8 px,
+  wrapping. Under 600 px wide the row stacks: the text column, then the input
+  and the two buttons on a wrapping line. « Valeur hors limites (24 à 8760 h). »
+  is an error line under the input, full width of the row. Saving a shorter life
+  is a disclosure as on the account page: the question stands inside the card,
+  under the rows, 12 px under a line-grey divider: « Cela effacera 2 salons
+  maintenant. » in ink, then « Confirmer » (primary) and « Annuler »
+  (secondary); while asked, that row's « Enregistrer » shows pressed (quiet).
+  No red button. Then a card « Relecture d'un salon »: the field « Code du salon » with « Relire » (primary)
   beside it; « Salon introuvable. » is an error line under the form. The edits, one
   line each (0.85rem, tabular), the current step on word blue and weight 600, later
   steps muted; the grid at the chosen step, drawn with the cells of `cells.md` with
