@@ -96,20 +96,6 @@ others, at the top of the list.
   buttons and the clue bar's minimum width (320 px) into `_design/room.md`;
   takes the grid's name in the computer top bar out of the design.
 
-### B-002 Phase 8: race and team modes
-
-- Status: approved (the human, 2026-10-22: E8 is wanted, once the visual design
-  is built)
-- Domains: gameplay/modes
-- Waits for: B-001
-- Problem: specs 030 and 031 are 1.5 KB stubs approved before their interface
-  existed.
-- In scope: race on one grid; two teams racing. Answers already given: teams
-  differ in size by at most one player and no team is empty; the host cannot
-  start with fewer than 2 players.
-- Out of scope: other competitive modes.
-- Screens: to draw in the screens sheet with the spec change.
-
 ### B-003 Compact the tests
 
 - Status: brief (the human delays the decision)
@@ -122,19 +108,6 @@ others, at the top of the list.
   copies; the same criteria proven, no weaker check.
 - Out of scope: the code; what the tests prove.
 - Screens: none.
-
-### B-004 Live "word completed" lines in the Salon's stream
-
-- Status: approved (the human's pick (b) of spec 034's decision 7: add the live
-  line as a later refinement of spec 013; never built)
-- Domains: social/chat, social/catch-up
-- Waits for: B-001
-- Problem: a player who comes back reads « … a complété … » lines in the
-  catch-up, but a player who stayed never sees them: live play adds no such line.
-- In scope: the same word-completed line, added live when a letter completes a
-  word.
-- Out of scope: other new kinds of line.
-- Screens: the stream's line, as the catch-up already draws it.
 
 ### B-005 Grid progress on the account
 
