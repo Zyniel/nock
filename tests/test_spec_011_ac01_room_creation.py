@@ -106,8 +106,6 @@ class RecordingRegistry(RoomRegistry):
         creator_account_id: str | None = None,
     ) -> str:
         self.created.append((grid, grid_number))
-        if creator_account_id is None:
-            return super().register_room(grid, grid_number=grid_number)
         return super().register_room(
             grid, grid_number=grid_number, creator_account_id=creator_account_id
         )

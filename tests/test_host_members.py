@@ -30,11 +30,12 @@ from host_harness import (
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import PlayerState, RemovePlayer
+from nock.store import RoomStore
 from spec014_harness import ping_and_wait, player_of
 from spec017_harness import FakeClock
 from spec024_harness import make_catalogue
 from spec032_harness import grid_from_text
-from spec033_harness import ROOMS_PATH, room_key, state_of, with_session
+from spec033_harness import ROOMS_PATH, room_key, state_of, wait_for, with_session
 
 
 @pytest.fixture
@@ -203,3 +204,52 @@ def test_ac10_a_removed_account_player_returns_from_another_device_as_a_new_play
                 )
 
     assert again.snapshot().you != bob_id
+
+
+def stored_link(database_path: Path, code: str, player_id: str) -> str | None:
+    """The account that the stored room links the player to, read from the file."""
+    store = RoomStore(database_path)
+    try:
+        stored = store.load_room(code)
+    finally:
+        store.close()
+    assert stored is not None, f"the store has no room {code}"
+    return player_of(stored, player_id).account_id
+
+
+def test_ac10_the_link_is_stored_and_survives_a_restart(
+    tmp_path: Path,
+    fake_clock: FakeClock,
+    catalogue: Catalogue,
+    fx01_grid: Grid,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with (
+        host_app(tmp_path, fake_clock, catalogue, monkeypatch) as app,
+        contextlib.ExitStack() as signed_out_device,
+        contextlib.ExitStack() as signed_in_device,
+    ):
+        code = room_of(app, fx01_grid)
+        session = sign_in_as(app, LEA_EMAIL)
+        lea_account = account_id_of(app, session)
+        signed_out = open_member(signed_out_device, app.client, code, "Lea")
+        lea_id = signed_out.snapshot().you
+        token = signed_out.snapshot().resume_token
+
+        # Lea stays connected, so that no later event or snapshot stores the link.
+        open_member(signed_in_device, app.client, code, "Lea", token, session)
+
+        wait_for(
+            lambda: stored_link(app.database_path, code, lea_id) == lea_account,
+            "the stored room to link Lea's member to her account",
+        )
+
+    with (
+        host_app(tmp_path, fake_clock, catalogue, monkeypatch) as restarted,
+        contextlib.ExitStack() as stack,
+    ):
+        device = open_member(stack, restarted.client, code, "Autre", None, session)
+        players = state_of(restarted.registry, code).players
+
+    assert device.snapshot().you == lea_id
+    assert len(players) == 1
