@@ -580,11 +580,11 @@ class AccountStore:
             state = peek_room(identity.code)
             if state is None or member_id(state, identity.resume_token) is None:
                 continue
-            _mark_grid(progress, state, state.solved)
+            _mark_grid(progress, state, is_finished=state.solved)
         for code in created_codes:
             state = peek_room(code)
             if state is not None:
-                _mark_grid(progress, state, False)
+                _mark_grid(progress, state, is_finished=False)
         for record in self.history(account_id):
             if record.grid_number is not None:
                 progress[str(record.grid_number)] = FINISHED
@@ -846,7 +846,9 @@ class AccountStore:
         return found
 
 
-def _mark_grid(progress: dict[str, str], state: RoomState, is_finished: bool) -> None:
+def _mark_grid(
+    progress: dict[str, str], state: RoomState, *, is_finished: bool
+) -> None:
     """Mark the room's grid in `progress`; `finished` is never lowered.
 
     A room with no grid number marks nothing.
