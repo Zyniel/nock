@@ -107,7 +107,10 @@ others, at the top of the list.
   3. When convenient, cost and structure: B-037 (lean snapshots), B-038
      (server structure).
   The rest went to "Small follow-ups". Each item's branch takes `main` once
-  this one is merged, so it has its brief.
+  this one is merged, so it has its brief. The human approved the order on
+  2026-10-29 (« Approve the order: B-029 to B-034 before the first public
+  test, then B-035 and B-036, then B-037 and B-038. Start with B-029. »); the
+  briefs B-030 to B-038 still wait for their own approval.
 
 ### B-029 The gate type-checks `scripts/`
 
@@ -1595,10 +1598,6 @@ none.
 - Hosting (Fly.io, Render or a VPS) and a domain, before the first public test.
   A cloud session drafts `docs/hosting.md` on the branch `docs/hosting-plan`.
 - Tag `v1.1.0` on `main` (never tagged).
-- The order of B-028's fixes against the approved B-002, B-004 and B-005: the
-  lead proposes B-029 to B-034 before the first public test (they close the
-  ways one client can hurt every room), then B-035 and B-036, then B-037 and
-  B-038 when convenient. B-029 is tooling and can go at once.
 - The branch `feat/b-016-creator-rooms` (8 commits, last on 2026-10-28, not
   merged, no item in this file) changes several spec files that B-031 to
   B-036 touch, while B-022 "Creator rooms and host return" is done: drop it,
