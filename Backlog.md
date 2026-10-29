@@ -706,7 +706,8 @@ an item that must be done first.
     are away longer than the hand-over delay, the role passes on as today.
   - A stand-in host cannot remove or mute the creator's player; a lock does
     not keep the creator's player out; a full room still does.
-  - If the creator's account is erased, the room becomes an anonymous room.
+  - If the creator's account is erased, the room is deleted (the human's
+    decision in review round 1, replacing "becomes an anonymous room").
   - Every duration or limit is written as its name with its default, never
     a bare number.
 - Out of scope: any mark of the creator in the roster, the snapshot or the
@@ -747,9 +748,10 @@ an item that must be done first.
     - The hand-over tick also gives the role back to a connected creator's
       player who lacks it, so "whenever connected" holds after a plain
       reconnection; the tick never gives the role to a disconnected player.
-    - Erasure clears the room's creator and the member's account, live and
-      stored, with no event; a stand-in keeps the role. Its criterion lives
-      in `host.md`.
+    - Erasure deletes the account's creator rooms, live and stored, as an
+      expired room's deletion does; in other rooms its recorded identities'
+      players become `--`, unlinked. Its criterion lives in `host.md`
+      (AC-15). (Review round 1; the first shape cleared the creator.)
     - Rooms where one account already holds several members get no
       backfill: the member whose token the device sends is stamped at the
       next signed-in join. A member linked to account A, joined with its
@@ -774,6 +776,18 @@ an item that must be done first.
     `joining.md` and `hud.md`; whichever merges second merges `origin/main`
     and resolves. B-023 waits for this item.
 - Open questions: none.
+- Review round 1 (2026-10-29): one blocking finding, `account.md` rule 18
+  promising that erasure unlinks the account's members in every room while
+  the code did it only in its creator rooms and through its identities. The
+  human: "Make things simpler. When deleting an account, remove all rooms
+  belonging to the host.", then "Go: erasure deletes the account's creator
+  rooms, as you laid it out, with your defaults." The defaults: "belonging
+  to the host" means the rooms the account created; their players' sockets
+  close with 4404 (the room-gone dialog of B-021); other players' finished
+  grids stay in their history; in other rooms the account's recorded
+  identities' players become `--`, unlinked, and rule 18 says only that.
+  B-023's "a room that changes kind (… its creator's account erased)" no
+  longer happens: its brief drops that case.
 
 ### B-021 Room gone dialog
 

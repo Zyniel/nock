@@ -9,8 +9,9 @@ status: approved
 ## Purpose
 
 A player who wants their rooms on every device signs in with a link sent by
-e-mail; nothing else needs an account. Deleting it erases the address at once
-and turns the player into « Ancien joueur » in every room.
+e-mail; nothing else needs an account. Deleting it erases the address at once,
+deletes the rooms it created and turns the player into « Ancien joueur » in the
+other rooms.
 
 ## Depends on
 
@@ -142,14 +143,14 @@ and turns the player into « Ancien joueur » in every room.
 ### Erasure and what is kept
 
 18. `DELETE /api/account` deletes in one transaction the account, its
-    sessions, identities, history and its address's links. Then, for every
-    identity it held whose room exists, live or stored, the nickname becomes
-    `--` in the live state, the stored snapshots and the logged
-    `player_joined`, with no event; ids, colours, seqs and letters stay. It
-    answers 204, clearing the cookie, and no copy of the address or of those
-    nicknames is left in the database files. The rooms it created lose their
-    creator and its members their account, live and stored, with no event
-    (`lobby/host.md` rule 14). The player stays, an anonymous player.
+    sessions, identities, history and its address's links, then deletes its
+    creator rooms, live and stored (`lobby/host.md` rule 14). Then, for every
+    identity it held whose room still exists, live or stored, its player stays
+    as an anonymous player named `--`: the member's account link is cleared and
+    the nickname becomes `--` in the live state, the stored snapshots and the
+    logged `player_joined`, with no event; ids, colours, seqs and letters stay.
+    Nothing else of a room changes. It answers 204, clearing the cookie, and no
+    copy of the address or of those nicknames is left in the database files.
 19. No join can take `--`, and a past `--` is seated back as `--` with no
     suffix (`lobby/joining.md` rules 1 and 13); pages show it as « Ancien
     joueur » (`player.former`).
@@ -166,12 +167,12 @@ and turns the player into « Ancien joueur » in every room.
 
 22. An account's record of a solved room is saved once, by the first of `GET
     /api/account/history` (for each room of its identities) and the delete
-    hook, which gets a room's latest state just before the sweep or a lookup
-    deletes it; a failing hook is logged and the deletion goes on. Only
-    identities whose token is a member's of that room count, so a room that
-    drew an old code saves nothing. A record: `code`, `grid_number`, `width`,
-    `height`, `finished_at`, `elapsed_ms` (`gameplay/results.md` rule 14) and
-    `teammates`, the other members in `team_nicknames` order, each once.
+    hook, which gets a room's latest state just before the sweep, a lookup or
+    an erasure (rule 18) deletes it; a failing hook is logged and the deletion
+    goes on. Only identities whose token is a member's of that room count, so a
+    room that drew an old code saves nothing. A record: `code`, `grid_number`,
+    `width`, `height`, `finished_at`, `elapsed_ms` (`gameplay/results.md` rule
+    14) and `teammates`, the other members in `team_nicknames` order, each once.
 23. `GET /api/account/history` lists the records, newest `finished_at` first,
     then by code. A deletion (rule 18) deletes the account's records and makes
     its players `--` among the others' team-mates, also in a record its own
@@ -301,6 +302,9 @@ and turns the player into « Ancien joueur » in every room.
 - A mail scanner uses nothing: the token is in the fragment (AC-12).
 - An erased player's open pages keep the old name until their next snapshot
   (AC-15).
+- A creator room is deleted whoever is host in it then; an anonymous room where
+  the account's player is host stays, that player `--` (`lobby/host.md`
+  AC-15).
 
 ## Out of scope
 
@@ -315,7 +319,8 @@ and turns the player into « Ancien joueur » in every room.
 - `src/nock/accounts.py`, `settings.py` (`account_settings_from_env`),
   `mailer.py`, `i18n.py`, `server.py` (routes, limits, purge).
 - `room.py` (`FORMER_PLAYER_NICKNAME`, `with_player_erased`, `member_id`),
-  `store.py` (`erase_player`), `hub.py` (`erase_player`, the delete hook).
+  `store.py` (`erase_player`), `hub.py` (`erase_player`, the creator rooms'
+  deletion, the delete hook).
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`.

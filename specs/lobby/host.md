@@ -11,7 +11,7 @@ status: approved
 The room's host removes players, locks the room, sets its help and mutes; the
 role passes on when the host stays away. A room created by a signed-in player has
 a creator, whose player is host whenever connected and whom no stand-in can keep
-out.
+out; the room goes with the creator's account.
 
 ## Depends on
 
@@ -115,10 +115,16 @@ out.
     1). A lock does not keep them out: a join from the creator's session skips
     the locked step, member or not; a full room refuses them like anyone
     (`lobby/joining.md` rule 4).
-14. The erasure of the creator's account (`account/account.md` rule 18) clears
-    the room's creator and that member's account, live and stored, with no event:
-    the room is an anonymous room, a stand-in keeps the role, and the erased
-    player, host or not, is from then on an ordinary player.
+14. The erasure of the creator's account (`account/account.md` rule 18) deletes
+    the room, live or stored, whoever is host then, as the deletion of an expired
+    room does (`lobby/joining.md` rule 16): its sockets close with 4404 and
+    nothing else, a page that had shown it shows the room-gone dialog
+    (`client/hud.md` rule 16), one that had not the entry card
+    (`client/shell.md` rule 7), and a later socket to its code counts as a wrong
+    code. The other players' finished grids stay in their history
+    (`gameplay/results.md` rule 15, `account/account.md` rule 22). Being host of
+    an anonymous room deletes nothing: the erased account's player there is `--`
+    (`account/account.md` rule 18), the room otherwise unchanged.
 15. While accounts are off a stored creator stays and the room plays as an
     anonymous room; `POST /api/rooms` sets no creator, whatever cookie it
     carries.
@@ -215,11 +221,14 @@ not-found pages ».
   Lea's, timed out, passes and ends in `host_changed`; from a new device, signed
   in with no token in a locked room she never joined, Lea is a new player and
   host; with 8 players she gets `room_full`.
-- **AC-15** Lea, creator, away with Bob stand-in host, deletes her account: no
-  event; Bob keeps the role; her token's resume makes her `--`, an ordinary
-  player whose `lock_room` gets `not_host` and whom no tick makes host; the
-  stored room names no creator, after a restart too. Erased while host, she
-  stays host until a hand-over, and is no host on her return.
+- **AC-15** Lea, creator of R, where Bob, signed in, is connected stand-in host,
+  and a player of Bob's creator room S, her identity recorded in both, deletes
+  her account: Bob's R socket closes with 4404 and nothing else; R has no live
+  state and no store rows, after a restart too, and a new socket to its code
+  counts as a wrong code; R solved beforehand, Bob's history keeps its record,
+  naming her `--`; in S her player is `--`, linked to no account, with no
+  event, and S keeps its creator, players and host; an anonymous room where
+  Lea was host keeps its players and its host, her player `--`.
 - **AC-16** R, Lea's creator room, loaded by an app with accounts off: Bob, host
   after a hand-over, keeps the role when Lea resumes, and her `remove_player`
   gets `not_host`; the store still names her creator; an app with accounts on
@@ -240,6 +249,8 @@ not-found pages ».
   (AC-10).
 - The creator's player removed by a stand-in is impossible (AC-13); one who
   leaves and comes back is host again (AC-12).
+- The erasure deletes a creator room whether its creator's player is host,
+  away, timed out or never joined; the room is gone before the 204 (AC-15).
 
 ## Out of scope
 
@@ -255,9 +266,9 @@ not-found pages ».
 
 - `src/nock/room.py`: host actions, the hand-over and the creator's return in
   `tick`, the join's member and its account; `RoomConfig` holds the hand-over
-  delay. `src/nock/hub.py`: `register_room`, erasure. `src/nock/store.py`: the
-  creator column. `src/nock/server.py`: the cookie of `POST /api/rooms` and of
-  the room socket.
+  delay. `src/nock/hub.py`: `register_room`, the creator rooms' deletion at an
+  erasure. `src/nock/store.py`: the creator column. `src/nock/server.py`: the
+  cookie of `POST /api/rooms` and of the room socket.
 - `web/src/lib/PlayersPanel.svelte`, `HostSettings.svelte`: host controls;
   `RoomPage.svelte`, `roomSession.ts`: final statuses.
 - Tests: `tests/test_spec_014_*`, `tests/test_host_*`.
