@@ -1281,9 +1281,9 @@ Before the human tags a release on `main`:
 
 ### B-027 The order of the overrides holder
 
-- Status: ready (the human approved the brief and picked A, 2026-10-29;
+- Status: building (the human approved the brief and picked A, 2026-10-29;
   no spec change)
-- Waits for: B-024 (#64), which brings the code this item touches.
+- Waits for: nothing left (B-024 is merged and on this branch).
 - Domains: none (no behaviour change: `src/nock/server.py` only)
 - Architecture decision: no (private names of `server.py`)
 - Criteria: none new; the tests of `admin/overrides.md` prove nothing changed
