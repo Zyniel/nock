@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import CatalogueFrame from './CatalogueFrame.svelte'
   import OpsReplay from './OpsReplay.svelte'
+  import OpsSettings from './OpsSettings.svelte'
   import { t, type MessageKey } from './i18n'
   import {
     fetchDashboard,
@@ -20,7 +21,7 @@
   // sessionStorage only, and every ops API request sends it in its
   // Authorization header. Spec 048 draws it in the catalogue frame on the page
   // grey: the token form as a card, one line per waiting or failed state, then
-  // the dashboard and the replay as two cards.
+  // the dashboard, the room lives (admin/overrides) and the replay as three cards.
 
   type PageState = 'locked' | 'loading' | 'ready' | 'error'
 
@@ -75,9 +76,11 @@
     showDashboardAnswer(answer)
   }
 
-  // A press of a period button. The page stays `ready` while the request is
-  // pending, so the dashboard, the replay and the focus on the button stay.
-  async function changePeriod(days: Period): Promise<void> {
+  // A press of a period button, or (with null, no period) the dashboard asked
+  // again after a save of the settings card. The page stays `ready` while the
+  // request is pending, so the dashboard, the replay and the focus on the button
+  // stay.
+  async function changePeriod(days: Period | null): Promise<void> {
     if (token === null) {
       return
     }
@@ -178,6 +181,7 @@
           {/each}
         </ul>
       </section>
+      <OpsSettings {token} onLocked={lock} onSaved={() => void changePeriod(null)} />
       <OpsReplay {token} onLocked={lock} />
     {/if}
   </CatalogueFrame>
