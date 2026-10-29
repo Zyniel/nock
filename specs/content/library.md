@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -9,16 +9,16 @@ status: done
 ## Purpose
 
 A player browses the published grids on « Grilles », filters them by force,
-sees which ones this device started or finished, and opens one grid by its own
-link `/g/<number>`. The grid APIs feed both pages and never send a clue or an
-answer.
+sees which ones this device or their account started or finished, and opens
+one grid by its own link `/g/<number>`. The grid APIs feed both pages and
+never send a clue or an answer.
 
 ## Depends on
 
 - `content/grid-files.md`: the index, the number, published and withdrawn.
 - `lobby/rooms.md`: « Jouer » on each card, its failure's cause, and the writing
   of `nock.progress`.
-- `client/shell.md`: client routing, texts, the page not found.
+- `account/account.md`: the sign-in status and the account's progress.
 
 ## Rules
 
@@ -45,20 +45,28 @@ answer.
    `{"detail": "Not Found"}`, never `index.html`, built or not. A trailing slash
    (`/api/grids/`, `/g/2/`) is 404 with no redirect.
 
-### Progress on this device
+### Progress on this device or account
 
-7. A card's progress is read from `localStorage` `nock.progress`, a JSON object
-   from grid numbers in decimal to `"started"` or `"finished"`
-   (`lobby/rooms.md` writes it). Each value is read on its own: any other value,
-   a missing key, text that is not JSON or JSON that is not an object means no
-   progress. Progress never comes from the server.
+7. A card's progress is `finished` if either source says so, else `started` if
+   either does, else none. The sources, read the same way: `localStorage`
+   `nock.progress` (`lobby/rooms.md` writes it) and the body of `GET
+   /api/account/progress` (`account/account.md` rule 24), never stored on the
+   device; each a JSON object from grid numbers in decimal to `"started"` or
+   `"finished"`. Each value is read on its own: any other value, a missing key,
+   text that is not JSON or JSON that is not an object means no progress from
+   that source. A request that fails or answers another status than 2xx (401
+   signed out, 404 accounts off) means none from the account. The pills show
+   the device's progress at once and the merged one when the answer comes;
+   neither page's state waits for it.
 
 ### The catalogue page `/`
 
 8. The page asks `GET /api/grids` once. It is loading until the answer, then
    ready, or in error when the request fails, answers another status than 2xx,
    or answers anything but a list of summaries. The heading « Grilles »
-   (`catalogue.heading`) shows in every state.
+   (`catalogue.heading`) shows in every state. Once `GET /api/account` has
+   answered signed in (`account/account.md` rule 13), it asks `GET
+   /api/account/progress` once; signed out, never.
 9. Its column holds, in order: the heading, « Mes salons » when it shows
    (`lobby/joining.md`), the force filter, then one state line or the cards,
    then « Grilles terminées » when it shows (`gameplay/results.md`). By state:
@@ -106,7 +114,8 @@ answer.
 
 ### The grid page `/g/<n>`
 
-16. The page asks `GET /api/grids/<n>` and nothing else of the grids. It shows,
+16. The page asks `GET /api/grids/<n>` and, once, `GET /api/account/progress`
+    (rule 7), nothing else of the grids or of the account. It shows,
     under a top bar holding the brand only (no « Compte », accounts on or off)
     and with no heading, filter, « Mes salons » or « Grilles terminées »: the
     muted line `catalogue.loading` while loading, then the grid's one card as
@@ -128,6 +137,12 @@ answer.
   error line, brand link, plain on the catalogue).
 - The state lines: `_design/pages.md`, « States: opening, loading, empty,
   error ».
+
+## New interface
+
+- `web/src/lib/catalogue.ts`: `fetchAccountProgress(): Promise<Record<string,
+  unknown> | null>` (null on any failure) and `progressOf(number,
+  accountProgress)`, the merge of rule 7.
 
 ## Acceptance criteria
 
@@ -217,13 +232,29 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-21** On `/g/2` the brand is the link « Accueil » to `/` with no
   `aria-current`; following it loads the catalogue, which asks
   `GET /api/grids`.
+- **AC-22** Ana signed in, `nock.progress` `{"1": "started", "3": "finished"}`
+  and `GET /api/account/progress` answering `{"1": "finished", "2": "started",
+  "3": "started"}`: `/` shows card 1 « Terminée », card 2 « Commencée » and
+  card 3 « Terminée »; while the answer is pending the page is already ready
+  with « Commencée », no pill and « Terminée »; `nock.progress` is unchanged
+  afterwards.
+- **AC-23** With AC-22's storage and answer, `/g/2` asks
+  `GET /api/account/progress` and not `GET /api/account`, shows « Commencée »
+  on its card and no « Compte »; `/g/1` shows « Terminée ».
+- **AC-24** With AC-22's storage, when `GET /api/account/progress` answers
+  401, 404, 500, `[1]` or `{"1": "done", "3": "started"}`, or the request
+  fails, `/` (signed in) and `/g/1` show « Commencée » on card 1, « Terminée »
+  on card 3 and are ready; signed out, `/` never asks the route.
 
 ## Edge cases
 
 - Two grids of the same date: the higher number comes first (AC-2).
 - A published grid dated in the future is listed (AC-2).
 - A grid number of nine digits is valid; ten digits is 404 (AC-4).
-- A progress key for a grid not listed (`99`) is ignored (AC-7).
+- A progress key for a grid not listed (`99`) is ignored, from either source
+  (AC-7).
+- The account's `finished` beats the device's `started`, and the reverse
+  (AC-22).
 - A catalogue of one grid on a computer still has two columns, so its card
   has its drawing (AC-15).
 - « Jouer » failing on one card leaves the others untouched (AC-16).
@@ -236,7 +267,8 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - Reloading the grid list while the server runs: `content/grid-files.md`.
 - « Jouer », the room it creates and the writing of `nock.progress`:
   `lobby/rooms.md`. « Mes salons »: `lobby/joining.md`. « Grilles terminées »:
-  `gameplay/results.md`. « Compte » and its dialog: `account/account.md`.
+  `gameplay/results.md`. « Compte », its dialog and how the account's progress
+  is derived: `account/account.md`.
 - The frame of entry pages, the page not found, the scans of every page and
   their fit at every window: `client/shell.md`.
 
@@ -248,8 +280,10 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   `FORCE_PATTERN`.
 - `web/src/App.svelte`: the `/g/<n>` route. `web/src/lib/CataloguePage.svelte`,
   `GridPage.svelte`, `CatalogueFrame.svelte`, `CatalogueList.svelte`,
-  `CatalogueItem.svelte`; `catalogue.ts` (progress, date); `gridThumb.ts`.
-- Tests: `tests/test_spec_004_ac01_ac03_*`, `test_spec_004_ac04_*`,
+  `CatalogueItem.svelte`; `catalogue.ts` (progress, its merge with the
+  account's, date); `gridThumb.ts`.
+- Tests: `tests/test_library_*` (the account's progress);
+  `tests/test_spec_004_ac01_ac03_*`, `test_spec_004_ac04_*`,
   `test_spec_004_ac06_*`, the force tests of `test_spec_004_ac07_*`;
   `tests/test_spec_046_ac01_ac02_*` (AC-2), `test_spec_046_ac04_ac06_*`,
   `test_spec_046_ac07_ac08_*`, `test_spec_046_ac09_ac10_*`,

@@ -1,17 +1,17 @@
 ---
 area: account
 file: account
-status: done
+status: approved
 ---
 
 # account/account - Optional account
 
 ## Purpose
 
-A player who wants their rooms on every device signs in with a link sent by
-e-mail; nothing else needs an account. Deleting it erases the address at once,
-deletes the rooms it created and turns the player into « Ancien joueur » in the
-other rooms.
+A player who wants their rooms, and the progress of their grids, on every
+device signs in with a link sent by e-mail; nothing else needs an account.
+Deleting it erases the address at once, deletes the rooms it created and turns
+the player into « Ancien joueur » in the other rooms.
 
 ## Depends on
 
@@ -83,9 +83,9 @@ other rooms.
     `{"signed_in": false, "email": null}`. `POST /api/account/sign-out`
     answers 204, ends the session if any and clears the cookie. Without a
     valid session, `GET` and `PUT /api/account/rooms`, `GET
-    /api/account/history` and `DELETE /api/account` answer 401 `{"detail":
-    "Not authorized"}`, before the body's fields are checked (a body that is
-    not JSON is 422).
+    /api/account/history`, `GET /api/account/progress` and `DELETE
+    /api/account` answer 401 `{"detail": "Not authorized"}`, before the body's
+    fields are checked (a body that is not JSON is 422).
 
 ### The rooms of an account
 
@@ -179,6 +179,18 @@ other rooms.
     its players `--` among the others' team-mates, also in a record its own
     erasure's lookup just saved.
 
+### Grid progress
+
+24. `GET /api/account/progress` answers the account's progress as
+    `nock.progress` holds the device's (`content/library.md` rule 7): an object
+    from grid numbers in decimal to `"finished"`, for each history record and
+    each solved room of an identity rule 12 lists, or `"started"`, for each
+    unsolved one and each creator room (`lobby/host.md` rule 11) that still
+    exists; `finished` wins. A room or record with no grid number gives
+    nothing; `{}` when nothing does. Derived at each request, nothing stored:
+    it saves no record, and « Grilles terminées » lists every grid it marks
+    `finished`, since rule 22 saves each solved room that counts here.
+
 ### Look
 
 - The sheet: `_design/room.md` « Room sheets: host settings and account ».
@@ -186,6 +198,13 @@ other rooms.
 - The account page and its deletion: `_design/pages.md` « Plain pages:
   account, shared recap, operator ».
 - Its lines: `_design/pages.md` « States: opening, loading, empty, error ».
+
+## New interface
+
+- `GET /api/account/progress` (`src/nock/server.py`, beside the history
+  route); `AccountStore.progress(account_id: str, peek_room: Callable[[str],
+  RoomState | None], created_codes: list[str]) -> dict[str, str]` in
+  `src/nock/accounts.py`.
 
 ## Acceptance criteria
 
@@ -297,6 +316,18 @@ other rooms.
   confirm sends one `DELETE /api/account`. Signed in, no sideways scroll at
   320 by 568, a long address included; with the deletion asked, nothing on
   the page is red. (← 048 AC-3, 048 AC-4, 033 AC-5)
+- **AC-19** Ana, signed in, is a member of R (grid 1, solved), S (grid 2,
+  unsolved) and S2 (grid 3, unsolved), holds a record of a swept room of grid
+  3, and created U (grid 4) without joining it: `GET /api/account/progress`
+  answers exactly `{"1": "finished", "2": "started", "3": "finished", "4":
+  "started"}` with `Cache-Control: no-store`, and `GET /api/account/history`
+  asked next lists grids 1 and 3. An account with no room gets `{}`.
+- **AC-20** Once S expires the answer loses `"2"`, also when a new room with
+  S's code plays grid 2 with Bob and Cy; a solved room with no grid number
+  gives nothing; R expired unswept still gives `"1": "finished"`.
+- **AC-21** Without a cookie `GET /api/account/progress` answers 401
+  `{"detail": "Not authorized"}`; accounts off, 404 `{"detail": "Not
+  Found"}`.
 
 ## Edge cases
 
@@ -306,12 +337,16 @@ other rooms.
 - A creator room is deleted whoever is host in it then; an anonymous room where
   the account's player is host stays, that player `--` (`lobby/host.md`
   AC-15).
+- A solved creator room the account never joined is `started`, as its history
+  never lists it (AC-19).
 
 ## Out of scope
 
 - Passwords, social sign-in, changing or adding an address, merging
   accounts, other e-mails; erasing chat lines or backups; an IPv6 public URL.
-- Grid progress on an account: approved, not built (`Backlog.md` B-005).
+- Pushing a device's progress up to the account; a guest's progress across
+  devices. How the pages merge the account's progress with the device's:
+  `content/library.md`.
 - Catch-up, kept per device: `social/catch-up.md`.
 - Logs and retention: `admin/operations.md`.
 
@@ -324,4 +359,5 @@ other rooms.
   deletion, the delete hook).
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
-- Tests: those of the pointers, in `tests/test_spec_NNN_*`.
+- Tests: those of the pointers, in `tests/test_spec_NNN_*`;
+  `tests/test_account_*` (the progress route).
