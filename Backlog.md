@@ -1003,9 +1003,10 @@ others, at the top of the list.
 
 ### B-024 /ops overrides of the room lives
 
-- Status: building (the human approved the brief as written, with the lead's
+- Status: done (the human approved the brief as written, with the lead's
   calls, and picked A for the INFO log, then the spec change as written with
-  the lead's calls, 2026-10-29)
+  the lead's calls, 2026-10-29; the dry run's count and AC-16's wording fixed
+  on the human's word; built and reviewed in two rounds, 2026-10-29)
 - Waits for: nothing left (B-023 is merged and on this branch).
 - Domains: admin/overrides (new), admin/operations (its token and throttle
   rules cover the new routes; the periods read the effective lives),

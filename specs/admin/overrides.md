@@ -1,7 +1,7 @@
 ---
 area: admin
 file: overrides
-status: approved
+status: done
 ---
 
 # admin/overrides - The `/ops` overrides of the room lives
@@ -120,28 +120,6 @@ shorter life would delete before saving it.
 
 - The card, its rows, the source tag, the question and the phone layout:
   `_design/pages.md`, « Plain pages: account, shared recap, operator ».
-
-## New interface
-
-- `src/nock/overrides.py`: the five settings, the effective values, the dry
-  run; its logger `nock.overrides`. `src/nock/store.py`: the table `overrides`.
-- `web/src/lib/OpsSettings.svelte`; the keys of `web/src/i18n/fr.json`:
-  `ops.settings_heading` « Durées de vie des salons »;
-  `ops.setting.creator_solved_room_hours` « Salon d'un compte, résolu »,
-  `ops.setting.creator_room_hours` « Salon d'un compte, en cours »,
-  `ops.setting.anonymous_solved_room_hours` « Salon anonyme, résolu »,
-  `ops.setting.anonymous_room_hours` « Salon anonyme, en cours »,
-  `ops.setting.expiry_sweep_minutes` « Intervalle de nettoyage »;
-  `ops.hours_value` « {value} h », `ops.minutes_value` « {value} min »;
-  `ops.source.default` « par défaut », `ops.source.environment` « variable »,
-  `ops.source.override` « modifiée »; `ops.setting_save` « Enregistrer »,
-  `ops.setting_reset` « Rétablir »; `ops.setting_out_of_bounds` « Valeur hors
-  limites ({min} à {max} {unit}). » with `h` or `min`;
-  `ops.setting_confirm_one` « Cela effacera {count} salon maintenant. »,
-  `ops.setting_confirm_many` « Cela effacera {count} salons maintenant. »,
-  `ops.setting_confirm` « Confirmer », `ops.setting_cancel` « Annuler »;
-  `ops.settings_in_memory` « Sans base de données, ces réglages sont perdus au
-  redémarrage. »
 
 ## Acceptance criteria
 
