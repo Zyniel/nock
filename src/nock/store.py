@@ -28,7 +28,6 @@ from nock.room import (
     entry_with_player_erased,
     is_edit,
     replay,
-    with_account_erased,
     with_player_erased,
 )
 
@@ -246,37 +245,6 @@ class RoomStore:
             codes.append(str(code))
         return codes
 
-    def erase_account(self, code: str, account_id: str) -> None:
-        """Take a deleted account out of a room: its creator and its members.
-
-        The room's creator is cleared when it is the account, and so is the
-        account of each member linked to it in every stored snapshot, in one
-        transaction (`lobby/host.md` rule 14). Nothing is logged: the log holds
-        no account. In a file database the write-ahead log is then checkpointed
-        and emptied, as in `delete_room`.
-
-        Args:
-            code: The room. An unknown room changes nothing.
-            account_id: The account that was deleted.
-        """
-        with self._lock:
-            if not self._room_exists(code):
-                return
-            self._connection.execute("BEGIN IMMEDIATE")
-            try:
-                self._connection.execute(
-                    "UPDATE room_times SET creator_account_id = NULL "
-                    "WHERE code = ? AND creator_account_id = ?",
-                    (code, account_id),
-                )
-                self._erase_account_in_snapshots(code, account_id)
-            except BaseException:
-                self._connection.execute("ROLLBACK")
-                raise
-            self._connection.execute("COMMIT")
-            if self._is_file:
-                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
-
     def delete_room(self, code: str) -> bool:
         """Delete the room, its snapshots, its log and its share token, at once.
 
@@ -492,19 +460,6 @@ class RoomStore:
                 (_snapshot_json(erased), code, seq),
             )
 
-    def _erase_account_in_snapshots(self, code: str, account_id: str) -> None:
-        """Rewrite each snapshot of the room without the account. Caller locks."""
-        rows = self._connection.execute(
-            "SELECT seq, state_json FROM snapshots WHERE code = ?", (code,)
-        ).fetchall()
-        for seq, state_json in rows:
-            state = RoomState.model_validate_json(state_json)
-            erased = with_account_erased(state, account_id)
-            self._connection.execute(
-                "UPDATE snapshots SET state_json = ? WHERE code = ? AND seq = ?",
-                (_snapshot_json(erased), code, seq),
-            )
-
     def _erase_in_log(self, code: str, player_id: str) -> None:
         """Rewrite each logged `player_joined` of the player. Caller locks."""
         rows = self._connection.execute(
@@ -527,9 +482,20 @@ class RoomStore:
         column: the column is added once and the version set to 1. The rooms it
         holds have no creator, and their other data stays.
         """
-        version_row = self._connection.execute("PRAGMA user_version").fetchone()
-        if int(version_row[0]) >= _CREATOR_COLUMN_VERSION:
-            return
+        # One transaction, so that two processes opening the same old file at
+        # once do not both run the ALTER: the second waits, then sees version 1.
+        self._connection.execute("BEGIN IMMEDIATE")
+        try:
+            version_row = self._connection.execute("PRAGMA user_version").fetchone()
+            if int(version_row[0]) < _CREATOR_COLUMN_VERSION:
+                self._add_creator_column_once()
+        except BaseException:
+            self._connection.execute("ROLLBACK")
+            raise
+        self._connection.execute("COMMIT")
+
+    def _add_creator_column_once(self) -> None:
+        """Add the column if the table lacks it, then set the version to 1."""
         column_rows = self._connection.execute(
             "PRAGMA table_info(room_times)"
         ).fetchall()

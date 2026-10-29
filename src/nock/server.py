@@ -913,14 +913,6 @@ def create_app(
             raise _not_found()
         return store
 
-    def signed_in_account(request: Request) -> Account | None:
-        """Return the account of the request's session cookie, or None."""
-        store = account_store_in_use()
-        session = request.cookies.get(SESSION_COOKIE)
-        if session is None:
-            return None
-        return store.account_of_session(session, holder.get().clock())
-
     def account_of_cookies(cookies: Mapping[str, str]) -> Account | None:
         """Return the account of a session cookie, None while accounts are off."""
         store = account_service.store
@@ -928,6 +920,11 @@ def create_app(
         if store is None or session is None:
             return None
         return store.account_of_session(session, holder.get().clock())
+
+    def signed_in_account(request: Request) -> Account | None:
+        """Return the account of the request's session cookie, or None."""
+        account_store_in_use()
+        return account_of_cookies(request.cookies)
 
     def require_account(request: Request) -> Account:
         """Return the account of the session, or refuse the request (spec 033).
@@ -1256,7 +1253,7 @@ def create_app(
         deleted_identities = store.delete_account(account.account_id)
         for identity in deleted_identities:
             room_registry.erase_player(identity.code, identity.player_id)
-        room_registry.erase_account(account.account_id)
+        room_registry.delete_creator_rooms(account.account_id)
         # Erasing a player deletes an expired room, whose delete hook may have
         # saved a record with the nickname: erase it from the records once more.
         store.erase_players_from_history(deleted_identities)

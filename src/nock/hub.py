@@ -62,7 +62,6 @@ from nock.room import (
     new_room,
     room_summary,
     tick,
-    with_account_erased,
     with_last_seen,
     with_player_erased,
 )
@@ -482,18 +481,6 @@ class _RoomRunner:
         self.state = with_player_erased(self.state, player_id)
         self._store.erase_player(self.state.code, player_id)
 
-    def erase_account(self, account_id: str) -> None:
-        """Take a deleted account out of the room, between two of its steps.
-
-        Called on the engine's loop, so no step runs meanwhile. The live state
-        changes first, then the store: the room has no creator and its members
-        no account. No event is logged or sent. A deleted room changes nothing.
-        """
-        if self._is_deleted:
-            return
-        self.state = with_account_erased(self.state, account_id)
-        self._store.erase_account(self.state.code, account_id)
-
     def _close_open_connections(self) -> None:
         """Close each connection opened to the room with ROOM_NOT_FOUND_CLOSE_CODE."""
         for connection in self._open_connections:
@@ -503,7 +490,9 @@ class _RoomRunner:
     def save_snapshot(self, *, force: bool = False) -> None:
         """Save a snapshot of the room unless the store has one at this seq.
 
-        A failure is logged: the log alone is enough to rebuild the room. A
+        A failure is logged, and the room goes on: the log rebuilds the room's
+        events, but a link between a member and an account is only in the
+        snapshot, so a failed forced save loses it at the next restart. A
         deleted room saves nothing.
 
         Args:
@@ -1081,38 +1070,19 @@ class RoomRegistry:
         erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
         return True
 
-    def erase_account(self, account_id: str) -> None:
-        """Take a deleted account out of every room it created (spec 033).
+    def delete_creator_rooms(self, account_id: str) -> None:
+        """Delete every room that an erased account created (spec 033).
 
-        Each such room loses its creator and its members their account, live
-        state included (`lobby/host.md` rule 14). For a live room, the room's
-        task does it between two steps, then the store; for a room only in the
-        store, the store. No event is logged or sent. Returns once it is done.
+        Each deletion is that of an expired room (spec 032): the delete hook
+        first, then the room's sockets closed with ROOM_NOT_FOUND_CLOSE_CODE and
+        its rows removed, live or stored (`lobby/host.md` rule 14). Returns once
+        they are all deleted.
 
         Args:
             account_id: The account that was deleted.
         """
         for code in self._store.codes_created_by(account_id):
-            self._erase_account_in_room(code, account_id)
-
-    def _erase_account_in_room(self, code: str, account_id: str) -> None:
-        """Take the account out of room `code`, as `erase_account` says."""
-        with self._lock:
-            runner = self._runners.get(code)
-            loop = self._loop
-            if runner is None or loop is None or self._closed:
-                # No task runs the room, and none can start while the lock is
-                # held: the state can change here.
-                if runner is not None:
-                    runner.state = with_account_erased(runner.state, account_id)
-                self._store.erase_account(code, account_id)
-                return
-
-        async def erase_between_steps() -> None:
-            runner.erase_account(account_id)
-
-        erasing = asyncio.run_coroutine_threadsafe(erase_between_steps(), loop)
-        erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
+            self._delete_room(code)
 
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.

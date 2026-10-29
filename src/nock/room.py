@@ -505,45 +505,6 @@ def with_player_erased(state: RoomState, player_id: str) -> RoomState:
     )
 
 
-def with_account_erased(state: RoomState, account_id: str) -> RoomState:
-    """Return the room without the erased account: no creator, no linked member.
-
-    The room's creator is cleared when it is that account, and so is the account
-    of each member linked to it, player or past player (`lobby/host.md` rule 14).
-    Nicknames stay as they are.
-
-    Args:
-        state: The room.
-        account_id: The account that was deleted.
-
-    Returns:
-        The new state; the same content when the account has no part in the room.
-    """
-    unlinked = {"account_id": None}
-    players: list[PlayerRecord] = []
-    for player in state.players:
-        if player.account_id == account_id:
-            players.append(player.model_copy(update=unlinked))
-        else:
-            players.append(player)
-    past_players: list[PastPlayer] = []
-    for past_player in state.past_players:
-        if past_player.account_id == account_id:
-            past_players.append(past_player.model_copy(update=unlinked))
-        else:
-            past_players.append(past_player)
-    creator = state.creator_account_id
-    if creator == account_id:
-        creator = None
-    return state.model_copy(
-        update={
-            "players": tuple(players),
-            "past_players": tuple(past_players),
-            "creator_account_id": creator,
-        }
-    )
-
-
 def entry_with_player_erased(entry: LogEntry, player_id: str) -> LogEntry | None:
     """Return a logged `player_joined` of the player with FORMER_PLAYER_NICKNAME.
 
