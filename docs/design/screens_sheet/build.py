@@ -1632,6 +1632,56 @@ REPLAY_STEPS = [
 ]
 
 
+SETTING_ROWS = [
+    ("Salon d'un compte, résolu", "720 h", "par défaut"),
+    ("Salon d'un compte, en cours", "48 h", "variable"),
+    ("Salon anonyme, résolu", "720 h", "par défaut"),
+    ("Salon anonyme, en cours", "96 h", "modifiée"),
+    ("Intervalle de nettoyage", "60 min", "par défaut"),
+]
+
+
+def settings_card(phone: bool) -> str:
+    """Return the card « Durées de vie des salons » (admin/overrides.md).
+
+    The phone shows the in-memory line; the computer shows the question open on
+    the second row, whose « Enregistrer » is pressed.
+    """
+    rows = ""
+    for index, (name, value, source) in enumerate(SETTING_ROWS):
+        asked = not phone and index == 1
+        typed = "24" if asked else ""
+        save = "quiet" if asked else "primary"
+        reset = "quiet" if source == "modifiée" else "off"
+        rows += (
+            f'<li class="setrow"><div class="grow"><span class="t">{esc(name)}</span>'
+            f'<span class="v">{value}<span class="tag">{source}</span></span></div>'
+            f'<div class="act"><span class="input num">{typed}</span>'
+            f'<span class="btn {save}">Enregistrer</span>'
+            f'<span class="btn {reset}">Rétablir</span></div></li>'
+        )
+    memory_line = (
+        '<p class="muted">Sans base de données, ces réglages sont perdus au '
+        "redémarrage.</p>"
+        if phone
+        else ""
+    )
+    question = (
+        ""
+        if phone
+        else (
+            '<p style="border-top:1px solid var(--nock-line);padding-top:12px;'
+            'width:100%">Cela effacera 2 salons maintenant.</p>'
+            '<div class="row2"><span class="btn primary">Confirmer</span>'
+            '<span class="btn secondary">Annuler</span></div>'
+        )
+    )
+    return (
+        '<div class="card"><h1>Durées de vie des salons</h1>'
+        f'{memory_line}<ul class="setrows">{rows}</ul>{question}</div>'
+    )
+
+
 def ops_body(phone: bool) -> str:
     """Return the operator page's content."""
     seg = (
@@ -1696,7 +1746,7 @@ def ops_body(phone: bool) -> str:
     return (
         '<h1 class="cat-h">Exploitation</h1>'
         f'<div class="card"><h1>Tableau de bord</h1><div class="field">Période{seg}</d'
-        f"iv>{m}</div>{rep}"
+        f"iv>{m}</div>{settings_card(phone)}{rep}"
     )
 
 
@@ -1722,8 +1772,8 @@ def sec_ops() -> str:
     )
     out = screen(
         "s-ops",
-        "Operator dashboard and room replay",
-        [L_PLAIN, "spec 038"],
+        "Operator dashboard, room lives and room replay",
+        [L_PLAIN, "spec 038", "admin/overrides"],
         [
             (
                 "<code>/ops</code>, for the operator only, with the operator "
@@ -1741,6 +1791,17 @@ def sec_ops() -> str:
                 "to the grid at the chosen step and a step slider. The current "
                 "step is in word blue, later steps muted. The grid reuses "
                 "the playing grid's cells, without clue text."
+            ),
+            (
+                "« Durées de vie des salons »: one list row per setting, its "
+                "effective value and its source as a tag (« par défaut », "
+                "« variable », « modifiée »), a number input, « Enregistrer » "
+                "and « Rétablir » (disabled without an override). Without a "
+                "database file, the muted line under the title (phone). Saving "
+                "a shorter life asks under a divider, as the account page "
+                "does: the dry run's count, « Confirmer », « Annuler », the "
+                "row's « Enregistrer » pressed meanwhile (computer). On a "
+                "phone each row stacks."
             ),
         ],
         [

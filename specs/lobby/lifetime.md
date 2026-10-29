@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: done
+status: approved
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
@@ -39,8 +39,11 @@ deletes it with all its data.
    solved or not. While accounts are off every room is anonymous, a stored
    creator included (`lobby/host.md` rule 15).
 4. A room life is how long a room lasts after its starting point: a whole number
-   of hours, 24 to 8760, one per kind, each a server variable with a `RoomConfig`
-   field (`src/nock/room.py`), default 720:
+   of hours, 24 to 8760, one per kind, default 720. Each has a server variable,
+   which gives its environment value, and a `RoomConfig` field
+   (`src/nock/room.py`), which holds its effective value: an override saved
+   from `/ops`, else the variable's value, else the default
+   (`admin/overrides.md` rules 1, 2). The rules below read the effective value:
    - `NOCK_CREATOR_SOLVED_ROOM_HOURS` (`creator_solved_room_hours`): a solved
      creator room, from its solve time;
    - `NOCK_CREATOR_ROOM_HOURS` (`creator_room_hours`): an unsolved creator room,
@@ -53,14 +56,17 @@ deletes it with all its data.
    The shortest room life is the least of the four.
 5. A room is expired once more than its room life has passed since its starting
    point; at exactly its room life it is open. One function decides it, the same
-   for the sweep and the lookups. A room that changes kind (solved; accounts
+   for the sweep, the lookups and the dry run of `admin/overrides.md` rule 5. A
+   room that changes kind (solved; accounts
    turned off, or back on) takes the matching life from the same starting point
    from then on: one already past it goes at the next sweep or lookup.
 
 ### The sweep
 
-6. A sweep at the app's start, then every `NOCK_EXPIRY_SWEEP_MINUTES`
-   (`RoomConfig.expiry_sweep_seconds`, in seconds), deletes the expired rooms;
+6. A sweep at the app's start, then every sweep interval (the effective value
+   of `NOCK_EXPIRY_SWEEP_MINUTES`, held by `RoomConfig.expiry_sweep_seconds` in
+   seconds; a new value applies after the current wait, `admin/overrides.md`
+   rule 9), deletes the expired rooms;
    any lookup that meets one (a socket, a summary) deletes it first. Deletion
    removes the room, its log, its snapshots and its share token, closes every
    socket opened to it, joined or not, with 4404 and nothing else, and writes no
@@ -74,14 +80,16 @@ deletes it with all its data.
 ### The variables
 
 7. `NOCK_EXPIRY_SWEEP_MINUTES` is a whole number of minutes, 1 to 1440, default
-   60. Each of the five variables, unset or empty, takes its default; set, it is
+   60. The five variables give the environment values. Each, unset or empty,
+   takes its default; set, it is
    ASCII digits only, any number of leading zeros, its value within its bounds.
    `main()` checks them after `NOCK_DATABASE` and before the account variables
    (`platform/server.md` rule 15); a refused value stops it with one line naming
    the variable and showing the value as `repr()` writes it (`platform/server.md`
    rule 19), and `python -m nock` exits with 1 without serving. An app given no
    registry reads them when it starts and fails its start with `SettingsError`
-   on a refused value; one given a registry uses its config and reads none.
+   on a refused value; one given a registry reads none, and its config gives
+   the environment values.
 
 ### Stored times and migration
 
@@ -167,9 +175,10 @@ deletes it with all its data.
 ## Out of scope
 
 - A warning before expiry, extending or restoring a room, a log of how many
-  rooms a sweep deletes; changing the lives from `/ops`; the other durations
-  (resume window, idle state, votes, sign-in links), each a constant of its
-  domain.
+  rooms a sweep deletes; the other durations (resume window, idle state, votes,
+  sign-in links), each a constant of its domain.
+- Overriding the lives and the sweep interval from `/ops`, the override's
+  storage and the dry run: `admin/overrides.md`.
 - The deletion of a creator room at its creator's erasure: `lobby/host.md` rule
   14. What a deletion erases for privacy: `admin/operations.md`. Summaries and
   « Mes salons »: `lobby/joining.md`. The `/ops` periods a life allows:
