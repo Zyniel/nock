@@ -216,17 +216,20 @@ that the "no byte stays" promise is checked rather than assumed.
 
 ### Low
 
-#### L1. Resume tokens are stored in clear in the account tables
+#### L1. The accounts docstring overstates what a database copy protects
 
 The module docstring of `accounts.py` (`accounts.py:11`) says a copy of the
 database "cannot sign anybody in". That holds for link and session tokens, which
 are hashed, but `account_identities.resume_token` and
 `account_links.room_resume_token` (`accounts.py:75`, `accounts.py:82`) are
 stored as given, and a resume token is a full credential for its player in its
-room. (The rooms' own snapshots hold them too, which the room rules need for now.)
+room. (The rooms' own snapshots hold them too, which the room rules need.)
 
-Recommendation: store the account side as SHA-256 digests, compared with
-`compare_digest`, and correct the docstring to say what a copy does give.
+Recommendation, revised on a second reading: hashing them cannot work, because
+`GET /api/account/rooms` hands the raw token back to the player's other devices,
+which is the point of the identities. Correct the docstring to say what a copy
+does give; protecting the tokens further would mean encrypting them at rest,
+which the threat does not justify today.
 
 #### L2. A failure half-way through `DELETE /api/account` leaves the erasure unfinished
 
@@ -348,20 +351,22 @@ app when it is imported (`server.py:1451`), so a broken grid file makes every
 
 ## Prioritised recommendations
 
-1. **Cache the solution and the cell index of a grid** (H2, M4). Small, local,
-   no spec change, removes the worst CPU path: do it first.
-2. **Decide on creation limits and runner eviction** (H1, M5). A spec change in
-   `lobby/rooms.md` for the limit; eviction is internal.
-3. **Rate-limit checks and reveals per player** (H2). A spec change in
+1. **Fix the gate's pyrefly step** (B-029), so every later item is type-checked
+   in full.
+2. **Cache the solution and the cell index of a grid** (H2, M4: B-030). Small,
+   local, no behaviour change, removes the worst CPU path.
+3. **Rate-limit checks and reveals per player** (H2: B-031). A spec change in
    `gameplay/hints.md`.
-4. **Keep the event loop free** (M1) and **close sockets that never join** (M2).
-5. **Bound request bodies and add security headers in the `Caddyfile`** (M3, L6).
-   Deployment files only.
-6. **Batch the sweep's checkpoints and check their result** (M7), then add the
-   missing indexes in the same migration (L5).
-7. **Slim the snapshots** (M6): grid by reference, pruning.
-8. The Low items as follow-ups, L1 and L2 first (they touch erasure and
-   credentials).
+4. **Decide on creation limits and runner eviction** (H1, M5, L4: B-032). A
+   spec change in `lobby/rooms.md` for the limit; eviction is internal.
+5. **Keep the event loop free and close sockets that never join** (M1, M2, L3:
+   B-033).
+6. **Bound request bodies and add security headers** (M3, L6, L7: B-034).
+7. **Batch the sweep's checkpoints and check their result**, with the missing
+   indexes in the same migration (M7, L5: B-035).
+8. **Make account erasure finish** (L2, L1: B-036).
+9. **Slim the snapshots** (M6: B-037) and **type the server's answers** (L8, L9:
+   B-038) when convenient.
 
 A load test would keep these from coming back: a script that creates rooms,
 connects a few hundred sockets and replays a recorded game while timing the
@@ -379,8 +384,37 @@ engine's steps, run by hand before a release.
     3,287 bytes of log entry;
   - `register_room` x 2,000 on a file store: 685 rooms a second, 89 KiB of
     traced memory and 32 KiB of database per room.
-- Aside, outside the backend: under the gate, pyrefly prints "Skipping include
-  pattern ...\scripts because it is matched by project-excludes or an ignore
-  file" in a worktree, while a direct `uv run pyrefly check` does not. Worth a
-  look by the lead: `scripts/` may go unchecked when the gate runs in a
-  worktree.
+- Aside, outside the backend, confirmed on a second look: the gate puts
+  `scripts/` on `PYTHONPATH` (`scripts/gate.py:241`) for every step, and
+  pyrefly then reads it as a site-packages folder and leaves it out of the
+  project (`pyrefly dump-config` lists it under `project-excludes`). So
+  `scripts/` is not type-checked by the gate, locally or in CI, in a worktree
+  or not. A plain `uv run pyrefly check` checks it, with 0 errors today.
+
+## Backlog items
+
+The findings were regrouped into coherent fixes and queued in `Backlog.md`, in
+this order:
+
+| Item | Fix | Findings |
+| --- | --- | --- |
+| B-029 | The gate type-checks `scripts/` (tooling) | the aside above |
+| B-030 | Grid lookups in constant time | H2 (CPU), M4 |
+| B-031 | Limits on checks and reveals | H2 (abuse) |
+| B-032 | Room capacity: a creation limit, idle rooms leave memory | H1, M5, L4 |
+| B-033 | Sockets: off the event loop, a join deadline, a cap per address | M1, M2, L3 |
+| B-034 | HTTP edge: body size, security headers, the Bearer scheme | M3, L6, L7 |
+| B-035 | The store: checked secure deletion, one checkpoint per sweep, indexes | M7, L5 |
+| B-036 | Account erasure that always finishes | L2, L1 |
+| B-037 | Lean snapshots | M6, L10 (removed tokens) |
+| B-038 | Server structure: typed answers and an app factory | L8, L9 |
+| Small follow-ups | `MAX_PLAYERS`, chat characters, double `QUIT`, the SMTP threads | L10, L11 |
+
+B-029 to B-034 come before the first public test: together they close the ways
+one client can hurt every room. B-035 and B-036 make two privacy promises
+checked rather than assumed. B-037 and B-038 can wait.
+
+One constraint surfaced while writing the briefs: a check over its limit cannot
+be answered `rate_limited`, because the client reads that code as the answer to
+an edit and drops its oldest pending edit (`web/src/lib/roomSession.ts:1289`).
+B-031 therefore proposes dropping it silently, as chat does.
