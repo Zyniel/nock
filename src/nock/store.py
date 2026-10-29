@@ -6,6 +6,9 @@ are found without loading them, and its creator, the account that created it
 (`lobby/host.md` rule 11), kept in `room_times` only: the snapshots hold no
 creator.
 
+The table `overrides` holds the settings saved from `/ops`
+(`admin/overrides.md` rule 7); a room's deletion never touches it.
+
 One connection is shared by all threads and every call takes a lock, so the
 store is safe to call from several threads. Rooms are independent: the lock is
 only held for the duration of one short statement or transaction.
@@ -64,6 +67,10 @@ CREATE TABLE IF NOT EXISTS room_times (
     creator_account_id TEXT,
     solved_at REAL
 );
+CREATE TABLE IF NOT EXISTS overrides (
+    name TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
+);
 """
 
 # `PRAGMA user_version` of a database that has the creator column (1) and the
@@ -113,6 +120,45 @@ class RoomStore:
         self._connection.execute("PRAGMA secure_delete = ON")
         self._connection.executescript(_TABLES)
         self._migrate()
+
+    @property
+    def is_durable(self) -> bool:
+        """Whether the database is a file, so that its rows survive a restart."""
+        return self._is_file
+
+    def read_overrides(self) -> list[tuple[str, object]]:
+        """Return the rows of the table `overrides` (`admin/overrides.md` rule 7).
+
+        Returns:
+            One (name, value) per row, by name. The value is what the row holds,
+            which may be anything SQLite stored: the caller checks it.
+        """
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT name, value FROM overrides ORDER BY name"
+            ).fetchall()
+        saved: list[tuple[str, object]] = []
+        for name, value in rows:
+            saved.append((str(name), value))
+        return saved
+
+    def save_override(self, name: str, value: int) -> None:
+        """Save the override of a setting, replacing the one it had.
+
+        Args:
+            name: The setting.
+            value: Its new override.
+        """
+        with self._lock:
+            self._connection.execute(
+                "INSERT OR REPLACE INTO overrides (name, value) VALUES (?, ?)",
+                (name, value),
+            )
+
+    def delete_override(self, name: str) -> None:
+        """Remove the override of a setting; nothing happens when it has none."""
+        with self._lock:
+            self._connection.execute("DELETE FROM overrides WHERE name = ?", (name,))
 
     def create_room(
         self, state: RoomState, *, last_edit_at: float | None = None

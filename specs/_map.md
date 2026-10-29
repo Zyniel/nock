@@ -41,6 +41,7 @@ table, the naming rules and the glossary follow in the same change.
 | content | `content/grid-files.md` | the index `grids/catalogue.json`, the `.ipuz` grid files, credits, withdrawal, the converter | | 004 AC-5, AC-7; 005 AC-1 to AC-3, AC-6, AC-7 |
 | content | `content/library.md` | what players browse: list, filter, grid page | pages | 004 AC-1 to AC-4, AC-6, AC-7; 046 AC-2, AC-4 to AC-10, AC-14 |
 | admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038 AC-3 to AC-11; 048 AC-6 to AC-12 |
+| admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
 | platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
 | platform | `platform/server.md` | durable state, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
@@ -168,7 +169,12 @@ then nothing of race or teams is built.
 | room life | (not shown: how long a room lasts after its starting point, one per kind) | `RoomConfig.*_room_hours`, `NOCK_*_ROOM_HOURS` |
 | expired room | « Ce salon n'existe pas. » (more than its room life past its starting point; at exactly its room life it is open) | the expiry function (`lobby/lifetime.md`) |
 | sweep | (not shown: the deletion of the expired rooms at start, then at each interval) | `expire_rooms`, `NOCK_EXPIRY_SWEEP_MINUTES` |
-| shortest room life | (not shown: the least of the four room lives) | `offered_days` (the `/ops` periods it allows) |
+| shortest room life | (not shown: the least of the four effective room lives) | `offered_days` (the `/ops` periods it allows) |
+| default value | « par défaut » (a source on « Durées de vie des salons ») | `RoomConfig` field defaults, `DEFAULT_ROOM_LIFE_HOURS`, `DEFAULT_SWEEP_MINUTES` |
+| environment value | « variable » (the variable's value, when set) | `room_config_from_env`, `NOCK_*_ROOM_HOURS`, `NOCK_EXPIRY_SWEEP_MINUTES` |
+| override | « modifiée » (a value saved from `/ops`, stored in the database, in memory when `NOCK_DATABASE` is unset) | table `overrides`, `PUT /api/ops/settings` |
+| effective value | the value each row of « Durées de vie des salons » shows (the override, else the environment value, else the default; every rule reads it) | `RoomRegistry.config` |
+| dry run | « Cela effacera N salons maintenant. » (how many rooms a proposed value would delete now; nothing saved) | `POST /api/ops/settings/dry-run` |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |

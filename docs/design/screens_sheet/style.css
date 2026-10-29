@@ -347,6 +347,15 @@ td code, .cap code, .lead code { font-size: .85em; }
 .ops-metrics li { background: var(--nock-white); border: 1px solid var(--nock-line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; }
 .ops-metrics .k2 { color: var(--nock-muted); font-size: .85rem; }
 .ops-metrics .v2 { font: 700 1.05rem/1.2 var(--nock-font-ui); color: var(--nock-ink); font-variant-numeric: tabular-nums; }
+.setrows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; width: 100%; }
+.setrow { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; background: var(--nock-white); border: 1px solid var(--nock-line); border-radius: 8px; padding: 12px 14px; }
+.setrow .grow { flex: 1; min-width: 160px; display: grid; gap: 3px; }
+.setrow .t { font-weight: 700; }
+.setrow .v { display: flex; gap: 8px; align-items: center; font-size: .95rem; font-variant-numeric: tabular-nums; }
+.setrow .act { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.setrow .act .input.num { min-height: 0; padding: 8px 10px; }
+.setrow .errtxt { flex-basis: 100%; }
+.phone .setrow .grow { flex-basis: 100%; }
 .edits { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .85rem; font-variant-numeric: tabular-nums; }
 .edits li { padding: 4px 8px; border-radius: 4px; }
 .edits li.now { background: var(--nock-word); font-weight: 600; }

@@ -165,14 +165,18 @@ function isRoomReplay(value: unknown): value is RoomReplay {
 }
 
 // Ask the ops API for a body of the expected shape, with the operator token in
-// the Authorization header, the only place the server reads it from.
+// the Authorization header, the only place the server reads it from. `init` is
+// the method and body of a request that is not a GET.
 async function fetchOps<Body>(
   path: string,
   token: string,
   isExpected: (value: unknown) => value is Body,
+  init: RequestInit = {},
 ): Promise<OpsAnswer<Body>> {
   try {
-    const response = await fetch(path, { headers: { Authorization: `Bearer ${token}` } })
+    const headers = new Headers(init.headers)
+    headers.set('Authorization', `Bearer ${token}`)
+    const response = await fetch(path, { ...init, headers })
     if (response.status === 401) {
       return { kind: 'refused' }
     }
@@ -209,6 +213,141 @@ export function fetchDashboard(
 export function fetchReplay(token: string, code: string): Promise<OpsAnswer<RoomReplay>> {
   const path = `/api/ops/rooms/${encodeURIComponent(code)}/edits`
   return fetchOps(path, token, isRoomReplay)
+}
+
+// ---- The room lives (admin/overrides) -------------------------------------------
+
+export type SettingName =
+  | 'creator_solved_room_hours'
+  | 'creator_room_hours'
+  | 'anonymous_solved_room_hours'
+  | 'anonymous_room_hours'
+  | 'expiry_sweep_minutes'
+
+export type SettingUnit = 'hours' | 'minutes'
+export type SettingSource = 'default' | 'environment' | 'override'
+
+// One setting as the server lists it.
+export interface Setting {
+  name: SettingName
+  unit: SettingUnit
+  min: number
+  max: number
+  default: number
+  // The variable's value; null when the variable is unset.
+  environment: number | null
+  // The value saved from /ops; null when there is none.
+  override: number | null
+  // The effective value.
+  value: number
+  source: SettingSource
+}
+
+// The answer of GET and PUT /api/ops/settings.
+export interface SettingsList {
+  // True when the server's store is a database file.
+  durable: boolean
+  settings: Setting[]
+}
+
+// The answer of the dry run: how many rooms the proposed life would delete now.
+export interface DryRun {
+  rooms: number
+}
+
+const SETTING_NAMES: string[] = [
+  'creator_solved_room_hours',
+  'creator_room_hours',
+  'anonymous_solved_room_hours',
+  'anonymous_room_hours',
+  'expiry_sweep_minutes',
+]
+const SETTING_SOURCES: string[] = ['default', 'environment', 'override']
+
+// The title of each setting's row.
+export const SETTING_TITLE_KEYS: Record<SettingName, MessageKey> = {
+  creator_solved_room_hours: 'ops.setting.creator_solved_room_hours',
+  creator_room_hours: 'ops.setting.creator_room_hours',
+  anonymous_solved_room_hours: 'ops.setting.anonymous_solved_room_hours',
+  anonymous_room_hours: 'ops.setting.anonymous_room_hours',
+  expiry_sweep_minutes: 'ops.setting.expiry_sweep_minutes',
+}
+
+// The tag of each source.
+export const SOURCE_KEYS: Record<SettingSource, MessageKey> = {
+  default: 'ops.source.default',
+  environment: 'ops.source.environment',
+  override: 'ops.source.override',
+}
+
+// Tell whether a parsed JSON value looks like one setting.
+function isSetting(value: unknown): value is Setting {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.name === 'string' &&
+    SETTING_NAMES.includes(record.name) &&
+    (record.unit === 'hours' || record.unit === 'minutes') &&
+    typeof record.min === 'number' &&
+    typeof record.max === 'number' &&
+    typeof record.default === 'number' &&
+    isNumberOrNull(record.environment) &&
+    isNumberOrNull(record.override) &&
+    typeof record.value === 'number' &&
+    typeof record.source === 'string' &&
+    SETTING_SOURCES.includes(record.source)
+  )
+}
+
+// Tell whether a parsed JSON value looks like the list of settings.
+function isSettingsList(value: unknown): value is SettingsList {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  const record = value as Record<string, unknown>
+  return (
+    typeof record.durable === 'boolean' &&
+    Array.isArray(record.settings) &&
+    record.settings.every(isSetting)
+  )
+}
+
+function isDryRun(value: unknown): value is DryRun {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+  return typeof (value as Record<string, unknown>).rooms === 'number'
+}
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' }
+
+// The five settings, with their sources.
+export function fetchSettings(token: string): Promise<OpsAnswer<SettingsList>> {
+  return fetchOps('/api/ops/settings', token, isSettingsList)
+}
+
+// Save the override of a setting; a null value removes it. The answer is the
+// list, as fetchSettings gives it.
+export function saveSetting(
+  token: string,
+  name: SettingName,
+  value: number | null,
+): Promise<OpsAnswer<SettingsList>> {
+  const init = { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ name, value }) }
+  return fetchOps('/api/ops/settings', token, isSettingsList, init)
+}
+
+// How many rooms a life of `value` hours would delete now; a null value is the
+// one a reset falls back to. Nothing is saved.
+export function fetchDryRun(
+  token: string,
+  name: SettingName,
+  value: number | null,
+): Promise<OpsAnswer<DryRun>> {
+  const init = { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ name, value }) }
+  return fetchOps('/api/ops/settings/dry-run', token, isDryRun, init)
 }
 
 // The operator token this tab keeps, or null. A browser that refuses storage
