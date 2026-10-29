@@ -301,13 +301,25 @@ class _RoomsHolder:
 
         Returns:
             The setting names of `nock.overrides.settings_set_in`, for a registry
-            created here; None for a registry given, or before one is created.
+            created here; None for a registry given.
+
+        Raises:
+            RuntimeError: the holder has no registry yet, or it was closed. Call
+                `get` first.
         """
         with self._lock:
+            if self._registry is None:
+                raise RuntimeError(
+                    "The holder has no registry: call get() before settings_set()."
+                )
             return self._settings_set
 
     def close_if_created(self) -> None:
-        """Close the registry (and its store) when this holder created it."""
+        """Close the registry (and its store) when this holder created it.
+
+        After it, the holder has no registry, so `settings_set` raises until `get`
+        creates one again.
+        """
         with self._lock:
             if self._registry is not None and self._is_created_here:
                 self._registry.close()
