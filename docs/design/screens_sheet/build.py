@@ -515,7 +515,7 @@ def sec_entry() -> str:
     )
     gone = entry_card(
         "Ce salon n'existe pas.",
-        "Un salon est effacé 30 jours après sa dernière modification.",
+        "Un salon est effacé après un certain temps sans modification.",
         button="primary",
     )
     c = screen(

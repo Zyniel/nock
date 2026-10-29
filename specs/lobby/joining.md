@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: done
+status: approved
 ---
 
 # lobby/joining - Joining, resuming and « Mes salons »
@@ -11,7 +11,7 @@ status: done
 An invited player enters a room with only a nickname. A player who comes back
 gets the same seat: after a reload, the next day, after a server restart, from
 « Mes salons » on the catalogue page, or from any device signed in to their
-account. A room lives 30 days after its last edit.
+account. A room outlives its players for its room life (`lobby/lifetime.md`).
 
 ## Depends on
 
@@ -127,23 +127,13 @@ account. A room lives 30 days after its last edit.
 
 ### Room life
 
-15. An edit is a `letter_changed` or a `cell_locked`. A room's last edit time is
-    its latest edit's, or the start of its life; it never goes back. A room is
-    expired once more than 30 days have passed since; at exactly 30 days it is
-    open.
-16. A sweep at server start, then every hour, deletes the expired rooms; any
-    lookup that meets one (a socket, a summary) deletes it first. Deletion removes
-    the room, its log, its snapshots and its share token, closes every socket
-    opened to it, joined or not, with 4404 and nothing else, and writes no log
-    entry; a page that had shown the room then shows the room-gone dialog
-    (`client/hud.md` rule 16). The code may then be drawn again, where an old
-    token matches nobody. Until the deletion, a live room's open sockets keep
-    working. A sweep that fails is logged at WARNING or above, and the next one
-    runs.
+15. A room's last edit time, its room life, its expiry and the sweep that deletes
+    it: `lobby/lifetime.md`. A lookup that meets an expired room (a socket, a
+    summary) deletes it first.
 
 ### Summaries and « Mes salons »
 
-17. `POST /api/rooms/summaries` takes `{"rooms": [{"code", "resume_token"}]}`,
+16. `POST /api/rooms/summaries` takes `{"rooms": [{"code", "resume_token"}]}`,
     at most 100 keys, and answers one summary per room that some key holds a
     member's token for, newest last activity first, then code order. A summary is
     the code, the grid number (null outside the catalogue), width, height, the
@@ -152,7 +142,7 @@ account. A room lives 30 days after its last edit.
     of `gameplay/results.md`; no letter. The answer never says why a room is left
     out; it is not counted by the wrong-code throttle, makes no room live and
     writes nothing. An invalid body answers 422.
-18. The catalogue page sends the identities whose code matches `^[A-Z0-9]{6}$`
+17. The catalogue page sends the identities whose code matches `^[A-Z0-9]{6}$`
     and whose token matches `^[A-Za-z0-9_-]{16,128}$`, in requests of at most
     100 keys, and lists the summaries in the server's order. With none to send
     it has no « Mes salons »; while loading and with no summary it shows
@@ -223,21 +213,14 @@ account. A room lives 30 days after its last edit.
   `Jean-Luc`, `D'Artagnan`, `Ana 2`, `O’Neil` and `Νίκος` in the roster, the
   host's remove labels, a flag's label, the Auteurs legend, the chat and its mute
   rows. (← 012 AC-8)
-- **AC-14** A room created at t0 with a letter at t0 + 10, a chat line at t0 +
-  20, a check result at t0 + 25 and a locked cell at t0 + 30 has its last edit at
-  t0 + 30: open 30 days later, expired half a second after. (← 032 AC-1)
-- **AC-15** A room whose last edit is at t0 + 10 survives the sweep at t0 + 10 +
-  30 days and is deleted one second later: its sockets close with 4404, its
-  store rows and share link are gone, a new room may take its code, and a join
-  there with an old token makes a new player. (← 032 AC-2)
 - **AC-16** After Ana writes `T` and `A`, reveals (4, 4) and leaves, a day later
   and after a restart Bob, from another device, gets those letters, a budget of 4
   letters and 1 word and about 90 seconds of timer, and Ana's token seats her back
   with her id. (← 032 AC-3)
 - **AC-17** In room A, where Bob timed out and Cy was removed, Ana's or Bob's
   token gets one summary naming `BOB` then `ANA`; Cy's token, an unknown token or
-  code gets `[]`; 101 keys get 422; an expired room is left out and deleted.
-  (← 032 AC-4)
+  code gets `[]`; 101 keys get 422; an expired room (`lobby/lifetime.md`) is
+  left out and deleted. (← 032 AC-4)
 - **AC-18** With identities for `XYZ789` and `ABC234`, one corrupt and one with a
   15-character token, « Mes salons » sends the two valid keys and lists `Grille n°
   2`, `5 × 5`, « Joueurs : Ana, Bob », « Dernière activité : 14 octobre 2026 à
@@ -275,7 +258,6 @@ account. A room lives 30 days after its last edit.
   it carries, as before (AC-21).
 - A past player dropped by the cap of 100 joins as a new player (AC-17, AC-20).
 - Several keys for one room give one summary; one member's key is enough (AC-17).
-- A socket to an expired code counts as a wrong code (AC-15).
 - More than 100 identities go in several requests, listed in the server's order
   (AC-18).
 ## Out of scope
@@ -284,7 +266,8 @@ account. A room lives 30 days after its last edit.
   (`McLean` shows as `Mclean`).
 - Leaving a room on purpose, removing a room from « Mes salons », sorting it,
   clearing identities of deleted rooms.
-- A warning before expiry, extending or restoring a room.
+- Room lives, expiry, the sweep and what a deletion removes:
+  `lobby/lifetime.md`.
 - Presence states in the roster: `social/presence.md`. Host controls and the
   creator: `lobby/host.md`. Codes and creation: `lobby/rooms.md`. The rooms of
   an account: `account/account.md`. Finished grids
@@ -295,11 +278,9 @@ account. A room lives 30 days after its last edit.
 ## Code
 
 - `src/nock/room.py`: nicknames, `join_room` (the member by account or token),
-  disconnection, seat back, members, `room_summary`; `RoomConfig` holds the
-  room life and sweep interval.
-- `src/nock/store.py`: last edit time, expired codes, deletion.
-- `src/nock/hub.py`: the sweep, lookups and their deletions, summaries.
-- `src/nock/server.py`: the summaries route and the app's sweep.
+  disconnection, seat back, members, `room_summary`.
+- `src/nock/hub.py`: the lookups and summaries.
+- `src/nock/server.py`: the summaries route.
 - `web/src/lib/joinRules.ts`, `roomSession.ts`, `RoomPage.svelte`: the room
   page's join; `nickname.ts`: the display; `myRooms.ts`, `MyRooms.svelte`:
   « Mes salons ».

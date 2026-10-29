@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: host
-status: done
+status: approved
 ---
 
 # lobby/host - The host role and the creator
@@ -99,9 +99,9 @@ out; the room goes with the creator's account.
     that account, set once and never changed. Such a room is a creator room; any
     other is an anonymous room and stays one, whoever signs in later. The creator
     is stored with the room, in `room_times` (`src/nock/store.py`) beside
-    `last_edit_at`, as a nullable column that makes the schema's `user_version`
-    1, added once at open to an older store; a stored room without one is
-    anonymous. Nothing tells the creator apart: no mark in the roster, the
+    `last_edit_at`, as a nullable column, added once at open to an older store
+    (the schema's versions: `lobby/lifetime.md` rule 8); a stored room without
+    one is anonymous. Nothing tells the creator apart: no mark in the roster, the
     snapshot or the page.
 12. The creator's player is the member of a creator room whose account is the
     creator; a time-out and a seat back keep them so. A stand-in host is a host
@@ -118,7 +118,7 @@ out; the room goes with the creator's account.
     (`lobby/joining.md` rule 4).
 14. The erasure of the creator's account (`account/account.md` rule 18) deletes
     the room, live or stored, whoever is host then, as the deletion of an expired
-    room does (`lobby/joining.md` rule 16): its sockets close with 4404 and
+    room does (`lobby/lifetime.md` rule 6): its sockets close with 4404 and
     nothing else, a page that had shown it shows the room-gone dialog
     (`client/hud.md` rule 16), one that had not the entry card
     (`client/shell.md` rule 7), and a later socket to its code counts as a wrong
@@ -127,8 +127,8 @@ out; the room goes with the creator's account.
     an anonymous room deletes nothing: the erased account's player there is `--`
     (`account/account.md` rule 18), the room otherwise unchanged.
 15. While accounts are off a stored creator stays and the room plays as an
-    anonymous room; `POST /api/rooms` sets no creator, whatever cookie it
-    carries.
+    anonymous room, with an anonymous room's life (`lobby/lifetime.md` rule 3);
+    `POST /api/rooms` sets no creator, whatever cookie it carries.
 
 ### Look
 
@@ -181,9 +181,9 @@ not-found pages ».
   the sheet. (← 014 AC-7, 014 AC-10)
 - **AC-9** Accounts on, Lea's signed-in `POST /api/rooms` makes a room whose
   stored `room_times` row names her account as creator, and `PRAGMA
-  user_version` reads 1; a database written before the column (`user_version`
-  0) opens with it added and `user_version` 1, its stored rooms anonymous rooms,
-  their other data kept; a request with no cookie, an unknown or expired
+  user_version` reads 2 (`lobby/lifetime.md` rule 8); a database written before
+  the column (`user_version` 0) opens with it added, its stored rooms anonymous
+  rooms, their other data kept; a request with no cookie, an unknown or expired
   session, or made while accounts are off with her cookie, makes a room with no
   creator; a host of such a room who signs in later, and sends `PUT
   /api/account/rooms` for it, gives it none.
@@ -245,7 +245,8 @@ not-found pages ».
 ## Out of scope
 
 - Handing the host role on by hand, co-hosts, un-banning, banning by address or
-  browser; room lives (`Backlog.md` B-023); a mark of the creator anywhere.
+  browser; a mark of the creator anywhere. Room lives and expiry:
+  `lobby/lifetime.md`.
 - Codes, creation, the throttle and the engine: `lobby/rooms.md`. The join's
   steps, members and takeover: `lobby/joining.md`. Accounts, the session and
   erasure: `account/account.md`. Feed lines of host, lock and settings changes,

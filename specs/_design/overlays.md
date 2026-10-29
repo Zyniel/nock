@@ -92,8 +92,8 @@ The room deleted once it has shown. The recap's frame (« Recap »): the 440 px
 dialog in the column layout, the bottom sheet in the sheet layout, over the
 `--nock-scrim-dialog` scrim covering the whole window, top bar included, at the
 recap's layer (`room.md`, « Layers »). Content in order: the title « Ce salon
-n'existe plus. » in the recap's title style; the line « Un salon est effacé 30
-jours après sa dernière modification. » in muted (0.95rem); « Voir les grilles »
+n'existe plus. » in the recap's title style; the line « Un salon est effacé
+après un certain temps sans modification. » in muted (0.95rem); « Voir les grilles »
 (primary), right-aligned. No « Fermer » and no close button. Under the scrim the
 room stays drawn as it was, without the connection band or a status band. Drawn
 in the screens sheet, part 3 (« The room deleted after it showed »).

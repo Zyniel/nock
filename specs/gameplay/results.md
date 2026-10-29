@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: results
-status: done
+status: approved
 ---
 
 # gameplay/results - End of game, recap, shared recap and history
@@ -17,7 +17,8 @@ grids in « Grilles terminées », where a grid can be played again.
 
 - `gameplay/rules.md`: solved rooms, `grid_solved`, the timer's text, the band.
 - `gameplay/hints.md`: the check and reveal entries the recap counts.
-- `lobby/joining.md`: nicknames and their display, summaries, room deletion.
+- `lobby/joining.md`: nicknames and their display, summaries; a room's
+  deletion is `lobby/lifetime.md`.
 
 ## Rules
 
@@ -109,7 +110,7 @@ grids in « Grilles terminées », where a grid can be played again.
 ### Finished grids
 
 14. A room keeps its `grid_solved`'s time and `elapsed_ms`, by `replay` too. A
-    summary (`lobby/joining.md` rule 17) adds `finished_at` (that time, UTC) and
+    summary (`lobby/joining.md` rule 16) adds `finished_at` (that time, UTC) and
     `elapsed_ms`, null unless solved; a room stored without them takes them from
     its log.
 15. `nock.history` holds the device's records, a JSON array of `{"code",

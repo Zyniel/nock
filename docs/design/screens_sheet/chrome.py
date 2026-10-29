@@ -528,7 +528,7 @@ def room_gone_body() -> str:
     """Return the room-gone dialog's content (overlays.md, « Room gone »)."""
     return (
         "<h3>Ce salon n'existe plus.</h3>"
-        '<p class="dmuted">Un salon est effacé 30 jours après sa dernière '
+        '<p class="dmuted">Un salon est effacé après un certain temps sans '
         "modification.</p>"
         '<div class="end"><span class="btn primary">Voir les grilles</span></div>'
     )
