@@ -20,7 +20,7 @@ import secrets
 import sqlite3
 import string
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -42,6 +42,8 @@ SESSION_LIFE_SECONDS: float = 7_776_000.0  # 90 days (decision 11)
 LINKS_PER_EMAIL_PER_HOUR: int = 3  # decision 11
 LINKS_PER_ADDRESS_PER_HOUR: int = 10  # decision 11
 EMAIL_MAX_LENGTH: int = 254
+FINISHED: str = "finished"  # a grid's progress, as the client's nock.progress
+STARTED: str = "started"
 
 LOCAL_PART_MAX_LENGTH: int = 64
 DOMAIN_LABEL_MAX_LENGTH: int = 63
@@ -549,6 +551,45 @@ class AccountStore:
             records.append(record)
         return records
 
+    def progress(
+        self,
+        account_id: str,
+        peek_room: Callable[[str], RoomState | None],
+        created_codes: list[str],
+    ) -> dict[str, str]:
+        """Return the account's progress, grid numbers in decimal to a state.
+
+        A grid is `"finished"` for each history record and each solved room of the
+        account's identities, `"started"` for each unsolved one and each creator
+        room that still exists; `"finished"` wins. A room or record with no grid
+        number gives nothing. Nothing is stored.
+
+        The rooms are looked up before the records are read: looking up an expired
+        solved room deletes it, and the delete hook saves its record first.
+
+        Args:
+            account_id: The account.
+            peek_room: Returns a room's latest state, None when it does not exist.
+            created_codes: The codes of the rooms the account created.
+
+        Returns:
+            The progress; `{}` when no room or record gives a grid number.
+        """
+        progress: dict[str, str] = {}
+        for identity in self.identities(account_id):
+            state = peek_room(identity.code)
+            if state is None or member_id(state, identity.resume_token) is None:
+                continue
+            _mark_grid(progress, state, state.solved)
+        for code in created_codes:
+            state = peek_room(code)
+            if state is not None:
+                _mark_grid(progress, state, False)
+        for record in self.history(account_id):
+            if record.grid_number is not None:
+                progress[str(record.grid_number)] = FINISHED
+        return progress
+
     def accounts_of_room(self, code: str) -> list[str]:
         """Return the ids of the accounts that hold an identity with code `code`.
 
@@ -803,6 +844,20 @@ class AccountStore:
             )
             found.append(identity)
         return found
+
+
+def _mark_grid(progress: dict[str, str], state: RoomState, is_finished: bool) -> None:
+    """Mark the room's grid in `progress`; `finished` is never lowered.
+
+    A room with no grid number marks nothing.
+    """
+    if state.grid_number is None:
+        return
+    key = str(state.grid_number)
+    if is_finished:
+        progress[key] = FINISHED
+    elif key not in progress:
+        progress[key] = STARTED
 
 
 def _counting_player_ids(identities: list[RoomIdentity], state: RoomState) -> set[str]:
