@@ -9,6 +9,7 @@
   import InAppKeyboard from './InAppKeyboard.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
+  import RoomGoneDialog from './RoomGoneDialog.svelte'
   import RoomMenu from './RoomMenu.svelte'
   import RoomNote from './RoomNote.svelte'
   import type { ShownNote } from './RoomNote.svelte'
@@ -1477,8 +1478,12 @@
     menuButton?.focus()
   }
 
-  // A room sheet closed: the focus goes back to « Menu ».
+  // A room sheet closed: the focus goes back to « Menu », unless the room is
+  // gone, where the room-gone dialog holds the focus.
   function onRoomSheetClosed(): void {
+    if (isRoomGone) {
+      return
+    }
     menuButton?.focus()
   }
 
@@ -1789,6 +1794,28 @@
     stopReconnectTimer()
     dropSocket(ended)
     session.status = statusAfterFinalClose(closeCode, session.status)
+    if (isRoomGone) {
+      leaveDeletedRoom()
+    }
+  }
+
+  // ---- The room gone (client/hud.md rule 16) ----
+
+  // The room was deleted once it had shown: the room-gone dialog covers the
+  // page. Before the first snapshot a deletion is the entry card instead.
+  let isRoomGone = $derived(session.snapshot !== null && session.status === 'not_found')
+
+  // Close what is open over the room and drop the letters waiting to be sent,
+  // before the room-gone dialog shows. The Salon column stays as it is.
+  function leaveDeletedRoom(): void {
+    openPopover = null
+    isSheetSalonOpen = false
+    isPickerOpen = false
+    isRecapOpen = false
+    hostSettings?.close()
+    accountDialog?.close()
+    stopEditQueue()
+    session.pendingEdits = []
   }
 
   // The browser has a network again: do not wait for the next delay.
@@ -2114,9 +2141,10 @@
     <div class="opening-area" data-testid="grid-area">
       <p class="nock-state-line" data-testid="room-status">{t(`room.status.${session.status}`)}</p>
     </div>
-  {:else if session.snapshot !== null}
+  {:else if session.snapshot !== null && !isRoomGone}
     <!-- Once the room shows, a joined or reconnecting status is read but not
-         seen; any other status is a band under the top bar (spec 043). -->
+         seen; any other status but the room gone, which is the room-gone
+         dialog, is a band under the top bar (spec 043, client/hud.md rule 7). -->
     <p
       class="room-status"
       class:visually-hidden={session.status === 'joined' || session.status === 'reconnecting'}
@@ -2366,6 +2394,9 @@
       {isAccessibilityOn}
       onClose={closeRecap}
     />
+  {/if}
+  {#if isRoomGone}
+    <RoomGoneDialog {layout} />
   {/if}
 </main>
 

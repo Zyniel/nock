@@ -9,12 +9,13 @@ status: done
 ## Purpose
 
 An invited player enters a room with only a nickname. A player who comes back
-gets the same seat: after a reload, the next day, after a server restart, or from
-« Mes salons » on the catalogue page. A room lives 30 days after its last edit.
+gets the same seat: after a reload, the next day, after a server restart, from
+« Mes salons » on the catalogue page, or from any device signed in to their
+account. A room lives 30 days after its last edit.
 
 ## Depends on
 
-- `lobby/rooms.md`: room codes, creation from the catalogue, removing and locking.
+- `lobby/host.md`: removing and locking, the creator, the account of a member.
 - `platform/realtime.md`: the join message, error codes, the resume window and the
   time-out of a disconnected player.
 - `platform/server.md`: the store that keeps a room across restarts.
@@ -42,27 +43,36 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 
 ### Join
 
-4. A join runs these steps in order; the first that applies ends it:
-   1. a removed player's token: `removed` (`lobby/rooms.md`);
-   2. a player's token: resume (rule 6), unless that player has been away longer
+4. A join's member is chosen once, before the steps: signed in
+   (`account/account.md` rule 9), the account's member of the room, player or
+   past player, whatever token the join carries; else the member whose token it
+   carries. A token that is not the join's member's is not used: its member is
+   not touched and their connection stays open. Then these steps run in order;
+   the first that applies ends the join:
+   1. the token used, a removed player's: `removed` (`lobby/host.md`);
+   2. the member a player: resume (rule 6), unless they have been away longer
       than the resume window: they time out here (rule 12) and the join goes on;
-   3. a locked room: `room_locked` (`lobby/rooms.md`);
-   4. 8 players: `room_full`;
-   5. a past player's token: seat back (rule 13);
+   3. a locked room: `room_locked` (`lobby/host.md`), skipped for a join from
+      the creator's session, member or not;
+   4. 8 players: `room_full`, for everyone;
+   5. the member a past player: seat back (rule 13);
    6. a nickname that breaks rule 1: `invalid_nickname`;
    7. a new player: the lowest colour index 0 to 7 that no player has, host
-      when no player is host, appended last.
+      when no player is host, appended last, linked to the session's account
+      when signed in.
 
    `removed`, `room_locked` and `room_full` close the socket; `invalid_nickname`
-   leaves it open for another join. A token that matches nobody is ignored.
+   leaves it open for another join. A token that matches nobody is ignored. The
+   creator's player is host at the end of their join whatever step seated them
+   (`lobby/host.md` rule 13).
 5. The joiner gets a snapshot that already counts the join and holds the room's
    letters, hint budget and timer; the others get `player_joined`, the joiner
    never does. A second join on a joined socket is ignored.
 6. A resume keeps the player's id, nickname, colour, host role and letters and
    ignores the join's nickname. A disconnected player becomes active, which the
    others see (an idle one too, `social/presence.md`). An active player still
-   connected elsewhere is taken over: the older socket is closed with 4001 and the
-   others get nothing.
+   connected elsewhere is taken over, by their token or by their account alike:
+   the older socket is closed with 4001 and the others get nothing.
 7. A closed socket makes its player disconnected; they keep their seat, colour,
    nickname and letters, and count among the 8, until they time out.
 
@@ -92,7 +102,7 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
     never does.
 11. `room_full` ends on `room.status.full`, a 4001 close on
     `room.status.replaced`. Before any snapshot, such a refusal, like those of
-    `lobby/rooms.md`, is the card's title, under the room code line
+    `lobby/host.md`, is the card's title, under the room code line
     `room.heading` (« Salon <code> »), with one link, `share.home` (« Voir les
     grilles »), to `/`. Once joined, the roster lists the players in snapshot
     order with their colour, marks one's own row with `roster.you`, and follows
@@ -109,7 +119,8 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
     `player_joined`: same id, token, letters and mute; nickname made unique by
     rule 2 (an erased player's `--` keeps no suffix); colour kept unless a player
     has it, else the lowest free one. The join's nickname is ignored. They are
-    host only when no player is. Their flag, undo history and rate windows start
+    host only when no player is, or when they are the creator's player
+    (`lobby/host.md` rule 13). Their flag, undo history and rate windows start
     afresh, and a vote opened while they were away does not count them.
 14. A seat back refused (locked, full) leaves them a past player and a member. A
     refusal after a time-out inside the join keeps that time-out.
@@ -124,9 +135,11 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
     lookup that meets one (a socket, a summary) deletes it first. Deletion removes
     the room, its log, its snapshots and its share token, closes every socket
     opened to it, joined or not, with 4404 and nothing else, and writes no log
-    entry. The code may then be drawn again, where an old token matches nobody.
-    Until the deletion, a live room's open sockets keep working. A sweep that
-    fails is logged at WARNING or above, and the next one runs.
+    entry; a page that had shown the room then shows the room-gone dialog
+    (`client/hud.md` rule 16). The code may then be drawn again, where an old
+    token matches nobody. Until the deletion, a live room's open sockets keep
+    working. A sweep that fails is logged at WARNING or above, and the next one
+    runs.
 
 ### Summaries and « Mes salons »
 
@@ -240,6 +253,12 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
   gives back her id, `ANA`, colour 0, her letters and her mute, not the host role;
   if `ana` joined meanwhile she is `ANA 2`, and if Dan took colour 0 she gets 3;
   in a full or locked room she is refused and stays a member. (← 032 AC-7)
+- **AC-21** In R, Lea (signed in, token T, host, `T` at (1, 0)) and Bob (token
+  U) are players: a device signed in as Lea joining with no token, with U or
+  with an unknown token resumes Lea, same id, colour, letters and host role,
+  closes her older connection with 4001, and leaves Bob and his connection
+  untouched; signed out, the join with U resumes Bob. Lea timed out, the
+  signed-in join with no token seats her back with her id.
 
 ## Edge cases
 
@@ -252,6 +271,8 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 - A seat back ignores a nickname that rule 1 refuses (AC-20).
 - A second device with the same token, after the seat back, is a resume: the
   older socket gets 4001 (AC-20).
+- A signed-in device whose account has no member in the room joins by the token
+  it carries, as before (AC-21).
 - A past player dropped by the cap of 100 joins as a new player (AC-17, AC-20).
 - Several keys for one room give one summary; one member's key is enough (AC-17).
 - A socket to an expired code counts as a wrong code (AC-15).
@@ -264,20 +285,22 @@ gets the same seat: after a reload, the next day, after a server restart, or fro
 - Leaving a room on purpose, removing a room from « Mes salons », sorting it,
   clearing identities of deleted rooms.
 - A warning before expiry, extending or restoring a room.
-- Presence states in the roster: `social/presence.md`. Host controls:
-  `lobby/rooms.md`. The rooms of an account: `account/account.md`. Finished grids
+- Presence states in the roster: `social/presence.md`. Host controls and the
+  creator: `lobby/host.md`. Codes and creation: `lobby/rooms.md`. The rooms of
+  an account: `account/account.md`. Finished grids
   after deletion: `gameplay/results.md`. What changed while away:
   `social/catch-up.md`. What deletion erases for privacy:
   `admin/operations.md`.
 
 ## Code
 
-- `src/nock/room.py`: nicknames, `join_room`, disconnection, seat back, members,
-  `room_summary`; `RoomConfig` holds the room life and sweep interval.
+- `src/nock/room.py`: nicknames, `join_room` (the member by account or token),
+  disconnection, seat back, members, `room_summary`; `RoomConfig` holds the
+  room life and sweep interval.
 - `src/nock/store.py`: last edit time, expired codes, deletion.
 - `src/nock/hub.py`: the sweep, lookups and their deletions, summaries.
 - `src/nock/server.py`: the summaries route and the app's sweep.
 - `web/src/lib/joinRules.ts`, `roomSession.ts`, `RoomPage.svelte`: the room
   page's join; `nickname.ts`: the display; `myRooms.ts`, `MyRooms.svelte`:
   « Mes salons ».
-- Tests: `tests/test_spec_012_*`, `tests/test_spec_032_*`.
+- Tests: `tests/test_spec_012_*`, `tests/test_spec_032_*`, `tests/test_joining_*`.

@@ -28,6 +28,11 @@
   let dialog: HTMLDialogElement | null = $state(null)
   let emailInput: HTMLInputElement | null = $state(null)
 
+  // Close the dialog if it is open (client/hud.md rule 16: the room is gone).
+  export function close(): void {
+    dialog?.close()
+  }
+
   // Show the dialog and move the focus into it: to the address input when it
   // shows, else to its first control.
   export function open(): void {

@@ -70,7 +70,7 @@ the specs whose criteria this one mentions.
 | [009](009-keyboard-navigation.md) | US-2.4 Keyboard and navigation | E2 | MVP | 4 | - |
 | [010](010-instant-solo-start.md) | US-2.5 Instant solo start | E2 | MVP | 6 | - |
 | [011](011-room-creation.md) | US-3.1 Room creation and invitation | E3 | MVP | 4 | - |
-| [012](012-guest-join.md) | US-3.2 Guest join | E3 | MVP | 8 | 014, 019, 021, 022 |
+| [012](012-guest-join.md) | US-3.2 Invited player's join | E3 | MVP | 8 | 014, 019, 021, 022 |
 | [013](013-presence.md) | US-3.3 Presence | E3 | MVP | 8 | 006, 009, 035 |
 | [014](014-host-controls.md) | US-3.4 Host controls | E3 | MVP | 10 | 006, 013, 035 |
 | [015](015-shared-letters.md) | US-4.1 Shared letters | E4 | MVP | 4 | - |
@@ -128,7 +128,7 @@ Four choices are settled for the MVP and ticked below. Three remain open: the gr
 - [ ] Grid source: commission an author, license from a publisher, or generate and review? It blocks real content in `grids/`, not the code (owner, 2026-10-11; spec 005).
 - [x] Same-cell rule: decided, last write wins (AC-4.2.1).
 - [x] Room size: decided, 8 players per room (AC-3.2.4).
-- [x] Identity: decided, guests only for the MVP. Accounts stay in V1 (US-9.2).
+- [x] Identity: decided, anonymous players only for the MVP. Accounts stay in V1 (US-9.2).
 - [ ] Competitive play: is E8 wanted at all?
 - [x] Platform: decided, web only and responsive on any device (AC-2.1.5).
 - [ ] Le Parisien baseline: confirm it from screenshots of the listing, an open grid and its help menu.

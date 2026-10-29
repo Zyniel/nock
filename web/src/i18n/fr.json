@@ -70,6 +70,7 @@
   "room.status.throttled": "Trop de codes erronés. Réessayez dans une minute.",
   "room.status.closed": "Connexion perdue.",
   "room.status.reconnecting": "Reconnexion…",
+  "room.gone.title": "Ce salon n'existe plus.",
   "room.banner.offline": "Connexion perdue. Vous pouvez continuer : vos lettres seront envoyées au retour du réseau.",
   "room.share.label": "Lien d'invitation",
   "room.share.copy": "Copier le lien",
