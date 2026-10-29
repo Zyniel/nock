@@ -1003,7 +1003,7 @@ others, at the top of the list.
 
 ### B-024 /ops overrides of the room lives
 
-- Status: ready (the human approved the brief as written, with the lead's
+- Status: building (the human approved the brief as written, with the lead's
   calls, and picked A for the INFO log, then the spec change as written with
   the lead's calls, 2026-10-29)
 - Waits for: nothing left (B-023 is merged and on this branch).
