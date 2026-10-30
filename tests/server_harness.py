@@ -150,15 +150,10 @@ class SlowConnectRegistry(RoomRegistry):
         *,
         owner_loop: asyncio.AbstractEventLoop | None = None,
     ) -> RoomConnection | None:
-        """Wait when the room is slow, then open the connection as usual.
-
-        `owner_loop` is handed on only when the caller gave one.
-        """
+        """Wait when the room is slow, then open the connection as usual."""
         if code in self.slow_codes:
             self.connect_started.set()
             time.sleep(CONNECT_DELAY_SECONDS)
-        if owner_loop is None:
-            return super().connect(code, account_id)
         return super().connect(code, account_id, owner_loop=owner_loop)
 
 

@@ -197,14 +197,8 @@ class SlowLookupRegistry(RoomRegistry):
         *,
         owner_loop: asyncio.AbstractEventLoop | None = None,
     ) -> RoomConnection | None:
-        """Wait `LOOKUP_DELAY_SECONDS`, then open the connection as usual.
-
-        `owner_loop` is handed on only when the caller gave one, so that the
-        wait is the same for a caller that does not know the keyword.
-        """
+        """Wait `LOOKUP_DELAY_SECONDS`, then open the connection as usual."""
         time.sleep(LOOKUP_DELAY_SECONDS)
-        if owner_loop is None:
-            return super().connect(code, account_id)
         return super().connect(code, account_id, owner_loop=owner_loop)
 
 

@@ -10,6 +10,9 @@ tests are in `tests/test_rooms_*.py`:
   `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` read by an app that builds its own registry,
   by `main()` and by `python -m nock`.
 
+`create_room_code` also serves the tests of other domains that need a room created
+over HTTP.
+
 The limit is counted on the registry's clock, so the tests of the hour give the
 registry the fake clock. An app that is given a registry may or may not read the
 variable, so the tests of AC-16 and AC-17 give the app none.
@@ -48,6 +51,18 @@ def post_room(client: TestClient, body: object | None = None) -> Response:
     if body is None:
         body = {"grid_number": GRID_NUMBER}
     return client.post("/api/rooms", json=body)
+
+
+def create_room_code(client: TestClient) -> str:
+    """`POST /api/rooms` for the catalogue's grid; the code of the new room.
+
+    Fails the test when the room is not created.
+    """
+    response = post_room(client)
+    assert response.status_code == 201, response.text
+    code = response.json()["code"]
+    assert isinstance(code, str)
+    return code
 
 
 def post_rooms(client: TestClient, count: int) -> list[int]:

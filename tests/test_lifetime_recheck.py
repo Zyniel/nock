@@ -39,6 +39,7 @@ from lifetime_harness import (
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import EditLetter, Join, LetterCellView, LetterChanged, Snapshot
+from rooms_harness import create_room_code
 from server_harness import serving
 from spec014_harness import Peer, socket_url
 from spec017_harness import FakeClock
@@ -52,7 +53,6 @@ PAST_THE_LIFE_SECONDS = LIFE_HOURS * HOUR + 1
 LETTER_ROW = 1
 LETTER_COLUMN = 0
 LETTER = "T"
-GRID_NUMBER = 1  # the number of the grid of `spec024_harness.make_catalogue`
 
 
 @pytest.fixture
@@ -63,15 +63,6 @@ def fx01_grid(fx01_text: str) -> Grid:
 @pytest.fixture
 def catalogue(fx01_grid: Grid) -> Catalogue:
     return make_catalogue(fx01_grid)
-
-
-def create_room(client: TestClient) -> str:
-    """`POST /api/rooms` for the catalogue's grid; the code of the new room."""
-    response = client.post("/api/rooms", json={"grid_number": GRID_NUMBER})
-    assert response.status_code == 201, response.text
-    code = response.json()["code"]
-    assert isinstance(code, str)
-    return code
 
 
 def type_the_letter(player: Peer) -> None:
@@ -120,7 +111,7 @@ def test_ac14_a_lookup_keeps_the_room_when_a_letter_lands_before_its_lock(
             serving(store, fake_clock, catalogue, config) as (client, registry),
             ExitStack() as stack,
         ):
-            code = create_room(client)
+            code = create_room_code(client)
             ana = open_member(stack, client, code, "Ana")
             fake_clock.advance(PAST_THE_LIFE_SECONDS)
             store.after_next_read = lambda: type_the_letter(ana)
@@ -152,7 +143,7 @@ def test_ac14_a_lookup_deletes_the_expired_room_when_no_letter_lands(
             serving(store, fake_clock, catalogue, config) as (client, registry),
             ExitStack() as stack,
         ):
-            code = create_room(client)
+            code = create_room_code(client)
             ana = open_member(stack, client, code, "Ana")
             fake_clock.advance(PAST_THE_LIFE_SECONDS)
 
@@ -185,8 +176,8 @@ def test_ac15_the_sweep_keeps_the_room_where_a_letter_landed_after_its_read(
             serving(store, fake_clock, catalogue, config) as (client, registry),
             ExitStack() as stack,
         ):
-            code_a = create_room(client)
-            code_b = create_room(client)
+            code_a = create_room_code(client)
+            code_b = create_room_code(client)
             bob = open_member(stack, client, code_a, "Bob")
             ana = open_member(stack, client, code_b, "Ana")
             fake_clock.advance(PAST_THE_LIFE_SECONDS)
@@ -226,8 +217,8 @@ def test_ac15_the_sweep_deletes_both_rooms_when_no_letter_lands(
             serving(store, fake_clock, catalogue, config) as (client, registry),
             ExitStack() as stack,
         ):
-            code_a = create_room(client)
-            code_b = create_room(client)
+            code_a = create_room_code(client)
+            code_b = create_room_code(client)
             bob = open_member(stack, client, code_a, "Bob")
             ana = open_member(stack, client, code_b, "Ana")
             fake_clock.advance(PAST_THE_LIFE_SECONDS)

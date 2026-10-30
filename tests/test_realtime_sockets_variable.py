@@ -40,7 +40,6 @@ from nock.catalogue import Catalogue
 from nock.grid import Grid
 from realtime_harness import (
     DEFAULT_SOCKET_CAP,
-    GRID_NUMBER,
     SOCKETS_VARIABLE,
     TOO_MANY_SOCKETS_CLOSE_CODE,
     fill_address,
@@ -49,6 +48,7 @@ from realtime_harness import (
 )
 from rooms_harness import (
     LIMIT_VARIABLE,
+    create_room_code,
     record_server_runs,
     refusal_of_main,
     run_python_m_nock,
@@ -82,15 +82,6 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
 @pytest.fixture
 def server_runs(monkeypatch: pytest.MonkeyPatch) -> list[uvicorn.Config]:
     return record_server_runs(monkeypatch)
-
-
-def create_room_code(client: TestClient) -> str:
-    """`POST /api/rooms` for the catalogue's grid; the code of the new room."""
-    response = client.post("/api/rooms", json={"grid_number": GRID_NUMBER})
-    assert response.status_code == 201, response.text
-    code = response.json()["code"]
-    assert isinstance(code, str)
-    return code
 
 
 # ---- The accepted values ------------------------------------------------------------

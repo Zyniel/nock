@@ -41,11 +41,14 @@ SOCKETS_VARIABLE = "NOCK_SOCKETS_PER_ADDRESS"
 DEFAULT_SOCKET_CAP = 50
 TOO_MANY_SOCKETS_CLOSE_CODE = 4503
 SILENT_CLOSE_CODE = 4408
+ROOM_NOT_FOUND_CLOSE_CODE = 4404
+THROTTLED_CLOSE_CODE = 4429
 WRONG_CODE_LIMIT = 10  # the closes 4404 an address gets before 4429
+WRONG_CODE_WINDOW_SECONDS = 60.0  # the minute of the throttle (`lobby/rooms.md`)
+UNKNOWN_CODE = "ZZZZZZ"
 OTHER_ADDRESS = "10.0.0.2"
 RETRY_LIMIT_SECONDS = 5.0
 RETRY_PAUSE_SECONDS = 0.05
-GRID_NUMBER = 1  # the number of the grid of `spec024_harness.make_catalogue`
 
 
 class OpenSocket(NamedTuple):
@@ -107,26 +110,39 @@ def fill_address(
     return sockets
 
 
+def try_socket_until_counted(
+    client: TestClient, code: str, parent: ExitStack
+) -> OpenSocket:
+    """Try sockets until one is not closed with 4503; return that one.
+
+    The socket returned is served or closed with another code. A closed socket
+    frees its place when the server notices it, a little later: the tries go on
+    for `RETRY_LIMIT_SECONDS`, then fail the test.
+    """
+    deadline = time.monotonic() + RETRY_LIMIT_SECONDS
+    while True:
+        socket = try_socket(client, code, parent)
+        if socket.peer.close_code != TOO_MANY_SOCKETS_CLOSE_CODE:
+            return socket
+        if time.monotonic() >= deadline:
+            pytest.fail(
+                f"every socket was still closed with 4503 after {RETRY_LIMIT_SECONDS} s"
+            )
+        time.sleep(RETRY_PAUSE_SECONDS)
+
+
 def try_socket_until_free(
     client: TestClient, code: str, parent: ExitStack
 ) -> OpenSocket:
     """Try sockets until one is served; a close other than 4503 fails the test.
 
-    A closed socket frees its place when the server notices it, a little later:
-    the tries go on for `RETRY_LIMIT_SECONDS`.
+    The tries are those of `try_socket_until_counted`.
     """
-    deadline = time.monotonic() + RETRY_LIMIT_SECONDS
-    while True:
-        socket = try_socket(client, code, parent)
-        if is_served(socket):
-            return socket
-        close_code = socket.peer.close_code
-        assert (
-            close_code == TOO_MANY_SOCKETS_CLOSE_CODE
-        ), f"the socket was closed with {close_code}, not 4503"
-        if time.monotonic() >= deadline:
-            pytest.fail(f"every socket was still refused after {RETRY_LIMIT_SECONDS} s")
-        time.sleep(RETRY_PAUSE_SECONDS)
+    socket = try_socket_until_counted(client, code, parent)
+    assert is_served(
+        socket
+    ), f"the socket was closed with {socket.peer.close_code}, not 4503"
+    return socket
 
 
 def client_from_another_address(client: TestClient) -> TestClient:

@@ -185,7 +185,7 @@ deletes it with all its data.
 - A refused value is shown in the message, since none of the five variables is
   a secret (AC-8).
 - The creator's erasure deletes its rooms whether expired or not, with no
-  second read (`lobby/host.md` rule 14) (AC-14, AC-15).
+  second read (`lobby/host.md` rule 14) (`lobby/host.md` AC-15).
 
 ## Out of scope
 
