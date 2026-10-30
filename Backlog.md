@@ -74,6 +74,330 @@ others, at the top of the list.
 - A worktree gets it once its branch takes `main` after the merge: the hook
   runs the `gate.py` of the checkout it checks.
 
+### B-028 Review of the Python backend
+
+- Status: done (the human asked for it, 2026-10-29: « As the Code Reviewer
+  agent "code-reviewer.md", create a new branch and proceed to a full review
+  of the python backend. »; a review, built by the lead)
+- Domains: none (the report `claude_docs/backend-review.md`; no spec, test or
+  code changes)
+- Architecture decision: no
+- Branch: feat/b-028-backend-review · PR: none yet
+- Problem: no review had looked at `src/nock/` as a whole, across specs, for
+  security, capacity and maintainability.
+- In scope: every module of `src/nock/`, the gate without browser tests, and
+  measurements of the hot paths on the largest catalogue grid.
+- Out of scope: the web client, the tests themselves, the tooling.
+- Screens: none.
+- Findings: 2 High (unlimited room creation that stays in memory; grid checks
+  and full-grid edits that pin the one engine thread), 7 Medium, 11 Low, and a
+  gap of the gate (pyrefly skips `scripts/`). One recommendation changed on a
+  second reading: L1 asked to hash the resume tokens of the account tables,
+  which cannot work, since the account hands the raw token back to the
+  player's other devices; only the docstring that promises safety is wrong
+  (B-036).
+- Queued (the human, 2026-10-29: « Review your comments, regroupe them in
+  technical coherent fixes and queue them in the backlog »), one item per
+  coherent fix, in the lead's order:
+  1. Before the first public test, the ways one client hurts every room:
+     B-029 (gate), B-030 (grid lookups), B-031 (check and reveal limits),
+     B-032 (room capacity), B-033 (sockets), B-034 (HTTP edge).
+  2. Next, privacy promises that are not checked: B-035 (store deletion),
+     B-036 (account erasure).
+  3. When convenient, cost and structure: B-037 (lean snapshots), B-038
+     (server structure).
+  The rest went to "Small follow-ups". Each item's branch takes `main` once
+  this one is merged, so it has its brief. The human approved the order on
+  2026-10-29 (« Approve the order: B-029 to B-034 before the first public
+  test, then B-035 and B-036, then B-037 and B-038. Start with B-029. »); the
+  briefs B-030 to B-038 still wait for their own approval.
+
+### B-029 The gate type-checks `scripts/`
+
+- Status: ready (tooling, built by the lead: CLAUDE.md lets the lead fix a
+  weakness of the tooling without asking, in a pull request of its own)
+- Priority: first (every item's gate runs on it; the smallest fix of B-028)
+- Domains: none (tooling only: `scripts/gate.py`)
+- Architecture decision: no
+- Criteria: none (tooling)
+- Branch: feat/b-029-gate-pyrefly-scripts · PR: none yet
+- Problem: the gate puts `scripts/` on `PYTHONPATH` (`scripts/gate.py:241`)
+  for every step. Pyrefly then reads `scripts/` as a site-packages folder and
+  leaves it out of the project ("Skipping include pattern ...scripts because
+  it is matched by `project-excludes`"), so neither the local gate nor CI
+  type-checks `scripts/`, though `pyproject.toml` includes it. A plain
+  `uv run pyrefly check` does check it, with 0 errors today.
+- In scope: run pyrefly without `scripts/` on its `PYTHONPATH`, the other
+  steps unchanged; a test of the gate that pyrefly's environment holds no
+  `scripts/` entry, if it stays cheap.
+- Out of scope: the other steps of the gate; `src/` and `tests/`.
+- Screens: none.
+- Open questions: none.
+
+### B-030 Grid lookups in constant time
+
+- Status: brief
+- Priority: second (B-028's worst CPU path; no behaviour change)
+- Domains: content/grids (the model's lookups), platform/server (a time
+  budget)
+- Architecture decision: yes (new public names of `Grid`, read by `room.py`,
+  `catch_up.py`, `recap.py`, `grid_import.py` and `ipuz.py`): options from
+  the Plan agent on Fable
+- Branch: feat/b-030-grid-lookups · PR: none yet
+- Problem: one engine thread runs every room (`nock.hub`), and the hottest
+  rules find a cell's answer by linear scans: `Grid.cell_at` walks every cell,
+  `word_cells` calls it for each letter, `_solution_letter` (`room.py:2405`)
+  rebuilds every word of the grid for each cell, and `Clue.letters`
+  normalises the answer again at each read. On the largest catalogue grid
+  (12 x 15), the solving edit, and any edit of a full grid, cost up to 56 ms
+  of that thread, a grid check 80 ms, and a catch-up rebuilds every word for
+  each letter of the absence (`catch_up.py:181`). Every other room waits
+  meanwhile (B-028 H2, M4).
+- In scope: a grid computes its cell index, its words and its solution
+  letters once, and the rules read them. Options:
+  - A (lead's pick): private attributes filled after validation
+    (`model_post_init`), read through public methods (`solution_letter`,
+    `words`); the model stays frozen and its JSON unchanged.
+  - B: a module cache keyed by the grid, outside the model.
+  - C: precompute in the catalogue only; a grid built by hand (tests, the
+    converter) stays slow.
+  A time budget proves it, for example "the solving edit and a grid check on
+  the largest catalogue grid each take under 5 ms" (its test file goes in
+  `SERIAL_TEST_FILES`); the spec-writer picks the measure.
+- Out of scope: the limits on checks and reveals (B-031); the protocol, the
+  answers and the store.
+- Screens: none.
+- Open questions: none beyond the option.
+
+### B-031 Limits on checks and reveals
+
+- Status: brief
+- Priority: third (with B-030 it closes B-028 H2: B-030 makes a check cheap,
+  this one bounds how often)
+- Domains: gameplay/hints, platform/realtime
+- Architecture decision: no with the lead's default below; yes with a new
+  error code (a protocol message)
+- Branch: feat/b-031-hint-limits · PR: none yet
+- Problem: checks and reveals count toward no limit (`room.py:2033`; only
+  edits count toward `max_edits_per_second`), the default help mode is
+  `free`, and a check of wrong cells locks nothing, so the next one costs the
+  same and logs another `check_result`. One player can send about 12 grid
+  checks a second in their own room: 3.3 KB of log each (about 3.4 GB a day)
+  and, until B-030, a fully busy engine thread for every room.
+- In scope: a window per player for `check` and `reveal` requests, a vote
+  request included, with its numbers in `RoomConfig`.
+- Out of scope: the edit limit; the reveal budget (`gameplay/hints.md`).
+- Screens: none with the lead's default (a dropped request shows nothing).
+- Open questions:
+  1. The numbers: A (lead's default) 5 requests per 10 seconds per player, as
+     chat; B 1 a second.
+  2. A request over the limit: A (lead's default) dropped without an answer,
+     as a chat message over its limit is. Not `rate_limited`: the client
+     reads it as the answer to an edit and drops its oldest pending edit
+     (`web/src/lib/roomSession.ts:1289`). B: a new error code the page shows,
+     a protocol change and a new text.
+
+### B-032 Room capacity: a creation limit, idle rooms leave memory
+
+- Status: brief
+- Priority: fourth (before the first public test)
+- Domains: lobby/rooms (a creation limit; its "Out of scope" line on
+  throttling creation goes), platform/server (a room stays in memory only
+  while it is played), gameplay/results (the recap read without making the
+  room live, kept once built)
+- Architecture decision: no (inside `nock.hub` and `nock.server`; a refused
+  creation answers 429, which the catalogue already shows as
+  `catalogue.play_failed`, `lobby/rooms.md` rule 2)
+- Branch: feat/b-032-room-capacity · PR: none yet
+- Problem: `POST /api/rooms` creates rooms for anyone, with no limit, and
+  every room created or loaded keeps its runner in memory until it expires,
+  720 hours later by default: 89 KiB of memory and 32 KiB of database each,
+  about 685 creations a second. 100 requests a second for an hour leave about
+  31 GiB in memory (B-028 H1). Any read through `room_state` (a recap route,
+  a socket) loads a stored room and keeps it too, and the shutdown writes a
+  snapshot of each (M5). The public recap is built twice per view, from the
+  whole log (L4).
+- In scope: a per-address limit on creation, on the pattern of `_LinkLimits`,
+  answered 429; a runner whose task ends with no open socket saves its
+  snapshot and leaves memory; the recap routes read through `peek_room`, and
+  a solved room's recap is kept once built.
+- Out of scope: the limits of sockets (B-033); the size of snapshots (B-037).
+- Screens: none.
+- Open questions:
+  1. The creation limit: A (lead's default) 30 rooms an hour per address; B 10;
+     C more for a signed-in creator.
+  2. A cap on rooms in memory once idle ones leave: A (lead's default) none;
+     B a cap answered 503.
+
+### B-033 Sockets: off the event loop, a deadline to join, a cap per address
+
+- Status: brief
+- Priority: fifth (before the first public test)
+- Domains: platform/realtime (a join deadline and its close code, a cap on
+  open sockets per address), platform/server
+- Architecture decision: yes (a close code is part of the protocol,
+  `platform/realtime.md` rule 13): options from the Plan agent on Fable
+- Branch: feat/b-033-socket-hygiene · PR: none yet
+- Problem: `_serve_socket` calls `RoomRegistry.connect` on uvicorn's event
+  loop; `connect` reads SQLite and can wait for the registry lock, which a
+  deletion holds up to 5 seconds, and every request of the process waits
+  meanwhile (B-028 M1). A socket that never sends `join` stays open for ever,
+  and nothing caps the sockets of one address (M2). An expiry is decided
+  outside the lock that deletes the room (L3).
+- In scope: `connect` off the event loop; a socket still not joined some
+  seconds after it opened is closed with its own code; a cap on the open
+  sockets of an address; the expiry checked again under the registry lock.
+- Out of scope: frame sizes and the flood and stall bounds (unchanged).
+- Screens: none (the page sends `join` as soon as the socket opens, so only a
+  client that never joins meets the deadline; the spec-writer says what the
+  page does on the new code).
+- Open questions:
+  1. The deadline and the cap: A (lead's default) 10 seconds and 20 sockets
+     per address; B 30 seconds and 50.
+  2. The close code: A (lead's default) a new 44xx code; B 4408, the silence
+     code.
+
+### B-034 HTTP edge: body size, security headers, the Bearer scheme
+
+- Status: brief
+- Priority: sixth (before the first public test; small)
+- Domains: platform/server ("Serving the client": body size, headers),
+  admin/operations (the scheme of the operator token)
+- Architecture decision: no (one middleware, and the `Caddyfile` of B-009)
+- Branch: feat/b-034-http-edge · PR: none yet
+- Problem: neither uvicorn nor the `Caddyfile` limits a request body, and
+  FastAPI reads it whole before validation (B-028 M3). No answer has a
+  `Content-Security-Policy`, `X-Content-Type-Options` or `Referrer-Policy`,
+  and any site can frame the room page or `/ops` (L6). The ops API accepts the
+  exact prefix `Bearer ` only, though the scheme is case-insensitive
+  (RFC 9110), and a wrong case counts toward the throttle (L7).
+- In scope: a body limit (lead's proposal: 64 KB) in the app (a middleware
+  answering 413) and in the `Caddyfile` (`request_body max_size`); the
+  headers on every answer, the CSP to `'self'` with `frame-ancestors 'none'`;
+  the scheme compared case-insensitively.
+- Out of scope: the WebSocket frame size (8 KiB already); CORS (no
+  cross-origin use).
+- Screens: none (a CSP that breaks the page shows in the browser tests).
+- Open questions:
+  1. Where the headers are set: A (lead's default) by the app, so they hold
+     behind any proxy and in the tests; B by Caddy only.
+
+### B-035 The store: checked secure deletion, one checkpoint per sweep, indexes
+
+- Status: brief
+- Priority: seventh (privacy promise and sweep cost)
+- Domains: admin/operations (no copy of a deleted room stays), lobby/lifetime
+  (the sweep), account/account (the purge)
+- Architecture decision: no (indexes in migration 3 and the order of the
+  statements; no row changes)
+- Branch: feat/b-035-store-deletion · PR: none yet
+- Problem: each room deletion runs `PRAGMA wal_checkpoint(TRUNCATE)`
+  (`store.py:347`) inside the store lock that the engine thread takes for
+  each step, so a sweep of thousands of expired rooms stalls every room. The
+  checkpoint's result is never read: one that gave up (busy, while the
+  account store's connection to the same file is active) leaves the old pages
+  in the log, although `admin/operations.md` says no byte of the room stays.
+  The same holds for `erase_player`, `delete_account`,
+  `erase_players_from_history` and `purge` (B-028 M7). Several queries scan
+  their whole table: rooms by creation time and by creator, identities by
+  room code, team-mates by code and player, links by address, sessions by
+  account (L5).
+- In scope: a sweep deletes its expired rooms, then checkpoints once; each
+  checkpoint reads its `busy` column; the indexes, in migration 3.
+- Out of scope: the size of snapshots (B-037).
+- Screens: none.
+- Open questions:
+  1. A checkpoint that stays busy: A (lead's default) one retry, then a
+     WARNING, and the next sweep empties the log; B the request fails.
+
+### B-036 Account erasure that always finishes
+
+- Status: brief
+- Priority: eighth (privacy; the failure needs a busy engine, which B-030 and
+  B-031 make rare)
+- Domains: account/account
+- Architecture decision: yes with option B (a new table, stored data)
+- Branch: feat/b-036-erasure-finishes · PR: none yet
+- Problem: `DELETE /api/account` (`server.py:1391`) deletes the account rows,
+  then erases its players from the live rooms, waiting up to 5 seconds on the
+  engine for each (`hub.py:1106`, `hub.py:1377`). A timeout answers 500 once
+  the account is gone; the remaining rooms and the history records keep the
+  nickname, and nothing is left to retry from (B-028 L2). Also, from spec 029
+  ("Small follow-ups"): a history save that read the room before an erasure
+  and writes after it keeps the nickname. And the module docstring of
+  `accounts.py` promises that a copy of the database "cannot sign anybody
+  in": true of accounts, but its room identities hold resume tokens in clear,
+  as they must (the account gives them back to the player's devices).
+- In scope: every step of the erasure runs even when one room fails, and a
+  failure is not lost. Options:
+  - A: each room tried, logged and passed; the history erased in any case;
+    nothing retried.
+  - B (lead's pick): A, plus a table of pending erasures that the sweep
+    retries until each is done.
+  - C: the rooms erased before the account goes, so a failure leaves the
+    account for the player to retry.
+  The docstring says what a copy of the database does give.
+- Out of scope: an export of the account.
+- Screens: none.
+- Open questions: none beyond the option.
+
+### B-037 Lean snapshots
+
+- Status: brief
+- Priority: ninth (the disk grows with play, slowly)
+- Waits for: B-035 (both migrate the schema)
+- Domains: platform/server (snapshots), social/catch-up (which snapshots a
+  catch-up needs), lobby/host (the removed tokens)
+- Architecture decision: yes (stored data): options from the Plan agent on
+  Fable
+- Branch: feat/b-037-lean-snapshots · PR: none yet
+- Problem: every 100 events a snapshot stores the whole room: the grid with
+  its clues and answers (about 30 KiB), every cell and the whole chat, and no
+  snapshot is ever deleted, though `load_room_at` needs only those a catch-up
+  can still ask for (B-028 M6). `removed_tokens` grows with every removal and
+  goes into every snapshot (L10).
+- In scope: the grid out of the snapshots; the snapshots no catch-up can reach
+  pruned; a bound on `removed_tokens` (lead's proposal: the last 100, as past
+  players). Options for the grid:
+  - A (lead's pick): stored once per room, in a table of its own.
+  - B: by its catalogue number; a room on a bare or withdrawn grid still needs
+    its own copy.
+- Out of scope: the log, append-only (`platform/server.md`).
+- Screens: none.
+- Open questions:
+  1. Which snapshots stay: A (lead's default) the first and the newest, a
+     catch-up from further back replaying the log from the first; B one per
+     day of play.
+
+### B-038 Server structure: typed answers and an app factory
+
+- Status: brief
+- Priority: last (maintainability; no player sees it)
+- Waits for: nothing (B-027, which changed `server.py`, is merged)
+- Domains: platform/server, admin/overrides, admin/operations (the answers
+  keep their JSON)
+- Architecture decision: yes (`nock.server`'s public names, how the app is
+  built, and the modeling rules of `_architecture.md`): options from the Plan
+  agent on Fable
+- Branch: feat/b-038-server-structure · PR: none yet
+- Problem: several answers are built as `dict[str, object]`
+  (`RoomLifeOverrides.answer`, the dashboard's `offered_days`, the dry run's
+  `{"rooms": n}`, the link route's `{}`), `Setting` and `SETTINGS` are a
+  public `NamedTuple`, against the modeling rules, and no route declares a
+  `response_model`, so no answer is checked on its way out (B-028 L8).
+  `nock.server` reads the catalogue and builds the app when it is imported
+  (`server.py:1475`), so one bad grid file fails every import, tests
+  included, and the data folders resolve only from the repository layout
+  (L9).
+- In scope: a model per answer and `response_model` on each route, with the
+  same JSON; `Setting` private, or a model; an app factory that `__main__`
+  calls.
+- Out of scope: any change of what an answer holds.
+- Screens: none.
+- Open questions:
+  1. The data folders (`web/dist`, `grids/`, `fr.json`) from variables: A
+     (lead's default) no, the image keeps the layout (B-009); B yes.
+
 ### B-001 Rebaseline v1.1.0 into domain specs
 
 - Status: done (the human approved every domain file, 2026-10-24)
@@ -96,20 +420,6 @@ others, at the top of the list.
   buttons and the clue bar's minimum width (320 px) into `_design/room.md`;
   takes the grid's name in the computer top bar out of the design.
 
-### B-002 Phase 8: race and team modes
-
-- Status: approved (the human, 2026-10-22: E8 is wanted, once the visual design
-  is built)
-- Domains: gameplay/modes
-- Waits for: B-001
-- Problem: specs 030 and 031 are 1.5 KB stubs approved before their interface
-  existed.
-- In scope: race on one grid; two teams racing. Answers already given: teams
-  differ in size by at most one player and no team is empty; the host cannot
-  start with fewer than 2 players.
-- Out of scope: other competitive modes.
-- Screens: to draw in the screens sheet with the spec change.
-
 ### B-003 Compact the tests
 
 - Status: brief (the human delays the decision)
@@ -123,31 +433,47 @@ others, at the top of the list.
 - Out of scope: the code; what the tests prove.
 - Screens: none.
 
-### B-004 Live "word completed" lines in the Salon's stream
-
-- Status: approved (the human's pick (b) of spec 034's decision 7: add the live
-  line as a later refinement of spec 013; never built)
-- Domains: social/chat, social/catch-up
-- Waits for: B-001
-- Problem: a player who comes back reads « … a complété … » lines in the
-  catch-up, but a player who stayed never sees them: live play adds no such line.
-- In scope: the same word-completed line, added live when a letter completes a
-  word.
-- Out of scope: other new kinds of line.
-- Screens: the stream's line, as the catch-up already draws it.
-
 ### B-005 Grid progress on the account
 
-- Status: approved (spec 004's decision 8, approved by the human on
-  2026-10-10: progress shows "on my device or account", the account part
-  waiting for spec 033; never built)
-- Domains: content/library, account/account
-- Waits for: B-001
+- Status: done (spec 004's decision 8, 2026-10-10: progress shows "on my
+  device or account"; the human approved this brief with option A,
+  2026-10-29, the spec change and AC-24's rewording, 2026-10-30; review
+  approved in rounds 1 and 2)
+- Domains: account/account (the route), content/library (rule 7, the merge)
+- Architecture decision: yes (a new account route): options from the Plan
+  agent on Fable; the human picked A
+- Criteria: account AC-19, AC-20, AC-21 (new); library AC-22, AC-23, AC-24
+  (new)
+- Branch: feat/b-005-account-progress · PR: #66
 - Problem: a grid's « Commencée » or « Terminée » comes only from this
-  device's storage; a signed-in player on another device sees none.
-- In scope: progress read from the account for a signed-in player.
-- Out of scope: progress of guests across devices.
-- Screens: the catalogue's progress pills, as drawn today.
+  device's `nock.progress`; a signed-in player on another device sees none.
+- In scope: a signed-in player's progress read from the account and merged
+  with the device's on `/` and `/g/<n>`, per grid `finished` over `started`
+  over none. Signed out, accounts off, or a failed request: the device's
+  progress alone, the page ready either way. Options:
+  - A (lead's pick): derived, nothing stored. `GET /api/account/progress`
+    answers `{"<n>": "started" | "finished"}` like `nock.progress`:
+    `finished` for each history record, and for each solved room still
+    existing of the account's identities; `started` for the others and for
+    its creator rooms still existing. 401 without session, 404 accounts off.
+    Erasure and privacy unchanged. Lost: « Commencée » once an unsolved room
+    expires (it can no longer be resumed); « Terminée » lasts as « Grilles
+    terminées » does. About 3 criteria; no clash with B-036 or B-038.
+  - B: a table `account_progress (account, grid, progress)` written by the
+    client beside `nock.progress` (`PUT /api/account/progress`), read by the
+    same `GET`. Keeps « Commencée » forever; erasure must delete it (clashes
+    with B-036 on rule 18), and `account.md` would pass the size guidance, so
+    a new domain file `account/progress.md` (a map change).
+  - C: B's table written by the server (room creation, signed-in join,
+    `grid_solved`). Counts rooms joined by link too, but changes the room
+    engine and three more domains.
+- Out of scope: guests' progress across devices; pushing a device's progress
+  up to the account at sign-in; progress from a room joined by link before
+  the account's identity was stored; splitting `account/account.md` (19.8 KB,
+  a later item after B-036).
+- Screens: none change: the catalogue's and `/g/<n>`'s pills as drawn today,
+  shown from the device at once, then with the account's when it answers.
+- Open questions: none (the human picked A).
 
 ### B-008 Docs and comments follow the domain specs
 
@@ -1228,6 +1554,16 @@ Taken when a change touches them.
   `data/` inside, not root). Needs the human's approval of the CI actions.
 - Rule grey `#9AA3B2` is 2.54:1 on white, under the 3:1 WCAG 1.4.11 asks of a
   control's boundary; kept by the human, `#8A93A3` (3.10:1) remains possible.
+- B-028: `RoomState.players` and `Snapshot.players` hold `max_length=8` where
+  `MAX_PLAYERS` is meant (`room.py:277`, `protocol.py:739`).
+- B-028: `SmtpMailer._send` calls `quit()` inside `with connection:`, whose
+  exit sends `QUIT` again (`mailer.py:93`); `smtplib` swallows the error.
+- B-028: a chat text accepts control and bidirectional override characters
+  (U+202E), which can show a message reversed; nicknames refuse them
+  (`social/chat.md`, a rule to add).
+- B-028: the SMTP send runs in the thread pool of every sync route, with a
+  10-second timeout; a slow mail server and many addresses could fill its 40
+  threads. Low while the per-address limits hold.
 
 ## Grid engine ideas from ipuz
 
@@ -1264,6 +1600,10 @@ none.
 - Hosting (Fly.io, Render or a VPS) and a domain, before the first public test.
   A cloud session drafts `docs/hosting.md` on the branch `docs/hosting-plan`.
 - Tag `v1.1.0` on `main` (never tagged).
+- The branch `feat/b-016-creator-rooms` (8 commits, last on 2026-10-28, not
+  merged, no item in this file) changes several spec files that B-031 to
+  B-036 touch, while B-022 "Creator rooms and host return" is done: drop it,
+  or say what it still carries.
 
 ## Release checklist
 
@@ -1278,3 +1618,26 @@ Before the human tags a release on `main`:
    human.
 5. The human tags `vX.Y.Z` and pushes the tag; the done items then leave this
    file.
+
+### B-027 The order of the overrides holder
+
+- Status: done (the human approved the brief and picked A, 2026-10-29;
+  no spec change; built and reviewed in two rounds, 2026-10-29)
+- Waits for: nothing left (B-024 is merged and on this branch).
+- Domains: none (no behaviour change: `src/nock/server.py` only)
+- Architecture decision: no (private names of `server.py`)
+- Criteria: none new; the tests of `admin/overrides.md` prove nothing changed
+- Branch: feat/b-027-overrides-holder-order · PR: #65
+- Problem: in `server.py`, `_RoomsHolder.settings_set()` answers None both for
+  a registry given to the app and before any registry exists, which mean
+  different things. It works today only because the lifespan calls
+  `holder.get()` first (B-024 review round 2, a suggestion).
+- In scope: make that order impossible to break by accident. Options:
+  - A (the human's pick): `settings_set()` fails loudly when no registry exists
+    yet, so None means only "a registry was given".
+  - B: `get()` answers the registry and the set together, and
+    `settings_set()` goes.
+  - C: a comment at the call site only.
+- Out of scope: any change to the routes, the answers or the page.
+- Screens: none.
+- Open questions: none beyond the option.
