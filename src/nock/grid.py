@@ -190,7 +190,10 @@ class Clue(BaseModel):
     """A clue: its text, its arrow and the answer of its word.
 
     The answer is kept as written; its letters and breaks are derived from it
-    once, when the clue is built, and never dumped.
+    once, when the clue is built, and never dumped. Build a clue only through
+    validation: a copy with a changed answer (`model_copy(update=...)`) keeps the
+    old letters and breaks, so validate it again with
+    `Clue.model_validate(copy.model_dump())`.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -280,7 +283,10 @@ class Grid(BaseModel):
 
     Once built, the grid derives its lookups once: the cell at each position,
     its words and the solution letter of each letter cell. They are private
-    and never dumped, so the JSON of a grid holds only its fields.
+    and never dumped, so the JSON of a grid holds only its fields. Build a grid
+    only through validation: `model_construct` leaves the lookups empty, and a
+    copy with changed cells (`model_copy(update=...)`) shares the original's
+    lookups, so validate it again with `Grid.model_validate(copy.model_dump())`.
     """
 
     model_config = ConfigDict(frozen=True)
