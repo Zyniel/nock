@@ -7,6 +7,11 @@ tests are in `tests/test_server_*.py`:
 - `test_server_rooms_in_memory.py`: AC-23 and AC-24, over the room socket, with the
   app of `host_harness` (a fake clock, the rooms' store on a file).
 - `test_server_engine_time.py`: rule 20, which has its own setup.
+- `test_server_socket_responsiveness.py`: AC-25, a socket whose lookup is slow
+  (`SlowConnectRegistry`) delays nobody. It measures durations, so it runs on its
+  own (`SERIAL_TEST_FILES`).
+- `test_server_socket_loads.py`: AC-26, the store reads of a socket's lookup
+  (`CountingStore`).
 
 A room is live when `RoomRegistry.live_codes()` holds its code. `state_of` (and
 every `room_state` lookup) loads a room and so makes it live: a test that reads
@@ -19,17 +24,46 @@ its own (`snapshots` has one row per saved seq).
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import sqlite3
 import threading
+import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
-from nock.hub import RoomRegistry
-from nock.room import RoomState
+from fastapi.testclient import TestClient
+
+from nock.catalogue import Catalogue
+from nock.hub import RoomConnection, RoomRegistry
+from nock.room import RoomConfig, RoomState
+from nock.server import create_app
 from nock.store import RoomStore
 from spec033_harness import wait_for
 
 SNAPSHOT_FAILURE_PAUSE_SECONDS = 0.3
 HOLD_LIMIT_SECONDS = 10.0
+CONNECT_DELAY_SECONDS = 1.0
+
+
+@contextlib.contextmanager
+def serving(
+    store: RoomStore,
+    clock: Callable[[], float],
+    catalogue: Catalogue,
+    config: RoomConfig,
+) -> Iterator[tuple[TestClient, RoomRegistry]]:
+    """Run the app on a registry over `store`, on `clock`; yield the client and it.
+
+    The registry is closed on the way out; the store is the test's to close.
+    """
+    registry = RoomRegistry(clock=clock, store=store, config=config)
+    try:
+        app = create_app(rooms=registry, catalogue=catalogue)
+        with TestClient(app) as client:
+            yield client, registry
+    finally:
+        registry.close()
 
 
 def wait_until_live(registry: RoomRegistry, code: str) -> None:
@@ -93,3 +127,56 @@ class SnapshotStore(RoomStore):
             self.release_snapshot.wait(HOLD_LIMIT_SECONDS)
         super().save_snapshot(state)
         self.saved_seqs.append(state.seq)
+
+
+class SlowConnectRegistry(RoomRegistry):
+    """A registry whose `connect` takes `CONNECT_DELAY_SECONDS` for some rooms.
+
+    `slow_codes` holds the rooms concerned; the test fills it once the rooms
+    exist. While a slow lookup waits, `connect_started` is set, so that a test
+    sends its other requests only once the wait has begun, in whatever thread or
+    loop the socket route runs `connect`.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.slow_codes: set[str] = set()
+        self.connect_started = threading.Event()
+
+    def connect(
+        self,
+        code: str,
+        account_id: str | None = None,
+        *,
+        owner_loop: asyncio.AbstractEventLoop | None = None,
+    ) -> RoomConnection | None:
+        """Wait when the room is slow, then open the connection as usual.
+
+        `owner_loop` is handed on only when the caller gave one.
+        """
+        if code in self.slow_codes:
+            self.connect_started.set()
+            time.sleep(CONNECT_DELAY_SECONDS)
+        if owner_loop is None:
+            return super().connect(code, account_id)
+        return super().connect(code, account_id, owner_loop=owner_loop)
+
+
+class CountingStore(RoomStore):
+    """A file store that records each `load_room` read that found a room.
+
+    `loaded` holds the code of each such read, in order; a read of an unknown
+    code finds nothing and is not recorded. A room is loaded when the store
+    returns its snapshot with the log replayed.
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.loaded: list[str] = []
+
+    def load_room(self, code: str) -> RoomState | None:
+        """Load the room as usual and record the read when it found the room."""
+        state = super().load_room(code)
+        if state is not None:
+            self.loaded.append(code)
+        return state

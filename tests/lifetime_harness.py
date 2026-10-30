@@ -10,6 +10,9 @@ tests are in `tests/test_lifetime_*.py`:
 - `test_lifetime_sweep.py`: AC-10, the sweeps of a running app and the purge they
   pace.
 - `test_lifetime_migration.py`: AC-13, a database below `user_version` 2.
+- `test_lifetime_recheck.py`: AC-14 and AC-15, the expiry read again under the
+  registry lock, with a store (`EditingStore`) that lets an edit be committed
+  right after the first read of the times (the app is `server_harness.serving`).
 
 AC-1 and AC-2 are proven by the tests of spec 032 (`tests/test_spec_032_ac01_*`,
 `tests/test_spec_032_ac02_*`), which their pointers name.
@@ -31,7 +34,7 @@ that need them, so that each test fails on the name it needs.
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 from pathlib import Path
 from typing import NamedTuple
@@ -42,7 +45,7 @@ from host_harness import HostApp, open_member
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import EditLetter, GridSolved, LetterChanged
-from nock.room import LogEntry, RoomConfig, RoomState, new_room
+from nock.room import LogEntry, RoomConfig, RoomState, RoomTimes, new_room
 from nock.store import RoomStore
 from spec017_harness import FakeClock
 from spec026_harness import FIRST_17, LAST_CELL, SOLUTION
@@ -84,6 +87,7 @@ STARTUP_VARIABLES = (
     SWEEP_VARIABLE,
     *(life.variable for life in LIVES),
     "NOCK_ROOMS_PER_ADDRESS_PER_HOUR",
+    "NOCK_SOCKETS_PER_ADDRESS",
     "NOCK_PUBLIC_URL",
     "NOCK_SMTP_HOST",
     "NOCK_SMTP_PORT",
@@ -172,6 +176,43 @@ def assert_open_then_expired(
     clock.now = limit + HALF_SECOND
     assert registry.room_state(code) is None, "the room is expired after its life"
     assert registry.store.has_room(code) is False
+
+
+# ---- A store that lets an edit land between two reads of the times -----------------
+
+
+class EditingStore(RoomStore):
+    """A file store that runs `after_next_read` once, right after a read of times.
+
+    The reads are `room_times` (a lookup's) and `read_room_times` (the sweep's):
+    the first of either, once `after_next_read` is set, returns the times it read
+    and then runs the action, so that whatever the action commits (an edit over
+    a socket) lands after that read and before anything the caller does next. The
+    action runs in the thread of the reader and is cleared before it runs, so
+    its own reads of the store do not run it again.
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.after_next_read: Callable[[], None] | None = None
+
+    def room_times(self, code: str) -> RoomTimes | None:
+        """Read the times of a room, then run the pending action, if any."""
+        times = super().room_times(code)
+        self._run_pending_action()
+        return times
+
+    def read_room_times(self) -> list[RoomTimes]:
+        """Read the times of every room, then run the pending action, if any."""
+        all_times = super().read_room_times()
+        self._run_pending_action()
+        return all_times
+
+    def _run_pending_action(self) -> None:
+        action = self.after_next_read
+        self.after_next_read = None
+        if action is not None:
+            action()
 
 
 # ---- Solving a room over a socket --------------------------------------------------
