@@ -10,7 +10,7 @@ outcome of the room: its `entries` are the numbered events sent to all, its
 `reply` goes to the sender only.
 
 The window of a player is private to the room and the spec does not name its
-field, so no test reads it: a test reads what the room does next.
+field, so no test of this file reads it: a test reads what the room does next.
 """
 
 from __future__ import annotations
