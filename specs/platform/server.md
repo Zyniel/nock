@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
 # platform/server - Durable rooms, undo, serving and settings
@@ -134,7 +134,8 @@ address and with the database its environment gives.
     (`NOCK_CREATOR_SOLVED_ROOM_HOURS`, `NOCK_CREATOR_ROOM_HOURS`,
     `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS`, `NOCK_ANONYMOUS_ROOM_HOURS`,
     `NOCK_EXPIRY_SWEEP_MINUTES`, `lobby/lifetime.md` rule 7), then
-    `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` (`lobby/rooms.md` rule 14), then the
+    `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` (`lobby/rooms.md` rule 14), then
+    `NOCK_SOCKETS_PER_ADDRESS` (`platform/realtime.md` rule 26), then the
     account variables by their own rules (`account/account.md` rule 2). What
     it runs: `product.md` rule 27.
 16. `NOCK_HOST`, unset or empty `127.0.0.1`: only ASCII letters, ASCII digits,
@@ -150,12 +151,13 @@ address and with the database its environment gives.
 19. A refused value stops `main()` before any server is built; `python -m
     nock` prints the message on stderr and exits with status 1. For
     `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE`, the five variables of
-    `lobby/lifetime.md` and `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` the message is
-    one line naming the variable and showing the value as `repr()` writes it,
-    so it holds no character of Cc, Cf, Zl or Zp; with several of them
-    refused, it names one, a room-life variable only when `NOCK_HOST`,
-    `NOCK_PORT` and `NOCK_DATABASE` pass, and the creation limit only when
-    those and the five pass.
+    `lobby/lifetime.md`, `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` and
+    `NOCK_SOCKETS_PER_ADDRESS` the message is one line naming the variable and
+    showing the value as `repr()` writes it, so it holds no character of Cc,
+    Cf, Zl or Zp; with several of them refused, it names one, a room-life
+    variable only when `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE` pass, the
+    creation limit only when those and the five pass, and the socket cap only
+    when the creation limit passes too.
     The messages of the operator token and the account variables, which never
     show a secret: `admin/operations.md` rule 4, `account/account.md` rule 3.
 
@@ -180,12 +182,27 @@ address and with the database its environment gives.
     live until its task next ends or the server stops. The next socket loads
     it back by rule 6; its players are all disconnected already, so the
     restart step logs nothing. The number of live rooms has no cap.
+22. A socket's lookup of its room is one registry call, `RoomRegistry.connect`,
+    run in a worker thread, never on the server's event loop. In one step under
+    the registry lock it deletes an expired room (`lobby/lifetime.md` rule 6),
+    loads and replays a room not in memory (rule 6) and counts the socket (rule
+    21), then gives back the connection, or nothing for an unknown or expired
+    code, which the wrong-code throttle then records (`lobby/rooms.md` rule 9).
+    No other lookup is made for the socket, so a room is loaded once per
+    socket. A handler cancelled while the call runs leaves the connection it
+    gets back, so the room's count of open sockets stays right.
 
 ### Look
 
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
 `client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two
 top bars (« Phone top bar », « Computer top bar »).
+
+## New interface
+
+- `src/nock/hub.py`: `RoomRegistry.connect(code, account_id=None, *,
+  owner_loop=None)`, callable from any thread; `owner_loop` is the event loop
+  of the socket's handler, which owns the connection (None: the running loop).
 
 ## Acceptance criteria
 
@@ -282,6 +299,14 @@ top bars (« Phone top bar », « Computer top bar »).
   socket: the room stays live. Once Bob's closes, it is not live and the
   store's latest snapshot is at the room's seq. Ana's next socket finds `T`
   and her seat, and the log holds no entry between that seq and her join's.
+- **AC-25** With a registry whose `connect` takes 1 second, a socket opening to
+  Ana's room delays nobody: `GET /api/grids` and a second socket to another
+  room, sent meanwhile, are answered within 200 ms; the first socket's join
+  then gets its snapshot.
+- **AC-26** A socket to a room not in memory makes the store load it once (one
+  `load_room` read for that socket), with its restart step; a socket to
+  `ZZZZZZ` loads nothing and closes with 4404; a second socket to the room
+  while the first is open loads nothing.
 
 ## Edge cases
 
@@ -324,12 +349,12 @@ top bars (« Phone top bar », « Computer top bar »).
   (`build_catch_up`), `src/nock/recap.py`: the rules of rule 20, reading
   `Grid.words` and `Grid.solution_letter`.
 - `src/nock/server.py`: `create_app`, the store's path, client routes,
-  `WEB_DIST_DIR`. `src/nock/__main__.py`, `src/nock/settings.py`: the
-  variables.
+  `WEB_DIST_DIR`, the socket route's one call to `connect` in a worker thread.
+  `src/nock/__main__.py`, `src/nock/settings.py`: the variables.
 - `web/src/lib/RoomTopBar.svelte`, `GridViewport.svelte`, `RoomPage.svelte`,
   `roomSession.ts`, `RoomNote.svelte`: the undo button, shortcut and message.
 - Tests: `tests/test_spec_018_*`, `tests/test_spec_040_ac01_ac06_*`,
   `tests/test_spec_040_ac27_ac29_*`, `tests/test_spec_036_ac10_ac12_*`;
   `tests/test_server_engine_time.py` for rule 20, which measures durations and
-  so runs on its own (`SERIAL_TEST_FILES`); `tests/test_server_*` for AC-23
-  and AC-24.
+  so runs on its own (`SERIAL_TEST_FILES`), as does the file of AC-25;
+  `tests/test_server_*` for AC-23 to AC-26.

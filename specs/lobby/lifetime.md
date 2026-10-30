@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: done
+status: approved
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
@@ -67,10 +67,15 @@ deletes it with all its data.
    of `NOCK_EXPIRY_SWEEP_MINUTES`, held by `RoomConfig.expiry_sweep_seconds` in
    seconds; a new value applies after the current wait, `admin/overrides.md`
    rule 9), deletes the expired rooms;
-   any lookup that meets one (a socket, a summary) deletes it first. Deletion
-   removes the room, its log, its snapshots and its share token, closes every
-   socket opened to it, joined or not, with 4404 and nothing else, and writes no
-   log entry; a page that had shown the room then shows the room-gone dialog
+   any lookup that meets one (a socket, a summary) deletes it first. Every
+   deletion for expiry, the sweep's and a lookup's, reads the room's times
+   again under the registry lock before deleting: a room no longer expired by
+   then (an edit moved its last edit time meanwhile) is kept, a lookup serves
+   it, and the sweep does not list it among the codes it deleted.
+   Deletion removes the room, its log, its snapshots and its share token,
+   closes every socket opened to it, joined or not, with 4404 and nothing
+   else, and writes no log entry; a page that had shown the room then shows
+   the room-gone dialog
    (`client/hud.md` rule 16). The code may then be drawn again, where an old
    token matches nobody. Until the deletion, a live room's open sockets keep
    working. A sweep that fails is logged at WARNING or above, and the next one
@@ -158,6 +163,14 @@ deletes it with all its data.
   column too; a solved room whose stored state and log give no solve time gets
   its last edit time. With `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS` 24, S is then
   expired at s + 24 h + 1 s.
+- **AC-14** A live room A, last edited at t, looked up at t + its life + 1 s:
+  when Ana's letter is committed after the lookup read A's times and before it
+  took the registry lock, A is not deleted, Ana's socket stays open, and the
+  lookup serves A with her letter; with no such letter, the lookup deletes A.
+- **AC-15** Rooms A and B, both live and past their life, are swept: when
+  Ana's letter in B is committed after the sweep read the times and before it
+  deletes B, the sweep deletes A alone, returns `[A]`, and B's sockets stay
+  open with her letter; without the letter it deletes both.
 
 ## Edge cases
 
@@ -171,6 +184,8 @@ deletes it with all its data.
   creator room again when they are on (AC-12).
 - A refused value is shown in the message, since none of the five variables is
   a secret (AC-8).
+- The creator's erasure deletes its rooms whether expired or not, with no
+  second read (`lobby/host.md` rule 14) (AC-14, AC-15).
 
 ## Out of scope
 
