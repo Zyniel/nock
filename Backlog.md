@@ -136,9 +136,9 @@ others, at the top of the list.
 
 ### B-030 Grid lookups in constant time
 
-- Status: ready (the human approved the brief and picked A, then approved the
+- Status: done (the human approved the brief and picked A, then approved the
   spec change, 2026-10-30; the Plan agent on Fable confirmed A, with the two
-  corrections below)
+  corrections below; both review rounds approved)
 - Priority: second (B-028's worst CPU path; no behaviour change)
 - Domains: content/grids (the model's lookups), platform/server (a time
   budget)

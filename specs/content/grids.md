@@ -1,7 +1,7 @@
 ---
 area: content
 file: grids
-status: approved
+status: done
 ---
 
 # content/grids - Grids: model, import checks and no third-party content
@@ -112,17 +112,6 @@ party.
     The lookups refuse no grid: whatever rule 6 will find, the model loads, and
     the rules read the lookups instead of resolving a clue again. Two grids built
     from the same JSON are equal.
-
-## New interface
-
-`src/nock/grid.py`:
-
-- `Word`: a frozen model with `row`, `column`, `clue_index` (the clue), `cells:
-  tuple[Position, ...]` and `letters: str`.
-- `Grid.words -> tuple[Word, ...]`, a property: rule 12's words.
-- `Grid.solution_letter(row: int, column: int) -> str | None`.
-
-`cell_at`, `word_cells` and `hyphen_edges` keep their names and results.
 
 ## Acceptance criteria
 
