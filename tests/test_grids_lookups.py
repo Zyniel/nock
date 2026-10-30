@@ -166,10 +166,12 @@ def test_ac22_letters_leave_out_the_separators(fx01_text: str) -> None:
     assert list(grid.words) == fx01_words()
 
 
-def test_ac22_a_word_is_frozen(fx01: Grid) -> None:
+@pytest.mark.parametrize("name", ["letters", "row", "cells"])
+def test_ac22_a_word_is_frozen(fx01: Grid, name: str) -> None:
     first_word = fx01.words[0]
     with pytest.raises(ValidationError):
-        first_word.letters = "TAMIX"
+        setattr(first_word, name, "TAMIX")
+    assert first_word == fx01_words()[0]
 
 
 # ---- AC-23: the solution letter of a cell --------------------------------------------
