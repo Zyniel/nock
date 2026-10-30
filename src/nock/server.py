@@ -1503,9 +1503,10 @@ def create_app(
         if wrong_codes.is_blocked(address, now):
             await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        # In a worker thread: the lookup may load the room from the store, or
+        # In a worker thread: the lookup may read the room from the store, or
         # delete it once expired (spec 032), and the event loop must not wait.
-        # It only reads: `connect` makes the room live once the socket is served.
+        # It keeps nothing in memory: `connect` makes the room live once the
+        # socket is served.
         state = await asyncio.to_thread(room_registry.peek_room, code)
         if state is None:
             # Checked again as it is recorded: other sockets of the address may

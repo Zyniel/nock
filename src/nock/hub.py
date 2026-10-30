@@ -1145,6 +1145,10 @@ class RoomRegistry:
         No event is logged or sent: a snapshot built afterwards shows the new
         nickname. Returns once it is done.
 
+        The lock is held throughout, as in a deletion: the room can neither
+        leave memory nor be loaded again while the nickname goes, so the erasure
+        reaches the room that is live when it applies.
+
         Args:
             code: The room.
             player_id: The player whose account was deleted.
@@ -1164,17 +1168,11 @@ class RoomRegistry:
                 if runner is not None:
                     runner.state = with_player_erased(runner.state, player_id)
                 room_exists = self._store.erase_player(code, player_id)
-                self._drop_recap(code)
-                return room_exists
-
-        async def erase_between_steps() -> None:
-            runner.erase_player(player_id)
-
-        erasing = asyncio.run_coroutine_threadsafe(erase_between_steps(), loop)
-        erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
-        with self._lock:
+            else:
+                self._erase_between_steps(runner, player_id, loop)
+                room_exists = True
             self._drop_recap(code)
-        return True
+            return room_exists
 
     def delete_creator_rooms(self, account_id: str) -> None:
         """Delete every room that an erased account created (spec 033).
@@ -1247,7 +1245,8 @@ class RoomRegistry:
 
         The connection receives the room's messages once the player's join is
         accepted by the room task. Its bounds are the registry's
-        `max_outbound_messages` and `max_inbound_pending` (spec 036).
+        `max_outbound_messages` and `max_inbound_pending` (spec 036). The room
+        is live from now until its task ends with no socket open.
 
         Must be called from the event loop that serves the socket.
 
@@ -1255,8 +1254,6 @@ class RoomRegistry:
             code: The room.
             account_id: The account that the socket's session signs in, which
                 the connection's join runs as; None for an anonymous join.
-
-        The room is live from now until its task ends with no socket open.
 
         Returns:
             The connection, or None when there is no such room. An expired room
@@ -1441,6 +1438,21 @@ class RoomRegistry:
         """
         self._recaps.pop(code, None)
         self._recap_generation += 1
+
+    def _erase_between_steps(
+        self, runner: _RoomRunner, player_id: str, loop: asyncio.AbstractEventLoop
+    ) -> None:
+        """Have a live room's task erase a player's nickname, and wait for it.
+
+        The caller holds the lock. Nothing on the engine's loop takes it, so the
+        wait ends.
+        """
+
+        async def erase() -> None:
+            runner.erase_player(player_id)
+
+        erasing = asyncio.run_coroutine_threadsafe(erase(), loop)
+        erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _as_played(self, state: RoomState) -> RoomState:
         """Return a room loaded from the store as it plays.
