@@ -15,15 +15,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Whether a pull request changes anything a browser test can see. One that
-  # changes only files under specs/, docs/ or grids/ skips the browser jobs: no
-  # test reads those folders, and the static job still checks the specs against
-  # their tests (spec traceability) and loads the grids the repository ships. A
-  # push to main runs every job (human decision, 2026-10-21).
+  # Which gate jobs a pull request needs, from the files it changes. A file
+  # that no check and no test reads needs none: the backlog, CLAUDE.md,
+  # claude_docs/, .claude/ (agents, skills, session settings and hooks),
+  # docs/ outside docs/design/, and the container files. A file that only the
+  # static job reads skips the browser jobs: specs/ (spec traceability),
+  # docs/design/ (the screens sheet), grids/ (the grids the repository ships)
+  # and README.md (its font credits, a test without a browser). Any other
+  # file, and a Python file anywhere (ruff and black read the whole
+  # repository), runs every job. A push to main runs every job (human
+  # decision, 2026-10-21).
   changes:
     name: Changed files
     runs-on: ubuntu-latest
     outputs:
+      static: ${{ steps.files.outputs.static }}
       browsers: ${{ steps.files.outputs.browsers }}
     steps:
       - uses: actions/checkout@v7
@@ -37,22 +43,46 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          static=true
           browsers=true
           if [ "$EVENT_NAME" = "pull_request" ]; then
             changed_files=$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA")
             echo "$changed_files"
-            other_files=$(echo "$changed_files" | grep -vE '^(specs|docs|grids)/' || true)
-            if [ -n "$changed_files" ] && [ -z "$other_files" ]; then
+            if [ -n "$changed_files" ]; then
+              static=false
               browsers=false
+              while IFS= read -r file; do
+                case "$file" in
+                  specs/* | docs/design/* | grids/* | README.md)
+                    static=true
+                    ;;
+                  *.py)
+                    static=true
+                    browsers=true
+                    ;;
+                  Backlog.md | CLAUDE.md | claude_docs/* | .claude/* | docs/* | \
+                  Dockerfile | .dockerignore | compose.yaml | compose.*.yaml | \
+                  Caddyfile | .env.*.example)
+                    ;;
+                  *)
+                    static=true
+                    browsers=true
+                    ;;
+                esac
+              done <<< "$changed_files"
             fi
           fi
+          echo "Static job runs: $static"
           echo "Browser jobs run: $browsers"
+          echo "static=$static" >> "$GITHUB_OUTPUT"
           echo "browsers=$browsers" >> "$GITHUB_OUTPUT"
 
   # The static checks and the tests without a browser, on the oldest Python.
-  # They run for every pull request.
+  # They run for every pull request that changes a file a check reads.
   static:
     name: Quality gate (${{ matrix.label }})
+    needs: changes
+    if: needs.changes.outputs.static == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -137,8 +167,8 @@ jobs:
 
   # One check that passes only when every gate job passed, so the branch rule
   # of main needs to require this name only, whatever the matrix holds. The
-  # browser jobs may be skipped only when the changed files allow it, and the
-  # other engines only on a pull request.
+  # static and browser jobs may be skipped only when the changed files allow
+  # it, and the other engines only on a pull request.
   all-gates:
     name: Quality gate
     if: always()
@@ -149,14 +179,19 @@ jobs:
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          STATIC_RUN: ${{ needs.changes.outputs.static }}
           BROWSERS_RESULT: ${{ needs.browsers.result }}
           BROWSERS_RUN: ${{ needs.changes.outputs.browsers }}
           OTHER_ENGINES_RESULT: ${{ needs.other-engines.result }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "changes: $CHANGES_RESULT, static: $STATIC_RESULT, browsers: $BROWSERS_RESULT (run: $BROWSERS_RUN), other engines: $OTHER_ENGINES_RESULT"
+          echo "changes: $CHANGES_RESULT, static: $STATIC_RESULT (run: $STATIC_RUN), browsers: $BROWSERS_RESULT (run: $BROWSERS_RUN), other engines: $OTHER_ENGINES_RESULT"
           test "$CHANGES_RESULT" = "success"
-          test "$STATIC_RESULT" = "success"
+          if [ "$STATIC_RUN" = "false" ]; then
+            test "$STATIC_RESULT" = "skipped"
+          else
+            test "$STATIC_RESULT" = "success"
+          fi
           if [ "$BROWSERS_RUN" = "false" ]; then
             test "$BROWSERS_RESULT" = "skipped"
           else
