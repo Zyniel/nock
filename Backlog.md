@@ -318,7 +318,7 @@ others, at the top of the list.
 - Domains: account/account
 - Architecture decision: yes with option B (a new table, stored data)
 - Branch: feat/b-036-erasure-finishes · PR: none yet
-- Problem: `DELETE /api/account` (`server.py:1379`) deletes the account rows,
+- Problem: `DELETE /api/account` (`server.py:1391`) deletes the account rows,
   then erases its players from the live rooms, waiting up to 5 seconds on the
   engine for each (`hub.py:1106`, `hub.py:1377`). A timeout answers 500 once
   the account is gone; the remaining rooms and the history records keep the
@@ -386,7 +386,7 @@ others, at the top of the list.
   public `NamedTuple`, against the modeling rules, and no route declares a
   `response_model`, so no answer is checked on its way out (B-028 L8).
   `nock.server` reads the catalogue and builds the app when it is imported
-  (`server.py:1463`), so one bad grid file fails every import, tests
+  (`server.py:1475`), so one bad grid file fails every import, tests
   included, and the data folders resolve only from the repository layout
   (L9).
 - In scope: a model per answer and `response_model` on each route, with the
