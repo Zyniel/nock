@@ -57,9 +57,11 @@ WARM_UP_TIMEOUT_MS = 60_000
 # spec 034's highlight window (on at 4.5 s, gone at 6 s) and feed scroll
 # measure durations too, as does spec 043's note lifetime (fading from 2.7 s,
 # gone by 3.7 s; 2026-10-22) and spec 047's « Lien copié » line (gone 2 s after
-# the copy; 2026-10-23).
+# the copy; 2026-10-23). The server's engine time (`platform/server.md` rule
+# 20) times the room's rules in milliseconds, with no browser (B-030).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
+        "test_server_engine_time.py",
         "test_spec_013_ac02_selections.py",
         "test_spec_013_ac07_ac08_feed_scroll.py",
         "test_spec_015_ac01_relay_to_the_others.py",

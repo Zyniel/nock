@@ -14,7 +14,7 @@ from typing import Annotated
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
 
-from nock.grid import ClueCell, Grid, LetterCell
+from nock.grid import Grid, LetterCell
 from nock.protocol import (
     CellLocked,
     CellRef,
@@ -1832,7 +1832,7 @@ def _is_right(state: RoomState) -> bool:
     if not _is_full(state):
         return False
     for cell in state.cells:
-        if cell.letter != _solution_letter(state.grid, cell.row, cell.column):
+        if cell.letter != state.grid.solution_letter(cell.row, cell.column):
             return False
     return True
 
@@ -2229,7 +2229,7 @@ def _apply_check(
     for cell in scope:
         if cell.letter is None or cell.locked or cell.pencil:
             continue
-        if cell.letter == _solution_letter(state.grid, cell.row, cell.column):
+        if cell.letter == state.grid.solution_letter(cell.row, cell.column):
             correct.append(cell)
         else:
             wrong.append(cell)
@@ -2347,7 +2347,7 @@ def _required_solution_letter(grid: Grid, cell: CellState) -> str:
         ValueError: the cell belongs to no word of the grid, so it has no
             solution letter.
     """
-    letter = _solution_letter(grid, cell.row, cell.column)
+    letter = grid.solution_letter(cell.row, cell.column)
     if letter is None:
         raise ValueError(
             f"The letter cell ({cell.row}, {cell.column}) belongs to no word"
@@ -2400,18 +2400,6 @@ def _cells_of_word(state: RoomState, target: WordTarget) -> list[CellState]:
         if cell is not None:
             cells.append(cell)
     return cells
-
-
-def _solution_letter(grid: Grid, row: int, column: int) -> str | None:
-    """Return the solution letter of a letter cell, from a clue whose word holds it."""
-    for clue_cell in grid.cells:
-        if not isinstance(clue_cell, ClueCell):
-            continue
-        for clue_index, clue in enumerate(clue_cell.clues):
-            positions = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
-            if (row, column) in positions:
-                return clue.letters[positions.index((row, column))]
-    return None
 
 
 def _undo_entry_before(cell: CellState, seq: int) -> UndoEntry:

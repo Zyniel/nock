@@ -13,7 +13,6 @@ from typing import Annotated, Literal, NamedTuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from nock.grid import ClueCell, Grid
 from nock.protocol import (
     CellLocked,
     CellRef,
@@ -178,39 +177,17 @@ def _words_completed(
 
     filled_positions = _filled_positions(state_after)
     completed: list[ClueRef] = []
-    for clue, positions in _words_of_grid(state_after.grid):
-        if (event.row, event.column) not in positions:
+    for word in state_after.grid.words:
+        if (event.row, event.column) not in word.cells:
             continue
         is_complete = True
-        for position in positions:
+        for position in word.cells:
             if position not in filled_positions:
                 is_complete = False
         if is_complete:
+            clue = ClueRef(row=word.row, column=word.column, clue_index=word.clue_index)
             completed.append(clue)
     return completed
-
-
-def _words_of_grid(grid: Grid) -> list[tuple[ClueRef, list[tuple[int, int]]]]:
-    """Return each clue of the grid with the positions of its word, in clue order.
-
-    Clue order is by the clue cell's row, then its column, then the clue's index
-    in that cell.
-    """
-    clue_cells: list[ClueCell] = []
-    for cell in grid.cells:
-        if isinstance(cell, ClueCell):
-            clue_cells.append(cell)
-    clue_cells.sort(key=lambda clue_cell: (clue_cell.row, clue_cell.column))
-
-    words: list[tuple[ClueRef, list[tuple[int, int]]]] = []
-    for clue_cell in clue_cells:
-        for clue_index in range(len(clue_cell.clues)):
-            positions = grid.word_cells(clue_cell.row, clue_cell.column, clue_index)
-            clue = ClueRef(
-                row=clue_cell.row, column=clue_cell.column, clue_index=clue_index
-            )
-            words.append((clue, positions))
-    return words
 
 
 def _filled_positions(state: RoomState) -> set[tuple[int, int]]:
