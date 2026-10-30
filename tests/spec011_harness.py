@@ -169,18 +169,25 @@ BURST_TIMEOUT_SECONDS = 10.0
 
 
 class SlowLookupRegistry(RoomRegistry):
-    """A registry whose `room_state` answers `LOOKUP_DELAY_SECONDS` later.
+    """A registry whose room lookups answer `LOOKUP_DELAY_SECONDS` later.
 
-    A lookup that loads a room from the disk can take that long. In a burst the
-    delay keeps the requests in flight at the same time, whatever the order in
-    which their threads run, so a burst that is not counted one request after
-    another shows on every run. The throttle's rule holds whatever a lookup costs.
+    The room socket and the recap route look a room up with `peek_room`; `room_state`
+    is slowed too. A lookup that loads a room from the disk can take that long. In a
+    burst the delay keeps the requests in flight at the same time, whatever the
+    order in which their threads run, so a burst that is not counted one request
+    after another shows on every run. The throttle's rule holds whatever a lookup
+    costs.
     """
 
     def room_state(self, code: str) -> RoomState | None:
         """Wait `LOOKUP_DELAY_SECONDS`, then look the room up as usual."""
         time.sleep(LOOKUP_DELAY_SECONDS)
         return super().room_state(code)
+
+    def peek_room(self, code: str) -> RoomState | None:
+        """Wait `LOOKUP_DELAY_SECONDS`, then peek at the room as usual."""
+        time.sleep(LOOKUP_DELAY_SECONDS)
+        return super().peek_room(code)
 
 
 def at_once(count: int, action: Callable[[], object]) -> list[object]:

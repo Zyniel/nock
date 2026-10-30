@@ -29,6 +29,7 @@ from nock.store import RoomStore
 from spec033_harness import wait_for
 
 SNAPSHOT_FAILURE_PAUSE_SECONDS = 0.3
+HOLD_LIMIT_SECONDS = 10.0
 
 
 def wait_until_live(registry: RoomRegistry, code: str) -> None:
@@ -63,7 +64,10 @@ def last_logged_seq(store: RoomStore, code: str) -> int:
 
 
 class SnapshotStore(RoomStore):
-    """A file store whose `save_snapshot` the test can make fail, and that counts.
+    """A file store whose `save_snapshot` the test can make fail or hold, and counts.
+
+    While `hold_next_snapshot` is set, the next `save_snapshot` sets
+    `snapshot_held` and waits (bounded) for `release_snapshot`.
 
     `saved_seqs` holds the seq of each snapshot saved through `save_snapshot`
     (the room's first snapshot is written by `create_room` and is not in it).
@@ -73,6 +77,9 @@ class SnapshotStore(RoomStore):
         super().__init__(path)
         self.fail_snapshots = False
         self.snapshot_failed = threading.Event()
+        self.hold_next_snapshot = threading.Event()
+        self.snapshot_held = threading.Event()
+        self.release_snapshot = threading.Event()
         self.saved_seqs: list[int] = []
 
     def save_snapshot(self, state: RoomState) -> None:
@@ -80,5 +87,9 @@ class SnapshotStore(RoomStore):
         if self.fail_snapshots:
             self.snapshot_failed.set()
             raise OSError("the disk is full")
+        if self.hold_next_snapshot.is_set():
+            self.hold_next_snapshot.clear()
+            self.snapshot_held.set()
+            self.release_snapshot.wait(HOLD_LIMIT_SECONDS)
         super().save_snapshot(state)
         self.saved_seqs.append(state.seq)

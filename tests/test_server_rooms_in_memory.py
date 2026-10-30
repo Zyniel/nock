@@ -25,6 +25,7 @@ from __future__ import annotations
 import contextlib
 import time
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -50,6 +51,7 @@ from nock.protocol import (
 )
 from nock.server import create_app
 from server_harness import (
+    HOLD_LIMIT_SECONDS,
     SNAPSHOT_FAILURE_PAUSE_SECONDS,
     SnapshotStore,
     last_logged_seq,
@@ -246,6 +248,86 @@ def test_ac24_a_room_whose_snapshot_fails_stays_live_and_is_saved_at_shutdown(
     assert saved_before_shutdown == []
     assert snapshot_seq == room_seq
     assert store.saved_seqs == [room_seq]
+
+
+def test_ac24_a_room_whose_snapshot_failed_is_saved_when_its_task_next_ends(
+    tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
+) -> None:
+    store = SnapshotStore(tmp_path / DATABASE_FILE_NAME)
+    registry: RoomRegistry | None = None
+    try:
+        with serving(tmp_path, fake_clock, catalogue, store) as (client, registry):
+            code = client.post("/api/rooms", json={"grid_number": 1}).json()["code"]
+            store.fail_snapshots = True
+            with contextlib.ExitStack() as first_stack:
+                ana = open_member(first_stack, client, code, "Ana")
+                ana_token = ana.snapshot().resume_token
+            wait_for(store.snapshot_failed.is_set, "the failed snapshot")
+            time.sleep(SNAPSHOT_FAILURE_PAUSE_SECONDS)
+            live_after_failure = registry.live_codes()
+
+            store.fail_snapshots = False
+            with contextlib.ExitStack() as second_stack:
+                open_member(second_stack, client, code, "Ana", ana_token)
+                live_while_open = registry.live_codes()
+            wait_until_not_live(registry, code)
+            room_seq = last_logged_seq(store, code)
+            snapshot_seq = latest_snapshot_seq(tmp_path / DATABASE_FILE_NAME, code)
+        registry.close()
+    finally:
+        if registry is not None:
+            registry.close()
+        store.close()
+
+    assert live_after_failure == frozenset({code})
+    assert live_while_open == frozenset({code})
+    assert snapshot_seq == room_seq
+    assert store.saved_seqs == [room_seq]
+
+
+def test_ac24_a_socket_arriving_while_the_room_is_leaving_gets_a_working_room(
+    tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
+) -> None:
+    store = SnapshotStore(tmp_path / DATABASE_FILE_NAME)
+    registry: RoomRegistry | None = None
+    try:
+        with serving(tmp_path, fake_clock, catalogue, store) as (client, registry):
+            code = client.post("/api/rooms", json={"grid_number": 1}).json()["code"]
+            store.hold_next_snapshot.set()
+            with contextlib.ExitStack() as first_stack:
+                ana = open_member(first_stack, client, code, "Ana")
+                ana_token = ana.snapshot().resume_token
+                ana_id = ana.snapshot().you
+            wait_for(store.snapshot_held.is_set, "the snapshot of the leaving room")
+
+            with (
+                ThreadPoolExecutor(max_workers=1) as pool,
+                contextlib.ExitStack() as second_stack,
+            ):
+                arriving = pool.submit(
+                    open_member, second_stack, client, code, "Ana", ana_token
+                )
+                time.sleep(SNAPSHOT_FAILURE_PAUSE_SECONDS)
+                store.release_snapshot.set()
+                again = arriving.result(timeout=HOLD_LIMIT_SECONDS)
+                again.send(
+                    EditLetter(row=TYPED_ROW, column=TYPED_COLUMN, letter=TYPED_LETTER)
+                )
+                wait_for_message(again, LetterChanged)
+                seat = again.snapshot().you
+                live_while_open = registry.live_codes()
+            wait_until_not_live(registry, code)
+            room_seq = last_logged_seq(store, code)
+            snapshot_seq = latest_snapshot_seq(tmp_path / DATABASE_FILE_NAME, code)
+    finally:
+        store.release_snapshot.set()
+        if registry is not None:
+            registry.close()
+        store.close()
+
+    assert seat == ana_id
+    assert live_while_open == frozenset({code})
+    assert snapshot_seq == room_seq
 
 
 def test_ac24_the_shutdown_saves_no_snapshot_of_a_room_that_left_memory(
