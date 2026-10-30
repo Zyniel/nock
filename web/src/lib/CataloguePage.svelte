@@ -17,7 +17,7 @@
     storeMissingIdentities,
     type AccountStatus,
   } from './account'
-  import { isGridSummary, type GridSummary } from './catalogue'
+  import { fetchAccountProgress, isGridSummary, type GridSummary } from './catalogue'
   import {
     fetchAccountHistory,
     mergeHistories,
@@ -39,6 +39,9 @@
   // What GET /api/account answered, or null while accounts are off or the
   // request failed (spec 033): then there is no "Compte".
   let accountStatus: AccountStatus | null = $state(null)
+  // The account's progress while signed in, null until the answer (spec 004
+  // rule 7): the cards show the device's progress meanwhile.
+  let accountProgress: Record<string, unknown> | null = $state(null)
 
   // The finished grids (spec 029): this device's records, and the account's
   // while signed in, which are never written to the device.
@@ -93,6 +96,10 @@
     void loadGrids()
   })
 
+  async function loadAccountProgress(): Promise<void> {
+    accountProgress = await fetchAccountProgress()
+  }
+
   // Spec 033: before "My rooms" asks for its summaries, a signed-in page stores
   // each room of the account that this device has no identity for yet.
   async function loadAccountRooms(): Promise<void> {
@@ -100,6 +107,7 @@
     accountStatus = status
     if (status !== null && status.signed_in) {
       void loadAccountHistory()
+      void loadAccountProgress()
       const identities = await fetchAccountRooms()
       if (identities !== null) {
         storeMissingIdentities(identities)
@@ -191,7 +199,7 @@
         {t('catalogue.empty_filtered')}
       </p>
     {:else}
-      <CatalogueList grids={shownGrids} />
+      <CatalogueList grids={shownGrids} {accountProgress} />
     {/if}
     {#if shownHistory.length > 0}
       <HistoryList records={shownHistory} />
