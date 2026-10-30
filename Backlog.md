@@ -441,7 +441,7 @@ others, at the top of the list.
 - Domains: none (the report `claude_docs/frontend-review.md`; no spec, test or
   code changes)
 - Architecture decision: no
-- Branch: feat/b-039-frontend-review · PR: none yet
+- Branch: feat/b-039-frontend-review · PR: #70
 - Problem: no review had looked at `web/` as a whole, across specs, for
   correctness, security, accessibility, performance and maintainability.
 - In scope: every file of `web/src`, the web client's config, its build,
