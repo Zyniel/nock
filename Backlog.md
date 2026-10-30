@@ -291,8 +291,13 @@ others, at the top of the list.
   deletion holds up to 5 seconds, and every request of the process waits
   meanwhile (B-028 M1). A socket that never sends `join` stays open for ever,
   and nothing caps the sockets of one address (M2). An expiry is decided
-  outside the lock that deletes the room (L3).
-- In scope: `connect` off the event loop; a socket still not joined some
+  outside the lock that deletes the room (L3). Since B-032, rooms leave
+  memory, so a socket to a room not in memory is the common case: `connect`
+  then always takes the registry lock and loads and replays the room on the
+  event loop, after `room_socket` already replayed it once with `peek_room`
+  (B-032 review, round 1).
+- In scope: `connect` off the event loop, with one load of the room per
+  socket; a socket still not joined some
   seconds after it opened is closed with its own code; a cap on the open
   sockets of an address; the expiry checked again under the registry lock.
 - Out of scope: frame sizes and the flood and stall bounds (unchanged).

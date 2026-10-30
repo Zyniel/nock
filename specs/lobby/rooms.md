@@ -95,12 +95,13 @@ codes are limited per address.
 
 13. `POST /api/rooms` is limited per client address, signed in or not: the
     address the server sees, as for the sign-in links (`account/account.md`
-    rule 6); behind Caddy `compose.yaml` makes it the player's own. After the body (422) and grid (404) checks, an address that has
-    created as many rooms with a time `t > now - 3600` as the limit (rule 14)
-    gets 429 `{"detail": "Too Many Requests"}` and no room. Only a 201 counts;
-    requests at once count one after another. Each app keeps its counts in
-    memory, from zero, and at each count forgets the addresses with none left
-    in the hour. The catalogue shows a 429 as any failure (rule 2).
+    rule 6); behind Caddy `compose.yaml` makes it the player's own. After the
+    body (422) and grid (404) checks, an address that has created as many
+    rooms with a time `t > now - 3600` as the limit (rule 14) gets 429
+    `{"detail": "Too Many Requests"}` and no room. Only a 201 counts; requests
+    at once count one after another. Each app keeps its counts in memory, from
+    zero, and at each count forgets the addresses with none left in the hour.
+    The catalogue shows a 429 as any failure (rule 2).
 14. The limit is `NOCK_ROOMS_PER_ADDRESS_PER_HOUR`, a whole number of rooms
     from 1 to 10000, default 30: unset or empty, the default; set, ASCII
     digits only, any number of leading zeros, within the bounds. `main()`

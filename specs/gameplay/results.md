@@ -297,8 +297,9 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
 ## Code
 
 - `src/nock/recap.py`: `build_recap`, `public_recap`; `hub.py`: `room_recap`,
-  `shared_recap`, the kept recaps, share tokens; `store.py`: `code_for_share_token`; `room.py`:
-  `solved_at`, `room_summary`; `server.py`: the recap routes.
+  `shared_recap`, the kept recaps, share tokens; `store.py`:
+  `code_for_share_token`; `room.py`: `solved_at`, `room_summary`;
+  `server.py`: the recap routes.
 - `web/src/App.svelte`: the `/recap/<token>` route. `web/src/lib/`:
   `RoomPage.svelte` (the button), `RecapDialog.svelte`, `recap.ts`,
   `copyLink.ts`, `SharePage.svelte`, `history.ts`, `HistoryList.svelte`,
