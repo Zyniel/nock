@@ -196,7 +196,7 @@ def test_ac3_add_room_with_a_taken_code_raises_and_keeps_the_room(
         with pytest.raises(ValueError, match="ABCDEF"):
             registry.add_room(fresh_state(other_grid, "ABCDEF"))
 
-        assert registry.room_state("ABCDEF") is original
+        assert registry.room_state("ABCDEF") == original
         assert registry.find_room("ABCDEF") == fx01_grid
     finally:
         registry.close()
@@ -220,7 +220,7 @@ def test_ac3_register_room_never_returns_the_code_of_an_added_room(
         code = registry.register_room(fx01_grid)
 
         assert code == "GHJKLM"
-        assert registry.room_state("ABCDEF") is original
+        assert registry.room_state("ABCDEF") == original
     finally:
         registry.close()
 

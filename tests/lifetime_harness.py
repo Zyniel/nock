@@ -83,6 +83,7 @@ STARTUP_VARIABLES = (
     "NOCK_OPERATOR_TOKEN",
     SWEEP_VARIABLE,
     *(life.variable for life in LIVES),
+    "NOCK_ROOMS_PER_ADDRESS_PER_HOUR",
     "NOCK_PUBLIC_URL",
     "NOCK_SMTP_HOST",
     "NOCK_SMTP_PORT",

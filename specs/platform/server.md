@@ -61,17 +61,17 @@ address and with the database its environment gives.
    with its requester's yes, completion, the timer). Selections, recent edits,
    input times, the other ballots and the chat and reaction windows are not
    logged. A damaged row makes the load fail; nothing repairs it.
-6. A code held only in the store is taken. The room's socket and the recap
-   requests (`gameplay/results.md`) load such a room and make it live, after
-   one restart step run before anything else and logged like any step: each
+6. A code held only in the store is taken. A socket to the room, and nothing
+   else, loads such a room and makes it live (rule 21), after one restart
+   step run before anything else and logged like any step: each
    player not disconnected becomes disconnected at that time, with one
    `player_state_changed` each in roster order, selection and recent edits
    cleared. Their resume window runs from then (`platform/realtime.md`). What
    the restart step does to chat windows, the vote and the timer:
    `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every other
-   read (summaries, catch-up, the account's rooms and history, the operator's
-   edits) replays the room from the store without making it live, with no
-   restart step and no log entry. A lookup that meets an expired room deletes
+   read (summaries, catch-up, the recaps, the account's rooms and history, the
+   operator's edits) replays the room from the store without making it live,
+   with no restart step and no log entry. A lookup that meets an expired room deletes
    it instead (`lobby/lifetime.md`).
 
 ### Undo
@@ -133,9 +133,10 @@ address and with the database its environment gives.
     empty, then the four room lives and the sweep interval
     (`NOCK_CREATOR_SOLVED_ROOM_HOURS`, `NOCK_CREATOR_ROOM_HOURS`,
     `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS`, `NOCK_ANONYMOUS_ROOM_HOURS`,
-    `NOCK_EXPIRY_SWEEP_MINUTES`, `lobby/lifetime.md` rule 7), then the account
-    variables by their own rules (`account/account.md` rule 2). What it runs:
-    `product.md` rule 27.
+    `NOCK_EXPIRY_SWEEP_MINUTES`, `lobby/lifetime.md` rule 7), then
+    `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` (`lobby/rooms.md` rule 14), then the
+    account variables by their own rules (`account/account.md` rule 2). What
+    it runs: `product.md` rule 27.
 16. `NOCK_HOST`, unset or empty `127.0.0.1`: only ASCII letters, ASCII digits,
     `.`, `-` and `:`. With `:` it is an IPv6 address that
     `ipaddress.IPv6Address` accepts, without brackets; else a name whose dots
@@ -148,11 +149,13 @@ address and with the database its environment gives.
     `main()` never changes it; the app reads it when it starts.
 19. A refused value stops `main()` before any server is built; `python -m
     nock` prints the message on stderr and exits with status 1. For
-    `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE` and the five variables of
-    `lobby/lifetime.md` the message is one line naming the variable and showing
-    the value as `repr()` writes it, so it holds no character of Cc, Cf, Zl or
-    Zp; with several of them refused, it names one, and a room-life variable
-    only when `NOCK_HOST`, `NOCK_PORT` and `NOCK_DATABASE` pass.
+    `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE`, the five variables of
+    `lobby/lifetime.md` and `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` the message is
+    one line naming the variable and showing the value as `repr()` writes it,
+    so it holds no character of Cc, Cf, Zl or Zp; with several of them
+    refused, it names one, a room-life variable only when `NOCK_HOST`,
+    `NOCK_PORT` and `NOCK_DATABASE` pass, and the creation limit only when
+    those and the five pass.
     The messages of the operator token and the account variables, which never
     show a secret: `admin/operations.md` rule 4, `account/account.md` rule 3.
 
@@ -166,6 +169,17 @@ address and with the database its environment gives.
     under 5 ms; a check of the whole grid, every letter wrong, under 10 ms; the
     catch-up of an absence of 100 letters (`social/catch-up.md`) under 50 ms.
     No player sees a difference: the events, replies and answers are as before.
+
+### Rooms in memory
+
+21. A room is live, held in memory with its task, only while it is played:
+    from when a socket opens to it until its task ends with no socket open to
+    it, joined or not. Creating a room writes it to the store (rule 2) and
+    holds nothing. When its task ends with no socket open, its snapshot is
+    saved (rule 4) and it leaves memory; a room whose snapshot fails stays
+    live until its task next ends or the server stops. The next socket loads
+    it back by rule 6; its players are all disconnected already, so the
+    restart step logs nothing. The number of live rooms has no cap.
 
 ### Look
 
@@ -261,6 +275,13 @@ top bars (« Phone top bar », « Computer top bar »).
 - **AC-22** The catch-up of an absence of 100 letters typed into an empty FX-02
   room is built, with its changed cells and completed words, in under 50 ms by
   rule 20's measure.
+- **AC-23** A room created through `POST /api/rooms` is not live; a socket
+  opened to it makes it live, and once that socket closes without joining the
+  room is not live again.
+- **AC-24** Ana and Bob are in a room; Ana types `T` at (1, 0) and closes her
+  socket: the room stays live. Once Bob's closes, it is not live and the
+  store's latest snapshot is at the room's seq. Ana's next socket finds `T`
+  and her seat, and the log holds no entry between that seq and her join's.
 
 ## Edge cases
 
@@ -277,6 +298,9 @@ top bars (« Phone top bar », « Computer top bar »).
 - A room's grid built from the store's JSON (rule 5) and one taken from the
   catalogue keep the same budgets: each builds its lookups once, when it is
   built (AC-20).
+- A room whose snapshot fails as its last socket closes stays live, and is
+  saved at the server's shutdown (AC-24).
+- The shutdown saves no snapshot of a room that already left memory (AC-24).
 
 ## Out of scope
 
@@ -294,7 +318,8 @@ top bars (« Phone top bar », « Computer top bar »).
 
 - `src/nock/store.py`: `RoomStore`. `src/nock/room.py`: `replay`,
   `after_restart`, undo in `handle_message`; `RoomConfig.snapshot_every`.
-- `src/nock/hub.py`: commit before delivery, snapshots, loading, `close()`.
+- `src/nock/hub.py`: commit before delivery, snapshots, loading, rooms
+  leaving memory, `close()`.
 - `src/nock/room.py` (`handle_message`), `src/nock/catch_up.py`
   (`build_catch_up`), `src/nock/recap.py`: the rules of rule 20, reading
   `Grid.words` and `Grid.solution_letter`.
@@ -306,4 +331,5 @@ top bars (« Phone top bar », « Computer top bar »).
 - Tests: `tests/test_spec_018_*`, `tests/test_spec_040_ac01_ac06_*`,
   `tests/test_spec_040_ac27_ac29_*`, `tests/test_spec_036_ac10_ac12_*`;
   `tests/test_server_engine_time.py` for rule 20, which measures durations and
-  so runs on its own (`SERIAL_TEST_FILES`).
+  so runs on its own (`SERIAL_TEST_FILES`); `tests/test_server_*` for AC-23
+  and AC-24.

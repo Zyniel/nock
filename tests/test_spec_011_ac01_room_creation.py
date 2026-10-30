@@ -453,7 +453,7 @@ def test_ac1_add_room_returns_the_state_given(fx01_grid: Grid) -> None:
         state = fresh_state(fx01_grid, "ABCDEF")
         registry.add_room(state)
 
-        assert registry.room_state("ABCDEF") is state
+        assert registry.room_state("ABCDEF") == state
         assert registry.find_room("ABCDEF") == fx01_grid
     finally:
         registry.close()

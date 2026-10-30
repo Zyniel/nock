@@ -6,8 +6,9 @@ file named by NOCK_DATABASE (spec 018), and NOCK_OPERATOR_TOKEN turns on the
 operator pages (spec 038). NOCK_PUBLIC_URL and the NOCK_SMTP_* variables turn
 on the accounts (spec 033), and the four NOCK_*_ROOM_HOURS and
 NOCK_EXPIRY_SWEEP_MINUTES set the room lives and the sweep interval
-(`lobby/lifetime.md`). The variables are checked before the server is built,
-and a refused value stops the start (specs 036, 038 and 033).
+(`lobby/lifetime.md`); NOCK_ROOMS_PER_ADDRESS_PER_HOUR limits the rooms an
+address creates (`lobby/rooms.md`). The variables are checked before the server is
+built, and a refused value stops the start (specs 036, 038 and 033).
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ from nock.settings import (
     operator_token_from_env,
     port_number,
     room_config_from_env,
+    rooms_per_address_per_hour_from_env,
 )
 
 HOST_VARIABLE: str = "NOCK_HOST"
@@ -90,6 +92,10 @@ def main() -> None:
       room life is 24 to 8760 hours and the sweep interval 1 to 1440 minutes,
       each in ASCII digits only. The variables are not changed: the app reads
       them when it starts.
+    - NOCK_ROOMS_PER_ADDRESS_PER_HOUR, checked after the room lives: the rule of
+      `nock.settings.rooms_per_address_per_hour_from_env` (`lobby/rooms.md` rule
+      14), 1 to 10000 in ASCII digits only. The variable is not changed: the app
+      reads it when it starts.
     - NOCK_PUBLIC_URL and the NOCK_SMTP_* variables, checked last: the rules of
       `nock.settings.account_settings_from_env` (spec 033). The app reads them
       again when it starts.
@@ -106,6 +112,7 @@ def main() -> None:
     port = _read_port()
     _check_database()
     _check_room_config()
+    _check_rooms_per_address_per_hour()
     _check_account_settings()
     config = nock.server.server_config(nock.server.app, host=host, port=port)
     uvicorn.Server(config).run()
@@ -138,6 +145,22 @@ def _check_room_config() -> None:
     """
     try:
         room_config_from_env(os.environ)
+    except SettingsError as error:
+        raise SystemExit(str(error)) from error
+
+
+def _check_rooms_per_address_per_hour() -> None:
+    """Stop the start when NOCK_ROOMS_PER_ADDRESS_PER_HOUR breaks its rule.
+
+    The variable is only read: the app reads it again when it starts.
+
+    Raises:
+        SystemExit: the variable breaks the rule of
+            `rooms_per_address_per_hour_from_env`. Its code is the message of the
+            SettingsError, which shows the value.
+    """
+    try:
+        rooms_per_address_per_hour_from_env(os.environ)
     except SettingsError as error:
         raise SystemExit(str(error)) from error
 
