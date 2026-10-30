@@ -255,7 +255,7 @@ others, at the top of the list.
   `catalogue.play_failed`, `lobby/rooms.md` rule 2)
 - Criteria: rooms AC-13 to AC-17 (new), server AC-23, AC-24 (new),
   results AC-21 to AC-23 (new)
-- Branch: feat/b-032-room-capacity · PR: none yet
+- Branch: feat/b-032-room-capacity · PR: #73
 - Problem: `POST /api/rooms` creates rooms for anyone, with no limit, and
   every room created or loaded keeps its runner in memory until it expires,
   720 hours later by default: 89 KiB of memory and 32 KiB of database each,
