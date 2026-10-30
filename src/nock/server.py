@@ -97,11 +97,13 @@ from nock.protocol import grid_view, parse_client_message
 from nock.room import RoomKey, RoomState, RoomSummary
 from nock.room import member_id as room_member_id
 from nock.settings import (
+    DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR,
     OPERATOR_TOKEN_VARIABLE,
     AccountSettings,
     account_settings_from_env,
     operator_token_from_env,
     room_config_from_env,
+    rooms_per_address_per_hour_from_env,
 )
 from nock.store import RoomStore
 
@@ -452,6 +454,71 @@ class _LinkLimits:
             self._times_per_email[email] = email_times
             self._times_per_address[address] = address_times
             return True
+
+
+class _RoomCreationLimit:
+    """The rooms each client address created in the last hour (`lobby/rooms.md`).
+
+    Per address, the times of its counted creations. An address is kept until
+    LINK_LIMIT_WINDOW_SECONDS after its last counted creation, and at most until
+    the next creation counted after that. Every method may be called from any
+    thread: each one takes the lock.
+    """
+
+    def __init__(self) -> None:
+        """Create a limit that holds no creation, at the default number of rooms."""
+        self._lock = threading.Lock()
+        self._rooms_per_hour = DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR
+        self._times_per_address: dict[str, list[float]] = {}
+
+    def read_at_start(self) -> None:
+        """Take the number of rooms of NOCK_ROOMS_PER_ADDRESS_PER_HOUR.
+
+        Raises:
+            SettingsError: the variable breaks the rule of `lobby/rooms.md`
+                rule 14.
+        """
+        rooms_per_hour = rooms_per_address_per_hour_from_env(os.environ)
+        with self._lock:
+            self._rooms_per_hour = rooms_per_hour
+
+    def count_unless_reached(self, address: str, now: float) -> bool:
+        """Count one creation by `address`, unless it reached the limit.
+
+        The check and the count are one step under the lock, so creations that
+        arrive at once are counted one after another. Before it counts, the
+        limit forgets the addresses with no creation left in the hour.
+
+        Args:
+            address: The client's address.
+            now: Clock time of the request.
+
+        Returns:
+            True when the creation is counted. False when the address has
+            created as many rooms with a time `t > now - 3600` as the limit:
+            nothing is counted or forgotten then.
+        """
+        with self._lock:
+            recent = _times_in_window(self._times_per_address.get(address, []), now)
+            if len(recent) >= self._rooms_per_hour:
+                return False
+            self._times_per_address = _forget_old_times(self._times_per_address, now)
+            recent.append(now)
+            self._times_per_address[address] = recent
+            return True
+
+    def forget_creation(self, address: str, now: float) -> None:
+        """Take back the creation counted for `address` at `now`.
+
+        For a creation that failed after it was counted: only a created room
+        counts.
+        """
+        with self._lock:
+            times = self._times_per_address.get(address, [])
+            if now in times:
+                times.remove(now)
+            if len(times) == 0:
+                self._times_per_address.pop(address, None)
 
 
 def _times_in_window(times: list[float], now: float) -> list[float]:
@@ -912,7 +979,9 @@ def create_app(
 
     Never raises because `dist_dir` is missing or empty (see AC-6). The app's
     startup raises SettingsError when it reads a NOCK_OPERATOR_TOKEN that breaks
-    the rule of spec 038, or account variables that break the rules of spec 033.
+    the rule of spec 038, a NOCK_ROOMS_PER_ADDRESS_PER_HOUR that breaks the rule
+    of `lobby/rooms.md` rule 14, or account variables that break the rules of
+    spec 033.
 
     Raises:
         SettingsError: `operator_token` breaks the rule of NOCK_OPERATOR_TOKEN.
@@ -921,6 +990,7 @@ def create_app(
     holder = _RoomsHolder(rooms)
     operator = _OperatorToken(operator_token)
     running_overrides = _RunningOverrides()
+    room_creations = _RoomCreationLimit()
     account_service = _AccountService(accounts, account_store, mailer)
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
@@ -933,6 +1003,7 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         operator.read_at_start()
+        room_creations.read_at_start()
         account_service.start()
         try:
             room_registry = holder.get()
@@ -1123,11 +1194,20 @@ def create_app(
             raise _not_found()
         creator = account_of_cookies(request.cookies)
         creator_account_id = None if creator is None else creator.account_id
-        code = holder.get().register_room(
-            entry.grid,
-            grid_number=body.grid_number,
-            creator_account_id=creator_account_id,
-        )
+        room_registry = holder.get()
+        address = _client_address(request)
+        now = room_registry.clock()
+        if not room_creations.count_unless_reached(address, now):
+            raise _too_many_requests()
+        try:
+            code = room_registry.register_room(
+                entry.grid,
+                grid_number=body.grid_number,
+                creator_account_id=creator_account_id,
+            )
+        except Exception:
+            room_creations.forget_creation(address, now)
+            raise
         base_url = str(request.base_url).rstrip("/")
         return CreateRoomResponse(code=code, share_url=f"{base_url}/r/{code}")
 
@@ -1140,7 +1220,7 @@ def create_app(
         now = room_registry.clock()
         if wrong_codes.is_blocked(address, now):
             raise _too_many_requests()
-        if room_registry.room_state(code) is None:
+        if room_registry.peek_room(code) is None:
             # Checked again as it is recorded: requests run in several threads.
             if not wrong_codes.record_unless_blocked(address, now):
                 raise _too_many_requests()
@@ -1425,7 +1505,8 @@ def create_app(
             return
         # In a worker thread: the lookup may load the room from the store, or
         # delete it once expired (spec 032), and the event loop must not wait.
-        state = await asyncio.to_thread(room_registry.room_state, code)
+        # It only reads: `connect` makes the room live once the socket is served.
+        state = await asyncio.to_thread(room_registry.peek_room, code)
         if state is None:
             # Checked again as it is recorded: other sockets of the address may
             # have been counted while this one waited for its lookup.

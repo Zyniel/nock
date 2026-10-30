@@ -292,6 +292,14 @@ migrated once when it opens. A deleted room leaves no copy in the database
 files: SQLite overwrites its rows with zeros, and the write-ahead log is emptied
 after each deletion (spec 038).
 
+A room is held in the server's memory only while someone is in it: it is loaded
+when a player's page opens it and saved to the database, then dropped from memory,
+once the last page has left. The number of rooms an address may create in an hour
+is `NOCK_ROOMS_PER_ADDRESS_PER_HOUR`: a whole number from 1 to 10000, default 30,
+written with the digits 0 to 9 (an empty variable counts as unset, and a refused
+value stops the server with a one-line message). Past it, creating a room answers
+429; the count is kept in memory and starts again from zero with the server.
+
 ### The operator pages
 
 The `NOCK_OPERATOR_TOKEN` environment variable turns on the operator pages of

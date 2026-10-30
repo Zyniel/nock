@@ -8,6 +8,11 @@ Each connection bounds what waits for it in both directions (spec 036): a client
 that never reads its socket is closed as stalled, and a client that sends faster
 than its room applies is closed as flooding.
 
+A room is held in memory, with its task, only while it is played: from the moment
+a socket opens to it until its task ends with no socket open (`platform/server.md`
+rule 21). Then its snapshot is saved and it leaves memory; the next socket loads it
+again.
+
 A room lives its room life from its starting point (`lobby/lifetime.md`). An
 expired room is deleted by `expire_rooms`, which the app runs at its start and
 then every sweep interval, and by any lookup that meets it.
@@ -381,6 +386,7 @@ class _RoomRunner:
         clock: Clock,
         store: RoomStore,
         snapshot_seq: int | None,
+        on_task_end: Callable[[_RoomRunner], None],
     ) -> None:
         """Create a runner with no task yet; the first connection starts it.
 
@@ -391,6 +397,8 @@ class _RoomRunner:
             store: Where the steps of the room are written.
             snapshot_seq: Seq of the newest snapshot the store holds for the
                 room, None when that is not known.
+            on_task_end: Called on the engine's loop each time the room's task
+                ends, once the task has saved its snapshot.
         """
         self.state = state
         self._config = config
@@ -400,13 +408,46 @@ class _RoomRunner:
         # Every connection opened to the room whose socket has not closed yet,
         # joined or not: a deletion closes them all (spec 032).
         self._open_connections: list[RoomConnection] = []
+        # How many sockets are open to the room, counted from `connect` (before
+        # the engine's loop knows the connection) until the connection is
+        # detached. Another thread reads it, so a lock guards it.
+        self._socket_lock = threading.Lock()
+        self._open_sockets = 0
         self._inbox: asyncio.Queue[_Input] = asyncio.Queue()
         self._task: asyncio.Task[None] | None = None
         self._is_closed = False
         self._is_deleted = False
+        self._has_ended = True  # True while no task runs
+        self._on_task_end = on_task_end
         self._store = store
         self._snapshot_seq = snapshot_seq
         self._events_since_snapshot = 0
+
+    def expect_connection(self) -> None:
+        """Count a socket that is about to open to the room (any thread).
+
+        The registry calls it under its lock, at the moment it hands the runner
+        to `connect`, so that the room cannot leave memory before the engine's
+        loop has heard of the connection.
+        """
+        with self._socket_lock:
+            self._open_sockets += 1
+
+    def is_ready_to_leave(self) -> bool:
+        """Tell whether the room may leave memory now (any thread).
+
+        It may when its task has ended, no socket is open to it, and the store
+        holds its snapshot at its seq. The registry asks under its lock.
+        """
+        with self._socket_lock:
+            has_open_socket = self._open_sockets > 0
+        if has_open_socket or self._is_deleted or not self._has_ended:
+            return False
+        return self._snapshot_seq == self.state.seq
+
+    def retire(self) -> None:
+        """Refuse every further input: the room left memory (any thread)."""
+        self._is_closed = True
 
     def keep_connection(self, connection: RoomConnection) -> None:
         """Keep a connection just opened to the room, so a deletion can close it.
@@ -432,6 +473,7 @@ class _RoomRunner:
             return
         self._inbox.put_nowait(item)
         if self._task is None or self._task.done():
+            self._has_ended = False
             self._task = asyncio.get_running_loop().create_task(self._run())
 
     async def cancel(self) -> None:
@@ -518,12 +560,15 @@ class _RoomRunner:
     async def _run(self) -> None:
         """Apply the inputs and the ticks until no connection is left.
 
-        A snapshot is saved when the task stops, however it stops.
+        A snapshot is saved when the task stops, however it stops. Then the
+        registry is told, so that it can take the room out of memory.
         """
         try:
             await self._apply_inputs()
         finally:
             self.save_snapshot()
+            self._has_ended = True
+            self._on_task_end(self)
 
     async def _apply_inputs(self) -> None:
         """Apply the inputs and the ticks until no connection is left."""
@@ -685,6 +730,8 @@ class _RoomRunner:
         """
         if leaving in self._open_connections:
             self._open_connections.remove(leaving)
+            with self._socket_lock:
+                self._open_sockets -= 1
         if leaving not in self._connections:
             return
         others = [other for other in self._connections if other is not leaving]
@@ -815,6 +862,14 @@ class RoomRegistry:
         # Deletions started on the engine's own thread, kept until they end: an
         # event loop keeps only weak references to its tasks.
         self._deletion_tasks: set[asyncio.Task[None]] = set()
+        # Rooms leaving memory, each in a worker thread: it waits for the lock.
+        self._leaving_tasks: set[asyncio.Task[None]] = set()
+        # `gameplay/results.md` rule 21: the recap of each solved room that was
+        # read, with the seq it was built at. A change of the generation tells
+        # a build under way that what it read may be out of date (a nickname
+        # erased, a room deleted).
+        self._recaps: dict[str, tuple[int, Recap]] = {}
+        self._recap_generation = 0
         # Spec 029: called with a room's latest state just before its deletion.
         self._delete_hook: Callable[[RoomState], None] | None = None
         # False while accounts are off: the rooms then play as anonymous rooms.
@@ -888,7 +943,8 @@ class RoomRegistry:
         Returns:
             A code of ROOM_CODE_LENGTH characters of ROOM_CODE_ALPHABET, drawn
             at random and different from every code in use. The room also gets
-            a random share token (spec 028), which is not its code.
+            a random share token (spec 028), which is not its code. The room is
+            written to the store and is not live: a socket makes it live.
 
         Raises:
             RuntimeError: the registry is closed.
@@ -908,14 +964,14 @@ class RoomRegistry:
                 creator_account_id=creator_account_id,
             )
             self._store.create_room(state)
-            self._runners[code] = self._new_runner(state, state.seq)
             return code
 
     def add_room(self, state: RoomState) -> None:
         """Register a room in a given state (tests, and spec 018's loader).
 
-        The room keeps the share token of `state` (spec 028). Its life starts at
-        `clock()`, whatever its `created_at` (spec 032).
+        The room is written to the store and is not live, as after
+        `register_room`. It keeps the share token of `state` (spec 028). Its
+        life starts at `clock()`, whatever its `created_at` (spec 032).
 
         Raises:
             ValueError: a room with `state.code` already exists, or another room
@@ -927,7 +983,15 @@ class RoomRegistry:
             if self._is_taken(state.code):
                 raise ValueError(f"A room with code {state.code} already exists")
             self._store.create_room(state, last_edit_at=self._clock())
-            self._runners[state.code] = self._new_runner(state, state.seq)
+
+    def live_codes(self) -> frozenset[str]:
+        """Return the codes of the live rooms (`platform/server.md` rule 21).
+
+        A room is live from when a socket opens to it until its task ends with
+        no socket open. Read under the registry's lock.
+        """
+        with self._lock:
+            return frozenset(self._runners)
 
     def find_room(self, code: str) -> Grid | None:
         """Return the grid of room `code`, or None when there is no such room.
@@ -943,7 +1007,9 @@ class RoomRegistry:
         """Return the latest state of room `code`, or None.
 
         Read-only: the returned model is the one the room task last stored.
-        A room that is only in the store is loaded first (see `_find_runner`).
+        A room that is only in the store is loaded first (see `_find_runner`),
+        and so is live, even with no socket: it leaves memory once a socket has
+        come and gone. The server reads a room with `peek_room` instead.
         An expired room is deleted first, and so gives None (spec 032).
         """
         runner = self._find_runner(code)
@@ -1097,13 +1163,17 @@ class RoomRegistry:
                 # held: the state can change here.
                 if runner is not None:
                     runner.state = with_player_erased(runner.state, player_id)
-                return self._store.erase_player(code, player_id)
+                room_exists = self._store.erase_player(code, player_id)
+                self._drop_recap(code)
+                return room_exists
 
         async def erase_between_steps() -> None:
             runner.erase_player(player_id)
 
         erasing = asyncio.run_coroutine_threadsafe(erase_between_steps(), loop)
         erasing.result(timeout=_STOP_TIMEOUT_SECONDS)
+        with self._lock:
+            self._drop_recap(code)
         return True
 
     def delete_creator_rooms(self, account_id: str) -> None:
@@ -1123,22 +1193,35 @@ class RoomRegistry:
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.
 
+        The room is read as `peek_room` does: it is not made live and nothing is
+        logged. A recap, once built, is kept with the room's seq and given again
+        while the seq is the same (`gameplay/results.md` rule 21); a new log
+        entry, an erased nickname or the room's deletion makes the next call
+        build it again.
+
         Returns:
             `build_recap` of the room's latest state and its stored log; None when
             there is no such room, when it is not solved, or when `build_recap`
             raises ValueError, for example when its log does not hold its whole
             history (a room added in a later state).
         """
-        state = self.room_state(code)
+        with self._lock:
+            generation = self._recap_generation
+        state = self.peek_room(code)
         if state is None or not state.solved:
             return None
+        kept = self._kept_recap(code, state.seq)
+        if kept is not None:
+            return kept
         # The log is read after the state: the store holds every entry of the
         # state, and build_recap leaves out the ones that came after it.
         log = self._store.read_log(code)
         try:
-            return build_recap(state, log)
+            recap = build_recap(state, log)
         except ValueError:
             return None
+        self._keep_recap(code, state.seq, recap, generation)
+        return recap
 
     def shared_recap(self, token: str) -> PublicRecap | None:
         """Return the public recap of the room whose share token is `token`.
@@ -1173,6 +1256,8 @@ class RoomRegistry:
             account_id: The account that the socket's session signs in, which
                 the connection's join runs as; None for an anonymous join.
 
+        The room is live from now until its task ends with no socket open.
+
         Returns:
             The connection, or None when there is no such room. An expired room
             is deleted first, and so gives None (spec 032).
@@ -1180,7 +1265,7 @@ class RoomRegistry:
         Raises:
             RuntimeError: the registry is closed.
         """
-        runner = self._find_runner(code)
+        runner = self._find_runner_for_socket(code)
         if runner is None:
             return None
         engine_loop = self._engine_loop()
@@ -1240,7 +1325,14 @@ class RoomRegistry:
 
     def _new_runner(self, state: RoomState, snapshot_seq: int | None) -> _RoomRunner:
         """Create the runner of a room."""
-        return _RoomRunner(state, self._config, self._clock, self._store, snapshot_seq)
+        return _RoomRunner(
+            state,
+            self._config,
+            self._clock,
+            self._store,
+            snapshot_seq,
+            self._room_task_ended,
+        )
 
     def _find_runner(self, code: str) -> _RoomRunner | None:
         """Return the live runner of room `code`, loading it from the store.
@@ -1256,18 +1348,99 @@ class RoomRegistry:
         if runner is not None:
             return runner
         with self._lock:
-            runner = self._runners.get(code)
-            if runner is not None or self._closed:
-                return runner
-            state = self._store.load_room(code)
-            if state is None:
-                return None
-            outcome = after_restart(self._as_played(state), self._clock())
-            if len(outcome.entries) > 0:
-                self._store.append(code, outcome.entries)
-            runner = self._new_runner(outcome.state, None)
-            self._runners[code] = runner
+            return self._live_runner(code)
+
+    def _find_runner_for_socket(self, code: str) -> _RoomRunner | None:
+        """Return the live runner of room `code` for a socket about to open to it.
+
+        As `_find_runner`, and the runner counts the socket in the same step,
+        under the lock: the room cannot leave memory between this call and the
+        moment the engine's loop learns of the connection.
+        """
+        if self._delete_if_expired(code):
+            return None
+        with self._lock:
+            runner = self._live_runner(code)
+            if runner is not None:
+                runner.expect_connection()
             return runner
+
+    def _live_runner(self, code: str) -> _RoomRunner | None:
+        """Return the live runner of room `code`, making the room live if needed.
+
+        The caller holds the lock.
+
+        Returns:
+            The runner; None when the room is unknown, or when the registry is
+            closed and the room is not live.
+        """
+        runner = self._runners.get(code)
+        if runner is not None or self._closed:
+            return runner
+        state = self._store.load_room(code)
+        if state is None:
+            return None
+        outcome = after_restart(self._as_played(state), self._clock())
+        if len(outcome.entries) > 0:
+            self._store.append(code, outcome.entries)
+        runner = self._new_runner(outcome.state, None)
+        self._runners[code] = runner
+        return runner
+
+    def _room_task_ended(self, runner: _RoomRunner) -> None:
+        """Take the room out of memory when it is no longer played.
+
+        Called on the engine's loop when the room's task has ended and saved its
+        snapshot. The lock is taken in a worker thread, not here: a deletion
+        holds the lock while it waits for this loop.
+        """
+        if self._closed or not runner.is_ready_to_leave():
+            return
+        leaving = asyncio.get_running_loop().create_task(
+            asyncio.to_thread(self._leave_memory, runner)
+        )
+        self._leaving_tasks.add(leaving)
+        leaving.add_done_callback(self._leaving_tasks.discard)
+
+    def _leave_memory(self, runner: _RoomRunner) -> None:
+        """Remove the room from the live rooms, if it is still not played.
+
+        Under the lock, so that a socket arriving now either counted itself
+        first (the room stays) or finds the room gone and loads it again.
+        """
+        with self._lock:
+            code = runner.state.code
+            if self._runners.get(code) is not runner:
+                return  # deleted meanwhile
+            if not runner.is_ready_to_leave():
+                return
+            del self._runners[code]
+            runner.retire()
+
+    def _kept_recap(self, code: str, seq: int) -> Recap | None:
+        """Return the recap kept for room `code` if it was built at `seq`."""
+        with self._lock:
+            kept = self._recaps.get(code)
+        if kept is None:
+            return None
+        kept_seq, recap = kept
+        if kept_seq != seq:
+            return None
+        return recap
+
+    def _keep_recap(self, code: str, seq: int, recap: Recap, generation: int) -> None:
+        """Keep a recap built at `seq`, unless the room changed since `generation`."""
+        with self._lock:
+            if generation == self._recap_generation:
+                self._recaps[code] = (seq, recap)
+
+    def _drop_recap(self, code: str) -> None:
+        """Forget the recap kept for room `code`, and any build under way.
+
+        The caller holds the lock.
+        """
+        self._recaps.pop(code, None)
+        self._recap_generation += 1
 
     def _as_played(self, state: RoomState) -> RoomState:
         """Return a room loaded from the store as it plays.
@@ -1354,6 +1527,7 @@ class RoomRegistry:
         """
         with self._lock:
             runner = self._runners.pop(code, None)
+            self._drop_recap(code)
             self._call_delete_hook(code, runner)
             loop = self._loop
             if runner is None or loop is None or self._closed:

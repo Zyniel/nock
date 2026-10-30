@@ -1,13 +1,15 @@
 """Settings the server reads from its environment (specs 036, 038 and 033).
 
-Three groups of settings live here:
+Four groups of settings live here:
 
 - the operator token of NOCK_OPERATOR_TOKEN, which turns on the operator pages
   (spec 038);
 - the account settings (spec 033): the public URL of the server and how it sends
   e-mail, from NOCK_PUBLIC_URL and the NOCK_SMTP_* variables;
 - the room lives and the sweep interval (`lobby/lifetime.md`), from the four
-  NOCK_*_ROOM_HOURS variables and NOCK_EXPIRY_SWEEP_MINUTES.
+  NOCK_*_ROOM_HOURS variables and NOCK_EXPIRY_SWEEP_MINUTES;
+- the creation limit of an address (`lobby/rooms.md` rule 14), from
+  NOCK_ROOMS_PER_ADDRESS_PER_HOUR.
 
 The rules of a host and of a port are those of NOCK_HOST and NOCK_PORT (spec 036),
 which `nock.__main__` checks with the same functions.
@@ -63,6 +65,12 @@ MAX_SWEEP_MINUTES: int = 1440
 DEFAULT_SWEEP_MINUTES: int = 60
 SECONDS_PER_MINUTE: float = 60.0
 
+# The creation limit of an address (`lobby/rooms.md` rule 14).
+ROOMS_PER_ADDRESS_PER_HOUR_VARIABLE: str = "NOCK_ROOMS_PER_ADDRESS_PER_HOUR"
+MIN_ROOMS_PER_ADDRESS_PER_HOUR: int = 1
+MAX_ROOMS_PER_ADDRESS_PER_HOUR: int = 10000
+DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR: int = 30
+
 URL_SCHEMES: tuple[str, ...] = ("http://", "https://")
 # The usual port of each security mode, used when NOCK_SMTP_PORT is unset.
 DEFAULT_SMTP_PORTS: dict[str, int] = {"starttls": 587, "tls": 465, "none": 25}
@@ -101,6 +109,10 @@ _ROOM_LIFE_RULE = (
 _SWEEP_RULE = (
     f"a whole number of minutes from {MIN_SWEEP_MINUTES} to {MAX_SWEEP_MINUTES}, "
     "written with the digits 0 to 9 only"
+)
+_ROOMS_PER_HOUR_RULE = (
+    f"a whole number of rooms from {MIN_ROOMS_PER_ADDRESS_PER_HOUR} to "
+    f"{MAX_ROOMS_PER_ADDRESS_PER_HOUR}, written with the digits 0 to 9 only"
 )
 _PRINTABLE_ASCII_RULE = "written with the printable ASCII characters only"
 
@@ -200,6 +212,31 @@ def room_config_from_env(environ: Mapping[str, str]) -> RoomConfig:
         ),
         anonymous_room_hours=_read_room_life(environ, ANONYMOUS_ROOM_HOURS_VARIABLE),
         expiry_sweep_seconds=sweep_minutes * SECONDS_PER_MINUTE,
+    )
+
+
+def rooms_per_address_per_hour_from_env(environ: Mapping[str, str]) -> int:
+    """Return how many rooms one address may create in an hour.
+
+    Args:
+        environ: The environment to read, such as `os.environ`.
+
+    Returns:
+        The number of `environ["NOCK_ROOMS_PER_ADDRESS_PER_HOUR"]`, or 30 when
+        the variable is unset or empty.
+
+    Raises:
+        SettingsError: the value is not a whole number from 1 to 10000 written
+            with ASCII digits. The message is one line that names the variable
+            and shows the value as `repr()` writes it.
+    """
+    return _read_whole_number(
+        environ,
+        ROOMS_PER_ADDRESS_PER_HOUR_VARIABLE,
+        minimum=MIN_ROOMS_PER_ADDRESS_PER_HOUR,
+        maximum=MAX_ROOMS_PER_ADDRESS_PER_HOUR,
+        default=DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR,
+        rule=_ROOMS_PER_HOUR_RULE,
     )
 
 
