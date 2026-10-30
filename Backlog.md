@@ -905,6 +905,31 @@ others, at the top of the list.
   2. The ops fixes (L18, L19): A (lead's default) in this item; B an item of
      their own.
 
+### B-051 CI skips the gate for notes-only pull requests
+
+- Status: done (the human asked for it, 2026-10-30: « PR B-039 is triggering
+  Quality Gates when only updating backlog and claude_docs review. This should
+  not happen. »; tooling, built by the lead)
+- Domains: none (tooling only: `.github/workflows/ci.yml`)
+- Architecture decision: no
+- Criteria: none (tooling)
+- Branch: feat/b-051-ci-skip-notes-only · PR: none yet
+- Problem: CI skipped the browser jobs only for a pull request that changed
+  nothing outside `specs/`, `docs/` and `grids/`. B-039 (#70) changed
+  `Backlog.md` and `claude_docs/frontend-review.md` only, files no check and
+  no test reads, and still ran the static job and the Chromium job.
+- In scope: a pull request that changes only `Backlog.md` and files under
+  `claude_docs/` skips the static and browser jobs; those files no longer
+  count when deciding the browser skip of a `specs/`, `docs/`, `grids/`
+  change; the `Quality gate` check accepts a skipped static job only then.
+- Out of scope: a push to `main` and a run started by hand (every job, as
+  before); other top-level files (`README.md`, `CLAUDE.md`).
+- Screens: none.
+- Built: checked by running the workflow's shell step on sample file lists:
+  notes only skips both, notes with `specs/` or `grids/` skips the browsers
+  only, notes with `src/` runs both, look-alike paths (`Backlog.mdx`,
+  `claude_docsx/`) run both, a push runs both.
+
 ### B-001 Rebaseline v1.1.0 into domain specs
 
 - Status: done (the human approved every domain file, 2026-10-24)
