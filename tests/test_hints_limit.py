@@ -352,6 +352,22 @@ def test_ac22_the_limit_comes_before_the_refusal_steps(fx01_grid: Grid) -> None:
     assert refusal_code(later) == ErrorCode.HELP_DISABLED
 
 
+def test_ac22_a_refusal_that_closes_an_expired_vote_does_not_count(
+    fx01_grid: Grid,
+) -> None:
+    play = v3(fx01_grid)
+    play.send("p1", REVEAL_1_0)
+
+    refused = play.send("p2", Reveal(target=CLUE_CELL), NOW + 21.0)
+
+    # The refusal carries the entry of the expired vote, and no entry of its own.
+    assert refusal_code(refused) == ErrorCode.NOT_A_LETTER_CELL
+    assert events_of(refused) == [closed(6, 1, VoteOutcome.TIMED_OUT, 1, 3)]
+    for _ in range(LIMIT):
+        check_applied(play, "p2", TAMIS, NOW + 21.0)
+    dropped(play, "p2", Check(target=TAMIS), NOW + 21.0)
+
+
 # ---- AC-23: votes and the limit ----
 
 
@@ -419,3 +435,33 @@ def test_ac23_a_check_dropped_after_the_votes_time_leaves_it_for_the_tick(
     timed_out = play.tick(NOW + 20.5)
     assert events_of(timed_out) == [closed(11, 1, VoteOutcome.TIMED_OUT, 1, 3)]
     assert open_vote_of(play.state) is None
+
+
+def test_ac23_a_vote_passes_though_its_requesters_window_is_full_and_counts_nothing(
+    fx01_grid: Grid,
+) -> None:
+    play = v3(fx01_grid)
+    play.send("p1", REVEAL_1_0)
+    for _ in range(LIMIT - 1):
+        check_applied(play, "p1", LETTER_2_1)
+
+    # Ana's window is full (the opening and four checks) when the vote passes.
+    passing = play.send("p2", Vote(vote_id=1, yes=True), NOW + 9.0)
+
+    assert passing.reply == ()
+    assert events_of(passing) == [
+        closed(10, 1, VoteOutcome.PASSED, 2, 3),
+        RevealResult(
+            seq=11,
+            player_id="p1",
+            target=CellTarget(row=1, column=0),
+            reveal_budget=RevealBudget(letters=4, words=1),
+        ),
+        CellLocked(seq=12, row=1, column=0, letter="T", revealed=True),
+    ]
+    # Once the requests of NOW have left the window, the pass is in nobody's:
+    # five checks apply for Ana and for Bob.
+    for player_id, target in (("p1", LETTER_2_1), ("p2", TAMIS)):
+        for _ in range(LIMIT):
+            check_applied(play, player_id, target, NOW + WINDOW_SECONDS)
+        dropped(play, player_id, Check(target=target), NOW + WINDOW_SECONDS)
