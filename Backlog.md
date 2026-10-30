@@ -476,8 +476,11 @@ others, at the top of the list.
      once B-041 and B-045 pin the behaviour it keeps. B-050 (small fixes)
      at any time.
   Each item's branch takes `main` once this one is merged, so it has its
-  brief. The order against B-035 to B-038, and each brief, wait for the
-  human.
+  brief. The human approved the order on 2026-10-30 (« Approve the order.
+  Push and open PR for all new features. Let the main session handle the
+  queuing / priority management »): the main session places these items
+  among the others and sets their priorities. Each brief still waits for
+  its own approval.
 
 ### B-040 Sign-out forgets the account's seats on the device
 
