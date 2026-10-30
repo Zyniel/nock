@@ -74,6 +74,33 @@ others, at the top of the list.
 - A worktree gets it once its branch takes `main` after the merge: the hook
   runs the `gate.py` of the checkout it checks.
 
+### B-039 Review of the web client
+
+- Status: done (the human asked for it, 2026-10-30: « As the Code Reviewer
+  agent "code-reviewer.md", create a new branch and proceed to a full review
+  of the frontend. Propose a strategy to resolve each point. »; a review,
+  built by the lead)
+- Domains: none (the report `claude_docs/frontend-review.md`; no spec, test or
+  code changes)
+- Architecture decision: no
+- Branch: feat/b-039-frontend-review · PR: none yet
+- Problem: no review had looked at `web/` as a whole, across specs, for
+  correctness, security, accessibility, performance and maintainability.
+- In scope: every file of `web/src`, the web client's config, its build,
+  audit and type check, and a screenshot check of the grid's focus ring in
+  Chromium and WebKit.
+- Out of scope: the Python backend (B-028), the tests themselves, the tooling.
+- Screens: none.
+- Findings: 1 High (sign-out leaves the account's seats on the device),
+  11 Medium (undo, check and reveal overtake the resent edits; no rejoin when
+  storage is refused; the selection is not sent again after a reconnection;
+  the grid's focus ring is painted under the letter cells; every frame
+  re-runs every letter cell; a zoomed grid does not follow the selection;
+  focus under the sheets; four copies of the dialog; live regions created
+  full; no caching headers; the connection inside `RoomPage.svelte`),
+  27 Low. The report proposes twelve items, not claimed yet; most need a
+  spec change first.
+
 ### B-001 Rebaseline v1.1.0 into domain specs
 
 - Status: done (the human approved every domain file, 2026-10-24)
