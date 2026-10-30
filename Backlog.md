@@ -147,13 +147,17 @@ others, at the top of the list.
 
 ### B-030 Grid lookups in constant time
 
-- Status: brief
+- Status: done (the human approved the brief and picked A, then approved the
+  spec change, 2026-10-30; the Plan agent on Fable confirmed A, with the two
+  corrections below; both review rounds approved)
 - Priority: second (B-028's worst CPU path; no behaviour change)
 - Domains: content/grids (the model's lookups), platform/server (a time
   budget)
 - Architecture decision: yes (new public names of `Grid`, read by `room.py`,
   `catch_up.py`, `recap.py`, `grid_import.py` and `ipuz.py`): options from
   the Plan agent on Fable
+- Criteria: grids AC-22 (new), grids AC-23 (new), grids AC-24 (new), server
+  AC-20 (new), server AC-21 (new), server AC-22 (new)
 - Branch: feat/b-030-grid-lookups · PR: none yet
 - Problem: one engine thread runs every room (`nock.hub`), and the hottest
   rules find a cell's answer by linear scans: `Grid.cell_at` walks every cell,
@@ -166,19 +170,33 @@ others, at the top of the list.
   meanwhile (B-028 H2, M4).
 - In scope: a grid computes its cell index, its words and its solution
   letters once, and the rules read them. Options:
-  - A (lead's pick): private attributes filled after validation
-    (`model_post_init`), read through public methods (`solution_letter`,
-    `words`); the model stays frozen and its JSON unchanged.
-  - B: a module cache keyed by the grid, outside the model.
-  - C: precompute in the catalogue only; a grid built by hand (tests, the
-    converter) stays slow.
-  A time budget proves it, for example "the solving edit and a grid check on
-  the largest catalogue grid each take under 5 ms" (its test file goes in
-  `SERIAL_TEST_FILES`); the spec-writer picks the measure.
+  - A (the human's pick): private attributes filled after validation, read
+    through public methods (`Grid.solution_letter`, `Grid.words` of a frozen
+    `Word`); the model stays frozen and its JSON, schema and equality
+    unchanged. The Plan agent's corrections: fill them at the end of the
+    grid's after-validator, since `model_post_init` runs before it and would
+    change AC-5's message; index only the clues that resolve, so that
+    `grid_import` keeps its own messages for the others (AC-6).
+  - B: a module cache keyed by the grid, outside the model (rejected: no
+    cheap key, state the tests cannot see).
+  - C: precompute in the catalogue only (rejected: every store load builds a
+    grid, so rooms after a restart, catch-up and recaps stay slow).
+  A time budget proves it, measured on FX-02 (`tests/fixtures/fx02.json`,
+  13 x 17), since the catalogue files are not in the repository: for example
+  the solving edit under 5 ms, a check of a grid full of wrong letters under
+  10 ms, a catch-up over 100 letters under 50 ms (its test file goes in
+  `SERIAL_TEST_FILES`); the spec-writer picks the measure and its home.
 - Out of scope: the limits on checks and reveals (B-031); the protocol, the
   answers and the store.
 - Screens: none.
-- Open questions: none beyond the option.
+- Open questions: none left. The spec-writer's two, answered by the lead:
+  `Grid.solution_letter` gives none for a position outside the grid (callers
+  ask only about room cells, and it stays total), and a cell held by words
+  that disagree takes the first word in clue order (deterministic, so
+  equality holds; the import still refuses such a grid, AC-11).
+- Build note: `tests/test_server_engine_time.py` measures durations; the lead
+  adds it to `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) before the
+  test-writer's gate.
 
 ### B-031 Limits on checks and reveals
 
@@ -1575,6 +1593,10 @@ Taken when a change touches them.
 - B-028: the SMTP send runs in the thread pool of every sync route, with a
   10-second timeout; a slow mail server and many addresses could fill its 40
   threads. Low while the per-address limits hold.
+- `platform/server.md` is over the size guideline (about 18 KB, 22 criteria
+  after B-030): the spec-writer proposes moving "Serving the client" and
+  "Environment settings" (rules 10 to 19, AC-14 to AC-19) to a new
+  `platform/serving.md`, an architecture decision.
 
 ## Grid engine ideas from ipuz
 

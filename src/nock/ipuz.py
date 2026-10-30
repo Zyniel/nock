@@ -608,17 +608,6 @@ def _check_cells_are_words(
             )
 
 
-def _solution_letters(grid: Grid) -> dict[Position, str]:
-    """Return the letter of every letter cell, read from the answers."""
-    letters: dict[Position, str] = {}
-    for clue_cell in _clue_cells(grid):
-        for index, clue in enumerate(clue_cell.clues):
-            word = grid.word_cells(clue_cell.row, clue_cell.column, index)
-            for position, letter in zip(word, clue.letters, strict=True):
-                letters[position] = letter
-    return letters
-
-
 def _read_solution_values(solution: object) -> dict[Position, object]:
     """Read the rows of `solution` into a value for each position."""
     values: dict[Position, object] = {}
@@ -635,10 +624,9 @@ def _check_solution(data: JsonObject, grid: Grid, block: str) -> None:
     if "solution" not in data:
         return
     found_values = _read_solution_values(data["solution"])
-    letters = _solution_letters(grid)
     for cell in grid.cells:
         position = (cell.row, cell.column)
-        expected = letters.get(position, block)
+        expected = grid.solution_letter(cell.row, cell.column) or block
         if position not in found_values:
             raise IpuzError(
                 f"solution has no value at {_format_position(position)}, "
@@ -827,12 +815,11 @@ def _written_puzzle(grid: Grid) -> list[list[object]]:
 
 def _written_solution(grid: Grid) -> list[list[str]]:
     """Write `solution`: the letters at the letter cells, `#` elsewhere."""
-    letters = _solution_letters(grid)
     rows: list[list[str]] = []
     for row in range(grid.height):
         values: list[str] = []
         for column in range(grid.width):
-            values.append(letters.get((row, column), DEFAULT_BLOCK))
+            values.append(grid.solution_letter(row, column) or DEFAULT_BLOCK)
         rows.append(values)
     return rows
 

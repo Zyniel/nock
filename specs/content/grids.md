@@ -96,6 +96,23 @@ party.
     sandbox: names or URLs built at run time are not flagged. The samples each
     scan must and must not flag are in its tests.
 
+### Lookups
+
+12. Once a grid is built (rules 1 to 4 hold), it derives once, and never stores
+    or writes in its JSON:
+    - its cell at each position, read in constant time;
+    - its words: one per clue that resolves by rule 3, in clue order (the clue
+      cell's row, column, then the clue's index), each with its clue cell and
+      index, its cells in reading order and its letters (rule 4). A clue that
+      does not resolve has no word: rule 6 reports it;
+    - the solution letter of each letter cell: the letter at its place in the
+      first word, in clue order, that holds it and whose answer has a letter
+      there. A cell no word reaches has none.
+
+    The lookups refuse no grid: whatever rule 6 will find, the model loads, and
+    the rules read the lookups instead of resolving a clue again. Two grids built
+    from the same JSON are equal.
+
 ## Acceptance criteria
 
 - **AC-1** A grid declares its size and one type per cell. FX-01, in the model's
@@ -148,6 +165,18 @@ party.
   naming both answers and the edge: `VI-DE` across from (1, 0) with `IDE` across
   from (1, 1) names `VI-DE`, `IDE` and `(1, 1)`, `(1, 2)`; with `I-DE`, and
   with `I DE`, the grid loads. The check comes last, after the crossing check.
+- **AC-22** A grid lists its words in clue order. FX-01 gives 8: the first is
+  clue 0 of (0, 0), cells (1, 0) to (1, 4), letters `TAMIS`; the second clue 1
+  of (0, 0), (0, 1) to (4, 1), `NAVAL`; the last clue 0 of (4, 0), (4, 1) to
+  (4, 4), `LEST`. With the clue of (0, 4) turned `right`, the grid loads with
+  7 words and none for that clue.
+- **AC-23** A grid gives the solution letter of a cell. On FX-01, (1, 0) gives
+  `T` and (4, 2) gives `E` (held by `MIME` and `LEST`); (0, 0), a clue cell,
+  gives none, as do (0, 1) in FX-01 without the clue `De la marine` and a
+  position outside the grid.
+- **AC-24** FX-02, in the model's JSON, survives load, save and load with no
+  difference, its saved JSON holds only the fields of rule 8, two loads of it
+  are equal, and every one of its letter cells has a solution letter.
 
 ## Edge cases
 
@@ -164,7 +193,10 @@ party.
 - A room holds its grid's answers as written, so their breaks follow rule 4 as
   it stands; a room stored before answers were kept as written holds letters
   only (`ARCENCIEL`), so it loads with no break (AC-3).
-- Cells may be listed in any order in the model's JSON (AC-1).
+- Cells may be listed in any order in the model's JSON (AC-1); the words still
+  come in clue order (AC-22).
+- A grid the import will refuse still answers: FX-01 with `MIME` changed to
+  `MIMA` loads, and (4, 2) gives `A`, from the first word in clue order (AC-23).
 - `tests/` and `scripts/` are not scanned; `web/dist/`, `web/node_modules/` and
   `web/public/` are not scanned (AC-18, AC-19).
 
@@ -178,10 +210,12 @@ party.
 - The grid files, the index, credits and withdrawal: `content/grid-files.md`.
 - Listing, filtering and the grid page: `content/library.md`.
 - Where real grids come from (commission, licence, generation): an owner decision.
+- How long the room's rules take reading the lookups: `platform/server.md`.
 
 ## Code
 
-- `src/nock/grid.py`: the model, letters and breaks, clue resolution.
+- `src/nock/grid.py`: the model, letters and breaks, clue resolution, the
+  lookups of rule 12 (`Word`, `Grid.words`, `Grid.solution_letter`).
 - `src/nock/grid_import.py`: the import checks.
 - `src/nock/mailer.py`: the one file allowed to send mail.
 - Tests: `tests/test_grids_*`, `tests/test_spec_002_*`, `test_spec_003_*`, and
