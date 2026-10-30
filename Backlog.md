@@ -120,7 +120,7 @@ others, at the top of the list.
   agent on Fable; the human picked A
 - Criteria: account AC-19, AC-20, AC-21 (new); library AC-22, AC-23, AC-24
   (new)
-- Branch: feat/b-005-account-progress · PR: none yet
+- Branch: feat/b-005-account-progress · PR: #66
 - Problem: a grid's « Commencée » or « Terminée » comes only from this
   device's `nock.progress`; a signed-in player on another device sees none.
 - In scope: a signed-in player's progress read from the account and merged
