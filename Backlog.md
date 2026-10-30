@@ -114,13 +114,14 @@ others, at the top of the list.
 
 ### B-029 The gate type-checks `scripts/`
 
-- Status: ready (tooling, built by the lead: CLAUDE.md lets the lead fix a
-  weakness of the tooling without asking, in a pull request of its own)
+- Status: done (the human, 2026-10-29: « Start with B-029 »; tooling, built
+  by the lead)
+- Waits for: nothing (B-028 is merged, with B-030).
 - Priority: first (every item's gate runs on it; the smallest fix of B-028)
 - Domains: none (tooling only: `scripts/gate.py`)
 - Architecture decision: no
 - Criteria: none (tooling)
-- Branch: feat/b-029-gate-pyrefly-scripts · PR: none yet
+- Branch: feat/b-029-gate-pyrefly-scripts · PR: #68
 - Problem: the gate puts `scripts/` on `PYTHONPATH` (`scripts/gate.py:241`)
   for every step. Pyrefly then reads `scripts/` as a site-packages folder and
   leaves it out of the project ("Skipping include pattern ...scripts because
@@ -133,6 +134,15 @@ others, at the top of the list.
 - Out of scope: the other steps of the gate; `src/` and `tests/`.
 - Screens: none.
 - Open questions: none.
+- Built: `run_tool` puts `scripts/` on `PYTHONPATH` for pytest only, the one
+  step that loads a module from it (the `gate_browsers` plugin); no other step
+  imports from `scripts/`, so ruff, black, the screens sheet, svelte-check and
+  the grids step lose an entry they never read. Checked with a file of
+  `scripts/` holding a type error, run through the gate's own `run_tool`:
+  before the fix pyrefly answered 0 errors, after it reports the error and
+  the step fails. The full gate without browser tests passes (4,300 parallel
+  and 64 serial tests, which load the plugin). No test of the gate: `tests/`
+  holds the domains' tests only, and the probe above is the check.
 
 ### B-030 Grid lookups in constant time
 
