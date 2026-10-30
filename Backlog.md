@@ -275,12 +275,12 @@ others, at the top of the list.
   2. The close code: A (lead's default) a new 44xx code; B 4408, the silence
      code.
 
-### B-034 HTTP edge: body size, security headers, the Bearer scheme
+### B-034 HTTP edge: body size, security and caching headers, the Bearer scheme
 
 - Status: brief
 - Priority: sixth (before the first public test; small)
-- Domains: platform/server ("Serving the client": body size, headers),
-  admin/operations (the scheme of the operator token)
+- Domains: platform/server ("Serving the client": body size, headers,
+  caching), admin/operations (the scheme of the operator token)
 - Architecture decision: no (one middleware, and the `Caddyfile` of B-009)
 - Branch: feat/b-034-http-edge · PR: none yet
 - Problem: neither uvicorn nor the `Caddyfile` limits a request body, and
@@ -288,11 +288,17 @@ others, at the top of the list.
   `Content-Security-Policy`, `X-Content-Type-Options` or `Referrer-Policy`,
   and any site can frame the room page or `/ops` (L6). The ops API accepts the
   exact prefix `Bearer ` only, though the scheme is case-insensitive
-  (RFC 9110), and a wrong case counts toward the throttle (L7).
+  (RFC 9110), and a wrong case counts toward the throttle (L7). The page
+  routes answer `index.html`, and `/assets/` its hashed files, with no
+  `Cache-Control` (`server.py:711`, `:1408`; the `Caddyfile` adds none): a
+  browser can keep a days-old `index.html` after a deploy and ask for
+  scripts the new build no longer has, a blank page (B-039 M10).
 - In scope: a body limit (lead's proposal: 64 KB) in the app (a middleware
   answering 413) and in the `Caddyfile` (`request_body max_size`); the
   headers on every answer, the CSP to `'self'` with `frame-ancestors 'none'`;
-  the scheme compared case-insensitively.
+  the scheme compared case-insensitively; `Cache-Control: no-cache` on
+  `index.html` for every page route, and `public, max-age=31536000,
+  immutable` on `/assets/*`.
 - Out of scope: the WebSocket frame size (8 KiB already); CORS (no
   cross-origin use).
 - Screens: none (a CSP that breaks the page shows in the browser tests).
@@ -440,8 +446,438 @@ others, at the top of the list.
   re-runs every letter cell; a zoomed grid does not follow the selection;
   focus under the sheets; four copies of the dialog; live regions created
   full; no caching headers; the connection inside `RoomPage.svelte`),
-  27 Low. The report proposes twelve items, not claimed yet; most need a
-  spec change first.
+  27 Low. The report proposes twelve items; most need a spec change first.
+- Queued (the human, 2026-10-30: « Claim the twelve proposed items of the
+  B-039 review and write their briefs in Backlog.md, in the proposed
+  order. »), in the report's order. Eleven items, claimed with
+  `scripts/claim_item.py`; the twelfth, the caching headers (M10), joins
+  B-034 as the report proposed, since both set the headers of the same
+  answers:
+  1. Before the first public test, with B-031 to B-034: B-040 (sign-out
+     forgets the account's seats), B-041 (reconnection keeps order and
+     presence), and B-034 with the caching headers.
+  2. Next, a baseline the product breaks today: B-042 (the grid's focus
+     ring).
+  3. Then cost, reach and focus on the room page: B-043 (remote updates),
+     B-044 (zoomed grid), B-045 (room sheets), B-046 (one status region),
+     B-047 (connection hardening).
+  4. Before the split, if the human takes it: B-048 (unit tests, tooling).
+  5. Last: B-049 (the split of `RoomPage.svelte` and `GridViewport.svelte`),
+     once B-041 and B-045 pin the behaviour it keeps. B-050 (small fixes)
+     at any time.
+  Each item's branch takes `main` once this one is merged, so it has its
+  brief. The order against B-035 to B-038, and each brief, wait for the
+  human.
+
+### B-040 Sign-out forgets the account's seats on the device
+
+- Status: brief
+- Priority: first of B-039's items (before the first public test: a leak of
+  seats on shared devices, B-039 H1)
+- Domains: account/account (rules 13 and 17: what sign-out and deletion
+  forget on the device), client/hud (its « Out of scope » line on forgetting
+  identities)
+- Architecture decision: no with option A (a new device record that only the
+  account code reads); yes with option B (the identity record of
+  `lobby/joining.md` rule 8, which every page reads)
+- Branch: feat/b-040-signout-forgets-seats · PR: none yet
+- Problem: after a sign-in, and on every catalogue load while signed in,
+  `storeMissingIdentities` (`web/src/lib/account.ts:192`) copies each seat of
+  the account (player id, resume token, nickname) into `localStorage`
+  (`account/account.md` rule 13). « Se déconnecter » and « Supprimer mon
+  compte » (`AccountPage.svelte:103`, `:112`) remove nothing, and nothing
+  prunes `nock.identity.*`, `nock.room.*` or `nock.history`. On a shared
+  computer the next person sees the account's rooms in « Mes salons », and
+  « Reprendre » takes a seat with its nickname, its colour and its host
+  rights. After a deletion the seats stay too, as `--`, and the history keeps
+  the team-mates' nicknames.
+- In scope: the device knows which identities the account brought; a 204 from
+  sign-out or deletion removes them, their `nock.room.*` records and the
+  history records of their rooms, then shows the state. The seats the device
+  took itself stay: they are how a guest comes back. Options:
+  - A (lead's pick): a list `nock.account_rooms` of the codes that
+    `storeMissingIdentities` wrote.
+  - B: a flag `from_account` in each identity record.
+- Out of scope: forgetting an identity whose room the summaries no longer
+  return; a session that expires with no sign-out (its seats stay until the
+  next sign-out on that device).
+- Overlaps: B-036 changes `account/account.md` rule 18, a different rule.
+  The file is over the size guideline already ("Small follow-ups").
+- Screens: none (« Mes salons » lists fewer rooms; no new state).
+- Open questions:
+  1. A sign-out or deletion that fails: A (lead's default) the device keeps
+     everything, as the account does, and the page shows `error` (rule 16);
+     B the device forgets anyway.
+
+### B-041 Reconnection keeps order and presence
+
+- Status: brief
+- Priority: second of B-039's items (before the first public test: after a
+  network drop an undo erases another letter for everyone, B-039 M1)
+- Waits for: B-031's merge (done on its branch; it changes
+  `gameplay/hints.md` and `platform/realtime.md` too)
+- Domains: gameplay/hints (check and reveal wait for the resent edits),
+  lobby/joining (rule 8: a page that has joined rejoins with the identity it
+  holds; rule 9: the kept form's button), platform/realtime (rule 22: the kept
+  selection sent again), platform/server (rule 9 already orders the undo; its
+  reconnection case has no test)
+- Architecture decision: no (the order of the page's sends; no message
+  changes)
+- Branch: feat/b-041-reconnect-order · PR: none yet
+- Problem: after a reconnection only edits wait for the resend
+  (`sendEdit`, `RoomPage.svelte:1718`; `resendPendingEdits`, `:1839`, one
+  every 100 ms). Undo, check and reveal (`:868`, `:876`, `:934`) go at once,
+  or are dropped while the socket is closed (`:552`): offline, the player
+  types A, B, C; a Ctrl+Z 50 ms into the resend reaches the server before B
+  and undoes A for everyone, against `platform/server.md` rule 9 (M1). A
+  browser that refuses storage cannot rejoin after its first drop: the join
+  plan reads the identity from `localStorage` only (`joinRules.ts:96`), so
+  the band asks for a nickname and no form shows (M2). After a reconnection
+  the others no longer see the player's cursor: the server cleared it at the
+  disconnection (`room.py:1146`) and the page sends no unchanged selection
+  (M3). « Rejoindre » on the kept form does nothing during the retry delay
+  (`:633`, `:2011`; L11).
+- In scope: one way to send a command after the pending edits (kept while
+  not joined, queued behind a running resend, else sent), used by undo,
+  check and reveal; the identity of the last snapshot kept in memory and
+  used first by the join on open; the kept selection, checked against the
+  new snapshot's words, sent before the resend; « Rejoindre » disabled
+  unless the status is `nickname`.
+- Out of scope: reactions and flags sent offline (B-047); moving the
+  connection out of `RoomPage.svelte` (B-049).
+- Screens: the kept join form while the page reconnects, « Rejoindre »
+  disabled (a look that exists; drawn if the screens sheet draws that form).
+- Open questions:
+  1. A check or reveal pressed before the snapshot after a loss: A (lead's
+     default) kept and sent after the resent edits, as the undo is; B
+     refused, the buttons disabled until joined.
+
+### B-042 The grid's focus ring above the cells
+
+- Status: brief
+- Priority: third of B-039's items (a baseline the product breaks today:
+  `product.md` rule 14)
+- Domains: client/shell (AC-18 reads the ring's computed style only; a
+  pixel check along the grid's edges), `_design/foundation.md` « Focus »
+  with option B only
+- Architecture decision: no
+- Model: Opus for the test-writer and the implementer (painted pixels,
+  `CLAUDE.md`)
+- Branch: feat/b-042-grid-focus-ring · PR: none yet
+- Problem: `.grid:focus-visible` draws its ring inside, at offset -3 px
+  (`GridViewport.svelte:1195`), over the edge cells, and the letter cells are
+  positioned and opaque (`:896`): Chromium and WebKit paint them after the
+  grid's outline. On screenshots of a 14 by 9 grid focused from the keyboard,
+  the ring shows only where a clue cell touches the edge and is hidden along
+  every letter cell (B-039 M4). The test of the ring
+  (`tests/test_spec_041_ac07_ac08_focus_ring.py`) reads the computed style,
+  so the gate cannot see it.
+- In scope: a ring that shows along the whole edge, and a pixel check along
+  the right and bottom edges in Chromium and WebKit. Options:
+  - A (lead's pick): the same ring drawn by an `aria-hidden` overlay painted
+    after the cells (`inset: 0`, `pointer-events: none`), outlined while the
+    grid has `:focus-visible`; the look as designed.
+  - B: the ring outside the grid, at the foundation's offset of 2 px; the
+    look changes and the viewport must not clip it.
+- Out of scope: the focus of the cells themselves (`aria-activedescendant`).
+- Screens: the grid focused from the keyboard; none changes with option A
+  (the ring is drawn as designed), the screens sheet redrawn with option B.
+- Open questions: none beyond the option.
+
+### B-043 Remote updates in proportion to what changed
+
+- Status: brief
+- Priority: fourth of B-039's items (on the path of `product.md` rules 23
+  and 24)
+- Domains: client/shell (a frame that changes nothing of a cell leaves it
+  untouched; the spec-writer picks the measure)
+- Architecture decision: no (inside `roomSession.ts` and
+  `GridViewport.svelte`)
+- Model: Opus for the test-writer and the implementer (timing in a browser,
+  `CLAUDE.md`)
+- Branch: feat/b-043-remote-update-cost · PR: none yet
+- Problem: every frame, the pong every 2 seconds included, assigns a new
+  array of cursors (`roomSession.ts:1197`), and each letter cell reads fresh
+  arrays from `cursorsOn` and `tintsOn` (`GridViewport.svelte:171`), so every
+  frame re-runs the template of every letter cell. With 8 players at 2
+  letters a second (rule 24) that is about 16 passes over the grid a second,
+  against the 50 ms local echo of rule 23 on the throttled phone (B-039 M5;
+  not measured). Each keystroke also copies every cell for `filledWords`
+  with the Salon closed, and scans the grid once per cell of a word (L13). A
+  pinch sets `--triangle` on every letter cell, and every arrow has two
+  `drop-shadow` filters (L16).
+- In scope: `nextCursors` returns the same array when nothing moved; one
+  derived map from cell to its cursors and tint, with shared empty values;
+  the same for flashes and caught-up cells; a cell index per snapshot and a
+  map of the latest pending edit per cell; `--triangle` on `.grid`; the
+  arrows' white halo as an SVG stroke. A measure proves it, for example "a
+  pong changes no cell of the grid" (a mutation count) and rule 23's echo
+  with 8 remote players typing; its test file goes in `SERIAL_TEST_FILES`
+  if it measures a pace.
+- Out of scope: splitting the cells into components (B-049).
+- Screens: none (the halo as a stroke looks the same; the cell sheet checks
+  it).
+- Open questions: none.
+
+### B-044 A zoomed grid follows the selection
+
+- Status: brief
+- Priority: fifth of B-039's items (phones)
+- Domains: gameplay/board (rule 3: while zoomed, a change of selection
+  scrolls the grid the least needed to show the selected cell)
+- Architecture decision: no
+- Model: Opus for the test-writer and the implementer (layout, `CLAUDE.md`)
+- Branch: feat/b-044-zoom-follows-selection · PR: none yet
+- Problem: the selection moves only `aria-activedescendant`, which no engine
+  scrolls into view, and nothing outside the pinch and pan code sets the
+  viewport's scroll (`GridViewport.svelte:544`, `:577`). On a 360 px phone,
+  zoomed to read a clue, letters 6 and 7 of a word typed with the in-app
+  keyboard land off-screen; Tab and the arrows can select a word wholly
+  off-screen (B-039 M6).
+- In scope: while zoomed, an effect on the selected cell and the cell size
+  scrolls the viewport the least that shows the cell with a margin; a tap
+  moves nothing, its cell being in view.
+- Out of scope: the zoom itself; the grid at zoom 1.
+- Screens: none (the zoomed grid scrolls; no new look).
+- Open questions:
+  1. The margin kept around the cell: A (lead's default) one cell; B none.
+
+### B-045 One room sheet, focus kept in overlays
+
+- Status: brief
+- Priority: sixth of B-039's items (before B-049, whose split its tests pin)
+- Domains: client/hud (rule 12: the focus and an open menu or the Salon
+  sheet; rule 13: Tab stays in every room sheet), lobby/host (rule 8: the
+  settings form's errors, the focus when the host role goes), gameplay/hints
+  (rule 19: the vote's « Oui » disabled under the focus), account/account
+  (rule 14: the backdrop closes the sheet only on a press and a release on
+  it)
+- Architecture decision: no (a client component)
+- Branch: feat/b-045-room-sheet-focus · PR: none yet
+- Problem: in the sheet layout, Shift+Tab from « Discussion » goes to the
+  clue bar's buttons under the Salon sheet, and Tab from an open Aide menu
+  goes to the grid under the scrim while the menu stays open (B-039 M7).
+  `HostSettings`, `AccountDialog`, `RecapDialog` and `RoomGoneDialog` each
+  reimplement the dialog, with different Tab traps, and the host sheet has
+  none: Tab from « Enregistrer » leaves for the address bar (M8). When the
+  host role goes, the sheet is unmounted and the focus falls to the page;
+  « Oui » of the vote is disabled under the focus when the connection drops
+  (L8). An invalid count in the host settings fails silently or in the
+  browser's language (`HostSettings.svelte:65`, no `novalidate`; L9). A drag
+  that starts in the account sheet and ends on the backdrop closes it,
+  losing the typed address (L17).
+- In scope: one `RoomSheet.svelte` (layout, title, backdrop and cancel
+  rules, one Tab trap on a full tabbable selector, `open()`, `close()`,
+  `onClosed`) used by the four sheets; the host sheet closed through it when
+  the role goes; the vote buttons give the focus away before they are
+  disabled, as the chat does for a mute; the settings form with
+  `novalidate`, an error line from `fr.json`, `aria-invalid` and
+  `aria-describedby`; the focus kept in an open menu or the Salon sheet.
+- Out of scope: the settings form reset by any `settings_changed` (B-050);
+  the overlays' state, which B-049 moves.
+- Screens: the host's settings with an invalid count (a new error line,
+  drawn in `docs/design/screens_sheet/`).
+- Open questions:
+  1. Focus leaving an open menu or the Salon sheet: A (lead's default) the
+     overlay closes, without moving the focus; B Tab wraps inside it, as in
+     the sheets.
+
+### B-046 One live status region, and the names and references
+
+- Status: brief
+- Priority: seventh of B-039's items (screen readers)
+- Domains: client/hud (one status region for the room page), with the rules
+  that call a message a status (`platform/realtime.md` rule 20 for the
+  band, `client/room.md` for the notes, `gameplay/results.md` for the
+  recap); the spec-writer finds them
+- Architecture decision: no
+- Branch: feat/b-046-live-status · PR: none yet
+- Problem: the connection band, the grid status, the undo note, the Joueurs
+  status and the recap status are live regions created with their text
+  already in them (`RoomPage.svelte:2131`, `:2304`, `RoomNote.svelte:75`,
+  `PlayersPanel.svelte:155`, `RecapDialog.svelte:220`); screen readers often
+  stay silent for a region that is created full (B-039 M9, plausible). The
+  vote banner does it right (`RoomPage.svelte:2173`). The catalogue's
+  « Jouer » buttons cannot be told apart, `aria-controls="reaction-picker"`
+  points to an element that exists only while open, and the nickname field
+  is `aria-invalid` with no `aria-describedby` (L22).
+- In scope: one persistent, visually hidden `role="status"` region in the
+  room page and an `announce(text)` passed down; the visible elements lose
+  their role; « Jouer » described by its card's title; the references set
+  only while their target exists.
+- Out of scope: the vote banner's region (already right); the alerts of the
+  forms.
+- Screens: none.
+- Open questions: none.
+
+### B-047 Connection hardening
+
+- Status: brief
+- Priority: eighth of B-039's items (rare cases of the connection)
+- Waits for: B-041 (the same connection code of `RoomPage.svelte`) and B-033
+  (the same rules of `platform/realtime.md`; its new close code is one more
+  the page reads)
+- Domains: client/hud (a final status makes the grid read-only), social/chat
+  (rules 5 and 13: « Je bloque » and « Réagir » while not joined),
+  gameplay/co-op (rule 12: which errors answer an edit), platform/realtime
+  (rules 16, 18 and 21: hidden tabs, the connect timeout, the jitter)
+- Architecture decision: no with the lead's defaults; yes with option B of
+  question 2 (pings sent by the server, a protocol change)
+- Branch: feat/b-047-connection-hardening · PR: none yet
+- Problem (B-039 L1 to L7): after a 4001, a removal or a lock the grid still
+  takes letters that are never sent (`RoomPage.svelte:813`). Reactions and
+  flags sent offline are lost but count for the pacing (`:1171`), and both
+  buttons stay enabled while not joined, unlike « Envoyer ». Five error codes
+  drop the oldest pending edit (`roomSession.ts:1288`), and two of them also
+  answer undo, check, reveal and `select_cell`; harmless today, but written
+  nowhere. Some server data is cast unchecked, and an invalid date throws in
+  `Intl.DateTimeFormat` after `session.seq` moved (`roomSession.ts:991`,
+  `activityFeed.ts:138`, `ops.ts:499`, `catalogue.ts:96`). The heartbeat runs
+  on page timers, which hidden tabs throttle (plausible). A socket stuck
+  connecting has no timeout (`:1896`). Every page retries at exactly 1, 2,
+  4 and 8 seconds after a server restart.
+- In scope: the grid read-only in a final status; « Réagir » and « Je
+  bloque » disabled while not joined, and only a send that went out counts;
+  the invariant of the error codes in `gameplay/co-op.md` rule 12, with a
+  server test; the parsers check those fields; a measure of hidden tabs in
+  the three engines, then the fix it calls for; a connect timeout; a jitter
+  on the delays.
+- Out of scope: a client reference echoed in the errors (an architecture
+  decision of its own, if the invariant ever breaks).
+- Screens: the clue bar while not joined, « Réagir » and « Je bloque »
+  disabled (a look that exists; drawn if the screens sheet draws that
+  state).
+- Open questions:
+  1. The connect timeout: A (lead's default) 6 seconds, the silence limit;
+     B 10 seconds.
+  2. Hidden tabs, if the measure shows drops: A (lead's default) the page
+     checks the silence again on `visibilitychange` before it closes; B the
+     server sends the pings.
+  3. The jitter: A (lead's default) ±20 % on each delay; B none, the delays
+     of rule 21 kept exact.
+
+### B-048 Unit tests for the client's pure modules
+
+- Status: brief (tooling, built by the lead; the runner, and a new
+  dependency with option B, are the human's call)
+- Priority: before B-049, if the human takes it
+- Domains: none (tooling: `web/package.json`, `scripts/gate.py`, CI)
+- Architecture decision: yes (the design of the tooling: a second test
+  runner in the gate): options from the Plan agent on Fable
+- Criteria: none (tooling)
+- Branch: feat/b-048-client-unit-tests · PR: none yet
+- Problem: the client's pure modules (`roomSession`, `activityFeed`,
+  `catchUp`, `remoteSelections`, `joinRules`, `navigation`, `history`,
+  `wordSelection`, `gridLayout`, `ops.cellStatesAtStep`) are tested only
+  through Playwright, one page per case. Their permutations (a gap in the
+  sequence, an error during a resend, a snapshot over pending edits) are slow
+  to reach that way, and the split of B-049 needs them pinned.
+- In scope: a runner for TypeScript tests of those modules, a gate step and
+  its CI job, and one test that proves the step runs; the test-writer adds
+  tests with the items that need them. Options:
+  - A (lead's pick): Node's own `node:test`, which runs TypeScript in Node 24
+    (CI takes `lts/*`): no new dependency, but a resolve hook for the
+    extensionless imports, the import of `fr.json` and `svelte/reactivity`.
+  - B: Vitest, a new dev dependency that reads the Vite config as it is.
+- Out of scope: component tests (the Svelte components stay with the browser
+  tests).
+- Screens: none.
+- Open questions:
+  1. Where the tests live: A (lead's default) `tests/web/`, written by the
+     test-writer, whose folder it is; B beside the modules in `web/src`,
+     which the implementer owns.
+  2. Whether such a test proves a criterion: A (lead's default) no, criteria
+     stay proven by `tests/test_<name>_*.py`; B the traceability check reads
+     them too.
+
+### B-049 Split `RoomPage.svelte` and `GridViewport.svelte`
+
+- Status: brief
+- Priority: last of B-039's items (maintainability; no player sees it)
+- Waits for: B-041 and B-045 (their tests pin the behaviour the split
+  keeps), and B-048 if the human takes it; best after B-042 to B-047, which
+  change the same files
+- Domains: none (no behaviour change: `web/src/lib/` only)
+- Architecture decision: yes (new modules of the client and their public
+  names): the Plan agent checks the report's split on Fable
+- Criteria: none new; every existing test proves nothing changed
+- Branch: feat/b-049-client-structure · PR: none yet
+- Problem: `RoomPage.svelte` holds 2,720 lines and five concerns: the
+  transport, the game commands, the view state, the layout arithmetic and
+  the device storage. `session` has two writers, and the connection code,
+  where M1, M2, M3, L1, L2, L6 and L11 come from, is reachable only by a
+  browser test (B-039 M11). `GridViewport.svelte` mixes gestures, key
+  mapping, legend arithmetic, announcements and cell drawing in 1,321 lines.
+  The one-overlay rule is applied by hand in eight places, the expiry timers
+  are three copies, and the play state machine and the WebKit link
+  workaround are repeated (L24); some leftovers and comments are wrong
+  (L25).
+- In scope: the nine steps of the report's « Structure », one commit each,
+  every `data-testid`, id and the document order of `client/hud.md` rule 3
+  kept, no wrapper element added: `roomConnection.ts` (an injected socket
+  factory and clock, the only writer of `session.status`),
+  `expiry.svelte.ts`, `VoteBanner`, `GridStatus`, `EntryPage`, `NoteSlot`,
+  `roomOverlays.svelte.ts`, `playFit.svelte.ts` (last, on Opus: pixels),
+  optionally `roomCommands.ts`; for the grid `LetterCell`, `ClueCell`, a
+  `use:pinchPan` action, `gridKeys.ts` and `legendLayout.ts`; the duplicates
+  of L24 and the leftovers of L25.
+- Out of scope: any change a player or a test can see.
+- Screens: none.
+- Open questions:
+  1. The props drilled through `Salon` (22) and `RoomTopBar` (26): A (lead's
+     default) grouped into a few objects here; B left as they are.
+
+### B-050 Small fixes of the web client
+
+- Status: brief
+- Priority: any time, between larger items; one fix per commit
+- Domains: lobby/host (rule 8: the settings form), admin/operations (rules
+  16, 18 and 19: the ops requests and the token), `product.md` (« Stable
+  routes »); the other fixes keep rules that already hold
+- Architecture decision: no (L26 adds the row of an existing route; no
+  baseline changes)
+- Branch: feat/b-050-client-small-fixes · PR: none yet
+- Problem and fix, one per B-039 Low finding:
+  - L10: any `settings_changed` resets the unsaved settings form
+    (`RoomPage.svelte:588`): only the fields that changed are copied.
+  - L12: a menu keeps its old place when the top bar changes form with no
+    layout change (`RoomPopover.svelte:50`, plausible): placed again after
+    `tick()`.
+  - L14: the scrolling lists observe every item again on each new line, with
+    two ResizeObservers on the chat stream (`scrollingLists.ts:16`, `:203`):
+    one watcher per list.
+  - L15: a pinch that gains a third finger and loses one makes the zoom jump
+    (`GridViewport.svelte:526`), and a lost `pointerup` can leave a ghost
+    finger: a new baseline at two fingers, the pointer captured.
+  - L18: crossing answers of `/ops` can end on the wrong period, the replay
+    too (`OpsPage.svelte:83`, `OpsReplay.svelte:70`): a request counter per
+    kind.
+  - L19: a token that cannot be a header value sticks in `sessionStorage`
+    (`OpsPage.svelte:95`, `ops.ts:176`): its shape checked before it is
+    stored, the field cleared on lock and focused when the form comes back.
+  - L20: the list separator `', '` (four places) and the units « h » and
+    « min » (`OpsSettings.svelte:52`) are outside `fr.json`:
+    `Intl.ListFormat('fr')` or a key, and two unit keys.
+  - L21: on the plain pages the top bar is inside `<main>`, so there is no
+    banner landmark (`CatalogueFrame.svelte:34`, `EntryFrame.svelte:24`):
+    the frames own `<main>` after the top bar.
+  - L23: one bundle serves every route, and the fonts are neither subset nor
+    preloaded: `import()` per page in `App.svelte`, the `latin` and
+    `latin-ext` subsets, a preload of the grid's two faces, measured against
+    `product.md` rule 22 before and after.
+  - L26: « Stable routes » omits `GET /api/account/progress`
+    (`account/account.md` rule 24): one row.
+  - L27: patches for svelte, svelte-check and vite, and two low advisories,
+    build-time only: tooling, the human's call, taken with the next tooling
+    item.
+- Out of scope: the host sheet's errors and focus (B-045).
+- Screens: none (L21 moves no pixel; the tests that locate `main` are
+  checked).
+- Open questions:
+  1. A change of the lock alone: A (lead's default) the typed counts stay;
+     B they reset, as today.
+  2. The ops fixes (L18, L19): A (lead's default) in this item; B an item of
+     their own.
 
 ### B-001 Rebaseline v1.1.0 into domain specs
 
