@@ -279,9 +279,9 @@ others, at the top of the list.
 
 ### B-033 Sockets: off the event loop, a deadline to join, a cap per address
 
-- Status: building (the human, 2026-10-30: « Approve the B-033 brief with the
+- Status: done (the human, 2026-10-30: « Approve the B-033 brief with the
   lead's picks (1A, 2A, 3A, 4A, 5) and process it »; then the spec change
-  « Approved as written »)
+  « Approved as written »; both review rounds approved)
 - Priority: fifth (before the first public test)
 - Domains: platform/realtime (a join deadline and its close code, a cap on
   open sockets per address), platform/server (the lookup in one worker-thread

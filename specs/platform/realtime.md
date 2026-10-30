@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: approved
+status: done
 ---
 
 # platform/realtime - Room events, reconnection and fair play
@@ -207,11 +207,6 @@ earns it.
 ### Look
 
 The connection band follows `_design/room.md`, « Connection lost ».
-
-## New interface
-
-- `src/nock/room.py`: `RoomConfig.join_timeout_seconds: float = 10.0` (> 0).
-- `NOCK_SOCKETS_PER_ADDRESS`, read as `lobby/rooms.md` rule 14's variable is.
 
 ## Acceptance criteria
 

@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: approved
+status: done
 ---
 
 # platform/server - Durable rooms, undo, serving and settings
@@ -197,12 +197,6 @@ address and with the database its environment gives.
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
 `client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two
 top bars (« Phone top bar », « Computer top bar »).
-
-## New interface
-
-- `src/nock/hub.py`: `RoomRegistry.connect(code, account_id=None, *,
-  owner_loop=None)`, callable from any thread; `owner_loop` is the event loop
-  of the socket's handler, which owns the connection (None: the running loop).
 
 ## Acceptance criteria
 
