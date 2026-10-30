@@ -301,13 +301,25 @@ class _RoomsHolder:
 
         Returns:
             The setting names of `nock.overrides.settings_set_in`, for a registry
-            created here; None for a registry given, or before one is created.
+            created here; None for a registry given.
+
+        Raises:
+            RuntimeError: the holder has no registry yet, or it was closed. Call
+                `get` first.
         """
         with self._lock:
+            if self._registry is None:
+                raise RuntimeError(
+                    "The holder has no registry: call get() before settings_set()."
+                )
             return self._settings_set
 
     def close_if_created(self) -> None:
-        """Close the registry (and its store) when this holder created it."""
+        """Close the registry (and its store) when this holder created it.
+
+        After it, the holder has no registry, so `settings_set` raises until `get`
+        creates one again.
+        """
         with self._lock:
             if self._registry is not None and self._is_created_here:
                 self._registry.close()
@@ -1337,6 +1349,18 @@ def create_app(
         for record in store.history(account.account_id):
             bodies.append(record.model_dump(mode="json"))
         return bodies
+
+    # Rule 24: derived at each request from the history, the rooms and the
+    # creator rooms; nothing is saved.
+    @web_app.get(f"{ACCOUNT_API_ROOT}/progress")
+    def get_account_progress(request: Request) -> dict[str, str]:
+        account = require_account(request)
+        store = account_store_in_use()
+        room_registry = holder.get()
+        created_codes = room_registry.store.codes_created_by(account.account_id)
+        return store.progress(
+            account.account_id, room_registry.peek_room, created_codes
+        )
 
     # The dependency refuses a request without a session before its body is
     # read (spec 033) and hands the account of the session to the route. The

@@ -3,7 +3,7 @@
   // 046): the grid's one card, or one state line in its place.
   import CatalogueFrame from './CatalogueFrame.svelte'
   import CatalogueList from './CatalogueList.svelte'
-  import { isGridSummary, type GridSummary } from './catalogue'
+  import { fetchAccountProgress, isGridSummary, type GridSummary } from './catalogue'
   import { t } from './i18n'
 
   type State = 'loading' | 'ready' | 'error' | 'not_found'
@@ -12,6 +12,8 @@
 
   let pageState: State = $state('loading')
   let summary: GridSummary | null = $state(null)
+  // The account's progress, null until the answer (or when there is none).
+  let accountProgress: Record<string, unknown> | null = $state(null)
 
   async function loadGrid(): Promise<void> {
     try {
@@ -36,8 +38,14 @@
     }
   }
 
+  // Asked once, straight from the route: the page does not ask who is signed in.
+  async function loadAccountProgress(): Promise<void> {
+    accountProgress = await fetchAccountProgress()
+  }
+
   $effect(() => {
     void loadGrid()
+    void loadAccountProgress()
   })
 </script>
 
@@ -50,7 +58,7 @@
     {:else if pageState === 'not_found'}
       <p class="nock-state-line" data-testid="catalogue-status">{t('not_found.heading')}</p>
     {:else if summary !== null}
-      <CatalogueList grids={[summary]} />
+      <CatalogueList grids={[summary]} {accountProgress} />
     {/if}
   </CatalogueFrame>
 </main>
