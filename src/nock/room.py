@@ -161,6 +161,9 @@ class RoomConfig(RoomModel):
     chat_window_seconds: float = Field(default=10.0, gt=0)
     reaction_limit: int = Field(default=5, ge=1)  # spec 022: reactions per window
     reaction_window_seconds: float = Field(default=10.0, gt=0)
+    # `gameplay/hints.md` rule 2: checks and reveals per window
+    hint_limit: int = Field(default=5, ge=1)
+    hint_window_seconds: float = Field(default=10.0, gt=0)
     # `lobby/lifetime.md` rule 4: how many hours a room lasts after its starting
     # point, one life per kind of room
     creator_solved_room_hours: int = Field(
@@ -233,6 +236,9 @@ class PlayerRecord(RoomModel):
     recent_chat: tuple[float, ...] = ()
     # spec 022: times of the reactions relayed in the window (not logged)
     recent_reactions: tuple[float, ...] = ()
+    # `gameplay/hints.md` rule 2: times of the checks and reveals counted in the
+    # window (not logged)
+    recent_hints: tuple[float, ...] = ()
     # `lobby/host.md` rule 10: the account this member is linked to, None for an
     # anonymous player. Never sent to a browser. A snapshot stored before the link
     # has no such key and loads with None.
@@ -2037,18 +2043,56 @@ def _run_help_message(
     now: float,
     config: RoomConfig,
 ) -> Outcome:
-    """Close an expired vote, then run a check, a reveal or a ballot (spec 025).
+    """Drop a request over the hint limit, else run a check, a reveal or a ballot.
 
-    The closing entry of the expired vote comes before the message's own
-    entries, so a late ballot finds no open vote.
+    A check or a reveal from a sender over the hint limit is dropped before
+    anything else, even the closing of an expired vote (hints rule 2). Otherwise
+    the closing entry of the expired vote comes before the message's own
+    entries, so a late ballot finds no open vote (spec 025).
     """
-    expiry = _expire_vote(state, now)
     if isinstance(message, Vote):
+        expiry = _expire_vote(state, now)
         outcome = _vote(expiry.state, player_id, message, now)
-    else:
-        outcome = _run_request(expiry.state, message, player_id, now, config)
-    all_entries = (*expiry.entries, *outcome.entries)
-    return outcome.model_copy(update={"entries": all_entries})
+        return outcome.model_copy(
+            update={"entries": (*expiry.entries, *outcome.entries)}
+        )
+    if _is_over_hint_limit(state, player_id, now, config):
+        return Outcome(state=state)
+    expiry = _expire_vote(state, now)
+    outcome = _run_request(expiry.state, message, player_id, now, config)
+    if outcome.entries:
+        outcome = _with_hint_counted(outcome, player_id, now, config)
+    return outcome.model_copy(update={"entries": (*expiry.entries, *outcome.entries)})
+
+
+def _recent_hints(
+    state: RoomState, player_id: str, now: float, config: RoomConfig
+) -> tuple[float, ...]:
+    """Return the times of the player's counted requests still in the window."""
+    player = _find_player(state, player_id)
+    if player is None:
+        return ()
+    return _times_in_window(player.recent_hints, now, config.hint_window_seconds)
+
+
+def _is_over_hint_limit(
+    state: RoomState, player_id: str, now: float, config: RoomConfig
+) -> bool:
+    """Tell whether the player already has `config.hint_limit` counted requests."""
+    recent = _recent_hints(state, player_id, now, config)
+    return len(recent) >= config.hint_limit
+
+
+def _with_hint_counted(
+    outcome: Outcome, player_id: str, now: float, config: RoomConfig
+) -> Outcome:
+    """Add `now` to the sender's window of a request that applied or opened a vote."""
+    player = _find_player(outcome.state, player_id)
+    if player is None:
+        return outcome
+    recent = _recent_hints(outcome.state, player_id, now, config)
+    counted = player.model_copy(update={"recent_hints": (*recent, now)})
+    return outcome.model_copy(update={"state": _replace_player(outcome.state, counted)})
 
 
 def _run_request(
@@ -2893,7 +2937,11 @@ def after_restart(state: RoomState, now: float) -> Outcome:
     for player in state.players:
         if player.state == PlayerState.DISCONNECTED:
             already_disconnected = player.model_copy(
-                update={"recent_chat": (), "recent_reactions": ()}
+                update={
+                    "recent_chat": (),
+                    "recent_reactions": (),
+                    "recent_hints": (),
+                }
             )
             players.append(already_disconnected)
             continue
@@ -2906,6 +2954,7 @@ def after_restart(state: RoomState, now: float) -> Outcome:
                 "recent_edits": (),
                 "recent_chat": (),
                 "recent_reactions": (),
+                "recent_hints": (),
             }
         )
         players.append(disconnected)
