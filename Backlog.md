@@ -240,7 +240,10 @@ others, at the top of the list.
 
 ### B-032 Room capacity: a creation limit, idle rooms leave memory
 
-- Status: brief
+- Status: approved (the human, 2026-10-30: « Use pattern 2 », « Approve and
+  process »: the limit in
+  an environment variable read at start, with the lead's defaults: 30
+  rooms an hour per address, no cap on rooms in memory)
 - Priority: fourth (before the first public test)
 - Domains: lobby/rooms (a creation limit; its "Out of scope" line on
   throttling creation goes), platform/server (a room stays in memory only
@@ -259,16 +262,17 @@ others, at the top of the list.
   snapshot of each (M5). The public recap is built twice per view, from the
   whole log (L4).
 - In scope: a per-address limit on creation, on the pattern of `_LinkLimits`,
-  answered 429; a runner whose task ends with no open socket saves its
-  snapshot and leaves memory; the recap routes read through `peek_room`, and
-  a solved room's recap is kept once built.
+  answered 429, its count of rooms an hour read at start from
+  `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` (a whole number, default 30; a bad
+  value stops the start, like the other variables; listed in
+  `specs/_settings.md`, no `/ops` override); a runner whose task ends with
+  no open socket saves its snapshot and leaves memory; the recap routes read
+  through `peek_room`, and a solved room's recap is kept once built.
 - Out of scope: the limits of sockets (B-033); the size of snapshots (B-037).
 - Screens: none.
-- Open questions:
-  1. The creation limit: A (lead's default) 30 rooms an hour per address; B 10;
-     C more for a signed-in creator.
-  2. A cap on rooms in memory once idle ones leave: A (lead's default) none;
-     B a cap answered 503.
+- Decisions: 30 rooms an hour per address, set by
+  `NOCK_ROOMS_PER_ADDRESS_PER_HOUR`; no cap on rooms in memory once idle
+  rooms leave. A `/ops` override of the limit would be a later item.
 
 ### B-033 Sockets: off the event loop, a deadline to join, a cap per address
 
