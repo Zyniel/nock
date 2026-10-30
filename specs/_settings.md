@@ -52,6 +52,7 @@ empty variable counts as unset.
 | `NOCK_ANONYMOUS_ROOM_HOURS` * | life of an unsolved anonymous room, from its last edit (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
 | `NOCK_EXPIRY_SWEEP_MINUTES` * | how often the expired rooms are deleted (whole minutes, 1 to 1440) | 60 | `lobby/lifetime.md` 6, 7 |
 | `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` | rooms one client address may create in an hour (whole number, 1 to 10000) | 30 | `lobby/rooms.md` 13, 14 |
+| `NOCK_SOCKETS_PER_ADDRESS` | room sockets one client address may hold open at once (whole number, 1 to 10000) | 50 | `platform/realtime.md` 2, 26 |
 | `NOCK_PUBLIC_URL` | public URL of the sign-in links | accounts off | `account/account.md` 1, 2 |
 | `NOCK_SMTP_HOST` | mail server | accounts off | `account/account.md` 1, 2 |
 | `NOCK_SMTP_SECURITY` | `starttls`, `tls` or `none` | `starttls` | `account/account.md` 2 |

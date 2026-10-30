@@ -148,6 +148,9 @@ class RoomConfig(RoomModel):
     idle_after_seconds: float = Field(default=120.0, gt=0)  # spec 013 AC-1
     host_handover_seconds: float = Field(default=60.0, gt=0)  # spec 014 AC-3
     silence_timeout_seconds: float = Field(default=6.0, gt=0)  # spec 017 AC-4
+    # `platform/realtime.md` rule 16: a socket that has not joined and sends no
+    # frame for this long is closed
+    join_timeout_seconds: float = Field(default=10.0, gt=0)
     resume_window_seconds: float = Field(default=300.0, gt=0)  # spec 017 AC-3
     max_edits_per_second: int = Field(default=20, ge=1)  # spec 037 AC-3
     snapshot_every: int = Field(default=100, ge=1)  # spec 018

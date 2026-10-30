@@ -209,7 +209,8 @@ status band of « Connection lost »; before, the entry card of
 
 - The host role, its controls and the creator: `lobby/host.md`. Limits on any
   other HTTP route than creation, the recap route, the ops API and the
-  sign-in link; limits on sockets other than the wrong-code throttle; the app
+  sign-in link; the cap on the open sockets of an address:
+  `platform/realtime.md` rules 2 and 26; the app
   parsing `X-Forwarded-For` itself; changing the creation limit from `/ops`.
   Web Share, QR codes, offline play.
 - Reconnection and fair play: `platform/realtime.md`. Durable state:

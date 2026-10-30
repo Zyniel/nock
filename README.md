@@ -300,6 +300,13 @@ written with the digits 0 to 9 (an empty variable counts as unset, and a refused
 value stops the server with a one-line message). Past it, creating a room answers
 429; the count is kept in memory and starts again from zero with the server.
 
+The number of room sockets one address may hold open at once is
+`NOCK_SOCKETS_PER_ADDRESS`: a whole number from 1 to 10000, default 50, written
+with the digits 0 to 9 (an empty variable counts as unset, and a refused value
+stops the server with a one-line message). Past it, a new socket is closed with
+4503, which the page treats as a loss and retries. A socket that has not joined
+and sends no frame for 10 seconds is closed with 4408.
+
 ### The operator pages
 
 The `NOCK_OPERATOR_TOKEN` environment variable turns on the operator pages of

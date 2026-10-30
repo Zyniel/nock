@@ -98,12 +98,14 @@ from nock.room import RoomKey, RoomState, RoomSummary
 from nock.room import member_id as room_member_id
 from nock.settings import (
     DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR,
+    DEFAULT_SOCKETS_PER_ADDRESS,
     OPERATOR_TOKEN_VARIABLE,
     AccountSettings,
     account_settings_from_env,
     operator_token_from_env,
     room_config_from_env,
     rooms_per_address_per_hour_from_env,
+    sockets_per_address_from_env,
 )
 from nock.store import RoomStore
 
@@ -125,6 +127,7 @@ GRID_NUMBER_PATTERN: str = r"^[1-9][0-9]{0,8}$"
 FORCE_PATTERN: str = r"^[1-4]$"
 MAX_SUMMARY_KEYS: int = 100  # spec 032: keys in one POST /api/rooms/summaries
 THROTTLED_CLOSE_CODE: int = 4429  # WebSocket close code, too many wrong codes
+TOO_MANY_SOCKETS_CLOSE_CODE: int = 4503  # too many sockets open from the address
 WRONG_CODE_LIMIT: int = 10
 WRONG_CODE_WINDOW_SECONDS: float = 60.0
 DATABASE_VARIABLE: str = "NOCK_DATABASE"  # path of the SQLite file (spec 018)
@@ -521,6 +524,61 @@ class _RoomCreationLimit:
                 self._times_per_address.pop(address, None)
 
 
+class _OpenSocketCap:
+    """The room sockets each client address holds open, kept in memory by one app.
+
+    The cap is NOCK_SOCKETS_PER_ADDRESS (`platform/realtime.md` rule 26). An
+    address is kept while it holds a socket. Every method may be called from any
+    thread: each one takes the lock.
+    """
+
+    def __init__(self) -> None:
+        """Create a cap that holds no socket, at the default number of sockets."""
+        self._lock = threading.Lock()
+        self._cap = DEFAULT_SOCKETS_PER_ADDRESS
+        self._open_per_address: dict[str, int] = {}
+
+    def read_at_start(self) -> None:
+        """Take the number of sockets of NOCK_SOCKETS_PER_ADDRESS.
+
+        Raises:
+            SettingsError: the variable breaks the rule of `platform/realtime.md`
+                rule 26.
+        """
+        cap = sockets_per_address_from_env(os.environ)
+        with self._lock:
+            self._cap = cap
+
+    def count_unless_reached(self, address: str) -> bool:
+        """Count one open socket for `address`, unless it reached the cap.
+
+        The check and the count are one step under the lock, so sockets that
+        arrive at once are counted one after another.
+
+        Args:
+            address: The client's address.
+
+        Returns:
+            True when the socket is counted. False when the address already
+            holds as many open sockets as the cap: nothing is counted then.
+        """
+        with self._lock:
+            open_count = self._open_per_address.get(address, 0)
+            if open_count >= self._cap:
+                return False
+            self._open_per_address[address] = open_count + 1
+            return True
+
+    def release(self, address: str) -> None:
+        """Take back the socket counted for `address`, whatever closed it."""
+        with self._lock:
+            open_count = self._open_per_address.get(address, 0)
+            if open_count <= 1:
+                self._open_per_address.pop(address, None)
+            else:
+                self._open_per_address[address] = open_count - 1
+
+
 def _times_in_window(times: list[float], now: float) -> list[float]:
     """Return the times of `times` inside the hour that ends at `now`."""
     recent: list[float] = []
@@ -865,23 +923,45 @@ async def _read_frames(websocket: WebSocket, connection: RoomConnection) -> None
         connection.submit(message)
 
 
-async def _serve_socket(
-    websocket: WebSocket,
-    room_registry: RoomRegistry,
-    code: str,
-    account_id: str | None,
-) -> None:
-    """Link the socket to the room and serve it until it closes.
+async def _connect_in_worker(
+    connect: Callable[[], RoomConnection | None],
+) -> RoomConnection | None:
+    """Run `connect` in a worker thread; never leave its connection behind.
+
+    When the handler is cancelled while the thread runs, the thread goes on, and
+    the connection it returns is left as soon as it comes, so that the room's
+    count of open sockets stays right (`platform/server.md` rule 22).
+
+    Args:
+        connect: Opens the connection; it runs in the worker thread.
+
+    Returns:
+        What `connect` returned.
+    """
+    connecting = asyncio.ensure_future(asyncio.to_thread(connect))
+    try:
+        return await asyncio.shield(connecting)
+    except asyncio.CancelledError:
+        connecting.add_done_callback(_leave_connection_of)
+        raise
+
+
+def _leave_connection_of(connecting: asyncio.Future[RoomConnection | None]) -> None:
+    """Leave the connection that a finished `connect` call gave, if it gave one."""
+    if connecting.cancelled() or connecting.exception() is not None:
+        return
+    connection = connecting.result()
+    if connection is not None:
+        connection.leave()
+
+
+async def _serve_socket(websocket: WebSocket, connection: RoomConnection) -> None:
+    """Serve the socket of a connection until it closes.
 
     The writer sends what the room task queues for this connection, in order:
     the snapshot of the join, the events, the errors and the closes. The join
     runs as the account that the socket's session signs in, if any.
     """
-    connection = room_registry.connect(code, account_id)
-    if connection is None:
-        # The room expired since the route looked it up (spec 032).
-        await websocket.close(code=ROOM_NOT_FOUND_CLOSE_CODE)
-        return
     writer = asyncio.create_task(
         connection.run_writer(
             websocket.send_text, lambda close_code: websocket.close(close_code)
@@ -980,7 +1060,8 @@ def create_app(
     Never raises because `dist_dir` is missing or empty (see AC-6). The app's
     startup raises SettingsError when it reads a NOCK_OPERATOR_TOKEN that breaks
     the rule of spec 038, a NOCK_ROOMS_PER_ADDRESS_PER_HOUR that breaks the rule
-    of `lobby/rooms.md` rule 14, or account variables that break the rules of
+    of `lobby/rooms.md` rule 14, a NOCK_SOCKETS_PER_ADDRESS that breaks the rule
+    of `platform/realtime.md` rule 26, or account variables that break the rules of
     spec 033.
 
     Raises:
@@ -991,6 +1072,7 @@ def create_app(
     operator = _OperatorToken(operator_token)
     running_overrides = _RunningOverrides()
     room_creations = _RoomCreationLimit()
+    open_sockets = _OpenSocketCap()
     account_service = _AccountService(accounts, account_store, mailer)
     client_dir = dist_dir if dist_dir is not None else WEB_DIST_DIR
     grid_catalogue = catalogue if catalogue is not None else Catalogue()
@@ -1004,6 +1086,7 @@ def create_app(
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         operator.read_at_start()
         room_creations.read_at_start()
+        open_sockets.read_at_start()
         account_service.start()
         try:
             room_registry = holder.get()
@@ -1494,21 +1577,27 @@ def create_app(
             raise _not_found()
         return _file_in_directory(client_dir, file_name)
 
-    @web_app.websocket("/api/rooms/{code}/ws")
-    async def room_socket(websocket: WebSocket, code: str) -> None:
-        room_registry = holder.get()
-        await websocket.accept()
-        address = _client_address(websocket)
+    async def serve_counted_socket(
+        websocket: WebSocket, room_registry: RoomRegistry, code: str, address: str
+    ) -> None:
+        """Serve a socket that is counted among the open sockets of its address."""
         now = room_registry.clock()
         if wrong_codes.is_blocked(address, now):
             await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        # In a worker thread: the lookup may read the room from the store, or
-        # delete it once expired (spec 032), and the event loop must not wait.
-        # It keeps nothing in memory: `connect` makes the room live once the
-        # socket is served.
-        state = await asyncio.to_thread(room_registry.peek_room, code)
-        if state is None:
+        owner_loop = asyncio.get_running_loop()
+        cookies = websocket.cookies
+
+        def connect() -> RoomConnection | None:
+            account = account_of_cookies(cookies)
+            account_id = None if account is None else account.account_id
+            return room_registry.connect(code, account_id, owner_loop=owner_loop)
+
+        # One call in a worker thread (`platform/server.md` rule 22): it may
+        # read the room from the store or delete it once expired (spec 032),
+        # and the event loop must not wait.
+        connection = await _connect_in_worker(connect)
+        if connection is None:
             # Checked again as it is recorded: other sockets of the address may
             # have been counted while this one waited for its lookup.
             if wrong_codes.record_unless_blocked(address, now):
@@ -1516,10 +1605,21 @@ def create_app(
             else:
                 await websocket.close(code=THROTTLED_CLOSE_CODE)
             return
-        # In a worker thread: the session is read from the account database.
-        account = await asyncio.to_thread(account_of_cookies, websocket.cookies)
-        account_id = None if account is None else account.account_id
-        await _serve_socket(websocket, room_registry, code, account_id)
+        await _serve_socket(websocket, connection)
+
+    @web_app.websocket("/api/rooms/{code}/ws")
+    async def room_socket(websocket: WebSocket, code: str) -> None:
+        room_registry = holder.get()
+        await websocket.accept()
+        address = _client_address(websocket)
+        # Counted before the throttle, and released whatever closes the socket.
+        if not open_sockets.count_unless_reached(address):
+            await websocket.close(code=TOO_MANY_SOCKETS_CLOSE_CODE)
+            return
+        try:
+            await serve_counted_socket(websocket, room_registry, code, address)
+        finally:
+            open_sockets.release(address)
 
     return web_app
 

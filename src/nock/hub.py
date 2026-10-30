@@ -159,6 +159,11 @@ class RoomConnection:
 
     The room's thread and the socket's thread both change the counts behind
     these bounds, so a lock guards them.
+
+    A connection that has not joined has a deadline (`platform/realtime.md`
+    rule 16): `join_timeout_seconds` after its opening and after each frame, it
+    is closed with SILENCE_CLOSE_CODE through the outbound queue. The timer
+    runs on the owner loop, and an accepted join ends it.
     """
 
     def __init__(
@@ -168,6 +173,7 @@ class RoomConnection:
         max_outbound: int = DEFAULT_CONFIG.max_outbound_messages,
         max_inbound: int = DEFAULT_CONFIG.max_inbound_pending,
         account_id: str | None = None,
+        join_timeout_seconds: float = DEFAULT_CONFIG.join_timeout_seconds,
     ) -> None:
         """Create a connection owned by `owner_loop`, the loop of the socket.
 
@@ -180,6 +186,8 @@ class RoomConnection:
             max_inbound: How many inputs may wait to be applied by the room.
             account_id: The account that the socket's session signs in, which
                 the connection's join runs as; None for an anonymous join.
+            join_timeout_seconds: How long the connection may stay without a
+                frame before its join.
         """
         self.player_id: str | None = None
         self.account_id = account_id
@@ -194,6 +202,25 @@ class RoomConnection:
         self._inbound_count = 0  # inputs passed on and not applied by the room yet
         self._is_stalled = False
         self._is_flooded = False
+        self._join_timeout_seconds = join_timeout_seconds
+        # Both only touched on the owner loop.
+        self._join_deadline: asyncio.TimerHandle | None = None
+        self._is_join_deadline_over = False
+
+    def start_join_deadline(self) -> None:
+        """Start counting the time left to join (any thread).
+
+        The registry calls it once the connection is made.
+        """
+        self._call_on_owner_loop(self._restart_join_deadline)
+
+    def end_join_deadline(self) -> None:
+        """Stop counting the time left to join, for good (any thread).
+
+        The room calls it when it accepts the connection's join, and the socket
+        when it closes.
+        """
+        self._call_on_owner_loop(self._stop_join_deadline)
 
     def submit(self, message: ClientMessage) -> None:
         """Pass a message of this player to the room (any thread).
@@ -204,6 +231,7 @@ class RoomConnection:
         connection, or comes after.
         """
         read_at = time.monotonic()
+        self._count_frame_toward_join_deadline()
         if self._admit_frame():
             self._post(_Message(self, message, read_at))
 
@@ -212,6 +240,7 @@ class RoomConnection:
 
         The frame is dropped when it floods the connection, or comes after.
         """
+        self._count_frame_toward_join_deadline()
         if self._admit_frame():
             self._post(_Invalid(self))
 
@@ -220,6 +249,7 @@ class RoomConnection:
 
         Never dropped, even after a flood, and not counted as an input.
         """
+        self.end_join_deadline()
         self._post(_Detach(self))
 
     def mark_input_applied(self) -> None:
@@ -346,6 +376,44 @@ class RoomConnection:
                 return
             self._outbound_count += 1
         self._enqueue(_Outbound(text=None, close_code=close_code))
+
+    def _count_frame_toward_join_deadline(self) -> None:
+        """Give a connection that has not joined a whole new time to join."""
+        if self.player_id is None:
+            self._call_on_owner_loop(self._restart_join_deadline)
+
+    def _restart_join_deadline(self) -> None:
+        """Count `join_timeout_seconds` again from now. Runs on the owner loop."""
+        if self._is_join_deadline_over:
+            return
+        if self._join_deadline is not None:
+            self._join_deadline.cancel()
+        self._join_deadline = self._owner_loop.call_later(
+            self._join_timeout_seconds, self._close_for_silence
+        )
+
+    def _stop_join_deadline(self) -> None:
+        """Cancel the deadline and never start it again. Runs on the owner loop."""
+        self._is_join_deadline_over = True
+        if self._join_deadline is not None:
+            self._join_deadline.cancel()
+            self._join_deadline = None
+
+    def _close_for_silence(self) -> None:
+        """Close a connection that did not join in time. Runs on the owner loop."""
+        self._join_deadline = None
+        if self.player_id is not None:
+            return  # the room accepted the join just before the deadline
+        self._is_join_deadline_over = True
+        self._queue_close(SILENCE_CLOSE_CODE)
+
+    def _call_on_owner_loop(self, callback: Callable[[], None]) -> None:
+        """Run a function on the owner loop, from any thread."""
+        try:
+            self._owner_loop.call_soon_threadsafe(callback)
+        except RuntimeError:
+            # The socket's event loop is closed: nobody is left to wait for.
+            return
 
     def _enqueue(self, item: _Outbound) -> None:
         """Put an item in the queue from any thread."""
@@ -714,6 +782,7 @@ class _RoomRunner:
         with SESSION_REPLACED_CLOSE_CODE and are sent nothing else.
         """
         connection.player_id = player_id
+        connection.end_join_deadline()
         if is_resume:
             for older in list(self._connections):
                 if older.player_id == player_id:
@@ -1104,7 +1173,9 @@ class RoomRegistry:
         """Delete every room that is expired at `clock()` (`lobby/lifetime.md`).
 
         A room is expired by `is_room_expired`. A live room's task stops first,
-        and each of its sockets is closed with ROOM_NOT_FOUND_CLOSE_CODE.
+        and each of its sockets is closed with ROOM_NOT_FOUND_CLOSE_CODE. The
+        times of each room are read again under the lock before it is deleted:
+        a room that an edit has kept alive meanwhile is left alone.
 
         Returns:
             The codes of the rooms deleted, in code-point order.
@@ -1113,9 +1184,12 @@ class RoomRegistry:
         for times in self._store.read_room_times():
             if self._is_expired(times):
                 expired_codes.append(times.code)
+        deleted_codes: list[str] = []
         for code in expired_codes:
-            self._delete_room(code)
-        return expired_codes
+            with self._lock:
+                if self._delete_room_if_expired(code):
+                    deleted_codes.append(code)
+        return deleted_codes
 
     def count_expired_rooms(self, config: RoomConfig) -> int:
         """Count the rooms that `config` would find expired now, deleting none.
@@ -1239,29 +1313,40 @@ class RoomRegistry:
         return public_recap(recap)
 
     def connect(
-        self, code: str, account_id: str | None = None
+        self,
+        code: str,
+        account_id: str | None = None,
+        *,
+        owner_loop: asyncio.AbstractEventLoop | None = None,
     ) -> RoomConnection | None:
         """Open a connection to room `code` for a socket that has not joined.
 
         The connection receives the room's messages once the player's join is
         accepted by the room task. Its bounds are the registry's
         `max_outbound_messages` and `max_inbound_pending` (spec 036). The room
-        is live from now until its task ends with no socket open.
+        is live from now until its task ends with no socket open. The join
+        deadline of the connection starts now (`RoomConfig.join_timeout_seconds`).
 
-        Must be called from the event loop that serves the socket.
+        May be called from any thread, so that the socket's handler runs it in
+        a worker thread: it reads the store (`platform/server.md` rule 22).
 
         Args:
             code: The room.
             account_id: The account that the socket's session signs in, which
                 the connection's join runs as; None for an anonymous join.
+            owner_loop: The event loop of the socket's handler, which owns the
+                connection. None: the running loop.
 
         Returns:
             The connection, or None when there is no such room. An expired room
             is deleted first, and so gives None (spec 032).
 
         Raises:
-            RuntimeError: the registry is closed.
+            RuntimeError: the registry is closed, or `owner_loop` is None and
+                no loop is running.
         """
+        if owner_loop is None:
+            owner_loop = asyncio.get_running_loop()
         runner = self._find_runner_for_socket(code)
         if runner is None:
             return None
@@ -1275,15 +1360,17 @@ class RoomRegistry:
                 return
 
         connection = RoomConnection(
-            asyncio.get_running_loop(),
+            owner_loop,
             post,
             max_outbound=self._config.max_outbound_messages,
             max_inbound=self._config.max_inbound_pending,
             account_id=account_id,
+            join_timeout_seconds=self._config.join_timeout_seconds,
         )
         # Scheduled before any input of the connection, so the room knows it
         # before its first frame.
         engine_loop.call_soon_threadsafe(runner.keep_connection, connection)
+        connection.start_join_deadline()
         return connection
 
     def close(self) -> None:
@@ -1350,13 +1437,19 @@ class RoomRegistry:
     def _find_runner_for_socket(self, code: str) -> _RoomRunner | None:
         """Return the live runner of room `code` for a socket about to open to it.
 
-        As `_find_runner`, and the runner counts the socket in the same step,
-        under the lock: the room cannot leave memory between this call and the
-        moment the engine's loop learns of the connection.
+        One step under the lock: an expired room is deleted (its times read
+        again, as `_delete_if_expired` does), a room not in memory is loaded
+        once, and the runner counts the socket. The room cannot leave memory
+        between this call and the moment the engine's loop learns of the
+        connection.
+
+        Returns:
+            The runner; None when the room is unknown or expired.
         """
-        if self._delete_if_expired(code):
-            return None
+        looks_expired = self._looks_expired(code)
         with self._lock:
+            if looks_expired and self._delete_room_if_expired(code):
+                return None
             runner = self._live_runner(code)
             if runner is not None:
                 runner.expect_connection()
@@ -1518,49 +1611,78 @@ class RoomRegistry:
     def _delete_if_expired(self, code: str) -> bool:
         """Delete room `code` when it is expired at `clock()`.
 
+        The times are read once to decide whether to take the lock, then again
+        under the lock before the deletion (`lobby/lifetime.md` rule 6).
+
         Returns:
             True when the room was expired, and so is deleted now.
         """
-        times = self._store.room_times(code)
-        if times is None or not self._is_expired(times):
+        if not self._looks_expired(code):
             return False
-        self._delete_room(code)
+        with self._lock:
+            return self._delete_room_if_expired(code)
+
+    def _looks_expired(self, code: str) -> bool:
+        """Tell whether the times of room `code`, read now, make it expired.
+
+        The first read of a lookup, made before it takes the lock: an edit may
+        land after it, so a deletion reads the times again.
+        """
+        times = self._store.room_times(code)
+        return times is not None and self._is_expired(times)
+
+    def _delete_room_if_expired(self, code: str) -> bool:
+        """Read the times of room `code` again, and delete it if still expired.
+
+        The caller holds the lock. A room that an edit kept alive since the
+        caller's first read is kept.
+
+        Returns:
+            True when the room was still expired, and so is deleted now.
+        """
+        if not self._looks_expired(code):
+            return False
+        self._delete_room_locked(code)
         return True
 
     def _delete_room(self, code: str) -> None:
+        """Delete a room, expired or not, with no second read of its times."""
+        with self._lock:
+            self._delete_room_locked(code)
+
+    def _delete_room_locked(self, code: str) -> None:
         """Delete a room: stop it when it is live, then remove it from the store.
 
-        The lock is held throughout, so that no lookup loads the room again while
+        The caller holds the lock, so that no lookup loads the room again while
         it goes. A live room is stopped on the engine's loop, which then deletes
         it from the store and closes its sockets (`_RoomRunner.delete`); this
         waits until that is done, except on the engine's own thread.
 
         The delete hook (spec 029) runs first, with the room's latest state.
         """
-        with self._lock:
-            runner = self._runners.pop(code, None)
-            self._drop_recap(code)
-            self._call_delete_hook(code, runner)
-            loop = self._loop
-            if runner is None or loop is None or self._closed:
-                # No task or socket to stop: none ever connected, or close()
-                # stopped them all.
+        runner = self._runners.pop(code, None)
+        self._drop_recap(code)
+        self._call_delete_hook(code, runner)
+        loop = self._loop
+        if runner is None or loop is None or self._closed:
+            # No task or socket to stop: none ever connected, or close()
+            # stopped them all.
+            self._store.delete_room(code)
+            return
+        if threading.current_thread() is self._thread:
+            # Waiting for ourselves would block, as in close(): the store
+            # forgets the room now, under the lock, and the room's task stops
+            # after this step, even when the store fails. The stop leaves the
+            # store alone: a new room may have taken the code by then.
+            try:
                 self._store.delete_room(code)
-                return
-            if threading.current_thread() is self._thread:
-                # Waiting for ourselves would block, as in close(): the store
-                # forgets the room now, under the lock, and the room's task stops
-                # after this step, even when the store fails. The stop leaves the
-                # store alone: a new room may have taken the code by then.
-                try:
-                    self._store.delete_room(code)
-                finally:
-                    stopping = loop.create_task(runner.stop_for_deletion())
-                    self._deletion_tasks.add(stopping)
-                    stopping.add_done_callback(self._deletion_tasks.discard)
-                return
-            deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
-            deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
+            finally:
+                stopping = loop.create_task(runner.stop_for_deletion())
+                self._deletion_tasks.add(stopping)
+                stopping.add_done_callback(self._deletion_tasks.discard)
+            return
+        deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
+        deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _call_delete_hook(self, code: str, runner: _RoomRunner | None) -> None:
         """Call the delete hook with the latest state of a room about to go.
