@@ -7,7 +7,10 @@
   import type { GridSummary } from './catalogue'
   import { THUMB_MIN_LIST_WIDTH_PX } from './gridThumb'
 
-  let { grids }: { grids: GridSummary[] } = $props()
+  let {
+    grids,
+    accountProgress,
+  }: { grids: GridSummary[]; accountProgress: Record<string, unknown> | null } = $props()
 
   let listWidth = $state(0)
   const isThumbShown = $derived(listWidth >= THUMB_MIN_LIST_WIDTH_PX)
@@ -28,7 +31,7 @@
 
 <div class="catalogue-list" data-testid="catalogue-list" use:watchWidth>
   {#each grids as grid (grid.number)}
-    <CatalogueItem summary={grid} {isThumbShown} />
+    <CatalogueItem summary={grid} {isThumbShown} {accountProgress} />
   {/each}
 </div>
 
