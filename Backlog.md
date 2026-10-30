@@ -905,11 +905,12 @@ others, at the top of the list.
   2. The ops fixes (L18, L19): A (lead's default) in this item; B an item of
      their own.
 
-### B-051 CI skips the gate for notes-only pull requests
+### B-051 CI runs only the gate jobs that read the changed files
 
 - Status: done (the human asked for it, 2026-10-30: « PR B-039 is triggering
   Quality Gates when only updating backlog and claude_docs review. This should
-  not happen. »; tooling, built by the lead)
+  not happen. », then « Review my requirements and include coherent files in
+  potential QG skips »; tooling, built by the lead)
 - Domains: none (tooling only: `.github/workflows/ci.yml`)
 - Architecture decision: no
 - Criteria: none (tooling)
@@ -918,17 +919,27 @@ others, at the top of the list.
   nothing outside `specs/`, `docs/` and `grids/`. B-039 (#70) changed
   `Backlog.md` and `claude_docs/frontend-review.md` only, files no check and
   no test reads, and still ran the static job and the Chromium job.
-- In scope: a pull request that changes only `Backlog.md` and files under
-  `claude_docs/` skips the static and browser jobs; those files no longer
-  count when deciding the browser skip of a `specs/`, `docs/`, `grids/`
-  change; the `Quality gate` check accepts a skipped static job only then.
+- In scope: each changed file of a pull request says which gate jobs it
+  needs. None, for a file no check and no test reads: `Backlog.md`,
+  `CLAUDE.md`, `claude_docs/`, `.claude/`, `docs/` outside `docs/design/`,
+  `Dockerfile`, `.dockerignore`, `compose*.yaml`, `Caddyfile`,
+  `.env.*.example`. The static job only, for a file only it reads: `specs/`
+  (traceability), `docs/design/` (the screens sheet), `grids/` (the shipped
+  grids), `README.md` (the font credits, spec 041 AC-6, a test without a
+  browser). Every job for any other file and for a Python file anywhere
+  (ruff and black read the whole repository). The `Quality gate` check
+  accepts a skipped static job only when the files allow it.
 - Out of scope: a push to `main` and a run started by hand (every job, as
-  before); other top-level files (`README.md`, `CLAUDE.md`).
+  before). Files that change what a check sees stay in every job:
+  `.gitignore` (ruff and black skip what it lists), `.gitattributes` (line
+  endings at checkout), `.python-version`, `pyproject.toml`, `uv.lock`,
+  `.github/`.
 - Screens: none.
-- Built: checked by running the workflow's shell step on sample file lists:
-  notes only skips both, notes with `specs/` or `grids/` skips the browsers
-  only, notes with `src/` runs both, look-alike paths (`Backlog.mdx`,
-  `claude_docsx/`) run both, a push runs both.
+- Built: checked by running the workflow's shell step under `bash -e` on 31
+  sample file lists, one or more per kind above, with look-alike paths
+  (`Backlog.mdx`, `claude_docsx/`, `compose.yml`, `.env`), a quoted
+  non-ASCII path, a path with a space and an empty list (every job); a push
+  runs every job.
 
 ### B-001 Rebaseline v1.1.0 into domain specs
 
