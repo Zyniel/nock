@@ -155,8 +155,13 @@ def test_ac3_two_no_of_three_reject_the_vote_and_leave_the_room_as_it_was(
     assert play.state.cells == room_v3.cells
     assert play.state.reveal_budget == FIVE_AND_ONE
     assert open_vote_of(play.state) is None
-    expected = room_v3.model_copy(update={"seq": 6, "last_vote_id": 1})
-    assert with_times_of(play.state, room_v3) == expected
+    # The requester's request counted for the hint limit when the vote opened.
+    requester = room_v3.players[0].model_copy(update={"recent_hints": (NOW,)})
+    players = (requester, *room_v3.players[1:])
+    expected = room_v3.model_copy(
+        update={"seq": 6, "last_vote_id": 1, "players": players}
+    )
+    assert with_times_of(play.state, expected) == expected
 
 
 @pytest.mark.parametrize(

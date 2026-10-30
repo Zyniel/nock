@@ -199,12 +199,16 @@ others, at the top of the list.
 
 ### B-031 Limits on checks and reveals
 
-- Status: brief
+- Status: done (the human approved the brief with the lead's defaults,
+  2026-10-30: « 5 checks and reveals per 10 seconds per player, extra ones
+  dropped silently », then the spec change as written; both review rounds
+  approved)
 - Priority: third (with B-030 it closes B-028 H2: B-030 makes a check cheap,
   this one bounds how often)
 - Domains: gameplay/hints, platform/realtime
-- Architecture decision: no with the lead's default below; yes with a new
-  error code (a protocol message)
+- Architecture decision: no (the lead's defaults: no new error code)
+- Criteria: hints AC-21 (new), hints AC-22 (new), hints AC-23 (new); realtime
+  rule 12 points to the limit (no criterion)
 - Branch: feat/b-031-hint-limits · PR: none yet
 - Problem: checks and reveals count toward no limit (`room.py:2033`; only
   edits count toward `max_edits_per_second`), the default help mode is
@@ -216,14 +220,23 @@ others, at the top of the list.
   request included, with its numbers in `RoomConfig`.
 - Out of scope: the edit limit; the reveal budget (`gameplay/hints.md`).
 - Screens: none with the lead's default (a dropped request shows nothing).
-- Open questions:
-  1. The numbers: A (lead's default) 5 requests per 10 seconds per player, as
-     chat; B 1 a second.
-  2. A request over the limit: A (lead's default) dropped without an answer,
-     as a chat message over its limit is. Not `rate_limited`: the client
-     reads it as the answer to an edit and drops its oldest pending edit
-     (`web/src/lib/roomSession.ts:1289`). B: a new error code the page shows,
-     a protocol change and a new text.
+- Open questions (answered, A and A):
+  1. The numbers: A (lead's default, picked) 5 requests per 10 seconds per
+     player, as chat; B 1 a second.
+  2. A request over the limit: A (lead's default, picked) dropped without an
+     answer, as a chat message over its limit is. Not `rate_limited`: the
+     client reads it as the answer to an edit and drops its oldest pending
+     edit (`web/src/lib/roomSession.ts:1289`). B: a new error code the page
+     shows, a protocol change and a new text.
+- The spec-writer's choices where the brief left it open: a ballot never
+  counts and is never dropped; a refused request uses no place; the limit
+  comes before every other step, so a full window drops even a request that
+  would be refused, with no error, and leaves an expired vote for the tick;
+  the vote that passes uses no place.
+- Build note: `tests/test_spec_023_ac03_ac04_result_reaches_players.py`
+  sends 30 grid checks from one player at once; its test is edited in place
+  with a higher `hint_limit` (`specs/_map.md`: a pointer's tests change with
+  the behaviour).
 
 ### B-032 Room capacity: a creation limit, idle rooms leave memory
 
@@ -1596,6 +1609,16 @@ Taken when a change touches them.
   after B-030): the spec-writer proposes moving "Serving the client" and
   "Environment settings" (rules 10 to 19, AC-14 to AC-19) to a new
   `platform/serving.md`, an architecture decision.
+- `gameplay/hints.md` is over the size guideline (about 21 KB, 23 criteria
+  after B-031): the spec-writer proposes moving the vote and its banner
+  (rules 14 to 22, AC-13 to AC-20, with their pointers) to a new
+  `gameplay/votes.md`, an architecture decision. `platform/realtime.md` is
+  over too (about 19 KB, 20 criteria).
+- `tests/test_spec_046_ac01_ac02_frames.py::test_ac1_the_second_child_of_the_column_is_the_card[chromium-1024x768]`
+  failed once in the parallel pass (B-031's close, 2026-10-30): the card's
+  background read transparent, as if its styles had not applied yet; alone,
+  the file passes. If it fails again, it waits for the styles or goes in
+  `SERIAL_TEST_FILES` (a tooling fix of the lead's).
 
 ## Grid engine ideas from ipuz
 

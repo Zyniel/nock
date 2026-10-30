@@ -10,7 +10,8 @@ status: done
 
 A stuck group can check its letters or reveal the right ones. The server decides
 and the whole room sees the result, within the limits the host sets: a help mode,
-a reveal budget and, in vote mode, a majority of the players.
+a reveal budget and, in vote mode, a majority of the players. Each player may
+ask only a few times in a short while.
 
 ## Depends on
 
@@ -32,8 +33,16 @@ a reveal budget and, in vote mode, a majority of the players.
 ### Requests
 
 2. A check, a reveal or a ballot is input (it wakes an idle player,
-   `social/presence.md`); the edit rate limit counts none of them. The first step
-   that applies refuses a check or a reveal:
+   `social/presence.md`); the edit rate limit counts none of them. A check or a
+   reveal, whatever its target, meets the hint limit first: when its sender
+   already has `RoomConfig.hint_limit` (5) counted requests in the last
+   `hint_window_seconds` (10) seconds (sliding: those after now − 10), it is
+   dropped. A dropped request gets no reply, adds no entry, closes no expired
+   vote and changes nothing but the sender's presence. A request counts when it
+   is applied at once or opens a vote; a dropped or refused one does not, nor a
+   ballot, which no limit holds back, nor the request of a vote that passes.
+   Each player has their own window, never logged; a restart empties them all.
+   Then the first step that applies refuses a check or a reveal:
    1. the grid is solved: `grid_solved`;
    2. help mode `none`: `help_disabled`;
    3. a letter target that is not a letter cell: `not_a_letter_cell`; a word
@@ -112,12 +121,12 @@ a reveal budget and, in vote mode, a majority of the players.
     player who is not eligible, or has voted, is ignored without reply. The vote
     passes once the yes are more than half of the eligible voters, and is
     rejected once that cannot happen: 2 voters need 2 yes, 3 need 2, 4 need 3.
-16. A vote that passes runs its request again through rule 2: refused, it closes
-    `rejected` and nothing else happens; else `vote_closed` (`passed`) comes
-    first, then the request's entries in the requester's name.
-17. A vote expires 20 seconds after it opened: the room's tick, or the next
-    check, reveal or ballot (closing it first), closes it `timed_out`. A vote
-    that does not pass changes no cell and no budget.
+16. A vote that passes runs its request again through rule 2's steps: refused,
+    it closes `rejected` and nothing else happens; else `vote_closed`
+    (`passed`) comes first, then the request's entries in the requester's name.
+17. A vote expires 20 seconds after it opened: the room's tick, the next
+    ballot, or the next check or reveal not dropped (closing it first), closes
+    it `timed_out`. A vote that does not pass changes no cell and no budget.
 18. Snapshots carry the open vote. Ballots are not logged: after a server
     restart an open vote keeps its id, request, opening time and voters, and only
     the requester's yes.
@@ -256,6 +265,20 @@ on its layer of `_design/room.md`, « Layers ».
   with the ring inside the banner, and a close or a solve sends the focus from
   the banner to the grid; its states pass the scans of `product.md`, and
   `fr.json` holds the vote texts. (← 025 AC-8, 047 AC-1, 047 AC-13, 047 AC-14)
+- **AC-21** In `free`, Ana's six grid checks at one instant give five
+  `check_result`, each to every player; the sixth gets no reply, adds no event
+  and leaves the seq where the fifth left it. One more at +9.9 s is dropped too
+  and one at +10 s applies; Bob's grid check at the same instant applies, and
+  after a restart within those 10 seconds five checks of Ana's apply at once.
+- **AC-22** In `free`, after Ana's letter check, word check, grid check and
+  letter reveal, her reveal of the clue (0, 0) gets `not_a_letter_cell` and her
+  reveal of MIME applies; then her letter check is dropped, and so is a reveal
+  of (0, 0), with no `not_a_letter_cell`.
+- **AC-23** In `vote` with Ana, Bob and Cy connected, after Bob's five word
+  checks, Ana's reveal of (1, 0) opens vote 1 and Bob's yes passes it, revealing
+  `T`, while Bob's next word check is dropped; Ana's next four letter checks
+  apply and a fifth is dropped. With Ana's window full, her grid check opens no
+  vote.
 
 ## Edge cases
 
@@ -266,11 +289,14 @@ on its layer of `_design/room.md`, « Layers ».
   then closes `rejected` (AC-12, AC-14).
 - After a restart, a page that recorded its ballot still reads `vote.cast`; the
   others decide, or the vote times out (AC-16, AC-17).
+- A check dropped after a vote's 20 seconds leaves the vote open for the tick
+  to close (AC-23).
 
 ## Out of scope
 
 - Generated hints, revealing the whole grid, undoing a reveal, keyboard
-  shortcuts, a tally of ballots, changing a ballot, votes on anything else.
+  shortcuts, a tally of ballots, changing a ballot, votes on anything else, a
+  message telling a player their request was dropped.
 - The host settings: `lobby/host.md`. The Aide menu's place, « Réagir » under
   the banner: `client/hud.md`; the notes: `client/room.md`. Cell marks and
   pending edits: `gameplay/board.md`. Completion: `gameplay/rules.md`. The
@@ -280,10 +306,12 @@ on its layer of `_design/room.md`, « Layers ».
 ## Code
 
 - `src/nock/room.py`: check, reveal, the budget and its count, votes, `tick`,
-  `replay`, `snapshot_for`, `after_restart`; `RoomConfig` holds the vote time.
+  `replay`, `snapshot_for`, `after_restart`, the hint limit; `RoomConfig` holds
+  the vote time and the limit's numbers.
 - `src/nock/protocol.py`: messages and error codes.
 - `web/src/lib/AideMenu.svelte`, `RoomPage.svelte` (what is enabled, the
   banner), `GridViewport.svelte` (strike, notch), `roomSession.ts`,
   `voteCountdown.ts`, `activityFeed.ts` (the stream lines).
 - Tests: `tests/test_spec_023_*`, `test_spec_024_*`, `test_spec_025_*`,
-  `test_spec_047_ac01*` to `..._ac05*`, `..._ac13*`, `..._ac14*`.
+  `test_spec_047_ac01*` to `..._ac05*`, `..._ac13*`, `..._ac14*`,
+  `test_hints_*`.

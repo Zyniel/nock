@@ -104,7 +104,8 @@ earns it.
 12. A refusal is one `error` to the sender only and changes neither the room nor
     its seq, except that it wakes an idle sender first (`social/presence.md`).
     Chat and reactions over their limit, a muted player's reaction and an
-    invalid reaction are dropped with no answer (`social/chat.md`). The
+    invalid reaction are dropped with no answer (`social/chat.md`), and so are
+    checks and reveals over their limit (`gameplay/hints.md`). The
     `room_full` or `room_locked` of a join, and the `removed` of a removed
     token's join or of the host's removal (sent to the removed player), are
     followed by a close with 1000.
@@ -296,8 +297,9 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - Durable state across a restart, the log and undo: `platform/server.md`.
   Stalled, flooding and oversized sockets: `product.md`. What changed while
   away: `social/catch-up.md`.
-- Throttling other messages: chat and reactions, `social/chat.md`; wrong codes,
-  `lobby/rooms.md`; `undo`, `select_cell` and the rest are not limited.
+- Throttling other messages: chat and reactions, `social/chat.md`; checks and
+  reveals, `gameplay/hints.md`; wrong codes, `lobby/rooms.md`; `undo`,
+  `select_cell`, ballots and the rest are not limited.
 - Peer-to-peer sync, pending edits kept across a reload, a leave message,
   message acknowledgements, a Content Security Policy.
 
