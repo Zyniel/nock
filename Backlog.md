@@ -116,13 +116,12 @@ others, at the top of the list.
 
 - Status: done (the human, 2026-10-29: « Start with B-029 »; tooling, built
   by the lead)
-- Waits for: B-028's branch, which this one carries: its pull request shows
-  B-028's commits until B-028 is merged.
+- Waits for: nothing (B-028 is merged, with B-030).
 - Priority: first (every item's gate runs on it; the smallest fix of B-028)
 - Domains: none (tooling only: `scripts/gate.py`)
 - Architecture decision: no
 - Criteria: none (tooling)
-- Branch: feat/b-029-gate-pyrefly-scripts · PR: none yet
+- Branch: feat/b-029-gate-pyrefly-scripts · PR: #68
 - Problem: the gate puts `scripts/` on `PYTHONPATH` (`scripts/gate.py:241`)
   for every step. Pyrefly then reads `scripts/` as a site-packages folder and
   leaves it out of the project ("Skipping include pattern ...scripts because
