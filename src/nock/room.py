@@ -2053,16 +2053,21 @@ def _run_help_message(
     if isinstance(message, Vote):
         expiry = _expire_vote(state, now)
         outcome = _vote(expiry.state, player_id, message, now)
-        return outcome.model_copy(
-            update={"entries": (*expiry.entries, *outcome.entries)}
-        )
+        return _after_expiry(expiry, outcome)
     if _is_over_hint_limit(state, player_id, now, config):
         return Outcome(state=state)
     expiry = _expire_vote(state, now)
     outcome = _run_request(expiry.state, message, player_id, now, config)
+    # Only a request that applied or opened a vote has entries: it counts.
     if outcome.entries:
         outcome = _with_hint_counted(outcome, player_id, now, config)
-    return outcome.model_copy(update={"entries": (*expiry.entries, *outcome.entries)})
+    return _after_expiry(expiry, outcome)
+
+
+def _after_expiry(expiry: Outcome, outcome: Outcome) -> Outcome:
+    """Put the entry that closed an expired vote before the entries of `outcome`."""
+    all_entries = (*expiry.entries, *outcome.entries)
+    return outcome.model_copy(update={"entries": all_entries})
 
 
 def _recent_hints(
