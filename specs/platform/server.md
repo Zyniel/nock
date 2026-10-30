@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: approved
+status: done
 ---
 
 # platform/server - Durable rooms, undo, serving and settings
@@ -186,11 +186,6 @@ address and with the database its environment gives.
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
 `client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two
 top bars (« Phone top bar », « Computer top bar »).
-
-## New interface
-
-- `nock.hub.RoomRegistry.live_codes() -> frozenset[str]`: the codes of the
-  live rooms (rule 21), read under the registry's lock.
 
 ## Acceptance criteria
 

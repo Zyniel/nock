@@ -240,11 +240,11 @@ others, at the top of the list.
 
 ### B-032 Room capacity: a creation limit, idle rooms leave memory
 
-- Status: building (the human, 2026-10-30: « Use pattern 2 », « Approve and
+- Status: done (the human, 2026-10-30: « Use pattern 2 », « Approve and
   process »: the limit in an environment variable read at start, with the
   lead's defaults; then the spec change « Approved as written, with the
   spec-writer's picks (the restart step on reload, the recap kept per seq,
-  live_codes as a test hook) »)
+  live_codes as a test hook) »; both review rounds approved)
 - Priority: fourth (before the first public test)
 - Domains: lobby/rooms (a creation limit; its "Out of scope" line on
   throttling creation goes), platform/server (a room stays in memory only

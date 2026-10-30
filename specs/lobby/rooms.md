@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: approved
+status: done
 ---
 
 # lobby/rooms - Solo start, room creation and invitation
