@@ -26,6 +26,7 @@ from nock.protocol import (
     GridTarget,
     Join,
 )
+from nock.room import RoomConfig
 from nock.server import create_app
 from spec023_harness import (
     TAMIS,
@@ -144,10 +145,20 @@ def test_ac3_websocket_a_later_joiner_sees_the_lock_and_the_strike(
 
 
 def test_ac3_websocket_a_check_does_not_use_the_edit_rate_limit(
-    registry: RoomRegistry, client: TestClient, room_code: str
+    fx01_grid: Grid, dist_dir: Path, catalogue: Catalogue
 ) -> None:
-    with contextlib.ExitStack() as stack:
-        (ana,) = join_peers(stack, client, room_code, ["Ana"])
+    # The default edit limit (20 a second) is under the 30 checks sent at once;
+    # the hint limit (`hints.md` rule 2) is raised to let all of them apply.
+    config = RoomConfig(silence_timeout_seconds=600, hint_limit=30)
+    limited_registry = RoomRegistry(config=config)
+    code = limited_registry.register_room(fx01_grid)
+    app = create_app(rooms=limited_registry, dist_dir=dist_dir, catalogue=catalogue)
+    with (
+        contextlib.closing(limited_registry),
+        TestClient(app) as limited_client,
+        contextlib.ExitStack() as stack,
+    ):
+        (ana,) = join_peers(stack, limited_client, code, ["Ana"])
         for _ in range(30):
             ana.send(Check(target=GridTarget()))
         ana.wait_for_seq(31, "thirty empty checks")

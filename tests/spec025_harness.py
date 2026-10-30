@@ -251,18 +251,39 @@ def seen_at(state: RoomState, player_id: str, now: float) -> RoomState:
     return state.model_copy(update={"players": tuple(players)})
 
 
+def hint_window_fields() -> list[str]:
+    """The names of the player fields that hold the hint-limit window (B-031).
+
+    `hints.md` rule 2 keeps each player's window in the room without naming the
+    field, so a field of `PlayerRecord` counts when its name holds `hint`.
+    """
+    names: list[str] = []
+    for name in PlayerRecord.model_fields:
+        if "hint" in name:
+            names.append(name)
+    return names
+
+
 def with_times_of(state: RoomState, reference: RoomState) -> RoomState:
-    """The state with each player's two times taken from `reference`."""
-    times: dict[str, tuple[float, float]] = {}
+    """The state with each player's times and hint window taken from `reference`.
+
+    The times are `last_seen_at` and `last_input_at`; the hint window is the
+    private count of the hint limit (`hints.md` rule 2), which a request of the
+    play fills and a comparison of the rest of the room does not care about.
+    """
+    times: dict[str, dict[str, object]] = {}
     for player in reference.players:
-        times[player.player_id] = (player.last_seen_at, player.last_input_at)
+        kept: dict[str, object] = {
+            "last_seen_at": player.last_seen_at,
+            "last_input_at": player.last_input_at,
+        }
+        for name in hint_window_fields():
+            kept[name] = getattr(player, name)
+        times[player.player_id] = kept
     players: list[PlayerRecord] = []
     for player in state.players:
         if player.player_id in times:
-            seen, last_input = times[player.player_id]
-            player = player.model_copy(
-                update={"last_seen_at": seen, "last_input_at": last_input}
-            )
+            player = player.model_copy(update=times[player.player_id])
         players.append(player)
     return state.model_copy(update={"players": tuple(players)})
 

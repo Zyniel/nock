@@ -23,6 +23,7 @@ from nock.protocol import (
 )
 from nock.room import (
     LogEntry,
+    RoomConfig,
     after_restart,
     disconnect_player,
     handle_message,
@@ -54,6 +55,15 @@ from spec027_harness import (
     timer_fields,
     type_letter,
 )
+
+
+def every_cell_revealed() -> RoomConfig:
+    """The rules for a player who reveals every letter cell at one time.
+
+    The hint limit (`hints.md` rule 2) is raised to let all the reveals apply.
+    """
+    return RoomConfig(hint_limit=len(ROW_MAJOR))
+
 
 # ---- Fixtures ----
 
@@ -212,7 +222,9 @@ def test_ac6_the_first_letter_that_solves_the_grid_gives_zero(fx01_grid: Grid) -
     state = host_changes(two_player_room(fx01_grid), HelpMode.FREE, 18, 1)
     for row, column in ROW_MAJOR[:-1]:
         target = CellTarget(row=row, column=column)
-        revealed = handle_message(state, "p1", Reveal(target=target), NOW + 10.0)
+        revealed = handle_message(
+            state, "p1", Reveal(target=target), NOW + 10.0, every_cell_revealed()
+        )
         assert revealed.reply == ()
         state = revealed.state
     assert state.timer_started is False
@@ -238,7 +250,9 @@ def test_ac6_a_grid_solved_only_by_reveals_ends_with_zero(fx01_grid: Grid) -> No
     last_outcome = None
     for row, column in ROW_MAJOR:
         target = CellTarget(row=row, column=column)
-        last_outcome = handle_message(state, "p1", Reveal(target=target), NOW + 600.0)
+        last_outcome = handle_message(
+            state, "p1", Reveal(target=target), NOW + 600.0, every_cell_revealed()
+        )
         assert last_outcome.reply == ()
         state = last_outcome.state
 
