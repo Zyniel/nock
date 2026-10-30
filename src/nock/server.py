@@ -1350,6 +1350,18 @@ def create_app(
             bodies.append(record.model_dump(mode="json"))
         return bodies
 
+    # Rule 24: derived at each request from the history, the rooms and the
+    # creator rooms; nothing is saved.
+    @web_app.get(f"{ACCOUNT_API_ROOT}/progress")
+    def get_account_progress(request: Request) -> dict[str, str]:
+        account = require_account(request)
+        store = account_store_in_use()
+        room_registry = holder.get()
+        created_codes = room_registry.store.codes_created_by(account.account_id)
+        return store.progress(
+            account.account_id, room_registry.peek_room, created_codes
+        )
+
     # The dependency refuses a request without a session before its body is
     # read (spec 033) and hands the account of the session to the route. The
     # dependency is a default value, not an `Annotated` one: `require_account` is

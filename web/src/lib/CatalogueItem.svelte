@@ -10,7 +10,15 @@
   import { NOCK_MARK_POINTS } from './icons'
   import { playGrid } from './playGrid'
 
-  let { summary, isThumbShown }: { summary: GridSummary; isThumbShown: boolean } = $props()
+  let {
+    summary,
+    isThumbShown,
+    accountProgress,
+  }: {
+    summary: GridSummary
+    isThumbShown: boolean
+    accountProgress: Record<string, unknown> | null
+  } = $props()
 
   // The force line draws one Nock mark per force level, navy up to the grid's.
   const FORCE_LEVELS = [1, 2, 3, 4]
@@ -24,7 +32,7 @@
 
   const progress = $derived.by(() => {
     void progressVersion
-    return progressOf(summary.number)
+    return progressOf(summary.number, accountProgress)
   })
 
   // A page restored from the back-forward cache keeps its old state: start again.
