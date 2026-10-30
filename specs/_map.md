@@ -24,7 +24,7 @@ table, the naming rules and the glossary follow in the same change.
 | Area | File | What it covers | Look | From the v1.1.0 specs |
 | --- | --- | --- | --- | --- |
 | account | `account/account.md` | sign-in, profile, the player's own data and its deletion | pages | 033; 029 AC-3, AC-6, AC-7 (server side); 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
-| lobby | `lobby/rooms.md` | solo start, room creation, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
+| lobby | `lobby/rooms.md` | solo start, room creation and its limit per address, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
 | lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do; the creator | room | 014 |
 | lobby | `lobby/joining.md` | join by link, the account's one seat, room resume, « Mes salons » | pages | 012; 032 AC-3 to AC-7; 046 AC-11, AC-12, AC-15 to AC-17 |
 | lobby | `lobby/lifetime.md` | room lifetime: the kinds of room and their lives, when a room expires, the sweep that deletes it, the five variables | | 032 AC-1, AC-2 |
@@ -43,7 +43,7 @@ table, the naming rules and the glossary follow in the same change.
 | admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038 AC-3 to AC-11; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
 | platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
-| platform | `platform/server.md` | durable state, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
+| platform | `platform/server.md` | durable state, the rooms held in memory, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
 | client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |
@@ -155,6 +155,7 @@ then nothing of race or teams is built.
 | grid file | (not shown) | `grids/*.ipuz`, `GridFile` |
 | index | (not shown) | `grids/catalogue.json`, `IndexEntry`, `CatalogueEntry` |
 | room | « salon » | `room.py`, `/r/<code>` |
+| live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open) | `RoomRegistry.live_codes` |
 | member | (a player or a past player of a room) | `PlayerRecord`, `PastPlayer` |
 | connection | (one socket of a player; "session" is the sign-in cookie) | `RoomConnection`, `nock_session` |
 | invited player | the nickname form under « Salon <code> » | `join` without token |

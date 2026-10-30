@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: results
-status: done
+status: approved
 ---
 
 # gameplay/results - End of game, recap, shared recap and history
@@ -142,6 +142,15 @@ grids in « Grilles terminées », where a grid can be played again.
     its windows; the dialog stays inside the window, scrolls when taller, and
     Tab reaches each control in it.
 
+### Reading and keeping the recap
+
+21. The recap routes (rules 6, 7) read the room without making it live and
+    log nothing (`platform/server.md` rule 6). A solved room's recap, once
+    built, is kept in memory with the room's seq and reused while the seq is
+    the same. A new log entry, or a member's nickname erased
+    (`account/account.md` rule 18), has it built again at the next request;
+    the room's deletion drops it.
+
 ### Look
 
 The band: `_design/overlays.md`, « End of grid ». The dialog:
@@ -258,6 +267,15 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
   row, the button enabled. The section passes the scans, Tab reaches « Rejouer »
   with the ring, Enter sends, and 7 team-mates of 20 characters scroll no window
   sideways. (← 029 AC-4, 029 AC-5)
+- **AC-21** A solved FX-01 room only in the store, saved with Ana still
+  connected, answers its recap route and both share routes 200 as before;
+  after them it is not live and its log has no new entry.
+- **AC-22** In a solved room, the recap route, then `GET /recap/<token>` and
+  `GET /api/recaps/<token>` twice each, build its recap once. Once Dan joins,
+  the next request builds it again, and its team ends with `DAN`.
+- **AC-23** Once Zoé, a player of a solved room whose recap was built,
+  erases her account, the next recap names her `--`; once the room is
+  deleted, its token answers 404 at both share routes.
 
 ## Edge cases
 
@@ -279,7 +297,7 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
 ## Code
 
 - `src/nock/recap.py`: `build_recap`, `public_recap`; `hub.py`: `room_recap`,
-  `shared_recap`, share tokens; `store.py`: `code_for_share_token`; `room.py`:
+  `shared_recap`, the kept recaps, share tokens; `store.py`: `code_for_share_token`; `room.py`:
   `solved_at`, `room_summary`; `server.py`: the recap routes.
 - `web/src/App.svelte`: the `/recap/<token>` route. `web/src/lib/`:
   `RoomPage.svelte` (the button), `RecapDialog.svelte`, `recap.ts`,
@@ -288,4 +306,5 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
   the account history).
 - Tests: `tests/test_spec_028_*`, `test_spec_029_*`, AC-13 of
   `test_spec_046_ac11_ac13_*`, `test_spec_047_ac06_*` to `..._ac11_*`,
-  `..._ac13_*`, `..._ac14_*`, `test_spec_048_ac01_ac02_*`.
+  `..._ac13_*`, `..._ac14_*`, `test_spec_048_ac01_ac02_*`;
+  `tests/test_results_*` for AC-21 to AC-23.

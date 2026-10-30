@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: done
+status: approved
 ---
 
 # lobby/rooms - Solo start, room creation and invitation
@@ -9,8 +9,8 @@ status: done
 ## Purpose
 
 A player starts a grid alone in one tap and invites friends with the room's link.
-Each room runs as one task that applies its inputs in order; wrong codes are
-throttled per address.
+Each room runs as one task that applies its inputs in order; creations and wrong
+codes are limited per address.
 
 ## Depends on
 
@@ -88,7 +88,26 @@ throttled per address.
     leaves the state as it was, and the room goes on. Each socket is delivered to
     and detached on its own; a player disconnects with their last socket (a resume
     takes over the older one, `lobby/joining.md` rule 6). Once the registry is
-    closed, its thread stops and no input runs a rule.
+    closed, its thread stops and no input runs a rule. A room leaves memory
+    when its task ends with no socket open (`platform/server.md` rule 21).
+
+### Creation limit
+
+13. `POST /api/rooms` is limited per client address, signed in or not: the
+    address the server sees, as for the sign-in links (`account/account.md`
+    rule 6); behind Caddy `compose.yaml` makes it the player's own. After the body (422) and grid (404) checks, an address that has
+    created as many rooms with a time `t > now - 3600` as the limit (rule 14)
+    gets 429 `{"detail": "Too Many Requests"}` and no room. Only a 201 counts;
+    requests at once count one after another. Each app keeps its counts in
+    memory, from zero, and at each count forgets the addresses with none left
+    in the hour. The catalogue shows a 429 as any failure (rule 2).
+14. The limit is `NOCK_ROOMS_PER_ADDRESS_PER_HOUR`, a whole number of rooms
+    from 1 to 10000, default 30: unset or empty, the default; set, ASCII
+    digits only, any number of leading zeros, within the bounds. `main()`
+    checks it after the five variables of `lobby/lifetime.md` and before the
+    account variables, and stops on a refused value (`platform/server.md`
+    rules 15, 19). An app reads it each time it starts and fails its start with
+    `SettingsError` on a refused value. `/ops` cannot change it.
 
 ### Look
 
@@ -151,6 +170,23 @@ status band of « Connection lost »; before, the entry card of
   inputs go on; two
   sockets of one player both get each event, and closing either keeps the other;
   after `close()` the engine thread stops and no input runs a rule. (← 011 AC-4)
+- **AC-13** With the variable unset, thirty `{"grid_number": 1}` from one
+  address answer 201; the thirty-first answers 429 `{"detail": "Too Many
+  Requests"}` and creates no room, while another address gets 201. That
+  address is still refused 3,599.9 s after its first creation and gets 201 at
+  3,600 s.
+- **AC-14** Forty creations at once from one address give thirty 201 and ten
+  429, and thirty rooms exist.
+- **AC-15** Twenty requests answered 422 and twenty answered 404 from one
+  address count nothing: thirty creations then answer 201. Once the address
+  is refused, a new app on the same store gives it 201.
+- **AC-16** With `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` `"3"` or `"0003"`, the
+  fourth creation of an address answers 429; with `"1"`, the second; `"10000"`
+  is taken.
+- **AC-17** `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` `"0"`, `"10001"`, `" 30"`,
+  `"3.0"`, `"-1"` or `"٣"` stops `main()` with a one-line message holding
+  the name and `repr()` of the value, and no server runs; `python -m nock`
+  exits with 1; an app starting with it fails with `SettingsError`.
 
 ## Edge cases
 
@@ -164,13 +200,17 @@ status band of « Connection lost »; before, the entry card of
   reload keeps its record (AC-4).
 - Failures at T refuse at T + 59.9, not at T + 60.0; codes with 0, O, 1, I, small
   letters or another length count; another address or app is not held (AC-11).
+- A signed-in creator counts with the anonymous creations of its address
+  (AC-13).
+- The 429s refused within the hour do not delay the next 201 (AC-13).
 
 ## Out of scope
 
-- The host role, its controls and the creator: `lobby/host.md`. Throttling
-  creation or any other HTTP route than the ops API and the recap route,
-  `X-Forwarded-For` (behind a proxy all players share one address); Web Share,
-  QR codes, offline play.
+- The host role, its controls and the creator: `lobby/host.md`. Limits on any
+  other HTTP route than creation, the recap route, the ops API and the
+  sign-in link; limits on sockets other than the wrong-code throttle; the app
+  parsing `X-Forwarded-For` itself; changing the creation limit from `/ops`.
+  Web Share, QR codes, offline play.
 - Reconnection and fair play: `platform/realtime.md`. Durable state:
   `platform/server.md`. Feed lines of joins and departures:
   `social/presence.md`. The Menu, sheets and top bar: `client/hud.md`.
@@ -178,9 +218,11 @@ status band of « Connection lost »; before, the entry card of
 ## Code
 
 - `src/nock/room.py`: `new_room`. `src/nock/hub.py`: `RoomRegistry`, codes,
-  room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle.
+  room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle, the
+  creation limit. `src/nock/settings.py`, `src/nock/__main__.py`: the
+  variable.
 - `web/src/lib/playGrid.ts`, `CatalogueItem.svelte`: « Jouer »; `roomRecord.ts`:
   the record; `PlayersPanel.svelte`: the link; `RoomPage.svelte`,
   `roomSession.ts`: the throttled status.
-- Tests: `tests/test_spec_010_*`, `test_spec_011_*`, and AC-7 of
-  `tests/test_spec_040_*`.
+- Tests: `tests/test_spec_010_*`, `test_spec_011_*`, AC-7 of
+  `tests/test_spec_040_*`, and `tests/test_rooms_*` for AC-13 to AC-17.

@@ -240,10 +240,11 @@ others, at the top of the list.
 
 ### B-032 Room capacity: a creation limit, idle rooms leave memory
 
-- Status: approved (the human, 2026-10-30: « Use pattern 2 », « Approve and
-  process »: the limit in
-  an environment variable read at start, with the lead's defaults: 30
-  rooms an hour per address, no cap on rooms in memory)
+- Status: building (the human, 2026-10-30: « Use pattern 2 », « Approve and
+  process »: the limit in an environment variable read at start, with the
+  lead's defaults; then the spec change « Approved as written, with the
+  spec-writer's picks (the restart step on reload, the recap kept per seq,
+  live_codes as a test hook) »)
 - Priority: fourth (before the first public test)
 - Domains: lobby/rooms (a creation limit; its "Out of scope" line on
   throttling creation goes), platform/server (a room stays in memory only
@@ -252,6 +253,8 @@ others, at the top of the list.
 - Architecture decision: no (inside `nock.hub` and `nock.server`; a refused
   creation answers 429, which the catalogue already shows as
   `catalogue.play_failed`, `lobby/rooms.md` rule 2)
+- Criteria: rooms AC-13 to AC-17 (new), server AC-23, AC-24 (new),
+  results AC-21 to AC-23 (new)
 - Branch: feat/b-032-room-capacity · PR: none yet
 - Problem: `POST /api/rooms` creates rooms for anyone, with no limit, and
   every room created or loaded keeps its runner in memory until it expires,
