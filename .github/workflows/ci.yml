@@ -15,14 +15,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Which gate jobs a pull request needs, from the files it changes. One that
-  # changes only Backlog.md and files under claude_docs/ skips every gate job:
-  # no check and no test reads them. One that changes nothing else than those
-  # and files under specs/, docs/ or grids/ skips the browser jobs: no test
-  # reads those folders, and the static job still checks the specs against
-  # their tests (spec traceability), rebuilds the screens sheet and loads the
-  # grids the repository ships. A push to main runs every job (human decision,
-  # 2026-10-21).
+  # Which gate jobs a pull request needs, from the files it changes. A file
+  # that no check and no test reads needs none: the backlog, CLAUDE.md,
+  # claude_docs/, .claude/ (agents, skills, session settings and hooks),
+  # docs/ outside docs/design/, and the container files. A file that only the
+  # static job reads skips the browser jobs: specs/ (spec traceability),
+  # docs/design/ (the screens sheet), grids/ (the grids the repository ships)
+  # and README.md (its font credits, a test without a browser). Any other
+  # file, and a Python file anywhere (ruff and black read the whole
+  # repository), runs every job. A push to main runs every job (human
+  # decision, 2026-10-21).
   changes:
     name: Changed files
     runs-on: ubuntu-latest
@@ -47,14 +49,27 @@ jobs:
             changed_files=$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA")
             echo "$changed_files"
             if [ -n "$changed_files" ]; then
-              checked_files=$(echo "$changed_files" | grep -vE '^(Backlog\.md$|claude_docs/)' || true)
-              browser_files=$(echo "$checked_files" | grep -vE '^(specs|docs|grids)/' || true)
-              if [ -z "$checked_files" ]; then
-                static=false
-              fi
-              if [ -z "$browser_files" ]; then
-                browsers=false
-              fi
+              static=false
+              browsers=false
+              while IFS= read -r file; do
+                case "$file" in
+                  specs/* | docs/design/* | grids/* | README.md)
+                    static=true
+                    ;;
+                  *.py)
+                    static=true
+                    browsers=true
+                    ;;
+                  Backlog.md | CLAUDE.md | claude_docs/* | .claude/* | docs/* | \
+                  Dockerfile | .dockerignore | compose.yaml | compose.*.yaml | \
+                  Caddyfile | .env.*.example)
+                    ;;
+                  *)
+                    static=true
+                    browsers=true
+                    ;;
+                esac
+              done <<< "$changed_files"
             fi
           fi
           echo "Static job runs: $static"
