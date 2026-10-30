@@ -171,9 +171,10 @@ others, at the top of the list.
 
 ### B-031 Limits on checks and reveals
 
-- Status: ready (the human approved the brief with the lead's defaults,
+- Status: done (the human approved the brief with the lead's defaults,
   2026-10-30: « 5 checks and reveals per 10 seconds per player, extra ones
-  dropped silently », then the spec change as written)
+  dropped silently », then the spec change as written; both review rounds
+  approved)
 - Priority: third (with B-030 it closes B-028 H2: B-030 makes a check cheap,
   this one bounds how often)
 - Domains: gameplay/hints, platform/realtime
@@ -1581,6 +1582,11 @@ Taken when a change touches them.
   (rules 14 to 22, AC-13 to AC-20, with their pointers) to a new
   `gameplay/votes.md`, an architecture decision. `platform/realtime.md` is
   over too (about 19 KB, 20 criteria).
+- `tests/test_spec_046_ac01_ac02_frames.py::test_ac1_the_second_child_of_the_column_is_the_card[chromium-1024x768]`
+  failed once in the parallel pass (B-031's close, 2026-10-30): the card's
+  background read transparent, as if its styles had not applied yet; alone,
+  the file passes. If it fails again, it waits for the styles or goes in
+  `SERIAL_TEST_FILES` (a tooling fix of the lead's).
 
 ## Grid engine ideas from ipuz
 

@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: hints
-status: approved
+status: done
 ---
 
 # gameplay/hints - Check, reveal and the vote on help
@@ -159,11 +159,6 @@ ask only a few times in a short while.
 The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
 `_design/cells.md`, « Letter marks »; the banner, `_design/overlays.md`, « Vote »,
 on its layer of `_design/room.md`, « Layers ».
-
-## New interface
-
-- `nock.room.RoomConfig`: `hint_limit: int` (default 5, at least 1) and
-  `hint_window_seconds: float` (default 10.0, above 0), rule 2's limit.
 
 ## Acceptance criteria
 
