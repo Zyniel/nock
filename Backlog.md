@@ -291,7 +291,7 @@ others, at the top of the list.
   lifetime AC-14, AC-15 (new)
 - Architecture decision: yes (a close code is part of the protocol,
   `platform/realtime.md` rule 13): options from the Plan agent on Fable
-- Branch: feat/b-033-socket-hygiene · PR: none yet
+- Branch: feat/b-033-socket-hygiene · PR: #74
 - Problem: `_serve_socket` calls `RoomRegistry.connect` on uvicorn's event
   loop; `connect` reads SQLite and can wait for the registry lock, which a
   deletion holds up to 5 seconds, and every request of the process waits
