@@ -12,7 +12,7 @@ from typing import NamedTuple
 
 from pydantic import BaseModel, ConfigDict, StrictBool
 
-from nock.grid import ClueCell, Grid, Position
+from nock.grid import Position
 from nock.protocol import (
     CellLocked,
     CellTarget,
@@ -103,9 +103,7 @@ def build_recap(state: RoomState, log: Sequence[LogEntry]) -> Recap:
 
     Raises:
         ValueError: `state.solved` is False, or those entries are not exactly
-            seq 1 to state.seq, in order, with one `grid_solved` among them, or
-            a clue of the grid does not resolve to a word (an imported grid
-            always resolves, spec 003).
+            seq 1 to state.seq, in order, with one `grid_solved` among them.
     """
     if not state.solved:
         raise ValueError(f"Room {state.code} is not solved, so it has no recap")
@@ -113,7 +111,7 @@ def build_recap(state: RoomState, log: Sequence[LogEntry]) -> Recap:
     _check_numbering(entries, state.seq)
     solved_event = _only_grid_solved(entries)
     help_used = _count_help(entries)
-    words = _grid_words(state.grid)
+    words = [list(word.cells) for word in state.grid.words]
     letters_by_player = _letters_by_player(state)
     words_by_player = _words_by_player(words, entries)
     revealed_cells = [cell for cell in state.cells if cell.revealed]
@@ -232,30 +230,6 @@ def _letters_by_player(state: RoomState) -> dict[str, int]:
             continue
         letters[cell.author] = letters.get(cell.author, 0) + 1
     return letters
-
-
-def _grid_words(grid: Grid) -> list[list[Position]]:
-    """Return the cells of each word of the grid: one word per clue, in grid order.
-
-    Raises:
-        ValueError: a clue does not resolve to a word. An imported grid has no
-            such clue (spec 003).
-    """
-    words: list[list[Position]] = []
-    for cell in grid.cells:
-        if not isinstance(cell, ClueCell):
-            continue
-        for clue_index in range(len(cell.clues)):
-            try:
-                positions = grid.word_cells(cell.row, cell.column, clue_index)
-            except ValueError as error:
-                raise ValueError(
-                    f"Clue {clue_index} of the clue cell at ({cell.row}, "
-                    f"{cell.column}) has no word ({error}): the recap expects "
-                    "every clue of the grid to resolve to a word"
-                ) from error
-            words.append(positions)
-    return words
 
 
 def _words_by_player(

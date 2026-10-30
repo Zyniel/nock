@@ -10,7 +10,8 @@ status: done
 
 The server holds the only true room state and keeps it on disk, so a restart
 loses nothing a player saw and every player gets their seat back. A player can
-take back their last edit. The same process serves the built client, on the
+take back their last edit. Every room's rules run on one thread, so each step
+stays short whatever the grid. The same process serves the built client, on the
 address and with the database its environment gives.
 
 ## Depends on
@@ -155,6 +156,17 @@ address and with the database its environment gives.
     The messages of the operator token and the account variables, which never
     show a secret: `admin/operations.md` rule 4, `account/account.md` rule 3.
 
+### Engine time
+
+20. Every live room's step runs on the one engine thread (`lobby/rooms.md` rule
+    12), so a step is bounded in time whatever the grid: the rules read the
+    grid's lookups (`content/grids.md` rule 12) and never resolve a clue again.
+    Measured on the rules alone, with no socket and no store, on FX-02, as the
+    median of 5 runs after one warm-up: the edit that solves the grid takes
+    under 5 ms; a check of the whole grid, every letter wrong, under 10 ms; the
+    catch-up of an absence of 100 letters (`social/catch-up.md`) under 50 ms.
+    No player sees a difference: the events, replies and answers are as before.
+
 ### Look
 
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
@@ -240,6 +252,15 @@ top bars (« Phone top bar », « Computer top bar »).
   `C:\Users\François\nock.sqlite3`, `"/srv/nock\u200ddata/nock.sqlite3"` or
   `"/srv/donn\udce9es/nock.sqlite3"` never stops `main()`, which leaves the
   variable as it was. (← 036 AC-12)
+- **AC-20** In a FX-02 room with every letter cell right but one, the edit that
+  fills the last cell is applied, `grid_solved` among its events, in under 5 ms
+  by rule 20's measure.
+- **AC-21** In a FX-02 room with a wrong letter in every letter cell, a check of
+  the whole grid is applied, its `check_result` naming every cell wrong and no
+  cell correct, in under 10 ms by rule 20's measure.
+- **AC-22** The catch-up of an absence of 100 letters typed into an empty FX-02
+  room is built, with its changed cells and completed words, in under 50 ms by
+  rule 20's measure.
 
 ## Edge cases
 
@@ -253,6 +274,9 @@ top bars (« Phone top bar », « Computer top bar »).
 - Loading an unknown code gives nothing and a lookup stays unknown (AC-7).
 - `NOCK_HOST` refuses a zone (`fe80::1%eth0`) and a port (`localhost:8000`)
   (AC-18).
+- A room's grid built from the store's JSON (rule 5) and one taken from the
+  catalogue keep the same budgets: each builds its lookups once, when it is
+  built (AC-20).
 
 ## Out of scope
 
@@ -261,17 +285,25 @@ top bars (« Phone top bar », « Computer top bar »).
 - Expiry, deletion and the sweep: `lobby/lifetime.md`. Logs, retention and the
   operator's replay of the log: `admin/operations.md`. What changed while away:
   `social/catch-up.md`. Client routing and its pages: `client/shell.md`.
-- The run configuration, frame size and connection bounds: `product.md`.
+- The run configuration, frame size and connection bounds: `product.md`; the
+  budgets measured in a browser or across sockets: `product.md` rules 21 to 25.
+- What the grid's lookups hold: `content/grids.md`. How many checks a room
+  may run: `gameplay/hints.md`.
 
 ## Code
 
 - `src/nock/store.py`: `RoomStore`. `src/nock/room.py`: `replay`,
   `after_restart`, undo in `handle_message`; `RoomConfig.snapshot_every`.
 - `src/nock/hub.py`: commit before delivery, snapshots, loading, `close()`.
+- `src/nock/room.py` (`handle_message`), `src/nock/catch_up.py`
+  (`build_catch_up`), `src/nock/recap.py`: the rules of rule 20, reading
+  `Grid.words` and `Grid.solution_letter`.
 - `src/nock/server.py`: `create_app`, the store's path, client routes,
   `WEB_DIST_DIR`. `src/nock/__main__.py`, `src/nock/settings.py`: the
   variables.
 - `web/src/lib/RoomTopBar.svelte`, `GridViewport.svelte`, `RoomPage.svelte`,
   `roomSession.ts`, `RoomNote.svelte`: the undo button, shortcut and message.
 - Tests: `tests/test_spec_018_*`, `tests/test_spec_040_ac01_ac06_*`,
-  `tests/test_spec_040_ac27_ac29_*`, `tests/test_spec_036_ac10_ac12_*`.
+  `tests/test_spec_040_ac27_ac29_*`, `tests/test_spec_036_ac10_ac12_*`;
+  `tests/test_server_engine_time.py` for rule 20, which measures durations and
+  so runs on its own (`SERIAL_TEST_FILES`).
