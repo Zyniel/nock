@@ -913,7 +913,7 @@ others, at the top of the list.
 - Domains: none (tooling only: `.github/workflows/ci.yml`)
 - Architecture decision: no
 - Criteria: none (tooling)
-- Branch: feat/b-051-ci-skip-notes-only · PR: none yet
+- Branch: feat/b-051-ci-skip-notes-only · PR: #71
 - Problem: CI skipped the browser jobs only for a pull request that changed
   nothing outside `specs/`, `docs/` and `grids/`. B-039 (#70) changed
   `Backlog.md` and `claude_docs/frontend-review.md` only, files no check and
