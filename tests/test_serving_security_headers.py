@@ -13,7 +13,6 @@ cannot drift into another kind of answer.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
@@ -23,16 +22,17 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from nock.catalogue import Catalogue
-from nock.grid import Grid
-from nock.hub import RoomRegistry
 from serving_harness import (
     BODY_LIMIT,
     EDGE_HEADERS,
     ROOM_REQUEST_HEADERS,
+    RecordingRegistry,
     edge_app,
     padded_room_request,
 )
-from spec010_harness import catalogue_from_grid
+from serving_harness import catalogue as catalogue
+from serving_harness import fx01_grid as fx01_grid
+from serving_harness import registry as registry
 from spec040_harness import make_dist_dir
 
 RAISING_PATH = "/raises-an-error"
@@ -85,28 +85,10 @@ def add_raising_route(app: FastAPI) -> None:
     app.router.routes.insert(0, APIRoute(RAISING_PATH, raising_route))
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1."""
-    return catalogue_from_grid(fx01_grid)
-
-
-@pytest.fixture
-def registry() -> Iterator[RoomRegistry]:
-    room_registry = RoomRegistry()
-    yield room_registry
-    room_registry.close()
-
-
 @pytest.mark.parametrize("request_made", REQUESTS)
 def test_ac10_every_answer_carries_the_security_headers(
     request_made: Request,
-    registry: RoomRegistry,
+    registry: RecordingRegistry,
     catalogue: Catalogue,
     tmp_path: Path,
 ) -> None:

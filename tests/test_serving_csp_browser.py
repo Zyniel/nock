@@ -31,7 +31,8 @@ from playwright.sync_api import ConsoleMessage, Page, Response
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from serving_harness import EDGE_HEADERS
-from spec010_harness import catalogue_from_grid
+from serving_harness import catalogue as catalogue
+from serving_harness import fx01_grid as fx01_grid
 from spec038_harness import (
     OpsServer,
     open_dashboard,
@@ -97,17 +98,6 @@ class Reports:
             for response in self.responses
             if response.request.resource_type == "document"
         )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1."""
-    return catalogue_from_grid(fx01_grid)
 
 
 @pytest.fixture

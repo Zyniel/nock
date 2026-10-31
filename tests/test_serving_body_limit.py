@@ -1,8 +1,10 @@
-"""Tests of platform/serving, AC-7 to AC-9: the body limit of the HTTP edge.
+"""Tests of platform/serving, AC-7 to AC-9 and AC-14: the body limit of the HTTP edge.
 
 AC-7: `POST /api/rooms` with a `Content-Length` of 65,537 gets 413 and creates no
-room, and one of exactly 65,536 bytes is not refused. AC-8: the same with a
-chunked body and no `Content-Length`. AC-9: the `Caddyfile` sets the same limit.
+room, and one of exactly 65,536 bytes is not refused; the 413 carries
+`Cache-Control: no-store`. AC-8: the same with a chunked body and no
+`Content-Length`. AC-9: the `Caddyfile` sets the same limit. AC-14: the check
+comes before the ops and account routes, on or off.
 
 The body of every request is the valid `{"grid_number": 1}` padded with spaces
 to the size wanted, so that a request nothing refuses creates a room (201): a
@@ -20,6 +22,10 @@ Choices where the spec leaves room:
   gets its 413 all the same, and no room.
 - "Nothing is counted by a throttle": 31 refused requests (one more than the
   default of 30 rooms an hour for an address) do not stop a valid one.
+- AC-14: the app has no build and no catalogue, as the check runs before any
+  route; the request carries no token and no cookie, so that a route that ran
+  would answer 401, 404 or 405 and never 413. The accounts on use an
+  `AccountStore` on a file of the test's folder.
 - The `Caddyfile`'s "site block" is the block of its one site address; its
   comment lines are left out.
 """
@@ -34,8 +40,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from nock.accounts import AccountStore
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.settings import DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR
 from serving_harness import (
     BODY_LIMIT,
@@ -47,33 +53,19 @@ from serving_harness import (
     padded_room_request,
     raw_exchange,
 )
-from spec010_harness import catalogue_from_grid
-from spec038_harness import serving
+from serving_harness import catalogue as catalogue
+from serving_harness import fx01_grid as fx01_grid
+from serving_harness import registry as registry
+from spec033_harness import ACCOUNT_PATH
+from spec038_harness import DASHBOARD_PATH, serving
 
 CADDYFILE_PATH = Path(__file__).resolve().parents[1] / "Caddyfile"
 ROOMS_PATH = "/api/rooms"
 CREATED = 201
+NO_STORE = "no-store"
 
 
 # ---- Fixtures ------------------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1."""
-    return catalogue_from_grid(fx01_grid)
-
-
-@pytest.fixture
-def registry() -> Iterator[RecordingRegistry]:
-    room_registry = RecordingRegistry()
-    yield room_registry
-    room_registry.close()
 
 
 @pytest.fixture
@@ -109,6 +101,7 @@ def test_ac7_a_declared_length_above_the_limit_is_413_and_creates_no_room(
 
     assert response.status_code == 413
     assert response.json() == CONTENT_TOO_LARGE
+    assert response.headers.get("cache-control") == NO_STORE
     assert registry.created_codes == []
 
 
@@ -160,6 +153,7 @@ def test_ac7_a_declared_length_above_the_limit_is_refused_before_the_body(
 
     assert answer.status == 413
     assert json.loads(answer.body) == CONTENT_TOO_LARGE
+    assert answer.headers.get("cache-control") == NO_STORE
     assert registry.created_codes == []
 
 
@@ -213,3 +207,49 @@ def test_ac9_the_caddyfile_site_block_limits_the_request_body_to_64_kib() -> Non
 
     pattern = r"request_body\s*\{\s*max_size\s+64KiB\s*\}"
     assert re.search(pattern, block) is not None, block
+
+
+# ---- AC-14: the ops and account routes ---------------------------------------------
+
+
+@pytest.fixture
+def account_store(tmp_path: Path) -> Iterator[AccountStore]:
+    store = AccountStore(tmp_path / "accounts.sqlite3")
+    yield store
+    store.close()
+
+
+@pytest.mark.parametrize(
+    ("path", "operator_pages", "accounts"),
+    [
+        pytest.param(DASHBOARD_PATH, True, False, id="ops-on"),
+        pytest.param(DASHBOARD_PATH, False, False, id="ops-off"),
+        pytest.param(ACCOUNT_PATH, True, True, id="accounts-on"),
+        pytest.param(ACCOUNT_PATH, True, False, id="accounts-off"),
+    ],
+)
+def test_ac14_the_limit_comes_before_the_ops_and_account_routes(
+    registry: RecordingRegistry,
+    account_store: AccountStore,
+    tmp_path: Path,
+    path: str,
+    operator_pages: bool,
+    accounts: bool,
+) -> None:
+    app = edge_app(
+        registry,
+        tmp_path / "no-build",
+        account_store=account_store if accounts else None,
+        operator_pages=operator_pages,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            path,
+            content=padded_room_request(BODY_LIMIT + 1),
+            headers=ROOM_REQUEST_HEADERS,
+        )
+
+    assert response.status_code == 413
+    assert response.json() == CONTENT_TOO_LARGE
+    assert response.headers.get("cache-control") == NO_STORE

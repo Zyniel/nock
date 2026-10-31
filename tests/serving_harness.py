@@ -1,10 +1,10 @@
-"""Shared setup of the tests of platform/serving about the HTTP edge (AC-7 to AC-13).
+"""Shared setup of the tests of platform/serving about the HTTP edge (AC-7 to AC-14).
 
 Pytest does not collect this module (its name does not start with `test_`). The
 tests are in `tests/test_serving_*.py`:
 
-- `test_serving_body_limit.py`: AC-7 to AC-9, the body limit of rule 11 and the
-  `Caddyfile`'s.
+- `test_serving_body_limit.py`: AC-7 to AC-9 and AC-14, the body limit of rule 11
+  and the `Caddyfile`'s.
 - `test_serving_security_headers.py`: AC-10, the three headers of rule 12 on
   every kind of answer.
 - `test_serving_cache_control.py`: AC-12 and AC-13, the `Cache-Control` of rule 13.
@@ -12,10 +12,15 @@ tests are in `tests/test_serving_*.py`:
   browser.
 
 This module holds what more than one of those files uses: the values of the
-spec, the app of the HTTP edge tests (a built client, the operator pages on, a
-catalogue holding FX-01) and a bare HTTP exchange over a socket, for the
-requests that no test client can make (a chunked body with no `Content-Length`,
-a declared length with no body).
+spec, the fixtures `fx01_grid`, `catalogue` (FX-01 as entry 1) and `registry`
+(a `RecordingRegistry`), the app of the HTTP edge tests (a built client, the
+operator pages on, a catalogue holding FX-01) and a bare HTTP exchange over a
+socket, for the requests that no test client can make (a chunked body with no
+`Content-Length`, a declared length with no body).
+
+Pytest finds a fixture by name in the module of the test, so each test file that
+asks for one imports it under the same name (`from serving_harness import
+catalogue as catalogue`, the form that tells ruff the import is meant to stay).
 
 The app is `create_app(rooms=registry, dist_dir=..., catalogue=...,
 operator_token=OPS_TOKEN)`, the way spec 038's tests build it, with the accounts
@@ -26,11 +31,12 @@ from __future__ import annotations
 
 import socket
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from typing import NamedTuple
 from urllib.parse import urlsplit
 
+import pytest
 from fastapi import FastAPI
 
 from nock.accounts import AccountStore
@@ -38,6 +44,7 @@ from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.server import create_app
+from spec010_harness import catalogue_from_grid
 from spec033_harness import account_settings
 from spec038_harness import OPS_TOKEN
 
@@ -91,6 +98,25 @@ class RecordingRegistry(RoomRegistry):
         return code
 
 
+@pytest.fixture
+def fx01_grid(fx01_text: str) -> Grid:
+    return Grid.model_validate_json(fx01_text)
+
+
+@pytest.fixture
+def catalogue(fx01_grid: Grid) -> Catalogue:
+    """FX-01 as published entry 1."""
+    return catalogue_from_grid(fx01_grid)
+
+
+@pytest.fixture
+def registry() -> Iterator[RecordingRegistry]:
+    """A registry that keeps the codes of the rooms it registered; closed after."""
+    room_registry = RecordingRegistry()
+    yield room_registry
+    room_registry.close()
+
+
 def padded_room_request(size: int) -> bytes:
     """A valid body of `POST /api/rooms`, padded with spaces to `size` bytes."""
     return ROOM_REQUEST.ljust(size).encode("ascii")
@@ -101,6 +127,7 @@ def edge_app(
     dist_dir: Path,
     catalogue: Catalogue | None = None,
     account_store: AccountStore | None = None,
+    operator_pages: bool = True,
 ) -> FastAPI:
     """The app of the HTTP edge tests.
 
@@ -109,22 +136,24 @@ def edge_app(
         dist_dir: The built client (a folder that may hold no build).
         catalogue: The grids served; None: an empty catalogue.
         account_store: Turns the accounts on, with this store; None: accounts off.
+        operator_pages: True: the operator pages are on (`OPS_TOKEN`); False: off.
 
     Returns:
-        An app with the operator pages on (`OPS_TOKEN`).
+        The app.
     """
+    operator_token = OPS_TOKEN if operator_pages else ""
     if account_store is None:
         return create_app(
             rooms=registry,
             dist_dir=dist_dir,
             catalogue=catalogue,
-            operator_token=OPS_TOKEN,
+            operator_token=operator_token,
         )
     return create_app(
         rooms=registry,
         dist_dir=dist_dir,
         catalogue=catalogue,
-        operator_token=OPS_TOKEN,
+        operator_token=operator_token,
         accounts=account_settings(),
         account_store=account_store,
     )
