@@ -537,7 +537,7 @@ class RoomStore:
             self._connection.execute("BEGIN IMMEDIATE")
             try:
                 self._insert_snapshot(state)
-                self._delete_older_snapshots(state)
+                self._keep_first_and_newest_snapshots(state)
             except BaseException:
                 self._connection.execute("ROLLBACK")
                 raise
@@ -809,7 +809,7 @@ class RoomStore:
             (state.code, state.seq, _snapshot_json(state)),
         )
 
-    def _delete_older_snapshots(self, state: RoomState) -> None:
+    def _keep_first_and_newest_snapshots(self, state: RoomState) -> None:
         """Delete the room's snapshots but the ones at its lowest and highest seq.
 
         The caller holds the lock and has just written the snapshot of `state`,
