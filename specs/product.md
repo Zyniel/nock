@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
@@ -73,7 +73,8 @@ the path. Everything else under `/` is a file of the built client or 404
 
 While accounts are off, `/account` and every `/api/account` path answer 404
 whatever the method; while the operator pages are off, `GET /ops` answers 404 and
-every `/api/ops` path 404 whatever the method.
+every `/api/ops` path 404 whatever the method (a body over the limit: 413 first,
+`platform/serving.md` rule 11).
 
 ### Browsers and windows
 

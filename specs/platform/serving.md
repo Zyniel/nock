@@ -88,11 +88,14 @@ it before it serves, with one line naming the variable.
 
 11. A request body is at most 65,536 bytes, whatever the method and path. A
     request whose `Content-Length` is above that gets 413 `{"detail": "Content
-    Too Large"}` with its body unread; one sent without `Content-Length`
-    (chunked) gets the same 413 once the app has read more than 65,536 bytes
-    of it. Either way no route's handler runs, so nothing is created, saved or
-    counted by a throttle. The `Caddyfile` sets the same limit in front of the
-    app: `request_body` with `max_size 64KiB`.
+    Too Large"}` with `Cache-Control: no-store` and its body unread; one sent
+    without `Content-Length` (chunked) gets the same 413 once the app has read
+    more than 65,536 bytes of it. This check comes before every route and
+    every other rule of any domain, under `/api/ops` and `/api/account` too,
+    whether operator pages and accounts are on or off: no route, guard or
+    handler runs, so nothing is created, saved or counted by a throttle. The
+    `Caddyfile` sets the same limit in front of the app: `request_body` with
+    `max_size 64KiB`.
 12. Every HTTP answer of the app, whatever its path and status (404, 405, 413,
     422, 401, 429, the 503 with no build, an unhandled error's 500), carries:
     - `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'`;
@@ -107,8 +110,9 @@ it before it serves, with one line naming the variable.
     `index.html` from every page route (rule 2) and on a file directly in the
     build's root (`/favicon.svg`), whose names are not hashed; `public,
     max-age=31536000, immutable` on a file of `assets/`, whose names the build
-    hashes. A 404 or 503 of these routes has no `Cache-Control`. The API's:
-    `admin/operations.md` rule 10, `account/account.md` rule 1.
+    hashes. A 404 or 503 of these routes has no `Cache-Control`. The 413 of any
+    path: rule 11. The API's: `admin/operations.md` rule 10,
+    `account/account.md` rule 1.
 
 ## Acceptance criteria
 
@@ -141,7 +145,8 @@ it before it serves, with one line naming the variable.
   `"/srv/donn\udce9es/nock.sqlite3"` never stops `main()`, which leaves the
   variable as it was. (← 036 AC-12)
 - **AC-7** `POST /api/rooms` with a `Content-Length` of 65,537 gets 413
-  `{"detail": "Content Too Large"}` and creates no room; with a body of
+  `{"detail": "Content Too Large"}` with `Cache-Control: no-store` and creates
+  no room; with a body of
   exactly 65,536 bytes it gets the answer it gets without the limit, never 413.
 - **AC-8** `POST /api/rooms` with a chunked body, no `Content-Length`, of
   65,537 bytes in all gets 413 `{"detail": "Content Too Large"}` and creates no
@@ -163,6 +168,10 @@ it before it serves, with one line naming the variable.
 - **AC-13** With a build, `/assets/app.js` carries `Cache-Control: public,
   max-age=31536000, immutable`; `/assets/missing.js` (404) has no
   `Cache-Control`.
+- **AC-14** `POST /api/ops/dashboard` with operator pages on and off, and
+  `POST /api/account` with accounts on and off, each with a `Content-Length` of
+  65,537, get 413 `{"detail": "Content Too Large"}` with `Cache-Control:
+  no-store`, never 404 or 405.
 
 ## Edge cases
 
@@ -173,8 +182,8 @@ it before it serves, with one line naming the variable.
 ## Out of scope
 
 - The run configuration, frame size and connection bounds: `product.md`.
-- CORS (no cross-origin use); the `Cache-Control` of API answers but rule 13's
-  pointers.
+- CORS (no cross-origin use). The `Cache-Control` of API answers other than
+  the 413: the files rule 13 names.
 - The store `NOCK_DATABASE` opens, the rooms in memory, undo, engine time:
   `platform/server.md`. The bounds of the room lives, the creation limit, the
   socket cap and the account variables: the files rule 6 names. Client routing
@@ -187,5 +196,5 @@ it before it serves, with one line naming the variable.
   proxy's body limit. `src/nock/__main__.py`, `src/nock/settings.py`: the
   variables.
 - Tests: `tests/test_spec_040_ac01_ac06_*`, `tests/test_spec_040_ac27_ac29_*`,
-  `tests/test_spec_036_ac10_ac12_*`; `tests/test_serving_*` for AC-7 to AC-13,
+  `tests/test_spec_036_ac10_ac12_*`; `tests/test_serving_*` for AC-7 to AC-14,
   AC-11 in the browsers.

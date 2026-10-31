@@ -65,7 +65,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
    under `/api/`: 404 `{"detail": "Not Found"}`, no `Cache-Control`, no token
    check, nothing counted. `GET /ops` answers as an unknown path (404); another
    method on `/ops` 405, as on any unknown one-segment path such as `/xyz`, and
-   as while the pages are on.
+   as while the pages are on. A body over the limit gets the 413 of
+   `platform/serving.md` rule 11 first, as on any path.
 
 ### Operator pages on: the ops API
 
@@ -88,7 +89,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 10. Any other request under `/api/ops/` gets FastAPI's 404 (unknown path) or 405
     (another method on a route's path), with no token check, not counted. Every
     answer under `/api/ops/`, refusals included, has `Cache-Control: no-store`;
-    `/api/ops` itself answers a plain 404 without it, for every method.
+    `/api/ops` itself answers a plain 404 without it, for every method. A body
+    over the limit gets the 413 of `platform/serving.md` rule 11, `no-store`
+    too, before any of this.
 11. `GET /ops` serves `index.html` to anyone, without a token, or 503 as `/` when
     the client is not built.
 

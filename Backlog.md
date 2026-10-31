@@ -348,7 +348,7 @@ others, at the top of the list.
   admin/operations (the scheme of the operator token)
 - Architecture decision: yes, the new domain (the human, 2026-10-31); the
   rest is one middleware and the `Caddyfile` of B-009
-- Criteria: serving AC-7 to AC-13 (new), serving AC-1 to AC-6 (moved from
+- Criteria: serving AC-7 to AC-14 (new), serving AC-1 to AC-6 (moved from
   server AC-14 to AC-19, retired with server AC-27 to AC-33), operations
   AC-21 (new)
 - Branch: feat/b-034-http-edge · PR: none yet
@@ -2121,7 +2121,8 @@ Taken when a change touches them.
 - WebKit reaching the brand by Tab (`tabindex="0"`, hud AC-20) is proven only
   once CI runs WebKit after the merge.
 - `client/shell.md` (about 16.4 KB, 20 criteria) and `admin/operations.md`
-  (about 18 KB, 20 criteria) are past the size budget of `specs/_map.md`; the
+  (about 19.6 KB, 21 criteria after B-034, whose one criterion the human
+  approved without a split) are past the size budget of `specs/_map.md`; the
   next criterion in either needs a split first (an architecture item). For
   shell, the B-010 spec-writer proposed `client/foundation.md` taking rules 13
   to 17 and their criteria.

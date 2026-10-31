@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: done
+status: approved
 ---
 
 # lobby/rooms - Solo start, room creation and invitation
@@ -48,7 +48,8 @@ codes are limited per address.
 6. `POST /api/rooms` with `{"grid_number": N}`, N a whole number from 1, answers
    201 with only `code` and `share_url` (`<base URL>/r/<code>`) when N is
    published, 404 `{"detail": "Not Found"}` when it is unknown or unpublished, and
-   422 for any other body. `GET` is 404 JSON, `PUT`, `PATCH` and `DELETE` are 405,
+   422 for any other body (one over the limit: 413 first, `platform/serving.md`
+   rule 11). `GET` is 404 JSON, `PUT`, `PATCH` and `DELETE` are 405,
    `POST /api/rooms/` is 404 with no redirect. Only a 201 creates a room. A valid
    session on the request makes its account the room's creator (`lobby/host.md`
    rule 11).
