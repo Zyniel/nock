@@ -623,6 +623,63 @@ def _forget_old_times(
     return kept
 
 
+class _RunningErasures:
+    """The erasures of an app that have an attempt under way.
+
+    The app runs one attempt of an erasure at a time (`account/account.md` rule
+    26): an attempt claims its erasure's id before it starts and gives it back
+    when it ends. A claim never waits: an attempt that finds its erasure claimed
+    does nothing, and other erasures go on meanwhile.
+    """
+
+    def __init__(self) -> None:
+        """Start with no attempt under way."""
+        self._lock = threading.Lock()
+        self._erasure_ids: set[int] = set()
+
+    def claim(self, erasure_id: int) -> bool:
+        """Claim an erasure for one attempt.
+
+        Args:
+            erasure_id: The erasure.
+
+        Returns:
+            True when the erasure is now claimed; False when another attempt of
+            it is under way.
+        """
+        with self._lock:
+            if erasure_id in self._erasure_ids:
+                return False
+            self._erasure_ids.add(erasure_id)
+            return True
+
+    def claim_new(
+        self, write: Callable[[], PendingErasure | None]
+    ) -> PendingErasure | None:
+        """Write a new erasure and claim it before any other attempt can.
+
+        A sweep that reads the new erasure while it is being written can only
+        claim it after this claim, so it then finds it claimed. Other claims
+        wait for the write.
+
+        Args:
+            write: Writes the erasure; returns it, or None when it wrote none.
+
+        Returns:
+            What `write` returned, the erasure claimed when there is one.
+        """
+        with self._lock:
+            pending = write()
+            if pending is not None:
+                self._erasure_ids.add(pending.erasure_id)
+            return pending
+
+    def give_back(self, erasure_id: int) -> None:
+        """End the claim of an erasure, once its attempt is over."""
+        with self._lock:
+            self._erasure_ids.discard(erasure_id)
+
+
 class _AccountService:
     """What an app's accounts run on: their settings, their store, their mailer.
 
@@ -646,6 +703,7 @@ class _AccountService:
         self.store: AccountStore | None = None
         self.mailer: Mailer | None = None
         self.limits = _LinkLimits()
+        self.running_erasures = _RunningErasures()
         self._is_store_created_here = False
 
     def start(self) -> None:
@@ -815,11 +873,13 @@ def _history_saver(store: AccountStore) -> Callable[[RoomState], None]:
 class _ErasureAttempts:
     """The attempts that end the erasure of a deleted account.
 
-    An attempt counts itself, then runs three steps, each idempotent and each
-    run even when an earlier one failed: it erases the players the erasure still
-    lists, deletes the account's creator rooms, and erases its players from the
-    history records. When no step failed it sends the e-mail and marks the
-    erasure done (`account/account.md` rules 26 and 27).
+    The app runs one attempt of an erasure at a time (`_RunningErasures`). An
+    attempt counts itself, then runs three steps, each idempotent and each run
+    even when an earlier one failed: it erases from their rooms the players the
+    erasure holds not yet marked erased, deletes the account's creator rooms,
+    and erases every player it holds from the history records. When no step
+    failed it sends the e-mail and marks the erasure done (`account/account.md`
+    rules 26 and 27).
     """
 
     def __init__(
@@ -828,20 +888,74 @@ class _ErasureAttempts:
         store: AccountStore,
         settings: AccountSettings,
         mailer: Mailer,
+        running: _RunningErasures,
     ) -> None:
-        """Keep what an attempt works on."""
+        """Keep what an attempt works on, and the app's erasures under way."""
         self._rooms = rooms
         self._store = store
         self._settings = settings
         self._mailer = mailer
+        self._running = running
+
+    def delete_account(self, account_id: str) -> bool:
+        """Delete the account, then run the first attempt of its erasure.
+
+        The erasure is claimed as it is written, so a sweep leaves it to this
+        attempt. A failure of the attempt is logged, never raised.
+
+        Args:
+            account_id: The account.
+
+        Returns:
+            False when there is no such account; nothing is done then.
+        """
+
+        def write_erasure() -> PendingErasure | None:
+            return self._store.delete_account(account_id, self._rooms.clock())
+
+        pending = self._running.claim_new(write_erasure)
+        if pending is None:
+            return False
+        try:
+            self._attempt(pending)
+        finally:
+            self._running.give_back(pending.erasure_id)
+        return True
 
     def run_pending(self) -> None:
         """Run one attempt of every pending erasure, the oldest request first."""
         for pending in self._store.pending_erasures():
-            self.run(pending)
+            self._run(pending.erasure_id)
 
-    def run(self, pending: PendingErasure) -> None:
-        """Run one attempt of an erasure. A failure is logged, never raised."""
+    def _run(self, erasure_id: int) -> None:
+        """Run one attempt of an erasure, unless it is done or under way.
+
+        The erasure is read again once claimed: an attempt that ended meanwhile
+        may have marked it done. A failure is logged, never raised.
+        """
+        if not self._running.claim(erasure_id):
+            return
+        try:
+            pending = self._read_pending(erasure_id)
+            if pending is not None:
+                self._attempt(pending)
+        except Exception:
+            logger.exception("An attempt of an account erasure failed")
+        finally:
+            self._running.give_back(erasure_id)
+
+    def _read_pending(self, erasure_id: int) -> PendingErasure | None:
+        """Return the erasure as it is now; None when it is done."""
+        for pending in self._store.pending_erasures():
+            if pending.erasure_id == erasure_id:
+                return pending
+        return None
+
+    def _attempt(self, pending: PendingErasure) -> None:
+        """Count one attempt, run its steps, and end the erasure when they pass.
+
+        The caller has claimed the erasure. A failure is logged, never raised.
+        """
         try:
             self._store.begin_attempt(pending.erasure_id)
             are_players_erased = self._erase_players(pending)
@@ -853,16 +967,18 @@ class _ErasureAttempts:
             logger.exception("An attempt of an account erasure failed")
 
     def _erase_players(self, pending: PendingErasure) -> bool:
-        """Step 1: erase each listed player from its room, then unlist it.
+        """Step 1: erase each player not yet marked erased, then mark it.
 
         Returns:
-            True when every listed player is erased.
+            True when every player the erasure holds is marked erased.
         """
         are_all_erased = True
         for player in pending.players:
+            if player.is_erased:
+                continue
             try:
                 self._rooms.erase_player(player.code, player.player_id)
-                self._store.drop_erased_player(
+                self._store.mark_player_erased(
                     pending.erasure_id, player.code, player.player_id
                 )
             except Exception:
@@ -888,7 +1004,7 @@ class _ErasureAttempts:
         return True
 
     def _erase_history(self, pending: PendingErasure) -> bool:
-        """Step 3: make its players `--` among the team-mates of every record.
+        """Step 3: make every player it holds `--` among the record team-mates.
 
         Returns:
             True when the history records are erased.
@@ -929,7 +1045,7 @@ def _erasure_attempts(
     mailer = accounts.mailer
     if store is None or settings is None or mailer is None:
         return None
-    return _ErasureAttempts(rooms, store, settings, mailer)
+    return _ErasureAttempts(rooms, store, settings, mailer, accounts.running_erasures)
 
 
 def _clear_session_cookie(response: Response) -> None:
@@ -1830,15 +1946,14 @@ def create_app(
     @web_app.delete(ACCOUNT_API_ROOT, status_code=204)
     def delete_account(request: Request) -> Response:
         account = require_account(request)
-        store = account_store_in_use()
-        room_registry = holder.get()
-        pending = store.delete_account(account.account_id, room_registry.clock())
-        if pending is None:
+        attempts = _erasure_attempts(holder.get(), account_service)
+        if attempts is None:
+            # Accounts are off; `guard_account_paths` already answers so.
+            raise _not_found()
+        is_deleted = attempts.delete_account(account.account_id)
+        if not is_deleted:
             # The account was deleted after the session was read.
             raise _no_session()
-        attempts = _erasure_attempts(room_registry, account_service)
-        if attempts is not None:
-            attempts.run(pending)
         response = Response(status_code=204)
         _clear_session_cookie(response)
         return response

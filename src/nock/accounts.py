@@ -27,7 +27,6 @@ import sqlite3
 import string
 import threading
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
@@ -133,6 +132,7 @@ CREATE TABLE IF NOT EXISTS account_erasure_players (
     erasure_id INTEGER NOT NULL,
     code TEXT NOT NULL,
     player_id TEXT NOT NULL,
+    erased INTEGER NOT NULL,
     PRIMARY KEY (erasure_id, code, player_id)
 );
 CREATE INDEX IF NOT EXISTS account_identities_by_code
@@ -285,16 +285,15 @@ class HistoryRecord(AccountModel):
     teammates: tuple[Nickname, ...]  # in team_nicknames order
 
 
-@dataclass(frozen=True)
-class ErasedPlayer:
-    """A player of a deleted account that an erasure still has to erase."""
+class ErasedPlayer(AccountModel):
+    """A player of a deleted account, which its erasure holds until it is done."""
 
-    code: str
-    player_id: str
+    code: RoomCode
+    player_id: PlayerId
+    is_erased: StrictBool  # True once an attempt erased it from its room
 
 
-@dataclass(frozen=True)
-class PendingErasure:
+class PendingErasure(AccountModel):
     """An erasure of a deleted account, written at the deletion and not done yet."""
 
     erasure_id: int
@@ -302,7 +301,7 @@ class PendingErasure:
     email: str
     requested_at: float
     attempts: int  # how many attempts have begun
-    players: tuple[ErasedPlayer, ...]  # the players still listed
+    players: tuple[ErasedPlayer, ...]  # every player it holds, erased or not
 
 
 class _Teammate(NamedTuple):
@@ -747,7 +746,7 @@ class AccountStore:
         """Return the erasures not done yet, oldest request first.
 
         Returns:
-            Each with the players it still lists.
+            Each with every player it holds, marked erased or not.
         """
         with self._lock:
             rows = self._connection.execute(
@@ -782,11 +781,11 @@ class AccountStore:
                 (erasure_id,),
             )
 
-    def drop_erased_player(self, erasure_id: int, code: str, player_id: str) -> None:
-        """Take a player off the list of an erasure, once it is erased.
+    def mark_player_erased(self, erasure_id: int, code: str, player_id: str) -> None:
+        """Mark a player of an erasure as erased from its room.
 
-        On a file database the write-ahead log is then checkpointed
-        (`checkpoint_wal`); a busy checkpoint leaves it to a later one.
+        The erasure still holds the player until it is done, so that a history
+        record saved meanwhile names it FORMER_PLAYER_NICKNAME.
 
         Args:
             erasure_id: The erasure.
@@ -795,12 +794,10 @@ class AccountStore:
         """
         with self._lock:
             self._connection.execute(
-                "DELETE FROM account_erasure_players "
+                "UPDATE account_erasure_players SET erased = 1 "
                 "WHERE erasure_id = ? AND code = ? AND player_id = ?",
                 (erasure_id, code, player_id),
             )
-            if self._is_file:
-                checkpoint_wal(self._connection)
 
     def count_deleted_room(self, erasure_id: int) -> None:
         """Count one more creator room deleted by the erasure.
@@ -821,9 +818,10 @@ class AccountStore:
         """Mark the erasure done, in one write that also drops its address.
 
         The row keeps the request time, `now`, `notified_at`, the attempts and the
-        counts; its account id, its address and its players go. On a file
-        database the write-ahead log is then checkpointed (`checkpoint_wal`); a
-        busy checkpoint leaves it to a later one.
+        counts; its account id, its address and its players go. An erasure
+        already done is left as it is. On a file database the write-ahead log is
+        then checkpointed (`checkpoint_wal`); a busy checkpoint leaves it to a
+        later one.
 
         Args:
             erasure_id: The erasure.
@@ -836,7 +834,8 @@ class AccountStore:
             try:
                 self._connection.execute(
                     "UPDATE account_erasures SET account_id = NULL, email = NULL, "
-                    "done_at = ?, notified_at = ? WHERE erasure_id = ?",
+                    "done_at = ?, notified_at = ? "
+                    "WHERE erasure_id = ? AND done_at IS NULL",
                     (now, notified_at, erasure_id),
                 )
                 self._connection.execute(
@@ -970,8 +969,8 @@ class AccountStore:
             raise RuntimeError("SQLite gave no id to the new erasure")
         for player in players:
             self._connection.execute(
-                "INSERT INTO account_erasure_players (erasure_id, code, player_id) "
-                "VALUES (?, ?, ?)",
+                "INSERT INTO account_erasure_players "
+                "(erasure_id, code, player_id, erased) VALUES (?, ?, ?, 0)",
                 (erasure_id, player.code, player.player_id),
             )
         return PendingErasure(
@@ -984,16 +983,13 @@ class AccountStore:
         )
 
     def _read_erasure_players(self, erasure_id: int) -> tuple[ErasedPlayer, ...]:
-        """Read the players an erasure still lists. The caller holds the lock."""
+        """Read every player an erasure holds. The caller holds the lock."""
         rows = self._connection.execute(
-            "SELECT code, player_id FROM account_erasure_players "
+            "SELECT code, player_id, erased FROM account_erasure_players "
             "WHERE erasure_id = ? ORDER BY code, player_id",
             (erasure_id,),
         ).fetchall()
-        players: list[ErasedPlayer] = []
-        for code, player_id in rows:
-            players.append(ErasedPlayer(code=code, player_id=player_id))
-        return tuple(players)
+        return _erased_players_of(rows)
 
     def _erase_from_history(self, account_id: str, players: list[ErasedPlayer]) -> None:
         """Delete the account's records, and erase its players from the others'.
@@ -1010,17 +1006,15 @@ class AccountStore:
         )
 
     def _mark_pending_players_former(self) -> None:
-        """Give FORMER_PLAYER_NICKNAME to each team-mate a pending erasure lists.
+        """Give FORMER_PLAYER_NICKNAME to each team-mate a pending erasure holds.
 
-        The caller holds the lock and runs the transaction.
+        A player already marked erased counts too. The caller holds the lock and
+        runs the transaction.
         """
         rows = self._connection.execute(
-            "SELECT code, player_id FROM account_erasure_players"
+            "SELECT code, player_id, erased FROM account_erasure_players"
         ).fetchall()
-        listed: list[ErasedPlayer] = []
-        for code, player_id in rows:
-            listed.append(ErasedPlayer(code=code, player_id=player_id))
-        self._mark_former_players(listed)
+        self._mark_former_players(_erased_players_of(rows))
 
     def _mark_former_players(self, players: Sequence[ErasedPlayer]) -> None:
         """Give FORMER_PLAYER_NICKNAME to each team-mate matching a player.
@@ -1077,8 +1071,26 @@ def _players_of(identities: list[RoomIdentity]) -> list[ErasedPlayer]:
     """Return the code and player id of each identity."""
     players: list[ErasedPlayer] = []
     for identity in identities:
-        players.append(ErasedPlayer(code=identity.code, player_id=identity.player_id))
+        player = ErasedPlayer(
+            code=identity.code, player_id=identity.player_id, is_erased=False
+        )
+        players.append(player)
     return players
+
+
+def _erased_players_of(
+    rows: list[tuple[str, str, int]],
+) -> tuple[ErasedPlayer, ...]:
+    """Return the players of rows of `account_erasure_players`.
+
+    Args:
+        rows: Each row's code, player id and `erased` column (0 or 1).
+    """
+    players: list[ErasedPlayer] = []
+    for code, player_id, erased in rows:
+        player = ErasedPlayer(code=code, player_id=player_id, is_erased=erased == 1)
+        players.append(player)
+    return tuple(players)
 
 
 def _mark_grid(

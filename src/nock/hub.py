@@ -553,7 +553,7 @@ class _RoomRunner:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
-    async def delete(self, *, checkpoint: bool) -> None:
+    async def delete(self, *, checkpoint: bool) -> bool:
         """Stop the room for good, delete it from the store, then close its sockets.
 
         The inputs still in the inbox are dropped, and no step, snapshot or log
@@ -564,11 +564,14 @@ class _RoomRunner:
         Args:
             checkpoint: Whether the store checkpoints after the deletion; a sweep
                 says False and checkpoints once after all its deletions.
+
+        Returns:
+            True when the store held the room and removed it.
         """
         self._is_deleted = True
         await self.cancel()
         try:
-            self._store.delete_room(self.state.code, checkpoint=checkpoint)
+            return self._store.delete_room(self.state.code, checkpoint=checkpoint)
         finally:
             self._close_open_connections()
 
@@ -1271,12 +1274,14 @@ class RoomRegistry:
 
         Args:
             account_id: The account that was deleted.
-            on_deleted: Called after each room is deleted, so that the caller
-                counts them.
+            on_deleted: Called after each room whose deletion removed it, so
+                that the caller counts them; a room already gone meanwhile is
+                not reported.
         """
         for code in self._store.codes_created_by(account_id):
-            self._delete_room(code)
-            on_deleted()
+            is_removed = self._delete_room(code)
+            if is_removed:
+                on_deleted()
 
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.
@@ -1666,12 +1671,16 @@ class RoomRegistry:
         self._delete_room_locked(code, checkpoint=checkpoint)
         return True
 
-    def _delete_room(self, code: str) -> None:
-        """Delete a room, expired or not, with no second read of its times."""
-        with self._lock:
-            self._delete_room_locked(code)
+    def _delete_room(self, code: str) -> bool:
+        """Delete a room, expired or not, with no second read of its times.
 
-    def _delete_room_locked(self, code: str, *, checkpoint: bool = True) -> None:
+        Returns:
+            True when the store held the room and removed it.
+        """
+        with self._lock:
+            return self._delete_room_locked(code)
+
+    def _delete_room_locked(self, code: str, *, checkpoint: bool = True) -> bool:
         """Delete a room: stop it when it is live, then remove it from the store.
 
         The caller holds the lock, so that no lookup loads the room again while
@@ -1685,6 +1694,9 @@ class RoomRegistry:
             code: The room.
             checkpoint: Whether the store checkpoints after the deletion; the
                 sweep says False and checkpoints once after all its deletions.
+
+        Returns:
+            True when the store held the room and removed it.
         """
         runner = self._runners.pop(code, None)
         self._drop_recap(code)
@@ -1693,24 +1705,22 @@ class RoomRegistry:
         if runner is None or loop is None or self._closed:
             # No task or socket to stop: none ever connected, or close()
             # stopped them all.
-            self._store.delete_room(code, checkpoint=checkpoint)
-            return
+            return self._store.delete_room(code, checkpoint=checkpoint)
         if threading.current_thread() is self._thread:
             # Waiting for ourselves would block, as in close(): the store
             # forgets the room now, under the lock, and the room's task stops
             # after this step, even when the store fails. The stop leaves the
             # store alone: a new room may have taken the code by then.
             try:
-                self._store.delete_room(code, checkpoint=checkpoint)
+                return self._store.delete_room(code, checkpoint=checkpoint)
             finally:
                 stopping = loop.create_task(runner.stop_for_deletion())
                 self._deletion_tasks.add(stopping)
                 stopping.add_done_callback(self._deletion_tasks.discard)
-            return
         deleting = asyncio.run_coroutine_threadsafe(
             runner.delete(checkpoint=checkpoint), loop
         )
-        deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
+        return deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _call_delete_hook(self, code: str, runner: _RoomRunner | None) -> None:
         """Call the delete hook with the latest state of a room about to go.
