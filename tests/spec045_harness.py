@@ -302,7 +302,7 @@ return {
 # appended to `body`, read, then removed ("Test harness" of spec 019 and 045).
 INK_PROBE_SCRIPT = "index => {\n" + READERS_JS + r"""
 const probe = document.createElement('span');
-probe.setAttribute('style', `color: var(--player-ink-${index})`);
+probe.style.cssText = `color: var(--player-ink-${index})`;
 probe.textContent = 'probe';
 document.body.appendChild(probe);
 const colour = parseColour(getComputedStyle(probe).color);

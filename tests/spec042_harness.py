@@ -627,15 +627,25 @@ HIT_STYLE_ID = "spec042-hit-test"
 START_HIT_TEST_SCRIPT = """
 ([selector, styleId, withSelection]) => {
   document.querySelector(selector).scrollIntoView();
-  const style = document.createElement('style');
-  style.id = styleId;
+  // A constructed stylesheet: the page's Content-Security-Policy blocks an
+  // inline `<style>` element, not the CSSOM.
+  const sheet = new CSSStyleSheet();
   const skipped = withSelection ? '' : ':not([data-testid="cell-selection"])';
-  style.textContent = '[data-testid="cell"] *' + skipped
-    + ' { pointer-events: auto !important; }';
-  document.head.appendChild(style);
+  sheet.replaceSync('[data-testid="cell"] *' + skipped
+    + ' { pointer-events: auto !important; }');
+  window[styleId] = sheet;
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 }
 """
-END_HIT_TEST_SCRIPT = "styleId => document.getElementById(styleId)?.remove()"
+END_HIT_TEST_SCRIPT = """
+styleId => {
+  const sheet = window[styleId];
+  document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+    adopted => adopted !== sheet
+  );
+  delete window[styleId];
+}
+"""
 
 
 # ---- Snapshots and players ----------------------------------------------------
