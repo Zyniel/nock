@@ -387,7 +387,7 @@ others, at the top of the list.
 
 ### B-035 The store: checked secure deletion, one checkpoint per sweep, indexes
 
-- Status: ready
+- Status: done
 - Priority: seventh (privacy promise and sweep cost)
 - Domains: admin/operations (no copy of a deleted room stays), lobby/lifetime
   (the sweep), account/account (the purge)

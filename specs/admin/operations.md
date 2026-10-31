@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: approved
+status: done
 ---
 
 # admin/operations - Logs, retention and the operator pages
@@ -211,12 +211,6 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 - The replay's cells: `_design/cells.md`, « Grid lines and empty cells » and
   « Letter marks »; the slider and
   buttons: `_design/foundation.md`, « Components ».
-
-## New interface
-
-- `nock.store.checkpoint_wal(connection: sqlite3.Connection) -> bool`: rule
-  20's checkpoint on that connection; True when the WAL was emptied, False
-  when it stayed busy after the second try.
 
 ## Acceptance criteria
 
