@@ -7,11 +7,12 @@ tests are in `tests/test_account_*.py`:
   HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one
   file, a fake clock).
 - `test_account_erasure.py`, `test_account_erasure_history.py`,
-  `test_account_erasure_record.py`, `test_account_erasure_retry.py` and
-  `test_account_erasure_overlap.py`: AC-24 to AC-27, AC-29 and AC-30, the erasure
-  that always finishes, on the same app. Zoé's play (`zoe_in_rooms`,
-  `zoe_in_new_live_room`), the room store that holds a room's engine
-  (`HoldingStore`) and the reading of the erasure's two tables are here.
+  `test_account_erasure_record.py`, `test_account_erasure_retry.py`,
+  `test_account_erasure_overlap.py` and `test_account_erasure_once.py`: AC-24 to
+  AC-27, AC-29 and AC-30, the erasure that always finishes, on the same app. Zoé's
+  play (`zoe_in_rooms`, `zoe_in_new_live_room`), the room store that holds a
+  room's engine (`HoldingStore`) and the reading of the erasure's two tables are
+  here.
 - `test_account_returning_device.py`: AC-28, a browser.
 
 Ana's rooms are FX-01 rooms played with the rules (spec 029's `play_fx01`) and
