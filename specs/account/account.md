@@ -17,7 +17,8 @@ the player into « Ancien joueur » in the other rooms.
 
 - `lobby/joining.md`: identities, members, seat back, « Mes salons »; the sweep
   is `lobby/lifetime.md`.
-- `platform/server.md`: the database file, `main()`, `NOCK_HOST`, `NOCK_PORT`.
+- `platform/serving.md`: `main()`, `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE`;
+  the store that file names is `platform/server.md` rule 1.
 - `gameplay/results.md`: « Grilles terminées », the history on screen.
 
 ## Rules

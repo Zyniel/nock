@@ -48,7 +48,7 @@ None. Every domain spec depends on this file.
 
 Page routes serve the built client's `index.html`; the client picks the page from
 the path. Everything else under `/` is a file of the built client or 404
-(`platform/server.md`).
+(`platform/serving.md`).
 
 | Route | Serves | Owner |
 | --- | --- | --- |
@@ -172,7 +172,7 @@ every `/api/ops` path 404 whatever the method.
     uvicorn's defaults otherwise; the address is `NOCK_HOST`:`NOCK_PORT`
     (default `127.0.0.1`:8000); the rooms live in the SQLite file
     `NOCK_DATABASE` when it is set, in memory when it is unset or empty. The
-    variables and their checks: `platform/server.md`.
+    variables and their checks: `platform/serving.md`.
 
 ### Look
 
@@ -286,7 +286,7 @@ conformance is checked »).
   room or many rooms at once; bundle size budgets.
 - Limits per address: `lobby/rooms.md`, `admin/operations.md`,
   `account/account.md`. The environment
-  variables and their checks: `platform/server.md`.
+  variables and their checks: `platform/serving.md`.
 
 ## Code
 

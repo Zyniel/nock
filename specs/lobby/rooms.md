@@ -106,8 +106,8 @@ codes are limited per address.
     from 1 to 10000, default 30: unset or empty, the default; set, ASCII
     digits only, any number of leading zeros, within the bounds. `main()`
     checks it after the five variables of `lobby/lifetime.md` and before the
-    account variables, and stops on a refused value (`platform/server.md`
-    rules 15, 19). An app reads it each time it starts and fails its start with
+    account variables, and stops on a refused value (`platform/serving.md`
+    rules 6, 10). An app reads it each time it starts and fails its start with
     `SettingsError` on a refused value. `/ops` cannot change it.
 
 ### Look

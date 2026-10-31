@@ -17,8 +17,8 @@ deletes it with all its data.
 - `lobby/host.md`: creator and anonymous rooms, a creator room played as
   anonymous while accounts are off, the deletion at the creator's erasure.
 - `gameplay/rules.md`: `grid_solved`, and that no edit is accepted once solved.
-- `platform/server.md`: the store, `main()`, the order and the wording of its
-  variable checks.
+- `platform/serving.md`: `main()`, the order and the wording of its variable
+  checks; the store is `platform/server.md`.
 
 ## Rules
 
@@ -89,9 +89,9 @@ deletes it with all its data.
    takes its default; set, it is
    ASCII digits only, any number of leading zeros, its value within its bounds.
    `main()` checks them after `NOCK_DATABASE` and before the account variables
-   (`platform/server.md` rule 15); a refused value stops it with one line naming
-   the variable and showing the value as `repr()` writes it (`platform/server.md`
-   rule 19), and `python -m nock` exits with 1 without serving. An app given no
+   (`platform/serving.md` rule 6); a refused value stops it with one line naming
+   the variable and showing the value as `repr()` writes it (`platform/serving.md`
+   rule 10), and `python -m nock` exits with 1 without serving. An app given no
    registry reads them when it starts and fails its start with `SettingsError`
    on a refused value; one given a registry reads none, and its config gives
    the environment values.
