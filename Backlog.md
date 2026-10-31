@@ -422,7 +422,7 @@ others, at the top of the list.
 
 ### B-036 Account erasure that always finishes
 
-- Status: building
+- Status: done
 - Priority: eighth (privacy; the failure needs a busy engine, which B-030 and
   B-031 make rare)
 - Domains: account/account, lobby/lifetime (the sweep's step),

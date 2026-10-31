@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: approved
+status: done
 ---
 
 # account/account - Optional account
@@ -261,33 +261,6 @@ the other rooms, and an e-mail says when it is done.
 - The account page and its deletion: `_design/pages.md` « Plain pages:
   account, shared recap, operator ».
 - Its lines: `_design/pages.md` « States: opening, loading, empty, error ».
-
-## New interface
-
-- `src/nock/accounts.py`, tables: `account_erasures` (`erasure_id` INTEGER
-  PRIMARY KEY, `account_id` TEXT, `email` TEXT, `requested_at` REAL NOT NULL,
-  `done_at` REAL, `notified_at` REAL, `attempts` INTEGER NOT NULL, `players`
-  INTEGER NOT NULL, `rooms_deleted` INTEGER NOT NULL; `account_id` and
-  `email` null once done, `done_at` null while pending) and
-  `account_erasure_players` (`erasure_id`, `code`, `player_id`, the three the
-  primary key, `erased` INTEGER NOT NULL, 0 until step 1 has erased the
-  player; a row per player the erasure holds, gone once it is done).
-  `ERASURE_RECORD_LIFE_SECONDS = 157_680_000.0` (5 × 365 days). Frozen models
-  `ErasedPlayer(code, player_id, is_erased)` and `PendingErasure(erasure_id,
-  account_id, email, requested_at, attempts, players: tuple[ErasedPlayer,
-  ...])`, every player it holds. `AccountStore.delete_account(account_id,
-  now) -> PendingErasure | None` (None: no such account), `pending_erasures()
-  -> list[PendingErasure]` (oldest request first), `begin_attempt(erasure_id)`,
-  `mark_player_erased(erasure_id, code, player_id)`,
-  `count_deleted_room(erasure_id)`, `finish_erasure(erasure_id, now,
-  notified_at: float | None)`; `erase_players_from_history(players:
-  Sequence[ErasedPlayer])`.
-- `src/nock/hub.py`: `RoomRegistry.delete_creator_rooms(account_id,
-  on_deleted: Callable[[], None])`, `on_deleted` called once per room its
-  deletion removed.
-- `src/nock/mailer.py`: `deleted_message(settings: AccountSettings, to: str)
-  -> EmailMessage`.
-- `web/src/i18n/fr.json`: `email.deleted.subject`, `email.deleted.body`.
 
 ## Acceptance criteria
 
