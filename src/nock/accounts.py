@@ -35,6 +35,7 @@ from nock.room import (
     member_id,
     utc_datetime,
 )
+from nock.store import checkpoint_wal
 
 SESSION_COOKIE: str = "nock_session"
 LINK_LIFE_SECONDS: float = 1_800.0  # 30 minutes (decision 11)
@@ -62,8 +63,9 @@ ACCOUNT_ID_BYTES: int = 16
 
 _MEMORY_PATH = ":memory:"
 
-# The tables of the accounts, in the database file of the rooms. Their names
-# start with "account" so that they cannot meet a table of the rooms.
+# The tables of the accounts, in the database file of the rooms, and the indexes
+# their lookups read (`account/account.md` rule 25). Their names start with
+# "account" so that they cannot meet a table of the rooms.
 _TABLES = """
 CREATE TABLE IF NOT EXISTS accounts (
     account_id TEXT PRIMARY KEY,
@@ -108,6 +110,13 @@ CREATE TABLE IF NOT EXISTS account_history_teammates (
     nickname TEXT NOT NULL,
     PRIMARY KEY (account_id, code, position)
 );
+CREATE INDEX IF NOT EXISTS account_identities_by_code
+    ON account_identities (code, account_id);
+CREATE INDEX IF NOT EXISTS account_history_teammates_by_player
+    ON account_history_teammates (code, player_id);
+CREATE INDEX IF NOT EXISTS account_links_by_email ON account_links (email);
+CREATE INDEX IF NOT EXISTS account_sessions_by_account
+    ON account_sessions (account_id);
 """
 
 
@@ -678,7 +687,7 @@ class AccountStore:
                 raise
             self._connection.execute("COMMIT")
             if self._is_file:
-                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+                checkpoint_wal(self._connection)
         return held_identities
 
     def erase_players_from_history(self, identities: Sequence[RoomIdentity]) -> None:
@@ -702,7 +711,7 @@ class AccountStore:
                 raise
             self._connection.execute("COMMIT")
             if self._is_file:
-                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+                checkpoint_wal(self._connection)
 
     def purge(self, now: float) -> None:
         """Delete the links and the sessions that are too old to be used.
@@ -724,7 +733,7 @@ class AccountStore:
                 (now - SESSION_LIFE_SECONDS,),
             )
             if self._is_file:
-                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+                checkpoint_wal(self._connection)
 
     def close(self) -> None:
         """Close the database. Idempotent."""

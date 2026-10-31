@@ -14,14 +14,17 @@ store is safe to call from several threads. Rooms are independent: the lock is
 only held for the duration of one short statement or transaction.
 
 A deleted room leaves no copy behind (spec 038): SQLite overwrites deleted rows
-with zeros (`secure_delete`), and in a file database each deletion ends with a
-checkpoint that empties the write-ahead log. Erasing a player's nickname (spec
-033) ends the same way.
+with zeros (`secure_delete`), and in a file database a checkpoint then empties
+the write-ahead log (`checkpoint_wal`, `admin/operations.md` rule 20). A deletion
+outside a sweep ends with one, and so does erasing a player's nickname (spec
+033); a sweep deletes its rooms without one and calls `RoomStore.checkpoint`
+once after them.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 from collections.abc import Sequence
@@ -37,6 +40,8 @@ from nock.room import (
     replay,
     with_player_erased,
 )
+
+logger = logging.getLogger(__name__)
 
 _MEMORY_PATH = ":memory:"
 
@@ -73,11 +78,25 @@ CREATE TABLE IF NOT EXISTS overrides (
 );
 """
 
-# `PRAGMA user_version` of a database that has the creator column (1) and the
-# solve time column (2) in `room_times`.
-_SCHEMA_VERSION = 2
+# `PRAGMA user_version` of a database that has the creator column (1), the solve
+# time column (2) and the indexes of `room_times` (3).
+_SCHEMA_VERSION = 3
+# The version that brought the solve times, which a database below it is given.
+_SOLVE_TIME_VERSION = 2
 # The columns a database below that version may lack, with their SQL types.
 _ADDED_COLUMNS: dict[str, str] = {"creator_account_id": "TEXT", "solved_at": "REAL"}
+
+# The indexes of `room_times` (version 3): the rooms created since a time and the
+# rooms of a creator. `IF NOT EXISTS`, since a store opens over a database that
+# may have them.
+_ROOM_TIMES_INDEXES: tuple[str, ...] = (
+    "CREATE INDEX IF NOT EXISTS room_times_by_created_at ON room_times (created_at)",
+    "CREATE INDEX IF NOT EXISTS room_times_by_creator "
+    "ON room_times (creator_account_id)",
+)
+
+# A checkpoint is tried this many times before it is given up (rule 20).
+_CHECKPOINT_TRIES = 2
 
 # The columns `RoomTimes` is read from, in the order `_room_times_of` expects.
 _ROOM_TIMES_COLUMNS = "code, last_edit_at, solved_at, creator_account_id"
@@ -91,6 +110,43 @@ _ROOM_DELETIONS: tuple[str, ...] = (
     "DELETE FROM room_times WHERE code = ?",
     "DELETE FROM rooms WHERE code = ?",
 )
+
+
+def checkpoint_wal(connection: sqlite3.Connection) -> bool:
+    """Copy the write-ahead log into the database file and empty it.
+
+    Runs `PRAGMA wal_checkpoint(TRUNCATE)` (`admin/operations.md` rule 20). A try
+    never waits on SQLite's busy handler: the connection's busy timeout is 0
+    during the checkpoint and is restored after it. A checkpoint that reports
+    busy is tried once more at once; when it is busy again, one WARNING is logged
+    and the log keeps the deleted rows' old pages until a later checkpoint.
+
+    Args:
+        connection: A connection to a database file in WAL mode.
+
+    Returns:
+        True when the log was emptied, False when it stayed busy after the second
+        try.
+    """
+    timeout_row = connection.execute("PRAGMA busy_timeout").fetchone()
+    saved_timeout_ms = int(timeout_row[0])
+    connection.execute("PRAGMA busy_timeout = 0")
+    try:
+        for _ in range(_CHECKPOINT_TRIES):
+            result_row = connection.execute(
+                "PRAGMA wal_checkpoint(TRUNCATE)"
+            ).fetchone()
+            is_busy = int(result_row[0]) != 0
+            if not is_busy:
+                return True
+    finally:
+        connection.execute(f"PRAGMA busy_timeout = {saved_timeout_ms}")
+    logger.warning(
+        "The write-ahead log checkpoint stayed busy after %d tries; "
+        "the next one will empty it",
+        _CHECKPOINT_TRIES,
+    )
+    return False
 
 
 class RoomStore:
@@ -317,7 +373,7 @@ class RoomStore:
             codes.append(str(code))
         return codes
 
-    def delete_room(self, code: str) -> bool:
+    def delete_room(self, code: str, *, checkpoint: bool = True) -> bool:
         """Delete the room, its snapshots, its log and its share token, at once.
 
         Everything goes in one transaction (spec 032). This is the one exception
@@ -325,6 +381,11 @@ class RoomStore:
         The deleted rows are overwritten with zeros, and in a file database the
         write-ahead log is then checkpointed and emptied, so no byte of the room
         stays in the database files (spec 038).
+
+        Args:
+            code: The room.
+            checkpoint: False for a sweep's deletion, which runs no checkpoint:
+                the sweep calls `checkpoint` once after its last deletion.
 
         Returns:
             True when the room existed. Its code is then free for a new room, and
@@ -341,11 +402,22 @@ class RoomStore:
                 self._connection.execute("ROLLBACK")
                 raise
             self._connection.execute("COMMIT")
-            if self._is_file:
-                # Copies the log's pages into the database file, then truncates
-                # the log, so the older copies of the room's pages go with it.
-                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+            if checkpoint and self._is_file:
+                checkpoint_wal(self._connection)
             return True
+
+    def checkpoint(self) -> None:
+        """Empty the write-ahead log of a file database; nothing in memory.
+
+        A sweep calls it once after its deletions, and when it deleted nothing,
+        so that a log left by a busy checkpoint is emptied at the latest by the
+        next sweep. A busy checkpoint is logged and does not fail
+        (`checkpoint_wal`).
+        """
+        if not self._is_file:
+            return
+        with self._lock:
+            checkpoint_wal(self._connection)
 
     def erase_player(self, code: str, player_id: str) -> bool:
         """Replace the nickname of `player_id` with FORMER_PLAYER_NICKNAME.
@@ -376,7 +448,7 @@ class RoomStore:
                 raise
             self._connection.execute("COMMIT")
             if self._is_file:
-                self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+                checkpoint_wal(self._connection)
             return True
 
     def append(self, code: str, entries: Sequence[LogEntry]) -> None:
@@ -559,17 +631,21 @@ class RoomStore:
         """Bring a database below `_SCHEMA_VERSION` to it, once, at open.
 
         The missing columns of `room_times` are added, each solved room gets its
-        solve time (see `_store_solve_times`), and the version is set. The rooms'
-        other data stays.
+        solve time (see `_store_solve_times`), the missing indexes are created,
+        and the version is set. The rooms' other data stays.
         """
         # One transaction, so that two processes opening the same old file at
         # once do not both migrate it: the second waits, then sees the new version.
         self._connection.execute("BEGIN IMMEDIATE")
         try:
             version_row = self._connection.execute("PRAGMA user_version").fetchone()
-            if int(version_row[0]) < _SCHEMA_VERSION:
+            version = int(version_row[0])
+            if version < _SCHEMA_VERSION:
                 self._add_missing_columns()
-                self._store_solve_times()
+                if version < _SOLVE_TIME_VERSION:
+                    self._store_solve_times()
+                for index_statement in _ROOM_TIMES_INDEXES:
+                    self._connection.execute(index_statement)
                 self._connection.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
         except BaseException:
             self._connection.execute("ROLLBACK")
