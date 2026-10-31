@@ -431,7 +431,7 @@ others, at the top of the list.
   whose shape option 1's retries follow)
 - Architecture decision: yes (a new table, stored data): options from the
   Plan agent on Fable
-- Criteria: account AC-24 to AC-29 (new), operations AC-23 (changed)
+- Criteria: account AC-24 to AC-30 (new), operations AC-23 (changed)
 - Branch: feat/b-036-erasure-finishes · PR: none yet
 - Problem: `DELETE /api/account` (`server.py:1696`) deletes the account rows,
   then erases its players from the live rooms, waiting up to 5 seconds on the

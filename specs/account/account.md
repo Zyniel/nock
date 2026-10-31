@@ -176,24 +176,27 @@ the other rooms, and an e-mail says when it is done.
     playing sets no cookie.
 26. An erasure runs in attempts: the route's, then one in each sweep
     (`lobby/lifetime.md` rule 6), the first at the app's start, for as long as
-    it is pending. An attempt counts itself, then runs these steps in order,
-    each idempotent, going on past a step that fails, which is logged at
-    WARNING or above:
-    1. for each player it still lists whose room still exists, live or
-       stored, the player stays as an anonymous player named `--`: the
-       member's account link is cleared and the nickname becomes `--` in the
-       live state, the stored snapshots and the logged `player_joined`, with
-       no event; ids, colours, seqs and letters stay, nothing else of the
-       room changes; a live room's engine is waited for at most 5 s. The
-       player then leaves the list, as does one whose room is gone;
+    it is pending. The app runs one attempt of an erasure at a time: an
+    attempt that finds the erasure done, or another attempt of it running,
+    does nothing and is not counted. Otherwise an attempt counts itself, then
+    runs these steps in order, each idempotent, going on past a step that
+    fails, which is logged at WARNING or above:
+    1. for each player it holds not yet marked erased whose room still
+       exists, live or stored, the player stays as an anonymous player named
+       `--`: the member's account link is cleared and the nickname becomes
+       `--` in the live state, the stored snapshots and the logged
+       `player_joined`, with no event; ids, colours, seqs and letters stay,
+       nothing else of the room changes; a live room's engine is waited for
+       at most 5 s. The player is then marked erased, as is one whose room is
+       gone; the erasure holds every player, marked or not, until it is done;
     2. its creator rooms are deleted, live and stored (`lobby/host.md` rule
-       14);
-    3. last, its players become `--` among the team-mates of every history
-       record (rule 23).
+       14); a room counts as deleted only when its deletion removed it;
+    3. last, every player the erasure holds, marked or not, becomes `--`
+       among the team-mates of every history record (rule 23).
 
     When no step failed, the e-mail of rule 27 goes, then one write marks the
     erasure done: it keeps the request and completion times, the attempts, how
-    many players it listed, how many rooms step 2 deleted and the time the
+    many players it held, how many rooms step 2 deleted and the time the
     e-mail was accepted, or none; its account id, address and players go in
     that write. A done erasure is kept 5 years, then purged (rule 20); a
     pending one stays until an attempt ends it.
@@ -225,7 +228,7 @@ the other rooms, and an e-mail says when it is done.
     `width`, `height`, `finished_at`, `elapsed_ms` (`gameplay/results.md` rule
     14) and `teammates`, the other members in `team_nicknames` order, each
     once. In the save's transaction, a team-mate whose code and player id a
-    pending erasure lists is written `--`.
+    pending erasure holds, marked erased or not (rule 26), is written `--`.
 23. `GET /api/account/history` lists the records, newest `finished_at` first,
     then by code. An erasure makes its players `--` among the others'
     team-mates: in the deletion's transaction (rule 18), at the last step of
@@ -267,17 +270,21 @@ the other rooms, and an e-mail says when it is done.
   INTEGER NOT NULL, `rooms_deleted` INTEGER NOT NULL; `account_id` and
   `email` null once done, `done_at` null while pending) and
   `account_erasure_players` (`erasure_id`, `code`, `player_id`, the three the
-  primary key; a row per player still listed).
+  primary key, `erased` INTEGER NOT NULL, 0 until step 1 has erased the
+  player; a row per player the erasure holds, gone once it is done).
   `ERASURE_RECORD_LIFE_SECONDS = 157_680_000.0` (5 × 365 days). Frozen models
-  `ErasedPlayer(code, player_id)` and `PendingErasure(erasure_id, account_id,
-  email, requested_at, attempts, players: tuple[ErasedPlayer, ...])`.
-  `AccountStore.delete_account(account_id, now) -> PendingErasure | None`
-  (None: no such account), `pending_erasures() -> list[PendingErasure]`
-  (oldest request first), `begin_attempt(erasure_id)`,
-  `drop_erased_player(erasure_id, code, player_id)`,
+  `ErasedPlayer(code, player_id, is_erased)` and `PendingErasure(erasure_id,
+  account_id, email, requested_at, attempts, players: tuple[ErasedPlayer,
+  ...])`, every player it holds. `AccountStore.delete_account(account_id,
+  now) -> PendingErasure | None` (None: no such account), `pending_erasures()
+  -> list[PendingErasure]` (oldest request first), `begin_attempt(erasure_id)`,
+  `mark_player_erased(erasure_id, code, player_id)`,
   `count_deleted_room(erasure_id)`, `finish_erasure(erasure_id, now,
   notified_at: float | None)`; `erase_players_from_history(players:
   Sequence[ErasedPlayer])`.
+- `src/nock/hub.py`: `RoomRegistry.delete_creator_rooms(account_id,
+  on_deleted: Callable[[], None])`, `on_deleted` called once per room its
+  deletion removed.
 - `src/nock/mailer.py`: `deleted_message(settings: AccountSettings, to: str)
   -> EmailMessage`.
 - `web/src/i18n/fr.json`: `email.deleted.subject`, `email.deleted.body`.
@@ -424,8 +431,9 @@ the other rooms, and an e-mail says when it is done.
 - **AC-25** Zoé, in live rooms R and S and creator of U, deletes her account
   while S's engine is held in a step for more than 5 s: 204 within 7 s, her
   cookie reads signed out, one WARNING record is logged, R's player is `--`,
-  U is gone, no e-mail is sent; her erasure is pending, listing S's code and
-  her player id, `attempts` 1, and the files hold her address and S's `ZOÉ`.
+  U is gone, no e-mail is sent; her erasure is pending, holding R's player
+  marked erased and S's not, `attempts` 1, and the files hold her address and
+  S's `ZOÉ`.
   Once S's engine answers, the next sweep, or the first of an app started on
   that database, makes S's player `--`, sends the e-mail and marks the
   erasure done, `attempts` 2, `players` 2, `rooms_deleted` 1; the files then
@@ -434,16 +442,23 @@ the other rooms, and an e-mail says when it is done.
   answers 204, one WARNING record is logged without the address, the erasure
   is done with `notified_at` null, the files hold no address, and no later
   sweep sends anything.
-- **AC-27** Bob's record of solved R, saved from a state read before Zoé's
-  deletion and written while her erasure is pending on another room, names
-  her `--` among its team-mates; so does the record the delete hook saves
-  when the erasure deletes her expired room T.
+- **AC-27** Zoé, in R and S, deletes her account while S's engine is held
+  for more than 5 s: R's player is `--` and her erasure is pending. Bob's
+  record of solved R, read before her deletion and saved now, names her `--`
+  among its team-mates; so does one saved after a second attempt that S still
+  holds up, and the record the delete hook saves when an attempt deletes her
+  expired room T.
 - **AC-28** Zoé's device, holding her R identity, reloads R after her
   deletion: it enters with no form as the player `--`, named « Ancien joueur »
   in its own roster with her colour and letters, a letter it types is
   applied, and `GET /api/account` there reads signed out.
 - **AC-29** A done erasure of time 0 is deleted by the purge at 157,680,001 s
   and kept at 157,679,999 s, no other row touched.
+- **AC-30** Zoé, in live room R and creator of U, deletes her account while
+  R's engine is held for 1 s, and a sweep starts during the route's attempt:
+  once both are over, R's player is `--`, U is gone, her address received
+  one e-mail, and the erasure is done with `attempts` 1 and `rooms_deleted`
+  1.
 
 ## Edge cases
 
@@ -455,13 +470,15 @@ the other rooms, and an e-mail says when it is done.
   AC-15).
 - A solved creator room the account never joined is `started`, as its history
   never lists it (AC-19).
-- A listed player's room that expired meanwhile is deleted by step 1, its hook
+- A held player's room that expired meanwhile is deleted by step 1, its hook
   saving the nickname, which step 3 erases (AC-27).
 - An app stopped between the e-mail and the write that marks the erasure done
   sends it again at its next attempt (AC-25).
+- A sweep that starts during the route's attempt leaves that erasure to it
+  (AC-30).
 - With accounts in memory (rule 3), a pending erasure goes with the app.
 - The deleted account's sessions are gone, so a second `DELETE` from another
-  device gets 401 (AC-28).
+  device gets 401 (AC-14).
 
 ## Out of scope
 
@@ -487,4 +504,4 @@ the other rooms, and an e-mail says when it is done.
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`;
-  `tests/test_account_*` (the progress route, AC-22 to AC-29).
+  `tests/test_account_*` (the progress route, AC-22 to AC-30).

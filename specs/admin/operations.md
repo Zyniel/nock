@@ -62,7 +62,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
     One runs after each room deletion outside a sweep, once per sweep, and
     after each of `erase_player`, `delete_account`,
     `erase_players_from_history`, `finish_erasure` and `purge`
-    (`account/account.md` rules 18, 20, 26).
+    (`account/account.md` rules 18, 20, 26), the writes that remove an
+    address, a nickname or a player id; no other write of an erasure (an
+    attempt's count, a player's mark, a room's count) runs one.
 
 ### Operator token
 
@@ -331,7 +333,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   `purge` each run one checkpoint through `checkpoint_wal`; with it returning
   False each still does its work (the room gone, the nickname `--`, the
   account gone, the erasure done with no address, the old link purged) and
-  returns as usual. On an in-memory store none runs.
+  returns as usual; `begin_attempt`, `mark_player_erased` and
+  `count_deleted_room` run none. On an in-memory store none runs.
 - **AC-24** Room A, with the chat `chat-busy-6610`, expires and a lookup
   deletes it while a second connection to the file holds a read open: the
   lookup returns within 1 second, A's code is then unknown, one WARNING is
