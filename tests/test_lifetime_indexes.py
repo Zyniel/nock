@@ -2,7 +2,10 @@
 
 A database "at `user_version` 2" is a database that the store made, from which the
 test drops the indexes and sets the version back to 2: the tables are the ones of
-the store, and nothing depends on how the indexes are named.
+the store, and nothing depends on how the indexes are named. The migration test's
+database also holds a solved room whose stored `solved_at` was set by hand to a
+time that the version-1 backfill would not give it (its last edit time): a
+migration that runs that backfill again changes the row.
 
 The query plans are those of the SQL the store really runs: the test traces the
 statements of `codes_created_since` and `codes_created_by` (`trace_new_connections`
@@ -13,6 +16,7 @@ an index shows `SEARCH room_times USING ... INDEX`; a scan of the table shows
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
@@ -22,21 +26,26 @@ import pytest
 from host_harness import schema_version
 from lifetime_harness import (
     LEA_ACCOUNT,
+    SOLVE_TIME_COLUMN,
     drop_created_indexes,
     plan_scans,
     plan_searches,
     query_plan,
     set_schema_version,
     stored_room,
+    stored_solve_time,
     table_rows,
     trace_new_connections,
 )
 from nock.grid import Grid
+from nock.room import new_room
 from nock.store import RoomStore
 from spec032_harness import T0, grid_from_text
 
 CREATED_ROOMS = ["AAAAAA", "BBBBBB", "CCCCCC"]
 LEAS_ROOM = "BBBBBB"
+SOLVED_ROOM = "SOLVED"
+HAND_SET_SOLVE_TIME = 12345.0  # not the room's last edit time (T0)
 
 
 @pytest.fixture
@@ -51,11 +60,43 @@ def add_rooms(store: RoomStore, grid: Grid) -> None:
         stored_room(store, grid, code, T0 + 10 + position, creator)
 
 
-def write_version_2_database(path: Path, grid: Grid) -> None:
-    """A database with the three rooms, with no created index, at `user_version` 2."""
+def add_solved_room(store: RoomStore, grid: Grid) -> None:
+    """A solved room created at t0 whose stored solve time is its last edit time."""
+    solved_state = new_room(SOLVED_ROOM, grid, T0).model_copy(update={"solved": True})
+    store.create_room(solved_state)
+
+
+def set_stored_solve_time(path: Path, code: str, solve_time: float) -> None:
+    """Write the column `solved_at` of the room's `room_times` row, by hand."""
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            f"UPDATE room_times SET {SOLVE_TIME_COLUMN} = ? WHERE code = ?",
+            (solve_time, code),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def write_version_2_database(
+    path: Path, grid: Grid, *, with_solved_room: bool = False
+) -> None:
+    """A database with the three rooms, with no created index, at `user_version` 2.
+
+    Args:
+        path: The database file to make.
+        grid: The grid of every room.
+        with_solved_room: Also store a solved room, whose solve time is then set
+            by hand to `HAND_SET_SOLVE_TIME`.
+    """
     store = RoomStore(path)
     add_rooms(store, grid)
+    if with_solved_room:
+        add_solved_room(store, grid)
     store.close()
+    if with_solved_room:
+        set_stored_solve_time(path, SOLVED_ROOM, HAND_SET_SOLVE_TIME)
     drop_created_indexes(path)
     set_schema_version(path, 2)
     assert schema_version(path) == 2
@@ -90,15 +131,16 @@ def test_ac17_a_version_2_database_opens_at_version_3_with_every_row_as_it_was(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "nock.sqlite3"
-    write_version_2_database(path, fx01_grid)
+    write_version_2_database(path, fx01_grid, with_solved_room=True)
     before = table_rows(path)
 
     RoomStore(path).close()
 
     assert schema_version(path) == 3
     assert table_rows(path) == before
-    assert len(before["room_times"]) == len(CREATED_ROOMS)
-    assert len(before["snapshots"]) == len(CREATED_ROOMS)
+    assert stored_solve_time(path, SOLVED_ROOM) == HAND_SET_SOLVE_TIME
+    assert len(before["room_times"]) == len(CREATED_ROOMS) + 1
+    assert len(before["snapshots"]) == len(CREATED_ROOMS) + 1
 
 
 @pytest.mark.parametrize("database", ["new", "migrated from version 2"])

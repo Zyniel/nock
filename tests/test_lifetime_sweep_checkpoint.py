@@ -8,7 +8,10 @@ checkpoint runs, so a call "after the 50th deletion" holds 2. The real checkpoin
 still runs.
 
 A sweep is `RoomRegistry.expire_rooms()`; a lookup that deletes an expired room is
-`room_state`. The rooms are stored, not live, and accounts are off.
+`room_state`. The rooms are stored, not live, and accounts are off, except one of
+the 50 expired rooms of the first test, which a lookup made live before the clock
+moved: the sweep stops it and deletes it through its room task, which must not
+checkpoint either.
 """
 
 from __future__ import annotations
@@ -27,6 +30,7 @@ from spec017_harness import FakeClock
 from spec032_harness import T0, grid_from_text
 
 EXPIRED_COUNT = 50
+LIVE_EXPIRED_CODE = "E00020"  # one of the 50; made live before the sweep
 EXPIRED_LAST_EDIT_AT = T0 + 10
 OPEN_CODES = ["OPENAA", "OPENBB"]
 OPEN_LAST_EDIT_AT = T0 + 100 * HOUR
@@ -91,15 +95,20 @@ def test_ac16_a_sweep_deletes_the_expired_rooms_then_runs_one_checkpoint(
     registry = RoomRegistry(clock=fake_clock, store=store, config=config_with_lives())
     try:
         store_rooms(store, fx01_grid, EXPIRED_COUNT)
+        assert registry.room_state(LIVE_EXPIRED_CODE) is not None
+        was_live = registry.live_codes() == {LIVE_EXPIRED_CODE}
         rooms_at_each_call = record_checkpoints(monkeypatch, path)
         fake_clock.now = NOW
 
         swept = registry.expire_rooms()
         kept = store.has_room(OPEN_CODES[0]) and store.has_room(OPEN_CODES[1])
+        live_after = registry.live_codes()
     finally:
         registry.close()
         store.close()
 
+    assert was_live is True
+    assert live_after == frozenset()
     assert swept == expired_codes(EXPIRED_COUNT)
     assert kept is True
     assert rooms_at_each_call == [len(OPEN_CODES)]
