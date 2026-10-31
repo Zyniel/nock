@@ -1,4 +1,4 @@
-"""Shared setup of the tests of account/account, AC-19 to AC-21 and AC-24 to AC-29.
+"""Shared setup of the tests of account/account, AC-19 to AC-21 and AC-24 to AC-30.
 
 Pytest does not collect this module (its name does not start with `test_`). The
 tests are in `tests/test_account_*.py`:
@@ -7,14 +7,12 @@ tests are in `tests/test_account_*.py`:
   HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one
   file, a fake clock).
 - `test_account_erasure.py`, `test_account_erasure_history.py`,
-  `test_account_erasure_record.py` and `test_account_erasure_retry.py`: AC-24 to
-  AC-27 and AC-29, the erasure that always finishes, on the same app. Zoé's play
-  (`zoe_in_rooms`) and the reading of the erasure's two tables are here.
+  `test_account_erasure_record.py`, `test_account_erasure_retry.py` and
+  `test_account_erasure_overlap.py`: AC-24 to AC-27, AC-29 and AC-30, the erasure
+  that always finishes, on the same app. Zoé's play (`zoe_in_rooms`,
+  `zoe_in_new_live_room`), the room store that holds a room's engine
+  (`HoldingStore`) and the reading of the erasure's two tables are here.
 - `test_account_returning_device.py`: AC-28, a browser.
-
-The names that B-036 adds (`nock.accounts.ErasedPlayer`, the erasure tables) are
-imported inside the functions that need them, so that the tests of AC-19 to AC-21
-load before they exist.
 
 Ana's rooms are FX-01 rooms played with the rules (spec 029's `play_fx01`) and
 registered with `add_room`, so that the grid number of each one is chosen. A room
@@ -31,6 +29,8 @@ from __future__ import annotations
 
 import contextlib
 import sqlite3
+import threading
+import time
 from pathlib import Path
 from typing import NamedTuple
 
@@ -39,6 +39,7 @@ from httpx2 import Response
 
 from nock.grid import Grid
 from nock.room import RoomState
+from nock.store import RoomStore
 from spec017_harness import open_peer
 from spec029_harness import (
     SOLVE_SECONDS,
@@ -240,20 +241,17 @@ def zoe_in_rooms(
     in the store, where Bob plays (`creator_room`). The session is returned apart,
     and the client's cookies are cleared: the tests name it with `with_session`.
     """
-    r_code = app.registry.register_room(grid, grid_number=1)
-    zoe_in_r = open_peer(stack, app.client, r_code, ZOE_NICKNAME)
-    r_snapshot = zoe_in_r.snapshot()
+    zoe_in_r = zoe_in_new_live_room(app, stack, grid)
     signed_in = link_and_sign_in(
-        app, ZOE_EMAIL, room_key(r_code, r_snapshot.resume_token)
+        app, ZOE_EMAIL, room_key(zoe_in_r.code, zoe_in_r.resume_token)
     )
     session = set_cookie_of(signed_in).value
     account_id = account_id_of(app, session)
     if s_live:
-        s_code = app.registry.register_room(grid, grid_number=1)
-        zoe_in_s = open_peer(stack, app.client, s_code, ZOE_NICKNAME)
-        s_snapshot = zoe_in_s.snapshot()
-        s_player = s_snapshot.you
-        s_token = s_snapshot.resume_token
+        zoe_in_s = zoe_in_new_live_room(app, stack, grid)
+        s_code = zoe_in_s.code
+        s_player = zoe_in_s.player_id
+        s_token = zoe_in_s.resume_token
     else:
         s_code = "SSSSSS"
         stored = play_fx01(
@@ -269,7 +267,79 @@ def zoe_in_rooms(
     link_room(app.client, session, s_code, s_token)
     creator_room(app, Ana(session, account_id), grid, U_CODE, 4, solved=False)
     app.client.cookies.clear()
-    return ZoeRooms(session, account_id, r_code, s_code, r_snapshot.you, s_player)
+    return ZoeRooms(
+        session, account_id, zoe_in_r.code, s_code, zoe_in_r.player_id, s_player
+    )
+
+
+class LiveMember(NamedTuple):
+    """Zoé's member of a live room: the room's code, her player id and her token."""
+
+    code: str
+    player_id: str
+    resume_token: str
+
+
+def zoe_in_new_live_room(
+    app: AccountApp, stack: contextlib.ExitStack, grid: Grid
+) -> LiveMember:
+    """Register a room on `grid` (grid 1) and make it live with Zoé in it.
+
+    She enters it by a socket kept open in `stack` and writes nothing. Her account,
+    if any, is not linked to the member: the caller signs in from the room
+    (`sign_in_from`) or links it (`link_room`).
+    """
+    code = app.registry.register_room(grid, grid_number=1)
+    zoe = open_peer(stack, app.client, code, ZOE_NICKNAME)
+    snapshot = zoe.snapshot()
+    return LiveMember(code, snapshot.you, snapshot.resume_token)
+
+
+class HoldingStore(RoomStore):
+    """A `RoomStore` whose `erase_player` of one room holds the room's engine.
+
+    `hold` arms it for one room code. While it is armed, each call of
+    `erase_player` for that code sleeps for the hold's seconds, then sets
+    `hold_over` and either raises `RuntimeError` (`fail`) or erases the player as
+    the store does. For a live room the call runs in the step of the room's task,
+    so the engine's loop is blocked for as long. With `once`, the first such call
+    disarms it; `release` disarms it at any time, a hold under way ending as
+    planned. Every other call is the store's own.
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.hold_over = threading.Event()
+        self._held_code = ""
+        self._hold_seconds = 0.0
+        self._is_failing = False
+        self._is_once = False
+
+    def hold(self, code: str, seconds: float, *, fail: bool, once: bool) -> None:
+        """Arm the hold for room `code`; `hold_over` is cleared."""
+        self.hold_over.clear()
+        self._hold_seconds = seconds
+        self._is_failing = fail
+        self._is_once = once
+        self._held_code = code
+
+    def release(self) -> None:
+        """Disarm the hold: later calls are the store's own."""
+        self._held_code = ""
+
+    def erase_player(self, code: str, player_id: str) -> bool:
+        """Hold (then fail, with `fail`) for the held room; else erase the player."""
+        if self._held_code == "" or code != self._held_code:
+            return super().erase_player(code, player_id)
+        seconds = self._hold_seconds
+        is_failing = self._is_failing
+        if self._is_once:
+            self.release()
+        time.sleep(seconds)
+        self.hold_over.set()
+        if is_failing:
+            raise RuntimeError("the engine was held in this step")
+        return super().erase_player(code, player_id)
 
 
 def nicknames_of(state: RoomState, player_id: str) -> list[str]:

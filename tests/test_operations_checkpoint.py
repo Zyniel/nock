@@ -14,7 +14,9 @@ calls and read its answers without timing anything:
   The recorder is set on `nock.store` and on `nock.accounts`, whichever module the
   account store looks the function up in (`raising=False` on the second). The
   erasure done with no address (`finish_erasure`) is read on a file with the real
-  checkpoint, in a test of its own.
+  checkpoint, in a test of its own. With the same recorder, the three other writes
+  of an erasure (`begin_attempt`, `mark_player_erased`, `count_deleted_room`) run
+  none on a file, and still count the attempt, mark the player and count the room.
 
 The time bounds of AC-24 and AC-25 are in `test_operations_checkpoint_busy.py`.
 """
@@ -31,7 +33,8 @@ from typing import TYPE_CHECKING, NamedTuple
 import pytest
 
 import nock.store
-from nock.accounts import AccountStore, RoomIdentity
+from account_harness import erasure_rows
+from nock.accounts import AccountStore, ErasedPlayer, RoomIdentity
 from nock.grid import Grid
 from nock.room import FORMER_PLAYER_NICKNAME, new_room
 from nock.store import RoomStore
@@ -279,8 +282,6 @@ def erase_a_player_from_history(
     database: str, grid: Grid, stack: contextlib.ExitStack
 ) -> Operation:
     """`erase_players_from_history`: Ana's team-mate Bob becomes `--` in her record."""
-    from nock.accounts import ErasedPlayer
-
     accounts = AccountStore(database)
     stack.callback(accounts.close)
     play = play_fx01(
@@ -288,7 +289,7 @@ def erase_a_player_from_history(
     )
     started = accounts.sign_in(ANA_EMAIL, T0)
     ana = RoomIdentity(code=CODE, player_id=ANA, resume_token=TA, nickname="ANA")
-    bob = ErasedPlayer(code=CODE, player_id=BOB)
+    bob = ErasedPlayer(code=CODE, player_id=BOB, is_erased=False)
     assert accounts.link_identity(started.account_id, ana, T0)
     accounts.save_history(started.account_id, play.state)
     assert accounts.history(started.account_id)[0].teammates == ("BOB",)
@@ -377,6 +378,94 @@ def test_ac23_in_memory_no_operation_runs_a_checkpoint(
     assert recorder.calls == 0
     assert returned == operation.returns
     assert effect == operation.effect_after
+
+
+# ---- AC-23: the other writes of an erasure run no checkpoint ----------------------
+
+
+class ErasureWrite(NamedTuple):
+    """A write of an erasure that removes no address, nickname or player id.
+
+    `act` runs it; `effect` reads what it changed, compared with `effect_after`.
+    """
+
+    act: Callable[[], object]
+    effect: Callable[[], object]
+    effect_after: object
+
+
+def ana_pending_erasure(
+    database: str, stack: contextlib.ExitStack
+) -> tuple[AccountStore, int]:
+    """Ana, linked to her player in CODE, deletes her account.
+
+    Returns:
+        The account store and the id of her pending erasure, which holds that
+        player, not marked erased.
+    """
+    accounts = AccountStore(database)
+    stack.callback(accounts.close)
+    started = accounts.sign_in(ANA_EMAIL, T0)
+    ana = RoomIdentity(code=CODE, player_id=ANA, resume_token=TA, nickname="ANA")
+    assert accounts.link_identity(started.account_id, ana, T0)
+    pending = accounts.delete_account(started.account_id, T0)
+    assert pending is not None
+    return accounts, pending.erasure_id
+
+
+def begin_an_attempt(database: str, stack: contextlib.ExitStack) -> ErasureWrite:
+    """`begin_attempt`: the pending erasure counts one attempt."""
+    accounts, erasure_id = ana_pending_erasure(database, stack)
+    return ErasureWrite(
+        act=lambda: accounts.begin_attempt(erasure_id),
+        effect=lambda: accounts.pending_erasures()[0].attempts,
+        effect_after=1,
+    )
+
+
+def mark_a_player_erased(database: str, stack: contextlib.ExitStack) -> ErasureWrite:
+    """`mark_player_erased`: the erasure still holds Ana's player, marked erased."""
+    accounts, erasure_id = ana_pending_erasure(database, stack)
+    return ErasureWrite(
+        act=lambda: accounts.mark_player_erased(erasure_id, CODE, ANA),
+        effect=lambda: accounts.pending_erasures()[0].players,
+        effect_after=(ErasedPlayer(code=CODE, player_id=ANA, is_erased=True),),
+    )
+
+
+def count_a_deleted_room(database: str, stack: contextlib.ExitStack) -> ErasureWrite:
+    """`count_deleted_room`: the erasure's row counts one deleted room."""
+    accounts, erasure_id = ana_pending_erasure(database, stack)
+    return ErasureWrite(
+        act=lambda: accounts.count_deleted_room(erasure_id),
+        effect=lambda: erasure_rows(Path(database))[0].rooms_deleted,
+        effect_after=1,
+    )
+
+
+ERASURE_WRITES = {
+    "begin_attempt": begin_an_attempt,
+    "mark_player_erased": mark_a_player_erased,
+    "count_deleted_room": count_a_deleted_room,
+}
+
+
+@pytest.mark.parametrize("write_name", list(ERASURE_WRITES))
+def test_ac23_on_a_file_the_counts_and_marks_of_an_erasure_run_no_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, write_name: str
+) -> None:
+    recorder = record_checkpoints(monkeypatch, True)
+    database = str(tmp_path / "nock.sqlite3")
+
+    with contextlib.ExitStack() as stack:
+        write = ERASURE_WRITES[write_name](database, stack)
+        recorder.calls = 0
+        write.act()
+        checkpoints = recorder.calls
+        effect = write.effect()
+
+    assert checkpoints == 0
+    assert effect == write.effect_after
 
 
 def test_ac23_finish_erasure_leaves_the_erasure_done_with_no_address(

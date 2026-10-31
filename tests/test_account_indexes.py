@@ -37,7 +37,7 @@ from lifetime_harness import (
     table_rows,
     trace_new_connections,
 )
-from nock.accounts import AccountStore, RoomIdentity
+from nock.accounts import AccountStore, ErasedPlayer, RoomIdentity
 from nock.grid import Grid
 from nock.room import RoomKey
 from spec029_harness import Player, play_fx01
@@ -117,9 +117,7 @@ def ask_accounts_of_room(accounts: AccountStore, account_id: str) -> object:
 
 
 def erase_bob(accounts: AccountStore, account_id: str) -> object:
-    from nock.accounts import ErasedPlayer
-
-    bob = ErasedPlayer(code=CODE, player_id=BOB)
+    bob = ErasedPlayer(code=CODE, player_id=BOB, is_erased=False)
     return accounts.erase_players_from_history([bob])
 
 

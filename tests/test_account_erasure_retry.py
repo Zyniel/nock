@@ -6,14 +6,16 @@ than the 5 s that the erasure waits for it), so it runs in the serial pass
 (`SERIAL_TEST_FILES` of `scripts/gate_browsers.py`).
 
 Zoé plays R and S, both live (a socket of hers stays open to each), signs in, and
-created U. The engine's loop is held for real: the store of the app is a `RoomStore`
-whose `erase_player` of S's code sleeps for 5.6 s, inside the step of S's task, and
-then raises, once. It is armed just before `DELETE /api/account`. The two rooms
-share one engine loop, so whichever of R and S the attempt takes first, the other
-waits behind the hold at most until it ends, well inside the 5 s of its own wait;
-the answer comes in about 5.6 s at the latest. The step fails after the hold, so
-that S's stored rows still hold `ZOÉ` when the answer comes, whichever room came
-first.
+created U. The engine's loop is held for real: the store of the app is a
+`HoldingStore` (`account_harness`) whose `erase_player` of S's code sleeps for 5.6 s,
+inside the step of S's task, and then raises, once. It is armed just before
+`DELETE /api/account`. The two rooms share one engine loop, so whichever of R and S
+the attempt takes first, the other waits behind the hold at most until it ends, well
+inside the 5 s of its own wait; the answer comes in about 5.6 s at the latest. The
+step fails after the hold, so that S's stored rows still hold `ZOÉ` when the answer
+comes, whichever room came first. While the erasure is pending it holds both her
+players, R's marked erased and S's not, read from `pending_erasures` and as the two
+rows of `account_erasure_players`.
 
 After the answer, the test waits for the hold to end, stops the app (its first
 attempt is over: the erasure is pending), and starts a second app on the same file.
@@ -27,7 +29,6 @@ from __future__ import annotations
 
 import contextlib
 import logging
-import threading
 import time
 from pathlib import Path
 
@@ -40,6 +41,7 @@ from account_harness import (
     ZOE_EMAIL,
     ZOE_STORED,
     ErasureRow,
+    HoldingStore,
     erasure_rows,
     listed_players,
     nicknames_of,
@@ -47,7 +49,6 @@ from account_harness import (
 )
 from nock.accounts import ErasedPlayer
 from nock.grid import Grid
-from nock.store import RoomStore
 from operations_harness import LOGGER_PREFIX
 from spec017_harness import FakeClock
 from spec032_harness import grid_from_text
@@ -74,32 +75,6 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-class HoldingStore(RoomStore):
-    """A `RoomStore` whose `erase_player` of one room holds the engine, then fails.
-
-    The hold happens once, on the first call for `held_code` after `hold_seconds`
-    is set; it sleeps in the step of that room's task, which blocks the engine's
-    loop, then sets `hold_over` and raises `RuntimeError`. Every other call, and
-    every later one, is the store's own.
-    """
-
-    def __init__(self, path: Path) -> None:
-        super().__init__(path)
-        self.held_code = ""
-        self.hold_seconds = 0.0
-        self.hold_over = threading.Event()
-
-    def erase_player(self, code: str, player_id: str) -> bool:
-        """Hold and fail once for the held room; else erase the player."""
-        if code == self.held_code and self.hold_seconds > 0.0:
-            seconds = self.hold_seconds
-            self.hold_seconds = 0.0
-            time.sleep(seconds)
-            self.hold_over.set()
-            raise RuntimeError("the engine was held in this step")
-        return super().erase_player(code, player_id)
-
-
 def test_ac25_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends_it(
     tmp_path: Path,
     fake_clock: FakeClock,
@@ -116,8 +91,7 @@ def test_ac25_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends
         rooms = zoe_in_rooms(first, stack, fx01_grid, s_live=True)
         assert first.registry.live_codes() >= {rooms.r_code, rooms.s_code}
         sent_before = len(first.mailer.messages)
-        store.held_code = rooms.s_code
-        store.hold_seconds = HOLD_SECONDS
+        store.hold(rooms.s_code, HOLD_SECONDS, fail=True, once=True)
         caplog.clear()
 
         started = time.monotonic()
@@ -138,6 +112,7 @@ def test_ac25_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends
         sent = list(first.mailer.messages[sent_before:])
         pending = first.accounts.pending_erasures()
         rows = erasure_rows(first.database_path)
+        held = listed_players(first.database_path)
         secrets = strings_in(
             database_bytes(first.database_path), [ZOE_EMAIL, ZOE_STORED]
         )
@@ -153,7 +128,13 @@ def test_ac25_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends
     assert len(pending) == 1
     assert (pending[0].account_id, pending[0].email) == (rooms.account_id, ZOE_EMAIL)
     assert (pending[0].requested_at, pending[0].attempts) == (requested_at, 1)
-    assert pending[0].players == (ErasedPlayer(rooms.s_code, rooms.zoe_in_s),)
+    assert set(pending[0].players) == {
+        ErasedPlayer(code=rooms.r_code, player_id=rooms.zoe_in_r, is_erased=True),
+        ErasedPlayer(code=rooms.s_code, player_id=rooms.zoe_in_s, is_erased=False),
+    }
+    assert held == sorted(
+        [(rooms.r_code, rooms.zoe_in_r), (rooms.s_code, rooms.zoe_in_s)]
+    )
     assert rows == [
         ErasureRow(rooms.account_id, ZOE_EMAIL, requested_at, None, None, 1, 2, 1)
     ]

@@ -26,12 +26,12 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 import pytest
 from playwright.sync_api import Browser, expect
 
-from nock.accounts import AccountStore, RoomIdentity
+from nock.accounts import AccountStore, ErasedPlayer, RoomIdentity
 from nock.grid import Grid
 from nock.room import RoomState
 from spec017_harness import FakeClock
@@ -66,9 +66,6 @@ from spec033_harness import (
     strings_in,
     with_session,
 )
-
-if TYPE_CHECKING:
-    from nock.accounts import ErasedPlayer
 
 R_CODE = "RRRRRR"
 ZELIE_STORED = "ZÉLIE-PROBE"  # as the server stores `Zélie-Probe` (spec 012)
@@ -251,9 +248,7 @@ def identity_of(code: str, player_id: str, token: str, nickname: str) -> RoomIde
 
 
 def erased_player(code: str, player_id: str) -> ErasedPlayer:
-    from nock.accounts import ErasedPlayer
-
-    return ErasedPlayer(code=code, player_id=player_id)
+    return ErasedPlayer(code=code, player_id=player_id, is_erased=False)
 
 
 def solved_state(grid: Grid, code: str) -> RoomState:
