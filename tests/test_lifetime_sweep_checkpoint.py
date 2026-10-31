@@ -9,13 +9,15 @@ still runs.
 
 A sweep is `RoomRegistry.expire_rooms()`; a lookup that deletes an expired room is
 `room_state`. The rooms are stored, not live, and accounts are off, except one of
-the 50 expired rooms of the first test, which a lookup made live before the clock
-moved: the sweep stops it and deletes it through its room task, which must not
-checkpoint either.
+the 50 expired rooms of the first test, which a socket opened (`connect`, on an
+event loop of the test's own) before the clock moved. That starts the engine's
+loop, so the sweep stops that room and deletes it through its room task, which
+must not checkpoint either.
 """
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from pathlib import Path
 
@@ -24,13 +26,13 @@ import pytest
 import nock.store
 from lifetime_harness import HOUR, config_with_lives, stored_room
 from nock.grid import Grid
-from nock.hub import RoomRegistry
+from nock.hub import RoomConnection, RoomRegistry
 from nock.store import RoomStore
 from spec017_harness import FakeClock
 from spec032_harness import T0, grid_from_text
 
 EXPIRED_COUNT = 50
-LIVE_EXPIRED_CODE = "E00020"  # one of the 50; made live before the sweep
+LIVE_EXPIRED_CODE = "E00020"  # one of the 50; a socket opens it before the sweep
 EXPIRED_LAST_EDIT_AT = T0 + 10
 OPEN_CODES = ["OPENAA", "OPENBB"]
 OPEN_LAST_EDIT_AT = T0 + 100 * HOUR
@@ -93,9 +95,12 @@ def test_ac16_a_sweep_deletes_the_expired_rooms_then_runs_one_checkpoint(
     path = tmp_path / "nock.sqlite3"
     store = RoomStore(path)
     registry = RoomRegistry(clock=fake_clock, store=store, config=config_with_lives())
+    socket_loop = asyncio.new_event_loop()
+    connection: RoomConnection | None = None
     try:
         store_rooms(store, fx01_grid, EXPIRED_COUNT)
-        assert registry.room_state(LIVE_EXPIRED_CODE) is not None
+        connection = registry.connect(LIVE_EXPIRED_CODE, owner_loop=socket_loop)
+        assert connection is not None
         was_live = registry.live_codes() == {LIVE_EXPIRED_CODE}
         rooms_at_each_call = record_checkpoints(monkeypatch, path)
         fake_clock.now = NOW
@@ -104,8 +109,11 @@ def test_ac16_a_sweep_deletes_the_expired_rooms_then_runs_one_checkpoint(
         kept = store.has_room(OPEN_CODES[0]) and store.has_room(OPEN_CODES[1])
         live_after = registry.live_codes()
     finally:
+        if connection is not None:
+            connection.leave()
         registry.close()
         store.close()
+        socket_loop.close()
 
     assert was_live is True
     assert live_after == frozenset()
