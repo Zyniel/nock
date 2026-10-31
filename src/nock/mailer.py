@@ -1,4 +1,4 @@
-"""Sending the sign-in e-mails (spec 033).
+"""Sending the e-mails of the accounts: the sign-in link and the deletion notice.
 
 This is the only module of the server that opens a network connection: it sends
 mail with the standard library's `smtplib`, over TLS that checks the server's
@@ -120,5 +120,27 @@ def sign_in_message(settings: AccountSettings, to: str, token: str) -> EmailMess
     # Quoted-printable: the body stays 7-bit, which every SMTP server takes.
     message.set_content(
         t("email.sign_in.body", link=link), charset="utf-8", cte="quoted-printable"
+    )
+    return message
+
+
+def deleted_message(settings: AccountSettings, to: str) -> EmailMessage:
+    """Return the e-mail that says an account's erasure is done.
+
+    Args:
+        settings: The account settings: the sender.
+        to: The address of the deleted account, as the pending erasure holds it.
+
+    Returns:
+        A message `From` the sender, `To` the address, with the `Subject`
+        `t("email.deleted.subject")` and a plain-text UTF-8 body
+        `t("email.deleted.body")`, which holds no link.
+    """
+    message = EmailMessage()
+    message["From"] = settings.smtp.sender
+    message["To"] = to
+    message["Subject"] = t("email.deleted.subject")
+    message.set_content(
+        t("email.deleted.body"), charset="utf-8", cte="quoted-printable"
     )
     return message
