@@ -648,8 +648,8 @@ class AccountStore:
         transaction, each team-mate of another account's record whose room code
         and player id are an identity of this account gets the nickname
         FORMER_PLAYER_NICKNAME (spec 029). On a file database the write-ahead log
-        is then checkpointed and emptied, so no copy of the address or of the
-        nickname stays in the database files (spec 038).
+        is then checkpointed (`checkpoint_wal`); a busy checkpoint leaves it to a
+        later one (spec 038).
 
         Args:
             account_id: The account.
@@ -697,7 +697,7 @@ class AccountStore:
         player id are those of one of `identities` gets the nickname
         FORMER_PLAYER_NICKNAME (spec 029). `DELETE /api/account` calls it once
         the rooms are erased. On a file database the write-ahead log is then
-        checkpointed and emptied, as by `delete_account`.
+        checkpointed (`checkpoint_wal`); a busy checkpoint leaves it to a later one.
 
         Args:
             identities: The identities of a deleted account.
@@ -716,8 +716,8 @@ class AccountStore:
     def purge(self, now: float) -> None:
         """Delete the links and the sessions that are too old to be used.
 
-        On a file database the write-ahead log is then checkpointed and emptied,
-        so no deleted row stays in the database files.
+        On a file database the write-ahead log is then checkpointed
+        (`checkpoint_wal`); a busy checkpoint leaves it to a later one.
 
         Args:
             now: Clock time of the sweep. A link older than LINK_LIFE_SECONDS and

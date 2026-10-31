@@ -379,8 +379,8 @@ class RoomStore:
         Everything goes in one transaction (spec 032). This is the one exception
         to the rule that the log is never rewritten or truncated (spec 018).
         The deleted rows are overwritten with zeros, and in a file database the
-        write-ahead log is then checkpointed and emptied, so no byte of the room
-        stays in the database files (spec 038).
+        write-ahead log is then checkpointed (`checkpoint_wal`); a busy
+        checkpoint leaves it to a later one (spec 038).
 
         Args:
             code: The room.
@@ -427,7 +427,7 @@ class RoomStore:
         one transaction (spec 033). Seqs, order and everything else stay. This
         is the second exception to the rule that the log is never rewritten
         (spec 018). In a file database the write-ahead log is then checkpointed
-        and emptied, as in `delete_room`, so the old nickname leaves the files.
+        (`checkpoint_wal`); a busy checkpoint leaves it to a later one.
 
         Args:
             code: The room.

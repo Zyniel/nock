@@ -1191,11 +1191,14 @@ class RoomRegistry:
             if self._is_expired(times):
                 expired_codes.append(times.code)
         deleted_codes: list[str] = []
-        for code in expired_codes:
-            with self._lock:
-                if self._delete_room_if_expired(code, checkpoint=False):
-                    deleted_codes.append(code)
-        self._store.checkpoint()
+        try:
+            for code in expired_codes:
+                with self._lock:
+                    if self._delete_room_if_expired(code, checkpoint=False):
+                        deleted_codes.append(code)
+        finally:
+            # Also when a deletion raised: the rooms already deleted leave the log.
+            self._store.checkpoint()
         return deleted_codes
 
     def count_expired_rooms(self, config: RoomConfig) -> int:
