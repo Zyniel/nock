@@ -151,7 +151,7 @@ def room_state(
 def test_ac17_the_first_removed_players_token_joins_as_a_new_player(
     room_state: RoomState,
 ) -> None:
-    join = _join("Zed", token_of(FIRST_REMOVED))
+    join = _join("Zed", token_of(BOB_NUMBER))
 
     outcome = join_room(room_state, join, NOW, NEW_PLAYER_ID, NEW_TOKEN)
 
@@ -191,7 +191,8 @@ def test_ac17_the_room_holds_100_banned_tokens(room_state: RoomState) -> None:
 
 LEGACY_BANS = 150
 LEGACY_FIRST = 1000  # `token_of(1000)`, the oldest token banned in the stored room
-BOB = f"p{FIRST_REMOVED}"
+BOB_NUMBER = 2  # Bob joins second, after Ana (`p1`)
+BOB = f"p{BOB_NUMBER}"
 
 
 def legacy_tokens() -> tuple[str, ...]:
@@ -212,7 +213,7 @@ def bob_removed_from_a_stored_room(
     """
     state = new_room(CODE, grid, NOW)
     entries: list[LogEntry] = []
-    for nickname, player_id, number in (("Ana", HOST, 1), ("Bob", BOB, FIRST_REMOVED)):
+    for nickname, player_id, number in (("Ana", HOST, 1), ("Bob", BOB, BOB_NUMBER)):
         joined = join_room(state, _join(nickname), NOW, player_id, token_of(number))
         entries.extend(joined.entries)
         state = joined.state
@@ -255,7 +256,7 @@ def test_ac17_a_stored_room_over_100_bans_keeps_the_newest_100_after_a_removal(
     forgotten = join_room(state, _join("Zed", dropped), NOW, NEW_PLAYER_ID, NEW_TOKEN)
     banned = join_room(state, _join("Zed", oldest_kept), NOW, NEW_PLAYER_ID, NEW_TOKEN)
 
-    newest = (*legacy_tokens()[LEGACY_BANS - KEPT_BANS + 1 :], token_of(FIRST_REMOVED))
+    newest = (*legacy_tokens()[LEGACY_BANS - KEPT_BANS + 1 :], token_of(BOB_NUMBER))
     assert len(state.removed_tokens) == KEPT_BANS
     assert set(state.removed_tokens) == set(newest)
     assert forgotten.close_sender is False

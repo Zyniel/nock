@@ -173,6 +173,9 @@ def at_seq(state: RoomState, seq: int) -> RoomState:
         pytest.param(
             [100, 0], [0, 100], id="a save at the first's seq leaves the newest"
         ),
+        pytest.param(
+            [200, 100], [0, 200], id="a save between the first and newest is dropped"
+        ),
     ],
 )
 def test_ac27_each_save_leaves_the_rooms_first_and_newest_snapshots(
