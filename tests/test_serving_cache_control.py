@@ -30,18 +30,12 @@ from nock.grid import Grid
 from nock.hub import RoomRegistry
 from results_harness import shared_page_route, stored_solved_app
 from serving_harness import IMMUTABLE_CACHE, NO_CACHE, edge_app
+from serving_harness import account_store as account_store
 from serving_harness import catalogue as catalogue
 from serving_harness import fx01_grid as fx01_grid
 from serving_harness import registry as registry
 from spec028_harness import SHARE_TOKEN
 from spec040_harness import make_dist_dir
-
-
-@pytest.fixture
-def account_store(tmp_path: Path) -> Iterator[AccountStore]:
-    store = AccountStore(tmp_path / "accounts.sqlite3")
-    yield store
-    store.close()
 
 
 @pytest.fixture

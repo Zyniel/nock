@@ -53,6 +53,7 @@ from serving_harness import (
     padded_room_request,
     raw_exchange,
 )
+from serving_harness import account_store as account_store
 from serving_harness import catalogue as catalogue
 from serving_harness import fx01_grid as fx01_grid
 from serving_harness import registry as registry
@@ -160,24 +161,38 @@ def test_ac7_a_declared_length_above_the_limit_is_refused_before_the_body(
 # ---- AC-8: a chunked body ------------------------------------------------------------
 
 
+CHUNKED_ROOMS_HEAD = (
+    f"POST {ROOMS_PATH} HTTP/1.1\r\n"
+    "Host: 127.0.0.1\r\n"
+    "Content-Type: application/json\r\n"
+    "Transfer-Encoding: chunked\r\n"
+    "Connection: close\r\n\r\n"
+).encode("ascii")
+
+
 def test_ac8_a_chunked_body_above_the_limit_is_413_and_creates_no_room(
     base_url: str, registry: RecordingRegistry
 ) -> None:
-    head = (
-        f"POST {ROOMS_PATH} HTTP/1.1\r\n"
-        "Host: 127.0.0.1\r\n"
-        "Content-Type: application/json\r\n"
-        "Transfer-Encoding: chunked\r\n"
-        "Connection: close\r\n\r\n"
-    ).encode("ascii")
-    assert b"content-length" not in head.lower()
+    assert b"content-length" not in CHUNKED_ROOMS_HEAD.lower()
     pieces = chunked(padded_room_request(BODY_LIMIT + 1))
 
-    answer = raw_exchange(base_url, head, pieces)
+    answer = raw_exchange(base_url, CHUNKED_ROOMS_HEAD, pieces)
 
     assert answer.status == 413
     assert json.loads(answer.body) == CONTENT_TOO_LARGE
     assert registry.created_codes == []
+
+
+def test_ac8_a_chunked_body_of_exactly_the_limit_is_not_refused(
+    base_url: str, registry: RecordingRegistry
+) -> None:
+    assert b"content-length" not in CHUNKED_ROOMS_HEAD.lower()
+    pieces = chunked(padded_room_request(BODY_LIMIT))
+
+    answer = raw_exchange(base_url, CHUNKED_ROOMS_HEAD, pieces)
+
+    assert answer.status == CREATED
+    assert registry.created_codes == [json.loads(answer.body)["code"]]
 
 
 # ---- AC-9: the Caddyfile -------------------------------------------------------------
@@ -210,13 +225,6 @@ def test_ac9_the_caddyfile_site_block_limits_the_request_body_to_64_kib() -> Non
 
 
 # ---- AC-14: the ops and account routes ---------------------------------------------
-
-
-@pytest.fixture
-def account_store(tmp_path: Path) -> Iterator[AccountStore]:
-    store = AccountStore(tmp_path / "accounts.sqlite3")
-    yield store
-    store.close()
 
 
 @pytest.mark.parametrize(
