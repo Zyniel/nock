@@ -395,7 +395,7 @@ others, at the top of the list.
   statements; no row changes)
 - Criteria: operations AC-22 to AC-25 (new), lifetime AC-16, AC-17 (new),
   lifetime AC-13 (changed), account AC-22, AC-23 (new), host AC-9 (changed)
-- Branch: feat/b-035-store-deletion · PR: none yet
+- Branch: feat/b-035-store-deletion · PR: #76
 - Problem: each room deletion runs `PRAGMA wal_checkpoint(TRUNCATE)`
   (`store.py:347`) inside the store lock that the engine thread takes for
   each step, so a sweep of thousands of expired rooms stalls every room. The
