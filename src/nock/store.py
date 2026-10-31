@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS overrides (
 """
 
 # `PRAGMA user_version` of a database that has the creator column (1), the solve
-# time column (2) and the indexes of `room_times` (3).
-_SCHEMA_VERSION = 3
+# time column (2), the indexes of `room_times` (3) and two snapshots per room (4).
+_SCHEMA_VERSION = 4
 # The version that brought the solve times, which a database below it is given.
 _SOLVE_TIME_VERSION = 2
 # The columns a database below that version may lack, with their SQL types.
@@ -524,7 +524,9 @@ class RoomStore:
     def save_snapshot(self, state: RoomState) -> None:
         """Store `state` as a snapshot of room `state.code` at `state.seq`.
 
-        A snapshot at the same seq is replaced. The log is left as it is.
+        A snapshot at the same seq is replaced. The log is left as it is. The
+        room keeps two snapshots, its lowest seq and this one: the others are
+        deleted in the same transaction (`platform/server.md` rule 4).
 
         Raises:
             ValueError: the room is unknown.
@@ -532,7 +534,14 @@ class RoomStore:
         with self._lock:
             if not self._room_exists(state.code):
                 raise ValueError(f"Unknown room {state.code}")
-            self._insert_snapshot(state)
+            self._connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._insert_snapshot(state)
+                self._delete_older_snapshots(state)
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
 
     def load_room(self, code: str) -> RoomState | None:
         """Return the state of room `code`, or None when it is unknown.
@@ -632,6 +641,7 @@ class RoomStore:
 
         The missing columns of `room_times` are added, each solved room gets its
         solve time (see `_store_solve_times`), the missing indexes are created,
+        each room's extra snapshots are deleted (see `_delete_extra_snapshots`),
         and the version is set. The rooms' other data stays.
         """
         # One transaction, so that two processes opening the same old file at
@@ -646,11 +656,24 @@ class RoomStore:
                     self._store_solve_times()
                 for index_statement in _ROOM_TIMES_INDEXES:
                     self._connection.execute(index_statement)
+                self._delete_extra_snapshots()
                 self._connection.execute(f"PRAGMA user_version = {_SCHEMA_VERSION}")
         except BaseException:
             self._connection.execute("ROLLBACK")
             raise
         self._connection.execute("COMMIT")
+
+    def _delete_extra_snapshots(self) -> None:
+        """Delete each room's snapshots but its lowest and its highest seq.
+
+        Plain SQL: no snapshot is read, so a damaged one does not fail the open.
+        """
+        self._connection.execute(
+            "DELETE FROM snapshots WHERE seq NOT IN ("
+            "SELECT MIN(seq) FROM snapshots AS kept WHERE kept.code = snapshots.code"
+            ") AND seq NOT IN ("
+            "SELECT MAX(seq) FROM snapshots AS kept WHERE kept.code = snapshots.code)"
+        )
 
     def _add_missing_columns(self) -> None:
         """Add to `room_times` each column of `_ADDED_COLUMNS` that it lacks."""
@@ -774,11 +797,27 @@ class RoomStore:
         return int(snapshot_row[0])
 
     def _insert_snapshot(self, state: RoomState) -> None:
-        """Write a snapshot, replacing the one at the same seq. Caller locks."""
+        """Write a snapshot, replacing the one at the same seq. Caller locks.
+
+        The caller's transaction ends with the write; `save_snapshot` wraps it in
+        its own, with the deletion of the room's other snapshots.
+        """
         self._connection.execute(
             "INSERT OR REPLACE INTO snapshots (code, seq, state_json) "
             "VALUES (?, ?, ?)",
             (state.code, state.seq, _snapshot_json(state)),
+        )
+
+    def _delete_older_snapshots(self, state: RoomState) -> None:
+        """Delete the room's snapshots but its lowest seq and the one of `state`.
+
+        Caller locks and has just written the snapshot of `state`. No checkpoint
+        follows (`admin/operations.md` rule 2).
+        """
+        self._connection.execute(
+            "DELETE FROM snapshots WHERE code = ? AND seq != ? AND seq != ("
+            "SELECT MIN(seq) FROM snapshots WHERE code = ?)",
+            (state.code, state.seq, state.code),
         )
 
 

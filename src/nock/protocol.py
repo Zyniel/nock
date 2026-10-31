@@ -740,7 +740,7 @@ class Snapshot(ProtocolModel):
     settings: RoomSettings
     reveal_budget: RevealBudget  # what is left
     flags: tuple[FlagView, ...]
-    chat: tuple[ChatMessage, ...]  # full history, in seq order
+    chat: tuple[ChatMessage, ...]  # the newest 200, in seq order
     open_vote: VoteOpened | None
     timer_elapsed_ms: Count
     timer_running: StrictBool
