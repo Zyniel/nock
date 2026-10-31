@@ -235,6 +235,8 @@ not-found pages ».
   `invalid_target` (AC-1).
 - The 101st removal forgets the oldest banned token, whose device then joins as
   a newcomer (AC-17).
+- A room loaded with more than 100 banned tokens comes down to the newest 100
+  at its next removal (AC-17).
 - A player away within the resume window resumes in a locked room; one timed out
   is refused, and seats back once it is unlocked (AC-2).
 - A room with one account holding several members gets no backfill: the member

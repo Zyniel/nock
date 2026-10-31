@@ -287,8 +287,9 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 
 - A text made only of whitespace that `str.strip()` removes but `trim()` keeps
   (U+001C to U+001F, U+0085) gets `invalid_message` and is lost (AC-9).
-- The 201st message drops the oldest from the history; its seq still counts for
-  the unread count (AC-21).
+- The 201st message drops the oldest from the history (AC-21).
+- A room loaded with more than 200 messages in its history comes down to the
+  newest 200 at its next message (AC-21).
 
 ## Out of scope
 

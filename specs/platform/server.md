@@ -69,7 +69,8 @@ played.
    it. The room's state at an earlier seq, which a catch-up asks for
    (`social/catch-up.md`), is the newest snapshot at or before that seq, so the
    first one for any seq below the newest's, then a replay of the log up to
-   that seq: the same state whatever snapshots a save deleted since.
+   that seq: the same cells and players whatever snapshots a save deleted
+   since.
 6. A code held only in the store is taken. A socket to the room, and nothing
    else, loads such a room and makes it live (rule 21), after one restart
    step run before anything else and logged like any step: each
