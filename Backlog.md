@@ -485,7 +485,7 @@ others, at the top of the list.
 
 ### B-037 Lean snapshots
 
-- Status: approved
+- Status: building
 - Priority: ninth (the disk grows with play, slowly)
 - Waits for: nothing (B-035 is merged)
 - Domains: platform/server (snapshots), lobby/host (the removed tokens),
@@ -494,6 +494,9 @@ others, at the top of the list.
   snapshot)
 - Architecture decision: yes (stored data): options from the Plan agent on
   Fable
+- Criteria: server AC-27, AC-28 (new), host AC-17 (new), AC-9 (changed),
+  lifetime AC-18 (new), AC-13, AC-17 (changed), chat AC-21 (new),
+  operations AC-23 (changed)
 - Branch: feat/b-037-lean-snapshots · PR: none yet
 - Problem: a snapshot stores the whole room (grid, every cell, the chat, past
   players, removed tokens) at seq 0, every 100 events, at each task end and at
@@ -531,7 +534,8 @@ others, at the top of the list.
      of it.
 - Decisions: the human, 2026-10-31: option 1, the first and the newest
   snapshots kept; the last 100 removed tokens (1A); the last 200 chat
-  lines in a snapshot (2A).
+  lines in a snapshot (2A). The spec change approved, with the chat
+  bounded in the room's state, not only in the stored snapshot.
 
 ### B-038 Server structure: typed answers and an app factory
 

@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: done
+status: approved
 ---
 
 # social/chat - Chat, reactions, the clue flag and mute
@@ -65,8 +65,10 @@ help is wanted. The host can mute a player's chat and reactions.
    answer; else one `chat_message` (seq, player, text unchanged) reaches every
    player, sender included, and joins the room's history. Refused and dropped
    messages do not count. Chat works on a solved grid.
-8. The history lives only in the room's log and snapshots, never in another
-   table, file or log record; a snapshot carries all of it.
+8. The history is the room's newest 200 messages, the stream's cap (rule 18):
+   an older one stays in the log alone, and no snapshot, reload or restart
+   brings it back. The history lives only in the room's log and snapshots,
+   never in another table, file or log record; a snapshot carries all of it.
 9. The message box (`chat.input_label`, placeholder `chat.placeholder`) takes
    at most 280 characters. « Envoyer » (`chat.send`) is disabled while the text
    trimmed by `trim()` is empty, the page is not joined, I am muted, or pacing
@@ -277,11 +279,16 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   « Envoyer » takes the disabled look whenever disabled, the muted box too, and
   the muted Discussion tab passes the contrast and language scans of
   `product.md`. (← 022 AC-19, 047 AC-12, 047 AC-14)
+- **AC-21** After 205 messages in a room, a joiner's snapshot carries the
+  newest 200 in seq order, and so does the room loaded from the store; the
+  stream shows those 200.
 
 ## Edge cases
 
 - A text made only of whitespace that `str.strip()` removes but `trim()` keeps
   (U+001C to U+001F, U+0085) gets `invalid_message` and is lost (AC-9).
+- The 201st message drops the oldest from the history; its seq still counts for
+  the unread count (AC-21).
 
 ## Out of scope
 
@@ -303,4 +310,4 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   `Salon.svelte`, `RoomPage.svelte`, `roomSession.ts`.
 - Tests: `tests/test_spec_021_*`, `test_spec_022_*`, `test_spec_013_ac05_*`,
   `test_spec_013_ac07_ac08_*`, `test_spec_047_ac12_*`, `test_spec_047_ac14_*`,
-  `test_spec_043_ac16_ac18_stream.py`.
+  `test_spec_043_ac16_ac18_stream.py`; `tests/test_chat_*` for AC-21.

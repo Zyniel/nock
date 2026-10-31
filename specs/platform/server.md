@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
 # platform/server - Durable rooms, undo, engine time, rooms in memory
@@ -51,17 +51,25 @@ played.
    more; when the room stops running, its last socket gone; and for every live
    room when the server shuts down. The count starts at 0 when the room
    becomes live in this process, and the restart step's entries are not
-   counted. A failed snapshot is logged; the log alone rebuilds the room.
+   counted. A failed snapshot is logged; the log alone rebuilds the room. A
+   room keeps two snapshots, its first (the lowest seq) and its newest (the
+   highest): each save, in its own transaction, deletes every other snapshot
+   of the room, and runs no checkpoint (`admin/operations.md` rule 2).
 
 ### Loading and restart
 
 5. A stored room is its latest snapshot, then a replay of each later log entry
    in order. Replay rebuilds every field the log carries: cells, players and
-   their order, tokens, removed tokens, past players, each player's undo, and
-   the fields of the other domains (settings, budget, flags, chat, an open vote
-   with its requester's yes, completion, the timer). Selections, recent edits,
-   input times, the other ballots and the chat and reaction windows are not
-   logged. A damaged row makes the load fail; nothing repairs it.
+   their order, tokens, removed tokens (the newest 100, `lobby/host.md` rule
+   2), past players, each player's undo, and the fields of the other domains
+   (settings, budget, flags, chat (the newest 200, `social/chat.md` rule 8), an
+   open vote with its requester's yes, completion, the timer). Selections,
+   recent edits, input times, the other ballots and the chat and reaction
+   windows are not logged. A damaged row makes the load fail; nothing repairs
+   it. The room's state at an earlier seq, which a catch-up asks for
+   (`social/catch-up.md`), is the newest snapshot at or before that seq, so the
+   first one for any seq below the newest's, then a replay of the log up to
+   that seq: the same state whatever snapshots a save deleted since.
 6. A code held only in the store is taken. A socket to the room, and nothing
    else, loads such a room and makes it live (rule 21), after one restart
    step run before anything else and logged like any step: each
@@ -214,6 +222,15 @@ top bars (« Phone top bar », « Computer top bar »).
   `load_room` read for that socket), with its restart step; a socket to
   `ZZZZZZ` loads nothing and closes with 4404; a second socket to the room
   while the first is open loads nothing.
+- **AC-27** As Ana types 250 letters in a FX-01 room, after the saves at seq
+  100 and 200 the store holds two snapshots of the room, at seq 0 and 200;
+  once her socket closes, at 0 and the room's seq only, the log whole, and the
+  room loads with every letter; with her socket still open, the server's
+  shutdown leaves 0 and the room's seq alike.
+- **AC-28** In that room, Ana's catch-up from seq 150 to 250 answers the same
+  cells, lines and names after the save that deleted the snapshot at 200 as
+  before it, and the room's state at seq 150 reads the same; the state at or
+  before the first snapshot's seq is still the first snapshot's.
 
 ## Edge cases
 
@@ -231,6 +248,10 @@ top bars (« Phone top bar », « Computer top bar »).
 - A room whose snapshot fails as its last socket closes stays live, and is
   saved at the server's shutdown (AC-24).
 - The shutdown saves no snapshot of a room that already left memory (AC-24).
+- A room whose first and newest snapshots are one row keeps that one; a save at
+  the newest's seq replaces it (AC-27).
+- A deleted snapshot's pages leave the WAL at the next checkpoint
+  (`admin/operations.md` rule 2) (AC-27).
 
 ## Out of scope
 
@@ -261,4 +282,4 @@ top bars (« Phone top bar », « Computer top bar »).
   `roomSession.ts`, `RoomNote.svelte`: the undo button, shortcut and message.
 - Tests: `tests/test_spec_018_*`; `tests/test_server_engine_time.py` for rule
   20, which measures durations and so runs on its own (`SERIAL_TEST_FILES`), as
-  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-26.
+  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-28.
