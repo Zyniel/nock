@@ -525,8 +525,8 @@ class RoomStore:
         """Store `state` as a snapshot of room `state.code` at `state.seq`.
 
         A snapshot at the same seq is replaced. The log is left as it is. The
-        room keeps two snapshots, its lowest seq and this one: the others are
-        deleted in the same transaction (`platform/server.md` rule 4).
+        room keeps two snapshots, the ones at its lowest and highest seq: the
+        others are deleted in the same transaction (`platform/server.md` rule 4).
 
         Raises:
             ValueError: the room is unknown.
@@ -797,10 +797,11 @@ class RoomStore:
         return int(snapshot_row[0])
 
     def _insert_snapshot(self, state: RoomState) -> None:
-        """Write a snapshot, replacing the one at the same seq. Caller locks.
+        """Write a snapshot, replacing the one at the same seq.
 
-        The caller's transaction ends with the write; `save_snapshot` wraps it in
-        its own, with the deletion of the room's other snapshots.
+        The caller holds the lock and has opened a transaction, which it commits
+        with its other writes: `create_room` with the room's rows, `save_snapshot`
+        with the deletion of the older snapshots.
         """
         self._connection.execute(
             "INSERT OR REPLACE INTO snapshots (code, seq, state_json) "
@@ -809,15 +810,17 @@ class RoomStore:
         )
 
     def _delete_older_snapshots(self, state: RoomState) -> None:
-        """Delete the room's snapshots but its lowest seq and the one of `state`.
+        """Delete the room's snapshots but the ones at its lowest and highest seq.
 
-        Caller locks and has just written the snapshot of `state`. No checkpoint
-        follows (`admin/operations.md` rule 2).
+        The caller holds the lock and has just written the snapshot of `state`,
+        so a save below the newest snapshot never deletes the newest. No
+        checkpoint follows (`admin/operations.md` rule 2).
         """
         self._connection.execute(
-            "DELETE FROM snapshots WHERE code = ? AND seq != ? AND seq != ("
-            "SELECT MIN(seq) FROM snapshots WHERE code = ?)",
-            (state.code, state.seq, state.code),
+            "DELETE FROM snapshots WHERE code = ? "
+            "AND seq != (SELECT MIN(seq) FROM snapshots WHERE code = ?) "
+            "AND seq != (SELECT MAX(seq) FROM snapshots WHERE code = ?)",
+            (state.code, state.code, state.code),
         )
 
 

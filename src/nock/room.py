@@ -828,8 +828,8 @@ def snapshot_for(
     Returns:
         The snapshot, with the player's own resume token. Its `open_vote` is the
         event that opened the room's open vote, None when no vote is open, its
-        `chat` is the room's whole chat history (spec 022), and its timer is the
-        shared timer of spec 027.
+        `chat` is the room's chat history, its newest MAX_CHAT_HISTORY messages
+        (`social/chat.md` rule 8), and its timer is the shared timer of spec 027.
 
     Raises:
         KeyError: no player `player_id` in the room.
@@ -2701,7 +2701,9 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
     elif isinstance(event, FlagChanged):
         replayed = _replay_flag_changed(state, event)
     elif isinstance(event, ChatMessage):
-        replayed = state.model_copy(update={"chat": _with_chat_message(state, event)})
+        replayed = state.model_copy(
+            update={"chat": _with_chat_message(state.chat, event)}
+        )
     else:
         replayed = state
     numbered = replayed.model_copy(update={"seq": event.seq})
@@ -2815,21 +2817,23 @@ def _replay_player_left(state: RoomState, event: PlayerLeft) -> RoomState:
 def _with_removed_token(
     removed_tokens: tuple[ResumeToken, ...], token: ResumeToken
 ) -> tuple[ResumeToken, ...]:
-    """Append `token`; the oldest goes when MAX_REMOVED_TOKENS are kept."""
-    kept = removed_tokens
-    if len(kept) >= MAX_REMOVED_TOKENS:
-        kept = kept[1:]
-    return (*kept, token)
+    """Append `token` and keep the newest MAX_REMOVED_TOKENS tokens.
+
+    A room stored with more tokens than the limit comes down to it here.
+    """
+    appended = (*removed_tokens, token)
+    return appended[-MAX_REMOVED_TOKENS:]
 
 
 def _with_chat_message(
-    state: RoomState, message: ChatMessage
+    chat: tuple[ChatMessage, ...], message: ChatMessage
 ) -> tuple[ChatMessage, ...]:
-    """Append `message`; the oldest goes when MAX_CHAT_HISTORY are kept."""
-    kept = state.chat
-    if len(kept) >= MAX_CHAT_HISTORY:
-        kept = kept[1:]
-    return (*kept, message)
+    """Append `message` and keep the newest MAX_CHAT_HISTORY messages.
+
+    A room stored with more messages than the limit comes down to it here.
+    """
+    appended = (*chat, message)
+    return appended[-MAX_CHAT_HISTORY:]
 
 
 def _past_record_of(player: PlayerRecord) -> PastPlayer:
