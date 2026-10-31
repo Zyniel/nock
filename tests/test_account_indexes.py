@@ -59,7 +59,6 @@ INDEXED_TABLES = [
     "account_links",
     "account_sessions",
 ]
-BOB_IDENTITY = RoomIdentity(code=CODE, player_id=BOB, resume_token=TB, nickname="BOB")
 
 
 @pytest.fixture
@@ -118,11 +117,14 @@ def ask_accounts_of_room(accounts: AccountStore, account_id: str) -> object:
 
 
 def erase_bob(accounts: AccountStore, account_id: str) -> object:
-    return accounts.erase_players_from_history([BOB_IDENTITY])
+    from nock.accounts import ErasedPlayer
+
+    bob = ErasedPlayer(code=CODE, player_id=BOB)
+    return accounts.erase_players_from_history([bob])
 
 
 def delete_ana(accounts: AccountStore, account_id: str) -> object:
-    return accounts.delete_account(account_id)
+    return accounts.delete_account(account_id, T0)
 
 
 LOOKUPS = {

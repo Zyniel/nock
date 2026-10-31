@@ -26,7 +26,7 @@ from __future__ import annotations
 import contextlib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 import pytest
 from playwright.sync_api import Browser, expect
@@ -66,6 +66,9 @@ from spec033_harness import (
     strings_in,
     with_session,
 )
+
+if TYPE_CHECKING:
+    from nock.accounts import ErasedPlayer
 
 R_CODE = "RRRRRR"
 ZELIE_STORED = "ZÉLIE-PROBE"  # as the server stores `Zélie-Probe` (spec 012)
@@ -247,6 +250,12 @@ def identity_of(code: str, player_id: str, token: str, nickname: str) -> RoomIde
     )
 
 
+def erased_player(code: str, player_id: str) -> ErasedPlayer:
+    from nock.accounts import ErasedPlayer
+
+    return ErasedPlayer(code=code, player_id=player_id)
+
+
 def solved_state(grid: Grid, code: str) -> RoomState:
     """A solved FX-01 room: Ana, Zélie (`Zélie-Probe`) and Bob."""
     return play_fx01(grid, code, PLAYERS, start=T0).state
@@ -284,7 +293,7 @@ def test_ac6_erase_players_from_history_makes_the_matching_teammate_a_former_pla
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     with account_with_two_records(tmp_path, fx01_grid) as held:
-        zelie = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
+        zelie = erased_player(R_CODE, BOB)
         before = teammates_by_code(held.accounts, held.account_id)
 
         held.accounts.erase_players_from_history([zelie])
@@ -298,7 +307,7 @@ def test_ac6_erase_players_from_history_keeps_a_teammate_of_another_room_code(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     with account_with_two_records(tmp_path, fx01_grid) as held:
-        zelie = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
+        zelie = erased_player(R_CODE, BOB)
 
         held.accounts.erase_players_from_history([zelie])
         after = teammates_by_code(held.accounts, held.account_id)
@@ -310,7 +319,7 @@ def test_ac6_erase_players_from_history_keeps_a_teammate_with_another_player_id(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     with account_with_two_records(tmp_path, fx01_grid) as held:
-        stranger = identity_of(R_CODE, UNKNOWN_PLAYER_ID, TB, ZELIE_STORED)
+        stranger = erased_player(R_CODE, UNKNOWN_PLAYER_ID)
 
         held.accounts.erase_players_from_history([stranger])
         after = teammates_by_code(held.accounts, held.account_id)
@@ -322,8 +331,8 @@ def test_ac6_erase_players_from_history_erases_every_identity_given(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     with account_with_two_records(tmp_path, fx01_grid) as held:
-        zelie_in_r = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
-        zelie_in_s = identity_of(OTHER_CODE, BOB, TB, ZELIE_STORED)
+        zelie_in_r = erased_player(R_CODE, BOB)
+        zelie_in_s = erased_player(OTHER_CODE, BOB)
 
         held.accounts.erase_players_from_history([zelie_in_r, zelie_in_s])
         after = teammates_by_code(held.accounts, held.account_id)
@@ -335,8 +344,8 @@ def test_ac6_erase_players_from_history_leaves_the_files_without_the_nickname(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     with account_with_two_records(tmp_path, fx01_grid) as held:
-        zelie_in_r = identity_of(R_CODE, BOB, TB, ZELIE_STORED)
-        zelie_in_s = identity_of(OTHER_CODE, BOB, TB, ZELIE_STORED)
+        zelie_in_r = erased_player(R_CODE, BOB)
+        zelie_in_s = erased_player(OTHER_CODE, BOB)
         before = strings_in(database_bytes(held.path), [ZELIE_STORED])
 
         held.accounts.erase_players_from_history([zelie_in_r, zelie_in_s])

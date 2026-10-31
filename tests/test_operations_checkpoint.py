@@ -10,9 +10,11 @@ calls and read its answers without timing anything:
   first column of its row as `busy`. The subclass also tells which busy timeout
   the connection had at each try.
 - AC-23 replaces `checkpoint_wal` by a recorder that returns the answer a test
-  chooses, and runs the five operations of the criterion on a file and in memory.
+  chooses, and runs the six operations of the criterion on a file and in memory.
   The recorder is set on `nock.store` and on `nock.accounts`, whichever module the
-  account store looks the function up in (`raising=False` on the second).
+  account store looks the function up in (`raising=False` on the second). The
+  erasure done with no address (`finish_erasure`) is read on a file with the real
+  checkpoint, in a test of its own.
 
 The time bounds of AC-24 and AC-25 are in `test_operations_checkpoint_busy.py`.
 """
@@ -36,7 +38,7 @@ from nock.store import RoomStore
 from operations_harness import LOGGER_PREFIX, write_room
 from spec029_harness import Player, play_fx01
 from spec032_harness import ANA, BOB, NO_TICK_CONFIG, T0, TA, TB, Run, grid_from_text
-from spec033_harness import ANA_EMAIL
+from spec033_harness import ANA_EMAIL, database_bytes, strings_in
 
 if TYPE_CHECKING:
     from _typeshed import SupportsLenAndGetItem
@@ -162,7 +164,7 @@ def test_ac25_each_try_has_a_busy_timeout_of_0_and_the_timeout_comes_back(
     assert timeout_row[0] == BUSY_TIMEOUT_MS
 
 
-# ---- AC-23: five operations, one checkpoint each ----------------------------------
+# ---- AC-23: six operations, one checkpoint each -----------------------------------
 
 
 class CheckpointRecorder:
@@ -227,15 +229,49 @@ def erase_a_player(database: str, grid: Grid, stack: contextlib.ExitStack) -> Op
 def delete_an_account(
     database: str, grid: Grid, stack: contextlib.ExitStack
 ) -> Operation:
-    """`AccountStore.delete_account`: the session no longer finds an account."""
+    """`AccountStore.delete_account`: the session no longer finds an account.
+
+    It returns the pending erasure: the account, its address, the time of the call,
+    no attempt yet and no player (the account holds no identity).
+    """
     accounts = AccountStore(database)
     stack.callback(accounts.close)
     started = accounts.sign_in(ANA_EMAIL, T0)
+
+    def delete() -> object:
+        pending = accounts.delete_account(started.account_id, T0)
+        assert pending is not None
+        return (
+            pending.account_id,
+            pending.email,
+            pending.requested_at,
+            pending.attempts,
+            pending.players,
+        )
+
     return Operation(
-        act=lambda: accounts.delete_account(started.account_id),
-        returns=[],
+        act=delete,
+        returns=(started.account_id, ANA_EMAIL, T0, 0, ()),
         effect=lambda: accounts.account_of_session(started.session, T0),
         effect_after=None,
+    )
+
+
+def finish_an_erasure(
+    database: str, grid: Grid, stack: contextlib.ExitStack
+) -> Operation:
+    """`AccountStore.finish_erasure`: no pending erasure is left."""
+    accounts = AccountStore(database)
+    stack.callback(accounts.close)
+    started = accounts.sign_in(ANA_EMAIL, T0)
+    pending = accounts.delete_account(started.account_id, T0)
+    assert pending is not None
+    assert accounts.pending_erasures() == [pending]
+    return Operation(
+        act=lambda: accounts.finish_erasure(pending.erasure_id, T0 + 1, None),
+        returns=None,
+        effect=accounts.pending_erasures,
+        effect_after=[],
     )
 
 
@@ -243,6 +279,8 @@ def erase_a_player_from_history(
     database: str, grid: Grid, stack: contextlib.ExitStack
 ) -> Operation:
     """`erase_players_from_history`: Ana's team-mate Bob becomes `--` in her record."""
+    from nock.accounts import ErasedPlayer
+
     accounts = AccountStore(database)
     stack.callback(accounts.close)
     play = play_fx01(
@@ -250,7 +288,7 @@ def erase_a_player_from_history(
     )
     started = accounts.sign_in(ANA_EMAIL, T0)
     ana = RoomIdentity(code=CODE, player_id=ANA, resume_token=TA, nickname="ANA")
-    bob = RoomIdentity(code=CODE, player_id=BOB, resume_token=TB, nickname="BOB")
+    bob = ErasedPlayer(code=CODE, player_id=BOB)
     assert accounts.link_identity(started.account_id, ana, T0)
     accounts.save_history(started.account_id, play.state)
     assert accounts.history(started.account_id)[0].teammates == ("BOB",)
@@ -285,6 +323,7 @@ OPERATIONS = {
     "delete_room": delete_a_room,
     "erase_player": erase_a_player,
     "delete_account": delete_an_account,
+    "finish_erasure": finish_an_erasure,
     "erase_players_from_history": erase_a_player_from_history,
     "purge": purge_an_old_link,
 }
@@ -338,3 +377,27 @@ def test_ac23_in_memory_no_operation_runs_a_checkpoint(
     assert recorder.calls == 0
     assert returned == operation.returns
     assert effect == operation.effect_after
+
+
+def test_ac23_finish_erasure_leaves_the_erasure_done_with_no_address(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "nock.sqlite3"
+    accounts = AccountStore(database)
+    try:
+        started = accounts.sign_in(ANA_EMAIL, T0)
+        pending = accounts.delete_account(started.account_id, T0)
+        assert pending is not None
+        assert strings_in(database_bytes(database), [ANA_EMAIL]) == [ANA_EMAIL]
+
+        accounts.finish_erasure(pending.erasure_id, T0 + 1, T0 + 1)
+        with contextlib.closing(sqlite3.connect(database)) as connection:
+            rows = connection.execute(
+                "SELECT account_id, email, done_at, notified_at FROM account_erasures"
+            ).fetchall()
+        files = strings_in(database_bytes(database), [ANA_EMAIL])
+    finally:
+        accounts.close()
+
+    assert rows == [(None, None, T0 + 1, T0 + 1)]
+    assert files == []

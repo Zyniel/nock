@@ -1,4 +1,4 @@
-"""Shared setup of the tests of account/account, AC-19 to AC-21: the grid progress.
+"""Shared setup of the tests of account/account, AC-19 to AC-21 and AC-24 to AC-29.
 
 Pytest does not collect this module (its name does not start with `test_`). The
 tests are in `tests/test_account_*.py`:
@@ -6,6 +6,15 @@ tests are in `tests/test_account_*.py`:
 - `test_account_progress.py`: AC-19 to AC-21, `GET /api/account/progress` over
   HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one
   file, a fake clock).
+- `test_account_erasure.py`, `test_account_erasure_history.py`,
+  `test_account_erasure_record.py` and `test_account_erasure_retry.py`: AC-24 to
+  AC-27 and AC-29, the erasure that always finishes, on the same app. Zoé's play
+  (`zoe_in_rooms`) and the reading of the erasure's two tables are here.
+- `test_account_returning_device.py`: AC-28, a browser.
+
+The names that B-036 adds (`nock.accounts.ErasedPlayer`, the erasure tables) are
+imported inside the functions that need them, so that the tests of AC-19 to AC-21
+load before they exist.
 
 Ana's rooms are FX-01 rooms played with the rules (spec 029's `play_fx01`) and
 registered with `add_room`, so that the grid number of each one is chosen. A room
@@ -20,6 +29,9 @@ reads.
 
 from __future__ import annotations
 
+import contextlib
+import sqlite3
+from pathlib import Path
 from typing import NamedTuple
 
 from fastapi.testclient import TestClient
@@ -27,6 +39,7 @@ from httpx2 import Response
 
 from nock.grid import Grid
 from nock.room import RoomState
+from spec017_harness import open_peer
 from spec029_harness import (
     SOLVE_SECONDS,
     Play,
@@ -36,11 +49,12 @@ from spec029_harness import (
     play_fx01,
     sign_in_from,
 )
-from spec032_harness import ANA, BOB, CY, LIFE, T0, TA, TB, TC
+from spec032_harness import ANA, BOB, CY, LIFE, NO_TICK_CONFIG, T0, TA, TB, TC
 from spec033_harness import (
     ANA_EMAIL,
     AccountApp,
     link_and_sign_in,
+    room_key,
     set_cookie_of,
     with_session,
 )
@@ -180,3 +194,125 @@ def progress_body(client: TestClient, session: str) -> object:
     response = ask_progress(client, session)
     assert response.status_code == 200, response.text
     return response.json()
+
+
+# ---- AC-24 to AC-29: Zoé deletes her account -------------------------------------
+
+ZOE_EMAIL = "zoe.probe@example.org"
+BOB_EMAIL = "bob.probe@example.org"
+ZOE_NICKNAME = "Zoé"
+ZOE_STORED = "ZOÉ"  # as the server stores her nickname (spec 012 decision 12)
+ZOE = "p-zoe"
+TZ = "token-of-zoe-0001"
+# A sweep every 0.1 s of real time, on which no tick changes anything.
+FAST_SWEEP_CONFIG = NO_TICK_CONFIG.model_copy(update={"expiry_sweep_seconds": 0.1})
+
+DELETED_SUBJECT = "Votre compte Nock a été supprimé"
+# Rule 27's text, as `email.deleted.body` holds it.
+DELETED_BODY = (
+    "Bonjour,\n\nVotre compte Nock et les données qui lui étaient liées ont été"
+    " supprimés. Les salons que vous aviez créés sont fermés ; dans les autres,"
+    " vous apparaissez comme « Ancien joueur ».\n\nSi vous n'aviez rien demandé,"
+    " une personne connectée à ce compte l'a supprimé."
+)
+
+
+class ZoeRooms(NamedTuple):
+    """Zoé, signed in, and her three rooms: R and S as a player, U as the creator."""
+
+    session: str
+    account_id: str
+    r_code: str
+    s_code: str
+    zoe_in_r: str
+    zoe_in_s: str
+
+
+def zoe_in_rooms(
+    app: AccountApp, stack: contextlib.ExitStack, grid: Grid, *, s_live: bool
+) -> ZoeRooms:
+    """Zoé plays R and S, signs in and creates U; no request carries her cookie.
+
+    R is live: she enters it by a socket kept open in `stack`, writes nothing, then
+    asks a link from it and signs in. S is another room of hers, linked to her
+    account with `PUT /api/account/rooms`: live by a second socket in `stack` when
+    `s_live`, else a room only in the store, with Bob. U is a room she created, only
+    in the store, where Bob plays (`creator_room`). The session is returned apart,
+    and the client's cookies are cleared: the tests name it with `with_session`.
+    """
+    r_code = app.registry.register_room(grid, grid_number=1)
+    zoe_in_r = open_peer(stack, app.client, r_code, ZOE_NICKNAME)
+    r_snapshot = zoe_in_r.snapshot()
+    signed_in = link_and_sign_in(
+        app, ZOE_EMAIL, room_key(r_code, r_snapshot.resume_token)
+    )
+    session = set_cookie_of(signed_in).value
+    account_id = account_id_of(app, session)
+    if s_live:
+        s_code = app.registry.register_room(grid, grid_number=1)
+        zoe_in_s = open_peer(stack, app.client, s_code, ZOE_NICKNAME)
+        s_snapshot = zoe_in_s.snapshot()
+        s_player = s_snapshot.you
+        s_token = s_snapshot.resume_token
+    else:
+        s_code = "SSSSSS"
+        stored = play_fx01(
+            grid,
+            s_code,
+            [Player(ZOE_NICKNAME, ZOE, TZ), BOB_PLAYER],
+            start=app.clock(),
+            solved_after=None,
+        )
+        app.registry.add_room(stored.state)
+        s_player = ZOE
+        s_token = TZ
+    link_room(app.client, session, s_code, s_token)
+    creator_room(app, Ana(session, account_id), grid, U_CODE, 4, solved=False)
+    app.client.cookies.clear()
+    return ZoeRooms(session, account_id, r_code, s_code, r_snapshot.you, s_player)
+
+
+def nicknames_of(state: RoomState, player_id: str) -> list[str]:
+    """The nickname of each record of the player in `players` and `past_players`."""
+    found = [p.nickname for p in state.players if p.player_id == player_id]
+    found += [p.nickname for p in state.past_players if p.player_id == player_id]
+    return found
+
+
+class ErasureRow(NamedTuple):
+    """One row of `account_erasures`, as the file holds it."""
+
+    account_id: str | None
+    email: str | None
+    requested_at: float
+    done_at: float | None
+    notified_at: float | None
+    attempts: int
+    players: int
+    rooms_deleted: int
+
+
+def erasure_rows(database_path: Path) -> list[ErasureRow]:
+    """The rows of `account_erasures`, oldest request first, read on a connection."""
+    with contextlib.closing(sqlite3.connect(database_path)) as connection:
+        rows = connection.execute(
+            "SELECT account_id, email, requested_at, done_at, notified_at, attempts,"
+            " players, rooms_deleted FROM account_erasures ORDER BY erasure_id"
+        ).fetchall()
+    found: list[ErasureRow] = []
+    for row in rows:
+        found.append(ErasureRow(*row))
+    return found
+
+
+def listed_players(database_path: Path) -> list[tuple[str, str]]:
+    """The (code, player id) of each row of `account_erasure_players`, in order."""
+    with contextlib.closing(sqlite3.connect(database_path)) as connection:
+        rows = connection.execute(
+            "SELECT code, player_id FROM account_erasure_players"
+            " ORDER BY code, player_id"
+        ).fetchall()
+    found: list[tuple[str, str]] = []
+    for code, player_id in rows:
+        found.append((code, player_id))
+    return found
