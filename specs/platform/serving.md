@@ -1,7 +1,7 @@
 ---
 area: platform
 file: serving
-status: approved
+status: done
 ---
 
 # platform/serving - Serving the client, the HTTP edge, environment settings

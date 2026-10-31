@@ -341,7 +341,7 @@ others, at the top of the list.
 
 ### B-034 HTTP edge: body size, security and caching headers, the Bearer scheme
 
-- Status: building
+- Status: done
 - Priority: sixth (before the first public test; small)
 - Domains: platform/serving (new, split from platform/server: serving the
   client, environment settings, the HTTP edge), platform/server,
