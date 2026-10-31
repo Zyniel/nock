@@ -16,6 +16,12 @@ has to give the same joins:
 A join with a token is `join_room` with that token: a banned token gets the
 `removed` error and a close; any other token is a new player, who gets a snapshot
 with the id and the token the rules give them.
+
+A room stored before the banned tokens had a bound may hold more: its snapshot,
+written by hand into the store file (`server_harness.insert_stored_snapshot`),
+bans 150 tokens (`token_of(1000)` to `token_of(1149)`, oldest first) while Ana and
+Bob (`p2`) are in it. Ana removing Bob brings the live room and the room loaded
+from the store to the newest 100: the last 99 of those and Bob's.
 """
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ from nock.room import (
     replay,
 )
 from nock.store import RoomStore
+from server_harness import insert_stored_snapshot
 from spec014_harness import NEW_PLAYER_ID, NEW_TOKEN, NOW, QUIET_RULES, token_of
 from spec018_harness import grid_from_text
 
@@ -178,3 +185,84 @@ def test_ac17_the_room_holds_100_banned_tokens(room_state: RoomState) -> None:
     assert set(room_state.removed_tokens) == {
         token_of(number) for number in range(FIRST_REMOVED + 1, LAST_REMOVED + 1)
     }
+
+
+# ---- A room stored with more than 100 banned tokens ---------------------------------
+
+LEGACY_BANS = 150
+LEGACY_FIRST = 1000  # `token_of(1000)`, the oldest token banned in the stored room
+BOB = f"p{FIRST_REMOVED}"
+
+
+def legacy_tokens() -> tuple[str, ...]:
+    """The 150 tokens the stored room bans, oldest first."""
+    tokens: list[str] = []
+    for number in range(LEGACY_FIRST, LEGACY_FIRST + LEGACY_BANS):
+        tokens.append(token_of(number))
+    return tuple(tokens)
+
+
+def bob_removed_from_a_stored_room(
+    grid: Grid, path: Path
+) -> tuple[RoomState, RoomState]:
+    """Ana removes Bob from a room whose stored snapshot bans 150 tokens.
+
+    Returns:
+        The live state after the removal, and the room the store then loads.
+    """
+    state = new_room(CODE, grid, NOW)
+    entries: list[LogEntry] = []
+    for nickname, player_id, number in (("Ana", HOST, 1), ("Bob", BOB, FIRST_REMOVED)):
+        joined = join_room(state, _join(nickname), NOW, player_id, token_of(number))
+        entries.extend(joined.entries)
+        state = joined.state
+    stored = state.model_copy(update={"removed_tokens": legacy_tokens()})
+    writer = RoomStore(path)
+    try:
+        writer.create_room(new_room(CODE, grid, NOW))
+        writer.append(CODE, entries)
+    finally:
+        writer.close()
+    insert_stored_snapshot(path, stored)
+    store = RoomStore(path)
+    try:
+        loaded = store.load_room(CODE)
+        assert loaded is not None
+        assert loaded.removed_tokens == legacy_tokens(), "stored as it was"
+        removed = handle_message(
+            loaded, HOST, RemovePlayer(player_id=BOB), NOW, QUIET_RULES
+        )
+        assert len(removed.entries) > 0, "Bob was not removed"
+        store.append(CODE, removed.entries)
+        reloaded = store.load_room(CODE)
+    finally:
+        store.close()
+    assert reloaded is not None
+    return removed.state, reloaded
+
+
+@pytest.mark.parametrize("reading", ["live", "from the store"])
+def test_ac17_a_stored_room_over_100_bans_keeps_the_newest_100_after_a_removal(
+    fx01_grid: Grid, tmp_path: Path, reading: str
+) -> None:
+    live, loaded = bob_removed_from_a_stored_room(
+        fx01_grid, tmp_path / "legacy.sqlite3"
+    )
+    state = live if reading == "live" else loaded
+    dropped = token_of(LEGACY_FIRST + LEGACY_BANS - KEPT_BANS)
+    oldest_kept = token_of(LEGACY_FIRST + LEGACY_BANS - KEPT_BANS + 1)
+
+    forgotten = join_room(state, _join("Zed", dropped), NOW, NEW_PLAYER_ID, NEW_TOKEN)
+    banned = join_room(state, _join("Zed", oldest_kept), NOW, NEW_PLAYER_ID, NEW_TOKEN)
+
+    newest = (*legacy_tokens()[LEGACY_BANS - KEPT_BANS + 1 :], token_of(FIRST_REMOVED))
+    assert len(state.removed_tokens) == KEPT_BANS
+    assert set(state.removed_tokens) == set(newest)
+    assert forgotten.close_sender is False
+    forgotten_reply = forgotten.reply[0]
+    assert isinstance(forgotten_reply, Snapshot)
+    assert forgotten_reply.you == NEW_PLAYER_ID
+    assert banned.close_sender is True
+    banned_reply = banned.reply[0]
+    assert isinstance(banned_reply, ErrorMessage)
+    assert banned_reply.code == ErrorCode.REMOVED

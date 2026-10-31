@@ -126,6 +126,24 @@ def snapshot_seqs(database_path: Path, code: str) -> list[int]:
     return seqs
 
 
+def insert_stored_snapshot(database_path: Path, state: RoomState) -> None:
+    """Write `state` as a snapshot row of the file, by hand, as it is.
+
+    The row is the JSON of the whole state, as a store wrote it before any bound
+    on what a snapshot holds: no rule of the store touches it on the way in. The
+    room must exist in the file and have no snapshot at `state.seq`.
+    """
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute(
+            "INSERT INTO snapshots (code, seq, state_json) VALUES (?, ?, ?)",
+            (state.code, state.seq, state.model_dump_json()),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def type_letters(ana: Peer, grid: Grid, count: int) -> dict[tuple[int, int], str]:
     """Send `count` letters from `ana`, cell after cell, and wait until all are made.
 

@@ -13,6 +13,11 @@ history is read three ways, which have to agree:
 - on the page: a room of the live server whose log holds 205 messages, opened in a
   browser, shows the newest 200 in its stream.
 
+A room stored before the history had a bound may hold more: its snapshot, written
+by hand into the store file (`server_harness.insert_stored_snapshot`), has 300
+messages. One more message brings the live room, a joiner's snapshot and the room
+loaded from the store to the newest 200.
+
 A message that leaves the history still counts: the room's seq is that of the
 last message. The page's cap on the stream is the same 200 (`social/chat.md`
 rule 18), so the page part of the criterion already held before the server capped
@@ -33,6 +38,7 @@ from nock.hub import RoomRegistry
 from nock.protocol import ChatMessage, Join, Snapshot
 from nock.room import LogEntry, RoomConfig, RoomState, join_room, new_room
 from nock.store import RoomStore
+from server_harness import insert_stored_snapshot
 from spec022_harness import chat_seqs, open_panel, send_chat
 from spec024_harness import (
     NOW,
@@ -48,6 +54,7 @@ CHAT_CONFIG = RoomConfig(chat_limit=1_000)
 SENT_BY = ("p1", "p2")
 STORED_MESSAGES = 205
 MIDWAY_SEQ = 150
+LEGACY_MESSAGES = 300
 
 
 class SentRoom(NamedTuple):
@@ -177,6 +184,72 @@ def test_ac21_a_message_after_a_snapshot_of_200_drops_the_oldest(
     assert loaded is not None
     assert loaded.chat[0].seq == JOINED_AT_SEQ + STORED_MESSAGES - HISTORY_CAP + 1
     assert len(loaded.chat) == HISTORY_CAP
+
+
+def stored_room_over_the_cap(
+    grid: Grid, path: Path, count: int
+) -> tuple[RoomStore, RoomState]:
+    """A store file holding a room whose newest snapshot has `count` messages.
+
+    The room is the one of `joined_room` followed by `count` messages, all in the
+    log; its snapshot after the last one holds every message, written by hand as
+    a store kept it before the history had a bound.
+
+    Returns:
+        The store opened on the file, and the room it loads.
+    """
+    state, entries = joined_room(grid)
+    messages: list[ChatMessage] = []
+    for number in range(count):
+        seq = JOINED_AT_SEQ + number + 1
+        sender = SENT_BY[number % len(SENT_BY)]
+        message = ChatMessage(seq=seq, player_id=sender, text=f"Ligne {seq}")
+        messages.append(message)
+        entries.append(LogEntry(at=NOW, event=message))
+    stored = state.model_copy(
+        update={"chat": tuple(messages), "seq": JOINED_AT_SEQ + count}
+    )
+    writer = RoomStore(path)
+    try:
+        writer.create_room(new_room(ROOM_CODE, grid, NOW))
+        writer.append(ROOM_CODE, entries)
+    finally:
+        writer.close()
+    insert_stored_snapshot(path, stored)
+    store = RoomStore(path)
+    loaded = store.load_room(ROOM_CODE)
+    assert loaded is not None
+    assert len(loaded.chat) == count, "the stored history is loaded as it was"
+    return store, loaded
+
+
+def test_ac21_a_stored_history_over_200_keeps_the_newest_200_after_a_message(
+    store_path: Path, fx01_grid: Grid
+) -> None:
+    store, stored = stored_room_over_the_cap(fx01_grid, store_path, LEGACY_MESSAGES)
+    try:
+        last_seq = stored.seq + 1
+        outcome = send_chat(stored, "p1", f"Ligne {last_seq}", NOW, CHAT_CONFIG)
+        assert len(outcome.entries) == 1, "the message was not accepted"
+        live = outcome.state
+        joined = join_room(
+            live, Join(nickname="Cy", resume_token=None), NOW, "p3", "cy-token-0001-aa"
+        )
+        store.append(ROOM_CODE, outcome.entries)
+        loaded = store.load_room(ROOM_CODE)
+    finally:
+        store.close()
+
+    seqs = list(range(last_seq - HISTORY_CAP + 1, last_seq + 1))
+    reply = joined.reply[0]
+    assert isinstance(reply, Snapshot)
+    assert live.seq == last_seq
+    assert seqs_of(live.chat) == seqs
+    assert seqs_of(reply.chat) == seqs
+    assert texts_of(reply.chat) == [f"Ligne {seq}" for seq in seqs]
+    assert loaded is not None
+    assert loaded.seq == last_seq
+    assert loaded.chat == live.chat
 
 
 # ---- The stream on the page ----------------------------------------------------------
