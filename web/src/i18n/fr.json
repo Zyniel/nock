@@ -263,6 +263,8 @@
   "player.former": "Ancien joueur",
   "email.sign_in.subject": "Votre lien de connexion à Nock",
   "email.sign_in.body": "Bonjour,\n\nOuvrez ce lien pour vous connecter à Nock :\n{link}\n\nIl est valable 30 minutes et ne sert qu'une fois. Si vous n'avez rien demandé, ignorez ce message.",
+  "email.deleted.subject": "Votre compte Nock a été supprimé",
+  "email.deleted.body": "Bonjour,\n\nVotre compte Nock et les données qui lui étaient liées ont été supprimés. Les salons que vous aviez créés sont fermés ; dans les autres, vous apparaissez comme « Ancien joueur ».\n\nSi vous n'aviez rien demandé, une personne connectée à ce compte l'a supprimé.",
   "topbar.home": "Accueil",
   "topbar.aide": "Aide",
   "topbar.salon": "Salon",

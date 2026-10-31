@@ -63,6 +63,7 @@ from nock.accounts import (
     Account,
     AccountStatus,
     AccountStore,
+    PendingErasure,
     RoomIdentity,
     SignInLinkRequest,
     SignInRequest,
@@ -85,7 +86,13 @@ from nock.hub import (
     RoomConnection,
     RoomRegistry,
 )
-from nock.mailer import Mailer, MailError, SmtpMailer, sign_in_message
+from nock.mailer import (
+    Mailer,
+    MailError,
+    SmtpMailer,
+    deleted_message,
+    sign_in_message,
+)
 from nock.operations import (
     DAY_SECONDS,
     RoomLog,
@@ -805,6 +812,126 @@ def _history_saver(store: AccountStore) -> Callable[[RoomState], None]:
     return save_before_deletion
 
 
+class _ErasureAttempts:
+    """The attempts that end the erasure of a deleted account.
+
+    An attempt counts itself, then runs three steps, each idempotent and each
+    run even when an earlier one failed: it erases the players the erasure still
+    lists, deletes the account's creator rooms, and erases its players from the
+    history records. When no step failed it sends the e-mail and marks the
+    erasure done (`account/account.md` rules 26 and 27).
+    """
+
+    def __init__(
+        self,
+        rooms: RoomRegistry,
+        store: AccountStore,
+        settings: AccountSettings,
+        mailer: Mailer,
+    ) -> None:
+        """Keep what an attempt works on."""
+        self._rooms = rooms
+        self._store = store
+        self._settings = settings
+        self._mailer = mailer
+
+    def run_pending(self) -> None:
+        """Run one attempt of every pending erasure, the oldest request first."""
+        for pending in self._store.pending_erasures():
+            self.run(pending)
+
+    def run(self, pending: PendingErasure) -> None:
+        """Run one attempt of an erasure. A failure is logged, never raised."""
+        try:
+            self._store.begin_attempt(pending.erasure_id)
+            are_players_erased = self._erase_players(pending)
+            are_rooms_deleted = self._delete_creator_rooms(pending)
+            is_history_erased = self._erase_history(pending)
+            if are_players_erased and are_rooms_deleted and is_history_erased:
+                self._finish(pending)
+        except Exception:
+            logger.exception("An attempt of an account erasure failed")
+
+    def _erase_players(self, pending: PendingErasure) -> bool:
+        """Step 1: erase each listed player from its room, then unlist it.
+
+        Returns:
+            True when every listed player is erased.
+        """
+        are_all_erased = True
+        for player in pending.players:
+            try:
+                self._rooms.erase_player(player.code, player.player_id)
+                self._store.drop_erased_player(
+                    pending.erasure_id, player.code, player.player_id
+                )
+            except Exception:
+                logger.exception("Erasing a player from room %s failed", player.code)
+                are_all_erased = False
+        return are_all_erased
+
+    def _delete_creator_rooms(self, pending: PendingErasure) -> bool:
+        """Step 2: delete the rooms the account created, counting each one.
+
+        Returns:
+            True when the rooms are deleted.
+        """
+
+        def count_room() -> None:
+            self._store.count_deleted_room(pending.erasure_id)
+
+        try:
+            self._rooms.delete_creator_rooms(pending.account_id, count_room)
+        except Exception:
+            logger.exception("Deleting the creator rooms of an erasure failed")
+            return False
+        return True
+
+    def _erase_history(self, pending: PendingErasure) -> bool:
+        """Step 3: make its players `--` among the team-mates of every record.
+
+        Returns:
+            True when the history records are erased.
+        """
+        try:
+            self._store.erase_players_from_history(pending.players)
+        except Exception:
+            logger.exception("Erasing players from the history records failed")
+            return False
+        return True
+
+    def _finish(self, pending: PendingErasure) -> None:
+        """Send the e-mail, then mark the erasure done."""
+        notified_at = self._send_deleted_message(pending.email)
+        self._store.finish_erasure(pending.erasure_id, self._rooms.clock(), notified_at)
+
+    def _send_deleted_message(self, email: str) -> float | None:
+        """Send the e-mail of rule 27.
+
+        Returns:
+            The time the e-mail was accepted; None when the mailer refused it.
+        """
+        try:
+            self._mailer.send(deleted_message(self._settings, email))
+        except MailError as error:
+            # A MailError names the kind of failure only: no address, no secret.
+            logger.warning("The e-mail of an account erasure was not sent: %s", error)
+            return None
+        return self._rooms.clock()
+
+
+def _erasure_attempts(
+    rooms: RoomRegistry, accounts: _AccountService
+) -> _ErasureAttempts | None:
+    """Return what runs the erasure attempts, None while accounts are off."""
+    store = accounts.store
+    settings = accounts.settings
+    mailer = accounts.mailer
+    if store is None or settings is None or mailer is None:
+        return None
+    return _ErasureAttempts(rooms, store, settings, mailer)
+
+
 def _clear_session_cookie(response: Response) -> None:
     """Make the browser forget its session cookie (`Max-Age=0`)."""
     response.delete_cookie(SESSION_COOKIE, path="/")
@@ -1007,16 +1134,23 @@ async def _sweep_expired_rooms(
 ) -> None:
     """Delete the expired rooms now, then every `expiry_sweep_seconds`, until `stop`.
 
-    While accounts are on, each sweep then deletes the old sign-in links and
-    sessions (spec 033). Each sweep runs in a worker thread, since it waits for
-    the disk. A sweep that raises is logged, and the next one runs as planned
-    (spec 032).
+    While accounts are on, each sweep then runs one attempt of every pending
+    account erasure, and deletes the old sign-in links, sessions and done
+    erasures (`account/account.md` rules 20 and 26). Each sweep runs in a worker
+    thread, since it waits for the disk. A sweep that raises is logged, and the
+    next one runs as planned (spec 032).
     """
     while not stop.is_set():
         try:
             await asyncio.to_thread(rooms.expire_rooms)
         except Exception:
             logger.exception("The sweep of the expired rooms failed")
+        attempts = _erasure_attempts(rooms, accounts)
+        if attempts is not None:
+            try:
+                await asyncio.to_thread(attempts.run_pending)
+            except Exception:
+                logger.exception("The sweep of the account erasures failed")
         account_store = accounts.store
         if account_store is not None:
             try:
@@ -1690,20 +1824,21 @@ def create_app(
             raise _no_session()
         return Response(status_code=204)
 
-    # Spec 033: the account goes at once, then each of its players is erased
-    # from the rooms that still exist.
+    # `account/account.md` rule 18: the account goes at once with its erasure
+    # written as pending, then one attempt of the erasure runs; the answer is
+    # 204 whatever the attempt did, since the sweeps go on with it.
     @web_app.delete(ACCOUNT_API_ROOT, status_code=204)
     def delete_account(request: Request) -> Response:
         account = require_account(request)
         store = account_store_in_use()
         room_registry = holder.get()
-        deleted_identities = store.delete_account(account.account_id)
-        for identity in deleted_identities:
-            room_registry.erase_player(identity.code, identity.player_id)
-        room_registry.delete_creator_rooms(account.account_id)
-        # Erasing a player deletes an expired room, whose delete hook may have
-        # saved a record with the nickname: erase it from the records once more.
-        store.erase_players_from_history(deleted_identities)
+        pending = store.delete_account(account.account_id, room_registry.clock())
+        if pending is None:
+            # The account was deleted after the session was read.
+            raise _no_session()
+        attempts = _erasure_attempts(room_registry, account_service)
+        if attempts is not None:
+            attempts.run(pending)
         response = Response(status_code=204)
         _clear_session_cookie(response)
         return response

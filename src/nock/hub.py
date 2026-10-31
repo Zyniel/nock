@@ -1258,19 +1258,25 @@ class RoomRegistry:
             self._drop_recap(code)
             return room_exists
 
-    def delete_creator_rooms(self, account_id: str) -> None:
+    def delete_creator_rooms(
+        self, account_id: str, on_deleted: Callable[[], None]
+    ) -> None:
         """Delete every room that an erased account created (spec 033).
 
         Each deletion is that of an expired room (spec 032): the delete hook
         first, then the room's sockets closed with ROOM_NOT_FOUND_CLOSE_CODE and
         its rows removed, live or stored (`lobby/host.md` rule 14). Returns once
-        they are all deleted.
+        they are all deleted. A deletion that raises stops the others; the rooms
+        deleted before it stay deleted, and each was reported.
 
         Args:
             account_id: The account that was deleted.
+            on_deleted: Called after each room is deleted, so that the caller
+                counts them.
         """
         for code in self._store.codes_created_by(account_id):
             self._delete_room(code)
+            on_deleted()
 
     def room_recap(self, code: str) -> Recap | None:
         """Return the recap of room `code` (spec 028), from its state and its log.
