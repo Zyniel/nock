@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: done
+status: approved
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
@@ -66,16 +66,17 @@ deletes it with all its data.
 6. A sweep at the app's start, then every sweep interval (the effective value
    of `NOCK_EXPIRY_SWEEP_MINUTES`, held by `RoomConfig.expiry_sweep_seconds` in
    seconds; a new value applies after the current wait, `admin/overrides.md`
-   rule 9), deletes the expired rooms;
-   any lookup that meets one (a socket, a summary) deletes it first. Every
-   deletion for expiry, the sweep's and a lookup's, reads the room's times
-   again under the registry lock before deleting: a room no longer expired by
-   then (an edit moved its last edit time meanwhile) is kept, a lookup serves
-   it, and the sweep does not list it among the codes it deleted.
-   Deletion removes the room, its log, its snapshots and its share token,
-   closes every socket opened to it, joined or not, with 4404 and nothing
-   else, and writes no log entry; a page that had shown the room then shows
-   the room-gone dialog
+   rule 9), deletes the expired rooms; any lookup that meets one (a socket, a
+   summary) deletes it first. Every deletion for expiry, the sweep's and a
+   lookup's, reads the room's times again under the registry lock before
+   deleting: a room no longer expired by then (an edit moved its last edit time
+   meanwhile) is kept, a lookup serves it, and the sweep does not list it among
+   the codes it deleted. A sweep runs no checkpoint between its deletions: on a
+   file, it runs one after the last (`admin/operations.md` rule 20), and one
+   when it deleted nothing; a lookup's deletion runs its own. Deletion removes
+   the room, its log, its snapshots and its share token, closes every socket
+   opened to it, joined or not, with 4404 and nothing else, and writes no log
+   entry; a page that had shown the room then shows the room-gone dialog
    (`client/hud.md` rule 16). The code may then be drawn again, where an old
    token matches nobody. Until the deletion, a live room's open sockets keep
    working. A sweep that fails is logged at WARNING or above, and the next one
@@ -96,14 +97,17 @@ deletes it with all its data.
    on a refused value; one given a registry reads none, and its config gives
    the environment values.
 
-### Stored times and migration
+### Stored times and migrations
 
-8. The solve time is a nullable column of `room_times`, which makes the schema's
-   `user_version` 2 (the creator column made it 1, `lobby/host.md` rule 11). A
-   store below 2 is migrated once at open, in one transaction: the missing
-   columns are added, and each solved room gets its solve time from its stored
-   state or log, or its last edit time when neither gives one; the rooms' other
-   data stays.
+8. The schema's `user_version` is 3: 1 brought the creator column
+   (`lobby/host.md` rule 11); 2 the solve time, a nullable column of
+   `room_times`; 3 the indexes of `room_times` by creation time and by
+   creator, which the dashboard's rooms (`admin/operations.md` rule 12) and an
+   erased account's creator rooms (`lobby/host.md` rule 14) read. A store
+   below 3 is migrated once at open, in one transaction: the missing columns
+   are added; below 2, each solved room gets its solve time from its stored
+   state or log, or its last edit time when neither gives one; the missing
+   indexes are created. The rooms' other data stays.
 
 ## Acceptance criteria
 
@@ -158,7 +162,7 @@ deletes it with all its data.
   t + 60 h, and an app with accounts off started then deletes it at its first
   sweep.
 - **AC-13** A database at `user_version` 1 holding S, solved at s, and U,
-  unsolved, opens at `user_version` 2 with S's solve time s and none for U,
+  unsolved, opens at `user_version` 3 with S's solve time s and none for U,
   every other row as it was; one at `user_version` 0 opens with the creator
   column too; a solved room whose stored state and log give no solve time gets
   its last edit time. With `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS` 24, S is then
@@ -171,6 +175,14 @@ deletes it with all its data.
   Ana's letter in B is committed after the sweep read the times and before it
   deletes B, the sweep deletes A alone, returns `[A]`, and B's sockets stay
   open with her letter; without the letter it deletes both.
+- **AC-16** On a file database, a sweep that finds 50 rooms expired deletes
+  them all and runs one checkpoint, after the 50th deletion; a sweep that
+  finds none runs one too; a lookup that deletes an expired room runs one of
+  its own.
+- **AC-17** A database at `user_version` 2 holding rooms, a creator room among
+  them, opens at `user_version` 3 with every row as it was; there, as in a new
+  database, SQLite's query plan for the rooms created since a time and for the
+  rooms of a creator reads an index of `room_times`, not a scan of the table.
 
 ## Edge cases
 
@@ -203,8 +215,10 @@ deletes it with all its data.
 
 - `src/nock/room.py`: `RoomConfig`; the one function that decides expiry.
 - `src/nock/store.py`: `room_times` (last edit time, solve time, creator), the
-  migration, deletion. It does not decide expiry.
-- `src/nock/hub.py`: the sweep, the lookups and their deletions.
+  migrations and indexes, deletion, `checkpoint_wal`. It does not decide
+  expiry.
+- `src/nock/hub.py`: the sweep and its one checkpoint, the lookups and their
+  deletions.
 - `src/nock/server.py`: the app's sweep and the purge it paces.
   `src/nock/settings.py`, `src/nock/__main__.py`: the variables.
 - Tests: `tests/test_spec_032_ac01_*`, `tests/test_spec_032_ac02_*`,

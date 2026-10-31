@@ -1,7 +1,7 @@
 ---
 area: admin
 file: overrides
-status: done
+status: approved
 ---
 
 # admin/overrides - The `/ops` overrides of the room lives
@@ -66,9 +66,10 @@ shorter life would delete before saving it.
 
 7. The overrides are rows of the table `overrides (name TEXT PRIMARY KEY,
    value INTEGER NOT NULL)` of the room store, created with the other tables
-   (`CREATE TABLE IF NOT EXISTS`; `user_version` stays 2, `lobby/lifetime.md`
-   rule 8). A room's deletion never touches it. On a file they survive a
-   restart; in memory (`NOCK_DATABASE` unset) they go with the process.
+   (`CREATE TABLE IF NOT EXISTS`, with no migration of its own,
+   `lobby/lifetime.md` rule 8). A room's deletion never touches it. On a file
+   they survive a restart; in memory (`NOCK_DATABASE` unset) they go with the
+   process.
 8. When the app starts, before its first sweep, it reads the table: each valid
    row is an override; a row whose name is unknown, or whose value is not a
    whole number within the bounds, is deleted and logged once at WARNING

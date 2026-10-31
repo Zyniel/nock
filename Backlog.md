@@ -387,12 +387,14 @@ others, at the top of the list.
 
 ### B-035 The store: checked secure deletion, one checkpoint per sweep, indexes
 
-- Status: brief
+- Status: ready
 - Priority: seventh (privacy promise and sweep cost)
 - Domains: admin/operations (no copy of a deleted room stays), lobby/lifetime
   (the sweep), account/account (the purge)
 - Architecture decision: no (indexes in migration 3 and the order of the
   statements; no row changes)
+- Criteria: operations AC-22 to AC-25 (new), lifetime AC-16, AC-17 (new),
+  lifetime AC-13 (changed), account AC-22, AC-23 (new), host AC-9 (changed)
 - Branch: feat/b-035-store-deletion · PR: none yet
 - Problem: each room deletion runs `PRAGMA wal_checkpoint(TRUNCATE)`
   (`store.py:347`) inside the store lock that the engine thread takes for
@@ -412,6 +414,11 @@ others, at the top of the list.
 - Open questions:
   1. A checkpoint that stays busy: A (lead's default) one retry, then a
      WARNING, and the next sweep empties the log; B the request fails.
+- Decisions: the human, 2026-10-31: 1A, one retry, then a WARNING, and the
+  next sweep empties the log. The spec change approved, with the lead's
+  picks: a checkpoint try never waits on the busy handler; the account
+  store makes its own indexes when it opens; two checkpoints per sweep
+  with accounts on; `nock.store.checkpoint_wal` as the one checkpoint.
 
 ### B-036 Account erasure that always finishes
 

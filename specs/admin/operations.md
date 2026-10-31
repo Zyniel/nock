@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: done
+status: approved
 ---
 
 # admin/operations - Logs, retention and the operator pages
@@ -35,9 +35,10 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 
 2. A room's data (rows, snapshots, log, nicknames, resume tokens, chat texts)
    lives until the room is deleted (`lobby/lifetime.md` rules 5, 6). The store
-   zeroes deleted rows and, on a file, ends each deletion with a write-ahead log
-   checkpoint: none of the room's own rows stays in the database file or its
-   WAL, the store open or closed. With accounts on, which share that database,
+   zeroes deleted rows and, on a file, a checkpoint (rule 20) follows each
+   deletion, or each sweep's deletions: once a checkpoint has emptied the WAL,
+   none of the deleted room's rows stays in the database file or its WAL, the
+   store open or closed. With accounts on, which share that database,
    an account keeps its identity in the room (code, player id, resume token,
    nickname) and its record of a solved room until the account goes, and a
    pending sign-in link its room key until used or expired
@@ -46,6 +47,20 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
    failures and their times, never the code or token that failed, forgotten as
    `lobby/rooms.md` rule 9 says; with accounts on, also the link limits of
    `account/account.md`.
+20. A checkpoint copies the WAL into the database file and empties it
+    (`PRAGMA wal_checkpoint(TRUNCATE)`), on a file only, through
+    `checkpoint_wal` (`src/nock/store.py`). A try never waits on SQLite's
+    busy handler: the connection's busy timeout is 0 for the checkpoint and
+    restored after it. It reads the result's `busy` column: busy, it tries
+    once more at once; still busy, it logs one record at
+    WARNING and gives up, the deleted rows' old pages staying in the WAL until
+    a later checkpoint empties it, at the latest the next sweep's
+    (`lobby/lifetime.md` rule 6). A busy checkpoint never fails its request:
+    the deletion, erasure or purge it follows stands and answers as usual.
+    One runs after each room deletion outside a sweep, once per sweep, and
+    after each of `erase_player`, `delete_account`,
+    `erase_players_from_history` and `purge` (`account/account.md` rules 18,
+    20).
 
 ### Operator token
 
@@ -197,6 +212,12 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   « Letter marks »; the slider and
   buttons: `_design/foundation.md`, « Components ».
 
+## New interface
+
+- `nock.store.checkpoint_wal(connection: sqlite3.Connection) -> bool`: rule
+  20's checkpoint on that connection; True when the WAL was emptied, False
+  when it stayed busy after the second try.
+
 ## Acceptance criteria
 
 - **AC-1** `python -m nock` serving a page that joins as `Ana`, types three
@@ -302,6 +323,24 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 - **AC-21** With the right token, `Authorization: bearer <token>`, `BEARER
   <token>` and `bEaReR <token>` each get the dashboard's 200, 12 times in a row
   from one address with no 429.
+- **AC-22** `checkpoint_wal` on a connection whose first checkpoint reports
+  busy and whose second does not runs two checkpoints, returns True and logs
+  nothing; on one that reports busy twice it runs exactly two, logs one
+  `nock.*` record at WARNING and returns False without raising.
+- **AC-25** On a file connection whose busy timeout is 5 s, while a second
+  connection holds a read open on the file, `checkpoint_wal` returns False in
+  under 1 second, and the connection's busy timeout is 5 s again afterwards.
+- **AC-23** On a file database, `delete_room`, `RoomStore.erase_player`,
+  `delete_account`, `erase_players_from_history` and `purge` each run one
+  checkpoint through `checkpoint_wal`; with it returning False each still does
+  its work (the room gone, the nickname `--`, the account gone, the old link
+  purged) and returns as usual. On an in-memory store none runs.
+- **AC-24** Room A, with the chat `chat-busy-6610`, expires and a lookup
+  deletes it while a second connection to the file holds a read open: the
+  lookup returns within 1 second, A's code is then unknown, one WARNING is
+  logged and the WAL is not empty. Once that connection closes, the next
+  sweep, which deletes nothing, leaves the WAL at 0 bytes, and neither file
+  holds the chat text or A's code.
 
 ## Edge cases
 
@@ -311,6 +350,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   cell is `undone` without letter (AC-11).
 - A seated-back player's later edits take the nickname of the new join (AC-11).
 - A code breaking the pattern shows « Salon introuvable. » (AC-17).
+- A checkpoint busy at every sweep leaves the deleted pages in the WAL until
+  one finds it free (AC-24).
 
 ## Out of scope
 
@@ -327,9 +368,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 
 - `src/nock/operations.py`: figures, edits. `src/nock/server.py`: ops routes,
   guard, throttles, `/ops`. `src/nock/settings.py`: `operator_token_from_env`.
-  `src/nock/store.py`: deletion, `codes_created_since`. `src/nock/hub.py`:
-  `relay_ms`.
+  `src/nock/store.py`: deletion, `checkpoint_wal`, `codes_created_since`.
+  `src/nock/accounts.py`: its checkpoints. `src/nock/hub.py`: `relay_ms`.
   `src/nock/__main__.py`: `main()`.
 - `web/src/lib/OpsPage.svelte`, `OpsReplay.svelte`, `ops.ts`, `duration.ts`.
 - Tests: `tests/test_spec_038_ac03*` to `ac11*`, `tests/test_spec_048_ac06*`,
-  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21.
+  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21 to AC-25.
