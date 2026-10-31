@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: done
+status: approved
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
@@ -80,8 +80,10 @@ deletes it with all its data.
    (`client/hud.md` rule 16). The code may then be drawn again, where an old
    token matches nobody. Until the deletion, a live room's open sockets keep
    working. A sweep that fails is logged at WARNING or above, and the next one
-   runs. Each sweep also runs the purge of sign-in links and sessions
-   (`account/account.md` rule 20).
+   runs. After its deletions, each sweep also runs one attempt of every
+   pending account erasure, then the purge of sign-in links, sessions and done
+   erasures (`account/account.md` rules 26, 20); the erasure's own writes
+   checkpoint as that file says, apart from the sweep's one.
 
 ### The variables
 
@@ -219,7 +221,8 @@ deletes it with all its data.
   expiry.
 - `src/nock/hub.py`: the sweep and its one checkpoint, the lookups and their
   deletions.
-- `src/nock/server.py`: the app's sweep and the purge it paces.
+- `src/nock/server.py`: the app's sweep, the erasure attempts and the purge it
+  paces.
   `src/nock/settings.py`, `src/nock/__main__.py`: the variables.
 - Tests: `tests/test_spec_032_ac01_*`, `tests/test_spec_032_ac02_*`,
   `tests/test_lifetime_*`.

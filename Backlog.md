@@ -422,7 +422,7 @@ others, at the top of the list.
 
 ### B-036 Account erasure that always finishes
 
-- Status: approved
+- Status: building
 - Priority: eighth (privacy; the failure needs a busy engine, which B-030 and
   B-031 make rare)
 - Domains: account/account, lobby/lifetime (the sweep's step),
@@ -431,6 +431,7 @@ others, at the top of the list.
   whose shape option 1's retries follow)
 - Architecture decision: yes (a new table, stored data): options from the
   Plan agent on Fable
+- Criteria: account AC-24 to AC-29 (new), operations AC-23 (changed)
 - Branch: feat/b-036-erasure-finishes · PR: none yet
 - Problem: `DELETE /api/account` (`server.py:1696`) deletes the account rows,
   then erases its players from the live rooms, waiting up to 5 seconds on the
@@ -476,7 +477,11 @@ others, at the top of the list.
      an item of its own.
 - Decisions: the human, 2026-10-31: option 2, the pending-erasure job
   retried by the sweep, the completion e-mail (1A), the spec line on a
-  returning device; creator rooms still deleted (2A).
+  returning device; creator rooms still deleted (2A). The spec change
+  approved, with the lead's picks: a done erasure kept 5 years with times
+  and counts only; the e-mail sent in the request when its attempt ends
+  the erasure; a save slower than a whole erasure accepted; no split of
+  account.md in this item.
 
 ### B-037 Lean snapshots
 

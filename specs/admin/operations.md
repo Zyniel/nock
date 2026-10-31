@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: done
+status: approved
 ---
 
 # admin/operations - Logs, retention and the operator pages
@@ -42,7 +42,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
    an account keeps its identity in the room (code, player id, resume token,
    nickname) and its record of a solved room until the account goes, and a
    pending sign-in link its room key until used or expired
-   (`account/account.md` rules 12, 22).
+   (`account/account.md` rules 12, 22). A deleted account's erasure keeps its
+   address and its players' codes and ids until it is done, then its times
+   and counts alone for 5 years (`account/account.md` rules 26, 27).
 3. Memory holds the live rooms and, per app and throttle, the addresses with
    failures and their times, never the code or token that failed, forgotten as
    `lobby/rooms.md` rule 9 says; with accounts on, also the link limits of
@@ -59,8 +61,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
     the deletion, erasure or purge it follows stands and answers as usual.
     One runs after each room deletion outside a sweep, once per sweep, and
     after each of `erase_player`, `delete_account`,
-    `erase_players_from_history` and `purge` (`account/account.md` rules 18,
-    20).
+    `erase_players_from_history`, `finish_erasure` and `purge`
+    (`account/account.md` rules 18, 20, 26).
 
 ### Operator token
 
@@ -325,10 +327,11 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   connection holds a read open on the file, `checkpoint_wal` returns False in
   under 1 second, and the connection's busy timeout is 5 s again afterwards.
 - **AC-23** On a file database, `delete_room`, `RoomStore.erase_player`,
-  `delete_account`, `erase_players_from_history` and `purge` each run one
-  checkpoint through `checkpoint_wal`; with it returning False each still does
-  its work (the room gone, the nickname `--`, the account gone, the old link
-  purged) and returns as usual. On an in-memory store none runs.
+  `delete_account`, `erase_players_from_history`, `finish_erasure` and
+  `purge` each run one checkpoint through `checkpoint_wal`; with it returning
+  False each still does its work (the room gone, the nickname `--`, the
+  account gone, the erasure done with no address, the old link purged) and
+  returns as usual. On an in-memory store none runs.
 - **AC-24** Room A, with the chat `chat-busy-6610`, expires and a lookup
   deletes it while a second connection to the file holds a read open: the
   lookup returns within 1 second, A's code is then unknown, one WARNING is
