@@ -9,7 +9,7 @@ tests are in `tests/test_lifetime_*.py`:
   (`room_config_from_env`, `main()`, `python -m nock`, the app's registry).
 - `test_lifetime_sweep.py`: AC-10, the sweeps of a running app and the purge they
   pace.
-- `test_lifetime_migration.py`: AC-13, a database below `user_version` 3.
+- `test_lifetime_migration.py`: AC-13, a database below `user_version` 4.
 - `test_lifetime_recheck.py`: AC-14 and AC-15, the expiry read again under the
   registry lock, with a store (`EditingStore`) that lets an edit be committed
   right after the first read of the times (the app is `server_harness.serving`).
@@ -17,6 +17,8 @@ tests are in `tests/test_lifetime_*.py`:
   lookup's deletion, counted through `nock.store.checkpoint_wal`.
 - `test_lifetime_indexes.py`: AC-17, a database at `user_version` 2 migrated, and
   the query plans of the lookups of `room_times`.
+- `test_lifetime_snapshots.py`: AC-18, a database at `user_version` 3 whose rooms
+  hold several snapshots, migrated to 4.
 
 AC-1 and AC-2 are proven by the tests of spec 032 (`tests/test_spec_032_ac01_*`,
 `tests/test_spec_032_ac02_*`), which their pointers name.

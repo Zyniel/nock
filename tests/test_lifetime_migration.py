@@ -1,4 +1,4 @@
-"""Tests of lobby/lifetime, AC-13: a database below `user_version` 3 is migrated.
+"""Tests of lobby/lifetime, AC-13: a database below `user_version` 4 is migrated.
 
 The old databases are written by hand with the old schemas of `src/nock/store.py`
 (no creator column at `user_version` 0; the creator column and no solve time at
@@ -199,7 +199,7 @@ def migrate(path: Path) -> None:
 
 
 @pytest.mark.parametrize("version", [1, 0])
-def test_ac13_an_old_database_opens_at_version_3_with_the_solve_times(
+def test_ac13_an_old_database_opens_at_version_4_with_the_solve_times(
     tmp_path: Path, fx01_grid: Grid, version: int
 ) -> None:
     path = tmp_path / "old.sqlite3"
@@ -208,7 +208,7 @@ def test_ac13_an_old_database_opens_at_version_3_with_the_solve_times(
 
     migrate(path)
 
-    assert schema_version(path) == 3
+    assert schema_version(path) == 4
     assert stored_solve_time(path, SOLVED_ROOM) == SOLVED_AT
     assert stored_solve_time(path, LOGGED_ROOM) == LOGGED_SOLVED_AT
     assert stored_solve_time(path, NO_TIME_ROOM) == NO_TIME_LAST_EDIT_AT
@@ -262,7 +262,7 @@ def test_ac13_a_migrated_database_is_not_migrated_again(
 
     migrate(path)
 
-    assert schema_version(path) == 3
+    assert schema_version(path) == 4
     assert unchanged_rows(path, 1) == after_the_first
     assert stored_solve_time(path, UNSOLVED_ROOM) is None
     assert stored_solve_time(path, SOLVED_ROOM) == SOLVED_AT
