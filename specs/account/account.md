@@ -152,15 +152,19 @@ the player into « Ancien joueur » in the other rooms.
     as an anonymous player named `--`: the member's account link is cleared and
     the nickname becomes `--` in the live state, the stored snapshots and the
     logged `player_joined`, with no event; ids, colours, seqs and letters stay.
-    Nothing else of a room changes. It answers 204, clearing the cookie, and no
-    copy of the address or of those nicknames is left in the database files.
+    Nothing else of a room changes. It answers 204, clearing the cookie. Each
+    of its writes to the store ends with a checkpoint (`admin/operations.md`
+    rule 20): once they have emptied the WAL, no copy of the address or of
+    those nicknames is left in the database files. A checkpoint that stays busy
+    leaves the answer a 204, and the next sweep empties the WAL.
 19. No join can take `--`, and a past `--` is seated back as `--` with no
     suffix (`lobby/joining.md` rules 1 and 13); pages show it as « Ancien
     joueur » (`player.former`).
 20. Links and sessions are stored as SHA-256 only. Each expiry sweep
     (`lobby/lifetime.md` rule 6), the first at the app's start, then deletes
-    the links older than 30 minutes and the sessions older than 90 days and
-    empties the WAL; a failed purge is logged and the next sweep runs.
+    the links older than 30 minutes and the sessions older than 90 days, then
+    runs a checkpoint (`admin/operations.md` rule 20); a failed purge is logged
+    and the next sweep runs.
 21. No log record, traceback included, holds an address, a link token, a
     session, a resume token or the SMTP password. An anonymous player is
     stored as a nickname and random identifiers, nothing of their browser;
@@ -192,6 +196,12 @@ the player into « Ancien joueur » in the other rooms.
     nothing; `{}` when nothing does. Derived at each request, nothing stored:
     it saves no record, and « Grilles terminées » lists every grid it marks
     `finished`, since rule 22 saves each solved room that counts here.
+
+### Indexes
+
+25. The account store creates, when it opens, the indexes its lookups read,
+    changing no row: identities by room code, history team-mates by room code
+    and player id, sign-in links by address, sessions by account.
 
 ### Look
 
@@ -323,6 +333,15 @@ the player into « Ancien joueur » in the other rooms.
 - **AC-21** Without a cookie `GET /api/account/progress` answers 401
   `{"detail": "Not authorized"}`; accounts off, 404 `{"detail": "Not
   Found"}`.
+- **AC-22** Zoé, in R, deletes her account while a second connection to the
+  file holds a read open: the answer is 204 within 2 seconds, her cookie then
+  reads signed out, and WARNING records are logged.
+  Once that connection closes, the next sweep leaves neither her address nor
+  `ZOÉ` in the database file or its WAL.
+- **AC-23** A database holding accounts, sessions, links, identities and
+  history records opens in the account store with every row as it was; there,
+  as in a new database, SQLite's query plan for each lookup of rule 25 reads
+  an index, not a scan of its table.
 
 ## Edge cases
 
@@ -347,7 +366,8 @@ the player into « Ancien joueur » in the other rooms.
 
 ## Code
 
-- `src/nock/accounts.py`, `settings.py` (`account_settings_from_env`),
+- `src/nock/accounts.py` (with its indexes and checkpoints), `settings.py`
+  (`account_settings_from_env`),
   `mailer.py`, `i18n.py`, `server.py` (routes, limits, purge).
 - `room.py` (`FORMER_PLAYER_NICKNAME`, `with_player_erased`, `member_id`),
   `store.py` (`erase_player`), `hub.py` (`erase_player`, the creator rooms'
@@ -355,4 +375,4 @@ the player into « Ancien joueur » in the other rooms.
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`;
-  `tests/test_account_*` (the progress route).
+  `tests/test_account_*` (the progress route, AC-22, AC-23).

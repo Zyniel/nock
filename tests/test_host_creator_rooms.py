@@ -57,7 +57,7 @@ def test_ac9_a_signed_in_post_stores_the_account_as_the_creator(
 
     assert live_creator == room.account_id
     assert stored_creator(app.database_path, room.code) == room.account_id
-    assert schema_version(app.database_path) == 2
+    assert schema_version(app.database_path) == 3
 
 
 def assert_anonymous_room(app: HostApp, code: str) -> None:
@@ -196,7 +196,7 @@ def test_ac9_a_database_written_before_the_column_opens_with_it_added(
     finally:
         store.close()
 
-    assert schema_version(path) == 2
+    assert schema_version(path) == 3
     assert stored_creator(path, OLD_CODE) is None
     assert loaded is not None
     assert loaded.creator_account_id is None

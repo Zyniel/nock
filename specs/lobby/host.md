@@ -181,7 +181,7 @@ not-found pages ».
   the sheet. (← 014 AC-7, 014 AC-10)
 - **AC-9** Accounts on, Lea's signed-in `POST /api/rooms` makes a room whose
   stored `room_times` row names her account as creator, and `PRAGMA
-  user_version` reads 2 (`lobby/lifetime.md` rule 8); a database written before
+  user_version` reads 3 (`lobby/lifetime.md` rule 8); a database written before
   the column (`user_version` 0) opens with it added, its stored rooms anonymous
   rooms, their other data kept; a request with no cookie, an unknown or expired
   session, or made while accounts are off with her cookie, makes a room with no

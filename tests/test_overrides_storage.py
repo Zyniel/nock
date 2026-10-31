@@ -9,10 +9,11 @@ depend on how the store creates it.
 
 Readings taken where the spec leaves room:
 
-- Rule 7 ("created with the other tables; `user_version` stays 2; a room's
+- Rule 7 ("created with the other tables, with no migration of its own; a room's
   deletion never touches it") is checked under AC-9: the table's columns by
-  `PRAGMA table_info`, the version by `PRAGMA user_version`, and a deletion by
-  the sweep of an expired room.
+  `PRAGMA table_info`, the version by `PRAGMA user_version` (3, since the
+  migration of `lobby/lifetime.md` rule 8 adds no table), and a deletion by the
+  sweep of an expired room.
 - Rule 8 ("before its first sweep") is checked under AC-10: a stored override of
   24 hours deletes a room 30 hours old at the very first sweep of the app, whose
   interval is the default hour of real time.

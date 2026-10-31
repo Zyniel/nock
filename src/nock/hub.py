@@ -553,18 +553,22 @@ class _RoomRunner:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
-    async def delete(self) -> None:
+    async def delete(self, *, checkpoint: bool) -> None:
         """Stop the room for good, delete it from the store, then close its sockets.
 
         The inputs still in the inbox are dropped, and no step, snapshot or log
         entry is made. Then each connection opened to the room is sent a close
         with ROOM_NOT_FOUND_CLOSE_CODE and no other message (spec 032), also
         when the store fails.
+
+        Args:
+            checkpoint: Whether the store checkpoints after the deletion; a sweep
+                says False and checkpoints once after all its deletions.
         """
         self._is_deleted = True
         await self.cancel()
         try:
-            self._store.delete_room(self.state.code)
+            self._store.delete_room(self.state.code, checkpoint=checkpoint)
         finally:
             self._close_open_connections()
 
@@ -1175,7 +1179,9 @@ class RoomRegistry:
         A room is expired by `is_room_expired`. A live room's task stops first,
         and each of its sockets is closed with ROOM_NOT_FOUND_CLOSE_CODE. The
         times of each room are read again under the lock before it is deleted:
-        a room that an edit has kept alive meanwhile is left alone.
+        a room that an edit has kept alive meanwhile is left alone. The
+        deletions run no checkpoint; the sweep runs one after the last, also
+        when it deleted nothing (`lobby/lifetime.md` rule 6).
 
         Returns:
             The codes of the rooms deleted, in code-point order.
@@ -1185,10 +1191,14 @@ class RoomRegistry:
             if self._is_expired(times):
                 expired_codes.append(times.code)
         deleted_codes: list[str] = []
-        for code in expired_codes:
-            with self._lock:
-                if self._delete_room_if_expired(code):
-                    deleted_codes.append(code)
+        try:
+            for code in expired_codes:
+                with self._lock:
+                    if self._delete_room_if_expired(code, checkpoint=False):
+                        deleted_codes.append(code)
+        finally:
+            # Also when a deletion raised: the rooms already deleted leave the log.
+            self._store.checkpoint()
         return deleted_codes
 
     def count_expired_rooms(self, config: RoomConfig) -> int:
@@ -1631,18 +1641,23 @@ class RoomRegistry:
         times = self._store.room_times(code)
         return times is not None and self._is_expired(times)
 
-    def _delete_room_if_expired(self, code: str) -> bool:
+    def _delete_room_if_expired(self, code: str, *, checkpoint: bool = True) -> bool:
         """Read the times of room `code` again, and delete it if still expired.
 
         The caller holds the lock. A room that an edit kept alive since the
         caller's first read is kept.
+
+        Args:
+            code: The room.
+            checkpoint: Whether the store checkpoints after the deletion; the
+                sweep says False.
 
         Returns:
             True when the room was still expired, and so is deleted now.
         """
         if not self._looks_expired(code):
             return False
-        self._delete_room_locked(code)
+        self._delete_room_locked(code, checkpoint=checkpoint)
         return True
 
     def _delete_room(self, code: str) -> None:
@@ -1650,7 +1665,7 @@ class RoomRegistry:
         with self._lock:
             self._delete_room_locked(code)
 
-    def _delete_room_locked(self, code: str) -> None:
+    def _delete_room_locked(self, code: str, *, checkpoint: bool = True) -> None:
         """Delete a room: stop it when it is live, then remove it from the store.
 
         The caller holds the lock, so that no lookup loads the room again while
@@ -1659,6 +1674,11 @@ class RoomRegistry:
         waits until that is done, except on the engine's own thread.
 
         The delete hook (spec 029) runs first, with the room's latest state.
+
+        Args:
+            code: The room.
+            checkpoint: Whether the store checkpoints after the deletion; the
+                sweep says False and checkpoints once after all its deletions.
         """
         runner = self._runners.pop(code, None)
         self._drop_recap(code)
@@ -1667,7 +1687,7 @@ class RoomRegistry:
         if runner is None or loop is None or self._closed:
             # No task or socket to stop: none ever connected, or close()
             # stopped them all.
-            self._store.delete_room(code)
+            self._store.delete_room(code, checkpoint=checkpoint)
             return
         if threading.current_thread() is self._thread:
             # Waiting for ourselves would block, as in close(): the store
@@ -1675,13 +1695,15 @@ class RoomRegistry:
             # after this step, even when the store fails. The stop leaves the
             # store alone: a new room may have taken the code by then.
             try:
-                self._store.delete_room(code)
+                self._store.delete_room(code, checkpoint=checkpoint)
             finally:
                 stopping = loop.create_task(runner.stop_for_deletion())
                 self._deletion_tasks.add(stopping)
                 stopping.add_done_callback(self._deletion_tasks.discard)
             return
-        deleting = asyncio.run_coroutine_threadsafe(runner.delete(), loop)
+        deleting = asyncio.run_coroutine_threadsafe(
+            runner.delete(checkpoint=checkpoint), loop
+        )
         deleting.result(timeout=_STOP_TIMEOUT_SECONDS)
 
     def _call_delete_hook(self, code: str, runner: _RoomRunner | None) -> None:
