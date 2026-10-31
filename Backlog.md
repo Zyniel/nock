@@ -485,7 +485,7 @@ others, at the top of the list.
 
 ### B-037 Lean snapshots
 
-- Status: building
+- Status: done
 - Priority: ninth (the disk grows with play, slowly)
 - Waits for: nothing (B-035 is merged)
 - Domains: platform/server (snapshots), lobby/host (the removed tokens),
