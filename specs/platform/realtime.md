@@ -200,7 +200,7 @@ earns it.
     from 1 to 10000, default 50: unset or empty, the default; set, ASCII digits
     only, any number of leading zeros, within the bounds. `main()` checks it
     after `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` and before the account variables,
-    and stops on a refused value (`platform/server.md` rules 15, 19). An app
+    and stops on a refused value (`platform/serving.md` rules 6, 10). An app
     reads it each time it starts and fails its start with `SettingsError` on a
     refused value; each app keeps its counts in memory. `/ops` cannot change it.
 

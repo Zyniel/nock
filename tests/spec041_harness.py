@@ -223,7 +223,7 @@ TEXT_CONTRAST_SCRIPT = (
 # `color` is that value, appended to `body`, read, then removed.
 VALUE_COLOUR_SCRIPT = "value => {\n" + STYLE_READERS_JS + r"""
 const probe = document.createElement('div');
-probe.setAttribute('style', `color: ${value}`);
+probe.style.cssText = `color: ${value}`;
 probe.textContent = 'probe';
 document.body.appendChild(probe);
 const colour = readColour(probe, 'color');
@@ -239,6 +239,15 @@ ADD_PROBE_SCRIPT = r"""
   holder.innerHTML = markup.trim();
   const probe = holder.content.firstElementChild;
   probe.setAttribute('data-spec041-probe', name);
+  // The page's Content-Security-Policy does not apply a `style` attribute that
+  // markup brings in (Firefox even empties it when the element joins the page);
+  // the same declarations set through the CSSOM, before that, apply.
+  const styled = [probe, ...probe.querySelectorAll('[style]')];
+  for (const element of styled) {
+    if (element.hasAttribute('style')) {
+      element.style.cssText = element.getAttribute('style');
+    }
+  }
   document.body.appendChild(probe);
 }
 """

@@ -18,7 +18,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   room life (rules 4 to 6).
 - `lobby/rooms.md`: the wrong-code throttle (rule 9), whose second instance
   guards the ops API.
-- `platform/server.md`: the store, its room log, serving and the other settings.
+- `platform/server.md`: the store and its room log; serving and the other
+  settings are `platform/serving.md`.
 
 ## Rules
 
@@ -64,7 +65,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
    under `/api/`: 404 `{"detail": "Not Found"}`, no `Cache-Control`, no token
    check, nothing counted. `GET /ops` answers as an unknown path (404); another
    method on `/ops` 405, as on any unknown one-segment path such as `/xyz`, and
-   as while the pages are on.
+   as while the pages are on. A body over the limit gets the 413 of
+   `platform/serving.md` rule 11 first, as on any path.
 
 ### Operator pages on: the ops API
 
@@ -77,7 +79,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 8. On those two routes and the three settings routes (`admin/overrides.md`
    rules 3 to 5), in this order: an address with 10 refusals under 60
    seconds old gets 429 `{"detail": "Too Many Requests"}`, whatever its token,
-   not counted; a request without `Authorization: Bearer <token>` (compared in
+   not counted; a request without `Authorization: Bearer <token>` (the scheme
+   in any case, `bearer` or `BEARER` too, then one space; the token compared in
    constant time; never read from the query, a cookie or the URL) gets 401
    `{"detail": "Not authorized"}` with `WWW-Authenticate: Bearer` and counts one
    refusal; only then are its `days`, code, room or body read.
@@ -86,7 +89,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 10. Any other request under `/api/ops/` gets FastAPI's 404 (unknown path) or 405
     (another method on a route's path), with no token check, not counted. Every
     answer under `/api/ops/`, refusals included, has `Cache-Control: no-store`;
-    `/api/ops` itself answers a plain 404 without it, for every method.
+    `/api/ops` itself answers a plain 404 without it, for every method. A body
+    over the limit gets the 413 of `platform/serving.md` rule 11, `no-store`
+    too, before any of this.
 11. `GET /ops` serves `index.html` to anyone, without a token, or 503 as `/` when
     the client is not built.
 
@@ -294,6 +299,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   Enter loads the dashboard, each period shows the visible focus; the contrast
   and language scans find nothing on the `ready` page, on a computer or a phone;
   no supported window scrolls sideways. (← 038 AC-7)
+- **AC-21** With the right token, `Authorization: bearer <token>`, `BEARER
+  <token>` and `bEaReR <token>` each get the dashboard's 200, 12 times in a row
+  from one address with no 429.
 
 ## Edge cases
 
@@ -311,7 +319,7 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   restart; editing a room's log.
 - An anonymous player's stored data, cookies, the player's own data:
   `account/account.md`.
-  The other environment variables: `platform/server.md`, `lobby/lifetime.md`.
+  The other environment variables: `platform/serving.md`, `lobby/lifetime.md`.
   Overriding the room lives and the sweep interval from `/ops`, the settings
   routes and card: `admin/overrides.md`.
 
@@ -324,4 +332,4 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   `src/nock/__main__.py`: `main()`.
 - `web/src/lib/OpsPage.svelte`, `OpsReplay.svelte`, `ops.ts`, `duration.ts`.
 - Tests: `tests/test_spec_038_ac03*` to `ac11*`, `tests/test_spec_048_ac06*`,
-  `ac09_ac10*`, `ac11_ac12*`.
+  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21.

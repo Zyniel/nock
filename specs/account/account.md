@@ -17,7 +17,8 @@ the player into « Ancien joueur » in the other rooms.
 
 - `lobby/joining.md`: identities, members, seat back, « Mes salons »; the sweep
   is `lobby/lifetime.md`.
-- `platform/server.md`: the database file, `main()`, `NOCK_HOST`, `NOCK_PORT`.
+- `platform/serving.md`: `main()`, `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE`;
+  the store that file names is `platform/server.md` rule 1.
 - `gameplay/results.md`: « Grilles terminées », the history on screen.
 
 ## Rules
@@ -30,7 +31,8 @@ the player into « Ancien joueur » in the other rooms.
    `{"detail": "Not Found"}` whatever the method. On, `GET /account` serves the
    client (503 while it is not built), another method on an account route
    answers 405, and every answer under `/api/account` has `Cache-Control:
-   no-store`.
+   no-store`. On or off, a body over the limit gets the 413 of
+   `platform/serving.md` rule 11 first, `no-store` too.
 2. `main()` before serving, and an app given no settings when it starts, read
    (accounts off: only the first two): `NOCK_PUBLIC_URL`, `http://` or
    `https://`, a host as `NOCK_SMTP_HOST` takes but no IPv6, an optional

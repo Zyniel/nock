@@ -105,10 +105,12 @@ cell => {
     return {found: false};
   }
   cell.scrollIntoView();
-  const style = document.createElement('style');
-  style.textContent = '[data-testid="cell"] *:not([data-testid="cell-selection"])'
-    + ' { pointer-events: auto !important; }';
-  document.head.appendChild(style);
+  // A constructed stylesheet: the page's Content-Security-Policy blocks an
+  // inline `<style>` element, not the CSSOM.
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync('[data-testid="cell"] *:not([data-testid="cell-selection"])'
+    + ' { pointer-events: auto !important; }');
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
   try {
     const corner = triangle.getAttribute('data-corner') || '';
     const cellBox = cell.getBoundingClientRect();
@@ -129,7 +131,9 @@ cell => {
       hit: hit === null ? null : hit.outerHTML.slice(0, 200),
     };
   } finally {
-    style.remove();
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
+      adopted => adopted !== sheet
+    );
   }
 }
 """

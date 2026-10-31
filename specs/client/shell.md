@@ -27,7 +27,7 @@ fonts, focus ring, shared components, state lines).
    (`content/library.md`), `/r/<code>` (6 capitals or digits) the room page,
    `/g/<number>`, `/recap/<token>`, `/account` and `/ops` their domains' pages;
    any other path the client is loaded on shows the page not found. The server
-   serves the client only on page routes (`platform/server.md` rule 12). Every
+   serves the client only on page routes (`platform/serving.md` rule 3). Every
    page sets the document title to `app.title` (« Nock »).
 2. Every string a user reads (text, `alt`, `title`, `placeholder`, `aria-*`
    names, the title) comes from `web/src/i18n/fr.json` through `t()`, which

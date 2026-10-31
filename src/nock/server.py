@@ -49,8 +49,11 @@ from fastapi import (
 )
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from starlette.datastructures import MutableHeaders
+from starlette.requests import ClientDisconnect
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from nock.accounts import (
     LINKS_PER_ADDRESS_PER_HOUR,
@@ -135,7 +138,20 @@ MEMORY_DATABASE: str = ":memory:"
 WS_MAX_SIZE_BYTES: int = 8192  # spec 036: uvicorn refuses larger frames (close 1009)
 OPS_API_ROOT: str = "/api/ops"  # spec 038: hidden too while the pages are off
 OPS_API_PREFIX: str = "/api/ops/"  # spec 038: the paths of the ops API
-BEARER_PREFIX: str = "Bearer "  # spec 038: the operator token's header value
+BEARER_SCHEME: str = "bearer"  # spec 038: the scheme of the token, in any case
+MAX_BODY_BYTES: int = 65_536  # `platform/serving.md` rule 11: a request body's size
+CONTENT_TOO_LARGE_DETAIL: str = "Content Too Large"
+# `platform/serving.md` rule 12: sent with every HTTP answer of the app.
+SECURITY_HEADERS: dict[str, str] = {
+    "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+}
+# `platform/serving.md` rule 13: the Cache-Control of the client's files.
+NOT_KEPT_WITHOUT_ASKING: dict[str, str] = {"Cache-Control": "no-cache"}
+KEPT_FOR_A_YEAR: dict[str, str] = {
+    "Cache-Control": "public, max-age=31536000, immutable"
+}
 NO_STORE: str = "no-store"  # spec 038: the Cache-Control of every ops API answer
 ACCOUNT_PAGE_PATH: str = "/account"  # spec 033: hidden too while accounts are off
 ACCOUNT_API_ROOT: str = "/api/account"  # spec 033: its routes are under it
@@ -807,9 +823,10 @@ def _carries_token(request: Request, token: str) -> bool:
     tell how much of the token was right.
     """
     header = request.headers.get("authorization", "")
-    if not header.startswith(BEARER_PREFIX):
+    scheme, separator, given_token = header.partition(" ")
+    # The scheme is read in any case, then exactly one space.
+    if separator != " " or scheme.lower() != BEARER_SCHEME:
         return False
-    given_token = header.removeprefix(BEARER_PREFIX)
     # As bytes: compare_digest refuses a str that is not ASCII.
     return secrets.compare_digest(given_token.encode("utf-8"), token.encode("utf-8"))
 
@@ -842,7 +859,7 @@ def _index_response(dist_dir: Path) -> Response:
     index_path = dist_dir / "index.html"
     if not index_path.is_file():
         return PlainTextResponse(_MISSING_BUILD_TEXT, status_code=503)
-    return FileResponse(index_path)
+    return FileResponse(index_path, headers=NOT_KEPT_WITHOUT_ASKING)
 
 
 def _published_entry(
@@ -876,8 +893,15 @@ def _is_safe_file_name(name: str) -> bool:
     return ":" not in name
 
 
-def _file_in_directory(directory: Path, name: str) -> FileResponse:
+def _file_in_directory(
+    directory: Path, name: str, cache_headers: dict[str, str]
+) -> FileResponse:
     """Answer with the regular file `name` directly inside `directory`.
+
+    Args:
+        directory: The folder that holds the file.
+        name: The file's name.
+        cache_headers: The Cache-Control header of the 200 answer.
 
     Raises:
         HTTPException: 404 when there is no such file, or `name` leaves `directory`.
@@ -889,7 +913,7 @@ def _file_in_directory(directory: Path, name: str) -> FileResponse:
         raise _not_found()
     if not file_path.is_file():
         raise _not_found()
-    return FileResponse(file_path)
+    return FileResponse(file_path, headers=cache_headers)
 
 
 def _frame_size(raw_message: str | bytes) -> int:
@@ -1022,6 +1046,123 @@ async def _expiry_sweeps(
         await sweeping
 
 
+def _declared_length(scope: Scope) -> int | None:
+    """Return the request's `Content-Length`, or None when it has none."""
+    for name, value in scope["headers"]:
+        if name == b"content-length":
+            try:
+                return int(value)
+            except ValueError:
+                return None
+    return None
+
+
+class _HttpEdge:
+    """The HTTP edge of the app, around everything else (`platform/serving.md`).
+
+    It refuses a request body above MAX_BODY_BYTES with 413 before any handler
+    runs (rule 11), and adds the SECURITY_HEADERS to every HTTP answer (rule 12).
+    A WebSocket scope passes through untouched.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        """Keep the app that the edge wraps."""
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Serve one connection: only an HTTP request is checked and marked."""
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+
+        async def send_with_security_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in SECURITY_HEADERS.items():
+                    headers[name] = value
+            await send(message)
+
+        declared_length = _declared_length(scope)
+        if declared_length is not None:
+            if declared_length > MAX_BODY_BYTES:
+                await self._refuse(scope, receive, send_with_security_headers)
+                return
+            await self._app(scope, receive, send_with_security_headers)
+            return
+
+        # No Content-Length (a chunked body): read the body before the app sees
+        # any of it.
+        try:
+            body = await _read_body_within_limit(receive)
+        except ClientDisconnect:
+            return  # the client left before the end of its request
+        if body is None:
+            await self._refuse(scope, receive, send_with_security_headers)
+            return
+        await self._app(scope, _replay_body(body, receive), send_with_security_headers)
+
+    async def _refuse(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Answer 413, whatever the body that follows. It is never cached."""
+        response = JSONResponse(
+            {"detail": CONTENT_TOO_LARGE_DETAIL},
+            status_code=413,
+            headers={"Cache-Control": "no-store"},
+        )
+        await response(scope, receive, send)
+
+
+async def _read_body_within_limit(receive: Receive) -> bytes | None:
+    """Read a whole request body, stopping as soon as it is over MAX_BODY_BYTES.
+
+    At most one chunk above the limit is read.
+
+    Args:
+        receive: The ASGI `receive` of the request.
+
+    Returns:
+        The whole body, or None when it is over MAX_BODY_BYTES.
+
+    Raises:
+        ClientDisconnect: The client left before the end of its request.
+    """
+    body = bytearray()
+    while True:
+        message = await receive()
+        if message["type"] != "http.request":
+            raise ClientDisconnect("The client left before the end of its request")
+        body.extend(message.get("body", b""))
+        if len(body) > MAX_BODY_BYTES:
+            return None
+        if not message.get("more_body", False):
+            return bytes(body)
+
+
+def _replay_body(body: bytes, receive: Receive) -> Receive:
+    """Return a `receive` that gives `body` first, then what `receive` gives."""
+    is_replayed = False
+
+    async def replay() -> Message:
+        nonlocal is_replayed
+        if not is_replayed:
+            is_replayed = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        return await receive()
+
+    return replay
+
+
+class _EdgeFastAPI(FastAPI):
+    """A FastAPI app whose whole middleware stack sits inside the HTTP edge.
+
+    The edge is outside Starlette's error middleware, so the answer to an
+    unhandled error carries the security headers too.
+    """
+
+    def build_middleware_stack(self) -> ASGIApp:
+        """Build the stack, wrapped in the HTTP edge."""
+        return _HttpEdge(super().build_middleware_stack())
+
+
 def create_app(
     rooms: RoomRegistry | None = None,
     dist_dir: Path | None = None,
@@ -1109,7 +1250,7 @@ def create_app(
             holder.close_if_created()
 
     # No slash redirect: a path ending with "/" matches no route and is a 404.
-    web_app = FastAPI(
+    web_app = _EdgeFastAPI(
         lifespan=lifespan,
         redirect_slashes=False,
         docs_url=None,
@@ -1569,13 +1710,13 @@ def create_app(
 
     @web_app.get("/assets/{file_name}", include_in_schema=False)
     def serve_asset(file_name: str) -> FileResponse:
-        return _file_in_directory(client_dir / "assets", file_name)
+        return _file_in_directory(client_dir / "assets", file_name, KEPT_FOR_A_YEAR)
 
     @web_app.get("/{file_name}", include_in_schema=False)
     def serve_root_file(file_name: str) -> FileResponse:
         if file_name == "api":
             raise _not_found()
-        return _file_in_directory(client_dir, file_name)
+        return _file_in_directory(client_dir, file_name, NOT_KEPT_WITHOUT_ASKING)
 
     async def serve_counted_socket(
         websocket: WebSocket, room_registry: RoomRegistry, code: str, address: str
