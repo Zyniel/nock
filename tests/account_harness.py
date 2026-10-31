@@ -1,4 +1,4 @@
-"""Shared setup of the tests of account/account, AC-19 to AC-21: the grid progress.
+"""Shared setup of the tests of account/account, AC-19 to AC-21 and AC-24 to AC-30.
 
 Pytest does not collect this module (its name does not start with `test_`). The
 tests are in `tests/test_account_*.py`:
@@ -6,6 +6,14 @@ tests are in `tests/test_account_*.py`:
 - `test_account_progress.py`: AC-19 to AC-21, `GET /api/account/progress` over
   HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one
   file, a fake clock).
+- `test_account_erasure.py`, `test_account_erasure_history.py`,
+  `test_account_erasure_record.py`, `test_account_erasure_retry.py`,
+  `test_account_erasure_overlap.py` and `test_account_erasure_once.py`: AC-24 to
+  AC-27, AC-29 and AC-30, the erasure that always finishes, on the same app. Zoé's
+  play (`zoe_in_rooms`, `zoe_in_new_live_room`), the room store that holds a
+  room's engine (`HoldingStore`) and the reading of the erasure's two tables are
+  here.
+- `test_account_returning_device.py`: AC-28, a browser.
 
 Ana's rooms are FX-01 rooms played with the rules (spec 029's `play_fx01`) and
 registered with `add_room`, so that the grid number of each one is chosen. A room
@@ -20,6 +28,11 @@ reads.
 
 from __future__ import annotations
 
+import contextlib
+import sqlite3
+import threading
+import time
+from pathlib import Path
 from typing import NamedTuple
 
 from fastapi.testclient import TestClient
@@ -27,6 +40,8 @@ from httpx2 import Response
 
 from nock.grid import Grid
 from nock.room import RoomState
+from nock.store import RoomStore
+from spec017_harness import open_peer
 from spec029_harness import (
     SOLVE_SECONDS,
     Play,
@@ -36,11 +51,12 @@ from spec029_harness import (
     play_fx01,
     sign_in_from,
 )
-from spec032_harness import ANA, BOB, CY, LIFE, T0, TA, TB, TC
+from spec032_harness import ANA, BOB, CY, LIFE, NO_TICK_CONFIG, T0, TA, TB, TC
 from spec033_harness import (
     ANA_EMAIL,
     AccountApp,
     link_and_sign_in,
+    room_key,
     set_cookie_of,
     with_session,
 )
@@ -180,3 +196,194 @@ def progress_body(client: TestClient, session: str) -> object:
     response = ask_progress(client, session)
     assert response.status_code == 200, response.text
     return response.json()
+
+
+# ---- AC-24 to AC-29: Zoé deletes her account -------------------------------------
+
+ZOE_EMAIL = "zoe.probe@example.org"
+BOB_EMAIL = "bob.probe@example.org"
+ZOE_NICKNAME = "Zoé"
+ZOE_STORED = "ZOÉ"  # as the server stores her nickname (spec 012 decision 12)
+ZOE = "p-zoe"
+TZ = "token-of-zoe-0001"
+# A sweep every 0.1 s of real time, on which no tick changes anything.
+FAST_SWEEP_CONFIG = NO_TICK_CONFIG.model_copy(update={"expiry_sweep_seconds": 0.1})
+
+DELETED_SUBJECT = "Votre compte Nock a été supprimé"
+# Rule 27's text, as `email.deleted.body` holds it.
+DELETED_BODY = (
+    "Bonjour,\n\nVotre compte Nock et les données qui lui étaient liées ont été"
+    " supprimés. Les salons que vous aviez créés sont fermés ; dans les autres,"
+    " vous apparaissez comme « Ancien joueur ».\n\nSi vous n'aviez rien demandé,"
+    " une personne connectée à ce compte l'a supprimé."
+)
+
+
+class ZoeRooms(NamedTuple):
+    """Zoé, signed in, and her three rooms: R and S as a player, U as the creator."""
+
+    session: str
+    account_id: str
+    r_code: str
+    s_code: str
+    zoe_in_r: str
+    zoe_in_s: str
+
+
+def zoe_in_rooms(
+    app: AccountApp, stack: contextlib.ExitStack, grid: Grid, *, s_live: bool
+) -> ZoeRooms:
+    """Zoé plays R and S, signs in and creates U; no request carries her cookie.
+
+    R is live: she enters it by a socket kept open in `stack`, writes nothing, then
+    asks a link from it and signs in. S is another room of hers, linked to her
+    account with `PUT /api/account/rooms`: live by a second socket in `stack` when
+    `s_live`, else a room only in the store, with Bob. U is a room she created, only
+    in the store, where Bob plays (`creator_room`). The session is returned apart,
+    and the client's cookies are cleared: the tests name it with `with_session`.
+    """
+    zoe_in_r = zoe_in_new_live_room(app, stack, grid)
+    signed_in = link_and_sign_in(
+        app, ZOE_EMAIL, room_key(zoe_in_r.code, zoe_in_r.resume_token)
+    )
+    session = set_cookie_of(signed_in).value
+    account_id = account_id_of(app, session)
+    if s_live:
+        zoe_in_s = zoe_in_new_live_room(app, stack, grid)
+        s_code = zoe_in_s.code
+        s_player = zoe_in_s.player_id
+        s_token = zoe_in_s.resume_token
+    else:
+        s_code = "SSSSSS"
+        stored = play_fx01(
+            grid,
+            s_code,
+            [Player(ZOE_NICKNAME, ZOE, TZ), BOB_PLAYER],
+            start=app.clock(),
+            solved_after=None,
+        )
+        app.registry.add_room(stored.state)
+        s_player = ZOE
+        s_token = TZ
+    link_room(app.client, session, s_code, s_token)
+    creator_room(app, Ana(session, account_id), grid, U_CODE, 4, solved=False)
+    app.client.cookies.clear()
+    return ZoeRooms(
+        session, account_id, zoe_in_r.code, s_code, zoe_in_r.player_id, s_player
+    )
+
+
+class LiveMember(NamedTuple):
+    """Zoé's member of a live room: the room's code, her player id and her token."""
+
+    code: str
+    player_id: str
+    resume_token: str
+
+
+def zoe_in_new_live_room(
+    app: AccountApp, stack: contextlib.ExitStack, grid: Grid
+) -> LiveMember:
+    """Register a room on `grid` (grid 1) and make it live with Zoé in it.
+
+    She enters it by a socket kept open in `stack` and writes nothing. Her account,
+    if any, is not linked to the member: the caller signs in from the room
+    (`sign_in_from`) or links it (`link_room`).
+    """
+    code = app.registry.register_room(grid, grid_number=1)
+    zoe = open_peer(stack, app.client, code, ZOE_NICKNAME)
+    snapshot = zoe.snapshot()
+    return LiveMember(code, snapshot.you, snapshot.resume_token)
+
+
+class HoldingStore(RoomStore):
+    """A `RoomStore` whose `erase_player` of one room holds the room's engine.
+
+    `hold` arms it for one room code. While it is armed, each call of
+    `erase_player` for that code sleeps for the hold's seconds, then sets
+    `hold_over` and either raises `RuntimeError` (`fail`) or erases the player as
+    the store does. For a live room the call runs in the step of the room's task,
+    so the engine's loop is blocked for as long. With `once`, the first such call
+    disarms it; `release` disarms it at any time, a hold under way ending as
+    planned. Every other call is the store's own.
+    """
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.hold_over = threading.Event()
+        self._held_code = ""
+        self._hold_seconds = 0.0
+        self._is_failing = False
+        self._is_once = False
+
+    def hold(self, code: str, seconds: float, *, fail: bool, once: bool) -> None:
+        """Arm the hold for room `code`; `hold_over` is cleared."""
+        self.hold_over.clear()
+        self._hold_seconds = seconds
+        self._is_failing = fail
+        self._is_once = once
+        self._held_code = code
+
+    def release(self) -> None:
+        """Disarm the hold: later calls are the store's own."""
+        self._held_code = ""
+
+    def erase_player(self, code: str, player_id: str) -> bool:
+        """Hold (then fail, with `fail`) for the held room; else erase the player."""
+        if self._held_code == "" or code != self._held_code:
+            return super().erase_player(code, player_id)
+        seconds = self._hold_seconds
+        is_failing = self._is_failing
+        if self._is_once:
+            self.release()
+        time.sleep(seconds)
+        self.hold_over.set()
+        if is_failing:
+            raise RuntimeError("the engine was held in this step")
+        return super().erase_player(code, player_id)
+
+
+def nicknames_of(state: RoomState, player_id: str) -> list[str]:
+    """The nickname of each record of the player in `players` and `past_players`."""
+    found = [p.nickname for p in state.players if p.player_id == player_id]
+    found += [p.nickname for p in state.past_players if p.player_id == player_id]
+    return found
+
+
+class ErasureRow(NamedTuple):
+    """One row of `account_erasures`, as the file holds it."""
+
+    account_id: str | None
+    email: str | None
+    requested_at: float
+    done_at: float | None
+    notified_at: float | None
+    attempts: int
+    players: int
+    rooms_deleted: int
+
+
+def erasure_rows(database_path: Path) -> list[ErasureRow]:
+    """The rows of `account_erasures`, oldest request first, read on a connection."""
+    with contextlib.closing(sqlite3.connect(database_path)) as connection:
+        rows = connection.execute(
+            "SELECT account_id, email, requested_at, done_at, notified_at, attempts,"
+            " players, rooms_deleted FROM account_erasures ORDER BY erasure_id"
+        ).fetchall()
+    found: list[ErasureRow] = []
+    for row in rows:
+        found.append(ErasureRow(*row))
+    return found
+
+
+def listed_players(database_path: Path) -> list[tuple[str, str]]:
+    """The (code, player id) of each row of `account_erasure_players`, in order."""
+    with contextlib.closing(sqlite3.connect(database_path)) as connection:
+        rows = connection.execute(
+            "SELECT code, player_id FROM account_erasure_players"
+            " ORDER BY code, player_id"
+        ).fetchall()
+    found: list[tuple[str, str]] = []
+    for code, player_id in rows:
+        found.append((code, player_id))
+    return found

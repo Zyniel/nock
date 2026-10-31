@@ -103,6 +103,7 @@ ZELIE_NICKNAME = "Zélie-Probe"
 ZELIE_STORED = "ZÉLIE-PROBE"  # as the server stores it (spec 012 decision 12)
 LINKED_AT = 1.0
 LINKED_AFTER_ERASURE_AT = 2.0
+DELETED_AT = 1.5
 RESUME_WINDOW = 300.0  # spec 017's resume window, RoomConfig's default
 
 
@@ -708,7 +709,7 @@ def test_ac4_d_a_link_after_the_erasure_returns_false(
     account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
     identity = zelie_identity()
     assert account_store.link_identity(account_id, identity, LINKED_AT) is True
-    account_store.delete_account(account_id)
+    account_store.delete_account(account_id, DELETED_AT)
 
     linked = account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
 
@@ -721,7 +722,7 @@ def test_ac4_d_a_link_after_the_erasure_leaves_no_identity(
     account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
     identity = zelie_identity()
     assert account_store.link_identity(account_id, identity, LINKED_AT) is True
-    account_store.delete_account(account_id)
+    account_store.delete_account(account_id, DELETED_AT)
 
     account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
 
@@ -734,7 +735,7 @@ def test_ac4_d_a_link_after_the_erasure_writes_no_row_in_the_table(
     account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
     identity = zelie_identity()
     assert account_store.link_identity(account_id, identity, LINKED_AT) is True
-    account_store.delete_account(account_id)
+    account_store.delete_account(account_id, DELETED_AT)
 
     account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
     rows = identity_rows_of(tmp_path / DATABASE_FILE_NAME, account_id)
@@ -748,7 +749,7 @@ def test_ac4_d_a_link_after_the_erasure_leaves_no_nickname_in_the_files(
     account_id = account_store.sign_in(ZELIE_EMAIL, 0.0).account_id
     identity = zelie_identity()
     assert account_store.link_identity(account_id, identity, LINKED_AT) is True
-    account_store.delete_account(account_id)
+    account_store.delete_account(account_id, DELETED_AT)
 
     account_store.link_identity(account_id, identity, LINKED_AFTER_ERASURE_AT)
     data = database_bytes(tmp_path / DATABASE_FILE_NAME)
@@ -761,15 +762,18 @@ def delete_the_account_before_each_link(
 ) -> None:
     """Make the app's `link_identity` run a deletion first, as a race would.
 
-    The replacement does what `DELETE /api/account` does (the account goes, then
-    each of its players is erased from the rooms), then calls the original.
+    The replacement does what `DELETE /api/account` does (the account goes with a
+    pending erasure, each of its players is erased from the rooms, the erasure is
+    done), then calls the original.
     """
     original_link_identity = app.accounts.link_identity
 
     def deleting_first(account_id: str, identity: RoomIdentity, now: float) -> bool:
-        erased_identities = app.accounts.delete_account(account_id)
-        for erased in erased_identities:
-            app.registry.erase_player(erased.code, erased.player_id)
+        pending = app.accounts.delete_account(account_id, now)
+        if pending is not None:
+            for erased in pending.players:
+                app.registry.erase_player(erased.code, erased.player_id)
+            app.accounts.finish_erasure(pending.erasure_id, now, None)
         return original_link_identity(account_id, identity, now)
 
     monkeypatch.setattr(app.accounts, "link_identity", deleting_first)
