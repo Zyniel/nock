@@ -52,6 +52,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.datastructures import MutableHeaders
+from starlette.requests import ClientDisconnect
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from nock.accounts import (
@@ -1089,27 +1090,51 @@ class _HttpEdge:
             await self._app(scope, receive, send_with_security_headers)
             return
 
-        # No Content-Length (a chunked body): read the body, at most one chunk
-        # above the limit, before the app sees any of it.
-        body = bytearray()
-        while True:
-            message = await receive()
-            if message["type"] != "http.request":
-                return  # the client left before the end of its request
-            body.extend(message.get("body", b""))
-            if len(body) > MAX_BODY_BYTES:
-                await self._refuse(scope, receive, send_with_security_headers)
-                return
-            if not message.get("more_body", False):
-                break
-        await self._app(
-            scope, _replay_body(bytes(body), receive), send_with_security_headers
-        )
+        # No Content-Length (a chunked body): read the body before the app sees
+        # any of it.
+        try:
+            body = await _read_body_within_limit(receive)
+        except ClientDisconnect:
+            return  # the client left before the end of its request
+        if body is None:
+            await self._refuse(scope, receive, send_with_security_headers)
+            return
+        await self._app(scope, _replay_body(body, receive), send_with_security_headers)
 
     async def _refuse(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Answer 413, whatever the body that follows."""
-        response = JSONResponse({"detail": CONTENT_TOO_LARGE_DETAIL}, status_code=413)
+        """Answer 413, whatever the body that follows. It is never cached."""
+        response = JSONResponse(
+            {"detail": CONTENT_TOO_LARGE_DETAIL},
+            status_code=413,
+            headers={"Cache-Control": "no-store"},
+        )
         await response(scope, receive, send)
+
+
+async def _read_body_within_limit(receive: Receive) -> bytes | None:
+    """Read a whole request body, stopping as soon as it is over MAX_BODY_BYTES.
+
+    At most one chunk above the limit is read.
+
+    Args:
+        receive: The ASGI `receive` of the request.
+
+    Returns:
+        The whole body, or None when it is over MAX_BODY_BYTES.
+
+    Raises:
+        ClientDisconnect: The client left before the end of its request.
+    """
+    body = bytearray()
+    while True:
+        message = await receive()
+        if message["type"] != "http.request":
+            raise ClientDisconnect("The client left before the end of its request")
+        body.extend(message.get("body", b""))
+        if len(body) > MAX_BODY_BYTES:
+            return None
+        if not message.get("more_body", False):
+            return bytes(body)
 
 
 def _replay_body(body: bytes, receive: Receive) -> Receive:
