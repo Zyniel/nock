@@ -1,4 +1,5 @@
-"""Shared setup of the tests of `client/hud.md`: the room-gone dialog (rule 16).
+"""Shared setup of the tests of `client/hud.md`: the room-gone dialog (rule 16) and
+the focus kept in the overlays and the room sheets (rules 12 and 13).
 
 Pytest does not collect this module (its name does not start with `test_`). It
 holds what the tests of AC-21 and AC-22 (`test_hud_room_gone.py`) share: the
@@ -9,6 +10,12 @@ reconnecting with a letter not yet answered), and the checks of the dialog's loo
 It reuses spec 043's mocked room and snapshots (`open_room`, `RoomMock.close`),
 spec 042's box and pixel readers, spec 046's content box and button colours, and
 spec 047's checks of the recap's frame, which the dialog shares.
+
+For AC-23 to AC-25 (`test_hud_overlay_focus.py`), and for the tests of
+`lobby/host.md` AC-18 to AC-20, `gameplay/hints.md` AC-24 and `account/account.md`
+AC-34, which share them: the host's sheet on a mocked room (`open_host_sheet`),
+the `host_changed` frame, and a press at one point released at another
+(`press_and_release`), the way a drag between a sheet and its backdrop reads.
 
 Readings where the spec leaves room:
 
@@ -34,7 +41,8 @@ from typing import NamedTuple
 from playwright.sync_api import Locator, Page, expect
 
 from nock.grid import Grid
-from room_panels import show_tab
+from nock.protocol import HostChanged
+from room_panels import open_host_settings, open_host_settings_with_keyboard, show_tab
 from spec042_harness import Box, box_of, pixel_at, wait_until
 from spec043_harness import (
     FX01_SOLUTION,
@@ -359,3 +367,58 @@ def box_holds(box: Box, x: float, y: float) -> bool:
     inside_x = box.left - 1.0 <= x <= box.right + 1.0
     inside_y = box.top - 1.0 <= y <= box.bottom + 1.0
     return inside_x and inside_y
+
+
+# ---- The room sheets: the host's settings and the pointer (rule 13) -----------------
+
+# A point of the backdrop at 1280 by 720: left of the centred sheet, clear of the
+# top bar's buttons.
+COMPUTER_BACKDROP_POINT = (20.0, 360.0)
+DRAG_STEPS = 4
+
+
+def open_host_sheet(
+    page: Page, base_url: str, grid: Grid, *, keyboard: bool = False
+) -> RoomMock:
+    """Open FX-01 as the host `p1` (3 players) and open the host's settings.
+
+    Args:
+        page: A fresh page, in the window the test wants.
+        base_url: The live server.
+        grid: FX-01.
+        keyboard: Whether the sheet is opened with the keyboard only.
+
+    Returns:
+        The mocked socket, once the sheet is open.
+    """
+    mock = open_fx01_room(page, base_url, grid)
+    if keyboard:
+        open_host_settings_with_keyboard(page)
+    else:
+        open_host_settings(page)
+    return mock
+
+
+def host_changed_frame(seq: int, new_host: str) -> str:
+    """The `host_changed` frame that gives the host role to `new_host`."""
+    return HostChanged(seq=seq, player_id=new_host).model_dump_json()
+
+
+def centre_of(locator: Locator) -> tuple[float, float]:
+    """Return the centre of an element, in page pixels."""
+    box = box_of(locator)
+    return (box.centre_x, box.centre_y)
+
+
+def press_and_release(
+    page: Page, start: tuple[float, float], end: tuple[float, float]
+) -> None:
+    """Press the mouse at `start` and release it at `end`: a drag.
+
+    A click is the press and the release at one point; here the two differ, as when
+    a player starts in a field of a sheet and lets go over its backdrop.
+    """
+    page.mouse.move(start[0], start[1])
+    page.mouse.down()
+    page.mouse.move(end[0], end[1], steps=DRAG_STEPS)
+    page.mouse.up()
