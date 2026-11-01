@@ -4,7 +4,7 @@ title: One room sheet, focus kept in overlays
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T22:16:00Z'
+updated_date: '2026-11-01T22:48:00Z'
 labels:
   - domain:hud
   - domain:host
@@ -101,4 +101,6 @@ Lead, on the spec-writer's questions: (1) one error line « Entrez un nombre ent
 Spec-checker: CHANGES REQUESTED in round 1 (rule 12's edge case and a press on the overlay's button, rule 13's wording, account rule 14's catalogue case, the look in host rule 8), APPROVED in round 2. Lead, on its optional notes: a Tab or Shift+Tab onto an element outside an open overlay closes it wherever the focus was, the mute case included; a press on its own button (« Aide », « Menu », « Salon ») closes it once.
 
 Lead: merging origin/main (B-041) clashed on hints AC-24, which B-041 took for its offline requests; B-045's criterion of the vote's focus is hints AC-25 (spec, test name and this task renumbered in the merge commit, text unchanged).
+
+Reviewer round 1: CHANGES REQUESTED. (1) Blocking: rule 12's case of a Tab from the browser's own controls cannot be seen by the page (no keydown reaches it), so the Salon sheet closes only on the next Tab inside the page. Lead: option (b), the spec states that limit (the harm is one Tab, the focus on the visible top bar); option (a), guessing a Tab from a focusin after the window regains focus, would misfire on the mute case and cannot be tested headless. (2) Taken: the vote's focus moves to the grid only from « Oui » or « Non », not from the status line a ballot focuses. (3) Taken: hud_harness.py's docstring renumbered to hints AC-25. (4) Taken: hud.md rule 12 rewrapped. The spec 035 AC-2 test edit (the walk starts inside the Salon sheet) keeps what AC-2 checks, per the reviewer.
 <!-- SECTION:NOTES:END -->

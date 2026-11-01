@@ -1402,7 +1402,11 @@
       return
     }
     const focused = document.activeElement
-    if (voteBanner !== null && focused !== null && voteBanner.contains(focused)) {
+    // The banner's only buttons are « Oui » and « Non »: the status line that
+    // replaces them after a ballot is not a button and keeps the focus.
+    const isOnBallotButton =
+      focused instanceof HTMLButtonElement && voteBanner !== null && voteBanner.contains(focused)
+    if (isOnBallotButton) {
       gridViewport?.focusGrid()
     }
   })
