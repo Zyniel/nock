@@ -9,11 +9,14 @@
     arrowSide,
     arrowsByCell,
     clampZoom,
+    dashesImage,
     distanceBetween,
     fitCellSize,
     hyphenDashes,
     hyphenDrawings,
     hyphenThickness,
+    hyphenWidthAfter,
+    hyphenWidthBefore,
     hyphensByCell,
     triangleSide,
   } from './gridLayout'
@@ -27,7 +30,7 @@
   import IconShapes from './IconShapes.svelte'
   import PlayerIcon from './PlayerIcon.svelte'
   import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
-  import { shownCell, shownGrid } from './roomSession'
+  import { latestPendingEdits, shownCellWith, shownGrid } from './roomSession'
   import type {
     CaughtUpCell,
     CellFlash,
@@ -37,7 +40,8 @@
   } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
   import type { Position, Selection, Word } from './wordSelection'
-  import type { Corner, RemoteSelection } from './remoteSelections'
+  import { NO_REMOTES, remotesByCell } from './remoteSelections'
+  import type { CellRemotes, Corner, RemoteSelection } from './remoteSelections'
   import type { ClueFlagMarker } from './clueFlags'
   import type { ClueReactionMarker } from './chat'
 
@@ -133,12 +137,6 @@
     'bottom-left': '0,0 10,10 0,10',
   }
 
-  // A remote selection that holds a corner of its cell, the one drawn there.
-  interface DrawnCursor {
-    remote: RemoteSelection
-    corner: Corner
-  }
-
   // The colour index of a letter cell's finder (see finderColour), or '' while
   // the Auteurs mode is off: then no cell has a finder.
   function finderOf(cell: LetterCellView): string {
@@ -166,38 +164,44 @@
     return `cell-${row}-${column}`
   }
 
-  // The cursors drawn on a cell: the remote selections there that hold a
-  // corner. A player who waits for a corner is not drawn.
-  function cursorsOn(row: number, column: number): DrawnCursor[] {
-    const drawn: DrawnCursor[] = []
-    for (const remote of remoteSelections) {
-      if (remote.row === row && remote.column === column && remote.corner !== null) {
-        drawn.push({ remote, corner: remote.corner })
-      }
+  // What a frame redraws (client/shell.md rule 18): each letter cell reads
+  // what it draws from the maps below, by its "row,column", and a cell whose
+  // value stays the same does not draw again. A cell with nothing to draw
+  // finds no entry, and takes one shared empty value.
+
+  // What the other players draw on each cell. The map before is kept, so that
+  // a cell they did not change keeps its value (see remotesByCell).
+  let previousRemotes = new Map<string, CellRemotes>()
+  let remotesOfCells = $derived.by(() => {
+    const next = remotesByCell(remoteSelections, previousRemotes)
+    previousRemotes = next
+    return next
+  })
+
+  // The colour index of the flash of each flashing cell, as text.
+  let flashOfCells = $derived(flashColoursByCell(flashes))
+
+  function flashColoursByCell(cellFlashes: CellFlash[]): Map<string, string> {
+    const colours = new Map<string, string>()
+    for (const flash of cellFlashes) {
+      colours.set(positionKey(flash.row, flash.column), String(flash.colour))
     }
-    return drawn
+    return colours
   }
 
-  // The remote selections whose word holds a cell, in roster order.
-  function tintsOn(row: number, column: number): RemoteSelection[] {
-    const key = positionKey(row, column)
-    return remoteSelections.filter((remote) => remote.wordPositions.has(key))
-  }
+  // The cells a catch-up highlights (spec 034).
+  let caughtUpKeys = $derived(caughtUpKeysOf(caughtUpCells))
 
-  // The colour index of the flash on a cell, or '' when it does not flash.
-  function flashOf(row: number, column: number): string {
-    for (const flash of flashes) {
-      if (flash.row === row && flash.column === column) {
-        return String(flash.colour)
-      }
+  function caughtUpKeysOf(cells: CaughtUpCell[]): Set<string> {
+    const keys = new Set<string>()
+    for (const cell of cells) {
+      keys.add(positionKey(cell.row, cell.column))
     }
-    return ''
+    return keys
   }
 
-  // True while a catch-up highlights the cell (spec 034).
-  function isCaughtUp(row: number, column: number): boolean {
-    return caughtUpCells.some((cell) => cell.row === row && cell.column === column)
-  }
+  // The newest pending edit of each cell.
+  let latestEdits = $derived(latestPendingEdits(pendingEdits))
 
   // The arrows drawn in a letter cell: those of the clues whose word starts
   // there (spec 042).
@@ -211,12 +215,11 @@
     return hyphensOfCells.get(positionKey(row, column)) ?? null
   }
 
-  // What a letter cell draws for the hyphen edges that touch it, at the
-  // current cell size.
+  // What a letter cell draws for the hyphen edges that touch it. What
+  // depends on the cell size is set on the grid (hyphenStyle).
   function hyphenDrawingsOn(hyphens: CellHyphens, row: number, column: number): EdgeDrawing[] {
     return hyphenDrawings(
       hyphens,
-      hyphenThickness(cellSize),
       isSelected(row, column),
       isSelected(row, column + 1),
       isSelected(row + 1, column),
@@ -319,9 +322,33 @@
 
   let fitSize = $derived(fitCellSize(areaWidth, areaHeight, grid.width, grid.height))
   let cellSize = $derived(fitSize * zoom)
-  // The dashes of every hyphen edge at the current cell size: they read the
-  // cell's side, as « Hyphen edges » gives them.
-  let dashes = $derived(hyphenDashes(cellSize))
+  // The dashes of every hyphen edge at the current cell size, as « Hyphen
+  // edges » gives them, and their thickness. They are set on the grid, as
+  // variables HyphenEdge.svelte reads, so that a pinch changes no cell's
+  // drawing (client/shell.md rule 18).
+  let hyphenStyle = $derived(hyphenStyleOf(cellSize))
+
+  interface HyphenStyle {
+    widthBefore: string
+    widthAfter: string
+    dashesDown: string
+    dashesAcross: string
+    bandDashesDown: string
+    bandDashesAcross: string
+  }
+
+  function hyphenStyleOf(side: number): HyphenStyle {
+    const dashes = hyphenDashes(side)
+    const thickness = hyphenThickness(side)
+    return {
+      widthBefore: `${hyphenWidthBefore(thickness)}px`,
+      widthAfter: `${hyphenWidthAfter(thickness)}px`,
+      dashesDown: dashesImage(dashes, 'to bottom', 'var(--nock-hyphen)'),
+      dashesAcross: dashesImage(dashes, 'to right', 'var(--nock-hyphen)'),
+      bandDashesDown: dashesImage(dashes, 'to bottom', 'var(--nock-navy)'),
+      bandDashesAcross: dashesImage(dashes, 'to right', 'var(--nock-navy)'),
+    }
+  }
 
   // The exact size of the viewport, rounded down. clientWidth and clientHeight
   // round to the nearest pixel, sometimes up, and a grid fitted to them then
@@ -618,6 +645,13 @@
     data-word={activeKey}
     class:authors-view={isAuthorsViewOn}
     style:--cell="{cellSize}px"
+    style:--triangle="{triangleSide(cellSize)}px"
+    style:--hyphen-width-before={hyphenStyle.widthBefore}
+    style:--hyphen-width-after={hyphenStyle.widthAfter}
+    style:--hyphen-dashes-down={hyphenStyle.dashesDown}
+    style:--hyphen-dashes-across={hyphenStyle.dashesAcross}
+    style:--band-dashes-down={hyphenStyle.bandDashesDown}
+    style:--band-dashes-across={hyphenStyle.bandDashesAcross}
     style:grid-template-columns="repeat({grid.width}, var(--cell))"
     style:grid-auto-rows="var(--cell)"
   >
@@ -625,13 +659,15 @@
       <div class="row" data-testid="grid-row" role="row" data-row={rowIndex}>
         {#each rowCells as cell (cell.column)}
           {#if cell.type === 'letter'}
-            {@const shown = shownCell(cell, pendingEdits)}
-            {@const cursors = cursorsOn(cell.row, cell.column)}
-            {@const tints = tintsOn(cell.row, cell.column)}
-            {@const isInWord = wordPositions.has(positionKey(cell.row, cell.column))}
+            {@const key = positionKey(cell.row, cell.column)}
+            {@const latestEdit = latestEdits.get(key) ?? null}
+            {@const shown = shownCellWith(cell, latestEdit)}
+            {@const remotes = remotesOfCells.get(key) ?? NO_REMOTES}
+            {@const isInWord = wordPositions.has(key)}
+            {@const isCellSelected = isSelected(cell.row, cell.column)}
             {@const finder = finderOf(cell)}
-            {@const caughtUp = isCaughtUp(cell.row, cell.column)}
-            {@const flash = flashOf(cell.row, cell.column)}
+            {@const caughtUp = caughtUpKeys.has(key)}
+            {@const flash = flashOfCells.get(key) ?? ''}
             {@const letter = shown.letter ?? ''}
             {@const hyphens = hyphensOn(cell.row, cell.column)}
             {@const edges = hyphens === null ? [] : hyphenDrawingsOn(hyphens, cell.row, cell.column)}
@@ -650,7 +686,7 @@
               data-type="letter"
               role="gridcell"
               id={cellId(cell.row, cell.column)}
-              aria-selected={isSelected(cell.row, cell.column)}
+              aria-selected={isCellSelected}
               data-letter={letter}
               data-unconfirmed={String(shown.unconfirmed)}
               data-pencil={String(shown.pencil)}
@@ -661,17 +697,18 @@
               data-wrong={String(cell.wrong && !shown.unconfirmed)}
               data-flash={flash}
               data-caught-up={String(caughtUp)}
-              data-selected={String(isSelected(cell.row, cell.column))}
+              data-selected={String(isCellSelected)}
               data-in-word={String(isInWord)}
-              data-tinted-by={tints.map((remote) => remote.playerId).join(' ')}
-              class:selected={isSelected(cell.row, cell.column)}
+              data-tinted-by={remotes.tintedBy.join(' ')}
+              class:selected={isCellSelected}
               class:in-word={isInWord}
-              class:tinted={tints.length > 0 && isOthersTintOn}
+              class:tinted={remotes.tintColour !== null && isOthersTintOn}
               class:hyphen-right={hyphens?.right === true}
               class:hyphen-bottom={hyphens?.bottom === true}
-              style:--tint={tints.length > 0 ? `var(--player-colour-${tints[0].colour})` : null}
+              style:--tint={remotes.tintColour === null
+                ? null
+                : `var(--player-colour-${remotes.tintColour})`}
               style:--finder-ink={letterColourOf(finder)}
-              style:--triangle="{triangleSide(cellSize)}px"
               style:grid-row={cell.row + 1}
               style:grid-column={cell.column + 1}
             >{#if letter !== ''}<span class="cell-letter" data-testid="cell-letter"
@@ -681,10 +718,7 @@
                   data-testid="cell-flash"
                   aria-hidden="true"
                   style:background-color={`var(--player-colour-${flash})`}
-                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'hyphen'}<HyphenEdge
-                    drawing={edge}
-                    {dashes}
-                  />{/if}{/each}{#if hyphens?.right === true && hyphens.bottom}<span
+                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'hyphen'}<HyphenEdge drawing={edge} />{/if}{/each}{#if hyphens?.right === true && hyphens.bottom}<span
                   class="hyphen-corner"
                   aria-hidden="true"
                 ></span>{/if}{#if caughtUp}<span
@@ -697,16 +731,16 @@
                   aria-hidden="true"
                 ></span><span class="visually-hidden" data-testid="reveal-label"
                   >{t('a11y.revealed')}</span
-                >{/if}{#each cursors as cursor (cursor.remote.playerId)}<span
+                >{/if}{#each remotes.cursors as cursor (cursor.playerId)}<span
                   class="remote-selection"
                   data-testid="remote-selection"
-                  data-player-id={cursor.remote.playerId}
-                  data-colour={String(cursor.remote.colour)}
+                  data-player-id={cursor.playerId}
+                  data-colour={String(cursor.colour)}
                   data-corner={cursor.corner}
                   data-shape={isAccessibilityOn ? 'icon' : 'triangle'}
                   aria-hidden="true"
                   >{#if isAccessibilityOn}<PlayerIcon
-                      colour={cursor.remote.colour}
+                      colour={cursor.colour}
                     />{:else}<svg
                       class="triangle"
                       viewBox="0 0 10 10"
@@ -714,7 +748,7 @@
                       aria-hidden="true"
                       ><polygon
                         points={TRIANGLE_POINTS[cursor.corner]}
-                        style:fill={`var(--player-colour-${cursor.remote.colour})`}
+                        style:fill={`var(--player-colour-${cursor.colour})`}
                       /></svg
                     >{/if}</span
                 >{/each}{#each arrowsIn(cell.row, cell.column) as placed (`${placed.clueRow},${placed.clueColumn},${placed.clueIndex}`)}<svg
@@ -727,17 +761,18 @@
                   data-clue-index={placed.clueIndex}
                   aria-hidden="true"
                   viewBox="0 0 24 24"
+                  ><g class="halo"
+                    ><path d={ARROW_GLYPHS[placed.arrow].path} /><polygon
+                      points={ARROW_GLYPHS[placed.arrow].head}
+                    /></g
                   ><path d={ARROW_GLYPHS[placed.arrow].path} /><polygon
                     points={ARROW_GLYPHS[placed.arrow].head}
                   /></svg
-                >{/each}{#if isSelected(cell.row, cell.column)}<span
+                >{/each}{#if isCellSelected}<span
                   class="cell-selection"
                   data-testid="cell-selection"
                   aria-hidden="true"
-                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'band'}<HyphenEdge
-                    drawing={edge}
-                    {dashes}
-                  />{/if}{/each}</div>
+                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'band'}<HyphenEdge drawing={edge} />{/if}{/each}</div>
           {:else if cell.type === 'clue'}
             <div
               class="cell clue-cell"
@@ -1133,7 +1168,7 @@
 
   /* A direction arrow (spec 042), in the letter cell where its word starts:
      a box of side --arrow whose edge at -1px lies on the grid line, over every
-     mark of the cell but my selection border, with a thin white halo. */
+     mark of the cell but my selection border. */
   .clue-arrow {
     --arrow: max(9px, calc(var(--cell) * 0.26));
     position: absolute;
@@ -1141,7 +1176,6 @@
     width: var(--arrow);
     height: var(--arrow);
     pointer-events: none;
-    filter: drop-shadow(0 0 0.8px var(--nock-white)) drop-shadow(0 0 0.8px var(--nock-white));
   }
 
   .clue-arrow path {
@@ -1154,6 +1188,21 @@
 
   .clue-arrow polygon {
     fill: var(--nock-ink);
+  }
+
+  /* The thin white halo (_design/cells.md « Direction arrows »): the same path
+     and head drawn first, under the ink, in white and wider, so 1.2 units of
+     white border every ink edge. Drawn, never a CSS filter. */
+  .clue-arrow .halo path {
+    stroke: var(--nock-white);
+    stroke-width: 4.8;
+  }
+
+  .clue-arrow .halo polygon {
+    fill: var(--nock-white);
+    stroke: var(--nock-white);
+    stroke-width: 2.4;
+    stroke-linejoin: round;
   }
 
   /* The places of gridLayout.ts (ArrowPlace). */

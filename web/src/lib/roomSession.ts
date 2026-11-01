@@ -1233,11 +1233,28 @@ function receiveSelectionMoved(session: RoomSession, message: Record<string, unk
   if (session.snapshot === null || message.player_id === session.snapshot.you) {
     return
   }
+  const selection = toSelection(message.selection)
   for (const player of session.snapshot.players) {
     if (player.player_id === message.player_id && player.state !== 'disconnected') {
-      player.selection = toSelection(message.selection)
+      // A selection the player already holds changes nothing: nothing drawn
+      // from it draws again (client/shell.md rule 18).
+      if (!isSameSelection(player.selection, selection)) {
+        player.selection = selection
+      }
     }
   }
+}
+
+// True when both are no selection, or the same cell and direction.
+function isSameSelection(first: PlayerSelection | null, second: PlayerSelection | null): boolean {
+  if (first === null || second === null) {
+    return first === second
+  }
+  return (
+    first.row === second.row &&
+    first.column === second.column &&
+    first.direction === second.direction
+  )
 }
 
 // True when the clue reference names a clue of the grid.
@@ -1394,16 +1411,52 @@ export function addPendingEdit(
 export function shownCell(
   cell: LetterCellView,
   pendingEdits: PendingEdit[],
-): { letter: string | null; pencil: boolean; unconfirmed: boolean } {
-  if (!cell.locked) {
-    for (let index = pendingEdits.length - 1; index >= 0; index--) {
-      const edit = pendingEdits[index]
-      if (edit.row === cell.row && edit.column === cell.column) {
-        return { letter: edit.letter, pencil: edit.kind === 'pencil', unconfirmed: true }
-      }
+): ShownLetter {
+  for (let index = pendingEdits.length - 1; index >= 0; index--) {
+    const edit = pendingEdits[index]
+    if (edit.row === cell.row && edit.column === cell.column) {
+      return shownCellWith(cell, edit)
     }
   }
+  return shownCellWith(cell, null)
+}
+
+// What a letter cell shows (see shownCell).
+export interface ShownLetter {
+  letter: string | null
+  pencil: boolean
+  unconfirmed: boolean
+}
+
+// What a cell shows, from its newest pending edit (null: it has none). As
+// shownCell, for a page that keeps the newest edit of each cell
+// (latestPendingEdits).
+export function shownCellWith(cell: LetterCellView, latestEdit: PendingEdit | null): ShownLetter {
+  if (!cell.locked && latestEdit !== null) {
+    return { letter: latestEdit.letter, pencil: latestEdit.kind === 'pencil', unconfirmed: true }
+  }
   return { letter: cell.letter, pencil: cell.pencil, unconfirmed: false }
+}
+
+// The newest pending edit of each cell, by "row,column" (positionKey of
+// wordSelection.ts). A cell with no pending edit has no entry.
+export function latestPendingEdits(pendingEdits: PendingEdit[]): Map<string, PendingEdit> {
+  const latest = new Map<string, PendingEdit>()
+  for (const edit of pendingEdits) {
+    latest.set(`${edit.row},${edit.column}`, edit)
+  }
+  return latest
+}
+
+// The letter cells of a grid, by "row,column" (positionKey of wordSelection.ts).
+export function letterCellIndex(grid: GridView): Map<string, LetterCellView> {
+  const index = new Map<string, LetterCellView>()
+  for (const cell of grid.cells) {
+    if (cell.type === 'letter') {
+      index.set(`${cell.row},${cell.column}`, cell)
+    }
+  }
+  return index
 }
 
 // The grid as the player sees it: every letter cell holds its shown letter, so

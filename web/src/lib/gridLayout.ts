@@ -249,16 +249,42 @@ export function hyphenWidthAfter(thickness: number): number {
   return thickness >= 2 ? 1 : 0
 }
 
+// The direction the dashes of an edge run in: down a right or left side, to
+// the right along a bottom or top side.
+export type DashDirection = 'to bottom' | 'to right'
+
+// The dashes of an edge as a CSS image: a gradient of hard stops, in `colour`
+// on each dash and transparent between them. Every stop is a whole number of
+// px from the edge's start, as the dashes are, so no pixel is blended.
+//
+// The grid holds it in a variable, set from the cell side: a pinch then
+// changes the grid's style and no cell's (client/shell.md rule 18).
+export function dashesImage(dashes: DashRun[], direction: DashDirection, colour: string): string {
+  const stops: string[] = []
+  let previousEnd = 0
+  for (const dash of dashes) {
+    stops.push(`transparent ${previousEnd}px ${dash.start}px`)
+    stops.push(`${colour} ${dash.start}px ${dash.end}px`)
+    previousEnd = dash.end
+  }
+  stops.push(`transparent ${previousEnd}px`)
+  return `linear-gradient(${direction}, ${stops.join(', ')})`
+}
+
 // A side of a letter cell that a hyphen edge runs along.
 export type EdgeSide = 'right' | 'bottom' | 'left' | 'top'
 
-// What one cell draws along one side for a hyphen edge, `width` px across:
+// What one cell draws along one side for a hyphen edge:
 // - 'hyphen': its share of the dashes in hyphen grey, under every mark;
 // - 'band': its share of my selection border's dashed side, navy dashes with
 //   gaps in the selected blue, over every mark.
 export interface EdgeDrawing {
   side: EdgeSide
-  width: number
+  // A band's width across, in px. null for the dashes: their width is the
+  // cell's share of the thickness (hyphenWidthBefore on the right and bottom
+  // sides, hyphenWidthAfter on the left and top), which depends on the cell
+  // side and so is set on the grid.
+  width: number | null
   kind: 'hyphen' | 'band'
 }
 
@@ -270,17 +296,15 @@ const SELECTION_BAND_PX = SELECTION_BORDER_PX + GRID_LINE_PX
 // What a letter cell draws for the hyphen edges that touch it. On my selected
 // cell, the side along a hyphen edge is the dashed band; the grid line's pixel
 // of that band lies in the cell before the edge, which draws it when the cell
-// after is my selected one.
+// after is my selected one. The cell after the edge always has its share of
+// the dashes: it is 0 px wide while the thickness is 1 px.
 export function hyphenDrawings(
   hyphens: CellHyphens,
-  thickness: number,
   isSelected: boolean,
   isRightSelected: boolean,
   isBelowSelected: boolean,
 ): EdgeDrawing[] {
   const drawings: EdgeDrawing[] = []
-  const widthBefore = hyphenWidthBefore(thickness)
-  const widthAfter = hyphenWidthAfter(thickness)
 
   const sidesBefore: { side: EdgeSide; isAfterSelected: boolean }[] = []
   if (hyphens.right) {
@@ -290,7 +314,7 @@ export function hyphenDrawings(
     sidesBefore.push({ side: 'bottom', isAfterSelected: isBelowSelected })
   }
   for (const { side, isAfterSelected } of sidesBefore) {
-    drawings.push({ side, width: widthBefore, kind: 'hyphen' })
+    drawings.push({ side, width: null, kind: 'hyphen' })
     if (isSelected) {
       drawings.push({ side, width: SELECTION_BAND_PX, kind: 'band' })
     } else if (isAfterSelected) {
@@ -306,9 +330,7 @@ export function hyphenDrawings(
     sidesAfter.push('top')
   }
   for (const side of sidesAfter) {
-    if (widthAfter > 0) {
-      drawings.push({ side, width: widthAfter, kind: 'hyphen' })
-    }
+    drawings.push({ side, width: null, kind: 'hyphen' })
     if (isSelected) {
       drawings.push({ side, width: SELECTION_BORDER_PX, kind: 'band' })
     }

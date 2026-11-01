@@ -4,7 +4,7 @@ title: Remote updates in proportion to what changed
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T21:58:00Z'
+updated_date: '2026-11-01T22:52:00Z'
 labels:
   - domain:shell
 milestone: m-0
@@ -87,4 +87,6 @@ Lead: base commit ffc9b81. No open question. The quick gate is widened with boar
 Lead, on the spec-writer's questions: (1) shell.md is at 26 criteria, 21 KB: the split (client/foundation.md for the visual foundation) is a follow-up for the human. (2) 7 others plus the measured player (a room holds 8). (3) 250 ms between the measured player's letters, as product AC-13. (4) The mutation counts may pass before the fix, Svelte skipping unchanged writes: kept as guards, plus one criterion that measures the fix itself, at most 2 ms of main-thread time per frame that changes no cell, on average over a burst of about 100, on the reference phone and FX-02. (5) The halo is 1.2 units of the arrow's 24-unit box. (6) Rule 18 asks nothing of a snapshot.
 
 Spec-checker: CHANGES REQUESTED in round 1 (AC-23's scope, the catch-up ring untested, the snapshot exemption outside the rule, what is averaged), APPROVED in round 2. The design: the arrows' halo is a white copy of the path and head under the ink, 1.2 units wide (specs/_design/cells.md « Direction arrows », cell sheet and screens sheet redrawn); it changes how the halo is drawn, not how it looks, so the spec-writer's halo tests move from the filter to the stroke (042 AC-15, AC-16 tests and spec042_harness.py).
+
+Implementer: AC-27 now 0.28 to 0.40 ms per relayed selection (3.05 ms before). Lead: 041 AC-15's arrow test counted one path per arrow, which the halo's white copy contradicts: the test-writer makes it read the ink path. Hyphen edges redrew on a pinch (their dashes sized from the cell side): sized from a variable on .grid too, as rule 18 allows no exception. The selected state held as one value per cell, beyond remote frames, accepted: it serves AC-26's echo.
 <!-- SECTION:NOTES:END -->

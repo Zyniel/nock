@@ -1,27 +1,22 @@
 <script lang="ts">
   // One letter cell's share of a hyphen edge (specs/_design/cells.md « Hyphen
-  // edges »): a strip along one side of the cell, `width` px across, holding
-  // the dashes. Every position is a whole number of px from the cell's box, so
-  // every dash end lies on a whole pixel even when the cell's side is not.
-  import type { DashRun, EdgeDrawing } from './gridLayout'
+  // edges »): a strip along one side of the cell, painted with the dashes. Every
+  // dash end is a whole number of px from the cell's box, so it lies on a whole
+  // pixel even when the cell's side is not.
+  //
+  // What depends on the cell side, the dashes and the width of their strip, is
+  // read from variables the grid sets (GridViewport.svelte): a pinch changes
+  // no cell's drawing (client/shell.md rule 18).
+  import type { EdgeDrawing } from './gridLayout'
 
-  let { drawing, dashes }: { drawing: EdgeDrawing; dashes: DashRun[] } = $props()
-
-  let isAcross = $derived(drawing.side === 'right' || drawing.side === 'left')
+  let { drawing }: { drawing: EdgeDrawing } = $props()
 </script>
 
 <span
   class="hyphen-edge {drawing.side} {drawing.kind}"
-  style:--edge-width="{drawing.width}px"
+  style:--edge-width={drawing.width === null ? null : `${drawing.width}px`}
   aria-hidden="true"
-  >{#each dashes as dash, index (index)}<span
-      class="dash"
-      style:top={isAcross ? `${dash.start}px` : null}
-      style:height={isAcross ? `${dash.end - dash.start}px` : null}
-      style:left={isAcross ? null : `${dash.start}px`}
-      style:width={isAcross ? null : `${dash.end - dash.start}px`}
-    ></span>{/each}</span
->
+></span>
 
 <style>
   /* The strip runs along its side from the cell's start to the grid line that
@@ -34,6 +29,18 @@
   .hyphen-edge {
     position: absolute;
     pointer-events: none;
+  }
+
+  /* The dashes' share of the thickness: the cell before the edge (its right
+     or bottom side) holds the grid line's pixel, the cell after it the rest. */
+  .hyphen-edge.hyphen.right,
+  .hyphen-edge.hyphen.bottom {
+    --edge-width: var(--hyphen-width-before);
+  }
+
+  .hyphen-edge.hyphen.left,
+  .hyphen-edge.hyphen.top {
+    --edge-width: var(--hyphen-width-after);
   }
 
   .hyphen-edge.right,
@@ -72,30 +79,28 @@
 
   .hyphen-edge.band {
     z-index: 7;
-    background: var(--nock-selected);
+    background-color: var(--nock-selected);
   }
 
-  .dash {
-    position: absolute;
+  /* The dashes, from the start of the strip: in hyphen grey, or navy on my
+     selection border's band. */
+  .hyphen-edge.hyphen.right,
+  .hyphen-edge.hyphen.left {
+    background-image: var(--hyphen-dashes-down);
   }
 
-  .right .dash,
-  .left .dash {
-    left: 0;
-    right: 0;
+  .hyphen-edge.hyphen.bottom,
+  .hyphen-edge.hyphen.top {
+    background-image: var(--hyphen-dashes-across);
   }
 
-  .bottom .dash,
-  .top .dash {
-    top: 0;
-    bottom: 0;
+  .hyphen-edge.band.right,
+  .hyphen-edge.band.left {
+    background-image: var(--band-dashes-down);
   }
 
-  .hyphen .dash {
-    background: var(--nock-hyphen);
-  }
-
-  .band .dash {
-    background: var(--nock-navy);
+  .hyphen-edge.band.bottom,
+  .hyphen-edge.band.top {
+    background-image: var(--band-dashes-across);
   }
 </style>
