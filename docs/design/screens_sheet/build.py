@@ -800,6 +800,12 @@ def sec_room() -> str:
                 "dialog. A switch for the lock, a three-way segmented control "
                 "for help, two number fields, « Enregistrer »."
             ),
+            (
+                "Computer: « Enregistrer » with a count out of 0 to 99 sends "
+                "nothing; the refused input takes the red border and the error "
+                "line « Entrez un nombre entier de 0 à 99. » shows under the "
+                "two fields."
+            ),
         ],
         [
             (
@@ -811,10 +817,10 @@ def sec_room() -> str:
             ),
             (
                 "pc",
-                PC,
+                PC + " · count refused",
                 desk_room(
                     pressed={"salon", "menu"},
-                    layer=desk_dialog(host_settings("par vote")),
+                    layer=desk_dialog(host_settings("par vote", refused=True)),
                 ),
             ),
         ],

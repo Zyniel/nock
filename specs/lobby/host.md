@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: host
-status: done
+status: approved
 ---
 
 # lobby/host - The host role and the creator
@@ -70,11 +70,17 @@ out; the room goes with the creator's account.
    host sheet (`settings.heading`): the switch `host.lock`; the help mode
    (`settings.help_mode_label`) as three choices (`settings.help_mode.*`); the
    counts `settings.reveal_letters_label` and `settings.reveal_words_label`
-   (whole, 0 to 99); « Enregistrer », which sends `change_settings`, never with a
-   count out of those bounds. The sheet shows the room's help mode and allowance,
-   not the remaining budget, and follows `settings_changed`; the switch sends the
-   opposite of the room's lock and shows the room's, not the click's. A
-   `host_changed` gives or takes these controls at once.
+   (whole, 0 to 99); « Enregistrer », which sends `change_settings`. With a
+   count that is not one of those (empty included), it sends nothing and the
+   sheet stays open: each such count is marked invalid and described by the
+   error line `settings.error.count` (« Entrez un nombre entier de 0 à 99. »),
+   the focus goes to the first of them, and the browser shows no message of its
+   own. Each « Enregistrer » sets the marks anew; a close clears them. The
+   sheet shows the room's help mode and allowance, not the remaining budget,
+   and follows `settings_changed`; the switch sends the opposite of the room's
+   lock and shows the room's, not the click's. A `host_changed` gives or takes
+   these controls at once; taking them closes an open host sheet
+   (`client/hud.md` rule 13).
 9. `removed` or `room_locked`, on a join, during the game or a reconnection, ends
    the page on `removed` or `locked` with `room.status.removed` or
    `room.status.locked`, with no form, no reconnection band and no reconnection;
@@ -228,6 +234,18 @@ not-found pages ».
 - **AC-17** Ana removes 101 players one after another: a join with the first
   one's token is a new player, one with the 101st's is `removed`, in the live
   room and once it is replayed from the log.
+- **AC-18** At 1280 by 720, the host sheet opened by keyboard: Tab on
+  « Enregistrer » focuses the switch « Verrouiller le salon », Shift+Tab on the
+  switch focuses « Enregistrer », and no run of Tabs leaves the sheet.
+- **AC-19** Ana types `100` in « Lettres à révéler » and presses
+  « Enregistrer »: nothing is sent, the sheet stays open, focused on that field,
+  marked invalid and described by « Entrez un nombre entier de 0 à 99. »,
+  « Mots à révéler » unmarked; `-1`, `2.5` and an empty field do
+  the same. Set to `3`, the next « Enregistrer » sends 3 and closes the sheet,
+  and reopened it shows no error line.
+- **AC-20** Ana's host sheet open at 360 by 740, a `host_changed` to Bob
+  closes it and focuses « Menu », whose items no longer hold « Réglages de
+  l'hôte ».
 
 ## Edge cases
 
