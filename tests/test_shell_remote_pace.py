@@ -140,6 +140,7 @@ READ_SELECTION_COUNTER_SCRIPT = "() => window.__shellSelectionCounter.selectionM
 
 @pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
+    """Return the FX-02 full-size grid (13 by 17)."""
     return Grid.model_validate_json(fx02_text)
 
 
@@ -156,6 +157,14 @@ def room_registry() -> Iterator[RoomRegistry]:
 
 
 def cells_of(keystrokes: list[Keystroke]) -> set[Cell]:
+    """The cells some keys type in.
+
+    Args:
+        keystrokes: The keys, each with its cell.
+
+    Returns:
+        The (row, column) of each key's cell, once.
+    """
     return {(keystroke.row, keystroke.column) for keystroke in keystrokes}
 
 
@@ -179,6 +188,12 @@ def letter_of_pass(answer_letter: str, pass_number: int) -> str:
 
 
 def select_across(peer: Peer, cell: Cell) -> None:
+    """Send a `select_cell` of a cell, across, from a simulated player.
+
+    Args:
+        peer: The player who selects.
+        cell: The (row, column) selected.
+    """
     peer.send(SelectCell(row=cell[0], column=cell[1], direction=Direction.ACROSS))
 
 
@@ -212,6 +227,7 @@ class TypingPlayers:
         self._threads: list[threading.Thread] = []
 
     def start(self) -> None:
+        """Start every player's thread; their first sends are 62.5 ms apart."""
         start_at = time.monotonic() + SENDER_LEAD_SECONDS
         for index in range(len(self._peers)):
             first_send_at = start_at + index * START_OFFSET_SECONDS
@@ -270,6 +286,12 @@ class TypingPlayers:
 
 
 def expect_cursors_shown(page: Page, count: int) -> None:
+    """Wait until the page draws `count` cursors of other players, else fail.
+
+    Args:
+        page: The room page.
+        count: How many `remote-selection` elements the page must hold.
+    """
     expect(page.get_by_test_id("remote-selection")).to_have_count(
         count, timeout=CURSOR_TIMEOUT_MS
     )
@@ -288,6 +310,14 @@ def main_thread_ms(session: CDPSession) -> float:
 
 
 def selection_frames_received(page: Page) -> int:
+    """How many frames holding a `selection_moved` the page has received.
+
+    Args:
+        page: A room page opened with `SELECTION_COUNTER_SCRIPT`.
+
+    Returns:
+        The counter of the init script, on all the page's sockets.
+    """
     count = page.evaluate(READ_SELECTION_COUNTER_SCRIPT)
     assert isinstance(count, int), count
     return count

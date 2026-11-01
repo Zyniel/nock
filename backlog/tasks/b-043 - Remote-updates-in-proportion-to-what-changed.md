@@ -4,7 +4,7 @@ title: Remote updates in proportion to what changed
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T22:52:00Z'
+updated_date: '2026-11-01T23:44:00Z'
 labels:
   - domain:shell
 milestone: m-0
@@ -89,4 +89,6 @@ Lead, on the spec-writer's questions: (1) shell.md is at 26 criteria, 21 KB: the
 Spec-checker: CHANGES REQUESTED in round 1 (AC-23's scope, the catch-up ring untested, the snapshot exemption outside the rule, what is averaged), APPROVED in round 2. The design: the arrows' halo is a white copy of the path and head under the ink, 1.2 units wide (specs/_design/cells.md « Direction arrows », cell sheet and screens sheet redrawn); it changes how the halo is drawn, not how it looks, so the spec-writer's halo tests move from the filter to the stroke (042 AC-15, AC-16 tests and spec042_harness.py).
 
 Implementer: AC-27 now 0.28 to 0.40 ms per relayed selection (3.05 ms before). Lead: 041 AC-15's arrow test counted one path per arrow, which the halo's white copy contradicts: the test-writer makes it read the ink path. Hyphen edges redrew on a pinch (their dashes sized from the cell side): sized from a variable on .grid too, as rule 18 allows no exception. The selected state held as one value per cell, beyond remote frames, accepted: it serves AC-26's echo.
+
+Reviewer: APPROVE in round 1. Taken: the helpers' docstrings of the two new test files. Not taken, as follow-up drafts: no test guards the reuse of previous values in remotesByCell (a pace for frames that change a cell); every cell still builds a new shown object when any pending edit changes, cheap, for B-049's cell components.
 <!-- SECTION:NOTES:END -->

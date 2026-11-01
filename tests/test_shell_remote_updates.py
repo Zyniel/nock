@@ -241,6 +241,14 @@ def mutations_outside(
 
 
 def places_of(cells: list[tuple[int, int]]) -> set[str]:
+    """The places of cells, as a mutation's places name them.
+
+    Args:
+        cells: The (row, column) of each cell.
+
+    Returns:
+        Each cell's place, `"row,column"`.
+    """
     return {place(row, column) for row, column in cells}
 
 
@@ -249,6 +257,7 @@ def places_of(cells: list[tuple[int, int]]) -> set[str]:
 
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
+    """Return the FX-01 reference grid (5 by 5)."""
     return Grid.model_validate_json(fx01_text)
 
 
