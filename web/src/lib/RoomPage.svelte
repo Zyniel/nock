@@ -1931,10 +1931,10 @@
   // selection first (the server cleared it), then the pending edits and the
   // kept requests in order. They are paced, the first one at once, then one
   // every EDIT_SEND_INTERVAL_MS.
-  function sendAfterSnapshot(isReturn: boolean): void {
+  function sendAfterSnapshot(isAfterLoss: boolean): void {
     stopSendQueue()
     isSynced = true
-    if (isReturn && selection !== null) {
+    if (isAfterLoss && selection !== null) {
       sendQueue.push({ message: selectCellMessage(selection), request: null })
     }
     sendQueue.push(...pendingInOrder())
@@ -1982,7 +1982,11 @@
         lastSeenChatSeq = session.snapshot.seq
       }
       reconnectAttempt = 0
-      sendAfterSnapshot(snapshotBefore !== null)
+      // After a loss: the first snapshot of this socket (isSynced is still
+      // false), when the page had a snapshot on an earlier socket. A second
+      // snapshot on the same socket is not one.
+      const isAfterLoss = snapshotBefore !== null && !isSynced
+      sendAfterSnapshot(isAfterLoss)
     }
     if (session.status === 'nickname') {
       formJoinNickname = null
