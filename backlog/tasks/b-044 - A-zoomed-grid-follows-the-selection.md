@@ -56,7 +56,7 @@ ordinal: 5000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -75,6 +75,8 @@ Lead: base commit ffc9b81. Open question 1 (the margin kept around the cell): A,
 Lead, on the spec-writer's questions: (1) only a change of selected cell scrolls; a pinch or a resize never does (A: a literal reading would undo every pinch). (2) A tap on a clue scrolls like a key (A); only a tap on a letter cell scrolls nothing. (3) A viewport smaller than the cell and two margins centres the cell on that axis (A). (4) The scroll is at once, no animation (A: fast typing and deterministic tests). board.md is at 27 criteria, over the 20 of _map.md: the split (the in-app keyboard as its own domain file) is an architecture decision for the human, recorded as a follow-up draft.
 
 Spec-checker: CHANGES REQUESTED in round 1 (pinch and ⇄ untested, AC-23's start condition, AC-27's reachability, the least vertical scroll, wording), APPROVED in round 2. Its non-blocking notes: AC-29's start (OREIL already typed with the viewport at the top-left corner) is for the test-writer to set up, by typing then panning back or a snapshot.
+
+Pull request: https://github.com/Zyniel/nock/pull/87, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
