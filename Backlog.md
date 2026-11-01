@@ -497,7 +497,7 @@ others, at the top of the list.
 - Criteria: server AC-27, AC-28 (new), host AC-17 (new), AC-9 (changed),
   lifetime AC-18 (new), AC-13, AC-17 (changed), chat AC-21 (new),
   operations AC-23 (changed)
-- Branch: feat/b-037-lean-snapshots · PR: none yet
+- Branch: feat/b-037-lean-snapshots · PR: #79
 - Problem: a snapshot stores the whole room (grid, every cell, the chat, past
   players, removed tokens) at seq 0, every 100 events, at each task end and at
   shutdown, and none is ever deleted (B-028 M6). Measured on FX-02: 30 KiB
