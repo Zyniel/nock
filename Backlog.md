@@ -2143,14 +2143,14 @@ others, at the top of the list.
 
 ### B-052 CLAUDE.md and the role files follow Claude Code's guidance
 
-- Status: building (the human asked for it, 2026-10-30: « review the CLAUDE.md
+- Status: done (the human asked for it, 2026-10-30: « review the CLAUDE.md
   and AGENTS.md. Rewrite them if needed against best practices »; tooling,
-  built by the lead)
+  built by the lead; the human read the diff and asked for the PR)
 - Domains: none (tooling only: `CLAUDE.md`, `.claude/agents/*.md`,
   `.claude/skills/python-standards/SKILL.md`)
 - Architecture decision: no (the same rules in new words; one change of
   behaviour: the roles stop loading `CLAUDE.md`)
-- Branch: feat/b-052-instructions-review · PR: none yet
+- Branch: feat/b-052-instructions-review · PR: #80
 - Problem: `CLAUDE.md` (183 lines, 10.7 KB) loads in the lead and in every role
   run. It describes a layout Claude can read itself, carries gate internals and
   dated notes, and mixes the lead's rules with rules the roles already hold in
