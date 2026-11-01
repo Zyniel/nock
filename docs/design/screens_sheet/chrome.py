@@ -548,8 +548,11 @@ def desk_dialog(inner: str, recap: bool = False) -> str:
 
 
 def host_settings(mode: str = "libre", refused: bool = False) -> str:
-    """Return the host settings' content; `refused`: « Lettres à révéler »
-    holds a count out of bounds after « Enregistrer »."""
+    """Return the host settings' content.
+
+    `refused`: « Lettres à révéler » holds a count out of bounds after
+    « Enregistrer ».
+    """
     seg = "".join(
         f'<span class="{"on" if m == mode else ""}">{m}</span>'
         for m in ("libre", "par vote", "désactivée")
