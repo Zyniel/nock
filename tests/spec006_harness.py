@@ -6,11 +6,13 @@ are in `tests/test_spec_006_*.py`, one file per criterion group.
 It holds what more than one of those files uses: the timeouts, the window sizes of
 AC-5 and AC-7, the helpers that open a room on a live server (`open_room`) or on
 the mocked socket (`open_mock_room`), the snapshot builders of AC-4, AC-6 and
-AC-8, and AC-1's pinch through CDP (`pinch`, also used by the tests of
-`client/shell.md` AC-25). What only one file uses stays in that file, next to its
-tests. The fixtures
-`fx01_grid` and `fx02_grid` are defined in each file as thin wrappers around
-`grid_from_text`: a fixture imported from here would be an unused import for ruff.
+AC-8, and AC-1's pinch and pan through the Chrome DevTools Protocol (`pinch`,
+`pan`), which the zoomed grid tests of board AC-23 to AC-29
+(`tests/test_board_zoom_follow.py`) and the tests of `client/shell.md` AC-25
+use too. What only one file uses stays in that file, next to its tests. The
+fixtures `fx01_grid` and `fx02_grid` are defined in each file as thin wrappers
+around `grid_from_text`: a fixture imported from here would be an unused import
+for ruff.
 """
 
 from __future__ import annotations
@@ -81,7 +83,15 @@ def box_of(locator: Locator) -> FloatRect:
     return box
 
 
-# ---- Pinch through the Chrome DevTools Protocol (Chromium only) -------------
+def count_clues(grid: Grid) -> int:
+    total = 0
+    for cell in grid.cells:
+        if isinstance(cell, ClueCell):
+            total += len(cell.clues)
+    return total
+
+
+# ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
 
 PINCH_STEPS = 10
 
@@ -118,12 +128,23 @@ def pinch(page: Page, viewport: Locator, start: float, end: float) -> None:
         session.detach()
 
 
-def count_clues(grid: Grid) -> int:
-    total = 0
-    for cell in grid.cells:
-        if isinstance(cell, ClueCell):
-            total += len(cell.clues)
-    return total
+def pan(page: Page, viewport: Locator) -> None:
+    """Drag one finger from the viewport centre by -200 px in x and y."""
+    box = box_of(viewport)
+    session = page.context.new_cdp_session(page)
+    try:
+        session.send(
+            "Input.synthesizeScrollGesture",
+            {
+                "x": box["x"] + box["width"] / 2,
+                "y": box["y"] + box["height"] / 2,
+                "xDistance": -200,
+                "yDistance": -200,
+                "gestureSourceType": "touch",
+            },
+        )
+    finally:
+        session.detach()
 
 
 # ---- Mocked room socket (browser tests of AC-4, AC-6 and AC-8) ---------------

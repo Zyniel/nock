@@ -365,6 +365,38 @@ export function distanceBetween(
   return Math.hypot(first.clientX - second.clientX, first.clientY - second.clientY)
 }
 
+// One axis of a zoomed grid's viewport, in px from the start of what it
+// scrolls: the viewport shows `viewSide` px from `scroll`, the selected cell
+// runs from `cellStart` for `cellSide` px, the grid from `gridStart` to
+// `gridEnd`.
+export interface ScrollAxis {
+  scroll: number
+  viewSide: number
+  cellStart: number
+  cellSide: number
+  gridStart: number
+  gridEnd: number
+}
+
+// The scroll on one axis that shows the selected cell with one cell of margin
+// on each side the grid's edge allows, moving the least (board rule 3). On a
+// viewport that holds less than three cells, the cell is centred instead.
+export function scrollShowingCell(axis: ScrollAxis): number {
+  const { scroll, viewSide, cellStart, cellSide, gridStart, gridEnd } = axis
+  if (viewSide < 3 * cellSide) {
+    return cellStart + cellSide / 2 - viewSide / 2
+  }
+  const marginStart = Math.max(gridStart, cellStart - cellSide)
+  const marginEnd = Math.min(gridEnd, cellStart + 2 * cellSide)
+  if (marginStart < scroll) {
+    return marginStart
+  }
+  if (marginEnd > scroll + viewSide) {
+    return marginEnd - viewSide
+  }
+  return scroll
+}
+
 // The box of a grid fitted to an area at zoom 1, in px: its cells at the side
 // that fits (fitCellSize) and the grid's own left and top line. The column
 // layout sizes the grid viewport to it (spec 043, "Play area and fit").

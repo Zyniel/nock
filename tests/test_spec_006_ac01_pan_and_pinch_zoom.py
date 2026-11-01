@@ -24,6 +24,7 @@ from spec006_harness import (
     cell_at,
     grid_from_text,
     open_room,
+    pan,
     pinch,
 )
 
@@ -88,6 +89,7 @@ def client_size(viewport: Locator) -> tuple[float, float]:
 
 
 # ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
+# `pinch` and `pan` are in `spec006_harness`.
 
 
 def pinch_out(page: Page, viewport: Locator) -> None:
@@ -96,25 +98,6 @@ def pinch_out(page: Page, viewport: Locator) -> None:
 
 def pinch_in(page: Page, viewport: Locator) -> None:
     pinch(page, viewport, BIG_PINCH_END, SMALL_PINCH_START)
-
-
-def pan(page: Page, viewport: Locator) -> None:
-    """Drag one finger from the viewport centre by -200 px in x and y."""
-    box = box_of(viewport)
-    session = page.context.new_cdp_session(page)
-    try:
-        session.send(
-            "Input.synthesizeScrollGesture",
-            {
-                "x": box["x"] + box["width"] / 2,
-                "y": box["y"] + box["height"] / 2,
-                "xDistance": -200,
-                "yDistance": -200,
-                "gestureSourceType": "touch",
-            },
-        )
-    finally:
-        session.detach()
 
 
 def wait_for_zoom(page: Page, viewport: Locator, condition: str, before: float) -> None:
