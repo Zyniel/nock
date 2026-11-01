@@ -118,9 +118,11 @@ td code, .cap code, .lead code { font-size: .85em; }
 .flag { position: absolute; top: 0; left: -2px; width: max(8px, calc(var(--s) * .22)); height: max(8px, calc(var(--s) * .22)); background: var(--nock-clue-bg); border-radius: 0 0 3px 0; z-index: 2; display: grid; place-items: center; }
 .flag svg { width: 86%; height: 86%; fill: var(--nock-red); stroke: var(--nock-red); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .ring { position: absolute; inset: 0; border: 3px solid var(--nock-ink); z-index: 1; pointer-events: none; }
-.arw { position: absolute; z-index: 6; filter: drop-shadow(0 0 .8px var(--nock-white)) drop-shadow(0 0 .8px var(--nock-white)); width: max(9px, calc(var(--s) * .26)); height: max(9px, calc(var(--s) * .26)); }
+.arw { position: absolute; z-index: 6; width: max(9px, calc(var(--s) * .26)); height: max(9px, calc(var(--s) * .26)); }
 .arw path { fill: none; stroke: var(--nock-ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .arw polygon { fill: var(--nock-ink); }
+.arw .halo path { stroke: var(--nock-white); stroke-width: 4.8; }
+.arw .halo polygon { fill: var(--nock-white); stroke: var(--nock-white); stroke-width: 2.4; stroke-linejoin: round; }
 .react { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; background: var(--nock-white); border: 1px solid var(--nock-line); border-radius: 12px; padding: 2px 6px; font-size: 16px; line-height: 1.2; box-shadow: 0 4px 10px -4px var(--nock-shadow-soft); text-transform: none; }
 .ico { width: 1em; height: 1em; vertical-align: -0.15em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ico.filled { fill: currentColor; }

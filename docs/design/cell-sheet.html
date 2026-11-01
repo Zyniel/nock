@@ -131,10 +131,13 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .gwrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .dot8 { position: absolute; top: 8px; right: 15px; width: 8px; height: 8px; border-radius: 50%; background: var(--wrong); }
 .gstat.notyet { background: var(--clue-bg); color: var(--navy); }
-/* direction arrows are always drawn on top, with a thin white halo so they read on any mark */
-.arw { position: absolute; z-index: 6; filter: drop-shadow(0 0 .8px #FFFFFF) drop-shadow(0 0 .8px #FFFFFF); width: max(9px, calc(var(--s) * .26)); height: max(9px, calc(var(--s) * .26)); }
+/* direction arrows are always drawn on top, with a thin white halo so they read on any mark:
+   the same path and head drawn first in white, wider by 1.2 units on each side (no filter) */
+.arw { position: absolute; z-index: 6; width: max(9px, calc(var(--s) * .26)); height: max(9px, calc(var(--s) * .26)); }
 .arw path { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .arw polygon { fill: var(--ink); }
+.arw .halo path { stroke: #FFFFFF; stroke-width: 4.8; }
+.arw .halo polygon { fill: #FFFFFF; stroke: #FFFFFF; stroke-width: 2.4; stroke-linejoin: round; }
 
 /* ---------- contrast table ---------- */
 .tbl-wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; }
@@ -613,7 +616,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     down_then_right: '<path d="M5 2V10Q5 15 10 15H15"/><polygon points="14,10.5 22,15 14,19.5"/>',
     right_then_down: '<path d="M2 5H10Q15 5 15 10V15"/><polygon points="10.5,14 15,22 19.5,14"/>'
   };
-  function arrowSvg(kind, style) { return '<svg class="arw" viewBox="0 0 24 24" style="' + style + '" aria-hidden="true">' + ARROWS[kind] + "</svg>"; }
+  function arrowSvg(kind, style) { return '<svg class="arw" viewBox="0 0 24 24" style="' + style + '" aria-hidden="true"><g class="halo">' + ARROWS[kind] + "</g>" + ARROWS[kind] + "</svg>"; }
   function arrowFor(kind, s, slot, shift) {
     var a = Math.max(9, s * 0.26);
     if (kind === "down_then_right" && shift) return arrowSvg(kind, "top:-1px;left:" + s * 0.4 + "px");

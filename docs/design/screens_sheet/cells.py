@@ -143,11 +143,11 @@ def fmt(v: float) -> str:
 
 
 def arrow_svg(kind: str, style: str) -> str:
-    """Return a direction arrow (cells.md) with its box style."""
+    """Return a direction arrow (cells.md) with its box style, its halo first."""
     return (
         '<svg class="arw" viewBox="0 0 24 24" '
-        f'style="{style}" aria-hidden="true">{ARROWS[kind]}'
-        "</svg>"
+        f'style="{style}" aria-hidden="true"><g class="halo">{ARROWS[kind]}</g>'
+        f"{ARROWS[kind]}</svg>"
     )
 
 
