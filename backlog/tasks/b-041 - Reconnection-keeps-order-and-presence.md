@@ -1,9 +1,10 @@
 ---
 id: B-041
 title: Reconnection keeps order and presence
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-01T19:39:00Z'
 labels:
   - domain:hints
   - domain:joining
@@ -63,6 +64,15 @@ ordinal: 2000
      refused, the buttons disabled until joined.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 realtime AC-24 (new)
+- [ ] #2 server AC-29 (new)
+- [ ] #3 hints AC-24 (new)
+- [ ] #4 joining AC-22 (new)
+- [ ] #5 joining AC-23 (new)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -72,3 +82,19 @@ ordinal: 2000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/gameplay/hints.md, specs/lobby/joining.md, specs/platform/realtime.md, specs/platform/server.md
+Tests: tests/test_hints_*.py, tests/test_joining_*.py, tests/test_realtime_*.py, tests/test_server_*.py
+Gate: uv run python scripts/gate.py --specs hints,joining,realtime,server --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead's decisions: B-031 is merged (PR #69), so nothing waits. Open question 1 takes A (a check or reveal pressed before the snapshot after a loss is kept and sent after the resent edits, as the undo is).
+
+Lead's decisions in the spec change: an undo, check or reveal made between edits typed offline goes out in the order made (after the edits pending when it was made, before any later edit; server AC-29's second example). The kept selection is sent again with no check against the snapshot's words: a room's grid never changes, so the check is unobservable. The identity held in memory goes first even when another tab stored a different one (joining AC-22's second example). The button is « Entrer dans le salon » (join.submit), the task's « Rejoindre ». The kept join form with its button disabled is drawn as a specimen in the screens sheet. Follow-up drafts: split realtime.md (reconnection) and hints.md (votes).
+<!-- SECTION:NOTES:END -->

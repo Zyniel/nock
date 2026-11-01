@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
 # platform/server - Durable rooms, undo, engine time, rooms in memory
@@ -106,10 +106,11 @@ played.
    Control+z and Meta+z while the grid has the focus, their default prevented;
    all until the grid is solved, when they send nothing and the button is
    disabled (`gameplay/rules.md` rule 6).
-   An undo made while edits are pending is sent after them. An error
-   `nothing_to_undo` shows `undo.nothing` (« Rien à annuler. ») for 3 seconds;
-   no other error does. The undo's `letter_changed` only updates the confirmed
-   grid (`gameplay/co-op.md` rule 12).
+   An undo is sent after the edits pending when it was made and before any
+   later edit, across a reconnection too (`platform/realtime.md` rules 20 and
+   22). An error `nothing_to_undo` shows `undo.nothing` (« Rien à annuler. »)
+   for 3 seconds; no other error does. The undo's `letter_changed` only
+   updates the confirmed grid (`gameplay/co-op.md` rule 12).
 
 ### Engine time
 
@@ -232,6 +233,12 @@ top bars (« Phone top bar », « Computer top bar »).
   cells, lines and names after the save that deleted the snapshot at 200 as
   before it, and the room's state at seq 150 reads the same; the state at or
   before the first snapshot's seq is still the first snapshot's.
+- **AC-29** Offline, Ana types `T`, `A`, `M` from (1, 0); her Control+z,
+  pressed offline after `M` or 50 ms after her reconnection snapshot, reaches
+  the server after the three edits: every page ends with `T` at (1, 0), `A`
+  at (1, 1) and (1, 2) empty. Pressed offline between `A` and `M`, it reaches
+  the server between them: every page ends with (1, 1) empty and `M` at
+  (1, 2).
 
 ## Edge cases
 
@@ -283,4 +290,4 @@ top bars (« Phone top bar », « Computer top bar »).
   `roomSession.ts`, `RoomNote.svelte`: the undo button, shortcut and message.
 - Tests: `tests/test_spec_018_*`; `tests/test_server_engine_time.py` for rule
   20, which measures durations and so runs on its own (`SERIAL_TEST_FILES`), as
-  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-28.
+  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-29.

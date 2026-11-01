@@ -445,6 +445,12 @@ NICK_OK = (
     '<div class="field">Pseudo<span class="input caps">Bruno</span></div>'
     '<span class="btn primary">Entrer dans le salon</span></div>'
 )
+NICK_WAIT = (
+    '<div class="codeline">Salon K7QM2X</div><div class="card"><h1>Choisissez '
+    "un pseudo</h1>"
+    '<div class="field">Pseudo<span class="input caps">Bruno</span></div>'
+    '<span class="btn off">Entrer dans le salon</span></div>'
+)
 
 
 def sec_entry() -> str:
@@ -466,6 +472,20 @@ def sec_entry() -> str:
             ),
         ],
         [("ph", PH + " · error", phone_page(NICK)), ("pc", PC, desk_page(NICK_OK))],
+    ) + (
+        '<div class="mini">'
+        + box(
+            (
+                '<div style="width:330px;display:grid;gap:14px;backgrou'
+                "nd:var(--nock-page);pa"
+                f'dding:16px;border-radius:6px">{NICK_WAIT}</div>'
+            ),
+            (
+                "Kept after a lost connection: « Entrer dans le salon » "
+                "disabled until the next socket opens (joining AC-23)."
+            ),
+        )
+        + "</div>"
     )
     statuses = [
         ("Ce salon est complet (8 joueurs).", ""),

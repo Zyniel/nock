@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: done
+status: approved
 ---
 
 # platform/realtime - Room events, reconnection and fair play
@@ -159,17 +159,24 @@ earns it.
 20. After a loss, once the page has joined: state `reconnecting`, the room
     status reads `room.status.reconnecting`, and the connection band, announced
     as a status, shows `room.banner.offline` within 5 seconds. The grid stays
-    usable: typed and erased letters show and wait as pending edits, and nothing
+    usable: typed and erased letters show and wait as pending edits; an undo, a
+    check or a reveal made meanwhile is kept in its place among them; nothing
     is sent without an open socket. Before the first snapshot: state
     `connecting`, no band, and a shown nickname form stays.
 21. A new socket opens after 1, 2, 4, 8 seconds, then every 8 seconds, without
     end; the browser's `online` event tries at once, replacing a socket still
     connecting. On open, the page joins as `lobby/joining.md` rule 8 says.
-22. On a snapshot: state `joined`, band hidden, delays back to 1 second; then the
-    pending edits are sent again, oldest first, each with its `base_seq`, the
-    first at once and one every 100 ms; an edit typed meanwhile queues behind
-    them. No edit is sent between the socket opening and its snapshot. Pending
-    edits live in memory only: a reload loses them.
+22. On a snapshot: state `joined`, band hidden, delays back to 1 second. After
+    a loss, the page then sends the selection it holds, if any, as one
+    `select_cell` (the server cleared it at the disconnection,
+    `social/presence.md` rule 8). Then the pending edits, each with its
+    `base_seq`, and the kept undos, checks and reveals go out in the order
+    they were made, each request after the edits that were pending when it
+    was made and before any later one: the first at once and one every 100 ms.
+    An edit, undo, check or reveal made while these go out queues behind them;
+    otherwise it is sent at once. No edit, undo, check or reveal is sent
+    between the socket opening and its snapshot. Pending edits and kept
+    requests live in memory only: a reload loses them.
 
 ### Fair play
 
@@ -306,6 +313,9 @@ The connection band follows `_design/room.md`, « Connection lost ».
   one-line message holding the name and `repr()` of the value, and no server
   runs; `python -m nock` exits with 1; an app starting with it fails with
   `SettingsError`.
+- **AC-24** Offline, Ana types `T` at (1, 0), her selection moving to (1, 1)
+  across: after her reconnection snapshot, Bob receives `selection_moved` for
+  Ana on (1, 1) across, then the `letter_changed` of her `T`.
 
 ## Edge cases
 
@@ -343,8 +353,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - Throttling other messages: chat and reactions, `social/chat.md`; checks and
   reveals, `gameplay/hints.md`; wrong codes, `lobby/rooms.md`; `undo`,
   `select_cell`, ballots and the rest are not limited.
-- Peer-to-peer sync, pending edits kept across a reload, a leave message,
-  message acknowledgements, a Content Security Policy.
+- Peer-to-peer sync, pending edits or kept requests across a reload, a leave
+  message, message acknowledgements, a Content Security Policy.
 
 ## Code
 
@@ -358,7 +368,7 @@ The connection band follows `_design/room.md`, « Connection lost ».
   rule, the rate limit; `RoomConfig` holds the silence, join deadline, resume
   and rate values.
 - `web/src/lib/roomSession.ts`, `RoomPage.svelte`: heartbeat, losses, retries,
-  resent edits.
+  the selection sent again, resent edits, kept requests.
 - Tests: `tests/test_spec_039_*`, `tests/test_spec_017_*`,
   `tests/test_spec_037_*`, `tests/test_spec_040_ac07_ac13_*`;
-  `tests/test_realtime_*` for AC-21 to AC-23.
+  `tests/test_realtime_*` for AC-21 to AC-24.
