@@ -95,19 +95,21 @@ gives the Salon (`client/room.md`) its column or its sheet.
     else the menu; Escape inside closes it and focuses the button. Column
     layout: a pointer press outside closes it. Sheet layout: while a menu or
     the Salon is open a scrim covers the page under the top bar; a tap on it
-    closes them, moving no focus and selecting nothing. A Tab or Shift+Tab that
-    puts the focus on an element outside an open menu or the Salon sheet
-    closes it, the focus staying on that element, wherever the focus was
-    before: inside it, lost to no element (another window, the browser's own
-    controls, an item disabled under it), or on an element outside it where the
-    page had moved it. Losing the focus to no element closes nothing, nor does
-    a focus the page moves: after a mute (`social/chat.md` rule 15) the Salon
-    sheet stays open with the focus on « Salon », and the next Tab closes it. A
-    press follows the rules above, not the focus: a press on its own button
-    (« Aide », « Menu », « Salon ») closes it, once. At most one of the menus,
-    the Salon sheet and the reaction picker is open; the Salon column is apart. A closed menu stays in the page, hidden, with its items' states. A
-    menu's place follows the top bar's form; its content scrolls inside it, so
-    it stays in the window.
+    closes them, moving no focus and selecting nothing. A Tab or Shift+Tab
+    pressed inside the page that puts the focus on an element outside an open
+    menu or the Salon sheet closes it, the focus staying on that element,
+    wherever the focus was before: inside it, lost to no element (an item
+    disabled under it), or on an element outside it where the page had moved
+    it. Losing the focus to no element closes nothing, nor does a focus the
+    page moves: after a mute (`social/chat.md` rule 15) the Salon sheet stays
+    open with the focus on « Salon », and the next Tab closes it. A focus that
+    enters the page from another window or the browser's own controls closes
+    nothing by itself. A press follows the rules above, not the focus: a press
+    on its own button (« Aide », « Menu », « Salon ») closes it, once. At most
+    one of the menus, the Salon sheet and the reaction picker is open; the
+    Salon column is apart. A closed menu stays in the page, hidden, with its
+    items' states. A menu's place follows the top bar's form; its content
+    scrolls inside it, so it stays in the window.
 
 ### Sheets, clue bar
 
@@ -270,7 +272,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 - A 4404 before the first snapshot: the entry card (`client/shell.md` rule 7),
   not the dialog (AC-21).
 - Tab on the Salon sheet's last control leaves the page for the browser and
-  closes nothing; the next Tab into the page closes it (rule 12).
+  closes nothing; the Tab that brings the focus back to the page's first
+  control closes nothing either, and the next Tab pressed inside the page
+  closes it (rule 12).
 
 ## Out of scope
 
