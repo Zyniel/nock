@@ -96,7 +96,10 @@ ask only a few times in a short while.
     0, the same for words. An item's name is its visible text.
 11. An item sends its request once, for the selected cell, the selected word's
     clue or the grid, and closes the menu; it moves no selection and guesses no
-    result. An error answering it changes nothing on the page.
+    result. The request goes after the edits pending when it was made and
+    before any later one: kept while the page is not joined, queued behind a
+    resend (`platform/realtime.md` rules 20 and 22). An error answering it
+    changes nothing on the page.
 12. Disabled: « Vérifier » letter or word while nothing is selected; « Révéler »
     letter while nothing is selected, the cell is locked or no letter is left;
     « Révéler » word while nothing is selected, its cells are all locked or no
@@ -280,7 +283,11 @@ on its layer of `_design/room.md`, « Layers ».
   `T`, while Bob's next word check is dropped; Ana's next four letter checks
   apply and a fifth is dropped. With Ana's window full, her grid check opens no
   vote.
-- **AC-24** On Bob's vote, Ana's unvoted page has « Oui » focused and (1, 0)
+- **AC-24** Offline, Ana types `T`, `X` from (1, 0), the selection moving to
+  (1, 2), then picks « Vérifier » « Le mot » and « Révéler » « La lettre »:
+  after her reconnection snapshot the server receives the two edits, the
+  check of TAMIS, then the reveal of (1, 2), so the check marks (1, 1) wrong.
+- **AC-25** On Bob's vote, Ana's unvoted page has « Oui » focused and (1, 0)
   selected; her socket closes: once « Oui » and « Non » are disabled the focus
   is on the grid, (1, 0) still selected, and no ballot was sent. « Non »
   focused does the same.
@@ -296,6 +303,8 @@ on its layer of `_design/room.md`, « Layers ».
   others decide, or the vote times out (AC-16, AC-17).
 - A check dropped after a vote's 20 seconds leaves the vote open for the tick
   to close (AC-23).
+- While the page reconnects, the Aide items stay as rule 12 sets them; a
+  request made then waits for the resent edits (AC-24).
 
 ## Out of scope
 

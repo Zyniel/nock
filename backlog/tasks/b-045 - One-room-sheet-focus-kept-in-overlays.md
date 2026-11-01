@@ -4,7 +4,7 @@ title: One room sheet, focus kept in overlays
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T22:00:00Z'
+updated_date: '2026-11-01T22:16:00Z'
 labels:
   - domain:hud
   - domain:host
@@ -69,7 +69,7 @@ ordinal: 6000
 - [ ] #4 host AC-18 (new): Tab and Shift+Tab wrap inside the host sheet
 - [ ] #5 host AC-19 (new): an invalid count sends nothing and shows the error line, linked to its field
 - [ ] #6 host AC-20 (new): the loss of the host role closes the host sheet and focuses « Menu »
-- [ ] #7 hints AC-24 (new): a focused « Oui » or « Non » gives the focus to the grid before it is disabled
+- [ ] #7 hints AC-25 (new): a focused « Oui » or « Non » gives the focus to the grid before it is disabled
 - [ ] #8 account AC-34 (new): a drag from the account sheet to the backdrop keeps it open with what was typed
 <!-- AC:END -->
 
@@ -99,4 +99,6 @@ Lead: base commit ffc9b81. Open question 1 (focus leaving an open menu or the Sa
 Lead, on the spec-writer's questions: (1) one error line « Entrez un nombre entier de 0 à 99. » (settings.error.count) shared under both counts, the focus on the first refused count (the inputs are 64 px wide side by side). (2) The vote buttons give the focus to the grid before they are disabled, as rule 22 does when the banner leaves. (3) A focus lost to no element (another window, the browser's controls, an item disabled under it) closes no menu or Salon sheet: hud AC-7 keeps the Aide menu open when an item is disabled under the focus. (4) A focus moved by the page itself (the chat mute, « Inviter ») closes nothing, or chat rule 15 would close the Salon sheet. account.md (34 criteria, 32 KB) and hints.md (24) were over the budget before this change: their split is a follow-up for the human. Screens sheet rebuilt for « Host settings » (count refused).
 
 Spec-checker: CHANGES REQUESTED in round 1 (rule 12's edge case and a press on the overlay's button, rule 13's wording, account rule 14's catalogue case, the look in host rule 8), APPROVED in round 2. Lead, on its optional notes: a Tab or Shift+Tab onto an element outside an open overlay closes it wherever the focus was, the mute case included; a press on its own button (« Aide », « Menu », « Salon ») closes it once.
+
+Lead: merging origin/main (B-041) clashed on hints AC-24, which B-041 took for its offline requests; B-045's criterion of the vote's focus is hints AC-25 (spec, test name and this task renumbered in the merge commit, text unchanged).
 <!-- SECTION:NOTES:END -->

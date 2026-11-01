@@ -70,7 +70,8 @@ Cards:
 
 - Nickname: title « Choisissez un pseudo »; field « Pseudo »; when refused, the
   input's border turns red and the error text shows in red under the field;
-  primary « Entrer dans le salon ».
+  primary « Entrer dans le salon », disabled (`foundation.md`, « Components »)
+  while the page joins or the kept form waits for a new socket.
 - Entry statuses (full, locked, not found, removed, replaced, throttled): the
   status text as the card title, a muted line when the status has one, secondary
   « Voir les grilles ».

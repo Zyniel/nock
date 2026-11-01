@@ -1,7 +1,7 @@
-"""Tests of `gameplay/hints.md` AC-24: the vote's buttons give the focus to the grid
+"""Tests of `gameplay/hints.md` AC-25: the vote's buttons give the focus to the grid
 before they are disabled (rule 19).
 
-AC-24: on Bob's vote, Ana's unvoted page has « Oui » focused and (1, 0) selected;
+AC-25: on Bob's vote, Ana's unvoted page has « Oui » focused and (1, 0) selected;
 her socket closes: once « Oui » and « Non » are disabled the focus is on the grid,
 (1, 0) still selected, and no ballot was sent. « Non » focused does the same.
 
@@ -60,7 +60,7 @@ def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
 
 
 @pytest.mark.parametrize("button", ["vote-yes", "vote-no"])
-def test_ac24_a_lost_connection_gives_the_focus_to_the_grid_and_sends_no_ballot(
+def test_ac25_a_lost_connection_gives_the_focus_to_the_grid_and_sends_no_ballot(
     window: OpenWindow, live_server: str, fx01_grid: Grid, button: str
 ) -> None:
     page = window(COMPUTER[0], COMPUTER[1], False)
