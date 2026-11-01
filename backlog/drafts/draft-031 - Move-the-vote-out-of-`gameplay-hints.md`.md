@@ -4,6 +4,7 @@ title: Move the vote out of `gameplay/hints.md`
 status: Draft
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-01T20:21:00Z'
 labels:
   - follow-up
   - domain:hints
@@ -15,7 +16,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-`gameplay/hints.md` is over the size guideline (about 21 KB, 23 criteria after B-031): the spec-writer proposes moving the vote and its banner (rules 14 to 22, AC-13 to AC-20, with their pointers) to a new `gameplay/votes.md`, an architecture decision. `platform/realtime.md` is over too (about 19 KB, 20 criteria).
+`gameplay/hints.md` is over the size guideline (24 criteria after B-041): the spec-writer proposes moving the vote and its banner (rules 14 to 22, AC-13 to AC-20, with their pointers) to a new `gameplay/votes.md`, an architecture decision. `platform/realtime.md` is over too (about 23 KB, 24 criteria after B-041): the B-041 spec-writer proposes moving the reconnection (rules 15 to 22) into `platform/reconnection.md`, leaving the socket, the messages, their order and fair play.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
