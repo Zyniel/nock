@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { t } from './i18n'
+  import RoomSheet from './RoomSheet.svelte'
 
   // The room-gone dialog (client/hud.md rule 16): the room was deleted once it
   // had shown. A modal alert dialog with the recap's frame (app.css, room
@@ -16,7 +17,7 @@
     layout: 'sheet' | 'column'
   } = $props()
 
-  let dialog: HTMLDialogElement | null = $state(null)
+  let sheet: RoomSheet | undefined = $state()
   let homeLink: HTMLAnchorElement | null = $state(null)
 
   onMount(() => {
@@ -25,13 +26,8 @@
 
   // Opens the dialog as a modal over the room, the focus on the link.
   function showOverRoom(): void {
-    dialog?.showModal()
+    sheet?.open()
     homeLink?.focus()
-  }
-
-  // Escape does not close the dialog: the browser's close request is refused.
-  function refuseCancel(event: Event): void {
-    event.preventDefault()
   }
 
   // A close request the browser does not let the page refuse (a second Android
@@ -39,50 +35,27 @@
   // again at once, so the room never shows without it. A dialog no longer in
   // the page (the player left) stays closed.
   function reopenAfterClose(): void {
-    if (dialog === null || !dialog.isConnected) {
-      return
-    }
     showOverRoom()
-  }
-
-  // Escape changes nothing, and Tab and Shift+Tab stay on the link, the one
-  // control: the focus must not leave for the browser's own controls.
-  function keepFocusOnLink(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      return
-    }
-    if (event.key === 'Tab') {
-      event.preventDefault()
-      homeLink?.focus()
-    }
-  }
-
-  // A press anywhere but on the link, the scrim included (it lands on the
-  // dialog itself), leaves the focus on the link.
-  function keepFocusOnPress(event: MouseEvent): void {
-    const target = event.target
-    if (target instanceof Node && homeLink?.contains(target)) {
-      return
-    }
-    event.preventDefault()
   }
 </script>
 
-<dialog
-  bind:this={dialog}
-  class="room-sheet over-all room-gone"
-  class:bottom={layout === 'sheet'}
-  data-testid="room-gone"
+<!-- Escape and a press outside close nothing, and a press anywhere but on the
+     link leaves the focus on it. Tab and Shift+Tab stay on the link, the one
+     control. -->
+<RoomSheet
+  bind:this={sheet}
+  {layout}
+  title={t('room.gone.title')}
+  titleId="room-gone-title"
+  testId="room-gone"
+  extraClass="over-all room-gone"
   role="alertdialog"
-  aria-labelledby="room-gone-title"
-  aria-describedby="room-gone-detail"
-  oncancel={refuseCancel}
-  onclose={reopenAfterClose}
-  onkeydown={keepFocusOnLink}
-  onmousedown={keepFocusOnPress}
+  describedBy="room-gone-detail"
+  canCancel={false}
+  closesOnBackdrop={false}
+  keepsFocusOnPress={true}
+  onClosed={reopenAfterClose}
 >
-  <h2 class="room-sheet-title" id="room-gone-title">{t('room.gone.title')}</h2>
   <p class="nock-muted-line" id="room-gone-detail">{t('room.status.not_found_detail')}</p>
   <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
   <a
@@ -92,7 +65,7 @@
     tabindex="0"
     bind:this={homeLink}>{t('share.home')}</a
   >
-</dialog>
+</RoomSheet>
 
 <style>
   /* « Voir les grilles », right-aligned. */
