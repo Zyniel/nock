@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flushSync } from 'svelte'
+  import { flushSync, untrack } from 'svelte'
   import { t } from './i18n'
   import {
     ARROW_GLYPHS,
@@ -15,9 +15,10 @@
     hyphenDrawings,
     hyphenThickness,
     hyphensByCell,
+    scrollShowingCell,
     triangleSide,
   } from './gridLayout'
-  import type { CellHyphens, EdgeDrawing, PlacedArrow } from './gridLayout'
+  import type { CellHyphens, EdgeDrawing, PlacedArrow, ScrollAxis } from './gridLayout'
   import HyphenEdge from './HyphenEdge.svelte'
   import { actionForKey } from './letterEntry'
   import { LEGEND_GAP_PX, finderColour } from './authorsView'
@@ -304,6 +305,7 @@
         gridElement?.focus()
       }
     } else if (cellElement.getAttribute('data-type') === 'letter') {
+      tappedCellKey = positionKey(row, column)
       onCellTap(row, column)
       gridElement?.focus()
     }
@@ -589,6 +591,83 @@
       target.removeEventListener('pointercancel', onPointerEnd)
     }
   })
+
+  // ---- Following the selection while zoomed (board rule 3) ----
+
+  // The cell of the last tap on a letter cell: the selection it makes is in
+  // view already and must not scroll. Plain, not state: only the effect below
+  // reads it.
+  let tappedCellKey: string | null = null
+  let selectedCellKey = $derived(
+    selection === null ? null : positionKey(selection.row, selection.column),
+  )
+
+  // Only a change of selected cell scrolls: everything else the scroll reads
+  // (zoom, sizes, direction) is untracked, so a pinch, a pan, a resize or a
+  // refit never brings the selected cell back.
+  $effect(() => {
+    const key = selectedCellKey
+    untrack(() => followSelectedCell(key))
+  })
+
+  function followSelectedCell(key: string | null): void {
+    const isFromCellTap = key !== null && key === tappedCellKey
+    tappedCellKey = null
+    if (key === null || isFromCellTap || zoom <= ZOOM_MIN || selection === null) {
+      return
+    }
+    const cellElement = document.getElementById(cellId(selection.row, selection.column))
+    if (viewport === undefined || gridElement === undefined || cellElement === null) {
+      return
+    }
+    const viewBox = viewport.getBoundingClientRect()
+    const cellBox = cellElement.getBoundingClientRect()
+    const gridBox = gridElement.getBoundingClientRect()
+    const across = axisOf(
+      viewport.scrollLeft,
+      viewBox.left,
+      viewBox.width,
+      cellBox.left,
+      cellBox.width,
+      gridBox.left,
+      gridBox.right,
+    )
+    const down = axisOf(
+      viewport.scrollTop,
+      viewBox.top,
+      viewBox.height,
+      cellBox.top,
+      cellBox.height,
+      gridBox.top,
+      gridBox.bottom,
+    )
+    const left = scrollShowingCell(across)
+    const top = scrollShowingCell(down)
+    // At once: an explicit 'instant' overrides any smooth scroll-behavior.
+    viewport.scrollTo({ left, top, behavior: 'instant' })
+  }
+
+  // One axis of the viewport, from boxes on screen to positions in what it
+  // scrolls: a point at `screen` px is at `screen - viewStart + scroll`.
+  function axisOf(
+    scroll: number,
+    viewStart: number,
+    viewSide: number,
+    cellStart: number,
+    cellSide: number,
+    gridStart: number,
+    gridEnd: number,
+  ): ScrollAxis {
+    const offset = scroll - viewStart
+    return {
+      scroll,
+      viewSide,
+      cellStart: cellStart + offset,
+      cellSide,
+      gridStart: gridStart + offset,
+      gridEnd: gridEnd + offset,
+    }
+  }
 </script>
 
 <div
