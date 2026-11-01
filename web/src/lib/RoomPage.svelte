@@ -46,7 +46,14 @@
     writeSwitch,
   } from './cellDisplaySwitches'
   import { clueFlagMarkers, flagOf, isClueOfWord } from './clueFlags'
-  import { checkNickname, planAutomaticJoin, readNickname, writeIdentity, writeNickname } from './joinRules'
+  import {
+    checkNickname,
+    planAutomaticJoin,
+    readNickname,
+    writeIdentity,
+    writeNickname,
+    type Identity,
+  } from './joinRules'
   import { markFinished } from './catalogue'
   import { recordOwnRoom } from './history'
   import {
@@ -647,15 +654,20 @@
     send({ type: 'join', nickname: check.nickname, resume_token: null })
   }
 
+  // The identity of the last snapshot, held in memory: the next join uses it
+  // first (lobby/joining.md rules 8.1 and 10).
+  let heldIdentity: Identity | null = null
+
   // A snapshot answers a join: remember who I am, and the nickname I typed.
   function rememberJoin(snapshot: Snapshot): void {
     for (const player of snapshot.players) {
       if (player.player_id === snapshot.you) {
-        writeIdentity(code, {
+        heldIdentity = {
           player_id: snapshot.you,
           resume_token: snapshot.resume_token,
           nickname: player.nickname,
-        })
+        }
+        writeIdentity(code, heldIdentity)
       }
     }
     if (formJoinNickname !== null) {
@@ -676,14 +688,19 @@
       selection.direction !== next.direction
     rawSelection = next
     writeRoomSelection(code, next)
-    // The server only knows the cell and the direction, not the chosen word.
     if (cellChanged) {
-      send({
-        type: 'select_cell',
-        row: next.row,
-        column: next.column,
-        direction: next.direction,
-      })
+      send(selectCellMessage(next))
+    }
+  }
+
+  // The select_cell of a selection: the server only knows the cell and the
+  // direction, not the chosen word.
+  function selectCellMessage(selected: Selection): object {
+    return {
+      type: 'select_cell',
+      row: selected.row,
+      column: selected.column,
+      direction: selected.direction,
     }
   }
 
@@ -784,6 +801,7 @@
     baseSeq: number | null,
   ): void {
     addPendingEdit(session, cell.row, cell.column, letter, kind)
+    editsMade += 1
     sendEdit(editMessage({ row: cell.row, column: cell.column, letter, kind }, baseSeq))
   }
 
@@ -864,12 +882,13 @@
     }
   }
 
-  // Ask the server to undo my last edit. It arrives after any edit already sent.
+  // Ask the server to undo my last edit. It goes after the edits pending when it
+  // is made and before any later edit (platform/server.md rule 9).
   function onUndo(): void {
     if (session.solved) {
       return
     }
-    send({ type: 'undo' })
+    sendRequest({ type: 'undo' })
   }
 
   // Ask the server to check the selected letter, the selected word or the grid.
@@ -877,7 +896,7 @@
     if (session.solved) {
       return
     }
-    send({ type: 'check', target })
+    sendRequest({ type: 'check', target })
   }
 
   function onCheckLetter(): void {
@@ -935,7 +954,7 @@
     if (isRevealLetterDisabled || selection === null) {
       return
     }
-    send({
+    sendRequest({
       type: 'reveal',
       target: { scope: 'letter', row: selection.row, column: selection.column },
     })
@@ -946,7 +965,7 @@
     if (isRevealWordDisabled || activeWord === null) {
       return
     }
-    send({
+    sendRequest({
       type: 'reveal',
       target: {
         scope: 'word',
@@ -1690,46 +1709,93 @@
     reconnectTimer = undefined
   }
 
-  // Edits wait here while the socket has no snapshot yet, and are then sent one
-  // every EDIT_SEND_INTERVAL_MS (spec 017 AC-5), oldest first.
-  let isSynced = false
-  let editQueue: object[] = []
-  let editTimer: ReturnType<typeof setInterval> | undefined
+  // ---- What the page sends after a snapshot (platform/realtime.md rules 20, 22) ----
 
-  function stopEditQueue(): void {
-    clearInterval(editTimer)
-    editTimer = undefined
-    editQueue = []
+  // An undo, a check or a reveal made while the page is not joined, kept until
+  // the next snapshot. `editsBefore` counts the edits made before it: it goes out
+  // after them and before any later edit.
+  interface KeptRequest {
+    message: object
+    editsBefore: number
+  }
+
+  // A message waiting its turn in the send queue. `request` is set for an undo,
+  // a check or a reveal, so that a loss can keep it again; an edit stays pending
+  // and is resent anyway, and a select_cell is sent again after the next snapshot.
+  interface QueuedMessage {
+    message: object
+    request: KeptRequest | null
+  }
+
+  // Until the socket has its snapshot nothing is sent: edits stay pending, and
+  // undos, checks and reveals are kept. They are then sent one every
+  // EDIT_SEND_INTERVAL_MS, oldest first, through the send queue.
+  let isSynced = false
+  let sendQueue: QueuedMessage[] = []
+  let sendTimer: ReturnType<typeof setInterval> | undefined
+  // How many edits the page has made since it opened.
+  let editsMade = 0
+  let keptRequests: KeptRequest[] = []
+
+  // Stop the send queue. The requests it still holds are kept again, before any
+  // kept since, for the next snapshot.
+  function stopSendQueue(): void {
+    clearInterval(sendTimer)
+    sendTimer = undefined
+    const stillQueued: KeptRequest[] = []
+    for (const queued of sendQueue) {
+      if (queued.request !== null) {
+        stillQueued.push(queued.request)
+      }
+    }
+    keptRequests = [...stillQueued, ...keptRequests]
+    sendQueue = []
     isSynced = false
   }
 
-  function sendNextQueuedEdit(): void {
-    const next = editQueue.shift()
+  function sendNextQueued(): void {
+    const next = sendQueue.shift()
     if (next === undefined) {
-      clearInterval(editTimer)
-      editTimer = undefined
+      clearInterval(sendTimer)
+      sendTimer = undefined
       return
     }
-    send(next)
+    send(next.message)
   }
 
-  // Send an edit now, or behind the edits still waiting. Before the snapshot of
+  // Send an edit now, or behind the messages still queued. Before the snapshot of
   // the socket nothing is sent: the edit is pending and is resent with the others.
   function sendEdit(message: object): void {
     if (!isSynced) {
       return
     }
-    if (editTimer === undefined) {
+    if (sendTimer === undefined) {
       send(message)
       return
     }
-    editQueue.push(message)
+    sendQueue.push({ message, request: null })
+  }
+
+  // Send an undo, a check or a reveal after the edits pending when it is made:
+  // kept while the page is not joined, queued behind a running resend, else sent
+  // at once.
+  function sendRequest(message: object): void {
+    const request: KeptRequest = { message, editsBefore: editsMade }
+    if (!isSynced) {
+      keptRequests.push(request)
+      return
+    }
+    if (sendTimer === undefined) {
+      send(message)
+      return
+    }
+    sendQueue.push({ message, request })
   }
 
   // Stop listening to a socket and close it.
   function dropSocket(dropped: WebSocket): void {
     if (socket === dropped) {
-      stopEditQueue()
+      stopSendQueue()
     }
     dropped.onopen = null
     dropped.onmessage = null
@@ -1814,8 +1880,9 @@
     isRecapOpen = false
     hostSettings?.close()
     accountDialog?.close()
-    stopEditQueue()
+    stopSendQueue()
     session.pendingEdits = []
+    keptRequests = []
   }
 
   // The browser has a network again: do not wait for the next delay.
@@ -1833,22 +1900,52 @@
     }
   }
 
-  // Send my pending edits again, oldest first, each as the message of its kind
-  // and with the base_seq it had. They are paced, the first one at once, then
-  // one every EDIT_SEND_INTERVAL_MS.
-  function resendPendingEdits(): void {
-    stopEditQueue()
-    isSynced = true
-    for (const edit of session.pendingEdits) {
-      editQueue.push(editMessage(edit, edit.baseSeq))
+  // My pending edits, each as the message of its kind and with the base_seq it
+  // had, and the kept requests, in the order they were made. The pending edits
+  // are the newest edits made: counting from 0, the first of them is edit
+  // number editsMade minus their count.
+  function pendingInOrder(): QueuedMessage[] {
+    const ordered: QueuedMessage[] = []
+    const firstEditNumber = editsMade - session.pendingEdits.length
+    let requestIndex = 0
+    session.pendingEdits.forEach((edit, index) => {
+      const editNumber = firstEditNumber + index
+      // The requests made before this edit go before it.
+      while (
+        requestIndex < keptRequests.length &&
+        keptRequests[requestIndex].editsBefore <= editNumber
+      ) {
+        const request = keptRequests[requestIndex]
+        ordered.push({ message: request.message, request })
+        requestIndex += 1
+      }
+      ordered.push({ message: editMessage(edit, edit.baseSeq), request: null })
+    })
+    for (const request of keptRequests.slice(requestIndex)) {
+      ordered.push({ message: request.message, request })
     }
-    editTimer = setInterval(sendNextQueuedEdit, EDIT_SEND_INTERVAL_MS)
-    sendNextQueuedEdit()
+    return ordered
+  }
+
+  // Once the socket has its snapshot, send what waited: after a loss the
+  // selection first (the server cleared it), then the pending edits and the
+  // kept requests in order. They are paced, the first one at once, then one
+  // every EDIT_SEND_INTERVAL_MS.
+  function sendAfterSnapshot(isReturn: boolean): void {
+    stopSendQueue()
+    isSynced = true
+    if (isReturn && selection !== null) {
+      sendQueue.push({ message: selectCellMessage(selection), request: null })
+    }
+    sendQueue.push(...pendingInOrder())
+    keptRequests = []
+    sendTimer = setInterval(sendNextQueued, EDIT_SEND_INTERVAL_MS)
+    sendNextQueued()
   }
 
   // The first message of a socket: the join of the stored identity, or the form.
   function joinOnOpen(opened: WebSocket): void {
-    const plan = planAutomaticJoin(code, t('room.default_nickname'))
+    const plan = planAutomaticJoin(code, t('room.default_nickname'), heldIdentity)
     isFormKept = false
     if (plan === null) {
       session.status = 'nickname'
@@ -1885,7 +1982,7 @@
         lastSeenChatSeq = session.snapshot.seq
       }
       reconnectAttempt = 0
-      resendPendingEdits()
+      sendAfterSnapshot(snapshotBefore !== null)
     }
     if (session.status === 'nickname') {
       formJoinNickname = null
@@ -2012,7 +2109,7 @@
           type="submit"
           class="nock-button nock-button-primary"
           data-testid="nickname-submit"
-          disabled={session.status === 'joining'}>{t('join.submit')}</button
+          disabled={session.status !== 'nickname'}>{t('join.submit')}</button
         >
       </form>
     {/if}

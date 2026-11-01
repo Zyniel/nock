@@ -93,8 +93,15 @@ function isRoomCreatedHere(code: string): boolean {
 }
 
 // The join to send at once when the socket opens, or null to show the form.
-export function planAutomaticJoin(code: string, defaultNickname: string): JoinPlan | null {
-  const identity = readIdentity(code)
+// `heldIdentity` is the identity of the page's last snapshot, held in memory: it
+// comes first, so that a browser refusing storage still rejoins, and an identity
+// another tab stored meanwhile does not replace it.
+export function planAutomaticJoin(
+  code: string,
+  defaultNickname: string,
+  heldIdentity: Identity | null,
+): JoinPlan | null {
+  const identity = heldIdentity ?? readIdentity(code)
   if (identity !== null) {
     return { nickname: identity.nickname, resume_token: identity.resume_token }
   }
