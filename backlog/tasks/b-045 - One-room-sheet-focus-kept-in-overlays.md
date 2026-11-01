@@ -1,10 +1,10 @@
 ---
 id: B-045
 title: One room sheet, focus kept in overlays
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T23:24:00Z'
+updated_date: '2026-11-01T23:54:00Z'
 labels:
   - domain:hud
   - domain:host
@@ -63,23 +63,23 @@ ordinal: 6000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 hud AC-23 (new): Tab or Shift+Tab out of an open menu closes it, the focus staying where it went
-- [ ] #2 hud AC-24 (new): Shift+Tab out of the Salon sheet closes it and its scrim
-- [ ] #3 hud AC-25 (new): a room sheet's backdrop closes it only on a press and its release both on it
-- [ ] #4 host AC-18 (new): Tab and Shift+Tab wrap inside the host sheet
-- [ ] #5 host AC-19 (new): an invalid count sends nothing and shows the error line, linked to its field
-- [ ] #6 host AC-20 (new): the loss of the host role closes the host sheet and focuses « Menu »
-- [ ] #7 hints AC-25 (new): a focused « Oui » or « Non » gives the focus to the grid before it is disabled
-- [ ] #8 account AC-34 (new): a drag from the account sheet to the backdrop keeps it open with what was typed
+- [x] #1 hud AC-23 (new): Tab or Shift+Tab out of an open menu closes it, the focus staying where it went
+- [x] #2 hud AC-24 (new): Shift+Tab out of the Salon sheet closes it and its scrim
+- [x] #3 hud AC-25 (new): a room sheet's backdrop closes it only on a press and its release both on it
+- [x] #4 host AC-18 (new): Tab and Shift+Tab wrap inside the host sheet
+- [x] #5 host AC-19 (new): an invalid count sends nothing and shows the error line, linked to its field
+- [x] #6 host AC-20 (new): the loss of the host role closes the host sheet and focuses « Menu »
+- [x] #7 hints AC-25 (new): a focused « Oui » or « Non » gives the focus to the grid before it is disabled
+- [x] #8 account AC-34 (new): a drag from the account sheet to the backdrop keeps it open with what was typed
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -106,3 +106,30 @@ Reviewer round 1: CHANGES REQUESTED. (1) Blocking: rule 12's case of a Tab from 
 
 Close: the full gate failed on 022 AC-18's mute test (after a Tab inside the Salon sheet, the mute's page-moved focus closed the sheet, against chat rule 15): the widened quick gate had left the chat domain out. Back to the implementer; the 006 AC-2 arrow failure was ERR_NO_BUFFER_SPACE and passes alone.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The room's four sheets share one dialog frame, `RoomSheet.svelte`, and the focus no longer escapes an open menu, the Salon sheet or a sheet.
+
+Criteria:
+- hud AC-23: `tests/test_hud_overlay_focus.py::test_ac23_*` (Tab off the Aide menu focuses the grid and closes it; Shift+Tab off the Menu focuses « Menu » and closes it; a vote disabling the focused item leaves the menu open).
+- hud AC-24: `test_ac24_shift_tab_on_discussion_focuses_the_clue_bar_and_closes_the_sheet`; rule 12's edge case in `test_ac24_tab_out_of_the_page_closes_nothing_until_the_focus_is_in_the_page`.
+- hud AC-25: `test_ac25_*` (a press and release in two places close nothing; both on the backdrop close and focus « Menu »).
+- host AC-18: `tests/test_host_settings_sheet.py::test_ac18_*` (Tab wraps in the host sheet).
+- host AC-19: `test_ac19_*` (`100`, `-1`, `2.5`, empty: nothing sent, the field focused, `aria-invalid`, « Entrez un nombre entier de 0 à 99. »; a valid save closes; marks set anew and cleared on close).
+- host AC-20: `test_ac20_a_host_change_closes_the_sheet_and_focuses_menu`.
+- hints AC-25: `tests/test_hints_vote_focus.py::test_ac25_*` (« Oui » or « Non » focused when the socket closes: the focus on the grid, the selection kept, no ballot).
+- account AC-34: `tests/test_account_sheet_backdrop.py::test_ac34_*` (a drag to the backdrop keeps the sheet and `lea@exa`, in a room and on the catalogue).
+- product AC-2's feed outline test (spec 035) now starts its Tab walk inside the open Salon sheet: the old walk Tabbed through the top bar with the sheet open, which rule 12 now closes.
+
+Reviewer: CHANGES REQUESTED in round 1, APPROVE in round 2. Blocking: rule 12 promised to close the Salon sheet on a Tab from the browser's own controls, which sends the page no keydown; the spec now closes it on the first Tab pressed inside the page (option b; option a, guessing from a focusin after the window regains focus, would misfire on the mute case and cannot be tested headless). Taken: the vote's focus moves only from « Oui » or « Non », not from the status line a ballot focuses; a harness docstring; rule 12 rewrapped.
+
+The close gate: the first full gate found 022 AC-18's mute test closing the Salon sheet (a Tab whose focus stayed inside it left the Tab flag up, so the mute's page-moved focus was taken for the Tab's); fixed in 6821e89, the flag now clearing at the first focus change after a Tab and on the key's release. The widened quick gates had left the chat domain out; the full gate passed after the fix (8584 parallel, 160 serial).
+
+Lead's decisions: a Tab or Shift+Tab onto an element outside an open menu or the Salon sheet closes it, the focus staying there (the task's default A), wherever the focus was, the mute case included; a focus lost to no element or moved by the page closes nothing; a press keeps the scrim's rules and a press on the overlay's own button closes it once; one shared error line under both counts, the focus on the first refused one; the vote's focus goes to the grid. The spec-checker asked for changes once and approved the second round.
+
+Flagged: B-041 took hints AC-24 on main, so B-045's criterion is hints AC-25 (renumbered in the merge). Rule 12's mute case has no criterion of its own. `account.md` (34 criteria), `hints.md` (25), `host.md` (20) and `hud.md` are at or over the budget of `specs/_map.md`: their split is a follow-up for the human.
+
+Code: `web/src/lib/RoomSheet.svelte` (new: open, close, onClosed, one Tab trap, canCancel, closesOnBackdrop), `HostSettings`, `AccountDialog`, `RecapDialog`, `RoomGoneDialog` on it, `revealCount.ts` (`isValidCount`, shared), `Salon.svelte` (a bindable element), `RoomPage.svelte` (the overlay Tab rule, the host sheet closed on the role's loss, the vote's focus), `fr.json` (`settings.error.count`). The look: the host's settings with a refused count, drawn in the screens sheet.
+<!-- SECTION:FINAL_SUMMARY:END -->
