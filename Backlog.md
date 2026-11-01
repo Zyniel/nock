@@ -1069,7 +1069,7 @@ others, at the top of the list.
   built by the lead)
 - Domains: none (tooling only: `.claude/settings.json`, `CLAUDE.md`)
 - Architecture decision: no
-- Branch: feat/b-053-gate-six-workers · PR: none yet
+- Branch: feat/b-053-gate-six-workers · PR: #78 (merged)
 - Problem: the PC restarted on 2026-10-31 at 22:58, 8 minutes into B-037's
   closing full gate, which had started at 22:50 with 10 workers (B-026's
   number, on a machine with 16 logical CPUs). The same gate, run again with
