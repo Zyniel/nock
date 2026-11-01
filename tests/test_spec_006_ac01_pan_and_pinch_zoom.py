@@ -24,11 +24,12 @@ from spec006_harness import (
     cell_at,
     grid_from_text,
     open_room,
+    pan,
+    pinch,
 )
 
 ZOOM_PATTERN = re.compile(r"^\d+(\.\d{1,2})?$")
 MAX_PINCHES = 5
-PINCH_STEPS = 10
 SMALL_PINCH_START = 40.0
 BIG_PINCH_END = 300.0
 EPSILON = 1e-6
@@ -88,38 +89,7 @@ def client_size(viewport: Locator) -> tuple[float, float]:
 
 
 # ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
-
-
-def pinch(page: Page, viewport: Locator, start: float, end: float) -> None:
-    """Pinch around the viewport centre, finger distance `start` to `end`."""
-    box = box_of(viewport)
-    center_x = box["x"] + box["width"] / 2
-    center_y = box["y"] + box["height"] / 2
-
-    def two_fingers(distance: float) -> list[dict[str, float]]:
-        half = distance / 2
-        return [
-            {"x": center_x - half, "y": center_y, "id": 0},
-            {"x": center_x + half, "y": center_y, "id": 1},
-        ]
-
-    session = page.context.new_cdp_session(page)
-    try:
-        session.send(
-            "Input.dispatchTouchEvent",
-            {"type": "touchStart", "touchPoints": two_fingers(start)},
-        )
-        for step in range(1, PINCH_STEPS + 1):
-            distance = start + (end - start) * step / PINCH_STEPS
-            session.send(
-                "Input.dispatchTouchEvent",
-                {"type": "touchMove", "touchPoints": two_fingers(distance)},
-            )
-        session.send(
-            "Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []}
-        )
-    finally:
-        session.detach()
+# `pinch` and `pan` are in `spec006_harness`.
 
 
 def pinch_out(page: Page, viewport: Locator) -> None:
@@ -128,25 +98,6 @@ def pinch_out(page: Page, viewport: Locator) -> None:
 
 def pinch_in(page: Page, viewport: Locator) -> None:
     pinch(page, viewport, BIG_PINCH_END, SMALL_PINCH_START)
-
-
-def pan(page: Page, viewport: Locator) -> None:
-    """Drag one finger from the viewport centre by -200 px in x and y."""
-    box = box_of(viewport)
-    session = page.context.new_cdp_session(page)
-    try:
-        session.send(
-            "Input.synthesizeScrollGesture",
-            {
-                "x": box["x"] + box["width"] / 2,
-                "y": box["y"] + box["height"] / 2,
-                "xDistance": -200,
-                "yDistance": -200,
-                "gestureSourceType": "touch",
-            },
-        )
-    finally:
-        session.detach()
 
 
 def wait_for_zoom(page: Page, viewport: Locator, condition: str, before: float) -> None:

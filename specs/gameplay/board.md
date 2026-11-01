@@ -37,7 +37,14 @@ AZERTY keyboard replaces the system one, and the player may hide it.
    scrolling; the grid refits when its room changes. Two fingers multiply the
    zoom by the ratio of their distances, between 1 and a maximum at which no
    FX-02 clue text is cut off on a 360 px wide phone; one finger pans. There is
-   no other zoom control.
+   no other zoom control. While the zoom is above 1, each change of selected
+   cell, except one made by a tap on a letter cell, scrolls the grid's
+   viewport at once the least that shows the whole cell with one cell of
+   margin on each side the grid's edge allows; on an axis where the viewport
+   holds less than three cells, the cell is centred on it instead. A tap on a
+   letter cell, a change of direction alone, a pan, a pinch, a resize, a
+   refit, or the keyboard shown or hidden never scrolls toward the selected
+   cell; the room page itself never scrolls.
 4. Cursors follow `product.md` rule 16, one's own never drawn. A selection
    arriving from another cell or none takes the first free corner of top-left,
    top-right, bottom-right, bottom-left; a change of direction keeps it;
@@ -298,18 +305,52 @@ AZERTY keyboard replaces the system one, and the player may hide it.
   side in navy, as « Hyphen edges » says, and solid on its three others; a tap
   on (2, 2) selects VIDE's four cells, and `v`, `i`, `d`, `e` give the same
   cells and letters as on FX-01 as published.
+- **AC-23** On a touch phone held upright, FX-02 zoomed to 2, the viewport at
+  the grid's top-left corner: after a tap on « Elle entend les sons », the
+  in-app keys `O R E I L L E` fill OREILLE, (1, 2) to (1, 8). Each letter that
+  selects a cell with no whole cell right of it in view scrolls across only,
+  the viewport's right edge ending at the right edge of the cell after the
+  selected one; the scroll down stays 0, the page unscrolled. Typed on the
+  grid with a physical keyboard, the letters scroll the same.
+- **AC-24** In AC-23's start, after a tap on « Elle va du genou au pied »,
+  ArrowDown steps from (2, 0) down column 0 to MONT's (12, 0); each step onto
+  a cell with no whole cell below it in view scrolls down only, the viewport's
+  bottom edge ending one cell below the selected cell's bottom. From AC-23's
+  start again, Shift+Tab with nothing selected selects ECHEC on (16, 6) and
+  scrolls down until the viewport's bottom edge is the grid's, and across no
+  further than needed to show (16, 7) whole.
+- **AC-25** In AC-23's start, after a tap on (1, 2), `O` selects (1, 3), in
+  view with a cell of margin around it, and leaves the scroll unchanged; a
+  tap on the cell of row 1 that the viewport's right edge cuts selects it,
+  the scroll unchanged too.
+- **AC-26** On FX-02 at zoom 1, after a tap on « Elle entend les sons »,
+  typing OREILLE, then Shift+Tab to JAMBE on (2, 0) and ArrowDown to
+  (12, 0) leave the grid's viewport and the page unscrolled.
+- **AC-27** On a touch phone held upright, the keyboard hidden, FX-01 zoomed
+  to 2 holds two and a half cells across: after a tap on (2, 1), ArrowRight
+  selects (2, 2) and centres it left to right, to within 1 px.
+- **AC-28** In AC-23's start with (1, 2) selected and a pan to the grid's
+  bottom-right corner, (1, 2) stays out of view after ⇄ (COU down), after a
+  pinch from 2 to 3 away from it (Chromium only, as AC-2), and after
+  « Clavier » hides the keyboard: none of them scrolls toward it.
+- **AC-29** In AC-23's start with OREIL in (1, 2) to (1, 6), a tap on « Elle
+  entend les sons » selects (1, 7) and scrolls across only, the viewport's
+  right edge ending at (1, 8)'s right edge.
 
 ## Edge cases
 
 - Locked cells are selectable and count as filled (AC-11, AC-15).
 - A stored keyboard choice changes nothing off a touch screen (AC-18).
+- A selected cell on the grid's first or last row or column keeps no margin
+  beyond the grid's edge (AC-24).
 - A snapshot of a room stored before answers kept their hyphens has no mark:
   no edge is dashed (AC-21).
 
 ## Out of scope
 
-- Zoom buttons, Ctrl+wheel; Home, End, Page, Delete keys; shortcuts for ⇄ or ✎;
-  QWERTY, accent or digit keys; erasing a word with ⌫, key repeat.
+- Zoom buttons, Ctrl+wheel; an animated scroll to the selection; Home, End,
+  Page, Delete keys; shortcuts for ⇄ or ✎; QWERTY, accent or digit keys;
+  erasing a word with ⌫, key repeat.
 - The separator in the clue bar, the announcement or a length pattern; a look
   of its own per separator; the dashed edge in the operator's replay
   (`admin/operations.md`) and the catalogue's generic grid drawing.
@@ -319,7 +360,8 @@ AZERTY keyboard replaces the system one, and the player may hide it.
 
 ## Code
 
-- `web/src/lib/`: `GridViewport.svelte` (cells, taps, keys, pinch),
+- `web/src/lib/`: `GridViewport.svelte` (cells, taps, keys, pinch, following
+  the selection),
   `gridLayout.ts`, `HyphenEdge.svelte`, `wordSelection.ts`, `navigation.ts`,
   `letterEntry.ts`, `remoteSelections.ts`, `cellDisplaySwitches.ts`,
   `RoomPage.svelte` (typing, keyboard, layout), `roomSession.ts`,
