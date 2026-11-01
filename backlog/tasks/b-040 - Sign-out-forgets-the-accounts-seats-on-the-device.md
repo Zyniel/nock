@@ -1,10 +1,10 @@
 ---
 id: B-040
 title: Sign-out forgets the account's seats on the device
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T19:34:00Z'
+updated_date: '2026-11-01T20:16:00Z'
 labels:
   - domain:account
   - domain:hud
@@ -59,18 +59,18 @@ ordinal: 1000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 account AC-31 (new)
-- [ ] #2 account AC-32 (new)
-- [ ] #3 account AC-33 (new)
+- [x] #1 account AC-31 (new)
+- [x] #2 account AC-32 (new)
+- [x] #3 account AC-33 (new)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -86,4 +86,25 @@ Gate: uv run python scripts/gate.py --specs account,hud --browsers chromium
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead's decisions: option A (a list nock.account_rooms of the codes storeMissingIdentities wrote), so no architecture decision; open question 1 takes A (a failed sign-out or deletion keeps everything, the page shows error, rule 16).
+
+Tests: the device's own seat T keeps its room record too (rule 17: a seat the device took itself stays), so the test asserts nock.room.T stays.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Sign-out and deletion now forget, on a 204, the seats the account brought to the device; the device's own seats stay.
+
+- account AC-31: tests/test_account_signout_forgets.py::test_ac31_a_sign_out_forgets_r_and_s_and_keeps_t, ::test_ac31_mes_salons_lists_t_alone_after_the_sign_out
+- account AC-32: ::test_ac32_a_deletion_leaves_the_device_as_a_sign_out_does
+- account AC-33: ::test_ac33_a_failed_sign_out_or_deletion_removes_nothing (sign-out, deletion)
+- hud: its Out of scope line only (no criterion).
+
+Code: web/src/lib/account.ts (nock.account_rooms written by storeMissingIdentities; forgetAccountSeats), web/src/lib/AccountPage.svelte (called on a 204 only). specs/_settings.md lists the new key.
+
+Spec-checker: APPROVED in round 2 (round 1 asked for a clearer AC-31 setup and a concrete AC-33 example). Reviewer: APPROVE in round 1; two suggestions taken (the key in _settings.md; the history rewritten only when a record goes). Full gate: passed (8535 parallel, 160 serial).
+
+Lead's decisions: option A (nock.account_rooms, read only by the account code), so no architecture decision; a failed sign-out or deletion keeps everything (open question 1, A); nock.progress stays out of scope; the device's own seat keeps its room record too (rule 17).
+
+Flagged: account.md is over the size guideline (33 criteria), its split is a follow-up draft; readAccountRoomCodes keeps the string items of a mixed array (the rule leaves it open); when the sign-out does rewrite nock.history, malformed records of other rooms are dropped; tests/test_spec_046_ac22_fit.py failed once in the implementer's first gate run and passed alone (possible flake).
+<!-- SECTION:FINAL_SUMMARY:END -->
