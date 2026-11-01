@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 maxTurns: 250
 effort: high
+omitClaudeMd: true
 skills:
   - python-standards
 ---

@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
 maxTurns: 250
 effort: high
+omitClaudeMd: true
 skills:
   - python-standards
 ---
@@ -58,8 +59,12 @@ The rules are in `specs/_map.md`, "Criteria and their tests". In short:
   under test.
 - Assert on exact results. `assert result` or `assert result is not None` passes
   for almost any implementation.
-- Split a test file past about 800 lines by criterion group (human decision,
-  2026-10-14).
+- Split a test file past about 800 lines by criterion group.
+- A test file that measures a duration or a pace (a latency percentile, a time
+  budget, a time window) runs alone, after the parallel pass: name it in your
+  report so the lead adds it to `SERIAL_TEST_FILES` in
+  `scripts/gate_browsers.py`. A check that only waits up to a bound for a
+  change stays in the parallel pass.
 - Follow the python-standards skill. It applies to test code too.
 
 ## Before you finish

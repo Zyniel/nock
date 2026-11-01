@@ -4,6 +4,7 @@ description: Read-only review of a finished change against its domain spec. Chec
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
+omitClaudeMd: true
 skills:
   - python-standards
 ---
@@ -60,7 +61,7 @@ Then look at the change as a whole:
   layout or new state that reaches the screen must match the design file of that
   part of the screen in `specs/_design/` and be drawn in `docs/design/` (the
   screens sheet's sources in `docs/design/screens_sheet/`, the cell sheet for
-  cells), in the same change (human decision, 2026-10-22). A screen that changed
+  cells), in the same change. A screen that changed
   without its drawing is a blocking finding for the spec-writer.
 
 Finally run the quick gate of the change,

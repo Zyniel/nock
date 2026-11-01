@@ -1,183 +1,173 @@
 # Nock
 
-Nock is an online collaborative arrowword (mots fléchés) game. The name is the
-notch at the back of an arrow. It is a Python project built spec-first by a small
-team of Claude Code agents. A human approves each brief and each spec change;
-agents write the specs, the tests, then the code, then review it.
+Nock is an online collaborative arrowword (mots fléchés) game: a Python server
+and a Svelte + TypeScript client. The name is the notch at the back of an arrow.
+It is built spec-first by Claude Code agents. The human owns the product. The
+main session is the lead: it plans, delegates to the four roles in
+`.claude/agents/` and keeps `Backlog.md`; it writes no tests and no code.
 
-Before writing a spec or code, read `specs/_map.md` (the domains, how domain specs
-work, the glossary), then only the files your task names. `specs/_architecture.md`
-holds the stack and modeling rules.
+This file is for the lead. The roles carry their own instructions and do not
+load it.
+
+## Rules
+
+- No implementation without an approved spec, and none before its tests exist:
+  the tests, written from the spec by another agent, decide what gets built.
+- Only the human approves a brief or a spec change. The lead sets a status line
+  only on their word.
+- Take technical decisions yourself and report them: tooling details, test
+  setup, small spec slips, reviewer suggestions. Ask the human about product
+  scope or behaviour they would notice, money and accounts, and pushing to
+  `main`.
+- Tooling and new dependencies (Python or npm) are the human's call: ask first.
+  Tooling means `pyproject.toml`, `scripts/`, `.claude/`, `.github/` and, in
+  `web/`, `package.json`, `package-lock.json` and the Vite, Svelte and
+  TypeScript config files. Exception: the lead fixes an incoherence or a
+  weakness of the tooling (a timeout, a flaky setup, a hook that blocks the
+  wrong thing) without asking, in a pull request of its own.
+- Specs and design files state what is true now, with no dated notes and no
+  history. The reason for a change goes in its commit message.
+- The visual documentation is always current, so the human can see the whole
+  look at any time. A change that alters what a screen looks like updates the
+  design file of that part of the screen in `specs/_design/` and redraws it in
+  `docs/design/` in the same commit, before tests and code: the cell sheet by
+  hand, the screens sheet from `docs/design/screens_sheet/`, then rebuilt. The
+  reviewer blocks a change of look that is not drawn.
 
 ## Commands
 
-Everything runs through uv. Do not use `pip` or a bare `python`.
+Everything runs through uv: never `pip` or a bare `python`.
 
 | What | Command |
 | --- | --- |
 | Install or update the environment | `uv sync` |
-| Full quality gate (same as CI) | `uv run python scripts/gate.py` |
-| Gate while the code does not exist yet | `uv run python scripts/gate.py --stage tests` |
-| Gate with the browser tests in all three engines | `uv run python scripts/gate.py --browsers all` |
-| Gate, one engine's browser tests only (a CI job) | `uv run python scripts/gate.py --skip-static --tests browser --browsers firefox` |
-| Gate, static checks and tests without a browser | `uv run python scripts/gate.py --tests other` |
+| Full quality gate (what CI runs) | `uv run python scripts/gate.py` |
+| Gate before the code exists | `uv run python scripts/gate.py --stage tests` |
 | Quick gate: static checks, tests without a browser, browser tests of the domain `grids` and of spec 027 | `uv run python scripts/gate.py --specs grids,027 --browsers chromium` |
-| Tests only (browser tests in Chromium) | `uv run pytest` |
+| Gate without browser tests | `uv run python scripts/gate.py --tests other` |
+| Gate in the three engines | `uv run python scripts/gate.py --browsers all` |
+| One engine's browser tests only (a CI job) | `uv run python scripts/gate.py --skip-static --tests browser --browsers firefox` |
+| All tests, or one file (browser tests in Chromium) | `uv run pytest`, `uv run pytest <file>` |
+| Format, lint, type check | `uv run black .`, `uv run ruff check --fix .`, `uv run pyrefly check` |
+| Web client: install, type check, build | `npm --prefix web ci`, `npm --prefix web run check`, `npm --prefix web run build` |
+| Browsers for the browser tests | `uv run playwright install chromium firefox webkit` |
 | Rebuild the screens sheet (after any change of look) | `uv run python docs/design/screens_sheet/build.py` |
-| Fix formatting | `uv run black .` |
-| Fix lint findings | `uv run ruff check --fix .` |
-| Type check | `uv run pyrefly check` |
-| Install the web client dependencies | `npm --prefix web ci` |
-| Web client type check | `npm --prefix web run check` |
-| Build the web client | `npm --prefix web run build` |
-| Install the browsers for browser tests | `uv run playwright install chromium firefox webkit` |
-| Claim a new backlog item: its number, branch and worktree | `uv run python scripts/claim_item.py <short-name>` |
-| List the items in flight and the spec files they change | `uv run python scripts/claim_item.py --list` |
+| Claim a backlog item: its number, branch and worktree | `uv run python scripts/claim_item.py <short-name>` |
+| The items in flight and the spec files they change | `uv run python scripts/claim_item.py --list` |
 
-Black is the only formatter. Ruff is a linter here; do not run `ruff format`.
+Black is the only formatter. Ruff is a linter only: never run `ruff format`.
 
-## Layout
+## Building a change
 
-- `Backlog.md`: the work queue. One item per change, from its brief to done, and
-  the release checklist.
-- `specs/_map.md`: the index of the domain specs and their rules.
-- `specs/<area>/<file>.md`: one domain spec per domain, saying what is true now,
-  in the format of `specs/_template.md`. `specs/product.md`: core flows, stable
-  routes and the baselines every domain keeps.
-- `specs/_design/`: the look, with its drawings in `docs/design/`:
-  `cell-sheet.html` (grid cells, edited by hand) and `screens-sheet.html` (every
-  screen and state, generated by `docs/design/screens_sheet/build.py`; never
-  edit its HTML).
-- `specs/_archive/v1.1.0/`: the numbered specs (`NNN-short-name.md`) and the
-  old `_design.md`, the build record of v1.1.0. Never edited again.
-- `tests/test_<name>_*.py`: the tests of the domain `<name>` (`co-op` gives
-  `test_co_op_*`); `tests/test_spec_NNN_*.py`: the tests of v1.1.0, which domain
-  criteria point to. Shared setup in `tests/<name>_harness.py` and
-  `tests/specNNN_harness.py`.
-- `src/nock/`: the package.
-- `web/`: the Svelte + TypeScript client, built by Vite into `web/dist`.
-- `scripts/gate.py`: the quality gate. `scripts/claim_item.py`: gives a backlog
-  item its number, branch and worktree.
-- `.claude/agents/`: the four roles. `.claude/skills/`: standards and workflows.
-  `scripts/hooks/`: the scripts that enforce the rules below.
-- `.claude/hooks/session-start.sh`: in a Claude Code cloud session, installs the
-  Python and web dependencies and the three test browsers before the first prompt.
+Before a spec or code, read `specs/_map.md` (the domains, how domain specs work,
+the glossary), then only the files the task names. `specs/_architecture.md`
+holds the stack and the modeling rules.
 
-## How a feature gets built
+1. `/new-spec <description>`: the lead claims the item, writes its brief in
+   `Backlog.md` and stops for the human's approval; the spec-writer changes the
+   domain specs, and the human approves the change.
+2. `/feature B-NNN`: test-writer, implementer, then reviewer (two rounds at
+   most), with one commit per phase.
 
-1. `/new-spec <description>`: the lead claims the item (`scripts/claim_item.py`),
-   writes a brief in `Backlog.md` and the human approves it; the spec-writer changes the domain specs and the human
-   approves the change. Only a human approves.
-2. `/feature B-NNN` runs test-writer, then implementer, then reviewer (two rounds
-   at most), with one commit per phase.
+A tooling change skips `/new-spec`: the lead claims the item, writes its brief
+in `Backlog.md` with "Domains: none (tooling only)", and builds it on its
+branch.
 
-Never write implementation for behaviour that has no approved spec, and never
-write the implementation before its tests exist.
+## Roles
 
-## Rules the tooling relies on
+| Role | Model | Writes | Never touches |
+| --- | --- | --- | --- |
+| spec-writer | Opus | `specs/`, `docs/design/` | everything else |
+| test-writer | Sonnet | `tests/` | `src/`, `specs/` |
+| implementer | Sonnet | `src/`, `web/`, `docs/` (not `docs/design/`), `README.md` | `tests/`, `specs/`, `docs/design/`, tooling |
+| reviewer | Opus | nothing (read-only) | everything |
 
-- The visual documentation is always current (human decision, 2026-10-22). Any
-  change that alters what a screen looks like (a design decision, a new or changed
-  spec, a review finding) updates the design file of that part of the screen and
-  redraws the change in `docs/design/` in the same commit, before tests and code:
-  the cell sheet by hand, the screens sheet in `docs/design/screens_sheet/`, then
-  rebuilt. The gate fails when `screens-sheet.html` is not what its sources build
-  (`build.py --check`); the reviewer blocks a change of look that is not drawn.
-- Specs and design files state what is true now, with no dated notes and no
-  history (human decision, 2026-10-24). The reason of a change goes in its commit
-  message.
-- An acceptance criterion is a bullet starting with a bold id: `- **AC-1** ...`.
-  Numbers are per file and never reused.
-- A criterion is proven by a test `def test_acN_...` in `tests/test_<name>_*.py`,
-  or by its pointer `(← NNN AC-n)` to the tests of v1.1.0. The gate fails when a
-  test points to a criterion that does not exist, when a pointer names a numbered
-  criterion that does not exist or has no test, when a `done` domain spec has a
-  criterion with no proof, and when a tested criterion of an archived numbered
-  spec is cited by no domain spec (`specs/_map.md`, "How domain specs work").
-- Spec status is one of `draft`, `approved`, `done`, on a line `status: ...` in the
-  front matter. A change makes a `done` file `draft` until the human approves it.
-- The gate leaves out the tests of a browser engine that is not installed, with a
-  warning (`scripts/gate_browsers.py`). CI runs, on Ubuntu, Chromium for each
-  pull request, and Firefox and WebKit too after a merge into `main` or when
-  started by hand (human decision, 2026-10-21; no Windows job).
-- The gate runs the tests in parallel (pytest-xdist), then the timing-sensitive
-  files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`) on their own.
-  A test file that measures a duration or a pace (a latency percentile, a time
-  budget, a time window) goes in that list; a check that only waits up to a
-  bound for a change stays in the parallel pass unless it flakes there.
-- The gate's engines come from `--browsers` or the `NOCK_BROWSERS` environment
-  variable (default `chromium`).
-- The gate's pytest workers come from `--workers` or the `NOCK_WORKERS`
-  environment variable (default `auto`, one per logical CPU, never more);
-  `.claude/settings.json` sets 6 for every session (human decision,
-  2026-10-31). The parallel pass runs at a low priority, and one gate at a time
-  runs its tests in a clone: another waits up to 10 minutes for the lock in
-  `.git/`, then fails naming the gate that holds it.
-- When a role finishes, `scripts/hooks/role_gate.py` runs the gate: the
-  test-writer's `--stage tests`, the implementer's quick gate (the domains and
-  numbered specs whose spec, test or harness files the branch changed since
-  `main`, with `--specs` and Chromium). CI runs everything. A role held by a
-  failure outside its files (a stale test, for the implementer) says so in its
-  report and finishes again without changing anything; the hook then lets it
-  stop.
-- In a cloud session, the browsers draw text in CI's font, DejaVu Sans
-  (`.claude/hooks/ci-fonts.conf`, installed by the session-start hook).
-
-## Who may write what
-
-| Role | Writes | Never touches |
-| --- | --- | --- |
-| spec-writer | `specs/`, `docs/design/` | everything else |
-| test-writer | `tests/` | `src/`, `specs/` |
-| implementer | `src/`, `web/`, `docs/` (not `docs/design/`), `README.md` | `tests/`, `specs/`, `docs/design/`, tooling |
-| reviewer | nothing (read-only) | everything |
-
-The lead (the main session) writes `Backlog.md` and, on the human's word, the
-status lines; it does not write tests or code.
-
-Tooling means `pyproject.toml`, `scripts/`, `.claude/`, `.github/` and, in `web/`,
-`package.json`, `package-lock.json` and the Vite, Svelte and TypeScript config
-files. Changing it, or adding a dependency (Python or npm), is a decision for the
-human: ask first. Exception (human decision, 2026-10-16): the lead fixes an
-incoherence or a weakness of the tooling (a timeout, a flaky setup, a hook that
-blocks the wrong thing) without asking, in a pull request of its own; new
-tooling behaviour and new dependencies still need the human.
+`scripts/hooks/guard_paths.py` holds each role to its paths. The lead writes
+`Backlog.md` and, on the human's word, the status lines. A role sees none of
+this conversation: each message to one stands on its own.
 
 ## Models and effort
 
-Human decision, 2026-10-24, from the token use measured in the transcripts:
+The weekly token budget is the constraint, and context size costs more than
+model price.
 
-- No role runs above `high` effort, on any model.
-- The spec-writer and the reviewer run on Opus, the test-writer and the
-  implementer on Sonnet (their definitions in `.claude/agents/`). The lead passes
-  `model: "opus"` to the test-writer or the implementer only when the criteria
-  are about layout, painted pixels or timing in a browser, or after a review sent
-  the work back.
-- Architecture decisions run on Fable when the human's Fable tokens are
-  available, else on Opus, at `high` effort: pass `model: "fable"` and
-  `effort: "high"`. An architecture decision is a change that adds, splits or
-  merges a domain; changes an interface between modules (protocol messages,
-  stored data, a module's public names); changes `specs/_architecture.md` or the
-  baselines of `specs/product.md`; or changes the design of the tooling. For such
-  an item, the `Plan` agent proposes the brief's options and the spec-writer
-  writes its spec change on Fable.
+- No agent runs above `high` effort, on any model.
+- The roles' models are set in their files. Pass `model: "opus"` to the
+  test-writer or the implementer only when the criteria are about layout,
+  painted pixels or timing in a browser, or after a review sent the work back.
+- Architecture decisions run on Fable at `high` effort, or on Opus at `high`
+  when the human's Fable tokens are used up: the `Plan` agent proposes the
+  brief's options, and the spec-writer writes the change. An architecture
+  decision adds, splits or merges a domain; changes an interface between
+  modules (protocol messages, stored data, a module's public names); changes
+  `specs/_architecture.md` or the baselines of `specs/product.md`; or changes
+  the design of the tooling.
 - Small fixes (a flaky test, a typo, an import): Sonnet at `medium`.
-- The lead is the human's session: Opus at `high`, a fresh session per backlog
-  item when the context has grown large.
+- The lead runs on Opus at `high`, in a fresh session per backlog item once the
+  context has grown large.
 
-## Code standards
+## Specs and criteria
 
-The `python-standards` skill has the full list. In short: PEP 8, 88-character
-lines, full type annotations, Google-style docstrings, `from __future__ import
-annotations` in every module, and readable code (plain loops and named variables
-rather than clever one-liners). No `# noqa`, no `# type: ignore`.
-Write invisible characters as `\N{NAME}` escapes, never raw; keep LF line
-endings.
+- A domain spec, `specs/<area>/<file>.md`, says what is true now, in the format
+  of `specs/_template.md`. `specs/product.md` holds the core flows, the stable
+  routes and the baselines every domain keeps.
+- Status is `draft`, `approved` or `done`, on a `status:` line in the front
+  matter. A change makes a `done` file `draft` until the human approves it.
+- A criterion is a bullet starting with a bold id: `- **AC-1** ...`. Numbers are
+  per file and never reused.
+- A criterion is proven by a test `def test_acN_...` in `tests/test_<name>_*.py`
+  (the domain `co-op` gives `test_co_op_*`), or by its pointer `(← NNN AC-n)` to
+  the tests of v1.1.0 in `tests/test_spec_NNN_*.py`. The gate checks every link
+  both ways; `specs/_map.md`, "Criteria and their tests", has the rules.
+- `specs/_archive/v1.1.0/` is the build record of v1.1.0: never edited.
+- `docs/design/cell-sheet.html` is drawn by hand. `docs/design/screens-sheet.html`
+  is generated by `build.py`: never edit it. The gate fails when it is not what
+  its sources build (`build.py --check`).
+
+## Quality gate
+
+- `scripts/gate.py` runs the static checks, then the tests in parallel
+  (pytest-xdist, at a low priority), then on their own the timing-sensitive
+  files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`). A test file
+  that measures a duration or a pace goes in that list.
+- Engines come from `--browsers` or `NOCK_BROWSERS` (default `chromium`); an
+  engine that is not installed is left out with a warning. Workers come from
+  `--workers` or `NOCK_WORKERS`, which `.claude/settings.json` sets.
+- One gate at a time runs its tests: another waits up to 10 minutes for the
+  lock in `.git/`, then fails naming the gate that holds it.
+- When a role finishes, `scripts/hooks/role_gate.py` runs the gate: `--stage
+  tests` for the test-writer, and for the implementer the quick gate of the
+  domains and numbered specs the branch changed since `main`. A role held by a
+  failure outside its files (a stale test, for the implementer) says so in its
+  report and finishes again without changing anything; the hook then lets it
+  stop.
+- CI runs on Ubuntu: Chromium on each pull request, plus Firefox and WebKit after
+  a merge into `main` or when started by hand. It runs only the gate jobs the
+  changed files can affect. There is no Windows job.
 
 ## Git
 
-Work on a `feat/...` branch in a worktree of its own under `.claude/worktrees/`,
-never directly on `main`. Never run `git switch` or `git checkout` in the main
-checkout: several sessions share it. A backlog item's number comes from
-`scripts/claim_item.py` and never changes; on a clash, stop and report instead of
-renumbering. Do not push and do not open pull requests unless the human asks.
+- Work on a `feat/b-NNN-short-name` branch in a worktree of its own under
+  `.claude/worktrees/`, never on `main`. Never run `git switch` or `git
+  checkout` in the main checkout: several sessions share it.
+- An item's number, branch and worktree come from `scripts/claim_item.py`, and
+  the number never changes. On a clash, stop and report instead of renumbering.
+- One branch and one pull request per item. After the merge, delete the remote
+  branch and the worktree.
+- Do not push and do not open pull requests unless the human asks.
+
+## Code standards
+
+The `python-standards` skill holds them: PEP 8, 88-character lines, full type
+annotations, Google-style docstrings, `from __future__ import annotations` in
+every module, and readable code (plain loops and named variables rather than
+clever one-liners). No `# noqa`, no `# type: ignore`. Write invisible characters
+as `\N{NAME}` escapes, never raw, and keep LF line endings.
+
+## Environment
+
+- The human works on Windows 11. CI and cloud sessions run Linux.
+- In a cloud session, `.claude/hooks/session-start.sh` installs the Python and
+  web dependencies and the three test browsers before the first prompt, and
+  the browsers draw text in CI's font, DejaVu Sans
+  (`.claude/hooks/ci-fonts.conf`).

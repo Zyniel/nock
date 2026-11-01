@@ -19,6 +19,8 @@ The tools enforce the mechanical part; the readability rules are on you.
 - Black is the only formatter. Ruff is used as a linter only; do not run
   `ruff format`.
 - Lines are at most 88 characters (black's default, inside the limit PEP 8 allows).
+- Write invisible characters as `\N{NAME}` escapes, never raw, and keep LF line
+  endings.
 
 ## Typing
 
@@ -67,7 +69,8 @@ def count_words(text: str) -> int:
 ## Tests
 
 - pytest, plain `assert`, one behaviour per test.
-- File `tests/test_spec_NNN_short_name.py`, functions `test_acN_what_it_checks`.
+- Files `tests/test_<name>_<topic>.py` for a domain (`tests/test_spec_NNN_*.py`
+  hold the tests of v1.1.0), functions `test_acN_what_it_checks`.
 - Use `pytest.raises(ErrorType, match="...")` for errors and
   `@pytest.mark.parametrize` for the same check over several inputs.
 

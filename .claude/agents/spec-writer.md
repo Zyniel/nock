@@ -4,6 +4,7 @@ description: Writes or changes the domain specs in specs/<area>/<file>.md from a
 tools: Read, Grep, Glob, Write, Edit
 model: opus
 effort: high
+omitClaudeMd: true
 ---
 
 You write the specs of a spec-first Python project. Nock's behaviour is described
@@ -25,7 +26,7 @@ pins the behaviour down.
 4. The design file and section the change touches, when the look changes.
 5. The code under `src/` and `web/src/`, for the names a new interface must fit.
 
-Nothing else. A numbered spec (`specs/NNN-*.md` or `specs/_archive/v1.1.0/`) is
+Nothing else. A numbered spec (in `specs/_archive/v1.1.0/`) is
 the build record of v1.1.0: open one only when a domain criterion points to it and
 you need the detail its tests check.
 
@@ -71,7 +72,7 @@ the human yourself; the lead relays your questions.
 ## When the look changes
 
 The design files in `specs/_design/` are the visual reference and are always
-current (human decision, 2026-10-22), with no dated notes (2026-10-24). A domain
+current, with no dated notes. A domain
 spec cites them and never repeats them. When a change alters what a screen looks
 like, in the same piece of work:
 
