@@ -1,9 +1,10 @@
 ---
 id: B-042
 title: The grid's focus ring above the cells
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-01T19:35:00Z'
 labels:
   - domain:shell
 milestone: m-1
@@ -46,6 +47,11 @@ ordinal: 3000
 - Open questions: none beyond the option.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 shell AC-21 (new)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -55,3 +61,19 @@ ordinal: 3000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/client/shell.md
+Tests: tests/test_shell_*.py (pixel check along the right and bottom edges, Chromium and WebKit)
+Gate: uv run python scripts/gate.py --specs shell --browsers chromium (then --browsers all for the pixel check)
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead's decisions: option A (the ring drawn by an aria-hidden overlay painted after the cells, as designed; no change of look, nothing to redraw), as the milestone's pitch says. Test-writer and implementer on Opus (painted pixels).
+
+Lead's decisions: the ring keeps its built offset of -3 px (no change of look); AC-21 samples FX-01 rather than the review's 14 by 9 grid. Follow-up drafts: split shell.md (the visual foundation into its own file).
+<!-- SECTION:NOTES:END -->
