@@ -5,8 +5,11 @@ are in `tests/test_spec_006_*.py`, one file per criterion group.
 
 It holds what more than one of those files uses: the timeouts, the window sizes of
 AC-5 and AC-7, the helpers that open a room on a live server (`open_room`) or on
-the mocked socket (`open_mock_room`), and the snapshot builders of AC-4, AC-6 and
-AC-8. What only one file uses stays in that file, next to its tests. The fixtures
+the mocked socket (`open_mock_room`), the snapshot builders of AC-4, AC-6 and
+AC-8, and AC-1's pinch and pan through the Chrome DevTools Protocol (`pinch`,
+`pan`), which the zoomed grid tests of board AC-23 to AC-29 use too
+(`tests/test_board_zoom_follow.py`). What only one file uses stays in that file,
+next to its tests. The fixtures
 `fx01_grid` and `fx02_grid` are defined in each file as thin wrappers around
 `grid_from_text`: a fixture imported from here would be an unused import for ruff.
 """
@@ -85,6 +88,62 @@ def count_clues(grid: Grid) -> int:
         if isinstance(cell, ClueCell):
             total += len(cell.clues)
     return total
+
+
+# ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
+
+PINCH_STEPS = 10
+
+
+def pinch(page: Page, viewport: Locator, start: float, end: float) -> None:
+    """Pinch around the viewport centre, finger distance `start` to `end`."""
+    box = box_of(viewport)
+    center_x = box["x"] + box["width"] / 2
+    center_y = box["y"] + box["height"] / 2
+
+    def two_fingers(distance: float) -> list[dict[str, float]]:
+        half = distance / 2
+        return [
+            {"x": center_x - half, "y": center_y, "id": 0},
+            {"x": center_x + half, "y": center_y, "id": 1},
+        ]
+
+    session = page.context.new_cdp_session(page)
+    try:
+        session.send(
+            "Input.dispatchTouchEvent",
+            {"type": "touchStart", "touchPoints": two_fingers(start)},
+        )
+        for step in range(1, PINCH_STEPS + 1):
+            distance = start + (end - start) * step / PINCH_STEPS
+            session.send(
+                "Input.dispatchTouchEvent",
+                {"type": "touchMove", "touchPoints": two_fingers(distance)},
+            )
+        session.send(
+            "Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []}
+        )
+    finally:
+        session.detach()
+
+
+def pan(page: Page, viewport: Locator) -> None:
+    """Drag one finger from the viewport centre by -200 px in x and y."""
+    box = box_of(viewport)
+    session = page.context.new_cdp_session(page)
+    try:
+        session.send(
+            "Input.synthesizeScrollGesture",
+            {
+                "x": box["x"] + box["width"] / 2,
+                "y": box["y"] + box["height"] / 2,
+                "xDistance": -200,
+                "yDistance": -200,
+                "gestureSourceType": "touch",
+            },
+        )
+    finally:
+        session.detach()
 
 
 # ---- Mocked room socket (browser tests of AC-4, AC-6 and AC-8) ---------------
