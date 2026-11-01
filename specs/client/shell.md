@@ -127,8 +127,9 @@ fonts, focus ring, shared components, state lines).
     focus ring, including its form on a navy surface, are global styles, their
     colours those of « Components »; a hidden note lets pointers through.
     Nothing of the Vite template's demo is left. The grid's ring, its own
-    outline, is drawn again by an overlay over the whole grid, painted after the cells, hidden from assistive technology and letting
-    pointers through, so the ring shows along every edge cell.
+    outline, is drawn again by an overlay over the whole grid, painted after
+    the cells, hidden from assistive technology and letting pointers through,
+    so the ring shows along every edge cell.
 
 ### The brand
 
@@ -287,5 +288,6 @@ fonts, focus ring, shared components, state lines).
 - `web/src/app.css` (tokens, page base, focus ring, components),
   `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay),
   `web/src/main.ts` (fonts), `web/src/lib/icons.ts`.
-- Tests: `tests/test_shell_*`, `tests/test_spec_041_*` and the `tests/test_spec_040_*`,
-  `test_spec_046_*` and `test_spec_048_*` files of the cited criteria.
+- Tests: `tests/test_shell_*`, `tests/test_spec_041_*` and the
+  `tests/test_spec_040_*`, `test_spec_046_*` and `test_spec_048_*` files of the
+  cited criteria.
