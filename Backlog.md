@@ -279,13 +279,19 @@ others, at the top of the list.
 
 ### B-033 Sockets: off the event loop, a deadline to join, a cap per address
 
-- Status: brief
+- Status: done (the human, 2026-10-30: « Approve the B-033 brief with the
+  lead's picks (1A, 2A, 3A, 4A, 5) and process it »; then the spec change
+  « Approved as written »; both review rounds approved)
 - Priority: fifth (before the first public test)
 - Domains: platform/realtime (a join deadline and its close code, a cap on
-  open sockets per address), platform/server
+  open sockets per address), platform/server (the lookup in one worker-thread
+  call), lobby/lifetime (the expiry read again under the lock), lobby/rooms
+  (an out-of-scope line)
+- Criteria: realtime AC-21 to AC-23 (new), server AC-25, AC-26 (new),
+  lifetime AC-14, AC-15 (new)
 - Architecture decision: yes (a close code is part of the protocol,
   `platform/realtime.md` rule 13): options from the Plan agent on Fable
-- Branch: feat/b-033-socket-hygiene · PR: none yet
+- Branch: feat/b-033-socket-hygiene · PR: #74
 - Problem: `_serve_socket` calls `RoomRegistry.connect` on uvicorn's event
   loop; `connect` reads SQLite and can wait for the registry lock, which a
   deletion holds up to 5 seconds, and every request of the process waits
@@ -297,27 +303,55 @@ others, at the top of the list.
   event loop, after `room_socket` already replayed it once with `peek_room`
   (B-032 review, round 1).
 - In scope: `connect` off the event loop, with one load of the room per
-  socket; a socket still not joined some
-  seconds after it opened is closed with its own code; a cap on the open
-  sockets of an address; the expiry checked again under the registry lock.
+  socket; a socket not joined that sends nothing for some seconds is closed;
+  a cap on the open sockets of an address; the expiry checked again under the
+  registry lock.
 - Out of scope: frame sizes and the flood and stall bounds (unchanged).
-- Screens: none (the page sends `join` as soon as the socket opens, so only a
-  client that never joins meets the deadline; the spec-writer says what the
-  page does on the new code).
-- Open questions:
-  1. The deadline and the cap: A (lead's default) 10 seconds and 20 sockets
-     per address; B 30 seconds and 50.
-  2. The close code: A (lead's default) a new 44xx code; B 4408, the silence
-     code.
+- Screens: none (an honest page pings every 2 seconds, so it never meets the
+  deadline; the page treats both close codes below as a loss, as today).
+- Options (Plan agent on Fable; lead's picks marked):
+  1. The lookup. A (pick): one worker-thread call, `connect`, replaces
+     `peek_room` in `room_socket`: the expiry check, one load and replay, and
+     the socket counted, in one step under the registry lock (B-032's
+     invariant kept); the wrong-code throttle decides on its `None`. A handler
+     cancelled while the thread runs leaves the connection it gets back. B:
+     keep `peek_room`, thread `connect` only: two loads per socket. C: thread
+     the runner lookup, build the connection on the loop: same work, a private
+     type crosses the module.
+  2. The deadline. The page opens its socket, pings, and only then shows the
+     nickname form, so a player on the form holds an unjoined socket as long
+     as they think: an absolute deadline would close it again and again. A
+     (pick): a silence before the join: no frame of any kind for 10 seconds
+     (a ping resets it), held by the connection, its value in `RoomConfig`.
+     B: an absolute 10 or 30 seconds from the open, with a page change on the
+     form.
+  3. Its close code. A (pick): 4408, the silence code, extended to sockets not
+     yet joined; the page already retries on it. B: a new 44xx code.
+  4. The cap. A (pick): 50 open sockets per address, counted by the server at
+     accept and released at close, read at start from
+     `NOCK_SOCKETS_PER_ADDRESS` (whole number, default 50, a bad value stops
+     the start; no `/ops` override); over the cap, a close with a new code
+     4503, a loss for the page (it retries every 8 seconds) since it clears
+     when a tab closes; 4429 would be final and read « too many wrong codes ».
+     B: 20, fixed: a class of 30 behind one school address would not fit.
+  5. L3: `_delete_if_expired` reads the times again under the registry lock
+     before deleting; the creator's deletion, which deletes rooms not expired,
+     keeps its own path.
+- Decisions: the lead's picks, 1A, 2A, 3A, 4A and 5.
 
 ### B-034 HTTP edge: body size, security and caching headers, the Bearer scheme
 
-- Status: brief
+- Status: done
 - Priority: sixth (before the first public test; small)
-- Domains: platform/server ("Serving the client": body size, headers,
-  caching), admin/operations (the scheme of the operator token)
-- Architecture decision: no (one middleware, and the `Caddyfile` of B-009)
-- Branch: feat/b-034-http-edge · PR: none yet
+- Domains: platform/serving (new, split from platform/server: serving the
+  client, environment settings, the HTTP edge), platform/server,
+  admin/operations (the scheme of the operator token)
+- Architecture decision: yes, the new domain (the human, 2026-10-31); the
+  rest is one middleware and the `Caddyfile` of B-009
+- Criteria: serving AC-7 to AC-14 (new), serving AC-1 to AC-6 (moved from
+  server AC-14 to AC-19, retired with server AC-27 to AC-33), operations
+  AC-21 (new)
+- Branch: feat/b-034-http-edge · PR: #75
 - Problem: neither uvicorn nor the `Caddyfile` limits a request body, and
   FastAPI reads it whole before validation (B-028 M3). No answer has a
   `Content-Security-Policy`, `X-Content-Type-Options` or `Referrer-Policy`,
@@ -336,20 +370,32 @@ others, at the top of the list.
   immutable` on `/assets/*`.
 - Out of scope: the WebSocket frame size (8 KiB already); CORS (no
   cross-origin use).
-- Screens: none (a CSP that breaks the page shows in the browser tests).
+- The `Caddyfile` is deployment configuration, not tooling under `CLAUDE.md`;
+  the implementer changes it with the app.
+- Screens: none (a CSP that breaks the page shows in the browser tests). The
+  client has no inline script, no `style="…"` in its markup and no outside
+  source; Svelte sets styles through the CSSOM, which a CSP does not block.
 - Open questions:
   1. Where the headers are set: A (lead's default) by the app, so they hold
      behind any proxy and in the tests; B by Caddy only.
+- Decisions: the human, 2026-10-31: 1A, the app sets the headers; the spec
+  change approved, with `platform/server.md` split into
+  `platform/serving.md` first. The lead's picks: `Referrer-Policy:
+  no-referrer`, no `X-Frame-Options`, `no-cache` on the build's root files,
+  the brief's CSP as it stands, one space after the scheme; server.md keeps
+  rules 20 to 22 at their numbers (no reference changes).
 
 ### B-035 The store: checked secure deletion, one checkpoint per sweep, indexes
 
-- Status: brief
+- Status: done
 - Priority: seventh (privacy promise and sweep cost)
 - Domains: admin/operations (no copy of a deleted room stays), lobby/lifetime
   (the sweep), account/account (the purge)
 - Architecture decision: no (indexes in migration 3 and the order of the
   statements; no row changes)
-- Branch: feat/b-035-store-deletion · PR: none yet
+- Criteria: operations AC-22 to AC-25 (new), lifetime AC-16, AC-17 (new),
+  lifetime AC-13 (changed), account AC-22, AC-23 (new), host AC-9 (changed)
+- Branch: feat/b-035-store-deletion · PR: #76
 - Problem: each room deletion runs `PRAGMA wal_checkpoint(TRUNCATE)`
   (`store.py:347`) inside the store lock that the engine thread takes for
   each step, so a sweep of thousands of expired rooms stalls every room. The
@@ -368,18 +414,28 @@ others, at the top of the list.
 - Open questions:
   1. A checkpoint that stays busy: A (lead's default) one retry, then a
      WARNING, and the next sweep empties the log; B the request fails.
+- Decisions: the human, 2026-10-31: 1A, one retry, then a WARNING, and the
+  next sweep empties the log. The spec change approved, with the lead's
+  picks: a checkpoint try never waits on the busy handler; the account
+  store makes its own indexes when it opens; two checkpoints per sweep
+  with accounts on; `nock.store.checkpoint_wal` as the one checkpoint.
 
 ### B-036 Account erasure that always finishes
 
-- Status: brief
+- Status: done
 - Priority: eighth (privacy; the failure needs a busy engine, which B-030 and
   B-031 make rare)
-- Domains: account/account
-- Architecture decision: yes with option B (a new table, stored data)
-- Branch: feat/b-036-erasure-finishes · PR: none yet
-- Problem: `DELETE /api/account` (`server.py:1391`) deletes the account rows,
+- Domains: account/account, lobby/lifetime (the sweep's step),
+  admin/operations (the record's retention)
+- Waits for: B-035 (PR #76: it changes `account/account.md` and the sweep
+  whose shape option 1's retries follow)
+- Architecture decision: yes (a new table, stored data): options from the
+  Plan agent on Fable
+- Criteria: account AC-24 to AC-30 (new), operations AC-23 (changed)
+- Branch: feat/b-036-erasure-finishes · PR: #77
+- Problem: `DELETE /api/account` (`server.py:1696`) deletes the account rows,
   then erases its players from the live rooms, waiting up to 5 seconds on the
-  engine for each (`hub.py:1106`, `hub.py:1377`). A timeout answers 500 once
+  engine for each (`hub.py:1548`, `hub.py:1685`). A timeout answers 500 once
   the account is gone; the remaining rooms and the history records keep the
   nickname, and nothing is left to retry from (B-028 L2). Also, from spec 029
   ("Small follow-ups"): a history save that read the room before an erasure
@@ -387,46 +443,99 @@ others, at the top of the list.
   `accounts.py` promises that a copy of the database "cannot sign anybody
   in": true of accounts, but its room identities hold resume tokens in clear,
   as they must (the account gives them back to the player's devices).
+- Market practice (Plan agent on Fable, 2026-10-31): mature products split
+  deactivated, deletion requested (a grace period, undone by signing in:
+  Discord 15 days, Steam and Facebook 30) and deleted; a deleted user's
+  posts in shared spaces stay under a placeholder (GitHub's ghost, Discord's
+  Deleted User), which Nock already does with `--`; the erasure runs as a job
+  retried until done, with a record of completion that keeps no personal
+  data (CNIL: within one month, keep a record of the request, and the purge
+  and the erasure share one mechanism); a notice by e-mail on completion.
+  Nock lacks the job, the record and the notice.
 - In scope: every step of the erasure runs even when one room fails, and a
-  failure is not lost. Options:
-  - A: each room tried, logged and passed; the history erased in any case;
-    nothing retried.
-  - B (lead's pick): A, plus a table of pending erasures that the sweep
-    retries until each is done.
-  - C: the rooms erased before the account goes, so a failure leaves the
-    account for the player to retry.
-  The docstring says what a copy of the database does give.
-- Out of scope: an export of the account.
+  failure is not lost; the history-save race; the docstring says what a copy
+  of the database does give. Options:
+  - 1: a table of pending erasures written in the deletion's transaction;
+    the route tries once and answers 204 whatever happens; the sweep and the
+    app's start retry each pending erasure (rooms, creator rooms, history
+    last), idempotent, until done; a done row keeps only its times and
+    counts.
+  - 2 (lead's pick): 1, plus an e-mail « Votre compte Nock a été supprimé »
+    sent once the erasure is done, best effort, and a line in the spec on a
+    device that rejoins as « Ancien joueur ».
+  - 3: an account lifecycle epic: a deletion requested with a grace period
+    and an undo by signing in, then 1's erasure; four or five items, a state
+    that every account query and the engine's account checks must read.
+- Out of scope: an export of the account; backups and chat texts; a
+  confirmation link before deleting and a grace period (option 3, later if
+  abuse shows up); keeping creator rooms alive for their other players.
 - Screens: none.
-- Open questions: none beyond the option.
+- Open questions:
+  1. The completion e-mail (option 2): A (lead's default) yes; B no.
+  2. Creator rooms on deletion: A (lead's default) still deleted
+     (`lobby/host.md` rule 14); B made anonymous so the others finish, as
+     an item of its own.
+- Decisions: the human, 2026-10-31: option 2, the pending-erasure job
+  retried by the sweep, the completion e-mail (1A), the spec line on a
+  returning device; creator rooms still deleted (2A). The spec change
+  approved, with the lead's picks: a done erasure kept 5 years with times
+  and counts only; the e-mail sent in the request when its attempt ends
+  the erasure; a save slower than a whole erasure accepted; no split of
+  account.md in this item.
 
 ### B-037 Lean snapshots
 
-- Status: brief
+- Status: done
 - Priority: ninth (the disk grows with play, slowly)
-- Waits for: B-035 (both migrate the schema)
-- Domains: platform/server (snapshots), social/catch-up (which snapshots a
-  catch-up needs), lobby/host (the removed tokens)
+- Waits for: nothing (B-035 is merged)
+- Domains: platform/server (snapshots), lobby/host (the removed tokens),
+  lobby/lifetime (migration 4); social/chat if the chat is bounded;
+  social/catch-up keeps its rules (a catch-up replays from the first
+  snapshot)
 - Architecture decision: yes (stored data): options from the Plan agent on
   Fable
-- Branch: feat/b-037-lean-snapshots · PR: none yet
-- Problem: every 100 events a snapshot stores the whole room: the grid with
-  its clues and answers (about 30 KiB), every cell and the whole chat, and no
-  snapshot is ever deleted, though `load_room_at` needs only those a catch-up
-  can still ask for (B-028 M6). `removed_tokens` grows with every removal and
-  goes into every snapshot (L10).
-- In scope: the grid out of the snapshots; the snapshots no catch-up can reach
-  pruned; a bound on `removed_tokens` (lead's proposal: the last 100, as past
-  players). Options for the grid:
-  - A (lead's pick): stored once per room, in a table of its own.
-  - B: by its catalogue number; a room on a bare or withdrawn grid still needs
-    its own copy.
-- Out of scope: the log, append-only (`platform/server.md`).
+- Criteria: server AC-27, AC-28 (new), host AC-17 (new), AC-9 (changed),
+  lifetime AC-18 (new), AC-13, AC-17 (changed), chat AC-21 (new),
+  operations AC-23 (changed)
+- Branch: feat/b-037-lean-snapshots · PR: #79
+- Problem: a snapshot stores the whole room (grid, every cell, the chat, past
+  players, removed tokens) at seq 0, every 100 events, at each task end and at
+  shutdown, and none is ever deleted (B-028 M6). Measured on FX-02: 30 KiB
+  fresh (grid 12, cells 18), 35 KiB mid-game, 77 KiB in a long game. A
+  typical game writes 5 to 8 snapshots (about 75 % of the room's bytes), a
+  long one 60 to 80 (3 to 6 MiB). Only `load_room_at` (the catch-up) reads an
+  old snapshot; the erasure rewrites every one of them, and each holds a copy
+  of nicknames, tokens and chat. `removed_tokens` grows with every removal
+  (L10).
+- Market practice: snapshots are a cache of the log; only the newest is
+  needed to load, any past state is rebuilt by replaying from a kept one
+  (cheap here: 5,000 events in 70 ms); static data is kept once; unbounded
+  collections are bounded.
+- In scope: options.
+  - 1 (lead's pick): keep two snapshots per room, the first and the newest;
+    each save deletes the others in its transaction; a catch-up from before
+    the newest replays the log from the first. `removed_tokens` keeps the last
+    100. Migration 4 deletes the other snapshots in SQL alone, no JSON
+    rewritten. Erasure then rewrites two rows, not up to 80.
+  - 2: 1, plus the grid in a table of its own, once per room. Saves 23 KiB a
+    room once only two snapshots stay; the migration rewrites every room's
+    JSON.
+  - Rejected by the Plan agent: the grid by catalogue number (a re-imported
+    file would change a room's answers), one snapshot per day of play.
+- Out of scope: the log, append-only (`platform/server.md`); writing cells
+  without their default fields (a format change of its own).
 - Screens: none.
 - Open questions:
-  1. Which snapshots stay: A (lead's default) the first and the newest, a
-     catch-up from further back replaying the log from the first; B one per
-     day of play.
+  1. The removed tokens: A (lead's default) the last 100 banned, an older one
+     joins as a new player, as any other token already does
+     (`lobby/host.md` rule 2); B every token kept.
+  2. The chat in a snapshot: A (lead's default) the last 200 lines, the
+     page's own cap (`social/chat.md` rule 8 changes, nothing visible); B all
+     of it.
+- Decisions: the human, 2026-10-31: option 1, the first and the newest
+  snapshots kept; the last 100 removed tokens (1A); the last 200 chat
+  lines in a snapshot (2A). The spec change approved, with the chat
+  bounded in the room's state, not only in the stored snapshot.
 
 ### B-038 Server structure: typed answers and an app factory
 
@@ -953,6 +1062,30 @@ others, at the top of the list.
   (`Backlog.mdx`, `claude_docsx/`, `compose.yml`, `.env`), a quoted
   non-ASCII path, a path with a space and an empty list (every job); a push
   runs every job.
+
+### B-053 The gate runs 6 workers
+
+- Status: done (the human asked for it, 2026-10-31: « Lower to 6 »; tooling,
+  built by the lead)
+- Domains: none (tooling only: `.claude/settings.json`, `CLAUDE.md`)
+- Architecture decision: no
+- Branch: feat/b-053-gate-six-workers · PR: #78 (merged)
+- Problem: the PC restarted on 2026-10-31 at 22:58, 8 minutes into B-037's
+  closing full gate, which had started at 22:50 with 10 workers (B-026's
+  number, on a machine with 16 logical CPUs). The same gate, run again with
+  4 workers, passed and the PC held; its parallel pass took 11 minutes,
+  against about 5 with 10. The crash's cause is not confirmed: the Windows
+  event log was not read.
+- In scope: `NOCK_WORKERS` goes from 10 to 6 in `.claude/settings.json`, and
+  `CLAUDE.md` says so.
+- Out of scope: the gate's own default (`auto`, one per logical CPU), CI's
+  workers, and the role gate's timeout.
+- Open questions: none. Two things to watch: a quick gate that changes many
+  specs runs longer with 6 workers, and `scripts/hooks/role_gate.py` gives
+  the gate 1,140 s, the lock wait included (a gate out of time does not
+  block, so it would let a role finish unchecked); and B-052 rewrites
+  `CLAUDE.md` without its line about the workers, so whichever merges second
+  keeps B-052's text.
 
 ### B-001 Rebaseline v1.1.0 into domain specs
 
@@ -2105,7 +2238,8 @@ Taken when a change touches them.
 - WebKit reaching the brand by Tab (`tabindex="0"`, hud AC-20) is proven only
   once CI runs WebKit after the merge.
 - `client/shell.md` (about 16.4 KB, 20 criteria) and `admin/operations.md`
-  (about 18 KB, 20 criteria) are past the size budget of `specs/_map.md`; the
+  (about 19.6 KB, 21 criteria after B-034, whose one criterion the human
+  approved without a split) are past the size budget of `specs/_map.md`; the
   next criterion in either needs a split first (an architecture item). For
   shell, the B-010 spec-writer proposed `client/foundation.md` taking rules 13
   to 17 and their criteria.
@@ -2148,10 +2282,6 @@ Taken when a change touches them.
 - B-028: the SMTP send runs in the thread pool of every sync route, with a
   10-second timeout; a slow mail server and many addresses could fill its 40
   threads. Low while the per-address limits hold.
-- `platform/server.md` is over the size guideline (about 18 KB, 22 criteria
-  after B-030): the spec-writer proposes moving "Serving the client" and
-  "Environment settings" (rules 10 to 19, AC-14 to AC-19) to a new
-  `platform/serving.md`, an architecture decision.
 - `gameplay/hints.md` is over the size guideline (about 21 KB, 23 criteria
   after B-031): the spec-writer proposes moving the vote and its banner
   (rules 14 to 22, AC-13 to AC-20, with their pointers) to a new

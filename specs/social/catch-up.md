@@ -50,7 +50,8 @@ their players.
 
 6. `POST /api/rooms/{code}/catch-up` takes a member's resume token,
    `after_seq` (the seen seq) and `until_seq` (the return's `seq`), both whole
-   numbers of 0 or more, and nothing else; any other body answers 422.
+   numbers of 0 or more, and nothing else; any other body answers 422 (one over
+   the limit: 413 first, `platform/serving.md` rule 11).
 7. It answers 404 `{"detail": "Not Found"}` when the code is not a room code, the
    room is unknown or expired, the token is no member's (player or past player),
    or the store holds no state of the room at or before `after_seq`. The answer

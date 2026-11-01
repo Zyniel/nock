@@ -12,6 +12,7 @@ here would be an unused import for ruff.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import queue
 import re
@@ -28,7 +29,7 @@ from starlette.testclient import WebSocketTestSession
 
 from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
-from nock.hub import RoomRegistry
+from nock.hub import RoomConnection, RoomRegistry
 from nock.room import RoomState, new_room
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -171,12 +172,12 @@ BURST_TIMEOUT_SECONDS = 10.0
 class SlowLookupRegistry(RoomRegistry):
     """A registry whose room lookups answer `LOOKUP_DELAY_SECONDS` later.
 
-    The room socket and the recap route look a room up with `peek_room`; `room_state`
-    is slowed too. A lookup that loads a room from the disk can take that long. In a
-    burst the delay keeps the requests in flight at the same time, whatever the
-    order in which their threads run, so a burst that is not counted one request
-    after another shows on every run. The throttle's rule holds whatever a lookup
-    costs.
+    The room socket looks its room up with `connect` (`platform/server.md`
+    rule 22) and the recap route with `peek_room`; `room_state` is slowed too. A
+    lookup that loads a room from the disk can take that long. In a burst the
+    delay keeps the requests in flight at the same time, whatever the order in
+    which their threads run, so a burst that is not counted one request after
+    another shows on every run. The throttle's rule holds whatever a lookup costs.
     """
 
     def room_state(self, code: str) -> RoomState | None:
@@ -188,6 +189,17 @@ class SlowLookupRegistry(RoomRegistry):
         """Wait `LOOKUP_DELAY_SECONDS`, then peek at the room as usual."""
         time.sleep(LOOKUP_DELAY_SECONDS)
         return super().peek_room(code)
+
+    def connect(
+        self,
+        code: str,
+        account_id: str | None = None,
+        *,
+        owner_loop: asyncio.AbstractEventLoop | None = None,
+    ) -> RoomConnection | None:
+        """Wait `LOOKUP_DELAY_SECONDS`, then open the connection as usual."""
+        time.sleep(LOOKUP_DELAY_SECONDS)
+        return super().connect(code, account_id, owner_loop=owner_loop)
 
 
 def at_once(count: int, action: Callable[[], object]) -> list[object]:

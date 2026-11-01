@@ -43,7 +43,8 @@ table, the naming rules and the glossary follow in the same change.
 | admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038 AC-3 to AC-11; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
 | platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
-| platform | `platform/server.md` | durable state, the rooms held in memory, serving, environment settings | | 018; 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
+| platform | `platform/server.md` | durable state, undo, engine time, the rooms held in memory | | 018; 036 AC-12 |
+| platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
 | client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |

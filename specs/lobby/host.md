@@ -31,7 +31,9 @@ out; the room goes with the creator's account.
 2. Removing t: `player_left` with reason `removed`; t's seat, colour and nickname
    are freed, their letters keep their author, their token is banned (its join is
    `removed`, `lobby/joining.md` rule 4); a connected t gets `error` `removed`,
-   then a close 1000. No confirmation. Another token, or none, is a new player.
+   then a close 1000. No confirmation. The room keeps its newest 100 banned
+   tokens, across replay and a restart: an older one, like any other token or
+   none, is a new player.
 3. Locking or unlocking announces `settings_changed` with the settings and the
    remaining budget. While locked, every join that is neither a resume nor a
    removed token's (`removed` comes first), a seat back included, is
@@ -181,7 +183,7 @@ not-found pages ».
   the sheet. (← 014 AC-7, 014 AC-10)
 - **AC-9** Accounts on, Lea's signed-in `POST /api/rooms` makes a room whose
   stored `room_times` row names her account as creator, and `PRAGMA
-  user_version` reads 2 (`lobby/lifetime.md` rule 8); a database written before
+  user_version` reads 4 (`lobby/lifetime.md` rule 8); a database written before
   the column (`user_version` 0) opens with it added, its stored rooms anonymous
   rooms, their other data kept; a request with no cookie, an unknown or expired
   session, or made while accounts are off with her cookie, makes a room with no
@@ -223,11 +225,18 @@ not-found pages ».
   after a hand-over, keeps the role when Lea resumes, and her `remove_player`
   gets `not_host`; the store still names her creator; an app with accounts on
   then gives her the role at her next join.
+- **AC-17** Ana removes 101 players one after another: a join with the first
+  one's token is a new player, one with the 101st's is `removed`, in the live
+  room and once it is replayed from the log.
 
 ## Edge cases
 
 - A disconnected player can be removed, with no socket to close; removed again,
   `invalid_target` (AC-1).
+- The 101st removal forgets the oldest banned token, whose device then joins as
+  a newcomer (AC-17).
+- A room loaded with more than 100 banned tokens comes down to the newest 100
+  at its next removal (AC-17).
 - A player away within the resume window resumes in a locked room; one timed out
   is refused, and seats back once it is unlocked (AC-2).
 - A room with one account holding several members gets no backfill: the member

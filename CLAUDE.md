@@ -131,7 +131,8 @@ model price.
   files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`). A test file
   that measures a duration or a pace goes in that list.
 - Engines come from `--browsers` or `NOCK_BROWSERS` (default `chromium`); an
-  engine that is not installed is left out with a warning.
+  engine that is not installed is left out with a warning. Workers come from
+  `--workers` or `NOCK_WORKERS`, which `.claude/settings.json` sets.
 - One gate at a time runs its tests: another waits up to 10 minutes for the
   lock in `.git/`, then fails naming the gate that holds it.
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: `--stage

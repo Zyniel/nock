@@ -1,6 +1,11 @@
 # The public address comes from NOCK_DOMAIN (compose.yaml). Caddy gets and
 # renews the TLS certificate by itself; ports 80 and 443 must reach this host.
 # WebSockets pass through reverse_proxy without any option.
+# The body limit matches the app's (platform/serving.md rule 11); 64KiB is
+# 65,536 bytes. The security and caching headers are the app's, not Caddy's.
 {$NOCK_DOMAIN} {
+	request_body {
+		max_size 64KiB
+	}
 	reverse_proxy nock:8000
 }

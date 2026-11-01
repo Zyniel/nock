@@ -37,14 +37,14 @@ Set in « Réglages de l'hôte » (`lobby/host.md` rule 8), sent in
 
 ## Server (environment)
 
-Read by `python -m nock` before it serves (`platform/server.md` rule 15). An
+Read by `python -m nock` before it serves (`platform/serving.md` rule 6). An
 empty variable counts as unset.
 
 | Variable | Meaning | Default (unset) | Owner |
 | --- | --- | --- | --- |
-| `NOCK_HOST` | address to listen on | `127.0.0.1` | `platform/server.md` 16 |
-| `NOCK_PORT` | port to listen on | 8000 | `platform/server.md` 17 |
-| `NOCK_DATABASE` | SQLite file of the rooms and accounts | in memory, no file | `platform/server.md` 1, 18 |
+| `NOCK_HOST` | address to listen on | `127.0.0.1` | `platform/serving.md` 7 |
+| `NOCK_PORT` | port to listen on | 8000 | `platform/serving.md` 8 |
+| `NOCK_DATABASE` | SQLite file of the rooms and accounts | in memory, no file | `platform/serving.md` 9; `platform/server.md` 1 |
 | `NOCK_OPERATOR_TOKEN` | secret of the `/ops` pages | operator pages off | `admin/operations.md` 4 |
 | `NOCK_CREATOR_SOLVED_ROOM_HOURS` * | life of a solved creator room, from its solve time (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
 | `NOCK_CREATOR_ROOM_HOURS` * | life of an unsolved creator room, from its last edit (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
@@ -52,6 +52,7 @@ empty variable counts as unset.
 | `NOCK_ANONYMOUS_ROOM_HOURS` * | life of an unsolved anonymous room, from its last edit (whole hours, 24 to 8760) | 720 | `lobby/lifetime.md` 4, 7 |
 | `NOCK_EXPIRY_SWEEP_MINUTES` * | how often the expired rooms are deleted (whole minutes, 1 to 1440) | 60 | `lobby/lifetime.md` 6, 7 |
 | `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` | rooms one client address may create in an hour (whole number, 1 to 10000) | 30 | `lobby/rooms.md` 13, 14 |
+| `NOCK_SOCKETS_PER_ADDRESS` | room sockets one client address may hold open at once (whole number, 1 to 10000) | 50 | `platform/realtime.md` 2, 26 |
 | `NOCK_PUBLIC_URL` | public URL of the sign-in links | accounts off | `account/account.md` 1, 2 |
 | `NOCK_SMTP_HOST` | mail server | accounts off | `account/account.md` 1, 2 |
 | `NOCK_SMTP_SECURITY` | `starttls`, `tls` or `none` | `starttls` | `account/account.md` 2 |

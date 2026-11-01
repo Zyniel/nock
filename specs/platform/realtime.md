@@ -29,9 +29,14 @@ earns it.
    9) names the account of the socket's joins (`lobby/joining.md` rule 4);
    nothing else of the handshake is read. A frame, text or binary, is one JSON
    message.
-2. An address held by the wrong-code throttle is closed with 4429
+2. At accept, a socket is counted among the open sockets of its client address
+   (the address of `lobby/rooms.md` rule 13); an address that already has as
+   many open as the cap (rule 26) gets a close with 4503 and no message, and
+   nothing is recorded. A close, by either side, releases the count. Then an
+   address held by the wrong-code throttle is closed with 4429
    (`lobby/rooms.md`). An unknown, malformed or expired code is closed with 4404
-   and no message, and counts as a wrong code.
+   and no message, and counts as a wrong code; the lookup that decides it is
+   `platform/server.md` rule 22.
 3. A frame of 4,097 to 8,192 bytes (UTF-8 for text) is answered
    `invalid_message` unparsed; a larger one is closed with 1009 (`product.md`).
    A frame that does not parse is answered `invalid_message`. After an
@@ -39,8 +44,8 @@ earns it.
 4. Before its join, a socket's `join` runs the join of `lobby/joining.md`, a
    `ping` gets a `pong`, and any other valid message gets `not_joined`; the
    socket stays open.
-5. Every frame of a joined player, a ping, an invalid frame or a repeated join
-   included, counts as a sign of life for rule 16. A ping is not input
+5. Every frame, a ping, an invalid frame, a refused or repeated join included,
+   counts as a sign of life for rule 16, joined or not. A ping is not input
    (`social/presence.md`).
 
 ### Messages
@@ -109,9 +114,10 @@ earns it.
     `room_full` or `room_locked` of a join, and the `removed` of a removed
     token's join or of the host's removal (sent to the removed player), are
     followed by a close with 1000.
-13. Close codes: 4404 unknown or deleted room; 4429 throttled; 4001 replaced by
-    the same player's newer socket (`lobby/joining.md`); 4408 silent; 1000 after
-    rule 12's refusals; 1011 a join the store could not save
+13. Close codes: 4404 unknown or deleted room; 4429 throttled; 4503 too many
+    sockets open from the address (rule 2); 4001 replaced by the same player's
+    newer socket (`lobby/joining.md`); 4408 silent, joined or not (rule 16);
+    1000 after rule 12's refusals; 1011 a join the store could not save
     (`platform/server.md`); 4507 and 1008, a socket that does not read or sends
     too fast, and 1009, a frame over 8,192 bytes (`product.md`).
 14. `player_id` is public. `resume_token` is secret: drawn at random for each new
@@ -128,7 +134,12 @@ earns it.
     `cell_locked`, then staleness (the full order: `gameplay/co-op.md`).
 16. A closed socket disconnects its player at once. A connected player with no
     frame for 6 seconds is disconnected and their socket closed with 4408; the
-    room checks every second, each player in roster order.
+    room checks every second, each player in roster order. A socket not yet
+    joined with no frame of any kind for `RoomConfig.join_timeout_seconds` (10),
+    counted from its opening and again from each frame, is closed with 4408 by
+    its own connection, on the socket's loop: no room task is needed, and none
+    runs for a room whose sockets are all unjoined. An accepted join ends the
+    count.
 17. The resume window is 300 seconds. A player disconnected for exactly 300 still
     resumes; past that they time out, at the next check or inside a join with
     their token: `player_left` with `timed_out`, then they are a past player whom
@@ -141,9 +152,10 @@ earns it.
 18. While its socket is open the page sends `ping` every 2 seconds; when no frame
     of any kind has come for 4 seconds, the connection is lost at once: the socket
     is dropped, and its late frames and close event change nothing.
-19. Any close or socket error is a loss, 4408 included, except a final one: 4404,
-    4429, 4001, or a close after an `error` `room_full`, `room_locked` or
-    `removed`. A final close ends the tries with its state (`client/shell.md`).
+19. Any close or socket error is a loss, 4408 and 4503 included, except a final
+    one: 4404, 4429, 4001, or a close after an `error` `room_full`,
+    `room_locked` or `removed`. A final close ends the tries with its state
+    (`client/shell.md`).
 20. After a loss, once the page has joined: state `reconnecting`, the room
     status reads `room.status.reconnecting`, and the connection band, announced
     as a status, shows `room.banner.offline` within 5 seconds. The grid stays
@@ -181,6 +193,16 @@ earns it.
     `insertAdjacentHTML`, `document.write`, `parseFromString`,
     `createContextualFragment`, `setHTMLUnsafe` or `srcdoc` in its `.ts` and
     `.svelte` files.
+
+### Sockets per address
+
+26. The cap of rule 2 is `NOCK_SOCKETS_PER_ADDRESS`, a whole number of sockets
+    from 1 to 10000, default 50: unset or empty, the default; set, ASCII digits
+    only, any number of leading zeros, within the bounds. `main()` checks it
+    after `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` and before the account variables,
+    and stops on a refused value (`platform/serving.md` rules 6, 10). An app
+    reads it each time it starts and fails its start with `SettingsError` on a
+    refused value; each app keeps its counts in memory. `/ops` cannot change it.
 
 ### Look
 
@@ -268,6 +290,22 @@ The connection band follows `_design/room.md`, « Connection lost ».
   on FX-01 as published every mark is false; a letter cell written without the
   marks parses with both false, and one with `"hyphen_right": "yes"` is
   refused.
+- **AC-21** With `join_timeout_seconds` 0.5, a socket that opens and sends
+  nothing is closed with 4408 within 1.5 seconds; one that sends a `ping`, an
+  invalid frame or a join as `A` every 0.3 seconds is still open 2 seconds
+  later and its join as `Ana` then gets a snapshot; once joined, Ana's silence
+  is the 6 seconds of AC-15.
+- **AC-22** With the variable unset, 50 sockets from one address to Ana's room
+  stay open; the 51st closes with 4503 before any message while Ana's play goes
+  on and a socket from another address gets its snapshot; once one of the 50
+  closes, the next socket of the address is served; after ten 4503s the
+  address's next socket is served, not closed with 4429.
+- **AC-23** With `NOCK_SOCKETS_PER_ADDRESS` `"2"` or `"0002"`, the third socket
+  of an address closes with 4503; with `"1"`, the second; `"10000"` is taken;
+  `"0"`, `"10001"`, `" 50"`, `"5.0"`, `"-1"` or `"٥"` stops `main()` with a
+  one-line message holding the name and `repr()` of the value, and no server
+  runs; `python -m nock` exits with 1; an app starting with it fails with
+  `SettingsError`.
 
 ## Edge cases
 
@@ -286,6 +324,11 @@ The connection band follows `_design/room.md`, « Connection lost ».
   before (`gameplay/hints.md`).
 - A room stored while answers held letters only (`VIDE`) snapshots with every
   mark false (AC-20).
+- An honest page pings every 2 seconds, so it never meets the join deadline,
+  however long its nickname form stays (AC-21).
+- A 4503 closes that socket alone: the address's other sockets keep playing;
+  a socket closed with 4429 or 4404 counted while it was open, like any other
+  (AC-22).
 
 ## Out of scope
 
@@ -308,10 +351,14 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - `src/nock/protocol.py`: every message, `grid_view`, `parse_client_message`,
   `parse_server_message`.
 - `src/nock/hub.py`: frames before and after the join, delivery, close codes,
-  `MAX_FRAME_BYTES`. `src/nock/server.py`: the socket route.
+  the join deadline of `RoomConnection`, `MAX_FRAME_BYTES`.
+  `src/nock/server.py`: the socket route, the sockets per address.
+  `src/nock/settings.py`, `src/nock/__main__.py`: the variable.
 - `src/nock/room.py`: `tick`, `disconnect_player`, the edit checks, the stale
-  rule, the rate limit; `RoomConfig` holds the silence, resume and rate values.
+  rule, the rate limit; `RoomConfig` holds the silence, join deadline, resume
+  and rate values.
 - `web/src/lib/roomSession.ts`, `RoomPage.svelte`: heartbeat, losses, retries,
   resent edits.
 - Tests: `tests/test_spec_039_*`, `tests/test_spec_017_*`,
-  `tests/test_spec_037_*`, `tests/test_spec_040_ac07_ac13_*`.
+  `tests/test_spec_037_*`, `tests/test_spec_040_ac07_ac13_*`;
+  `tests/test_realtime_*` for AC-21 to AC-23.

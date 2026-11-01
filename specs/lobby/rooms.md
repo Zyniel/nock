@@ -48,7 +48,8 @@ codes are limited per address.
 6. `POST /api/rooms` with `{"grid_number": N}`, N a whole number from 1, answers
    201 with only `code` and `share_url` (`<base URL>/r/<code>`) when N is
    published, 404 `{"detail": "Not Found"}` when it is unknown or unpublished, and
-   422 for any other body. `GET` is 404 JSON, `PUT`, `PATCH` and `DELETE` are 405,
+   422 for any other body (one over the limit: 413 first, `platform/serving.md`
+   rule 11). `GET` is 404 JSON, `PUT`, `PATCH` and `DELETE` are 405,
    `POST /api/rooms/` is 404 with no redirect. Only a 201 creates a room. A valid
    session on the request makes its account the room's creator (`lobby/host.md`
    rule 11).
@@ -106,8 +107,8 @@ codes are limited per address.
     from 1 to 10000, default 30: unset or empty, the default; set, ASCII
     digits only, any number of leading zeros, within the bounds. `main()`
     checks it after the five variables of `lobby/lifetime.md` and before the
-    account variables, and stops on a refused value (`platform/server.md`
-    rules 15, 19). An app reads it each time it starts and fails its start with
+    account variables, and stops on a refused value (`platform/serving.md`
+    rules 6, 10). An app reads it each time it starts and fails its start with
     `SettingsError` on a refused value. `/ops` cannot change it.
 
 ### Look
@@ -209,7 +210,8 @@ status band of « Connection lost »; before, the entry card of
 
 - The host role, its controls and the creator: `lobby/host.md`. Limits on any
   other HTTP route than creation, the recap route, the ops API and the
-  sign-in link; limits on sockets other than the wrong-code throttle; the app
+  sign-in link; the cap on the open sockets of an address:
+  `platform/realtime.md` rules 2 and 26; the app
   parsing `X-Forwarded-For` itself; changing the creation limit from `/ops`.
   Web Share, QR codes, offline play.
 - Reconnection and fair play: `platform/realtime.md`. Durable state:

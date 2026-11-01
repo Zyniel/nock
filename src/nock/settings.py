@@ -1,6 +1,6 @@
 """Settings the server reads from its environment (specs 036, 038 and 033).
 
-Four groups of settings live here:
+Five groups of settings live here:
 
 - the operator token of NOCK_OPERATOR_TOKEN, which turns on the operator pages
   (spec 038);
@@ -9,7 +9,9 @@ Four groups of settings live here:
 - the room lives and the sweep interval (`lobby/lifetime.md`), from the four
   NOCK_*_ROOM_HOURS variables and NOCK_EXPIRY_SWEEP_MINUTES;
 - the creation limit of an address (`lobby/rooms.md` rule 14), from
-  NOCK_ROOMS_PER_ADDRESS_PER_HOUR.
+  NOCK_ROOMS_PER_ADDRESS_PER_HOUR;
+- the cap on the room sockets an address holds open (`platform/realtime.md`
+  rule 26), from NOCK_SOCKETS_PER_ADDRESS.
 
 The rules of a host and of a port are those of NOCK_HOST and NOCK_PORT (spec 036),
 which `nock.__main__` checks with the same functions.
@@ -71,6 +73,12 @@ MIN_ROOMS_PER_ADDRESS_PER_HOUR: int = 1
 MAX_ROOMS_PER_ADDRESS_PER_HOUR: int = 10000
 DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR: int = 30
 
+# The cap on the room sockets an address holds open (`platform/realtime.md` rule 26).
+SOCKETS_PER_ADDRESS_VARIABLE: str = "NOCK_SOCKETS_PER_ADDRESS"
+MIN_SOCKETS_PER_ADDRESS: int = 1
+MAX_SOCKETS_PER_ADDRESS: int = 10000
+DEFAULT_SOCKETS_PER_ADDRESS: int = 50
+
 URL_SCHEMES: tuple[str, ...] = ("http://", "https://")
 # The usual port of each security mode, used when NOCK_SMTP_PORT is unset.
 DEFAULT_SMTP_PORTS: dict[str, int] = {"starttls": 587, "tls": 465, "none": 25}
@@ -113,6 +121,10 @@ _SWEEP_RULE = (
 _ROOMS_PER_HOUR_RULE = (
     f"a whole number of rooms from {MIN_ROOMS_PER_ADDRESS_PER_HOUR} to "
     f"{MAX_ROOMS_PER_ADDRESS_PER_HOUR}, written with the digits 0 to 9 only"
+)
+_SOCKETS_PER_ADDRESS_RULE = (
+    f"a whole number of sockets from {MIN_SOCKETS_PER_ADDRESS} to "
+    f"{MAX_SOCKETS_PER_ADDRESS}, written with the digits 0 to 9 only"
 )
 _PRINTABLE_ASCII_RULE = "written with the printable ASCII characters only"
 
@@ -237,6 +249,31 @@ def rooms_per_address_per_hour_from_env(environ: Mapping[str, str]) -> int:
         maximum=MAX_ROOMS_PER_ADDRESS_PER_HOUR,
         default=DEFAULT_ROOMS_PER_ADDRESS_PER_HOUR,
         rule=_ROOMS_PER_HOUR_RULE,
+    )
+
+
+def sockets_per_address_from_env(environ: Mapping[str, str]) -> int:
+    """Return how many room sockets one address may hold open at once.
+
+    Args:
+        environ: The environment to read, such as `os.environ`.
+
+    Returns:
+        The number of `environ["NOCK_SOCKETS_PER_ADDRESS"]`, or 50 when the
+        variable is unset or empty.
+
+    Raises:
+        SettingsError: the value is not a whole number from 1 to 10000 written
+            with ASCII digits. The message is one line that names the variable
+            and shows the value as `repr()` writes it.
+    """
+    return _read_whole_number(
+        environ,
+        SOCKETS_PER_ADDRESS_VARIABLE,
+        minimum=MIN_SOCKETS_PER_ADDRESS,
+        maximum=MAX_SOCKETS_PER_ADDRESS,
+        default=DEFAULT_SOCKETS_PER_ADDRESS,
+        rule=_SOCKETS_PER_ADDRESS_RULE,
     )
 
 
