@@ -2295,15 +2295,7 @@ none.
 
 ## Decisions waiting for the human
 
-- Le Parisien baseline: confirm it from screenshots, if the comparison is still
-  wanted.
-- Hosting (Fly.io, Render or a VPS) and a domain, before the first public test.
-  A cloud session drafts `docs/hosting.md` on the branch `docs/hosting-plan`.
-- Tag `v1.1.0` on `main` (never tagged).
-- The branch `feat/b-016-creator-rooms` (8 commits, last on 2026-10-28, not
-  merged, no item in this file) changes several spec files that B-031 to
-  B-036 touch, while B-022 "Creator rooms and host return" is done: drop it,
-  or say what it still carries.
+None.
 
 ## Release checklist
 
