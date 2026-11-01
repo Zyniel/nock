@@ -59,7 +59,7 @@ ordinal: 3000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -78,6 +78,8 @@ Lead's decisions: option A (the ring drawn by an aria-hidden overlay painted aft
 Lead's decisions: the ring keeps its built offset of -3 px (no change of look); AC-21 samples FX-01 rather than the review's 14 by 9 grid. Follow-up drafts: split shell.md (the visual foundation into its own file).
 
 Tests: AC-21 uses spec 035's mocked FX-01 room (nothing filled), as the other shell and spec 041 ring tests do; the lead reads « fresh » as nothing filled. Navy tolerance: each channel within 12 of #1B2F55.
+
+Pull request: https://github.com/Zyniel/nock/pull/84
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
