@@ -80,7 +80,7 @@ ordinal: 6000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -105,6 +105,8 @@ Lead: merging origin/main (B-041) clashed on hints AC-24, which B-041 took for i
 Reviewer round 1: CHANGES REQUESTED. (1) Blocking: rule 12's case of a Tab from the browser's own controls cannot be seen by the page (no keydown reaches it), so the Salon sheet closes only on the next Tab inside the page. Lead: option (b), the spec states that limit (the harm is one Tab, the focus on the visible top bar); option (a), guessing a Tab from a focusin after the window regains focus, would misfire on the mute case and cannot be tested headless. (2) Taken: the vote's focus moves to the grid only from « Oui » or « Non », not from the status line a ballot focuses. (3) Taken: hud_harness.py's docstring renumbered to hints AC-25. (4) Taken: hud.md rule 12 rewrapped. The spec 035 AC-2 test edit (the walk starts inside the Salon sheet) keeps what AC-2 checks, per the reviewer.
 
 Close: the full gate failed on 022 AC-18's mute test (after a Tab inside the Salon sheet, the mute's page-moved focus closed the sheet, against chat rule 15): the widened quick gate had left the chat domain out. Back to the implementer; the 006 AC-2 arrow failure was ERR_NO_BUFFER_SPACE and passes alone.
+
+Pull request: https://github.com/Zyniel/nock/pull/88, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
