@@ -126,7 +126,10 @@ fonts, focus ring, shared components, state lines).
     their items, details, headings and separators, the badge, the note) and the
     focus ring, including its form on a navy surface, are global styles, their
     colours those of « Components »; a hidden note lets pointers through.
-    Nothing of the Vite template's demo is left.
+    Nothing of the Vite template's demo is left. The grid's ring, its own
+    outline, is drawn again by an overlay over the whole grid, painted after
+    the cells, hidden from assistive technology and letting pointers through,
+    so the ring shows along every edge cell.
 
 ### The brand
 
@@ -252,6 +255,11 @@ fonts, focus ring, shared components, state lines).
   CSS, which declares each token once; `icons.ts` holds every shape of the
   design once; no demo file or text is left. (← 041 AC-18, 041 AC-19, 041 AC-20,
   040 AC-26)
+- **AC-21** On a fresh FX-01 room with (1,0) across selected and the grid
+  focused from the keyboard, the ring shows in painted pixels over the letter
+  cells of the grid's right and bottom edges: at the middle of the outer side
+  of each of (1,4) to (4,4) and (4,1) to (4,4), the 3 px inside the grid's edge
+  hold a pixel of the ring's navy (`--nock-navy`, #1B2F55).
 
 ## Edge cases
 
@@ -278,6 +286,8 @@ fonts, focus ring, shared components, state lines).
   (socket, cards, opening), `EntryFrame.svelte`, `NotFoundPage.svelte`,
   `PageTopBar.svelte`, `TopBarBrand.svelte`.
 - `web/src/app.css` (tokens, page base, focus ring, components),
+  `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay),
   `web/src/main.ts` (fonts), `web/src/lib/icons.ts`.
-- Tests: `tests/test_spec_041_*` and the `tests/test_spec_040_*`,
-  `test_spec_046_*` and `test_spec_048_*` files of the cited criteria.
+- Tests: `tests/test_shell_*`, `tests/test_spec_041_*` and the
+  `tests/test_spec_040_*`, `test_spec_046_*` and `test_spec_048_*` files of the
+  cited criteria.

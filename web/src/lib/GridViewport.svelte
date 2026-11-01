@@ -866,6 +866,7 @@
      it, never past the grid, so the grid that fits its viewport leaves nothing
      to scroll (spec 006). Every mark of a letter cell is already inside it. */
   .grid {
+    position: relative;
     flex: none;
     display: grid;
     width: max-content;
@@ -1193,6 +1194,27 @@
 
   /* The focus outline stays inside the scrolling viewport. */
   .grid:focus-visible {
+    outline-offset: -3px;
+  }
+
+  /* The same ring again, over the cells (shell rule 16). The letter cells are
+     positioned and opaque, so the engines paint them over the grid's own
+     outline, which then shows only along the clue cells. This overlay covers
+     the whole grid and is painted after the cells and their marks (layer 9,
+     above a reaction's 8); it takes no pointer. It is a pseudo-element, so it
+     is neither a child of the grid (which holds only its rows, spec 035 AC-5)
+     nor in the accessibility tree. The grid keeps its own outline, which is
+     what is read as its focus ring. An absolute box is placed against the
+     grid's padding box, so the overlay reaches 1px out over the grid's left
+     and top line to take the grid's border box: its ring lies on the same
+     pixels as the grid's own. */
+  .grid:focus-visible::after {
+    content: '';
+    position: absolute;
+    inset: -1px 0 0 -1px;
+    z-index: 9;
+    pointer-events: none;
+    outline: var(--focus-outline);
     outline-offset: -3px;
   }
 
