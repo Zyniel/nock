@@ -1,9 +1,10 @@
 ---
 id: B-040
 title: Sign-out forgets the account's seats on the device
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-01T19:34:00Z'
 labels:
   - domain:account
   - domain:hud
@@ -56,6 +57,13 @@ ordinal: 1000
      B the device forgets anyway.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 account AC-31 (new)
+- [ ] #2 account AC-32 (new)
+- [ ] #3 account AC-33 (new)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -65,3 +73,17 @@ ordinal: 1000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/account/account.md, specs/client/hud.md
+Tests: tests/test_account_*.py, tests/test_hud_*.py
+Gate: uv run python scripts/gate.py --specs account,hud --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead's decisions: option A (a list nock.account_rooms of the codes storeMissingIdentities wrote), so no architecture decision; open question 1 takes A (a failed sign-out or deletion keeps everything, the page shows error, rule 16).
+<!-- SECTION:NOTES:END -->

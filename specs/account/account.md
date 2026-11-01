@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: done
+status: approved
 ---
 
 # account/account - Optional account
@@ -108,7 +108,9 @@ the other rooms, and an e-mail says when it is done.
     sends one `PUT` with its code and its first snapshot's token; the
     catalogue, before « Mes salons » asks, and the account page after a
     sign-in store each identity whose code has none on the device
-    (`lobby/joining.md` rule 8), never replacing one.
+    (`lobby/joining.md` rule 8), never replacing one, and add its code to
+    `nock.account_rooms`, a JSON array of codes only the account code reads
+    (anything else reads as empty).
 
 ### The account sheet and page
 
@@ -142,7 +144,11 @@ the other rooms, and an e-mail says when it is done.
     `account.delete_warning`, « Supprimer définitivement », which alone sends
     `DELETE /api/account`, and « Garder mon compte », which closes it and
     focuses the disclosure. A 204 ends on `deleted`: `account.deleted` and
-    « Voir les grilles » to `/`.
+    « Voir les grilles » to `/`. Before it shows `signed_out` or `deleted`, a
+    204 removes, for each code of `nock.account_rooms`, its identity,
+    `nock.room.<CODE>` and its records in `nock.history`, then the list; a
+    seat the device took itself stays. A failed sign-out or deletion removes
+    nothing.
 
 ### Erasure and what is kept
 
@@ -432,6 +438,21 @@ the other rooms, and an e-mail says when it is done.
   once both are over, R's player is `--`, U is gone, her address received
   one e-mail, and the erasure is done with `attempts` 1 and `rooms_deleted`
   1.
+- **AC-31** Ana's account lists R and T; her device holds its own seat in T,
+  `nock.room.R` and history records of R and T. She signs in from `/account`
+  (which stores R), her account links S from another device, and `/` loads
+  (which stores S): the device holds R's and S's identities, T's unchanged.
+  « Se déconnecter », answered 204, shows `signed_out`; the device then holds
+  no identity, room record or history record of R or S and no
+  `nock.account_rooms`, T's identity and its history record stay, and « Mes
+  salons » on `/` lists T alone.
+- **AC-32** On AC-31's device before the sign-out, « Supprimer définitivement »,
+  answered 204, shows `deleted` and leaves the device as AC-31's sign-out
+  does.
+- **AC-33** On AC-31's device before the sign-out, a sign-out answered 500,
+  or a deletion answered 500, shows `account.error.generic`, and every
+  identity, room record, history record and `nock.account_rooms` stays as it
+  was.
 
 ## Edge cases
 
@@ -463,6 +484,9 @@ the other rooms, and an e-mail says when it is done.
   devices. How the pages merge the account's progress with the device's:
   `content/library.md`.
 - Catch-up, kept per device: `social/catch-up.md`.
+- Forgetting on the device a seat whose room the summaries no longer return;
+  forgetting the account's seats when a session expires with no sign-out
+  (they stay until the next sign-out on that device).
 - Logs and retention: `admin/operations.md`.
 
 ## Code
@@ -477,4 +501,4 @@ the other rooms, and an e-mail says when it is done.
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`;
-  `tests/test_account_*` (the progress route, AC-22 to AC-30).
+  `tests/test_account_*` (the progress route, AC-22 to AC-33).
