@@ -253,13 +253,14 @@ export function forgetAccountSeats(): void {
     removeItem(identityKey(code))
     removeItem(roomRecordKey(code))
   }
+  const storedRecords = readHistory()
   const keptRecords: HistoryRecord[] = []
-  for (const record of readHistory()) {
+  for (const record of storedRecords) {
     if (!accountCodes.includes(record.code)) {
       keptRecords.push(record)
     }
   }
-  if (readItem(HISTORY_KEY) !== null) {
+  if (keptRecords.length < storedRecords.length) {
     writeItem(HISTORY_KEY, JSON.stringify(keptRecords))
   }
   removeItem(ACCOUNT_ROOMS_KEY)
