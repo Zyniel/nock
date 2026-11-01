@@ -9,9 +9,9 @@ the mocked socket (`open_mock_room`), the snapshot builders of AC-4, AC-6 and
 AC-8, and AC-1's pinch and pan through the Chrome DevTools Protocol (`pinch`,
 `pan`), which the zoomed grid tests of board AC-23 to AC-29 use too
 (`tests/test_board_zoom_follow.py`). What only one file uses stays in that file,
-next to its tests. The fixtures
-`fx01_grid` and `fx02_grid` are defined in each file as thin wrappers around
-`grid_from_text`: a fixture imported from here would be an unused import for ruff.
+next to its tests. The fixtures `fx01_grid` and `fx02_grid` are defined in each
+file as thin wrappers around `grid_from_text`: a fixture imported from here would
+be an unused import for ruff.
 """
 
 from __future__ import annotations

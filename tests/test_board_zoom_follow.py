@@ -116,16 +116,19 @@ viewport => {
 
 @pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
+    """Yield spec 019's `open_window(width, height, touch)`; close its pages after."""
     yield from window_opener(browser, browser_name)
 
 
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
+    """The FX-01 grid (5 by 5)."""
     return Grid.model_validate_json(fx01_text)
 
 
 @pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
+    """The FX-02 grid (13 by 17)."""
     return Grid.model_validate_json(fx02_text)
 
 
@@ -133,6 +136,7 @@ def fx02_grid(fx02_text: str) -> Grid:
 
 
 def viewport_of(page: Page) -> Locator:
+    """The grid's viewport, the element that scrolls (`grid-viewport`)."""
     return page.get_by_test_id("grid-viewport")
 
 
@@ -151,6 +155,7 @@ def scrolled_ancestors(viewport: Locator) -> list[str]:
 
 
 def wait_two_frames(page: Page) -> None:
+    """Wait two animation frames: a scroll made at once is done by then."""
     page.evaluate(TWO_FRAMES_SCRIPT)
 
 
@@ -167,6 +172,7 @@ def is_out_of_view(cell: Box, view: Box) -> bool:
 
 
 def is_whole_in_view(cell: Box, view: Box) -> bool:
+    """Whether a cell's box is wholly inside the viewport's."""
     return (
         cell.left >= view.left
         and cell.right <= view.right
@@ -197,6 +203,7 @@ def least_scroll(scroll_before: float, margin_edge: float, view_edge: float) -> 
 
 
 def clue_at(page: Page, row: int, column: int, clue_index: int) -> Locator:
+    """Clue `clue_index` (0 or 1) of the clue cell at (row, column)."""
     selector = f'[data-testid="clue"][data-clue-index="{clue_index}"]'
     return cell_at(page, row, column).locator(selector)
 
@@ -215,6 +222,14 @@ def tap_shown_part(page: Page, target: Locator) -> None:
 
 
 def expect_selected(page: Page, row: int, column: int, direction: str) -> None:
+    """Wait until the grid's selection is (row, column) in `direction`.
+
+    Args:
+        page: The room page.
+        row: The selected cell's row.
+        column: The selected cell's column.
+        direction: `"across"` or `"down"`.
+    """
     grid = page.get_by_test_id("grid")
     expect(grid).to_have_attribute("data-selected-row", str(row))
     expect(grid).to_have_attribute("data-selected-column", str(column))
