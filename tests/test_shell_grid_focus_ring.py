@@ -37,7 +37,7 @@ Choices where the spec leaves room:
 from __future__ import annotations
 
 import math
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -77,12 +77,16 @@ RUNNING_ANIMATIONS_SCRIPT = "() => document.getAnimations().length"
 FOCUS_VISIBLE_SCRIPT = "element => element.matches(':focus-visible')"
 
 
+# The grid's edge a sample lies on.
+EdgeSide = Literal["right", "bottom"]
+
+
 class Sample(NamedTuple):
     """One sample of AC-21: a cell and the side of the grid's edge it lies on."""
 
     row: int
     column: int
-    side: str
+    side: EdgeSide
 
 
 RIGHT_EDGE_SAMPLES = [Sample(row, LAST_INDEX, "right") for row in range(1, 5)]
@@ -125,33 +129,42 @@ def wait_until_still(page: Page) -> None:
     page.get_by_test_id("grid").evaluate(LAYOUT_SETTLED_SCRIPT)
 
 
-def band_pixels(picture: Picture, grid_box: Box, cell_box: Box, side: str) -> list[Rgb]:
+def band_positions(edge: float) -> range:
+    """The whole pixels that meet the 3 px inside an edge at `edge`, outermost last."""
+    first = math.floor(edge - BAND_DEPTH_PX)
+    last = math.ceil(edge) - 1
+    return range(first, last + 1)
+
+
+def band_pixels(
+    picture: Picture, grid_box: Box, cell_box: Box, side: EdgeSide
+) -> list[Rgb]:
     """The pixels of the band inside the grid's edge, at the middle of a cell side.
 
     Args:
         picture: A picture of the grid.
         grid_box: The grid's box.
         cell_box: The box of an edge cell.
-        side: "right" or "bottom", the grid's edge the cell lies on.
+        side: The grid's edge the cell lies on.
 
     Returns:
         The pixels that meet the 3 px inside the edge, outermost last.
+
+    Raises:
+        ValueError: if `side` is neither "right" nor "bottom".
     """
-    if side == "right":
-        edge = grid_box.right
-        middle_line = math.floor(cell_box.centre_y)
-    else:
-        edge = grid_box.bottom
-        middle_line = math.floor(cell_box.centre_x)
-    first = math.floor(edge - BAND_DEPTH_PX)
-    last = math.ceil(edge) - 1
     pixels: list[Rgb] = []
-    for position in range(first, last + 1):
-        if side == "right":
-            pixels.append(picture.at(position, middle_line))
-        else:
-            pixels.append(picture.at(middle_line, position))
-    return pixels
+    if side == "right":
+        middle_row = math.floor(cell_box.centre_y)
+        for x in band_positions(grid_box.right):
+            pixels.append(picture.at(x, middle_row))
+        return pixels
+    if side == "bottom":
+        middle_column = math.floor(cell_box.centre_x)
+        for y in band_positions(grid_box.bottom):
+            pixels.append(picture.at(middle_column, y))
+        return pixels
+    raise ValueError(f"side {side!r} is not 'right' or 'bottom'")
 
 
 def is_navy(colour: Rgb) -> bool:
