@@ -4,7 +4,7 @@ title: Sign-out forgets the account's seats on the device
 status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T20:16:00Z'
+updated_date: '2026-11-01T20:17:00Z'
 labels:
   - domain:account
   - domain:hud
@@ -71,7 +71,7 @@ ordinal: 1000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -88,6 +88,8 @@ Gate: uv run python scripts/gate.py --specs account,hud --browsers chromium
 Lead's decisions: option A (a list nock.account_rooms of the codes storeMissingIdentities wrote), so no architecture decision; open question 1 takes A (a failed sign-out or deletion keeps everything, the page shows error, rule 16).
 
 Tests: the device's own seat T keeps its room record too (rule 17: a seat the device took itself stays), so the test asserts nock.room.T stays.
+
+Pull request: https://github.com/Zyniel/nock/pull/83
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
