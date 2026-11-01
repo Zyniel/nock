@@ -24,11 +24,11 @@ from spec006_harness import (
     cell_at,
     grid_from_text,
     open_room,
+    pinch,
 )
 
 ZOOM_PATTERN = re.compile(r"^\d+(\.\d{1,2})?$")
 MAX_PINCHES = 5
-PINCH_STEPS = 10
 SMALL_PINCH_START = 40.0
 BIG_PINCH_END = 300.0
 EPSILON = 1e-6
@@ -88,38 +88,6 @@ def client_size(viewport: Locator) -> tuple[float, float]:
 
 
 # ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
-
-
-def pinch(page: Page, viewport: Locator, start: float, end: float) -> None:
-    """Pinch around the viewport centre, finger distance `start` to `end`."""
-    box = box_of(viewport)
-    center_x = box["x"] + box["width"] / 2
-    center_y = box["y"] + box["height"] / 2
-
-    def two_fingers(distance: float) -> list[dict[str, float]]:
-        half = distance / 2
-        return [
-            {"x": center_x - half, "y": center_y, "id": 0},
-            {"x": center_x + half, "y": center_y, "id": 1},
-        ]
-
-    session = page.context.new_cdp_session(page)
-    try:
-        session.send(
-            "Input.dispatchTouchEvent",
-            {"type": "touchStart", "touchPoints": two_fingers(start)},
-        )
-        for step in range(1, PINCH_STEPS + 1):
-            distance = start + (end - start) * step / PINCH_STEPS
-            session.send(
-                "Input.dispatchTouchEvent",
-                {"type": "touchMove", "touchPoints": two_fingers(distance)},
-            )
-        session.send(
-            "Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []}
-        )
-    finally:
-        session.detach()
 
 
 def pinch_out(page: Page, viewport: Locator) -> None:

@@ -573,7 +573,8 @@ COLOUR_SCRIPT = (
     + "\nreturn parseColour(getComputedStyle(element)[property]);\n}"
 )
 
-# Every `clue-arrow` of the page, with its cell and the shapes it holds.
+# Every `clue-arrow` of the page, with its cell, its computed `filter` and the
+# `path` and `polygon` shapes it holds.
 ARROWS_SCRIPT = "() => {\n" + READERS_JS + r"""
 const found = [];
 for (const arrow of document.querySelectorAll('[data-testid="clue-arrow"]')) {
@@ -593,9 +594,11 @@ for (const arrow of document.querySelectorAll('[data-testid="clue-arrow"]')) {
   reading.cellType = cell === null ? null : cell.getAttribute('data-type');
   reading.parentIsCell = cell !== null && arrow.parentElement === cell;
   reading.cell = cell === null ? null : boxOf(cell);
+  // Every path and polygon of the arrow, at any depth, in document order: the
+  // halo's copies come first, as they are drawn under the ink.
   const shapes = [];
-  for (const child of arrow.children) {
-    shapes.push(shapeOf(child));
+  for (const shape of arrow.querySelectorAll('path, polygon')) {
+    shapes.push(shapeOf(shape));
   }
   reading.shapes = shapes;
   found.push(reading);

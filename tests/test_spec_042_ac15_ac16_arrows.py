@@ -9,9 +9,17 @@ Choices where the spec leaves room:
 
 - AC-15, "an `svg` child of the target letter cell": the arrow's parent element
   is the cell.
-- AC-15, the halo: the computed `filter` holds exactly two `drop-shadow()`
-  functions, each with the colour rgb(255, 255, 255), two offsets of 0 and a
-  blur of 0.8 px (0.01 px).
+- AC-15, the shapes of an arrow: every `path` and `polygon` it holds, at any
+  depth, in document order (`read_arrows`). Its ink glyph is its last `path` and
+  its last `polygon`.
+- AC-15, the halo (`_design/cells.md` « Direction arrows », B-043): the arrow's
+  computed `filter` is `none`, and it holds exactly two paths and two polygons,
+  the halo's copy of the path and of the head both before the ink's (drawn under
+  it). The copy of the path has the glyph's `d`, a stroke of exactly
+  rgb(255, 255, 255) (`--nock-white`), a computed stroke width of 4.8px, round
+  caps and joins and no fill; the copy of the head has the glyph's points, a
+  fill and a stroke of that white, a stroke width of 2.4px and round joins. So
+  1.2 units of white border every ink edge, the path's round caps included.
 - AC-15, the edge cases "Arrow targets" (a hand-built view whose clues point at
   an empty cell and outside the grid draws no arrow for them) and "Taps on an
   arrow" (a click at the centre of the ↓ of (1, 2) selects (1, 2)) are tested
@@ -21,8 +29,6 @@ Choices where the spec leaves room:
 """
 
 from __future__ import annotations
-
-import re
 
 import pytest
 from playwright.sync_api import Page, expect
@@ -40,6 +46,7 @@ from spec042_harness import (
     ARROW_SHAPES,
     ARROW_SIDES,
     INK,
+    WHITE,
     Box,
     Reading,
     arrow_of,
@@ -84,27 +91,24 @@ FX01_ARROWS = [
 ]
 FX01_IDS = [f"{row}-{column}-clue{index}" for row, column, index, _, _ in FX01_ARROWS]
 
-DROP_SHADOW = re.compile(r"drop-shadow\(((?:[^()]|\([^()]*\))*)\)")
-COLOUR_TEXT = re.compile(r"rgba?\([^)]*\)")
-WHITE_TEXT = "rgb(255, 255, 255)"
+HALO_PATH_WIDTH = "4.8px"
+HALO_HEAD_WIDTH = "2.4px"
+# The tags of one drawing of the glyph, sorted: its path and its head.
+GLYPH_TAGS = ["path", "polygon"]
 
 
-def drop_shadows(filter_text: str) -> list[tuple[str, list[float]]]:
-    """The `drop-shadow()` functions of a computed `filter`: colour and lengths."""
-    shadows: list[tuple[str, list[float]]] = []
-    for match in DROP_SHADOW.finditer(filter_text):
-        inside = match.group(1)
-        colour_match = COLOUR_TEXT.search(inside)
-        colour = "" if colour_match is None else colour_match.group(0)
-        rest = inside.replace(colour, " ")
-        lengths: list[float] = []
-        for part in rest.split():
-            if part.endswith("px"):
-                lengths.append(float(part.removesuffix("px")))
-            elif part == "0":
-                lengths.append(0.0)
-        shadows.append((colour, lengths))
-    return shadows
+def shapes_of(arrow: Reading, tag: str) -> list[Reading]:
+    """The arrow's shapes of one tag (`path` or `polygon`), in document order."""
+    found: list[Reading] = []
+    for shape in arrow["shapes"]:
+        if shape["tag"] == tag:
+            found.append(shape)
+    return found
+
+
+def points_of(polygon: Reading) -> str:
+    """A polygon's `points`, its whitespace made single spaces."""
+    return " ".join(str(polygon["attributes"].get("points", "")).split())
 
 
 def place_problems(arrow: Reading) -> list[str]:
@@ -136,19 +140,20 @@ def place_problems(arrow: Reading) -> list[str]:
 
 
 def glyph_problems(arrow: Reading) -> list[str]:
-    """The arrow's `path` and `polygon`, in ink, by the table of its arrow."""
+    """The ink `path` and `polygon` of the arrow (its last ones), by its table."""
     name = f"arrow {arrow['arrow']}"
-    shapes: list[Reading] = arrow["shapes"]
-    tags = [shape["tag"] for shape in shapes]
-    if sorted(tags) != ["path", "polygon"]:
+    tags = [shape["tag"] for shape in arrow["shapes"]]
+    paths = shapes_of(arrow, "path")
+    polygons = shapes_of(arrow, "polygon")
+    if not paths or not polygons or len(paths) + len(polygons) != len(tags):
         return [f"{name}: shapes {tags}"]
-    path = shapes[tags.index("path")]
-    polygon = shapes[tags.index("polygon")]
+    path = paths[-1]
+    polygon = polygons[-1]
     expected_d, expected_points = ARROW_SHAPES[str(arrow["arrow"])]
     problems: list[str] = []
     if path["attributes"].get("d") != expected_d:
         problems.append(f"{name}: d {path['attributes'].get('d')!r}")
-    points = " ".join(str(polygon["attributes"].get("points", "")).split())
+    points = points_of(polygon)
     if points != expected_points:
         problems.append(f"{name}: points {points!r}")
     if path["strokeColour"] is None:
@@ -165,6 +170,55 @@ def glyph_problems(arrow: Reading) -> list[str]:
         problems.append(f"{name}: polygon fill {polygon['fill']!r}")
     else:
         problems += colour_problems(f"{name} head", polygon["fillColour"], INK)
+    return problems
+
+
+def white_problems(name: str, colour: object, written: object) -> list[str]:
+    """A computed fill or stroke that must be exactly the opaque white."""
+    if colour is None:
+        return [f"{name} {written!r}"]
+    return colour_problems(name, colour, WHITE)
+
+
+def halo_problems(arrow: Reading) -> list[str]:
+    """The arrow's white halo by « Direction arrows »: two copies under the ink."""
+    name = f"arrow {arrow['arrow']}"
+    problems: list[str] = []
+    if arrow["filter"] != "none":
+        problems.append(f"{name}: filter {arrow['filter']!r}")
+    tags = [shape["tag"] for shape in arrow["shapes"]]
+    halo_tags = sorted(tags[:2])
+    ink_tags = sorted(tags[2:])
+    if halo_tags != GLYPH_TAGS or ink_tags != GLYPH_TAGS:
+        return [*problems, f"{name}: shapes {tags}, expected the halo then the ink"]
+    halo_path = shapes_of(arrow, "path")[0]
+    halo_head = shapes_of(arrow, "polygon")[0]
+    expected_d, expected_points = ARROW_SHAPES[str(arrow["arrow"])]
+    if halo_path["attributes"].get("d") != expected_d:
+        problems.append(f"{name} halo: d {halo_path['attributes'].get('d')!r}")
+    problems += white_problems(
+        f"{name} halo path stroke", halo_path["strokeColour"], halo_path["stroke"]
+    )
+    if halo_path["strokeWidth"] != HALO_PATH_WIDTH:
+        problems.append(f"{name} halo: path stroke-width {halo_path['strokeWidth']}")
+    if halo_path["linecap"] != "round" or halo_path["linejoin"] != "round":
+        caps = f"{halo_path['linecap']} {halo_path['linejoin']}"
+        problems.append(f"{name} halo: path caps {caps}")
+    if halo_path["fill"] != "none":
+        problems.append(f"{name} halo: path fill {halo_path['fill']}")
+    points = points_of(halo_head)
+    if points != expected_points:
+        problems.append(f"{name} halo: points {points!r}")
+    problems += white_problems(
+        f"{name} halo head fill", halo_head["fillColour"], halo_head["fill"]
+    )
+    problems += white_problems(
+        f"{name} halo head stroke", halo_head["strokeColour"], halo_head["stroke"]
+    )
+    if halo_head["strokeWidth"] != HALO_HEAD_WIDTH:
+        problems.append(f"{name} halo: head stroke-width {halo_head['strokeWidth']}")
+    if halo_head["linejoin"] != "round":
+        problems.append(f"{name} halo: head joins {halo_head['linejoin']}")
     return problems
 
 
@@ -247,15 +301,10 @@ def test_ac15_each_arrow_has_a_thin_white_halo(
     arrows = open_fx01(page, live_server, fx01_grid)
 
     assert len(arrows) == 8
+    problems: list[str] = []
     for arrow in arrows:
-        shadows = drop_shadows(str(arrow["filter"]))
-        assert len(shadows) == 2, arrow["filter"]
-        for colour, lengths in shadows:
-            assert colour == WHITE_TEXT, arrow["filter"]
-            assert len(lengths) == 3, arrow["filter"]
-            assert lengths[0] == 0, arrow["filter"]
-            assert lengths[1] == 0, arrow["filter"]
-            assert abs(lengths[2] - 0.8) <= 0.01, arrow["filter"]
+        problems.extend(halo_problems(arrow))
+    assert problems == []
 
 
 def test_ac15_each_arrow_is_a_square_placed_against_the_side_it_comes_from(
