@@ -79,7 +79,8 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 ### The room page
 
 8. When its socket opens, the page:
-   1. with a valid identity stored for this room code, joins at once with its
+   1. with the identity of its last snapshot, held in memory, else with a
+      valid identity stored for this room code, joins at once with its
       nickname and token;
    2. else, for a room created from the catalogue on this device (a room record
       whose `grid` is a JSON number), joins at once as a new player with the
@@ -93,13 +94,17 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 9. The form applies rule 1's checks after the capitals before it sends: a length
    break shows `join.error.length`, any other `join.error.characters`, announced
    as an alert, and nothing is sent. The status `room.status.nickname` is read
-   but not seen. The field shows capitals and keeps its value as typed. Submit is
-   disabled while joining; Enter submits. An `invalid_nickname` from the server,
-   whatever sent the join, shows the form again with `join.error.characters`.
+   but not seen. The field shows capitals and keeps its value as typed. Submit,
+   `join.submit`, is enabled only while the status is `nickname`: disabled
+   while joining, and while a form kept after a loss waits for the next socket
+   (`platform/realtime.md` rule 20); Enter submits when it is enabled. An
+   `invalid_nickname` from the server, whatever sent the join, shows the form
+   again with `join.error.characters`.
 10. Every snapshot stores the identity, `nock.identity.<CODE>`: id, token and the
-    nickname the server holds. A join sent from the form, once a snapshot answers
-    it, also stores `nock.nickname`, the nickname as sent; a join sent at once
-    never does.
+    nickname the server holds; the page also holds it in memory, so a browser
+    that refuses storage still rejoins. A join sent from the form, once a
+    snapshot answers it, also stores `nock.nickname`, the nickname as sent; a
+    join sent at once never does.
 11. `room_full` ends on `room.status.full`, a 4001 close on
     `room.status.replaced`. Before any snapshot, such a refusal, like those of
     `lobby/host.md`, is the card's title, under the room code line
@@ -242,6 +247,13 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
   closes her older connection with 4001, and leaves Bob and his connection
   untouched; signed out, the join with U resumes Bob. Lea timed out, the
   signed-in join with no token seats her back with her id.
+- **AC-22** In a browser that refuses storage, Ana enters from the form as
+  `Ana`; after her socket drops, the next socket's first frame is a join as
+  `ANA` with her token, and no form shows. Likewise when, while her page is
+  disconnected, another tab stores a different identity for the same code:
+  her next socket's first frame is still a join as `ANA` with her token.
+- **AC-23** With the form shown, a socket loss keeps it with « Entrer dans le
+  salon » disabled until the next socket opens, when it is enabled again.
 
 ## Edge cases
 
@@ -251,6 +263,8 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 - A disconnected player keeps their nickname and colour from a newcomer (AC-5).
 - A corrupt identity (`not json`, `[]`, a missing or empty field) gives case 2
   or 3 of rule 8; a server `invalid_nickname` to case 2 shows the form (AC-10).
+- An identity another tab stored meanwhile for the same code does not replace
+  the one the page holds from its last snapshot (AC-22).
 - A seat back ignores a nickname that rule 1 refuses (AC-20).
 - A second device with the same token, after the seat back, is a resume: the
   older socket gets 4001 (AC-20).
