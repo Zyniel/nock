@@ -2,8 +2,10 @@
 // the server and the room identities an account brings to this device. Plain
 // functions: no DOM.
 
-import { readIdentity, writeIdentity } from './joinRules'
+import { HISTORY_KEY, readHistory, type HistoryRecord } from './history'
+import { identityKey, readIdentity, writeIdentity } from './joinRules'
 import type { RoomKey } from './myRooms'
+import { readItem, removeItem, roomRecordKey, writeItem } from './storage'
 
 // What GET /api/account answers while accounts are on.
 export interface AccountStatus {
@@ -37,6 +39,8 @@ const LINK_URL = '/api/account/link'
 const SIGN_IN_URL = '/api/account/sign-in'
 const SIGN_OUT_URL = '/api/account/sign-out'
 const ROOMS_URL = '/api/account/rooms'
+// The codes of the rooms whose identity came from the account (a JSON array).
+const ACCOUNT_ROOMS_KEY = 'nock.account_rooms'
 
 function isString(value: unknown): value is string {
   return typeof value === 'string'
@@ -189,9 +193,38 @@ export async function linkRoom(key: RoomKey): Promise<void> {
   }
 }
 
+// The codes of the rooms whose identity this device took from the account. A
+// stored value that is not a JSON array reads as none, and an item that is not a
+// string is left out.
+function readAccountRoomCodes(): string[] {
+  const raw = readItem(ACCOUNT_ROOMS_KEY)
+  if (raw === null) {
+    return []
+  }
+  let stored: unknown
+  try {
+    stored = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(stored)) {
+    return []
+  }
+  const codes: string[] = []
+  for (const item of stored) {
+    if (isString(item)) {
+      codes.push(item)
+    }
+  }
+  return codes
+}
+
 // Store each identity of the account whose room has no valid identity on this
-// device yet, as spec 012's record. An identity already stored is never replaced.
+// device yet, as spec 012's record, and remember its code in `nock.account_rooms`.
+// An identity already stored is never replaced.
 export function storeMissingIdentities(identities: AccountIdentity[]): void {
+  const accountCodes = readAccountRoomCodes()
+  let hasNewCode = false
   for (const identity of identities) {
     if (readIdentity(identity.code) !== null) {
       continue
@@ -201,5 +234,34 @@ export function storeMissingIdentities(identities: AccountIdentity[]): void {
       resume_token: identity.resume_token,
       nickname: identity.nickname,
     })
+    if (!accountCodes.includes(identity.code)) {
+      accountCodes.push(identity.code)
+      hasNewCode = true
+    }
   }
+  if (hasNewCode) {
+    writeItem(ACCOUNT_ROOMS_KEY, JSON.stringify(accountCodes))
+  }
+}
+
+// Remove from this device what the account brought: for each code of
+// `nock.account_rooms`, its identity, its room record and its history records,
+// then the list itself. A seat the device took itself is not in the list.
+export function forgetAccountSeats(): void {
+  const accountCodes = readAccountRoomCodes()
+  for (const code of accountCodes) {
+    removeItem(identityKey(code))
+    removeItem(roomRecordKey(code))
+  }
+  const storedRecords = readHistory()
+  const keptRecords: HistoryRecord[] = []
+  for (const record of storedRecords) {
+    if (!accountCodes.includes(record.code)) {
+      keptRecords.push(record)
+    }
+  }
+  if (keptRecords.length < storedRecords.length) {
+    writeItem(HISTORY_KEY, JSON.stringify(keptRecords))
+  }
+  removeItem(ACCOUNT_ROOMS_KEY)
 }

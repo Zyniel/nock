@@ -247,7 +247,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 - A question before leaving the room; a brand on the phone top bar, where
   « Retour aux grilles » is the way home.
 - Room gone: leaving by itself after a delay; a dialog for a removed player or
-  another final status; forgetting the deleted room's stored identity.
+  another final status; forgetting the deleted room's stored identity, which
+  only a sign-out or deletion forgets, for a seat the account brought
+  (`account/account.md` rule 17).
 - The Salon, what « Salon » carries while it is closed, the 3-second notes:
   `client/room.md`. « Réagir », « Je bloque », the reactions: `social/chat.md`.
 - What items, sheets, lines and rows do: the domains each rule names. The page
