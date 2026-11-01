@@ -6,6 +6,7 @@
     LINK_TOKEN,
     deleteAccount,
     fetchAccountStatus,
+    forgetAccountSeats,
     signIn,
     signOut,
     storeMissingIdentities,
@@ -103,6 +104,7 @@
   async function leave(): Promise<void> {
     isDeleteAsked = false
     if (await signOut()) {
+      forgetAccountSeats()
       pageState = 'signed_out'
     } else {
       pageState = 'error'
@@ -112,6 +114,7 @@
   async function confirmDeletion(): Promise<void> {
     isDeleteAsked = false
     if (await deleteAccount()) {
+      forgetAccountSeats()
       pageState = 'deleted'
     } else {
       pageState = 'error'
