@@ -297,8 +297,9 @@
     isSheetSalonOpen = false
   }
 
-  // True while a Tab is moving the focus: from its key press to the end of the
-  // task, since the browser moves the focus right after the key press.
+  // True while a Tab is moving the focus: from its key press to its first focus
+  // change, or to the end of the task or the key's release if none comes. The
+  // browser moves the focus right after the key press.
   let isTabMovingFocus = false
 
   function noteTabPress(event: KeyboardEvent): void {
@@ -311,6 +312,12 @@
     }, 0)
   }
 
+  function noteTabRelease(event: KeyboardEvent): void {
+    if (event.key === 'Tab') {
+      isTabMovingFocus = false
+    }
+  }
+
   // A Tab or Shift+Tab that puts the focus on an element outside the open menu
   // or the Salon sheet closes it, the focus staying on that element
   // (client/hud.md rule 12). A focus that no Tab moved closes nothing, nor does
@@ -320,6 +327,8 @@
     if (!isTabMovingFocus || !(target instanceof Node)) {
       return
     }
+    // This focus is the one the Tab moved: a later one is the page's.
+    isTabMovingFocus = false
     const menu = openPopover === 'aide' ? aideMenu : roomMenu
     if (openPopover !== null && menu !== null && !menu.contains(target)) {
       openPopover = null
@@ -331,9 +340,11 @@
 
   $effect(() => {
     window.addEventListener('keydown', noteTabPress, true)
+    window.addEventListener('keyup', noteTabRelease, true)
     window.addEventListener('focusin', closeOverlayLeftByTab, true)
     return () => {
       window.removeEventListener('keydown', noteTabPress, true)
+      window.removeEventListener('keyup', noteTabRelease, true)
       window.removeEventListener('focusin', closeOverlayLeftByTab, true)
     }
   })

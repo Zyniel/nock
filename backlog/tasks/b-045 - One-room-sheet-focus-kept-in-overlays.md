@@ -4,7 +4,7 @@ title: One room sheet, focus kept in overlays
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T22:48:00Z'
+updated_date: '2026-11-01T23:24:00Z'
 labels:
   - domain:hud
   - domain:host
@@ -103,4 +103,6 @@ Spec-checker: CHANGES REQUESTED in round 1 (rule 12's edge case and a press on t
 Lead: merging origin/main (B-041) clashed on hints AC-24, which B-041 took for its offline requests; B-045's criterion of the vote's focus is hints AC-25 (spec, test name and this task renumbered in the merge commit, text unchanged).
 
 Reviewer round 1: CHANGES REQUESTED. (1) Blocking: rule 12's case of a Tab from the browser's own controls cannot be seen by the page (no keydown reaches it), so the Salon sheet closes only on the next Tab inside the page. Lead: option (b), the spec states that limit (the harm is one Tab, the focus on the visible top bar); option (a), guessing a Tab from a focusin after the window regains focus, would misfire on the mute case and cannot be tested headless. (2) Taken: the vote's focus moves to the grid only from « Oui » or « Non », not from the status line a ballot focuses. (3) Taken: hud_harness.py's docstring renumbered to hints AC-25. (4) Taken: hud.md rule 12 rewrapped. The spec 035 AC-2 test edit (the walk starts inside the Salon sheet) keeps what AC-2 checks, per the reviewer.
+
+Close: the full gate failed on 022 AC-18's mute test (after a Tab inside the Salon sheet, the mute's page-moved focus closed the sheet, against chat rule 15): the widened quick gate had left the chat domain out. Back to the implementer; the 006 AC-2 arrow failure was ERR_NO_BUFFER_SPACE and passes alone.
 <!-- SECTION:NOTES:END -->
