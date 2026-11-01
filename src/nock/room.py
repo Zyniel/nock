@@ -99,6 +99,10 @@ DEFAULT_ROOM_LIFE_HOURS: int = 720
 SECONDS_PER_HOUR: float = 3_600.0
 MAX_PLAYERS: int = 8  # spec 012 AC-4
 MAX_PAST_PLAYERS: int = 100  # spec 032 AC-4: past players a room keeps
+# `lobby/host.md` rule 2: banned tokens a room keeps, the newest in removal order.
+MAX_REMOVED_TOKENS: int = 100
+# `social/chat.md` rule 8: chat messages a room keeps, the newest in seq order.
+MAX_CHAT_HISTORY: int = 200
 # Space, hyphen, apostrophe, right single quotation mark (U+2019), underscore.
 NICKNAME_PUNCTUATION: str = " -'" + chr(0x2019) + "_"
 NICKNAME_MIN_LENGTH: int = 2
@@ -294,7 +298,9 @@ class RoomState(RoomModel):
     open_vote: OpenVote | None = None  # spec 025
     # spec 025: vote_id of the last vote opened, 0 for none
     last_vote_id: int = Field(default=0, ge=0, strict=True)
-    chat: tuple[ChatMessage, ...] = ()  # spec 022: every chat message, in seq order
+    # spec 022, `social/chat.md` rule 8: the newest MAX_CHAT_HISTORY messages, in
+    # seq order
+    chat: tuple[ChatMessage, ...] = ()
     # spec 027: the shared timer. A room stored before this spec has no such keys
     # and loads as a timer that was never started.
     timer_started: StrictBool = False  # a letter was typed
@@ -822,8 +828,8 @@ def snapshot_for(
     Returns:
         The snapshot, with the player's own resume token. Its `open_vote` is the
         event that opened the room's open vote, None when no vote is open, its
-        `chat` is the room's whole chat history (spec 022), and its timer is the
-        shared timer of spec 027.
+        `chat` is the room's chat history, its newest MAX_CHAT_HISTORY messages
+        (`social/chat.md` rule 8), and its timer is the shared timer of spec 027.
 
     Raises:
         KeyError: no player `player_id` in the room.
@@ -2695,7 +2701,9 @@ def replay(state: RoomState, entry: LogEntry) -> RoomState:
     elif isinstance(event, FlagChanged):
         replayed = _replay_flag_changed(state, event)
     elif isinstance(event, ChatMessage):
-        replayed = state.model_copy(update={"chat": (*state.chat, event)})
+        replayed = state.model_copy(
+            update={"chat": _with_chat_message(state.chat, event)}
+        )
     else:
         replayed = state
     numbered = replayed.model_copy(update={"seq": event.seq})
@@ -2794,7 +2802,7 @@ def _replay_player_left(state: RoomState, event: PlayerLeft) -> RoomState:
         if player.player_id != event.player_id:
             remaining.append(player)
         elif event.reason == LeaveReason.REMOVED:
-            removed_tokens = (*removed_tokens, player.resume_token)
+            removed_tokens = _with_removed_token(removed_tokens, player.resume_token)
         else:
             past_players = _with_past_player(past_players, _past_record_of(player))
     return state.model_copy(
@@ -2804,6 +2812,28 @@ def _replay_player_left(state: RoomState, event: PlayerLeft) -> RoomState:
             "past_players": past_players,
         }
     )
+
+
+def _with_removed_token(
+    removed_tokens: tuple[ResumeToken, ...], token: ResumeToken
+) -> tuple[ResumeToken, ...]:
+    """Append `token` and keep the newest MAX_REMOVED_TOKENS tokens.
+
+    A room stored with more tokens than the limit comes down to it here.
+    """
+    appended = (*removed_tokens, token)
+    return appended[-MAX_REMOVED_TOKENS:]
+
+
+def _with_chat_message(
+    chat: tuple[ChatMessage, ...], message: ChatMessage
+) -> tuple[ChatMessage, ...]:
+    """Append `message` and keep the newest MAX_CHAT_HISTORY messages.
+
+    A room stored with more messages than the limit comes down to it here.
+    """
+    appended = (*chat, message)
+    return appended[-MAX_CHAT_HISTORY:]
 
 
 def _past_record_of(player: PlayerRecord) -> PastPlayer:

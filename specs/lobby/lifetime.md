@@ -101,15 +101,18 @@ deletes it with all its data.
 
 ### Stored times and migrations
 
-8. The schema's `user_version` is 3: 1 brought the creator column
+8. The schema's `user_version` is 4: 1 brought the creator column
    (`lobby/host.md` rule 11); 2 the solve time, a nullable column of
    `room_times`; 3 the indexes of `room_times` by creation time and by
    creator, which the dashboard's rooms (`admin/operations.md` rule 12) and an
-   erased account's creator rooms (`lobby/host.md` rule 14) read. A store
-   below 3 is migrated once at open, in one transaction: the missing columns
-   are added; below 2, each solved room gets its solve time from its stored
-   state or log, or its last edit time when neither gives one; the missing
-   indexes are created. The rooms' other data stays.
+   erased account's creator rooms (`lobby/host.md` rule 14) read; 4 the two
+   snapshots per room (`platform/server.md` rule 4). A store below 4 is
+   migrated once at open, in one transaction: the missing columns are added;
+   below 2, each solved room gets its solve time from its stored state or log,
+   or its last edit time when neither gives one; the missing indexes are
+   created; each room's snapshots other than its lowest and its highest seq are
+   deleted, by SQL alone, no snapshot read or rewritten. Every other row stays
+   as it was.
 
 ## Acceptance criteria
 
@@ -164,11 +167,11 @@ deletes it with all its data.
   t + 60 h, and an app with accounts off started then deletes it at its first
   sweep.
 - **AC-13** A database at `user_version` 1 holding S, solved at s, and U,
-  unsolved, opens at `user_version` 3 with S's solve time s and none for U,
-  every other row as it was; one at `user_version` 0 opens with the creator
-  column too; a solved room whose stored state and log give no solve time gets
-  its last edit time. With `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS` 24, S is then
-  expired at s + 24 h + 1 s.
+  unsolved, opens at `user_version` 4 with S's solve time s and none for U,
+  every row but a snapshot rule 8 deletes as it was; one at `user_version` 0
+  opens with the creator column too; a solved room whose stored state and log
+  give no solve time gets its last edit time. With
+  `NOCK_ANONYMOUS_SOLVED_ROOM_HOURS` 24, S is then expired at s + 24 h + 1 s.
 - **AC-14** A live room A, last edited at t, looked up at t + its life + 1 s:
   when Ana's letter is committed after the lookup read A's times and before it
   took the registry lock, A is not deleted, Ana's socket stays open, and the
@@ -182,9 +185,15 @@ deletes it with all its data.
   finds none runs one too; a lookup that deletes an expired room runs one of
   its own.
 - **AC-17** A database at `user_version` 2 holding rooms, a creator room among
-  them, opens at `user_version` 3 with every row as it was; there, as in a new
-  database, SQLite's query plan for the rooms created since a time and for the
-  rooms of a creator reads an index of `room_times`, not a scan of the table.
+  them, opens at `user_version` 4 with every row but a snapshot rule 8 deletes
+  as it was; there, as in a new database, SQLite's query plan for the rooms
+  created since a time and for the rooms of a creator reads an index of
+  `room_times`, not a scan of the table.
+- **AC-18** A database at `user_version` 3 holding R, with snapshots at seq 0,
+  100, 200 and 300 and a log to seq 350, the one at 200 holding damaged JSON,
+  and S with its one snapshot, opens at `user_version` 4 with R's snapshots at
+  0 and 300 only and S's, like every other row, as it was; R's latest state
+  and its state at seq 150 then read as they did before the open.
 
 ## Edge cases
 
@@ -200,6 +209,7 @@ deletes it with all its data.
   a secret (AC-8).
 - The creator's erasure deletes its rooms whether expired or not, with no
   second read (`lobby/host.md` rule 14) (`lobby/host.md` AC-15).
+- A room with one or two snapshots loses none at migration 4 (AC-18).
 
 ## Out of scope
 

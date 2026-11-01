@@ -17,6 +17,9 @@ calls and read its answers without timing anything:
   checkpoint, in a test of its own. With the same recorder, the three other writes
   of an erasure (`begin_attempt`, `mark_player_erased`, `count_deleted_room`) run
   none on a file, and still count the attempt, mark the player and count the room.
+  A `save_snapshot` that deletes an older snapshot of its room (`platform/server.md`
+  rule 4) runs none either, on a file, and still leaves the room's first and newest
+  snapshots.
 
 The time bounds of AC-24 and AC-25 are in `test_operations_checkpoint_busy.py`.
 """
@@ -34,6 +37,7 @@ import pytest
 
 import nock.store
 from account_harness import erasure_rows
+from lifetime_harness import select_rows
 from nock.accounts import AccountStore, ErasedPlayer, RoomIdentity
 from nock.grid import Grid
 from nock.room import FORMER_PLAYER_NICKNAME, new_room
@@ -466,6 +470,26 @@ def test_ac23_on_a_file_the_counts_and_marks_of_an_erasure_run_no_checkpoint(
 
     assert checkpoints == 0
     assert effect == write.effect_after
+
+
+def test_ac23_on_a_file_a_snapshot_that_deletes_an_older_one_runs_no_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fx01_grid: Grid
+) -> None:
+    recorder = record_checkpoints(monkeypatch, True)
+    database = tmp_path / "nock.sqlite3"
+    first = new_room(CODE, fx01_grid, T0)
+    saved_seqs = [100, 200, 300]
+
+    with contextlib.closing(RoomStore(database)) as store:
+        store.create_room(first)
+        recorder.calls = 0
+        for seq in saved_seqs:
+            store.save_snapshot(first.model_copy(update={"seq": seq}))
+        checkpoints = recorder.calls
+        stored = select_rows(database, "SELECT seq FROM snapshots ORDER BY seq")
+
+    assert checkpoints == 0
+    assert stored == [(0,), (300,)]
 
 
 def test_ac23_finish_erasure_leaves_the_erasure_done_with_no_address(

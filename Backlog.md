@@ -485,31 +485,57 @@ others, at the top of the list.
 
 ### B-037 Lean snapshots
 
-- Status: brief
+- Status: done
 - Priority: ninth (the disk grows with play, slowly)
-- Waits for: B-035 (both migrate the schema)
-- Domains: platform/server (snapshots), social/catch-up (which snapshots a
-  catch-up needs), lobby/host (the removed tokens)
+- Waits for: nothing (B-035 is merged)
+- Domains: platform/server (snapshots), lobby/host (the removed tokens),
+  lobby/lifetime (migration 4); social/chat if the chat is bounded;
+  social/catch-up keeps its rules (a catch-up replays from the first
+  snapshot)
 - Architecture decision: yes (stored data): options from the Plan agent on
   Fable
-- Branch: feat/b-037-lean-snapshots · PR: none yet
-- Problem: every 100 events a snapshot stores the whole room: the grid with
-  its clues and answers (about 30 KiB), every cell and the whole chat, and no
-  snapshot is ever deleted, though `load_room_at` needs only those a catch-up
-  can still ask for (B-028 M6). `removed_tokens` grows with every removal and
-  goes into every snapshot (L10).
-- In scope: the grid out of the snapshots; the snapshots no catch-up can reach
-  pruned; a bound on `removed_tokens` (lead's proposal: the last 100, as past
-  players). Options for the grid:
-  - A (lead's pick): stored once per room, in a table of its own.
-  - B: by its catalogue number; a room on a bare or withdrawn grid still needs
-    its own copy.
-- Out of scope: the log, append-only (`platform/server.md`).
+- Criteria: server AC-27, AC-28 (new), host AC-17 (new), AC-9 (changed),
+  lifetime AC-18 (new), AC-13, AC-17 (changed), chat AC-21 (new),
+  operations AC-23 (changed)
+- Branch: feat/b-037-lean-snapshots · PR: #79
+- Problem: a snapshot stores the whole room (grid, every cell, the chat, past
+  players, removed tokens) at seq 0, every 100 events, at each task end and at
+  shutdown, and none is ever deleted (B-028 M6). Measured on FX-02: 30 KiB
+  fresh (grid 12, cells 18), 35 KiB mid-game, 77 KiB in a long game. A
+  typical game writes 5 to 8 snapshots (about 75 % of the room's bytes), a
+  long one 60 to 80 (3 to 6 MiB). Only `load_room_at` (the catch-up) reads an
+  old snapshot; the erasure rewrites every one of them, and each holds a copy
+  of nicknames, tokens and chat. `removed_tokens` grows with every removal
+  (L10).
+- Market practice: snapshots are a cache of the log; only the newest is
+  needed to load, any past state is rebuilt by replaying from a kept one
+  (cheap here: 5,000 events in 70 ms); static data is kept once; unbounded
+  collections are bounded.
+- In scope: options.
+  - 1 (lead's pick): keep two snapshots per room, the first and the newest;
+    each save deletes the others in its transaction; a catch-up from before
+    the newest replays the log from the first. `removed_tokens` keeps the last
+    100. Migration 4 deletes the other snapshots in SQL alone, no JSON
+    rewritten. Erasure then rewrites two rows, not up to 80.
+  - 2: 1, plus the grid in a table of its own, once per room. Saves 23 KiB a
+    room once only two snapshots stay; the migration rewrites every room's
+    JSON.
+  - Rejected by the Plan agent: the grid by catalogue number (a re-imported
+    file would change a room's answers), one snapshot per day of play.
+- Out of scope: the log, append-only (`platform/server.md`); writing cells
+  without their default fields (a format change of its own).
 - Screens: none.
 - Open questions:
-  1. Which snapshots stay: A (lead's default) the first and the newest, a
-     catch-up from further back replaying the log from the first; B one per
-     day of play.
+  1. The removed tokens: A (lead's default) the last 100 banned, an older one
+     joins as a new player, as any other token already does
+     (`lobby/host.md` rule 2); B every token kept.
+  2. The chat in a snapshot: A (lead's default) the last 200 lines, the
+     page's own cap (`social/chat.md` rule 8 changes, nothing visible); B all
+     of it.
+- Decisions: the human, 2026-10-31: option 1, the first and the newest
+  snapshots kept; the last 100 removed tokens (1A); the last 200 chat
+  lines in a snapshot (2A). The spec change approved, with the chat
+  bounded in the room's state, not only in the stored snapshot.
 
 ### B-038 Server structure: typed answers and an app factory
 
@@ -1043,7 +1069,7 @@ others, at the top of the list.
   built by the lead)
 - Domains: none (tooling only: `.claude/settings.json`, `CLAUDE.md`)
 - Architecture decision: no
-- Branch: feat/b-053-gate-six-workers · PR: none yet
+- Branch: feat/b-053-gate-six-workers · PR: #78 (merged)
 - Problem: the PC restarted on 2026-10-31 at 22:58, 8 minutes into B-037's
   closing full gate, which had started at 22:50 with 10 workers (B-026's
   number, on a machine with 16 logical CPUs). The same gate, run again with

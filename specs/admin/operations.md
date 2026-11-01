@@ -38,7 +38,11 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
    zeroes deleted rows and, on a file, a checkpoint (rule 20) follows each
    deletion, or each sweep's deletions: once a checkpoint has emptied the WAL,
    none of the deleted room's rows stays in the database file or its WAL, the
-   store open or closed. With accounts on, which share that database,
+   store open or closed. A snapshot that a save deletes (`platform/server.md`
+   rule 4) is zeroed like any deleted row, with no checkpoint of its own: its
+   pages leave the WAL at the next checkpoint, at the latest the next sweep's;
+   what it held stays in the room's newest snapshot and log until the room is
+   deleted. With accounts on, which share that database,
    an account keeps its identity in the room (code, player id, resume token,
    nickname) and its record of a solved room until the account goes, and a
    pending sign-in link its room key until used or expired
@@ -64,7 +68,8 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
     `erase_players_from_history`, `finish_erasure` and `purge`
     (`account/account.md` rules 18, 20, 26), the writes that remove an
     address, a nickname or a player id; no other write of an erasure (an
-    attempt's count, a player's mark, a room's count) runs one.
+    attempt's count, a player's mark, a room's count) runs one, nor does a
+    snapshot's save.
 
 ### Operator token
 
@@ -333,8 +338,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   `purge` each run one checkpoint through `checkpoint_wal`; with it returning
   False each still does its work (the room gone, the nickname `--`, the
   account gone, the erasure done with no address, the old link purged) and
-  returns as usual; `begin_attempt`, `mark_player_erased` and
-  `count_deleted_room` run none. On an in-memory store none runs.
+  returns as usual; `begin_attempt`, `mark_player_erased`,
+  `count_deleted_room` and a `save_snapshot` that deletes an older snapshot
+  run none. On an in-memory store none runs.
 - **AC-24** Room A, with the chat `chat-busy-6610`, expires and a lookup
   deletes it while a second connection to the file holds a read open: the
   lookup returns within 1 second, A's code is then unknown, one WARNING is

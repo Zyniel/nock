@@ -127,7 +127,7 @@ LOOKUPS = {
 }
 
 
-def test_ac17_a_version_2_database_opens_at_version_3_with_every_row_as_it_was(
+def test_ac17_a_version_2_database_opens_at_version_4_with_every_row_as_it_was(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "nock.sqlite3"
@@ -136,7 +136,7 @@ def test_ac17_a_version_2_database_opens_at_version_3_with_every_row_as_it_was(
 
     RoomStore(path).close()
 
-    assert schema_version(path) == 3
+    assert schema_version(path) == 4
     assert table_rows(path) == before
     assert stored_solve_time(path, SOLVED_ROOM) == HAND_SET_SOLVE_TIME
     assert len(before["room_times"]) == len(CREATED_ROOMS) + 1

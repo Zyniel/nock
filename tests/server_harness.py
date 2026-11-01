@@ -12,14 +12,17 @@ tests are in `tests/test_server_*.py`:
   own (`SERIAL_TEST_FILES`).
 - `test_server_socket_loads.py`: AC-26, the store reads of a socket's lookup
   (`CountingStore`).
+- `test_server_snapshots.py`: AC-27 and AC-28, the two snapshots a room keeps and
+  the catch-up that does not depend on the snapshots saved since. Ana types
+  through `type_letters`; the snapshots are read with `snapshot_seqs`.
 
 A room is live when `RoomRegistry.live_codes()` holds its code. `state_of` (and
 every `room_state` lookup) loads a room and so makes it live: a test that reads
 whether a room is live reads the room with `peek_room` or from the store, never
 with `state_of`, before it has asked.
 
-The store's latest snapshot is read from the database file with a connection of
-its own (`snapshots` has one row per saved seq).
+The store's snapshots are read from the database file with a connection of their
+own (`snapshots` has one row per saved seq).
 """
 
 from __future__ import annotations
@@ -35,15 +38,33 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from nock.catalogue import Catalogue
+from nock.grid import Grid
 from nock.hub import RoomConnection, RoomRegistry
+from nock.protocol import EditLetter, LetterChanged
 from nock.room import RoomConfig, RoomState
 from nock.server import create_app
 from nock.store import RoomStore
+from spec014_harness import Peer
+from spec018_harness import letter_cells
 from spec033_harness import wait_for
 
 SNAPSHOT_FAILURE_PAUSE_SECONDS = 0.3
 HOLD_LIMIT_SECONDS = 10.0
 CONNECT_DELAY_SECONDS = 1.0
+TYPING_LIMIT_SECONDS = 30.0
+TYPING_BATCH = 10
+
+# The rooms of the typing tests: the fake clock never moves, so the edit limit of a
+# second never opens again; nobody is timed out by silence or idleness.
+TYPING_CONFIG = RoomConfig(
+    tick_seconds=0.05,
+    idle_after_seconds=1e9,
+    silence_timeout_seconds=1e9,
+    max_edits_per_second=10_000,
+)
+# The letters typed in turn. No answer of FX-01 holds one of them, so the grid is
+# never solved, and two edits of one cell in a row always differ.
+TYPED_LETTERS = "QXZ"
 
 
 @contextlib.contextmanager
@@ -88,6 +109,76 @@ def latest_snapshot_seq(database_path: Path, code: str) -> int:
     assert row is not None, f"no snapshot of {code}"
     assert row[0] is not None, f"no snapshot of {code}"
     return int(row[0])
+
+
+def snapshot_seqs(database_path: Path, code: str) -> list[int]:
+    """The seq of every snapshot of the room, lowest first, read from the file."""
+    connection = sqlite3.connect(database_path)
+    try:
+        rows = connection.execute(
+            "SELECT seq FROM snapshots WHERE code = ? ORDER BY seq", (code,)
+        ).fetchall()
+    finally:
+        connection.close()
+    seqs: list[int] = []
+    for (seq,) in rows:
+        seqs.append(int(seq))
+    return seqs
+
+
+def insert_stored_snapshot(database_path: Path, state: RoomState) -> None:
+    """Write `state` as a snapshot row of the file, by hand, as it is.
+
+    The row is the JSON of the whole state, as a store wrote it before any bound
+    on what a snapshot holds: no rule of the store touches it on the way in. The
+    room must exist in the file and have no snapshot at `state.seq`.
+    """
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute(
+            "INSERT INTO snapshots (code, seq, state_json) VALUES (?, ?, ?)",
+            (state.code, state.seq, state.model_dump_json()),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def type_letters(ana: Peer, grid: Grid, count: int) -> dict[tuple[int, int], str]:
+    """Send `count` letters from `ana`, cell after cell, and wait until all are made.
+
+    Cell number k mod n gets, at round k div n, the letter `TYPED_LETTERS[round mod
+    3]`, where n is the number of letter cells of the grid: every message changes
+    its cell, so each one is a `letter_changed` of the room's log. The letters go
+    `TYPING_BATCH` at a time, each batch applied before the next is sent, since a
+    client that sends faster than the room applies is closed as flooding.
+
+    Returns:
+        The letter each typed cell ends with.
+    """
+    cells = letter_cells(grid)
+    letters: dict[tuple[int, int], str] = {}
+    for number in range(count):
+        row, column = cells[number % len(cells)]
+        letter = TYPED_LETTERS[(number // len(cells)) % len(TYPED_LETTERS)]
+        ana.send(EditLetter(row=row, column=column, letter=letter))
+        letters[(row, column)] = letter
+        if (number + 1) % TYPING_BATCH == 0 or number + 1 == count:
+            wait_for_letters(ana, number + 1)
+    return letters
+
+
+def wait_for_letters(ana: Peer, count: int) -> None:
+    """Wait until `ana` received `count` `letter_changed` events since her snapshot."""
+
+    def all_made() -> bool:
+        made = 0
+        for message in ana.events():
+            if isinstance(message, LetterChanged):
+                made += 1
+        return made >= count
+
+    ana.wait_until(all_made, f"{count} letters made", TYPING_LIMIT_SECONDS)
 
 
 def last_logged_seq(store: RoomStore, code: str) -> int:
