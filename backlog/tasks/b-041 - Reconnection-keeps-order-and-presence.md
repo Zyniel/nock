@@ -80,7 +80,7 @@ ordinal: 2000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -101,6 +101,8 @@ Lead's decisions in the spec change: an undo, check or reveal made between edits
 Tests: the kept select_cell counts as the first paced send after the snapshot (sent at once, the edits and kept requests then at the 100 ms pace); no test depends on it.
 
 Implementation: requests queued behind a resend that a new loss interrupts are kept again for the next snapshot (the spec does not cover it; the other option dropped them). Requests already sent on a socket that then drops are not resent. The select_cell is sent only after a loss; the first snapshot restores the saved selection as before.
+
+Pull request: https://github.com/Zyniel/nock/pull/86
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
