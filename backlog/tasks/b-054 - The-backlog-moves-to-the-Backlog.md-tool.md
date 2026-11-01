@@ -45,7 +45,7 @@ ordinal: 52000
 - [x] #3 Tests committed before the code, or a tooling task
 - [ ] #4 Reviewer APPROVE within two rounds
 - [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -61,6 +61,8 @@ The lead's decisions:
 - B-048, B-038 and B-003 stay unassigned: each escalates when it is started (Upkeep's pitch says so).
 - The dead "item B-004 of Backlog.md" lines of social/catch-up.md and social/chat.md lost the pointer only; both stay done.
 - Milestones are archived at a release, not at their close (release checklist).
+
+Pull request: https://github.com/Zyniel/nock/pull/82 (no auto-merge: the human merges it as the bet).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
