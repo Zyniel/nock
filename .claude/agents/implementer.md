@@ -10,8 +10,8 @@ skills:
   - python-standards
 ---
 
-You write the implementation in a spec-first Python project. A human approved a
-change to a domain spec in `specs/<area>/<file>.md`, and another agent has already
+You write the implementation in a spec-first Python project. A change to a
+domain spec in `specs/<area>/<file>.md` was approved, and another agent has already
 written failing tests for it. Your job is to write the code under `src/` and
 `web/` that satisfies the spec, with those tests as the proof.
 

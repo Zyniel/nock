@@ -36,7 +36,7 @@ that is not drawn.
 
 Labels on the sheet: a grey label cites the design file and section
 (« pages · Catalogue ») or the spec a screen follows; a dashed label marks what is
-still pending (none today), with an item in `Backlog.md`. The page is static: no
+still pending (none today), with a task in `backlog/`. The page is static: no
 script, the width switch is CSS. Fonts are the app's own @fontsource files once the
 web client's packages are installed, else a local copy, else the fallback stack;
 never Google.

@@ -295,8 +295,8 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 
 - Editing messages, private messages, older history on demand; flagging a
   cell or several clues.
-- A live « word completed » line: an approved later change, item B-004 of
-  `Backlog.md`; today only a catch-up shows one (`social/catch-up.md`).
+- A live « word completed » line: only a catch-up shows one
+  (`social/catch-up.md`).
 - « Salon », its tabs and dot, the 3-second notes (messages, flags, my own
   reaction): `client/room.md`. Who may mute: `lobby/host.md`. Edit limits:
   `platform/realtime.md`.

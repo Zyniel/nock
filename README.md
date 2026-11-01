@@ -2,8 +2,9 @@
 
 Nock is an online collaborative arrowword (mots fléchés) game, named after the
 notch at the back of an arrow. It is a spec-first Python project where a small
-team of Claude Code agents does the building: you approve a brief and a spec
-change, and the agents write the tests, then the code, then review it.
+team of Claude Code agents does the building: you bet on milestones and cut
+releases, and the agents write the specs, the tests, then the code, then review
+it.
 `CLAUDE.md` is the short version the agents read; this file is for you.
 
 ## 1. One-time setup (Windows, PowerShell)
@@ -171,31 +172,37 @@ clue, and `/g/<number>` opens a grid.
 
 ## 3. Building a feature
 
-The work queue is `Backlog.md`: one item per change, moving through `brief`,
-`approved`, `ready`, `building` and `done`. The behaviour lives in the domain
-specs, `specs/<area>/<file>.md`; `specs/_map.md` lists them and explains how they
-work. Inside `claude`, in this folder:
+The work queue is `backlog/`, kept with the Backlog.md CLI
+(`npm i -g backlog.md@1.55.3`): milestones, tasks (`B-NNN`, one per change,
+`To Do`, `In Progress` or `Done`) and drafts (ideas nothing is built from).
+`backlog browser` shows it as a board. The behaviour lives in the domain specs,
+`specs/<area>/<file>.md`; `specs/_map.md` lists them and explains how they work.
+You decide milestones, releases and the few questions the lead escalates; the
+doc "How you steer Nock" (`backlog doc list`) says how. Inside `claude`, in this
+folder:
 
-1. **Write the brief.** `/new-spec` followed by the feature or change in plain
-   words. The lead claims the item's number, branch and worktree
-   (`scripts/claim_item.py`), writes a brief in `Backlog.md` (`B-NNN`) and waits
-   for you. Approve it, or correct it.
-2. **Approve the spec change.** The spec-writer changes the domain specs of the
-   item (and, for a change of look, `specs/_design/` and `docs/design/`) and
-   lists its open questions. Read the change, fix what is wrong, then tell Claude
-   it is approved: the item becomes `ready`. Nothing gets built from a draft.
-3. **Build it.** `/feature B-NNN`. The lead works on a `feat/b-NNN-...` branch,
-   runs three agents in order and commits after each one:
+1. **Bet on a milestone.** `/milestone` followed by the feature in plain words.
+   The lead opens a `backlog: milestone <name>` pull request: the pitch
+   (problem, size in tasks, scope, look, risks, questions) and its tasks. Merge
+   it to bet, comment to reshape it, or close it to drop it.
+2. **Let it build.** `continue`, or `/feature B-NNN`. For each task the lead
+   works on a `feat/b-NNN-...` branch (`scripts/start_item.py`), runs the agents
+   in order and commits after each one:
 
    | Phase | Agent | Result | Blocked until |
    | --- | --- | --- | --- |
+   | Spec | spec-writer, then spec-checker | the domain specs (and, for a change of look, `specs/_design/` and `docs/design/`) | the spec-checker answers `APPROVED` |
    | Tests | test-writer | `tests/test_<name>_*.py` of the domain (`co-op` gives `test_co_op_*`), failing | lint is clean and every AC has a test |
    | Code | implementer | code under `src/nock/` and `web/` | the quick gate passes |
-   | Review | reviewer | `APPROVE` or `CHANGES REQUESTED` | read-only, reports to you |
+   | Review | reviewer | `APPROVE` or `CHANGES REQUESTED` | two rounds at most |
 
-4. **Publish it.** Claude stops before pushing. You run
-   `git push -u origin <branch>` and `gh pr create --fill`; GitHub Actions then
-   runs the same gate.
+   Then the lead pushes the branch and opens the pull request with auto-merge:
+   GitHub Actions runs the gate and merges it once it passes. A task that needs
+   you (a product, money, architecture or dependency question, or a task still
+   failing review after two rounds) is assigned to you instead:
+   `backlog task list -a @zyniel --plain` is your inbox.
+3. **Accept it.** Once the milestone's tasks are merged, the lead opens a
+   `backlog: close <name>` pull request with the verdict. Merge it to accept.
 
 `specs/_archive/v1.1.0/` holds the numbered specs (`002-...` to `048-...`), the
 build record of v1.1.0; they are never edited again, and the domain specs point
@@ -232,8 +239,8 @@ Then decide who uses it:
   `.claude/agents/implementer.md`).
 
 The kit ships three skills: `python-standards` (the coding rules, preloaded into
-the test-writer, implementer and reviewer), `new-spec` and `feature` (the two
-commands above). The four roles are in `.claude/agents/`.
+the test-writer, implementer and reviewer), `milestone`, `task` and `feature`
+(the commands above). The five roles are in `.claude/agents/`.
 
 ### Running the server with a database
 
@@ -489,8 +496,8 @@ usage.
 To use it:
 
 1. In `.claude/settings.json`, set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` to `"1"`.
-2. In the item's brief in `Backlog.md`, split the work so each implementer owns
-   different files.
+2. In the task's description (`backlog task edit B-NNN -d "..."`), split the
+   work so each implementer owns different files.
 3. Run `/feature B-NNN team`.
 
 Known limits of teams today: they need an interactive session, resuming a session

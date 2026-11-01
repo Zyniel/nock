@@ -212,8 +212,7 @@ players (seq 22).
   or presence, a seen seq shared by an account's devices, a catch-up over the
   WebSocket.
 - A live word-completed line: live play adds none, so only a catch-up shows
-  one. It is a later change already approved, item B-004 of `Backlog.md`, owned
-  by `social/chat.md`.
+  one. `social/chat.md` would own it.
 - Resume and seat back: `lobby/joining.md`. The stream, its live lines and their
   texts: `social/chat.md`. The « Salon » dot and 3-second notes:
   `client/room.md`. Reconnection and the log: `platform/realtime.md`,
