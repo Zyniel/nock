@@ -25,9 +25,11 @@ Readings where the spec leaves room:
   Tab walk would reach it, and then Tab is pressed.
 - The edge case of the Salon sheet is engine neutral, since an engine moves the
   focus to the browser's own controls, or to the page's start, or leaves it where
-  it is. After each Tab on the last control, the sheet is open exactly when the
-  focus is inside it or on no element (`body`); the focus is read until that
-  holds, and the Tab goes on while the focus is on no element.
+  it is. Tab is pressed up to four times from the sheet's last control. After a
+  Tab, the sheet is open when the focus is inside it or on no element. A Tab
+  pressed with the focus on an element of the page, that puts the focus on an
+  element outside the sheet, closes it. A Tab pressed from no element (it comes
+  from the browser's own controls) is not asserted: the page sees no key for it.
 - A drag is `mouse.down` at one point, `mouse.move` and `mouse.up` at another.
   "The backdrop" at 1280 by 720 is left of the centred sheet; "the sheet" is its
   heading. "Closes nothing" is read 300 ms after the release.
@@ -133,11 +135,9 @@ def salon_focus(page: Page) -> dict[str, bool]:
     return found
 
 
-def salon_matches_focus(page: Page) -> bool:
-    """Whether the Salon is open exactly when the focus is in it or on no element."""
-    state = salon_focus(page)
-    focus_keeps_it = state["onNothing"] or state["inSalon"]
-    return state["isOpen"] == focus_keeps_it
+def salon_is_open(page: Page) -> bool:
+    """Whether the Salon has no `hidden` attribute."""
+    return bool(salon_focus(page)["isOpen"])
 
 
 # ---- AC-23: the Aide menu and the Menu --------------------------------------------
@@ -241,19 +241,18 @@ def test_ac24_tab_out_of_the_page_closes_nothing_until_the_focus_is_in_the_page(
     salon.evaluate(FOCUS_LAST_CONTROL_SCRIPT)
     assert salon_focus(page)["inSalon"]
 
+    focus_was_on_an_element = True
     for _ in range(SALON_PRESSES):
         page.keyboard.press("Tab")
-        wait_until(
-            page,
-            lambda: salon_matches_focus(page),
-            "the Salon open exactly while the focus is in it or on no element",
-        )
+        page.wait_for_timeout(QUIET_MS)
         state = salon_focus(page)
-        if not state["onNothing"]:
-            break
-
-    final = salon_focus(page)
-    assert final["isOpen"] == final["inSalon"], final
+        if state["onNothing"] or state["inSalon"]:
+            assert state["isOpen"], state
+        elif focus_was_on_an_element:
+            wait_until(
+                page, lambda: not salon_is_open(page), "the Salon closed by the Tab"
+            )
+        focus_was_on_an_element = not state["onNothing"]
 
 
 # ---- AC-25: the host's settings and the backdrop ----------------------------------

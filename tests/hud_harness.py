@@ -12,7 +12,7 @@ spec 042's box and pixel readers, spec 046's content box and button colours, and
 spec 047's checks of the recap's frame, which the dialog shares.
 
 For AC-23 to AC-25 (`test_hud_overlay_focus.py`), and for the tests of
-`lobby/host.md` AC-18 to AC-20, `gameplay/hints.md` AC-24 and `account/account.md`
+`lobby/host.md` AC-18 to AC-20, `gameplay/hints.md` AC-25 and `account/account.md`
 AC-34, which share them: the host's sheet on a mocked room (`open_host_sheet`),
 the `host_changed` frame, and a press at one point released at another
 (`press_and_release`), the way a drag between a sheet and its backdrop reads.
