@@ -3,7 +3,7 @@
 #
 # Installs what the quality gate needs, so that the linters and every test,
 # including the browser tests in Chromium, Firefox and WebKit (the engines CI
-# runs), work from the first prompt.
+# runs), work from the first prompt; and the backlog's CLI.
 #
 # Idempotent: each step skips work that is already done, and the container is
 # cached after this hook, so later sessions start fast. A failed step does not
@@ -42,6 +42,13 @@ if [ ! -f web/node_modules/.package-lock.json ] ||
   run_step "npm --prefix web ci" npm --prefix web ci
 fi
 
+# The backlog's CLI, pinned (human decision, 2026-11-01): its commands change
+# between versions. A 130 MB binary, installed once per container.
+backlog_version="1.55.3"
+if [ "$(backlog --version 2>/dev/null)" != "$backlog_version" ]; then
+  run_step "backlog.md" npm install --global "backlog.md@$backlog_version"
+fi
+
 # Browsers for the browser tests. Builds already installed are skipped.
 run_step "playwright install" \
   uv run playwright install chromium firefox webkit
@@ -67,5 +74,6 @@ if [ "${#failed_steps[@]}" -gt 0 ]; then
   echo "Session setup incomplete, failed: ${failed_steps[*]}. Log: $log_file"
   exit 0
 fi
-echo "Session setup done: Python and web dependencies, Playwright" \
+echo "Session setup done: Python and web dependencies, backlog.md" \
+  "$backlog_version, Playwright" \
   "${playwright_version:-?} browsers (chromium, firefox, webkit), CI's fonts."

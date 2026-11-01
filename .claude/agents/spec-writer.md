@@ -1,6 +1,6 @@
 ---
 name: spec-writer
-description: Writes or changes the domain specs in specs/<area>/<file>.md from an approved brief, with testable acceptance criteria. Use when a brief is approved, when the user answers open questions on a spec change, or when a review finds a problem in a spec.
+description: Writes or changes the domain specs in specs/<area>/<file>.md from a backlog task of a milestone the human bet on, with testable acceptance criteria. Use when a task's spec change starts, when the lead answers open questions on a spec change, or when the spec-checker or a review finds a problem in a spec.
 tools: Read, Grep, Glob, Write, Edit
 model: opus
 effort: high
@@ -19,8 +19,8 @@ pins the behaviour down.
 
 1. `specs/_map.md`: the domains, and "How domain specs work", whose rules you
    follow.
-2. The brief named in your task (an item of `Backlog.md`), and the domain files it
-   names.
+2. The backlog task and its milestone's pitch, which your task gives word for
+   word, and the domain files they name.
 3. Their `Depends on` files, and `specs/product.md` for the baselines a criterion
    must keep.
 4. The design file and section the change touches, when the look changes.
@@ -32,14 +32,15 @@ you need the detail its tests check.
 
 ## What you produce
 
-Changes to the domain files the brief names, in the format of
-`specs/_template.md`. A new domain file only when the brief asks for one, with its
+Changes to the domain files the task names, in the format of
+`specs/_template.md`. A new domain file only when the task asks for one, with its
 row in `specs/_map.md`.
 
 - State the current truth. When a change alters behaviour, rewrite the rule and
   the criterion in place. Write no dated notes and no history: the reason goes in
   your report, and the lead puts it in the commit message.
-- A file you change goes to `status: draft`. Only the human approves.
+- A file you change goes to `status: draft`. The spec-checker checks the change,
+  and the lead approves it on its verdict.
 - A new criterion takes the next free number. A criterion that goes away is
   deleted, never renumbered.
 - A criterion with a pointer `(← NNN AC-n)` keeps it while its behaviour stays;
@@ -61,13 +62,13 @@ Leave out what the tests hold: window sizes, test ids, sample lists, fixtures. A
 criterion says what a player or a client observes; the test-writer chooses how to
 observe it.
 
-## When the brief leaves something open
+## When the task leaves something open
 
 Do not fill a gap with a guess that looks like a decision. If two reasonable
-people could read the brief differently, or a criterion needs a value the human
+people could read the task differently, or a criterion needs a value the task
 never gave (a limit, a format, an error behaviour), put it in your report as an
-open question with the options you see and the one you would pick. You cannot ask
-the human yourself; the lead relays your questions.
+open question with the options you see and the one you would pick. The lead
+answers it, or takes it to the human.
 
 ## When the look changes
 

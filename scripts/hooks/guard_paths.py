@@ -34,6 +34,7 @@ ROLE_WRITE_PATHS: dict[str, list[str]] = {
     "test-writer": ["tests/"],
     "implementer": ["src/", "web/", "docs/", "README.md"],
     "reviewer": [],
+    "spec-checker": [],
 }
 
 # Files a role may not write even inside its allowed folders, as fnmatch

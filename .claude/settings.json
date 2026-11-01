@@ -19,7 +19,8 @@
       "Bash(git branch *)",
       "Bash(git switch *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(backlog *)"
     ],
     "deny": [
       "Bash(git push --force *)",

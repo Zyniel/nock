@@ -31,7 +31,7 @@ tests/
 specs/
 docs/
 scripts/
-Backlog.md
+backlog/
 CLAUDE.md
 
 # The deployment files themselves

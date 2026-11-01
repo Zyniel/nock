@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   # Which gate jobs a pull request needs, from the files it changes. A file
-  # that no check and no test reads needs none: the backlog, CLAUDE.md,
+  # that no check and no test reads needs none: backlog/, CLAUDE.md,
   # claude_docs/, .claude/ (agents, skills, session settings and hooks),
   # docs/ outside docs/design/, and the container files. A file that only the
   # static job reads skips the browser jobs: specs/ (spec traceability),
@@ -46,7 +46,10 @@ jobs:
           static=true
           browsers=true
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            changed_files=$(git diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA")
+            # Paths as written: a quoted one ("backlog/drafts/... \302\253 ...")
+            # would match no pattern below and run every job.
+            changed_files=$(git -c core.quotePath=false diff --name-only \
+              --no-renames "$BASE_SHA...$HEAD_SHA")
             echo "$changed_files"
             if [ -n "$changed_files" ]; then
               static=false
@@ -60,7 +63,7 @@ jobs:
                     static=true
                     browsers=true
                     ;;
-                  Backlog.md | CLAUDE.md | claude_docs/* | .claude/* | docs/* | \
+                  backlog/* | CLAUDE.md | claude_docs/* | .claude/* | docs/* | \
                   Dockerfile | .dockerignore | compose.yaml | compose.*.yaml | \
                   Caddyfile | .env.*.example)
                     ;;

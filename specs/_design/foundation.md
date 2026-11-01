@@ -44,7 +44,7 @@ Rules:
    « a rejoint le salon »; « 31 / 48 mots » on a FX-01-sized grid), the string
    wins.
 7. The sheets draw the decided design. Something not yet decided carries a dashed
-   label in the screens sheet and an item in `Backlog.md` until the human decides
+   label in the screens sheet and a task in `backlog/` until the human decides
    it.
 
 Where the cell sheet differs, these files win: its `--clue-ink` is

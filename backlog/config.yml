@@ -2,7 +2,7 @@ project_name: "Nock"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 labels: ["domain:product", "domain:account", "domain:rooms", "domain:host", "domain:joining", "domain:lifetime", "domain:board", "domain:co-op", "domain:rules", "domain:hints", "domain:results", "domain:modes", "domain:presence", "domain:chat", "domain:catch-up", "domain:grids", "domain:grid-files", "domain:library", "domain:operations", "domain:overrides", "domain:realtime", "domain:server", "domain:serving", "domain:shell", "domain:hud", "domain:room", "tooling", "follow-up", "idea"]
-definition_of_done: ["Spec change APPROVED by the spec-checker, or no spec change", "Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look", "Tests committed before the code", "Reviewer APPROVE within two rounds", "Full gate green", "Pull request open with auto-merge on, or assigned to @zyniel"]
+definition_of_done: ["Spec change APPROVED by the spec-checker, or no spec change", "Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look", "Tests committed before the code, or a tooling task", "Reviewer APPROVE within two rounds", "Full gate green", "Pull request open with auto-merge on, or left to the human to merge"]
 date_format: yyyy-mm-dd
 max_column_width: 20
 auto_open_browser: false

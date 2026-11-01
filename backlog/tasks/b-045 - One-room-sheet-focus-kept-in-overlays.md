@@ -64,8 +64,8 @@ ordinal: 6000
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
 - [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code
+- [ ] #3 Tests committed before the code, or a tooling task
 - [ ] #4 Reviewer APPROVE within two rounds
 - [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
+- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->

@@ -78,8 +78,8 @@ then nothing of race or teams is built.
   `docs/design/`.
 - `_template.md`: the format of a domain spec.
 - `_archive/v1.1.0/`: the numbered specs once their domains are written.
-- `Backlog.md`, at the repository root: the work queue (briefs, the status of
-  each change, the release checklist).
+- `backlog/`, at the repository root: the work queue, kept with the Backlog.md
+  CLI (milestones, tasks and their status, drafts, the release checklist).
 
 ## How domain specs work
 
@@ -94,11 +94,13 @@ then nothing of race or teams is built.
 ### Status
 
 - `draft`: being written or changed, not approved yet.
-- `approved`: the human approved the file or its last change. Only the human
-  approves; the lead writes the status line on their word. Criteria without a
-  test are reported as pending, not failed: the change is not built yet.
+- `approved`: the spec-checker approved the file or its last change, inside a
+  milestone the human bet on; the lead writes the status line on its APPROVED.
+  Criteria without a test are reported as pending, not failed: the change is
+  not built yet.
 - `done`: built. Every criterion is proven by a test, or the gate fails.
-- A change to a `done` file makes it `draft` again until the human approves it.
+- A change to a `done` file makes it `draft` again until the spec-checker
+  approves it.
 
 ### Criteria and their tests
 
