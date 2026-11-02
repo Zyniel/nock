@@ -1,10 +1,10 @@
 ---
 id: B-059
 title: The room summaries leave `lobby/joining.md`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T01:20:00Z'
+updated_date: '2026-11-02T11:58:00Z'
 labels:
   - domain:joining
   - domain:summaries
@@ -42,8 +42,18 @@ ordinal: 14000
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: lobby/joining.md → lobby/summaries.md (new), gameplay/results.md citations, product.md's routes cell, specs/_map.md; joining's realtime rule 20 citation → reconnection rule 5.
+2. Tests: the joining tests of AC-17 to AC-19 → tests/test_summaries_*.py, renamed to the new numbers.
+3. Quick gate: uv run python scripts/gate.py --specs joining,summaries,results --browsers chromium
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Human (2026-11-02, chat, on the pitch's question): A. B-059 updates the one cell of specs/product.md's routes table that names the owner of POST /api/rooms/summaries, from lobby/joining.md to lobby/summaries.md; no behaviour change.
+
+Lead (2026-11-02): started after B-062 (#102, which also changed joining.md rule 3) merged. Spec-writer on Fable at high (new domain). product.md's routes cell for POST /api/rooms/summaries names summaries (the pitch's option A, taken with the pitch's merge). joining.md:102's realtime rule 20 → reconnection rule 5 (B-057's map). Base: origin/main 75c4263.
 <!-- SECTION:NOTES:END -->
