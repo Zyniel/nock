@@ -222,6 +222,10 @@ model price.
   failure outside its files (a stale test, for the implementer) says so in its
   report and finishes again without changing anything; the hook then lets it
   stop.
+- A client component that four domains or more name in their Code section is
+  listed with them in `SHARED_COMPONENT_DOMAINS` (`scripts/gate.py`, kept
+  equal to the specs by a static check): when the branch changed it, the quick
+  gate and the role hook add those domains to `--specs`.
 - CI runs on Ubuntu: Chromium on each pull request, plus Firefox and WebKit after
   a merge into `main` or when started by hand. It runs only the gate jobs the
   changed files can affect. There is no Windows job.
