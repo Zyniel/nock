@@ -1,10 +1,10 @@
 ---
 id: B-048
 title: Unit tests for the client's pure modules
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T09:59:00Z'
+updated_date: '2026-11-02T10:39:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -50,11 +50,11 @@ ordinal: 9000
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -72,4 +72,20 @@ ordinal: 9000
 Human (2026-11-02, chat): take B-048 with option A, Node's own node:test (no new dependency), to unblock B-049 and with it « Grid and room screens ». Open questions 1 and 2 take the lead's defaults: the tests in tests/web/, written by the test-writer; they prove no criterion.
 
 Lead (2026-11-02): the human's option A, node:test; tests in tests/web/ by the test-writer; they prove no criterion. Base: origin/main 4005dc3 merged into the stale branch.
+
+Lead: design from the Plan agent (Fable, high), option 1 of 3: the hook in scripts/ (tooling the human owns; a hook in web/ would be the implementer's), the step with the static group of the full stage rather than a third --tests kind (TEST_SELECTIONS are pytest selections), a dedicated web/tsconfig.tests.json (node types kept out of the app's config). No new CI job: the static job runs it; tests/web/* is static-only in the change detection. erasableSyntaxOnly added to tsconfig.app.json so the app refuses syntax Node cannot strip (none exists today). Local PATH node is v22.23 (fine: 22.18+); CI is lts/*.
+Lead: review round 1 CHANGES REQUESTED (the version check never ran on a Node without registerHooks; suggestions: the tests' tsconfig stricter than the app's, the hook's limits undocumented), all taken in 114e139; round 2 APPROVE, its wording suggestion taken. The full gate ran green at 21e0d86; after the review fixes, which touch only the hook and the tests' tsconfig, the gate without browser tests ran green.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Node's own node:test now runs TypeScript unit tests of the client's pure modules, tests/web/*.test.ts, with no new dependency (the human's option A).
+- scripts/node_test_hooks.mjs: resolve hook for the imports Vite allows and Node does not (extensionless relative .ts, JSON without its attribute); a version guard (Node 22.18+ with type stripping).
+- scripts/gate.py: step 'node:test (web unit tests)' in the full stage with the static group; left out by --skip-static and --tests browser; the node_modules check covers it.
+- CI: the static job runs it; tests/web/* is static-only in the change detection. No new job.
+- web/tsconfig.tests.json + npm run check type-check the tests; tsconfig.app.json gains erasableSyntaxOnly.
+- Docs: CLAUDE.md (command, quality gate), .claude/agents/test-writer.md (where such tests go; they prove no criterion).
+- Smoke test: tests/web/ops.test.ts, cellStatesAtStep (3 tests), through both hook branches. The reviewer loaded all ten named modules under the hook.
+Criteria: none (tooling). Reviewer: CHANGES REQUESTED round 1, APPROVE round 2. Full gate green (8674 + 162) at 21e0d86; gate without browser tests green after the fixes. Not verified: Windows, Node before 22.15.
+<!-- SECTION:FINAL_SUMMARY:END -->
