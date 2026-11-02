@@ -1,17 +1,17 @@
 ---
 area: gameplay
 file: hints
-status: done
+status: approved
 ---
 
-# gameplay/hints - Check, reveal and the vote on help
+# gameplay/hints - Check and reveal
 
 ## Purpose
 
 A stuck group can check its letters or reveal the right ones. The server decides
-and the whole room sees the result, within the limits the host sets: a help mode,
-a reveal budget and, in vote mode, a majority of the players. Each player may
-ask only a few times in a short while.
+and the whole room sees the result, within the limits the host sets: a help mode
+and a reveal budget; in vote mode, the group agrees first (`gameplay/votes.md`).
+Each player may ask only a few times in a short while.
 
 ## Depends on
 
@@ -27,8 +27,9 @@ ask only a few times in a short while.
 1. A room's help mode is `free` (a new room), `vote` or `none`, set by the host
    from the room's first snapshot. `free`: every check and reveal applies at
    once. `vote`: a check of a letter or a word applies at once; a check of the
-   grid and every reveal need a vote (rule 14). `none`: every check and reveal is
-   refused, and no page shows the « Vérifier » and « Révéler » groups.
+   grid and every reveal need a vote (`gameplay/votes.md`). `none`: every check
+   and reveal is refused, and no page shows the « Vérifier » and « Révéler »
+   groups.
 
 ### Requests
 
@@ -98,7 +99,7 @@ ask only a few times in a short while.
     clue or the grid, and closes the menu; it moves no selection and guesses no
     result. The request goes after the edits pending when it was made and
     before any later one: kept while the page is not joined, queued behind a
-    resend (`platform/realtime.md` rules 20 and 22). An error answering it
+    resend (`platform/reconnection.md` rules 5 and 7). An error answering it
     changes nothing on the page.
 12. Disabled: « Vérifier » letter or word while nothing is selected; « Révéler »
     letter while nothing is selected, the cell is locked or no letter is left;
@@ -110,59 +111,10 @@ ask only a few times in a short while.
     `a11y.revealed`; a cell locked by a check has neither. A flash on the cell
     (`gameplay/co-op.md`) keeps its whole time.
 
-### Votes
-
-14. After rule 2's steps, a request that needs a vote is refused
-    `vote_in_progress` while a vote is open, and applies at once when its sender
-    is the only connected player. Otherwise it opens a vote and changes nothing
-    else: one `vote_opened` (next vote id, requester, request, 20 seconds, number
-    of eligible voters), which adds no stream line. The eligible voters are the
-    players not disconnected when it opens (idle ones count), the requester being
-    a yes. The set never changes: a later joiner is not eligible, and a voter who
-    leaves or is removed keeps their ballot.
-15. A ballot on no open vote, or on another id, gets `no_open_vote`; one from a
-    player who is not eligible, or has voted, is ignored without reply. The vote
-    passes once the yes are more than half of the eligible voters, and is
-    rejected once that cannot happen: 2 voters need 2 yes, 3 need 2, 4 need 3.
-16. A vote that passes runs its request again through rule 2's steps: refused,
-    it closes `rejected` and nothing else happens; else `vote_closed`
-    (`passed`) comes first, then the request's entries in the requester's name.
-17. A vote expires 20 seconds after it opened: the room's tick, the next
-    ballot, or the next check or reveal not dropped (closing it first), closes
-    it `timed_out`. A vote that does not pass changes no cell and no budget.
-18. Snapshots carry the open vote. Ballots are not logged: after a server
-    restart an open vote keeps its id, request, opening time and voters, and only
-    the requester's yes.
-
-### The vote banner
-
-19. Every page shows the banner while a vote is open and the grid is not solved,
-    before the grid in document order; a vote on any request but a grid check or
-    a reveal shows none. It holds `vote.question.<kind>` with the
-    requester's name (« Quelqu'un » when unknown), as text; then « Oui » and
-    « Non », or `vote.waiting` on the requester's page, or `vote.cast` once this
-    page voted on that id (remembered while the page is open). The buttons are
-    disabled while the page is not joined; a focus on one of them goes to the
-    grid, the selection unchanged, before they are. A ballot moves the focus to
-    the line that replaces them.
-20. For a vote whose `vote_opened` the page applied, the banner shows the seconds
-    left (`vote.seconds_left`) and a bar, on the page's own clock, kept across a
-    reconnection, down to « 0 s ». A vote known only from a snapshot has neither.
-21. On `vote_closed` the banner leaves within 300 ms. A hidden live region
-    announces the question when a vote opens, and `vote.result.<outcome>` when
-    this page applies its close. The close adds one `vote` line to the stream
-    (`social/chat.md`), before the lines of a passed request, and a 3-second note
-    of it while the stream is hidden (`client/room.md`); that note replaces any
-    note held back during the vote. The `vote` line lights neither the Salon dot
-    nor the unread count; chat messages sent during the vote still count. A
-    snapshot or a catch-up adds no `vote` line.
-22. A focus inside the banner when it leaves goes to the grid.
-
 ### Look
 
 The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
-`_design/cells.md`, « Letter marks »; the banner, `_design/overlays.md`, « Vote »,
-on its layer of `_design/room.md`, « Layers ».
+`_design/cells.md`, « Letter marks ».
 
 ## Acceptance criteria
 
@@ -224,51 +176,6 @@ on its layer of `_design/room.md`, « Layers ».
   vote, none in that order; once the host sets `none`, every page, a later
   joiner's too, has no « Vérifier » or « Révéler » but keeps « Aide » and undo;
   `free` or `vote` brings both back. (← 025 AC-1, 025 AC-4)
-- **AC-13** With Ana, Bob and Cy connected in `vote`, Ana's reveal of (1, 0)
-  opens vote 1 with 3 voters and changes nothing; Bob's yes 19.9 seconds later
-  closes it `passed`, 2 of 3, then reveals `T` in Ana's name; the pages, which
-  read « Ana propose de révéler une lettre. », show `T` revealed, « 4 restantes »
-  and the line « Vote accepté. ». A passed reveal by Bob, even after Bob left,
-  reads « Bob a révélé une lettre », and a passed grid check gives a
-  `check_result` in the requester's name. With 4 connected, 2 yes leave the vote
-  open and 3 pass it. (← 025 AC-2)
-- **AC-14** Vote 1 closes `rejected`, 1 of 3, at the second no, or `timed_out` at
-  20 seconds, by a tick or before a late ballot, which gets `no_open_vote`; a yes
-  after the host set 0 letters closes it `rejected`, 2 of 3. The budget stays,
-  (1, 0) stays empty, and the page drops the banner within 300 ms and announces
-  « Vote refusé. » or « Temps écoulé, vote annulé. ». (← 025 AC-3)
-- **AC-15** While vote 1 is open, a grid check or a reveal is
-  `vote_in_progress`, a word check applies at once and the vote stays open, and
-  the page disables « Vérifier » grid and both reveals until the close; a ballot
-  on vote 2 is `no_open_vote`; the requester's, a second, or a later joiner's
-  ballot is ignored; a player alone connected reveals at once. (← 025 AC-5,
-  025 AC-6)
-- **AC-16** Bob reconnects during vote 1: his snapshot holds it and his yes
-  passes it; after Bob's no and a restart, the vote holds Ana's yes only, loaded
-  from a snapshot or from the log. (← 025 AC-9)
-- **AC-17** On a vote by Bob, Ana's page reads « Bob propose de révéler un mot. »
-  and announces it; « Oui » sends one yes and gives way, focused, to « Vote
-  enregistré. En attente des autres joueurs… », kept after a reconnection; the
-  requester's page reads « En attente des autres joueurs… »; an unvoted page's
-  buttons are disabled while reconnecting and enabled once joined; `grid_solved`
-  hides the banner. (← 025 AC-7, 047 AC-3)
-- **AC-18** A vote the page saw open reads « 20 s » with a full bar, « 15 s » and
-  three quarters 5 seconds later, « 0 s » and an empty bar at 20 seconds, then
-  stays until `vote_closed`, alike with reduced motion; after a reconnection it
-  never reads « 20 s » again; a vote from a first snapshot has no count and no
-  bar. (← 047 AC-2)
-- **AC-19** `vote_closed` `passed` removes the banner within 300 ms, announces
-  « Vote accepté. » and ends the stream with that line, shown as the one note
-  while the stream is hidden, even after two chat messages during the vote, and
-  as no note while it shows; a vote a snapshot dropped is never announced and
-  adds no line. (← 047 AC-4, 047 AC-5)
-- **AC-20** At every window of `product.md`, opening the banner moves no box of
-  the room, and « Oui » and « Non » meet the target size and are hit at their
-  centre; on a phone and a computer the banner follows its design section; from
-  the grid, Escape then Shift+Tab reaches « Non » then « Oui »
-  with the ring inside the banner, and a close or a solve sends the focus from
-  the banner to the grid; its states pass the scans of `product.md`, and
-  `fr.json` holds the vote texts. (← 025 AC-8, 047 AC-1, 047 AC-13, 047 AC-14)
 - **AC-21** In `free`, Ana's six grid checks at one instant give five
   `check_result`, each to every player; the sixth gets no reply, adds no event
   and leaves the seq where the fifth left it. One more at +9.9 s is dropped too
@@ -287,45 +194,32 @@ on its layer of `_design/room.md`, « Layers ».
   (1, 2), then picks « Vérifier » « Le mot » and « Révéler » « La lettre »:
   after her reconnection snapshot the server receives the two edits, the
   check of TAMIS, then the reveal of (1, 2), so the check marks (1, 1) wrong.
-- **AC-25** On Bob's vote, Ana's unvoted page has « Oui » focused and (1, 0)
-  selected; her socket closes: once « Oui » and « Non » are disabled the focus
-  is on the grid, (1, 0) still selected, and no ballot was sent. « Non »
-  focused does the same.
 
 ## Edge cases
 
-- A player who joins during a vote sees the buttons; the ballot is ignored
-  (AC-15).
-- A requester who leaves: the vote goes on, and a pass is in their name (AC-13).
-- `none` set during a vote hides the Aide groups and keeps the banner; a pass
-  then closes `rejected` (AC-12, AC-14).
-- After a restart, a page that recorded its ballot still reads `vote.cast`; the
-  others decide, or the vote times out (AC-16, AC-17).
-- A check dropped after a vote's 20 seconds leaves the vote open for the tick
-  to close (AC-23).
 - While the page reconnects, the Aide items stay as rule 12 sets them; a
   request made then waits for the resent edits (AC-24).
 
 ## Out of scope
 
 - Generated hints, revealing the whole grid, undoing a reveal, keyboard
-  shortcuts, a tally of ballots, changing a ballot, votes on anything else, a
-  message telling a player their request was dropped.
-- The host settings: `lobby/host.md`. The Aide menu's place, « Réagir » under
-  the banner: `client/hud.md`; the notes: `client/room.md`. Cell marks and
-  pending edits: `gameplay/board.md`. Completion: `gameplay/rules.md`. The
-  stream and its lines' look: `social/chat.md`. Protocol and fair play:
-  `platform/realtime.md`. The recap's counts: `gameplay/results.md`.
+  shortcuts, a message telling a player their request was dropped.
+- The vote and its banner: `gameplay/votes.md`. The host settings:
+  `lobby/host.md`. The Aide menu's place: `client/hud.md`; the notes:
+  `client/room.md`. Cell marks and pending edits: `gameplay/board.md`.
+  Completion: `gameplay/rules.md`. The stream and its lines' look:
+  `social/chat.md`. Protocol and fair play: `platform/realtime.md`. The recap's
+  counts: `gameplay/results.md`.
 
 ## Code
 
-- `src/nock/room.py`: check, reveal, the budget and its count, votes, `tick`,
-  `replay`, `snapshot_for`, `after_restart`, the hint limit; `RoomConfig` holds
-  the vote time and the limit's numbers.
+- `src/nock/room.py`: check, reveal, the budget and its count, `replay`,
+  `snapshot_for`, `after_restart`, the hint limit; `RoomConfig` holds the
+  limit's numbers.
 - `src/nock/protocol.py`: messages and error codes.
-- `web/src/lib/AideMenu.svelte`, `RoomPage.svelte` (what is enabled, the
-  banner), `GridViewport.svelte` (strike, notch), `roomSession.ts`,
-  `voteCountdown.ts`, `activityFeed.ts` (the stream lines).
-- Tests: `tests/test_spec_023_*`, `test_spec_024_*`, `test_spec_025_*`,
-  `test_spec_047_ac01*` to `..._ac05*`, `..._ac13*`, `..._ac14*`,
-  `test_hints_*`.
+- `web/src/lib/AideMenu.svelte`, `web/src/lib/RoomPage.svelte` (what is
+  enabled), `web/src/lib/GridViewport.svelte` (strike, notch),
+  `web/src/lib/roomSession.ts`, `web/src/lib/activityFeed.ts` (the stream
+  lines).
+- Tests: `tests/test_spec_023_*`, `test_spec_024_*`, `test_spec_025_ac01_*`,
+  `test_spec_025_ac04_ac05_*` (its AC-4 tests), `test_hints_*`.

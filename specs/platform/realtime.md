@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: done
+status: approved
 ---
 
 # platform/realtime - Room events and fair play
@@ -62,8 +62,10 @@ contract. No browser receives an answer letter before the room earns it.
      `confirm_pencil` (change a cell), answered by `letter_changed` (a cell's
      letter set or erased) and `cell_locked` (a cell fixed, checked right or
      revealed);
-   - `gameplay/hints.md`: `check`, `reveal`, `vote`, answered by
-     `check_result`, `reveal_result`, `vote_opened`, `vote_closed`;
+   - `gameplay/hints.md`: `check`, `reveal`, answered by `check_result`,
+     `reveal_result`;
+   - `gameplay/votes.md`: `vote` (a ballot), answered by `vote_opened`,
+     `vote_closed`;
    - `gameplay/rules.md`: `grid_solved`, `grid_full_wrong` (the grid finished
      right, or full with a mistake somewhere);
    - `social/presence.md`: `select_cell`, answered by `selection_moved` (where a
@@ -91,8 +93,9 @@ contract. No browser receives an answer letter before the room earns it.
     `not_host`, `invalid_target` (`lobby/host.md`); `cell_locked`
     (`gameplay/co-op.md`); `nothing_to_undo` (`platform/server.md`);
     `grid_solved` (`gameplay/rules.md`);
-    `help_disabled`, `budget_exhausted`, `vote_in_progress`, `no_open_vote`
-    (`gameplay/hints.md`); `muted` (`social/chat.md`). An error's text is
+    `help_disabled`, `budget_exhausted` (`gameplay/hints.md`);
+    `vote_in_progress`, `no_open_vote` (`gameplay/votes.md`); `muted`
+    (`social/chat.md`). An error's text is
     English, for logs; pages use the code.
 
 ### Order and delivery

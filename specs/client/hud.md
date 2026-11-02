@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: done
+status: approved
 ---
 
 # client/hud - The room's frame: top bar, menus, sheets, clue bar
@@ -165,7 +165,7 @@ gives the Salon (`client/room.md`) its column or its sheet.
     rule 8), `room.share.copied` (`lobby/rooms.md` rule 11). The elements that
     show them have no live role: no `role="status"`, no `aria-live`. A message
     first empties the region, then writes its text, so the same message twice
-    is announced twice. The vote's region (`gameplay/hints.md` rule 21), the
+    is announced twice. The vote's region (`gameplay/votes.md` rule 8), the
     grid's (`product.md` rule 17) and the alerts stay as they are.
 18. While a room sheet is open (rule 13) the page behind it is inert, so the
     sheet holds a region of the same kind, empty at its opening, and every

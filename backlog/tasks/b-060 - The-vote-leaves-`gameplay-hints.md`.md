@@ -4,11 +4,12 @@ title: The vote leaves `gameplay/hints.md`
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T11:33:00Z'
+updated_date: '2026-11-02T11:42:00Z'
 labels:
   - domain:hints
   - domain:votes
   - domain:realtime
+  - domain:hud
 milestone: m-3
 dependencies:
   - B-057
@@ -32,6 +33,28 @@ ordinal: 15000
 - Open questions: none.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 votes AC-1 (new, was hints AC-13)
+- [ ] #2 hints AC-13 (deleted, moved to votes AC-1)
+- [ ] #3 votes AC-2 (new, was hints AC-14)
+- [ ] #4 hints AC-14 (deleted, moved to votes AC-2)
+- [ ] #5 votes AC-3 (new, was hints AC-15)
+- [ ] #6 hints AC-15 (deleted, moved to votes AC-3)
+- [ ] #7 votes AC-4 (new, was hints AC-16)
+- [ ] #8 hints AC-16 (deleted, moved to votes AC-4)
+- [ ] #9 votes AC-5 (new, was hints AC-17)
+- [ ] #10 hints AC-17 (deleted, moved to votes AC-5)
+- [ ] #11 votes AC-6 (new, was hints AC-18)
+- [ ] #12 hints AC-18 (deleted, moved to votes AC-6)
+- [ ] #13 votes AC-7 (new, was hints AC-19)
+- [ ] #14 hints AC-19 (deleted, moved to votes AC-7)
+- [ ] #15 votes AC-8 (new, was hints AC-20)
+- [ ] #16 hints AC-20 (deleted, moved to votes AC-8)
+- [ ] #17 votes AC-9 (new, was hints AC-25)
+- [ ] #18 hints AC-25 (deleted, moved to votes AC-9)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -54,4 +77,6 @@ ordinal: 15000
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead (2026-11-02): started alongside B-058 (no shared domain). Spec-writer on Fable at high (new domain). hints.md's citations of realtime rules 20 and 22 go to reconnection rules 5 and 7 (B-057's map). Base: origin/main f6a5666.
+
+Lead: hud.md:168 cited hints rule 21 by number: repointed to votes rule 8 here; the task takes domain:hud. Spec-checker APPROVED in round 1; its optional notes left (hints' Depends on, at three files, does not list votes; realtime rule 7 gained '(a ballot)', the glossary term). By-name citations of the vote left: chat.md:101/:139, room.md:144 (B-064's list); rules.md:43, server.md:81, presence.md:278, product.md:36 (not on B-064's list: the lead adds them there on the next board branch). votes' Code section names RoomPage.svelte: B-055's map must follow when both are on main.
 <!-- SECTION:NOTES:END -->
