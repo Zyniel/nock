@@ -4,7 +4,7 @@ title: Citations repointed after the spec splits
 status: To Do
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T12:43:00Z'
 labels:
   - domain:host
   - domain:lifetime
@@ -19,6 +19,10 @@ labels:
   - domain:shell
   - domain:joining
   - domain:product
+  - domain:account
+  - domain:rules
+  - domain:server
+  - domain:presence
 milestone: m-2
 dependencies:
   - B-058
@@ -52,3 +56,14 @@ ordinal: 19000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02, after B-058, B-059, B-060, B-062): citations by name the closed splits listed for this task, beyond the description's list (file:line as of each split's branch; recheck after the merges):
+- B-062 (erasure): host.md:99/129/136/138, lifetime.md:85, results.md:153, library.md:53 (by number, in the description); joining.md:42 and product.md's routes were repointed by B-062 itself.
+- B-058 (foundation): results.md:300 « The page frame and state lines: client/shell.md » (state lines are foundation rule 1).
+- B-059 (summaries): results.md:20 (Depends on: summaries in joining), lifetime.md:222-223, library.md:264, hud.md:85-86 (« Mes salons » in joining), account.md:18/107/294 (« Mes salons », summaries).
+- B-060 (votes): chat.md:101/:139, room.md:144 (in the description); rules.md:43, server.md:81, presence.md:278, product.md:36 (the vote, still hints).
+The task takes domain:account, rules, server and presence for these one-line citations.
+<!-- SECTION:NOTES:END -->
