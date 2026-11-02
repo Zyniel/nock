@@ -1,5 +1,6 @@
 // The rules of joining a room: the nickname rule and what the browser stored.
-// Plain functions: the socket and the page live in RoomPage.svelte.
+// Plain functions: the socket lives in roomConnection.ts, the page in
+// RoomPage.svelte.
 
 import { parseObject, readItem, roomRecordKey, writeItem } from './storage'
 
@@ -19,10 +20,11 @@ export type NicknameCheck =
   | { ok: true; nickname: string }
   | { ok: false; reason: 'length' | 'characters' }
 
-// The join message the page sends at once.
+// What the page joins with at once: the identity to rejoin with, else the
+// nickname of a new player, else neither (the page shows the form).
 export interface JoinPlan {
-  nickname: string
-  resume_token: string | null
+  identity: Identity | null
+  nickname: string | null
 }
 
 export function identityKey(code: string): string {
@@ -92,28 +94,28 @@ function isRoomCreatedHere(code: string): boolean {
   return record !== null && typeof record.grid === 'number'
 }
 
-// The join to send at once when the socket opens, or null to show the form.
-// `heldIdentity` is the identity of the page's last snapshot, held in memory: it
-// comes first, so that a browser refusing storage still rejoins, and an identity
-// another tab stored meanwhile does not replace it.
+// The join to send at once when the socket opens; neither an identity nor a
+// nickname shows the form. `heldIdentity` is the identity of the page's last
+// snapshot, held in memory: it comes first, so that a browser refusing storage
+// still rejoins, and an identity another tab stored meanwhile does not replace it.
 export function planAutomaticJoin(
   code: string,
   defaultNickname: string,
   heldIdentity: Identity | null,
-): JoinPlan | null {
+): JoinPlan {
   const identity = heldIdentity ?? readIdentity(code)
   if (identity !== null) {
-    return { nickname: identity.nickname, resume_token: identity.resume_token }
+    return { identity, nickname: null }
   }
   if (!isRoomCreatedHere(code)) {
-    return null
+    return { identity: null, nickname: null }
   }
   const remembered = readNickname()
   if (remembered !== null) {
     const check = checkNickname(remembered)
     if (check.ok) {
-      return { nickname: remembered, resume_token: null }
+      return { identity: null, nickname: remembered }
     }
   }
-  return { nickname: defaultNickname, resume_token: null }
+  return { identity: null, nickname: defaultNickname }
 }

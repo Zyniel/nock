@@ -88,35 +88,29 @@
     VoteView,
   } from './roomSession'
   import {
-    CONNECT_LIMIT_MS,
-    EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
-    PING_INTERVAL_MS,
     REACTION_MS,
-    SILENCE_LIMIT_MS,
-    addPendingEdit,
     endFlash,
     endReaction,
     gridLabel,
     isEndedStatus,
-    isFinalClose,
     latestPendingEdits,
     letterCellIndex,
     newSession,
-    receiveFrame,
-    reconnectDelay,
     shownCell,
     shownCellWith,
     shownGrid,
-    statusAfterFinalClose,
-    statusAfterLoss,
   } from './roomSession'
   import { CLUE_BAR_HEIGHT_PX, fittedGridBox } from './gridLayout'
   import { trackExpiries } from './expiry'
   import {
+    createRoomConnection,
+    type ConnectionHooks,
+    type RoomConnection,
+  } from './roomConnection'
+  import {
     checkMessage,
     clueTarget,
-    editMessage,
     flagMessage,
     reactMessage,
     revealMessage,
@@ -165,7 +159,10 @@
   let nicknameText = $state(readNickname() ?? '')
   let formError: 'length' | 'characters' | null = $state(null)
   let formJoinNickname: string | null = $state(null)
-  let socket: WebSocket | null = null
+  // The socket, the heartbeat, the retries and what waits to be sent live in
+  // roomConnection.ts. The page makes its connection when it opens (the effect
+  // at the end of this script).
+  let connection: RoomConnection | null = null
   let gridViewport: GridViewport | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
@@ -623,11 +620,17 @@
   // Returns whether it went out: a socket that is no longer open, even before
   // the page has seen its close, drops what it is given.
   function send(message: object): boolean {
-    if (socket === null || socket.readyState !== WebSocket.OPEN) {
+    if (connection === null) {
       return false
     }
-    socket.send(JSON.stringify(message))
-    return true
+    return connection.send(message)
+  }
+
+  // Send an undo, a check or a reveal after the edits pending when it is made:
+  // kept while the page is not joined, queued behind a running resend, else sent
+  // at once.
+  function sendRequest(message: object): void {
+    connection?.request(message)
   }
 
   // True while the page is joined: a socket with its snapshot (« Réagir », « Je
@@ -765,8 +768,7 @@
     formError = null
     session.nicknameRefused = false
     formJoinNickname = check.nickname
-    session.status = 'joining'
-    send({ type: 'join', nickname: check.nickname, resume_token: null })
+    connection?.join(check.nickname)
   }
 
   // The identity of the last snapshot, held in memory: the next join uses it
@@ -899,9 +901,7 @@
     kind: EditKind,
     baseSeq: number | null,
   ): void {
-    addPendingEdit(session, cell.row, cell.column, letter, kind)
-    editsMade += 1
-    sendEdit(editMessage({ row: cell.row, column: cell.column, letter, kind }, baseSeq))
+    connection?.edit(cell, letter, kind, baseSeq)
   }
 
   // The confirm control shows while the selected cell shows a pencil letter
@@ -1754,185 +1754,7 @@
     return `${scheme}://${location.host}/api/rooms/${roomCode}/ws`
   }
 
-  // ---- The connection: heartbeat, loss detection and reconnection (spec 017) ----
-
-  // The next delay of the reconnection is `reconnectDelay(reconnectAttempt)`.
-  let reconnectAttempt = 0
-  let pingTimer: ReturnType<typeof setInterval> | undefined
-  let silenceTimer: ReturnType<typeof setTimeout> | undefined
-  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
-  // Watches the socket being opened for its connect limit.
-  let connectTimer: ReturnType<typeof setTimeout> | undefined
-  // The page clock (performance.now()) when the silence of the open socket
-  // started: its last frame, or the page's return into view.
-  let silenceStartedAt = 0
-
-  function stopHeartbeat(): void {
-    clearInterval(pingTimer)
-    clearTimeout(silenceTimer)
-    pingTimer = undefined
-    silenceTimer = undefined
-  }
-
-  function stopReconnectTimer(): void {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = undefined
-  }
-
-  function stopConnectTimer(): void {
-    clearTimeout(connectTimer)
-    connectTimer = undefined
-  }
-
-  // ---- What the page sends after a snapshot (platform/reconnection.md rules 5 and 7) ----
-
-  // An undo, a check or a reveal made while the page is not joined, kept until
-  // the next snapshot. `editsBefore` counts the edits made before it: it goes out
-  // after them and before any later edit.
-  interface KeptRequest {
-    message: object
-    editsBefore: number
-  }
-
-  // A message waiting its turn in the send queue. `request` is set for an undo,
-  // a check or a reveal, so that a loss can keep it again; an edit stays pending
-  // and is resent anyway, and a select_cell is sent again after the next snapshot.
-  interface QueuedMessage {
-    message: object
-    request: KeptRequest | null
-  }
-
-  // Until the socket has its snapshot nothing is sent: edits stay pending, and
-  // undos, checks and reveals are kept. They are then sent one every
-  // EDIT_SEND_INTERVAL_MS, oldest first, through the send queue.
-  let isSynced = false
-  let sendQueue: QueuedMessage[] = []
-  let sendTimer: ReturnType<typeof setInterval> | undefined
-  // How many edits the page has made since it opened.
-  let editsMade = 0
-  let keptRequests: KeptRequest[] = []
-
-  // Stop the send queue. The requests it still holds are kept again, before any
-  // kept since, for the next snapshot.
-  function stopSendQueue(): void {
-    clearInterval(sendTimer)
-    sendTimer = undefined
-    const stillQueued: KeptRequest[] = []
-    for (const queued of sendQueue) {
-      if (queued.request !== null) {
-        stillQueued.push(queued.request)
-      }
-    }
-    keptRequests = [...stillQueued, ...keptRequests]
-    sendQueue = []
-    isSynced = false
-  }
-
-  function sendNextQueued(): void {
-    const next = sendQueue.shift()
-    if (next === undefined) {
-      clearInterval(sendTimer)
-      sendTimer = undefined
-      return
-    }
-    send(next.message)
-  }
-
-  // Send an edit now, or behind the messages still queued. Before the snapshot of
-  // the socket nothing is sent: the edit is pending and is resent with the others.
-  function sendEdit(message: object): void {
-    if (!isSynced) {
-      return
-    }
-    if (sendTimer === undefined) {
-      send(message)
-      return
-    }
-    sendQueue.push({ message, request: null })
-  }
-
-  // Send an undo, a check or a reveal after the edits pending when it is made:
-  // kept while the page is not joined, queued behind a running resend, else sent
-  // at once.
-  function sendRequest(message: object): void {
-    const request: KeptRequest = { message, editsBefore: editsMade }
-    if (!isSynced) {
-      keptRequests.push(request)
-      return
-    }
-    if (sendTimer === undefined) {
-      send(message)
-      return
-    }
-    sendQueue.push({ message, request })
-  }
-
-  // Stop listening to a socket and close it.
-  function dropSocket(dropped: WebSocket): void {
-    if (socket === dropped) {
-      stopSendQueue()
-      stopConnectTimer()
-    }
-    dropped.onopen = null
-    dropped.onmessage = null
-    dropped.onclose = null
-    dropped.onerror = null
-    dropped.close()
-    if (socket === dropped) {
-      socket = null
-    }
-  }
-
-  // Any frame from the server shows the connection is alive: the silence starts
-  // again from now.
-  function restartSilenceTimer(opened: WebSocket): void {
-    silenceStartedAt = performance.now()
-    clearTimeout(silenceTimer)
-    silenceTimer = setTimeout(() => checkSilence(opened), SILENCE_LIMIT_MS)
-  }
-
-  // The silence is read from the clock, as the page's timers may run late:
-  // at SILENCE_LIMIT_MS of it the connection is lost at once, its socket
-  // dropped so that its late frames and close change nothing. A hidden page
-  // loses no socket to the silence: its return counts it again
-  // (platform/reconnection.md rule 3).
-  function checkSilence(opened: WebSocket): void {
-    silenceTimer = undefined
-    if (document.hidden) {
-      return
-    }
-    const silentMs = performance.now() - silenceStartedAt
-    if (silentMs >= SILENCE_LIMIT_MS) {
-      connectionLost(opened)
-      return
-    }
-    silenceTimer = setTimeout(() => checkSilence(opened), SILENCE_LIMIT_MS - silentMs)
-  }
-
-  function startHeartbeat(opened: WebSocket): void {
-    stopHeartbeat()
-    pingTimer = setInterval(() => send({ type: 'ping' }), PING_INTERVAL_MS)
-    restartSilenceTimer(opened)
-  }
-
-  // A socket still connecting CONNECT_LIMIT_MS after it was created is dropped:
-  // a loss. The time is read from the clock, so a hidden page whose timers ran
-  // late drops it at its first timer after them (platform/reconnection.md
-  // rule 6).
-  function watchConnectLimit(opened: WebSocket, createdAt: number): void {
-    const leftMs = CONNECT_LIMIT_MS - (performance.now() - createdAt)
-    connectTimer = setTimeout(() => {
-      connectTimer = undefined
-      if (opened !== socket || opened.readyState !== WebSocket.CONNECTING) {
-        return
-      }
-      if (performance.now() - createdAt >= CONNECT_LIMIT_MS) {
-        connectionLost(opened)
-        return
-      }
-      watchConnectLimit(opened, createdAt)
-    }, leftMs)
-  }
+  // ---- The connection (spec 017): the page's side ----
 
   // A loss before the first snapshot keeps the nickname form on screen when it was
   // shown, or when a join sent from it is lost (the new socket shows it again).
@@ -1944,42 +1766,34 @@
     formJoinNickname = null
   }
 
-  // The socket is lost: show it, then try again after the next delay.
-  function connectionLost(lost: WebSocket): void {
-    if (lost !== socket) {
-      return
+  // A new snapshot, before anything waiting is sent: catch up after an
+  // absence, remember who I am, and on the page's first snapshot select again
+  // what this device saved.
+  function onSnapshot(snapshot: Snapshot, isFirst: boolean): void {
+    snapshotCount += 1
+    // A return: a snapshot past the seen seq the page had when it arrived. A
+    // first visit on this device has no seen seq, so no return.
+    if (seenSeq !== null && snapshot.seq > seenSeq) {
+      void catchUpOnReturn(snapshot, seenSeq)
     }
-    stopHeartbeat()
-    dropSocket(lost)
-    keepFormAfterLoss()
-    session.status = statusAfterLoss(session)
-    const delay = reconnectDelay(reconnectAttempt)
-    reconnectAttempt += 1
-    stopReconnectTimer()
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = undefined
-      openSocket()
-    }, delay)
-  }
-
-  // The socket closed for good: no more tries, and nothing will be sent again,
-  // so what waited to be sent is dropped (client/hud.md rule 19).
-  function connectionEnded(ended: WebSocket, closeCode: number): void {
-    stopHeartbeat()
-    stopReconnectTimer()
-    dropSocket(ended)
-    session.status = statusAfterFinalClose(closeCode, session.status)
-    dropWaitingSends()
-    if (isRoomGone) {
-      leaveDeletedRoom()
+    rememberJoin(snapshot)
+    // Only the first snapshot of the page: a reconnection keeps the old
+    // snapshot until the new one arrives, so it sets no second mark.
+    if (isFirst) {
+      restoreSavedSelection(snapshot)
+      void markInteractive()
+      // The history of the first snapshot is not unread (spec 022).
+      lastSeenChatSeq = snapshot.seq
     }
   }
 
-  // Drop the letters waiting to be sent and the kept undos, checks and reveals.
-  function dropWaitingSends(): void {
-    stopSendQueue()
-    session.pendingEdits = []
-    keptRequests = []
+  // Any frame: a nickname the server refused ends the join sent from the form,
+  // and the page remembers its seq.
+  function onFrame(): void {
+    if (session.status === 'nickname') {
+      formJoinNickname = null
+    }
+    rememberSeenSeq()
   }
 
   // ---- The room gone (client/hud.md rule 16) ----
@@ -1999,157 +1813,32 @@
     accountDialog?.close()
   }
 
-  // The browser has a network again: do not wait for the next delay.
-  function onBrowserOnline(): void {
-    if (reconnectTimer !== undefined) {
-      stopReconnectTimer()
-      openSocket()
-      return
-    }
-    // A socket still connecting may never open on a dead network: replace it.
-    if (socket !== null && socket.readyState === WebSocket.CONNECTING) {
-      stopHeartbeat()
-      dropSocket(socket)
-      openSocket()
-    }
-  }
-
-  // The page came back into view (platform/reconnection.md rules 3 and 6): a
-  // try waiting on its delay goes at once; an open socket sends `ping` at once
-  // and counts its silence from now.
-  function onVisibilityChange(): void {
-    if (document.hidden) {
-      return
-    }
-    if (reconnectTimer !== undefined) {
-      stopReconnectTimer()
-      openSocket()
-      return
-    }
-    if (socket !== null && socket.readyState === WebSocket.OPEN) {
-      send({ type: 'ping' })
-      startHeartbeat(socket)
-    }
-  }
-
-  // My pending edits, each as the message of its kind and with the base_seq it
-  // had, and the kept requests, in the order they were made. The pending edits
-  // are the newest edits made: counting from 0, the first of them is edit
-  // number editsMade minus their count.
-  function pendingInOrder(): QueuedMessage[] {
-    const ordered: QueuedMessage[] = []
-    const firstEditNumber = editsMade - session.pendingEdits.length
-    let requestIndex = 0
-    session.pendingEdits.forEach((edit, index) => {
-      const editNumber = firstEditNumber + index
-      // The requests made before this edit go before it.
-      while (
-        requestIndex < keptRequests.length &&
-        keptRequests[requestIndex].editsBefore <= editNumber
-      ) {
-        const request = keptRequests[requestIndex]
-        ordered.push({ message: request.message, request })
-        requestIndex += 1
+  const connectionHooks: ConnectionHooks = {
+    joinPlan: () => planAutomaticJoin(code, t('room.default_nickname'), heldIdentity),
+    onOpen: () => {
+      isFormKept = false
+    },
+    onSnapshot,
+    onFrame,
+    onLoss: keepFormAfterLoss,
+    onEnded: () => {
+      if (isRoomGone) {
+        leaveDeletedRoom()
       }
-      ordered.push({ message: editMessage(edit, edit.baseSeq), request: null })
-    })
-    for (const request of keptRequests.slice(requestIndex)) {
-      ordered.push({ message: request.message, request })
-    }
-    return ordered
-  }
-
-  // Once the socket has its snapshot, send what waited: after a loss the
-  // selection first (the server cleared it), then the pending edits and the
-  // kept requests in order. They are paced, the first one at once, then one
-  // every EDIT_SEND_INTERVAL_MS.
-  function sendAfterSnapshot(isAfterLoss: boolean): void {
-    stopSendQueue()
-    isSynced = true
-    if (isAfterLoss && selection !== null) {
-      sendQueue.push({ message: selectCellMessage(selection), request: null })
-    }
-    sendQueue.push(...pendingInOrder())
-    keptRequests = []
-    sendTimer = setInterval(sendNextQueued, EDIT_SEND_INTERVAL_MS)
-    sendNextQueued()
-  }
-
-  // The first message of a socket: the join of the stored identity, or the form.
-  function joinOnOpen(opened: WebSocket): void {
-    const plan = planAutomaticJoin(code, t('room.default_nickname'), heldIdentity)
-    isFormKept = false
-    if (plan === null) {
-      session.status = 'nickname'
-      return
-    }
-    if (session.snapshot === null) {
-      session.status = 'joining'
-    }
-    opened.send(JSON.stringify({ type: 'join', ...plan }))
-  }
-
-  function onSocketMessage(opened: WebSocket, event: MessageEvent): void {
-    restartSilenceTimer(opened)
-    if (typeof event.data !== 'string') {
-      return
-    }
-    const snapshotBefore = session.snapshot
-    const seenSeqBefore = seenSeq
-    receiveFrame(session, event.data)
-    if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
-      snapshotCount += 1
-      // A return: a snapshot past the seen seq the page had when it arrived. A
-      // first visit on this device has no seen seq, so no return.
-      if (seenSeqBefore !== null && session.snapshot.seq > seenSeqBefore) {
-        void catchUpOnReturn(session.snapshot, seenSeqBefore)
-      }
-      rememberJoin(session.snapshot)
-      // Only the first snapshot of the page: a reconnection keeps the old
-      // snapshot until the new one arrives, so it sets no second mark.
-      if (snapshotBefore === null) {
-        restoreSavedSelection(session.snapshot)
-        void markInteractive()
-        // The history of the first snapshot is not unread (spec 022).
-        lastSeenChatSeq = session.snapshot.seq
-      }
-      reconnectAttempt = 0
-      // After a loss: the first snapshot of this socket (isSynced is still
-      // false), when the page had a snapshot on an earlier socket. A second
-      // snapshot on the same socket is not one.
-      const isAfterLoss = snapshotBefore !== null && !isSynced
-      sendAfterSnapshot(isAfterLoss)
-    }
-    if (session.status === 'nickname') {
-      formJoinNickname = null
-    }
-    rememberSeenSeq()
-  }
-
-  function openSocket(): void {
-    const opened = new WebSocket(roomSocketUrl(code))
-    socket = opened
-    stopConnectTimer()
-    watchConnectLimit(opened, performance.now())
-
-    opened.onopen = () => {
-      stopConnectTimer()
-      startHeartbeat(opened)
-      joinOnOpen(opened)
-    }
-    opened.onmessage = (event: MessageEvent) => onSocketMessage(opened, event)
-    opened.onclose = (event: CloseEvent) => {
-      if (isFinalClose(session, event.code)) {
-        connectionEnded(opened, event.code)
-      } else {
-        connectionLost(opened)
-      }
-    }
+    },
+    // After a loss the server forgot the selection: it is sent first.
+    selectionMessage: () => (selection === null ? null : selectCellMessage(selection)),
   }
 
   $effect(() => {
     seenSeq = readRoomSeenSeq(code)
-    openSocket()
+    const opened = createRoomConnection(roomSocketUrl(code), session, connectionHooks)
+    connection = opened
+    opened.start()
+    // The network back, and the page back into view, do not wait for the next
+    // delay (platform/reconnection.md rules 3 and 6).
+    const onBrowserOnline = (): void => opened.onOnline()
+    const onVisibilityChange = (): void => opened.onVisible()
     window.addEventListener('online', onBrowserOnline)
     document.addEventListener('visibilitychange', onVisibilityChange)
 
@@ -2157,12 +1846,7 @@
     return () => {
       window.removeEventListener('online', onBrowserOnline)
       document.removeEventListener('visibilitychange', onVisibilityChange)
-      stopHeartbeat()
-      stopReconnectTimer()
-      stopConnectTimer()
-      if (socket !== null) {
-        dropSocket(socket)
-      }
+      opened.dispose()
     }
   })
 </script>
