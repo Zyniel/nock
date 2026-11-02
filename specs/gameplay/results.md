@@ -112,7 +112,7 @@ grids in « Grilles terminées », where a grid can be played again.
 ### Finished grids
 
 14. A room keeps its `grid_solved`'s time and `elapsed_ms`, by `replay` too. A
-    summary (`lobby/joining.md` rule 16) adds `finished_at` (that time, UTC) and
+    summary (`lobby/summaries.md` rule 1) adds `finished_at` (that time, UTC) and
     `elapsed_ms`, null unless solved; a room stored without them takes them from
     its log.
 15. `nock.history` holds the device's records, a JSON array of `{"code",
@@ -284,7 +284,7 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
 
 ## Edge cases
 
-- A removed player gets no summary, so no record (`lobby/joining.md` AC-17).
+- A removed player gets no summary, so no record (`lobby/summaries.md` AC-1).
 - A team-mate with this device's nickname is left out too (AC-18).
 - One grid finished in two rooms gives two records (AC-18).
 - A room finished while away is recorded when the device next sees it solved,
