@@ -61,10 +61,10 @@ WARM_UP_TIMEOUT_MS = 60_000
 # 20) times the room's rules in milliseconds, with no browser (B-030).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
-        "test_account_erasure_busy.py",
-        "test_account_erasure_history.py",
-        "test_account_erasure_overlap.py",
-        "test_account_erasure_retry.py",
+        "test_erasure_busy.py",
+        "test_erasure_history.py",
+        "test_erasure_overlap.py",
+        "test_erasure_retry.py",
         "test_operations_checkpoint_busy.py",
         "test_realtime_join_deadline.py",
         "test_server_engine_time.py",

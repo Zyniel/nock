@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-19 to AC-21: `GET /api/account/progress`.
+"""Tests of account/erasure, AC-4 to AC-6: `GET /api/account/progress`.
 
 Over HTTP, on the app of spec 033's "Test harness" with a fake clock (accounts on,
 both stores on one file); `account_harness` builds Ana's rooms. The route answers
@@ -72,10 +72,10 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-# ---- AC-19: what the route answers ------------------------------------------------
+# ---- AC-4: what the route answers ------------------------------------------------
 
 
-def test_ac19_the_progress_marks_each_grid_finished_or_started(
+def test_ac4_the_progress_marks_each_grid_finished_or_started(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -88,7 +88,7 @@ def test_ac19_the_progress_marks_each_grid_finished_or_started(
     assert response.headers.get("cache-control") == NO_STORE
 
 
-def test_ac19_the_progress_saves_no_record_and_the_history_lists_the_finished_grids(
+def test_ac4_the_progress_saves_no_record_and_the_history_lists_the_finished_grids(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -105,7 +105,7 @@ def test_ac19_the_progress_saves_no_record_and_the_history_lists_the_finished_gr
     assert grid_numbers == [1, 3]
 
 
-def test_ac19_an_account_with_no_room_gets_an_empty_object(
+def test_ac4_an_account_with_no_room_gets_an_empty_object(
     tmp_path: Path, fake_clock: FakeClock
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -116,7 +116,7 @@ def test_ac19_an_account_with_no_room_gets_an_empty_object(
     assert body == {}
 
 
-def test_ac19_a_solved_creator_room_the_account_never_joined_is_started(
+def test_ac4_a_solved_creator_room_the_account_never_joined_is_started(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -131,7 +131,7 @@ def test_ac19_a_solved_creator_room_the_account_never_joined_is_started(
 @pytest.mark.parametrize(
     "case", ["joined creator room", "solved then unsolved", "unsolved then solved"]
 )
-def test_ac19_finished_wins_over_started_with_no_record_saved_yet(
+def test_ac4_finished_wins_over_started_with_no_record_saved_yet(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid, case: str
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -157,11 +157,11 @@ def test_ac19_finished_wins_over_started_with_no_record_saved_yet(
     assert body == {"4": "finished"}
 
 
-# ---- AC-20: rooms that are gone, rooms with no grid number ----------------------
+# ---- AC-5: rooms that are gone, rooms with no grid number ----------------------
 
 
 @pytest.mark.parametrize("how", ["swept", "unswept", "code reused"])
-def test_ac20_an_expired_room_leaves_the_progress(
+def test_ac5_an_expired_room_leaves_the_progress(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid, how: str
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -192,7 +192,7 @@ def test_ac20_an_expired_room_leaves_the_progress(
 
 
 @pytest.mark.parametrize("kind", ["solved", "unsolved", "swept record"])
-def test_ac20_a_room_with_no_grid_number_gives_nothing(
+def test_ac5_a_room_with_no_grid_number_gives_nothing(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid, kind: str
 ) -> None:
     solved = kind != "unsolved"
@@ -211,7 +211,7 @@ def test_ac20_a_room_with_no_grid_number_gives_nothing(
     assert body == CONTROL_ONLY
 
 
-def test_ac20_a_solved_room_expired_and_unswept_is_still_finished(
+def test_ac5_a_solved_room_expired_and_unswept_is_still_finished(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -225,11 +225,11 @@ def test_ac20_a_solved_room_expired_and_unswept_is_still_finished(
     assert body == {"1": "finished"}
 
 
-# ---- AC-21: signed out, accounts off ---------------------------------------------
+# ---- AC-6: signed out, accounts off ---------------------------------------------
 
 
 @pytest.mark.parametrize("cookie", ["none", "unknown", "expired"])
-def test_ac21_without_a_valid_session_the_progress_answers_401(
+def test_ac6_without_a_valid_session_the_progress_answers_401(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid, cookie: str
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
@@ -250,7 +250,7 @@ def test_ac21_without_a_valid_session_the_progress_answers_401(
     assert response.json() == NOT_AUTHORIZED
 
 
-def test_ac21_with_accounts_off_the_progress_answers_404(
+def test_ac6_with_accounts_off_the_progress_answers_404(
     tmp_path: Path, fake_clock: FakeClock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with host_app(
