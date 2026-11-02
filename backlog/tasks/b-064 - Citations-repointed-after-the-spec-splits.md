@@ -1,10 +1,10 @@
 ---
 id: B-064
 title: Citations repointed after the spec splits
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T17:58:00Z'
+updated_date: '2026-11-02T18:00:00Z'
 labels:
   - domain:host
   - domain:lifetime
@@ -49,11 +49,11 @@ ordinal: 19000
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -82,4 +82,15 @@ Lead (2026-11-02): started after B-058 to B-062 and B-047 merged; B-063 (in prog
 Lead: spec-checker CHANGES REQUESTED in round 1 (three « Depends on » entries, in host, library and hud, had replaced a dependency the rules still lean on; fixed by keeping both in one entry; its optional note taken: host.md:99, :138 and results.md:153 cite erasure rules 1, 5), APPROVED in round 2. The spec-writer's grep added presence.md:18-19 and :277-278, rules.md:43, server.md:81 and account.md:18. Left: shell.md and joining.md already cite reconnection (B-047); account.md:107 and :294 name « Mes salons » in running text with no file. B-063 (in progress) reverted five one-line repoints in server.md, product.md, results.md and shell.md, whose domains this task holds; this task takes them after B-063 merges.
 
 Lead: after B-063 merged (#110), the five repoints it left here were applied (server.md:269-270, product.md:44-45 and :60, results.md:136, shell.md:225), text exactly as B-063's spec-checker approved them in its round 1 before they were reverted there; no second spec check. shell.md (was done) is now approved with the rest.
+
+Lead: reviewer APPROVE in round 1; its suggestions left (a few rewritten lines past 80 columns; test comments citing old files, which mostly cite rules that stayed). Full gate green.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The one-line citations the eight spec splits left now name the new files and numbers: account/erasure.md, client/foundation.md, lobby/summaries.md, gameplay/votes.md, gameplay/viewport.md, platform/reconnection.md, admin/ops-page.md. 20 spec files touched (host, lifetime, results, library, hud, chat, room, co-op, catch-up, rooms, shell, product, account, rules, server, presence, among others); « Depends on » lists keep three files, the moved dependency named inside the entry it came from; product.md's baseline 25 changes its pointer only. No rule, criterion, test or code change.
+Criteria: none. Spec-checker: CHANGES REQUESTED round 1 (three « Depends on » entries dropped a dependency; fixed), APPROVED round 2; the five lines B-063 left here carried B-063's spec-checker approval. Reviewer: APPROVE round 1.
+Decisions: the extra citations found by grep (presence, rules, server, account) taken; account.md:107/:294 left (running text, no file); shell.md and joining.md already cited reconnection.
+Full gate: green.
+<!-- SECTION:FINAL_SUMMARY:END -->
