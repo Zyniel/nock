@@ -2,7 +2,8 @@
 id: B-055
 title: The quick gate of a change to a shared component
 status: In Progress
-assignee: []
+assignee:
+  - '@zyniel'
 created_date: '2026-11-02T00:07:00Z'
 updated_date: '2026-11-02T11:16:00Z'
 labels:
@@ -55,3 +56,15 @@ Lead: review round 1 CHANGES REQUESTED: product was missing from the map (specs/
 
 Lead: review round 2 CHANGES REQUESTED: the check read only names written Name.svelte, while room.md and hud.md list parts with the suffix once (`Salon`, `PlayersPanel` (`.svelte`)), so PlayersPanel lacked room and RoomMenu and RoomTopBar (4 domains each) were missing. Fixed in the next commit: the check now takes any capitalised word of a Code section that names a .svelte file of web/src/, the map has 5 components, a domain listed twice fails, and the check is split in two functions. A second CHANGES REQUESTED is an escalation (stuck): the task is held for the human, its PR labelled needs-human, no auto-merge.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-02T11:16:00Z
+
+---
+
+Stuck (two review rounds ended in CHANGES REQUESTED). Question: accept B-055 as fixed after round 2, or send it for a third round? Round 1: product missing from the map (fixed, plus a static check that keeps the map equal to the specs' Code sections). Round 2: that check missed names written with the suffix once (room.md, hud.md); fixed in 4a2c131, the map now has RoomPage 17 domains, GridViewport 9, PlayersPanel 5, RoomMenu 4, RoomTopBar 4. Options: A merge the PR once CI is green; B a third review round first; C drop the static check and keep the map by hand. Recommendation: A (the remaining findings were all fixed and the gate's tests stage passes).
+
+---
+<!-- COMMENTS:END -->
