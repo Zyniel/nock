@@ -49,7 +49,7 @@ ordinal: 12000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -68,6 +68,8 @@ Lead (2026-11-02): B-057 runs before B-047, which also carries domain:realtime: 
 Lead: client/hud.md rule 17 cites realtime rule 20 (the connection band) by number, outside the task's out-of-scope list (shell, joining, hints). Repointed here to reconnection rule 5 rather than left dangling until B-064; the task takes domain:hud. realtime.md ends at 17.5 KB with 19 criteria, above the 15 KB budget but the cut the pitch picked; no further split.
 
 Lead: the spec-checker APPROVED in round one; its three minor findings were taken before the commit (two lines rewrapped in realtime.md, rule 16's pointer sentence reworded, the locked-cell edge case cites realtime AC-12 again). server.md's citations by name of the moved behaviour (Depends on, rule 6, an edge case) were repointed here, server being in the task. The by-name citations left in co-op (21, 38, 247), catch-up (22, 218), rooms (18, 223), shell (20, 348), joining (19) and product.md baseline 25 (line 167, a pointer only) go to B-064's scope, which did not list them.
+
+Pull request: https://github.com/Zyniel/nock/pull/98
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
