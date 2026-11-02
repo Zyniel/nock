@@ -81,7 +81,7 @@ ordinal: 16000
 - [x] #3 Tests committed before the code
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
+- [x] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -100,6 +100,8 @@ Lead (2026-11-02): started after B-058, B-059, B-060, B-062 (the other splits). 
 Lead: by-name citations whose referent is now viewport repointed here, one line each (as B-058 and B-062 did): _design/cells.md:45, product.md:276, client/foundation.md:177, content/grids.md:209, gameplay/hints.md:209-210; the task takes those labels. Viewport's Code line keeps the Chromium-only clause (product.md rule 10, a baseline). Spec-checker APPROVED in round 1. Its notes: three test_board_*.py files move, not two (test_board_pinch_third_finger.py keeps test_ac2_); presence.md:20 (the grid under board, by name) goes to B-064's list; board's Tests line naming test_board_* stays harmless. B-055's map of shared components: viewport's Code section names GridViewport.svelte and RoomPage.svelte (the lead's tooling commit).
 
 Lead: review round 1 CHANGES REQUESTED (five web/src/ comments citing board rules 3 and 20, fixed by the implementer in b3090d9; board's Tests line still naming test_board_*, fixed by the spec-writer in 9f1d879); origin/main merged (7c2427b, no conflict). Round 2 APPROVE. presence.md:20 (« the grid » under board, by name) is for B-064, added to its list on the next board branch. Full gate green (8674 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/107
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
