@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: approved
+status: done
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
