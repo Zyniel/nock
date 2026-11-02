@@ -10,8 +10,9 @@ Usage:
 
 Stages:
     tests: ruff + black + the screens sheet up to date + spec traceability.
-    full:  everything in "tests", then pyrefly, svelte-check and the vite build
-           of web/, then pytest (browser tests included).
+    full:  everything in "tests", then pyrefly, svelte-check, the TypeScript
+           unit tests of tests/web/ (node:test) and the vite build of web/,
+           then pytest (browser tests included).
 
 Spec traceability (2026-10-24, the domain specs of specs/_map.md): every test
 points to a criterion that exists; a domain spec's criterion is proven by its own
@@ -28,8 +29,9 @@ Options of the full stage (2026-10-15, so CI can run one job per engine):
         warning, except in CI.
     --tests: "all" (default), "browser" (only the browser tests) or "other"
         (only the tests that run without a browser).
-    --skip-static: skip ruff, black, traceability, pyrefly and svelte-check,
-        for CI jobs whose static checks run in another job.
+    --skip-static: skip ruff, black, traceability, pyrefly, svelte-check and
+        the TypeScript unit tests, for CI jobs whose static checks run in
+        another job. --tests browser leaves the TypeScript unit tests out too.
     --workers: pytest-xdist workers, "auto" (one per CPU) or a number, never
         more than the machine's logical CPUs; 0 runs everything in one serial
         pass. Default: the NOCK_WORKERS environment variable, else auto. The
@@ -133,6 +135,20 @@ RUNTIME_STATIC_STEPS: list[tuple[str, list[str]]] = [
     ("svelte-check (web types)", ["npm", "--prefix", "web", "run", "check"]),
     ("grids (the repository's own)", ["python", "-c", LOAD_GRIDS_CODE]),
 ]
+# The TypeScript tests of the client's pure modules: Node's own runner, types
+# stripped by Node (22.18 or later), the Vite-style imports resolved by
+# scripts/node_test_hooks.mjs. They need no browser, so they run with the
+# static group, and they prove no criterion. Node expands the glob itself.
+NODE_TEST_STEP: tuple[str, list[str]] = (
+    "node:test (web unit tests)",
+    [
+        "node",
+        "--import",
+        "./scripts/node_test_hooks.mjs",
+        "--test",
+        "tests/web/**/*.test.ts",
+    ],
+)
 # pytest comes after the web build: browser tests load the built client.
 BUILD_STEP: tuple[str, list[str]] = (
     "vite build (web)",
@@ -231,7 +247,7 @@ def run_tool(
         )
         return None
 
-    if command[0] == "npm" and not (WEB_DIR / "node_modules").is_dir():
+    if command[0] in ("npm", "node") and not (WEB_DIR / "node_modules").is_dir():
         print("FAIL: the web dependencies are not installed. Run: npm --prefix web ci")
         return None
 
@@ -1050,7 +1066,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--skip-static",
         action="store_true",
-        help="Skip ruff, black, traceability, pyrefly and svelte-check.",
+        help="Skip ruff, black, traceability, pyrefly, svelte-check and the "
+        "TypeScript unit tests.",
     )
     parser.add_argument(
         "--workers",
@@ -1139,6 +1156,8 @@ def main() -> int:
         if run_static:
             for step_name, command in RUNTIME_STATIC_STEPS:
                 results.append(run_step(step_name, command))
+            if arguments.tests != "browser":
+                results.append(run_step(*NODE_TEST_STEP))
         build_name, build_command = BUILD_STEP
         results.append(run_step(build_name, build_command))
         if results[-1]:
