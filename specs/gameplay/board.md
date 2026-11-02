@@ -228,5 +228,5 @@ The grid itself (cells, arrows, cursors, zoom, the viewport):
   `web/src/lib/cellDisplaySwitches.ts`, `web/src/lib/RoomPage.svelte` (typing,
   keyboard, layout), `web/src/lib/roomSession.ts` (`select_cell`),
   `web/src/lib/ClueBar.svelte`, `web/src/lib/InAppKeyboard.svelte`.
-- Tests: `tests/test_board_*`, `tests/test_spec_007_*` to `009_*`, `044_*` and
-  the `tests/test_spec_042_*` files of the cited criteria.
+- Tests: `tests/test_spec_007_*` to `009_*`, `044_*` and the
+  `tests/test_spec_042_*` files of the cited criteria.
