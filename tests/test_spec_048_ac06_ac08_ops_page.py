@@ -10,7 +10,7 @@ or held, or refused, as each criterion says. Where a criterion opens the page
 
 Readings of the spec's wording:
 
-- The brand is the link « Accueil » to `/` (`admin/operations.md` AC-13): the
+- The brand is the link « Accueil » to `/` (`admin/ops-page.md` AC-3): the
   `topbar-brand` of `page-topbar`, locked, at both windows.
 - "Its column holds the `h1` then `ops-state-line` only": everything `ops-page`
   shows outside its `header` is the `h1`, the line, inside them, or a wrapper.

@@ -1,29 +1,29 @@
-"""Tests of `admin/operations.md` AC-26 to AC-31: the operator page `/ops` ignores an
+"""Tests of `admin/ops-page.md` AC-11 to AC-16: the operator page `/ops` ignores an
 answer that a later request superseded, refuses a token of another shape in the page,
 empties and focuses the token input whenever it locks, and shows a replay with a
-malformed edit as an error (rules 16, 18, 19).
+malformed edit as an error (rules 3, 5, 6).
 
-AC-26: on the dashboard `ready` on 7 days, the 1 day then the 30 days pressed, the
+AC-11: on the dashboard `ready` on 7 days, the 1 day then the 30 days pressed, the
 30-day answer coming first and the 1-day one after: the page shows the 30-day
 figures with 30 pressed, and still does once the 1-day answer has come.
 
-AC-27: the replay of `AAAAAA` asked, then that of a room whose answer comes first,
+AC-12: the replay of `AAAAAA` asked, then that of a room whose answer comes first,
 then `AAAAAA`'s 404: the card shows the room's replay, not « Salon introuvable. ».
 
-AC-28: on the form, a token of 40 characters holding `é`, one holding a space, or one
+AC-13: on the form, a token of 40 characters holding `é`, one holding a space, or one
 of 31 allowed characters, submitted: no request is sent, `sessionStorage` holds no
-token, and the form shows « Jeton refusé. » with the input empty and focused. Rule
-4's boundaries are checked on the other side: a token of 32 and one of 256 allowed
-characters are sent, as the `Authorization` header says.
+token, and the form shows « Jeton refusé. » with the input empty and focused.
+Rule 4 of `admin/operations.md` has its boundaries checked on the other side: a token
+of 32 and one of 256 allowed characters are sent, as the `Authorization` header says.
 
-AC-29: with `sessionStorage` holding a 40-character token with `é`, `/ops` sends no
+AC-14: with `sessionStorage` holding a 40-character token with `é`, `/ops` sends no
 request and opens `locked` with no error line, the token removed.
 
-AC-30: `ready` with the token, a replay answered 401 brings the form back with
-« Jeton refusé. », its input empty and focused. Rule 16 says every lock does it, so a
+AC-15: `ready` with the token, a replay answered 401 brings the form back with
+« Jeton refusé. », its input empty and focused. Rule 3 says every lock does it, so a
 429 (with `ops.throttled`) and a refused period press are checked the same way.
 
-AC-31: a replay answered 200 whose second edit has the time `hier`, or the `seq` 1.5,
+AC-16: a replay answered 200 whose second edit has the time `hier`, or the `seq` 1.5,
 puts the replay card in `error`: its one state line reads « Impossible de charger les
 données. », with no edit list, grid or slider (`ops-replay-body`), and the page
 stays `ready` with its six figures above.
@@ -147,10 +147,10 @@ def expect_thirty_days_shown(page: Page) -> None:
     assert pressed_periods(page) == ["false", "false", "true"]
 
 
-# ---- AC-26: a dashboard answer that a later request superseded  ----------------------
+# ---- AC-11: a dashboard answer that a later request superseded  ----------------------
 
 
-def test_ac26_the_1_day_answer_after_the_30_day_one_changes_nothing(
+def test_ac11_the_1_day_answer_after_the_30_day_one_changes_nothing(
     window: OpenWindow, server: OpsServer
 ) -> None:
     page = window(1280, 720)
@@ -175,10 +175,10 @@ def test_ac26_the_1_day_answer_after_the_30_day_one_changes_nothing(
     expect_thirty_days_shown(page)
 
 
-# ---- AC-27: a replay answer that a later code superseded  ----------------------------
+# ---- AC-12: a replay answer that a later code superseded  ----------------------------
 
 
-def test_ac27_the_404_of_the_first_code_after_the_second_replay_changes_nothing(
+def test_ac12_the_404_of_the_first_code_after_the_second_replay_changes_nothing(
     window: OpenWindow, server: OpsServer, fx01_grid: Grid
 ) -> None:
     page = window(1280, 720)
@@ -205,7 +205,7 @@ def test_ac27_the_404_of_the_first_code_after_the_second_replay_changes_nothing(
     )
 
 
-# ---- AC-28: a token of another shape given on the form  ------------------------------
+# ---- AC-13: a token of another shape given on the form  ------------------------------
 
 
 @pytest.mark.parametrize(
@@ -216,7 +216,7 @@ def test_ac27_the_404_of_the_first_code_after_the_second_replay_changes_nothing(
         pytest.param(TOKEN_OF_31, id="31-allowed"),
     ],
 )
-def test_ac28_a_token_of_another_shape_is_refused_with_no_request(
+def test_ac13_a_token_of_another_shape_is_refused_with_no_request(
     window: OpenWindow, server: OpsServer, token: str
 ) -> None:
     page = window(1280, 720)
@@ -235,7 +235,7 @@ def test_ac28_a_token_of_another_shape_is_refused_with_no_request(
     "token",
     [pytest.param(TOKEN_OF_32, id="32"), pytest.param(TOKEN_OF_256, id="256")],
 )
-def test_ac28_a_token_of_the_shape_is_sent_in_the_header(
+def test_ac13_a_token_of_the_shape_is_sent_in_the_header(
     window: OpenWindow, server: OpsServer, token: str
 ) -> None:
     page = window(1280, 720)
@@ -252,10 +252,10 @@ def test_ac28_a_token_of_the_shape_is_sent_in_the_header(
     assert sent.authorizations() == [f"Bearer {token}"]
 
 
-# ---- AC-29: a stored token of another shape  -----------------------------------------
+# ---- AC-14: a stored token of another shape  -----------------------------------------
 
 
-def test_ac29_a_stored_token_of_another_shape_is_removed_and_nothing_is_sent(
+def test_ac14_a_stored_token_of_another_shape_is_removed_and_nothing_is_sent(
     window: OpenWindow, server: OpsServer
 ) -> None:
     page = window(1280, 720)
@@ -272,7 +272,7 @@ def test_ac29_a_stored_token_of_another_shape_is_removed_and_nothing_is_sent(
     assert page.evaluate("key => sessionStorage.getItem(key)", OPS_TOKEN_KEY) is None
 
 
-# ---- AC-30: every lock empties and focuses the input  --------------------------------
+# ---- AC-15: every lock empties and focuses the input  --------------------------------
 
 
 @pytest.mark.parametrize(
@@ -282,7 +282,7 @@ def test_ac29_a_stored_token_of_another_shape_is_removed_and_nothing_is_sent(
         pytest.param(429, TOO_MANY_REQUESTS, "ops.throttled", id="429"),
     ],
 )
-def test_ac30_a_refused_replay_brings_the_form_back_with_the_input_empty_and_focused(
+def test_ac15_a_refused_replay_brings_the_form_back_with_the_input_empty_and_focused(
     window: OpenWindow,
     server: OpsServer,
     status: int,
@@ -305,7 +305,7 @@ def test_ac30_a_refused_replay_brings_the_form_back_with_the_input_empty_and_foc
     expect(token_input).to_be_focused()
 
 
-def test_ac30_a_refused_period_press_brings_the_form_back_with_the_input_empty(
+def test_ac15_a_refused_period_press_brings_the_form_back_with_the_input_empty(
     window: OpenWindow, server: OpsServer
 ) -> None:
     page = window(1280, 720)
@@ -318,7 +318,7 @@ def test_ac30_a_refused_period_press_brings_the_form_back_with_the_input_empty(
     expect_refused_form(page)
 
 
-# ---- AC-31: a replay whose edit is malformed is an error  ----------------------------
+# ---- AC-16: a replay whose edit is malformed is an error  ----------------------------
 
 
 def replay_with_second_edit(grid: Grid, field: str, value: object) -> object:
@@ -335,7 +335,7 @@ def replay_with_second_edit(grid: Grid, field: str, value: object) -> object:
         pytest.param("seq", 1.5, id="seq-1.5"),
     ],
 )
-def test_ac31_a_replay_with_a_malformed_edit_shows_only_the_error_line(
+def test_ac16_a_replay_with_a_malformed_edit_shows_only_the_error_line(
     window: OpenWindow, server: OpsServer, fx01_grid: Grid, field: str, value: object
 ) -> None:
     page = window(1280, 720)
