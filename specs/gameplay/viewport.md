@@ -191,11 +191,15 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
 
 ## Code
 
-- `web/src/lib/GridViewport.svelte` (cells, arrows, cursors, pinch, following
-  the selection), `web/src/lib/gridLayout.ts` (fit, zoom, arrow places, hyphen
-  dashes), `web/src/lib/HyphenEdge.svelte`, `web/src/lib/remoteSelections.ts`
-  (the corners), `web/src/lib/roomSession.ts` (the snapshot's grid check),
-  `web/src/lib/RoomPage.svelte` (the grid's box in the room page).
+- `web/src/lib/GridViewport.svelte` (placing the cells, following the
+  selection), `web/src/lib/LetterCell.svelte` (arrows, cursors, hyphen edges),
+  `web/src/lib/ClueCell.svelte` (the clue cells), `web/src/lib/pinchPan.ts`
+  (pinch and pan), `web/src/lib/legendLayout.ts` (the legend's margins),
+  `web/src/lib/gridLayout.ts` (fit, zoom, arrow places, hyphen dashes),
+  `web/src/lib/HyphenEdge.svelte`, `web/src/lib/remoteSelections.ts` (the
+  corners), `web/src/lib/roomSession.ts` (the snapshot's grid check),
+  `web/src/lib/playFit.ts` (the grid's box in the room page),
+  `web/src/lib/RoomPage.svelte` (its measure).
 - Tests: `tests/test_viewport_*`, `tests/test_spec_006_*` and the
   `tests/test_spec_042_*` files of the cited criteria; the pinch gestures of
   AC-2 and AC-16 are checked in Chromium only (`product.md` rule 10).

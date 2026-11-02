@@ -287,8 +287,9 @@ top bars (« Phone top bar », « Computer top bar »).
   `Grid.words` and `Grid.solution_letter`.
 - `src/nock/server.py`: `create_app`, the store's path, the socket route's one
   call to `connect` in a worker thread.
-- `web/src/lib/RoomTopBar.svelte`, `GridViewport.svelte`, `RoomPage.svelte`,
-  `roomSession.ts`, `RoomNote.svelte`: the undo button, shortcut and message.
+- `web/src/lib/RoomTopBar.svelte`, `gridKeys.ts`, `GridViewport.svelte`,
+  `RoomPage.svelte`, `roomSession.ts`, `RoomNote.svelte`: the undo button,
+  shortcut and message.
 - Tests: `tests/test_spec_018_*`; `tests/test_server_engine_time.py` for rule
   20, which measures durations and so runs on its own (`SERIAL_TEST_FILES`), as
   does the file of AC-25; `tests/test_server_*` for AC-23 to AC-29.

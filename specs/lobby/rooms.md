@@ -232,7 +232,7 @@ status band of « Connection lost »; before, the entry card of
   creation limit. `src/nock/settings.py`, `src/nock/__main__.py`: the
   variable.
 - `web/src/lib/playGrid.ts`, `CatalogueItem.svelte`: « Jouer »; `roomRecord.ts`:
-  the record; `PlayersPanel.svelte`: the link; `RoomPage.svelte`,
-  `roomSession.ts`: the throttled status.
+  the record; `PlayersPanel.svelte`: the link; `roomConnection.ts`,
+  `RoomPage.svelte`, `roomSession.ts`: the throttled status.
 - Tests: `tests/test_spec_010_*`, `test_spec_011_*`, AC-7 of
   `tests/test_spec_040_*`, and `tests/test_rooms_*` for AC-13 to AC-18.

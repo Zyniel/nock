@@ -156,7 +156,10 @@ The banner, `_design/overlays.md`, « Vote », on its layer of `_design/room.md`
 - `src/nock/room.py`: votes, `tick`, `replay`, `snapshot_for`, `after_restart`;
   `RoomConfig` holds the vote time.
 - `src/nock/protocol.py`: the vote messages and error codes.
-- `web/src/lib/RoomPage.svelte` (the banner), `web/src/lib/roomSession.ts`,
+- `web/src/lib/VoteBanner.svelte` (the banner and its live region),
+  `web/src/lib/RoomPage.svelte` (the ballot, what a vote disables),
+  `web/src/lib/roomCommands.ts` (the ballot message),
+  `web/src/lib/roomSession.ts`,
   `web/src/lib/voteCountdown.ts`, `web/src/lib/activityFeed.ts` (the `vote`
   line).
 - Tests: `tests/test_spec_025_ac02_*`, `test_spec_025_ac03_*`,

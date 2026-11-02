@@ -322,8 +322,10 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   `after_restart`; `RoomConfig` holds the limits.
 - `web/src/lib/clueFlags.ts`, `chat.ts`, `activityFeed.ts` (`streamEntries`,
   `trimFeed`, `FEED_LIMIT`), `scrollingLists.ts`, `ChatPanel.svelte`,
-  `ReactionPicker.svelte`, `ClueBar.svelte`, `PlayersPanel.svelte` (« Couper »),
-  `Salon.svelte`, `RoomPage.svelte`, `roomSession.ts`.
+  `ReactionPicker.svelte`, `ClueBar.svelte`, `ClueCell.svelte` (flag and
+  reaction marks), `PlayersPanel.svelte` (« Couper »), `Salon.svelte`,
+  `RoomPage.svelte` (the chat message), `roomCommands.ts` (flag, reaction),
+  `expiry.ts` (reaction expiry), `roomSession.ts`.
 - Tests: `tests/test_spec_021_*`, `test_spec_022_*`, `test_spec_013_ac05_*`,
   `test_spec_013_ac07_ac08_*`, `test_spec_047_ac12_*`, `test_spec_047_ac14_*`,
   `test_spec_043_ac16_ac18_stream.py`; `tests/test_chat_*` for AC-21 to AC-23.
