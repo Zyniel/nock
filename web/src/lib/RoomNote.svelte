@@ -76,7 +76,6 @@
   <p
     class="nock-note room-note {layout}"
     data-testid="undo-message"
-    role="status"
     style:margin-top="{marginTop}px"
     data-off={isOff ? '' : null}
   >{note.text}</p>

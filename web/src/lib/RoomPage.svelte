@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flushSync, onMount, tick, untrack } from 'svelte'
+  import { flushSync, onDestroy, onMount, tick, untrack } from 'svelte'
   import AccountDialog from './AccountDialog.svelte'
   import AideMenu from './AideMenu.svelte'
   import ClueBar from './ClueBar.svelte'
@@ -17,6 +17,8 @@
   import RoomPopover from './RoomPopover.svelte'
   import RoomTopBar from './RoomTopBar.svelte'
   import Salon from './Salon.svelte'
+  import StatusRegion from './StatusRegion.svelte'
+  import { announce, takeAnnouncing } from './announce'
   import { t } from './i18n'
   import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
   import { nameOf, streamEntries } from './activityFeed'
@@ -462,6 +464,29 @@
   // A nickname refused by the server is shown as a characters error.
   let shownError = $derived(formError ?? (session.nicknameRefused ? 'characters' : null))
 
+  // ---- The status region (client/hud.md rules 17 and 18) ----
+
+  // The page's region takes the messages while no sheet is open. It is taken
+  // here, before the sheets are made, so that a sheet is always taken after it.
+  let statusRegion: StatusRegion | undefined = $state()
+  onDestroy(takeAnnouncing((text) => statusRegion?.write(text)))
+
+  // The connection band shows its text from the moment it appears.
+  let isBandShown = $derived(session.status === 'reconnecting')
+  $effect(() => {
+    if (isBandShown) {
+      announce(t('room.banner.offline'))
+    }
+  })
+
+  // The grid status is announced each time it appears or its text changes; its
+  // move between the clue bar's row and the band changes neither.
+  $effect(() => {
+    if (gridStatusText !== null) {
+      announce(gridStatusText)
+    }
+  })
+
   // ---- The page before the first snapshot (spec 046) ----
 
   // The statuses that refuse entry: before any snapshot each shows its card.
@@ -641,6 +666,13 @@
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
   let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
+  let gridStatusText = $derived(
+    gridStatus === 'solved'
+      ? t('completion.solved')
+      : gridStatus === 'full_wrong'
+        ? t('completion.full_wrong')
+        : null,
+  )
   // Where the status shows (spec 026 AC-10, spec 044): in the clue bar's row
   // while the in-app keyboard shows on a low window, where a band would take the
   // grid's height; under the bar, as a band, everywhere else. A solved page has
@@ -1513,6 +1545,7 @@
     }
     shownUndoRefusals = session.undoRefusals
     shownNote = newShownNote(true, null, t('undo.nothing'))
+    announce(t('undo.nothing'))
   })
 
   // A note leaves once it has faded, unless a newer one replaced it.
@@ -2128,7 +2161,7 @@
 {/snippet}
 
 {#snippet statusInRow()}
-  <p class="grid-status in-row" data-testid="grid-status" data-state={gridStatus} role="status">
+  <p class="grid-status in-row" data-testid="grid-status" data-state={gridStatus}>
     {@render gridStatusContent()}
   </p>
 {/snippet}
@@ -2174,11 +2207,17 @@
             autocomplete="nickname"
             placeholder={t('room.default_nickname')}
             aria-invalid={shownError !== null ? 'true' : undefined}
+            aria-describedby={shownError !== null ? 'nickname-error' : undefined}
             bind:value={nicknameText}
           />
         </div>
         {#if shownError !== null}
-          <p class="nock-error-line nickname-error" data-testid="nickname-error" role="alert">
+          <p
+            class="nock-error-line nickname-error"
+            id="nickname-error"
+            data-testid="nickname-error"
+            role="alert"
+          >
             {shownError === 'length' ? t('join.error.length') : t('join.error.characters')}
           </p>
         {/if}
@@ -2211,6 +2250,8 @@
   data-pending={String(session.pending.length)}
   data-grid={gridLabel(session)}
 >
+  <!-- The page's status region, there from the first paint in every state. -->
+  <StatusRegion bind:this={statusRegion} testId="status-region" />
   {#if isEntryPage}
     {@render entryPage()}
   {:else}
@@ -2303,7 +2344,7 @@
     </RoomPopover>
   {/if}
   {#if session.status === 'reconnecting'}
-    <p class="room-band connection-banner" data-testid="connection-banner" role="status">
+    <p class="room-band connection-banner" data-testid="connection-banner">
       <span class="connection-dot" data-testid="connection-dot" aria-hidden="true"></span><span
         >{t('room.banner.offline')}</span
       >
@@ -2480,7 +2521,6 @@
               class="grid-status band"
               data-testid="grid-status"
               data-state={gridStatus}
-              role="status"
               style:width={clueBarWidth === null ? null : `${clueBarWidth}px`}
               bind:offsetHeight={statusBandHeight}
             >

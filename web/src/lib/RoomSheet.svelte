@@ -1,12 +1,16 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte'
+  import { onDestroy, type Snippet } from 'svelte'
+  import { takeAnnouncing } from './announce'
+  import StatusRegion from './StatusRegion.svelte'
 
   // The frame the room sheets share (client/hud.md rule 13): the host's
   // settings, the account, the recap and the room-gone dialog. A modal dialog
   // named by its title, centred in the column layout and a bottom sheet in the
   // sheet layout (app.css, `.room-sheet`). It holds what they do alike: the
   // Tab trap, the rules of Escape and of the backdrop, and the close event. The
-  // sheets put their content in it and keep their own look.
+  // sheets put their content in it and keep their own look. It holds the
+  // sheet's status region (client/hud.md rule 18): while the sheet is open it
+  // takes the messages that the page's region would take.
   let {
     layout,
     title,
@@ -54,6 +58,24 @@
   let dialog: HTMLDialogElement | null = $state(null)
   // True from a press that started on the backdrop until the click it ends in.
   let isPressOnBackdrop = false
+  let region: StatusRegion | undefined = $state()
+  // Gives the messages back to the region behind, or null while the sheet is shut.
+  let releaseAnnouncing: (() => void) | null = null
+
+  function stopAnnouncing(): void {
+    if (releaseAnnouncing !== null) {
+      releaseAnnouncing()
+      releaseAnnouncing = null
+    }
+  }
+
+  // The sheet is closed, whatever closed it.
+  function closed(): void {
+    stopAnnouncing()
+    onClosed()
+  }
+
+  onDestroy(stopAnnouncing)
 
   // Show the sheet over the page; the browser moves the focus into it. Nothing
   // happens when it is already open or is no longer on the page.
@@ -61,6 +83,8 @@
     if (dialog === null || dialog.open || !dialog.isConnected) {
       return
     }
+    region?.clear()
+    releaseAnnouncing = takeAnnouncing((text) => region?.write(text))
     dialog.showModal()
   }
 
@@ -69,6 +93,7 @@
     if (dialog === null || !dialog.open) {
       return false
     }
+    stopAnnouncing()
     dialog.close()
     return true
   }
@@ -180,11 +205,12 @@
   aria-labelledby={titleId}
   aria-describedby={describedBy}
   oncancel={onCancel}
-  onclose={onClosed}
+  onclose={closed}
   onkeydown={onKeydown}
   onmousedown={onPress}
   onclick={onClick}
 >
   <h2 class="room-sheet-title" id={titleId}>{title}</h2>
   {@render children()}
+  <StatusRegion bind:this={region} testId="sheet-status-region" />
 </dialog>

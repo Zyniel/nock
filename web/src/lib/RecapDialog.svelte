@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { announce } from './announce'
   import { newLinkCopier } from './copyLink'
   import { t } from './i18n'
   import { displayNickname } from './nickname'
@@ -47,6 +48,9 @@
   let copied = $state(false)
   const shareLinkCopier = newLinkCopier((isCopied) => {
     copied = isCopied
+    if (isCopied) {
+      announce(t('room.share.copied'))
+    }
   })
 
   let shownPlayers = $derived(recap === null ? [] : shownRecapPlayers(recap.players))
@@ -72,6 +76,7 @@
 
   onMount(() => {
     sheet?.open()
+    announce(t('recap.loading'))
     void loadRecap()
     return () => shareLinkCopier.stop()
   })
@@ -189,7 +194,7 @@
         >
       </div>
       {#if copied}
-        <p class="nock-done-line recap-copied" data-testid="recap-copied" role="status">
+        <p class="nock-done-line recap-copied" data-testid="recap-copied">
           {t('room.share.copied')}
         </p>
       {/if}
@@ -197,7 +202,7 @@
   {:else if dialogState === 'error'}
     <p class="nock-error-line" data-testid="recap-error" role="alert">{t('recap.error')}</p>
   {:else}
-    <p class="nock-muted-line" data-testid="recap-loading" role="status">{t('recap.loading')}</p>
+    <p class="nock-muted-line" data-testid="recap-loading">{t('recap.loading')}</p>
   {/if}
   <button
     type="button"
