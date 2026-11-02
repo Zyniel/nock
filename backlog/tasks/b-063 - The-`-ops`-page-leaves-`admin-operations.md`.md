@@ -4,7 +4,7 @@ title: The `/ops` page leaves `admin/operations.md`
 status: Done
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T17:33:00Z'
+updated_date: '2026-11-02T17:34:00Z'
 labels:
   - domain:operations
   - domain:ops-page
@@ -76,7 +76,7 @@ ordinal: 18000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -95,6 +95,8 @@ Lead (2026-11-02): started after B-047 (#109, which held domain:operations and a
 Lead: operations AC-26 to AC-31 (added after the task, all the page and its replay) moved with it: ops-page 16 criteria, operations 15. By-name repoints kept: overrides.md, gameplay/viewport.md Out of scope (the task takes domain:viewport), _settings.md:24. Repoints in server.md:269-270, product.md:44-45 and :60, results.md:136, shell.md:225 were reverted: B-064 (in progress) holds those domains and takes them after this task merges. Spec-checker APPROVED in round 1; its minor notes left (« latency measured in the browsers » now in ops-page's Out of scope; ops-page named inside overrides' operations bullet rather than its own, Depends on being at three).
 
 Lead: reviewer APPROVE in round 1 (it also ran the nine test files of the moved criteria directly: 165 passed); its three suggestions taken (762e765: a lost bullet dash and the browser latency exclusion back in operations; 163dcb0: harness comments). Full gate green (8704 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/110
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
