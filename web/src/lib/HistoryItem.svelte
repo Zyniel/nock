@@ -1,41 +1,18 @@
 <script lang="ts">
   import MetaSep from './MetaSep.svelte'
+  import PlayButton from './PlayButton.svelte'
   import { finishedText, teammatesText, timeText, type HistoryRecord } from './history'
   import { t } from './i18n'
-  import { playGrid } from './playGrid'
 
   // One finished grid of the history list (spec 029), a list row (spec 046):
   // its title and its one line of date, time and team-mates, then "Rejouer"
   // on the right when the grid has a number.
   let { record }: { record: HistoryRecord } = $props()
 
-  let isStarting = $state(false)
+  // True when « Rejouer », the play steps of spec 010 for the grid number,
+  // could not create the room: the row shows its error line.
   let hasFailed = $state(false)
-
-  // A page restored from the back-forward cache keeps its old state: start again.
-  function onPageShow(event: PageTransitionEvent): void {
-    if (event.persisted) {
-      isStarting = false
-    }
-  }
-
-  // Replay runs the play steps of spec 010 for the grid number; the button
-  // stays disabled while the request runs.
-  async function replay(number: number): Promise<void> {
-    if (isStarting) {
-      return
-    }
-    isStarting = true
-    hasFailed = false
-    const started = await playGrid(number)
-    if (!started) {
-      isStarting = false
-      hasFailed = true
-    }
-  }
 </script>
-
-<svelte:window onpageshow={onPageShow} />
 
 <li
   class="nock-list-row"
@@ -70,13 +47,12 @@
   </div>
   {#if record.grid !== null}
     {@const number = record.grid}
-    <button
-      type="button"
+    <PlayButton
+      {number}
       class="nock-button nock-button-secondary"
       data-testid="history-replay"
       aria-label={t('history.replay_label', { number })}
-      disabled={isStarting}
-      onclick={() => replay(number)}>{t('history.replay')}</button
+      bind:hasFailed>{t('history.replay')}</PlayButton
     >
   {/if}
 </li>
