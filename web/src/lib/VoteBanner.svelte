@@ -234,8 +234,8 @@
 
      Over the grid (spec 025 decision 9): absolutely placed, so it takes no
      height from the grid. The vote wins over the Salon sheet and the scrim
-     (spec 022 decision 16), which come later in the page on layer 8: it is
-     drawn one layer above them. Its top, left and right edges are 8 px inside
+     (spec 022 decision 16), which come later in the page, the sheet on layer
+     8 and the scrim on layer 7: it is drawn above them. Its top, left and right edges are 8 px inside
      the grid area: `grid-area` in the sheet layout (its 8 px padding, so the
      banner lies on the viewport's edges), the viewport in the column layout
      (under the grid area's 12 px top padding). */

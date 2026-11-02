@@ -811,7 +811,6 @@
     }
   }
 
-
   // The letter cells of the snapshot's grid, by "row,column": built once per
   // snapshot, so that finding a cell reads no other cell.
   let letterCells = $derived(

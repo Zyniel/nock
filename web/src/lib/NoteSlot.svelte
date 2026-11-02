@@ -12,8 +12,7 @@
   let {
     latestNote,
     undoRefusals,
-    // Named as the room page names it, so that the note effects read as before.
-    isBannerShown: isVoteBannerShown,
+    isBannerShown,
     isStreamShown,
     layout,
     bannerHeight,
@@ -58,7 +57,6 @@
   // stream shows by then: the player reads the same line there.
   $effect(() => {
     const latest = latestNote
-    const isBannerShown = isVoteBannerShown
     if (latest !== null && latest.id !== handledRoomNoteId) {
       handledRoomNoteId = latest.id
       receiveRoomNote(latest.kind, latest.text, isBannerShown)
@@ -69,13 +67,13 @@
     }
   })
 
-  function receiveRoomNote(kind: string | null, text: string, isBannerShown: boolean): void {
+  function receiveRoomNote(kind: string | null, text: string, waitsForBanner: boolean): void {
     if (untrack(() => isStreamShown)) {
       waitingNote = null
       return
     }
     const note = newShownNote(false, kind, text)
-    if (isBannerShown) {
+    if (waitsForBanner) {
       waitingNote = note
       return
     }
@@ -125,7 +123,7 @@
     <RoomNote
       note={shownNote}
       {layout}
-      bannerHeight={isVoteBannerShown ? bannerHeight : 0}
+      bannerHeight={isBannerShown ? bannerHeight : 0}
       onOpen={openSalonFromNote}
       onGone={onNoteGone}
     />
