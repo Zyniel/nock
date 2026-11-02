@@ -15,7 +15,8 @@ gives the Salon (`client/room.md`) its column or its sheet.
 ## Depends on
 
 - `product.md`: the supported windows and the accessibility baselines.
-- `gameplay/board.md`: the grid, its fit, the selection, the in-app keyboard.
+- `gameplay/viewport.md`: the grid and its fit; the selection and the in-app
+  keyboard are `gameplay/board.md`.
 - `client/room.md`: the Salon's open and closed states, which the layout, the
   scrim and the play area follow.
 
@@ -83,7 +84,7 @@ gives the Salon (`client/room.md`) its column or its sheet.
     Details are hidden from screen readers. Following « Retour aux grilles »
     or the brand asks nothing: the page loads `/`, and the player,
     disconnected, keeps the seat, to resume from « Mes salons »
-    (`lobby/joining.md`).
+    (`lobby/summaries.md`).
 11. A switch flips in place, the Menu open and focused on it. Every other item
     closes the Menu: « Inviter » opens the Salon on « Joueurs » focused on
     « Copier le lien »; « Réglages de l'hôte » and « Compte » open their sheet;

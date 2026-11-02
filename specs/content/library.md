@@ -18,7 +18,8 @@ never send a clue or an answer.
 - `content/grid-files.md`: the index, the number, published and withdrawn.
 - `lobby/rooms.md`: « Jouer » on each card, its failure's cause, and the writing
   of `nock.progress`.
-- `account/account.md`: the sign-in status and the account's progress.
+- `account/account.md`: the sign-in status; the account's progress is
+  `account/erasure.md`.
 
 ## Rules
 
@@ -51,7 +52,7 @@ never send a clue or an answer.
 7. A card's progress is `finished` if either source says so, else `started` if
    either does, else none. The sources, read the same way: `localStorage`
    `nock.progress` (`lobby/rooms.md` writes it) and the body of `GET
-   /api/account/progress` (`account/account.md` rule 24), never stored on the
+   /api/account/progress` (`account/erasure.md` rule 10), never stored on the
    device; each a JSON object from grid numbers in decimal to `"started"` or
    `"finished"`. Each value is read on its own: any other value, a missing key,
    text that is not JSON or JSON that is not an object means no progress from
@@ -69,7 +70,7 @@ never send a clue or an answer.
    answered signed in (`account/account.md` rule 13), it asks `GET
    /api/account/progress` once; signed out, never.
 9. Its column holds, in order: the heading, « Mes salons » when it shows
-   (`lobby/joining.md`), the force filter, then one state line or the cards,
+   (`lobby/summaries.md`), the force filter, then one state line or the cards,
    then « Grilles terminées » when it shows (`gameplay/results.md`). By state:
 
    | State | After the heading |
@@ -266,9 +267,9 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   grid's layout.
 - Reloading the grid list while the server runs: `content/grid-files.md`.
 - « Jouer », the room it creates and the writing of `nock.progress`:
-  `lobby/rooms.md`. « Mes salons »: `lobby/joining.md`. « Grilles terminées »:
-  `gameplay/results.md`. « Compte », its dialog and how the account's progress
-  is derived: `account/account.md`.
+  `lobby/rooms.md`. « Mes salons »: `lobby/summaries.md`. « Grilles terminées »:
+  `gameplay/results.md`. « Compte » and its dialog: `account/account.md`; how
+  the account's progress is derived: `account/erasure.md`.
 - The frame of entry pages, the page not found, the scans of every page and
   their fit at every window: `client/shell.md`.
 
