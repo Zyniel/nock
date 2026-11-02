@@ -1,3 +1,47 @@
+<script lang="ts" module>
+  import type { StreamEntry } from './activityFeed'
+  import type { PlayerView } from './roomSession'
+
+  // The words' progress: the words whose every cell shows a letter, and all
+  // the words.
+  export interface SalonProgress {
+    filledWords: number
+    totalWords: number
+  }
+
+  // What the Discussion tab shows.
+  export interface SalonChat {
+    // The stream, oldest first.
+    entries: StreamEntry[]
+    names: Map<string, string>
+    // The colour index of each player of the kept snapshot, by id.
+    colours: Map<string, number>
+    isMuted: boolean
+    isPaced: boolean
+    isJoined: boolean
+  }
+
+  // What the Joueurs tab shows.
+  export interface SalonRoster {
+    players: PlayerView[]
+    isHost: boolean
+    // The clue of each player's selected word, by player id.
+    clues: Map<string, string>
+    shareLink: string
+  }
+
+  // What the Salon asks the room page to do.
+  export interface SalonActions {
+    onSend: (text: string) => void
+    onMute: (playerId: string, isPlayerMuted: boolean) => void
+    onRemove: (playerId: string) => void
+    // Escape while the focus is inside the Salon.
+    onEscape: () => void
+    // A mute is about to disable the focused chat input.
+    onMuted: () => void
+  }
+</script>
+
 <script lang="ts">
   // The Salon (spec 043, "Salon"): a bottom sheet in the sheet layout, a side
   // column in the column layout. It shows the words' progress, then two tabs,
@@ -6,67 +50,33 @@
   import { tick } from 'svelte'
   import ChatPanel from './ChatPanel.svelte'
   import PlayersPanel from './PlayersPanel.svelte'
-  import type { StreamEntry } from './activityFeed'
   import { listenForEscape } from './escapeKey'
   import { t } from './i18n'
-  import type { PlayerView } from './roomSession'
 
   let {
     layout,
     isOpen,
     tab = $bindable(),
-    filledWords,
-    totalWords,
-    entries,
-    names,
-    colours,
-    players,
+    progress,
+    chat,
+    roster,
     you,
-    isHost,
-    isMuted,
-    isPaced,
-    isJoined,
     isAccessibilityOn,
-    clues,
-    shareLink,
     chatText = $bindable(),
-    onSend,
-    onMute,
-    onRemove,
-    onEscape,
-    onMuted,
+    actions,
     element = $bindable(null),
   }: {
     layout: 'sheet' | 'column'
     isOpen: boolean
     // The selected tab; the choice holds for the page's life.
     tab: 'discussion' | 'players'
-    // The words whose every cell shows a letter, and all the words.
-    filledWords: number
-    totalWords: number
-    // The stream of the Discussion tab, oldest first.
-    entries: StreamEntry[]
-    names: Map<string, string>
-    // The colour index of each player of the kept snapshot, by id.
-    colours: Map<string, number>
-    players: PlayerView[]
+    progress: SalonProgress
+    chat: SalonChat
+    roster: SalonRoster
     you: string
-    isHost: boolean
-    isMuted: boolean
-    isPaced: boolean
-    isJoined: boolean
     isAccessibilityOn: boolean
-    // The clue of each player's selected word, by player id.
-    clues: Map<string, string>
-    shareLink: string
     chatText: string
-    onSend: (text: string) => void
-    onMute: (playerId: string, isPlayerMuted: boolean) => void
-    onRemove: (playerId: string) => void
-    // Escape while the focus is inside the Salon.
-    onEscape: () => void
-    // A mute is about to disable the focused chat input.
-    onMuted: () => void
+    actions: SalonActions
     // The Salon's element, for the room page.
     element?: HTMLElement | null
   } = $props()
@@ -76,7 +86,9 @@
   let discussionTab: HTMLButtonElement | null = $state(null)
   let playersTab: HTMLButtonElement | null = $state(null)
 
-  let progressShare = $derived(totalWords === 0 ? 0 : filledWords / totalWords)
+  let progressShare = $derived(
+    progress.totalWords === 0 ? 0 : progress.filledWords / progress.totalWords,
+  )
 
   // Move the focus into the Salon once it shows: to the message input when the
   // Discussion tab is selected and the input is enabled, else to the selected
@@ -115,7 +127,7 @@
     if (element === null) {
       return
     }
-    return listenForEscape(element, onEscape)
+    return listenForEscape(element, actions.onEscape)
   })
 </script>
 
@@ -132,7 +144,7 @@
   {/if}
   <div class="salon-progress" data-testid="salon-progress">
     <span class="salon-progress-text" data-testid="salon-progress-text"
-      >{t('salon.progress', { filled: filledWords, total: totalWords })}</span
+      >{t('salon.progress', { filled: progress.filledWords, total: progress.totalWords })}</span
     >
     <div class="salon-progress-bar" data-testid="salon-progress-bar" aria-hidden="true">
       <div class="salon-progress-fill" style:width="{progressShare * 100}%"></div>
@@ -163,35 +175,35 @@
       tabindex={tab === 'players' ? 0 : -1}
       bind:this={playersTab}
       onclick={() => (tab = 'players')}
-      onkeydown={onTabKeydown}>{t('salon.players_tab', { count: players.length })}</button
+      onkeydown={onTabKeydown}>{t('salon.players_tab', { count: roster.players.length })}</button
     >
   </div>
   <ChatPanel
-    {entries}
-    {names}
-    {colours}
+    entries={chat.entries}
+    names={chat.names}
+    colours={chat.colours}
     {you}
     isShown={tab === 'discussion'}
-    {isMuted}
-    {isPaced}
-    {isJoined}
+    isMuted={chat.isMuted}
+    isPaced={chat.isPaced}
+    isJoined={chat.isJoined}
     {isAccessibilityOn}
     bind:text={chatText}
     bind:input={chatInput}
-    {onSend}
-    {onMuted}
+    onSend={actions.onSend}
+    onMuted={actions.onMuted}
   />
   <PlayersPanel
-    {players}
+    players={roster.players}
     {you}
-    {isHost}
+    isHost={roster.isHost}
     isShown={tab === 'players'}
     {isAccessibilityOn}
-    {clues}
-    {shareLink}
+    clues={roster.clues}
+    shareLink={roster.shareLink}
     bind:copyButton
-    {onMute}
-    {onRemove}
+    onMute={actions.onMute}
+    onRemove={actions.onRemove}
   />
 </aside>
 

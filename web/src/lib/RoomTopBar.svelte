@@ -1,3 +1,58 @@
+<script lang="ts" module>
+  // The timer slot: the timer, or the button that shows it again.
+  export interface TopBarTimer {
+    isShown: boolean
+    baseMs: number
+    isRunning: boolean
+    anchor: number
+  }
+
+  // What « Annuler », « Crayon » and « Clavier » show.
+  export interface TopBarEditing {
+    // Once the grid is solved, « Annuler », « Crayon » and « Clavier » are
+    // disabled.
+    isSolved: boolean
+    // True once a final status made the grid read-only (client/hud.md rule 19):
+    // « Annuler » is disabled.
+    isReadOnly: boolean
+    isPencilMode: boolean
+    // « Clavier » shows on a touch screen only, pressed while the in-app
+    // keyboard shows.
+    isTouchScreen: boolean
+    isKeyboardShown: boolean
+  }
+
+  // What the buttons « Aide », « Salon » and « Menu » have open.
+  export interface TopBarOverlays {
+    isAideOpen: boolean
+    isMenuOpen: boolean
+    isSalonOpen: boolean
+  }
+
+  // The badge or the dot on « Salon ».
+  export interface TopBarSalonBadge {
+    // The messages of others that came since the stream was last shown.
+    unreadLines: number
+    // True while the new-events dot shows: lines of other players came since
+    // the stream was last shown, and no message is unread.
+    hasNewEvents: boolean
+    // The accessible name of « Salon » while the badge or the dot shows, else
+    // null.
+    label: string | null
+  }
+
+  // What each button of the bar asks the room page to do.
+  export interface TopBarActions {
+    onShowTimer: () => void
+    onUndo: () => void
+    onTogglePencil: () => void
+    onToggleKeyboard: () => void
+    onToggleAide: () => void
+    onToggleSalon: () => void
+    onToggleMenu: () => void
+  }
+</script>
+
 <script lang="ts">
   // The room's top bar (spec 043, "Top bar"): the timer slot and five or six
   // buttons. The phone top bar (54 px) draws each icon above its label; the
@@ -15,71 +70,26 @@
   let {
     form,
     isOpening,
-    isTimerShown,
-    timerBaseMs,
-    isTimerRunning,
-    timerAnchor,
-    isSolved,
-    isReadOnly,
-    isPencilMode,
-    isTouchScreen,
-    isKeyboardShown,
-    isAideOpen,
-    isMenuOpen,
-    isSalonOpen,
-    unreadLines,
-    hasNewEvents,
-    salonLabel,
+    timer,
+    editing,
+    overlays,
+    salonBadge,
     aideButton = $bindable(null),
     menuButton = $bindable(null),
     chatToggle = $bindable(null),
-    onShowTimer,
-    onUndo,
-    onTogglePencil,
-    onToggleKeyboard,
-    onToggleAide,
-    onToggleSalon,
-    onToggleMenu,
+    actions,
   }: {
     form: 'phone' | 'computer'
     // True before the first snapshot (spec 046, "Opening the room").
     isOpening: boolean
-    isTimerShown: boolean
-    timerBaseMs: number
-    isTimerRunning: boolean
-    timerAnchor: number
-    // Once the grid is solved, « Annuler », « Crayon » and « Clavier » are
-    // disabled.
-    isSolved: boolean
-    // True once a final status made the grid read-only (client/hud.md rule 19):
-    // « Annuler » is disabled.
-    isReadOnly: boolean
-    isPencilMode: boolean
-    // « Clavier » shows on a touch screen only, pressed while the in-app
-    // keyboard shows.
-    isTouchScreen: boolean
-    isKeyboardShown: boolean
-    isAideOpen: boolean
-    isMenuOpen: boolean
-    isSalonOpen: boolean
-    // The messages of others that came since the stream was last shown.
-    unreadLines: number
-    // True while the new-events dot shows: lines of other players came since
-    // the stream was last shown, and no message is unread.
-    hasNewEvents: boolean
-    // The accessible name of « Salon » while the badge or the dot shows, else
-    // null.
-    salonLabel: string | null
+    timer: TopBarTimer
+    editing: TopBarEditing
+    overlays: TopBarOverlays
+    salonBadge: TopBarSalonBadge
     aideButton?: HTMLButtonElement | null
     menuButton?: HTMLButtonElement | null
     chatToggle?: HTMLButtonElement | null
-    onShowTimer: () => void
-    onUndo: () => void
-    onTogglePencil: () => void
-    onToggleKeyboard: () => void
-    onToggleAide: () => void
-    onToggleSalon: () => void
-    onToggleMenu: () => void
+    actions: TopBarActions
   } = $props()
 </script>
 
@@ -88,8 +98,8 @@
     testId="undo-button"
     icon="undo"
     label={t('room.undo')}
-    disabled={isSolved || isReadOnly}
-    onclick={onUndo}
+    disabled={editing.isSolved || editing.isReadOnly}
+    onclick={actions.onUndo}
   />
 {/snippet}
 
@@ -98,9 +108,9 @@
     testId="pencil-toggle"
     icon="crayon"
     label={t('pencil.toggle')}
-    ariaPressed={isPencilMode}
-    disabled={isSolved}
-    onclick={onTogglePencil}
+    ariaPressed={editing.isPencilMode}
+    disabled={editing.isSolved}
+    onclick={actions.onTogglePencil}
   />
 {/snippet}
 
@@ -109,9 +119,9 @@
     testId="keyboard-toggle"
     icon="clavier"
     label={t('keyboard.label')}
-    ariaPressed={isKeyboardShown}
-    disabled={isSolved}
-    onclick={onToggleKeyboard}
+    ariaPressed={editing.isKeyboardShown}
+    disabled={editing.isSolved}
+    onclick={actions.onToggleKeyboard}
   />
 {/snippet}
 
@@ -120,10 +130,10 @@
     testId="aide-button"
     icon="aide"
     label={t('topbar.aide')}
-    ariaExpanded={isAideOpen}
+    ariaExpanded={overlays.isAideOpen}
     ariaControls="aide-menu"
     bind:element={aideButton}
-    onclick={onToggleAide}
+    onclick={actions.onToggleAide}
   >
     {#if form === 'computer'}
       <span class="aide-caret" data-testid="aide-caret" aria-hidden="true"></span>
@@ -136,17 +146,17 @@
     testId="chat-toggle"
     icon="salon"
     label={t('topbar.salon')}
-    ariaLabel={salonLabel}
-    ariaExpanded={isSalonOpen}
+    ariaLabel={salonBadge.label}
+    ariaExpanded={overlays.isSalonOpen}
     ariaControls="salon"
     bind:element={chatToggle}
-    onclick={onToggleSalon}
+    onclick={actions.onToggleSalon}
   >
-    {#if unreadLines > 0}
+    {#if salonBadge.unreadLines > 0}
       <span class="nock-badge chat-unread" data-testid="chat-unread" aria-hidden="true"
-        >{unreadBadgeText(unreadLines)}</span
+        >{unreadBadgeText(salonBadge.unreadLines)}</span
       >
-    {:else if hasNewEvents}
+    {:else if salonBadge.hasNewEvents}
       <span class="salon-dot" data-testid="salon-dot" aria-hidden="true"></span>
     {/if}
   </TopBarButton>
@@ -157,10 +167,10 @@
     testId="menu-button"
     icon="menu"
     label={t('topbar.menu')}
-    ariaExpanded={isMenuOpen}
+    ariaExpanded={overlays.isMenuOpen}
     ariaControls="room-menu"
     bind:element={menuButton}
-    onclick={onToggleMenu}
+    onclick={actions.onToggleMenu}
   />
 {/snippet}
 
@@ -171,15 +181,15 @@
   <div class="timer-slot">
     {#if isOpening}
       <!-- The timer slot stays empty until the room exists (spec 046). -->
-    {:else if isTimerShown}
-      <RoomTimer baseMs={timerBaseMs} isRunning={isTimerRunning} anchor={timerAnchor} />
+    {:else if timer.isShown}
+      <RoomTimer baseMs={timer.baseMs} isRunning={timer.isRunning} anchor={timer.anchor} />
     {:else}
       <TopBarButton
         testId="timer-show"
         icon="chrono"
         label={t('timer.label')}
         ariaLabel={t('timer.toggle_label')}
-        onclick={onShowTimer}
+        onclick={actions.onShowTimer}
       />
     {/if}
   </div>
@@ -190,7 +200,7 @@
       {@render undoButton()}
       {@render aideMenuButton()}
       {@render salonButton()}
-      {#if isTouchScreen}
+      {#if editing.isTouchScreen}
         {@render keyboardButton()}
       {:else}
         {@render pencilButton()}
@@ -201,7 +211,7 @@
       {@render pencilButton()}
       {@render aideMenuButton()}
       {@render salonButton()}
-      {#if isTouchScreen}
+      {#if editing.isTouchScreen}
         {@render keyboardButton()}
       {/if}
       {@render roomMenuButton()}

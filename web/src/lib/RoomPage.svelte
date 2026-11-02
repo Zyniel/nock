@@ -15,8 +15,19 @@
   import RoomGoneDialog from './RoomGoneDialog.svelte'
   import RoomMenu from './RoomMenu.svelte'
   import RoomPopover from './RoomPopover.svelte'
-  import RoomTopBar from './RoomTopBar.svelte'
-  import Salon from './Salon.svelte'
+  import RoomTopBar, {
+    type TopBarActions,
+    type TopBarEditing,
+    type TopBarOverlays,
+    type TopBarSalonBadge,
+    type TopBarTimer,
+  } from './RoomTopBar.svelte'
+  import Salon, {
+    type SalonActions,
+    type SalonChat,
+    type SalonProgress,
+    type SalonRoster,
+  } from './Salon.svelte'
   import StatusRegion from './StatusRegion.svelte'
   import VoteBanner from './VoteBanner.svelte'
   import { announce, takeAnnouncing } from './announce'
@@ -1458,6 +1469,63 @@
     return clues
   }
 
+  // ---- What the top bar and the Salon are given ----
+
+  // Each group is a derived object: it is made again only when one of its
+  // values changes, so the top bar and the Salon do not work out again what
+  // depends on it at every change of the page. The actions never change.
+  let topBarTimer: TopBarTimer = $derived({
+    isShown: isTimerShown,
+    baseMs: session.timerBaseMs,
+    isRunning: session.timerRunning,
+    anchor: session.timerAnchor,
+  })
+  let topBarEditing: TopBarEditing = $derived({
+    isSolved: session.solved,
+    isReadOnly,
+    isPencilMode,
+    isTouchScreen,
+    isKeyboardShown,
+  })
+  let topBarOverlays: TopBarOverlays = $derived({
+    isAideOpen: openPopover === 'aide',
+    isMenuOpen: openPopover === 'menu',
+    isSalonOpen,
+  })
+  let salonBadge: TopBarSalonBadge = $derived({ unreadLines, hasNewEvents, label: salonLabel })
+  const topBarActions: TopBarActions = {
+    onShowTimer: () => setTimerShown(true),
+    onUndo,
+    onTogglePencil: togglePencilMode,
+    onToggleKeyboard: toggleKeyboard,
+    onToggleAide: () => togglePopover('aide'),
+    onToggleSalon: toggleSalon,
+    onToggleMenu: () => togglePopover('menu'),
+  }
+
+  let salonProgress: SalonProgress = $derived({ filledWords, totalWords: words.length })
+  let salonChat: SalonChat = $derived({
+    entries: stream,
+    names: session.names,
+    colours: playerColours,
+    isMuted,
+    isPaced: isChatPaced,
+    isJoined,
+  })
+  let salonRoster: SalonRoster = $derived({
+    players: session.snapshot === null ? [] : session.snapshot.players,
+    isHost,
+    clues: rosterClues,
+    shareLink,
+  })
+  const salonActions: SalonActions = {
+    onSend: sendChat,
+    onMute: toggleMute,
+    onRemove: removePlayer,
+    onEscape: onSalonEscape,
+    onMuted: () => chatToggle?.focus(),
+  }
+
   // ---- The play area (spec 043, "Play area and fit") ----
 
   // The block of the grid, the clue bar and the status, as large as the play
@@ -1716,31 +1784,14 @@
     <RoomTopBar
       form={topBarForm}
       {isOpening}
-      {isTimerShown}
-      timerBaseMs={session.timerBaseMs}
-      isTimerRunning={session.timerRunning}
-      timerAnchor={session.timerAnchor}
-      isSolved={session.solved}
-      {isReadOnly}
-      {isPencilMode}
-      {isTouchScreen}
-      {isKeyboardShown}
-      isAideOpen={openPopover === 'aide'}
-      isMenuOpen={openPopover === 'menu'}
-      {isSalonOpen}
-      {unreadLines}
-      {hasNewEvents}
-      {salonLabel}
+      timer={topBarTimer}
+      editing={topBarEditing}
+      overlays={topBarOverlays}
+      {salonBadge}
       bind:aideButton
       bind:menuButton
       bind:chatToggle
-      onShowTimer={() => setTimerShown(true)}
-      {onUndo}
-      onTogglePencil={togglePencilMode}
-      onToggleKeyboard={toggleKeyboard}
-      onToggleAide={() => togglePopover('aide')}
-      onToggleSalon={toggleSalon}
-      onToggleMenu={() => togglePopover('menu')}
+      actions={topBarActions}
     />
   {/if}
   {#if session.snapshot !== null}
@@ -1948,26 +1999,13 @@
         {layout}
         isOpen={isSalonOpen}
         bind:tab={salonTab}
-        {filledWords}
-        totalWords={words.length}
-        entries={stream}
-        names={session.names}
-        colours={playerColours}
-        players={session.snapshot.players}
+        progress={salonProgress}
+        chat={salonChat}
+        roster={salonRoster}
         {you}
-        {isHost}
-        {isMuted}
-        isPaced={isChatPaced}
-        isJoined={session.status === 'joined'}
         {isAccessibilityOn}
-        clues={rosterClues}
-        {shareLink}
         bind:chatText
-        onSend={sendChat}
-        onMute={toggleMute}
-        onRemove={removePlayer}
-        onEscape={onSalonEscape}
-        onMuted={() => chatToggle?.focus()}
+        actions={salonActions}
         bind:element={salonElement}
       />
     </div>
