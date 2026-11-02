@@ -4,7 +4,7 @@ title: Split `RoomPage.svelte` and `GridViewport.svelte`
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T16:55:00Z'
+updated_date: '2026-11-02T18:03:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -76,4 +76,6 @@ ordinal: 10000
 Lead (2026-11-02): started after B-047 (#109) merged: B-042 to B-047 changed the same files. B-048 (node:test) and B-055 (the quick gate of a shared component) are merged, as the human's order asked. Open question 1, the props drilled through Salon and RoomTopBar: A, grouped into a few objects (the lead's default). RoomPage.svelte is 3,073 lines and GridViewport.svelte 1,490 today (the report said 2,720 and 1,321). Base: origin/main b9871e7.
 
 Lead: the Plan agent (Fable, high) checked the report's split against today's code; plan taken as written: 14 steps, one commit each, risk rising (1 L25 leftovers; 2 roomCommands.ts; 3 gridKeys.ts, legendLayout.ts, pinch math; 4 expiry.ts; 5 roomConnection.ts with injected deps read at call time — openSocket, now, random, isHidden — the only writer of session.status but the parser; 6 roomOverlays.ts reducer; 7 GridStatus; 8 EntryPage; 9 VoteBanner, always mounted with its live region; 10 NoteSlot; 11 LetterCell, ClueCell, use:pinchPan; 12 the props of Salon and RoomTopBar grouped as $derived objects (question 1, A); 13 playFit.ts on Opus; 14 the specs' Code sections and B-055's map, last). Decisions: pure .ts modules with the $state kept in RoomPage rather than .svelte.ts rune modules (Node-testable, no change of effect ordering); roomCommands.ts mandatory and before roomConnection.ts; the connection exposes onOnline()/onVisible() rather than owning DOM listeners. Step 14 changes the Code sections of about 20 domain specs: it waits until B-063 and B-064 (in progress, many of those domains) merge. Node unit tests (tests/web/) pin roomConnection, roomCommands, expiry, roomOverlays, gridKeys, legendLayout, playFit and reconnectDelay before the moves; the components are covered by the browser tests. Full gate after steps 5, 11 and 13; three engines at the end.
+
+Lead: tests 239 in tests/web/ (one per module plus roomConnectionHarness.ts), checked by the test-writer against a scratch copy of today's logic (all pass) and against deliberate breakages (each fails). Interface decisions: the connection takes a joinPlan() hook (identity, nickname) instead of heldIdentity/defaultNickname, so it needs no room code; gridKeyAction returns { kind: 'modifier' } for a modifier key alone (keeps the Escape release), distinct from 'none' (clears it); announcementOf lives in gridKeys.ts; onEnded only when the room is gone (4404); join(nickname) sets joining and sends, the status guard and nicknameRefused reset stay in RoomPage; resent edits keep the base_seq stored when typed; a join plan with both an identity and a nickname uses the identity (as planAutomaticJoin).
 <!-- SECTION:NOTES:END -->
