@@ -160,7 +160,7 @@ gives the Salon (`client/room.md`) its column or its sheet.
 17. From its first paint, in every state, the room page holds one region with
     `role="status"`, read but not seen, empty until its first message and kept
     for the page's life. The messages the domains call announced are written
-    to it as text: the connection band (`platform/realtime.md` rule 20), the
+    to it as text: the connection band (`platform/reconnection.md` rule 5), the
     grid status (`gameplay/rules.md` rule 5), `undo.nothing` (`client/room.md`
     rule 8), `room.share.copied` (`lobby/rooms.md` rule 11). The elements that
     show them have no live role: no `role="status"`, no `aria-live`. A message

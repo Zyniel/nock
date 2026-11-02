@@ -4,20 +4,18 @@ file: realtime
 status: done
 ---
 
-# platform/realtime - Room events, reconnection and fair play
+# platform/realtime - Room events and fair play
 
 ## Purpose
 
 The browser and the server talk over one WebSocket per room, in one validated
-contract. A player whose connection drops keeps typing and gets their seat back
-with nothing to re-enter. No browser receives an answer letter before the room
-earns it.
+contract. No browser receives an answer letter before the room earns it.
 
 ## Depends on
 
 - `lobby/joining.md`: the join's steps, resume, seat back and past players.
 - `platform/server.md`: the log every event is written to before it is sent.
-- `gameplay/co-op.md`: edits, their check order and the page's pending edits.
+- `gameplay/co-op.md`: edits and their check order.
 
 ## Rules
 
@@ -78,20 +76,21 @@ earns it.
      `settings_changed` and `host_changed` (the host role passed on);
    - `platform/server.md`: `undo` (take back one's last edit).
 8. No client message carries an event seq; the four cell edits carry an
-   optional `base_seq` (rule 15). The 16 server messages that change the room
-   require `seq` >= 1; `selection_moved`, `reaction`, `pong` and `error` refuse
-   one; `snapshot.seq` is >= 0.
+   optional `base_seq` (`platform/reconnection.md` rule 1). The 16 server
+   messages that change the room require `seq` >= 1; `selection_moved`,
+   `reaction`, `pong` and `error` refuse one; `snapshot.seq` is >= 0.
 9. A letter is one character `A` to `Z`. A join's nickname is 2 to 20 code points
    once stripped, case untouched (`lobby/joining.md` adds its rules). A chat text
    is 1 to 280 code points once stripped as Python's `str.strip()` does. A
    snapshot lists at most 8 players. A reveal targets a letter or a word, a check
    also the grid.
 10. Error codes (19), each with the domain that gives it its meaning:
-    `invalid_message`, `not_joined`, `rate_limited`, `stale_edit`,
-    `not_a_letter_cell` (this file); `room_full`, `invalid_nickname`
-    (`lobby/joining.md`); `room_locked`, `removed`, `not_host`, `invalid_target`
-    (`lobby/host.md`); `cell_locked` (`gameplay/co-op.md`); `nothing_to_undo`
-    (`platform/server.md`); `grid_solved` (`gameplay/rules.md`);
+    `invalid_message`, `not_joined`, `rate_limited`, `not_a_letter_cell` (this
+    file); `stale_edit` (`platform/reconnection.md`); `room_full`,
+    `invalid_nickname` (`lobby/joining.md`); `room_locked`, `removed`,
+    `not_host`, `invalid_target` (`lobby/host.md`); `cell_locked`
+    (`gameplay/co-op.md`); `nothing_to_undo` (`platform/server.md`);
+    `grid_solved` (`gameplay/rules.md`);
     `help_disabled`, `budget_exhausted`, `vote_in_progress`, `no_open_vote`
     (`gameplay/hints.md`); `muted` (`social/chat.md`). An error's text is
     English, for logs; pages use the code.
@@ -123,15 +122,8 @@ earns it.
 14. `player_id` is public. `resume_token` is secret: drawn at random for each new
     player, sent only in that player's snapshots, given back in `join`.
 
-### Disconnection, offline edits and the resume window
+### Disconnection
 
-15. A cell edit sent again after a reconnection carries `base_seq`, the last seq
-    the page had applied when the edit was made; an edit without one is never
-    stale. A live `confirm_pencil` also carries the page's seq
-    (`gameplay/co-op.md`). With `base_seq` b, the edit is `stale_edit` when the
-    cell last changed after b by another player; else it applies as a live
-    edit. The rate limit comes before the letter-cell check, which comes before
-    `cell_locked`, then staleness (the full order: `gameplay/co-op.md`).
 16. A closed socket disconnects its player at once. A connected player with no
     frame for 6 seconds is disconnected and their socket closed with 4408; the
     room checks every second, each player in roster order. A socket not yet
@@ -139,45 +131,8 @@ earns it.
     counted from its opening and again from each frame, is closed with 4408 by
     its own connection, on the socket's loop: no room task is needed, and none
     runs for a room whose sockets are all unjoined. An accepted join ends the
-    count.
-17. The resume window is 300 seconds. A player disconnected for exactly 300 still
-    resumes; past that they time out, at the next check or inside a join with
-    their token: `player_left` with `timed_out`, then they are a past player whom
-    the join seats back (`lobby/joining.md`). A host who times out hands over at
-    once (`lobby/host.md`). Time-outs due while a room was not running apply
-    first when it runs again.
-
-### The page's connection
-
-18. While its socket is open the page sends `ping` every 2 seconds; when no frame
-    of any kind has come for 4 seconds, the connection is lost at once: the socket
-    is dropped, and its late frames and close event change nothing.
-19. Any close or socket error is a loss, 4408 and 4503 included, except a final
-    one: 4404, 4429, 4001, or a close after an `error` `room_full`,
-    `room_locked` or `removed`. A final close ends the tries with its state
-    (`client/shell.md`).
-20. After a loss, once the page has joined: state `reconnecting`, the room
-    status reads `room.status.reconnecting`, and the connection band shows
-    `room.banner.offline` within 5 seconds, with no live role, announced by
-    the status region (`client/hud.md` rule 17). The grid stays
-    usable: typed and erased letters show and wait as pending edits; an undo, a
-    check or a reveal made meanwhile is kept in its place among them; nothing
-    is sent without an open socket. Before the first snapshot: state
-    `connecting`, no band, and a shown nickname form stays.
-21. A new socket opens after 1, 2, 4, 8 seconds, then every 8 seconds, without
-    end; the browser's `online` event tries at once, replacing a socket still
-    connecting. On open, the page joins as `lobby/joining.md` rule 8 says.
-22. On a snapshot: state `joined`, band hidden, delays back to 1 second. After
-    a loss, the page then sends the selection it holds, if any, as one
-    `select_cell` (the server cleared it at the disconnection,
-    `social/presence.md` rule 8). Then the pending edits, each with its
-    `base_seq`, and the kept undos, checks and reveals go out in the order
-    they were made, each request after the edits that were pending when it
-    was made and before any later one: the first at once and one every 100 ms.
-    An edit, undo, check or reveal made while these go out queues behind them;
-    otherwise it is sent at once. No edit, undo, check or reveal is sent
-    between the socket opening and its snapshot. Pending edits and kept
-    requests live in memory only: a reload loses them.
+    count. A disconnected player's resume window is `platform/reconnection.md`
+    rule 2.
 
 ### Fair play
 
@@ -211,10 +166,6 @@ earns it.
     and stops on a refused value (`platform/serving.md` rules 6, 10). An app
     reads it each time it starts and fails its start with `SettingsError` on a
     refused value; each app keeps its counts in memory. `/ops` cannot change it.
-
-### Look
-
-The connection band follows `_design/room.md`, « Connection lost ».
 
 ## Acceptance criteria
 
@@ -276,24 +227,6 @@ The connection band follows `_design/room.md`, « Connection lost ».
   gets `player_state_changed` `disconnected` and the silent socket closes with
   4408; a socket the client closes is seen with no wait, and the other page's
   roster shows the state within 300 ms. (← 017 AC-4)
-- **AC-16** Bob (colour 1, not host), disconnected at t, resumes with his token
-  at t + 300 (same id, nickname, colour and letters); at t + 300.5 the join
-  gives `player_left` `timed_out` then his own `player_joined` (were he host,
-  `host_changed` between them); a reload of a page resumes its player without
-  the form. (← 017 AC-3)
-- **AC-17** In a room at seq 10 where Bob wrote `B` at (1, 0) at seq 8, Ana's
-  `T` there with `base_seq` 7 gets `stale_edit` and the cell keeps `B`; with
-  `base_seq` 8 it applies, as it does with 7 when the change at seq 9 was hers.
-  (← 017 AC-2)
-- **AC-18** When the socket closes with 1011, or goes silent, within 5 seconds
-  the band, with no live role, shows « Connexion perdue. Vous pouvez
-  continuer : vos lettres seront envoyées au retour du réseau. », which the
-  status region reads, the room status reads « Reconnexion… », and a typed
-  `t` shows `T`; a close with 4404,
-  4429 or 4001 ends the tries; the next snapshot hides the band. (← 017 AC-1)
-- **AC-19** With 30 letters typed offline, the reconnect snapshot is followed by
-  the 30 edits in order over about 3 seconds, never more than 10 in a second, and
-  none before it; an `online` event opens a socket at once. (← 017 AC-5)
 - **AC-20** On FX-01 with `VI-DE` and `NA-VAL`, the view's (2, 2) has
   `hyphen_right` true and (1, 1) `hyphen_down` true, every other mark false;
   on FX-01 as published every mark is false; a letter cell written without the
@@ -315,22 +248,13 @@ The connection band follows `_design/room.md`, « Connection lost ».
   one-line message holding the name and `repr()` of the value, and no server
   runs; `python -m nock` exits with 1; an app starting with it fails with
   `SettingsError`.
-- **AC-24** Offline, Ana types `T` at (1, 0), her selection moving to (1, 1)
-  across: after her reconnection snapshot, Bob receives `selection_moved` for
-  Ana on (1, 1) across, then the `letter_changed` of her `T`.
 
 ## Edge cases
 
 - The server reads a binary frame like a text one (AC-9); the page ignores the
   binary frames it receives (`client/shell.md`).
 - A frame of 4,097 bytes with few characters is still refused (AC-9).
-- An erase and a pencil letter follow the stale rule; a `base_seq` above the
-  room's seq is never stale; edits that reached the server before the loss are
-  resent and apply again with no visible change (AC-17).
-- A cell locked since the edit gets `cell_locked`, not `stale_edit`; with the
-  limit reached, `rate_limited` comes before both (AC-12, AC-17).
 - A player who only pings, or only sends invalid frames, is never silent (AC-15).
-- Two tabs never take the room from each other in a loop: 4001 is final (AC-18).
 - A typed letter replaced later stays earned at that cell, never at another
   (AC-13); a revealed letter is earned when its `cell_locked` is sent, not
   before (`gameplay/hints.md`).
@@ -347,16 +271,18 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - What each event does to the room: the gameplay and social domains. The join's
   steps, takeover with 4001 and past players: `lobby/joining.md`. Host hand-over
   and the creator: `lobby/host.md`. The wrong-code throttle: `lobby/rooms.md`.
-- The page's seq buffer and its other connection states: `client/shell.md`.
-  Presence states in the roster: `social/presence.md`.
+- Stale edits, the resume window, the page's heartbeat, losses, retries and
+  resends: `platform/reconnection.md`. The page's seq buffer and its other
+  connection states: `client/shell.md`. Presence states in the roster:
+  `social/presence.md`.
 - Durable state across a restart, the log and undo: `platform/server.md`.
   Stalled, flooding and oversized sockets: `product.md`. What changed while
   away: `social/catch-up.md`.
 - Throttling other messages: chat and reactions, `social/chat.md`; checks and
   reveals, `gameplay/hints.md`; wrong codes, `lobby/rooms.md`; `undo`,
   `select_cell`, ballots and the rest are not limited.
-- Peer-to-peer sync, pending edits or kept requests across a reload, a leave
-  message, message acknowledgements, a Content Security Policy.
+- Peer-to-peer sync, a leave message, message acknowledgements, a Content
+  Security Policy.
 
 ## Code
 
@@ -366,11 +292,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
   the join deadline of `RoomConnection`, `MAX_FRAME_BYTES`.
   `src/nock/server.py`: the socket route, the sockets per address.
   `src/nock/settings.py`, `src/nock/__main__.py`: the variable.
-- `src/nock/room.py`: `tick`, `disconnect_player`, the edit checks, the stale
-  rule, the rate limit; `RoomConfig` holds the silence, join deadline, resume
-  and rate values.
-- `web/src/lib/roomSession.ts`, `RoomPage.svelte`: heartbeat, losses, retries,
-  the selection sent again, resent edits, kept requests.
-- Tests: `tests/test_spec_039_*`, `tests/test_spec_017_*`,
+- `src/nock/room.py`: `tick`, `disconnect_player`, the edit checks, the rate
+  limit; `RoomConfig` holds the silence, join deadline and rate values.
+- Tests: `tests/test_spec_039_*`, `tests/test_spec_017_ac04_*`,
   `tests/test_spec_037_*`, `tests/test_spec_040_ac07_ac13_*`;
-  `tests/test_realtime_*` for AC-21 to AC-24.
+  `tests/test_realtime_*` for AC-20 to AC-23.

@@ -1,6 +1,6 @@
 """Tests of gameplay/hints AC-24: a check and a reveal made offline keep their place.
 
-Rule 11, with `platform/realtime.md` rules 20 and 22. Ana is in a room of the live
+Rule 11, with `platform/reconnection.md` rules 5 and 7. Ana is in a room of the live
 server (help `free`), her page behind a `RoomSocketProxy` (`realtime_harness`).
 Her socket is taken away; offline she types `T`, `X` from (1, 0), then picks
 « Vérifier » « Le mot » and « Révéler » « La lettre » with the selection on

@@ -8,7 +8,7 @@ of silence, the reconnect delays) on the page clock, which is frozen before the
 page loads and moved by hand with `advance_page`. The shared setup is in
 `spec017_harness`.
 
-Refined by `platform/realtime.md` AC-18 (B-046): the band has no live role, and the
+Refined by `platform/reconnection.md` AC-3 (B-046): the band has no live role, and the
 page's status region reads its text (`client/hud.md` rule 17).
 """
 

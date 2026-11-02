@@ -16,8 +16,8 @@ played.
 
 ## Depends on
 
-- `platform/realtime.md`: the messages, delivery by seq, refusals, close codes
-  and the resume window.
+- `platform/realtime.md`: the messages, delivery by seq, refusals and close
+  codes; the resume window and the resends are `platform/reconnection.md`.
 - `lobby/joining.md`: resume and seat back; room expiry and deletion are
   `lobby/lifetime.md`.
 - `gameplay/co-op.md`: the edits that undo reverses and the page's pending
@@ -76,13 +76,13 @@ played.
    step run before anything else and logged like any step: each
    player not disconnected becomes disconnected at that time, with one
    `player_state_changed` each in roster order, selection and recent edits
-   cleared. Their resume window runs from then (`platform/realtime.md`). What
-   the restart step does to chat windows, the vote and the timer:
-   `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every other
-   read (summaries, catch-up, the recaps, the account's rooms and history, the
-   operator's edits) replays the room from the store without making it live,
-   with no restart step and no log entry. A lookup that meets an expired room deletes
-   it instead (`lobby/lifetime.md`).
+   cleared. Their resume window runs from then (`platform/reconnection.md`
+   rule 2). What the restart step does to chat windows, the vote and the
+   timer: `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every
+   other read (summaries, catch-up, the recaps, the account's rooms and
+   history, the operator's edits) replays the room from the store without
+   making it live, with no restart step and no log entry. A lookup that meets
+   an expired room deletes it instead (`lobby/lifetime.md`).
 
 ### Undo
 
@@ -107,8 +107,8 @@ played.
    all until the grid is solved, when they send nothing and the button is
    disabled (`gameplay/rules.md` rule 6).
    An undo is sent after the edits pending when it was made and before any
-   later edit, across a reconnection too (`platform/realtime.md` rules 20 and
-   22). An error `nothing_to_undo` shows `undo.nothing` (« Rien à annuler. »)
+   later edit, across a reconnection too (`platform/reconnection.md` rules 5
+   and 7). An error `nothing_to_undo` shows `undo.nothing` (« Rien à annuler. »)
    for 3 seconds; no other error does. The undo's `letter_changed` only
    updates the confirmed grid (`gameplay/co-op.md` rule 12).
 
@@ -243,7 +243,8 @@ top bars (« Phone top bar », « Computer top bar »).
 ## Edge cases
 
 - A crash loses no event a player saw; an edit being applied when the process
-  died is lost, and its page sends it again (`platform/realtime.md`) (AC-3).
+  died is lost, and its page sends it again (`platform/reconnection.md` rule 7)
+  (AC-3).
 - A room that crashed without a snapshot still loads whole from its log (AC-1).
 - An undo of an erase brings the letter back, authored by the undoer; an undo
   after one's own second edit of the same cell goes back one step only (AC-10).

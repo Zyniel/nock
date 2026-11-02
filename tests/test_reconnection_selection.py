@@ -1,6 +1,6 @@
-"""Tests of platform/realtime AC-24: the selection is sent again after a return.
+"""Tests of platform/reconnection AC-5: the selection is sent again after a return.
 
-Rules 20 and 22. Ana and Bob are in a room of the live server, each page behind a
+Rules 5 and 7. Ana and Bob are in a room of the live server, each page behind a
 `RoomSocketProxy` (`realtime_harness`). Ana's socket is taken away; offline she
 types `T` at (1, 0), her selection moving to (1, 1) across. The server cleared
 her selection when her socket closed (`social/presence.md` rule 8), so after her
@@ -101,7 +101,7 @@ def ana_offline_after_t(page: Page, ana: Player, bob: Player) -> None:
     expect_selection(page, 1, 1, "across", TAMIS_KEY)
 
 
-def test_ac24_bob_hears_anas_selection_before_her_offline_letter(
+def test_ac5_bob_hears_anas_selection_before_her_offline_letter(
     page: Page,
     browser: Browser,
     live_server: str,

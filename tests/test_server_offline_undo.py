@@ -1,6 +1,6 @@
 """Tests of platform/server AC-29: an undo keeps its place among offline edits.
 
-Rule 9, with `platform/realtime.md` rules 20 and 22. Ana and Bob are in a room of
+Rule 9, with `platform/reconnection.md` rules 5 and 7. Ana and Bob are in a room of
 the live server, each page behind a `RoomSocketProxy` (`realtime_harness`).
 Ana's socket is taken away; offline she types `T`, `A`, `M` from (1, 0) and
 presses Control+z: after `M`, between `A` and `M`, or 50 ms after the snapshot of
