@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import AccountEmailForm from './AccountEmailForm.svelte'
   import EntryFrame from './EntryFrame.svelte'
+  import FocusableLink from './FocusableLink.svelte'
   import {
     LINK_TOKEN,
     deleteAccount,
@@ -138,12 +139,10 @@
           {t('account.signed_in_as', { email })}
         </p>
         {#if roomCode !== null}
-          <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-          <a
+          <FocusableLink
             class="nock-text-link"
             data-testid="account-room-link"
-            href={`/r/${roomCode}`}
-            tabindex="0">{t('account.back_to_room', { code: roomCode })}</a
+            href={`/r/${roomCode}`}>{t('account.back_to_room', { code: roomCode })}</FocusableLink
           >
         {/if}
         <div class="nock-button-row" data-testid="account-actions">
@@ -202,9 +201,8 @@
         <p class="nock-done-line" data-testid="account-state-line" role="status">
           {t('account.deleted')}
         </p>
-        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-        <a class="nock-button nock-button-primary" data-testid="account-home" href="/" tabindex="0"
-          >{t('share.home')}</a
+        <FocusableLink class="nock-button nock-button-primary" data-testid="account-home" href="/"
+          >{t('share.home')}</FocusableLink
         >
       {:else if pageState === 'error'}
         <p class="nock-error-line" data-testid="account-state-line" role="alert">

@@ -1,5 +1,6 @@
 <script lang="ts">
   import AccountEmailForm from './AccountEmailForm.svelte'
+  import FocusableLink from './FocusableLink.svelte'
   import RoomSheet from './RoomSheet.svelte'
   import type { AccountStatus } from './account'
   import { t } from './i18n'
@@ -55,8 +56,9 @@
 >
   {#if status.signed_in}
     <p>{t('account.signed_in_as', { email: status.email ?? '' })}</p>
-    <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-    <a class="nock-text-link" data-testid="account-page-link" href="/account" tabindex="0">{t('account.manage')}</a>
+    <FocusableLink class="nock-text-link" data-testid="account-page-link" href="/account"
+      >{t('account.manage')}</FocusableLink
+    >
   {:else}
     <p class="intro">
       {room === null ? t('account.signed_out_intro') : t('account.dialog_intro')}
@@ -85,8 +87,9 @@
     color: var(--nock-muted);
   }
 
-  /* The text link to the account page (app.css), as wide as its text. */
-  a {
+  /* The text link to the account page (app.css), as wide as its text. The
+     link is FocusableLink's element, reached through the dialog's class. */
+  :global(.account-dialog a) {
     align-self: flex-start;
   }
 

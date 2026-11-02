@@ -3,6 +3,7 @@
   // then the nickname card or the card of a status that refuses entry. The
   // room page checks the nickname and joins.
   import EntryFrame from './EntryFrame.svelte'
+  import FocusableLink from './FocusableLink.svelte'
   import { t } from './i18n'
   import type { RoomStatus } from './roomSession'
 
@@ -39,15 +40,17 @@
           {t('room.status.not_found_detail')}
         </p>
       {/if}
-      <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1).
-           "Voir les grilles" is primary where it is the only way on. -->
-      <a
-        class="nock-button"
-        class:nock-button-primary={status === 'not_found'}
-        class:nock-button-secondary={status !== 'not_found'}
+      <!-- "Voir les grilles" is primary where it is the only way on. -->
+      <FocusableLink
+        class={[
+          'nock-button',
+          {
+            'nock-button-primary': status === 'not_found',
+            'nock-button-secondary': status !== 'not_found',
+          },
+        ]}
         data-testid="entry-home"
-        href="/"
-        tabindex="0">{t('share.home')}</a
+        href="/">{t('share.home')}</FocusableLink
       >
     </div>
   {:else}
