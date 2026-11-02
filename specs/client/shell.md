@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: approved
+status: done
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation
@@ -187,11 +187,6 @@ fonts, focus ring, shared components, state lines).
   not-found pages »; the opening and state lines: « States: opening, loading,
   empty, error »; the plain pages: « Plain pages: account, shared recap,
   operator ».
-
-## New interface
-
-- `web/src/i18n/fr.json`: `list.separator` (« , » then a space),
-  `unit.hours` (« h »), `unit.minutes` (« min »).
 
 ## Acceptance criteria
 
