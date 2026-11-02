@@ -145,7 +145,7 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
 
 ## Code
 
-- `web/src/lib/RoomPage.svelte` (the Salon's state, the dot, the notes),
+- `web/src/lib/RoomPage.svelte` (the Salon's state, the dot),
   `roomOverlays.ts` (what each action leaves open) and its parts
   `Salon.svelte`, `PlayersPanel.svelte`, `RoomNote.svelte`, `NoteSlot.svelte`
   (the note slot); `chat.ts` (badge, dot); `roomSession.ts` (what makes a

@@ -342,8 +342,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 
 - `web/src/lib/RoomPage.svelte` (layout, overlays, play area), `roomOverlays.ts`
   (the one-overlay rule), `playFit.ts` (layout, the grid's box, the clue bar's
-  width, the legend's place), `GridStatus.svelte` (the status region) and its
-  parts: `RoomTopBar.svelte`, `RoomPopover.svelte`, `AideMenu.svelte`,
+  width, the legend's place), `StatusRegion.svelte` and `announce.ts` (the
+  status region, announced by `RoomPage.svelte`), `GridStatus.svelte` (the
+  grid's completion line) and its parts: `RoomTopBar.svelte`, `RoomPopover.svelte`, `AideMenu.svelte`,
   `RoomMenu.svelte`, `ClueBar.svelte`, `RoomGoneDialog.svelte`,
   `RoomSheet.svelte` (the room sheets' shared dialog and its region);
   `windowForm.ts`.
