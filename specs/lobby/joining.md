@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: done
+status: approved
 ---
 
 # lobby/joining - Joining, resuming and « Mes salons »
@@ -39,7 +39,8 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 3. Every page shows a nickname as plain text in capitalised words: the first
    character and each one after a space, `-`, `'` or `’` (not `_`) in capitals,
    the rest small, so `JEAN-LUC` reads `Jean-Luc` and a Greek name keeps its final
-   sigma. An erased player's `--` (`account/account.md`) reads « Ancien joueur ».
+   sigma. An erased player's `--` (`account/erasure.md` rule 2) reads « Ancien
+   joueur ».
 
 ### Join
 

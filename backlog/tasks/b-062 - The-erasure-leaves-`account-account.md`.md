@@ -4,10 +4,11 @@ title: The erasure leaves `account/account.md`
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T10:36:00Z'
+updated_date: '2026-11-02T10:45:00Z'
 labels:
   - domain:account
   - domain:erasure
+  - domain:joining
 milestone: m-3
 dependencies: []
 documentation:
@@ -28,6 +29,38 @@ ordinal: 17000
 - Screens: none.
 - Open questions: none.
 <!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 erasure AC-1 (new, was account AC-3)
+- [ ] #2 account AC-3 (deleted, moved to erasure AC-1)
+- [ ] #3 erasure AC-2 (new, was account AC-14)
+- [ ] #4 account AC-14 (deleted, moved to erasure AC-2)
+- [ ] #5 erasure AC-3 (new, was account AC-15)
+- [ ] #6 account AC-15 (deleted, moved to erasure AC-3)
+- [ ] #7 erasure AC-4 (new, was account AC-19)
+- [ ] #8 account AC-19 (deleted, moved to erasure AC-4)
+- [ ] #9 erasure AC-5 (new, was account AC-20)
+- [ ] #10 account AC-20 (deleted, moved to erasure AC-5)
+- [ ] #11 erasure AC-6 (new, was account AC-21)
+- [ ] #12 account AC-21 (deleted, moved to erasure AC-6)
+- [ ] #13 erasure AC-7 (new, was account AC-22)
+- [ ] #14 account AC-22 (deleted, moved to erasure AC-7)
+- [ ] #15 erasure AC-8 (new, was account AC-24)
+- [ ] #16 account AC-24 (deleted, moved to erasure AC-8)
+- [ ] #17 erasure AC-9 (new, was account AC-25)
+- [ ] #18 account AC-25 (deleted, moved to erasure AC-9)
+- [ ] #19 erasure AC-10 (new, was account AC-26)
+- [ ] #20 account AC-26 (deleted, moved to erasure AC-10)
+- [ ] #21 erasure AC-11 (new, was account AC-27)
+- [ ] #22 account AC-27 (deleted, moved to erasure AC-11)
+- [ ] #23 erasure AC-12 (new, was account AC-28)
+- [ ] #24 account AC-28 (deleted, moved to erasure AC-12)
+- [ ] #25 erasure AC-13 (new, was account AC-29)
+- [ ] #26 account AC-29 (deleted, moved to erasure AC-13)
+- [ ] #27 erasure AC-14 (new, was account AC-30)
+- [ ] #28 account AC-30 (deleted, moved to erasure AC-14)
+<!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
@@ -51,4 +84,6 @@ ordinal: 17000
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead (2026-11-02): started in parallel with B-048's review (different domains). Spec-writer on Fable at high (new domain). Base: origin/main 4005dc3.
+
+Lead: the by-name citations of moved content in product.md (routes table owner cells, core flow 8) and joining.md rule 3 (« Ancien joueur ») are repointed here, as the pitch's answer for B-059's route cell; the task takes domain:joining (B-059 not started). By-number citations left to their tasks: operations.md:49/51/69 (B-063); host.md:99/129/136/138, lifetime.md:85, results.md:153, library.md:53 (B-064). Spec-checker APPROVED in round 1. Its note: account AC-2, AC-10, AC-13 prove behaviour whose rules are now erasure rules 3 and 4, and account's Depends on (three files, the template's maximum) cannot list erasure; left, the out-of-scope line links them.
 <!-- SECTION:NOTES:END -->
