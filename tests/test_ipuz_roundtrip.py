@@ -1,14 +1,14 @@
-"""Tests of grid-files AC-7: a grid file survives load, write and load.
+"""Tests of content/ipuz AC-2: a grid file survives load, write and load.
 
-The writer of rule 14 (`write_ipuz`) writes the text of a loaded file; reading it
+The writer of rule 8 (`write_ipuz`) writes the text of a loaded file; reading it
 again gives the same file. The shared setup is in `grid_files_harness`.
 
 Choices where the spec leaves room:
 
 - A written `puzzle` is compared with `0` and `"0"` taken as the same value
-  (rule 6), since rule 14 only says `#` and `0`.
-- Rule 11's fields that are absent are expected to be left out of the text
-  ("the fields of rule 11 that are present").
+  (rule 2), since rule 8 only says `#` and `0`.
+- The fields of `content/grid-files.md` rule 11 that are absent are expected to
+  be left out of the text ("the fields of rule 11 that are present").
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ def vide_across_data(answer: str = "VI-DE", enumeration: str = "2-2") -> JsonDat
     return data
 
 
-def test_ac7_a_file_with_title_and_publisher_survives_write_and_read() -> None:
+def test_ac2_a_file_with_title_and_publisher_survives_write_and_read() -> None:
     data = fx01_ipuz_data()
     data["title"] = "Grille du jour"
     data["publisher"] = "Le Journal"
@@ -58,7 +58,7 @@ def test_ac7_a_file_with_title_and_publisher_survives_write_and_read() -> None:
     assert second.publisher == "Le Journal"
 
 
-def test_ac7_the_writer_writes_the_fields_of_rule_5_and_the_clues() -> None:
+def test_ac2_the_writer_writes_the_fields_of_rule_5_and_the_clues() -> None:
     expected = fx01_ipuz_data()
 
     written = written_json(fx01_ipuz_data())
@@ -71,7 +71,7 @@ def test_ac7_the_writer_writes_the_fields_of_rule_5_and_the_clues() -> None:
     assert written["clues"] == expected["clues"]
 
 
-def test_ac7_the_writer_writes_the_puzzle_with_hash_and_zero() -> None:
+def test_ac2_the_writer_writes_the_puzzle_with_hash_and_zero() -> None:
     expected = fx01_ipuz_data()
 
     written = written_json(fx01_ipuz_data())
@@ -85,7 +85,7 @@ def test_ac7_the_writer_writes_the_puzzle_with_hash_and_zero() -> None:
     assert written_rows == expected_rows
 
 
-def test_ac7_the_writer_writes_the_fields_of_rule_11_that_are_present() -> None:
+def test_ac2_the_writer_writes_the_fields_of_rule_11_that_are_present() -> None:
     data = fx01_ipuz_data()
     data["title"] = "Grille du jour"
     data["publisher"] = "Le Journal"
@@ -102,7 +102,7 @@ def test_ac7_the_writer_writes_the_fields_of_rule_11_that_are_present() -> None:
     ("answer", "enumeration"),
     [("VI-DE", "2-2"), ("VI.DE", "2.2"), ("VI DE", "2 2")],
 )
-def test_ac7_a_word_is_written_with_its_separator_and_its_dashed_edge(
+def test_ac2_a_word_is_written_with_its_separator_and_its_dashed_edge(
     answer: str, enumeration: str
 ) -> None:
     first = read_data(vide_across_data(answer, enumeration))
@@ -129,7 +129,7 @@ def test_ac7_a_word_is_written_with_its_separator_and_its_dashed_edge(
         ("ARC-EN CIEL", "ARCENCIEL", "3-2 4"),
     ],
 )
-def test_ac7_the_writer_derives_the_enumeration_from_the_answer(
+def test_ac2_the_writer_derives_the_enumeration_from_the_answer(
     answer: str, letters: str, enumeration: str
 ) -> None:
     first = read_data(mini_data(answer, letters))
@@ -142,7 +142,7 @@ def test_ac7_the_writer_derives_the_enumeration_from_the_answer(
     assert read_ipuz(write_ipuz(first)) == first
 
 
-def test_ac7_a_down_hyphen_is_written_as_dashed_b_on_the_letter_above() -> None:
+def test_ac2_a_down_hyphen_is_written_as_dashed_b_on_the_letter_above() -> None:
     data = fx01_ipuz_data()
     clue = clue_named(data, "De la marine")
     clue["answer"] = "NA-VAL"
@@ -186,7 +186,7 @@ def shared_edge_data() -> JsonData:
     return data
 
 
-def test_ac7_a_hyphen_edge_shared_by_two_words_is_written_once() -> None:
+def test_ac2_a_hyphen_edge_shared_by_two_words_is_written_once() -> None:
     first = read_data(shared_edge_data())
 
     written = json.loads(write_ipuz(first))

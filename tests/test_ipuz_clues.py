@@ -1,4 +1,4 @@
-"""Tests of grid-files AC-11 to AC-15: how a file's clues become the model's.
+"""Tests of content/ipuz AC-6 to AC-10: how a file's clues become the model's.
 
 Where a clue sits (`location`), the order of a cell's clues, the arrow that comes
 from `cells`, the check that `cells` is the resolved word, and the `solution` and
@@ -6,12 +6,12 @@ from `cells`, the check that `cells` is the resolved word, and the `solution` an
 
 Choices where the spec leaves room:
 
-- AC-14, "with SENT also changed to SE": the clue's `enumeration` is changed to
-  "2" too, so that only the length check of rule 6 can compete with the `cells`
-  check. That the message is not the length check's is read from the answer `SE`
-  not being quoted in it.
-- AC-15: ".5", "0", "0-5", "2--3" and "1.1." are refused like the criterion's
-  samples, since rule 9 asks for counts of one or more joined by single
+- AC-9, "with SENT also changed to SE": the clue's `enumeration` is changed to
+  "2" too, so that only the length check of rule 6 of `content/grids.md` can
+  compete with the `cells` check. That the message is not the length check's is
+  read from the answer `SE` not being quoted in it.
+- AC-10: ".5", "0", "0-5", "2--3" and "1.1." are refused like the criterion's
+  samples, since rule 5 asks for counts of one or more joined by single
   separators.
 """
 
@@ -32,7 +32,7 @@ from grid_files_harness import (
 )
 from nock.grid import Arrow
 
-# ---- AC-11: where a clue sits --------------------------------------------------
+# ---- AC-6: where a clue sits --------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -42,7 +42,7 @@ from nock.grid import Arrow
         pytest.param([1, 0], "(0, 1)", id="on-a-letter-cell"),
     ],
 )
-def test_ac11_a_location_outside_the_grid_or_on_a_letter_cell_is_refused(
+def test_ac6_a_location_outside_the_grid_or_on_a_letter_cell_is_refused(
     location: list[int], cell_name: str
 ) -> None:
     data = fx01_ipuz_data()
@@ -53,10 +53,10 @@ def test_ac11_a_location_outside_the_grid_or_on_a_letter_cell_is_refused(
     assert cell_name in message
 
 
-# ---- AC-12: the order of a cell's clues ----------------------------------------
+# ---- AC-7: the order of a cell's clues ----------------------------------------
 
 
-def test_ac12_the_clues_of_a_cell_come_in_the_order_of_clues() -> None:
+def test_ac7_the_clues_of_a_cell_come_in_the_order_of_clues() -> None:
     data = fx01_ipuz_data()
     clues = data["clues"]["Clues"]
     clues[0], clues[1] = clues[1], clues[0]
@@ -70,7 +70,7 @@ def test_ac12_the_clues_of_a_cell_come_in_the_order_of_clues() -> None:
     assert texts == ["De la marine", "Passoire fine"]
 
 
-def test_ac12_a_third_clue_in_a_cell_is_refused_naming_it() -> None:
+def test_ac7_a_third_clue_in_a_cell_is_refused_naming_it() -> None:
     data = fx01_ipuz_data()
     third_clue = copy.deepcopy(clue_named(data, "Passoire fine"))
     third_clue["clue"] = "Troisième indice"
@@ -81,7 +81,7 @@ def test_ac12_a_third_clue_in_a_cell_is_refused_naming_it() -> None:
     assert "(0, 0)" in message
 
 
-# ---- AC-13: the arrow comes from the clue cell and the first cells -------------
+# ---- AC-8: the arrow comes from the clue cell and the first cells -------------
 
 
 @pytest.mark.parametrize(
@@ -93,7 +93,7 @@ def test_ac12_a_third_clue_in_a_cell_is_refused_naming_it() -> None:
         ),
     ],
 )
-def test_ac13_cells_that_do_not_start_the_word_are_refused_naming_both_cells(
+def test_ac8_cells_that_do_not_start_the_word_are_refused_naming_both_cells(
     cells: list[list[int]], cell_name: str
 ) -> None:
     data = fx01_ipuz_data()
@@ -105,7 +105,7 @@ def test_ac13_cells_that_do_not_start_the_word_are_refused_naming_both_cells(
     assert cell_name in message
 
 
-def test_ac13_a_first_cell_outside_the_grid_gives_the_arrow_error_of_grids() -> None:
+def test_ac8_a_first_cell_outside_the_grid_gives_the_arrow_error_of_grids() -> None:
     data = fx01_ipuz_data()
     clue_named(data, "Flaire")["cells"] = [[5, 0]]
 
@@ -124,7 +124,7 @@ def test_ac13_a_first_cell_outside_the_grid_gives_the_arrow_error_of_grids() -> 
         pytest.param(True, Arrow.DOWN, id="below-its-clue-cell"),
     ],
 )
-def test_ac13_a_one_cell_word_takes_the_straight_arrow_of_its_first_cell(
+def test_ac8_a_one_cell_word_takes_the_straight_arrow_of_its_first_cell(
     vertical: bool, arrow: Arrow
 ) -> None:
     data = mini_data("A", "A", enumeration="1", vertical=vertical)
@@ -134,7 +134,7 @@ def test_ac13_a_one_cell_word_takes_the_straight_arrow_of_its_first_cell(
     assert cell_with_clues(grid_file.grid, 0, 0).clues[0].arrow == arrow
 
 
-# ---- AC-14: cells is the resolved word -----------------------------------------
+# ---- AC-9: cells is the resolved word -----------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -145,7 +145,7 @@ def test_ac13_a_one_cell_word_takes_the_straight_arrow_of_its_first_cell(
         pytest.param([[4, 1], [4, 2], [4, 3], [4, 4], [4, 5]], id="too-long"),
     ],
 )
-def test_ac14_cells_that_are_not_the_resolved_word_are_refused_naming_the_clue(
+def test_ac9_cells_that_are_not_the_resolved_word_are_refused_naming_the_clue(
     cells: list[list[int]],
 ) -> None:
     data = fx01_ipuz_data()
@@ -157,7 +157,7 @@ def test_ac14_cells_that_are_not_the_resolved_word_are_refused_naming_the_clue(
     assert "Flaire" in message
 
 
-def test_ac14_the_check_comes_before_the_length_of_the_answer() -> None:
+def test_ac9_the_check_comes_before_the_length_of_the_answer() -> None:
     data = fx01_ipuz_data()
     clue = clue_named(data, "Flaire")
     clue["cells"] = [[4, 1], [4, 2]]
@@ -171,7 +171,7 @@ def test_ac14_the_check_comes_before_the_length_of_the_answer() -> None:
     assert re.search(r"\bSE\b", message) is None, message
 
 
-# ---- AC-15: solution and enumeration -------------------------------------------
+# ---- AC-10: solution and enumeration -------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -181,7 +181,7 @@ def test_ac14_the_check_comes_before_the_length_of_the_answer() -> None:
         pytest.param(0, 0, "A", id="letter-on-a-clue-cell"),
     ],
 )
-def test_ac15_a_solution_that_disagrees_with_the_answers_is_refused_naming_the_cell(
+def test_ac10_a_solution_that_disagrees_with_the_answers_is_refused_naming_the_cell(
     row: int, column: int, letter: str
 ) -> None:
     data = fx01_ipuz_data()
@@ -192,7 +192,7 @@ def test_ac15_a_solution_that_disagrees_with_the_answers_is_refused_naming_the_c
     assert f"({row}, {column})" in message
 
 
-def test_ac15_the_solution_is_checked_after_every_check_of_the_import() -> None:
+def test_ac10_the_solution_is_checked_after_every_check_of_the_import() -> None:
     data = fx01_ipuz_data()
     data["solution"][1][4] = "X"
     clue_named(data, "Artiste muet")["answer"] = "MIMA"
@@ -206,7 +206,7 @@ def test_ac15_the_solution_is_checked_after_every_check_of_the_import() -> None:
 
 
 @pytest.mark.parametrize("enumeration", ["5", None])
-def test_ac15_an_enumeration_that_counts_the_letters_loads(
+def test_ac10_an_enumeration_that_counts_the_letters_loads(
     enumeration: str | None,
 ) -> None:
     data = fx01_ipuz_data()
@@ -223,7 +223,7 @@ def test_ac15_an_enumeration_that_counts_the_letters_loads(
     ("enumeration", "answer", "breaks"),
     [("2 3", "TA MIS", (2,)), ("2'3", "TA'MIS", (2,)), ("2.3", "TA.MIS", (2,))],
 )
-def test_ac15_an_enumeration_with_a_separator_gives_the_answer_its_break(
+def test_ac10_an_enumeration_with_a_separator_gives_the_answer_its_break(
     enumeration: str, answer: str, breaks: tuple[int, ...]
 ) -> None:
     data = fx01_ipuz_data()
@@ -240,7 +240,7 @@ def test_ac15_an_enumeration_with_a_separator_gives_the_answer_its_break(
     "enumeration",
     ["4", "5-", "5.", ".5", "0", "0-5", "2--3", "2  3", "2,3", "1.1."],
 )
-def test_ac15_an_enumeration_that_is_not_the_letters_counted_is_refused(
+def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
     enumeration: str,
 ) -> None:
     data = fx01_ipuz_data()
