@@ -94,7 +94,8 @@ def expect_room_status(page: Page, status: str) -> None:
 
 
 def expect_typed_t_leaves_1_0_empty(page: Page) -> None:
-    """A `t` typed on the grid leaves (1, 0) empty."""
+    """A `t` typed on the focused grid leaves (1, 0) empty."""
+    expect(page.get_by_test_id("grid")).to_be_focused()
     page.keyboard.press("t")
     page.wait_for_timeout(QUIET_MS)
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "")

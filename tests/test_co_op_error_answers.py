@@ -138,7 +138,9 @@ def test_ac21_a_select_a_check_and_a_reveal_of_a_clue_cell_get_not_a_letter_cell
     ):
         ana, _bob = join_two(ana_stack, bob_stack, client, code)
 
-        codes = [answer_code(ana, message) for message in messages]
+        codes = []
+        for message in messages:
+            codes.append(answer_code(ana, message))
 
     assert codes == [ErrorCode.NOT_A_LETTER_CELL] * 3
 
@@ -159,7 +161,9 @@ def test_ac21_on_a_solved_grid_an_undo_a_check_and_a_reveal_get_grid_solved(
         ana, _bob = join_two(ana_stack, bob_stack, client, code)
         solve_the_grid(ana)
 
-        codes = [answer_code(ana, message) for message in messages]
+        codes = []
+        for message in messages:
+            codes.append(answer_code(ana, message))
 
     assert codes == [ErrorCode.GRID_SOLVED] * 3
 
