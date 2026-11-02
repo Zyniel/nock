@@ -1,10 +1,10 @@
 ---
 id: B-058
 title: The visual foundation leaves `client/shell.md`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T11:33:00Z'
 labels:
   - domain:shell
   - domain:foundation
@@ -39,3 +39,17 @@ ordinal: 13000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: client/shell.md → client/foundation.md (new), specs/_map.md; shell's realtime rule 19/20 citations → platform/reconnection.md rules 4/5.
+2. Tests: tests/test_shell_*.py (3 files, ~11 functions) → tests/test_foundation_*.py, renamed to the new numbers.
+3. Quick gate: uv run python scripts/gate.py --specs shell,foundation --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started after B-057 (#98) merged. Spec-writer on Fable at high (new domain). The realtime citations at shell.md:67 and :70 go to reconnection rules 4 and 5 (B-057's map: realtime 19→reconnection 4, 20→5). If B-055 (held, PR #101) merges first, its map of shared components must follow any Code-section line that moves from shell to foundation; the lead reconciles whichever merges second. Base: origin/main f6a5666.
+<!-- SECTION:NOTES:END -->
