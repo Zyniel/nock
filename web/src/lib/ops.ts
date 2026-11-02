@@ -109,9 +109,17 @@ function isDashboardFigures(value: unknown): value is DashboardFigures {
   )
 }
 
-// Tell whether a value is a time that reads as a date, such as an ISO 8601 time.
+// An ISO 8601 date-time such as "2026-05-01T10:20:30.5Z": a fraction of a second
+// is optional, the offset is "Z" or "+hh:mm". `Date.parse` alone is lenient and
+// differs between engines.
+const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+
+// Tell whether a value is an ISO 8601 date-time that reads as a date.
 function isDateTime(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+  if (typeof value !== 'string' || !DATE_TIME_PATTERN.test(value)) {
+    return false
+  }
+  return !Number.isNaN(Date.parse(value))
 }
 
 // Tell whether a parsed JSON value looks like one edit of a replay: a whole
