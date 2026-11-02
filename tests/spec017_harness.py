@@ -14,7 +14,9 @@ Time-based client behaviour has two kinds of tests. The bounds the spec states i
 real seconds (the banner within 5,000 ms) are measured with Playwright's waiting
 assertions. The constants (ping every 2,000 ms, 4,000 ms of silence, the reconnect
 delays) are tested without long waits on Playwright's page clock, which is frozen
-before the page loads and moved by hand with `advance_page`.
+before the page loads and moved by hand with `advance_page`. Since B-047
+(`platform/reconnection.md` rule 6) a reconnect delay is drawn within 20 % of its
+value either way: `expect_new_connection_after` takes that range.
 
 Not tested in spec 017: the close 4408 reaching only the silent socket of a player
 (a player has one live socket, the older one being replaced by a resume), the
@@ -649,10 +651,17 @@ def expect_status(page: Page, status: str) -> None:
 
 
 def expect_new_connection_after(page: Page, room: MockRoom, delay_ms: int) -> None:
-    """The next socket opens after `delay_ms` of page time, not before."""
+    """The next socket opens after `delay_ms` of page time drawn within 20 %.
+
+    Refined by `platform/reconnection.md` rule 6 (B-047): each delay is drawn at
+    random within 20 % of its value either way, so no socket opens before 80 % of
+    `delay_ms` and exactly one has opened at 120 %.
+    """
     count = len(room.connections)
-    advance_page(page, delay_ms - 1)
+    earliest_ms = delay_ms * 4 // 5
+    latest_ms = delay_ms * 6 // 5
+    advance_page(page, earliest_ms - 1)
     assert len(room.connections) == count
-    advance_page(page, 1)
+    advance_page(page, latest_ms - earliest_ms + 1)
     wait_until(page, lambda: len(room.connections) > count)
     assert len(room.connections) == count + 1

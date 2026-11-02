@@ -26,6 +26,7 @@ from spec017_harness import (
     MockConnection,
     MockRoom,
     advance_page,
+    expect_new_connection_after,
     expect_status,
     grid_from_text,
     open_room,
@@ -38,7 +39,7 @@ from spec042_harness import make_storage_throw, stored_value
 
 ROOM_CODE = "ABC123"
 LOST_CLOSE_CODE = 1011
-FIRST_RETRY_MS = 1000  # the first retry delay (`platform/reconnection.md` rule 6)
+FIRST_RETRY_MS = 1000  # the first retry delay, drawn within 20 % (rule 6, B-047)
 SNAPSHOT_SEQ = 5
 WAIT_TIMEOUT_MS = 5000
 # The identity another tab stores for the same code while Ana is disconnected.
@@ -96,10 +97,8 @@ def store_from_another_tab(page: Page, base_url: str, key: str, value: str) -> N
 
 
 def next_socket(page: Page, room: MockRoom) -> MockConnection:
-    """Move the frozen clock by the first retry delay; return the new socket."""
-    count = len(room.connections)
-    advance_page(page, FIRST_RETRY_MS)
-    wait_until(page, lambda: len(room.connections) > count)
+    """Move the frozen clock past the first retry delay; return the new socket."""
+    expect_new_connection_after(page, room, FIRST_RETRY_MS)
     return room.connections[-1]
 
 
@@ -152,9 +151,9 @@ def test_ac23_a_kept_form_disables_its_submit_until_the_next_socket_opens(
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     expect(submit).to_have_text(load_fr()["join.submit"])
     expect(submit).to_be_disabled()
-    advance_page(page, FIRST_RETRY_MS - 1)
+    advance_page(page, FIRST_RETRY_MS * 4 // 5 - 1)
     assert len(room.connections) == 1
     expect(submit).to_be_disabled()
-    advance_page(page, 1)
+    advance_page(page, FIRST_RETRY_MS * 6 // 5 - FIRST_RETRY_MS * 4 // 5 + 1)
     wait_until(page, lambda: len(room.connections) == 2)
     expect(submit).to_be_enabled()

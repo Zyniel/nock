@@ -4,6 +4,7 @@
 
 import { feedItemFor, insertFeedItems, wordCompletedItem } from './activityFeed'
 import type { FeedItem, KeptFeedItem } from './activityFeed'
+import { toClueRef } from './roomSession'
 import type { RoomSession, Snapshot } from './roomSession'
 
 // How long a changed cell stays highlighted.
@@ -72,6 +73,10 @@ function toLine(value: unknown): CatchUpLine | null {
     return null
   }
   if (!isWholeNumber(line.seq) || typeof line.player_id !== 'string') {
+    return null
+  }
+  // A word line names its word by a clue of three integers.
+  if (line.type === 'word_completed' && toClueRef(line.clue) === null) {
     return null
   }
   return {

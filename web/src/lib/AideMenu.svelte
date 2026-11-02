@@ -8,6 +8,7 @@
 
   let {
     isConfirmShown,
+    isConfirmDisabled,
     isHelpShown,
     isCheckLetterDisabled,
     isCheckWordDisabled,
@@ -25,6 +26,9 @@
   }: {
     // True while the selected cell shows a pencil letter it can confirm.
     isConfirmShown: boolean
+    // True while the confirm shows but cannot act: the grid is read-only
+    // (client/hud.md rule 19).
+    isConfirmDisabled: boolean
     // True while the room's help mode is not `none` (spec 025).
     isHelpShown: boolean
     isCheckLetterDisabled: boolean
@@ -71,6 +75,7 @@
     type="button"
     class="nock-menu-item confirm-pencil"
     data-testid="confirm-pencil"
+    disabled={isConfirmDisabled}
     onclick={onConfirmPencil}
     ><span>{t('pencil.confirm')}</span><span
       class="nock-menu-detail pencil-detail"

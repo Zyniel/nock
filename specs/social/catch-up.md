@@ -80,7 +80,8 @@ their players.
     while that snapshot is still its latest; otherwise the answer is dropped and
     that absence is not asked again: the next return asks from the seen seq of
     rule 2, which has already moved past that snapshot. A failed request
-    (network error, a status other than 200, a body that is not a catch-up)
+    (network error, a status other than 200, a body that is not a catch-up,
+    such as one with a `word_completed` line whose clue is not three integers)
     shows nothing and is not retried; the page plays on.
 13. Applying a catch-up adds first each name for a player the page cannot name
     yet; a name the page knows stays.
@@ -190,6 +191,10 @@ players (seq 22).
 - **AC-20** A stream at its end before the lines go in is at its end within
   300 ms after, the newest line in view; a stream scrolled away from its end
   keeps every item in view in its place. (← 034 AC-4)
+- **AC-21** With `seen_seq` 5 and a snapshot at 9, an answer naming (1, 0)
+  whose `word_completed` line has the clue `null`, or `{"row": "2", "column":
+  0, "clue_index": 0}`, highlights no cell, adds no item to the stream and
+  sends no second request; typing `T` on (1, 0) still sends the letter.
 
 ## Edge cases
 
@@ -227,4 +232,5 @@ players (seq 22).
   `roomRecord.ts`: the seen seq; `RoomPage.svelte`: returns, dropped answers,
   highlight timers; `GridViewport.svelte`: the highlighted cell;
   `activityFeed.ts`: the word line, placing items.
-- Tests: `tests/test_spec_034_*`, `tests/spec034_harness.py`.
+- Tests: `tests/test_spec_034_*`, `tests/spec034_harness.py`;
+  `tests/test_catch_up_*` for AC-21.

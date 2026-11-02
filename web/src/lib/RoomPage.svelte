@@ -89,6 +89,7 @@
     VoteView,
   } from './roomSession'
   import {
+    CONNECT_LIMIT_MS,
     EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
     PING_INTERVAL_MS,
@@ -98,6 +99,7 @@
     endFlash,
     endReaction,
     gridLabel,
+    isEndedStatus,
     isFinalClose,
     latestPendingEdits,
     letterCellIndex,
@@ -643,11 +645,23 @@
   })
 
   // Send a message when the socket is open; after a close nothing is sent.
-  function send(message: object): void {
-    if (socket !== null && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(message))
+  // Returns whether it went out: a socket that is no longer open, even before
+  // the page has seen its close, drops what it is given.
+  function send(message: object): boolean {
+    if (socket === null || socket.readyState !== WebSocket.OPEN) {
+      return false
     }
+    socket.send(JSON.stringify(message))
+    return true
   }
+
+  // True while the page is joined: a socket with its snapshot (« Réagir », « Je
+  // bloque » and the ballot buttons need it).
+  let isJoined = $derived(session.status === 'joined')
+  // Once the room has shown, a final status but the room gone makes the grid
+  // read-only: no letter, no erase, no undo, no Aide item (client/hud.md rule
+  // 19). The selection still moves.
+  let isReadOnly = $derived(session.snapshot !== null && isEndedStatus(session.status))
 
   // ---- Host controls (spec 014) ----
 
@@ -944,14 +958,16 @@
     sendEdit(editMessage({ row: cell.row, column: cell.column, letter, kind }, baseSeq))
   }
 
-  // The confirm control works on the selected cell when it shows a pencil
-  // letter (confirmed or pending), is not locked, and the grid is not solved.
-  let isConfirmPencilDisabled = $derived(
-    session.solved ||
-      selectedCell === null ||
-      selectedCell.locked ||
-      !shownCell(selectedCell, session.pendingEdits).pencil,
+  // The confirm control shows while the selected cell shows a pencil letter
+  // (confirmed or pending), is not locked, and the grid is not solved. It is
+  // disabled while the grid is read-only.
+  let isConfirmPencilShown = $derived(
+    !session.solved &&
+      selectedCell !== null &&
+      !selectedCell.locked &&
+      shownCell(selectedCell, session.pendingEdits).pencil,
   )
+  let isConfirmPencilDisabled = $derived(!isConfirmPencilShown || isReadOnly)
 
   // Confirm the selected cell's pencil letter. The page's seq goes in base_seq,
   // so that a letter another player changed meanwhile is refused (decision 3).
@@ -968,7 +984,7 @@
   // With pencil mode on it is a pencil letter. A cell that already shows the
   // letter with the mode's pencil flag sends nothing.
   function onLetter(letter: string): void {
-    if (session.solved || selection === null || activeWord === null) {
+    if (session.solved || isReadOnly || selection === null || activeWord === null) {
       return
     }
     const cell = letterCellAt(selection.row, selection.column)
@@ -1002,7 +1018,7 @@
 
   // Backspace: clear the selected cell, or step back and clear the previous one.
   function onErase(): void {
-    if (session.solved || selection === null || activeWord === null) {
+    if (session.solved || isReadOnly || selection === null || activeWord === null) {
       return
     }
     const cell = letterCellAt(selection.row, selection.column)
@@ -1024,15 +1040,19 @@
   // Ask the server to undo my last edit. It goes after the edits pending when it
   // is made and before any later edit (platform/server.md rule 9).
   function onUndo(): void {
-    if (session.solved) {
+    if (session.solved || isReadOnly) {
       return
     }
     sendRequest({ type: 'undo' })
   }
 
+  // The check items are disabled once the grid is solved or read-only, and the
+  // letter and word checks while nothing is selected.
+  let isCheckDisabled = $derived(session.solved || isReadOnly)
+
   // Ask the server to check the selected letter, the selected word or the grid.
   function onCheck(target: object): void {
-    if (session.solved) {
+    if (isCheckDisabled) {
       return
     }
     sendRequest({ type: 'check', target })
@@ -1074,6 +1094,7 @@
 
   let isRevealLetterDisabled = $derived(
     session.solved ||
+      isReadOnly ||
       isVoteOpen ||
       selectedCell === null ||
       selectedCell.locked ||
@@ -1081,6 +1102,7 @@
   )
   let isRevealWordDisabled = $derived(
     session.solved ||
+      isReadOnly ||
       isVoteOpen ||
       activeWord === null ||
       isWordLocked(activeWord) ||
@@ -1127,7 +1149,7 @@
     activeWord !== null && myFlag !== null && isClueOfWord(myFlag, activeWord),
   )
   let isFlagDisabled = $derived(
-    activeWord === null || (isWordFullShown(activeWord) && !isFlagPressed),
+    !isJoined || activeWord === null || (isWordFullShown(activeWord) && !isFlagPressed),
   )
 
   // True when every cell of the word shows a letter, pending edits included.
@@ -1282,9 +1304,12 @@
   })
 
   // Send a message; the line shows when the server's chat_message comes back:
-  // no local echo.
+  // no local echo. Only a message that went out counts for the pacing.
   function sendChat(text: string): void {
-    send({ type: 'chat', text })
+    const wentOut = send({ type: 'chat', text })
+    if (!wentOut) {
+      return
+    }
     chatSendTimes = [...chatSendTimes, performance.now()]
     refreshPacing()
   }
@@ -1324,12 +1349,13 @@
     isPickerOpen = false
   }
 
-  // React on the selected word's clue.
+  // React on the selected word's clue. Only a reaction that went out counts for
+  // the pacing.
   function sendReaction(reaction: ReactionValue): void {
-    if (activeWord === null || isReactionPaced) {
+    if (activeWord === null || isReactDisabled || isReactionPaced) {
       return
     }
-    send({
+    const wentOut = send({
       type: 'react',
       clue: {
         row: activeWord.clueRow,
@@ -1338,6 +1364,9 @@
       },
       reaction,
     })
+    if (!wentOut) {
+      return
+    }
     reactionSendTimes = [...reactionSendTimes, performance.now()]
     refreshPacing()
   }
@@ -1382,8 +1411,11 @@
   // as soon as the vote closes and never shows a result (spec 047).
   let isVoteBannerShown = $derived(!session.solved && openVote !== null)
   // « Réagir » is disabled while the vote banner shows, so the picker never
-  // covers the vote's buttons (spec 043, Decision 10).
-  let isReactDisabled = $derived(activeWord === null || isMuted || isVoteBannerShown)
+  // covers the vote's buttons (spec 043, Decision 10), and while the page is not
+  // joined (social/chat.md rule 13). Disabling it closes the picker.
+  let isReactDisabled = $derived(
+    !isJoined || activeWord === null || isMuted || isVoteBannerShown,
+  )
   let isMyRequest = $derived(
     openVote !== null && session.snapshot !== null && openVote.player_id === session.snapshot.you,
   )
@@ -1435,7 +1467,7 @@
 
   // The ballot buttons are disabled while the page is not joined: a ballot sent
   // then would be dropped while the page showed it as cast (decision 18).
-  let isVotingOffline = $derived(session.status !== 'joined')
+  let isVotingOffline = $derived(!isJoined)
 
   // Send my ballot on the open vote, once, then give the focus to the status
   // that replaces the buttons, so it never falls back to the page (decision 19).
@@ -1833,6 +1865,11 @@
   let pingTimer: ReturnType<typeof setInterval> | undefined
   let silenceTimer: ReturnType<typeof setTimeout> | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+  // Watches the socket being opened for its connect limit.
+  let connectTimer: ReturnType<typeof setTimeout> | undefined
+  // The page clock (performance.now()) when the silence of the open socket
+  // started: its last frame, or the page's return into view.
+  let silenceStartedAt = 0
 
   function stopHeartbeat(): void {
     clearInterval(pingTimer)
@@ -1844,6 +1881,11 @@
   function stopReconnectTimer(): void {
     clearTimeout(reconnectTimer)
     reconnectTimer = undefined
+  }
+
+  function stopConnectTimer(): void {
+    clearTimeout(connectTimer)
+    connectTimer = undefined
   }
 
   // ---- What the page sends after a snapshot (platform/reconnection.md rules 5 and 7) ----
@@ -1933,6 +1975,7 @@
   function dropSocket(dropped: WebSocket): void {
     if (socket === dropped) {
       stopSendQueue()
+      stopConnectTimer()
     }
     dropped.onopen = null
     dropped.onmessage = null
@@ -1944,17 +1987,55 @@
     }
   }
 
-  // Any frame from the server shows the connection is alive: the silence count
-  // starts again.
+  // Any frame from the server shows the connection is alive: the silence starts
+  // again from now.
   function restartSilenceTimer(opened: WebSocket): void {
+    silenceStartedAt = performance.now()
     clearTimeout(silenceTimer)
-    silenceTimer = setTimeout(() => connectionSilent(opened), SILENCE_LIMIT_MS)
+    silenceTimer = setTimeout(() => checkSilence(opened), SILENCE_LIMIT_MS)
+  }
+
+  // The silence is read from the clock, as the page's timers may run late:
+  // at SILENCE_LIMIT_MS of it the connection is lost at once, its socket
+  // dropped so that its late frames and close change nothing. A hidden page
+  // loses no socket to the silence: its return counts it again
+  // (platform/reconnection.md rule 3).
+  function checkSilence(opened: WebSocket): void {
+    silenceTimer = undefined
+    if (document.hidden) {
+      return
+    }
+    const silentMs = performance.now() - silenceStartedAt
+    if (silentMs >= SILENCE_LIMIT_MS) {
+      connectionLost(opened)
+      return
+    }
+    silenceTimer = setTimeout(() => checkSilence(opened), SILENCE_LIMIT_MS - silentMs)
   }
 
   function startHeartbeat(opened: WebSocket): void {
     stopHeartbeat()
     pingTimer = setInterval(() => send({ type: 'ping' }), PING_INTERVAL_MS)
     restartSilenceTimer(opened)
+  }
+
+  // A socket still connecting CONNECT_LIMIT_MS after it was created is dropped:
+  // a loss. The time is read from the clock, so a hidden page whose timers ran
+  // late drops it at its first timer after them (platform/reconnection.md
+  // rule 6).
+  function watchConnectLimit(opened: WebSocket, createdAt: number): void {
+    const leftMs = CONNECT_LIMIT_MS - (performance.now() - createdAt)
+    connectTimer = setTimeout(() => {
+      connectTimer = undefined
+      if (opened !== socket || opened.readyState !== WebSocket.CONNECTING) {
+        return
+      }
+      if (performance.now() - createdAt >= CONNECT_LIMIT_MS) {
+        connectionLost(opened)
+        return
+      }
+      watchConnectLimit(opened, createdAt)
+    }, leftMs)
   }
 
   // A loss before the first snapshot keeps the nickname form on screen when it was
@@ -1965,12 +2046,6 @@
       isFormKept = true
     }
     formJoinNickname = null
-  }
-
-  // Nothing came from the server for too long: this is a loss at once. The
-  // socket is detached, so its late frames and its close event change nothing.
-  function connectionSilent(silent: WebSocket): void {
-    connectionLost(silent)
   }
 
   // The socket is lost: show it, then try again after the next delay.
@@ -1991,15 +2066,24 @@
     }, delay)
   }
 
-  // The socket closed for good: no more tries.
+  // The socket closed for good: no more tries, and nothing will be sent again,
+  // so what waited to be sent is dropped (client/hud.md rule 19).
   function connectionEnded(ended: WebSocket, closeCode: number): void {
     stopHeartbeat()
     stopReconnectTimer()
     dropSocket(ended)
     session.status = statusAfterFinalClose(closeCode, session.status)
+    dropWaitingSends()
     if (isRoomGone) {
       leaveDeletedRoom()
     }
+  }
+
+  // Drop the letters waiting to be sent and the kept undos, checks and reveals.
+  function dropWaitingSends(): void {
+    stopSendQueue()
+    session.pendingEdits = []
+    keptRequests = []
   }
 
   // ---- The room gone (client/hud.md rule 16) ----
@@ -2008,8 +2092,8 @@
   // page. Before the first snapshot a deletion is the entry card instead.
   let isRoomGone = $derived(session.snapshot !== null && session.status === 'not_found')
 
-  // Close what is open over the room and drop the letters waiting to be sent,
-  // before the room-gone dialog shows. The Salon column stays as it is.
+  // Close what is open over the room before the room-gone dialog shows. The
+  // Salon column stays as it is.
   function leaveDeletedRoom(): void {
     openPopover = null
     isSheetSalonOpen = false
@@ -2017,9 +2101,6 @@
     isRecapOpen = false
     hostSettings?.close()
     accountDialog?.close()
-    stopSendQueue()
-    session.pendingEdits = []
-    keptRequests = []
   }
 
   // The browser has a network again: do not wait for the next delay.
@@ -2034,6 +2115,24 @@
       stopHeartbeat()
       dropSocket(socket)
       openSocket()
+    }
+  }
+
+  // The page came back into view (platform/reconnection.md rules 3 and 6): a
+  // try waiting on its delay goes at once; an open socket sends `ping` at once
+  // and counts its silence from now.
+  function onVisibilityChange(): void {
+    if (document.hidden) {
+      return
+    }
+    if (reconnectTimer !== undefined) {
+      stopReconnectTimer()
+      openSocket()
+      return
+    }
+    if (socket !== null && socket.readyState === WebSocket.OPEN) {
+      send({ type: 'ping' })
+      startHeartbeat(socket)
     }
   }
 
@@ -2134,8 +2233,11 @@
   function openSocket(): void {
     const opened = new WebSocket(roomSocketUrl(code))
     socket = opened
+    stopConnectTimer()
+    watchConnectLimit(opened, performance.now())
 
     opened.onopen = () => {
+      stopConnectTimer()
       startHeartbeat(opened)
       joinOnOpen(opened)
     }
@@ -2153,12 +2255,15 @@
     seenSeq = readRoomSeenSeq(code)
     openSocket()
     window.addEventListener('online', onBrowserOnline)
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
     // Leaving the page closes the socket; the handlers must not react to it.
     return () => {
       window.removeEventListener('online', onBrowserOnline)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       stopHeartbeat()
       stopReconnectTimer()
+      stopConnectTimer()
       if (socket !== null) {
         dropSocket(socket)
       }
@@ -2297,6 +2402,7 @@
       isTimerRunning={session.timerRunning}
       timerAnchor={session.timerAnchor}
       isSolved={session.solved}
+      {isReadOnly}
       {isPencilMode}
       {isTouchScreen}
       {isKeyboardShown}
@@ -2330,11 +2436,12 @@
       onEscape={closePopoverToButton}
     >
       <AideMenu
-        isConfirmShown={!isConfirmPencilDisabled}
+        isConfirmShown={isConfirmPencilShown}
+        isConfirmDisabled={isConfirmPencilDisabled}
         {isHelpShown}
-        isCheckLetterDisabled={session.solved || selection === null}
-        isCheckWordDisabled={session.solved || activeWord === null}
-        isCheckGridDisabled={session.solved || isVoteOpen}
+        isCheckLetterDisabled={isCheckDisabled || selection === null}
+        isCheckWordDisabled={isCheckDisabled || activeWord === null}
+        isCheckGridDisabled={isCheckDisabled || isVoteOpen}
         {isRevealLetterDisabled}
         {isRevealWordDisabled}
         {lettersLeft}

@@ -117,9 +117,24 @@ def cluebar(
     width: int | None = None,
     empty: bool = False,
     status: str = "",
+    off: bool = False,
 ) -> str:
-    """Return the clue bar; status: the completion status in its row, if any."""
+    """Return the clue bar; status: the completion status in its row, if any.
+
+    off: « Réagir » and « Je bloque » disabled while the page is not joined
+    (room.md, « Clue bar »), the clue text kept; a pressed « Je bloque » keeps
+    its white background, its filled flag in --nock-rule.
+    """
     st = f' style="width:{width}px"' if width else ""
+    if off:
+        return (
+            f'<div class="cluebar"{st}><span class="cb">{IC["chev_l"]}</span><div '
+            f'class="txt">{esc(text)}<i>{glyph}</i></div>{status}'
+            f'<span class="cb pin off">{IC["smile"]}</span>'
+            f'<span class="cb pin off" aria-pressed="{str(pressed).lower()}">'
+            f'{IC["flag"]}</span>'
+            f'<span class="cb">{IC["chev_r"]}</span></div>'
+        )
     if empty:
         return (
             f'<div class="cluebar"{st}><span class="cb">{IC["chev_l"]}</span>'
@@ -275,7 +290,8 @@ def phone_room(
             word = grid_opts.get("word", 5)
             text, glyph = clue if clue else (FX_CLUE_TEXT[word], FX_DIR[word])
             status = row_status() if row_state else ""
-            h += cluebar(text, glyph, flag_pressed, status=status)
+            off = net or bool(final_status)
+            h += cluebar(text, glyph, flag_pressed, status=status, off=off)
     if band == "done":
         h += band_done()
     elif band == "notyet":
@@ -761,8 +777,9 @@ def desk_room(
     if authors:
         g = f'<div class="gwrap">{g}{legend([0, 1, 2, 3])}</div>'
     main = f'<div class="dmain"><div class="dstage">{g}{main_extra}</div>'
+    off = net or bool(final_status)
     main += (
-        cluebar(clue[0], clue[1], width=gw)
+        cluebar(clue[0], clue[1], width=gw, off=off)
         if not solved
         else cluebar("Fin de journée", "→", width=gw)
     )

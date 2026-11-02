@@ -84,6 +84,22 @@ export async function fetchAccountProgress(): Promise<Record<string, unknown> | 
   }
 }
 
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+// Tell whether a value is a calendar date written "YYYY-MM-DD". A day that does
+// not exist, such as "2026-02-30", is not one: the date read back differs.
+function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !DATE_PATTERN.test(value)) {
+    return false
+  }
+  const time = Date.parse(`${value}T00:00:00Z`)
+  if (Number.isNaN(time)) {
+    return false
+  }
+  const readBack = new Date(time).toISOString().slice(0, 10)
+  return readBack === value
+}
+
 // Tell whether a parsed JSON value looks like one grid summary.
 export function isGridSummary(value: unknown): value is GridSummary {
   if (typeof value !== 'object' || value === null) {
@@ -92,7 +108,7 @@ export function isGridSummary(value: unknown): value is GridSummary {
   const record = value as Record<string, unknown>
   return (
     typeof record.number === 'number' &&
-    typeof record.published_on === 'string' &&
+    isCalendarDate(record.published_on) &&
     typeof record.force === 'number' &&
     typeof record.width === 'number' &&
     typeof record.height === 'number' &&

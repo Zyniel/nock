@@ -762,7 +762,8 @@ def reach_refusal(
                 "data-status", "reconnecting", timeout=LOSS_BUDGET_MS
             )
             expect(banner(page)).to_be_visible(timeout=LOSS_BUDGET_MS)
-            advance_page(page, 1000)
+            # The first retry delay is 1 s drawn within 20 % (B-047).
+            advance_page(page, 1200)
             room.wait_for_connections(2)
             refused = room.connections[1]
             wait_until(page, lambda: len(refused.frames) > 0)

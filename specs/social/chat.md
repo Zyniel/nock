@@ -48,10 +48,10 @@ help is wanted. The host can mute a player's chat and reactions.
    ids the roster lacks, each « Quelqu'un », by id as plain strings. The marker
    never moves the clue text.
 5. « Je bloque » (`flag.button_label`, « Je bloque sur ce mot ») is pressed
-   while my flag is on the selected word's clue. It is disabled while nothing
-   is selected, and while the selected word is full on the page (pending
-   letters count) and it is not pressed. A press sends my flag on that clue, or
-   `clue: null` when pressed; the button and the marker change only with
+   while my flag is on the selected word's clue. It is disabled while the page
+   is not joined, while nothing is selected, and while the selected word is
+   full on the page (pending letters count) and it is not pressed. A press
+   sends my flag on that clue, or `clue: null` when pressed; the button and the marker change only with
    `flag_changed`. An error answering a flag changes nothing on the page.
 6. A `flag_changed` with a clue adds the stream line `feed.flag` (« {name}
    bloque sur « {clue} » »); one without a clue adds none.
@@ -77,7 +77,8 @@ help is wanted. The host can mute a player's chat and reactions.
    once per seq, with its author's nickname (`lobby/joining.md` rule 3), also
    for a player who left, else « Quelqu'un » (`feed.someone`).
 10. Pacing: the page sends a message only while fewer than 5 of its own went
-    out in the last 12 seconds; meanwhile « Envoyer » is disabled and the note
+    out in the last 12 seconds, counting only those that went out on an open
+    socket; meanwhile « Envoyer » is disabled and the note
     `chat.wait` (« Patientez avant d'envoyer. ») shows. Reactions are paced
     alike: every option of the picker is disabled.
 11. A message is unread when its seq is above the last seen seq and it is not
@@ -97,8 +98,9 @@ help is wanted. The host can mute a player's chat and reactions.
     `reaction`, with no seq and never logged, reaches every player once, the
     sender included, on any word, full or not. A restart empties every
     player's chat and reaction windows, connected or not.
-13. « Réagir » (`reaction.button_label`) is disabled while nothing is selected,
-    while I am muted and while the vote banner shows (`gameplay/hints.md`). A
+13. « Réagir » (`reaction.button_label`) is disabled while the page is not
+    joined, while nothing is selected, while I am muted and while the vote
+    banner shows (`gameplay/hints.md`). A
     press opens the picker (`reaction.picker_label`, the five in that order),
     the focus on the first option (on « Réagir » while pacing holds). An option
     sends `react` on the selected word's clue and closes the picker; Escape or a
@@ -286,6 +288,15 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 - **AC-21** After 205 messages in a room, a joiner's snapshot carries the
   newest 200 in seq order, and so does the room loaded from the store; the
   stream shows those 200.
+- **AC-22** With MIME selected and the picker open, the socket closes: within
+  5 s « Réagir » and « Je bloque » are disabled and the picker is closed,
+  nothing sent; the next snapshot enables both again. After a close 4001 both
+  stay disabled.
+- **AC-23** With four reactions sent in the last 12 s, a fifth chosen while
+  the socket is no longer open but the page has not yet seen its close (still
+  joined) reaches no player and does not count: once the page is joined
+  again, a fifth that goes out disables the options. A chat message sent in
+  that state does not count either.
 
 ## Edge cases
 
@@ -315,4 +326,4 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   `Salon.svelte`, `RoomPage.svelte`, `roomSession.ts`.
 - Tests: `tests/test_spec_021_*`, `test_spec_022_*`, `test_spec_013_ac05_*`,
   `test_spec_013_ac07_ac08_*`, `test_spec_047_ac12_*`, `test_spec_047_ac14_*`,
-  `test_spec_043_ac16_ac18_stream.py`; `tests/test_chat_*` for AC-21.
+  `test_spec_043_ac16_ac18_stream.py`; `tests/test_chat_*` for AC-21 to AC-23.

@@ -58,7 +58,10 @@ file, and the brand on the top bars.
    after, one at or below seq is ignored, seq + 1 is applied and the buffer
    drains (while it holds seq + 1, that event is applied), and a later one is
    buffered, once per seq. A gap that never fills stays buffered and the page
-   asks for nothing. What an event changes belongs to its domain.
+   asks for nothing. What an event changes belongs to its domain. An event
+   applies whole: a part of it of the wrong shape is skipped as if absent (a
+   struck cell of a `check_result` that is not two integers strikes nothing),
+   and the event still takes its seq.
 5. `selection_moved` and `reaction` are dropped before the first snapshot and
    apply at once after it; `error` applies at once at any time. None of them
    touches the seq or the buffer; any other message without an integer `seq`
@@ -200,6 +203,10 @@ file, and the brand on the top bars.
 - **AC-31** `/` fetches none of the code that only the room page or the
   operator page uses, and `/r/ABC123` none of the code that only the catalogue
   or the operator page uses.
+- **AC-34** On FX-01 with `X` at (1, 0) and `Y` at (1, 1), after a snapshot at
+  seq 5, a `check_result` 6 whose `wrong` is `[null, {"row": 1, "column": 0},
+  {"row": "1", "column": 1}]` gives seq 6, strikes (1, 0) and not (1, 1), and
+  adds its stream line; event 7 then gives seq 7.
 
 ## Edge cases
 

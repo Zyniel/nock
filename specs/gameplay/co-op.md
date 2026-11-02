@@ -101,9 +101,14 @@ uncertain until any player confirms it.
     player's, an undo's) only updates the confirmed grid. An error
     `rate_limited`, `not_a_letter_cell`, `cell_locked`, `stale_edit` or
     `grid_solved` removes the oldest pending edit, whatever its kind; other
-    errors leave them. A snapshot keeps them; after a reconnection each is sent
-    again as the message of its kind, oldest first, with its recorded seq as
-    `base_seq`.
+    errors leave the pending edits. A snapshot keeps the pending edits; after
+    a reconnection each is sent again as the message of its kind, oldest
+    first, with its recorded seq as `base_seq`. The server sends
+    `rate_limited`, `cell_locked` and `stale_edit` only in answer to an edit;
+    `not_a_letter_cell` also answers a `select_cell`, a check or a reveal
+    naming a cell that is not a letter cell, and `grid_solved` an undo, a
+    check or a reveal on a solved grid; no other message gets any of these
+    five codes.
 13. When the page applies another player's `letter_changed` on a cell whose
     confirmed letter I wrote, the cell flashes for 1 second in that player's
     colour (colour 0 for a player no longer in the room); a new flash on the cell
@@ -223,6 +228,13 @@ keyboard ».
   `_design/cells.md` « Letter marks » in every state, the flash included, and
   the page keeps the contrast baseline of `specs/product.md`;
   the two controls' texts pass its language check. (← 020 AC-7)
+- **AC-21** On FX-01, a `select_cell`, a check and a reveal of the clue cell
+  (0, 0) each get `not_a_letter_cell`; once Ana's `S` has solved the grid, her
+  undo, a check of the grid and a reveal of (1, 0) each get `grid_solved`. On
+  that solved grid, Ana's `chat`, `react`, `flag`, `vote`, `mute_player`,
+  `lock_room`, `change_settings`, `remove_player` of Bob, second `join` and
+  `ping` get none of `rate_limited`, `not_a_letter_cell`, `cell_locked`,
+  `stale_edit` and `grid_solved`.
 
 ## Edge cases
 
@@ -260,4 +272,4 @@ keyboard ».
   `GridViewport.svelte`: cell marks and the flash; `RoomTopBar.svelte`,
   `AideMenu.svelte`, `InAppKeyboard.svelte`: the pencil controls.
 - Tests: `tests/test_spec_015_*`, `tests/test_spec_016_*`,
-  `tests/test_spec_020_*`.
+  `tests/test_spec_020_*`; `tests/test_co_op_*` for AC-21.

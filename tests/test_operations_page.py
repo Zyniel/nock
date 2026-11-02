@@ -1,6 +1,7 @@
-"""Tests of `admin/operations.md` AC-26 to AC-30: the operator page `/ops` ignores an
+"""Tests of `admin/operations.md` AC-26 to AC-31: the operator page `/ops` ignores an
 answer that a later request superseded, refuses a token of another shape in the page,
-and empties and focuses the token input whenever it locks (rules 16, 18, 19).
+empties and focuses the token input whenever it locks, and shows a replay with a
+malformed edit as an error (rules 16, 18, 19).
 
 AC-26: on the dashboard `ready` on 7 days, the 1 day then the 30 days pressed, the
 30-day answer coming first and the 1-day one after: the page shows the 30-day
@@ -21,6 +22,11 @@ request and opens `locked` with no error line, the token removed.
 AC-30: `ready` with the token, a replay answered 401 brings the form back with
 « Jeton refusé. », its input empty and focused. Rule 16 says every lock does it, so a
 429 (with `ops.throttled`) and a refused period press are checked the same way.
+
+AC-31: a replay answered 200 whose second edit has the time `hier`, or the `seq` 1.5,
+puts the replay card in `error`: its one state line reads « Impossible de charger les
+données. », with no edit list, grid or slider (`ops-replay-body`), and the page
+stays `ready` with its six figures above.
 
 Setup: the live ops server of spec 038's "Test harness" (`ops_live_server`, the
 operator token `OPS_TOKEN`), a browser window of 1280 by 720. The dashboard and the
@@ -310,3 +316,41 @@ def test_ac30_a_refused_period_press_brings_the_form_back_with_the_input_empty(
     period_button(page, "30").click()
 
     expect_refused_form(page)
+
+
+# ---- AC-31: a replay whose edit is malformed is an error  ----------------------------
+
+
+def replay_with_second_edit(grid: Grid, field: str, value: object) -> object:
+    """FX-01's `REPLAY` as JSON, one field of its second edit replaced by `value`."""
+    body = replay(grid).model_dump(mode="json")
+    body["edits"][1][field] = value
+    return body
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        pytest.param("at", "hier", id="time-hier"),
+        pytest.param("seq", 1.5, id="seq-1.5"),
+    ],
+)
+def test_ac31_a_replay_with_a_malformed_edit_shows_only_the_error_line(
+    window: OpenWindow, server: OpsServer, fx01_grid: Grid, field: str, value: object
+) -> None:
+    page = window(1280, 720)
+    answer = (200, replay_with_second_edit(fx01_grid, field, value))
+    replays = HeldReplays(answer, held_codes=[])
+    page.route(REPLAY_ROUTE, replays.handle)
+    open_ready_ops(page, server.base_url)
+
+    submit_replay(page, ROOM_CODE)
+
+    expect_replay_state(page, "error")
+    expect(page.get_by_test_id("ops-replay-state-line")).to_have_text(
+        load_fr()["ops.error"]
+    )
+    expect(page.get_by_test_id("ops-replay-body")).to_have_count(0)
+    expect(page.get_by_test_id("ops-edit")).to_have_count(0)
+    expect_ops_state(page, "ready")
+    expect(page.get_by_test_id("ops-metric")).to_have_count(6)

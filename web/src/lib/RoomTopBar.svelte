@@ -20,6 +20,7 @@
     isTimerRunning,
     timerAnchor,
     isSolved,
+    isReadOnly,
     isPencilMode,
     isTouchScreen,
     isKeyboardShown,
@@ -50,6 +51,9 @@
     // Once the grid is solved, « Annuler », « Crayon » and « Clavier » are
     // disabled.
     isSolved: boolean
+    // True once a final status made the grid read-only (client/hud.md rule 19):
+    // « Annuler » is disabled.
+    isReadOnly: boolean
     isPencilMode: boolean
     // « Clavier » shows on a touch screen only, pressed while the in-app
     // keyboard shows.
@@ -84,7 +88,7 @@
     testId="undo-button"
     icon="undo"
     label={t('room.undo')}
-    disabled={isSolved}
+    disabled={isSolved || isReadOnly}
     onclick={onUndo}
   />
 {/snippet}

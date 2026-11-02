@@ -109,15 +109,29 @@ function isDashboardFigures(value: unknown): value is DashboardFigures {
   )
 }
 
-// Tell whether a parsed JSON value looks like one edit of a replay.
+// An ISO 8601 date-time such as "2026-05-01T10:20:30.5Z": a fraction of a second
+// is optional, the offset is "Z" or "+hh:mm". `Date.parse` alone is lenient and
+// differs between engines.
+const DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/
+
+// Tell whether a value is an ISO 8601 date-time that reads as a date.
+function isDateTime(value: unknown): value is string {
+  if (typeof value !== 'string' || !DATE_TIME_PATTERN.test(value)) {
+    return false
+  }
+  return !Number.isNaN(Date.parse(value))
+}
+
+// Tell whether a parsed JSON value looks like one edit of a replay: a whole
+// number `seq` and a time `at` that reads as a date, among the rest.
 function isRoomEdit(value: unknown): value is RoomEdit {
   if (typeof value !== 'object' || value === null) {
     return false
   }
   const record = value as Record<string, unknown>
   return (
-    typeof record.seq === 'number' &&
-    typeof record.at === 'string' &&
+    Number.isInteger(record.seq) &&
+    isDateTime(record.at) &&
     typeof record.kind === 'string' &&
     EDIT_KINDS.includes(record.kind) &&
     typeof record.row === 'number' &&

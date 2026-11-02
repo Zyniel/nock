@@ -164,6 +164,12 @@
     cursor: not-allowed;
   }
 
+  /* A pressed « Je bloque » stays pressed while disabled (my flag is still on):
+     the white background stays, the filled flag in rule grey. */
+  .flag-button.light:disabled {
+    background: var(--nock-white);
+  }
+
   /* One centred line that ends with an ellipsis when too long (specs 007, 043). */
   .clue-bar-text {
     flex: 1 1 auto;
