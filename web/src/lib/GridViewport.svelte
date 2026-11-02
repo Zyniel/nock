@@ -210,7 +210,7 @@
     return arrowsOfCells.get(positionKey(row, column)) ?? []
   }
 
-  // The hyphen edges that touch a letter cell (gameplay/board.md rule 20),
+  // The hyphen edges that touch a letter cell (gameplay/viewport.md rule 5),
   // or null when it touches none.
   function hyphensOn(row: number, column: number): CellHyphens | null {
     return hyphensOfCells.get(positionKey(row, column)) ?? null
@@ -638,7 +638,7 @@
     }
   })
 
-  // ---- Following the selection while zoomed (board rule 3) ----
+  // ---- Following the selection while zoomed (viewport rule 3) ----
 
   // The cell of the last tap on a letter cell: the selection it makes is in
   // view already and must not scroll. Plain, not state: only the effect below
@@ -1044,7 +1044,7 @@
     text-transform: uppercase;
   }
 
-  /* A hyphen edge (gameplay/board.md rule 20): the cell's own grid line along
+  /* A hyphen edge (gameplay/viewport.md rule 5): the cell's own grid line along
      it is taken away, and the dashes of HyphenEdge.svelte are drawn in its
      place. The 1px padding keeps the letter where it was, and --line-right and
      --line-bottom keep the marks drawn against the cell's sides where they
