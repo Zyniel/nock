@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 
 if (!process.features.typescript || typeof nodeModule.registerHooks !== 'function') {
   console.error(
-    `FAIL: the TypeScript tests need Node 22.18 or later (CI: lts/*); found ${process.version}.`,
+    `FAIL: the TypeScript tests need Node 22.18 or later with type stripping on (CI: lts/*); found ${process.version}.`,
   )
   process.exit(1)
 }
