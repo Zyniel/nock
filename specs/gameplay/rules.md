@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: rules
-status: approved
+status: done
 ---
 
 # gameplay/rules - Completion and the shared timer

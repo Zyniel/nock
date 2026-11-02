@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: results
-status: approved
+status: done
 ---
 
 # gameplay/results - End of game, recap, shared recap and history

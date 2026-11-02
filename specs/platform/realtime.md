@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: approved
+status: done
 ---
 
 # platform/realtime - Room events, reconnection and fair play
