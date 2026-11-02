@@ -1,4 +1,4 @@
-"""Tests of shell AC-21: the grid's focus ring shows over the edge letter cells.
+"""Tests of foundation AC-7: the grid's focus ring shows over the edge letter cells.
 
 The criterion reads painted pixels: the ring of the grid focused from the
 keyboard (2 px navy, offset -3 px, so it lies 1 px to 3 px inside the grid's
@@ -82,7 +82,7 @@ EdgeSide = Literal["right", "bottom"]
 
 
 class Sample(NamedTuple):
-    """One sample of AC-21: a cell and the side of the grid's edge it lies on."""
+    """One sample of AC-7: a cell and the side of the grid's edge it lies on."""
 
     row: int
     column: int
@@ -175,10 +175,10 @@ def is_navy(colour: Rgb) -> bool:
     return True
 
 
-# ---- AC-21: the grid's ring shows over the edge letter cells ----------------------
+# ---- AC-7: the grid's ring shows over the edge letter cells ----------------------
 
 
-def test_ac21_grid_ring_shows_over_right_and_bottom_letter_cells(
+def test_ac7_grid_ring_shows_over_right_and_bottom_letter_cells(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     focus_grid_with_first_word(page, live_server, fx01_grid)

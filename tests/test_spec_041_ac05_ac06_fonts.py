@@ -16,10 +16,10 @@ Choices where the spec leaves room:
 - AC-6: "lists" accepts the package under `dependencies` or `devDependencies`.
   An `@fontsource/` import is any quoted module name that starts with
   `@fontsource/` in a `.ts` or `.svelte` file under `web/src`, comments removed.
-- AC-6: "exactly the eight faces" is, since `client/shell.md` rule 21, each of the eight
-  faces imported from its two subset files, `latin` and `latin-ext`: sixteen imports,
-  each once, and no other (the package's all-subsets file of a face, such as
-  `400.css`, is none of them).
+- AC-6: "exactly the eight faces" is, since `client/foundation.md` rule 5, each of
+  the eight faces imported from its two subset files, `latin` and `latin-ext`:
+  sixteen imports, each once, and no other (the package's all-subsets file of a
+  face, such as `400.css`, is none of them).
 """
 
 from __future__ import annotations
@@ -155,9 +155,10 @@ def test_ac5_no_request_goes_to_another_host(page: Page, live_server: str) -> No
 # ---- AC-6: the font packages are the decided ones and are credited ----------------
 
 FONT_PACKAGES = ("@fontsource/source-sans-3", "@fontsource/ibm-plex-sans-condensed")
-# The eight faces of the design, each as the two subset files that `client/shell.md`
-# rule 21 allows: `latin` and `latin-ext` (`@fontsource/<package>/<subset>-<weight>`,
-# `-italic` after the weight for the italic faces).
+# The eight faces of the design, each as the two subset files that
+# `client/foundation.md` rule 5 allows: `latin` and `latin-ext`
+# (`@fontsource/<package>/<subset>-<weight>`, `-italic` after the weight for the
+# italic faces).
 FACE_FILES = [
     ("source-sans-3", "400"),
     ("source-sans-3", "500"),

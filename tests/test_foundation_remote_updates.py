@@ -1,21 +1,21 @@
-"""Tests of shell AC-22 to AC-25 and AC-28: a remote update redraws only its cells.
+"""Tests of foundation AC-8 to AC-11 and AC-14: a remote update redraws only its cells.
 
-`client/shell.md` rule 18: once the room shows, a frame mutates no node of the
+`client/foundation.md` rule 8: once the room shows, a frame mutates no node of the
 grid outside the cells whose drawing it changes; a pinch mutates no cell. These
-tests count mutations; the pace of rule 18 (AC-26, AC-27) is measured in
-`test_shell_remote_pace.py`.
+tests count mutations; the pace of rule 8 (AC-12, AC-13) is measured in
+`test_foundation_remote_pace.py`.
 
 Setup: spec 042's mocked room on FX-01 (`spec042_harness.open_room`, Ana `p1`
-with colour 0, Bob `p2` with colour 1) in the default 1280 by 720 window; AC-25
+with colour 0, Bob `p2` with colour 1) in the default 1280 by 720 window; AC-11
 in spec 024's touch phone context of 360 by 740 (`spec019_harness.new_context`),
-pinched through CDP with spec 006's `pinch`; AC-28 on spec 034's mocked socket
+pinched through CDP with spec 006's `pinch`; AC-14 on spec 034's mocked socket
 and catch-up route, as the tests of `social/catch-up.md` AC-11 set it up.
 
 How the mutations are counted:
 
 - A `MutationObserver` on the grid (`[data-testid="grid"]`) with `childList`,
   `attributes`, `characterData` and `subtree`. It starts once the state of the
-  criterion is set up (the room's first draw, and in AC-28 the reconnection's
+  criterion is set up (the room's first draw, and in AC-14 the reconnection's
   snapshot, are not counted), and the recording starts only once the grid has
   been quiet for 300 ms, so a refit still running from the setup is not counted
   either; a grid that never goes quiet within 5 s fails the test.
@@ -27,7 +27,7 @@ How the mutations are counted:
   grid element replaced by another counts as `"grid-replaced"`.
 - "Mutates no node of the grid": no mutation at all, the grid element's own
   attributes included. "No node outside (1, 2)": every mutation's places are
-  (1, 2). "No cell" (AC-25): every mutation's places are `"outside"` (the grid's
+  (1, 2). "No cell" (AC-11): every mutation's places are `"outside"` (the grid's
   own `--cell` may change).
 - A change of drawing has to show in its cell, so where a criterion names the
   cells a frame changes, the test also checks that each of them did mutate:
@@ -87,7 +87,7 @@ PINCH_START_DISTANCE = 100.0
 PINCH_END_DISTANCE = 150.0  # zoom 1 times 150 / 100
 ZOOM_AFTER_PINCH = "1.5"
 
-# FX-01's words of AC-24: TAMIS across row 1, MIME down column 2.
+# FX-01's words of AC-10: TAMIS across row 1, MIME down column 2.
 TAMIS = [(1, 0), (1, 1), (1, 2), (1, 3), (1, 4)]
 MIME = [(1, 2), (2, 2), (3, 2), (4, 2)]
 
@@ -302,10 +302,10 @@ def bob_letter_frame(seq: int, row: int, column: int, letter: str) -> str:
     return event.model_dump_json()
 
 
-# ---- AC-22: a frame that changes no cell mutates nothing -------------------------
+# ---- AC-8: a frame that changes no cell mutates nothing -------------------------
 
 
-def test_ac22_a_pong_a_chat_message_and_a_selection_in_place_mutate_no_node(
+def test_ac8_a_pong_a_chat_message_and_a_selection_in_place_mutate_no_node(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_with_bob_on(page, live_server, fx01_grid, 1, 1)
@@ -321,10 +321,10 @@ def test_ac22_a_pong_a_chat_message_and_a_selection_in_place_mutate_no_node(
     expect(bob_cursor(page, 1, 1)).to_have_count(1)
 
 
-# ---- AC-23: a letter change mutates only its cell, its flash included ------------
+# ---- AC-9: a letter change mutates only its cell, its flash included ------------
 
 
-def test_ac23_bobs_letter_in_an_empty_cell_mutates_only_that_cell(
+def test_ac9_bobs_letter_in_an_empty_cell_mutates_only_that_cell(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     players = [me(), player(BOB, BOB_COLOUR)]
@@ -339,7 +339,7 @@ def test_ac23_bobs_letter_in_an_empty_cell_mutates_only_that_cell(
     assert mutated_places(mutations) == {place(1, 2)}
 
 
-def test_ac23_bobs_letter_over_mine_mutates_only_that_cell_through_its_flash(
+def test_ac9_bobs_letter_over_mine_mutates_only_that_cell_through_its_flash(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     view = fx01_view(fx01_grid, [(1, 2, {"letter": "M", "author": "p1"})])
@@ -358,10 +358,10 @@ def test_ac23_bobs_letter_over_mine_mutates_only_that_cell_through_its_flash(
     assert mutated_places(mutations) == {place(1, 2)}
 
 
-# ---- AC-24: a cursor's move mutates the cells it and its tint leave and enter ----
+# ---- AC-10: a cursor's move mutates the cells it and its tint leave and enter ----
 
 
-def test_ac24_bobs_cursor_moving_along_his_word_mutates_only_the_two_cells(
+def test_ac10_bobs_cursor_moving_along_his_word_mutates_only_the_two_cells(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_with_bob_on(page, live_server, fx01_grid, 1, 1)
@@ -377,7 +377,7 @@ def test_ac24_bobs_cursor_moving_along_his_word_mutates_only_the_two_cells(
     assert mutated_places(mutations) == two_cells
 
 
-def test_ac24_bob_turning_down_mutates_only_the_cells_of_tamis_and_mime(
+def test_ac10_bob_turning_down_mutates_only_the_cells_of_tamis_and_mime(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     mock = open_with_bob_on(page, live_server, fx01_grid, 1, 1)
@@ -394,11 +394,11 @@ def test_ac24_bob_turning_down_mutates_only_the_cells_of_tamis_and_mime(
     expect(bob_cursor(page, 1, 2)).to_have_count(1)
 
 
-# ---- AC-25: a pinch mutates no cell, and the triangles follow the new side -------
+# ---- AC-11: a pinch mutates no cell, and the triangles follow the new side -------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac25_a_pinch_from_zoom_1_to_1_5_mutates_no_cell(
+def test_ac11_a_pinch_from_zoom_1_to_1_5_mutates_no_cell(
     phone_page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_with_bob_on(phone_page, live_server, fx01_grid, 1, 1)
@@ -414,7 +414,7 @@ def test_ac25_a_pinch_from_zoom_1_to_1_5_mutates_no_cell(
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac25_after_the_pinch_bobs_triangle_has_the_leg_of_the_new_side(
+def test_ac11_after_the_pinch_bobs_triangle_has_the_leg_of_the_new_side(
     phone_page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     open_with_bob_on(phone_page, live_server, fx01_grid, 1, 1)
@@ -433,10 +433,10 @@ def test_ac25_after_the_pinch_bobs_triangle_has_the_leg_of_the_new_side(
     assert box_problems("Bob's triangle", cursor_box, width=leg, height=leg) == []
 
 
-# ---- AC-28: a catch-up ring mutates only its cell, from its start to its end -----
+# ---- AC-14: a catch-up ring mutates only its cell, from its start to its end -----
 
 
-def test_ac28_a_catch_up_naming_one_cell_mutates_only_it_until_its_ring_ends(
+def test_ac14_a_catch_up_naming_one_cell_mutates_only_it_until_its_ring_ends(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
     route = CatchUpRoute()

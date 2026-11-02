@@ -5,7 +5,7 @@ in-page timing (the interactive mark, the keydown and cell-change probe), the pa
 actions that type letters, AC-2's 40 keys on FX-02's across words with the p95
 of the spec, and the mocked room socket used by the edge cases of AC-1 and of
 AC-5 and AC-6. Used by the tests of AC-1 to AC-6, and by the pace tests of
-`client/shell.md` (AC-26 and AC-27).
+`client/foundation.md` (AC-12 and AC-13).
 
 The shared setup of the other themes is in `spec036_harness`.
 """
@@ -59,7 +59,7 @@ FOUR_G_CONDITIONS: dict[str, bool | int] = {
 
 FX02_CELL_COUNT = 221
 
-# AC-2 (`product.md` AC-13, `client/shell.md` AC-26): the keys typed on FX-02.
+# AC-2 (`product.md` AC-13, `client/foundation.md` AC-12): the keys typed on FX-02.
 LOCAL_ECHO_KEYS = 40
 
 
