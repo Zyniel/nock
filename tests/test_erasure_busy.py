@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-22: an erasure while the database file is held.
+"""Tests of account/erasure, AC-7: an erasure while the database file is held.
 
 The app of spec 033's "Test harness" (accounts on, both stores on one file, a fake
 clock). Zoé plays room R with Bob and signs in from it, so her account holds her
@@ -11,7 +11,7 @@ file runs in the serial pass (`SERIAL_TEST_FILES` of `scripts/gate_browsers.py`)
 The criterion says "WARNING records are logged" without a number: the test asks for
 at least one, each from a `nock.*` logger. "The next sweep" is `expire_rooms()` of
 the registry and `purge` of the account store, the two calls that the app's sweep
-makes in turn (`lobby/lifetime.md` rule 6, `account/account.md` rule 20).
+makes in turn (`lobby/lifetime.md` rule 6, `account/erasure.md` rule 3).
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-def test_ac22_the_erasure_answers_at_once_and_the_next_sweep_empties_the_files(
+def test_ac7_the_erasure_answers_at_once_and_the_next_sweep_empties_the_files(
     tmp_path: Path,
     fx01_grid: Grid,
     fake_clock: FakeClock,

@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-30: one attempt of an erasure at a time.
+"""Tests of account/erasure, AC-14: one attempt of an erasure at a time.
 
 HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one file,
 a fake clock, a recording mailer), which sweeps every 0.1 s of real time
@@ -58,7 +58,7 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-def test_ac30_a_sweep_during_the_routes_attempt_leaves_the_erasure_to_it(
+def test_ac14_a_sweep_during_the_routes_attempt_leaves_the_erasure_to_it(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     store = HoldingStore(tmp_path / "nock.sqlite3")
