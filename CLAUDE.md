@@ -119,6 +119,7 @@ Everything runs through uv: never `pip` or a bare `python`.
 | All tests, or one file (browser tests in Chromium) | `uv run pytest`, `uv run pytest <file>` |
 | Format, lint, type check | `uv run black .`, `uv run ruff check --fix .`, `uv run pyrefly check` |
 | Web client: install, type check, build | `npm --prefix web ci`, `npm --prefix web run check`, `npm --prefix web run build` |
+| TypeScript unit tests of the client's pure modules (`tests/web/`) | `node --import ./scripts/node_test_hooks.mjs --test "tests/web/**/*.test.ts"` |
 | Browsers for the browser tests | `uv run playwright install chromium firefox webkit` |
 | Rebuild the screens sheet (after any change of look) | `uv run python docs/design/screens_sheet/build.py` |
 | A task's branch and worktree, from `origin/main` | `uv run python scripts/start_item.py B-NNN` |
@@ -206,6 +207,10 @@ model price.
   (pytest-xdist, at a low priority), then on their own the timing-sensitive
   files listed in `SERIAL_TEST_FILES` (`scripts/gate_browsers.py`). A test file
   that measures a duration or a pace goes in that list.
+- The TypeScript unit tests of the client's pure modules, `tests/web/*.test.ts`
+  (`node:test`, Node 22.18 or later), run with the static checks of the full
+  stage and prove no criterion; `scripts/node_test_hooks.mjs` resolves the
+  imports Vite allows and Node does not.
 - Engines come from `--browsers` or `NOCK_BROWSERS` (default `chromium`); an
   engine that is not installed is left out with a warning. Workers come from
   `--workers` or `NOCK_WORKERS`, which `.claude/settings.json` sets.

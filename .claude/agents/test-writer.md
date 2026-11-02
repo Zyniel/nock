@@ -43,6 +43,14 @@ The rules are in `specs/_map.md`, "Criteria and their tests". In short:
   place and keep their names. Do not touch the numbered spec.
 - A deleted criterion: delete its tests. The gate fails on a test that points to
   a criterion that does not exist.
+- A permutation of a pure client module (`web/src/lib/<module>.ts`: no
+  component, no DOM) that a task asks you to pin goes in
+  `tests/web/<module>.test.ts`, in TypeScript with `node:test` and
+  `node:assert/strict`, importing from `../../web/src/lib/<module>` without the
+  extension. These tests prove no criterion: criteria stay proven by
+  `tests/test_<name>_*.py`. Run them with
+  `node --import ./scripts/node_test_hooks.mjs --test "tests/web/**/*.test.ts"`;
+  `npm --prefix web run check` type-checks them.
 
 ## How to write them
 

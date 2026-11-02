@@ -20,8 +20,9 @@ jobs:
   # claude_docs/, .claude/ (agents, skills, session settings and hooks),
   # docs/ outside docs/design/, and the container files. A file that only the
   # static job reads skips the browser jobs: specs/ (spec traceability),
-  # docs/design/ (the screens sheet), grids/ (the grids the repository ships)
-  # and README.md (its font credits, a test without a browser). Any other
+  # docs/design/ (the screens sheet), grids/ (the grids the repository ships),
+  # README.md (its font credits, a test without a browser) and tests/web/
+  # (the client's TypeScript unit tests, run by the static job). Any other
   # file, and a Python file anywhere (ruff and black read the whole
   # repository), runs every job. A push to main runs every job (human
   # decision, 2026-10-21).
@@ -56,7 +57,7 @@ jobs:
               browsers=false
               while IFS= read -r file; do
                 case "$file" in
-                  specs/* | docs/design/* | grids/* | README.md)
+                  specs/* | docs/design/* | grids/* | README.md | tests/web/*)
                     static=true
                     ;;
                   *.py)

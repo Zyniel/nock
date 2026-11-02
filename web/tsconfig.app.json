@@ -16,7 +16,8 @@
     "allowJs": true,
     "checkJs": true,
     "moduleDetection": "force",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "erasableSyntaxOnly": true
   },
   "include": ["src/**/*.ts", "src/**/*.js", "src/**/*.svelte"]
 }
