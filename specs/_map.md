@@ -38,7 +38,8 @@ table, the naming rules and the glossary follow in the same change.
 | social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 013 AC-7, AC-8; 047 AC-12, AC-14 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
 | content | `content/grids.md` | grid model, import checks, no third-party content | | 002, 003; 005 AC-4, AC-5 |
-| content | `content/grid-files.md` | the index `grids/catalogue.json`, the `.ipuz` grid files, credits, withdrawal, the converter | | 004 AC-5, AC-7; 005 AC-1 to AC-3, AC-6, AC-7 |
+| content | `content/grid-files.md` | the index `grids/catalogue.json`, credits, withdrawal, the converter | | 004 AC-5; 005 AC-1 to AC-3, AC-6, AC-7 |
+| content | `content/ipuz.md` | the `.ipuz` grid file: its format, the reader and its checks, the writer | | 004 AC-7 |
 | content | `content/library.md` | what players browse: list, filter, grid page | pages | 004 AC-1 to AC-4, AC-6, AC-7; 046 AC-2, AC-4 to AC-10, AC-14 |
 | admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038 AC-3 to AC-11; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
@@ -156,6 +157,7 @@ then nothing of race or teams is built.
 | --- | --- | --- |
 | library | « Grilles » (the catalogue page) | `catalogue.py`, `catalogue-page` |
 | grid file | (not shown) | `grids/*.ipuz`, `GridFile` |
+| ipuz | (not shown: the standard crossword file format, v2 ArrowWord kind, a grid file is written in) | `ipuz.py`, `read_ipuz`, `write_ipuz` |
 | index | (not shown) | `grids/catalogue.json`, `IndexEntry`, `CatalogueEntry` |
 | room | « salon » | `room.py`, `/r/<code>` |
 | live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open) | `RoomRegistry.live_codes` |

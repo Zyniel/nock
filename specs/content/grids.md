@@ -1,7 +1,7 @@
 ---
 area: content
 file: grids
-status: done
+status: approved
 ---
 
 # content/grids - Grids: model, import checks and no third-party content
@@ -16,7 +16,8 @@ party.
 ## Depends on
 
 - `_reference.md`: the FX-01 and FX-02 grids used in the examples.
-- `content/grid-files.md`: the files a grid enters through, checked by rule 6.
+- `content/ipuz.md`: the file a grid enters through, whose reader adds its
+  checks to rule 6.
 - `lobby/rooms.md`: a room keeps its own copy of its grid, in the model's JSON.
 
 ## Rules
@@ -72,8 +73,7 @@ party.
       on its break: a break of one after the cell before the edge is a break
       of the other, whatever the separator of each.
 
-   A `.ipuz` file adds the checks of `content/grid-files.md` rule 12 to this
-   order.
+   A `.ipuz` file adds the checks of `content/ipuz.md` rule 7 to this order.
 7. A clue is named by its clue cell and its text, a word by its answer as
    written.
 
@@ -137,7 +137,7 @@ party.
 - **AC-6** An arrow that points to a clue cell, an empty cell or outside the grid
   is refused, naming the clue cell and the target: FX-01 with the clue of (0, 4)
   turned `right` names `(0, 4)` and `(0, 5)`. A `.ipuz` file reaches this error
-  through the arrow its `cells` give (`content/grid-files.md` rule 8).
+  through the arrow its `cells` give (`content/ipuz.md` rule 4).
   (← 003 AC-1)
 - **AC-7** An answer whose length differs from its word is refused, naming the
   clue cell and the answer: `MIME` changed to `MIM` names `(0, 2)` and `MIM`.
