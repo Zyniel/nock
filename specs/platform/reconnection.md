@@ -1,7 +1,7 @@
 ---
 area: platform
 file: reconnection
-status: approved
+status: done
 ---
 
 # platform/reconnection - Stale edits, the resume window, the page's connection
