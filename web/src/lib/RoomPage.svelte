@@ -4,6 +4,7 @@
   import AideMenu from './AideMenu.svelte'
   import ClueBar from './ClueBar.svelte'
   import EntryFrame from './EntryFrame.svelte'
+  import GridStatus from './GridStatus.svelte'
   import GridViewport from './GridViewport.svelte'
   import HostSettings from './HostSettings.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
@@ -663,7 +664,9 @@
     session.snapshot !== null &&
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
-  let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
+  let gridStatus: 'solved' | 'full_wrong' | null = $derived(
+    session.solved ? 'solved' : isGridFull ? 'full_wrong' : null,
+  )
   let gridStatusText = $derived(
     gridStatus === 'solved'
       ? t('completion.solved')
@@ -1172,13 +1175,18 @@
     isRoomLinked = true
     void linkRoom({ code, resume_token: session.snapshot.resume_token })
   })
-  let recapOpenButton: HTMLButtonElement | null = $state(null)
+  // The completion status on the page, in the clue bar's row or as the band.
+  let gridStatusView: GridStatus | undefined = $state()
+
+  function openRecap(): void {
+    isRecapOpen = true
+  }
 
   // Escape or the close button closed the dialog: the focus goes back to the
   // button that opens it.
   function closeRecap(): void {
     isRecapOpen = false
-    recapOpenButton?.focus()
+    gridStatusView?.focusRecapButton()
   }
 
   // ---- The stream and its unread messages (specs 013, 022, 043) ----
@@ -1847,31 +1855,18 @@
 
 <svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 
-<!-- The completion status (spec 026, spec 043, spec 044): its text, after the
-     ✓ pictogram once solved, and « Voir le bilan » in the band of a solved grid.
-     The page shows it in one of two places, never both: see isStatusInClueBar
-     and isStatusUnderClueBar. Only the full-but-wrong status sits in the clue
-     bar's row, since a solved page has no keyboard. -->
-{#snippet gridStatusContent()}
-  <span class="grid-status-text" data-testid="grid-status-text"
-    >{#if gridStatus === 'solved'}<span class="status-check" aria-hidden="true"></span
-      >{/if}{gridStatusText}</span
-  >
-  {#if gridStatus === 'solved'}
-    <button
-      type="button"
-      class="nock-button nock-button-primary recap-open"
-      data-testid="recap-open"
-      bind:this={recapOpenButton}
-      onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
-    >
-  {/if}
-{/snippet}
-
+<!-- The completion status in the clue bar's row, which ClueBar renders. The
+     page shows it in one of two places, never both: see isStatusInClueBar and
+     isStatusUnderClueBar. -->
 {#snippet statusInRow()}
-  <p class="grid-status in-row" data-testid="grid-status" data-state={gridStatus}>
-    {@render gridStatusContent()}
-  </p>
+  <GridStatus
+    bind:this={gridStatusView}
+    status={gridStatus}
+    text={gridStatusText}
+    placement="row"
+    width={null}
+    onOpenRecap={openRecap}
+  />
 {/snippet}
 
 <!-- The entry pages (spec 046, "Entry pages"): the room code line, then the
@@ -2229,15 +2224,15 @@
             />
           {/if}
           {#if isStatusUnderClueBar}
-            <p
-              class="grid-status band"
-              data-testid="grid-status"
-              data-state={gridStatus}
-              style:width={clueBarWidth === null ? null : `${clueBarWidth}px`}
-              bind:offsetHeight={statusBandHeight}
-            >
-              {@render gridStatusContent()}
-            </p>
+            <GridStatus
+              bind:this={gridStatusView}
+              status={gridStatus}
+              text={gridStatusText}
+              placement="band"
+              width={clueBarWidth}
+              bind:height={statusBandHeight}
+              onOpenRecap={openRecap}
+            />
           {/if}
         </div>
         {#if isKeyboardShown}
@@ -2562,72 +2557,6 @@
     height: 100%;
     background: var(--nock-navy);
     transition: none;
-  }
-
-  /* ---- The completion status (spec 026; specs/_design/overlays.md « End of grid ») ---- */
-
-  .grid-status {
-    margin: 0;
-    font: 600 0.95rem/1.2 var(--nock-font-ui);
-  }
-
-  /* The end band under the clue bar, as wide as the bar. */
-  .grid-status.band {
-    flex: none;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 100%;
-    padding: 8px 12px;
-  }
-
-  .grid-status.band[data-state='solved'] {
-    color: var(--nock-green);
-    background: var(--nock-green-bg);
-  }
-
-  .grid-status.band[data-state='full_wrong'] {
-    color: var(--nock-navy);
-    background: var(--nock-clue-bg);
-  }
-
-  /* In the clue bar's row: white text on one line, after the clue. */
-  .grid-status.in-row {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 8px;
-    white-space: nowrap;
-    color: var(--nock-white);
-  }
-
-  /* The text of the band, after its pictogram: it wraps when the band is too
-     narrow for it and "Voir le bilan" on one line (spec 047). */
-  .grid-status.band .grid-status-text {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-
-  /* The check mark of a solved grid: a pictogram drawn by CSS, never read, a space
-     before the text. */
-  .status-check::before {
-    content: '✓';
-  }
-
-  .status-check {
-    margin-right: 0.25em;
-  }
-
-  /* "Voir le bilan" keeps its whole label on one line, on the band's
-     right. */
-  .recap-open {
-    flex: none;
-    margin-left: auto;
-    padding: 7px 12px;
-    font-size: 0.85rem;
-    white-space: nowrap;
   }
 
   /* ---- The scrim of the sheet layout (layer 7, from under the 54 px top bar) ---- */
