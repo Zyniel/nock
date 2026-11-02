@@ -130,7 +130,7 @@ export interface VoteView {
 }
 
 // How a vote ended (spec 025).
-type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
+export type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
 
 // The countdown of a vote this page saw open (spec 047): the performance.now()
 // reading of the moment the page applied its vote_opened, and how long the vote
