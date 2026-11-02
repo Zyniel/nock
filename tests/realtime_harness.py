@@ -24,15 +24,15 @@ Every test of these files clears the variables an app reads at its start first
 nothing.
 
 The second part of this module, "A page's socket passed to the live server", is
-the setup of the tests of what a page sends after a reconnection (rules 20 and
-22): `test_realtime_reconnection_selection.py` (AC-24),
+the setup of the tests of what a page sends after a reconnection (rules 5 and
+7): `test_reconnection_selection.py` (`platform/reconnection.md` AC-5),
 `test_server_offline_undo.py` (`platform/server.md` AC-29) and
 `test_hints_offline_requests.py` (`gameplay/hints.md` AC-24). Each page's room
 socket goes through Playwright's `route_web_socket` to the live server, and the
 proxy keeps every frame of both ways. A test takes a page's socket away with
 `go_offline`: the proxy closes it on both sides, as a loss, and closes every new
 socket of the page at once until `come_back`, which lets the next one through and
-fires the browser's `online` event, so the page tries at once (rule 21). What the
+fires the browser's `online` event, so the page tries at once (rule 6). What the
 page does offline is so never sent too early, whatever the speed of the machine.
 `come_back(is_holding=True)` also holds what the server sends on the new socket
 until the test releases it, so a test can pause the page clock before the page
