@@ -258,7 +258,7 @@ export type DashDirection = 'to bottom' | 'to right'
 // px from the edge's start, as the dashes are, so no pixel is blended.
 //
 // The grid holds it in a variable, set from the cell side: a pinch then
-// changes the grid's style and no cell's (client/shell.md rule 18).
+// changes the grid's style and no cell's (client/foundation.md rule 8).
 export function dashesImage(dashes: DashRun[], direction: DashDirection, colour: string): string {
   const stops: string[] = []
   let previousEnd = 0

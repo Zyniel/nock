@@ -140,8 +140,8 @@
 
   let { code }: { code: string } = $props()
 
-  // The grid's two faces are fetched while the room opens (client/shell.md
-  // rule 21).
+  // The grid's two faces are fetched while the room opens (client/foundation.md
+  // rule 5).
   preloadGridFonts()
 
   let session = $state(newSession())
