@@ -1,10 +1,10 @@
 ---
 id: B-062
 title: The erasure leaves `account/account.md`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T10:36:00Z'
 labels:
   - domain:account
   - domain:erasure
@@ -38,3 +38,17 @@ ordinal: 17000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: account/account.md → account/erasure.md (new), specs/_map.md; the pointers of 029 and 033 move.
+2. Tests: about 31 functions in 9 files move to tests/test_erasure_*.py, renamed to the new numbers.
+3. Quick gate: uv run python scripts/gate.py --specs account,erasure --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started in parallel with B-048's review (different domains). Spec-writer on Fable at high (new domain). Base: origin/main 4005dc3.
+<!-- SECTION:NOTES:END -->
