@@ -1,4 +1,4 @@
-// The room page's fonts, fetched at once (client/shell.md rule 21): the grid's
+// The room page's fonts, fetched at once (client/foundation.md rule 5): the grid's
 // letters and clues use Source Sans 3 at 500 and IBM Plex Sans Condensed at 600,
 // and the browser would only find out which files it needs after it has drawn
 // the grid.

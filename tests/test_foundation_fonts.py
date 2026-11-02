@@ -1,14 +1,14 @@
-"""Tests of `client/shell.md` AC-32 and AC-33: the fonts are served in their `latin`
-and `latin-ext` subsets only, and the room page preloads the grid's two faces
-(rule 21).
+"""Tests of `client/foundation.md` AC-15 and AC-16: the fonts are served in
+their `latin` and `latin-ext` subsets only, and the room page preloads the grid's
+two faces (rule 5).
 
-AC-32: the built client declares its font faces for the `latin` and `latin-ext`
+AC-15: the built client declares its font faces for the `latin` and `latin-ext`
 subsets only, and ships no font file of another subset.
 
-AC-33: `/r/ABC123` preloads, from Nock's origin, the `latin` files of Source Sans 3 at
+AC-16: `/r/ABC123` preloads, from Nock's origin, the `latin` files of Source Sans 3 at
 500 and of IBM Plex Sans Condensed at 600.
 
-AC-32 reads the built files of `web/dist/assets` with Python only. AC-33 runs in a
+AC-15 reads the built files of `web/dist/assets` with Python only. AC-16 runs in a
 browser on the live server with the room's socket mocked.
 
 Readings where the spec leaves room:
@@ -17,7 +17,7 @@ Readings where the spec leaves room:
   `<family>-<subset>-<weight>-<style>-<hash>.woff2` (or `.woff`), the subset being
   `latin` or `latin-ext` (`cyrillic-ext`, `greek`, `vietnamese`... are others).
 - "Declares its font faces for the subsets only": every `@font-face` of the built CSS
-  has `src` files of those two subsets; the eight faces of `client/shell.md` rule 14
+  has `src` files of those two subsets; the eight faces of `client/foundation.md` rule 4
   (Source Sans 3 at 400, 500, 600, 700 and in italic 500 and 700, IBM Plex Sans
   Condensed at 500 and 600) are each declared in both.
 - "Preloads" is a `<link rel="preload" as="font">` of the page, once the nickname form
@@ -133,10 +133,10 @@ def font_files() -> list[str]:
     return names
 
 
-# ---- AC-32  --------------------------------------------------------------------------
+# ---- AC-15  --------------------------------------------------------------------------
 
 
-def test_ac32_every_declared_face_is_of_the_latin_or_latin_ext_subset() -> None:
+def test_ac15_every_declared_face_is_of_the_latin_or_latin_ext_subset() -> None:
     faces = declared_faces()
 
     other_subsets: list[str] = []
@@ -150,7 +150,7 @@ def test_ac32_every_declared_face_is_of_the_latin_or_latin_ext_subset() -> None:
     assert other_subsets == []
 
 
-def test_ac32_each_of_the_eight_faces_is_declared_in_both_subsets() -> None:
+def test_ac15_each_of_the_eight_faces_is_declared_in_both_subsets() -> None:
     declared: set[tuple[str, str, str, str]] = set()
     for face in declared_faces():
         family_file = face.family.lower().replace(" ", "-")
@@ -164,7 +164,7 @@ def test_ac32_each_of_the_eight_faces_is_declared_in_both_subsets() -> None:
     assert declared == expected
 
 
-def test_ac32_no_font_file_of_another_subset_is_shipped() -> None:
+def test_ac15_no_font_file_of_another_subset_is_shipped() -> None:
     names = font_files()
 
     other_subsets = [name for name in names if subset_of(name) not in SUBSETS]
@@ -185,13 +185,13 @@ def test_ac32_no_font_file_of_another_subset_is_shipped() -> None:
         ("source-sans-3-vietnamese-700-normal--5ui7us-.woff2", "vietnamese"),
     ],
 )
-def test_ac32_the_subset_reader_reads_the_subset_of_a_file_name(
+def test_ac15_the_subset_reader_reads_the_subset_of_a_file_name(
     name: str, subset: str
 ) -> None:
     assert subset_of(name) == subset
 
 
-# ---- AC-33  --------------------------------------------------------------------------
+# ---- AC-16  --------------------------------------------------------------------------
 
 
 def font_preloads(page: Page) -> list[str]:
@@ -201,7 +201,7 @@ def font_preloads(page: Page) -> list[str]:
     return [str(href) for href in found]
 
 
-def test_ac33_the_room_page_preloads_the_latin_files_of_the_grid_faces(
+def test_ac16_the_room_page_preloads_the_latin_files_of_the_grid_faces(
     window: OpenWindow, live_server: str
 ) -> None:
     page = window(1280, 720)

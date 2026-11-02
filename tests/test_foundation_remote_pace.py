@@ -1,10 +1,11 @@
-"""Tests of shell AC-26 and AC-27: the pace of remote updates on the reference phone.
+"""Tests of foundation AC-12 and AC-13: the pace of remote updates on the reference
+phone.
 
-`client/shell.md` rule 18: on the reference phone (`product.md` rule 21) and FX-02,
+`client/foundation.md` rule 8: on the reference phone (`product.md` rule 21) and FX-02,
 a frame that changes no cell costs at most 2 ms of main-thread time on average
 over a burst, and with the 7 other players typing at `product.md` rule 24's pace
-the local echo of rule 23 holds. The mutation counts of rule 18 are in
-`test_shell_remote_updates.py`.
+the local echo of rule 23 holds. The mutation counts of rule 8 are in
+`test_foundation_remote_updates.py`.
 
 These tests measure a time and a pace, so this file runs alone, after the
 parallel pass (`SERIAL_TEST_FILES` of `scripts/gate_browsers.py`).
@@ -27,20 +28,20 @@ Choices where the spec leaves room:
   back to the first after the last. Their first sends are 62.5 ms apart, as in
   spec 036's AC-4. A word's first pass types its answer, each later pass the
   letter after the one before (Z gives A), so every edit changes its cell.
-- AC-26's 40 letters: spec 036 AC-2's keys (`local_echo_keystrokes`, the answers
+- AC-12's 40 letters: spec 036 AC-2's keys (`local_echo_keystrokes`, the answers
   of FX-02's across words from the first, a tap on each word's first cell),
   typed 250 ms apart once the other players have typed for 1 s; the local echo is
   timed from each keydown to its cell's `data-letter` by spec 036's probe, and
   the p95 is the 38th smallest of the 40.
-- AC-27, "main-thread time": the renderer main thread's time in tasks, the
+- AC-13, "main-thread time": the renderer main thread's time in tasks, the
   `TaskDuration` of CDP `Performance.getMetrics` (under the CPU throttling),
   read once before Bob's first `select_cell` and once after the page has received
   the 100 `selection_moved`. The page's cost per `selection_moved` is the
   difference divided by 100.
-- AC-27, "100 `select_cell` in a row": `product.md` rule 25 lets a connection have
+- AC-13, "100 `select_cell` in a row": `product.md` rule 25 lets a connection have
   at most 100 inputs posted and not yet applied, so Bob sends them in 10 batches
   of 10, each followed by a ping whose pong he waits for.
-- AC-27, the test's own work in the measure: between the two reads the test runs
+- AC-13, the test's own work in the measure: between the two reads the test runs
   nothing in the page but the reads of a counter (a property read, once the
   burst has been relayed) and the counter itself, an init script's `message`
   listener on each socket that counts the frames holding `selection_moved` (a
@@ -342,11 +343,11 @@ def send_selection_burst(bob: Peer, cell: Cell) -> None:
         ping_and_wait(bob)
 
 
-# ---- AC-26: the local echo holds while the 7 others type ----------------------
+# ---- AC-12: the local echo holds while the 7 others type ----------------------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac26_the_local_echo_holds_while_seven_other_players_type(
+def test_ac12_the_local_echo_holds_while_seven_other_players_type(
     browser: Browser, live_server: str, room_registry: RoomRegistry, fx02_grid: Grid
 ) -> None:
     code = room_registry.register_room(fx02_grid)
@@ -391,11 +392,11 @@ def test_ac26_the_local_echo_holds_while_seven_other_players_type(
     )
 
 
-# ---- AC-27: a selection that changes nothing costs at most 2 ms ---------------
+# ---- AC-13: a selection that changes nothing costs at most 2 ms ---------------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac27_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
+def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
     browser: Browser, live_server: str, room_registry: RoomRegistry, fx02_grid: Grid
 ) -> None:
     code = room_registry.register_room(fx02_grid)

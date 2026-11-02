@@ -4,20 +4,19 @@ file: shell
 status: done
 ---
 
-# client/shell - Pages, connection states, texts and the visual foundation
+# client/shell - Pages, connection states, texts and the brand
 
 ## Purpose
 
 The browser client as a whole: which page a path shows, how the room page keeps
-the room in seq order, what it shows before the room and what a frame
-redraws, every text in one
-French file, and the foundation every screen is built from (colour tokens,
-fonts, focus ring, shared components, state lines).
+the room in seq order, what it shows before the room, every text in one French
+file, and the brand on the top bars.
 
 ## Depends on
 
 - `product.md`: stable routes, supported windows, accessibility baselines.
-- `platform/realtime.md`: the socket, losses, final closes, the band.
+- `platform/realtime.md`: the socket and its messages; `platform/reconnection.md`:
+  losses, final closes, the band.
 - `lobby/joining.md`: the join on open, the nickname card, the refusal card.
 
 ## Rules
@@ -64,11 +63,11 @@ fonts, focus ring, shared components, state lines).
    apply at once after it; `error` applies at once at any time. None of them
    touches the seq or the buffer; any other message without an integer `seq`
    is ignored.
-6. A final close (`platform/realtime.md` rule 19) ends the tries: 4404
+6. A final close (`platform/reconnection.md` rule 4) ends the tries: 4404
    `not_found`, 4429 `throttled`, 4001 `replaced`; after a refusal, the state
    the `error` set (`full`, `locked`, `removed`). Any other close is a loss:
-   `reconnecting` once joined (the band shows, `platform/realtime.md` rule
-   20); before, `connecting` with no band.
+   `reconnecting` once joined (the band shows, `platform/reconnection.md` rule
+   5); before, `connecting` with no band.
 
 ### Before the room shows
 
@@ -84,9 +83,10 @@ fonts, focus ring, shared components, state lines).
    - else the opening: the room's top bar for the window (`client/hud.md`),
      inert and without timer, so a press on it, the brand included, opens
      nothing, loads nothing and sends nothing; the heading read but not seen;
-     and where the grid will be, only the status line
-     `room.status.connecting` (« Connexion… ») or `room.status.joining`
-     (« Entrée dans le salon… »), seen. No grid, clue bar, keyboard or Salon.
+     and where the grid will be, only the status line (`client/foundation.md`
+     rule 1) `room.status.connecting` (« Connexion… ») or
+     `room.status.joining` (« Entrée dans le salon… »), seen. No grid, clue
+     bar, keyboard or Salon.
 8. The first snapshot turns the opening into the room within 300 ms; a refusal
    turns it into its card, `invalid_nickname` into the nickname card. A loss
    keeps it. Once the room has shown, the status follows `client/hud.md` rule 7.
@@ -101,47 +101,6 @@ fonts, focus ring, shared components, state lines).
     the top bar is the page's banner, outside `main`, and everything under it
     is in the page's one `main`.
 
-### States and motion
-
-11. A page's state (waiting, empty, failed, done) is one line of text where its
-    content will be: muted while waiting or empty, an error line when failed, a
-    confirmation line when done. No spinner, no skeleton: no `<progress>`, no
-    `role="progressbar"`, no CSS animation (`@keyframes` or an `animation`
-    property, vendor prefixes included) in the sources or the built CSS.
-12. The note's fade is a transition; under reduced motion it has none.
-
-### Visual foundation
-
-13. Colours come only from the tokens declared once in the token block of
-    `web/src/app.css` (`--nock-*`, `--player-colour-N`, `--player-ink-N`).
-    Outside a token declaration no CSS declaration, in `web/src` or in the
-    built CSS, holds a colour literal: a hex colour, a colour function (not
-    `color-mix()`), or a named or system colour; `transparent` and
-    `currentColor` are allowed, and so is `#0000` (transparent). Scripts and
-    markup hold no hex colour or colour function, and colour attributes of
-    markup (`style`, `fill`, `stroke`, …) no named colour. Comments,
-    `web/public/favicon.svg` and user content (emoji) are not colours of the
-    client.
-14. Nock serves its two font families itself, from the packages
-    `@fontsource/source-sans-3` and `@fontsource/ibm-plex-sans-condensed`,
-    importing only the eight faces the design uses; no request goes to
-    another host. `README.md` credits both under the SIL Open Font License 1.1.
-    A face that fails to load falls back to the next family. Form controls
-    take their parent's font, never the system's.
-21. The faces are served in their `latin` and `latin-ext` subsets only. The
-    room page preloads the `latin` files of the grid's letter and clue faces
-    (`_design/foundation.md`, « Typography »).
-15. `web/src/lib/icons.ts` holds the design's icon shapes, the eight player
-    icons and the Nock mark as data.
-16. The shared components (buttons in their variants and disabled, menus and
-    their items, details, headings and separators, the badge, the note) and the
-    focus ring, including its form on a navy surface, are global styles, their
-    colours those of « Components »; a hidden note lets pointers through.
-    Nothing of the Vite template's demo is left. The grid's ring, its own
-    outline, is drawn again by an overlay over the whole grid, painted after
-    the cells, hidden from assistive technology and letting pointers through,
-    so the ring shows along every edge cell.
-
 ### The brand
 
 17. The brand, the Nock mark (hidden from assistive technology) then
@@ -152,41 +111,12 @@ fonts, focus ring, shared components, state lines).
     as any link does. On `/` it is plain text, read « Nock »: no link, no Tab
     stop, no `aria-current`. The room's phone top bar has no brand.
 
-### What a frame redraws
-
-18. Once the room shows, each of the following mutates (adds, removes or
-    changes a node, an attribute or a text) no node of the grid outside the
-    cells whose drawing it changes and the nodes inside them:
-    - a frame other than a snapshot: one that changes no cell's drawing (a
-      `pong`, a `chat_message`, a `selection_moved` that leaves its cursor
-      where it was) mutates no node of the grid; a letter change only its
-      cell; a cursor's move only the cells it leaves and enters, and those its
-      player's word tint leaves or enters;
-    - a flash's start and end, and a catch-up ring's (`social/catch-up.md` rule
-      14), only their cell;
-    - a pinch no cell, and the cells still follow `_design/cells.md` at the new
-      side.
-
-    A snapshot, a reconnection's included, may redraw the whole grid.
-
-    On the reference phone (`product.md` rule 21) and a 13 by 17 grid, a frame
-    that changes no cell costs at most 2 ms of main-thread time on average over
-    a burst of such frames.
-    With the 7 other players each typing at `product.md` rule 24's pace,
-    the local echo of `product.md` rule 23 holds.
-
 ### Look
 
-- Tokens, player colours and inks: `_design/foundation.md`, « Colour tokens »,
-  « Player colours ». Fonts: « Typography ». Icons: « Icons ». Components and
-  focus ring, brand link: « Components ». The scans: « How conformance is
-  checked ».
-- Grid cells in token colours and the flash: `_design/cells.md`, « Letter cell
-  backgrounds », « Letter marks », « Clue cells », « Direction arrows ».
+- The brand link: `_design/foundation.md`, « Components ».
 - Entry frame, cards and page not found: `_design/pages.md`, « Entry and
-  not-found pages »; the opening and state lines: « States: opening, loading,
-  empty, error »; the plain pages: « Plain pages: account, shared recap,
-  operator ».
+  not-found pages »; the opening: « States: opening, loading, empty, error »;
+  the plain pages: « Plain pages: account, shared recap, operator ».
 
 ## Acceptance criteria
 
@@ -243,10 +173,6 @@ fonts, focus ring, shared components, state lines).
   room top bar; `invalid_nickname` the nickname card with
   `join.error.characters`; a close 1011 keeps the opening, reading
   « Connexion… », with no band. (← 046 AC-21)
-- **AC-13** The client's sources and built CSS hold no `@keyframes`, no
-  `animation` property (prefixed or not), no `<progress` and no
-  `role="progressbar"`: `a{-webkit-animation:spin 1s}` is refused and
-  `a{transition:opacity .25s}` passes. (← 048 AC-13)
 - **AC-14** The catalogue in its states, the grid page, the nickname card in
   error, each status card, the room not found, the page not found, the
   opening, the shared recap, account and operator pages in theirs pass the
@@ -261,62 +187,6 @@ fonts, focus ring, shared components, state lines).
   operator page with the FX-02 replay; on the first six, the top bar, each
   row and card, and each of their buttons lie inside their box.
   (← 046 AC-22, 048 AC-14)
-- **AC-16** Each colour token, translucent token, player colour and ink
-  resolves to its value in « Colour tokens » and « Player colours », the
-  roster swatch of colour N shows player colour N, the page base takes the
-  tokens' white and ink, the page and every form control use the UI font
-  stack of « Typography », a control at its parent's size, and the clue font
-  token gives the clue stack of « Typography ».
-  (← 041 AC-1, 041 AC-2, 041 AC-3, 041 AC-4, 041 AC-21)
-- **AC-17** The eight faces load from Nock's origin with status 200 and no
-  request leaves it; `web/package.json` lists the two font packages, the
-  client imports exactly the eight faces, and `README.md` credits both
-  families under the SIL Open Font License 1.1. (← 041 AC-5, 041 AC-6)
-- **AC-18** The focus ring on a force chip, the grid and an in-app key, the
-  ring on a navy surface, the four button looks (disabled text at 4.5:1 at
-  least), the menu, its item (hovered too), detail, heading and separator, the
-  badge and the note (hidden, and with reduced motion) each follow
-  « Components ». (← 041 AC-7, 041 AC-8, 041 AC-9, 041 AC-10, 041 AC-11,
-  041 AC-12, 041 AC-13, 041 AC-14)
-- **AC-19** On FX-01 with a locked `T`, a wrong `X`, a pencil `D`, Bob's word
-  and VIDE selected, every cell's colours, borders and arrows follow the cells
-  design. When Bob replaces a letter, the cell flashes as that design draws
-  it, until the flash ends, its letter in ink, a pencil one too, and for every
-  player colour the letter keeps 4.5:1 at least. (← 041 AC-15, 041 AC-16,
-  041 AC-17)
-- **AC-20** The colour scan refuses `<rect fill="white"/>`, passes
-  `:root{--nock-navy:#1b2f55}`, and finds nothing in `web/src` or the built
-  CSS, which declares each token once; `icons.ts` holds every shape of the
-  design once; no demo file or text is left. (← 041 AC-18, 041 AC-19, 041 AC-20,
-  040 AC-26)
-- **AC-21** On a fresh FX-01 room with (1,0) across selected and the grid
-  focused from the keyboard, the ring shows in painted pixels over the letter
-  cells of the grid's right and bottom edges: at the middle of the outer side
-  of each of (1,4) to (4,4) and (4,1) to (4,4), the 3 px inside the grid's edge
-  hold a pixel of the ring's navy (`--nock-navy`, #1B2F55).
-- **AC-22** On FX-01 with Bob's cursor on (1, 1) across, a `pong`, a
-  `chat_message` from Bob and a `selection_moved` putting Bob on (1, 1) across
-  again mutate no node of the grid.
-- **AC-23** On FX-01, Bob's `M` in the empty (1, 2) mutates no node of the
-  grid outside (1, 2); nor does Bob's `X` over my `M` there, from its flash's
-  start to its end.
-- **AC-24** On FX-01, Bob's cursor going from (1, 1) to (1, 2) across mutates
-  only those two cells; Bob then turning to down on (1, 2) mutates only the
-  cells of TAMIS and MIME.
-- **AC-25** On a touch phone with FX-01 and Bob on (1, 1), a pinch from zoom 1
-  to 1.5 (Chromium: pinch through CDP) mutates no cell, and Bob's triangle then
-  has the leg « Other players on a cell » gives the new cell side.
-- **AC-26** On the reference phone (Chromium), on FX-02 with 7 other players
-  each typing 2 letters a second in their own words, their cursors following,
-  40 letters typed 250 ms apart show in their cell within 50 ms at the p95.
-- **AC-27** On the reference phone (Chromium), on FX-02 with the 7 other
-  players' cursors in the grid, Bob sending 100 `select_cell` in a row for the
-  cell and direction he already holds costs the page at most 2 ms of
-  main-thread time per `selection_moved`, on average over the 100.
-- **AC-28** On FX-01, after a reconnection whose snapshot is at 9 with
-  `seen_seq` 5 stored, a catch-up answer naming only (1, 2) mutates no node of
-  the grid outside (1, 2), from the start of its ring to the ring's end 5
-  seconds later.
 - **AC-29** `fr.json` holds `list.separator` « , » then a space, `unit.hours`
   « h » and `unit.minutes` « min »; the shared recap's team reads « Ana, Bob,
   Cy » and the settings card's out-of-bounds line for a room life « Valeur
@@ -330,27 +200,22 @@ fonts, focus ring, shared components, state lines).
 - **AC-31** `/` fetches none of the code that only the room page or the
   operator page uses, and `/r/ABC123` none of the code that only the catalogue
   or the operator page uses.
-- **AC-32** The built client declares its font faces for the `latin` and
-  `latin-ext` subsets only, and ships no font file of another subset.
-- **AC-33** `/r/ABC123` preloads, from Nock's origin, the `latin` files of
-  Source Sans 3 at 500 and of IBM Plex Sans Condensed at 600.
 
 ## Edge cases
 
 - Snapshot 5, event 8 buffered, then snapshot 7: seq 8, nothing buffered; event
   1 then snapshot 0: seq 0 (AC-6).
-- A minifier writing `transparent` as `#0000` passes the scan (AC-20).
 
 ## Out of scope
 
-- Other languages and a language switch; a dark mode, forced colours, print
-  styles; screenshot comparison with the sheets.
-- The band, retries and resent edits: `platform/realtime.md`. The join, the
+- Other languages and a language switch.
+- The tokens, fonts, icons, shared components, focus ring, state lines, motion
+  and what a frame redraws: `client/foundation.md`.
+- The band, retries and resent edits: `platform/reconnection.md`. The join, the
   nickname card and refusals: `lobby/joining.md`, `lobby/host.md`,
-  `lobby/rooms.md`. The
-  room's frame once shown: `client/hud.md`. The catalogue and its states:
-  `content/library.md`. The plain pages' content: `account/account.md`,
-  `gameplay/results.md`, `admin/operations.md`.
+  `lobby/rooms.md`. The room's frame once shown: `client/hud.md`. The
+  catalogue and its states: `content/library.md`. The plain pages' content:
+  `account/account.md`, `gameplay/results.md`, `admin/operations.md`.
 
 ## Code
 
@@ -360,10 +225,5 @@ fonts, focus ring, shared components, state lines).
   `RoomPage.svelte` (socket, cards, opening), `EntryFrame.svelte`,
   `CatalogueFrame.svelte` (the frames and their `main`), `NotFoundPage.svelte`,
   `PageTopBar.svelte`, `TopBarBrand.svelte`.
-- `web/src/app.css` (tokens, page base, focus ring, components),
-  `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay, what a
-  frame redraws),
-  `web/src/main.ts` (fonts, subsets, preload), `web/src/lib/icons.ts`.
-- Tests: `tests/test_shell_*`, `tests/test_spec_041_*` and the
-  `tests/test_spec_040_*`, `test_spec_046_*` and `test_spec_048_*` files of the
-  cited criteria.
+- Tests: `tests/test_shell_*` and the `tests/test_spec_040_*`,
+  `test_spec_046_*` and `test_spec_048_*` files of the cited criteria.
