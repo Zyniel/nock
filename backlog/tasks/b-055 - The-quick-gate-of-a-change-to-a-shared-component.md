@@ -1,11 +1,10 @@
 ---
 id: B-055
 title: The quick gate of a change to a shared component
-status: In Progress
-assignee:
-  - '@zyniel'
+status: Done
+assignee: []
 created_date: '2026-11-02T00:07:00Z'
-updated_date: '2026-11-02T11:16:00Z'
+updated_date: '2026-11-02T11:35:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -31,10 +30,10 @@ priority: medium
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
 - [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
 - [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -55,6 +54,8 @@ Lead (2026-11-02): option A, the human's pick. The map lives in scripts/gate.py 
 Lead: review round 1 CHANGES REQUESTED: product was missing from the map (specs/product.md is a domain spec whose Code section names RoomPage and GridViewport; only product points to 035, B-041's regression). Fixed, and a static check 'shared components' (stage tests) now keeps the map equal to the Code sections, so a spec change that makes a fourth domain name a component fails the gate until the lead updates the map. Suggestions taken: CLAUDE.md bullet moved and rewrapped, the two copies of the changed-paths logic name each other, the broad except says why.
 
 Lead: review round 2 CHANGES REQUESTED: the check read only names written Name.svelte, while room.md and hud.md list parts with the suffix once (`Salon`, `PlayersPanel` (`.svelte`)), so PlayersPanel lacked room and RoomMenu and RoomTopBar (4 domains each) were missing. Fixed in the next commit: the check now takes any capitalised word of a Code section that names a .svelte file of web/src/, the map has 5 components, a domain listed twice fails, and the check is split in two functions. A second CHANGES REQUESTED is an escalation (stuck): the task is held for the human, its PR labelled needs-human, no auto-merge.
+
+Human (2026-11-02, chat): option A, merge B-055 once CI is green. The lead records it, unassigns the task, removes needs-human and turns on auto-merge.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -68,3 +69,11 @@ Stuck (two review rounds ended in CHANGES REQUESTED). Question: accept B-055 as 
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SHARED_COMPONENT_DOMAINS in scripts/gate.py maps the client components that four domains or more name in their spec's Code section to those domains (the human's option A): RoomPage.svelte 17, GridViewport.svelte 9, PlayersPanel.svelte 5, RoomMenu.svelte 4, RoomTopBar.svelte 4. When the branch changed one, gate.py --specs (printing what it adds) and the implementer's role hook add those domains, so B-041's (product 035 AC-5, board 007 AC-1) and B-045's (chat 022 AC-18) regressions now run in the quick gate. A static check 'shared components' (stage tests) keeps the map equal to the Code sections, reading names written Name.svelte or with the suffix once. The hook loads the checked checkout's own gate.py to read the map. CLAUDE.md: one Quality gate bullet.
+Criteria: none (tooling). Reviewer: CHANGES REQUESTED round 1 (product missing) and round 2 (the check missed short-form names), both fixed; stuck by the two-round rule, escalated; the human chose A (merge once CI is green). Gate: stage tests green, pyrefly 0 errors; the full gate is CI's on PR #101 (not run locally while B-062's gate held the lock).
+Pull request: https://github.com/Zyniel/nock/pull/101
+<!-- SECTION:FINAL_SUMMARY:END -->
