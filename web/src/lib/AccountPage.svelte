@@ -123,7 +123,7 @@
 </script>
 
 
-<main class="nock-plain-page account-page" data-testid="account-page" data-state={pageState}>
+<div class="nock-plain-page account-page" data-testid="account-page" data-state={pageState}>
   <EntryFrame>
     <div class="nock-card" data-testid="account-card">
       <h1 class="nock-card-title">{t('account.page_heading')}</h1>
@@ -213,7 +213,7 @@
       {/if}
     </div>
   </EntryFrame>
-</main>
+</div>
 
 <style>
   /* A long address wraps anywhere rather than widen the page. */

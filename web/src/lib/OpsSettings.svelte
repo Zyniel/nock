@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte'
-  import { t } from './i18n'
+  import { t, type MessageKey } from './i18n'
   import {
     fetchDryRun,
     fetchSettings,
@@ -11,6 +11,7 @@
     type OpsAnswer,
     type Setting,
     type SettingsList,
+    type SettingUnit,
   } from './ops'
 
   // The card « Durées de vie des salons » of the operator's page
@@ -49,7 +50,10 @@
   let errors = $state<Record<string, string>>({})
   let question = $state<Question | null>(null)
 
-  const SHORT_UNITS = { hours: 'h', minutes: 'min' }
+  const SHORT_UNIT_KEYS: Record<SettingUnit, MessageKey> = {
+    hours: 'unit.hours',
+    minutes: 'unit.minutes',
+  }
   // The question's block, which « Enregistrer » and « Rétablir » disclose.
   const QUESTION_ID = 'ops-settings-question'
 
@@ -107,7 +111,7 @@
     return t('ops.setting_out_of_bounds', {
       min: setting.min,
       max: setting.max,
-      unit: SHORT_UNITS[setting.unit],
+      unit: t(SHORT_UNIT_KEYS[setting.unit]),
     })
   }
 

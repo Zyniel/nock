@@ -1,11 +1,4 @@
 <script lang="ts">
-  import AccountPage from './lib/AccountPage.svelte'
-  import CataloguePage from './lib/CataloguePage.svelte'
-  import GridPage from './lib/GridPage.svelte'
-  import NotFoundPage from './lib/NotFoundPage.svelte'
-  import OpsPage from './lib/OpsPage.svelte'
-  import RoomPage from './lib/RoomPage.svelte'
-  import SharePage from './lib/SharePage.svelte'
   import { t } from './lib/i18n'
 
   const ROOM_PATH = /^\/r\/([A-Z0-9]{6})$/
@@ -21,20 +14,36 @@
   const recapMatch = RECAP_PATH.exec(path)
 </script>
 
+<!-- Each page is fetched only on its route, so a page does not carry the code
+     of the others (client/shell.md rule 20). -->
 {#if path === '/'}
-  <CataloguePage />
+  {#await import('./lib/CataloguePage.svelte') then { default: CataloguePage }}
+    <CataloguePage />
+  {/await}
 {:else if roomMatch !== null}
-  <RoomPage code={roomMatch[1]} />
+  {#await import('./lib/RoomPage.svelte') then { default: RoomPage }}
+    <RoomPage code={roomMatch[1]} />
+  {/await}
 {:else if gridMatch !== null}
-  <GridPage number={gridMatch[1]} />
+  {#await import('./lib/GridPage.svelte') then { default: GridPage }}
+    <GridPage number={gridMatch[1]} />
+  {/await}
 {:else if recapMatch !== null}
-  <SharePage token={recapMatch[1]} />
+  {#await import('./lib/SharePage.svelte') then { default: SharePage }}
+    <SharePage token={recapMatch[1]} />
+  {/await}
 {:else if path === '/account'}
   <!-- The account page (spec 033); the server serves it only while accounts are on. -->
-  <AccountPage />
+  {#await import('./lib/AccountPage.svelte') then { default: AccountPage }}
+    <AccountPage />
+  {/await}
 {:else if path === '/ops'}
   <!-- The operator's page (spec 038); the server serves it only while it is on. -->
-  <OpsPage />
+  {#await import('./lib/OpsPage.svelte') then { default: OpsPage }}
+    <OpsPage />
+  {/await}
 {:else}
-  <NotFoundPage />
+  {#await import('./lib/NotFoundPage.svelte') then { default: NotFoundPage }}
+    <NotFoundPage />
+  {/await}
 {/if}

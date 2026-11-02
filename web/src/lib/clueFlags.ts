@@ -109,7 +109,7 @@ export function clueFlagMarkers(
   const markers = new Map<string, ClueFlagMarker>()
   for (const [key, ids] of idsByClue) {
     const names = namesByClue.get(key) ?? []
-    markers.set(key, { flaggedBy: ids.join(' '), names: names.join(', ') })
+    markers.set(key, { flaggedBy: ids.join(' '), names: names.join(t('list.separator')) })
   }
   return markers
 }

@@ -4,7 +4,7 @@ title: Small fixes of the web client
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:39:00Z'
+updated_date: '2026-11-02T02:58:00Z'
 labels:
   - domain:host
   - domain:operations
@@ -121,4 +121,9 @@ Decisions (lead, 2026-11-02):
 - L12, L14, L15: no spec change (rules already hold; hud.md is B-046's domain).
 
 - Spec-checker: CHANGES REQUESTED (shell rule 2 units too wide; rule 21 restated the design's faces), then APPROVED in round 2. Size: shell.md (33 criteria), operations.md (30) and host.md (22) are over budget; shell and operations splits are B-058 and B-063, host.md and product.md become follow-up drafts.
+
+- One feat commit, not one per fix: RoomPage.svelte, OpsPage.svelte and SharePage.svelte each carry two or three of the fixes; the commit body lists the files of each fix.
+- L23 measured against product rule 22 (FX-02, median of 3 cold loads on the reference phone, test_spec_036_ac01): 1246.5 ms before, 1551 to 1578 ms after (limit 2500 ms). The room page's code now comes one round trip after the entry script; the catalogue and the other pages no longer load the room's code. Preloading the fonts from App.svelte cost about 100 ms more; from RoomPage nothing measurable, so it is there.
+- The font preload names the woff2 files through new URL(node_modules path, import.meta.url), not an @fontsource ?url import, which 041 AC-6's scan would count as a ninth face import.
+- No test proves L12, L14 and the ghost-finger part of L15 (a lost pointerup cannot be simulated through CDP).
 <!-- SECTION:NOTES:END -->

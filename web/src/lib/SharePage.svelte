@@ -41,7 +41,7 @@
   >
 {/snippet}
 
-<main class="nock-plain-page" data-testid="recap-page" data-state={pageState}>
+<div class="nock-plain-page" data-testid="recap-page" data-state={pageState}>
   <EntryFrame>
     <div class="nock-card" data-testid="share-card">
       {#if recap !== null}
@@ -55,7 +55,9 @@
           {t('recap.time', { time: timerText(recap.elapsed_ms) })}
         </p>
         <p class="nock-card-text share-team" data-testid="share-team">
-          {t('share.team', { names: recap.team.map(displayNickname).join(', ') })}
+          {t('share.team', {
+            names: recap.team.map(displayNickname).join(t('list.separator')),
+          })}
         </p>
         {@render homeLink()}
       {:else if pageState === 'error'}
@@ -69,7 +71,7 @@
       {/if}
     </div>
   </EntryFrame>
-</main>
+</div>
 
 <style>
   /* A long team wraps rather than widen the page. */

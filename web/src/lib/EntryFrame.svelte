@@ -1,8 +1,9 @@
 <script lang="ts">
   // The entry frame (spec 046, "Entry frame"): the page top bar, then the page
   // grey down to the window's bottom, holding one centred column at most 420 px
-  // wide. The entry pages of a room and the page not found show their room
-  // code line and their card in it. The page that holds the frame is a plain
+  // wide; it is the page's `main`, after the top bar, which is the banner. The
+  // entry pages of a room and the page not found show their room code line and
+  // their card in it. The page that holds the frame is a plain
   // page (the class `nock-plain-page`), so that the grey reaches the bottom.
   import type { Snippet } from 'svelte'
   import PageTopBar from './PageTopBar.svelte'
@@ -22,16 +23,18 @@
 <svelte:window onresize={followWindow} />
 
 <PageTopBar form="entry" {isWide} />
-<div class="page-body" class:narrow={!isWide} data-testid="page-body">
+<main class="page-body" class:narrow={!isWide} data-testid="page-body">
   <div class="page-column" data-testid="page-column">
     {@render children()}
   </div>
-</div>
+</main>
 
 <style>
   .page-body {
     flex: 1 0 auto;
     box-sizing: border-box;
+    max-width: none;
+    margin: 0;
     padding: 48px 24px;
     background: var(--nock-page);
   }

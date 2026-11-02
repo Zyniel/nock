@@ -19,6 +19,7 @@
   import Salon from './Salon.svelte'
   import { t } from './i18n'
   import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
+  import { preloadGridFonts } from './fontPreload'
   import { nameOf, streamEntries } from './activityFeed'
   import {
     AUTHORS_VIEW_KEY,
@@ -136,6 +137,10 @@
   const CLUE_BAR_MIN_PX = 320
 
   let { code }: { code: string } = $props()
+
+  // The grid's two faces are fetched while the room opens (client/shell.md
+  // rule 21).
+  preloadGridFonts()
 
   let session = $state(newSession())
   let rawSelection: Selection | null = $state(null)
@@ -649,18 +654,30 @@
   let isStatusUnderClueBar = $derived(gridStatus !== null && !isStatusInClueBar)
   let isLocked = $derived(session.snapshot !== null && session.snapshot.settings.locked)
 
-  // The settings form shows the settings of the room; it follows each change.
+  // The settings form shows the settings of the room. It follows a change of
+  // the room only field by field: a field whose room value did not change keeps
+  // what was typed or chosen (lobby/host.md rule 8).
   let helpModeInput = $state('free')
   let lettersInput: number | null = $state(5)
   let wordsInput: number | null = $state(1)
+  // The room's settings the form last followed; not reactive, the effect below
+  // must not run again because it wrote it.
+  let followedSettings: { help_mode: string; letters: number; words: number } | null = null
   $effect(() => {
     if (session.snapshot === null) {
       return
     }
     const { help_mode, letters, words } = session.snapshot.settings
-    helpModeInput = help_mode
-    lettersInput = letters
-    wordsInput = words
+    if (followedSettings === null || followedSettings.help_mode !== help_mode) {
+      helpModeInput = help_mode
+    }
+    if (followedSettings === null || followedSettings.letters !== letters) {
+      lettersInput = letters
+    }
+    if (followedSettings === null || followedSettings.words !== words) {
+      wordsInput = words
+    }
+    followedSettings = { help_mode, letters, words }
   })
 
   function removePlayer(playerId: string): void {
@@ -2197,7 +2214,11 @@
   {/if}
 {/snippet}
 
-<main
+<!-- The room is the page's `main`. An entry page is not: its frame owns the
+     `main`, after the top bar, which is the page's banner (client/shell.md
+     rule 19). -->
+<svelte:element
+  this={isEntryPage ? 'div' : 'main'}
   class="room-page"
   class:entry-page={isEntryPage}
   data-testid="room-page"
@@ -2573,7 +2594,7 @@
   {#if isRoomGone}
     <RoomGoneDialog {layout} />
   {/if}
-</main>
+</svelte:element>
 
 <style>
   /* The room fills the window: the top bar, the bands, then the play area and

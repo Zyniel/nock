@@ -5,7 +5,7 @@
   import { t } from './i18n'
 </script>
 
-<main class="nock-plain-page" data-testid="not-found-page">
+<div class="nock-plain-page" data-testid="not-found-page">
   <EntryFrame>
     <div class="nock-card">
       <h1 class="nock-card-title">{t('not_found.heading')}</h1>
@@ -15,4 +15,4 @@
       >
     </div>
   </EntryFrame>
-</main>
+</div>

@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import CatalogueFrame from './CatalogueFrame.svelte'
   import OpsReplay from './OpsReplay.svelte'
   import OpsSettings from './OpsSettings.svelte'
   import { t, type MessageKey } from './i18n'
   import {
     fetchDashboard,
+    isOpsTokenShape,
     metricViews,
     readOpsToken,
     removeOpsToken,
@@ -42,12 +43,21 @@
 
   const metrics = $derived(figures === null ? [] : metricViews(figures))
 
-  // Back to the token form after a 401 or a 429: the token is forgotten.
-  function lock(reason: LockReason): void {
+  let tokenInput: HTMLInputElement | undefined = $state()
+  // The number of the latest dashboard request (the first load, a period press,
+  // the reload after a save). An answer to an earlier one changes nothing.
+  let latestDashboardRequest = 0
+
+  // Back to the token form after a 401 or a 429: the token is forgotten, the
+  // input is emptied and takes the focus once the form is drawn.
+  async function lock(reason: LockReason): Promise<void> {
     removeOpsToken()
     token = null
+    typedToken = ''
     tokenError = reason === 'refused' ? 'ops.token_refused' : 'ops.throttled'
     pageState = 'locked'
+    await tick()
+    tokenInput?.focus()
   }
 
   // The answer to a dashboard request: its figures, the token form again after
@@ -57,7 +67,7 @@
       figures = answer.body
       pageState = 'ready'
     } else if (answer.kind === 'refused' || answer.kind === 'throttled') {
-      lock(answer.kind)
+      void lock(answer.kind)
     } else {
       pageState = 'error'
     }
@@ -72,7 +82,12 @@
       return
     }
     pageState = 'loading'
+    latestDashboardRequest += 1
+    const request = latestDashboardRequest
     const answer = await fetchDashboard(token, null)
+    if (request !== latestDashboardRequest) {
+      return
+    }
     showDashboardAnswer(answer)
   }
 
@@ -84,7 +99,12 @@
     if (token === null) {
       return
     }
+    latestDashboardRequest += 1
+    const request = latestDashboardRequest
     const answer = await fetchDashboard(token, days)
+    if (request !== latestDashboardRequest) {
+      return
+    }
     // A 401 or a 429 to the replay's request may have locked the page meanwhile.
     if (pageState !== 'ready') {
       return
@@ -94,6 +114,10 @@
 
   function submitToken(event: SubmitEvent): void {
     event.preventDefault()
+    if (!isOpsTokenShape(typedToken)) {
+      void lock('refused')
+      return
+    }
     token = typedToken
     writeOpsToken(typedToken)
     tokenError = null
@@ -108,7 +132,7 @@
   })
 </script>
 
-<main class="nock-plain-page ops-page" data-testid="ops-page" data-state={pageState}>
+<div class="nock-plain-page ops-page" data-testid="ops-page" data-state={pageState}>
   <CatalogueFrame>
     <h1 class="nock-page-heading">{t('ops.heading')}</h1>
     {#if pageState === 'locked'}
@@ -124,6 +148,7 @@
             aria-invalid={tokenError !== null ? 'true' : undefined}
             aria-describedby={tokenError !== null ? 'ops-token-error' : undefined}
             bind:value={typedToken}
+            bind:this={tokenInput}
           />
         </div>
         {#if tokenError !== null}
@@ -181,11 +206,15 @@
           {/each}
         </ul>
       </section>
-      <OpsSettings {token} onLocked={lock} onSaved={() => void changePeriod(null)} />
-      <OpsReplay {token} onLocked={lock} />
+      <OpsSettings
+        {token}
+        onLocked={(reason) => void lock(reason)}
+        onSaved={() => void changePeriod(null)}
+      />
+      <OpsReplay {token} onLocked={(reason) => void lock(reason)} />
     {/if}
   </CatalogueFrame>
-</main>
+</div>
 
 <style>
   .ops-page {

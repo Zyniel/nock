@@ -156,7 +156,7 @@
   />
 {/snippet}
 
-<main class="nock-plain-page catalogue-page" data-testid="catalogue-page" data-state={pageState}>
+<div class="nock-plain-page catalogue-page" data-testid="catalogue-page" data-state={pageState}>
   <CatalogueFrame topBarEnd={accountStatus === null ? undefined : accountOpen} bind:isWide>
     <h1 class="nock-page-heading">{t('catalogue.heading')}</h1>
     {#if myRoomKeys.length > 0}
@@ -214,7 +214,7 @@
       onClosed={onAccountClosed}
     />
   {/if}
-</main>
+</div>
 
 <style>
   .catalogue-page {
