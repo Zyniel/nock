@@ -284,7 +284,7 @@ conformance is checked »).
 - Real screen readers, an accessibility engine such as axe-core, other
   languages, right-to-left layouts, keyboard shortcuts beyond the grid's (Ctrl+Z
   undo). Reduced motion: `_design/room.md` (« 3-second notes »),
-  `client/shell.md`.
+  `client/foundation.md`.
 - Real phones and networks; Firefox and WebKit timings; load beyond 8 players a
   room or many rooms at once; bundle size budgets.
 - Limits per address: `lobby/rooms.md`, `admin/operations.md`,

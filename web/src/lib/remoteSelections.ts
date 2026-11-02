@@ -116,7 +116,7 @@ export function nextCursors(before: CellCursor[], now: CellCursor[]): CellCursor
     kept.push({ ...position, corner })
   }
   // Nothing moved: the same list, so that nothing drawn from it draws again
-  // (client/shell.md rule 18).
+  // (client/foundation.md rule 8).
   if (isSameCursorList(before, kept)) {
     return before
   }
@@ -220,7 +220,7 @@ export const NO_REMOTES: CellRemotes = { cursors: [], tintedBy: [], tintColour: 
 //
 // A cell whose drawing is the same as in `previous` keeps the value it had
 // there, so that only the cells a change of the room reaches draw again
-// (client/shell.md rule 18).
+// (client/foundation.md rule 8).
 export function remotesByCell(
   remotes: RemoteSelection[],
   previous: Map<string, CellRemotes>,

@@ -1237,7 +1237,7 @@ function receiveSelectionMoved(session: RoomSession, message: Record<string, unk
   for (const player of session.snapshot.players) {
     if (player.player_id === message.player_id && player.state !== 'disconnected') {
       // A selection the player already holds changes nothing: nothing drawn
-      // from it draws again (client/shell.md rule 18).
+      // from it draws again (client/foundation.md rule 8).
       if (!isSameSelection(player.selection, selection)) {
         player.selection = selection
       }

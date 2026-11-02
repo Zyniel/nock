@@ -6,7 +6,7 @@
   //
   // What depends on the cell side, the dashes and the width of their strip, is
   // read from variables the grid sets (GridViewport.svelte): a pinch changes
-  // no cell's drawing (client/shell.md rule 18).
+  // no cell's drawing (client/foundation.md rule 8).
   import type { EdgeDrawing } from './gridLayout'
 
   let { drawing }: { drawing: EdgeDrawing } = $props()

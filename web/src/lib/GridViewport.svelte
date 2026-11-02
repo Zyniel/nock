@@ -165,7 +165,7 @@
     return `cell-${row}-${column}`
   }
 
-  // What a frame redraws (client/shell.md rule 18): each letter cell reads
+  // What a frame redraws (client/foundation.md rule 8): each letter cell reads
   // what it draws from the maps below, by its "row,column", and a cell whose
   // value stays the same does not draw again. A cell with nothing to draw
   // finds no entry, and takes one shared empty value.
@@ -327,7 +327,7 @@
   // The dashes of every hyphen edge at the current cell size, as « Hyphen
   // edges » gives them, and their thickness. They are set on the grid, as
   // variables HyphenEdge.svelte reads, so that a pinch changes no cell's
-  // drawing (client/shell.md rule 18).
+  // drawing (client/foundation.md rule 8).
   let hyphenStyle = $derived(hyphenStyleOf(cellSize))
 
   interface HyphenStyle {
@@ -1344,7 +1344,7 @@
     outline-offset: -3px;
   }
 
-  /* The same ring again, over the cells (shell rule 16). The letter cells are
+  /* The same ring again, over the cells (foundation rule 7). The letter cells are
      positioned and opaque, so the engines paint them over the grid's own
      outline, which then shows only along the clue cells. This overlay covers
      the whole grid and is painted after the cells and their marks (layer 9,
