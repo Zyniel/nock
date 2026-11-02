@@ -197,6 +197,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "rules",
         "server",
         "shell",
+        "votes",
     ),
     "web/src/lib/RoomMenu.svelte": ("account", "hud", "presence", "rules"),
     "web/src/lib/RoomTopBar.svelte": ("co-op", "hud", "rules", "server"),
