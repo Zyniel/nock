@@ -1,10 +1,10 @@
 ---
 id: B-048
 title: Unit tests for the client's pure modules
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:00:00Z'
+updated_date: '2026-11-02T09:59:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -58,8 +58,18 @@ ordinal: 9000
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. No spec (tooling): the runner, its resolve hook, a gate step and CI job, built by the lead.
+2. Tests: tests/web/, one proving the step runs, by the test-writer; they prove no criterion.
+3. Gate: uv run python scripts/gate.py (full), node:test step included.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Human (2026-11-02, chat): take B-048 with option A, Node's own node:test (no new dependency), to unblock B-049 and with it « Grid and room screens ». Open questions 1 and 2 take the lead's defaults: the tests in tests/web/, written by the test-writer; they prove no criterion.
+
+Lead (2026-11-02): the human's option A, node:test; tests in tests/web/ by the test-writer; they prove no criterion. Base: origin/main 4005dc3 merged into the stale branch.
 <!-- SECTION:NOTES:END -->
