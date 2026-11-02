@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: summaries
-status: draft
+status: approved
 ---
 
 # lobby/summaries - Room summaries and « Mes salons »

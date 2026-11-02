@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: draft
+status: approved
 ---
 
 # lobby/joining - Joining and resuming
@@ -262,5 +262,6 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
   `web/src/lib/RoomPage.svelte`: the room page's join;
   `web/src/lib/nickname.ts`: the display.
 - Tests: those of the pointers, in `tests/test_spec_012_*`,
-  `tests/test_spec_032_ac03_*`, `tests/test_spec_032_ac07_*`,
-  `tests/test_spec_046_ac15_ac17_*`; `tests/test_joining_*` (AC-21 to AC-23).
+  `tests/test_spec_032_ac03_*`, `tests/test_spec_032_ac02_ac07_*` (AC-7),
+  `tests/test_spec_032_ac07_*`, `tests/test_spec_046_ac15_ac17_*`;
+  `tests/test_joining_*` (AC-21 to AC-23).

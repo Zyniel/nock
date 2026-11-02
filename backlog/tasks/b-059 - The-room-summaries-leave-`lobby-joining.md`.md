@@ -4,7 +4,7 @@ title: The room summaries leave `lobby/joining.md`
 status: In Progress
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T11:58:00Z'
+updated_date: '2026-11-02T12:06:00Z'
 labels:
   - domain:joining
   - domain:summaries
@@ -32,6 +32,16 @@ ordinal: 14000
 - Open questions: none beyond the pitch's.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 summaries AC-1 (new, was joining AC-17)
+- [ ] #2 joining AC-17 (deleted, moved to summaries AC-1)
+- [ ] #3 summaries AC-2 (new, was joining AC-18)
+- [ ] #4 joining AC-18 (deleted, moved to summaries AC-2)
+- [ ] #5 summaries AC-3 (new, was joining AC-19)
+- [ ] #6 joining AC-19 (deleted, moved to summaries AC-3)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -56,4 +66,6 @@ ordinal: 14000
 Human (2026-11-02, chat, on the pitch's question): A. B-059 updates the one cell of specs/product.md's routes table that names the owner of POST /api/rooms/summaries, from lobby/joining.md to lobby/summaries.md; no behaviour change.
 
 Lead (2026-11-02): started after B-062 (#102, which also changed joining.md rule 3) merged. Spec-writer on Fable at high (new domain). product.md's routes cell for POST /api/rooms/summaries names summaries (the pitch's option A, taken with the pitch's merge). joining.md:102's realtime rule 20 → reconnection rule 5 (B-057's map). Base: origin/main 75c4263.
+
+Lead: all three moved criteria are pointers (032 AC-4 to AC-6, 046 AC-11, AC-12): no domain test moves. product.md: the routes cell of POST /api/rooms/summaries and core flow 7 (« Mes salons ») name summaries; no baseline. results.md:115 and :287 (by number) repointed. Spec-checker: CHANGES REQUESTED round 1 (joining's Code section lost the 032 ac02_ac07 sockets file, which proves AC-7; fixed), APPROVED round 2. By-name citations left: results.md:20, lifetime.md:222-223, library.md:264, hud.md:85-86 (B-064); account.md:18/107/294 (to add to B-064). The spec change was first committed as a wip commit to merge origin/main (B-055's check) before the spec-checker; this commit completes it.
 <!-- SECTION:NOTES:END -->

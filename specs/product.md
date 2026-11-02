@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: draft
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
