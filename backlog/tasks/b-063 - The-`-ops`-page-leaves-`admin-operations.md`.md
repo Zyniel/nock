@@ -1,10 +1,10 @@
 ---
 id: B-063
 title: The `/ops` page leaves `admin/operations.md`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T16:47:00Z'
 labels:
   - domain:operations
   - domain:ops-page
@@ -41,3 +41,17 @@ ordinal: 18000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: admin/operations.md → admin/ops-page.md (new), admin/overrides.md citations, specs/_map.md; operations' account rule citations → account/erasure.md.
+2. Tests: the domain tests of the moved criteria → tests/test_ops_page_*.py, renamed to the new numbers.
+3. Quick gate: uv run python scripts/gate.py --specs operations,ops-page,overrides --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started after B-047 (#109, which held domain:operations and added operations AC-31 to rule 19, the replay) and B-062 merged. Spec-writer on Fable at high (new domain). Account → erasure rule map (B-062): 18→1, 19→2, 20→3, 21→4, 26→5, 27→6, 28→7, 22→8, 23→9, 24→10. Base: origin/main b9871e7.
+<!-- SECTION:NOTES:END -->
