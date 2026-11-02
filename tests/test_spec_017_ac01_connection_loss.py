@@ -7,6 +7,9 @@ with Playwright's waiting assertions; the constants (ping every 2,000 ms, 4,000 
 of silence, the reconnect delays) on the page clock, which is frozen before the
 page loads and moved by hand with `advance_page`. The shared setup is in
 `spec017_harness`.
+
+Refined by `platform/realtime.md` AC-18 (B-046): the band has no live role, and the
+page's status region reads its text (`client/hud.md` rule 17).
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Page, expect
 
+from hud_harness import expect_page_region_reads, live_role_problems
 from nock.grid import Grid
 from nock.protocol import ErrorCode
 from spec017_harness import (
@@ -85,7 +89,8 @@ def test_ac1_a_socket_closed_with_1011_shows_the_banner_and_typing_goes_on(
 
     expect(banner(page)).to_be_visible(timeout=LOSS_BUDGET_MS)
     expect(banner(page)).to_have_text(load_fr()["room.banner.offline"])
-    expect(banner(page)).to_have_attribute("role", "status")
+    assert live_role_problems(banner(page)) == []
+    expect_page_region_reads(page, load_fr()["room.banner.offline"])
     expect_status(page, "reconnecting")
     expect(page.get_by_test_id("room-status")).to_have_text(
         load_fr()["room.status.reconnecting"]

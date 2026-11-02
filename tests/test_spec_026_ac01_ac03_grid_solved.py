@@ -3,6 +3,9 @@
 AC-1 checks the completion rule on `handle_message`. AC-2 uses the real WebSocket
 with three simulated clients. AC-3 runs two browsers on the live server. The shared
 setup is in `spec026_harness`.
+
+Refined by `gameplay/rules.md` AC-3 (B-046): the status has no live role, and each
+page's status region reads it (`client/hud.md` rule 17).
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Page, expect
 
+from hud_harness import expect_page_region_reads, live_role_problems
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -258,7 +262,8 @@ def test_ac3_both_pages_show_the_solved_grid_within_a_second(
                 "data-state", "solved", timeout=SOLVED_BUDGET_MS
             )
             expect_status_text(status, load_fr()["completion.solved"])
-            expect(status).to_have_attribute("role", "status")
+            assert live_role_problems(status) == []
+            expect_page_region_reads(watcher, load_fr()["completion.solved"])
     finally:
         bob_context.close()
 

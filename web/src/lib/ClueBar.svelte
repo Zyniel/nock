@@ -77,7 +77,7 @@
     data-testid="react-button"
     aria-label={t('reaction.button_label')}
     aria-expanded={isPickerOpen}
-    aria-controls="reaction-picker"
+    aria-controls={isPickerOpen ? 'reaction-picker' : undefined}
     disabled={isReactDisabled}
     bind:this={reactButton}
     onclick={onToggleReactions}><Icon name="smile" /></button

@@ -4,6 +4,7 @@
   // then the invitation link. It stays on the page while its tab is not
   // selected, with the `hidden` attribute.
   import PlayerIcon from './PlayerIcon.svelte'
+  import { announce } from './announce'
   import { newLinkCopier } from './copyLink'
   import { t } from './i18n'
   import { displayNickname } from './nickname'
@@ -42,6 +43,9 @@
   let copied = $state(false)
   const linkCopier = newLinkCopier((isCopied) => {
     copied = isCopied
+    if (isCopied) {
+      announce(t('room.share.copied'))
+    }
   })
 
   // Leaving the page must not leave the timer to fire on a destroyed page.
@@ -153,7 +157,7 @@
       onclick={copyLink}>{t('room.share.copy')}</button
     >
     {#if copied}
-      <p class="share-copied" data-testid="share-copied" role="status">
+      <p class="share-copied" data-testid="share-copied">
         {t('room.share.copied')}
       </p>
     {/if}

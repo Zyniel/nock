@@ -31,7 +31,8 @@ codes are limited per address.
    and loads `/r/<code>`. On a network error, any other status or an answer
    without a code, it stays, shows `catalogue.play_failed` in that item and
    enables the button again. The button is disabled while the request runs.
-   Each tap makes a new room.
+   Each tap makes a new room. The button is named « Jouer » and described by
+   its card's title (`catalogue.item.number`, `content/library.md` rule 12).
 3. The room record `nock.room.<CODE>` is a JSON object with `grid` (the
    catalogue number or null) and `selection`; anything else reads as no
    record, and a rewrite keeps unknown fields. The room page writes the
@@ -73,8 +74,9 @@ codes are limited per address.
 
 11. Once joined, the Salon's Joueurs tab holds, under `room.share.label`, the link
     `<origin>/r/<code>` and « Copier le lien » (`room.share.copy`). A copy writes
-    the link to the clipboard and shows `room.share.copied` as a status for 2
-    seconds; the button keeps its text. Without a usable clipboard nothing
+    the link to the clipboard and shows `room.share.copied` for 2 seconds,
+    with no live role, announced by the status region (`client/hud.md` rule
+    17); the button keeps its text. Without a usable clipboard nothing
     changes. Before any snapshot (`not_found`, `throttled`, a refused join) no
     link shows.
 
@@ -151,8 +153,9 @@ status band of « Connection lost »; before, the entry card of
   `POST /api/rooms/`, and none creates a room. (← 011 AC-1)
 - **AC-9** Once joined, the Joueurs tab shows « Lien d'invitation » and links to
   `<origin>/r/<code>` with that text; « Copier le lien » puts it in the
-  clipboard and shows « Lien copié » for 2 seconds while the button still
-  reads « Copier le lien »; an unknown room shows no link. (← 011 AC-1)
+  clipboard and shows « Lien copié » for 2 seconds, with no live role and
+  read by the status region, while the button still reads « Copier le
+  lien »; an unknown room shows no link. (← 011 AC-1)
 - **AC-10** 1,000 codes from one registry are distinct and in the alphabet,
   use at least 20 characters at each position, and none is the previous one
   plus 1 in base 32; two registered rooms find their grid, `abc123` finds
@@ -189,6 +192,9 @@ status band of « Connection lost »; before, the entry card of
   `"3.0"`, `"-1"` or `"٣"` stops `main()` with a one-line message holding
   the name and `repr()` of the value, and no server runs; `python -m nock`
   exits with 1; an app starting with it fails with `SettingsError`.
+- **AC-18** On `/` with grids 3, 2 and 1, card 2's button is named « Jouer »
+  and described « Grille n° 2 », card 3's described « Grille n° 3 »; on `/g/1`
+  it is described « Grille n° 1 ».
 
 ## Edge cases
 
@@ -228,4 +234,4 @@ status band of « Connection lost »; before, the entry card of
   the record; `PlayersPanel.svelte`: the link; `RoomPage.svelte`,
   `roomSession.ts`: the throttled status.
 - Tests: `tests/test_spec_010_*`, `test_spec_011_*`, AC-7 of
-  `tests/test_spec_040_*`, and `tests/test_rooms_*` for AC-13 to AC-17.
+  `tests/test_spec_040_*`, and `tests/test_rooms_*` for AC-13 to AC-18.

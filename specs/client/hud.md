@@ -155,6 +155,24 @@ gives the Salon (`client/room.md`) its column or its sheet.
     nothing, and Tab and Shift+Tab stay on the link. The page stays until the
     player follows it.
 
+### Status region
+
+17. From its first paint, in every state, the room page holds one region with
+    `role="status"`, read but not seen, empty until its first message and kept
+    for the page's life. The messages the domains call announced are written
+    to it as text: the connection band (`platform/realtime.md` rule 20), the
+    grid status (`gameplay/rules.md` rule 5), `undo.nothing` (`client/room.md`
+    rule 8), `room.share.copied` (`lobby/rooms.md` rule 11). The elements that
+    show them have no live role: no `role="status"`, no `aria-live`. A message
+    first empties the region, then writes its text, so the same message twice
+    is announced twice. The vote's region (`gameplay/hints.md` rule 21), the
+    grid's (`product.md` rule 17) and the alerts stay as they are.
+18. While a room sheet is open (rule 13) the page behind it is inert, so the
+    sheet holds a region of the same kind, empty at its opening, and every
+    message goes to it instead, the recap's own (`gameplay/results.md` rules
+    9, 12) included; the page's region keeps its text, and gets the messages
+    again once the sheet closes.
+
 ### Look
 
 `_design/room.md`: « Which layout »; « Phone and upright tablet (sheet
@@ -263,6 +281,15 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   révéler » released on the backdrop, or a press on the backdrop released in
   the sheet, leaves it open with its values; a press and its release both on
   the backdrop close it and focus « Menu ».
+- **AC-26** With the socket opened but not answered, the room page's first
+  paint holds a region with `role="status"`, empty and read but not seen;
+  once joined, and again after a socket loss, it is still that element.
+- **AC-27** At 1280 by 720, Ana, host, opens « Réglages de l'hôte », whose
+  status region is empty; the socket closes: within 5 s that region reads
+  « Connexion perdue. Vous pouvez continuer : vos lettres seront envoyées au
+  retour du réseau. » while the page's region stays empty. Once the sheet is
+  closed, « Annuler » with nothing to undo makes the page's region read
+  « Rien à annuler. ».
 
 ## Edge cases
 
@@ -291,9 +318,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 
 ## Code
 
-- `web/src/lib/RoomPage.svelte` (layout, overlays, play area) and its parts:
-  `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `ClueBar`,
-  `RoomGoneDialog`, `RoomSheet` (the room sheets' shared dialog) (`.svelte`);
-  `windowForm.ts`.
+- `web/src/lib/RoomPage.svelte` (layout, overlays, play area, the status
+  region) and its parts: `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`,
+  `ClueBar`, `RoomGoneDialog`, `RoomSheet` (the room sheets' shared dialog and
+  its region) (`.svelte`); `windowForm.ts`.
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
   `tests/test_hud_*`, `tests/hud_harness.py`.

@@ -9,6 +9,9 @@ Joueurs tab, so the browser tests open it with `show_tab(page, "players")` (spec
 043's "Test harness") before they look at it or click in it; after a copy the
 green line `share-copied` shows `fr.json["room.share.copied"]` while `copy-link`
 keeps its text.
+
+Refined by `lobby/rooms.md` AC-9 (B-046): `share-copied` has no live role, and the
+page's status region reads it (`client/hud.md` rule 17).
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from pydantic import ValidationError
 
 import nock.hub
 import nock.server
+from hud_harness import expect_page_region_reads, live_role_problems
 from nock.catalogue import Catalogue
 from nock.grid import Grid, LetterCell
 from nock.hub import RoomRegistry
@@ -540,7 +544,8 @@ def test_ac1_browser_copy_link_puts_the_link_in_the_clipboard(
 
     copied = clipboard_page.get_by_test_id("share-copied")
     expect(copied).to_have_text(fr["room.share.copied"])
-    expect(copied).to_have_attribute("role", "status")
+    assert live_role_problems(copied) == []
+    expect_page_region_reads(clipboard_page, fr["room.share.copied"])
     expect(copy_button).to_have_text(fr["room.share.copy"])
     assert clipboard_page.evaluate("navigator.clipboard.readText()") == link
     expect(copied).to_have_count(0, timeout=4000)

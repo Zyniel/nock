@@ -40,6 +40,11 @@ has no `keyboard` and `data-layout="column"`, and `grid-status` is under the clu
 bar, as at 1280 by 720 (its layout checks and, at 568 by 320, its scans still run).
 Spec 013 AC-6's keyboard check runs on the pages where the keyboard shows: the
 touch context with `FX02_FULL_WRONG`.
+
+Refined by `gameplay/rules.md` AC-10 (B-046): `grid-status` has no live role, the
+page's status region reads its text (`client/hud.md` rule 17), and a resize that
+moves the status to its other place does not write the region again: the region's
+`MutationObserver` records nothing during the resizes.
 """
 
 from __future__ import annotations
@@ -52,6 +57,12 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
 from fonts_ready import wait_for_fonts
+from hud_harness import (
+    expect_page_region_reads,
+    live_role_problems,
+    record_region_texts,
+    recorded_region_texts,
+)
 from nock.grid import Arrow, ClueCell, Grid, LetterCell
 from nock.protocol import (
     GridTarget,
@@ -395,13 +406,15 @@ def open_status_page(
 
 
 def expect_status_shows(page: Page, state: str) -> None:
-    """One `grid-status`, shown, with `role`, `data-state` and text of `state`."""
+    """One `grid-status`, shown, with no live role, the `data-state` and the text of
+    `state`, which the page's status region reads."""
     status = page.get_by_test_id("grid-status")
     expect(status).to_have_count(1)
     expect(status).to_be_visible()
-    expect(status).to_have_attribute("role", "status")
+    assert live_role_problems(status) == []
     expect(status).to_have_attribute("data-state", state)
     expect_status_text(status, load_fr()[STATUS_TEXT_KEYS[state]])
+    expect_page_region_reads(page, load_fr()[STATUS_TEXT_KEYS[state]])
 
 
 # ---- Measures ----
@@ -859,6 +872,7 @@ def test_ac10_a_resize_across_500_px_moves_the_status(
     page = new_page(width, height, True)
     open_status_page(page, live_server, status_view(fx02_grid, state), False, True)
     expect_status_shows(page, state)
+    record_region_texts(page)
     problems: dict[str, list[str]] = {}
     found = status_place_problems(page, RESIZE_START)
     if found:
@@ -873,3 +887,23 @@ def test_ac10_a_resize_across_500_px_moves_the_status(
             problems[f"{size[0]}x{size[1]}"] = found
 
     assert problems == {}, f"{state}: {problems}"
+    assert recorded_region_texts(page) == [], "the status region was written again"
+
+
+def test_ac10_a_rotation_moves_the_status_and_the_region_is_not_written_again(
+    new_page: NewPage, live_server: str, fx02_grid: Grid
+) -> None:
+    state = "full_wrong"
+    landscape = (568, 320)
+    upright = (320, 568)
+    page = new_page(landscape[0], landscape[1], True)
+    open_status_page(page, live_server, status_view(fx02_grid, state), False, True)
+    expect_status_shows(page, state)
+    assert status_place_problems(page, landscape) == []
+    record_region_texts(page)
+
+    resize(page, upright)
+
+    expect_status_shows(page, state)
+    assert status_place_problems(page, upright) == []
+    assert recorded_region_texts(page) == [], "the status region was written again"

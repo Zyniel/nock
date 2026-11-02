@@ -38,6 +38,9 @@ Choices where the spec leaves room:
   closed at load (AC-14).
 - The notes after the vote are noted in the page by a `MutationObserver`, so that
   a note that shows and goes between two reads is not missed.
+
+Refined by `client/room.md` rule 8 (B-046): `undo-message` has no live role; the page's
+status region announces it (`tests/test_room_undo_announcement.py`).
 """
 
 from __future__ import annotations
@@ -47,6 +50,7 @@ from collections.abc import Iterator, Sequence
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
+from hud_harness import live_role_problems
 from nock.grid import Grid
 from nock.protocol import (
     CellTarget,
@@ -645,7 +649,7 @@ def answer_undo_with_nothing(page: Page, mock: RoomMock) -> Locator:
     mock.send(error_frame(ErrorCode.NOTHING_TO_UNDO))
     message = page.get_by_test_id("undo-message")
     expect(message).to_be_visible()
-    expect(message).to_have_attribute("role", "status")
+    assert live_role_problems(message) == []
     expect(message).to_have_text(fr_value("undo.nothing"))
     return message
 

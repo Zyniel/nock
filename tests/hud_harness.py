@@ -17,8 +17,28 @@ AC-34, which share them: the host's sheet on a mocked room (`open_host_sheet`),
 the `host_changed` frame, and a press at one point released at another
 (`press_and_release`), the way a drag between a sheet and its backdrop reads.
 
+For AC-26 and AC-27 (`test_hud_status_region.py`), and for every test of another
+domain that reads what the status region announces (`client/hud.md` rules 17 and
+18): the hooks of the two kinds of region, the checks of "read but not seen" and of
+"no live role", the recorder of what a region holds after each change, and the
+probe of what a sheet's region holds when the sheet opens.
+
 Readings where the spec leaves room:
 
+- The page's region is the element `data-testid="status-region"`; a room sheet's
+  region is the element `data-testid="sheet-status-region"` inside the sheet (its
+  own `data-testid`: `host-settings`, `account-dialog`, `recap`, `room-gone`).
+  Each has `role="status"` and the class `visually-hidden`.
+- "Read but not seen": the region's box is at most 1 px by 1 px, and neither it nor
+  an ancestor is `hidden`, `aria-hidden`, `inert`, `display: none` or `visibility:
+  hidden`. The page's region is only checked while no sheet is open, since an open
+  sheet makes the page inert.
+- "No live role": neither the element nor any ancestor has `role` `status`,
+  `alert` or `log`, or an `aria-live` attribute.
+- "Empty in between" and "not written again" are read from a `MutationObserver`
+  that records the region's text after each batch of changes. A region emptied and
+  refilled in one run of the page's code shows one batch, the final text: the empty
+  state has to be a state the page was in before it wrote the text.
 - The dialog is the one element of role `alertdialog`; it is modal when it
   matches `:modal` (a `<dialog>` opened with `showModal`) or has `aria-modal`
   `true`.
@@ -41,7 +61,7 @@ from typing import NamedTuple
 from playwright.sync_api import Locator, Page, expect
 
 from nock.grid import Grid
-from nock.protocol import HostChanged
+from nock.protocol import ErrorCode, HostChanged, Undo
 from room_panels import open_host_settings, open_host_settings_with_keyboard, show_tab
 from spec042_harness import Box, box_of, pixel_at, wait_until
 from spec043_harness import (
@@ -53,6 +73,7 @@ from spec043_harness import (
     Rgb,
     RoomMock,
     cell_at,
+    error_frame,
     fx01_view,
     open_room,
     players_up_to,
@@ -422,3 +443,213 @@ def press_and_release(
     page.mouse.down()
     page.mouse.move(end[0], end[1], steps=DRAG_STEPS)
     page.mouse.up()
+
+
+# ---- The status regions (`client/hud.md` rules 17 and 18) --------------------------
+
+PAGE_REGION_ID = "status-region"
+SHEET_REGION_ID = "sheet-status-region"
+UNDO_NOTHING_TEXT = "Rien à annuler."  # `undo.nothing`
+OFFLINE_TEXT = (  # `room.banner.offline`
+    "Connexion perdue. Vous pouvez continuer : vos lettres seront envoyées au "
+    "retour du réseau."
+)
+
+# What keeps a region out of the accessibility tree or on the screen.
+REGION_PROBLEMS_SCRIPT = r"""
+region => {
+  const problems = [];
+  if (region.getAttribute('role') !== 'status') {
+    problems.push(`role is ${region.getAttribute('role')}`);
+  }
+  const box = region.getBoundingClientRect();
+  if (box.width > 1.01 || box.height > 1.01) {
+    problems.push(`box is ${box.width} by ${box.height}, so it is seen`);
+  }
+  for (let node = region; node !== null; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    const name = node.getAttribute('data-testid') || node.tagName.toLowerCase();
+    if (style.display === 'none') problems.push(`${name} has display none`);
+    if (style.visibility === 'hidden') problems.push(`${name} is visibility hidden`);
+    if (node.hasAttribute('hidden')) problems.push(`${name} is hidden`);
+    if (node.getAttribute('aria-hidden') === 'true') {
+      problems.push(`${name} is aria-hidden`);
+    }
+    if (node.hasAttribute('inert')) problems.push(`${name} is inert`);
+  }
+  return problems;
+}
+"""
+
+# The live roles of an element and of its ancestors.
+LIVE_ROLE_PROBLEMS_SCRIPT = r"""
+element => {
+  const problems = [];
+  for (let node = element; node !== null; node = node.parentElement) {
+    const name = node.getAttribute('data-testid') || node.tagName.toLowerCase();
+    const role = node.getAttribute('role');
+    if (role === 'status' || role === 'alert' || role === 'log') {
+      problems.push(`${name} has role ${role}`);
+    }
+    if (node.hasAttribute('aria-live')) {
+      problems.push(`${name} has aria-live ${node.getAttribute('aria-live')}`);
+    }
+  }
+  return problems;
+}
+"""
+
+# Record the page region's text after each batch of changes, in `window`.
+RECORD_REGION_SCRIPT = r"""
+testId => {
+  const region = document.querySelector(`[data-testid="${testId}"]`);
+  window.__regionTexts = [];
+  const observer = new MutationObserver(() => {
+    window.__regionTexts.push(region.textContent.trim());
+  });
+  observer.observe(region, {childList: true, characterData: true, subtree: true});
+}
+"""
+
+# Watch a sheet: the text of its region at the first batch in which the sheet is
+# open and holds its region, then after each following batch.
+WATCH_SHEET_REGION_SCRIPT = r"""
+([sheetId, regionId]) => {
+  const probe = {textAtOpening: null, texts: []};
+  window.__sheetRegion = probe;
+  const observer = new MutationObserver(() => {
+    const sheet = document.querySelector(`[data-testid="${sheetId}"]`);
+    if (sheet === null || !sheet.hasAttribute('open')) return;
+    const region = sheet.querySelector(`[data-testid="${regionId}"]`);
+    if (region === null) return;
+    const text = region.textContent.trim();
+    if (probe.textAtOpening === null) probe.textAtOpening = text;
+    probe.texts.push(text);
+  });
+  observer.observe(document, {
+    subtree: true, childList: true, characterData: true,
+    attributes: true, attributeFilter: ['open'],
+  });
+}
+"""
+
+
+class SheetRegionWatch(NamedTuple):
+    """What a sheet's region held while a `watch_sheet_region` probe ran.
+
+    Attributes:
+        text_at_opening: The region's text in the first batch of changes after
+            which the sheet was open, or None while the sheet has not opened.
+        texts: The region's text after each batch from then on.
+    """
+
+    text_at_opening: str | None
+    texts: list[str]
+
+
+def page_region(page: Page) -> Locator:
+    """Return the locator of the room page's status region."""
+    return page.get_by_test_id(PAGE_REGION_ID)
+
+
+def sheet_region(page: Page, sheet_test_id: str) -> Locator:
+    """Return the locator of the status region of the room sheet `sheet_test_id`."""
+    return page.get_by_test_id(sheet_test_id).get_by_test_id(SHEET_REGION_ID)
+
+
+def region_problems(region: Locator) -> list[str]:
+    """How a status region fails to be a `role="status"` read but not seen.
+
+    Args:
+        region: The page's region, with no sheet open, or a sheet's region.
+
+    Returns:
+        One line per failure; an empty list for a region that is as rule 17 says.
+    """
+    found = region.evaluate(REGION_PROBLEMS_SCRIPT)
+    assert isinstance(found, list), found
+    return [str(problem) for problem in found]
+
+
+def live_role_problems(element: Locator) -> list[str]:
+    """The live roles on an element and its ancestors.
+
+    A message that a status region announces is shown by an element with none of
+    `role` `status`, `alert` or `log`, nor `aria-live`, on it or above it.
+
+    Args:
+        element: The element that shows a message.
+
+    Returns:
+        One line per live role found; an empty list when there is none.
+    """
+    found = element.evaluate(LIVE_ROLE_PROBLEMS_SCRIPT)
+    assert isinstance(found, list), found
+    return [str(problem) for problem in found]
+
+
+def expect_page_region_reads(page: Page, text: str) -> None:
+    """Wait until the page has one status region and it reads exactly `text`."""
+    region = page_region(page)
+    expect(region).to_have_count(1)
+    expect(region).to_have_text(text, timeout=WAIT_TIMEOUT_MS)
+
+
+def record_region_texts(page: Page) -> None:
+    """Start recording the page region's text after each batch of changes."""
+    expect(page_region(page)).to_have_count(1)
+    page.evaluate(RECORD_REGION_SCRIPT, PAGE_REGION_ID)
+
+
+def recorded_region_texts(page: Page) -> list[str]:
+    """Return what `record_region_texts` has recorded since it started."""
+    found = page.evaluate("() => window.__regionTexts")
+    assert isinstance(found, list), found
+    return [str(text) for text in found]
+
+
+def announcements_of(texts: list[str]) -> list[str]:
+    """Reduce recorded texts to the states the region was in, in order.
+
+    A text twice in a row is one state, and the empty states before the first
+    message and after the last one are left out.
+
+    Args:
+        texts: What `recorded_region_texts` returned.
+
+    Returns:
+        For example `["Rien", "", "Rien"]` for a message announced twice.
+    """
+    states: list[str] = []
+    for text in texts:
+        if not states or states[-1] != text:
+            states.append(text)
+    while states and states[0] == "":
+        states.pop(0)
+    while states and states[-1] == "":
+        states.pop()
+    return states
+
+
+def watch_sheet_region(page: Page, sheet_test_id: str) -> None:
+    """Start watching the region of a sheet that is not open yet."""
+    page.evaluate(WATCH_SHEET_REGION_SCRIPT, [sheet_test_id, SHEET_REGION_ID])
+
+
+def sheet_region_watch(page: Page) -> SheetRegionWatch:
+    """Return what `watch_sheet_region` has seen since it started."""
+    found = page.evaluate("() => window.__sheetRegion")
+    assert isinstance(found, dict), found
+    return SheetRegionWatch(found["textAtOpening"], list(found["texts"]))
+
+
+def press_undo_answered_nothing(page: Page, mock: RoomMock) -> None:
+    """Click « Annuler » and answer its `undo` with `nothing_to_undo`."""
+    frames_before = len(mock.frames_without_pings())
+    page.get_by_test_id("undo-button").click()
+    wait_until(
+        page,
+        lambda: Undo() in mock.parsed_frames_after(frames_before),
+        "the undo frame",
+    )
+    mock.send(error_frame(ErrorCode.NOTHING_TO_UNDO))

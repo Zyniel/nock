@@ -23,6 +23,9 @@
   // The force line draws one Nock mark per force level, navy up to the grid's.
   const FORCE_LEVELS = [1, 2, 3, 4]
 
+  // The id of the card's title, which describes « Jouer ».
+  const titleId = $derived(`catalogue-title-${summary.number}`)
+
   const thumb = $derived(gridThumbOf(summary.width, summary.height))
 
   let isStarting = $state(false)
@@ -106,7 +109,7 @@
   {/if}
   <div class="card-text">
     <div class="number-line">
-      <h2>{t('catalogue.item.number', { number: summary.number })}</h2>
+      <h2 id={titleId}>{t('catalogue.item.number', { number: summary.number })}</h2>
       {#if progress === 'started'}
         <span class="nock-status-pill nock-status-pill-started" data-testid="catalogue-progress"
           >{t('catalogue.progress.started')}</span
@@ -144,6 +147,7 @@
     type="button"
     class="nock-button nock-button-primary play"
     data-testid="catalogue-play"
+    aria-describedby={titleId}
     disabled={isStarting}
     onclick={play}>{t('catalogue.play')}</button
   >
