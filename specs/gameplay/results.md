@@ -133,7 +133,7 @@ grids in « Grilles terminées », where a grid can be played again.
     the catalogue column (`content/library.md` rule 9): a row per record with
     the grid label (`catalogue.item.number` or `my_rooms.unnumbered`) and
     `catalogue.item.size`; a line holding `history.finished` (the date as « Mes
-    salons » writes it), `history.time` (the duration as `admin/operations.md`
+    salons » writes it), `history.time` (the duration as `admin/ops-page.md`
     writes it) and `history.teammates` (names displayed, `--` as « Ancien
     joueur ») or `history.alone`; with a grid number only, `history.replay`
     (« Rejouer »), named `history.replay_label`.

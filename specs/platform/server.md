@@ -266,8 +266,8 @@ top bars (« Phone top bar », « Computer top bar »).
 
 - Several processes on one database, replication, backups, a real kill or
   power cut in tests, repairing a damaged database, multi-level undo, redo.
-- Expiry, deletion and the sweep: `lobby/lifetime.md`. Logs, retention and the
-  operator's replay of the log: `admin/operations.md`. What changed while away:
+- Expiry, deletion and the sweep: `lobby/lifetime.md`. Logs and retention:
+  `admin/operations.md`; the operator's replay of the log: `admin/ops-page.md`. What changed while away:
   `social/catch-up.md`. Client routing and its pages: `client/shell.md`.
 - Serving the client, the HTTP edge and the environment variables, `main()`
   included: `platform/serving.md`. The run configuration, frame size and
