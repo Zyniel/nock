@@ -1,23 +1,23 @@
 ---
 area: lobby
 file: joining
-status: done
+status: draft
 ---
 
-# lobby/joining - Joining, resuming and « Mes salons »
+# lobby/joining - Joining and resuming
 
 ## Purpose
 
 An invited player enters a room with only a nickname. A player who comes back
 gets the same seat: after a reload, the next day, after a server restart, from
-« Mes salons » on the catalogue page, or from any device signed in to their
+« Mes salons » (`lobby/summaries.md`), or from any device signed in to their
 account. A room outlives its players for its room life (`lobby/lifetime.md`).
 
 ## Depends on
 
 - `lobby/host.md`: removing and locking, the creator, the account of a member.
-- `platform/realtime.md`: the join message, error codes, the resume window and the
-  time-out of a disconnected player.
+- `platform/realtime.md`: the join message, error codes; the resume window and
+  the time-out of a disconnected player are `platform/reconnection.md`.
 - `platform/server.md`: the store that keeps a room across restarts.
 
 ## Rules
@@ -100,7 +100,7 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
    but not seen. The field shows capitals and keeps its value as typed. Submit,
    `join.submit`, is enabled only while the status is `nickname`: disabled
    while joining, and while a form kept after a loss waits for the next socket
-   (`platform/realtime.md` rule 20); Enter submits when it is enabled. An
+   (`platform/reconnection.md` rule 5); Enter submits when it is enabled. An
    `invalid_nickname` from the server, whatever sent the join, shows the form
    again with `join.error.characters`.
 10. Every snapshot stores the identity, `nock.identity.<CODE>`: id, token and the
@@ -137,37 +137,12 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 
 15. A room's last edit time, its room life, its expiry and the sweep that deletes
     it: `lobby/lifetime.md`. A lookup that meets an expired room (a socket, a
-    summary) deletes it first.
-
-### Summaries and « Mes salons »
-
-16. `POST /api/rooms/summaries` takes `{"rooms": [{"code", "resume_token"}]}`,
-    at most 100 keys, and answers one summary per room that some key holds a
-    member's token for, newest last activity first, then code order. A summary is
-    the code, the grid number (null outside the catalogue), width, height, the
-    members' nicknames (past players in leaving order, then players, each once),
-    the last activity (the last edit time, UTC), `solved` and the result fields
-    of `gameplay/results.md`; no letter. The answer never says why a room is left
-    out; it is not counted by the wrong-code throttle, makes no room live and
-    writes nothing. An invalid body answers 422.
-17. The catalogue page sends the identities whose code matches `^[A-Z0-9]{6}$`
-    and whose token matches `^[A-Za-z0-9_-]{16,128}$`, in requests of at most
-    100 keys, and lists the summaries in the server's order. With none to send
-    it has no « Mes salons »; while loading and with no summary it shows
-    nothing; a failed request, or an answer that is not a list of summaries,
-    shows `my_rooms.error`. The rest of the page never waits for it. A row
-    shows the grid label (`my_rooms.unnumbered` without a grid number), size,
-    players, last activity in the browser's time zone,
-    `catalogue.progress.finished` when solved, and the link `my_rooms.open` to
-    `/r/<code>`, named `my_rooms.open_label`. A room left out is not listed,
-    and its identity stays on the device.
+    summary, `lobby/summaries.md`) deletes it first.
 
 ### Look
 
 - The nickname form, its refused field and the refusal card: `_design/pages.md`,
   « Entry and not-found pages ».
-- « Mes salons » rows: `_design/pages.md`, « Catalogue »; its error line:
-  « States: opening, loading, empty, error ».
 - The roster: `_design/room.md`, « Salon ». Player colours:
   `_design/foundation.md`, « Player colours ».
 
@@ -228,21 +203,6 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
   and after a restart Bob, from another device, gets those letters, a budget of 4
   letters and 1 word and about 90 seconds of timer, and Ana's token seats her back
   with her id. (← 032 AC-3)
-- **AC-17** In room A, where Bob timed out and Cy was removed, Ana's or Bob's
-  token gets one summary naming `BOB` then `ANA`; Cy's token, an unknown token or
-  code gets `[]`; 101 keys get 422; an expired room (`lobby/lifetime.md`) is
-  left out and deleted. (← 032 AC-4)
-- **AC-18** With identities for `XYZ789` and `ABC234`, one corrupt and one with a
-  15-character token, « Mes salons » sends the two valid keys and lists `Grille n°
-  2`, `5 × 5`, « Joueurs : Ana, Bob », « Dernière activité : 14 octobre 2026 à
-  10:30 » in a browser set to Paris time, and « Reprendre », whose link resumes
-  the room without the form. While its request waits, or after `[]`, it takes no
-  space and shows no text; a 500 shows « Impossible de charger vos salons. » and
-  the grids still load. (← 032 AC-5, 046 AC-12)
-- **AC-19** « Mes salons » keeps the baselines of `product.md`: no contrast
-  or language offender, every link reached by Tab with a visible focus, and
-  no horizontal scroll with 8 players of 20 characters. Its rows follow the
-  catalogue design ("Look"). (← 032 AC-6, 046 AC-11)
 - **AC-20** Ana, timed out, joins with her token as `Autre`: one `player_joined`
   gives back her id, `ANA`, colour 0, her letters and her mute, not the host role;
   if `ana` joined meanwhile she is `ANA 2`, and if Dan took colour 0 she gets 3;
@@ -276,16 +236,14 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
   older socket gets 4001 (AC-20).
 - A signed-in device whose account has no member in the room joins by the token
   it carries, as before (AC-21).
-- A past player dropped by the cap of 100 joins as a new player (AC-17, AC-20).
-- Several keys for one room give one summary; one member's key is enough (AC-17).
-- More than 100 identities go in several requests, listed in the server's order
-  (AC-18).
+- A past player dropped by the cap of 100 joins as a new player (AC-20).
+
 ## Out of scope
 
 - Changing one's nickname or colour, choosing a colour, keeping the typed case
   (`McLean` shows as `Mclean`).
-- Leaving a room on purpose, removing a room from « Mes salons », sorting it,
-  clearing identities of deleted rooms.
+- Leaving a room on purpose.
+- The summaries route and « Mes salons »: `lobby/summaries.md`.
 - Room lives, expiry, the sweep and what a deletion removes:
   `lobby/lifetime.md`.
 - Presence states in the roster: `social/presence.md`. Host controls and the
@@ -298,10 +256,11 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 ## Code
 
 - `src/nock/room.py`: nicknames, `join_room` (the member by account or token),
-  disconnection, seat back, members, `room_summary`.
-- `src/nock/hub.py`: the lookups and summaries.
-- `src/nock/server.py`: the summaries route.
-- `web/src/lib/joinRules.ts`, `roomSession.ts`, `RoomPage.svelte`: the room
-  page's join; `nickname.ts`: the display; `myRooms.ts`, `MyRooms.svelte`:
-  « Mes salons ».
-- Tests: `tests/test_spec_012_*`, `tests/test_spec_032_*`, `tests/test_joining_*`.
+  disconnection, seat back, members.
+- `src/nock/hub.py`: the lookups.
+- `web/src/lib/joinRules.ts`, `web/src/lib/roomSession.ts`,
+  `web/src/lib/RoomPage.svelte`: the room page's join;
+  `web/src/lib/nickname.ts`: the display.
+- Tests: those of the pointers, in `tests/test_spec_012_*`,
+  `tests/test_spec_032_ac03_*`, `tests/test_spec_032_ac07_*`,
+  `tests/test_spec_046_ac15_ac17_*`; `tests/test_joining_*` (AC-21 to AC-23).

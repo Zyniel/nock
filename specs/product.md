@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: draft
 ---
 
 # product - What Nock is and what every domain keeps
@@ -38,7 +38,7 @@ None. Every domain spec depends on this file.
    shareable recap: `gameplay/rules.md`, `gameplay/results.md`.
 7. Come back to a room: the same seat after a reload, a day later or from « Mes
    salons », with what changed while away: `lobby/joining.md`,
-   `social/catch-up.md`.
+   `lobby/summaries.md`, `social/catch-up.md`.
 8. The optional account: sign in by email, keep rooms and history across devices:
    `account/account.md`; erase one's data: `account/erasure.md`.
 9. The operator's page: figures, a room's replay, retention:
@@ -60,7 +60,7 @@ the path. Everything else under `/` is a file of the built client or 404
 | `GET /ops` | the operator's page | `admin/operations.md` |
 | `GET /api/grids?force=`, `GET /api/grids/<number>` | the published grids, one grid | `content/library.md` |
 | `POST /api/rooms` | a room on a published grid: code, share link, 201; `GET` is 404 | `lobby/rooms.md` |
-| `POST /api/rooms/summaries` | « Mes salons » | `lobby/joining.md` |
+| `POST /api/rooms/summaries` | « Mes salons » | `lobby/summaries.md` |
 | `POST /api/rooms/<code>/catch-up` | what changed while away | `social/catch-up.md` |
 | `GET /api/rooms/<code>/recap`, `GET /api/recaps/<token>` | a room's recap, a shared one | `gameplay/results.md` |
 | `GET /api/account` | sign-in state | `account/account.md` |
