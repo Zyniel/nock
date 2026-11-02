@@ -178,7 +178,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "server",
         "shell",
     ),
-    "web/src/lib/PlayersPanel.svelte": ("chat", "host", "presence", "rooms"),
+    "web/src/lib/PlayersPanel.svelte": ("chat", "host", "presence", "room", "rooms"),
     "web/src/lib/RoomPage.svelte": (
         "board",
         "catch-up",
@@ -198,10 +198,15 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "server",
         "shell",
     ),
+    "web/src/lib/RoomMenu.svelte": ("account", "hud", "presence", "rules"),
+    "web/src/lib/RoomTopBar.svelte": ("co-op", "hud", "rules", "server"),
 }
 SHARED_COMPONENT_MIN_DOMAINS = 4
-# A client component's file name in a spec's Code section: `RoomPage.svelte`.
-COMPONENT_NAME_PATTERN = re.compile(r"\b([A-Z]\w*\.svelte)\b")
+# A word that may name a client component in a spec's Code section: the specs
+# write `RoomPage.svelte`, or a list of names with the suffix once at its end
+# (`Salon`, `PlayersPanel` (`.svelte`)). A word names a component when a
+# .svelte file of web/src/ has that name.
+COMPONENT_WORD_PATTERN = re.compile(r"\b([A-Z][A-Za-z0-9]*)\b")
 # The heading of a domain spec's Code section, and of the section after it.
 CODE_HEADING = "## Code"
 SECTION_HEADING_PATTERN = re.compile(r"^## ", re.MULTILINE)
@@ -1012,57 +1017,88 @@ def code_section(spec_text: str) -> str:
     return spec_text[body_start : next_heading.start()]
 
 
-def check_shared_components() -> bool:
-    """Check SHARED_COMPONENT_DOMAINS against the domain specs' Code sections.
-
-    Every client component that SHARED_COMPONENT_MIN_DOMAINS domain specs or
-    more name in their Code section must be in the map, under its path in web/,
-    with exactly those domains; the map holds no other component.
+def component_domains_from_specs() -> dict[str, set[str]]:
+    """Return the domains whose Code section names each client component.
 
     Returns:
-        True when the map and the Code sections agree.
+        The domain names, by the component's repository-relative path (for
+        example web/src/lib/RoomPage.svelte), for every component that some
+        Code section names.
     """
-    print("\n=== shared components (the quick gate's map) ===", flush=True)
+    paths_by_name: dict[str, str] = {}
+    for component_file in sorted(WEB_DIR.joinpath("src").rglob("*.svelte")):
+        component_path = component_file.relative_to(PROJECT_ROOT).as_posix()
+        paths_by_name[component_file.stem] = component_path
+
     domains_by_component: dict[str, set[str]] = {}
     for spec_file in find_domain_spec_files():
-        spec_text = spec_file.read_text(encoding="utf-8")
-        for component_name in COMPONENT_NAME_PATTERN.findall(code_section(spec_text)):
-            domains_by_component.setdefault(component_name, set()).add(spec_file.stem)
+        section = code_section(spec_file.read_text(encoding="utf-8"))
+        for word in COMPONENT_WORD_PATTERN.findall(section):
+            component_path = paths_by_name.get(word)
+            if component_path is None:
+                continue
+            domain_names = domains_by_component.setdefault(component_path, set())
+            domain_names.add(spec_file.stem)
+    return domains_by_component
 
+
+def shared_component_problems(
+    component_domains: dict[str, set[str]],
+) -> list[str]:
+    """Compare SHARED_COMPONENT_DOMAINS with the domains the specs give.
+
+    Args:
+        component_domains: The domains naming each component, from
+            component_domains_from_specs.
+
+    Returns:
+        One message per difference; empty when the map is right.
+    """
     expected: dict[str, set[str]] = {}
-    for component_name, domain_names in domains_by_component.items():
+    for component_path, domain_names in component_domains.items():
         if len(domain_names) >= SHARED_COMPONENT_MIN_DOMAINS:
-            expected[component_name] = domain_names
+            expected[component_path] = domain_names
 
     problems: list[str] = []
-    mapped_names: set[str] = set()
     for component_path, domain_tuple in SHARED_COMPONENT_DOMAINS.items():
-        component_name = component_path.rpartition("/")[2]
-        mapped_names.add(component_name)
-        if not (PROJECT_ROOT / component_path).is_file():
-            problems.append(f"{component_path} does not exist.")
-        expected_domains = expected.get(component_name)
+        if len(set(domain_tuple)) != len(domain_tuple):
+            problems.append(f"{component_path} lists a domain twice.")
+        expected_domains = expected.get(component_path)
         if expected_domains is None:
             problems.append(
-                f"{component_path} is named by fewer than "
-                f"{SHARED_COMPONENT_MIN_DOMAINS} domains' Code sections: "
-                "take it out of SHARED_COMPONENT_DOMAINS."
+                f"{component_path} is not a component that "
+                f"{SHARED_COMPONENT_MIN_DOMAINS} domains or more name in their "
+                "Code section: take it out of SHARED_COMPONENT_DOMAINS."
             )
             continue
         if set(domain_tuple) != expected_domains:
             names = ", ".join(sorted(expected_domains))
             problems.append(
-                f"{component_path}: the Code sections name it in {names}; "
+                f"{component_path}: the Code sections of {names} name it; "
                 "SHARED_COMPONENT_DOMAINS must list exactly those."
             )
-    for component_name in sorted(expected):
-        if component_name not in mapped_names:
-            names = ", ".join(sorted(expected[component_name]))
+    for component_path in sorted(expected):
+        if component_path not in SHARED_COMPONENT_DOMAINS:
+            names = ", ".join(sorted(expected[component_path]))
             problems.append(
-                f"{component_name} is named by the Code sections of {names}: "
-                "add it to SHARED_COMPONENT_DOMAINS."
+                f"{component_path}: the Code sections of {names} name it; add it "
+                "to SHARED_COMPONENT_DOMAINS."
             )
+    return problems
 
+
+def check_shared_components() -> bool:
+    """Check SHARED_COMPONENT_DOMAINS against the domain specs' Code sections.
+
+    Every client component that SHARED_COMPONENT_MIN_DOMAINS domain specs or
+    more name in their Code section must be in the map, under its path, with
+    exactly those domains; the map holds no other component.
+
+    Returns:
+        True when the map and the Code sections agree.
+    """
+    print("\n=== shared components (the quick gate's map) ===", flush=True)
+    problems = shared_component_problems(component_domains_from_specs())
     if problems:
         for problem in problems:
             print(f"FAIL: shared components: {problem}")
