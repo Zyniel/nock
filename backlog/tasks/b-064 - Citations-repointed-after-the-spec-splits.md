@@ -4,7 +4,7 @@ title: Citations repointed after the spec splits
 status: To Do
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T12:43:00Z'
+updated_date: '2026-11-02T15:53:00Z'
 labels:
   - domain:host
   - domain:lifetime
@@ -66,4 +66,6 @@ Lead (2026-11-02, after B-058, B-059, B-060, B-062): citations by name the close
 - B-059 (summaries): results.md:20 (Depends on: summaries in joining), lifetime.md:222-223, library.md:264, hud.md:85-86 (« Mes salons » in joining), account.md:18/107/294 (« Mes salons », summaries).
 - B-060 (votes): chat.md:101/:139, room.md:144 (in the description); rules.md:43, server.md:81, presence.md:278, product.md:36 (the vote, still hints).
 The task takes domain:account, rules, server and presence for these one-line citations.
+
+Lead (2026-11-02, after B-061): add specs/social/presence.md:20 (Depends on: « gameplay/board.md: the grid, … » — the grid is now gameplay/viewport.md).
 <!-- SECTION:NOTES:END -->
