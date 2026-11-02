@@ -1,10 +1,10 @@
 ---
 id: B-064
 title: Citations repointed after the spec splits
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T15:53:00Z'
+updated_date: '2026-11-02T16:49:00Z'
 labels:
   - domain:host
   - domain:lifetime
@@ -57,6 +57,14 @@ ordinal: 19000
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: one-line citations in the files of the task's labels repointed to the split files (erasure, foundation, summaries, votes, viewport, reconnection) and their new numbers; no rule text changes.
+2. Tests: none change.
+3. Quick gate: uv run python scripts/gate.py --stage tests (no test or code changes), then the full gate.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -68,4 +76,6 @@ Lead (2026-11-02, after B-058, B-059, B-060, B-062): citations by name the close
 The task takes domain:account, rules, server and presence for these one-line citations.
 
 Lead (2026-11-02, after B-061): add specs/social/presence.md:20 (Depends on: « gameplay/board.md: the grid, … » — the grid is now gameplay/viewport.md).
+
+Lead (2026-11-02): started after B-058 to B-062 and B-047 merged; B-063 (in progress) keeps operations' own citations. Spec-writer on Sonnet at medium, as the task says. Base: origin/main b9871e7.
 <!-- SECTION:NOTES:END -->
