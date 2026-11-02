@@ -4,7 +4,7 @@ title: The room summaries leave `lobby/joining.md`
 status: To Do
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T01:20:00Z'
 labels:
   - domain:joining
   - domain:summaries
@@ -41,3 +41,9 @@ ordinal: 14000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Human (2026-11-02, chat, on the pitch's question): A. B-059 updates the one cell of specs/product.md's routes table that names the owner of POST /api/rooms/summaries, from lobby/joining.md to lobby/summaries.md; no behaviour change.
+<!-- SECTION:NOTES:END -->
