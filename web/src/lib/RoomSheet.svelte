@@ -83,6 +83,8 @@
     if (dialog === null || dialog.open || !dialog.isConnected) {
       return
     }
+    // A close whose event has not come yet leaves its place on the stack.
+    stopAnnouncing()
     region?.clear()
     releaseAnnouncing = takeAnnouncing((text) => region?.write(text))
     dialog.showModal()

@@ -2143,11 +2143,9 @@
      and isStatusUnderClueBar. Only the full-but-wrong status sits in the clue
      bar's row, since a solved page has no keyboard. -->
 {#snippet gridStatusContent()}
-  {@const statusText =
-    gridStatus === 'solved' ? t('completion.solved') : t('completion.full_wrong')}
   <span class="grid-status-text" data-testid="grid-status-text"
     >{#if gridStatus === 'solved'}<span class="status-check" aria-hidden="true"></span
-      >{/if}{statusText}</span
+      >{/if}{gridStatusText}</span
   >
   {#if gridStatus === 'solved'}
     <button
