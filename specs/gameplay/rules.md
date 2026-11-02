@@ -40,7 +40,7 @@ for every player, measures the room's playing time from the first letter typed.
    undo, a check and a reveal are refused with `grid_solved`, to the sender only;
    the refusal changes no cell, no seq of its own and no timer (an idle sender
    still wakes, `social/presence.md`; before a check or a reveal an expired vote
-   still closes, `gameplay/hints.md`). An edit's own refusals and undo's
+   still closes, `gameplay/votes.md`). An edit's own refusals and undo's
    `nothing_to_undo` come first; check and reveal refuse it before any check of
    theirs. Every other message works as in a room not solved yet. A room never
    gets a second `grid_solved`.

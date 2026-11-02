@@ -182,7 +182,7 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
 
 - Zoom buttons, Ctrl+wheel; an animated scroll to the selection; a look of its
   own per separator; the dashed edge in the operator's replay
-  (`admin/operations.md`) and the catalogue's generic grid drawing.
+  (`admin/ops-page.md`) and the catalogue's generic grid drawing.
 - The selection, taps, typing, navigation, the clue bar, the in-app keyboard,
   « Mots des autres » and « Accessibilité »: `gameplay/board.md`. Others'
   selections and their tint: `social/presence.md`. Edits, pencil letters:

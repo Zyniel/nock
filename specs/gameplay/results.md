@@ -17,8 +17,8 @@ grids in « Grilles terminées », where a grid can be played again.
 
 - `gameplay/rules.md`: solved rooms, `grid_solved`, the timer's text, the band.
 - `gameplay/hints.md`: the check and reveal entries the recap counts.
-- `lobby/joining.md`: nicknames and their display, summaries; a room's
-  deletion is `lobby/lifetime.md`.
+- `lobby/summaries.md`: summaries. Nicknames and their display:
+  `lobby/joining.md`; a room's deletion: `lobby/lifetime.md`.
 
 ## Rules
 
@@ -133,7 +133,7 @@ grids in « Grilles terminées », where a grid can be played again.
     the catalogue column (`content/library.md` rule 9): a row per record with
     the grid label (`catalogue.item.number` or `my_rooms.unnumbered`) and
     `catalogue.item.size`; a line holding `history.finished` (the date as « Mes
-    salons » writes it), `history.time` (the duration as `admin/operations.md`
+    salons » writes it), `history.time` (the duration as `admin/ops-page.md`
     writes it) and `history.teammates` (names displayed, `--` as « Ancien
     joueur ») or `history.alone`; with a grid number only, `history.replay`
     (« Rejouer »), named `history.replay_label`.
@@ -150,7 +150,7 @@ grids in « Grilles terminées », where a grid can be played again.
     log nothing (`platform/server.md` rule 6). A solved room's recap, once
     built, is kept in memory with the room's seq and reused while the seq is
     the same. A new log entry, or a member's nickname erased
-    (`account/account.md` rule 18), has it built again at the next request;
+    (`account/erasure.md` rules 1, 5), has it built again at the next request;
     the room's deletion drops it.
 
 ### Look
@@ -297,7 +297,8 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
 - Deleting, sorting or filtering records; moving them to an account; a link
   from a record to its recap.
 - How an account saves and erases records, its history route:
-  `account/account.md`. The page frame and state lines: `client/shell.md`.
+  `account/erasure.md`. The page frame: `client/shell.md`; state lines:
+  `client/foundation.md`.
 
 ## Code
 

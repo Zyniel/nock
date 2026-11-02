@@ -78,7 +78,7 @@ played.
    `player_state_changed` each in roster order, selection and recent edits
    cleared. Their resume window runs from then (`platform/reconnection.md`
    rule 2). What the restart step does to chat windows, the vote and the
-   timer: `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every
+   timer: `social/chat.md`, `gameplay/votes.md`, `gameplay/rules.md`. Every
    other read (summaries, catch-up, the recaps, the account's rooms and
    history, the operator's edits) replays the room from the store without
    making it live, with no restart step and no log entry. A lookup that meets
@@ -266,8 +266,8 @@ top bars (« Phone top bar », « Computer top bar »).
 
 - Several processes on one database, replication, backups, a real kill or
   power cut in tests, repairing a damaged database, multi-level undo, redo.
-- Expiry, deletion and the sweep: `lobby/lifetime.md`. Logs, retention and the
-  operator's replay of the log: `admin/operations.md`. What changed while away:
+- Expiry, deletion and the sweep: `lobby/lifetime.md`. Logs and retention:
+  `admin/operations.md`; the operator's replay of the log: `admin/ops-page.md`. What changed while away:
   `social/catch-up.md`. Client routing and its pages: `client/shell.md`.
 - Serving the client, the HTTP edge and the environment variables, `main()`
   included: `platform/serving.md`. The run configuration, frame size and

@@ -10,7 +10,7 @@ Readings taken where the spec leaves room:
 - "The card holds « Chargement… » only" is the heading and that one line; the
   line is announced politely (`role="status"`), as `_design/pages.md`, « States »
   says of a waiting line in a card. The failure line is an alert.
-- The 401 and 429 of rule 11 lock the page as `admin/operations.md` rule 16 says:
+- The 401 and 429 of rule 11 lock the page as `admin/ops-page.md` rule 3 says:
   the token form comes back with « Jeton refusé. » or « Trop d'essais. Réessayez
   dans une minute. », and the tab's `sessionStorage` forgets the token.
 - Rule 12's 401 or 429 on a save, which no criterion names, is checked here

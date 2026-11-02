@@ -15,7 +15,8 @@ codes are limited per address.
 ## Depends on
 
 - `lobby/joining.md`: joins, identities, the roster, past players.
-- `platform/realtime.md`: messages, codes, delivery, resume and time-out.
+- `platform/realtime.md`: messages, codes, delivery; resume and time-out are
+  `platform/reconnection.md`.
 - `content/library.md`: the catalogue, published grids, `nock.progress`.
 
 ## Rules
@@ -220,7 +221,7 @@ status band of « Connection lost »; before, the entry card of
   `platform/realtime.md` rules 2 and 26; the app
   parsing `X-Forwarded-For` itself; changing the creation limit from `/ops`.
   Web Share, QR codes, offline play.
-- Reconnection and fair play: `platform/realtime.md`. Durable state:
+- Fair play: `platform/realtime.md`; reconnection: `platform/reconnection.md`. Durable state:
   `platform/server.md`. Feed lines of joins and departures:
   `social/presence.md`. The Menu, sheets and top bar: `client/hud.md`.
 

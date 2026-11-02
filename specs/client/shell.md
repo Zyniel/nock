@@ -222,7 +222,7 @@ file, and the brand on the top bars.
   nickname card and refusals: `lobby/joining.md`, `lobby/host.md`,
   `lobby/rooms.md`. The room's frame once shown: `client/hud.md`. The
   catalogue and its states: `content/library.md`. The plain pages' content:
-  `account/account.md`, `gameplay/results.md`, `admin/operations.md`.
+  `account/account.md`, `gameplay/results.md`, `admin/ops-page.md`.
 
 ## Code
 

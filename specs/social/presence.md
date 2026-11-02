@@ -16,9 +16,9 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 - `lobby/joining.md`: players, colours, nicknames and their display, the
   roster's rows and order, resume and seat back.
 - `platform/realtime.md`: the messages and who receives each, the silence
-  time-out, the resume window.
-- `gameplay/board.md`: the grid, a selection's word, the « Mots des autres »
-  and « Accessibilité » switches.
+  time-out; the resume window is `platform/reconnection.md`.
+- `gameplay/board.md`: a selection's word, the « Mots des autres »
+  and « Accessibilité » switches; the grid is `gameplay/viewport.md`.
 
 ## Rules
 
@@ -274,8 +274,8 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 ## Out of scope
 
 - The stream's order, caps and scroll, and its host, lock and settings
-  lines: `social/chat.md`. Its lines of checks, reveals and votes:
-  `gameplay/hints.md`. The Joueurs tab's layout: `client/room.md`; the Menu:
+  lines: `social/chat.md`. Its lines of checks and reveals:
+  `gameplay/hints.md`; of votes: `gameplay/votes.md`. The Joueurs tab's layout: `client/room.md`; the Menu:
   `client/hud.md`. Changes while away: `social/catch-up.md`. The recap's
   player marks: `gameplay/results.md`.
 - Cursor trails, typing indicators, avatars; a disconnected player's

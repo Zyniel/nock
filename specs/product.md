@@ -33,7 +33,7 @@ None. Every domain spec depends on this file.
    others are, chat: `gameplay/board.md`, `gameplay/co-op.md`,
    `social/presence.md`, `social/chat.md`.
 5. Use help: check or reveal within a budget, by the group's rule or a vote:
-   `gameplay/hints.md`.
+   `gameplay/hints.md`, `gameplay/votes.md`.
 6. Finish and see the recap: completion, the timer, « Bilan de la partie », the
    shareable recap: `gameplay/rules.md`, `gameplay/results.md`.
 7. Come back to a room: the same seat after a reload, a day later or from « Mes
@@ -41,8 +41,8 @@ None. Every domain spec depends on this file.
    `lobby/summaries.md`, `social/catch-up.md`.
 8. The optional account: sign in by email, keep rooms and history across devices:
    `account/account.md`; erase one's data: `account/erasure.md`.
-9. The operator's page: figures, a room's replay, retention:
-   `admin/operations.md`.
+9. The operator's page: figures, a room's replay: `admin/ops-page.md`;
+   retention: `admin/operations.md`.
 
 ### Stable routes
 
@@ -57,7 +57,7 @@ the path. Everything else under `/` is a file of the built client or 404
 | `GET /r/<code>` | the room page; 404 unless 6 capitals or digits | `lobby/joining.md` |
 | `GET /recap/<token>` | the shared recap page; unknown token 404 | `gameplay/results.md` |
 | `GET /account` | the account page | `account/account.md` |
-| `GET /ops` | the operator's page | `admin/operations.md` |
+| `GET /ops` | the operator's page | `admin/ops-page.md` |
 | `GET /api/grids?force=`, `GET /api/grids/<number>` | the published grids, one grid | `content/library.md` |
 | `POST /api/rooms` | a room on a published grid: code, share link, 201; `GET` is 404 | `lobby/rooms.md` |
 | `POST /api/rooms/summaries` | « Mes salons » | `lobby/summaries.md` |
@@ -165,7 +165,7 @@ every `/api/ops` path 404 whatever the method (a body over the limit: 413 first,
     and not yet applied, joined or not: the next frame and every later one are
     dropped, the connection is closed with 1008 without waiting for the room and
     counted as disconnected; the inputs before still apply. Neither code is
-    final: the page reconnects (`platform/realtime.md`).
+    final: the page reconnects (`platform/reconnection.md`).
 26. Frame size. The server accepts frames of at most 8,192 bytes
     (`WS_MAX_SIZE_BYTES`): a larger one closes the socket with 1009 before it is
     buffered; one of 4,097 to 8,192 bytes reaches the app and gets
