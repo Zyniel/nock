@@ -1,13 +1,15 @@
 ---
 id: B-050
 title: Small fixes of the web client
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-02T01:39:00Z'
 labels:
   - domain:host
   - domain:operations
   - domain:product
+  - domain:shell
 milestone: m-1
 dependencies: []
 documentation:
@@ -70,6 +72,22 @@ ordinal: 11000
      their own.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 host AC-21 (new)
+- [ ] #2 host AC-22 (new)
+- [ ] #3 operations AC-26 (new)
+- [ ] #4 operations AC-27 (new)
+- [ ] #5 operations AC-28 (new)
+- [ ] #6 operations AC-29 (new)
+- [ ] #7 operations AC-30 (new)
+- [ ] #8 shell AC-29 (new)
+- [ ] #9 shell AC-30 (new)
+- [ ] #10 shell AC-31 (new)
+- [ ] #11 shell AC-32 (new)
+- [ ] #12 shell AC-33 (new)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -79,3 +97,28 @@ ordinal: 11000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Spec: specs/lobby/host.md (rule 8), specs/admin/operations.md (rules 16, 18, 19), specs/product.md (Stable routes; accessibility and performance baselines as needed)
+Tests: tests/test_host_*.py, tests/test_operations_*.py, tests/test_product_*.py, plus regression tests under the existing criteria of the other fixes
+Quick gate: uv run python scripts/gate.py --specs host,operations,product --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Decisions (lead, 2026-11-02):
+- Q1: A. A settings_changed that changes the lock alone keeps the typed counts; only the fields that changed are copied into the form.
+- Q2: A. The ops fixes L18 and L19 are in this task.
+- L27 (svelte, svelte-check, vite patches and the two advisories) is tooling, the human's call: not built here, left to the next tooling task.
+- L20: one key for the list separator (keeps « , », no visible change) rather than Intl.ListFormat, whose « et » would change the text players see; two unit keys for « h » and « min ».
+- L23: no change to package.json or the Vite config (tooling); the font subsets come from the files @fontsource already ships, the preload from the client's own code.
+
+- L20, L21 and L23 are written in client/shell.md, not under the product baselines: a new baseline rule would be a baseline change (escalation class), and the task says no baseline changes. The task takes the label domain:shell (no task In Progress holds it). product.md gets only the Stable routes row (L26).
+- Spec-writer's open questions, all A: the client checks rule 4's full token shape; a wrong shape reads « Jeton refusé. » with the input empty and focused; a stored token of a wrong shape is removed and the page opens locked with no error line; the grid's two faces are Source Sans 3 500 and IBM Plex Sans Condensed 600, latin files; either placement of the preload passes.
+- L12, L14, L15: no spec change (rules already hold; hud.md is B-046's domain).
+
+- Spec-checker: CHANGES REQUESTED (shell rule 2 units too wide; rule 21 restated the design's faces), then APPROVED in round 2. Size: shell.md (33 criteria), operations.md (30) and host.md (22) are over budget; shell and operations splits are B-058 and B-063, host.md and product.md become follow-up drafts.
+<!-- SECTION:NOTES:END -->

@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: done
+status: approved
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation
@@ -39,7 +39,11 @@ fonts, focus ring, shared components, state lines).
    (`alt`, `title`, `placeholder`, `label`, `aria-label`, `aria-description`,
    `aria-placeholder`, `aria-roledescription`, `aria-valuetext`); an empty
    `alt` is allowed. `web/index.html` is `lang="fr"`, with an empty title and
-   no text in its body. French only.
+   no text in its body. French only. A list of names shown is joined with
+   `list.separator`; a unit the client adds after a shown number, outside a
+   text's template, is `unit.hours` or `unit.minutes` (the settings card's
+   bounds, `admin/overrides.md` rule 11).
+20. The code that only one page uses is fetched only on that page's route.
 
 ### The room page's connection
 
@@ -93,6 +97,9 @@ fonts, focus ring, shared components, state lines).
    window and follows a resize within 300 ms.
 10. The page not found is one card titled `not_found.heading` (« Page
     introuvable »), with `share.home` to `/` as its primary way on.
+19. On the pages of rule 9, the catalogue, a grid page and the operator page,
+    the top bar is the page's banner, outside `main`, and everything under it
+    is in the page's one `main`.
 
 ### States and motion
 
@@ -121,6 +128,9 @@ fonts, focus ring, shared components, state lines).
     another host. `README.md` credits both under the SIL Open Font License 1.1.
     A face that fails to load falls back to the next family. Form controls
     take their parent's font, never the system's.
+21. The faces are served in their `latin` and `latin-ext` subsets only. The
+    room page preloads the `latin` files of the grid's letter and clue faces
+    (`_design/foundation.md`, « Typography »).
 15. `web/src/lib/icons.ts` holds the design's icon shapes, the eight player
     icons and the Nock mark as data.
 16. The shared components (buttons in their variants and disabled, menus and
@@ -177,6 +187,11 @@ fonts, focus ring, shared components, state lines).
   not-found pages »; the opening and state lines: « States: opening, loading,
   empty, error »; the plain pages: « Plain pages: account, shared recap,
   operator ».
+
+## New interface
+
+- `web/src/i18n/fr.json`: `list.separator` (« , » then a space),
+  `unit.hours` (« h »), `unit.minutes` (« min »).
 
 ## Acceptance criteria
 
@@ -307,6 +322,23 @@ fonts, focus ring, shared components, state lines).
   `seen_seq` 5 stored, a catch-up answer naming only (1, 2) mutates no node of
   the grid outside (1, 2), from the start of its ring to the ring's end 5
   seconds later.
+- **AC-29** `fr.json` holds `list.separator` « , » then a space, `unit.hours`
+  « h » and `unit.minutes` « min »; the shared recap's team reads « Ana, Bob,
+  Cy » and the settings card's out-of-bounds line for a room life « Valeur
+  hors limites (24 à 8760 h). », and no client module joins shown names with
+  a literal separator or adds a literal unit a user reads after a shown
+  number.
+- **AC-30** On `/`, `/g/1`, `/r/ABC123` showing the nickname form, `/xyz`, a
+  shared recap, `/account` and `/ops` locked, the page has one banner, the top
+  bar, followed by one `main` holding the page's heading, and no banner inside
+  `main`.
+- **AC-31** `/` fetches none of the code that only the room page or the
+  operator page uses, and `/r/ABC123` none of the code that only the catalogue
+  or the operator page uses.
+- **AC-32** The built client declares its font faces for the `latin` and
+  `latin-ext` subsets only, and ships no font file of another subset.
+- **AC-33** `/r/ABC123` preloads, from Nock's origin, the `latin` files of
+  Source Sans 3 at 500 and of IBM Plex Sans Condensed at 600.
 
 ## Edge cases
 
@@ -327,15 +359,16 @@ fonts, focus ring, shared components, state lines).
 
 ## Code
 
-- `web/src/App.svelte` (routing, title), `web/index.html`,
+- `web/src/App.svelte` (routing, title, code per page), `web/index.html`,
   `web/src/lib/i18n.ts`, `web/src/i18n/fr.json`.
 - `web/src/lib/roomSession.ts` (frames, seq, final closes, cursors),
   `RoomPage.svelte` (socket, cards, opening), `EntryFrame.svelte`,
-  `NotFoundPage.svelte`, `PageTopBar.svelte`, `TopBarBrand.svelte`.
+  `CatalogueFrame.svelte` (the frames and their `main`), `NotFoundPage.svelte`,
+  `PageTopBar.svelte`, `TopBarBrand.svelte`.
 - `web/src/app.css` (tokens, page base, focus ring, components),
   `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay, what a
   frame redraws),
-  `web/src/main.ts` (fonts), `web/src/lib/icons.ts`.
+  `web/src/main.ts` (fonts, subsets, preload), `web/src/lib/icons.ts`.
 - Tests: `tests/test_shell_*`, `tests/test_spec_041_*` and the
   `tests/test_spec_040_*`, `test_spec_046_*` and `test_spec_048_*` files of the
   cited criteria.

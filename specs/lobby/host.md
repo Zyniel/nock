@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: host
-status: done
+status: approved
 ---
 
 # lobby/host - The host role and the creator
@@ -76,9 +76,11 @@ out; the room goes with the creator's account.
    error line `settings.error.count` (« Entrez un nombre entier de 0 à 99. »),
    the focus goes to the first of them, and the browser shows no message of its
    own. Each « Enregistrer » sets the marks anew; a close clears them. The
-   sheet shows the room's help mode and allowance, not the remaining budget,
-   and follows `settings_changed`; the switch sends the opposite of the room's
-   lock and shows the room's, not the click's. A `host_changed` gives or takes
+   sheet opens on the room's help mode and allowance, not the remaining
+   budget. While it is open, a `settings_changed` sets only the fields whose
+   room value it changes (the help mode, each count); the others keep what was
+   typed or chosen. The switch sends the opposite of the room's lock and shows
+   the room's, not the click's. A `host_changed` gives or takes
    these controls at once; taking them closes an open host sheet
    (`client/hud.md` rule 13).
 9. `removed` or `room_locked`, on a join, during the game or a reconnection, ends
@@ -246,6 +248,13 @@ not-found pages ».
 - **AC-20** Ana's host sheet open at 360 by 740, a `host_changed` to Bob
   closes it and focuses « Menu », whose items no longer hold « Réglages de
   l'hôte ».
+- **AC-21** Ana's host sheet open on the room's vote, 3 letters and 0 words:
+  she types `7` in « Lettres à révéler », chooses « libre » and presses the
+  switch; once the room is locked, the sheet still shows 7 and « libre ».
+- **AC-22** Ana's host sheet open on vote, 3 letters and 0 words, with `7`
+  typed in « Lettres à révéler »: a `settings_changed` to vote, 3 letters and
+  5 words, sent from her other connection, leaves 7 there and shows 5 in « Mots
+  à révéler ».
 
 ## Edge cases
 
