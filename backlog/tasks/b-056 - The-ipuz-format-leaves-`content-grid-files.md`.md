@@ -58,7 +58,7 @@ ordinal: 11000
 - [x] #3 Tests committed before the code
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
+- [x] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -79,6 +79,8 @@ Spec change: Fable spec-writer, spec-checker APPROVED in its second round. Decis
 Tests: the test-writer moved 57 functions to tests/test_ipuz_{structure,roundtrip,clues,compound,fields}.py, git mv for the four whole files; tests/grid_files_harness.py stays shared (the 004/005 tests import it). No implementer: no code changes, as the task says.
 
 Review: CHANGES REQUESTED in round 1 (one stale docstring citation of grid-files AC-16 in test_spec_004_ac07, two small renames), APPROVE in round 2. Not taken: the harness docstring's 'the tests of the domain' (singular), too small for a draft. Full gate: one failure, test_spec_012_ac01 nickname browser test (chromium, E+combining acute), outside this change; the file passes alone (100 passed), so a flake under the load of three parallel sessions.
+
+Pull request: https://github.com/Zyniel/nock/pull/93
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
