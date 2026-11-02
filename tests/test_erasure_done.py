@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-24 and AC-26, and the sweep of AC-25: an erasure that
+"""Tests of account/erasure, AC-8 and AC-10, and the sweep of AC-9: an erasure that
 always finishes.
 
 HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one file,
@@ -6,22 +6,22 @@ a fake clock, a recording mailer). Zoé plays R, which is live (a socket stays o
 and S, a room only in the store, signs in from R, and created U (`zoe_in_rooms` of
 `account_harness`). She then sends `DELETE /api/account`.
 
-- AC-24: the answer, the cookie, R's and S's players named `--`, U gone, the one
+- AC-8: the answer, the cookie, R's and S's players named `--`, U gone, the one
   e-mail (sender, recipient, subject, exact body, no link), the row of
   `account_erasures` (read on a connection of its own, the table of the spec's "New
   interface"), `account_erasure_players` empty, and the database files without her
   address or `ZOÉ`. `deleted_message` of `nock.mailer` builds the message.
-- AC-26: the same deletion with the mailer raising `MailError`: 204, one record at
+- AC-10: the same deletion with the mailer raising `MailError`: 204, one record at
   WARNING or above without the address, the erasure done with no e-mail time, no
   address in the files, and no later sweep (an app restarted on the file, which
   sweeps every 0.1 s) sends anything.
-- AC-25, the sweep: an erasure written by `AccountStore.delete_account` alone,
+- AC-9, the sweep: an erasure written by `AccountStore.delete_account` alone,
   with no attempt of the route, is finished by the next sweep of the same app,
-  which sends the e-mail once. The held engine of AC-25 is in
-  `test_account_erasure_retry.py`.
+  which sends the e-mail once. The held engine of AC-9 is in
+  `test_erasure_retry.py`.
 
 The count of log records is that of the `nock.*` loggers at WARNING or above, since
-rule 26 says "WARNING or above".
+erasure rule 5 says "WARNING or above".
 """
 
 from __future__ import annotations
@@ -149,10 +149,10 @@ def zoe_deletes(
         )
 
 
-# ---- AC-24: the deletion that finishes at once -----------------------------------
+# ---- AC-8: the deletion that finishes at once -----------------------------------
 
 
-def test_ac24_the_deletion_answers_204_and_her_rooms_are_erased(
+def test_ac8_the_deletion_answers_204_and_her_rooms_are_erased(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -171,7 +171,7 @@ def test_ac24_the_deletion_answers_204_and_her_rooms_are_erased(
     assert erased.records == []
 
 
-def test_ac24_her_address_receives_one_e_mail_with_the_text_of_rule_27(
+def test_ac8_her_address_receives_one_e_mail_with_the_text_of_rule_6(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -194,7 +194,7 @@ def test_ac24_her_address_receives_one_e_mail_with_the_text_of_rule_27(
     assert fr["email.deleted.body"] == DELETED_BODY
 
 
-def test_ac24_deleted_message_is_the_one_the_erasure_sends() -> None:
+def test_ac8_deleted_message_is_the_one_the_erasure_sends() -> None:
     from nock.mailer import deleted_message
 
     message = deleted_message(account_settings(), ZOE_EMAIL)
@@ -206,7 +206,7 @@ def test_ac24_deleted_message_is_the_one_the_erasure_sends() -> None:
     assert body_of(message) == DELETED_BODY
 
 
-def test_ac24_the_erasure_is_one_done_row_with_its_counts_and_no_address(
+def test_ac8_the_erasure_is_one_done_row_with_its_counts_and_no_address(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -220,7 +220,7 @@ def test_ac24_the_erasure_is_one_done_row_with_its_counts_and_no_address(
     assert erased.listed == []
 
 
-def test_ac24_the_files_hold_neither_her_address_nor_her_nickname(
+def test_ac8_the_files_hold_neither_her_address_nor_her_nickname(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -232,10 +232,10 @@ def test_ac24_the_files_hold_neither_her_address_nor_her_nickname(
     assert erased.secrets_in_files == []
 
 
-# ---- AC-26: the mailer raises at completion --------------------------------------
+# ---- AC-10: the mailer raises at completion --------------------------------------
 
 
-def test_ac26_a_failing_mailer_leaves_the_erasure_done_with_no_e_mail_time(
+def test_ac10_a_failing_mailer_leaves_the_erasure_done_with_no_e_mail_time(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -257,7 +257,7 @@ def test_ac26_a_failing_mailer_leaves_the_erasure_done_with_no_e_mail_time(
     assert erased.secrets_in_files == []
 
 
-def test_ac26_the_failure_is_logged_once_without_the_address(
+def test_ac10_the_failure_is_logged_once_without_the_address(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -273,7 +273,7 @@ def test_ac26_the_failure_is_logged_once_without_the_address(
     assert ZOE_EMAIL not in formatted
 
 
-def test_ac26_no_later_sweep_sends_anything(
+def test_ac10_no_later_sweep_sends_anything(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
@@ -293,10 +293,10 @@ def test_ac26_no_later_sweep_sends_anything(
     assert rows == rows_after_the_deletion
 
 
-# ---- AC-25: the next sweep finishes a pending erasure ----------------------------
+# ---- AC-9: the next sweep finishes a pending erasure ----------------------------
 
 
-def test_ac25_the_next_sweep_of_the_app_finishes_a_pending_erasure(
+def test_ac9_the_next_sweep_of_the_app_finishes_a_pending_erasure(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock, config=FAST_SWEEP_CONFIG) as app:

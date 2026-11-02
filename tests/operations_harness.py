@@ -17,8 +17,8 @@ tests are in `tests/test_operations_*.py`:
   focuses the input. A browser on the live ops server, with the dashboard and the
   replay answered by the test.
 
-The same helpers serve `tests/test_account_erasure_busy.py` (account/account
-AC-22). This module holds the two ways to look at a busy database: a second
+The same helpers serve `tests/test_erasure_busy.py` (account/erasure
+AC-7). This module holds the two ways to look at a busy database: a second
 connection that holds a read open, which makes a `TRUNCATE` checkpoint report
 busy, and the size of the WAL file; and, for the page, the held dashboard and
 replay routes, the log of the page's ops requests and the checks of the locked

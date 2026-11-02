@@ -1,19 +1,18 @@
-"""Shared setup of the tests of account/account, AC-19 to AC-21 and AC-24 to AC-30.
+"""Shared setup of the tests of account/erasure, AC-4 to AC-6 and AC-8 to AC-14.
 
 Pytest does not collect this module (its name does not start with `test_`). The
-tests are in `tests/test_account_*.py`:
+tests are in `tests/test_erasure_*.py`:
 
-- `test_account_progress.py`: AC-19 to AC-21, `GET /api/account/progress` over
+- `test_erasure_progress.py`: AC-4 to AC-6, `GET /api/account/progress` over
   HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one
   file, a fake clock).
-- `test_account_erasure.py`, `test_account_erasure_history.py`,
-  `test_account_erasure_record.py`, `test_account_erasure_retry.py`,
-  `test_account_erasure_overlap.py` and `test_account_erasure_once.py`: AC-24 to
-  AC-27, AC-29 and AC-30, the erasure that always finishes, on the same app. Zoé's
-  play (`zoe_in_rooms`, `zoe_in_new_live_room`), the room store that holds a
-  room's engine (`HoldingStore`) and the reading of the erasure's two tables are
-  here.
-- `test_account_returning_device.py`: AC-28, a browser.
+- `test_erasure_done.py`, `test_erasure_history.py`, `test_erasure_record.py`,
+  `test_erasure_retry.py`, `test_erasure_overlap.py` and `test_erasure_once.py`:
+  AC-8 to AC-11, AC-13 and AC-14, the erasure that always finishes, on the same
+  app. Zoé's play (`zoe_in_rooms`, `zoe_in_new_live_room`), the room store that
+  holds a room's engine (`HoldingStore`) and the reading of the erasure's two
+  tables are here.
+- `test_erasure_returning_device.py`: AC-12, a browser.
 
 Ana's rooms are FX-01 rooms played with the rules (spec 029's `play_fx01`) and
 registered with `add_room`, so that the grid number of each one is chosen. A room
@@ -68,7 +67,7 @@ ANA_PLAYER = Player("Ana", ANA, TA)
 BOB_PLAYER = Player("Bob", BOB, TB)
 CY_PLAYER = Player("Cy", CY, TC)
 
-R_CODE = "RRRRRR"  # AC-19: grid 1, solved
+R_CODE = "RRRRRR"  # AC-4: grid 1, solved
 S_CODE = "SSSSSS"  # grid 2, not solved
 S2_CODE = "TTTTTT"  # grid 3, not solved
 Q_CODE = "QQQQQQ"  # grid 3, solved, then swept: Ana keeps its record
@@ -77,7 +76,7 @@ K_CODE = "KKKKKK"  # a control room of grid 5, not solved, that stays open
 X_CODE = "XXXXXX"  # a room with no grid number
 CONTROL_GRID = 5
 
-# AC-19's answer.
+# AC-4's answer.
 ANA_PROGRESS = {"1": "finished", "2": "started", "3": "finished", "4": "started"}
 
 
@@ -167,7 +166,7 @@ def creator_room(
 
 
 def build_ana_progress_rooms(app: AccountApp, grid: Grid) -> Ana:
-    """AC-19's accounts and rooms: Ana, member of R, S and S2 and creator of U.
+    """AC-4's accounts and rooms: Ana, member of R, S and S2 and creator of U.
 
     Ana signs in from Q (grid 3, solved), which expires and is swept before she
     asks anything: her record of Q stays. Then R (grid 1, solved), S (grid 2) and
@@ -198,7 +197,7 @@ def progress_body(client: TestClient, session: str) -> object:
     return response.json()
 
 
-# ---- AC-24 to AC-29: Zoé deletes her account -------------------------------------
+# ---- AC-8 to AC-13: Zoé deletes her account -------------------------------------
 
 ZOE_EMAIL = "zoe.probe@example.org"
 BOB_EMAIL = "bob.probe@example.org"
@@ -210,7 +209,7 @@ TZ = "token-of-zoe-0001"
 FAST_SWEEP_CONFIG = NO_TICK_CONFIG.model_copy(update={"expiry_sweep_seconds": 0.1})
 
 DELETED_SUBJECT = "Votre compte Nock a été supprimé"
-# Rule 27's text, as `email.deleted.body` holds it.
+# Rule 6's text, as `email.deleted.body` holds it.
 DELETED_BODY = (
     "Bonjour,\n\nVotre compte Nock et les données qui lui étaient liées ont été"
     " supprimés. Les salons que vous aviez créés sont fermés ; dans les autres,"

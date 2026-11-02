@@ -1,7 +1,7 @@
-"""Tests of account/account, AC-30: an attempt that has nothing to do does nothing.
+"""Tests of account/erasure, AC-14: an attempt that has nothing to do does nothing.
 
 No engine is held and nothing here measures time, so the file runs in the parallel
-pass. Three cases of rule 26 that `test_account_erasure_overlap.py` (a real overlap,
+pass. Three cases of erasure rule 5 that `test_erasure_overlap.py` (a real overlap,
 in the serial pass) cannot pin down, each driven by a name of the code instead of
 by time:
 
@@ -91,7 +91,7 @@ class ListingThenDeleting(RoomStore):
         return codes
 
 
-def test_ac30_a_sweep_that_claims_a_done_erasure_after_its_list_does_nothing(
+def test_ac14_a_sweep_that_claims_a_done_erasure_after_its_list_does_nothing(
     tmp_path: Path, fake_clock: FakeClock
 ) -> None:
     with account_app(tmp_path, fake_clock, config=FAST_SWEEP_CONFIG) as app:
@@ -125,7 +125,7 @@ def test_ac30_a_sweep_that_claims_a_done_erasure_after_its_list_does_nothing(
     assert rows_after == rows_done
 
 
-def test_ac30_a_creator_room_deleted_meanwhile_is_not_reported_as_deleted(
+def test_ac14_a_creator_room_deleted_meanwhile_is_not_reported_as_deleted(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     store = ListingThenDeleting(tmp_path / "nock.sqlite3", GONE_CODE)
@@ -154,7 +154,7 @@ def test_ac30_a_creator_room_deleted_meanwhile_is_not_reported_as_deleted(
     assert u_exists is False
 
 
-def test_ac30_finishing_a_done_erasure_again_keeps_its_first_times(
+def test_ac14_finishing_a_done_erasure_again_keeps_its_first_times(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "nock.sqlite3"

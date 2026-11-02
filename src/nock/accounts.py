@@ -9,14 +9,15 @@ An account also keeps a record of each finished grid of its rooms, so that its
 history stays listed after the room is deleted.
 
 Deleting an account writes a pending erasure in the same transaction, which an
-attempt of the server ends later (`account/account.md` rules 18 and 26). A done
+attempt of the server ends later (`account/erasure.md` rules 1 and 5). A done
 erasure keeps its times and counts only.
 
 `AccountStore` keeps the accounts in the database file of the rooms. Link tokens
 and session values are stored as their SHA-256 hex digests only, so a copy of
 the database signs nobody in. It does give more than that: an identity holds its
 room's resume token in clear, since the account gives it back to its devices, so
-a copy of the database resumes those players in their rooms (rule 20).
+a copy of the database resumes those players in their rooms
+(`account/erasure.md` rule 3).
 """
 
 from __future__ import annotations

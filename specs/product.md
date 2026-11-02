@@ -39,8 +39,8 @@ None. Every domain spec depends on this file.
 7. Come back to a room: the same seat after a reload, a day later or from « Mes
    salons », with what changed while away: `lobby/joining.md`,
    `social/catch-up.md`.
-8. The optional account: sign in by email, keep rooms and history across devices,
-   erase one's data: `account/account.md`.
+8. The optional account: sign in by email, keep rooms and history across devices:
+   `account/account.md`; erase one's data: `account/erasure.md`.
 9. The operator's page: figures, a room's replay, retention:
    `admin/operations.md`.
 
@@ -65,9 +65,10 @@ the path. Everything else under `/` is a file of the built client or 404
 | `GET /api/rooms/<code>/recap`, `GET /api/recaps/<token>` | a room's recap, a shared one | `gameplay/results.md` |
 | `GET /api/account` | sign-in state | `account/account.md` |
 | `POST /api/account/link`, `.../sign-in`, `.../sign-out` | the sign-in flow (202, 200, 204) | `account/account.md` |
-| `GET`, `PUT /api/account/rooms`; `GET /api/account/history` | the account's rooms and history | `account/account.md` |
-| `GET /api/account/progress` | the account's progress on the grids | `account/account.md` |
-| `DELETE /api/account` | erase the account, 204 | `account/account.md` |
+| `GET`, `PUT /api/account/rooms` | the account's rooms | `account/account.md` |
+| `GET /api/account/history` | the account's history | `account/erasure.md` |
+| `GET /api/account/progress` | the account's progress on the grids | `account/erasure.md` |
+| `DELETE /api/account` | erase the account, 204 | `account/erasure.md` |
 | `GET /api/ops/dashboard?days=`, `GET /api/ops/rooms/<code>/edits` | figures, a room's edits; token needed | `admin/operations.md` |
 | `GET`, `PUT /api/ops/settings`; `POST /api/ops/settings/dry-run` | the room lives and the sweep interval: read, override, count a value's deletions; token needed | `admin/overrides.md` |
 | `WS /api/rooms/<code>/ws` | the room socket: join, play, events | `platform/realtime.md` |
