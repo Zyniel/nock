@@ -4,7 +4,7 @@ title: Connection hardening
 status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T16:20:00Z'
+updated_date: '2026-11-02T16:21:00Z'
 labels:
   - domain:hud
   - domain:chat
@@ -96,7 +96,7 @@ ordinal: 8000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -115,6 +115,8 @@ Lead (2026-11-02): started after B-057 (#98) and B-060 (#103) merged. B-057 move
 Lead: answers to the spec-writer: in a final status (not not_found) pending letters and kept undos/checks/reveals are dropped, letters, erases, « Annuler » and the Aide items send nothing (disabled look); a retry waiting when the page becomes visible tries at once; the connect timeout stays 6 s (the server's silence limit, not the page's 4 s); the parser rules live where each parser's rule already lives (shell, catch-up, operations, library: the task takes those labels; B-058, which held domain:shell, had merged first, and the spec was committed after it); « Je bloque » pressed and disabled keeps its pressed state under the disabled look (drawn in s-net). Parsers: in a room event a malformed field is treated as absent and the event applies with its seq; HTTP bodies with a malformed field are refused whole. Spec-checker: CHANGES REQUESTED in round 1 (six wording fixes: co-op rule 12's pronouns, chat AC-23's state, rule 6's clock reading on a hidden page, AC-21's message types, an edge case's citation, AC-7's margin), APPROVED in round 2; its cosmetic note (one long line in chat rule 5) left. The file sizes (operations 24.9 KB / 31 criteria, hud 21.2 KB, chat 20.6 KB, library 25 criteria, co-op and catch-up 21) go to a follow-up draft: a split is the human's call. The 017 tests behind reconnection AC-3/AC-4 assume exact delays: the test-writer edits them in place.
 
 Lead: tests 3821640 (co-op AC-21 and AC-7's 5 s half already true); implementation 4a43010 (Opus); the implementer's gate found tests/test_joining_reconnection.py assuming an exact 1000 ms first retry: the test-writer allowed the jitter (ca11c2e). Reviewer APPROVE in round 1 (8284 + 160 passed); suggestions taken: the read-only tests check the grid's focus, the server test's sends in a plain loop (08e2d80), ops.ts's date check anchored to ISO 8601 (002931f); suggestions left as DRAFT-056 (rule 19's wording, the all-malformed check, untested parts) and DRAFT-057 (myRooms' dates); the spec sizes as DRAFT-058 (board PR #108). Full gate green (8704 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/109
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
