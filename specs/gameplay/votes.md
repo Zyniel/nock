@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: votes
-status: approved
+status: done
 ---
 
 # gameplay/votes - The group vote on help and its banner
