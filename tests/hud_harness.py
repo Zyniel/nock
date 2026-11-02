@@ -43,7 +43,7 @@ Readings where the spec leaves room:
   matches `:modal` (a `<dialog>` opened with `showModal`) or has `aria-modal`
   `true`.
 - The deletion is the close of the newest socket with 4404, as the server closes
-  every socket of a deleted room (`lobby/joining.md` rule 16).
+  every socket of a deleted room (`lobby/lifetime.md` rule 6).
 - "No band under the top bar": `connection-banner` is not on the page, `room-status`
   is either not on the page or visually hidden (class `visually-hidden`,
   `_design/room.md` « Connection lost »), and the grid area's top is where it was
