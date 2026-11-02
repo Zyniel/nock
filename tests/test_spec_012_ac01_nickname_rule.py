@@ -3,6 +3,10 @@
 The nickname rule (`normalize_nickname` and `join_room`), the real WebSocket and the
 browser, with the live server and with spec 040's mocked socket.
 The shared setup is in `spec012_harness`.
+
+Refined by `lobby/joining.md` AC-4 (B-046): before a refusal the nickname field is
+neither invalid nor described; while the refusal's error shows it is `aria-invalid`
+and described by the error's text (`joining_harness`).
 """
 
 from __future__ import annotations
@@ -18,6 +22,10 @@ from playwright.sync_api import Page, expect
 import nock.hub
 import nock.room
 import nock.server
+from joining_harness import (
+    expect_field_invalid_and_described_by,
+    expect_field_neither_invalid_nor_described,
+)
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -518,10 +526,12 @@ def test_ac1_browser_a_bad_nickname_shows_the_error_and_sends_nothing(
     mock = open_mock_room(page, live_server)
     room = page.get_by_test_id("room-page")
     expect(room).to_have_attribute("data-status", "nickname")
+    expect_field_neither_invalid_nor_described(page)
 
     submit_form(page, typed)
 
     expect(page.get_by_test_id("nickname-error")).to_have_text(load_fr()[error_key])
+    expect_field_invalid_and_described_by(page, load_fr()[error_key])
     expect(room).to_have_attribute("data-status", "nickname")
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
     settle(page)

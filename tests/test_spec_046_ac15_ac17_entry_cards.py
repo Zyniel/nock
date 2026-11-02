@@ -14,6 +14,10 @@ Choices where the spec leaves room:
 - "As wide as the card's content box": the card's box less its border and its
   padding; "its left on the card's content left" likewise.
 - "No frame was sent" leaves spec 017's pings aside and waits 300 ms.
+
+Refined by `lobby/joining.md` AC-4 (B-046): once a valid nickname is sent and the
+join waits for its reply (AC-16), the error is gone and the field is neither
+`aria-invalid` nor described (`joining_harness`).
 """
 
 from __future__ import annotations
@@ -24,6 +28,7 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from fonts_ready import wait_for_fonts
+from joining_harness import expect_field_neither_invalid_nor_described
 from nock.grid import Grid
 from spec035_harness import build_fx01_grid
 from spec042_harness import box_of
@@ -260,6 +265,8 @@ def test_ac16_while_joining_the_card_stays_with_a_disabled_button_until_the_room
     wait_for_join(page, mock)
     submit = page.get_by_test_id("nickname-submit")
     expect(page.get_by_test_id("nickname-form")).to_be_visible()
+    expect(page.get_by_test_id("nickname-error")).to_have_count(0)
+    expect_field_neither_invalid_nor_described(page)
     expect(submit).to_be_disabled()
     assert button_colour_problems(submit, "disabled") == []
     mock.send(fx01_snapshot(fx01_grid))

@@ -3,6 +3,10 @@
 AC-6 checks the rule on `handle_message` and on the real WebSocket. AC-7 drives the
 room page with a mocked socket, and runs two browsers on the live server. The shared
 setup is in `spec026_harness`.
+
+Refined by `gameplay/rules.md` AC-7 (B-046): the status has no live role, and the
+page's status region reads it, also on a page that joins a full, wrong grid
+(`client/hud.md` rule 17).
 """
 
 from __future__ import annotations
@@ -16,6 +20,7 @@ import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Locator, Page, expect
 
+from hud_harness import expect_page_region_reads, live_role_problems
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import EditLetter, Erase, GridFullWrong, LetterChanged
@@ -269,8 +274,9 @@ def test_ac7_the_banner_follows_the_full_wrong_grid(
     expect_seq(page, 7)
     status = status_locator(page)
     expect(status).to_have_attribute("data-state", "full_wrong")
-    expect(status).to_have_attribute("role", "status")
+    assert live_role_problems(status) == []
     expect(status).to_have_text(load_fr()["completion.full_wrong"])
+    expect_page_region_reads(page, load_fr()["completion.full_wrong"])
     expect(wrong_cells(page)).to_have_count(0)
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-solved", "false")
 
@@ -302,6 +308,8 @@ def test_ac7_a_page_that_joins_a_full_wrong_grid_shows_the_banner_at_once(
     status = status_locator(page)
     expect(status).to_have_attribute("data-state", "full_wrong")
     expect(status).to_have_text(load_fr()["completion.full_wrong"])
+    assert live_role_problems(status) == []
+    expect_page_region_reads(page, load_fr()["completion.full_wrong"])
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-solved", "false")
 
 

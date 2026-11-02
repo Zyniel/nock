@@ -21,6 +21,11 @@ text `fr.json["reaction.button"]`"); the picker comes after `clue-bar` and befor
 `salon`, over the bottom of `grid-viewport` (spec 043 AC-25: centred, 8 px above
 its bottom), and the last step runs with the Salon open on Discussion.
 
+Refined by `social/chat.md` AC-11 (B-046): `react-button` has no `aria-controls`
+while the picker is closed (before the first opening and after each of the three
+ways to close it), and while the picker is open its `aria-controls` is the picker's
+`id`.
+
 The shared setup is in `spec022_harness`.
 """
 
@@ -28,12 +33,13 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import time
 from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.grid import Grid
 from nock.hub import RoomRegistry
@@ -502,6 +508,20 @@ OPTIONS_SCRIPT = r"""
   return options;
 }
 """
+
+
+def expect_picker_controlled(button: Locator, picker: Locator) -> None:
+    """The button's `aria-controls` is the id of the picker that is open."""
+    picker_id = picker.get_attribute("id")
+    assert picker_id, "the open picker has no id"
+    expect(button).to_have_attribute("aria-controls", picker_id)
+
+
+def expect_no_controls(button: Locator) -> None:
+    """The button has no `aria-controls` attribute at all."""
+    expect(button).not_to_have_attribute("aria-controls", re.compile(".*"))
+
+
 # With both open: whether the picker comes before the panel in document order,
 # neither holding the other.
 PICKER_BEFORE_PANEL_SCRIPT = r"""
@@ -543,16 +563,18 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(button).to_have_attribute("type", "button")
     expect(button).to_have_text("")
     expect(button).to_have_attribute("aria-label", fr["reaction.button_label"])
-    expect(button).to_have_attribute("aria-controls", "reaction-picker")
+    expect_no_controls(button)
     expect(button).to_have_attribute("aria-expanded", "false")
     expect(button).to_be_disabled()
     expect(picker).to_have_count(0)
 
     select_word(page, VIDE)
     expect(button).to_be_enabled()
+    expect_no_controls(button)
     button.click()
     expect(picker).to_be_visible()
     expect(button).to_have_attribute("aria-expanded", "true")
+    expect_picker_controlled(button, picker)
     expect(picker).to_have_attribute("id", "reaction-picker")
     expect(picker).to_have_attribute("role", "group")
     expect(picker).to_have_attribute("aria-label", fr["reaction.picker_label"])
@@ -564,18 +586,22 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     expect(picker).to_have_count(0)
     expect(button).to_be_focused()
     expect(button).to_have_attribute("aria-expanded", "false")
+    expect_no_controls(button)
 
     button.click()
     expect(picker).to_be_visible()
+    expect_picker_controlled(button, picker)
     assert_sends_nothing(page, mock, lambda: page.keyboard.press("Escape"))
     expect(picker).to_have_count(0)
     expect(button).to_be_focused()
+    expect_no_controls(button)
 
     button.click()
     expect(picker).to_be_visible()
     assert_sends_nothing(page, mock, lambda: button.click())
     expect(picker).to_have_count(0)
     expect(button).to_be_focused()
+    expect_no_controls(button)
 
     # Last: with VIDE still selected and the Salon open on Discussion (the column
     # layout at 1280 by 720), the picker (decision 15).
@@ -591,6 +617,7 @@ def test_ac5_browser_the_picker_offers_the_five_reactions_on_the_selected_word(
     page.keyboard.press("Escape")
     expect(picker).to_have_count(0)
     expect(button).to_be_focused()
+    expect_no_controls(button)
     page.wait_for_timeout(SETTLE_MS)
     expect(panel).to_be_visible()
 
