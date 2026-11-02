@@ -7,13 +7,15 @@ described by it; otherwise it has neither.
 
 Readings where the spec leaves room:
 
-- "Neither" is: `aria-invalid` is not `true`, and the field's accessible description
-  is empty (so it has no `aria-describedby` to an element with text).
+- "Neither" is: `aria-invalid` is not `true`, the field has no `aria-describedby`
+  attribute at all, and its accessible description is empty.
 - "Described by that text" is: `aria-invalid` is `true` and the field's accessible
   description is exactly the text of the error.
 """
 
 from __future__ import annotations
+
+import re
 
 from playwright.sync_api import Page, expect
 
@@ -24,6 +26,7 @@ def expect_field_neither_invalid_nor_described(page: Page) -> None:
     """Wait until the nickname field is not invalid and has no description."""
     field = page.get_by_test_id(NICKNAME_FIELD_ID)
     expect(field).not_to_have_attribute("aria-invalid", "true")
+    expect(field).not_to_have_attribute("aria-describedby", re.compile(".*"))
     expect(field).to_have_accessible_description("")
 
 
