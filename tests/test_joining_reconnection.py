@@ -8,7 +8,7 @@ socket opens.
 
 The page runs on spec 017's mocked socket (`spec017_harness.open_room`), with its
 clock frozen before it loads: a new socket opens only when the test moves the
-clock by the first retry delay, 1 second (`platform/realtime.md` rule 21), so
+clock by the first retry delay, 1 second (`platform/reconnection.md` rule 6), so
 what the test does between the loss and the next socket is always done in time.
 """
 
@@ -38,7 +38,7 @@ from spec042_harness import make_storage_throw, stored_value
 
 ROOM_CODE = "ABC123"
 LOST_CLOSE_CODE = 1011
-FIRST_RETRY_MS = 1000  # the first retry delay (`platform/realtime.md` rule 21)
+FIRST_RETRY_MS = 1000  # the first retry delay (`platform/reconnection.md` rule 6)
 SNAPSHOT_SEQ = 5
 WAIT_TIMEOUT_MS = 5000
 # The identity another tab stores for the same code while Ana is disconnected.

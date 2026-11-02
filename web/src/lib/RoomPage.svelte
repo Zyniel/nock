@@ -1846,7 +1846,7 @@
     reconnectTimer = undefined
   }
 
-  // ---- What the page sends after a snapshot (platform/realtime.md rules 20, 22) ----
+  // ---- What the page sends after a snapshot (platform/reconnection.md rules 5 and 7) ----
 
   // An undo, a check or a reveal made while the page is not joined, kept until
   // the next snapshot. `editsBefore` counts the edits made before it: it goes out

@@ -77,13 +77,12 @@ played.
    player not disconnected becomes disconnected at that time, with one
    `player_state_changed` each in roster order, selection and recent edits
    cleared. Their resume window runs from then (`platform/reconnection.md`
-   rule 2). What
-   the restart step does to chat windows, the vote and the timer:
-   `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every other
-   read (summaries, catch-up, the recaps, the account's rooms and history, the
-   operator's edits) replays the room from the store without making it live,
-   with no restart step and no log entry. A lookup that meets an expired room deletes
-   it instead (`lobby/lifetime.md`).
+   rule 2). What the restart step does to chat windows, the vote and the
+   timer: `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every
+   other read (summaries, catch-up, the recaps, the account's rooms and
+   history, the operator's edits) replays the room from the store without
+   making it live, with no restart step and no log entry. A lookup that meets
+   an expired room deletes it instead (`lobby/lifetime.md`).
 
 ### Undo
 
