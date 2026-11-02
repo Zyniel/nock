@@ -68,7 +68,8 @@ GATE_TIMEOUT_SECONDS = 1140
 GIT_TIMEOUT_SECONDS = 30
 # How long a gate stopped at its timeout gets to close its output.
 STOP_WAIT_SECONDS = 30
-# The branch the changes are measured from, first the remote one.
+# The branch the changes are measured from, first the remote one (the same as
+# BASE_REFS of scripts/gate.py, whose branch_changed_paths copies changed_paths).
 BASE_REFS: tuple[str, ...] = ("origin/main", "main")
 # The paths that name a numbered spec: specs/027-shared-timer.md, the same in
 # specs/_archive/v1.1.0/, tests/test_spec_027_ac05_display.py,
@@ -279,6 +280,9 @@ def shared_component_domains(project_root: Path, paths: list[str]) -> set[str]:
     try:
         module_spec.loader.exec_module(gate_module)
     except Exception:
+        # Any failure to load another checkout's gate (a syntax error, a
+        # missing import) only costs the extra domains; the gate run next
+        # reports a broken gate.py itself.
         return set()
     finally:
         sys.modules.pop(module_spec.name, None)

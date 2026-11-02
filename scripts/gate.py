@@ -9,7 +9,8 @@ Usage:
     uv run python scripts/gate.py --browsers all  # browser tests in all three engines
 
 Stages:
-    tests: ruff + black + the screens sheet up to date + spec traceability.
+    tests: ruff + black + the screens sheet up to date + spec traceability +
+           the map of the shared client components (SHARED_COMPONENT_DOMAINS).
     full:  everything in "tests", then pyrefly, svelte-check, the TypeScript
            unit tests of tests/web/ (node:test) and the vite build of web/,
            then pytest (browser tests included).
@@ -161,8 +162,10 @@ BUILD_STEP: tuple[str, list[str]] = (
 # browser tests they serve: the domain specs whose « Code » section names them.
 # A change to one of them adds those domains to the quick gate (--specs) and to
 # the implementer's gate (scripts/hooks/role_gate.py), since such a change broke
-# other domains' tests that only the full gate ran (B-041, B-045). A component
-# that a fourth domain's « Code » section starts to name joins this map.
+# other domains' tests that only the full gate ran (B-041, B-045). The static
+# check "shared components" keeps it equal to what the Code sections say: every
+# component that SHARED_COMPONENT_MIN_DOMAINS domains or more name, with exactly
+# those domains.
 SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
     "web/src/lib/GridViewport.svelte": (
         "board",
@@ -170,6 +173,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "co-op",
         "hints",
         "presence",
+        "product",
         "rules",
         "server",
         "shell",
@@ -185,6 +189,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "hud",
         "joining",
         "presence",
+        "product",
         "reconnection",
         "results",
         "room",
@@ -194,7 +199,14 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "shell",
     ),
 }
-# The branch whose changes the quick gate measures, first the remote one.
+SHARED_COMPONENT_MIN_DOMAINS = 4
+# A client component's file name in a spec's Code section: `RoomPage.svelte`.
+COMPONENT_NAME_PATTERN = re.compile(r"\b([A-Z]\w*\.svelte)\b")
+# The heading of a domain spec's Code section, and of the section after it.
+CODE_HEADING = "## Code"
+SECTION_HEADING_PATTERN = re.compile(r"^## ", re.MULTILINE)
+# The branch whose changes the quick gate measures, first the remote one
+# (the same as BASE_REFS of scripts/hooks/role_gate.py).
 BASE_REFS: tuple[str, ...] = ("origin/main", "main")
 GIT_TIMEOUT_SECONDS = 30
 
@@ -980,6 +992,85 @@ def check_traceability() -> bool:
     return True
 
 
+def code_section(spec_text: str) -> str:
+    """Return a domain spec's Code section, without its heading.
+
+    Args:
+        spec_text: The domain spec's text.
+
+    Returns:
+        The text between "## Code" and the next "## " heading; empty when the
+        spec has no Code section.
+    """
+    start = spec_text.find(f"\n{CODE_HEADING}\n")
+    if start < 0:
+        return ""
+    body_start = start + len(CODE_HEADING) + 2
+    next_heading = SECTION_HEADING_PATTERN.search(spec_text, body_start)
+    if next_heading is None:
+        return spec_text[body_start:]
+    return spec_text[body_start : next_heading.start()]
+
+
+def check_shared_components() -> bool:
+    """Check SHARED_COMPONENT_DOMAINS against the domain specs' Code sections.
+
+    Every client component that SHARED_COMPONENT_MIN_DOMAINS domain specs or
+    more name in their Code section must be in the map, under its path in web/,
+    with exactly those domains; the map holds no other component.
+
+    Returns:
+        True when the map and the Code sections agree.
+    """
+    print("\n=== shared components (the quick gate's map) ===", flush=True)
+    domains_by_component: dict[str, set[str]] = {}
+    for spec_file in find_domain_spec_files():
+        spec_text = spec_file.read_text(encoding="utf-8")
+        for component_name in COMPONENT_NAME_PATTERN.findall(code_section(spec_text)):
+            domains_by_component.setdefault(component_name, set()).add(spec_file.stem)
+
+    expected: dict[str, set[str]] = {}
+    for component_name, domain_names in domains_by_component.items():
+        if len(domain_names) >= SHARED_COMPONENT_MIN_DOMAINS:
+            expected[component_name] = domain_names
+
+    problems: list[str] = []
+    mapped_names: set[str] = set()
+    for component_path, domain_tuple in SHARED_COMPONENT_DOMAINS.items():
+        component_name = component_path.rpartition("/")[2]
+        mapped_names.add(component_name)
+        if not (PROJECT_ROOT / component_path).is_file():
+            problems.append(f"{component_path} does not exist.")
+        expected_domains = expected.get(component_name)
+        if expected_domains is None:
+            problems.append(
+                f"{component_path} is named by fewer than "
+                f"{SHARED_COMPONENT_MIN_DOMAINS} domains' Code sections: "
+                "take it out of SHARED_COMPONENT_DOMAINS."
+            )
+            continue
+        if set(domain_tuple) != expected_domains:
+            names = ", ".join(sorted(expected_domains))
+            problems.append(
+                f"{component_path}: the Code sections name it in {names}; "
+                "SHARED_COMPONENT_DOMAINS must list exactly those."
+            )
+    for component_name in sorted(expected):
+        if component_name not in mapped_names:
+            names = ", ".join(sorted(expected[component_name]))
+            problems.append(
+                f"{component_name} is named by the Code sections of {names}: "
+                "add it to SHARED_COMPONENT_DOMAINS."
+            )
+
+    if problems:
+        for problem in problems:
+            print(f"FAIL: shared components: {problem}")
+        return False
+    print(f"OK: shared components ({len(SHARED_COMPONENT_DOMAINS)} in the map)")
+    return True
+
+
 def parse_engines(engines_text: str) -> list[str]:
     """Return the engines named in a comma-separated list, or all for "all".
 
@@ -1130,6 +1221,9 @@ def run_git(arguments: list[str]) -> str | None:
 
 def branch_changed_paths() -> list[str]:
     """Return the paths changed since the branch left `main`, committed or not.
+
+    The role hook has its own copy (changed_paths of
+    scripts/hooks/role_gate.py), which measures the checkout it checks.
 
     Returns:
         Repository-relative paths; empty when git cannot tell.
@@ -1282,6 +1376,7 @@ def main() -> int:
         for step_name, command in STATIC_STEPS:
             results.append(run_step(step_name, command))
         results.append(check_traceability())
+        results.append(check_shared_components())
 
     if arguments.stage == "full":
         if run_static:
