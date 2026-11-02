@@ -1,8 +1,8 @@
-"""Tests of board AC-23 to AC-29: a zoomed grid follows the selection (rule 3).
+"""Tests of viewport AC-11 to AC-17: a zoomed grid follows the selection (rule 3).
 
 The room is spec 042's mocked room (`tests/spec042_harness.py`) on the live
 server's client, in spec 019's touch context at 360 by 740 (a phone held
-upright, the in-app keyboard showing unless the test hides it). "AC-23's start"
+upright, the in-app keyboard showing unless the test hides it). "AC-11's start"
 is FX-02 zoomed to 2 by a pinch from 100 to 200 px apart (`spec006_harness`'s
 `pinch`, AC-2's), then the viewport scrolled back to the grid's top-left corner,
 with nothing selected. At that zoom a FX-02 cell is about 52.75 px and the
@@ -11,7 +11,7 @@ viewport about 344 by 478 px.
 Choices where the spec leaves room:
 
 - A pinch goes through the Chrome DevTools Protocol, as AC-2's do, and there is
-  no other zoom control: every zoomed test runs in Chromium only. AC-26, at zoom
+  no other zoom control: every zoomed test runs in Chromium only. AC-14, at zoom
   1, runs in the three engines.
 - The viewport is put back at the grid's top-left corner by setting its scroll
   from the test. The rule reads no scroll: a pan and a scroll set by script are
@@ -29,9 +29,9 @@ Choices where the spec leaves room:
   animated scroll is caught mid-way.
 - "The page unscrolled": the window and every ancestor of the viewport keep a
   scroll of 0 (an element's `scrollIntoView` also scrolls hidden overflows).
-- AC-25's cut cell: at 360 px and zoom 2, the viewport's right edge falls
+- AC-13's cut cell: at 360 px and zoom 2, the viewport's right edge falls
   inside (1, 6), a letter cell of OREILLE; the test finds it from the boxes.
-- AC-29's start: OREIL is in the snapshot, (1, 2) to (1, 6), so the page opens
+- AC-17's start: OREIL is in the snapshot, (1, 2) to (1, 6), so the page opens
   with nothing selected and the clue tap changes the selected cell.
 """
 
@@ -281,8 +281,8 @@ def open_zoomed(
     return page
 
 
-def open_ac23_start(window: OpenWindow, base_url: str, grid: Grid) -> Page:
-    """AC-23's start: FX-02 zoomed to 2, at the grid's top-left corner."""
+def open_ac11_start(window: OpenWindow, base_url: str, grid: Grid) -> Page:
+    """AC-11's start: FX-02 zoomed to 2, at the grid's top-left corner."""
     return open_zoomed(window, base_url, grid_view(grid), keyboard_hidden=False)
 
 
@@ -298,15 +298,15 @@ def pan_to_bottom_right(page: Page, viewport: Locator) -> None:
     ), "the pans did not reach the corner"
 
 
-# ---- AC-23: typing along an across word scrolls across only -----------------------
+# ---- AC-11: typing along an across word scrolls across only -----------------------
 
 
 @pytest.mark.only_browser("chromium")
 @pytest.mark.parametrize("typing", [IN_APP_KEYS, PHYSICAL_KEYBOARD])
-def test_ac23_typing_oreille_scrolls_across_only_to_the_cell_after_the_selected_one(
+def test_ac11_typing_oreille_scrolls_across_only_to_the_cell_after_the_selected_one(
     window: OpenWindow, live_server: str, fx02_grid: Grid, typing: str
 ) -> None:
-    page = open_ac23_start(window, live_server, fx02_grid)
+    page = open_ac11_start(window, live_server, fx02_grid)
     viewport = viewport_of(page)
     tap_shown_part(page, clue_at(page, *EARS_CLUE))
     expect_selected(page, OREILLE_ROW, OREILLE_FIRST_COLUMN, "across")
@@ -342,14 +342,14 @@ def test_ac23_typing_oreille_scrolls_across_only_to_the_cell_after_the_selected_
         expect(cell).to_have_attribute("data-letter", letter)
 
 
-# ---- AC-24: ArrowDown and Shift+Tab scroll the least ------------------------------
+# ---- AC-12: ArrowDown and Shift+Tab scroll the least ------------------------------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac24_arrow_down_column_zero_scrolls_down_only_one_cell_below_the_selected(
+def test_ac12_arrow_down_column_zero_scrolls_down_only_one_cell_below_the_selected(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
-    page = open_ac23_start(window, live_server, fx02_grid)
+    page = open_ac11_start(window, live_server, fx02_grid)
     viewport = viewport_of(page)
     tap_shown_part(page, clue_at(page, *LEG_CLUE))
     expect_selected(page, 2, 0, "down")
@@ -378,10 +378,10 @@ def test_ac24_arrow_down_column_zero_scrolls_down_only_one_cell_below_the_select
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac24_shift_tab_selects_echec_and_scrolls_to_the_grid_bottom_and_shows_16_7(
+def test_ac12_shift_tab_selects_echec_and_scrolls_to_the_grid_bottom_and_shows_16_7(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
-    page = open_ac23_start(window, live_server, fx02_grid)
+    page = open_ac11_start(window, live_server, fx02_grid)
     viewport = viewport_of(page)
     grid = page.get_by_test_id("grid")
     view = box_of(viewport)
@@ -408,14 +408,14 @@ def test_ac24_shift_tab_selects_echec_and_scrolls_to_the_grid_bottom_and_shows_1
     assert scrolled_ancestors(viewport) == []
 
 
-# ---- AC-25: a cell already in view, or a tap on a cut cell, scrolls nothing -------
+# ---- AC-13: a cell already in view, or a tap on a cut cell, scrolls nothing -------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac25_a_cell_in_view_with_its_margin_and_a_tap_on_a_cut_cell_scroll_nothing(
+def test_ac13_a_cell_in_view_with_its_margin_and_a_tap_on_a_cut_cell_scroll_nothing(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
-    page = open_ac23_start(window, live_server, fx02_grid)
+    page = open_ac11_start(window, live_server, fx02_grid)
     viewport = viewport_of(page)
     view = box_of(viewport)
     tap_shown_part(page, cell_at(page, OREILLE_ROW, OREILLE_FIRST_COLUMN))
@@ -450,10 +450,10 @@ def test_ac25_a_cell_in_view_with_its_margin_and_a_tap_on_a_cut_cell_scroll_noth
     assert scrolled_ancestors(viewport) == []
 
 
-# ---- AC-26: at zoom 1 nothing scrolls ---------------------------------------------
+# ---- AC-14: at zoom 1 nothing scrolls ---------------------------------------------
 
 
-def test_ac26_at_zoom_1_typing_shift_tab_and_arrows_leave_everything_unscrolled(
+def test_ac14_at_zoom_1_typing_shift_tab_and_arrows_leave_everything_unscrolled(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
     page = open_phone_room(
@@ -485,11 +485,11 @@ def test_ac26_at_zoom_1_typing_shift_tab_and_arrows_leave_everything_unscrolled(
     expect(viewport).to_have_attribute("data-zoom", "1")
 
 
-# ---- AC-27: a viewport under three cells across centres the cell ------------------
+# ---- AC-15: a viewport under three cells across centres the cell ------------------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac27_a_viewport_of_two_and_a_half_cells_centres_the_cell_left_to_right(
+def test_ac15_a_viewport_of_two_and_a_half_cells_centres_the_cell_left_to_right(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = open_zoomed(window, live_server, grid_view(fx01_grid), keyboard_hidden=True)
@@ -511,14 +511,14 @@ def test_ac27_a_viewport_of_two_and_a_half_cells_centres_the_cell_left_to_right(
     assert scrolled_ancestors(viewport) == []
 
 
-# ---- AC-28: ⇄, a pinch and the keyboard hidden do not bring the cell back ---------
+# ---- AC-16: ⇄, a pinch and the keyboard hidden do not bring the cell back ---------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac28_after_a_pan_swap_pinch_and_hidden_keyboard_never_scroll_to_the_cell(
+def test_ac16_after_a_pan_swap_pinch_and_hidden_keyboard_never_scroll_to_the_cell(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
-    page = open_ac23_start(window, live_server, fx02_grid)
+    page = open_ac11_start(window, live_server, fx02_grid)
     viewport = viewport_of(page)
     selected = cell_at(page, OREILLE_ROW, OREILLE_FIRST_COLUMN)
     tap_shown_part(page, selected)
@@ -553,11 +553,11 @@ def test_ac28_after_a_pan_swap_pinch_and_hidden_keyboard_never_scroll_to_the_cel
     assert scrolled_ancestors(viewport) == []
 
 
-# ---- AC-29: a tap on a clue scrolls like a key ------------------------------------
+# ---- AC-17: a tap on a clue scrolls like a key ------------------------------------
 
 
 @pytest.mark.only_browser("chromium")
-def test_ac29_a_tap_on_the_clue_selects_1_7_and_scrolls_across_to_1_8(
+def test_ac17_a_tap_on_the_clue_selects_1_7_and_scrolls_across_to_1_8(
     window: OpenWindow, live_server: str, fx02_grid: Grid
 ) -> None:
     changes: list[tuple[int, int, dict[str, object]]] = []

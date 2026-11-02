@@ -42,7 +42,7 @@ crossing grid line, which stays plain), with s the cell side at the current zoom
   period, with half a gap at each end, so the corners stay open and the edge
   never merges into the crossing lines;
 - the edge's start and every dash end lie on whole CSS pixels, whatever the cell
-  size (fractional at zoom 1, `gameplay/board.md`) or the pinch zoom: along the
+  size (fractional at zoom 1, `gameplay/viewport.md`) or the pinch zoom: along the
   edge every pixel is `--nock-hyphen` or the cells' background, none blended.
 
 | Cell side | t | Dashes | Each about |

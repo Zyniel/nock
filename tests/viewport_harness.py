@@ -1,8 +1,8 @@
-"""Shared setup of the tests of the domain board (`specs/gameplay/board.md`).
+"""Shared setup of the tests of the domain viewport (`specs/gameplay/viewport.md`).
 
 Pytest does not collect this module (its name does not start with `test_`). It
-holds the readers of painted pixels that the hyphen edge tests (board AC-21 and
-AC-22) use: a screenshot clip decoded into its pixels, and the reading of one
+holds the readers of painted pixels that the hyphen edge tests (viewport AC-9 and
+AC-10) use: a screenshot clip decoded into its pixels, and the reading of one
 cell edge across its thickness and along its length, with the geometry of
 `specs/_design/cells.md` « Hyphen edges ».
 

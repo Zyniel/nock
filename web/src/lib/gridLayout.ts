@@ -379,7 +379,7 @@ export interface ScrollAxis {
 }
 
 // The scroll on one axis that shows the selected cell with one cell of margin
-// on each side the grid's edge allows, moving the least (board rule 3). On a
+// on each side the grid's edge allows, moving the least (viewport rule 3). On a
 // viewport that holds less than three cells, the cell is centred instead.
 export function scrollShowingCell(axis: ScrollAxis): number {
   const { scroll, viewSide, cellStart, cellSide, gridStart, gridEnd } = axis

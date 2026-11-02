@@ -49,7 +49,7 @@ export interface LetterCellView {
   pencil: boolean
   // True when a word of the grid has a hyphen right after this cell, across
   // (its right edge) or down (its bottom edge); false when the server sent
-  // no mark (gameplay/board.md rule 20).
+  // no mark (gameplay/viewport.md rule 5).
   hyphen_right: boolean
   hyphen_down: boolean
 }

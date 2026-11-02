@@ -27,9 +27,11 @@ table, the naming rules and the glossary follow in the same change.
 | account | `account/erasure.md` | the account's deletion: the erasure and its attempts, what is kept, « Ancien joueur », history records, grid progress | | 033 AC-4, AC-5; 029 AC-3, AC-6, AC-7 (server side) |
 | lobby | `lobby/rooms.md` | solo start, room creation and its limit per address, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
 | lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do; the creator | room | 014 |
-| lobby | `lobby/joining.md` | join by link, the account's one seat, room resume, « Mes salons » | pages | 012; 032 AC-3 to AC-7; 046 AC-11, AC-12, AC-15 to AC-17 |
+| lobby | `lobby/joining.md` | join by link, the account's one seat, room resume | pages | 012; 032 AC-3, AC-7; 046 AC-15 to AC-17 |
+| lobby | `lobby/summaries.md` | the summaries route and « Mes salons »: the rooms a device's identities hold a seat in | pages | 032 AC-4 to AC-6; 046 AC-11, AC-12 |
 | lobby | `lobby/lifetime.md` | room lifetime: the kinds of room and their lives, when a room expires, the sweep that deletes it, the five variables | | 032 AC-1, AC-2 |
-| gameplay | `gameplay/board.md` | grid display, word selection, letter entry, navigation, in-app keyboard | cells, room | 006, 007, 008, 009, 042, 044 |
+| gameplay | `gameplay/board.md` | word selection, letter entry, navigation, in-app keyboard, the display switches | cells, room | 007, 008, 009, 044; 042 AC-3, AC-11, AC-19 |
+| gameplay | `gameplay/viewport.md` | the grid's drawing, cursors, fit, zoom, following the selection, hyphen edges | cells, foundation | 006; 042 (but AC-3, AC-11, AC-19) |
 | gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, pencil letters | cells, room | 015, 016, 020 |
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
 | gameplay | `gameplay/hints.md` | check, reveal, the reveal budget, the hint limit, the Aide items | cells, room | 023, 024; 025 AC-1, AC-4 |
@@ -176,6 +178,7 @@ then nothing of race or teams is built.
 | creator, creator room, anonymous room | (not shown: the account whose session sent `POST /api/rooms`; a room with one, without) | `creator_account_id` |
 | creator's player | (not shown: the member linked to the creator) | `creator_account_id` = `account_id` |
 | resume list | « Mes salons » | `my_rooms` |
+| summary | (not shown: what the server tells a member's key of a room: code, grid, size, nicknames, last activity, result; no letter) | `room_summary`, `POST /api/rooms/summaries` |
 | edit, last edit time | (not shown: a letter change or a cell lock; the latest one's time) | `is_edit`, `last_edit_at` |
 | solve time | (not shown: the time of the room's `grid_solved`) | `solved_at` |
 | room life | (not shown: how long a room lasts after its starting point, one per kind) | `RoomConfig.*_room_hours`, `NOCK_*_ROOM_HOURS` |
@@ -189,6 +192,7 @@ then nothing of race or teams is built.
 | dry run | « Cela effacera N salons maintenant. » (how many rooms a proposed value would delete now; nothing saved) | `POST /api/ops/settings/dry-run` |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
+| viewport | « Grille » (the grid's scroll area: the part of the grid the page shows at its zoom and scroll) | `GridViewport.svelte`, `gridLayout.ts` |
 | foundation, state line | (not shown: the tokens, fonts, icons, components and focus ring every screen is built from; the one line a page shows while waiting, empty, failed or done) | `app.css`, `icons.ts`, `--nock-*` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |
 | vote, ballot | « … propose de vérifier la grille », « Oui » / « Non » (the group's decision on a grid check or a reveal; one player's yes or no) | `vote_opened`, `vote_closed`; `vote` |
