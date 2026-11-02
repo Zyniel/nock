@@ -4,7 +4,7 @@ title: The visual foundation leaves `client/shell.md`
 status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T13:09:00Z'
+updated_date: '2026-11-02T13:10:00Z'
 labels:
   - domain:shell
   - domain:foundation
@@ -73,7 +73,7 @@ ordinal: 13000
 - [x] #3 Tests committed before the code
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
+- [x] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -92,6 +92,8 @@ Lead (2026-11-02): started after B-057 (#98) merged. Spec-writer on Fable at hig
 Lead: shell rule 21 and AC-32/AC-33 (font subsets, the room page's preload), added after the task was written, move with the fonts (foundation rule 5, AC-15/AC-16): one coherent part, so foundation has 16 criteria and shell 17, and tests/test_shell_fonts.py moves too. product.md:286 (Reduced motion, a file name in Out of scope) repointed to foundation, as B-062 did for product's route cells; results.md:300 (by name) left for B-064. Spec-checker APPROVED in round 1; its minor note (foundation's Look cell in _map.md could add pages) left: the column already lists only the main files. shell's Code section no longer names GridViewport.svelte (foundation does): B-055's map must follow when both are on main.
 
 Lead: review round 1 CHANGES REQUESTED (ten code comments in web/src/ citing moved shell rules 16, 18, 21), fixed by the implementer in e2a58d6; suggestions left (foundation's font tests import shell_harness; shorter section rulers). origin/main merged (b5b0733, no conflict); B-055's map of shared components: GridViewport.svelte moves from shell to foundation (5977a1d, the lead's tooling commit). Round 2 APPROVE. Full gate green (8674 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/105
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
