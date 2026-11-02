@@ -1,9 +1,10 @@
 ---
 id: B-049
 title: Split `RoomPage.svelte` and `GridViewport.svelte`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-02T16:48:00Z'
 labels: []
 milestone: m-1
 dependencies:
@@ -60,3 +61,17 @@ ordinal: 10000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. No spec change (no behaviour change); the Plan agent (Fable, high) checks the report's split (claude_docs/frontend-review.md « Structure ») against today's code.
+2. Tests: node:test unit tests (tests/web/) pinning the pure modules the split extracts (roomConnection with an injected socket factory and clock, expiry, gridKeys, legendLayout), by the test-writer, before the moves; the browser tests prove nothing changed.
+3. Implementation in the report's steps, one commit each; gate: uv run python scripts/gate.py (full, RoomPage and GridViewport serve 17 and 9 domains).
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started after B-047 (#109) merged: B-042 to B-047 changed the same files. B-048 (node:test) and B-055 (the quick gate of a shared component) are merged, as the human's order asked. Open question 1, the props drilled through Salon and RoomTopBar: A, grouped into a few objects (the lead's default). RoomPage.svelte is 3,073 lines and GridViewport.svelte 1,490 today (the report said 2,720 and 1,321). Base: origin/main b9871e7.
+<!-- SECTION:NOTES:END -->
