@@ -1485,7 +1485,7 @@
 
   // Runs before the ballot buttons are disabled by a lost connection: a focus on
   // one goes to the grid instead of falling back to the page, as the chat does
-  // for a mute (gameplay/hints.md rule 19).
+  // for a mute (gameplay/votes.md rule 6).
   $effect.pre(() => {
     if (!isVotingOffline) {
       return

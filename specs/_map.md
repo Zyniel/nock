@@ -32,7 +32,8 @@ table, the naming rules and the glossary follow in the same change.
 | gameplay | `gameplay/board.md` | grid display, word selection, letter entry, navigation, in-app keyboard | cells, room | 006, 007, 008, 009, 042, 044 |
 | gameplay | `gameplay/co-op.md` | shared letters, same-cell conflicts, pencil letters | cells, room | 015, 016, 020 |
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
-| gameplay | `gameplay/hints.md` | check, reveal, the group vote on help | room, overlays | 023, 024, 025; 047 AC-1 to AC-5, AC-13, AC-14 |
+| gameplay | `gameplay/hints.md` | check, reveal, the reveal budget, the hint limit, the Aide items | cells, room | 023, 024; 025 AC-1, AC-4 |
+| gameplay | `gameplay/votes.md` | the group vote on a grid check or a reveal, its banner | room, overlays | 025 AC-2, AC-3, AC-5 to AC-9; 047 AC-1 to AC-5, AC-13, AC-14 |
 | gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029; 046 AC-13; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
 | gameplay | `gameplay/modes.md` | race, teams (B-002, not written yet) | | 030, 031 (untested stubs) |
 | social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
@@ -54,8 +55,8 @@ table, the naming rules and the glossary follow in the same change.
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
 criteria goes whole to its row; a criterion may be cited by more than one domain
-(043 AC-5 is cited by `hud` and `room`, 047 AC-13 by `hints` and `results`,
-047 AC-14 by `hints`, `results` and `chat`, 033 AC-5 by `account` and
+(043 AC-5 is cited by `hud` and `room`, 047 AC-13 by `votes` and `results`,
+047 AC-14 by `votes`, `results` and `chat`, 033 AC-5 by `account` and
 `erasure`), and each of them states the part its own screens hold.
 
 Every file of the table exists but `gameplay/modes.md`, which B-002 writes; until
@@ -188,7 +189,7 @@ then nothing of race or teams is built.
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |
-| hint vote | « … propose de vérifier la grille » | `vote` |
+| vote, ballot | « … propose de vérifier la grille », « Oui » / « Non » (the group's decision on a grid check or a reveal; one player's yes or no) | `vote_opened`, `vote_closed`; `vote` |
 | authorship | « Auteurs » | `authors` |
 | results | « Bilan de la partie », « Voir le bilan » | `recap.py`, `recap` |
 | history | « Grilles terminées » | `history` |
