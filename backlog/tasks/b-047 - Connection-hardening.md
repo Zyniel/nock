@@ -1,14 +1,16 @@
 ---
 id: B-047
 title: Connection hardening
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-02T12:58:00Z'
 labels:
   - domain:hud
   - domain:chat
   - domain:co-op
   - domain:realtime
+  - domain:reconnection
 milestone: m-0
 dependencies:
   - B-041
@@ -76,3 +78,17 @@ ordinal: 8000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: platform/reconnection.md (hidden tabs, connect timeout, jitter), client/hud.md (final status: grid read-only), social/chat.md (Réagir, Je bloque while not joined), gameplay/co-op.md rule 12 (the error codes' invariant).
+2. Tests: tests/test_reconnection_*, test_hud_*, test_chat_*, test_co_op_* (a server test for the invariant).
+3. Quick gate: uv run python scripts/gate.py --specs reconnection,realtime,hud,chat,co-op --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started after B-057 (#98) and B-060 (#103) merged. B-057 moved the realtime rules this task names (16 hidden tabs → now reconnection's heartbeat rule; 18 the connect; 21 retries) into platform/reconnection.md, so the connection rules are written there; the task takes domain:reconnection. Open questions, the lead's defaults (the pitch: « with the lead's defaults »): 1 A, a 6-second connect timeout, the silence limit; 2 A, the page checks the silence again on visibilitychange before it closes — taken directly, without the measure in three engines first: it is harmless when no drop happens and keeps the pitch's « no protocol change »; 3 A, ±20 % jitter on each retry delay. Test-writer and implementer on Opus: criteria about timing in a browser. Base: origin/main af1fef7.
+<!-- SECTION:NOTES:END -->
