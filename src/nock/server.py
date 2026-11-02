@@ -626,8 +626,8 @@ def _forget_old_times(
 class _RunningErasures:
     """The erasures of an app that have an attempt under way.
 
-    The app runs one attempt of an erasure at a time (`account/account.md` rule
-    26): an attempt claims its erasure's id before it starts and gives it back
+    The app runs one attempt of an erasure at a time (`account/erasure.md` rule
+    5): an attempt claims its erasure's id before it starts and gives it back
     when it ends. A claim never waits: an attempt that finds its erasure claimed
     does nothing, and other erasures go on meanwhile.
     """
@@ -878,8 +878,8 @@ class _ErasureAttempts:
     even when an earlier one failed: it erases from their rooms the players the
     erasure holds not yet marked erased, deletes the account's creator rooms,
     and erases every player it holds from the history records. When no step
-    failed it sends the e-mail and marks the erasure done (`account/account.md`
-    rules 26 and 27).
+    failed it sends the e-mail and marks the erasure done (`account/erasure.md`
+    rules 5 and 6).
     """
 
     def __init__(
@@ -1022,7 +1022,7 @@ class _ErasureAttempts:
         self._store.finish_erasure(pending.erasure_id, self._rooms.clock(), notified_at)
 
     def _send_deleted_message(self, email: str) -> float | None:
-        """Send the e-mail of rule 27.
+        """Send the e-mail of `account/erasure.md` rule 6.
 
         Returns:
             The time the e-mail was accepted; None when the mailer refused it.
@@ -1252,7 +1252,7 @@ async def _sweep_expired_rooms(
 
     While accounts are on, each sweep then runs one attempt of every pending
     account erasure, and deletes the old sign-in links, sessions and done
-    erasures (`account/account.md` rules 20 and 26). Each sweep runs in a worker
+    erasures (`account/erasure.md` rules 3 and 5). Each sweep runs in a worker
     thread, since it waits for the disk. A sweep that raises is logged, and the
     next one runs as planned (spec 032).
     """
@@ -1940,7 +1940,7 @@ def create_app(
             raise _no_session()
         return Response(status_code=204)
 
-    # `account/account.md` rule 18: the account goes at once with its erasure
+    # `account/erasure.md` rule 1: the account goes at once with its erasure
     # written as pending, then one attempt of the erasure runs; the answer is
     # 204 whatever the attempt did, since the sweeps go on with it.
     @web_app.delete(ACCOUNT_API_ROOT, status_code=204)
