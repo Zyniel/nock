@@ -77,7 +77,7 @@ ordinal: 7000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -103,6 +103,8 @@ Review round 1: APPROVE. Lead took the three small, certain suggestions: the nic
 - Follow-ups for the next board branch (drafts, label follow-up): (1) a status region keeps its last text for good (« Connexion perdue… » after reconnecting, « Chargement du bilan… » after the recap loads, or written after it if the fetch answers within 50 ms): empty a region a few seconds after it is written; (2) add « status region » to the glossary of specs/_map.md and mention it in the hud row.
 
 Full gate (chromium): 8598 passed, 1 failed in the parallel run (test_shell_remote_updates.py::test_ac25_after_the_pinch..., a fixed-wait pinch test of B-043, unrelated), 162 passed serial. The failing test passed alone and 3 of 3 in its file: flaky under load; follow-up draft for the next board branch.
+
+Pull request: https://github.com/Zyniel/nock/pull/94
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
