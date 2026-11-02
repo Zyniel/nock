@@ -1,7 +1,7 @@
 ---
 area: content
 file: ipuz
-status: approved
+status: done
 ---
 
 # content/ipuz - The ipuz file: format, reader, writer
