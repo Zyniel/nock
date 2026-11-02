@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: done
+status: draft
 ---
 
 # admin/operations - Logs, retention and the operator pages
@@ -203,7 +203,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 19. The card `ops.replay_heading` holds a form, the field `ops.replay_code_label`
     and the button `ops.replay_submit`. It sends the code in capitals and shows
     under the form `loading` (`ops.loading`), `not_found` (a 404,
-    `ops.replay_not_found`), `error` (any other failure, `ops.error`) or
+    `ops.replay_not_found`), `error` (any other failure, `ops.error`, a 200
+    with an edit whose `seq` is not a whole number or whose time does not read
+    as a date included) or
     `ready`, the dashboard staying above; the answer to a code that a later
     code has superseded changes nothing. A room with no edit shows only
     `ops.replay_empty`. Otherwise: every edit by its `ops.edit.*` line
@@ -369,6 +371,9 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   removed.
 - **AC-30** `ready` with the token, a replay answered 401 brings the form back
   with « Jeton refusé. », its input empty and focused.
+- **AC-31** A replay answered 200 whose second edit has the time `hier`, or
+  the `seq` 1.5, shows only « Impossible de charger les données. » under the
+  form, the dashboard above.
 
 ## Edge cases
 
@@ -401,4 +406,4 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   `src/nock/__main__.py`: `main()`.
 - `web/src/lib/OpsPage.svelte`, `OpsReplay.svelte`, `ops.ts`, `duration.ts`.
 - Tests: `tests/test_spec_038_ac03*` to `ac11*`, `tests/test_spec_048_ac06*`,
-  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21 to AC-30.
+  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21 to AC-31.

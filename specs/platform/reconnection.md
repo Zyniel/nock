@@ -1,7 +1,7 @@
 ---
 area: platform
 file: reconnection
-status: done
+status: draft
 ---
 
 # platform/reconnection - Stale edits, the resume window, the page's connection
@@ -46,13 +46,18 @@ a loss, retries and sends what it held.
 
 ### The page's connection
 
-3. While its socket is open the page sends `ping` every 2 seconds; when no frame
-   of any kind has come for 4 seconds, the connection is lost at once: the socket
-   is dropped, and its late frames and close event change nothing.
+3. While its socket is open the page sends `ping` every 2 seconds. The silence
+   is the time since the socket's last frame of any kind, read from the clock,
+   not counted in timer ticks; at 4 seconds of silence the connection is lost
+   at once: the socket is dropped, and its late frames and close event change
+   nothing. A hidden page loses no socket to the silence, as its timers may run
+   late: when it becomes visible again it sends `ping` at once and counts the
+   silence from that moment.
 4. Any close or socket error is a loss, 4408 and 4503 included
    (`platform/realtime.md` rule 13), except a final one: 4404, 4429, 4001, or a
    close after an `error` `room_full`, `room_locked` or `removed`. A final
-   close ends the tries with its state (`client/shell.md`).
+   close ends the tries with its state (`client/shell.md`); once the room has
+   shown, the grid is then read-only (`client/hud.md` rule 19).
 5. After a loss, once the page has joined: state `reconnecting`, the room
    status reads `room.status.reconnecting`, and the connection band shows
    `room.banner.offline` within 5 seconds, with no live role, announced by
@@ -61,11 +66,17 @@ a loss, retries and sends what it held.
    check or a reveal made meanwhile is kept in its place among them; nothing
    is sent without an open socket. Before the first snapshot: state
    `connecting`, no band, and a shown nickname form stays.
-6. A new socket opens after 1, 2, 4, 8 seconds, then every 8 seconds, without
-   end; the browser's `online` event tries at once, replacing a socket still
-   connecting. On open, the page joins as `lobby/joining.md` rule 8 says.
-7. On a snapshot: state `joined`, band hidden, delays back to 1 second. After
-   a loss, the page then sends the selection it holds, if any, as one
+6. After each loss a new socket opens after the next delay of 1, 2, 4, 8
+   seconds, then 8 seconds each time, without end; each delay is drawn at
+   random, uniformly within 20 % of its value either way (0.8 to 1.2 seconds
+   for the first). The browser's `online` event tries at once, replacing a
+   socket still connecting; the page becoming visible again tries at once
+   when a try waits on its delay. A socket still connecting 6 seconds after
+   it was created (the server's silence limit, `platform/realtime.md` rule 16,
+   not the page's 4 seconds of rule 3) is dropped, hidden page or not, and its
+   late events change nothing: a loss. On open, the page joins as `lobby/joining.md` rule 8 says.
+7. On a snapshot: state `joined`, band hidden, the next delay the first again.
+   After a loss, the page then sends the selection it holds, if any, as one
    `select_cell` (the server cleared it at the disconnection,
    `social/presence.md` rule 8). Then the pending edits, each with its
    `base_seq`, and the kept undos, checks and reveals go out in the order
@@ -103,6 +114,20 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - **AC-5** Offline, Ana types `T` at (1, 0), her selection moving to (1, 1)
   across: after her reconnection snapshot, Bob receives `selection_moved` for
   Ana on (1, 1) across, then the `letter_changed` of her `T`.
+- **AC-6** Ana's joined page is hidden and its timers run late, so for 5
+  seconds it sends no ping and gets no frame while the server keeps the socket
+  open: made visible again, it sends `ping` at once and keeps the same socket,
+  with no band. Made visible on a socket that then gets no frame, it shows the
+  band within 5 seconds of the return. Made visible while a try waits on an
+  8-second delay, it opens a socket at once.
+- **AC-7** After a loss, a socket whose opening the network never answers is
+  dropped 6 seconds after it was created, and the next socket opens after the
+  second delay, 1.6 to 2.4 seconds later; a socket that opens 5.9 seconds
+  after it was created is kept and joins.
+- **AC-8** With every random draw at its lowest, the tries after successive
+  losses come 0.8, 1.6, 3.2, 6.4 and 6.4 seconds after each loss; at its
+  highest, 1.2, 2.4, 4.8, 9.6 and 9.6 seconds; after a snapshot, the next loss
+  is followed by a try 0.8 to 1.2 seconds later.
 
 ## Edge cases
 
@@ -113,6 +138,10 @@ The connection band follows `_design/room.md`, « Connection lost ».
   limit reached, `rate_limited` comes before both (AC-2; `platform/realtime.md`
   AC-12).
 - Two tabs never take the room from each other in a loop: 4001 is final (AC-3).
+- A page hidden on a dead network keeps its socket until it is visible again,
+  unless a close event comes first (AC-6).
+- An `online` event replaces a socket stuck connecting before its 6 seconds
+  (AC-4, AC-7).
 
 ## Out of scope
 
@@ -126,7 +155,7 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - The restart step that starts the resume window again, the log and undo:
   `platform/server.md`. What changed while away: `social/catch-up.md`.
 - Peer-to-peer sync, pending edits or kept requests across a reload, a leave
-  message, message acknowledgements.
+  message, message acknowledgements, pings from the server.
 
 ## Code
 
@@ -136,4 +165,4 @@ The connection band follows `_design/room.md`, « Connection lost ».
   the selection sent again, resent edits, kept requests.
 - Tests: `tests/test_spec_017_ac01_*`, `tests/test_spec_017_ac02_*`,
   `tests/test_spec_017_ac03_*`, `tests/test_spec_017_ac05_*`;
-  `tests/test_reconnection_*` for AC-5.
+  `tests/test_reconnection_*` for AC-5 to AC-8.

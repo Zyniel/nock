@@ -921,8 +921,8 @@ def sec_room() -> str:
         [
             (
                 "A band under the top bar pushes the grid down; the grid "
-                "stays usable and letters wait to be sent. It goes when the "
-                "room is back."
+                "stays usable and letters wait to be sent, while « Réagir » "
+                "and « Je bloque » are disabled. It goes when the room is back."
             )
         ],
         [("ph", PH, phone_room(net=True)), ("pc", PC, desk_room(net=True))],
@@ -936,7 +936,9 @@ def sec_room() -> str:
                 "Removed by the host, opened in another tab, or the connection "
                 "closed for good, once the room has shown: the status text in a "
                 "band under the top bar, the connection band's look without its "
-                "red dot. The room stays drawn under it. A refusal before the "
+                "red dot. The room stays drawn under it, its grid read-only, "
+                "« Annuler », the Aide items, « Réagir » and « Je bloque » "
+                "disabled. A refusal before the "
                 "room showed is the card of part 2 instead."
             ),
         ],
@@ -944,12 +946,17 @@ def sec_room() -> str:
             (
                 "ph",
                 PH + " · removed",
-                phone_room(final_status="Vous avez été retiré de ce salon."),
+                phone_room(
+                    final_status="Vous avez été retiré de ce salon.", off={"undo"}
+                ),
             ),
             (
                 "pc",
                 PC + " · another tab",
-                desk_room(final_status="Ce salon est ouvert dans un autre onglet."),
+                desk_room(
+                    final_status="Ce salon est ouvert dans un autre onglet.",
+                    pressed={"salon", "undo"},
+                ),
             ),
         ],
     )

@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: done
+status: draft
 ---
 
 # client/shell - Pages, connection states, texts and the visual foundation
@@ -59,7 +59,10 @@ fonts, focus ring, shared components, state lines).
    after, one at or below seq is ignored, seq + 1 is applied and the buffer
    drains (while it holds seq + 1, that event is applied), and a later one is
    buffered, once per seq. A gap that never fills stays buffered and the page
-   asks for nothing. What an event changes belongs to its domain.
+   asks for nothing. What an event changes belongs to its domain. An event
+   applies whole: a part of it of the wrong shape is skipped as if absent (a
+   struck cell of a `check_result` that is not two integers strikes nothing),
+   and the event still takes its seq.
 5. `selection_moved` and `reaction` are dropped before the first snapshot and
    apply at once after it; `error` applies at once at any time. None of them
    touches the seq or the buffer; any other message without an integer `seq`
@@ -334,6 +337,10 @@ fonts, focus ring, shared components, state lines).
   `latin-ext` subsets only, and ships no font file of another subset.
 - **AC-33** `/r/ABC123` preloads, from Nock's origin, the `latin` files of
   Source Sans 3 at 500 and of IBM Plex Sans Condensed at 600.
+- **AC-34** On FX-01 with `X` at (1, 0) and `Y` at (1, 1), after a snapshot at
+  seq 5, a `check_result` 6 whose `wrong` is `[null, {"row": 1, "column": 0},
+  {"row": "1", "column": 1}]` gives seq 6, strikes (1, 0) and not (1, 1), and
+  adds its stream line; event 7 then gives seq 7.
 
 ## Edge cases
 

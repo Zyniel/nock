@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: draft
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -26,7 +26,8 @@ never send a clue or an answer.
 
 1. A grid is listed when its index entry says published and not withdrawn
    (`content/grid-files.md` rule 13); a publication date in the future is listed.
-2. A summary is exactly `number`, `published_on` (`YYYY-MM-DD`), `force`,
+2. A summary is exactly `number`, `published_on` (a calendar date,
+   `YYYY-MM-DD`), `force`,
    `width`, `height` and `word_count` (the number of clues). No grid route sends
    anything else of a grid: no cell, clue, answer or credit.
 
@@ -240,6 +241,10 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   fails, `/` (signed in) shows « Commencée » on card 1 and « Terminée » on card
   3, `/g/1` shows « Commencée » and `/g/3` « Terminée », each page ready;
   signed out, `/` never asks the route.
+- **AC-25** When `GET /api/grids` answers CAT's list with grid 2's
+  `published_on` `2026-02-30` or `hier`, `/` shows « Impossible de charger les
+  grilles. » with no filter and no card; when `GET /api/grids/2` answers that
+  summary, `/g/2` shows the same error line.
 
 ## Edge cases
 
@@ -277,7 +282,7 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   `GridPage.svelte`, `CatalogueFrame.svelte`, `CatalogueList.svelte`,
   `CatalogueItem.svelte`; `catalogue.ts` (progress, its merge with the
   account's, date); `gridThumb.ts`.
-- Tests: `tests/test_library_*` (the account's progress);
+- Tests: `tests/test_library_*` (the account's progress, the date check);
   `tests/test_spec_004_ac01_ac03_*`, `test_spec_004_ac04_*`,
   `test_spec_004_ac06_*`, the force tests of `test_spec_004_ac07_*`;
   `tests/test_spec_046_ac01_ac02_*` (AC-2), `test_spec_046_ac04_ac06_*`,

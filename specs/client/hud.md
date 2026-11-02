@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: done
+status: draft
 ---
 
 # client/hud - The room's frame: top bar, menus, sheets, clue bar
@@ -155,6 +155,16 @@ gives the Salon (`client/room.md`) its column or its sheet.
     nothing, and Tab and Shift+Tab stay on the link. The page stays until the
     player follows it.
 
+### Other final states
+
+19. Once the room has shown, any other final state (`replaced`, `removed`,
+    `locked`, `full`, `throttled`: `platform/reconnection.md` rule 4) drops
+    the letters waiting to be sent and the kept undos, checks and reveals, and
+    makes the grid read-only: a typed letter or an erase, from the keys or the
+    in-app keyboard, changes no cell and sends nothing; « Annuler » and every
+    Aide item, the confirm item included, are disabled (rule 9). The selection
+    still moves.
+
 ### Status region
 
 17. From its first paint, in every state, the room page holds one region with
@@ -290,6 +300,17 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   retour du réseau. » while the page's region stays empty. Once the sheet is
   closed, « Annuler » with nothing to undo makes the page's region read
   « Rien à annuler. ».
+- **AC-28** At 1280 by 720, joined with the empty (1, 0) selected, the socket
+  closes with 4001: the band under the top bar reads « Ce salon est ouvert
+  dans un autre onglet. », a typed `t` leaves (1, 0) empty, and › still moves
+  the selection. After `removed` a typed `t` leaves (1, 0) empty alike.
+  Reconnecting with `T` typed at (1, 0) and not yet answered, a rejoin refused
+  with `room_locked` leaves (1, 0) empty.
+- **AC-29** After a close 4001 with MIME selected, « Annuler » and the Aide
+  items « La lettre », « Le mot », « La grille » of « Vérifier » and « La
+  lettre », « Le mot » of « Révéler » take the disabled look, and a press on
+  any sends nothing; with Bob's pencil `T` at (1, 0) selected, the confirm
+  item is disabled alike.
 
 ## Edge cases
 

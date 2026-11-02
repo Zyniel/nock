@@ -74,8 +74,10 @@ author name, no pencil tag. Focus inside the bar: white ring, offset −4 px
 
 With no cell selected, the text is the hint « Touchez une case ou une
 définition. », and « Réagir » and « Je bloque » are drawn disabled, their icons in
-`--nock-rule`, so the bar keeps its shape. While a vote is open, « Réagir » is
-disabled (« Layers »).
+`--nock-rule`, so the bar keeps its shape. While the page is not joined
+(reconnecting, or a final status once the room has shown, « Connection lost »),
+both are drawn disabled the same way, the clue text kept. While a vote is open,
+« Réagir » is disabled (« Layers »).
 
 In the column layout the clue bar is as wide as the grid (grid width + 1 px), and
 never narrower than the smaller of 320 px and the play area. With the Auteurs mode
@@ -297,7 +299,8 @@ perdue. »), and the room's other final statuses but its deletion) is the connec
 band's look without the red dot: under the top bar, full width, `--nock-clue-bg`,
 1 px line-grey bottom border, padding 8 px 12 px, the status text in ink 500
 0.85rem/1.3, for example « Vous avez été retiré de ce salon. ». The room stays
-drawn under it as it was. Drawn in the screens sheet, part 3 (« A final status
+drawn under it, with « Annuler », the Aide items, « Réagir » and « Je bloque »
+in their disabled looks. Drawn in the screens sheet, part 3 (« A final status
 after the room showed »). The room deleted once it has shown has no band: the
 connection band goes and the room-gone dialog shows (`overlays.md`, « Room
 gone »). A refusal before the room shows is an entry card (`pages.md`, « Entry
