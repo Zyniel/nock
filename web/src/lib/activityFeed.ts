@@ -136,7 +136,10 @@ function helpModeText(helpMode: string): string {
 
 // The text of the clue that `value` ({row, column, clue_index}) names, or ''.
 function clueText(snapshot: Snapshot, value: unknown): string {
-  const ref = value as Record<string, unknown>
+  const ref = value as Record<string, unknown> | null
+  if (typeof ref !== 'object' || ref === null) {
+    return ''
+  }
   for (const cell of snapshot.grid.cells) {
     if (cell.type !== 'clue' || cell.row !== ref.row || cell.column !== ref.column) {
       continue

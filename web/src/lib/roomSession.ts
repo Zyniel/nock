@@ -330,6 +330,17 @@ export const PING_INTERVAL_MS = 2000
 export const SILENCE_LIMIT_MS = 4000
 export const EDIT_SEND_INTERVAL_MS = 100
 export const RECONNECT_DELAYS_MS: number[] = [1000, 2000, 4000, 8000]
+// Each retry delay is drawn at random within 20 % of its value either way
+// (platform/reconnection.md rule 6).
+export const RECONNECT_JITTER = 0.2
+// A socket still connecting this long after it was created is dropped
+// (platform/reconnection.md rule 6).
+export const CONNECT_LIMIT_MS = 6000
+
+// The statuses that end the tries for good while the room stays on screen. Once
+// the room has shown, each makes the grid read-only (client/hud.md rule 19). The
+// room deleted is not one of them: the room-gone dialog covers the page.
+const ENDED_STATUSES: RoomStatus[] = ['replaced', 'removed', 'locked', 'full', 'throttled']
 
 const PLAYER_STATES: string[] = ['active', 'idle', 'disconnected']
 const MAX_COLOUR = 7
@@ -692,7 +703,7 @@ function keepVoteClock(session: RoomSession, snapshot: Snapshot): void {
 }
 
 // Returns null when the value is not a clue reference of three integers.
-function toClueRef(value: unknown): ClueRefView | null {
+export function toClueRef(value: unknown): ClueRefView | null {
   const clue = value as Record<string, unknown> | null | undefined
   if (typeof clue !== 'object' || clue === null) {
     return null
@@ -988,12 +999,28 @@ function applyCellLocked(snapshot: Snapshot, event: RoomEvent): void {
   }
 }
 
-// A check_result strikes through the letters of its wrong list.
+// Returns null when the value is not a cell position of two integers.
+function toCellPosition(value: unknown): { row: number; column: number } | null {
+  const position = value as Record<string, unknown> | null
+  if (typeof position !== 'object' || position === null) {
+    return null
+  }
+  const { row, column } = position
+  if (!Number.isInteger(row) || !Number.isInteger(column)) {
+    return null
+  }
+  return { row: row as number, column: column as number }
+}
+
+// A check_result strikes through the letters of its wrong list. A cell of the
+// list that is not two integers is skipped (client/shell.md rule 4).
 function applyCheckResult(snapshot: Snapshot, event: RoomEvent): void {
-  const wrongCells: Array<{ row: number; column: number }> = Array.isArray(event.message.wrong)
-    ? event.message.wrong
-    : []
-  for (const reference of wrongCells) {
+  const wrongCells: unknown[] = Array.isArray(event.message.wrong) ? event.message.wrong : []
+  for (const value of wrongCells) {
+    const reference = toCellPosition(value)
+    if (reference === null) {
+      continue
+    }
     const cell = letterCellAt(snapshot, reference.row, reference.column)
     if (cell !== null) {
       cell.wrong = true
@@ -1372,10 +1399,19 @@ export function statusAfterFinalClose(code: number, current: RoomStatus): RoomSt
   return current
 }
 
-// The delay before reconnection try number `attempt` (0 for the first).
+// True for a final status that leaves the room on screen (see ENDED_STATUSES).
+export function isEndedStatus(status: RoomStatus): boolean {
+  return ENDED_STATUSES.includes(status)
+}
+
+// The delay before reconnection try number `attempt` (0 for the first), in
+// whole milliseconds. One random draw places it between 80 % of its base delay
+// (a draw of 0) and 120 % (a draw just below 1).
 export function reconnectDelay(attempt: number): number {
   const last = RECONNECT_DELAYS_MS.length - 1
-  return RECONNECT_DELAYS_MS[Math.min(attempt, last)]
+  const baseMs = RECONNECT_DELAYS_MS[Math.min(attempt, last)]
+  const share = 1 - RECONNECT_JITTER + 2 * RECONNECT_JITTER * Math.random()
+  return Math.round(baseMs * share)
 }
 
 // The status once the connection is lost. After a snapshot the page shows the
