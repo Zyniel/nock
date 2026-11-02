@@ -3,7 +3,7 @@
   import AccountDialog from './AccountDialog.svelte'
   import AideMenu from './AideMenu.svelte'
   import ClueBar from './ClueBar.svelte'
-  import EntryFrame from './EntryFrame.svelte'
+  import EntryPage from './EntryPage.svelte'
   import GridStatus from './GridStatus.svelte'
   import GridViewport from './GridViewport.svelte'
   import HostSettings from './HostSettings.svelte'
@@ -479,7 +479,9 @@
       (session.status === 'connecting' && isFormKept),
   )
   // A nickname refused by the server is shown as a characters error.
-  let shownError = $derived(formError ?? (session.nicknameRefused ? 'characters' : null))
+  let shownError: 'length' | 'characters' | null = $derived(
+    formError ?? (session.nicknameRefused ? 'characters' : null),
+  )
 
   // ---- The status region (client/hud.md rules 17 and 18) ----
 
@@ -1869,74 +1871,6 @@
   />
 {/snippet}
 
-<!-- The entry pages (spec 046, "Entry pages"): the room code line, then the
-     nickname card or the card of a status that refuses entry. -->
-{#snippet entryPage()}
-  <EntryFrame>
-    <h1 class="room-code-line">{t('room.heading', { code })}</h1>
-    {#if isEntryCardShown}
-      <div class="nock-card" data-testid="entry-card">
-        <p class="nock-card-title" data-testid="room-status">
-          {t(`room.status.${session.status}`)}
-        </p>
-        {#if session.status === 'not_found'}
-          <!-- An expired room is deleted (spec 032), so it reads as one that
-               never existed: the line says why a room may be gone (P3). -->
-          <p class="nock-card-detail" data-testid="entry-detail">
-            {t('room.status.not_found_detail')}
-          </p>
-        {/if}
-        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1).
-             "Voir les grilles" is primary where it is the only way on. -->
-        <a
-          class="nock-button"
-          class:nock-button-primary={session.status === 'not_found'}
-          class:nock-button-secondary={session.status !== 'not_found'}
-          data-testid="entry-home"
-          href="/"
-          tabindex="0">{t('share.home')}</a
-        >
-      </div>
-    {:else}
-      <form class="nock-card" data-testid="nickname-form" onsubmit={submitNickname}>
-        <h2 class="nock-card-title">{t('join.heading')}</h2>
-        <div class="nock-field">
-          <label for="nickname-input">{t('join.nickname_label')}</label>
-          <input
-            id="nickname-input"
-            class="nock-text-input nickname-input"
-            data-testid="nickname-input"
-            type="text"
-            autocomplete="nickname"
-            placeholder={t('room.default_nickname')}
-            aria-invalid={shownError !== null ? 'true' : undefined}
-            aria-describedby={shownError !== null ? 'nickname-error' : undefined}
-            bind:value={nicknameText}
-          />
-        </div>
-        {#if shownError !== null}
-          <p
-            class="nock-error-line nickname-error"
-            id="nickname-error"
-            data-testid="nickname-error"
-            role="alert"
-          >
-            {shownError === 'length' ? t('join.error.length') : t('join.error.characters')}
-          </p>
-        {/if}
-        <button
-          type="submit"
-          class="nock-button nock-button-primary"
-          data-testid="nickname-submit"
-          disabled={session.status !== 'nickname'}>{t('join.submit')}</button
-        >
-        <!-- The status of the nickname card: read but not seen. -->
-        <p class="visually-hidden" data-testid="room-status">{t(`room.status.${session.status}`)}</p>
-      </form>
-    {/if}
-  </EntryFrame>
-{/snippet}
-
 <!-- The room is the page's `main`. An entry page is not: its frame owns the
      `main`, after the top bar, which is the page's banner (client/shell.md
      rule 19). -->
@@ -1958,7 +1892,14 @@
   <!-- The page's status region, there from the first paint in every state. -->
   <StatusRegion bind:this={statusRegion} testId="status-region" />
   {#if isEntryPage}
-    {@render entryPage()}
+    <EntryPage
+      {code}
+      status={session.status}
+      isCardShown={isEntryCardShown}
+      bind:nicknameText
+      {shownError}
+      onSubmit={submitNickname}
+    />
   {:else}
     <!-- The room's heading: read but not seen while the room opens and once it
          shows (spec 043, spec 046). -->
@@ -2347,18 +2288,6 @@
 
   .room-status {
     margin: 0;
-  }
-
-  /* The nickname shows in capitals, the placeholder too, while the value keeps
-     the text as typed, so input methods and the caret work as usual (spec 012,
-     room page flow step 3). */
-  .nickname-input {
-    text-transform: uppercase;
-  }
-
-  /* The refused nickname's reason, right under the field. */
-  .nickname-error {
-    margin-top: -6px;
   }
 
   /* While the room opens (spec 046): all the height under the top bar, its
