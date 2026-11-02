@@ -69,7 +69,7 @@ ordinal: 17000
 - [x] #3 Tests committed before the code
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
+- [x] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -88,6 +88,8 @@ Lead (2026-11-02): started in parallel with B-048's review (different domains). 
 Lead: the by-name citations of moved content in product.md (routes table owner cells, core flow 8) and joining.md rule 3 (« Ancien joueur ») are repointed here, as the pitch's answer for B-059's route cell; the task takes domain:joining (B-059 not started). By-number citations left to their tasks: operations.md:49/51/69 (B-063); host.md:99/129/136/138, lifetime.md:85, results.md:153, library.md:53 (B-064). Spec-checker APPROVED in round 1. Its note: account AC-2, AC-10, AC-13 prove behaviour whose rules are now erasure rules 3 and 4, and account's Depends on (three files, the template's maximum) cannot list erasure; left, the out-of-scope line links them.
 
 Lead: review round 1 CHANGES REQUESTED (seven code comments in src/nock/accounts.py and server.py citing moved account rules; suggestion: account AC-2, AC-10, AC-13 prove erasure rules 3 and 4), the comments fixed by the implementer in 1eea671, the suggestion became DRAFT-055 (board PR #100, merged). Round 2 APPROVE. SERIAL_TEST_FILES follows the four renamed serial files (e8601bb, the lead's tooling commit). Full gate green (8674 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/102
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
