@@ -1,7 +1,7 @@
 ---
 area: admin
 file: ops-page
-status: approved
+status: done
 ---
 
 # admin/ops-page - The `/ops` page: token form, dashboard card, replay
