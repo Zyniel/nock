@@ -27,14 +27,13 @@ import threading
 import time
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
-from typing import NamedTuple
 
 import pytest
 from fastapi.testclient import TestClient
 from playwright.sync_api import Browser, Page, expect
 from starlette.testclient import WebSocketTestSession
 
-from nock.grid import Arrow, ClueCell, Grid, LetterCell
+from nock.grid import Grid, LetterCell
 from nock.hub import RoomRegistry
 from nock.protocol import (
     EditLetter,
@@ -49,22 +48,27 @@ from nock.room import RoomConfig
 from nock.server import create_app
 from spec036_browser_harness import (
     FX02_AT_MARK,
+    LOCAL_ECHO_KEYS,
     MARK_PROBE_SCRIPT,
     PAGE_WAIT_MS,
     TYPING_PROBE_SCRIPT,
     Cell,
     Keystroke,
+    Word,
+    across_words,
     auto_join_script,
     cell_at,
     expect_fx02_room_shown,
     expect_last_letters_shown,
     expect_reconnection_after_close,
     interactive_mark_times,
+    local_echo_keystrokes,
     local_echo_times,
     measured_times,
     missing_keystrokes,
     open_mock_room,
     open_phone_page,
+    percentile_95,
     propagation_times,
     read_probe,
     states_at_mark,
@@ -87,7 +91,6 @@ PROPAGATION_BUDGET_MS = 300.0
 RELAY_BUDGET_SECONDS = 0.100
 
 COLD_LOADS = 3
-LOCAL_ECHO_KEYS = 40
 LOCAL_ECHO_GAP_MS = 250
 ANA_KEYS = 20
 ANA_GAP_MS = 500
@@ -129,16 +132,6 @@ def default_registry() -> Iterator[RoomRegistry]:
     registry.close()
 
 
-# ---- Measurements --------------------------------------------------------------------
-
-
-def percentile_95(samples: Sequence[float]) -> float:
-    """The p95 of the spec: the ceil(0.95 * n)-th smallest of n samples."""
-    ordered = sorted(samples)
-    rank = (95 * len(ordered) + 99) // 100  # ceil(0.95 * n), in whole numbers
-    return ordered[rank - 1]
-
-
 # ---- Grids ---------------------------------------------------------------------------
 
 
@@ -150,38 +143,6 @@ def letter_cells(grid: Grid) -> list[Cell]:
             positions.append((cell.row, cell.column))
     positions.sort()
     return positions
-
-
-class Word(NamedTuple):
-    """An across word: its cells in reading order and its answer."""
-
-    cells: list[Cell]
-    answer: str
-
-
-def across_words(grid: Grid) -> list[Word]:
-    """The across words of `grid`, ordered by their first cell (row-major)."""
-    words: list[Word] = []
-    for cell in grid.cells:
-        if not isinstance(cell, ClueCell):
-            continue
-        for index, clue in enumerate(cell.clues):
-            if clue.arrow in (Arrow.RIGHT, Arrow.DOWN_THEN_RIGHT):
-                cells = grid.word_cells(cell.row, cell.column, index)
-                words.append(Word(cells=cells, answer=clue.answer))
-    words.sort(key=lambda word: word.cells[0])
-    return words
-
-
-def local_echo_keystrokes(grid: Grid) -> list[Keystroke]:
-    """AC-2's 40 keys: the answers of the across words, word after word."""
-    keystrokes: list[Keystroke] = []
-    for word in across_words(grid):
-        for index, (row, column) in enumerate(word.cells):
-            if len(keystrokes) == LOCAL_ECHO_KEYS:
-                return keystrokes
-            keystrokes.append(Keystroke(row, column, word.answer[index], index == 0))
-    return keystrokes
 
 
 def ana_words(grid: Grid) -> list[Word]:

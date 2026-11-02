@@ -69,6 +69,7 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_realtime_join_deadline.py",
         "test_server_engine_time.py",
         "test_server_socket_responsiveness.py",
+        "test_shell_remote_pace.py",
         "test_spec_013_ac02_selections.py",
         "test_spec_013_ac07_ac08_feed_scroll.py",
         "test_spec_015_ac01_relay_to_the_others.py",

@@ -96,10 +96,13 @@
     endReaction,
     gridLabel,
     isFinalClose,
+    latestPendingEdits,
+    letterCellIndex,
     newSession,
     receiveFrame,
     reconnectDelay,
     shownCell,
+    shownCellWith,
     shownGrid,
     statusAfterFinalClose,
     statusAfterLoss,
@@ -107,6 +110,7 @@
   import { fittedGridBox } from './gridLayout'
   import {
     computeWords,
+    positionKey,
     sameSelection,
     selectedWord,
     selectionAfterCellTap,
@@ -764,17 +768,30 @@
     }
   }
 
+  // The letter cells of the snapshot's grid, by "row,column": built once per
+  // snapshot, so that finding a cell reads no other cell.
+  let letterCells = $derived(
+    session.snapshot === null
+      ? new Map<string, LetterCellView>()
+      : letterCellIndex(session.snapshot.grid),
+  )
+  // The newest pending edit of each cell, by "row,column".
+  let latestEdits = $derived(latestPendingEdits(session.pendingEdits))
+
   // The letter cell at a position of the snapshot, or null.
   function letterCellAt(row: number, column: number): LetterCellView | null {
-    if (session.snapshot === null) {
+    return letterCells.get(positionKey(row, column)) ?? null
+  }
+
+  // The letter a cell of the snapshot shows, pending edits included; null
+  // when it shows none, or when it is not a letter cell.
+  function shownLetterAt(row: number, column: number): string | null {
+    const cell = letterCellAt(row, column)
+    if (cell === null) {
       return null
     }
-    for (const cell of session.snapshot.grid.cells) {
-      if (cell.type === 'letter' && cell.row === row && cell.column === column) {
-        return cell
-      }
-    }
-    return null
+    const latestEdit = latestEdits.get(positionKey(row, column)) ?? null
+    return shownCellWith(cell, latestEdit).letter
   }
 
   // The selection moved to the cell at `index` of the selected word.
@@ -1054,8 +1071,7 @@
   // True when every cell of the word shows a letter, pending edits included.
   function isWordFullShown(word: Word): boolean {
     for (const position of word.cells) {
-      const cell = letterCellAt(position.row, position.column)
-      if (cell === null || shownCell(cell, session.pendingEdits).letter === null) {
+      if (shownLetterAt(position.row, position.column) === null) {
         return false
       }
     }
@@ -1587,32 +1603,12 @@
 
   // The words whose every cell shows a letter on the page, pending edits
   // included.
-  let filledWords = $derived(countFilledWords(session.snapshot, words, session.pendingEdits))
+  let filledWords = $derived(countFilledWords(words))
 
-  function countFilledWords(
-    snapshot: Snapshot | null,
-    allWords: Word[],
-    pendingEdits: PendingEdit[],
-  ): number {
-    if (snapshot === null) {
-      return 0
-    }
-    const shownLetters = new Map<string, string | null>()
-    for (const cell of shownGrid(snapshot.grid, pendingEdits).cells) {
-      if (cell.type === 'letter') {
-        shownLetters.set(`${cell.row},${cell.column}`, cell.letter)
-      }
-    }
+  function countFilledWords(allWords: Word[]): number {
     let count = 0
     for (const word of allWords) {
-      let isFull = true
-      for (const position of word.cells) {
-        const letter = shownLetters.get(`${position.row},${position.column}`)
-        if (letter === null || letter === undefined) {
-          isFull = false
-        }
-      }
-      if (isFull) {
+      if (isWordFullShown(word)) {
         count += 1
       }
     }

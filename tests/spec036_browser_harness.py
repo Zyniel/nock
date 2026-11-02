@@ -2,8 +2,10 @@
 
 The phone profile of the spec (CPU throttling and the 4G network profile), the
 in-page timing (the interactive mark, the keydown and cell-change probe), the page
-actions that type letters, and the mocked room socket used by the edge cases of
-AC-1 and of AC-5 and AC-6. Used by the tests of AC-1 to AC-6.
+actions that type letters, AC-2's 40 keys on FX-02's across words with the p95
+of the spec, and the mocked room socket used by the edge cases of AC-1 and of
+AC-5 and AC-6. Used by the tests of AC-1 to AC-6, and by the pace tests of
+`client/shell.md` (AC-26 and AC-27).
 
 The shared setup of the other themes is in `spec036_harness`.
 """
@@ -13,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 import string
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import NamedTuple
 
 import pytest
@@ -29,7 +31,7 @@ from playwright.sync_api import (
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from fonts_ready import wait_for_fonts
-from nock.grid import Grid
+from nock.grid import Arrow, ClueCell, Grid
 from nock.protocol import (
     HelpMode,
     Join,
@@ -56,6 +58,9 @@ FOUR_G_CONDITIONS: dict[str, bool | int] = {
 }
 
 FX02_CELL_COUNT = 221
+
+# AC-2 (`product.md` AC-13, `client/shell.md` AC-26): the keys typed on FX-02.
+LOCAL_ECHO_KEYS = 40
 
 
 # ---- Values of the test harness ------------------------------------------------------
@@ -418,6 +423,48 @@ def missing_keystrokes(
 def measured_times(times: list[float | None]) -> list[float]:
     """The times that were measured."""
     return [measured for measured in times if measured is not None]
+
+
+# ---- Measurements and the keys of the local echo -------------------------------
+
+
+def percentile_95(samples: Sequence[float]) -> float:
+    """The p95 of the spec: the ceil(0.95 * n)-th smallest of n samples."""
+    ordered = sorted(samples)
+    rank = (95 * len(ordered) + 99) // 100  # ceil(0.95 * n), in whole numbers
+    return ordered[rank - 1]
+
+
+class Word(NamedTuple):
+    """An across word: its cells in reading order and its answer."""
+
+    cells: list[Cell]
+    answer: str
+
+
+def across_words(grid: Grid) -> list[Word]:
+    """The across words of `grid`, ordered by their first cell (row-major)."""
+    words: list[Word] = []
+    for cell in grid.cells:
+        if not isinstance(cell, ClueCell):
+            continue
+        for index, clue in enumerate(cell.clues):
+            if clue.arrow in (Arrow.RIGHT, Arrow.DOWN_THEN_RIGHT):
+                cells = grid.word_cells(cell.row, cell.column, index)
+                words.append(Word(cells=cells, answer=clue.answer))
+    words.sort(key=lambda word: word.cells[0])
+    return words
+
+
+def local_echo_keystrokes(grid: Grid) -> list[Keystroke]:
+    """AC-2's 40 keys: the answers of the across words, word after word."""
+    keystrokes: list[Keystroke] = []
+    for word in across_words(grid):
+        for index, (row, column) in enumerate(word.cells):
+            if len(keystrokes) == LOCAL_ECHO_KEYS:
+                return keystrokes
+            keystrokes.append(Keystroke(row, column, word.answer[index], index == 0))
+    return keystrokes
 
 
 # ---- Room page actions ---------------------------------------------------------------

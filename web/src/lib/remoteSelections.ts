@@ -115,7 +115,32 @@ export function nextCursors(before: CellCursor[], now: CellCursor[]): CellCursor
     const corner = firstFreeCorner(kept, position.row, position.column)
     kept.push({ ...position, corner })
   }
+  // Nothing moved: the same list, so that nothing drawn from it draws again
+  // (client/shell.md rule 18).
+  if (isSameCursorList(before, kept)) {
+    return before
+  }
   return kept
+}
+
+// True when both lists hold the same cursors, in the same order.
+function isSameCursorList(first: CellCursor[], second: CellCursor[]): boolean {
+  if (first.length !== second.length) {
+    return false
+  }
+  for (let index = 0; index < first.length; index++) {
+    const one = first[index]
+    const other = second[index]
+    const isSame =
+      one.playerId === other.playerId &&
+      one.row === other.row &&
+      one.column === other.column &&
+      one.corner === other.corner
+    if (!isSame) {
+      return false
+    }
+  }
+  return true
 }
 
 // The corner a player holds on the cell (row, column), or null.
@@ -164,4 +189,98 @@ export function remoteSelectionsOf(
     })
   }
   return remotes
+}
+
+// One other player's cursor as a cell draws it: their colour in the corner
+// they hold there.
+export interface DrawnCursor {
+  playerId: string
+  colour: number
+  corner: Corner
+}
+
+// What the other players draw on one letter cell: their cursors on it, and
+// the tint of the players whose selected word holds it.
+export interface CellRemotes {
+  // The cursors that hold a corner of the cell, in roster order. A player who
+  // waits for a corner is not drawn.
+  cursors: DrawnCursor[]
+  // The ids of the players whose word holds the cell, in roster order.
+  tintedBy: string[]
+  // The colour of the first of them; null when no word of theirs holds it.
+  tintColour: number | null
+}
+
+// The value of every cell the other players draw nothing on. One shared value,
+// so that such a cell never sees a change; it is never modified.
+export const NO_REMOTES: CellRemotes = { cursors: [], tintedBy: [], tintColour: null }
+
+// What the other players draw on each cell, by "row,column" (positionKey). A
+// cell they draw nothing on has no entry: it takes NO_REMOTES.
+//
+// A cell whose drawing is the same as in `previous` keeps the value it had
+// there, so that only the cells a change of the room reaches draw again
+// (client/shell.md rule 18).
+export function remotesByCell(
+  remotes: RemoteSelection[],
+  previous: Map<string, CellRemotes>,
+): Map<string, CellRemotes> {
+  const byCell = new Map<string, CellRemotes>()
+  for (const remote of remotes) {
+    for (const key of remote.wordPositions) {
+      const remotesHere = entryOf(byCell, key)
+      remotesHere.tintedBy.push(remote.playerId)
+      if (remotesHere.tintColour === null) {
+        remotesHere.tintColour = remote.colour
+      }
+    }
+    if (remote.corner !== null) {
+      const remotesHere = entryOf(byCell, positionKey(remote.row, remote.column))
+      remotesHere.cursors.push({
+        playerId: remote.playerId,
+        colour: remote.colour,
+        corner: remote.corner,
+      })
+    }
+  }
+  for (const [key, remotesHere] of byCell) {
+    const before = previous.get(key)
+    if (before !== undefined && isSameCellRemotes(before, remotesHere)) {
+      byCell.set(key, before)
+    }
+  }
+  return byCell
+}
+
+// The entry of a cell in the map, added empty when it has none yet.
+function entryOf(byCell: Map<string, CellRemotes>, key: string): CellRemotes {
+  let remotesHere = byCell.get(key)
+  if (remotesHere === undefined) {
+    remotesHere = { cursors: [], tintedBy: [], tintColour: null }
+    byCell.set(key, remotesHere)
+  }
+  return remotesHere
+}
+
+// True when a cell draws the same cursors and the same tint with either value.
+function isSameCellRemotes(first: CellRemotes, second: CellRemotes): boolean {
+  if (first.tintColour !== second.tintColour) {
+    return false
+  }
+  if (first.tintedBy.join(' ') !== second.tintedBy.join(' ')) {
+    return false
+  }
+  if (first.cursors.length !== second.cursors.length) {
+    return false
+  }
+  for (let index = 0; index < first.cursors.length; index++) {
+    const one = first.cursors[index]
+    const other = second.cursors[index]
+    const isSame =
+      one.playerId === other.playerId && one.colour === other.colour && one.corner === other.corner
+    if (!isSame) {
+      return false
+    }
+  }
+  return true
 }

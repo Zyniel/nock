@@ -9,7 +9,8 @@ status: done
 ## Purpose
 
 The browser client as a whole: which page a path shows, how the room page keeps
-the room in seq order and what it shows before the room, every text in one
+the room in seq order, what it shows before the room and what a frame
+redraws, every text in one
 French file, and the foundation every screen is built from (colour tokens,
 fonts, focus ring, shared components, state lines).
 
@@ -141,6 +142,29 @@ fonts, focus ring, shared components, state lines).
     as any link does. On `/` it is plain text, read « Nock »: no link, no Tab
     stop, no `aria-current`. The room's phone top bar has no brand.
 
+### What a frame redraws
+
+18. Once the room shows, each of the following mutates (adds, removes or
+    changes a node, an attribute or a text) no node of the grid outside the
+    cells whose drawing it changes and the nodes inside them:
+    - a frame other than a snapshot: one that changes no cell's drawing (a
+      `pong`, a `chat_message`, a `selection_moved` that leaves its cursor
+      where it was) mutates no node of the grid; a letter change only its
+      cell; a cursor's move only the cells it leaves and enters, and those its
+      player's word tint leaves or enters;
+    - a flash's start and end, and a catch-up ring's (`social/catch-up.md` rule
+      14), only their cell;
+    - a pinch no cell, and the cells still follow `_design/cells.md` at the new
+      side.
+
+    A snapshot, a reconnection's included, may redraw the whole grid.
+
+    On the reference phone (`product.md` rule 21) and a 13 by 17 grid, a frame
+    that changes no cell costs at most 2 ms of main-thread time on average over
+    a burst of such frames.
+    With the 7 other players each typing at `product.md` rule 24's pace,
+    the local echo of `product.md` rule 23 holds.
+
 ### Look
 
 - Tokens, player colours and inks: `_design/foundation.md`, « Colour tokens »,
@@ -260,6 +284,29 @@ fonts, focus ring, shared components, state lines).
   cells of the grid's right and bottom edges: at the middle of the outer side
   of each of (1,4) to (4,4) and (4,1) to (4,4), the 3 px inside the grid's edge
   hold a pixel of the ring's navy (`--nock-navy`, #1B2F55).
+- **AC-22** On FX-01 with Bob's cursor on (1, 1) across, a `pong`, a
+  `chat_message` from Bob and a `selection_moved` putting Bob on (1, 1) across
+  again mutate no node of the grid.
+- **AC-23** On FX-01, Bob's `M` in the empty (1, 2) mutates no node of the
+  grid outside (1, 2); nor does Bob's `X` over my `M` there, from its flash's
+  start to its end.
+- **AC-24** On FX-01, Bob's cursor going from (1, 1) to (1, 2) across mutates
+  only those two cells; Bob then turning to down on (1, 2) mutates only the
+  cells of TAMIS and MIME.
+- **AC-25** On a touch phone with FX-01 and Bob on (1, 1), a pinch from zoom 1
+  to 1.5 (Chromium: pinch through CDP) mutates no cell, and Bob's triangle then
+  has the leg « Other players on a cell » gives the new cell side.
+- **AC-26** On the reference phone (Chromium), on FX-02 with 7 other players
+  each typing 2 letters a second in their own words, their cursors following,
+  40 letters typed 250 ms apart show in their cell within 50 ms at the p95.
+- **AC-27** On the reference phone (Chromium), on FX-02 with the 7 other
+  players' cursors in the grid, Bob sending 100 `select_cell` in a row for the
+  cell and direction he already holds costs the page at most 2 ms of
+  main-thread time per `selection_moved`, on average over the 100.
+- **AC-28** On FX-01, after a reconnection whose snapshot is at 9 with
+  `seen_seq` 5 stored, a catch-up answer naming only (1, 2) mutates no node of
+  the grid outside (1, 2), from the start of its ring to the ring's end 5
+  seconds later.
 
 ## Edge cases
 
@@ -282,11 +329,12 @@ fonts, focus ring, shared components, state lines).
 
 - `web/src/App.svelte` (routing, title), `web/index.html`,
   `web/src/lib/i18n.ts`, `web/src/i18n/fr.json`.
-- `web/src/lib/roomSession.ts` (frames, seq, final closes), `RoomPage.svelte`
-  (socket, cards, opening), `EntryFrame.svelte`, `NotFoundPage.svelte`,
-  `PageTopBar.svelte`, `TopBarBrand.svelte`.
+- `web/src/lib/roomSession.ts` (frames, seq, final closes, cursors),
+  `RoomPage.svelte` (socket, cards, opening), `EntryFrame.svelte`,
+  `NotFoundPage.svelte`, `PageTopBar.svelte`, `TopBarBrand.svelte`.
 - `web/src/app.css` (tokens, page base, focus ring, components),
-  `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay),
+  `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay, what a
+  frame redraws),
   `web/src/main.ts` (fonts), `web/src/lib/icons.ts`.
 - Tests: `tests/test_shell_*`, `tests/test_spec_041_*` and the
   `tests/test_spec_040_*`, `test_spec_046_*` and `test_spec_048_*` files of the

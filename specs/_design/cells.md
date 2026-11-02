@@ -201,8 +201,10 @@ Drawn in the letter cell where the word starts, next to its clue, as in printed
 grids; never in the clue cell. SVG `viewBox="0 0 24 24"`, box side
 a = max(9px, 0.26 s), stroke ink, stroke width 2.4 (in the 24-unit box), round caps
 and joins, no fill on the path, the head a filled ink polygon. A thin white halo
-lets it read over any mark: `filter: drop-shadow(0 0 0.8px #FFFFFF)
-drop-shadow(0 0 0.8px #FFFFFF)` (white is `--nock-white`).
+lets it read over any mark: under the ink, the same path and head drawn in
+`--nock-white`, the path at stroke width 4.8, the head filled and stroked at
+width 2.4 with round joins, so 1.2 units of white border every ink edge. The
+halo is drawn, never a CSS filter.
 
 | Arrow | Kind (`content/grids.md`) | Path | Head |
 | --- | --- | --- | --- |
