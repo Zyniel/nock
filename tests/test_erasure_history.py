@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-27: a history record never brings an erased name back.
+"""Tests of account/erasure, AC-11: a history record never brings an erased name back.
 
 HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one file,
 a fake clock). Two plays:
@@ -20,8 +20,8 @@ a fake clock). Two plays:
   releases S, and the erasure ends before the app stops.
 - The delete hook of a room an attempt deletes: T is solved by Bob and Zoé, has
   expired and is not swept; both signed in from it. Zoé deletes her account and the
-  attempt deletes T (rule 26, step 1), whose delete hook saves Bob's record from the
-  state that still names her. His history then lists T with `["--"]`.
+  attempt deletes T (erasure rule 5, step 1), whose delete hook saves Bob's record
+  from the state that still names her. His history then lists T with `["--"]`.
 
 The first play holds an engine for more than 5 s, twice, and waits for the sweeps of
 real time: this file runs in the serial pass (`SERIAL_TEST_FILES` of
@@ -91,7 +91,7 @@ def is_second_attempt_over(accounts: AccountStore) -> bool:
     return pending[0].attempts >= ATTEMPTS_AFTER_THE_SECOND
 
 
-def test_ac27_records_saved_from_a_state_read_before_her_deletion_name_her_dashes(
+def test_ac11_records_saved_from_a_state_read_before_her_deletion_name_her_dashes(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     store = HoldingStore(tmp_path / "nock.sqlite3")
@@ -141,7 +141,7 @@ def test_ac27_records_saved_from_a_state_read_before_her_deletion_name_her_dashe
     assert cy_teammates == [("BOB", FORMER_NICKNAME)]
 
 
-def test_ac27_the_record_saved_by_the_delete_hook_of_her_deleted_room_names_her_dashes(
+def test_ac11_the_record_saved_by_the_delete_hook_of_her_deleted_room_names_her_dashes(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:

@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-29: the purge of the done erasures.
+"""Tests of account/erasure, AC-13: the purge of the done erasures.
 
 Python, on an `AccountStore` on a file. Three erasures are written with
 `delete_account`: Ana's, done at time 0 (`finish_erasure`); Zoé's, done at 1,000, a
@@ -32,7 +32,7 @@ def erasure_ids(database_path: Path) -> list[int]:
     return [int(row[0]) for row in rows]
 
 
-def test_ac29_the_life_of_a_done_erasure_is_five_years() -> None:
+def test_ac13_the_life_of_a_done_erasure_is_five_years() -> None:
     assert ERASURE_RECORD_LIFE_SECONDS == FIVE_YEARS
 
 
@@ -41,7 +41,7 @@ def test_ac29_the_life_of_a_done_erasure_is_five_years() -> None:
     [(157_680_001.0, False), (157_679_999.0, True)],
     ids=["one second past 5 years", "one second short of 5 years"],
 )
-def test_ac29_a_done_erasure_of_time_0_is_purged_past_5_years_and_no_other_row(
+def test_ac13_a_done_erasure_of_time_0_is_purged_past_5_years_and_no_other_row(
     tmp_path: Path, purged_at: float, old_one_kept: bool
 ) -> None:
     path = tmp_path / "nock.sqlite3"

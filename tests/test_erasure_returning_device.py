@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-28: the device of an erased player returns.
+"""Tests of account/erasure, AC-12: the device of an erased player returns.
 
 A browser, on the live server of spec 033's "Test harness" (accounts on, a recording
 mailer, the real client). Zoé enters room R from her device and writes `T` at (1, 0);
@@ -100,7 +100,7 @@ def zoe_deletes_her_account(
     return Erased(page, server.base_url, zoe_id, colour)
 
 
-def test_ac28_her_device_reloads_the_room_as_the_player_named_ancien_joueur(
+def test_ac12_her_device_reloads_the_room_as_the_player_named_ancien_joueur(
     account_server: AccountServer,
     devices: Devices,
     fx01_grid: Grid,
@@ -122,7 +122,7 @@ def test_ac28_her_device_reloads_the_room_as_the_player_named_ancien_joueur(
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "T")
 
 
-def test_ac28_a_letter_she_types_is_applied_and_the_page_reads_signed_out(
+def test_ac12_a_letter_she_types_is_applied_and_the_page_reads_signed_out(
     account_server: AccountServer,
     devices: Devices,
     fx01_grid: Grid,

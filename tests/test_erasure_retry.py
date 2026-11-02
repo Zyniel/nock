@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-25: a held engine leaves the erasure pending, and the
+"""Tests of account/erasure, AC-9: a held engine leaves the erasure pending, and the
 next attempt finishes it.
 
 This file measures real time (the answer within 7 s while an engine is held for more
@@ -21,7 +21,7 @@ After the answer, the test waits for the hold to end, stops the app (its first
 attempt is over: the erasure is pending), and starts a second app on the same file.
 The first sweep of that app, the "app started on that database" of the criterion, is
 the next attempt; it needs no held engine. The periodic sweep of an app that stays up
-is in `test_account_erasure.py`. A third app, which sweeps every 0.1 s, shows that
+is in `test_erasure_done.py`. A third app, which sweeps every 0.1 s, shows that
 a later sweep sends nothing.
 """
 
@@ -75,7 +75,7 @@ def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
 
 
-def test_ac25_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends_it(
+def test_ac9_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends_it(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
