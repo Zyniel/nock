@@ -4,13 +4,17 @@ title: Connection hardening
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T12:58:00Z'
+updated_date: '2026-11-02T13:43:00Z'
 labels:
   - domain:hud
   - domain:chat
   - domain:co-op
   - domain:realtime
   - domain:reconnection
+  - domain:shell
+  - domain:catch-up
+  - domain:operations
+  - domain:library
 milestone: m-0
 dependencies:
   - B-041
@@ -69,6 +73,22 @@ ordinal: 8000
      of rule 21 kept exact.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 reconnection AC-6 (new): a hidden page keeps a live socket; checks on return
+- [ ] #2 reconnection AC-7 (new): the 6 s connect timeout
+- [ ] #3 reconnection AC-8 (new): ±20 % retry delays, reset after a snapshot
+- [ ] #4 hud AC-28 (new): a final status makes the grid read-only, pending letters dropped
+- [ ] #5 hud AC-29 (new): « Annuler » and the Aide items disabled in a final status
+- [ ] #6 chat AC-22 (new): « Réagir » and « Je bloque » disabled while not joined
+- [ ] #7 chat AC-23 (new): only a send that went out counts for pacing
+- [ ] #8 co-op AC-21 (new): the five error codes answer only their messages (server test)
+- [ ] #9 shell AC-34 (new): a malformed event field is skipped, the event keeps its seq
+- [ ] #10 catch-up AC-21 (new): a malformed word_completed clue fails the answer
+- [ ] #11 operations AC-31 (new): a malformed replay time or seq shows the error line
+- [ ] #12 library AC-25 (new): an invalid published_on gives the error state
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -91,4 +111,6 @@ ordinal: 8000
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead (2026-11-02): started after B-057 (#98) and B-060 (#103) merged. B-057 moved the realtime rules this task names (16 hidden tabs → now reconnection's heartbeat rule; 18 the connect; 21 retries) into platform/reconnection.md, so the connection rules are written there; the task takes domain:reconnection. Open questions, the lead's defaults (the pitch: « with the lead's defaults »): 1 A, a 6-second connect timeout, the silence limit; 2 A, the page checks the silence again on visibilitychange before it closes — taken directly, without the measure in three engines first: it is harmless when no drop happens and keeps the pitch's « no protocol change »; 3 A, ±20 % jitter on each retry delay. Test-writer and implementer on Opus: criteria about timing in a browser. Base: origin/main af1fef7.
+
+Lead: answers to the spec-writer: in a final status (not not_found) pending letters and kept undos/checks/reveals are dropped, letters, erases, « Annuler » and the Aide items send nothing (disabled look); a retry waiting when the page becomes visible tries at once; the connect timeout stays 6 s (the server's silence limit, not the page's 4 s); the parser rules live where each parser's rule already lives (shell, catch-up, operations, library: the task takes those labels; B-058, which held domain:shell, had merged first, and the spec was committed after it); « Je bloque » pressed and disabled keeps its pressed state under the disabled look (drawn in s-net). Parsers: in a room event a malformed field is treated as absent and the event applies with its seq; HTTP bodies with a malformed field are refused whole. Spec-checker: CHANGES REQUESTED in round 1 (six wording fixes: co-op rule 12's pronouns, chat AC-23's state, rule 6's clock reading on a hidden page, AC-21's message types, an edge case's citation, AC-7's margin), APPROVED in round 2; its cosmetic note (one long line in chat rule 5) left. The file sizes (operations 24.9 KB / 31 criteria, hud 21.2 KB, chat 20.6 KB, library 25 criteria, co-op and catch-up 21) go to a follow-up draft: a split is the human's call. The 017 tests behind reconnection AC-3/AC-4 assume exact delays: the test-writer edits them in place.
 <!-- SECTION:NOTES:END -->

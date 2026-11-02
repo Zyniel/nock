@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: draft
+status: approved
 ---
 
 # social/chat - Chat, reactions, the clue flag and mute
@@ -50,8 +50,8 @@ help is wanted. The host can mute a player's chat and reactions.
 5. « Je bloque » (`flag.button_label`, « Je bloque sur ce mot ») is pressed
    while my flag is on the selected word's clue. It is disabled while the page
    is not joined, while nothing is selected, and while the selected word is
-   full on the page (pending letters count) and it is not pressed. A press sends my flag on that clue, or
-   `clue: null` when pressed; the button and the marker change only with
+   full on the page (pending letters count) and it is not pressed. A press
+   sends my flag on that clue, or `clue: null` when pressed; the button and the marker change only with
    `flag_changed`. An error answering a flag changes nothing on the page.
 6. A `flag_changed` with a clue adds the stream line `feed.flag` (« {name}
    bloque sur « {clue} » »); one without a clue adds none.
@@ -293,9 +293,10 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   nothing sent; the next snapshot enables both again. After a close 4001 both
   stay disabled.
 - **AC-23** With four reactions sent in the last 12 s, a fifth chosen while
-  the socket is closing goes out nowhere and the options stay enabled; once
-  the page is joined again, a fifth that goes out disables them. A chat
-  message sent while the socket is closing does not count either.
+  the socket is no longer open but the page has not yet seen its close (still
+  joined) reaches no player and does not count: once the page is joined
+  again, a fifth that goes out disables the options. A chat message sent in
+  that state does not count either.
 
 ## Edge cases
 

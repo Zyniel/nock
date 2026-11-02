@@ -122,7 +122,8 @@ def cluebar(
     """Return the clue bar; status: the completion status in its row, if any.
 
     off: « Réagir » and « Je bloque » disabled while the page is not joined
-    (room.md, « Clue bar »), the clue text kept.
+    (room.md, « Clue bar »), the clue text kept; a pressed « Je bloque » keeps
+    its white background, its filled flag in --nock-rule.
     """
     st = f' style="width:{width}px"' if width else ""
     if off:
@@ -130,7 +131,8 @@ def cluebar(
             f'<div class="cluebar"{st}><span class="cb">{IC["chev_l"]}</span><div '
             f'class="txt">{esc(text)}<i>{glyph}</i></div>{status}'
             f'<span class="cb pin off">{IC["smile"]}</span>'
-            f'<span class="cb pin off">{IC["flag"]}</span>'
+            f'<span class="cb pin off" aria-pressed="{str(pressed).lower()}">'
+            f'{IC["flag"]}</span>'
             f'<span class="cb">{IC["chev_r"]}</span></div>'
         )
     if empty:

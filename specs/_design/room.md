@@ -76,7 +76,9 @@ With no cell selected, the text is the hint « Touchez une case ou une
 définition. », and « Réagir » and « Je bloque » are drawn disabled, their icons in
 `--nock-rule`, so the bar keeps its shape. While the page is not joined
 (reconnecting, or a final status once the room has shown, « Connection lost »),
-both are drawn disabled the same way, the clue text kept. While a vote is open,
+both are drawn disabled the same way, the clue text kept. A pressed « Je
+bloque » stays pressed while disabled (my flag is still on): the white button
+background stays, the filled flag in `--nock-rule`. While a vote is open,
 « Réagir » is disabled (« Layers »).
 
 In the column layout the clue bar is as wide as the grid (grid width + 1 px), and

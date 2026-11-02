@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: draft
+status: approved
 ---
 
 # client/hud - The room's frame: top bar, menus, sheets, clue bar

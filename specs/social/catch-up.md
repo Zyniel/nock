@@ -1,7 +1,7 @@
 ---
 area: social
 file: catch-up
-status: draft
+status: approved
 ---
 
 # social/catch-up - Catching up after an absence

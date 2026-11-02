@@ -1,7 +1,7 @@
 ---
 area: platform
 file: reconnection
-status: draft
+status: approved
 ---
 
 # platform/reconnection - Stale edits, the resume window, the page's connection
@@ -73,8 +73,11 @@ a loss, retries and sends what it held.
    socket still connecting; the page becoming visible again tries at once
    when a try waits on its delay. A socket still connecting 6 seconds after
    it was created (the server's silence limit, `platform/realtime.md` rule 16,
-   not the page's 4 seconds of rule 3) is dropped, hidden page or not, and its
-   late events change nothing: a loss. On open, the page joins as `lobby/joining.md` rule 8 says.
+   not the page's 4 seconds of rule 3) is dropped, and its late events change
+   nothing: a loss. The 6 seconds are read from the clock, not counted in
+   timer ticks: on a hidden page whose timers run late, the socket is dropped
+   at the page's first timer after them. On open, the page joins as
+   `lobby/joining.md` rule 8 says.
 7. On a snapshot: state `joined`, band hidden, the next delay the first again.
    After a loss, the page then sends the selection it holds, if any, as one
    `select_cell` (the server cleared it at the disconnection,
@@ -122,7 +125,7 @@ The connection band follows `_design/room.md`, « Connection lost ».
   8-second delay, it opens a socket at once.
 - **AC-7** After a loss, a socket whose opening the network never answers is
   dropped 6 seconds after it was created, and the next socket opens after the
-  second delay, 1.6 to 2.4 seconds later; a socket that opens 5.9 seconds
+  second delay, 1.6 to 2.4 seconds later; a socket that opens 5 seconds
   after it was created is kept and joins.
 - **AC-8** With every random draw at its lowest, the tries after successive
   losses come 0.8, 1.6, 3.2, 6.4 and 6.4 seconds after each loss; at its
@@ -141,7 +144,7 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - A page hidden on a dead network keeps its socket until it is visible again,
   unless a close event comes first (AC-6).
 - An `online` event replaces a socket stuck connecting before its 6 seconds
-  (AC-4, AC-7).
+  (rule 6).
 
 ## Out of scope
 

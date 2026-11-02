@@ -922,10 +922,15 @@ def sec_room() -> str:
             (
                 "A band under the top bar pushes the grid down; the grid "
                 "stays usable and letters wait to be sent, while « Réagir » "
-                "and « Je bloque » are disabled. It goes when the room is back."
+                "and « Je bloque » are disabled; a pressed « Je bloque » "
+                "(phone, my flag on the clue) stays pressed under the disabled "
+                "look. It goes when the room is back."
             )
         ],
-        [("ph", PH, phone_room(net=True)), ("pc", PC, desk_room(net=True))],
+        [
+            ("ph", PH + " · my flag on", phone_room(net=True, flag_pressed=True)),
+            ("pc", PC, desk_room(net=True)),
+        ],
     )
     out += screen(
         "s-final",
