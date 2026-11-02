@@ -1,9 +1,12 @@
 <script lang="ts">
-  // The host's settings (spec 043, "Room sheets"; spec 014): a modal dialog,
-  // centred in the column layout and a bottom sheet in the sheet layout. The
+  // The host's settings (spec 043, "Room sheets"; spec 014): a room sheet. The
   // lock switch sends at once; the form sends the help mode and the reveal
-  // allowance when it is saved, then closes the dialog.
+  // allowance when it is saved, then closes the sheet. A count that is not a
+  // whole number from 0 to 99 sends nothing: the sheet stays open and shows
+  // the error line (lobby/host.md rule 8).
   import { t } from './i18n'
+  import { isValidCount } from './revealCount'
+  import RoomSheet from './RoomSheet.svelte'
 
   let {
     layout,
@@ -23,63 +26,69 @@
     letters: number | null
     words: number | null
     onToggleLock: () => void
-    // Send the form's values. Returns false when they are not valid: the dialog
+    // Send the form's values. Returns false when they are not valid: the sheet
     // then stays open.
     onSave: () => boolean
-    // The dialog closed: by Escape, the backdrop or a save.
+    // The sheet closed: by Escape, the backdrop, or a save.
     onClosed: () => void
   } = $props()
 
   const HELP_MODES = ['free', 'vote', 'none'] as const
+  const COUNT_ERROR_ID = 'settings-count-error'
 
-  let dialog: HTMLDialogElement | null = $state(null)
+  let sheet: RoomSheet | undefined = $state()
+  let lettersInput: HTMLInputElement | null = $state(null)
+  let wordsInput: HTMLInputElement | null = $state(null)
+  // The counts the last « Enregistrer » refused.
+  let isLettersRefused = $state(false)
+  let isWordsRefused = $state(false)
 
-  // Close the dialog if it is open (client/hud.md rule 16: the room is gone).
-  export function close(): void {
-    dialog?.close()
-  }
-
-  // Show the dialog over the page; the browser moves the focus into it.
+  // Show the sheet over the page.
   export function open(): void {
-    if (dialog !== null && !dialog.open) {
-      dialog.showModal()
-    }
+    sheet?.open()
   }
 
-  // A click on the backdrop lands on the dialog itself, outside its box.
-  function closeOnBackdrop(event: MouseEvent): void {
-    if (dialog === null || event.target !== dialog) {
-      return
-    }
-    const box = dialog.getBoundingClientRect()
-    const isInside =
-      event.clientX >= box.left &&
-      event.clientX <= box.right &&
-      event.clientY >= box.top &&
-      event.clientY <= box.bottom
-    if (!isInside) {
-      dialog.close()
-    }
+  // Close the sheet if it is open (the room is gone, or the host role went).
+  // Returns whether it was open.
+  export function close(): boolean {
+    return sheet?.close() ?? false
+  }
+
+  // A close, whatever the cause, clears the marks.
+  function sheetClosed(): void {
+    isLettersRefused = false
+    isWordsRefused = false
+    onClosed()
   }
 
   function submit(event: SubmitEvent): void {
     event.preventDefault()
+    isLettersRefused = !isValidCount(letters)
+    isWordsRefused = !isValidCount(words)
+    if (isLettersRefused) {
+      lettersInput?.focus()
+      return
+    }
+    if (isWordsRefused) {
+      wordsInput?.focus()
+      return
+    }
     if (onSave()) {
-      dialog?.close()
+      sheet?.close()
     }
   }
 </script>
 
-<dialog
-  class="room-sheet"
-  class:bottom={layout === 'sheet'}
-  data-testid="host-settings"
-  aria-labelledby="host-settings-title"
-  bind:this={dialog}
-  onclick={closeOnBackdrop}
-  onclose={onClosed}
+<RoomSheet
+  bind:this={sheet}
+  {layout}
+  title={t('settings.heading')}
+  titleId="host-settings-title"
+  testId="host-settings"
+  canCancel={true}
+  closesOnBackdrop={true}
+  onClosed={sheetClosed}
 >
-  <h2 class="room-sheet-title" id="host-settings-title">{t('settings.heading')}</h2>
   <div class="switch-row">
     <span class="switch-label">{t('host.lock')}</span>
     <button
@@ -91,7 +100,7 @@
       onclick={onToggleLock}><span class="switch-knob"></span></button
     >
   </div>
-  <form class="settings-form" data-testid="settings-form" onsubmit={submit}>
+  <form class="settings-form" data-testid="settings-form" novalidate onsubmit={submit}>
     <fieldset class="help-mode" data-testid="help-mode-select">
       <legend class="field-label">{t('settings.help_mode_label')}</legend>
       <div class="segments">
@@ -121,6 +130,9 @@
           min="0"
           max="99"
           step="1"
+          aria-invalid={isLettersRefused ? 'true' : undefined}
+          aria-describedby={isLettersRefused ? COUNT_ERROR_ID : undefined}
+          bind:this={lettersInput}
           bind:value={letters}
         />
       </div>
@@ -136,17 +148,25 @@
           min="0"
           max="99"
           step="1"
+          aria-invalid={isWordsRefused ? 'true' : undefined}
+          aria-describedby={isWordsRefused ? COUNT_ERROR_ID : undefined}
+          bind:this={wordsInput}
           bind:value={words}
         />
       </div>
     </div>
+    {#if isLettersRefused || isWordsRefused}
+      <p id={COUNT_ERROR_ID} class="nock-error-line" role="alert">
+        {t('settings.error.count')}
+      </p>
+    {/if}
     <button
       type="submit"
       class="nock-button nock-button-primary settings-save"
       data-testid="settings-save">{t('settings.save')}</button
     >
   </form>
-</dialog>
+</RoomSheet>
 
 <style>
   /* The switch row (specs/_design/foundation.md « Components »): the label left, the switch right. */
@@ -293,6 +313,10 @@
     color: var(--nock-ink);
     background: var(--nock-white);
     text-align: center;
+  }
+
+  .number-input[aria-invalid='true'] {
+    border-color: var(--nock-red);
   }
 
   .settings-save {

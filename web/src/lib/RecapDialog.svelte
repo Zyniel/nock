@@ -4,6 +4,7 @@
   import { t } from './i18n'
   import { displayNickname } from './nickname'
   import PlayerIcon from './PlayerIcon.svelte'
+  import RoomSheet from './RoomSheet.svelte'
   import { fetchRecap, recapColour, shownRecapPlayers, type Recap } from './recap'
   import { timerText } from './timer'
 
@@ -38,7 +39,7 @@
 
   type State = 'loading' | 'ready' | 'error'
 
-  let dialog: HTMLDialogElement | null = $state(null)
+  let sheet: RoomSheet | undefined = $state()
   let dialogState: State = $state('loading')
   let recap = $state<Recap | null>(null)
   // True while the line "Lien copie" shows under the share link, after a
@@ -70,7 +71,7 @@
   }
 
   onMount(() => {
-    dialog?.showModal()
+    sheet?.open()
     void loadRecap()
     return () => shareLinkCopier.stop()
   })
@@ -83,50 +84,20 @@
     }
     await shareLinkCopier.copy(shareUrl)
   }
-
-  // The controls of the dialog that Tab moves between, in document order.
-  function tabStops(): HTMLElement[] {
-    if (dialog === null) {
-      return []
-    }
-    return Array.from(dialog.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)'))
-  }
-
-  // Tab and Shift+Tab go round the controls of the dialog: the page behind it is
-  // inert, and the focus must not leave for the browser's own controls.
-  function keepTabInside(event: KeyboardEvent): void {
-    if (event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) {
-      return
-    }
-    const stops = tabStops()
-    if (stops.length === 0) {
-      event.preventDefault()
-      return
-    }
-    const first = stops[0]
-    const last = stops[stops.length - 1]
-    const focused = document.activeElement
-    if (event.shiftKey && (focused === first || focused === dialog)) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && focused === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
 </script>
 
-<dialog
-  bind:this={dialog}
-  class="room-sheet over-all recap"
-  class:bottom={layout === 'sheet'}
-  data-testid="recap"
-  data-state={dialogState}
-  aria-labelledby="recap-heading"
-  onclose={onClose}
-  onkeydown={keepTabInside}
+<RoomSheet
+  bind:this={sheet}
+  {layout}
+  title={t('recap.heading')}
+  titleId="recap-heading"
+  testId="recap"
+  extraClass="over-all recap"
+  dataState={dialogState}
+  canCancel={true}
+  closesOnBackdrop={false}
+  onClosed={onClose}
 >
-  <h2 class="room-sheet-title" id="recap-heading">{t('recap.heading')}</h2>
   {#if recap !== null}
     <p class="nock-recap-time" data-testid="recap-time">
       {t('recap.time', { time: timerText(recap.elapsed_ms) })}
@@ -232,9 +203,9 @@
     type="button"
     class="nock-button nock-button-primary recap-close"
     data-testid="recap-close"
-    onclick={() => dialog?.close()}>{t('recap.close')}</button
+    onclick={() => sheet?.close()}>{t('recap.close')}</button
   >
-</dialog>
+</RoomSheet>
 
 <style>
   /* The frame is the room sheet's (app.css): 440 px and centred in the column
@@ -328,7 +299,7 @@
 
   /* In the sheet layout the counts always take a line of their own, under
      the name (past the dot and its gap). */
-  .bottom .recap-values {
+  :global(.bottom) .recap-values {
     flex-basis: 100%;
     margin-left: 18px;
   }
@@ -350,7 +321,7 @@
     gap: 8px;
   }
 
-  .bottom .recap-share-row {
+  :global(.bottom) .recap-share-row {
     flex-wrap: wrap;
   }
 
@@ -370,7 +341,7 @@
     text-overflow: ellipsis;
   }
 
-  .bottom .recap-share-link {
+  :global(.bottom) .recap-share-link {
     flex-basis: 100%;
   }
 

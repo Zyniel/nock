@@ -313,8 +313,11 @@ computer as the recap's dialog (440 px, `overlays.md`, « Recap »).
   switch row « Verrouiller le salon » (switch, `foundation.md`, « Components »);
   the field « Aide » with a three-way segmented control « libre » | « par vote » |
   « désactivée »; two number fields side by side, 16 px apart, « Lettres à
-  révéler » and « Mots à révéler » (inputs 64 px wide, text centred); primary
-  « Enregistrer », right-aligned.
+  révéler » and « Mots à révéler » (inputs 64 px wide, text centred); while a
+  count is refused, the error line (`foundation.md`, « Components ») under the
+  two fields, and each refused input in error (red border); primary
+  « Enregistrer », right-aligned. Drawn in the screens sheet's « Host
+  settings » (computer, « count refused »).
 - Account, from Menu « Compte » or the catalogue's « Compte ». Signed out: title
   `account.dialog_heading`, text `account.dialog_intro` (muted 0.9rem), field
   « Adresse e-mail », primary « Recevoir le lien », after sending the green line

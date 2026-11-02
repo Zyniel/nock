@@ -95,18 +95,36 @@ gives the Salon (`client/room.md`) its column or its sheet.
     else the menu; Escape inside closes it and focuses the button. Column
     layout: a pointer press outside closes it. Sheet layout: while a menu or
     the Salon is open a scrim covers the page under the top bar; a tap on it
-    closes them, moving no focus and selecting nothing. At most one of the
-    menus, the Salon sheet and the reaction picker is open; the Salon column is
-    apart. A closed menu stays in the page, hidden, with its items' states. A
-    menu's place follows the top bar's form; its content scrolls inside it, so
-    it stays in the window.
+    closes them, moving no focus and selecting nothing. A Tab or Shift+Tab
+    pressed inside the page that puts the focus on an element outside an open
+    menu or the Salon sheet closes it, the focus staying on that element,
+    wherever the focus was before: inside it, lost to no element (an item
+    disabled under it), or on an element outside it where the page had moved
+    it. Losing the focus to no element closes nothing, nor does a focus the
+    page moves: after a mute (`social/chat.md` rule 15) the Salon sheet stays
+    open with the focus on « Salon », and the next Tab closes it. A focus that
+    enters the page from another window or the browser's own controls closes
+    nothing by itself. A press follows the rules above, not the focus: a press
+    on its own button (« Aide », « Menu », « Salon ») closes it, once. At most
+    one of the menus, the Salon sheet and the reaction picker is open; the
+    Salon column is apart. A closed menu stays in the page, hidden, with its
+    items' states. A menu's place follows the top bar's form; its content
+    scrolls inside it, so it stays in the window.
 
 ### Sheets, clue bar
 
-13. The host's settings and the account are modal sheets named by their title;
-    in the sheet layout the top bar stays seen and inert above. Escape or a
-    press on the backdrop closes one and focuses « Menu »; so does
-    « Enregistrer » once it has sent the settings (`lobby/host.md`).
+13. The room sheets (the host's settings, the account, the recap of
+    `gameplay/results.md` rule 9, the room-gone dialog of rule 16) are modal
+    dialogs named by their title, the focus inside from their opening; in the
+    sheet layout the top bar stays seen and inert above. Tab and Shift+Tab go
+    round a sheet's controls and never leave it: Tab on its last control
+    focuses its first, Shift+Tab on its first its last. The host's settings and
+    the account close on Escape, or on a press and its release both on the
+    backdrop: a press that starts in the sheet and ends on the backdrop, or the
+    reverse, closes nothing. Each close of either focuses « Menu » (Escape, the
+    backdrop, « Fermer », « Enregistrer » once it has sent the settings, the
+    loss of the host role, `lobby/host.md` rule 8), except when the room-gone
+    dialog closes it (rule 16).
 14. The clue bar holds ‹ `clue_bar.previous`, the clue on one line with its
     direction, « Réagir », « Je bloque », › `clue_bar.next`. › does what Tab
     does in the grid, ‹ what Shift+Tab does (`gameplay/board.md`), grid focused
@@ -127,8 +145,8 @@ gives the Salon (`client/room.md`) its column or its sheet.
 
 16. Once the room has shown, `not_found` (the 4404 of a deleted room,
     `lobby/lifetime.md` rule 6), joined or reconnecting, closes the menus, the
-    Salon sheet, the reaction picker, a room sheet and the recap, takes the
-    connection band away and drops the letters waiting to be sent. A modal
+    Salon sheet, the reaction picker and any other room sheet (rule 13), takes
+    the connection band away and drops the letters waiting to be sent. A modal
     alert dialog then covers the page, named by its title `room.gone.title`
     (« Ce salon n'existe plus. ») and described by
     `room.status.not_found_detail`, with one control, the link `share.home`
@@ -233,6 +251,18 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 - **AC-22** Under the room-gone dialog, with (1, 0) selected, Escape, a press on
   the scrim, Tab and Shift+Tab leave the focus on « Voir les grilles » and the
   dialog open; a typed `A` leaves (1, 0) empty; a press on the link loads `/`.
+- **AC-23** At 360 by 740 with MIME selected, Tab on « Le mot », the last item
+  of the open Aide menu, focuses the grid, the menu and the scrim gone; at 1280
+  by 720 Shift+Tab on « Auteurs » in the open Menu focuses « Menu », the Menu
+  closed. With « La grille » focused in the open Aide menu, a vote that
+  disables it leaves the menu open.
+- **AC-24** At 360 by 740 with MIME selected and the Salon sheet open,
+  Shift+Tab on « Discussion » focuses › of the clue bar, the sheet and the
+  scrim gone and « Salon » not expanded.
+- **AC-25** At 1280 by 720 in the host's settings, a press in « Lettres à
+  révéler » released on the backdrop, or a press on the backdrop released in
+  the sheet, leaves it open with its values; a press and its release both on
+  the backdrop close it and focus « Menu ».
 
 ## Edge cases
 
@@ -241,6 +271,10 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   room-gone dialog (AC-5).
 - A 4404 before the first snapshot: the entry card (`client/shell.md` rule 7),
   not the dialog (AC-21).
+- Tab on the Salon sheet's last control leaves the page for the browser and
+  closes nothing; the Tab that brings the focus back to the page's first
+  control closes nothing either, and the next Tab pressed inside the page
+  closes it (rule 12).
 
 ## Out of scope
 
@@ -259,6 +293,7 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 
 - `web/src/lib/RoomPage.svelte` (layout, overlays, play area) and its parts:
   `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`, `ClueBar`,
-  `RoomGoneDialog` (`.svelte`); `windowForm.ts`.
+  `RoomGoneDialog`, `RoomSheet` (the room sheets' shared dialog) (`.svelte`);
+  `windowForm.ts`.
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
   `tests/test_hud_*`, `tests/hud_harness.py`.

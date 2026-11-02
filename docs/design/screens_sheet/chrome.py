@@ -547,19 +547,29 @@ def desk_dialog(inner: str, recap: bool = False) -> str:
     return f'<div class="{cls}"><div class="dialog">{inner}</div></div>'
 
 
-def host_settings(mode: str = "libre") -> str:
-    """Return the host settings' content."""
+def host_settings(mode: str = "libre", refused: bool = False) -> str:
+    """Return the host settings' content.
+
+    `refused`: « Lettres à révéler » holds a count out of bounds after
+    « Enregistrer ».
+    """
     seg = "".join(
         f'<span class="{"on" if m == mode else ""}">{m}</span>'
         for m in ("libre", "par vote", "désactivée")
     )
+    letters = '<span class="input num">4</span>'
+    err = ""
+    if refused:
+        letters = '<span class="input num err">100</span>'
+        err = '<span class="errtxt">Entrez un nombre entier de 0 à 99.</span>'
     return (
         "<h3>Réglages de l'hôte</h3>"
         '<div class="switchrow">Verrouiller le salon<span class="tog on"></span></div>'
         f'<div class="field">Aide<span class="seg">{seg}</span></div>'
         '<div style="display:flex;gap:16px"><div class="field">Lettres '
-        'à révéler<span class="input num">4</span></div>'
+        f"à révéler{letters}</div>"
         '<div class="field">Mots à révéler<span class="input num">1</span></div></div>'
+        f"{err}"
         '<div class="end"><span class="btn primary">Enregistrer</span></div>'
     )
 
