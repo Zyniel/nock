@@ -35,6 +35,7 @@
     onRemove,
     onEscape,
     onMuted,
+    element = $bindable(null),
   }: {
     layout: 'sheet' | 'column'
     isOpen: boolean
@@ -66,9 +67,10 @@
     onEscape: () => void
     // A mute is about to disable the focused chat input.
     onMuted: () => void
+    // The Salon's element, for the room page.
+    element?: HTMLElement | null
   } = $props()
 
-  let salon: HTMLElement | null = $state(null)
   let chatInput: HTMLInputElement | null = $state(null)
   let copyButton: HTMLButtonElement | null = $state(null)
   let discussionTab: HTMLButtonElement | null = $state(null)
@@ -110,10 +112,10 @@
   }
 
   $effect(() => {
-    if (salon === null) {
+    if (element === null) {
       return
     }
-    return listenForEscape(salon, onEscape)
+    return listenForEscape(element, onEscape)
   })
 </script>
 
@@ -123,7 +125,7 @@
   data-testid="salon"
   aria-label={t('topbar.salon')}
   hidden={!isOpen}
-  bind:this={salon}
+  bind:this={element}
 >
   {#if layout === 'sheet'}
     <div class="salon-handle" data-testid="salon-handle" aria-hidden="true"></div>

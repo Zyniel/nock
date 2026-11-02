@@ -142,8 +142,9 @@ ask only a few times in a short while.
     requester's name (« Quelqu'un » when unknown), as text; then « Oui » and
     « Non », or `vote.waiting` on the requester's page, or `vote.cast` once this
     page voted on that id (remembered while the page is open). The buttons are
-    disabled while the page is not joined. A ballot moves the focus to the line
-    that replaces them.
+    disabled while the page is not joined; a focus on one of them goes to the
+    grid, the selection unchanged, before they are. A ballot moves the focus to
+    the line that replaces them.
 20. For a vote whose `vote_opened` the page applied, the banner shows the seconds
     left (`vote.seconds_left`) and a bar, on the page's own clock, kept across a
     reconnection, down to « 0 s ». A vote known only from a snapshot has neither.
@@ -286,6 +287,10 @@ on its layer of `_design/room.md`, « Layers ».
   (1, 2), then picks « Vérifier » « Le mot » and « Révéler » « La lettre »:
   after her reconnection snapshot the server receives the two edits, the
   check of TAMIS, then the reveal of (1, 2), so the check marks (1, 1) wrong.
+- **AC-25** On Bob's vote, Ana's unvoted page has « Oui » focused and (1, 0)
+  selected; her socket closes: once « Oui » and « Non » are disabled the focus
+  is on the grid, (1, 0) still selected, and no ballot was sent. « Non »
+  focused does the same.
 
 ## Edge cases
 

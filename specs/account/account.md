@@ -118,7 +118,8 @@ the other rooms, and an e-mail says when it is done.
     the catalogue from the top bar, whose button's `aria-expanded` follows the
     sheet. A modal dialog named by its heading: focus goes to the address
     field, else its first control, and stays inside; Escape, « Fermer » or the
-    backdrop close it and focus « Menu » or « Compte ». Signed out it shows
+    backdrop, on a press and its release both on it, in a room or on the
+    catalogue, close it and focus « Menu » or « Compte ». Signed out it shows
     `account.dialog_heading`, `account.dialog_intro` in a room or
     `account.signed_out_intro` outside, and the e-mail form; signed in
     `account.signed_in_heading`, `account.signed_in_as` and « Gérer mon
@@ -453,6 +454,10 @@ the other rooms, and an e-mail says when it is done.
   or a deletion answered 500, shows `account.error.generic`, and every
   identity, room record, history record and `nock.account_rooms` stays as it
   was.
+- **AC-34** In a room at 1280 by 720 and on the catalogue at 360 by 740, with
+  `lea@exa` typed in the account sheet, a press in the field released on the
+  backdrop leaves the sheet open with `lea@exa` still typed; a press and its
+  release both on the backdrop close it.
 
 ## Edge cases
 

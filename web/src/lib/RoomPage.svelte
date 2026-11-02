@@ -9,6 +9,7 @@
   import InAppKeyboard from './InAppKeyboard.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
+  import { isValidCount } from './revealCount'
   import RoomGoneDialog from './RoomGoneDialog.svelte'
   import RoomMenu from './RoomMenu.svelte'
   import RoomNote from './RoomNote.svelte'
@@ -120,7 +121,6 @@
   } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
 
-  const MAX_REVEAL_COUNT = 99
   // The performance mark set once the grid takes taps and keys (spec 036).
   const INTERACTIVE_MARK = 'nock:interactive'
   // The Salon column closed by the player, for every room of this browser.
@@ -223,6 +223,7 @@
   let aideMenu: HTMLElement | null = $state(null)
   let roomMenu: HTMLElement | null = $state(null)
   let salon: Salon | undefined = $state()
+  let salonElement: HTMLElement | null = $state(null)
 
   // The Salon is closed at load in the sheet layout; in the column layout it
   // is open unless the player closed it in this browser.
@@ -299,6 +300,58 @@
     openPopover = null
     isSheetSalonOpen = false
   }
+
+  // True while a Tab is moving the focus: from its key press to its first focus
+  // change, or to the end of the task or the key's release if none comes. The
+  // browser moves the focus right after the key press.
+  let isTabMovingFocus = false
+
+  function noteTabPress(event: KeyboardEvent): void {
+    if (event.key !== 'Tab') {
+      return
+    }
+    isTabMovingFocus = true
+    setTimeout(() => {
+      isTabMovingFocus = false
+    }, 0)
+  }
+
+  function noteTabRelease(event: KeyboardEvent): void {
+    if (event.key === 'Tab') {
+      isTabMovingFocus = false
+    }
+  }
+
+  // A Tab or Shift+Tab that puts the focus on an element outside the open menu
+  // or the Salon sheet closes it, the focus staying on that element
+  // (client/hud.md rule 12). A focus that no Tab moved closes nothing, nor does
+  // a focus lost to no element, which raises no focus event.
+  function closeOverlayLeftByTab(event: FocusEvent): void {
+    const target = event.target
+    if (!isTabMovingFocus || !(target instanceof Node)) {
+      return
+    }
+    // This focus is the one the Tab moved: a later one is the page's.
+    isTabMovingFocus = false
+    const menu = openPopover === 'aide' ? aideMenu : roomMenu
+    if (openPopover !== null && menu !== null && !menu.contains(target)) {
+      openPopover = null
+    }
+    if (isSheetSalonOpen && salonElement !== null && !salonElement.contains(target)) {
+      isSheetSalonOpen = false
+    }
+  }
+
+  $effect(() => {
+    window.addEventListener('keydown', noteTabPress, true)
+    window.addEventListener('keyup', noteTabRelease, true)
+    window.addEventListener('focusin', closeOverlayLeftByTab, true)
+    return () => {
+      window.removeEventListener('keydown', noteTabPress, true)
+      window.removeEventListener('keyup', noteTabRelease, true)
+      window.removeEventListener('focusin', closeOverlayLeftByTab, true)
+    }
+  })
 
   // « Salon » opens the Salon, with the focus inside it, or closes it.
   function toggleSalon(): void {
@@ -610,11 +663,6 @@
     wordsInput = words
   })
 
-  // True for a whole number from 0 to 99.
-  function isValidCount(value: number | null): value is number {
-    return value !== null && Number.isInteger(value) && value >= 0 && value <= MAX_REVEAL_COUNT
-  }
-
   function removePlayer(playerId: string): void {
     send({ type: 'remove_player', player_id: playerId })
   }
@@ -638,6 +686,18 @@
 
   // The host's settings sheet, opened from the Menu.
   let hostSettings: HostSettings | undefined = $state()
+
+  // Runs before the page takes the host sheet away with the host role: an open
+  // sheet closes first, and the focus goes to « Menu » instead of falling back
+  // to the page (lobby/host.md rule 8).
+  let wasHost = false
+  $effect.pre(() => {
+    const isHostNow = isHost
+    if (wasHost && !isHostNow && hostSettings?.close()) {
+      menuButton?.focus()
+    }
+    wasHost = isHostNow
+  })
 
   // Check the nickname typed in the form, and join with it, in capitals, when it
   // is valid.
@@ -1358,6 +1418,23 @@
     const focused = document.activeElement
     if (voteBanner !== null && focused !== null && voteBanner.contains(focused)) {
       void focusGridAfterUpdate()
+    }
+  })
+
+  // Runs before the ballot buttons are disabled by a lost connection: a focus on
+  // one goes to the grid instead of falling back to the page, as the chat does
+  // for a mute (gameplay/hints.md rule 19).
+  $effect.pre(() => {
+    if (!isVotingOffline) {
+      return
+    }
+    const focused = document.activeElement
+    // The banner's only buttons are « Oui » and « Non »: the status line that
+    // replaces them after a ballot is not a button and keeps the focus.
+    const isOnBallotButton =
+      focused instanceof HTMLButtonElement && voteBanner !== null && voteBanner.contains(focused)
+    if (isOnBallotButton) {
+      gridViewport?.focusGrid()
     }
   })
 
@@ -2447,6 +2524,7 @@
         onRemove={removePlayer}
         onEscape={onSalonEscape}
         onMuted={() => chatToggle?.focus()}
+        bind:element={salonElement}
       />
     </div>
     {#if isScrimShown}

@@ -4,7 +4,7 @@ title: Split `client/shell.md` and `admin/operations.md`
 status: Draft
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T20:21:00Z'
+updated_date: '2026-11-02T00:07:00Z'
 labels:
   - follow-up
   - domain:shell
@@ -16,7 +16,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-`client/shell.md` (about 17 KB, 21 criteria after B-042) and `admin/operations.md` (about 19.6 KB, 21 criteria after B-034, whose one criterion the human approved without a split) are past the size budget of `specs/_map.md`; the next criterion in either needs a split first (an architecture item). For shell, the B-010 and B-042 spec-writers propose `client/foundation.md` taking the visual foundation (rules 13 to 16 or 17; AC-13, AC-16 to AC-21).
+`client/shell.md` (about 20 KB, 28 criteria after B-043) and `admin/operations.md` (about 19.6 KB, 21 criteria after B-034, whose one criterion the human approved without a split) are past the size budget of `specs/_map.md`; the next criterion in either needs a split first (an architecture item). For shell, the B-010, B-042 and B-043 spec-writers propose `client/foundation.md` taking the visual foundation (rules 13 to 16 or 17; AC-13, AC-16 to AC-21); « What a frame redraws » (rule 18, AC-22 to AC-28) could also stand alone.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
