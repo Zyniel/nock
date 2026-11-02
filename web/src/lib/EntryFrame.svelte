@@ -33,8 +33,6 @@
   .page-body {
     flex: 1 0 auto;
     box-sizing: border-box;
-    max-width: none;
-    margin: 0;
     padding: 48px 24px;
     background: var(--nock-page);
   }

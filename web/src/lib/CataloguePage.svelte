@@ -92,7 +92,8 @@
     }
   }
 
-  $effect(() => {
+  // Once, when the page shows.
+  onMount(() => {
     void loadGrids()
   })
 

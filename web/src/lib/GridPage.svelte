@@ -1,6 +1,7 @@
 <script lang="ts">
   // The grid page `/g/<number>` (spec 004), in the catalogue's frame (spec
   // 046): the grid's one card, or one state line in its place.
+  import { onMount } from 'svelte'
   import CatalogueFrame from './CatalogueFrame.svelte'
   import CatalogueList from './CatalogueList.svelte'
   import { fetchAccountProgress, isGridSummary, type GridSummary } from './catalogue'
@@ -43,7 +44,8 @@
     accountProgress = await fetchAccountProgress()
   }
 
-  $effect(() => {
+  // Once, when the page shows: the route is read once, so `number` never changes.
+  onMount(() => {
     void loadGrid()
     void loadAccountProgress()
   })

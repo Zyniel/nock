@@ -48,7 +48,7 @@
   --player-colour-7: #784030;
 
   /* The Auteurs ink of each player: the player colour darkened just enough to
-     keep 4.5:1 on the selected cell. Nothing uses them yet. */
+     keep 4.5:1 on the selected cell. The Auteurs legend and the grid's cells use them. */
   --player-ink-0: #604800;
   --player-ink-1: #4b6a2c;
   --player-ink-2: #006d60;
@@ -84,12 +84,6 @@ input,
 select,
 textarea {
   font: inherit;
-}
-
-main {
-  max-width: 40rem;
-  margin: 0 auto;
-  padding: 2rem 1rem;
 }
 
 /* A visible focus on every focusable element after a keyboard move (spec 035):
@@ -329,9 +323,6 @@ main {
   flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
-  max-width: none;
-  margin: 0;
-  padding: 0;
 }
 
 /* A link drawn as a button: "Voir les grilles", "Reprendre". */
