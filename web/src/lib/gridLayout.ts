@@ -18,6 +18,11 @@ export const CLUE_BAR_HEIGHT_PX = 34
 // inside its side, so the grid is one line wider and higher than its cells.
 export const GRID_LINE_PX = 1
 
+// The DOM id of a cell, used by the grid's aria-activedescendant.
+export function cellId(row: number, column: number): string {
+  return `cell-${row}-${column}`
+}
+
 // The side of the clue cell where the word's first letter is.
 export function arrowSide(arrow: Arrow): ArrowSide {
   if (arrow === 'right' || arrow === 'right_then_down') {

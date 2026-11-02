@@ -1,37 +1,32 @@
 <script lang="ts">
-  import { flushSync, untrack } from 'svelte'
+  import { untrack } from 'svelte'
   import { t } from './i18n'
   import {
-    ARROW_GLYPHS,
     GRID_LINE_PX,
     ZOOM_MAX,
     ZOOM_MIN,
-    arrowSide,
     arrowsByCell,
-    clampZoom,
+    cellId,
     dashesImage,
-    distanceBetween,
     fitCellSize,
     hyphenDashes,
-    hyphenDrawings,
     hyphenThickness,
     hyphenWidthAfter,
     hyphenWidthBefore,
     hyphensByCell,
-    scrollAfterZoom,
     scrollShowingCell,
     triangleSide,
   } from './gridLayout'
-  import type { CellHyphens, EdgeDrawing, PlacedArrow, ScrollAxis } from './gridLayout'
-  import HyphenEdge from './HyphenEdge.svelte'
+  import type { CellHyphens, PlacedArrow, ScrollAxis } from './gridLayout'
+  import ClueCell from './ClueCell.svelte'
+  import LetterCell from './LetterCell.svelte'
+  import { pinchPan } from './pinchPan'
+  import type { PinchPanZoom } from './pinchPan'
   import { gridKeyAction, announcementOf } from './gridKeys'
   import { legendMargins } from './legendLayout'
   import { finderColour } from './authorsView'
   import type { LegendName } from './authorsView'
   import AuthorsLegend from './AuthorsLegend.svelte'
-  import { ICONS } from './icons'
-  import IconShapes from './IconShapes.svelte'
-  import PlayerIcon from './PlayerIcon.svelte'
   import { selectionAfterArrow, selectionAfterTab } from './navigation'
   import type { ArrowKey } from './navigation'
   import { latestPendingEdits, shownCellWith, shownGrid } from './roomSession'
@@ -45,14 +40,9 @@
   import { positionKey, wordKey } from './wordSelection'
   import type { Selection, Word } from './wordSelection'
   import { NO_REMOTES, remotesByCell } from './remoteSelections'
-  import type { CellRemotes, Corner, RemoteSelection } from './remoteSelections'
+  import type { CellRemotes, RemoteSelection } from './remoteSelections'
   import type { ClueFlagMarker } from './clueFlags'
   import type { ClueReactionMarker } from './chat'
-
-  interface Finger {
-    clientX: number
-    clientY: number
-  }
 
   let {
     grid,
@@ -132,15 +122,6 @@
     clueReactions: Map<string, ClueReactionMarker>
   } = $props()
 
-  // The triangle of another player in each corner of a cell: a right triangle
-  // in a 10 by 10 box, its legs along the corner's two edges.
-  const TRIANGLE_POINTS: Record<Corner, string> = {
-    'top-left': '0,0 10,0 0,10',
-    'top-right': '0,0 10,0 10,10',
-    'bottom-right': '10,0 10,10 0,10',
-    'bottom-left': '0,0 10,10 0,10',
-  }
-
   // The colour index of a letter cell's finder (see finderColour), or '' while
   // the Auteurs mode is off: then no cell has a finder.
   function finderOf(cell: LetterCellView): string {
@@ -150,28 +131,11 @@
     return finderColour(cell, playerColours)
   }
 
-  // The colour of a letter while the Auteurs mode is on: its finder's ink, or
-  // ink when it has no finder; null while the mode is off, so that the cell's
-  // own rules (pencil grey, ink) apply.
-  function letterColourOf(finder: string): string | null {
-    if (!isAuthorsViewOn) {
-      return null
-    }
-    if (finder === '') {
-      return 'var(--nock-ink)'
-    }
-    return `var(--player-ink-${finder})`
-  }
-
-  // The DOM id of a cell, used by aria-activedescendant.
-  function cellId(row: number, column: number): string {
-    return `cell-${row}-${column}`
-  }
-
   // What a frame redraws (client/foundation.md rule 8): each letter cell reads
-  // what it draws from the maps below, by its "row,column", and a cell whose
-  // value stays the same does not draw again. A cell with nothing to draw
-  // finds no entry, and takes one shared empty value.
+  // what it draws from the maps below, by its "row,column", and is given it as
+  // plain values (LetterCell.svelte); a cell whose values stay the same does
+  // not draw again. A cell with nothing to draw finds no entry, and takes one
+  // shared empty value.
 
   // What the other players draw on each cell. The map before is kept, so that
   // a cell they did not change keeps its value (see remotesByCell).
@@ -219,17 +183,6 @@
     return hyphensOfCells.get(positionKey(row, column)) ?? null
   }
 
-  // What a letter cell draws for the hyphen edges that touch it. What
-  // depends on the cell size is set on the grid (hyphenStyle).
-  function hyphenDrawingsOn(hyphens: CellHyphens, row: number, column: number): EdgeDrawing[] {
-    return hyphenDrawings(
-      hyphens,
-      isSelected(row, column),
-      isSelected(row, column + 1),
-      isSelected(row + 1, column),
-    )
-  }
-
   let gridElement: HTMLDivElement | undefined = $state()
 
   let arrowsOfCells = $derived(arrowsByCell(grid))
@@ -264,6 +217,15 @@
 
   function isSelected(row: number, column: number): boolean {
     return selection !== null && selection.row === row && selection.column === column
+  }
+
+  // The index of the clue of my selected word in the clue cell at (row,
+  // column), or null when that clue is not in this cell.
+  function activeClueIndexIn(row: number, column: number): number | null {
+    if (activeWord === null || activeWord.clueRow !== row || activeWord.clueColumn !== column) {
+      return null
+    }
+    return activeWord.clueIndex
   }
 
   // One handler for the whole grid: find the cell or the clue that was tapped.
@@ -470,105 +432,14 @@
     }
   })
 
-  // Touch gestures, handled here: one finger pans, two fingers pinch (the zoom
-  // follows the ratio of the finger distances).
-  $effect(() => {
-    const element = viewport
-    if (element === undefined) {
-      return
-    }
-    const target: HTMLDivElement = element
-    // The fingers now on the screen, with their last known position.
-    const fingers = new Map<number, Finger>()
-    let startDistance = 0
-    let startZoom = ZOOM_MIN
-
-    function onPointerDown(event: PointerEvent): void {
-      // Pinching and panning are touch gestures: a mouse or a pen keeps its
-      // click on the cell it touched.
-      if (event.pointerType !== 'touch') {
-        return
-      }
-      // A first finger starts a new gesture: a finger left over from a pointerup
-      // that went missing is forgotten.
-      if (event.isPrimary) {
-        fingers.clear()
-      }
-      // The grid keeps the finger until it lifts, even if the cell it touched is
-      // drawn again meanwhile; otherwise its pointerup could go missing and
-      // leave a finger that is not there.
-      target.setPointerCapture(event.pointerId)
-      fingers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
-      startPinchIfTwoFingers()
-    }
-
-    // A pinch measures its ratio against the two fingers on the screen when it
-    // started, so each time exactly two fingers are down it starts anew.
-    function startPinchIfTwoFingers(): void {
-      if (fingers.size !== 2) {
-        return
-      }
-      const [first, second] = [...fingers.values()]
-      startDistance = distanceBetween(first, second)
-      startZoom = zoom
-    }
-
-    function onPointerMove(event: PointerEvent): void {
-      const finger = fingers.get(event.pointerId)
-      if (finger === undefined) {
-        return
-      }
-      if (fingers.size === 1) {
-        target.scrollLeft -= event.clientX - finger.clientX
-        target.scrollTop -= event.clientY - finger.clientY
-      }
-      finger.clientX = event.clientX
-      finger.clientY = event.clientY
-      if (fingers.size === 2 && startDistance > 0) {
-        const [first, second] = [...fingers.values()]
-        const ratio = distanceBetween(first, second) / startDistance
-        const centerX = (first.clientX + second.clientX) / 2
-        const centerY = (first.clientY + second.clientY) / 2
-        zoomAround(clampZoom(startZoom * ratio), centerX, centerY)
-      }
-    }
-
-    function onPointerEnd(event: PointerEvent): void {
-      fingers.delete(event.pointerId)
-      if (fingers.size < 2) {
-        startDistance = 0
-      }
-      startPinchIfTwoFingers()
-    }
-
-    // Change the zoom and scroll so the point between the fingers stays put.
-    function zoomAround(newZoom: number, centerX: number, centerY: number): void {
-      if (newZoom === zoom || cellSize === 0) {
-        return
-      }
-      const box = target.getBoundingClientRect()
-      const offsetX = centerX - box.left
-      const offsetY = centerY - box.top
-      const oldCellSize = cellSize
-      const oldScrollLeft = target.scrollLeft
-      const oldScrollTop = target.scrollTop
+  // Touch gestures (pinchPan.ts): one finger pans, two fingers pinch.
+  const pinchZoom: PinchPanZoom = {
+    zoom: () => zoom,
+    cellSize: () => cellSize,
+    setZoom: (newZoom: number) => {
       zoom = newZoom
-      flushSync()
-      target.scrollLeft = scrollAfterZoom(oldScrollLeft, offsetX, oldCellSize, cellSize)
-      target.scrollTop = scrollAfterZoom(oldScrollTop, offsetY, oldCellSize, cellSize)
-    }
-
-    target.addEventListener('pointerdown', onPointerDown)
-    target.addEventListener('pointermove', onPointerMove)
-    target.addEventListener('pointerup', onPointerEnd)
-    target.addEventListener('pointercancel', onPointerEnd)
-    return () => {
-      target.removeEventListener('pointerdown', onPointerDown)
-      target.removeEventListener('pointermove', onPointerMove)
-      target.removeEventListener('pointerup', onPointerEnd)
-      target.removeEventListener('pointercancel', onPointerEnd)
-    }
-  })
+    },
+  }
 
   // ---- Following the selection while zoomed (viewport rule 3) ----
 
@@ -655,6 +526,7 @@
   data-zoom-min={String(ZOOM_MIN)}
   data-zoom-max={String(ZOOM_MAX)}
   bind:this={viewport}
+  use:pinchPan={pinchZoom}
 >
   <div
     class="grid"
@@ -693,178 +565,45 @@
             {@const latestEdit = latestEdits.get(key) ?? null}
             {@const shown = shownCellWith(cell, latestEdit)}
             {@const remotes = remotesOfCells.get(key) ?? NO_REMOTES}
-            {@const isInWord = wordPositions.has(key)}
-            {@const isCellSelected = isSelected(cell.row, cell.column)}
-            {@const finder = finderOf(cell)}
-            {@const caughtUp = caughtUpKeys.has(key)}
-            {@const flash = flashOfCells.get(key) ?? ''}
-            {@const letter = shown.letter ?? ''}
             {@const hyphens = hyphensOn(cell.row, cell.column)}
-            {@const edges = hyphens === null ? [] : hyphenDrawingsOn(hyphens, cell.row, cell.column)}
-            <!-- The cell's marks, in the drawing order of spec 042: the letter,
-                 then the flash overlay (under it, z-index -1), the dashes of a
-                 hyphen edge (over the flash, under the letter), the catch-up
-                 ring (1), the revealed notch (3), the other players' triangles
-                 or icons (2) and the arrows (6); last, my selection border (7)
-                 and its dashed side along a hyphen edge. -->
-            <div
-              class="cell letter"
-              class:locked={cell.locked}
-              data-testid="cell"
-              data-row={cell.row}
-              data-column={cell.column}
-              data-type="letter"
-              role="gridcell"
-              id={cellId(cell.row, cell.column)}
-              aria-selected={isCellSelected}
-              data-letter={letter}
-              data-unconfirmed={String(shown.unconfirmed)}
-              data-pencil={String(shown.pencil)}
-              data-author={cell.author ?? ''}
-              data-author-colour={finder}
-              data-locked={String(cell.locked)}
-              data-revealed={String(cell.revealed)}
-              data-wrong={String(cell.wrong && !shown.unconfirmed)}
-              data-flash={flash}
-              data-caught-up={String(caughtUp)}
-              data-selected={String(isCellSelected)}
-              data-in-word={String(isInWord)}
-              data-tinted-by={remotes.tintedBy.join(' ')}
-              class:selected={isCellSelected}
-              class:in-word={isInWord}
-              class:tinted={remotes.tintColour !== null && isOthersTintOn}
-              class:hyphen-right={hyphens?.right === true}
-              class:hyphen-bottom={hyphens?.bottom === true}
-              style:--tint={remotes.tintColour === null
-                ? null
-                : `var(--player-colour-${remotes.tintColour})`}
-              style:--finder-ink={letterColourOf(finder)}
-              style:grid-row={cell.row + 1}
-              style:grid-column={cell.column + 1}
-            >{#if letter !== ''}<span class="cell-letter" data-testid="cell-letter"
-                  >{letter}</span
-                >{/if}{#if flash !== ''}<span
-                  class="cell-flash"
-                  data-testid="cell-flash"
-                  aria-hidden="true"
-                  style:background-color={`var(--player-colour-${flash})`}
-                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'hyphen'}<HyphenEdge drawing={edge} />{/if}{/each}{#if hyphens?.right === true && hyphens.bottom}<span
-                  class="hyphen-corner"
-                  aria-hidden="true"
-                ></span>{/if}{#if caughtUp}<span
-                  class="catch-up-mark"
-                  data-testid="catch-up-mark"
-                  aria-hidden="true"
-                ></span>{/if}{#if cell.revealed}<span
-                  class="reveal-mark nock-reveal-notch"
-                  data-testid="reveal-mark"
-                  aria-hidden="true"
-                ></span><span class="visually-hidden" data-testid="reveal-label"
-                  >{t('a11y.revealed')}</span
-                >{/if}{#each remotes.cursors as cursor (cursor.playerId)}<span
-                  class="remote-selection"
-                  data-testid="remote-selection"
-                  data-player-id={cursor.playerId}
-                  data-colour={String(cursor.colour)}
-                  data-corner={cursor.corner}
-                  data-shape={isAccessibilityOn ? 'icon' : 'triangle'}
-                  aria-hidden="true"
-                  >{#if isAccessibilityOn}<PlayerIcon
-                      colour={cursor.colour}
-                    />{:else}<svg
-                      class="triangle"
-                      viewBox="0 0 10 10"
-                      preserveAspectRatio="none"
-                      aria-hidden="true"
-                      ><polygon
-                        points={TRIANGLE_POINTS[cursor.corner]}
-                        style:fill={`var(--player-colour-${cursor.colour})`}
-                      /></svg
-                    >{/if}</span
-                >{/each}{#each arrowsIn(cell.row, cell.column) as placed (`${placed.clueRow},${placed.clueColumn},${placed.clueIndex}`)}<svg
-                  class="clue-arrow {placed.place}"
-                  data-testid="clue-arrow"
-                  data-arrow={placed.arrow}
-                  data-side={arrowSide(placed.arrow)}
-                  data-clue-row={placed.clueRow}
-                  data-clue-column={placed.clueColumn}
-                  data-clue-index={placed.clueIndex}
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  ><g class="halo"
-                    ><path d={ARROW_GLYPHS[placed.arrow].path} /><polygon
-                      points={ARROW_GLYPHS[placed.arrow].head}
-                    /></g
-                  ><path d={ARROW_GLYPHS[placed.arrow].path} /><polygon
-                    points={ARROW_GLYPHS[placed.arrow].head}
-                  /></svg
-                >{/each}{#if isCellSelected}<span
-                  class="cell-selection"
-                  data-testid="cell-selection"
-                  aria-hidden="true"
-                ></span>{/if}{#each edges as edge (`${edge.side} ${edge.kind}`)}{#if edge.kind === 'band'}<HyphenEdge drawing={edge} />{/if}{/each}</div>
+            <LetterCell
+              row={cell.row}
+              column={cell.column}
+              letter={shown.letter ?? ''}
+              isUnconfirmed={shown.unconfirmed}
+              isPencil={shown.pencil}
+              author={cell.author ?? ''}
+              finder={finderOf(cell)}
+              {isAuthorsViewOn}
+              isLocked={cell.locked}
+              isRevealed={cell.revealed}
+              isWrong={cell.wrong && !shown.unconfirmed}
+              flash={flashOfCells.get(key) ?? ''}
+              isCaughtUp={caughtUpKeys.has(key)}
+              isSelected={isSelected(cell.row, cell.column)}
+              isInWord={wordPositions.has(key)}
+              tintedBy={remotes.tintedBy.join(' ')}
+              tintColour={remotes.tintColour}
+              {isOthersTintOn}
+              {isAccessibilityOn}
+              hyphenRight={hyphens?.right === true}
+              hyphenBottom={hyphens?.bottom === true}
+              hyphenLeft={hyphens?.left === true}
+              hyphenTop={hyphens?.top === true}
+              isRightSelected={isSelected(cell.row, cell.column + 1)}
+              isBelowSelected={isSelected(cell.row + 1, cell.column)}
+              cursors={remotes.cursors}
+              arrows={arrowsIn(cell.row, cell.column)}
+            />
           {:else if cell.type === 'clue'}
-            <div
-              class="cell clue-cell"
-              data-testid="cell"
-              data-row={cell.row}
-              data-column={cell.column}
-              data-type="clue"
-              data-author-colour=""
-              role="gridcell"
-              id={cellId(cell.row, cell.column)}
-              style:grid-row={cell.row + 1}
-              style:grid-column={cell.column + 1}
-            >
-              {#each cell.clues as clue, index (index)}
-                {@const flagMarker = clueFlags.get(`${cell.row},${cell.column},${index}`)}
-                {@const reactionMarker = clueReactions.get(`${cell.row},${cell.column},${index}`)}
-                {#if index === 1}
-                  <div class="separator" data-testid="clue-separator"></div>
-                {/if}
-                <div
-                  class="clue"
-                  data-testid="clue"
-                  data-clue-index={index}
-                  data-arrow={clue.arrow}
-                  data-active={String(activeKey === `${cell.row},${cell.column},${index}`)}
-                  data-flagged={String(flagMarker !== undefined)}
-                  class:active={activeKey === `${cell.row},${cell.column},${index}`}
-                >
-                  <span class="clue-text" data-testid="clue-text">{clue.text}</span>
-                  {#if flagMarker !== undefined}
-                    <!-- Over the top left corner of its own clue: it takes no room
-                         from the clue text and never moves it (spec 021). -->
-                    <span
-                      class="clue-flag"
-                      data-testid="clue-flag"
-                      data-flagged-by={flagMarker.flaggedBy}
-                      aria-hidden="true"
-                      ><svg viewBox="0 0 24 24" aria-hidden="true"
-                        ><IconShapes shapes={ICONS.flag} /></svg
-                      ></span
-                    >
-                    <span class="visually-hidden" data-testid="clue-flag-label"
-                      >{t('flag.marker_label', { names: flagMarker.names })}</span
-                    >
-                  {/if}
-                  {#if reactionMarker !== undefined}
-                    <!-- Drawn over the middle of its clue: it takes no room from
-                         the clue text (spec 022). -->
-                    <span
-                      class="clue-reaction"
-                      data-testid="clue-reaction"
-                      data-reaction={reactionMarker.reaction}
-                      data-player-id={reactionMarker.playerId}
-                      aria-hidden="true">{reactionMarker.text}</span
-                    >
-                    <span class="visually-hidden" data-testid="clue-reaction-label"
-                      >{reactionMarker.label}</span
-                    >
-                  {/if}
-                </div>
-              {/each}
-            </div>
+            <ClueCell
+              row={cell.row}
+              column={cell.column}
+              clues={cell.clues}
+              activeClueIndex={activeClueIndexIn(cell.row, cell.column)}
+              {clueFlags}
+              {clueReactions}
+            />
           {:else}
             <div
               class="cell empty"
@@ -946,6 +685,8 @@
     display: contents;
   }
 
+  /* An empty cell's grid lines; LetterCell.svelte and ClueCell.svelte hold the
+     same rule for theirs. */
   .cell {
     box-sizing: border-box;
     min-width: 0;
@@ -953,322 +694,6 @@
     border-right: 1px solid var(--nock-rule);
     border-bottom: 1px solid var(--nock-rule);
     background: var(--nock-white);
-  }
-
-  /* A letter cell is a stacking context of its own (isolation), so the
-     z-index of its marks orders them inside the cell only, and never against
-     the rest of the page (the vote banner). It clips its marks, and holds the
-     letter's font, which `cell-letter` inherits (spec 042). */
-  .letter {
-    --line-right: 0px;
-    --line-bottom: 0px;
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--nock-font-ui);
-    font-size: calc(var(--cell) * 0.56);
-    font-weight: 500;
-    line-height: 1;
-    color: var(--nock-ink);
-    text-transform: uppercase;
-  }
-
-  /* A hyphen edge (gameplay/viewport.md rule 5): the cell's own grid line along
-     it is taken away, and the dashes of HyphenEdge.svelte are drawn in its
-     place. The 1px padding keeps the letter where it was, and --line-right and
-     --line-bottom keep the marks drawn against the cell's sides where they
-     were, off the line's pixel. The line across the edge's end stays plain:
-     the cell's other line runs to the corner, or, when both of its lines are
-     hyphen edges, the corner pixel is drawn in rule grey. */
-  .letter.hyphen-right {
-    --line-right: 1px;
-    border-right-width: 0;
-    padding-right: 1px;
-  }
-
-  .letter.hyphen-bottom {
-    --line-bottom: 1px;
-    border-bottom-width: 0;
-    padding-bottom: 1px;
-  }
-
-  .hyphen-corner {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    z-index: -1;
-    width: 1px;
-    height: 1px;
-    background: var(--nock-rule);
-    pointer-events: none;
-  }
-
-  /* The capital is centred on its own cap height and baseline, not on the line
-     box. An engine without text-box centres the line box. */
-  .cell-letter {
-    text-box: trim-both cap alphabetic;
-  }
-
-  /* A letter found wrong by a check: struck through in red, drawn through the
-     letter that the cell holds. */
-  .letter[data-wrong='true'] {
-    text-decoration-line: line-through;
-    text-decoration-thickness: max(2px, 0.07em);
-    text-decoration-color: var(--nock-red);
-  }
-
-  /* A pencil letter (spec 020): in italics, the sign that does not rely on
-     colour, and in the pencil grey. While the cell flashes, a pencil letter
-     takes the ink like a normal letter (the data-flash rule below) and its
-     italics alone mark it (spec 020 decision 12). */
-  .letter[data-pencil='true'] {
-    font-style: italic;
-    color: var(--nock-pencil);
-  }
-
-  /* The backgrounds of a letter cell (spec 042): exactly one applies, the
-     first that matches in this order: flash, my selected cell, locked, my
-     word, another player's word, white. The rules below come in the reverse
-     order and have the same specificity, so the later one wins. */
-
-  /* The word of another player, while « Mots des autres » is on: their colour
-     at 16 % over white. */
-  .letter.tinted {
-    background: color-mix(in srgb, var(--tint) 16%, var(--nock-white));
-  }
-
-  .letter.in-word {
-    background: var(--nock-word);
-  }
-
-  /* Checked right, or revealed: locked grey and a bold letter (spec 035). */
-  .letter.locked {
-    background: var(--nock-locked);
-    font-weight: 700;
-  }
-
-  /* My cell: the selected blue, with a 2px navy border drawn inside it. The
-     cell's own outline is that border for spec 035 AC-2, but the engines paint
-     it under the cell's marks; the cell-selection element below draws it again
-     over every mark of the cell. */
-  .letter.selected {
-    background: var(--nock-selected);
-    outline: 2px solid var(--nock-navy);
-    outline-offset: -2px;
-  }
-
-  /* My selection border as the top layer of the cell (spec 042, decision 10):
-     on the cell's padding box, over the arrows (6) and every other mark. */
-  .cell-selection {
-    position: absolute;
-    inset: 0 var(--line-right) var(--line-bottom) 0;
-    z-index: 7;
-    box-sizing: border-box;
-    border: 2px solid var(--nock-navy);
-    pointer-events: none;
-  }
-
-  /* A flashing cell (spec 016): the cell turns white and its letter ink; the
-     cell-flash element below lays the replacer's colour at 38 % over the
-     white. A pencil letter takes the ink too (spec 020 decision 12). */
-  .letter:not([data-flash='']) {
-    background: var(--nock-white);
-    color: var(--nock-ink);
-  }
-
-  /* The replacer's colour, set on the element. Its negative z-index paints it
-     over the cell's background and under the letter and the marks, inside the
-     cell's own stacking context (isolation on .letter). */
-  .cell-flash {
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    opacity: 0.38;
-    pointer-events: none;
-  }
-
-  /* A cell changed while the page was away (spec 034): a 3px ink ring on the
-     cell's inner edge, under the other marks. */
-  .catch-up-mark {
-    position: absolute;
-    inset: 0 var(--line-right) var(--line-bottom) 0;
-    z-index: 1;
-    box-sizing: border-box;
-    border: 3px solid var(--nock-ink);
-    pointer-events: none;
-  }
-
-  /* The Auteurs mode (spec 045): each letter in its finder's ink, or ink when
-     it has no finder (--finder-ink, set on the cell), on every background of
-     the cell, the flash included. It replaces the pencil grey (the italics
-     stay) and the ink of a flash. The strike of a wrong letter turns ink, so
-     that it still shows on a red letter. */
-  .grid.authors-view .letter {
-    color: var(--finder-ink);
-  }
-
-  .grid.authors-view .letter[data-wrong='true'] {
-    text-decoration-color: var(--nock-ink);
-  }
-
-  /* A revealed letter (spec 024, spec 042): the orange-red notch of app.css
-     (nock-reveal-notch), drawn over the triangles and the ring. */
-  .reveal-mark {
-    z-index: 3;
-    bottom: var(--line-bottom);
-    left: calc((100% - var(--line-right)) / 2);
-  }
-
-  /* During a flash the notch is ink, which keeps 3:1 on every flash colour
-     (spec 042, lead's decision 2). */
-  .letter:not([data-flash='']) .reveal-mark {
-    background-color: var(--nock-ink);
-  }
-
-  /* Another player on the cell (spec 042): a plain triangle of side --triangle
-     in their colour, in the corner they took when they arrived. With
-     « Accessibilité » on, their icon instead, smaller and set in from the
-     corner. */
-  .remote-selection {
-    --inset: 0px;
-    position: absolute;
-    z-index: 2;
-    width: var(--triangle);
-    height: var(--triangle);
-    pointer-events: none;
-  }
-
-  .remote-selection[data-shape='icon'] {
-    --inset: max(1px, calc(var(--cell) * 0.04));
-    width: max(6px, calc(var(--cell) * 0.24));
-    height: max(6px, calc(var(--cell) * 0.24));
-  }
-
-  .remote-selection[data-corner='top-left'] {
-    top: var(--inset);
-    left: var(--inset);
-  }
-
-  .remote-selection[data-corner='top-right'] {
-    top: var(--inset);
-    right: calc(var(--inset) + var(--line-right));
-  }
-
-  .remote-selection[data-corner='bottom-right'] {
-    bottom: calc(var(--inset) + var(--line-bottom));
-    right: calc(var(--inset) + var(--line-right));
-  }
-
-  .remote-selection[data-corner='bottom-left'] {
-    bottom: calc(var(--inset) + var(--line-bottom));
-    left: var(--inset);
-  }
-
-  /* A triangle is a triangle for the pointer too: its box is clipped to the
-     drawn shape, so a point of the box outside the shape reaches what is under
-     it (the cell). */
-  .remote-selection[data-shape='triangle'][data-corner='top-left'] {
-    clip-path: polygon(0% 0%, 100% 0%, 0% 100%);
-  }
-
-  .remote-selection[data-shape='triangle'][data-corner='top-right'] {
-    clip-path: polygon(0% 0%, 100% 0%, 100% 100%);
-  }
-
-  .remote-selection[data-shape='triangle'][data-corner='bottom-right'] {
-    clip-path: polygon(100% 0%, 100% 100%, 0% 100%);
-  }
-
-  .remote-selection[data-shape='triangle'][data-corner='bottom-left'] {
-    clip-path: polygon(0% 0%, 100% 100%, 0% 100%);
-  }
-
-  .triangle {
-    display: block;
-    width: 100%;
-    height: 100%;
-  }
-
-  .triangle polygon {
-    stroke: none;
-  }
-
-  /* A direction arrow (spec 042), in the letter cell where its word starts:
-     a box of side --arrow whose edge at -1px lies on the grid line, over every
-     mark of the cell but my selection border. */
-  .clue-arrow {
-    --arrow: max(9px, calc(var(--cell) * 0.26));
-    position: absolute;
-    z-index: 6;
-    width: var(--arrow);
-    height: var(--arrow);
-    pointer-events: none;
-  }
-
-  .clue-arrow path {
-    fill: none;
-    stroke: var(--nock-ink);
-    stroke-width: 2.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  .clue-arrow polygon {
-    fill: var(--nock-ink);
-  }
-
-  /* The thin white halo (_design/cells.md « Direction arrows »): the same path
-     and head drawn first, under the ink, in white and wider, so 1.2 units of
-     white border every ink edge. Drawn, never a CSS filter. */
-  .clue-arrow .halo path {
-    stroke: var(--nock-white);
-    stroke-width: 4.8;
-  }
-
-  .clue-arrow .halo polygon {
-    fill: var(--nock-white);
-    stroke: var(--nock-white);
-    stroke-width: 2.4;
-    stroke-linejoin: round;
-  }
-
-  /* The places of gridLayout.ts (ArrowPlace). */
-  .clue-arrow.right {
-    left: -1px;
-    top: calc(var(--cell) * 0.5 - var(--arrow) / 2);
-  }
-
-  .clue-arrow.right-high {
-    left: -1px;
-    top: calc(var(--cell) * 0.25 - var(--arrow) / 2);
-  }
-
-  .clue-arrow.right-low {
-    left: -1px;
-    top: calc(var(--cell) * 0.72 - var(--arrow) / 2);
-  }
-
-  .clue-arrow.down {
-    top: -1px;
-    left: calc(var(--cell) * 0.5 - var(--arrow) / 2);
-  }
-
-  .clue-arrow.down-then-right {
-    top: -1px;
-    left: calc(var(--cell) * 0.06);
-  }
-
-  .clue-arrow.down-then-right-moved {
-    top: -1px;
-    left: calc(var(--cell) * 0.4);
-  }
-
-  .clue-arrow.right-then-down {
-    left: -1px;
-    top: calc(var(--cell) * 0.06);
   }
 
   /* The focus outline stays inside the scrolling viewport. */
@@ -1301,122 +726,5 @@
   .empty {
     overflow: hidden;
     background: var(--nock-rule);
-  }
-
-  /* A clue cell (spec 042): its clues fill its content box, one alone or two
-     in halves of equal height around the separator. It does not clip: at zoom
-     1 a long clue may reach past its edges. The padding is 2px by 3px; only on
-     tiny cells (a large grid beside the in-app keyboard on a low window) does
-     it give way, the sides below 15px and the top and bottom below 12px, so
-     that the clues keep a box that takes taps (FX-02's 5.8px cells leave a
-     clue about 2.5px wide, which Firefox's taps reach). */
-  .clue-cell {
-    --clue-padding-x: min(3px, calc(var(--cell) * 0.2));
-    display: flex;
-    flex-direction: column;
-    padding: min(2px, calc(var(--cell) * 0.17)) var(--clue-padding-x);
-    background: var(--nock-clue-bg);
-  }
-
-  /* A clue holds its text, centred, and the marks drawn over it (the flag, a
-     reaction), placed against it. */
-  .clue {
-    position: relative;
-    flex: 1 1 0;
-    min-height: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* The clue of my selected word: its own half of the cell (decided by the
-     human on 2026-10-16). */
-  .clue.active {
-    background: var(--nock-selected);
-    border-radius: 2px;
-  }
-
-  /* One size for every clue cell; the text keeps the clue as written and the
-     capitals are the CSS's. A long text that reaches past its cell takes no
-     tap: a tap goes to the cell or the clue under it (its own clue takes the
-     taps on its box). */
-  .clue-text {
-    pointer-events: none;
-    display: block;
-    width: 100%;
-    /* IBM Plex Sans Condensed's ascent and descent take 1.3em, more than the
-       1.12 line: this padding holds the 0.09em that the first and last lines'
-       glyphs reach past their lines, so the text's box holds all of it and no
-       clue text is cut at full zoom (spec 006 AC-1). The text stays centred. */
-    padding-block: 0.09em;
-    font-family: var(--nock-font-clue);
-    font-size: max(6px, calc(var(--cell) * 0.145));
-    font-weight: 600;
-    line-height: 1.12;
-    letter-spacing: 0.01em;
-    text-transform: uppercase;
-    text-align: center;
-    overflow-wrap: break-word;
-    -webkit-hyphens: manual;
-    hyphens: manual;
-    color: var(--nock-clue-ink);
-  }
-
-  .separator {
-    flex: none;
-    height: 1px;
-    margin: 0 14%;
-    background: var(--nock-clue-ink);
-    opacity: 0.55;
-  }
-
-  /* The flag of spec 021 on its own clue: the red flag icon on a square of
-     clue blue-grey at the clue's top left, 1px right of the cell's left edge
-     (the clue starts 3px in), or on that edge's padding when it is thinner
-     than 1px. It is drawn over the clue text and never moves it; a tap on it is
-     a tap on its clue. */
-  .clue-flag {
-    position: absolute;
-    z-index: 2;
-    top: 0;
-    left: calc(min(1px, var(--clue-padding-x)) - var(--clue-padding-x));
-    display: grid;
-    place-items: center;
-    width: max(8px, calc(var(--cell) * 0.22));
-    height: max(8px, calc(var(--cell) * 0.22));
-    background: var(--nock-clue-bg);
-    border-radius: 0 0 3px 0;
-  }
-
-  .clue-flag svg {
-    width: 86%;
-    height: 86%;
-    fill: var(--nock-red);
-    stroke: var(--nock-red);
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-  }
-
-  /* A shown reaction (spec 022): the white pill of specs/_design/room.md « Reactions »,
-     centred on its own clue (one half of a two-clue cell). Positioned against
-     the clue, so it adds no layout, and on layer 8, above the flag and the
-     cells around it, since it may reach past the cell's edges. It lies inside
-     its clue, so a tap on it is a tap on its clue. */
-  .clue-reaction {
-    position: absolute;
-    z-index: 8;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 2px 6px;
-    font-size: 16px;
-    line-height: 1.2;
-    white-space: nowrap;
-    color: var(--nock-ink);
-    background: var(--nock-white);
-    border: 1px solid var(--nock-line);
-    border-radius: 12px;
-    box-shadow: 0 4px 10px -4px var(--nock-shadow-soft);
   }
 </style>
