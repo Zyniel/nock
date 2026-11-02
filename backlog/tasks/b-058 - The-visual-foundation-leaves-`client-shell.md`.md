@@ -4,7 +4,7 @@ title: The visual foundation leaves `client/shell.md`
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T11:33:00Z'
+updated_date: '2026-11-02T11:41:00Z'
 labels:
   - domain:shell
   - domain:foundation
@@ -30,6 +30,42 @@ ordinal: 13000
 - Open questions: none.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 foundation AC-1 (new, was shell AC-13)
+- [ ] #2 shell AC-13 (deleted, moved to foundation AC-1)
+- [ ] #3 foundation AC-2 (new, was shell AC-16)
+- [ ] #4 shell AC-16 (deleted, moved to foundation AC-2)
+- [ ] #5 foundation AC-3 (new, was shell AC-17)
+- [ ] #6 shell AC-17 (deleted, moved to foundation AC-3)
+- [ ] #7 foundation AC-4 (new, was shell AC-18)
+- [ ] #8 shell AC-18 (deleted, moved to foundation AC-4)
+- [ ] #9 foundation AC-5 (new, was shell AC-19)
+- [ ] #10 shell AC-19 (deleted, moved to foundation AC-5)
+- [ ] #11 foundation AC-6 (new, was shell AC-20)
+- [ ] #12 shell AC-20 (deleted, moved to foundation AC-6)
+- [ ] #13 foundation AC-7 (new, was shell AC-21)
+- [ ] #14 shell AC-21 (deleted, moved to foundation AC-7)
+- [ ] #15 foundation AC-8 (new, was shell AC-22)
+- [ ] #16 shell AC-22 (deleted, moved to foundation AC-8)
+- [ ] #17 foundation AC-9 (new, was shell AC-23)
+- [ ] #18 shell AC-23 (deleted, moved to foundation AC-9)
+- [ ] #19 foundation AC-10 (new, was shell AC-24)
+- [ ] #20 shell AC-24 (deleted, moved to foundation AC-10)
+- [ ] #21 foundation AC-11 (new, was shell AC-25)
+- [ ] #22 shell AC-25 (deleted, moved to foundation AC-11)
+- [ ] #23 foundation AC-12 (new, was shell AC-26)
+- [ ] #24 shell AC-26 (deleted, moved to foundation AC-12)
+- [ ] #25 foundation AC-13 (new, was shell AC-27)
+- [ ] #26 shell AC-27 (deleted, moved to foundation AC-13)
+- [ ] #27 foundation AC-14 (new, was shell AC-28)
+- [ ] #28 shell AC-28 (deleted, moved to foundation AC-14)
+- [ ] #29 foundation AC-15 (new, was shell AC-32)
+- [ ] #30 shell AC-32 (deleted, moved to foundation AC-15)
+- [ ] #31 foundation AC-16 (new, was shell AC-33)
+- [ ] #32 shell AC-33 (deleted, moved to foundation AC-16)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -52,4 +88,6 @@ ordinal: 13000
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead (2026-11-02): started after B-057 (#98) merged. Spec-writer on Fable at high (new domain). The realtime citations at shell.md:67 and :70 go to reconnection rules 4 and 5 (B-057's map: realtime 19→reconnection 4, 20→5). If B-055 (held, PR #101) merges first, its map of shared components must follow any Code-section line that moves from shell to foundation; the lead reconciles whichever merges second. Base: origin/main f6a5666.
+
+Lead: shell rule 21 and AC-32/AC-33 (font subsets, the room page's preload), added after the task was written, move with the fonts (foundation rule 5, AC-15/AC-16): one coherent part, so foundation has 16 criteria and shell 17, and tests/test_shell_fonts.py moves too. product.md:286 (Reduced motion, a file name in Out of scope) repointed to foundation, as B-062 did for product's route cells; results.md:300 (by name) left for B-064. Spec-checker APPROVED in round 1; its minor note (foundation's Look cell in _map.md could add pages) left: the column already lists only the main files. shell's Code section no longer names GridViewport.svelte (foundation does): B-055's map must follow when both are on main.
 <!-- SECTION:NOTES:END -->

@@ -47,7 +47,8 @@ table, the naming rules and the glossary follow in the same change.
 | platform | `platform/reconnection.md` | stale edits, the resume window, the page's connection: heartbeat, losses, retries, resends | room | 017 AC-1 to AC-3, AC-5 |
 | platform | `platform/server.md` | durable state, undo, engine time, the rooms held in memory | | 018; 036 AC-12 |
 | platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
-| client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
+| client | `client/shell.md` | client routing, connection states, text and translations, entry and not-found pages, the opening, the brand | pages, foundation | 040 AC-14 to AC-25; 046 AC-1, AC-18 to AC-23; 048 AC-14 |
+| client | `client/foundation.md` | state lines, motion, colour tokens, fonts, icons, shared components, the focus ring, what a frame redraws | foundation, cells | 041; 040 AC-26; 048 AC-13 |
 | client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |
 
@@ -185,6 +186,7 @@ then nothing of race or teams is built.
 | dry run | « Cela effacera N salons maintenant. » (how many rooms a proposed value would delete now; nothing saved) | `POST /api/ops/settings/dry-run` |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
+| foundation, state line | (not shown: the tokens, fonts, icons, components and focus ring every screen is built from; the one line a page shows while waiting, empty, failed or done) | `app.css`, `icons.ts`, `--nock-*` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |
 | hint vote | « … propose de vérifier la grille » | `vote` |
 | authorship | « Auteurs » | `authors` |
