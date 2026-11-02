@@ -95,7 +95,7 @@ ordinal: 11000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -132,6 +132,8 @@ Decisions (lead, 2026-11-02):
 - Not taken: the ?url font import in place of the node_modules path (acceptable as is; a draft follow-up). Recorded for the human: rule 22 on the room route went from 1246 ms to about 1570 ms (limit 2500 ms), the cost of the room's own chunk.
 
 - Review round 2: CHANGES REQUESTED on one new finding, the {:catch} state of the page imports (unspecified screen state, borrowed key, role against _design/pages.md), which the lead had asked for; the reviewer named its removal as enough to approve. App.svelte is back to its round-1 content (commit after 9aba404); the load-failure state becomes a follow-up draft. Flakes seen under parallel load, each green alone: 014 AC-7, 013 AC-7, 044 AC-2, all waiting for the room page's first state, which now comes one chunk later.
+
+- Pull request: https://github.com/Zyniel/nock/pull/95 (auto-merge on).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
