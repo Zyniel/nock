@@ -16,6 +16,10 @@ Choices where the spec leaves room:
 - AC-6: "lists" accepts the package under `dependencies` or `devDependencies`.
   An `@fontsource/` import is any quoted module name that starts with
   `@fontsource/` in a `.ts` or `.svelte` file under `web/src`, comments removed.
+- AC-6: "exactly the eight faces" is, since `client/shell.md` rule 21, each of the eight
+  faces imported from its two subset files, `latin` and `latin-ext`: sixteen imports,
+  each once, and no other (the package's all-subsets file of a face, such as
+  `400.css`, is none of them).
 """
 
 from __future__ import annotations
@@ -151,15 +155,24 @@ def test_ac5_no_request_goes_to_another_host(page: Page, live_server: str) -> No
 # ---- AC-6: the font packages are the decided ones and are credited ----------------
 
 FONT_PACKAGES = ("@fontsource/source-sans-3", "@fontsource/ibm-plex-sans-condensed")
+# The eight faces of the design, each as the two subset files that `client/shell.md`
+# rule 21 allows: `latin` and `latin-ext` (`@fontsource/<package>/<subset>-<weight>`,
+# `-italic` after the weight for the italic faces).
+FACE_FILES = [
+    ("source-sans-3", "400"),
+    ("source-sans-3", "500"),
+    ("source-sans-3", "600"),
+    ("source-sans-3", "700"),
+    ("source-sans-3", "500-italic"),
+    ("source-sans-3", "700-italic"),
+    ("ibm-plex-sans-condensed", "500"),
+    ("ibm-plex-sans-condensed", "600"),
+]
+SUBSET_NAMES = ("latin", "latin-ext")
 FONT_IMPORTS = [
-    "@fontsource/source-sans-3/400.css",
-    "@fontsource/source-sans-3/500.css",
-    "@fontsource/source-sans-3/600.css",
-    "@fontsource/source-sans-3/700.css",
-    "@fontsource/source-sans-3/500-italic.css",
-    "@fontsource/source-sans-3/700-italic.css",
-    "@fontsource/ibm-plex-sans-condensed/500.css",
-    "@fontsource/ibm-plex-sans-condensed/600.css",
+    f"@fontsource/{package}/{subset}-{face}.css"
+    for package, face in FACE_FILES
+    for subset in SUBSET_NAMES
 ]
 FONTSOURCE_NAME = re.compile(r"""(['"`])(@fontsource/[^'"`]*)\1""")
 README_CREDITS = (
@@ -203,6 +216,7 @@ def test_ac6_package_json_lists_the_font_package(package: str) -> None:
 
 def test_ac6_the_fontsource_imports_are_exactly_the_eight_files_each_once() -> None:
     assert fontsource_imports() == Counter(FONT_IMPORTS)
+    assert len(FONT_IMPORTS) == 16
 
 
 def test_ac6_the_import_scan_finds_imports_and_leaves_comments_out() -> None:

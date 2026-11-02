@@ -94,6 +94,10 @@ FR_JSON_PATH = PROJECT_ROOT / "web" / "src" / "i18n" / "fr.json"
 
 # The operator token of the "Test harness": 44 characters of the allowed set.
 OPS_TOKEN = "Ops-" + "x" * 40
+# A token the server refuses that has the shape of `admin/operations.md` rule 4 (32 to
+# 256 of `A-Z a-z 0-9 _ -`), so the page sends it: a shorter or odder one is refused
+# in the page with no request.
+WRONG_TOKEN = "Wrong-" + "y" * 40
 OPS_TOKEN_KEY = "nock.ops_token"  # the page's sessionStorage key
 
 DASHBOARD_PATH = "/api/ops/dashboard"

@@ -44,6 +44,7 @@ from nock.catalogue import Catalogue
 from spec038_harness import (
     DASHBOARD_ROUTE,
     SEVEN_DAY_TEXTS,
+    WRONG_TOKEN,
     OpsServer,
     ops_live_server,
     texts_of,
@@ -132,15 +133,18 @@ def locked_page(window: OpenWindow, server: OpsServer, size: tuple[int, int]) ->
 
 
 def refuse_token(page: Page) -> None:
-    """Submit `wrong`, the dashboard answering 401; wait for `ops-token-error`."""
+    """Submit `WRONG_TOKEN`, the dashboard answering 401; wait for `ops-token-error`.
+
+    The token has the shape of `admin/operations.md` rule 4, so the page sends it.
+    """
 
     def refuse(route: Route) -> None:
         fulfil_json(route, 401, {"detail": "Not authorized"})
 
     page.route(DASHBOARD_ROUTE, refuse)
     field = page.get_by_test_id("ops-token-input")
-    field.fill("wrong")
-    expect(field).to_have_value("wrong")
+    field.fill(WRONG_TOKEN)
+    expect(field).to_have_value(WRONG_TOKEN)
     # 2026-10-23: Firefox under load lost the press; main's run after #43.
     click_until_pressed(page.get_by_test_id("ops-token-submit"))
     expect(page.get_by_test_id("ops-token-error")).to_be_visible()

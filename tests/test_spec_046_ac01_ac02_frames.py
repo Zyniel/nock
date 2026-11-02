@@ -53,6 +53,7 @@ from spec046_harness import (
     WIDE_BAR_INSET,
     WIDE_SIZES,
     OpenWindow,
+    bar_then_body_problems,
     card_problems,
     child_ids,
     child_tags,
@@ -298,9 +299,7 @@ def test_ac2_the_catalogue_page_is_white_and_holds_the_bar_then_the_column(
     open_catalogue(page, live_server)
     catalogue_page = page.get_by_test_id("catalogue-page")
 
-    ids = child_ids(catalogue_page)
-
-    assert ids == ["page-topbar", "catalogue-column"], ids
+    assert bar_then_body_problems(catalogue_page, "catalogue-column") == []
     assert colour_problem(catalogue_page, "page", "backgroundColor", WHITE) == []
 
 

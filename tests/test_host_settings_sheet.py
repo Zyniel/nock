@@ -1,6 +1,6 @@
-"""Tests of `lobby/host.md` AC-18, AC-19 and AC-20: the host's settings sheet
-(rule 8) keeps the focus inside, refuses a bad count in French, and goes with the
-host role.
+"""Tests of `lobby/host.md` AC-18 to AC-22: the host's settings sheet (rule 8) keeps
+the focus inside, refuses a bad count in French, goes with the host role, and takes
+from a `settings_changed` only the fields whose room value changed.
 
 AC-18: at 1280 by 720, the sheet opened by keyboard: Tab on « Enregistrer » focuses
 the switch « Verrouiller le salon », Shift+Tab on the switch focuses
@@ -17,6 +17,14 @@ close clears them.
 AC-20: Ana's host sheet open at 360 by 740, a `host_changed` to Bob closes it and
 focuses « Menu », whose items no longer hold « Réglages de l'hôte ».
 
+AC-21: Ana's sheet open on the room's vote, 3 letters and 0 words: she types `7` in
+« Lettres à révéler », chooses « libre » and presses the switch; once the room is
+locked, the sheet still shows 7 and « libre ».
+
+AC-22: the same sheet with `7` typed: a `settings_changed` to vote, 3 letters and 5
+words, from her other connection, leaves 7 there and shows 5 in « Mots à révéler ».
+Rule 8 adds that a help mode the event changes is taken too.
+
 Readings where the spec leaves room:
 
 - "Marked invalid" is `aria-invalid` `true`; "unmarked" is `aria-invalid` absent
@@ -29,6 +37,11 @@ Readings where the spec leaves room:
   included, and meets the switch, a help-mode choice, both counts and
   « Enregistrer ».
 - "Opened by keyboard" is spec 043's `open_host_settings_with_keyboard`.
+- AC-21 and AC-22 open spec 043's mocked room with a snapshot of vote, 3 letters and 0
+  words; "the room is locked" is a `settings_changed` of the same settings with
+  `locked` true, sent by the mock (the switch's own message is not checked: AC-21
+  is about what the sheet shows once the room answers); "from her other connection"
+  is a `settings_changed` whose `player_id` is Ana's, `p1`.
 """
 
 from __future__ import annotations
@@ -47,9 +60,15 @@ from spec035_harness import Walker
 from spec043_harness import (
     COMPUTER,
     PHONE,
+    RoomMock,
     fr_value,
     frames_sent_after,
+    fx01_view,
+    open_room,
+    players_up_to,
     send_and_wait,
+    settings_frame,
+    snapshot_frame,
 )
 
 COUNT_ERROR = "Entrez un nombre entier de 0 à 99."  # `settings.error.count`
@@ -87,6 +106,25 @@ def fx01_grid(fx01_text: str) -> Grid:
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     """Return `window(width, height, touch)`: a page in a context of that size."""
     yield from window_opener(browser, browser_name)
+
+
+def open_vote_sheet(page: Page, base_url: str, grid: Grid) -> RoomMock:
+    """Open FX-01 as the host `p1` on vote, 3 letters and 0 words, and her sheet."""
+    frame = snapshot_frame(
+        fx01_view(grid),
+        players_up_to(3),
+        help_mode=HelpMode.VOTE,
+        allowance=RevealBudget(letters=3, words=0),
+    )
+    mock = open_room(page, base_url, frame)
+    open_host_settings(page)
+    return mock
+
+
+def help_mode_choice(page: Page, mode: HelpMode) -> Locator:
+    """The radio of a help mode in the open sheet, named with its French label."""
+    label = fr_value(f"settings.help_mode.{mode.value}")
+    return page.get_by_test_id("host-settings").get_by_role("radio", name=label)
 
 
 def count_inputs(page: Page) -> dict[str, Locator]:
@@ -291,3 +329,81 @@ def test_ac20_a_host_change_closes_the_sheet_and_focuses_menu(
     expect(page.get_by_test_id("menu-button")).to_be_focused()
     room_menu = page.get_by_test_id("room-menu")
     expect(room_menu.get_by_test_id("host-settings-open")).to_have_count(0)
+
+
+# ---- AC-21, AC-22: a settings_changed sets only what it changes -------------------
+
+
+def test_ac21_a_lock_keeps_the_typed_count_and_the_chosen_help_mode(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(COMPUTER[0], COMPUTER[1], False)
+    mock = open_vote_sheet(page, live_server, fx01_grid)
+    fields = count_inputs(page)
+    fields["letters"].fill("7")
+    help_mode_choice(page, HelpMode.FREE).check()
+    page.get_by_test_id("lock-room").click()
+
+    send_and_wait(
+        page,
+        mock,
+        settings_frame(
+            6,
+            help_mode=HelpMode.VOTE,
+            allowance=RevealBudget(letters=3, words=0),
+            locked=True,
+        ),
+    )
+
+    # The switch shows the room's lock, so the event was applied.
+    expect(page.get_by_test_id("lock-room")).to_have_attribute("aria-pressed", "true")
+    expect(fields["letters"]).to_have_value("7")
+    expect(help_mode_choice(page, HelpMode.FREE)).to_be_checked()
+    expect(help_mode_choice(page, HelpMode.VOTE)).not_to_be_checked()
+    expect(fields["words"]).to_have_value("0")
+
+
+def test_ac22_a_count_the_event_changes_is_shown_and_a_typed_one_it_leaves_is_kept(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(COMPUTER[0], COMPUTER[1], False)
+    mock = open_vote_sheet(page, live_server, fx01_grid)
+    fields = count_inputs(page)
+    fields["letters"].fill("7")
+
+    send_and_wait(
+        page,
+        mock,
+        settings_frame(
+            6,
+            help_mode=HelpMode.VOTE,
+            allowance=RevealBudget(letters=3, words=5),
+        ),
+    )
+
+    expect(fields["words"]).to_have_value("5")
+    expect(fields["letters"]).to_have_value("7")
+    expect(help_mode_choice(page, HelpMode.VOTE)).to_be_checked()
+
+
+def test_ac22_a_help_mode_the_event_changes_is_shown_and_a_typed_count_is_kept(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(COMPUTER[0], COMPUTER[1], False)
+    mock = open_vote_sheet(page, live_server, fx01_grid)
+    fields = count_inputs(page)
+    fields["letters"].fill("7")
+
+    send_and_wait(
+        page,
+        mock,
+        settings_frame(
+            6,
+            help_mode=HelpMode.NONE,
+            allowance=RevealBudget(letters=3, words=0),
+        ),
+    )
+
+    expect(help_mode_choice(page, HelpMode.NONE)).to_be_checked()
+    expect(fields["letters"]).to_have_value("7")
+    expect(fields["words"]).to_have_value("0")
