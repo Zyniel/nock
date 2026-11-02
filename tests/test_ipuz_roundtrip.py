@@ -58,7 +58,7 @@ def test_ac2_a_file_with_title_and_publisher_survives_write_and_read() -> None:
     assert second.publisher == "Le Journal"
 
 
-def test_ac2_the_writer_writes_the_fields_of_rule_5_and_the_clues() -> None:
+def test_ac2_the_writer_writes_the_fields_of_rule_1_and_the_clues() -> None:
     expected = fx01_ipuz_data()
 
     written = written_json(fx01_ipuz_data())
