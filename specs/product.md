@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
@@ -273,7 +273,7 @@ conformance is checked »).
 - Typing a letter moves the selection, so the announcement changes only by its
   position; letters are never announced (AC-4).
 - A disconnected player has no cursor and does not count among a cell's four
-  (`social/presence.md`, `gameplay/board.md`).
+  (`social/presence.md`, `gameplay/viewport.md`).
 - A connection closed with 4507 or 1008 reconnects and gets a fresh snapshot
   (AC-15).
 - An honest page never nears the bounds of rule 25: edits are capped at 20 a
