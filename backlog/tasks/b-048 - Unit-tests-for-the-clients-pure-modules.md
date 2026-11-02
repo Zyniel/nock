@@ -4,7 +4,7 @@ title: Unit tests for the client's pure modules
 status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T10:39:00Z'
+updated_date: '2026-11-02T10:40:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -55,7 +55,7 @@ ordinal: 9000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -75,6 +75,8 @@ Lead (2026-11-02): the human's option A, node:test; tests in tests/web/ by the t
 
 Lead: design from the Plan agent (Fable, high), option 1 of 3: the hook in scripts/ (tooling the human owns; a hook in web/ would be the implementer's), the step with the static group of the full stage rather than a third --tests kind (TEST_SELECTIONS are pytest selections), a dedicated web/tsconfig.tests.json (node types kept out of the app's config). No new CI job: the static job runs it; tests/web/* is static-only in the change detection. erasableSyntaxOnly added to tsconfig.app.json so the app refuses syntax Node cannot strip (none exists today). Local PATH node is v22.23 (fine: 22.18+); CI is lts/*.
 Lead: review round 1 CHANGES REQUESTED (the version check never ran on a Node without registerHooks; suggestions: the tests' tsconfig stricter than the app's, the hook's limits undocumented), all taken in 114e139; round 2 APPROVE, its wording suggestion taken. The full gate ran green at 21e0d86; after the review fixes, which touch only the hook and the tests' tsconfig, the gate without browser tests ran green.
+
+Pull request: https://github.com/Zyniel/nock/pull/99
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
