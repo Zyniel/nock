@@ -1,9 +1,9 @@
-"""Tests of board AC-21 and AC-22: the dashed edge of a compound word's hyphen.
+"""Tests of viewport AC-9 and AC-10: the dashed edge of a compound word's hyphen.
 
 On the mocked room of `tests/spec042_harness.py`, desktop context, FX-01 with
 `VI-DE` and `NA-VAL` (the right edge of (2, 2) and the bottom edge of (1, 1) are
 hyphen edges) and FX-02 with `ORE-ILLE` (the right edge of (1, 4)). The tests
-read what the page paints, decoded from screenshots by `tests/board_harness.py`,
+read what the page paints, decoded from screenshots by `tests/viewport_harness.py`,
 against `specs/_design/cells.md` « Hyphen edges ».
 
 Choices where the spec leaves room:
@@ -18,7 +18,7 @@ Choices where the spec leaves room:
   side while the pixels count whole lines. "On a whole pixel": every pixel the
   dashes cover is `--nock-hyphen` or the background, none blended.
 - The crossing grid lines stay plain: their pixels at the ends of the edge are
-  rule grey across the dashes' thickness. Rule 20's "whatever the state of the
+  rule grey across the dashes' thickness. Rule 5's "whatever the state of the
   two cells" includes a cell with both marks: FX-01 with `TA-MIS` and `NA-VAL`,
   where both edges of (1, 1) end at its bottom right corner pixel.
 - "The same in every state": the same look by the formula for the cell's
@@ -33,13 +33,13 @@ Choices where the spec leaves room:
   pixel and the next one down) do not reach into (1, 1), so the notch is read on
   72 px cells and more (1024 by 768, about 130 px), where the dashes are 3 px
   and their top pixel row is the bottom row of (1, 1).
-- AC-22, my selection border: the rows of its top and bottom sides (2 px at each
+- AC-10, my selection border: the rows of its top and bottom sides (2 px at each
   end of the right side) belong to those sides and are not read as the dashed
-  side; its three other sides are read 3 px away from the corners. Rule 20's
+  side; its three other sides are read 3 px away from the corners. Rule 5's
   "whatever the state of the two cells" also reads the band with my selected
   cell after the edge ((2, 3), and (2, 1) below `NA-VAL`), where the line's
   pixel is in the cell before, and on the down hyphen with (1, 1) selected.
-- AC-22, the tap and the letters: the same tap and keys on FX-01 as published
+- AC-10, the tap and the letters: the same tap and keys on FX-01 as published
   give the same cells and letters.
 """
 
@@ -52,23 +52,6 @@ import pytest
 from playwright.sync_api import Page, ViewportSize, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
-from board_harness import (
-    HYPHEN,
-    INTERIOR_OFFSET,
-    EdgeReading,
-    Run,
-    Side,
-    dash_count,
-    dash_thickness,
-    expected_runs,
-    grid_picture,
-    hyphen_positions,
-    plain_edge_problems,
-    read_edge,
-    run_problems,
-    runs_of,
-    thickness_offsets,
-)
 from grids_harness import FX01_HYPHENS, grid_with_answers
 from nock.catalogue import Catalogue
 from nock.grid import Grid, LetterCell
@@ -108,6 +91,23 @@ from spec042_harness import (
     show_snapshot,
     snapshot_frame,
     tap,
+)
+from viewport_harness import (
+    HYPHEN,
+    INTERIOR_OFFSET,
+    EdgeReading,
+    Run,
+    Side,
+    dash_count,
+    dash_thickness,
+    expected_runs,
+    grid_picture,
+    hyphen_positions,
+    plain_edge_problems,
+    read_edge,
+    run_problems,
+    runs_of,
+    thickness_offsets,
 )
 
 # ---- Fixtures -----------------------------------------------------------------------
@@ -206,11 +206,11 @@ def open_fx01(page: Page, base_url: str, view: GridView, window: ViewportSize) -
     open_room(page, base_url, view, [me()])
 
 
-# ---- AC-21: count, ends, corners, thickness and colour ------------------------------
+# ---- AC-9: count, ends, corners, thickness and colour ------------------------------
 
 
 class EdgeCase(NamedTuple):
-    """One hyphen edge of AC-21 and how to open its page."""
+    """One hyphen edge of AC-9 and how to open its page."""
 
     grid_name: str
     window: ViewportSize
@@ -257,7 +257,7 @@ def read_case(
 
 
 @pytest.mark.parametrize("case_name", list(EDGE_CASES))
-def test_ac21_a_hyphen_edge_has_the_dashes_of_the_design(
+def test_ac9_a_hyphen_edge_has_the_dashes_of_the_design(
     page: Page,
     live_server: str,
     case_grids: dict[str, Grid],
@@ -273,7 +273,7 @@ def test_ac21_a_hyphen_edge_has_the_dashes_of_the_design(
 
 
 @pytest.mark.parametrize("case_name", list(CORNER_CASES))
-def test_ac21_a_hyphen_edge_leaves_its_corners_open_and_the_crossing_lines_plain(
+def test_ac9_a_hyphen_edge_leaves_its_corners_open_and_the_crossing_lines_plain(
     page: Page,
     live_server: str,
     case_grids: dict[str, Grid],
@@ -295,7 +295,7 @@ def test_ac21_a_hyphen_edge_leaves_its_corners_open_and_the_crossing_lines_plain
 
 
 @pytest.mark.parametrize("case_name", list(EDGE_CASES))
-def test_ac21_a_hyphen_edge_has_its_thickness_in_hyphen_grey_none_blended(
+def test_ac9_a_hyphen_edge_has_its_thickness_in_hyphen_grey_none_blended(
     page: Page,
     live_server: str,
     case_grids: dict[str, Grid],
@@ -318,7 +318,7 @@ def test_ac21_a_hyphen_edge_has_its_thickness_in_hyphen_grey_none_blended(
     assert problems == []
 
 
-# ---- AC-21: every other edge is the plain line ---------------------------------------
+# ---- AC-9: every other edge is the plain line ---------------------------------------
 
 
 def letter_edges(grid: Grid) -> list[tuple[Cell, Side]]:
@@ -349,7 +349,7 @@ def without_marks(frame: str) -> str:
 
 
 @pytest.mark.parametrize("grid_name", ["vi-de-na-val", "published", "marks-absent"])
-def test_ac21_every_other_edge_between_two_letters_is_the_plain_line(
+def test_ac9_every_other_edge_between_two_letters_is_the_plain_line(
     page: Page,
     live_server: str,
     fx01_grid: Grid,
@@ -382,7 +382,7 @@ def test_ac21_every_other_edge_between_two_letters_is_the_plain_line(
     assert problems == []
 
 
-# ---- AC-21: the same dashes in every state ----------------------------------------
+# ---- AC-9: the same dashes in every state ----------------------------------------
 
 STATE_SEQ = 5
 P2_COLOUR = 5  # Magenta, the darkest flash
@@ -412,7 +412,7 @@ FLASH_SCRIPT = """
 
 
 def apply_state(page: Page, mock: MockRoomSocket, state: str) -> None:
-    """Put the room in one state of AC-21, and wait until the page shows it."""
+    """Put the room in one state of AC-9, and wait until the page shows it."""
     mock_send = mock.send
     vide_cell = cell_at(page, *VIDE_EDGE)
     if state == "tint":
@@ -491,7 +491,7 @@ def dash_problems(reading: EdgeReading) -> list[str]:
 
 
 @pytest.mark.parametrize("state", ["tint", "locked", "wrong", "flash", "authors"])
-def test_ac21_the_dashes_read_the_same_in_every_state_of_the_two_cells(
+def test_ac9_the_dashes_read_the_same_in_every_state_of_the_two_cells(
     page: Page, live_server: str, hyphen_grid: Grid, state: str
 ) -> None:
     page.set_viewport_size(MEDIUM_WINDOW)
@@ -514,12 +514,12 @@ def test_ac21_the_dashes_read_the_same_in_every_state_of_the_two_cells(
     assert gap_problems(after) == []
 
 
-# ---- AC-21: the revealed notch over a down hyphen ---------------------------------
+# ---- AC-9: the revealed notch over a down hyphen ---------------------------------
 
 NOTCH_MARGIN_PX = 3
 
 
-def test_ac21_a_revealed_cell_puts_its_notch_over_the_down_hyphens_dashes(
+def test_ac9_a_revealed_cell_puts_its_notch_over_the_down_hyphens_dashes(
     page: Page, live_server: str, hyphen_grid: Grid
 ) -> None:
     changes: ChangeList = [
@@ -552,7 +552,7 @@ def test_ac21_a_revealed_cell_puts_its_notch_over_the_down_hyphens_dashes(
         assert in_the_cell[index] == HYPHEN, f"pixel {index}: {in_the_cell[index]}"
 
 
-# ---- AC-22: my selection border beside the hyphen ---------------------------------
+# ---- AC-10: my selection border beside the hyphen ---------------------------------
 
 BORDER_PX = 2
 CORNER_PX = 3
@@ -654,7 +654,7 @@ def border_problems(reading: EdgeReading, case: BorderCase) -> list[str]:
 
 
 @pytest.mark.parametrize("case_name", list(BORDER_CASES))
-def test_ac22_my_selected_cells_border_is_dashed_navy_on_its_hyphen_side(
+def test_ac10_my_selected_cells_border_is_dashed_navy_on_its_hyphen_side(
     page: Page, live_server: str, hyphen_grid: Grid, case_name: str
 ) -> None:
     case = BORDER_CASES[case_name]
@@ -680,7 +680,7 @@ def solid_problems(reading: EdgeReading, offsets: tuple[int, ...]) -> list[str]:
     return problems
 
 
-def test_ac22_my_selected_cells_three_other_sides_stay_solid_navy(
+def test_ac10_my_selected_cells_three_other_sides_stay_solid_navy(
     page: Page, live_server: str, hyphen_grid: Grid
 ) -> None:
     open_selected_vide(page, live_server, hyphen_grid)
@@ -696,12 +696,12 @@ def test_ac22_my_selected_cells_three_other_sides_stay_solid_navy(
 
 
 VIDE_CELLS: list[Cell] = [(2, 1), (2, 2), (2, 3), (2, 4)]
-# Rule 10 from (2, 2): V and I fill (2, 2) and (2, 3), D then E the last cell.
+# Board rule 10 from (2, 2): V and I fill (2, 2) and (2, 3), D then E the last cell.
 TYPED_LETTERS = ["", "V", "I", "E"]
 
 
 @pytest.mark.parametrize("grid_name", ["vi-de-na-val", "published"])
-def test_ac22_a_tap_selects_vides_four_cells_and_letters_fill_them_as_published(
+def test_ac10_a_tap_selects_vides_four_cells_and_letters_fill_them_as_published(
     page: Page,
     live_server: str,
     fx01_grid: Grid,

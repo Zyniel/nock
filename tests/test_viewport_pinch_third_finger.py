@@ -1,4 +1,4 @@
-"""Test of board AC-2 (rule 3): a pinch goes on from where it was when a third finger
+"""Test of viewport AC-2 (rule 3): a pinch goes on from where it was when a third finger
 joins and one leaves, with no jump of the zoom.
 
 No spec change: the fix is to `GridViewport.svelte`, which kept the distance of the
