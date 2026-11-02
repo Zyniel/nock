@@ -20,6 +20,13 @@
   import StatusRegion from './StatusRegion.svelte'
   import { announce, takeAnnouncing } from './announce'
   import { t } from './i18n'
+  import {
+    isSalonOpen as isSalonOpenIn,
+    isScrimShown as isScrimShownIn,
+    overlaysAfter,
+    type OverlayAction,
+    type OverlayState,
+  } from './roomOverlays'
   import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
   import { preloadGridFonts } from './fontPreload'
   import { nameOf, streamEntries } from './activityFeed'
@@ -232,8 +239,6 @@
 
   // ---- The popovers, the Salon and the scrim (spec 043) ----
 
-  // The open popover: the Aide menu, the Menu, or none.
-  let openPopover: 'aide' | 'menu' | null = $state(null)
   let aideButton: HTMLButtonElement | null = $state(null)
   let menuButton: HTMLButtonElement | null = $state(null)
   let chatToggle: HTMLButtonElement | null = $state(null)
@@ -242,17 +247,31 @@
   let salon: Salon | undefined = $state()
   let salonElement: HTMLElement | null = $state(null)
 
-  // The Salon is closed at load in the sheet layout; in the column layout it
-  // is open unless the player closed it in this browser.
-  let isSheetSalonOpen = $state(false)
-  let isColumnSalonOpen = $state(readItem(SALON_CLOSED_KEY) !== SALON_CLOSED_VALUE)
-  let isSalonOpen = $derived(layout === 'sheet' ? isSheetSalonOpen : isColumnSalonOpen)
+  // What is open over the room: the Aide menu or the Menu, the Salon, the
+  // reaction picker (roomOverlays.ts holds the one-overlay rule). The Salon is
+  // closed at load in the sheet layout; in the column layout it is open unless
+  // the player closed it in this browser.
+  let overlays: OverlayState = $state.raw({
+    popover: null,
+    isSheetSalonOpen: false,
+    isColumnSalonOpen: readItem(SALON_CLOSED_KEY) !== SALON_CLOSED_VALUE,
+    isPickerOpen: false,
+  })
+  let openPopover = $derived(overlays.popover)
+  let isPickerOpen = $derived(overlays.isPickerOpen)
+  let isSalonOpen = $derived(isSalonOpenIn(overlays, layout))
   let salonTab: 'discussion' | 'players' = $state('discussion')
   // The stream is read while it shows: the Salon open on its Discussion tab.
   let isStreamShown = $derived(isSalonOpen && salonTab === 'discussion')
   // The scrim covers the page under the top bar while a popover or the Salon
   // sheet is open (sheet layout only).
-  let isScrimShown = $derived(layout === 'sheet' && (openPopover !== null || isSalonOpen))
+  let isScrimShown = $derived(isScrimShownIn(overlays, layout))
+
+  // Apply an action to what is open. The page's state is not a dependency of
+  // the effect or the handler that dispatches.
+  function dispatchOverlay(action: OverlayAction): void {
+    overlays = overlaysAfter(untrack(() => overlays), action, untrack(() => layout))
+  }
 
   // A change of layout closes the popovers and the reaction picker; the Salon
   // takes the state it has in the new layout (the sheet starts closed).
@@ -263,29 +282,19 @@
       return
     }
     lastLayout = current
-    openPopover = null
-    isPickerOpen = false
-    isSheetSalonOpen = false
+    dispatchOverlay({ kind: 'layoutChanged' })
   })
 
   // Open or close a popover. In the sheet layout one overlay shows at a time;
   // in the column layout the Salon column stays as it is.
   function togglePopover(popover: 'aide' | 'menu'): void {
-    if (openPopover === popover) {
-      openPopover = null
-      return
-    }
-    openPopover = popover
-    isPickerOpen = false
-    if (layout === 'sheet') {
-      isSheetSalonOpen = false
-    }
+    dispatchOverlay({ kind: 'togglePopover', popover })
   }
 
   // Close the open popover and put the focus on its button.
   function closePopoverToButton(): void {
     const button = openPopover === 'aide' ? aideButton : menuButton
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     button?.focus()
   }
 
@@ -305,7 +314,7 @@
       if (popover?.contains(target) || button?.contains(target)) {
         return
       }
-      openPopover = null
+      dispatchOverlay({ kind: 'closePopover' })
     }
     window.addEventListener('pointerdown', onPointerDown, true)
     return () => window.removeEventListener('pointerdown', onPointerDown, true)
@@ -314,8 +323,7 @@
   // A tap or a click on the scrim closes what it lies under; the focus does
   // not move.
   function closeOverlays(): void {
-    openPopover = null
-    isSheetSalonOpen = false
+    dispatchOverlay({ kind: 'scrim' })
   }
 
   // True while a Tab is moving the focus: from its key press to its first focus
@@ -351,12 +359,11 @@
     // This focus is the one the Tab moved: a later one is the page's.
     isTabMovingFocus = false
     const menu = openPopover === 'aide' ? aideMenu : roomMenu
-    if (openPopover !== null && menu !== null && !menu.contains(target)) {
-      openPopover = null
-    }
-    if (isSheetSalonOpen && salonElement !== null && !salonElement.contains(target)) {
-      isSheetSalonOpen = false
-    }
+    dispatchOverlay({
+      kind: 'tabLeft',
+      leftMenu: menu !== null && !menu.contains(target),
+      leftSalon: salonElement !== null && !salonElement.contains(target),
+    })
   }
 
   $effect(() => {
@@ -383,20 +390,14 @@
   // Open or close the Salon of the current layout. The column remembers a
   // close in this browser; in the sheet layout one overlay shows at a time.
   function setSalonOpen(isOpen: boolean): void {
+    dispatchOverlay({ kind: 'setSalon', isOpen })
     if (layout === 'column') {
-      isColumnSalonOpen = isOpen
       if (isOpen) {
         removeItem(SALON_CLOSED_KEY)
       } else {
         writeItem(SALON_CLOSED_KEY, SALON_CLOSED_VALUE)
       }
       refitNow()
-      return
-    }
-    isSheetSalonOpen = isOpen
-    if (isOpen) {
-      openPopover = null
-      isPickerOpen = false
     }
   }
 
@@ -404,7 +405,7 @@
   // column stays open.
   function onSalonEscape(): void {
     if (layout === 'sheet') {
-      isSheetSalonOpen = false
+      dispatchOverlay({ kind: 'setSalon', isOpen: false })
     }
     chatToggle?.focus()
   }
@@ -1247,7 +1248,6 @@
 
   // ---- The reaction button and picker ----
 
-  let isPickerOpen = $state(false)
   let reactButton: HTMLButtonElement | null = $state(null)
 
   // In the sheet layout one overlay shows at a time; in the column layout the
@@ -1257,21 +1257,17 @@
       closeReactionPicker()
       return
     }
-    isPickerOpen = true
-    openPopover = null
-    if (layout === 'sheet') {
-      isSheetSalonOpen = false
-    }
+    dispatchOverlay({ kind: 'togglePicker' })
   }
 
   function closeReactionPicker(): void {
-    isPickerOpen = false
+    dispatchOverlay({ kind: 'closePicker' })
     reactButton?.focus()
   }
 
   // Close the picker and leave the focus where it is.
   function dismissReactionPicker(): void {
-    isPickerOpen = false
+    dispatchOverlay({ kind: 'closePicker' })
   }
 
   // React on the selected word's clue. Only a reaction that went out counts for
@@ -1551,7 +1547,7 @@
   // sends its message.
   function aideAction(action: () => void): () => void {
     return () => {
-      openPopover = null
+      dispatchOverlay({ kind: 'closePopover' })
       aideButton?.focus()
       action()
     }
@@ -1561,26 +1557,26 @@
 
   // « Inviter »: the Salon on its Joueurs tab, the focus on « Copier le lien ».
   function invite(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     salonTab = 'players'
     setSalonOpen(true)
     void salon?.focusCopyLink()
   }
 
   function openHostSettings(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     copyRoomSettingsToForm()
     hostSettings?.open()
   }
 
   function openAccount(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     accountDialog?.open()
   }
 
   // « Masquer le chrono » or « Afficher le chrono »: sends nothing.
   function toggleTimerFromMenu(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     setTimerShown(!isTimerShown)
     menuButton?.focus()
   }
@@ -1805,9 +1801,7 @@
   // Close what is open over the room before the room-gone dialog shows. The
   // Salon column stays as it is.
   function leaveDeletedRoom(): void {
-    openPopover = null
-    isSheetSalonOpen = false
-    isPickerOpen = false
+    dispatchOverlay({ kind: 'roomGone' })
     isRecapOpen = false
     hostSettings?.close()
     accountDialog?.close()
