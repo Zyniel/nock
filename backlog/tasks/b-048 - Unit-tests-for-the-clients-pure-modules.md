@@ -4,6 +4,7 @@ title: Unit tests for the client's pure modules
 status: To Do
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-02T01:00:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -56,3 +57,9 @@ ordinal: 9000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Human (2026-11-02, chat): take B-048 with option A, Node's own node:test (no new dependency), to unblock B-049 and with it « Grid and room screens ». Open questions 1 and 2 take the lead's defaults: the tests in tests/web/, written by the test-writer; they prove no criterion.
+<!-- SECTION:NOTES:END -->
