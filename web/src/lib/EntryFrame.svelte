@@ -7,20 +7,14 @@
   // page (the class `nock-plain-page`), so that the grey reaches the bottom.
   import type { Snippet } from 'svelte'
   import PageTopBar from './PageTopBar.svelte'
-  import { isWideWindow } from './windowForm'
+  import { isWindowWide } from './wideWindow'
 
   let { children }: { children: Snippet } = $props()
 
   // Whether the window is wide, worked out here once for the bar and the body,
   // and again after each resize or rotation.
-  let isWide = $state(isWideWindow(window.innerWidth, window.innerHeight))
-
-  function followWindow(): void {
-    isWide = isWideWindow(window.innerWidth, window.innerHeight)
-  }
+  const isWide = $derived(isWindowWide())
 </script>
-
-<svelte:window onresize={followWindow} />
 
 <PageTopBar form="entry" {isWide} />
 <main class="page-body" class:narrow={!isWide} data-testid="page-body">

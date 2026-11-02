@@ -6,31 +6,21 @@
   // holds the frame is a plain page (the class `nock-plain-page`).
   import type { Snippet } from 'svelte'
   import PageTopBar from './PageTopBar.svelte'
-  import { isWideWindow } from './windowForm'
+  import { isWindowWide } from './wideWindow'
 
   let {
     topBarEnd,
-    isWide = $bindable(false),
     children,
   }: {
     // What sits on the right of the top bar: the catalogue's "Compte".
     topBarEnd?: Snippet
-    // Whether the window is wide. The frame works it out; a page that needs it
-    // too (the catalogue, for its account dialog) reads it with `bind:isWide`.
-    isWide?: boolean
     children: Snippet
   } = $props()
 
-  // Worked out once here for the bar and the column, and again after each
-  // resize or rotation.
-  function followWindow(): void {
-    isWide = isWideWindow(window.innerWidth, window.innerHeight)
-  }
-
-  followWindow()
+  // Whether the window is wide, worked out here once for the bar and the
+  // column, and again after each resize or rotation.
+  const isWide = $derived(isWindowWide())
 </script>
-
-<svelte:window onresize={followWindow} />
 
 <PageTopBar form="catalogue" {isWide} end={topBarEnd} />
 <main class="catalogue-column" class:narrow={!isWide} data-testid="catalogue-column">
