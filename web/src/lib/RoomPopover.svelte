@@ -105,17 +105,18 @@
 
   // When the top bar changes form with no change of layout, the bar and the
   // button move: an open popover is placed again once the page has drawn the
-  // new bar. The form it was placed for is kept out of reactivity so that this
-  // effect only runs again for a change of form or of opening.
-  let placedForm: 'phone' | 'computer' | null = null
+  // new bar. The last form seen is kept out of reactivity so that this effect
+  // runs again only for a change of form; whether the popover is open is read
+  // at that moment.
+  let lastForm: 'phone' | 'computer' | null = null
   async function placeAgain(): Promise<void> {
     await tick()
     place()
   }
   $effect(() => {
     const currentForm = form
-    const isFormChanged = placedForm !== null && placedForm !== currentForm
-    placedForm = currentForm
+    const isFormChanged = lastForm !== null && lastForm !== currentForm
+    lastForm = currentForm
     if (isFormChanged && isOpen) {
       void placeAgain()
     }

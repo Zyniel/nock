@@ -4,7 +4,7 @@ title: Small fixes of the web client
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T02:58:00Z'
+updated_date: '2026-11-02T03:12:00Z'
 labels:
   - domain:host
   - domain:operations
@@ -126,4 +126,8 @@ Decisions (lead, 2026-11-02):
 - L23 measured against product rule 22 (FX-02, median of 3 cold loads on the reference phone, test_spec_036_ac01): 1246.5 ms before, 1551 to 1578 ms after (limit 2500 ms). The room page's code now comes one round trip after the entry script; the catalogue and the other pages no longer load the room's code. Preloading the fonts from App.svelte cost about 100 ms more; from RoomPage nothing measurable, so it is there.
 - The font preload names the woff2 files through new URL(node_modules path, import.meta.url), not an @fontsource ?url import, which 041 AC-6's scan would count as a ninth face import.
 - No test proves L12, L14 and the ghost-finger part of L15 (a lost pointerup cannot be simulated through CDP).
+
+- Review round 1: CHANGES REQUESTED. Blocking: the host sheet reopened on abandoned typed values (rule 8 says it opens on the room's values): the implementer copies the room's values on open. No criterion added for the reopen case (rule 8 already states it; a new criterion would cost another spec round for a one-line fix); it stays untested, noted for the verdict.
+- Suggestions taken: touch pointers only are captured, with an isPrimary guard against a ghost finger (L15); a {:catch} on the page imports showing the existing error state; the room entry page's status line inside its main; RoomPopover's comment and name; the exact 046 frame assertions restored, the shell page openers shared, a plain loop in 041's FONT_IMPORTS.
+- Not taken: the ?url font import in place of the node_modules path (acceptable as is; a draft follow-up). Recorded for the human: rule 22 on the room route went from 1246 ms to about 1570 ms (limit 2500 ms), the cost of the room's own chunk.
 <!-- SECTION:NOTES:END -->

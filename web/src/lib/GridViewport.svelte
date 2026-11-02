@@ -553,8 +553,15 @@
     let startZoom = ZOOM_MIN
 
     function onPointerDown(event: PointerEvent): void {
-      if (event.pointerType === 'mouse') {
+      // Pinching and panning are touch gestures: a mouse or a pen keeps its
+      // click on the cell it touched.
+      if (event.pointerType !== 'touch') {
         return
+      }
+      // A first finger starts a new gesture: a finger left over from a pointerup
+      // that went missing is forgotten.
+      if (event.isPrimary) {
+        fingers.clear()
       }
       // The grid keeps the finger until it lifts, even if the cell it touched is
       // drawn again meanwhile; otherwise its pointerup could go missing and
