@@ -1,5 +1,5 @@
-"""Shared setup of the tests of admin/operations, AC-22 to AC-30: the WAL checkpoint
-and the operator page.
+"""Shared setup of the tests of admin/operations, AC-22 to AC-25: the WAL checkpoint,
+and of admin/ops-page, AC-11 to AC-15: the operator page.
 
 Pytest does not collect this module (its name does not start with `test_`). The
 tests are in `tests/test_operations_*.py`:
@@ -12,10 +12,10 @@ tests are in `tests/test_operations_*.py`:
   of 5 s against a bound of 1 s), so it runs in the serial pass
   (`SERIAL_TEST_FILES` of `scripts/gate_browsers.py`).
 
-- `test_operations_page.py`: AC-26 to AC-30, the operator page: an answer that a
-  later request superseded, a token of another shape, a lock that empties and
-  focuses the input. A browser on the live ops server, with the dashboard and the
-  replay answered by the test.
+- `test_ops_page_states.py` (admin/ops-page): AC-11 to AC-15, the operator page: an
+  answer that a later request superseded, a token of another shape, a lock that
+  empties and focuses the input. A browser on the live ops server, with the
+  dashboard and the replay answered by the test.
 
 The same helpers serve `tests/test_erasure_busy.py` (account/erasure
 AC-7). This module holds the two ways to look at a busy database: a second
@@ -92,7 +92,7 @@ def warnings_logged(caplog: pytest.LogCaptureFixture) -> list[logging.LogRecord]
     return records
 
 
-# ---- The operator page (AC-26 to AC-30) --------------------------------------------
+# ---- The operator page (ops-page AC-11 to AC-15) ------------------------------
 
 FRAMES_TO_WAIT = 2
 EDITS_CODE = re.compile(r"/api/ops/rooms/([^/]+)/edits")
