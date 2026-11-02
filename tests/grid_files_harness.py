@@ -1,4 +1,6 @@
-"""Shared setup of the tests of the domain grid-files (`specs/content/grid-files.md`).
+"""Shared setup of the tests of the domains grid-files and ipuz.
+
+The specs are `specs/content/grid-files.md` and `specs/content/ipuz.md`.
 
 Pytest does not collect this module (its name does not start with `test_`). It
 holds what the tests of the domain and the numbered tests that edit its pointers

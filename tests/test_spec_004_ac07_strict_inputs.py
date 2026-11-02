@@ -1,8 +1,8 @@
 """Tests of spec 004, AC-7: inputs are read strictly.
 
 Dates (the `date` of a grid file) and the `force` parameter of the list route are
-read the same way on every platform. The date tests belong to grid-files AC-16 and
-the force tests to library rule 4. The shared setup is in `spec004_harness` and
+read the same way on every platform. The date tests belong to content/ipuz AC-11
+and the force tests to library rule 4. The shared setup is in `spec004_harness` and
 `grid_files_harness`.
 """
 
