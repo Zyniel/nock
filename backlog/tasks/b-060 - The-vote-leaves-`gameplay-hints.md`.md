@@ -1,10 +1,10 @@
 ---
 id: B-060
 title: The vote leaves `gameplay/hints.md`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T11:33:00Z'
 labels:
   - domain:hints
   - domain:votes
@@ -41,3 +41,17 @@ ordinal: 15000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: gameplay/hints.md → gameplay/votes.md (new), platform/realtime.md rules 7 and 10, specs/_map.md; hints's realtime 20/22 citations → reconnection rules 5/7.
+2. Tests: tests/test_hints_vote_focus.py renamed to tests/test_votes_*.py, renamed to the new numbers.
+3. Quick gate: uv run python scripts/gate.py --specs hints,votes,realtime --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started alongside B-058 (no shared domain). Spec-writer on Fable at high (new domain). hints.md's citations of realtime rules 20 and 22 go to reconnection rules 5 and 7 (B-057's map). Base: origin/main f6a5666.
+<!-- SECTION:NOTES:END -->
