@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: approved
+status: done
 ---
 
 # lobby/joining - Joining and resuming
