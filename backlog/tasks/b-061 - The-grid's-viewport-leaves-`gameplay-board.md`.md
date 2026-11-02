@@ -1,10 +1,10 @@
 ---
 id: B-061
 title: The grid's viewport leaves `gameplay/board.md`
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:16:00Z'
+updated_date: '2026-11-02T13:37:00Z'
 labels:
   - domain:board
   - domain:viewport
@@ -38,3 +38,17 @@ ordinal: 16000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: gameplay/board.md → gameplay/viewport.md (new), specs/_map.md.
+2. Tests: tests/test_board_*.py → tests/test_viewport_*.py, board_harness.py → viewport_harness.py, renamed to the new numbers.
+3. Quick gate: uv run python scripts/gate.py --specs board,viewport --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead (2026-11-02): started after B-058, B-059, B-060, B-062 (the other splits). Spec-writer on Fable at high (new domain). B-055's map of shared components (scripts/gate.py) follows if a component moves between Code sections (GridViewport.svelte, RoomPage.svelte): the lead's tooling commit. Base: origin/main bef13dc.
+<!-- SECTION:NOTES:END -->
