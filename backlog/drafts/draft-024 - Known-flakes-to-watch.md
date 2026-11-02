@@ -4,7 +4,7 @@ title: Known flakes to watch
 status: Draft
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-01T21:00:00Z'
+updated_date: '2026-11-02T08:22:00Z'
 labels:
   - follow-up
 dependencies: []
@@ -25,3 +25,9 @@ Known flakes: 036 AC-8's join on the room of `NOCK_DATABASE` fails under load an
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-02, first wave of the open milestones: B-043's pinch test tests/test_shell_remote_updates.py::test_ac25_after_the_pinch... (a fixed wait) failed once in B-046's full gate, passed alone and 3/3 in its file; test_spec_012_ac01 (a nickname with a combining accent) failed once in B-056's full gate and passed alone; the room-page timeouts of B-050 have their own draft.
+<!-- SECTION:NOTES:END -->
