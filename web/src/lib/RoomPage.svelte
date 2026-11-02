@@ -81,7 +81,6 @@
   import { LOW_WINDOW_PX, isWideWindow } from './windowForm'
   import type {
     LetterCellView,
-    PendingEdit,
     ReactionValue,
     RoomStatus,
     Snapshot,
@@ -112,7 +111,19 @@
     statusAfterFinalClose,
     statusAfterLoss,
   } from './roomSession'
-  import { fittedGridBox } from './gridLayout'
+  import { CLUE_BAR_HEIGHT_PX, fittedGridBox } from './gridLayout'
+  import { trackExpiries } from './expiry'
+  import {
+    checkMessage,
+    clueTarget,
+    editMessage,
+    flagMessage,
+    reactMessage,
+    revealMessage,
+    selectCellMessage,
+    voteMessage,
+    type EditKind,
+  } from './roomCommands'
   import {
     computeWords,
     positionKey,
@@ -525,66 +536,30 @@
 
   // Each flash ends FLASH_MS after it started. A flash that a newer one replaced
   // is no longer in the list, so its timer finds nothing to end.
-  const scheduledFlashes = new Set<number>()
-  const flashTimers = new Set<ReturnType<typeof setTimeout>>()
+  const flashExpiries = trackExpiries(FLASH_MS, (id) => endFlash(session, id))
   $effect(() => {
-    for (const flash of session.flashes) {
-      if (scheduledFlashes.has(flash.id)) {
-        continue
-      }
-      scheduledFlashes.add(flash.id)
-      const timer = setTimeout(() => {
-        flashTimers.delete(timer)
-        scheduledFlashes.delete(flash.id)
-        endFlash(session, flash.id)
-      }, FLASH_MS)
-      flashTimers.add(timer)
-    }
+    flashExpiries.schedule(session.flashes)
   })
 
   // Leaving the page must not leave the flash timers to fire on a destroyed page.
   // This is a separate effect: the one above re-runs with each new flash, and its
   // cleanup would cancel the timers of the flashes still showing.
   $effect(() => {
-    return () => {
-      for (const timer of flashTimers) {
-        clearTimeout(timer)
-      }
-      flashTimers.clear()
-      scheduledFlashes.clear()
-    }
+    return () => flashExpiries.dispose()
   })
 
   // Each cell highlighted by a catch-up goes back to normal CATCH_UP_HIGHLIGHT_MS
   // after its highlight started (spec 034). A cell highlighted again has a new
   // id, so the timer of its old highlight finds nothing to end.
-  const scheduledCaughtUp = new Set<number>()
-  const caughtUpTimers = new Set<ReturnType<typeof setTimeout>>()
+  const caughtUpExpiries = trackExpiries(CATCH_UP_HIGHLIGHT_MS, (id) => endCaughtUp(session, id))
   $effect(() => {
-    for (const cell of session.caughtUpCells) {
-      if (scheduledCaughtUp.has(cell.id)) {
-        continue
-      }
-      scheduledCaughtUp.add(cell.id)
-      const timer = setTimeout(() => {
-        caughtUpTimers.delete(timer)
-        scheduledCaughtUp.delete(cell.id)
-        endCaughtUp(session, cell.id)
-      }, CATCH_UP_HIGHLIGHT_MS)
-      caughtUpTimers.add(timer)
-    }
+    caughtUpExpiries.schedule(session.caughtUpCells)
   })
 
   // Leaving the page must not leave the highlight timers to fire on a destroyed
   // page (a separate effect, as for the flashes).
   $effect(() => {
-    return () => {
-      for (const timer of caughtUpTimers) {
-        clearTimeout(timer)
-      }
-      caughtUpTimers.clear()
-      scheduledCaughtUp.clear()
-    }
+    return () => caughtUpExpiries.dispose()
   })
 
   // ---- Catching up after an absence (spec 034) ----
@@ -833,16 +808,6 @@
     }
   }
 
-  // The select_cell of a selection: the server only knows the cell and the
-  // direction, not the chosen word.
-  function selectCellMessage(selected: Selection): object {
-    return {
-      type: 'select_cell',
-      row: selected.row,
-      column: selected.column,
-      direction: selected.direction,
-    }
-  }
 
   // The letter cells of the snapshot's grid, by "row,column": built once per
   // snapshot, so that finding a cell reads no other cell.
@@ -926,31 +891,12 @@
     isPencilMode = !isPencilMode
   }
 
-  // The message of an edit by its kind: edit_letter or erase for 'edit',
-  // pencil_edit for 'pencil', confirm_pencil for 'confirm'.
-  function editMessage(
-    edit: Pick<PendingEdit, 'row' | 'column' | 'letter' | 'kind'>,
-    baseSeq: number | null,
-  ): object {
-    const { row, column, letter } = edit
-    if (edit.kind === 'confirm') {
-      return { type: 'confirm_pencil', row, column, base_seq: baseSeq }
-    }
-    if (edit.kind === 'pencil') {
-      return { type: 'pencil_edit', row, column, letter, base_seq: baseSeq }
-    }
-    if (letter === null) {
-      return { type: 'erase', row, column, base_seq: baseSeq }
-    }
-    return { type: 'edit_letter', row, column, letter, base_seq: baseSeq }
-  }
-
   // Show an edit of a cell at once, keep it pending until the server answers,
   // and send it with `baseSeq`.
   function startEdit(
     cell: LetterCellView,
     letter: string | null,
-    kind: PendingEdit['kind'],
+    kind: EditKind,
     baseSeq: number | null,
   ): void {
     addPendingEdit(session, cell.row, cell.column, letter, kind)
@@ -1055,7 +1001,7 @@
     if (isCheckDisabled) {
       return
     }
-    sendRequest({ type: 'check', target })
+    sendRequest(checkMessage(target))
   }
 
   function onCheckLetter(): void {
@@ -1066,12 +1012,7 @@
 
   function onCheckWord(): void {
     if (activeWord !== null) {
-      onCheck({
-        scope: 'word',
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      })
+      onCheck({ scope: 'word', ...clueTarget(activeWord) })
     }
   }
 
@@ -1115,10 +1056,9 @@
     if (isRevealLetterDisabled || selection === null) {
       return
     }
-    sendRequest({
-      type: 'reveal',
-      target: { scope: 'letter', row: selection.row, column: selection.column },
-    })
+    sendRequest(
+      revealMessage({ scope: 'letter', row: selection.row, column: selection.column }),
+    )
   }
 
   // Ask the server to reveal the selected word.
@@ -1126,15 +1066,7 @@
     if (isRevealWordDisabled || activeWord === null) {
       return
     }
-    sendRequest({
-      type: 'reveal',
-      target: {
-        scope: 'word',
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      },
-    })
+    sendRequest(revealMessage({ scope: 'word', ...clueTarget(activeWord) }))
   }
 
   // ---- The clue flag (spec 021) ----
@@ -1169,17 +1101,10 @@
       return
     }
     if (isFlagPressed) {
-      send({ type: 'flag', clue: null })
+      send(flagMessage(null))
       return
     }
-    send({
-      type: 'flag',
-      clue: {
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      },
-    })
+    send(flagMessage(clueTarget(activeWord)))
   }
 
   // ---- Chat and reactions (spec 022) ----
@@ -1355,15 +1280,7 @@
     if (activeWord === null || isReactDisabled || isReactionPaced) {
       return
     }
-    const wentOut = send({
-      type: 'react',
-      clue: {
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      },
-      reaction,
-    })
+    const wentOut = send(reactMessage(activeWord, reaction))
     if (!wentOut) {
       return
     }
@@ -1375,33 +1292,15 @@
   // it arrived; one that a newer reaction replaced is no longer in the list, so
   // its timer finds nothing to end.
   let clueReactions = $derived(clueReactionMarkers(session.reactions, session.names))
-  const scheduledReactions = new Set<number>()
-  const reactionTimers = new Set<ReturnType<typeof setTimeout>>()
+  const reactionExpiries = trackExpiries(REACTION_MS, (id) => endReaction(session, id))
   $effect(() => {
-    for (const shown of session.reactions) {
-      if (scheduledReactions.has(shown.id)) {
-        continue
-      }
-      scheduledReactions.add(shown.id)
-      const timer = setTimeout(() => {
-        reactionTimers.delete(timer)
-        scheduledReactions.delete(shown.id)
-        endReaction(session, shown.id)
-      }, REACTION_MS)
-      reactionTimers.add(timer)
-    }
+    reactionExpiries.schedule(session.reactions)
   })
 
   // A separate effect, as for the flashes: the one above re-runs with each new
   // reaction, and its cleanup would cancel the timers of those still showing.
   $effect(() => {
-    return () => {
-      for (const timer of reactionTimers) {
-        clearTimeout(timer)
-      }
-      reactionTimers.clear()
-      scheduledReactions.clear()
-    }
+    return () => reactionExpiries.dispose()
   })
 
   // ---- Votes (spec 025) ----
@@ -1475,7 +1374,7 @@
     if (openVote === null || isVotingOffline || session.votedIds.includes(openVote.vote_id)) {
       return
     }
-    send({ type: 'vote', vote_id: openVote.vote_id, yes })
+    send(voteMessage(openVote.vote_id, yes))
     session.votedIds.push(openVote.vote_id)
     void focusVoteStatus()
   }
@@ -1745,9 +1644,6 @@
   }
 
   // ---- The play area (spec 043, "Play area and fit") ----
-
-  // The clue bar's height (specs/_design/room.md « Clue bar »).
-  const CLUE_BAR_HEIGHT_PX = 34
 
   // The block of the grid, the clue bar and the status, as large as the play
   // area leaves; and the height of the status band under the bar.
@@ -2760,9 +2656,6 @@
   .room-page {
     position: relative;
     box-sizing: border-box;
-    max-width: none;
-    margin: 0;
-    padding: 0;
     height: 100vh;
     height: 100dvh;
     display: flex;
@@ -3059,7 +2952,7 @@
     white-space: nowrap;
   }
 
-  /* ---- The scrim of the sheet layout (layer 7) ---- */
+  /* ---- The scrim of the sheet layout (layer 7, from under the 54 px top bar) ---- */
 
   .room-scrim {
     position: fixed;

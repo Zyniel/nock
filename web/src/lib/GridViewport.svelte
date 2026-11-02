@@ -18,19 +18,22 @@
     hyphenWidthAfter,
     hyphenWidthBefore,
     hyphensByCell,
+    scrollAfterZoom,
     scrollShowingCell,
     triangleSide,
   } from './gridLayout'
   import type { CellHyphens, EdgeDrawing, PlacedArrow, ScrollAxis } from './gridLayout'
   import HyphenEdge from './HyphenEdge.svelte'
-  import { actionForKey } from './letterEntry'
-  import { LEGEND_GAP_PX, finderColour } from './authorsView'
+  import { gridKeyAction, announcementOf } from './gridKeys'
+  import { legendMargins } from './legendLayout'
+  import { finderColour } from './authorsView'
   import type { LegendName } from './authorsView'
   import AuthorsLegend from './AuthorsLegend.svelte'
   import { ICONS } from './icons'
   import IconShapes from './IconShapes.svelte'
   import PlayerIcon from './PlayerIcon.svelte'
-  import { isArrowKey, selectionAfterArrow, selectionAfterTab } from './navigation'
+  import { selectionAfterArrow, selectionAfterTab } from './navigation'
+  import type { ArrowKey } from './navigation'
   import { latestPendingEdits, shownCellWith, shownGrid } from './roomSession'
   import type {
     CaughtUpCell,
@@ -40,7 +43,7 @@
     PendingEdit,
   } from './roomSession'
   import { positionKey, wordKey } from './wordSelection'
-  import type { Position, Selection, Word } from './wordSelection'
+  import type { Selection, Word } from './wordSelection'
   import { NO_REMOTES, remotesByCell } from './remoteSelections'
   import type { CellRemotes, Corner, RemoteSelection } from './remoteSelections'
   import type { ClueFlagMarker } from './clueFlags'
@@ -252,30 +255,6 @@
   // What a screen reader says when the selection moves (spec 035).
   let announcement = $derived(announcementOf(selection, activeWord))
 
-  function announcementOf(current: Selection | null, word: Word | null): string {
-    if (current === null || word === null) {
-      return ''
-    }
-    const direction = t(
-      word.direction === 'across' ? 'a11y.direction.across' : 'a11y.direction.down',
-    )
-    if (word.cells.length === 1) {
-      return t('a11y.announcement_one', { clue: word.text, direction })
-    }
-    const index = word.cells.findIndex(
-      (cell: Position) => cell.row === current.row && cell.column === current.column,
-    )
-    if (index === -1) {
-      return ''
-    }
-    return t('a11y.announcement', {
-      clue: word.text,
-      direction,
-      length: word.cells.length,
-      position: index + 1,
-    })
-  }
-
   // After Escape, the next Tab or Shift+Tab leaves the grid (spec 035).
   let isReleased = false
   let activeKey = $derived(activeWord === null ? '' : wordKey(activeWord))
@@ -369,31 +348,21 @@
 
   // ---- The Auteurs legend (spec 045) ----
 
-  // The legend is in the flow right under the viewport, and its margins and
-  // height add up to legendRoom, the height the viewport gives it. Its top is
-  // 8 px below the bottom of the part of the grid's box that shows: the grid
-  // is centred in the viewport while it is shorter, so the room left under the
-  // grid is taken back from the legend's top margin. While it lies over the
-  // grid, its margins and height add up to nothing: it is pulled up over the
-  // viewport's bottom, its bottom 8 px above it.
-  //
-  // That room is kept in quarter pixels, which every engine lays out exactly:
-  // the two margins then add up to the same height as legendRoom, and the
-  // viewport's height does not move by a fraction of a pixel at each frame
-  // (its height sets the room under the grid, which sets the margins).
+  // The legend is in the flow right under the viewport; legendLayout.ts works
+  // its margins out so that they and its height add up to legendRoom, the
+  // height the viewport gives it.
   let gridHeight = $derived(cellSize * grid.height + GRID_LINE_PX)
-  let roomUnderGrid = $derived(quarterPixels(Math.max(0, (viewportHeight - gridHeight) / 2)))
-  let legendMarginTop = $derived(
-    isLegendOverGrid ? -(legendHeight + LEGEND_GAP_PX) : LEGEND_GAP_PX - roomUnderGrid,
+  let legendMarginsNow = $derived(
+    legendMargins({
+      isOverGrid: isLegendOverGrid,
+      legendHeight,
+      legendRoom,
+      viewportHeight,
+      gridHeight,
+    }),
   )
-  let legendMarginBottom = $derived(
-    isLegendOverGrid ? LEGEND_GAP_PX : legendRoom - legendHeight - LEGEND_GAP_PX + roomUnderGrid,
-  )
-
-  // A length in px, rounded down to a quarter of a pixel.
-  function quarterPixels(length: number): number {
-    return Math.floor(length * 4) / 4
-  }
+  let legendMarginTop = $derived(legendMarginsNow.marginTop)
+  let legendMarginBottom = $derived(legendMarginsNow.marginBottom)
 
   // Follow the size of the viewport (the area the grid must fit in at zoom 1).
   $effect(() => {
@@ -418,8 +387,8 @@
   }
 
   // Arrow keys move the selection to the next letter cell (spec 009).
-  function onArrowKey(key: string): void {
-    if (selection === null || !isArrowKey(key)) {
+  function onArrowKey(key: ArrowKey): void {
+    if (selection === null) {
       return
     }
     const next = selectionAfterArrow(grid, words, selection, key)
@@ -434,10 +403,6 @@
     if (next !== null) {
       onSelect(next)
     }
-  }
-
-  function isModifierKey(key: string): boolean {
-    return key === 'Shift' || key === 'Control' || key === 'Alt' || key === 'Meta'
   }
 
   function onGridFocusChange(): void {
@@ -459,65 +424,31 @@
 
   // Navigation keys (spec 009), then letter keys and Backspace (spec 008).
   function onGridKeydown(event: KeyboardEvent): void {
-    if (isModifierKey(event.key)) {
+    const action = gridKeyAction(event, isReleased, selection !== null, onUndo !== undefined)
+    // A modifier key alone keeps a release; any other key ends or sets it.
+    if (action.kind === 'modifier') {
       return
     }
-    const wasReleased = isReleased
-    isReleased = false
-    const hasAnyModifier = event.ctrlKey || event.metaKey || event.altKey || event.shiftKey
-    if (event.key === 'Escape' && !hasAnyModifier) {
-      isReleased = true
-      return
-    }
-    const isPlainTab = event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey
-    if (isPlainTab && wasReleased) {
+    isReleased = action.kind === 'release'
+    if (action.kind === 'leaveGrid') {
       startTabNavigationFromGrid()
-      return
-    }
-    const isUndo =
-      (event.ctrlKey || event.metaKey) &&
-      !event.altKey &&
-      !event.shiftKey &&
-      event.key.toLowerCase() === 'z'
-    if (isUndo && onUndo !== undefined) {
+    } else if (action.kind === 'undo') {
       event.preventDefault()
-      onUndo()
-      return
-    }
-    const hasModifier = event.ctrlKey || event.metaKey || event.altKey
-    const isTab = !hasModifier && event.key === 'Tab'
-    if (isTab) {
+      onUndo?.()
+    } else if (action.kind === 'tab') {
       event.preventDefault()
-      onTabKey(event.shiftKey)
-      return
-    }
-    if (!hasModifier && isArrowKey(event.key) && selection !== null) {
+      onTabKey(action.step === -1)
+    } else if (action.kind === 'arrow') {
       event.preventDefault()
-      onArrowKey(event.key)
-      return
-    }
-    const action = actionForKey(
-      event.key,
-      event.ctrlKey,
-      event.metaKey,
-      event.altKey,
-      event.isComposing,
-    )
-    if (action.kind === 'ignore') {
-      return
-    }
-    if (selection === null) {
-      // Backspace never leaves the page, even with nothing selected.
-      if (action.kind === 'erase') {
-        event.preventDefault()
-      }
-      return
-    }
-    event.preventDefault()
-    if (action.kind === 'letter') {
+      onArrowKey(action.key)
+    } else if (action.kind === 'letter') {
+      event.preventDefault()
       onLetter(action.letter)
-    } else {
+    } else if (action.kind === 'erase') {
+      event.preventDefault()
       onErase()
+    } else if (action.kind === 'swallow') {
+      event.preventDefault()
     }
   }
 
@@ -618,12 +549,13 @@
       const box = target.getBoundingClientRect()
       const offsetX = centerX - box.left
       const offsetY = centerY - box.top
-      const gridX = (target.scrollLeft + offsetX) / cellSize
-      const gridY = (target.scrollTop + offsetY) / cellSize
+      const oldCellSize = cellSize
+      const oldScrollLeft = target.scrollLeft
+      const oldScrollTop = target.scrollTop
       zoom = newZoom
       flushSync()
-      target.scrollLeft = gridX * cellSize - offsetX
-      target.scrollTop = gridY * cellSize - offsetY
+      target.scrollLeft = scrollAfterZoom(oldScrollLeft, offsetX, oldCellSize, cellSize)
+      target.scrollTop = scrollAfterZoom(oldScrollTop, offsetY, oldCellSize, cellSize)
     }
 
     target.addEventListener('pointerdown', onPointerDown)
