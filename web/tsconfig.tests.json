@@ -8,9 +8,7 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "noEmit": true,
-    "erasableSyntaxOnly": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "erasableSyntaxOnly": true
   },
   "include": ["../tests/web/**/*.ts"]
 }

@@ -8,12 +8,17 @@
 // without its extension (`./activityFeed`) and a JSON import without its
 // attribute (`../i18n/fr.json`). `svelte/reactivity` needs nothing: Node finds
 // it in web/node_modules and takes Svelte's server build.
+//
+// Not handled: an extensionless import of a file whose name holds a dot
+// (`./room.types`) or of a folder's index (`./dir`); write the full path.
 
 import { existsSync } from 'node:fs'
-import { registerHooks } from 'node:module'
+// A namespace import, so that a Node without registerHooks reaches the check
+// below instead of failing on the import itself.
+import * as nodeModule from 'node:module'
 import { fileURLToPath } from 'node:url'
 
-if (process.features.typescript !== 'strip' || typeof registerHooks !== 'function') {
+if (!process.features.typescript || typeof nodeModule.registerHooks !== 'function') {
   console.error(
     `FAIL: the TypeScript tests need Node 22.18 or later (CI: lts/*); found ${process.version}.`,
   )
@@ -22,7 +27,7 @@ if (process.features.typescript !== 'strip' || typeof registerHooks !== 'functio
 
 const EXTENSION = /\.[a-z]+$/i
 
-registerHooks({
+nodeModule.registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.endsWith('.json')) {
       const resolved = nextResolve(specifier, context)
