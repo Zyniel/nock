@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: results
-status: done
+status: approved
 ---
 
 # gameplay/results - End of game, recap, shared recap and history
@@ -73,7 +73,8 @@ grids in « Grilles terminées », where a grid can be played again.
 9. The button opens a modal dialog named by its heading `recap.heading`
    (« Bilan de la partie »), the focus inside, after the room's other parts in
    document order, and asks for the recap once per opening. Waiting, it holds
-   the heading, the status `recap.loading` and `recap.close` (« Fermer »); on a
+   the heading, the line `recap.loading`, announced by the recap's status
+   region (`client/hud.md` rule 18), and `recap.close` (« Fermer »); on a
    failed request, a status other than 200 or a body that is not a recap
    (untested), the alert `recap.error` in the status's place. Escape and
    « Fermer » close it, the focus back on the button; Tab and Shift+Tab stay
@@ -92,9 +93,10 @@ grids in « Grilles terminées », where a grid can be played again.
     their icon instead, and any other dot still draws nothing.
 12. The share row: the link `<origin>` + `share_path`, as target and text,
     described by `recap.share_label`, then `room.share.copy` (« Copier le
-    lien »). A copy writes it to the clipboard and shows the status
-    `room.share.copied` under the row for 2 seconds, the button unchanged;
-    without a usable clipboard, nothing.
+    lien »). A copy writes it to the clipboard and shows `room.share.copied`
+    under the row for 2 seconds, announced as in rule 9, the button
+    unchanged; without a usable clipboard, nothing. Neither this line nor
+    `recap.loading` has a live role.
 
 ### The shared recap page
 
@@ -205,8 +207,10 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
 - **AC-10** « Voir le bilan », hit at its centre, asks once and opens the modal
   dialog named « Bilan de la partie », focused, after the top bar, band and
   Salon; Escape closes it onto the button; reopened it asks again, « Fermer »
-  closing alike. Waiting: heading, « Chargement du bilan… », « Fermer »; on a
-  404 or a failure, the alert « Le bilan n'est pas disponible. ».
+  closing alike. Waiting: heading, « Chargement du bilan… » with no live role,
+  « Fermer », and the recap's status region, empty at the opening, then
+  reading « Chargement du bilan… »; on a 404 or a failure, the alert « Le
+  bilan n'est pas disponible. ».
   (← 028 AC-1, 028 AC-7, 028 AC-10, 047 AC-11)
 - **AC-11** 754000 ms, 2 checks, 1 and 1 reveals, 5 revealed read « Temps :
   12:34 », « Vérifications : 2 », « Révélations : 1 lettres et 1 mots »,
@@ -220,7 +224,8 @@ error ». « Grilles terminées »: `_design/pages.md`, « Catalogue ».
   Accessibilité on, my dot is my icon. (← 028 AC-2, 028 AC-7, 047 AC-9)
 - **AC-13** The share link reads and targets `<origin>/recap/<token>`, described
   by « Lien à partager »; in Chromium « Copier le lien » copies it, « Lien
-  copié » shows under the row, gone at 2.5 s, the button unchanged; a missing or
+  copié » shows under the row with no live role, gone at 2.5 s, the recap's
+  status region reading it, the button unchanged; a missing or
   refusing clipboard shows nothing; `share_path` null, no share heading or row.
   (← 028 AC-5, 047 AC-10)
 - **AC-14** At every window, computer or touch, the open dialog lies inside and

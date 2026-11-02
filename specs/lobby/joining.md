@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: joining
-status: done
+status: approved
 ---
 
 # lobby/joining - Joining, resuming and « Mes salons »
@@ -93,7 +93,9 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
    `nickname` are non-empty strings; anything else counts as absent.
 9. The form applies rule 1's checks after the capitals before it sends: a length
    break shows `join.error.length`, any other `join.error.characters`, announced
-   as an alert, and nothing is sent. The status `room.status.nickname` is read
+   as an alert, and nothing is sent. While an error shows, the field is
+   `aria-invalid` and described by it (`aria-describedby`); otherwise it has
+   neither. The status `room.status.nickname` is read
    but not seen. The field shows capitals and keeps its value as typed. Submit,
    `join.submit`, is enabled only while the status is `nickname`: disabled
    while joining, and while a form kept after a loss waits for the next socket
@@ -183,7 +185,10 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
   succeeds. (← 012 AC-1)
 - **AC-4** On the form, `Ana` enters the room and one's own roster row reads
   `Ana`, while `A` shows « Le pseudo doit faire de 2 à 20 caractères. » and sends
-  nothing; typed `ana` shows in capitals and keeps the value `ana`. The form, and
+  nothing, the field, neither invalid nor described before, now `aria-invalid`
+  and described by that text; `Ana` then sent, while its join waits, the
+  error is gone and the field has neither; typed `ana` shows in capitals and
+  keeps the value `ana`. The form, and
   its field once refused, follow the entry pages design ("Look").
   (← 012 AC-1, 012 AC-8, 046 AC-15, 046 AC-16)
 - **AC-5** Joins as `Ana`, `ana`, `Ana`, `Bob`, `Cy`, `Di`, `Ed`, `Flo` give

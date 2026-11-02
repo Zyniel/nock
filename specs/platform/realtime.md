@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: done
+status: approved
 ---
 
 # platform/realtime - Room events, reconnection and fair play
@@ -157,8 +157,9 @@ earns it.
     `room_locked` or `removed`. A final close ends the tries with its state
     (`client/shell.md`).
 20. After a loss, once the page has joined: state `reconnecting`, the room
-    status reads `room.status.reconnecting`, and the connection band, announced
-    as a status, shows `room.banner.offline` within 5 seconds. The grid stays
+    status reads `room.status.reconnecting`, and the connection band shows
+    `room.banner.offline` within 5 seconds, with no live role, announced by
+    the status region (`client/hud.md` rule 17). The grid stays
     usable: typed and erased letters show and wait as pending edits; an undo, a
     check or a reveal made meanwhile is kept in its place among them; nothing
     is sent without an open socket. Before the first snapshot: state
@@ -285,9 +286,10 @@ The connection band follows `_design/room.md`, « Connection lost ».
   `base_seq` 8 it applies, as it does with 7 when the change at seq 9 was hers.
   (← 017 AC-2)
 - **AC-18** When the socket closes with 1011, or goes silent, within 5 seconds
-  the band, announced as a status, shows « Connexion perdue. Vous pouvez
-  continuer : vos lettres seront envoyées au retour du réseau. », the room
-  status reads « Reconnexion… », and a typed `t` shows `T`; a close with 4404,
+  the band, with no live role, shows « Connexion perdue. Vous pouvez
+  continuer : vos lettres seront envoyées au retour du réseau. », which the
+  status region reads, the room status reads « Reconnexion… », and a typed
+  `t` shows `T`; a close with 4404,
   4429 or 4001 ends the tries; the next snapshot hides the band. (← 017 AC-1)
 - **AC-19** With 30 letters typed offline, the reconnect snapshot is followed by
   the 30 edits in order over about 3 seconds, never more than 10 in a second, and

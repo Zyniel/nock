@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: done
+status: approved
 ---
 
 # social/chat - Chat, reactions, the clue flag and mute
@@ -104,7 +104,9 @@ help is wanted. The host can mute a player's chat and reactions.
     sends `react` on the selected word's clue and closes the picker; Escape or a
     second press closes it sending nothing; both put the focus on « Réagir ».
     When « Réagir » becomes disabled, an open picker closes at once, sending
-    nothing, and a focus inside it goes to the grid.
+    nothing, and a focus inside it goes to the grid. « Réagir » exposes
+    whether the picker is open and names it as what it controls
+    (`aria-controls`) only while it is open.
 14. A `reaction`, applied once the page has a snapshot and leaving its seq
     alone, shows on its clue when the grid has that clue: the emoji, hidden from
     assistive technology, labelled `reaction.shown_label` (« {name} :
@@ -217,9 +219,11 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   labelled « Bob : Waouh », and is gone 3.5 s after; a 🤔 a second later
   replaces it for its own 3 s; one on (1, 0, 0) shows nothing.
   (← 022 AC-3, 022 AC-4)
-- **AC-11** With VIDE selected, « Réagir » opens the picker with 👍 👏 😂 😮 🤔,
-  focus on the first; 😂 sends `react` on (2, 0, 0), closes it and focuses
-  « Réagir »; Escape closes it sending nothing; in the column layout it opens
+- **AC-11** With VIDE selected, « Réagir », not expanded and with no
+  `aria-controls`, opens the picker with 👍 👏 😂 😮 🤔, focus on the first,
+  and is then expanded with `aria-controls` naming the picker; 😂 sends
+  `react` on (2, 0, 0), closes it and focuses « Réagir »; Escape closes it
+  sending nothing, and `aria-controls` is gone; in the column layout it opens
   over the grid while the Salon stays open. (← 022 AC-5)
 - **AC-12** With the stream hidden, after a snapshot at seq 5, messages 6 (Bob),
   7 (Cy) and 8 (Ana) make « Salon » read 2, named « Salon, 2 messages non
