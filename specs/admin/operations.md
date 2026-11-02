@@ -236,11 +236,11 @@ them is `admin/ops-page.md`.
 
 ## Out of scope
 
-- Backups, log retention, the host's own logs; operator accounts, rotating the
-  token without a restart.
+- Backups, log retention, the host's own logs; latency measured in the
+  browsers; operator accounts, rotating the token without a restart.
 - The `/ops` page: the token form, the dashboard card, the replay of a room's
   edits: `admin/ops-page.md`.
-  An anonymous player's stored data, cookies, the player's own data:
+- An anonymous player's stored data, cookies, the player's own data:
   `account/account.md`.
   The other environment variables: `platform/serving.md`, `lobby/lifetime.md`.
   Overriding the room lives and the sweep interval from `/ops`, the settings

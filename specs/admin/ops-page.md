@@ -188,8 +188,7 @@ grid.
 
 ## Out of scope
 
-- Charts, alerts, exports; editing a room's log; latency measured in the
-  browsers.
+- Charts, alerts, exports; editing a room's log.
 - The token's check, the ops API, its throttle and answers, the dashboard
   figures, `GET /ops` served: `admin/operations.md`. The settings card:
   `admin/overrides.md`.
