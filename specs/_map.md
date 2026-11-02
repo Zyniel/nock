@@ -43,7 +43,8 @@ table, the naming rules and the glossary follow in the same change.
 | content | `content/library.md` | what players browse: list, filter, grid page | pages | 004 AC-1 to AC-4, AC-6, AC-7; 046 AC-2, AC-4 to AC-10, AC-14 |
 | admin | `admin/operations.md` | logs, metrics, retention, the `/ops` page | pages | 038 AC-3 to AC-11; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
-| platform | `platform/realtime.md` | room events protocol, reconnection, fair play | room | 039, 017, 037; 040 AC-8 to AC-13 |
+| platform | `platform/realtime.md` | room events protocol, fair play | | 039, 037; 017 AC-4; 040 AC-8 to AC-13 |
+| platform | `platform/reconnection.md` | stale edits, the resume window, the page's connection: heartbeat, losses, retries, resends | room | 017 AC-1 to AC-3, AC-5 |
 | platform | `platform/server.md` | durable state, undo, engine time, the rooms held in memory | | 018; 036 AC-12 |
 | platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, visual foundation, entry and not-found pages, loading, empty and error states | pages, foundation | 040 AC-14 to AC-26; 041; 046 AC-1, AC-18 to AC-23; 048 AC-13, AC-14 |
@@ -163,6 +164,7 @@ then nothing of race or teams is built.
 | live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open) | `RoomRegistry.live_codes` |
 | member | (a player or a past player of a room) | `PlayerRecord`, `PastPlayer` |
 | connection | (one socket of a player; "session" is the sign-in cookie) | `RoomConnection`, `nock_session` |
+| loss, final close, resume window | « Connexion perdue… » (a close the page retries after; one it stops at; how long a disconnected player keeps their seat) | `reconnecting`, `RoomConfig.resume_window_seconds` |
 | invited player | the nickname form under « Salon <code> » | `join` without token |
 | account player, anonymous player | (a member linked to an account, to none) | `PlayerRecord.account_id` |
 | host, stand-in host | « hôte » (a host who is not the creator's player) | `is_host`, `host_changed` |
