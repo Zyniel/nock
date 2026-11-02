@@ -44,7 +44,6 @@
   import { streamEntries } from './activityFeed'
   import {
     AUTHORS_VIEW_KEY,
-    MIN_GRID_VIEWPORT_PX,
     colourByPlayer,
     legendNames,
     legendRoom,
@@ -96,7 +95,7 @@
   } from './roomRecord'
   import { readItem, removeItem, writeItem } from './storage'
   import { readTimerHidden, writeTimerHidden } from './timer'
-  import { LOW_WINDOW_PX, isWideWindow } from './windowForm'
+  import { LOW_WINDOW_PX } from './windowForm'
   import type {
     LetterCellView,
     ReactionValue,
@@ -117,7 +116,13 @@
     shownCellWith,
     shownGrid,
   } from './roomSession'
-  import { CLUE_BAR_HEIGHT_PX, fittedGridBox } from './gridLayout'
+  import {
+    clueBarWidthOf,
+    columnGridBoxFor,
+    layoutOf,
+    legendPlacement,
+    type Box,
+  } from './playFit'
   import { trackExpiries } from './expiry'
   import {
     createRoomConnection,
@@ -156,10 +161,6 @@
   // (spec 044).
   const KEYBOARD_HIDDEN_KEY = 'nock.keyboard_hidden'
   const KEYBOARD_HIDDEN_VALUE = 'true'
-  // The column layout's play area: its padding, and the smallest width of the
-  // clue bar when the play area has that much room (spec 043, Decision 12).
-  const PLAY_AREA_PADDING_PX = 12
-  const CLUE_BAR_MIN_PX = 320
 
   let { code }: { code: string } = $props()
 
@@ -222,7 +223,8 @@
   let windowWidth = $state(window.innerWidth)
   let windowHeight = $state(window.innerHeight)
 
-  // A low window: at most 500 px high, a phone on its side.
+  // A low window: at most 500 px high, a phone on its side. The layout is
+  // "column" or "sheet" (playFit.ts).
   let isLowWindow = $derived(windowHeight <= LOW_WINDOW_PX)
   let layout = $derived(layoutOf(windowWidth, windowHeight, isKeyboardShown))
   // The phone top bar is the sheet layout's, and the column layout's on a low
@@ -230,21 +232,6 @@
   let topBarForm: 'phone' | 'computer' = $derived(
     layout === 'sheet' || isLowWindow ? 'phone' : 'computer',
   )
-
-  // The two layouts of the room (spec 043, spec 044, "Which layout"): "column"
-  // for a wide window, or for a landscape window at most LOW_WINDOW_PX high on
-  // which the in-app keyboard does not show; "sheet" otherwise.
-  function layoutOf(width: number, height: number, isKeyboardOn: boolean): 'sheet' | 'column' {
-    const isLandscape = width > height
-    if (!isLandscape) {
-      return 'sheet'
-    }
-    const isLowWithoutKeyboard = height <= LOW_WINDOW_PX && !isKeyboardOn
-    if (isWideWindow(width, height) || isLowWithoutKeyboard) {
-      return 'column'
-    }
-    return 'sheet'
-  }
 
   // ---- The popovers, the Salon and the scrim (spec 043) ----
 
@@ -1572,23 +1559,28 @@
   // The room the legend needs under the grid: 38 px, or its height and its gap
   // when it wraps.
   let wantedLegendRoom = $derived(legendRoom(authorsLegendHeight))
-  // True while the mode is on and that room would leave the viewport less than
-  // 100 px high: the legend then lies over the viewport's bottom and the grid
+  // While the mode is on, the legend lies over the viewport's bottom when its
+  // room would leave the viewport less than 100 px high, and the grid then
   // gives it no room (decision 8). The legend's height does not depend on the
   // grid's size, so the two places do not alternate.
-  let isLegendOverGrid = $derived(
-    isAuthorsViewOn && viewportHeightWithLegendRoom() < MIN_GRID_VIEWPORT_PX,
+  let legend = $derived(
+    legendPlacement({
+      isAuthorsViewOn,
+      wantedLegendRoom,
+      viewportHeightWithRoom: viewportHeightWithLegendRoom(),
+    }),
   )
+  let isLegendOverGrid = $derived(legend.isOverGrid)
   // The room the grid gives the legend: none while the mode is off or while
   // the legend lies over the grid.
-  let authorsLegendRoom = $derived(isAuthorsViewOn && !isLegendOverGrid ? wantedLegendRoom : 0)
+  let authorsLegendRoom = $derived(legend.legendRoom)
 
   // The viewport's height if the grid gave the legend its room: in the sheet
   // layout its height with the mode off less the room; in the column layout
   // the height of the grid's box fitted to the height left less the room.
   function viewportHeightWithLegendRoom(): number {
     if (layout === 'column') {
-      const box = columnGridBoxFor(wantedLegendRoom)
+      const box = columnGridBoxWith(wantedLegendRoom)
       return box === null ? 0 : box.height
     }
     const heightWithModeOff = gridAreaContent === undefined ? 0 : gridAreaContent.height
@@ -1599,37 +1591,27 @@
   // as the room left after the clue bar, the status and, while the Auteurs mode
   // is on, the legend's room (spec 045); null in the sheet layout, where the
   // viewport fills its area.
-  let columnGridBox = $derived(columnGridBoxFor(authorsLegendRoom))
+  let columnGridBox = $derived(columnGridBoxWith(authorsLegendRoom))
   // The grid's box with no legend under it: the clue bar keeps its width when
   // the Auteurs mode turns on (spec 045, "The grid's room").
-  let columnGridBoxWithoutLegend = $derived(columnGridBoxFor(0))
+  let columnGridBoxWithoutLegend = $derived(columnGridBoxWith(0))
   // The clue bar is as wide as the grid with no legend, but never narrower than
-  // the smaller of CLUE_BAR_MIN_PX and the play area (Decision 12); the full
-  // width in the sheet layout.
-  let clueBarWidth = $derived(
-    columnGridBoxWithoutLegend === null
-      ? null
-      : Math.max(columnGridBoxWithoutLegend.width, Math.min(CLUE_BAR_MIN_PX, playBlockWidth)),
-  )
+  // the smaller of 320 px and the play area (Decision 12); the full width in
+  // the sheet layout.
+  let clueBarWidth = $derived(clueBarWidthOf(columnGridBoxWithoutLegend, playBlockWidth))
 
   // The grid's box in the column layout when `legendRoomPx` is taken from the
   // height left for it; null in the sheet layout.
-  function columnGridBoxFor(legendRoomPx: number): { width: number; height: number } | null {
-    if (layout !== 'column' || session.snapshot === null) {
-      return null
-    }
-    const heightLeft =
-      playBlockHeight -
-      PLAY_AREA_PADDING_PX -
-      CLUE_BAR_HEIGHT_PX -
-      (isStatusUnderClueBar ? statusBandHeight : 0) -
-      legendRoomPx
-    return fittedGridBox(
+  function columnGridBoxWith(legendRoomPx: number): Box | null {
+    return columnGridBoxFor({
+      layout,
+      grid: session.snapshot === null ? null : session.snapshot.grid,
       playBlockWidth,
-      Math.max(0, heightLeft),
-      session.snapshot.grid.width,
-      session.snapshot.grid.height,
-    )
+      playBlockHeight,
+      statusBandHeight,
+      isStatusUnderClueBar,
+      legendRoomPx,
+    })
   }
 
   function roomSocketUrl(roomCode: string): string {
