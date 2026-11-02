@@ -4,7 +4,7 @@ title: The vote leaves `gameplay/hints.md`
 status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T12:35:00Z'
+updated_date: '2026-11-02T12:36:00Z'
 labels:
   - domain:hints
   - domain:votes
@@ -62,7 +62,7 @@ ordinal: 15000
 - [x] #3 Tests committed before the code
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or assigned to @zyniel
+- [x] #6 Pull request open with auto-merge on, or assigned to @zyniel
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -81,6 +81,8 @@ Lead (2026-11-02): started alongside B-058 (no shared domain). Spec-writer on Fa
 Lead: hud.md:168 cited hints rule 21 by number: repointed to votes rule 8 here; the task takes domain:hud. Spec-checker APPROVED in round 1; its optional notes left (hints' Depends on, at three files, does not list votes; realtime rule 7 gained '(a ballot)', the glossary term). By-name citations of the vote left: chat.md:101/:139, room.md:144 (B-064's list); rules.md:43, server.md:81, presence.md:278, product.md:36 (not on B-064's list: the lead adds them there on the next board branch). votes' Code section names RoomPage.svelte: B-055's map must follow when both are on main.
 
 Lead: review round 1 CHANGES REQUESTED (RoomPage.svelte:1488's comment cited hints rule 19), fixed by the implementer in ea166c3; origin/main merged (511d887, one _map.md conflict resolved: the note on criteria cited by several domains keeps votes and B-062's account/erasure); B-055's map of shared components gains votes under RoomPage.svelte (2c37260, the lead's tooling commit). Round 2 APPROVE. Full gate green (8674 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/103
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
