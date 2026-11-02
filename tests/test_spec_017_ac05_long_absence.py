@@ -3,6 +3,10 @@
 The page is tested with spec 040's mocked socket and the page clock, frozen before
 the page loads and moved by hand with `advance_page`. The shared setup is in
 `spec017_harness`.
+
+Refined by `platform/reconnection.md` rule 6 (B-047): the first retry comes 0.8 to
+1.2 seconds after a loss, so a test that waits for it moves the page clock by
+1.2 seconds.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from nock.protocol import EditLetter
+from reconnection_harness import SOCKET_STAND_INS_SCRIPT
 from spec017_harness import (
     SETTLE_MS,
     STORED_JOIN,
@@ -46,95 +51,13 @@ RESEND_WINDOW_MS = 1000
 SAMPLE_STEP_MS = 100
 SAMPLE_SETTLE_MS = 60
 RESEND_SPAN_LIMIT_MS = 4000
-# Two page-side stand-ins for what Playwright's mocked socket cannot do (its
+FIRST_DELAY_LATEST_MS = 1200  # the first retry delay, 1 s drawn within 20 %
+# The page-side stand-ins for what Playwright's mocked socket cannot do (its
 # `on_close` handler raises a KeyError when the page closes without a code, and
-# a mocked socket always opens at once). Both are off unless a test switches
-# them on, and other sockets are the real (mocked) ones.
-# - `window.__hangNext`: the next socket stays CONNECTING for ever.
-# - `window.__deafClose`: `close()` is recorded in `window.__pageCloses` and
-#   goes no further: the server side never sees it and the page never gets a
-#   `close` event, while messages still arrive (as on a dead network).
-SOCKET_STAND_INS_SCRIPT = """
-(() => {
-  const RealWebSocket = window.WebSocket;
-  window.__hangNext = false;
-  window.__deafClose = false;
-  window.__hung = 0;
-  window.__pageCloses = [];
-  class HangingSocket extends EventTarget {
-    constructor(url) {
-      super();
-      this.url = String(url);
-      this.readyState = 0;
-      this.protocol = '';
-      this.extensions = '';
-      this.bufferedAmount = 0;
-      this.binaryType = 'blob';
-      this.onopen = null;
-      this.onmessage = null;
-      this.onerror = null;
-      this.onclose = null;
-    }
-    send() { throw new DOMException('not open', 'InvalidStateError'); }
-    close() { this.readyState = 2; }
-  }
-  class DeafCloseSocket extends EventTarget {
-    constructor(url, protocols) {
-      super();
-      this._ws = protocols === undefined
-        ? new RealWebSocket(url) : new RealWebSocket(url, protocols);
-      this._closedByPage = false;
-      this.onopen = null;
-      this.onmessage = null;
-      this.onerror = null;
-      this.onclose = null;
-      for (const type of ['open', 'message', 'error', 'close']) {
-        this._ws.addEventListener(type, (event) => this._forward(type, event));
-      }
-    }
-    _forward(type, event) {
-      if (type === 'close' && this._closedByPage) { return; }
-      let copy = new Event(type);
-      if (type === 'message') {
-        copy = new MessageEvent('message', { data: event.data });
-      }
-      if (type === 'close') {
-        copy = new CloseEvent('close', { code: event.code, reason: event.reason });
-      }
-      this.dispatchEvent(copy);
-      const handler = this['on' + type];
-      if (typeof handler === 'function') { handler.call(this, copy); }
-    }
-    get url() { return this._ws.url; }
-    get protocol() { return this._ws.protocol; }
-    get extensions() { return this._ws.extensions; }
-    get bufferedAmount() { return this._ws.bufferedAmount; }
-    get binaryType() { return this._ws.binaryType; }
-    set binaryType(value) { this._ws.binaryType = value; }
-    get readyState() { return this._closedByPage ? 2 : this._ws.readyState; }
-    send(data) { this._ws.send(data); }
-    close(code) {
-      this._closedByPage = true;
-      window.__pageCloses.push(code === undefined ? null : code);
-    }
-  }
-  function PatchedWebSocket(url, protocols) {
-    if (window.__hangNext) {
-      window.__hung += 1;
-      return new HangingSocket(url);
-    }
-    if (window.__deafClose) { return new DeafCloseSocket(url, protocols); }
-    if (protocols === undefined) { return new RealWebSocket(url); }
-    return new RealWebSocket(url, protocols);
-  }
-  PatchedWebSocket.prototype = RealWebSocket.prototype;
-  PatchedWebSocket.CONNECTING = 0;
-  PatchedWebSocket.OPEN = 1;
-  PatchedWebSocket.CLOSING = 2;
-  PatchedWebSocket.CLOSED = 3;
-  window.WebSocket = PatchedWebSocket;
-})();
-"""
+# a mocked socket always opens at once) are `reconnection_harness`'s:
+# `window.__hangNext` keeps the next sockets CONNECTING for ever, and
+# `window.__deafClose` records `close()` in `window.__pageCloses` and sends it no
+# further, while messages still arrive (as on a dead network).
 DEAF_CLOSE_SCRIPT = SOCKET_STAND_INS_SCRIPT + "window.__deafClose = true;"
 
 
@@ -207,7 +130,7 @@ def test_ac5_the_online_event_forces_a_try_while_a_new_socket_is_connecting(
     expect_offline(page)
     page.evaluate("window.__hangNext = true")
 
-    advance_page(page, 1000)
+    advance_page(page, FIRST_DELAY_LATEST_MS)
 
     wait_until(page, lambda: page.evaluate("window.__hung") == 1)
     assert len(room.connections) == 1

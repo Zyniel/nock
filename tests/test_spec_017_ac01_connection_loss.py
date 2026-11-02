@@ -10,6 +10,11 @@ page loads and moved by hand with `advance_page`. The shared setup is in
 
 Refined by `platform/reconnection.md` AC-3 (B-046): the band has no live role, and the
 page's status region reads its text (`client/hud.md` rule 17).
+
+Refined by `platform/reconnection.md` rules 3 and 6 (B-047): the 4 seconds of silence
+are read from the clock, which the frozen page clock moves too, and each reconnect
+delay is drawn within 20 % of 1, 2, 4 or 8 seconds: `expect_new_connection_after`
+checks that no socket opens before 80 % of the delay and one has at 120 %.
 """
 
 from __future__ import annotations
