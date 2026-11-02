@@ -1,6 +1,7 @@
 <script lang="ts">
   // The catalogue frame (spec 046, "Catalogue frame"): the page top bar, then
   // one column at most 920 px wide, centred on white, its parts 16 px apart.
+  // The column is the page's `main`, after the top bar, which is the banner.
   // The catalogue and the grid page show their content in it. The page that
   // holds the frame is a plain page (the class `nock-plain-page`).
   import type { Snippet } from 'svelte'
@@ -32,9 +33,9 @@
 <svelte:window onresize={followWindow} />
 
 <PageTopBar form="catalogue" {isWide} end={topBarEnd} />
-<div class="catalogue-column" class:narrow={!isWide} data-testid="catalogue-column">
+<main class="catalogue-column" class:narrow={!isWide} data-testid="catalogue-column">
   {@render children()}
-</div>
+</main>
 
 <style>
   .catalogue-column {

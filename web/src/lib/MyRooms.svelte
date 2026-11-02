@@ -84,7 +84,9 @@
               {/if}
             </h3>
             <p class="nock-row-line" data-testid="my-room-players">
-              {t('my_rooms.players', { names: summary.players.map(displayNickname).join(', ') })}
+              {t('my_rooms.players', {
+                names: summary.players.map(displayNickname).join(t('list.separator')),
+              })}
             </p>
             <p class="nock-row-line" data-testid="my-room-activity">
               {lastActivityText(summary.last_activity_at)}

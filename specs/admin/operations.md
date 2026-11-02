@@ -168,12 +168,16 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
     given or found in the tab's `sessionStorage`, its only place (never
     `localStorage`, a cookie or a URL). The form holds a password input with
     autocomplete off, `ops.token_label`, and the button `ops.token_submit`.
+    Only a token of rule 4's shape is stored or sent: a given one of another
+    shape is refused as a 401 is, with no request; a stored one is removed,
+    the page `locked` with no error line.
     Every ops request sends the token in its header. Then `loading`
     (`ops.loading`) until the dashboard, asked with no period, answers: 200
     `ready`; any 401 or 429 of
-    the page, dashboard, settings card (`admin/overrides.md`) or replay,
-    forgets the token and goes back to `locked`
-    with `ops.token_refused` or `ops.throttled`; another dashboard answer (a 404
+    the page, dashboard, settings card (`admin/overrides.md`) or replay, but a
+    superseded one (rules 18, 19), forgets the token and goes back to `locked`
+    with `ops.token_refused` or `ops.throttled`, the input empty and focused;
+    another dashboard answer (a 404
     or a malformed 200 too) or a network failure gives `error` (`ops.error`)
     until a reload.
 17. `ready` shows the card `ops.dashboard_heading`, then the settings card
@@ -193,12 +197,15 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
 18. A period press keeps the page `ready`, with the dashboard, the replay and the
     focus on the button, and changes the figures and the pressed period on the
     answer; a 401 or 429 locks, another answer gives `error`. An answer that
-    finds the page no longer `ready` changes nothing.
+    finds the page no longer `ready` changes nothing, nor does the answer to a
+    dashboard request (the first load, a press, the reload after a settings
+    save) that a later one has superseded.
 19. The card `ops.replay_heading` holds a form, the field `ops.replay_code_label`
     and the button `ops.replay_submit`. It sends the code in capitals and shows
     under the form `loading` (`ops.loading`), `not_found` (a 404,
     `ops.replay_not_found`), `error` (any other failure, `ops.error`) or
-    `ready`, the dashboard staying above. A room with no edit shows only
+    `ready`, the dashboard staying above; the answer to a code that a later
+    code has superseded changes nothing. A room with no edit shows only
     `ops.replay_empty`. Otherwise: every edit by its `ops.edit.*` line
     (`typed_pencil` for a pencil letter), its time as fr-FR hours, minutes and
     seconds on two digits in the browser's zone, the nickname as
@@ -347,6 +354,21 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   logged and the WAL is not empty. Once that connection closes, the next
   sweep, which deletes nothing, leaves the WAL at 0 bytes, and neither file
   holds the chat text or A's code.
+- **AC-26** The dashboard `ready` on 7 days, pressing 1 then 30, the 30-day
+  answer coming first and the 1-day one after: the page shows the 30-day
+  figures with 30 pressed, and still does once the 1-day answer has come.
+- **AC-27** Asking the replay of `AAAAAA` then of FX-01's room, whose answer
+  comes first, then `AAAAAA`'s 404: the card shows FX-01's replay, not
+  « Salon introuvable. ».
+- **AC-28** On the form, a token of 40 characters holding `é`, one holding a
+  space, or one of 31 allowed characters, submitted: no request is sent,
+  `sessionStorage` holds no token, and the form shows « Jeton refusé. » with
+  the input empty and focused.
+- **AC-29** With `sessionStorage` holding a 40-character token with `é`,
+  `/ops` sends no request and opens `locked` with no error line, the token
+  removed.
+- **AC-30** `ready` with the token, a replay answered 401 brings the form back
+  with « Jeton refusé. », its input empty and focused.
 
 ## Edge cases
 
@@ -379,4 +401,4 @@ room's data goes at expiry with no copy left. An operator with the token reads, 
   `src/nock/__main__.py`: `main()`.
 - `web/src/lib/OpsPage.svelte`, `OpsReplay.svelte`, `ops.ts`, `duration.ts`.
 - Tests: `tests/test_spec_038_ac03*` to `ac11*`, `tests/test_spec_048_ac06*`,
-  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21 to AC-25.
+  `ac09_ac10*`, `ac11_ac12*`; `tests/test_operations_*` for AC-21 to AC-30.

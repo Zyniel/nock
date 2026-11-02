@@ -67,6 +67,7 @@ from spec038_harness import (
     PARIS,
     SEVEN_DAY_TEXTS,
     TOO_MANY_REQUESTS,
+    WRONG_TOKEN,
     DashboardRoute,
     OpsServer,
     answer_held_routes,
@@ -109,7 +110,6 @@ PERIOD_DAYS = ["1", "7", "30"]
 NOW = 1_800_000_000.0
 REPLAY_ROUTE = "**/api/ops/rooms/*/edits"
 REPLAY_CODE = "ZZZZZZ"  # any code: the route answers before the server sees it
-WRONG_TOKEN = "wrong"
 FORM_WATCHER = (
     "window.__opsFormSeen = false;"
     "new MutationObserver(() => {"

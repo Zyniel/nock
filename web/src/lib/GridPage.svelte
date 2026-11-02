@@ -49,7 +49,7 @@
   })
 </script>
 
-<main class="nock-plain-page grid-page" data-testid="grid-page" data-state={pageState}>
+<div class="nock-plain-page grid-page" data-testid="grid-page" data-state={pageState}>
   <CatalogueFrame>
     {#if pageState === 'loading'}
       <p class="nock-state-line" data-testid="catalogue-status">{t('catalogue.loading')}</p>
@@ -61,7 +61,7 @@
       <CatalogueList grids={[summary]} {accountProgress} />
     {/if}
   </CatalogueFrame>
-</main>
+</div>
 
 <style>
   .grid-page {

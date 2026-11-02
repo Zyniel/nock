@@ -67,9 +67,18 @@
     return Math.max(1, Math.min(widest, fitting))
   }
 
+  // The number of the latest replay request: the answer to an earlier code
+  // changes nothing.
+  let latestReplayRequest = 0
+
   async function loadReplay(code: string): Promise<void> {
     replayState = 'loading'
+    latestReplayRequest += 1
+    const request = latestReplayRequest
     const answer = await fetchReplay(token, code)
+    if (request !== latestReplayRequest) {
+      return
+    }
     if (answer.kind === 'ok') {
       replay = answer.body
       position = answer.body.edits.length

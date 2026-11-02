@@ -103,6 +103,25 @@
     return () => window.removeEventListener('resize', place)
   })
 
+  // When the top bar changes form with no change of layout, the bar and the
+  // button move: an open popover is placed again once the page has drawn the
+  // new bar. The last form seen is kept out of reactivity so that this effect
+  // runs again only for a change of form; whether the popover is open is read
+  // at that moment.
+  let lastForm: 'phone' | 'computer' | null = null
+  async function placeAgain(): Promise<void> {
+    await tick()
+    place()
+  }
+  $effect(() => {
+    const currentForm = form
+    const isFormChanged = lastForm !== null && lastForm !== currentForm
+    lastForm = currentForm
+    if (isFormChanged && isOpen) {
+      void placeAgain()
+    }
+  })
+
   // Escape while the focus is inside the popover.
   $effect(() => {
     if (element === null) {

@@ -42,7 +42,7 @@ from spec033_harness import (
     account_live_server,
 )
 from spec035_harness import Walker
-from spec038_harness import DASHBOARD_ROUTE, OpsServer, ops_live_server
+from spec038_harness import DASHBOARD_ROUTE, WRONG_TOKEN, OpsServer, ops_live_server
 from spec046_harness import HeldRoute, OpenWindow, fulfil_json, window_opener
 from spec048_harness import (
     NOT_FOUND,
@@ -198,8 +198,8 @@ def open_ops_state(page: Page, base_url: str, state: str, grid: Grid) -> None:
         page.route(DASHBOARD_ROUTE, refuse)
         open_ops(page, base_url)
         field = page.get_by_test_id("ops-token-input")
-        field.fill("wrong")
-        expect(field).to_have_value("wrong")
+        field.fill(WRONG_TOKEN)
+        expect(field).to_have_value(WRONG_TOKEN)
         # 2026-10-23: Firefox under load lost the press; main's run after #43.
         click_until_pressed(page.get_by_test_id("ops-token-submit"))
         expect(page.get_by_test_id("ops-token-error")).to_be_visible()

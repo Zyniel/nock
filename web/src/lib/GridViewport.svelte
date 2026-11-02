@@ -553,15 +553,33 @@
     let startZoom = ZOOM_MIN
 
     function onPointerDown(event: PointerEvent): void {
-      if (event.pointerType === 'mouse') {
+      // Pinching and panning are touch gestures: a mouse or a pen keeps its
+      // click on the cell it touched.
+      if (event.pointerType !== 'touch') {
         return
       }
-      fingers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
-      if (fingers.size === 2) {
-        const [first, second] = [...fingers.values()]
-        startDistance = distanceBetween(first, second)
-        startZoom = zoom
+      // A first finger starts a new gesture: a finger left over from a pointerup
+      // that went missing is forgotten.
+      if (event.isPrimary) {
+        fingers.clear()
       }
+      // The grid keeps the finger until it lifts, even if the cell it touched is
+      // drawn again meanwhile; otherwise its pointerup could go missing and
+      // leave a finger that is not there.
+      target.setPointerCapture(event.pointerId)
+      fingers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY })
+      startPinchIfTwoFingers()
+    }
+
+    // A pinch measures its ratio against the two fingers on the screen when it
+    // started, so each time exactly two fingers are down it starts anew.
+    function startPinchIfTwoFingers(): void {
+      if (fingers.size !== 2) {
+        return
+      }
+      const [first, second] = [...fingers.values()]
+      startDistance = distanceBetween(first, second)
+      startZoom = zoom
     }
 
     function onPointerMove(event: PointerEvent): void {
@@ -589,6 +607,7 @@
       if (fingers.size < 2) {
         startDistance = 0
       }
+      startPinchIfTwoFingers()
     }
 
     // Change the zoom and scroll so the point between the fingers stays put.

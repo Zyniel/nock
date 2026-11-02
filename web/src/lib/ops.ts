@@ -350,14 +350,28 @@ export function fetchDryRun(
   return fetchOps('/api/ops/settings/dry-run', token, isDryRun, init)
 }
 
+// The shape of the operator token (admin/operations.md rule 4): 32 to 256
+// characters of A-Z, a-z, 0-9, _ and -. The page stores and sends no other.
+const OPS_TOKEN_SHAPE = /^[A-Za-z0-9_-]{32,256}$/
+
+export function isOpsTokenShape(token: string): boolean {
+  return OPS_TOKEN_SHAPE.test(token)
+}
+
 // The operator token this tab keeps, or null. A browser that refuses storage
-// keeps none.
+// keeps none, and a kept token of another shape is removed.
 export function readOpsToken(): string | null {
+  let kept: string | null
   try {
-    return sessionStorage.getItem(OPS_TOKEN_KEY)
+    kept = sessionStorage.getItem(OPS_TOKEN_KEY)
   } catch {
     return null
   }
+  if (kept !== null && !isOpsTokenShape(kept)) {
+    removeOpsToken()
+    return null
+  }
+  return kept
 }
 
 export function writeOpsToken(token: string): void {

@@ -10,28 +10,80 @@
 
 // ---- Changes of a list ----
 
-// Call `onChange` after the list or one of its items changes size (a resize, a
-// rotation, a new root font), and after its content changes (an item comes or
-// goes, a button shows or goes, a text changes). Returns a function that stops.
-export function watchListChanges(list: HTMLElement, onChange: () => void): () => void {
-  const sizeObserver = new ResizeObserver(onChange)
-  // The items come and go, so the size observer follows the items of the moment.
-  function observeSizes(): void {
-    sizeObserver.disconnect()
-    sizeObserver.observe(list)
-    for (const item of Array.from(list.children)) {
-      sizeObserver.observe(item)
+// The observers of one list, and who they call. A list has one watcher however
+// many callers follow it.
+interface ListWatcher {
+  listeners: Set<() => void>
+  stop: () => void
+}
+
+const watchers = new WeakMap<HTMLElement, ListWatcher>()
+
+// Watch the size of a list and of its items, and its content. Calls `listeners`
+// after a change of either.
+function startListWatcher(list: HTMLElement): ListWatcher {
+  const listeners = new Set<() => void>()
+  function notify(): void {
+    for (const listener of Array.from(listeners)) {
+      listener()
+    }
+  }
+  const sizeObserver = new ResizeObserver(notify)
+  // The items come and go: the size observer follows the items of the moment,
+  // observing only the ones that came and letting go of the ones that went.
+  const observedItems = new Set<Element>()
+  function followItems(): void {
+    const items = new Set<Element>(Array.from(list.children))
+    for (const item of items) {
+      if (!observedItems.has(item)) {
+        sizeObserver.observe(item)
+        observedItems.add(item)
+      }
+    }
+    for (const item of Array.from(observedItems)) {
+      if (!items.has(item)) {
+        sizeObserver.unobserve(item)
+        observedItems.delete(item)
+      }
     }
   }
   const contentObserver = new MutationObserver(() => {
-    observeSizes()
-    onChange()
+    followItems()
+    notify()
   })
   contentObserver.observe(list, { childList: true, subtree: true, characterData: true })
-  observeSizes()
+  sizeObserver.observe(list)
+  followItems()
+  return {
+    listeners,
+    stop: () => {
+      sizeObserver.disconnect()
+      contentObserver.disconnect()
+    },
+  }
+}
+
+// Call `onChange` after the list or one of its items changes size (a resize, a
+// rotation, a new root font), and after its content changes (an item comes or
+// goes, a button shows or goes, a text changes). Returns a function that stops.
+// Every caller of the same list shares one watcher.
+export function watchListChanges(list: HTMLElement, onChange: () => void): () => void {
+  let watcher = watchers.get(list)
+  if (watcher === undefined) {
+    watcher = startListWatcher(list)
+    watchers.set(list, watcher)
+  }
+  const sharedWatcher = watcher
+  // A caller that registers twice with the same function must stop only its own
+  // registration, so each one gets a function of its own.
+  const listener = (): void => onChange()
+  sharedWatcher.listeners.add(listener)
   return () => {
-    sizeObserver.disconnect()
-    contentObserver.disconnect()
+    sharedWatcher.listeners.delete(listener)
+    if (sharedWatcher.listeners.size === 0 && watchers.get(list) === sharedWatcher) {
+      sharedWatcher.stop()
+      watchers.delete(list)
+    }
   }
 }
 

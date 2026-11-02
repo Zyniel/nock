@@ -221,6 +221,6 @@ export function teammatesText(record: HistoryRecord): string {
   if (record.teammates.length === 0) {
     return t('history.alone')
   }
-  const names = record.teammates.map(displayNickname).join(', ')
+  const names = record.teammates.map(displayNickname).join(t('list.separator'))
   return t('history.teammates', { names })
 }
