@@ -174,7 +174,7 @@ smooth on a phone.
 - A dark mode, forced colours, print styles; screenshot comparison with the
   sheets.
 - The pages, their frames and texts, the opening, the brand: `client/shell.md`.
-  What each cell's state draws: `gameplay/board.md`, `gameplay/co-op.md`,
+  What each cell's state draws: `gameplay/viewport.md`, `gameplay/co-op.md`,
   `social/presence.md`; the catch-up ring itself: `social/catch-up.md`. The
   connection band: `platform/reconnection.md`.
 

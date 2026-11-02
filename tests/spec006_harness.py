@@ -7,8 +7,8 @@ It holds what more than one of those files uses: the timeouts, the window sizes 
 AC-5 and AC-7, the helpers that open a room on a live server (`open_room`) or on
 the mocked socket (`open_mock_room`), the snapshot builders of AC-4, AC-6 and
 AC-8, and AC-1's pinch and pan through the Chrome DevTools Protocol (`pinch`,
-`pan`), which the zoomed grid tests of board AC-23 to AC-29
-(`tests/test_board_zoom_follow.py`) and the tests of `client/foundation.md` AC-11
+`pan`), which the zoomed grid tests of viewport AC-11 to AC-17
+(`tests/test_viewport_zoom_follow.py`) and the tests of `client/foundation.md` AC-11
 use too. What only one file uses stays in that file, next to its tests. The
 fixtures `fx01_grid` and `fx02_grid` are defined in each file as thin wrappers
 around `grid_from_text`: a fixture imported from here would be an unused import

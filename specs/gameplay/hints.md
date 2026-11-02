@@ -206,7 +206,8 @@ The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
   shortcuts, a message telling a player their request was dropped.
 - The vote and its banner: `gameplay/votes.md`. The host settings:
   `lobby/host.md`. The Aide menu's place: `client/hud.md`; the notes:
-  `client/room.md`. Cell marks and pending edits: `gameplay/board.md`.
+  `client/room.md`. Cell marks: `gameplay/viewport.md`; pending edits:
+  `gameplay/board.md`.
   Completion: `gameplay/rules.md`. The stream and its lines' look:
   `social/chat.md`. Protocol and fair play: `platform/realtime.md`. The recap's
   counts: `gameplay/results.md`.

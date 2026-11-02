@@ -3,7 +3,7 @@
 Pytest does not collect this module (its name does not start with `test_`). It
 holds the grid builders that the tests of more than one domain use: a reference
 grid with some answers written another way, for example FX-01 with the compound
-words `VI-DE` and `NA-VAL` (grids AC-21, realtime AC-20, board AC-21 and AC-22).
+words `VI-DE` and `NA-VAL` (grids AC-21, realtime AC-20, viewport AC-9 and AC-10).
 """
 
 from __future__ import annotations

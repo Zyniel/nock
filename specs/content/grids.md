@@ -206,7 +206,7 @@ party.
 - Reporting more than one problem per import.
 - A look of its own per separator (every break is drawn alike), the separators
   in the clue bar or a length pattern. What a break looks like on the grid:
-  `gameplay/board.md`; how it reaches the browser: `platform/realtime.md`.
+  `gameplay/viewport.md`; how it reaches the browser: `platform/realtime.md`.
 - The grid files, the index, credits and withdrawal: `content/grid-files.md`.
 - Listing, filtering and the grid page: `content/library.md`.
 - Where real grids come from (commission, licence, generation): an owner decision.
