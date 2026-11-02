@@ -1,10 +1,10 @@
 ---
 id: B-055
 title: The quick gate of a change to a shared component
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-02T00:07:00Z'
-updated_date: '2026-11-02T01:00:00Z'
+updated_date: '2026-11-02T11:08:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -36,8 +36,18 @@ priority: medium
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. No spec (tooling): SHARED_COMPONENT_DOMAINS in scripts/gate.py; gate.py --specs and scripts/hooks/role_gate.py add the domains of the shared components the branch changed.
+2. No tests (tooling; the repository has no tests of its scripts): probed by hand.
+3. Gate: uv run python scripts/gate.py (full).
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Human (2026-11-02, chat, answering the lead's wrap-up after B-043 to B-045): DRAFT-047 option A. Promoted to Upkeep as a tooling task.
+
+Lead (2026-11-02): option A, the human's pick. The map lives in scripts/gate.py rather than gate_browsers.py (the lead's default said beside SERIAL_TEST_FILES): the role hook runs from the main checkout and loads the checked checkout's gate.py to read the map, and gate_browsers.py imports pytest and Playwright, which the hook should not load. The map is the domain specs whose Code section names the component: RoomPage.svelte 16 domains, GridViewport.svelte 8, PlayersPanel.svelte 4; the other components are named by three domains at most and stay out. The quick gate run by hand (--specs) adds them too, printing what it adds, so the lead's quick gate and the hook's agree.
 <!-- SECTION:NOTES:END -->

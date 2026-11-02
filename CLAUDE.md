@@ -218,7 +218,11 @@ model price.
   lock in `.git/`, then fails naming the gate that holds it.
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: `--stage
   tests` for the test-writer, and for the implementer the quick gate of the
-  domains and numbered specs the branch changed since `main`. A role held by a
+  domains and numbered specs the branch changed since `main`.
+- A client component that serves several domains (`RoomPage.svelte`,
+  `GridViewport.svelte`, `PlayersPanel.svelte`: four domains or more) is listed with them in `SHARED_COMPONENT_DOMAINS`
+  (`scripts/gate.py`): when the branch changed it, the quick gate and the role
+  hook add those domains to `--specs`. A role held by a
   failure outside its files (a stale test, for the implementer) says so in its
   report and finishes again without changing anything; the hook then lets it
   stop.

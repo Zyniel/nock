@@ -39,9 +39,11 @@ Options of the full stage (2026-10-15, so CI can run one job per engine):
         parallel pass, on their own.
     --specs: spec numbers and domain names, comma-separated (for example
         027,grids): the browser tests run only for those numbered specs, those
-        domains and the numbered specs the domains point to; the static checks
-        and the tests without a browser run in full. The quick gate of an
-        agent's finish hook (2026-10-16; domain names since 2026-10-24).
+        domains, the numbered specs the domains point to, and the domains of
+        the shared client components the branch changed since main
+        (SHARED_COMPONENT_DOMAINS); the static checks and the tests without a
+        browser run in full. The quick gate of an agent's finish hook
+        (2026-10-16; domain names since 2026-10-24).
 
 The gate's load on the machine (2026-10-29: in a review round, 16 workers'
 Chromium processes and two gates at once froze a 16-thread desktop): the
@@ -154,6 +156,47 @@ BUILD_STEP: tuple[str, list[str]] = (
     "vite build (web)",
     ["npm", "--prefix", "web", "run", "build"],
 )
+
+# The client components that serve several domains, and the domains whose
+# browser tests they serve: the domain specs whose « Code » section names them.
+# A change to one of them adds those domains to the quick gate (--specs) and to
+# the implementer's gate (scripts/hooks/role_gate.py), since such a change broke
+# other domains' tests that only the full gate ran (B-041, B-045). A component
+# that a fourth domain's « Code » section starts to name joins this map.
+SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
+    "web/src/lib/GridViewport.svelte": (
+        "board",
+        "catch-up",
+        "co-op",
+        "hints",
+        "presence",
+        "rules",
+        "server",
+        "shell",
+    ),
+    "web/src/lib/PlayersPanel.svelte": ("chat", "host", "presence", "rooms"),
+    "web/src/lib/RoomPage.svelte": (
+        "board",
+        "catch-up",
+        "chat",
+        "co-op",
+        "hints",
+        "host",
+        "hud",
+        "joining",
+        "presence",
+        "reconnection",
+        "results",
+        "room",
+        "rooms",
+        "rules",
+        "server",
+        "shell",
+    ),
+}
+# The branch whose changes the quick gate measures, first the remote one.
+BASE_REFS: tuple[str, ...] = ("origin/main", "main")
+GIT_TIMEOUT_SECONDS = 30
 
 ENGINE_NAMES: tuple[str, ...] = ("chromium", "firefox", "webkit")
 DEFAULT_ENGINES = "chromium"
@@ -1040,6 +1083,93 @@ def expand_specs(specs: list[str]) -> tuple[list[str], list[str]]:
     return sorted(selectors), unknown_names
 
 
+def shared_component_domains(paths: list[str]) -> list[str]:
+    """Return the domains served by the shared components among some paths.
+
+    Args:
+        paths: Repository-relative paths written with "/".
+
+    Returns:
+        The domain names of SHARED_COMPONENT_DOMAINS for those paths, sorted.
+    """
+    domain_names: set[str] = set()
+    for path in paths:
+        domain_names.update(SHARED_COMPONENT_DOMAINS.get(path, ()))
+    return sorted(domain_names)
+
+
+def run_git(arguments: list[str]) -> str | None:
+    """Run one git command in the project and return its output.
+
+    Args:
+        arguments: The git arguments, without "git".
+
+    Returns:
+        The standard output, or None when git is missing or the command fails.
+    """
+    git_path = shutil.which("git")
+    if git_path is None:
+        return None
+    try:
+        completed = subprocess.run(
+            [git_path, *arguments],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=GIT_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    if completed.returncode != 0:
+        return None
+    return completed.stdout
+
+
+def branch_changed_paths() -> list[str]:
+    """Return the paths changed since the branch left `main`, committed or not.
+
+    Returns:
+        Repository-relative paths; empty when git cannot tell.
+    """
+    base_commit = None
+    for base_ref in BASE_REFS:
+        output = run_git(["merge-base", "HEAD", base_ref])
+        if output is not None and output.strip():
+            base_commit = output.strip()
+            break
+    if base_commit is None:
+        return []
+    paths: list[str] = []
+    changed = run_git(["diff", "--name-only", base_commit])
+    untracked = run_git(["ls-files", "--others", "--exclude-standard"])
+    for output in (changed, untracked):
+        if output is not None:
+            paths.extend(line for line in output.splitlines() if line)
+    return paths
+
+
+def add_shared_component_domains(specs: list[str]) -> list[str]:
+    """Add to --specs the domains of the shared components the branch changed.
+
+    Args:
+        specs: The spec numbers and domain names given to --specs.
+
+    Returns:
+        The same list, followed by the domains it lacked, which are printed.
+    """
+    added_names: list[str] = []
+    for domain_name in shared_component_domains(branch_changed_paths()):
+        if domain_name not in specs:
+            added_names.append(domain_name)
+    if added_names:
+        names = ",".join(added_names)
+        print(f"--specs: the branch changed a shared component, adding {names}")
+    return [*specs, *added_names]
+
+
 def parse_arguments() -> argparse.Namespace:
     """Parse the command line."""
     parser = argparse.ArgumentParser(description="Run the project quality gate.")
@@ -1139,7 +1269,8 @@ def main() -> int:
 
     selected_specs: list[str] | None = None
     if arguments.specs is not None:
-        selected_specs, unknown_names = expand_specs(arguments.specs)
+        specs = add_shared_component_domains(arguments.specs)
+        selected_specs, unknown_names = expand_specs(specs)
         if unknown_names:
             names = ", ".join(unknown_names)
             print(f"FAIL: --specs names no domain spec: {names} (see specs/_map.md)")

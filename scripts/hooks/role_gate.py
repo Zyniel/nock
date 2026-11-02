@@ -11,7 +11,9 @@ checks, every test without a browser, and the browser tests in Chromium of the
 specs the branch changed since `main` (found from the names of the changed
 spec, test and harness files). CI runs everything else. Since 2026-10-24 a
 changed domain spec, or a changed test or harness file of a domain, names that
-domain (specs/_map.md), and the gate adds the numbered specs it points to.
+domain (specs/_map.md), and the gate adds the numbered specs it points to. A
+changed client component that serves several domains names them all: the map
+SHARED_COMPONENT_DOMAINS of the checkout's own scripts/gate.py (B-055).
 
 Exit codes understood by Claude Code:
     0: the agent may stop.
@@ -39,6 +41,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -250,8 +253,48 @@ def names_domain(path: str, domain_name: str, spec_path: str) -> bool:
     return file_name.startswith((f"test_{prefix}_", f"{prefix}_harness"))
 
 
+def shared_component_domains(project_root: Path, paths: list[str]) -> set[str]:
+    """Return the domains served by the shared client components among paths.
+
+    The map is the checkout's own (SHARED_COMPONENT_DOMAINS of its
+    scripts/gate.py), so a worktree's gate and its hook agree; a gate that has
+    no such map, or that cannot be loaded, adds no domain.
+
+    Args:
+        project_root: The checkout the gate checks.
+        paths: Its changed paths, repository-relative.
+
+    Returns:
+        The domain names; empty when no shared component changed.
+    """
+    gate_script = project_root / "scripts" / "gate.py"
+    module_spec = importlib.util.spec_from_file_location(
+        "nock_checkout_gate", gate_script
+    )
+    if module_spec is None or module_spec.loader is None:
+        return set()
+    gate_module = importlib.util.module_from_spec(module_spec)
+    # dataclasses look their module up in sys.modules while the module loads.
+    sys.modules[module_spec.name] = gate_module
+    try:
+        module_spec.loader.exec_module(gate_module)
+    except Exception:
+        return set()
+    finally:
+        sys.modules.pop(module_spec.name, None)
+    component_domains = getattr(gate_module, "SHARED_COMPONENT_DOMAINS", None)
+    if not isinstance(component_domains, dict):
+        return set()
+    domain_names: set[str] = set()
+    for path in paths:
+        domain_names.update(component_domains.get(path, ()))
+    return domain_names
+
+
 def changed_specs(project_root: Path) -> list[str]:
     """Return the numbered specs and domains whose spec, tests or harness changed.
+
+    A changed shared client component adds the domains it serves.
 
     Args:
         project_root: The checkout whose changes are wanted.
@@ -271,6 +314,7 @@ def changed_specs(project_root: Path) -> list[str]:
         for path in paths:
             if names_domain(path, domain_name, spec_path):
                 specs.add(domain_name)
+    specs.update(shared_component_domains(project_root, paths))
     return sorted(specs)
 
 
