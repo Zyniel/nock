@@ -31,7 +31,6 @@ from spec046_harness import (
     SIZES,
     WAIT_TIMEOUT_MS,
     OpenWindow,
-    bar_then_body_problems,
     card_problems,
     card_title_problems,
     child_ids,
@@ -126,9 +125,9 @@ def test_ac19_the_page_not_found_has_the_entry_frame(
     page = window(width, height)
     open_nowhere(page, live_server)
 
-    root = page.get_by_test_id("not-found-page")
+    ids = child_ids(page.get_by_test_id("not-found-page"))
 
-    assert bar_then_body_problems(root, "page-body") == []
+    assert ids == ["page-topbar", "page-body"], ids
     assert entry_frame_problems(page) == []
 
 

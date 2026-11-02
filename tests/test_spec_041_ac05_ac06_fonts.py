@@ -169,11 +169,10 @@ FACE_FILES = [
     ("ibm-plex-sans-condensed", "600"),
 ]
 SUBSET_NAMES = ("latin", "latin-ext")
-FONT_IMPORTS = [
-    f"@fontsource/{package}/{subset}-{face}.css"
-    for package, face in FACE_FILES
-    for subset in SUBSET_NAMES
-]
+FONT_IMPORTS: list[str] = []
+for font_package, font_face in FACE_FILES:
+    for subset_name in SUBSET_NAMES:
+        FONT_IMPORTS.append(f"@fontsource/{font_package}/{subset_name}-{font_face}.css")
 FONTSOURCE_NAME = re.compile(r"""(['"`])(@fontsource/[^'"`]*)\1""")
 README_CREDITS = (
     "Source Sans 3",

@@ -37,12 +37,12 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, Route, expect
+from playwright.sync_api import Browser, Page, expect
 
 from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from nock.grid import Grid
-from nock.server import WEB_DIST_DIR
+from shell_harness import open_locked_ops, route_client
 from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec046_harness import (
     SIZES,
@@ -133,26 +133,6 @@ def open_grid_1(page: Page, base_url: str) -> None:
 def open_nickname(page: Page, base_url: str) -> None:
     """Open `/r/ABC123` on a mocked socket, on the nickname form."""
     open_nickname_card(page, base_url)
-
-
-def route_client(page: Page, url: str) -> None:
-    """Answer `GET url` with the built `index.html`, as the live server would."""
-    index_html = (WEB_DIST_DIR / "index.html").read_text(encoding="utf-8")
-
-    def answer(route: Route) -> None:
-        route.fulfill(status=200, content_type="text/html", body=index_html)
-
-    page.route(url, answer)
-
-
-def open_locked_ops(page: Page, base_url: str) -> None:
-    """Open `/ops` locked: the path answered with the built client."""
-    route_client(page, f"{base_url}/ops")
-    page.goto(f"{base_url}/ops")
-    expect(page.get_by_test_id("ops-page")).to_have_attribute(
-        "data-state", "locked", timeout=WAIT_TIMEOUT_MS
-    )
-    wait_for_fonts(page)
 
 
 def open_signed_out_account(page: Page, base_url: str) -> None:

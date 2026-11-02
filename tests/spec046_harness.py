@@ -745,21 +745,6 @@ def child_ids(locator: Locator) -> list[str | None]:
     return ids
 
 
-def bar_then_body_problems(root: Locator, body_test_id: str) -> list[str]:
-    """`root` holds the page top bar, then the page's body.
-
-    The first element child that shows is `page-topbar`, and the body (the element
-    with `body_test_id`) is the one other child or inside it: the frame may put the
-    body in its `main` (`client/shell.md` rule 19) or be the `main` itself.
-    """
-    ids = child_ids(root)
-    if len(ids) != 2 or ids[0] != "page-topbar":
-        return [f"children {ids}, not the page-topbar then the body"]
-    if ids[1] != body_test_id and root.get_by_test_id(body_test_id).count() != 1:
-        return [f"the second child {ids[1]} is not or does not hold {body_test_id}"]
-    return []
-
-
 def child_tags(locator: Locator) -> list[str]:
     return [str(child["tag"]) for child in children_of(locator)]
 

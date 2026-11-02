@@ -35,7 +35,6 @@ from spec046_harness import (
     OpenWindow,
     accounts_on,
     answer_json,
-    bar_then_body_problems,
     border_problems,
     child_ids,
     child_tags,
@@ -84,12 +83,11 @@ def test_ac14_the_grid_page_holds_the_bar_then_a_column_with_no_heading(
 ) -> None:
     page = window(width, height)
     open_grid_page(page, live_server)
-    column = page.get_by_test_id("catalogue-column")
+    column = page.get_by_test_id("grid-page").get_by_test_id("catalogue-column")
 
-    assert (
-        bar_then_body_problems(page.get_by_test_id("grid-page"), "catalogue-column")
-        == []
-    )
+    page_ids = child_ids(page.get_by_test_id("grid-page"))
+
+    assert page_ids == ["page-topbar", "catalogue-column"], page_ids
     assert child_ids(column) == ["catalogue-list"], child_ids(column)
     assert "H1" not in child_tags(column)
     expect(column.locator("h1")).to_have_count(0)

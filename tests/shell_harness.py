@@ -10,9 +10,9 @@ are in `tests/test_shell_*.py`:
 - `test_shell_fonts.py`: AC-32 and AC-33, the font subsets and the room page's preload.
 
 This module holds what more than one of those files uses: the built client's files
-(`web/dist`), the way a test reads the scripts a page fetched, and a rewrite of one
+(`web/dist`), the way a test reads the scripts a page fetched, a rewrite of one
 value of `fr.json` inside the scripts the page loads (to see which key the page
-reads).
+reads), and the opener of the pages answered with the built `index.html`.
 """
 
 from __future__ import annotations
@@ -25,9 +25,11 @@ from typing import NamedTuple
 from urllib.parse import urlsplit
 
 import pytest
-from playwright.sync_api import Page, Request, Route
+from playwright.sync_api import Page, Request, Route, expect
 
+from fonts_ready import wait_for_fonts
 from nock.server import WEB_DIST_DIR
+from spec046_harness import WAIT_TIMEOUT_MS
 
 ASSETS_DIR = WEB_DIST_DIR / "assets"
 SCRIPT_ROUTE = "**/assets/*.js"
@@ -43,6 +45,26 @@ def built_files(suffix: str) -> list[Path]:
         if path.suffix == suffix:
             found.append(path)
     return found
+
+
+def route_client(page: Page, url: str) -> None:
+    """Answer `GET url` with the built `index.html`, as the live server would."""
+    index_html = (WEB_DIST_DIR / "index.html").read_text(encoding="utf-8")
+
+    def answer(route: Route) -> None:
+        route.fulfill(status=200, content_type="text/html", body=index_html)
+
+    page.route(url, answer)
+
+
+def open_locked_ops(page: Page, base_url: str) -> None:
+    """Open `/ops` locked: the path answered with the built client."""
+    route_client(page, f"{base_url}/ops")
+    page.goto(f"{base_url}/ops")
+    expect(page.get_by_test_id("ops-page")).to_have_attribute(
+        "data-state", "locked", timeout=WAIT_TIMEOUT_MS
+    )
+    wait_for_fonts(page)
 
 
 def built_file_of(url: str) -> Path:

@@ -30,12 +30,11 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
-from playwright.sync_api import Browser, Page, Route
+from playwright.sync_api import Browser
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
-from nock.server import WEB_DIST_DIR
-from shell_harness import FetchedScripts, built_files
+from shell_harness import FetchedScripts, built_files, open_locked_ops
 from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec046_harness import (
     OpenWindow,
@@ -71,18 +70,6 @@ def markers_fetched(fetched: FetchedScripts, markers: list[str]) -> list[str]:
         if fetched.holding(marker) != []:
             found.append(marker)
     return found
-
-
-def open_locked_ops(page: Page, base_url: str) -> None:
-    """Open `/ops` locked: its path answered with the built client."""
-    index_html = (WEB_DIST_DIR / "index.html").read_text(encoding="utf-8")
-
-    def answer(route: Route) -> None:
-        route.fulfill(status=200, content_type="text/html", body=index_html)
-
-    page.route(f"{base_url}/ops", answer)
-    page.goto(f"{base_url}/ops")
-    page.get_by_test_id("ops-token-input").wait_for()
 
 
 # ---- The markers ---------------------------------------------------------------------
