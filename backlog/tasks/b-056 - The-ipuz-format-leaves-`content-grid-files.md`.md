@@ -4,7 +4,7 @@ title: The ipuz format leaves `content/grid-files.md`
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-02T01:35:00Z'
+updated_date: '2026-11-02T01:38:00Z'
 labels:
   - domain:grid-files
   - domain:ipuz
@@ -75,4 +75,6 @@ Quick gate: uv run python scripts/gate.py --specs grid-files,ipuz,grids --browse
 The pitch's merge settled the architecture options (the Plan agent's split, the lead's pick), so no new Plan run: the spec-writer runs on Fable at high effort.
 
 Spec change: Fable spec-writer, spec-checker APPROVED in its second round. Decisions: ipuz rules 1-8 are old grid-files rules 5,6,7,8,9,10,12,14 and its AC-1..14 old AC-6..16,18,19,21, in order; grid-files' Depends on drops content/library.md to stay at three files (library already depends on grid-files); grid-files AC-3 cites ipuz rule 6 for the author refusal; grid-files rule 3 says a file breaking ipuz's rules also stops the server (the checker's finding: 'these rules' lost the format rules); grids' Depends on names content/ipuz.md alone (three files), its by-name citations of grid-files left to B-064; ipuz AC-10 names content/grids.md rule 6 explicitly where bare 'rule 6' would now mean ipuz's own.
+
+Tests: the test-writer moved 57 functions to tests/test_ipuz_{structure,roundtrip,clues,compound,fields}.py, git mv for the four whole files; tests/grid_files_harness.py stays shared (the 004/005 tests import it). No implementer: no code changes, as the task says.
 <!-- SECTION:NOTES:END -->
