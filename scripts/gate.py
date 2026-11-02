@@ -171,12 +171,12 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "board",
         "catch-up",
         "co-op",
+        "foundation",
         "hints",
         "presence",
         "product",
         "rules",
         "server",
-        "shell",
     ),
     "web/src/lib/PlayersPanel.svelte": ("chat", "host", "presence", "room", "rooms"),
     "web/src/lib/RoomPage.svelte": (
