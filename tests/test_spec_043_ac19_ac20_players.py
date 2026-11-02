@@ -26,6 +26,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
+from hud_harness import live_role_problems
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import Direction, PlayerState
@@ -474,7 +475,7 @@ def test_ac20_a_copy_puts_the_link_in_the_clipboard_and_shows_the_green_line(
 
     copied = page.get_by_test_id("share-copied")
     expect(copied).to_have_text(fr_value("room.share.copied"))
-    expect(copied).to_have_attribute("role", "status")
+    assert live_role_problems(copied) == []
     expect_colour(copied, "color", GREEN)
     assert style_of(copied, "fontWeight") == "500"
     assert same_font_size(float(style_of(copied, "fontSize").removesuffix("px")), 13.6)

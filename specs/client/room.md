@@ -78,7 +78,8 @@ just did.
    (rule 6) replaces it.
 8. `undo.nothing` (« Rien à annuler. ») has a note's look and place, replaces
    any note and shows even with the stream shown; under the vote banner while
-   it shows.
+   it shows. It has no live role; each time it shows, the status region
+   announces it (`client/hud.md` rule 17).
 
 ### Look
 
@@ -124,6 +125,9 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
   fade. Bob's two messages during a vote make no note; after it only the vote's
   note shows. « Rien à annuler. » shows with the stream shown, and under the
   vote banner, uncovered. (← 043 AC-26)
+- **AC-8** Ana presses « Annuler » twice, 1 s apart, with nothing to undo: the
+  note « Rien à annuler. » has no live role, and after each press the status
+  region reads « Rien à annuler. », having been empty in between.
 
 ## Edge cases
 
@@ -144,4 +148,5 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
 - `web/src/lib/RoomPage.svelte` (the Salon's state, the dot, the notes) and
   its parts `Salon`, `PlayersPanel`, `RoomNote` (`.svelte`); `chat.ts` (badge,
   dot); `roomSession.ts` (what makes a note).
-- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`.
+- Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`;
+  `tests/test_room_*` for AC-8.

@@ -5,8 +5,10 @@ On `SOLVED` (spec 044's) with the recap route answering `RECAP`, at 1280 by 720 
 a context with spec 011's clipboard permissions (`clipboard-read`,
 `clipboard-write`), after `recap-open`: a click on `recap-copy` puts the share
 link in the clipboard; `recap-copied` then shows under `recap-share-row` with
-`role="status"`, `fr.json["room.share.copied"]` and the confirmation line's look,
-and is gone 2,500 ms after the click.
+no live role, `fr.json["room.share.copied"]` and the confirmation line's look, and
+is gone 2,500 ms after the click. The recap's own status region
+(`sheet-status-region` inside `recap`, `client/hud.md` rule 18) reads
+`fr.json["room.share.copied"]` (B-046, `gameplay/results.md` AC-13).
 
 This file times a window (the 2-second line), so it belongs with the
 timing-sensitive files that run serially (`SERIAL_TEST_FILES`).
@@ -26,6 +28,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from hud_harness import live_role_problems, region_problems, sheet_region
 from nock.grid import Grid
 from spec042_harness import box_of
 from spec043_harness import fr_value, set_timeouts
@@ -98,8 +101,11 @@ def test_ac10_lien_copie_shows_under_the_row_while_the_button_keeps_its_text(
     copied = clipboard_page.get_by_test_id("recap-copied")
 
     expect(copied).to_be_visible()
-    expect(copied).to_have_attribute("role", "status")
+    assert live_role_problems(copied) == []
     expect(copied).to_have_text(fr_value("room.share.copied"))
+    region = sheet_region(clipboard_page, "recap")
+    expect(region).to_have_text(fr_value("room.share.copied"))
+    assert region_problems(region) == []
     expect(clipboard_page.get_by_test_id("recap-copy")).to_have_text(
         fr_value("room.share.copy")
     )

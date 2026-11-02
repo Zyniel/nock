@@ -17,6 +17,12 @@ Readings where the spec leaves room:
 - "With the same gap" (AC-11): the parts are at least 14 px apart (1 px), as
   AC-8 reads the loaded parts.
 - The loading state is read once `recap-loading` shows, the route still held.
+
+Refined by `gameplay/results.md` AC-10 (B-046): `recap-loading` has no live role, and
+the recap's own status region (`sheet-status-region` inside `recap`, `client/hud.md`
+rule 18) is empty at the opening, then reads `fr.json["recap.loading"]`. "Empty at
+the opening" is the region's text in the first batch of changes after which the
+dialog is open, recorded by a `MutationObserver` installed before the click.
 """
 
 from __future__ import annotations
@@ -27,6 +33,13 @@ from itertools import pairwise
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
+from hud_harness import (
+    live_role_problems,
+    region_problems,
+    sheet_region,
+    sheet_region_watch,
+    watch_sheet_region,
+)
 from nock.grid import Grid
 from spec019_harness import OpenWindow, window_opener
 from spec028_harness import recap_body
@@ -94,6 +107,7 @@ def open_loading(
     """`SOLVED` at `size` with the route held; the recap open and loading."""
     page = window(size[0], size[1], False)
     open_solved_held(page, base_url, solved_frame(grid))
+    watch_sheet_region(page, "recap")
     click_recap_open(page)
     expect(page.get_by_test_id("recap-loading")).to_be_visible()
     return page
@@ -240,15 +254,20 @@ def test_ac11_while_loading_it_holds_the_title_the_loading_line_and_fermer(
 
 
 @pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
-def test_ac11_the_loading_line_is_a_muted_status(
+def test_ac11_the_loading_line_is_a_muted_line_that_the_recap_region_announces(
     window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
 ) -> None:
     page = open_loading(window, live_server, fx01_grid, size)
     loading = page.get_by_test_id("recap-loading")
+    region = sheet_region(page, "recap")
 
     expect(loading).to_have_text(fr_value("recap.loading"))
-    expect(loading).to_have_attribute("role", "status")
+    assert live_role_problems(loading) == []
     assert type_problems(loading, "recap-loading", size=15.2, colour=MUTED) == []
+    expect(region).to_have_count(1)
+    expect(region).to_have_text(fr_value("recap.loading"))
+    assert region_problems(region) == []
+    assert sheet_region_watch(page).text_at_opening == ""
 
 
 @pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)

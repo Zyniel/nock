@@ -50,10 +50,12 @@ for every player, measures the room's playing time from the first letter typed.
 ### The page
 
 5. A page is solved once it applies a `grid_solved` or a snapshot that says so.
-   Its status (`role="status"`, one at most) reads `completion.solved` (« Grille
-   terminée, bravo ! ») when solved, else `completion.full_wrong` (« Grille
-   complète, mais pas encore juste. ») while every letter cell of the confirmed
-   grid holds a letter (pending edits do not count), else is absent. Neither
+   Its status (one at most, with no live role) reads `completion.solved`
+   (« Grille terminée, bravo ! ») when solved, else `completion.full_wrong`
+   (« Grille complète, mais pas encore juste. ») while every letter cell of the
+   confirmed grid holds a letter (pending edits do not count), else is absent.
+   Each time it appears or its text changes, the status region announces that
+   text (`client/hud.md` rule 17); a move of rule 7 announces nothing. Neither
    `grid_full_wrong` nor the status changes a cell: they never say where the
    mistake is (a check does, `gameplay/hints.md`).
 6. Once solved, a letter key, `Backspace`, `Control+z`, `Meta+z` and the undo
@@ -131,7 +133,8 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
   them as its `letter_changed` then `grid_solved` with the next seq, within 1 s of
   his send. (← 026 AC-2)
 - **AC-3** Ana types the 17 letters and Bob `T` at (4, 4): within 1 s both pages
-  are solved and show « Grille terminée, bravo ! ». (← 026 AC-3)
+  are solved and show « Grille terminée, bravo ! » with no live role, which
+  each page's status region reads. (← 026 AC-3)
 - **AC-4** In that solved room, an edit, an erase, a pencil letter, a pencil
   confirmation and a grid check from Ana, and Bob's undo, each get one error
   `grid_solved`, to the sender only; the room stays at seq 21; Ana's selection of
@@ -148,9 +151,10 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
   (← 026 AC-6, 026 AC-8)
 - **AC-7** A page with 17 letters and (4, 4) empty shows no status; after `X` at
   (4, 4) and `grid_full_wrong` it shows « Grille complète, mais pas encore
-  juste. », no cell marked wrong, and is not solved; erasing (4, 4) removes it. A
-  page joining a full, wrong grid shows it at once; a pending last letter does not
-  show it. (← 026 AC-7)
+  juste. », which the status region reads, no cell marked wrong, and is not
+  solved; erasing (4, 4) removes it. A
+  page joining a full, wrong grid shows it at once, its status region reading
+  it; a pending last letter does not show it. (← 026 AC-7)
 - **AC-8** Replaying a solved play from a new room gives the live room's solved
   flag, seq and cells; a stored solved room loads solved and refuses an edit with
   `grid_solved`; a stored full, wrong room whose letters were typed at t0 + 100
@@ -163,8 +167,10 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
 - **AC-10** On a touch screen at 568 by 320, with the in-app keyboard and the
   clue « On la glisse dans une enveloppe » selected, the full-but-wrong status
   follows rule 7 in the clue bar's row, the bar as high as with no status;
-  solved, the page has no keyboard and the band; both pass the contrast and
-  language scans of `product.md`. (← 026 AC-10)
+  rotated to 320 by 568, it moves under the clue bar with the same text, and
+  the status region is not written again. Solved, the page has no keyboard
+  and the band; both pass the contrast and language scans of `product.md`.
+  (← 026 AC-10)
 - **AC-11** Ana and Bob join at t0; Ana's erase at t0 + 5 leaves a timer at 0,
   stopped; her `T` at (1, 0) at t0 + 10 starts it, and a snapshot at t0 + 40,
   Bob's or a newcomer's, says 30000, running. (← 027 AC-1)
