@@ -4,7 +4,7 @@ title: Citations repointed after the spec splits
 status: Done
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T18:00:00Z'
+updated_date: '2026-11-02T18:28:00Z'
 labels:
   - domain:host
   - domain:lifetime
@@ -84,6 +84,8 @@ Lead: spec-checker CHANGES REQUESTED in round 1 (three « Depends on » entries,
 Lead: after B-063 merged (#110), the five repoints it left here were applied (server.md:269-270, product.md:44-45 and :60, results.md:136, shell.md:225), text exactly as B-063's spec-checker approved them in its round 1 before they were reverted there; no second spec check. shell.md (was done) is now approved with the rest.
 
 Lead: reviewer APPROVE in round 1; its suggestions left (a few rewritten lines past 80 columns; test comments citing old files, which mostly cite rules that stayed). Full gate green.
+
+Lead: correction — the first full gate at the close had not run its tests (the worktree lacked web/node_modules: 3 checks failed), and the close recorded it green by mistake. After npm --prefix web ci, the full gate ran green (8704 parallel, 162 serial).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
