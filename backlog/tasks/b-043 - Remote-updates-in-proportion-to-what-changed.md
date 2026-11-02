@@ -68,7 +68,7 @@ ordinal: 4000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -91,6 +91,8 @@ Spec-checker: CHANGES REQUESTED in round 1 (AC-23's scope, the catch-up ring unt
 Implementer: AC-27 now 0.28 to 0.40 ms per relayed selection (3.05 ms before). Lead: 041 AC-15's arrow test counted one path per arrow, which the halo's white copy contradicts: the test-writer makes it read the ink path. Hyphen edges redrew on a pinch (their dashes sized from the cell side): sized from a variable on .grid too, as rule 18 allows no exception. The selected state held as one value per cell, beyond remote frames, accepted: it serves AC-26's echo.
 
 Reviewer: APPROVE in round 1. Taken: the helpers' docstrings of the two new test files. Not taken, as follow-up drafts: no test guards the reuse of previous values in remotesByCell (a pace for frames that change a cell); every cell still builds a new shown object when any pending edit changes, cheap, for B-049's cell components.
+
+Pull request: https://github.com/Zyniel/nock/pull/89, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
