@@ -49,7 +49,7 @@ ordinal: 14000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -70,6 +70,8 @@ Lead (2026-11-02): started after B-062 (#102, which also changed joining.md rule
 Lead: all three moved criteria are pointers (032 AC-4 to AC-6, 046 AC-11, AC-12): no domain test moves. product.md: the routes cell of POST /api/rooms/summaries and core flow 7 (« Mes salons ») name summaries; no baseline. results.md:115 and :287 (by number) repointed. Spec-checker: CHANGES REQUESTED round 1 (joining's Code section lost the 032 ac02_ac07 sockets file, which proves AC-7; fixed), APPROVED round 2. By-name citations left: results.md:20, lifetime.md:222-223, library.md:264, hud.md:85-86 (B-064); account.md:18/107/294 (to add to B-064). The spec change was first committed as a wip commit to merge origin/main (B-055's check) before the spec-checker; this commit completes it.
 
 Lead: reviewer APPROVE in round 1 (its suggestion, results.md:20, is on B-064's list via PR #104). Full gate green (8674 parallel, 162 serial).
+
+Pull request: https://github.com/Zyniel/nock/pull/106
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
