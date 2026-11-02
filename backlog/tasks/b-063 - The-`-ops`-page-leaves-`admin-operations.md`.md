@@ -4,11 +4,12 @@ title: The `/ops` page leaves `admin/operations.md`
 status: In Progress
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T16:47:00Z'
+updated_date: '2026-11-02T16:57:00Z'
 labels:
   - domain:operations
   - domain:ops-page
   - domain:overrides
+  - domain:viewport
 milestone: m-3
 dependencies:
   - B-062
@@ -32,6 +33,42 @@ ordinal: 18000
 - Open questions: none.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 ops-page AC-1 (new, was operations AC-11)
+- [ ] #2 operations AC-11 (deleted, moved to ops-page AC-1)
+- [ ] #3 ops-page AC-2 (new, was operations AC-12)
+- [ ] #4 operations AC-12 (deleted, moved to ops-page AC-2)
+- [ ] #5 ops-page AC-3 (new, was operations AC-13)
+- [ ] #6 operations AC-13 (deleted, moved to ops-page AC-3)
+- [ ] #7 ops-page AC-4 (new, was operations AC-14)
+- [ ] #8 operations AC-14 (deleted, moved to ops-page AC-4)
+- [ ] #9 ops-page AC-5 (new, was operations AC-15)
+- [ ] #10 operations AC-15 (deleted, moved to ops-page AC-5)
+- [ ] #11 ops-page AC-6 (new, was operations AC-16)
+- [ ] #12 operations AC-16 (deleted, moved to ops-page AC-6)
+- [ ] #13 ops-page AC-7 (new, was operations AC-17)
+- [ ] #14 operations AC-17 (deleted, moved to ops-page AC-7)
+- [ ] #15 ops-page AC-8 (new, was operations AC-18)
+- [ ] #16 operations AC-18 (deleted, moved to ops-page AC-8)
+- [ ] #17 ops-page AC-9 (new, was operations AC-19)
+- [ ] #18 operations AC-19 (deleted, moved to ops-page AC-9)
+- [ ] #19 ops-page AC-10 (new, was operations AC-20)
+- [ ] #20 operations AC-20 (deleted, moved to ops-page AC-10)
+- [ ] #21 ops-page AC-11 (new, was operations AC-26)
+- [ ] #22 operations AC-26 (deleted, moved to ops-page AC-11)
+- [ ] #23 ops-page AC-12 (new, was operations AC-27)
+- [ ] #24 operations AC-27 (deleted, moved to ops-page AC-12)
+- [ ] #25 ops-page AC-13 (new, was operations AC-28)
+- [ ] #26 operations AC-28 (deleted, moved to ops-page AC-13)
+- [ ] #27 ops-page AC-14 (new, was operations AC-29)
+- [ ] #28 operations AC-29 (deleted, moved to ops-page AC-14)
+- [ ] #29 ops-page AC-15 (new, was operations AC-30)
+- [ ] #30 operations AC-30 (deleted, moved to ops-page AC-15)
+- [ ] #31 ops-page AC-16 (new, was operations AC-31)
+- [ ] #32 operations AC-31 (deleted, moved to ops-page AC-16)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -54,4 +91,6 @@ ordinal: 18000
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead (2026-11-02): started after B-047 (#109, which held domain:operations and added operations AC-31 to rule 19, the replay) and B-062 merged. Spec-writer on Fable at high (new domain). Account → erasure rule map (B-062): 18→1, 19→2, 20→3, 21→4, 26→5, 27→6, 28→7, 22→8, 23→9, 24→10. Base: origin/main b9871e7.
+
+Lead: operations AC-26 to AC-31 (added after the task, all the page and its replay) moved with it: ops-page 16 criteria, operations 15. By-name repoints kept: overrides.md, gameplay/viewport.md Out of scope (the task takes domain:viewport), _settings.md:24. Repoints in server.md:269-270, product.md:44-45 and :60, results.md:136, shell.md:225 were reverted: B-064 (in progress) holds those domains and takes them after this task merges. Spec-checker APPROVED in round 1; its minor notes left (« latency measured in the browsers » now in ops-page's Out of scope; ops-page named inside overrides' operations bullet rather than its own, Depends on being at three).
 <!-- SECTION:NOTES:END -->

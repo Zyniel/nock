@@ -1,7 +1,7 @@
 ---
 area: admin
 file: overrides
-status: done
+status: approved
 ---
 
 # admin/overrides - The `/ops` overrides of the room lives
@@ -17,7 +17,7 @@ shorter life would delete before saving it.
 - `lobby/lifetime.md`: the five settings, their bounds and defaults (rules 4, 7),
   the expiry decision (rule 5) and the sweep (rule 6).
 - `admin/operations.md`: the operator token, the throttle and the ops API's
-  common rules (6, 8 to 10), the page's states (rule 16).
+  common rules (6, 8 to 10); the page's states are `admin/ops-page.md` rule 3.
 - `platform/server.md`: the store, on a file or in memory.
 
 ## Rules
@@ -92,7 +92,7 @@ shorter life would delete before saving it.
 11. In `ready`, between the dashboard and the replay, the card
     `ops.settings_heading` asks `GET /api/ops/settings` and holds one line
     while waiting (`ops.loading`) or when it fails (`ops.error`); a 401 or 429
-    locks the page (`admin/operations.md` rule 16). Then one row per setting,
+    locks the page (`admin/ops-page.md` rule 3). Then one row per setting,
     rule 3's order: its name `ops.setting.<name>`, its effective value
     (`ops.hours_value`, `ops.minutes_value`), its source (`ops.source.default`,
     `ops.source.environment`, `ops.source.override`), a number input named by
@@ -106,7 +106,7 @@ shorter life would delete before saving it.
     A life below the row's effective value sends the dry run first and asks
     (rule 13). After a 200 the rows show the answer, the input is emptied and
     the page asks the dashboard again with no period, handled as a period press
-    (`admin/operations.md` rule 18). A 422 or another failure shows `ops.error`
+    (`admin/ops-page.md` rule 5). A 422 or another failure shows `ops.error`
     as an error line under the input; a 401 or 429 locks.
 13. The question is the account page's disclosure inside the card, under a
     divider: `ops.setting_confirm_one` (0 or 1 room) or
@@ -223,8 +223,8 @@ shorter life would delete before saving it.
 - Overriding another setting; several processes sharing overrides
   (`platform/server.md`); a history of overrides (between two tabs the last
   save wins); undoing a deletion the override caused.
-- The token, the throttle and the page's states: `admin/operations.md`. What
-  expiry and the sweep do: `lobby/lifetime.md`.
+- The token and the throttle: `admin/operations.md`; the page's states:
+  `admin/ops-page.md`. What expiry and the sweep do: `lobby/lifetime.md`.
 
 ## Code
 
