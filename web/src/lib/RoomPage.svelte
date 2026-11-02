@@ -8,13 +8,12 @@
   import GridViewport from './GridViewport.svelte'
   import HostSettings from './HostSettings.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
+  import NoteSlot from './NoteSlot.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
   import { isValidCount } from './revealCount'
   import RoomGoneDialog from './RoomGoneDialog.svelte'
   import RoomMenu from './RoomMenu.svelte'
-  import RoomNote from './RoomNote.svelte'
-  import type { ShownNote } from './RoomNote.svelte'
   import RoomPopover from './RoomPopover.svelte'
   import RoomTopBar from './RoomTopBar.svelte'
   import Salon from './Salon.svelte'
@@ -1333,88 +1332,9 @@
 
   // ---- The 3-second notes (spec 043) ----
 
-  // The note over the grid, one at a time, and the newest note of the room
-  // that waits for the vote banner to go.
-  let shownNote: ShownNote | null = $state(null)
-  let waitingNote: ShownNote | null = $state(null)
-  // Each shown note gets its own id, so a newer one replaces the older at once.
-  let nextShownNoteId = 1
-  let handledRoomNoteId = 0
-  let shownUndoRefusals = 0
-
-  function newShownNote(isUndo: boolean, kind: string | null, text: string): ShownNote {
-    const note = { id: nextShownNoteId, isUndo, kind, text }
-    nextShownNoteId += 1
-    return note
-  }
-
-  // The notes of the room, in one place so that the newest always wins. A new
-  // note: none while the stream shows; while the vote banner is on the page it
-  // waits, replacing any older waiting note; otherwise it shows, and a note
-  // that waited is dropped (the result of a vote, made once the banner has
-  // left, replaces the notes that waited during it, spec 047). With no new
-  // note, once the banner has gone, the note that waited shows, unless the
-  // stream shows by then: the player reads the same line there.
-  $effect(() => {
-    const latest = session.latestNote
-    const isBannerShown = isVoteBannerShown
-    if (latest !== null && latest.id !== handledRoomNoteId) {
-      handledRoomNoteId = latest.id
-      receiveRoomNote(latest.kind, latest.text, isBannerShown)
-      return
-    }
-    if (!isBannerShown) {
-      showWaitingNote()
-    }
-  })
-
-  function receiveRoomNote(kind: string | null, text: string, isBannerShown: boolean): void {
-    if (untrack(() => isStreamShown)) {
-      waitingNote = null
-      return
-    }
-    const note = newShownNote(false, kind, text)
-    if (isBannerShown) {
-      waitingNote = note
-      return
-    }
-    waitingNote = null
-    shownNote = note
-  }
-
-  function showWaitingNote(): void {
-    const note = untrack(() => waitingNote)
-    if (note === null) {
-      return
-    }
-    waitingNote = null
-    if (!untrack(() => isStreamShown)) {
-      shownNote = note
-    }
-  }
-
-  // "Nothing to undo" (spec 018) has the note's look and place: it replaces
-  // any shown note, and shows whatever else shows.
-  $effect(() => {
-    if (session.undoRefusals === shownUndoRefusals) {
-      return
-    }
-    shownUndoRefusals = session.undoRefusals
-    shownNote = newShownNote(true, null, t('undo.nothing'))
-    announce(t('undo.nothing'))
-  })
-
-  // A note leaves once it has faded, unless a newer one replaced it.
-  function onNoteGone(noteId: number): void {
-    if (shownNote !== null && shownNote.id === noteId) {
-      shownNote = null
-    }
-  }
-
   // A tap or a click on a note opens the Salon on its Discussion tab, as
-  // « Salon » does, and removes the note.
+  // « Salon » does (the note slot removes the note first).
   function openSalonFromNote(): void {
-    shownNote = null
     salonTab = 'discussion'
     setSalonOpen(true)
     void salon?.focusInside()
@@ -1936,17 +1856,15 @@
               onVote={castVote}
               onFocusGrid={() => gridViewport?.focusGrid()}
             />
-            {#if shownNote !== null}
-              {#key shownNote.id}
-                <RoomNote
-                  note={shownNote}
-                  {layout}
-                  bannerHeight={isVoteBannerShown ? voteBannerHeight : 0}
-                  onOpen={openSalonFromNote}
-                  onGone={onNoteGone}
-                />
-              {/key}
-            {/if}
+            <NoteSlot
+              latestNote={session.latestNote}
+              undoRefusals={session.undoRefusals}
+              isBannerShown={isVoteBannerShown}
+              {isStreamShown}
+              {layout}
+              bannerHeight={voteBannerHeight}
+              onOpenSalon={openSalonFromNote}
+            />
             <GridViewport
               bind:this={gridViewport}
               grid={session.snapshot.grid}
