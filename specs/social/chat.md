@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: done
+status: approved
 ---
 
 # social/chat - Chat, reactions, the clue flag and mute
@@ -100,7 +100,7 @@ help is wanted. The host can mute a player's chat and reactions.
     player's chat and reaction windows, connected or not.
 13. « Réagir » (`reaction.button_label`) is disabled while the page is not
     joined, while nothing is selected, while I am muted and while the vote
-    banner shows (`gameplay/hints.md`). A
+    banner shows (`gameplay/votes.md`). A
     press opens the picker (`reaction.picker_label`, the five in that order),
     the focus on the first option (on « Réagir » while pacing holds). An option
     sends `react` on the selected word's clue and closes the picker; Escape or a
@@ -137,8 +137,8 @@ help is wanted. The host can mute a player's chat and reactions.
 18. The Discussion tab holds one stream, named `chat.heading` (« Discussion »),
     oldest first in seq order: the newest 200 messages of the history and the
     newest 100 event lines, each kind with its own cap. Joins and departures
-    belong to `social/presence.md`; checks, reveals and the vote line to
-    `gameplay/hints.md`; catch-up lines to `social/catch-up.md`; the flag line
+    belong to `social/presence.md`; checks and reveals to
+    `gameplay/hints.md`, the vote line to `gameplay/votes.md`; catch-up lines to `social/catch-up.md`; the flag line
     (rule 6) and the lines below to this file. A `settings_changed`, compared
     with the settings held before it, reads `feed.room_locked` (« {name} a
     verrouillé le salon ») or `feed.room_unlocked` (« {name} a déverrouillé le

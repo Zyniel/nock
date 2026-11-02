@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
@@ -33,7 +33,7 @@ None. Every domain spec depends on this file.
    others are, chat: `gameplay/board.md`, `gameplay/co-op.md`,
    `social/presence.md`, `social/chat.md`.
 5. Use help: check or reveal within a budget, by the group's rule or a vote:
-   `gameplay/hints.md`.
+   `gameplay/hints.md`, `gameplay/votes.md`.
 6. Finish and see the recap: completion, the timer, « Bilan de la partie », the
    shareable recap: `gameplay/rules.md`, `gameplay/results.md`.
 7. Come back to a room: the same seat after a reload, a day later or from « Mes
@@ -165,7 +165,7 @@ every `/api/ops` path 404 whatever the method (a body over the limit: 413 first,
     and not yet applied, joined or not: the next frame and every later one are
     dropped, the connection is closed with 1008 without waiting for the room and
     counted as disconnected; the inputs before still apply. Neither code is
-    final: the page reconnects (`platform/realtime.md`).
+    final: the page reconnects (`platform/reconnection.md`).
 26. Frame size. The server accepts frames of at most 8,192 bytes
     (`WS_MAX_SIZE_BYTES`): a larger one closes the socket with 1009 before it is
     buffered; one of 4,097 to 8,192 bytes reaches the app and gets

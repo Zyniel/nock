@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: done
+status: approved
 ---
 
 # account/account - Optional account
@@ -15,7 +15,8 @@ erases and keeps is `account/erasure.md`.
 
 ## Depends on
 
-- `lobby/joining.md`: identities, members, seat back, « Mes salons ».
+- `lobby/joining.md`: identities, members, seat back; « Mes salons » is
+  `lobby/summaries.md`.
 - `platform/serving.md`: `main()`, `NOCK_HOST`, `NOCK_PORT`, `NOCK_DATABASE`;
   the store that file names is `platform/server.md` rule 1.
 - `gameplay/results.md`: « Grilles terminées », the history on screen.

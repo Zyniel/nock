@@ -4,7 +4,7 @@ title: Citations repointed after the spec splits
 status: In Progress
 assignee: []
 created_date: '2026-11-02T01:16:00Z'
-updated_date: '2026-11-02T16:49:00Z'
+updated_date: '2026-11-02T16:57:00Z'
 labels:
   - domain:host
   - domain:lifetime
@@ -78,4 +78,6 @@ The task takes domain:account, rules, server and presence for these one-line cit
 Lead (2026-11-02, after B-061): add specs/social/presence.md:20 (Depends on: « gameplay/board.md: the grid, … » — the grid is now gameplay/viewport.md).
 
 Lead (2026-11-02): started after B-058 to B-062 and B-047 merged; B-063 (in progress) keeps operations' own citations. Spec-writer on Sonnet at medium, as the task says. Base: origin/main b9871e7.
+
+Lead: spec-checker CHANGES REQUESTED in round 1 (three « Depends on » entries, in host, library and hud, had replaced a dependency the rules still lean on; fixed by keeping both in one entry; its optional note taken: host.md:99, :138 and results.md:153 cite erasure rules 1, 5), APPROVED in round 2. The spec-writer's grep added presence.md:18-19 and :277-278, rules.md:43, server.md:81 and account.md:18. Left: shell.md and joining.md already cite reconnection (B-047); account.md:107 and :294 name « Mes salons » in running text with no file. B-063 (in progress) reverted five one-line repoints in server.md, product.md, results.md and shell.md, whose domains this task holds; this task takes them after B-063 merges.
 <!-- SECTION:NOTES:END -->

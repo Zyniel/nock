@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: host
-status: done
+status: approved
 ---
 
 # lobby/host - The host role and the creator
@@ -18,7 +18,8 @@ out; the room goes with the creator's account.
 - `lobby/rooms.md`: room creation (`POST /api/rooms`), the room engine and its
   ticks.
 - `lobby/joining.md`: the join's steps, members, past players, resume, seat back.
-- `account/account.md`: accounts on or off, the session cookie, erasure.
+- `account/account.md`: accounts on or off, the session; the erasure, which
+  deletes creator rooms, is `account/erasure.md`.
 
 ## Rules
 
@@ -96,7 +97,7 @@ out; the room goes with the creator's account.
     member linked to none. A signed-in join (`lobby/joining.md` rule 4) links the
     new player it makes to the session's account, and links a member it resumes
     or seats back only when that member has none; a member's account never
-    changes otherwise (`account/account.md` rule 18 apart). `PUT
+    changes otherwise (`account/erasure.md` rules 1, 5 apart). `PUT
     /api/account/rooms` links no member.
     An account is at most one player of a room: its signed-in joins reach its
     member, whatever token they carry. The link is stored with the member and
@@ -126,16 +127,16 @@ out; the room goes with the creator's account.
     1). A lock does not keep them out: a join from the creator's session skips
     the locked step, member or not; a full room refuses them like anyone
     (`lobby/joining.md` rule 4).
-14. The erasure of the creator's account (`account/account.md` rule 18) deletes
+14. The erasure of the creator's account (`account/erasure.md` rule 1) deletes
     the room, live or stored, whoever is host then, as the deletion of an expired
     room does (`lobby/lifetime.md` rule 6): its sockets close with 4404 and
     nothing else, a page that had shown it shows the room-gone dialog
     (`client/hud.md` rule 16), one that had not the entry card
     (`client/shell.md` rule 7), and a later socket to its code counts as a wrong
     code. The other players' finished grids stay in their history
-    (`gameplay/results.md` rule 15, `account/account.md` rule 22). Being host of
+    (`gameplay/results.md` rule 15, `account/erasure.md` rule 8). Being host of
     an anonymous room deletes nothing: the erased account's player there is `--`
-    (`account/account.md` rule 18), the room otherwise unchanged.
+    (`account/erasure.md` rules 1, 5), the room otherwise unchanged.
 15. While accounts are off a stored creator stays and the room plays as an
     anonymous room, with an anonymous room's life (`lobby/lifetime.md` rule 3);
     `POST /api/rooms` sets no creator, whatever cookie it carries.
@@ -284,8 +285,8 @@ not-found pages ».
   browser; a mark of the creator anywhere. Room lives and expiry:
   `lobby/lifetime.md`.
 - Codes, creation, the throttle and the engine: `lobby/rooms.md`. The join's
-  steps, members and takeover: `lobby/joining.md`. Accounts, the session and
-  erasure: `account/account.md`. Feed lines of host, lock and settings changes,
+  steps, members and takeover: `lobby/joining.md`. Accounts and the session:
+  `account/account.md`; the erasure: `account/erasure.md`. Feed lines of host, lock and settings changes,
   « Couper » and muting's effect: `social/chat.md`. The Menu, sheets and top
   bar: `client/hud.md`; the Joueurs tab: `client/room.md`.
 

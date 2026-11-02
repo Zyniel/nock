@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: co-op
-status: done
+status: approved
 ---
 
 # gameplay/co-op - Shared letters, same-cell conflicts and pencil letters
@@ -18,8 +18,9 @@ uncertain until any player confirms it.
 
 - `gameplay/board.md`: letter cells, selection, typing and erasing, the in-app
   keyboard.
-- `platform/realtime.md`: the edit messages and errors, the stale rule, the edit
-  rate, reconnection and the resend of pending edits.
+- `platform/realtime.md`: the edit messages and errors, the edit rate; the stale
+  rule, reconnection and the resend of pending edits are
+  `platform/reconnection.md`.
 - `gameplay/rules.md`: `grid_full_wrong`, `grid_solved` and the solved grid's
   input lock.
 
@@ -35,7 +36,7 @@ uncertain until any player confirms it.
    1. the edit rate (`platform/realtime.md`): `rate_limited`;
    2. not a letter cell: `not_a_letter_cell`;
    3. a locked cell: `cell_locked`;
-   4. the stale rule (`platform/realtime.md`): `stale_edit`;
+   4. the stale rule (`platform/reconnection.md` rule 1): `stale_edit`;
    5. a solved grid: `grid_solved`;
    6. for `confirm_pencil` only, a cell that holds no pencil letter: `stale_edit`.
 
@@ -255,8 +256,8 @@ keyboard ».
   shortcuts for pencil mode or confirming, remembering pencil mode across
   reloads.
 - Typing, selection and the in-app keyboard: `gameplay/board.md`. The top bar and
-  the Aide menu: `client/hud.md`. Messages, the stale rule, the edit rate,
-  reconnection: `platform/realtime.md`. Undo, the log and the store:
+  the Aide menu: `client/hud.md`. Messages and the edit rate:
+  `platform/realtime.md`; the stale rule, reconnection: `platform/reconnection.md`. Undo, the log and the store:
   `platform/server.md`. Locks by checks and reveals: `gameplay/hints.md`.
   Completion: `gameplay/rules.md`. Authors and their colours:
   `social/presence.md`. The relay under a 4G profile: `product.md`.

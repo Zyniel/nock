@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
 # platform/server - Durable rooms, undo, engine time, rooms in memory
@@ -78,7 +78,7 @@ played.
    `player_state_changed` each in roster order, selection and recent edits
    cleared. Their resume window runs from then (`platform/reconnection.md`
    rule 2). What the restart step does to chat windows, the vote and the
-   timer: `social/chat.md`, `gameplay/hints.md`, `gameplay/rules.md`. Every
+   timer: `social/chat.md`, `gameplay/votes.md`, `gameplay/rules.md`. Every
    other read (summaries, catch-up, the recaps, the account's rooms and
    history, the operator's edits) replays the room from the store without
    making it live, with no restart step and no log entry. A lookup that meets

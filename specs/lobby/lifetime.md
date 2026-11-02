@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: lifetime
-status: done
+status: approved
 ---
 
 # lobby/lifetime - Room lifetime: when a room expires and the sweep that deletes it
@@ -82,7 +82,7 @@ deletes it with all its data.
    working. A sweep that fails is logged at WARNING or above, and the next one
    runs. After its deletions, each sweep also runs one attempt of every
    pending account erasure, then the purge of sign-in links, sessions and done
-   erasures (`account/account.md` rules 26, 20); the erasure's own writes
+   erasures (`account/erasure.md` rules 5, 3); the erasure's own writes
    checkpoint as that file says, apart from the sweep's one.
 
 ### The variables
@@ -220,7 +220,7 @@ deletes it with all its data.
   storage and the dry run: `admin/overrides.md`.
 - The deletion of a creator room at its creator's erasure: `lobby/host.md` rule
   14. What a deletion erases for privacy: `admin/operations.md`. Summaries and
-  « Mes salons »: `lobby/joining.md`. The `/ops` periods a life allows:
+  « Mes salons »: `lobby/summaries.md`. The `/ops` periods a life allows:
   `admin/operations.md`.
 
 ## Code

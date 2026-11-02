@@ -1,7 +1,7 @@
 ---
 area: social
 file: catch-up
-status: done
+status: approved
 ---
 
 # social/catch-up - Catching up after an absence
@@ -19,7 +19,8 @@ their players.
   room; room expiry is `lobby/lifetime.md`.
 - `social/chat.md`: the Salon's stream (its order, its cap of 100 event lines
   and its scroll rules), not the text of every event line.
-- `platform/realtime.md`: snapshots, `seq`, reconnection, the logged events.
+- `platform/realtime.md`: snapshots, `seq`, the logged events; reconnection is
+  `platform/reconnection.md`.
 
 ## Rules
 
@@ -220,8 +221,8 @@ players (seq 22).
   one. `social/chat.md` would own it.
 - Resume and seat back: `lobby/joining.md`. The stream, its live lines and their
   texts: `social/chat.md`. The « Salon » dot and 3-second notes:
-  `client/room.md`. Reconnection and the log: `platform/realtime.md`,
-  `platform/server.md`.
+  `client/room.md`. Reconnection: `platform/reconnection.md`. The log:
+  `platform/realtime.md`, `platform/server.md`.
 
 ## Code
 

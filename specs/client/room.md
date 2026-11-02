@@ -1,7 +1,7 @@
 ---
 area: client
 file: room
-status: done
+status: approved
 ---
 
 # client/room - The room panel (« Salon ») and the notes
@@ -141,7 +141,7 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
   the stream, its lines and the message box do: `social/chat.md`. The Joueurs
   rows' content: `social/presence.md`; the invitation link: `lobby/rooms.md`;
   the host's buttons: `lobby/host.md`. The catch-up lines: `social/catch-up.md`. The
-  vote banner: `gameplay/hints.md`.
+  vote banner: `gameplay/votes.md`.
 
 ## Code
 
