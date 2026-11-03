@@ -1,9 +1,10 @@
 ---
 id: B-075
 title: Library rules proven
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T20:44:00Z'
 labels:
   - domain:library
 milestone: m-5
@@ -23,6 +24,9 @@ From DRAFT-016. library rules 8, 10, 16 and AC-6 are kept by the code but untest
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Each of the four behaviours has a test that fails if the code stops keeping it
+- [ ] #2 library AC-6 (changed)
+- [ ] #3 library AC-18 (changed)
+- [ ] #4 library AC-25 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -34,3 +38,11 @@ From DRAFT-016. library rules 8, 10, 16 and AC-6 are kept by the code but untest
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: content/library.md, widen the criteria of rules 8, 10, 16 and AC-6 (library is past the budget).
+2. Tests: tests/test_library_*.py.
+3. Quick gate: uv run python scripts/gate.py --specs library --browsers chromium
+<!-- SECTION:PLAN:END -->
