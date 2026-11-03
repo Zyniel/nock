@@ -4,7 +4,7 @@ title: Three account behaviours proven
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T21:38:00Z'
+updated_date: '2026-11-03T21:39:00Z'
 labels:
   - domain:account
 milestone: m-5
@@ -39,7 +39,7 @@ From DRAFT-023. Untested behaviour the code has: a link token arriving in the UR
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -56,6 +56,8 @@ From DRAFT-023. Untested behaviour the code has: a link token arriving in the UR
 Lead: new tests in tests/test_account_* and tests/test_erasure_* (not in the 033 tests behind the pointers); « logged » left without a level; account.md's next cut (page and sheet) is DRAFT-058's.
 
 Review round 1: APPROVE (mutations of the sweep, the log and the hashchange listener each failed the tests). Not taken: 1 (rule 1's long line: cosmetic, another spec round not worth it); 2 (merge the no-store test into the 405 one: one behaviour per test); 3 (a third copy of accounts_off_client: a harness move for a later tidy).
+
+PR #131.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
