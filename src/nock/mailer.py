@@ -58,7 +58,8 @@ class SmtpMailer:
 
         where `<context>` is `ssl.create_default_context()`, which checks the
         server's certificate and host name. Then `login(user, password)` when a
-        user is set, `send_message(message)` and `quit()`.
+        user is set and `send_message(message)`; leaving the `with` block ends
+        the session with one QUIT.
 
         Args:
             message: The message, with its `From` and `To`.
