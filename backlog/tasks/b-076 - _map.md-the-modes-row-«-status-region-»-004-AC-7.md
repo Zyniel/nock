@@ -4,7 +4,7 @@ title: '_map.md: the modes row, « status region », 004 AC-7'
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T21:14:00Z'
+updated_date: '2026-11-03T21:15:00Z'
 labels:
   - spec
 milestone: m-2
@@ -33,7 +33,7 @@ From DRAFT-033, DRAFT-048 and the « Spec splits » close. The gameplay/modes.md
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -43,6 +43,12 @@ From DRAFT-033, DRAFT-048 and the « Spec splits » close. The gameplay/modes.md
 2. Tests: none (no criterion; the gate's traceability check).
 3. Gate: uv run python scripts/gate.py --stage tests
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+PR #130.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
