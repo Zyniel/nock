@@ -1,4 +1,6 @@
-"""Tests of viewport AC-11 to AC-17: a zoomed grid follows the selection (rule 3).
+"""Tests of viewport AC-11 to AC-17 and AC-19: a zoomed grid follows the selection.
+
+These are rule 3's zoomed cases.
 
 The room is spec 042's mocked room (`tests/spec042_harness.py`) on the live
 server's client, in spec 019's touch context at 360 by 740 (a phone held
@@ -33,6 +35,11 @@ Choices where the spec leaves room:
   inside (1, 6), a letter cell of OREILLE; the test finds it from the boxes.
 - AC-17's start: OREIL is in the snapshot, (1, 2) to (1, 6), so the page opens
   with nothing selected and the clue tap changes the selected cell.
+- AC-19's scroll up is computed from the boxes before each step, like the
+  least scroll above but toward the top: the viewport's top edge ends at the
+  top edge of the cell above the selected one. "Back across" is checked as the
+  grid's left edge at the viewport's, and the three later steps keep the
+  scroll across the first one left (the least scroll moves nothing more).
 """
 
 from __future__ import annotations
@@ -79,6 +86,9 @@ LEG_CLUE = (1, 0, 1)
 # ArrowDown from (2, 0): JAMBE's cells, then past the empty (7, 0) and the clue
 # cell (8, 0), MONT's (9, 0) to (12, 0).
 COLUMN_ZERO_STEPS = [3, 4, 5, 6, 9, 10, 11, 12]
+# ArrowDown from (2, 0) to JAMBE's last cell (6, 0), then ArrowUp back to (2, 0).
+JAMBE_DOWN_STEPS = [3, 4, 5, 6]
+JAMBE_UP_STEPS = [5, 4, 3, 2]
 # ECHEC, « Contraire d'une réussite » in (16, 5): (16, 6) to (16, 10).
 ECHEC_FIRST = (16, 6)
 
@@ -584,3 +594,55 @@ def test_ac17_a_tap_on_the_clue_selects_1_7_and_scrolls_across_to_1_8(
     )
     assert top_after == 0.0
     assert scrolled_ancestors(viewport) == []
+
+
+# ---- AC-19: ArrowUp after a pan scrolls back up and across ------------------------
+
+
+@pytest.mark.only_browser("chromium")
+def test_ac19_arrow_up_to_2_0_after_a_pan_scrolls_up_to_the_cell_above_and_back_left(
+    window: OpenWindow, live_server: str, fx02_grid: Grid
+) -> None:
+    page = open_ac11_start(window, live_server, fx02_grid)
+    viewport = viewport_of(page)
+    grid = page.get_by_test_id("grid")
+    tap_shown_part(page, clue_at(page, *LEG_CLUE))
+    expect_selected(page, 2, 0, "down")
+    for row in JAMBE_DOWN_STEPS:
+        page.keyboard.press("ArrowDown")
+        expect_selected(page, row, 0, "down")
+    pan_to_bottom_right(page, viewport)
+    expect_selected(page, 6, 0, "down")
+    view = box_of(viewport)
+    assert is_out_of_view(box_of(cell_at(page, 6, 0)), view)
+    left_after_pan, _ = read_scroll(viewport)
+    assert left_after_pan > 0.0, "the pan did not scroll across: the start changed"
+
+    left_after_first_step: float | None = None
+    for row in JAMBE_UP_STEPS:
+        _, top_before = read_scroll(viewport)
+        margin_top_before = box_of(cell_at(page, row - 1, 0)).top
+        expected_top = top_before + margin_top_before - view.top
+        assert expected_top < top_before, f"({row - 1}, 0) was already in view"
+
+        page.keyboard.press("ArrowUp")
+
+        expect_selected(page, row, 0, "down")
+        wait_two_frames(page)
+        left_after, top_after = read_scroll(viewport)
+        assert top_after == pytest.approx(
+            expected_top, abs=SCROLL_TOLERANCE_PX
+        ), f"on ({row}, 0): scroll down {top_after}, expected {expected_top}"
+        assert box_of(cell_at(page, row - 1, 0)).top == pytest.approx(
+            view.top, abs=SCROLL_TOLERANCE_PX
+        ), f"on ({row}, 0): the viewport's top is not ({row - 1}, 0)'s"
+        if left_after_first_step is None:
+            left_after_first_step = left_after
+            assert box_of(grid).left == pytest.approx(
+                view.left, abs=SCROLL_TOLERANCE_PX
+            ), f"on ({row}, 0): the viewport's left is not the grid's"
+        else:
+            assert (
+                left_after == left_after_first_step
+            ), f"on ({row}, 0): scrolled across"
+        assert scrolled_ancestors(viewport) == []
