@@ -421,13 +421,22 @@ def test_ac2_websocket_a_text_that_only_str_strip_empties_gets_invalid_message(
 # Texts that rule 7 refuses for a character of category Cc, Cf, Zl or Zp that is
 # neither U+000A, U+200C, U+200D nor a tag: the bidirectional override U+202E, the
 # bell U+0007 and the line separator U+2028 (`social/chat.md` AC-9).
-TEXTS_WITH_REFUSED_CHARACTERS = ["a\u202eb", "a\u0007b", "a\u2028b"]
+TEXTS_WITH_REFUSED_CHARACTERS = [
+    "a\u202eb",
+    "a\u0007b",
+    "a\u2028b",
+    "a\u2029b",
+    "a\u200bb",
+    "a\U000e0001b",
+]
 
 # Texts that rule 7 accepts as sent: a line feed, an emoji joined by U+200D (woman
 # technologist), and the flag of Scotland, a base flag followed by tags U+E0067 to
 # U+E007F.
 TEXTS_WITH_ALLOWED_CHARACTERS = [
     "a\nb",
+    "a\u200cb",
+    "a\U000e0020b",
     "\U0001f469\u200d\U0001f4bb",
     "\U0001f3f4\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f",
 ]

@@ -4,7 +4,7 @@ title: Chat refuses control and direction-override characters
 status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T16:08:00Z'
+updated_date: '2026-11-03T16:59:00Z'
 labels:
   - domain:chat
 milestone: m-4
@@ -52,4 +52,6 @@ From DRAFT-029 (B-028's review). A chat text accepts control and bidirectional o
 Lead: nicknames use an allow-list, so chat refuses Unicode Cc, Cf, Zl, Zp except U+000A, U+200C, U+200D (serving.md rule 9's set); only U+000A among line breaks stays allowed; invalid_message reused; a stored message with a refused character still loads (AC-21 widened).
 
 Lead: tag characters U+E0020-U+E007F allowed too, so subdivision flag emoji (England, Scotland, Wales) are not refused (spec-checker's side-effect note).
+
+Review round 1: APPROVE (quick gate passed full: 5404 + 124). Suggestion 1 taken (boundary cases: U+2029, U+200B, U+E0001 refused; U+200C, U+E0020 accepted). Not taken: 2 (one shared helper for the refused categories of chat and NOCK_DATABASE: the sets differ by the line feed and the tags; recorded as a draft at the milestone's close); 3 (chat.md past the budget: DRAFT-058).
 <!-- SECTION:NOTES:END -->
