@@ -70,7 +70,8 @@ erases and keeps is `account/erasure.md`.
    `<NOCK_PUBLIC_URL>/account#<token>`, 43 random URL-safe characters, never a
    request's `Host`. Only `src/nock/mailer.py` sends (`content/grids.md`): 10 s
    timeout, `tls` and `starttls` over TLS that checks the certificate and host
-   name, a login when a user is set. A failure is `MailError`, whose text and
+   name, a login when a user is set, one `QUIT` per message and no command
+   once the connection is closed. A failure is `MailError`, whose text and
    traceback hold no address, password or token.
 8. `POST /api/account/sign-in`, `{"token"}` (43 URL-safe characters, else
    422), deletes its link: unknown, or asked more than 1,800 s before, 404.
@@ -208,9 +209,10 @@ erases and keeps is `account/erasure.md`.
 - **AC-9** With `none` an SMTP server receives one `text/plain` UTF-8 message
   from the sender with the link. With `starttls` the mailer connects with a
   10 s timeout, upgrades with a context that requires a certificate and
-  checks the host name, logs in, sends, quits; `tls` uses that context from
-  the start. A refused recipient raises `MailError` without the address,
-  traceback included, and the request gets 503. (← 033 AC-7)
+  checks the host name, logs in, sends, then issues `QUIT` once and no
+  command after it; `tls` uses that context from the start. A refused
+  recipient raises `MailError` without the address, traceback included, and
+  the request gets 503. (← 033 AC-7)
 - **AC-10** Across a link, a sign-in, a status, a `PUT`, a sign-out, a failed
   mail and a deletion, no log holds the link token, the session, a resume
   token, the address or the SMTP password; the files hold the address, and

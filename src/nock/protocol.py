@@ -30,6 +30,8 @@ class ProtocolModel(BaseModel):
 
 # ---- Shared value types -------------------------------------------------
 
+MAX_PLAYERS: int = 8  # spec 012 AC-4: players in a room and in its snapshot
+
 Coordinate = Annotated[int, Field(ge=0, strict=True)]  # row or column
 Count = Annotated[int, Field(ge=0, strict=True)]
 Seq = Annotated[int, Field(ge=1, strict=True)]  # room event number
@@ -736,7 +738,7 @@ class Snapshot(ProtocolModel):
     you: PlayerId  # the receiving player
     resume_token: ResumeToken  # only ever sent to that player
     grid: GridView
-    players: tuple[PlayerView, ...] = Field(max_length=8)
+    players: tuple[PlayerView, ...] = Field(max_length=MAX_PLAYERS)
     settings: RoomSettings
     reveal_budget: RevealBudget  # what is left
     flags: tuple[FlagView, ...]
