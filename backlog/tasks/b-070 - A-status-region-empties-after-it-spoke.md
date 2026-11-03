@@ -4,7 +4,7 @@ title: A status region empties after it spoke
 status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T16:18:00Z'
+updated_date: '2026-11-03T16:56:00Z'
 labels:
   - domain:hud
 milestone: m-4
@@ -52,4 +52,6 @@ From DRAFT-054 (B-046). The room page's role=status region and each open sheet's
 Lead: 5 s after the last write (MESSAGE_HOLD_MS), counted from the write after the existing 50 ms clear; a new message replaces at once and restarts the 5 s; a repeated text is still announced.
 
 Lead: « 5 s after » counts from when the region reads the message (rule 17), not from the press; « at once » means within 500 ms of page time. AC-26's wording aligned with rule 17 by the spec-writer.
+
+Review round 1: APPROVE (full gate green in Chromium, widened by the shared component). Suggestion 1 taken (pin MESSAGE_HOLD_MS with one more reading). Not taken: 2 (rule 17 naming MESSAGE_HOLD_MS and its file: product.md names constants the same way, the spec-checker accepted it); 3 (AC-27 setup copied instead of open_host_sheet: cost only); 4 (a page message written within 50 ms before a sheet opens lands in the inert page's region: no reader, no change).
 <!-- SECTION:NOTES:END -->

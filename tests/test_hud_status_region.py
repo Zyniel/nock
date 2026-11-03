@@ -247,6 +247,8 @@ def test_ac26_a_second_message_is_announced_again_and_starts_the_5_s_again(
 
     advance_clock_to(page, second_press_at + PRESS_GAP_MS)
     expect(region).to_have_text(UNDO_NOTHING_TEXT)
+    advance_clock_to(page, written_at + MESSAGE_HOLD_MS - WRITE_STEP_MS)
+    expect(region).to_have_text(UNDO_NOTHING_TEXT)
     advance_clock_to(page, written_at + MESSAGE_HOLD_MS)
     expect(region).to_have_text("")
 
