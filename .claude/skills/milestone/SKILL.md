@@ -1,6 +1,6 @@
 ---
 name: milestone
-description: Shape an idea into a milestone (its pitch and its tasks) in a `backlog: milestone <name>` pull request, which the human merges to bet on it; or close a milestone with its verdict in a `backlog: close <name>` pull request.
+description: Shape an idea into a milestone (its pitch and its tasks) in a `backlog: milestone <name>` pull request, which the human merges to bet on it; or close a milestone with its verdict in a `backlog: close <name>` pull request, which auto-merges unless the verdict is « not accepted ».
 argument-hint: [idea] | close [milestone]
 disable-model-invocation: true
 ---
@@ -73,8 +73,10 @@ with `/feature B-NNN` in the order of the tasks' ordinals and dependencies.
 3. Start a board branch (`--board close-<short-name>`). Each open item becomes a
    draft labelled `follow-up`.
 4. Commit `backlog: close <name>`, push, and open the pull request with that
-   title and the verdict as its body. No auto-merge: merging it is the human's
-   acceptance.
+   title and the verdict as its body. Turn on auto-merge (`gh pr merge --auto
+   --merge`): CI merges it once green, and the human stops it by closing it or
+   adding `needs-human`. A verdict `not accepted` gets no auto-merge and the
+   `needs-human` label: the human decides.
 
    ```md
    Verdict: accepted | accepted with open items | not accepted

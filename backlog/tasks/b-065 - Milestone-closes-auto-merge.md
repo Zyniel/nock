@@ -1,9 +1,10 @@
 ---
 id: B-065
 title: Milestone closes auto-merge
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T09:25:00Z'
+updated_date: '2026-11-03T09:26:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -30,3 +31,17 @@ ordinal: 53000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. No spec (tooling): CLAUDE.md « Decisions and escalations » and « Git », .claude/skills/milestone/SKILL.md (description, Close step 4).
+2. No tests (wording of the process).
+3. Gate: uv run python scripts/gate.py --stage tests (no code).
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: the edits as the human approved them in chat (2026-11-03).
+<!-- SECTION:NOTES:END -->

@@ -160,7 +160,9 @@ with the verdict:
 - **The verdict** of an independent review of the whole milestone: `accepted`,
   `accepted with open items` or `not accepted`, with the evidence.
 
-In about 10 minutes: **merge** to accept, or **comment** to send it back. If you
+The PR auto-merges once CI is green: letting it merge is your acceptance. To
+send it back, **close** it or add the `needs-human` label, and **comment** what is
+wrong. A verdict `not accepted` does not auto-merge: it waits for you. If you
 send it back, the lead adds fix tasks inside the same milestone. A fix task
 counts toward the budget, so a big send-back may also mean raising the size.
 
@@ -227,7 +229,8 @@ archive.
 | See what's going on | `backlog browser` (read only), or `backlog task list -a @zyniel` for your inbox |
 | Answer an escalation | `B-NNN: <your answer>` in a session, or a PR comment |
 | Give a stopped milestone more room | `<milestone>: 2 more tasks` |
-| Accept a milestone | Merge its `backlog: close …` PR |
+| Accept a milestone | Let its `backlog: close …` PR auto-merge (or merge a `not accepted` one) |
+| Send a milestone back | Close its `backlog: close …` PR, or add `needs-human`, and comment |
 | Ship a version | `prepare release vX.Y.Z`, then push the tag |
 | Stop something | `stop B-NNN` or `drop milestone <name>` |
 
