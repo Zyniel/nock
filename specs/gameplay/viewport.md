@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: viewport
-status: done
+status: approved
 ---
 
 # gameplay/viewport - The grid's drawing, cursors, fit, zoom and hyphen edges
@@ -170,11 +170,17 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
   `fr.json` holds `others_tint.switch` and `access.switch` with the texts of
   `gameplay/board.md` rule 18, and none of `grid.remote_overflow`,
   `a11y.remote_overflow`, `flag.marker`. (← 042 AC-20)
+- **AC-19** In AC-11's start, after a tap on « Elle va du genou au pied »,
+  ArrowDown to JAMBE's (6, 0) and a pan to the grid's bottom-right corner,
+  (6, 0) is out of view. Each ArrowUp back to (2, 0) then scrolls up, the
+  viewport's top edge ending at the top edge of the cell above the selected
+  one; the first one also scrolls back across, the viewport's left edge ending
+  at the grid's.
 
 ## Edge cases
 
 - A selected cell on the grid's first or last row or column keeps no margin
-  beyond the grid's edge (AC-12).
+  beyond the grid's edge (AC-12, AC-19).
 - A snapshot of a room stored before answers kept their hyphens has no mark:
   no edge is dashed (AC-9).
 
