@@ -171,8 +171,13 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-6** The filter group is named « Force » by its visible label and holds
   « Toutes », « Force 1 » to « Force 4 »; pressing « Force 1 » shows 3, 1 with
   it alone pressed; « Force 4 » shows no card and « Aucune grille de cette
-  force. »; « Toutes » shows 3, 2, 1 again. The label and the chips, pressed or
-  not, follow the catalogue design ("Look"). (← 004 AC-2, 046 AC-4)
+  force. »; « Toutes » shows 3, 2, 1 again. After each press, in any order,
+  the chip just pressed is the only one with `aria-pressed="true"`: after
+  « Force 4 » then « Force 2 », only « Force 2 ». From the page's load through
+  all these presses, `/` has made one request to `/api/grids`, with no query,
+  and none other to it (`?force=` included). The label and
+  the chips, pressed or not, follow the catalogue design ("Look").
+  (← 004 AC-2, 046 AC-4)
 - **AC-7** With `nock.progress` `{"1": "started", "2": "finished", "99":
   "started"}`, card 1 shows « Commencée », card 2 « Terminée » and card 3 no
   pill, as on `/g/1`; each pill sits after its card's number in the catalogue
@@ -218,7 +223,9 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   computer, none on a phone; `/g/3` shows grid 3. (← 004 AC-6, 046 AC-14)
 - **AC-18** When `GET /api/grids/2` answers 404, `/g/2` shows « Page
   introuvable » and no card; when it answers 500, « Impossible de charger les
-  grilles. » as an error line. (← 004 AC-6, 046 AC-14)
+  grilles. » as an error line. While `GET /api/grids/2` has not answered,
+  `/g/2` shows « Chargement… » as a muted line and no card.
+  (← 004 AC-6, 046 AC-14)
 - **AC-19** On `/` the brand is plain text read « Nock »: the top bar holds no
   link, Tab never stops on the brand, nothing on the page carries
   `aria-current`, and on a computer the hovered brand keeps its look at rest.
@@ -245,7 +252,9 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-25** When `GET /api/grids` answers CAT's list with grid 2's
   `published_on` `2026-02-30` or `hier`, `/` shows « Impossible de charger les
   grilles. » with no filter and no card; when `GET /api/grids/2` answers that
-  summary, `/g/2` shows the same error line.
+  summary, `/g/2` shows the same error line. So do `/` and `/g/2` when grid 2's
+  item, in CAT's list or as `GET /api/grids/2`'s answer, lacks `word_count`,
+  and `/g/2` when `GET /api/grids/2` answers `[]`.
 
 ## Edge cases
 
