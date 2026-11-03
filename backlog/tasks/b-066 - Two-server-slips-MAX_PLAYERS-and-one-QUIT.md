@@ -4,7 +4,7 @@ title: 'Two server slips: MAX_PLAYERS and one QUIT'
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T17:23:00Z'
+updated_date: '2026-11-03T17:26:00Z'
 labels:
   - domain:rooms
   - domain:account
@@ -38,7 +38,7 @@ From DRAFT-027 and DRAFT-028 (B-028's review). RoomState.players and Snapshot.pl
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -55,6 +55,8 @@ From DRAFT-027 and DRAFT-028 (B-028's review). RoomState.players and Snapshot.pl
 Lead: limit stays 8; QUIT criterion tested with a stub of smtplib.SMTP (a fake server sees one QUIT either way); a failed send also ends with one QUIT through the with-block, no extra criterion; joining.md's statement of the limit left as is.
 
 Review round 1: APPROVE. Suggestion 1 (mailer docstring still naming quit()) taken; suggestion 2 (index % 8 colour count in the AC-19 test helper) not taken: harmless, a test helper's own palette size.
+
+PR #120.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
