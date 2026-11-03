@@ -1,7 +1,7 @@
 ---
 area: client
 file: shell
-status: done
+status: approved
 ---
 
 # client/shell - Pages, connection states, texts and the brand
@@ -134,7 +134,7 @@ file, and the brand on the top bars.
 - **AC-3** `fr.json` is flat, its keys and values follow rule 2, and it holds
   `app.title`, `catalogue.heading`, `catalogue.empty`, `room.heading`,
   `room.default_nickname`, `room.status.connecting`, `room.status.joined`,
-  `room.status.not_found`, `room.status.closed`, `not_found.heading`; every
+  `room.status.not_found`, `not_found.heading`, and no `room.status.closed`; every
   key a `t("…")` call names exists; markup with `<p>Bonjour</p>` is refused,
   `<p>{t("a.b")}</p>` passes, and no `.svelte` file is refused.
   (← 040 AC-22, 040 AC-23, 040 AC-24)

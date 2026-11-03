@@ -1,9 +1,10 @@
 ---
 id: B-069
 title: « Mes salons » reads ISO dates only; the unreachable closed status goes
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T17:57:00Z'
 labels:
   - domain:summaries
   - domain:shell
@@ -26,6 +27,8 @@ From DRAFT-057 and DRAFT-020. isTime in web/src/lib/myRooms.ts uses Date.parse a
 <!-- AC:BEGIN -->
 - [ ] #1 A summary whose last_activity_at is not ISO 8601 reads as no date in every engine
 - [ ] #2 The room page has no closed status and no room.status.closed key
+- [ ] #3 summaries AC-4 (new)
+- [ ] #4 shell AC-3 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -37,3 +40,17 @@ From DRAFT-057 and DRAFT-020. isTime in web/src/lib/myRooms.ts uses Date.parse a
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: lobby/summaries.md (ISO dates in « Mes salons »), client/shell.md (no closed status, no room.status.closed key).
+2. Tests: tests/test_summaries_* or tests/web/myRooms.test.ts; the 040 AC-22 test entry.
+3. Quick gate: uv run python scripts/gate.py --specs summaries,shell --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: « Connexion perdue. » (room.status.closed) is unreachable (no closed status in any spec or in RoomStatus); the band room.banner.offline stays. The ISO check applies to a summary's finished_at too (one function). isTime is shared with history.ts (results' « Grilles terminées »): option (a), the stricter check applies there too, the server having only ever stored ISO strings; stating it in gameplay/results.md is a follow-up draft at the milestone's close. test_spec_012_ac01_nickname_rule.py's status-text list also drops closed.
+<!-- SECTION:NOTES:END -->

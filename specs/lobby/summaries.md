@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: summaries
-status: done
+status: approved
 ---
 
 # lobby/summaries - Room summaries and « Mes salons »
@@ -43,7 +43,12 @@ room they are no member of.
    100 keys, and lists the summaries in the server's order. With none to send
    it has no « Mes salons »; while loading and with no summary it shows
    nothing; a failed request, or an answer that is not a list of summaries,
-   shows `my_rooms.error`. The rest of the page never waits for it. A row
+   shows `my_rooms.error`. A summary's `last_activity_at`, and its
+   `finished_at` when set, is a date only as a date-time in ISO 8601 with a
+   time zone, its seconds' fraction read when present
+   (`2026-10-14T08:30:00.123456+00:00`, `2026-10-14T08:30:00Z`), in every
+   engine; any other string makes the answer no list of summaries. The rest
+   of the page never waits for it. A row
    shows the grid label (`my_rooms.unnumbered` without a grid number), size,
    players, last activity in the browser's time zone,
    `catalogue.progress.finished` when solved, and the link `my_rooms.open` to
@@ -72,6 +77,10 @@ room they are no member of.
   or language offender, every link reached by Tab with a visible focus, and
   no horizontal scroll with 8 players of 20 characters. Its rows follow the
   catalogue design ("Look"). (← 032 AC-6, 046 AC-11)
+- **AC-4** An answer whose one summary has `last_activity_at`
+  `2026-10-14 08:30:00Z` (a space for the `T`), or `2026-10-14T08:30:00` (no
+  time zone), shows « Impossible de charger vos salons. » and no row, while
+  `2026-10-14T08:30:00.5Z` lists the row.
 
 ## Edge cases
 

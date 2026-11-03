@@ -938,8 +938,9 @@ def sec_room() -> str:
         ["room · Connection lost", "spec 043", "specs 014, 040"],
         [
             (
-                "Removed by the host, opened in another tab, or the connection "
-                "closed for good, once the room has shown: the status text in a "
+                "Removed by the host, opened in another tab, or another final "
+                "status but the room's deletion, once the room has shown: the "
+                "status text in a "
                 "band under the top bar, the connection band's look without its "
                 "red dot. The room stays drawn under it, its grid read-only, "
                 "« Annuler », the Aide items, « Réagir » and « Je bloque » "
