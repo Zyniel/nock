@@ -23,6 +23,7 @@ from nock.catalogue import (
     Force,
     GridNumber,
     IndexEntry,
+    _is_former_file,
 )
 from nock.grid import Grid
 from nock.grid_import import import_grid
@@ -67,13 +68,8 @@ def _former_file_names(source: Path) -> list[str]:
     """List the names of the former files of `source`, in code-point order."""
     names: list[str] = []
     for path in source.iterdir():
-        if path.name.startswith("."):
-            continue
-        if not path.name.endswith(FORMER_SUFFIX):
-            continue
-        if not path.is_file():
-            continue
-        names.append(path.name)
+        if _is_former_file(path):
+            names.append(path.name)
     names.sort()
     return names
 

@@ -4,7 +4,7 @@ title: 'Grid files: one number once, safe file names, a former grids folder name
 status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T17:29:00Z'
+updated_date: '2026-11-03T18:26:00Z'
 labels:
   - domain:grid-files
 milestone: m-4
@@ -53,4 +53,6 @@ From DRAFT-004, 005, 006. The converter does not refuse two former files with on
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead: the warning fires for a file the converter would read (a .json name not starting with '.'); case-folded equal names reuse the existing same-file refusal; the converter's own lower-case and ':' checks on source names left out (a draft at the milestone's close).
+
+Review round 1: APPROVE (the reviewer's gate lost the lock to B-067's; it ran ruff, black, pyrefly and 258 grid-files/catalogue tests, all green). Suggestion 1 taken (one shared filter for a former file). Not taken: 2 (the converter's lower-case check on source names: the deferred draft); 3 (the two AC-22 tests: they prove convert and main).
 <!-- SECTION:NOTES:END -->
