@@ -19,7 +19,8 @@ focuses « Menu », whose items no longer hold « Réglages de l'hôte ».
 
 AC-21: Ana's sheet open on the room's vote, 3 letters and 0 words: she types `7` in
 « Lettres à révéler », chooses « libre » and presses the switch; once the room is
-locked, the sheet still shows 7 and « libre ».
+locked, the sheet still shows 7 and « libre ». Closed without « Enregistrer » and
+reopened, it shows vote, 3 and 0.
 
 AC-22: the same sheet with `7` typed: a `settings_changed` to vote, 3 letters and 5
 words, from her other connection, leaves 7 there and shows 5 in « Mots à révéler ».
@@ -360,6 +361,15 @@ def test_ac21_a_lock_keeps_the_typed_count_and_the_chosen_help_mode(
     expect(fields["letters"]).to_have_value("7")
     expect(help_mode_choice(page, HelpMode.FREE)).to_be_checked()
     expect(help_mode_choice(page, HelpMode.VOTE)).not_to_be_checked()
+    expect(fields["words"]).to_have_value("0")
+
+    # Closed with Escape, so without « Enregistrer »: the sheet reopens on the room.
+    page.keyboard.press("Escape")
+    expect(page.get_by_test_id("host-settings")).not_to_have_attribute("open", "")
+    open_host_settings(page)
+    expect(help_mode_choice(page, HelpMode.VOTE)).to_be_checked()
+    expect(help_mode_choice(page, HelpMode.FREE)).not_to_be_checked()
+    expect(fields["letters"]).to_have_value("3")
     expect(fields["words"]).to_have_value("0")
 
 

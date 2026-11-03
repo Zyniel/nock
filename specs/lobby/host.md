@@ -252,6 +252,7 @@ not-found pages ».
 - **AC-21** Ana's host sheet open on the room's vote, 3 letters and 0 words:
   she types `7` in « Lettres à révéler », chooses « libre » and presses the
   switch; once the room is locked, the sheet still shows 7 and « libre ».
+  Closed without « Enregistrer » and reopened, it shows vote, 3 and 0.
 - **AC-22** Ana's host sheet open on vote, 3 letters and 0 words, with `7`
   typed in « Lettres à révéler »: a `settings_changed` to vote, 3 letters and
   5 words, sent from her other connection, leaves 7 there and shows 5 in « Mots
