@@ -7,6 +7,7 @@ names (`specs/content/grid-files.md`).
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -33,6 +34,10 @@ CreditText = Annotated[
 
 INDEX_FILE_NAME = "catalogue.json"
 GRID_FILE_SUFFIX = ".ipuz"
+FORMER_SUFFIX = ".json"
+CONVERTER_COMMAND = "uv run python -m nock.ipuz_convert"
+
+logger = logging.getLogger(__name__)
 
 GRIDS_DIR: Path = Path(__file__).resolve().parents[2] / "grids"
 
@@ -41,10 +46,10 @@ def _check_file_name(name: str) -> str:
     """Accept a name directly inside `grids/` that ends in ".ipuz".
 
     Raises:
-        ValueError: The name holds a slash or a backslash, or does not end in
-            ".ipuz".
+        ValueError: The name holds a slash, a backslash or a colon, or does not
+            end in ".ipuz".
     """
-    if "/" in name or "\\" in name:
+    if "/" in name or "\\" in name or ":" in name:
         raise ValueError("'file' must be a name directly inside grids/")
     if not name.endswith(GRID_FILE_SUFFIX):
         raise ValueError(f"'file' must end in {GRID_FILE_SUFFIX!r}")
@@ -201,7 +206,8 @@ def _read_index(directory: Path) -> list[IndexEntry]:
     Raises:
         OSError: The index cannot be read.
         ValueError: The text is not valid JSON, an entry is not valid, or two
-            entries name the same number or the same file.
+            entries name the same number or the same file (names equal once
+            case-folded are the same file).
     """
     text = (directory / INDEX_FILE_NAME).read_text(encoding="utf-8")
     payload = json.loads(text)
@@ -209,17 +215,32 @@ def _read_index(directory: Path) -> list[IndexEntry]:
         raise ValueError("the index must be a JSON array of entries")
     index_entries: list[IndexEntry] = []
     numbers_seen: set[int] = set()
-    files_seen: set[str] = set()
+    folded_files_seen: set[str] = set()
     for item in payload:
         index_entry = IndexEntry.model_validate(item)
         if index_entry.number in numbers_seen:
             raise ValueError(f"duplicate grid number {index_entry.number}")
-        if index_entry.file in files_seen:
+        folded_file = index_entry.file.casefold()
+        if folded_file in folded_files_seen:
             raise ValueError(f"duplicate file {index_entry.file}")
         numbers_seen.add(index_entry.number)
-        files_seen.add(index_entry.file)
+        folded_files_seen.add(folded_file)
         index_entries.append(index_entry)
     return index_entries
+
+
+def _is_former_file(path: Path) -> bool:
+    """Tell whether the converter would read `path` (shared with the converter)."""
+    if path.name.startswith("."):
+        return False
+    return path.name.endswith(FORMER_SUFFIX) and path.is_file()
+
+
+def _holds_former_file(directory: Path) -> bool:
+    """Tell whether `directory` holds a file the converter would read."""
+    if not directory.is_dir():
+        return False
+    return any(_is_former_file(path) for path in directory.iterdir())
 
 
 def _read_grid_file(directory: Path, index_entry: IndexEntry) -> CatalogueEntry:
@@ -255,8 +276,10 @@ def _read_grid_file(directory: Path, index_entry: IndexEntry) -> CatalogueEntry:
 def load_catalogue(directory: Path) -> Catalogue:
     """Load the grids that the index of `directory` names, in the index's order.
 
-    A missing directory or a missing index gives an empty catalogue. A file the
-    index does not name is ignored.
+    A missing directory or a missing index gives an empty catalogue. With no
+    index, a directory holding a file the converter would read also logs one
+    warning naming the converter command. A file the index does not name is
+    ignored.
 
     Args:
         directory: The directory holding `catalogue.json` and the `.ipuz` files.
@@ -271,6 +294,14 @@ def load_catalogue(directory: Path) -> Catalogue:
     """
     index_path = directory / INDEX_FILE_NAME
     if not index_path.is_file():
+        if _holds_former_file(directory):
+            logger.warning(
+                "%s holds former grid files and no %s: no grid is loaded; "
+                "convert them with `%s SOURCE TARGET`",
+                directory,
+                INDEX_FILE_NAME,
+                CONVERTER_COMMAND,
+            )
         return Catalogue()
     try:
         index_entries = _read_index(directory)

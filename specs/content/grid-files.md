@@ -26,16 +26,20 @@ decides about a grid stays in the index. Both are read once at server start.
 ### Where grids live
 
 1. `grids/` holds the index `grids/catalogue.json` and one `.ipuz` file per grid,
-   read once at server start. No directory, or no index, is an empty catalogue.
-   A file the index does not name is ignored.
+   read once at server start. No directory, or no index, is an empty catalogue;
+   with no index, when `grids/` holds a file the converter of rule 15 would
+   read, the start also logs a warning naming the command
+   `uv run python -m nock.ipuz_convert`, and converts nothing. A file the index
+   does not name is ignored.
 2. The index is a JSON array of entries, each holding exactly: `number` (1 to
-   999,999,999), `file` (a name directly inside `grids/`, without `/` or `\`,
-   ending in `.ipuz`), `published` (boolean), `source` and `licence` (each 1 to
+   999,999,999), `file` (a name directly inside `grids/`, without `/`, `\` or
+   `:`, ending in `.ipuz`), `published` (boolean), `source` and `licence` (each 1 to
    200 characters once stripped, stored stripped) and the optional `withdrawn`
    (boolean, default false). Values are strict: `"1"` is not a number, `"yes"`
    is not a boolean; an unknown key is refused.
 3. Grids are read in the index's order. An entry naming a missing file, two
-   entries naming the same file or the same number, or an entry or a file that
+   entries naming the same file (names equal once case-folded, as `A.ipuz` and
+   `a.ipuz`, are the same file) or the same number, or an entry or a file that
    breaks these rules, those of `content/ipuz.md` or the import checks, stops
    the server from starting with one error naming the file concerned:
    `catalogue.json` for an index problem,
@@ -68,7 +72,8 @@ decides about a grid stays in the index. Both are read once at server start.
     `number`, `published_on` (`YYYY-MM-DD`), `force`, `published`, `author`,
     `source`, `licence`, the optional `withdrawn` and `grid` in the model's
     JSON. It writes `TARGET/<name>.ipuz` for each and `TARGET/catalogue.json`
-    with the entries in that order. When a source file is refused, or
+    with the entries in that order. A source file holding the number of an
+    earlier one in that order is refused. When a source file is refused, or
     `TARGET/catalogue.json` or a `.ipuz` it would write exists (the index is
     checked first), it writes nothing, names that file and exits with a non-zero
     code. Nothing else reads the former format.
@@ -108,6 +113,17 @@ decides about a grid stays in the index. Both are read once at server start.
   with number 1, force 2, `published_on` `2026-10-01`, the same credits and a
   grid equal to FX-01; run again on the same target it writes nothing, names
   `catalogue.json` and exits with a non-zero code.
+- **AC-22** The converter run on a source holding `g1.json` and `g2.json`, both
+  number 1, writes nothing into the target, names `g2.json` and exits with a
+  non-zero code.
+- **AC-23** With every file it names existing in `grids/` as a valid FX-01
+  file, an index whose `file` is `a:b.ipuz`, or one naming `A.ipuz` and
+  `a.ipuz` in two entries with different numbers, is refused naming
+  `catalogue.json`.
+- **AC-24** A `grids/` holding `g1.json` (former format) and no
+  `catalogue.json` loads as an empty catalogue and logs one warning holding
+  `uv run python -m nock.ipuz_convert`; a `grids/` holding only `notes.txt`,
+  or `g1.json` next to a valid `catalogue.json`, logs no warning.
 
 ## Edge cases
 
@@ -116,6 +132,8 @@ decides about a grid stays in the index. Both are read once at server start.
   code points (AC-3).
 - A withdrawn grid already open in a browser can still be joined by its room
   link (AC-5).
+- Former `.json` files next to a `catalogue.json` are ignored, with no warning
+  (AC-24).
 
 ## Out of scope
 
