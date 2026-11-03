@@ -185,6 +185,25 @@ def delete_while_joined_with_the_salon_open(
     return GonePage(page, mock, noted_pixel, noted_top)
 
 
+def delete_while_host_settings_open(page: Page, base_url: str, grid: Grid) -> GonePage:
+    """Joined on FX-01 as the host with « Réglages de l'hôte » open, the room is
+    deleted.
+
+    Args:
+        page: A fresh page, in the window the test wants (1280 by 720 for AC-21).
+        base_url: The live server.
+        grid: FX-01.
+
+    Returns:
+        The page once the 4404 is sent, and what it showed before.
+    """
+    mock = open_host_sheet(page, base_url, grid)
+    noted_top = grid_area_top(page)
+    noted_pixel = pixel_at(page, TOP_BAR_POINT[0], TOP_BAR_POINT[1])
+    delete_room(mock)
+    return GonePage(page, mock, noted_pixel, noted_top)
+
+
 def reconnect_with_t_pending(page: Page, mock: RoomMock) -> None:
     """Lose the socket, type `T` at (1, 0) offline, and wait for the page's new join.
 

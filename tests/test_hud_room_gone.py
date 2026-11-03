@@ -1,14 +1,18 @@
 """Tests of `client/hud.md` AC-21 and AC-22: the room-gone dialog (rule 16).
 
-AC-21: once the room has shown, the 4404 of a deleted room closes the Salon sheet,
-takes every band away, drops the letter waiting to be sent and shows a modal
-alert dialog named « Ce salon n'existe plus. », described by the 30-day line,
-whose one control, the link « Voir les grilles » to `/`, takes the focus. The two
-cases of the criterion: joined at 360 by 740 with the Salon sheet open, and
-reconnecting at 1280 by 720 with `T` typed at (1, 0) and not yet answered. Both
-follow « Room gone » (`_design/overlays.md`) and pass spec 035's contrast and
-language scans. From "Edge cases": a 4404 before the first snapshot shows no
-dialog (the entry card is `client/shell.md`'s, tested by spec 040).
+AC-21: once the room has shown, the 4404 of a deleted room closes the Salon sheet
+(or the host's settings), takes every band away, drops the letter waiting to be
+sent and shows a modal alert dialog named « Ce salon n'existe plus. », described by
+the 30-day line, whose one control, the link « Voir les grilles » to `/`, takes the
+focus. The two cases of the criterion: joined at 360 by 740 with the Salon sheet
+open, and reconnecting at 1280 by 720 with `T` typed at (1, 0) and not yet
+answered. Both follow « Room gone » (`_design/overlays.md`) and pass spec 035's
+contrast and language scans. The third case, at 1280 by 720 with « Réglages de
+l'hôte » open, closes that sheet and shows the dialog alike (name, description,
+focus, no band); the criterion asks for no scan there, and the top bar's pixel
+before the deletion already lies under the settings' backdrop, so the scrim is not
+measured on it. From "Edge cases": a 4404 before the first snapshot shows no dialog
+(the entry card is `client/shell.md`'s, tested by spec 040).
 
 AC-22: under the dialog, with (1, 0) selected, Escape, a press on the scrim, Tab
 and Shift+Tab leave the focus on the link and the dialog open; a typed `A`
@@ -39,6 +43,7 @@ from hud_harness import (
     GonePage,
     content_problems,
     delete_room,
+    delete_while_host_settings_open,
     delete_while_joined_with_the_salon_open,
     delete_while_reconnecting_with_t_pending,
     expect_dialog_as_rule_16_says,
@@ -173,6 +178,21 @@ def test_ac21_reconnecting_the_deletion_drops_the_pending_t_and_shows_the_dialog
     expect_layout(page, "column")
     expect_no_band(gone)
     expect(cell_at(page, 1, 0)).to_have_attribute("data-letter", "")
+
+
+def test_ac21_with_the_host_settings_open_the_deletion_closes_them_and_shows_it(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    gone = open_gone(
+        window, live_server, fx01_grid, delete_while_host_settings_open, COMPUTER
+    )
+    page = gone.page
+
+    expect_dialog_as_rule_16_says(page)
+    expect_layout(page, "column")
+    expect(page.get_by_test_id("host-settings")).not_to_have_attribute("open", "")
+    expect(page.get_by_test_id("host-settings")).not_to_be_visible()
+    expect_no_band(gone)
 
 
 # ---- AC-21: the look and the scans ------------------------------------------------
