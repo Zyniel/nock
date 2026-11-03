@@ -1,9 +1,10 @@
 ---
 id: B-076
 title: '_map.md: the modes row, « status region », 004 AC-7'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T21:12:00Z'
 labels:
   - spec
 milestone: m-2
@@ -34,3 +35,11 @@ From DRAFT-033, DRAFT-048 and the « Spec splits » close. The gameplay/modes.md
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: specs/_map.md (the modes row, « status region » in the glossary and the hud row, 004 AC-7 among shared criteria).
+2. Tests: none (no criterion; the gate's traceability check).
+3. Gate: uv run python scripts/gate.py --stage tests
+<!-- SECTION:PLAN:END -->
