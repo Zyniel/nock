@@ -1,7 +1,7 @@
 ---
 area: account
 file: erasure
-status: done
+status: approved
 ---
 
 # account/erasure - Erasure, what is kept, history records, grid progress
@@ -201,7 +201,8 @@ erasure must never undo.
   in its own roster with her colour and letters, a letter it types is
   applied, and `GET /api/account` there reads signed out.
 - **AC-13** A done erasure of time 0 is deleted by the purge at 157,680,001 s
-  and kept at 157,679,999 s, no other row touched.
+  and kept at 157,679,999 s, no other row touched. A purge at 157,680,001 s
+  that raises is logged, and the next sweep's purge deletes that erasure.
 - **AC-14** Zoé, in live room R and creator of U, deletes her account while
   R's engine is held for 1 s, and a sweep starts during the route's attempt:
   once both are over, R's player is `--`, U is gone, her address received
