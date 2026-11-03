@@ -4,7 +4,7 @@ title: A zoomed grid scrolls back to the selection, proven
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T21:10:00Z'
+updated_date: '2026-11-03T21:11:00Z'
 labels:
   - domain:viewport
 milestone: m-5
@@ -34,7 +34,7 @@ From DRAFT-045 (B-044's review). Every zoomed test of viewport AC-11 to AC-17 sc
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -51,6 +51,8 @@ From DRAFT-045 (B-044's review). Every zoomed test of viewport AC-11 to AC-17 sc
 Lead: ArrowUp alone along JAMBE (the backward branch on both axes, the across one clamped at column 0); the row-0 top-edge clamp is left to rule 3 (shared code).
 
 Review round 1: APPROVE. Not taken: 1 (simplify the test's loop: not worth a round); 2 (the across clamp at column 0 cannot be told from an unclamped scroll: the row-0 clamp left to rule 3, as noted).
+
+PR #129.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
