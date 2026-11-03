@@ -30,7 +30,7 @@ erases and keeps is `account/erasure.md`.
    Off, `/account`, `/api/account` and every path under it answer 404
    `{"detail": "Not Found"}` whatever the method. On, `GET /account` serves the
    client (503 while it is not built), another method on an account route
-   answers 405, and every answer under `/api/account` has `Cache-Control:
+   answers 405 `{"detail": "Method Not Allowed"}`, and every answer under `/api/account` has `Cache-Control:
    no-store`. On or off, a body over the limit gets the 413 of
    `platform/serving.md` rule 11 first, `no-store` too.
 2. `main()` before serving, and an app given no settings when it starts, read
@@ -192,10 +192,12 @@ erases and keeps is `account/erasure.md`.
   count; a 503 counts, a 429 does not; a new app starts from zero.
   (← 033 AC-8)
 - **AC-6** Accounts off, `GET /account`, `GET` and `DELETE /api/account`,
-  `POST` to `link`, `sign-in`, `sign-out`, `GET` and `PUT` to `rooms` answer
-  404 `{"detail": "Not Found"}`. On, `GET /account` serves `index.html`, and a
-  status, a link and a sign-in, accepted or refused, carry `Cache-Control:
-  no-store`. (← 033 AC-8, 033 AC-1)
+  `POST` to `link`, `sign-in`, `sign-out`, `GET` and `PUT` to `rooms`, and
+  the wrong methods `GET` to `link` and `POST /account`, answer 404
+  `{"detail": "Not Found"}`. On, `GET /account` serves `index.html`, those
+  two wrong methods answer 405 `{"detail": "Method Not Allowed"}`, and a
+  status, a link and a sign-in, accepted or refused, and the `GET` to `link`
+  carry `Cache-Control: no-store`. (← 033 AC-8, 033 AC-1)
 - **AC-7** `https://jeu.example/`, `smtp.jeu.example` and `nock@jeu.example`
   give `https://jeu.example`, port 587, `starttls`, no login; `tls` and
   `none` 465 and 25; `0002525` 2525; `::1` passes. Nothing set, or both empty
@@ -228,7 +230,9 @@ erases and keeps is `account/erasure.md`.
   null`) and enters as Ana with no form, replacing device 1
   (`lobby/joining.md` rule 11); its « Mes salons » lists the room, whose page
   sends one `PUT` after its first snapshot. A device holding Bob's identity
-  there keeps it. (← 033 AC-2, 033 AC-11)
+  there keeps it. On an `/account` already showing signed out, a link token
+  set as the fragment, with no reload, leaves the URL and signs in.
+  (← 033 AC-2, 033 AC-11)
 - **AC-13** With accounts on, a browser with no cookie or storage solves
   FX-01 with a word check: no 401 or 403, no cookie, the sheet never opens,
   every frame parses as a client message; solving from the catalogue, nothing
@@ -307,4 +311,5 @@ erases and keeps is `account/erasure.md`.
 - `web/src/lib/account.ts`, `Account*.svelte`, `RoomMenu.svelte`,
   `CataloguePage.svelte`.
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`;
-  `tests/test_account_*` (AC-23, AC-31 to AC-34).
+  `tests/test_account_*` (AC-6, AC-12 for their wrong methods and open page,
+  AC-23, AC-31 to AC-34).
