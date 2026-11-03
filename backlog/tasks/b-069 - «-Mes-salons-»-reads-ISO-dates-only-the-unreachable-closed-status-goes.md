@@ -4,7 +4,7 @@ title: « Mes salons » reads ISO dates only; the unreachable closed status goes
 status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T17:57:00Z'
+updated_date: '2026-11-03T18:02:00Z'
 labels:
   - domain:summaries
   - domain:shell
@@ -53,4 +53,6 @@ From DRAFT-057 and DRAFT-020. isTime in web/src/lib/myRooms.ts uses Date.parse a
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead: « Connexion perdue. » (room.status.closed) is unreachable (no closed status in any spec or in RoomStatus); the band room.banner.offline stays. The ISO check applies to a summary's finished_at too (one function). isTime is shared with history.ts (results' « Grilles terminées »): option (a), the stricter check applies there too, the server having only ever stored ISO strings; stating it in gameplay/results.md is a follow-up draft at the milestone's close. test_spec_012_ac01_nickname_rule.py's status-text list also drops closed.
+
+Lead: the test-writer's two finished_at cases kept (rule 2 covers both fields).
 <!-- SECTION:NOTES:END -->
