@@ -4,7 +4,7 @@ title: 'hud: the room-gone dialog, the reaction pill and the mute case proven'
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T19:42:00Z'
+updated_date: '2026-11-03T19:43:00Z'
 labels:
   - domain:hud
 milestone: m-5
@@ -39,7 +39,7 @@ From DRAFT-002, 022, 064. hud rule 16: AC-21 proves only the Salon sheet giving 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -58,6 +58,8 @@ Lead: AC-24's mute case from the muted player's side (rule 12: chat rule 15 move
 Lead: the new tests pass on the existing code, so no implementer phase; the scrim and scan checks stay on the two dialogs AC-21 names for them.
 
 Review round 1: APPROVE. Not taken: 1 (assert where the focus lands after the closing Tab: the test already fails on the regression it guards); 2 (AC-16 mixing a pointer and a named test: allowed by _map.md, explained in the docstring).
+
+PR #125.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
