@@ -1,9 +1,10 @@
 ---
 id: B-071
 title: 'hud: the room-gone dialog, the reaction pill and the mute case proven'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T18:27:00Z'
 labels:
   - domain:hud
 milestone: m-5
@@ -26,6 +27,9 @@ From DRAFT-002, 022, 064. hud rule 16: AC-21 proves only the Salon sheet giving 
 - [ ] #1 An open room sheet or the recap gives way to the room-gone dialog
 - [ ] #2 A tap on a clue's reaction pill selects that clue
 - [ ] #3 Muting from the Salon sheet keeps it open
+- [ ] #4 hud AC-16 (changed)
+- [ ] #5 hud AC-21 (changed)
+- [ ] #6 hud AC-24 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -37,3 +41,17 @@ From DRAFT-002, 022, 064. hud rule 16: AC-21 proves only the Salon sheet giving 
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: client/hud.md, widen AC-21 and the criteria of rules 12 and 14 (hud is past the budget).
+2. Tests: tests/test_hud_*.py.
+3. Quick gate: uv run python scripts/gate.py --specs hud --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: AC-24's mute case from the muted player's side (rule 12: chat rule 15 moves his focus to « Salon »); AC-21 names one room sheet (the host's settings), the recap left out (one sheet shows room sheets give way); the pill tap widens AC-16, the clue cell's pill (ClueCell.svelte).
+<!-- SECTION:NOTES:END -->
