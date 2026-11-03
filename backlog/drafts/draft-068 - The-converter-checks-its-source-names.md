@@ -13,7 +13,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Follow-up of B-068 (spec-writer and reviewer). content/grid-files.md rule 15 says the converter reads lower-case <name>.json, but the code (_is_former_file in src/nock/catalogue.py, shared with the warning of rule 1) checks neither case nor ':'. So A.json and a.json, or a:b.json, produce files the index now refuses at load (B-068's AC-23), and G1.json triggers rule 1's warning. Widen rule 15 so the converter refuses those names, with a criterion.
+Follow-up of B-068 (spec-writer and reviewer). content/grid-files.md rule 15 says the converter reads lower-case <name>.json, but the code (_is_former_file in src/nock/catalogue.py, shared with the warning of rule 1) checks neither case nor ':'. So A.json and a.json, or a:b.json, produce files the index now refuses at load (B-068's AC-23), and G1.json triggers rule 1's warning. Widen rule 15 so the converter refuses those names, with a criterion. Also (« Robustness fixes » close): ipuz_convert.py imports _is_former_file, a private name of catalogue.py; make it public (is_former_file, with its docstring) in the same change.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
