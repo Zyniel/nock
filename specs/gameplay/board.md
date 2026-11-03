@@ -223,10 +223,12 @@ The grid itself (cells, arrows, cursors, zoom, the viewport):
 
 ## Code
 
-- `web/src/lib/GridViewport.svelte` (taps, keys), `web/src/lib/wordSelection.ts`,
+- `web/src/lib/GridViewport.svelte` (taps), `web/src/lib/gridKeys.ts` (keys),
+  `web/src/lib/wordSelection.ts`,
   `web/src/lib/navigation.ts`, `web/src/lib/letterEntry.ts`,
   `web/src/lib/cellDisplaySwitches.ts`, `web/src/lib/RoomPage.svelte` (typing,
-  keyboard, layout), `web/src/lib/roomSession.ts` (`select_cell`),
+  keyboard), `web/src/lib/playFit.ts` (layout), `web/src/lib/roomCommands.ts`
+  (the edit and select messages), `web/src/lib/roomSession.ts` (`select_cell`),
   `web/src/lib/ClueBar.svelte`, `web/src/lib/InAppKeyboard.svelte`.
 - Tests: `tests/test_spec_007_*` to `009_*`, `044_*` and the
   `tests/test_spec_042_*` files of the cited criteria.

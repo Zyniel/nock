@@ -3,6 +3,7 @@
   // player, the host's « Couper » and « Retirer » on the other players' rows,
   // then the invitation link. It stays on the page while its tab is not
   // selected, with the `hidden` attribute.
+  import FocusableLink from './FocusableLink.svelte'
   import PlayerIcon from './PlayerIcon.svelte'
   import { announce } from './announce'
   import { newLinkCopier } from './copyLink'
@@ -141,13 +142,11 @@
     <span id="share-label" class="share-label" data-testid="share-label"
       >{t('room.share.label')}</span
     >
-    <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-    <a
+    <FocusableLink
       class="share-link"
       data-testid="share-link"
       href={shareLink}
-      tabindex="0"
-      aria-describedby="share-label">{shareLink}</a
+      aria-describedby="share-label">{shareLink}</FocusableLink
     >
     <button
       type="button"
@@ -332,8 +331,9 @@
     color: var(--nock-muted);
   }
 
-  /* The URL box: one line with an ellipsis. */
-  .share-link {
+  /* The URL box: one line with an ellipsis. The link is FocusableLink's
+     element, reached from its panel. */
+  .share-panel :global(.share-link) {
     display: block;
     box-sizing: border-box;
     align-self: stretch;

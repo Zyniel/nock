@@ -269,8 +269,9 @@ keyboard ».
 - `src/nock/hub.py`: the room task, arrival order, delivery to every connection.
 - `web/src/lib/roomSession.ts`: confirmed grid, pending edits, `shownCell`,
   answers, flashes (`FLASH_MS`).
-- `web/src/lib/RoomPage.svelte`: pencil mode, typing, confirming, flash timers;
-  `GridViewport.svelte`: cell marks and the flash; `RoomTopBar.svelte`,
+- `web/src/lib/RoomPage.svelte`: pencil mode, typing, confirming;
+  `roomCommands.ts`: the edit, pencil and confirm messages; `expiry.ts`: flash
+  timers; `LetterCell.svelte`: cell marks and the flash; `RoomTopBar.svelte`,
   `AideMenu.svelte`, `InAppKeyboard.svelte`: the pencil controls.
 - Tests: `tests/test_spec_015_*`, `tests/test_spec_016_*`,
   `tests/test_spec_020_*`; `tests/test_co_op_*` for AC-21.

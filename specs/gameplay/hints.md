@@ -219,7 +219,8 @@ The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
   limit's numbers.
 - `src/nock/protocol.py`: messages and error codes.
 - `web/src/lib/AideMenu.svelte`, `web/src/lib/RoomPage.svelte` (what is
-  enabled), `web/src/lib/GridViewport.svelte` (strike, notch),
+  enabled), `web/src/lib/roomCommands.ts` (check, reveal),
+  `web/src/lib/LetterCell.svelte` (strike, notch),
   `web/src/lib/roomSession.ts`, `web/src/lib/activityFeed.ts` (the stream
   lines).
 - Tests: `tests/test_spec_023_*`, `test_spec_024_*`, `test_spec_025_ac01_*`,

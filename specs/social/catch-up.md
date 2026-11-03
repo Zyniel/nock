@@ -230,8 +230,8 @@ players (seq 22).
 - `src/nock/store.py`: `load_room_at`. `src/nock/hub.py`: `RoomRegistry.catch_up`.
   `src/nock/server.py`: the catch-up route.
 - `web/src/lib/catchUp.ts`: the request, reading and applying the answer;
-  `roomRecord.ts`: the seen seq; `RoomPage.svelte`: returns, dropped answers,
-  highlight timers; `GridViewport.svelte`: the highlighted cell;
+  `roomRecord.ts`: the seen seq; `RoomPage.svelte`: returns, dropped answers;
+  `expiry.ts`: highlight timers; `LetterCell.svelte`: the highlighted cell;
   `activityFeed.ts`: the word line, placing items.
 - Tests: `tests/test_spec_034_*`, `tests/spec034_harness.py`;
   `tests/test_catch_up_*` for AC-21.

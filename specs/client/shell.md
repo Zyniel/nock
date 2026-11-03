@@ -229,7 +229,8 @@ file, and the brand on the top bars.
 - `web/src/App.svelte` (routing, title, code per page), `web/index.html`,
   `web/src/lib/i18n.ts`, `web/src/i18n/fr.json`.
 - `web/src/lib/roomSession.ts` (frames, seq, final closes, cursors),
-  `RoomPage.svelte` (socket, cards, opening), `EntryFrame.svelte`,
+  `roomConnection.ts` (the socket), `RoomPage.svelte` (opening),
+  `EntryPage.svelte` (the entry page, its cards), `EntryFrame.svelte`,
   `CatalogueFrame.svelte` (the frames and their `main`), `NotFoundPage.svelte`,
   `PageTopBar.svelte`, `TopBarBrand.svelte`.
 - Tests: `tests/test_shell_*` and the `tests/test_spec_040_*`,

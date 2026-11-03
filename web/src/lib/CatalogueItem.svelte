@@ -4,11 +4,11 @@
   // the text column (number and progress, publication, force line), then
   // "Jouer" on the right.
   import MetaSep from './MetaSep.svelte'
+  import PlayButton from './PlayButton.svelte'
   import { formatPublishedOn, progressOf, type GridSummary } from './catalogue'
   import { THUMB_HEIGHT_PX, gridThumbOf } from './gridThumb'
   import { t } from './i18n'
   import { NOCK_MARK_POINTS } from './icons'
-  import { playGrid } from './playGrid'
 
   let {
     summary,
@@ -28,7 +28,6 @@
 
   const thumb = $derived(gridThumbOf(summary.width, summary.height))
 
-  let isStarting = $state(false)
   let hasFailed = $state(false)
   // Bumped to read the progress again from the device.
   let progressVersion = $state(0)
@@ -38,25 +37,11 @@
     return progressOf(summary.number, accountProgress)
   })
 
-  // A page restored from the back-forward cache keeps its old state: start again.
+  // A page restored from the back-forward cache keeps its old progress: read
+  // it again.
   function onPageShow(event: PageTransitionEvent): void {
     if (event.persisted) {
-      isStarting = false
       progressVersion += 1
-    }
-  }
-
-  // One tap creates one room; the button stays disabled while the request runs.
-  async function play(): Promise<void> {
-    if (isStarting) {
-      return
-    }
-    isStarting = true
-    hasFailed = false
-    const started = await playGrid(summary.number)
-    if (!started) {
-      isStarting = false
-      hasFailed = true
     }
   }
 </script>
@@ -143,13 +128,12 @@
       </p>
     {/if}
   </div>
-  <button
-    type="button"
+  <PlayButton
+    number={summary.number}
     class="nock-button nock-button-primary play"
     data-testid="catalogue-play"
     aria-describedby={titleId}
-    disabled={isStarting}
-    onclick={play}>{t('catalogue.play')}</button
+    bind:hasFailed>{t('catalogue.play')}</PlayButton
   >
 </article>
 
@@ -226,7 +210,8 @@
     fill: var(--nock-navy);
   }
 
-  .play {
+  /* The button is PlayButton's element, so the rule reaches it from the card. */
+  .catalogue-item :global(.play) {
     flex: none;
     padding: 9px 16px;
   }

@@ -287,9 +287,10 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 - `src/nock/room.py`: input and idleness (`handle_message`, `tick`),
   `select_cell`, `disconnect_player`, authors, `replay`; `RoomConfig` holds
   the idle delay. `src/nock/store.py`: authors across a restart.
-- `web/src/lib/remoteSelections.ts`, `GridViewport.svelte`: cursors, tints,
-  inks; `roomSession.ts`: states and selections kept; `PlayersPanel.svelte`:
-  state words, current clue; `activityFeed.ts`: stream lines;
+- `web/src/lib/remoteSelections.ts`, `GridViewport.svelte`, `LetterCell.svelte`:
+  cursors, tints, inks; `roomSession.ts`: states and selections kept;
+  `PlayersPanel.svelte`: state words, current clue; `activityFeed.ts`: stream
+  lines;
   `authorsView.ts`, `AuthorsLegend.svelte`, `RoomPage.svelte`,
   `RoomMenu.svelte`: the switch, legend and room.
 - Tests: `tests/test_spec_013_ac01*` to `ac06*`, `tests/test_spec_019_*`,

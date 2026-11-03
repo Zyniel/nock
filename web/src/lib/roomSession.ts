@@ -21,7 +21,6 @@ export type RoomStatus =
   | 'throttled'
   | 'locked'
   | 'removed'
-  | 'closed'
 
 export type PlayerState = 'active' | 'idle' | 'disconnected'
 
@@ -131,7 +130,7 @@ export interface VoteView {
 }
 
 // How a vote ended (spec 025).
-type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
+export type VoteOutcome = 'passed' | 'rejected' | 'timed_out'
 
 // The countdown of a vote this page saw open (spec 047): the performance.now()
 // reading of the moment the page applied its vote_opened, and how long the vote
@@ -1406,11 +1405,12 @@ export function isEndedStatus(status: RoomStatus): boolean {
 
 // The delay before reconnection try number `attempt` (0 for the first), in
 // whole milliseconds. One random draw places it between 80 % of its base delay
-// (a draw of 0) and 120 % (a draw just below 1).
-export function reconnectDelay(attempt: number): number {
+// (a draw of 0) and 120 % (a draw just below 1). `random` gives the draw; it is
+// read at each call, so a test or a page can replace Math.random.
+export function reconnectDelay(attempt: number, random: () => number = Math.random): number {
   const last = RECONNECT_DELAYS_MS.length - 1
   const baseMs = RECONNECT_DELAYS_MS[Math.min(attempt, last)]
-  const share = 1 - RECONNECT_JITTER + 2 * RECONNECT_JITTER * Math.random()
+  const share = 1 - RECONNECT_JITTER + 2 * RECONNECT_JITTER * random()
   return Math.round(baseMs * share)
 }
 

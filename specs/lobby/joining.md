@@ -259,7 +259,8 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
   disconnection, seat back, members.
 - `src/nock/hub.py`: the lookups.
 - `web/src/lib/joinRules.ts`, `web/src/lib/roomSession.ts`,
-  `web/src/lib/RoomPage.svelte`: the room page's join;
+  `web/src/lib/roomConnection.ts`, `web/src/lib/EntryPage.svelte`,
+  `web/src/lib/RoomPage.svelte`: the room page's join, the nickname form;
   `web/src/lib/nickname.ts`: the display.
 - Tests: those of the pointers, in `tests/test_spec_012_*`,
   `tests/test_spec_032_ac03_*`, `tests/test_spec_032_ac02_ac07_*` (AC-7),

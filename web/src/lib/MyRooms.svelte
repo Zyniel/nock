@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import FocusableLink from './FocusableLink.svelte'
   import MetaSep from './MetaSep.svelte'
   import { t } from './i18n'
   import { fetchRoomSummaries, lastActivityText, type RoomKey, type RoomSummary } from './myRooms'
@@ -92,15 +93,15 @@
               {lastActivityText(summary.last_activity_at)}
             </p>
           </div>
-          <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-          <a
-            class="nock-button"
-            class:nock-button-primary={!summary.solved}
-            class:nock-button-secondary={summary.solved}
+          <FocusableLink
+            class={[
+              'nock-button',
+              { 'nock-button-primary': !summary.solved, 'nock-button-secondary': summary.solved },
+            ]}
             data-testid="my-room-link"
             href={`/r/${summary.code}`}
-            tabindex="0"
-            aria-label={t('my_rooms.open_label', { code: summary.code })}>{t('my_rooms.open')}</a
+            aria-label={t('my_rooms.open_label', { code: summary.code })}
+            >{t('my_rooms.open')}</FocusableLink
           >
         </li>
       {/each}

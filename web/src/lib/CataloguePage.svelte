@@ -27,6 +27,7 @@
   } from './history'
   import { t } from './i18n'
   import { storedRoomKeys, type RoomKey, type RoomSummary } from './myRooms'
+  import { isWindowWide } from './wideWindow'
 
   type State = 'loading' | 'ready' | 'error'
   type ForceFilter = 'all' | 1 | 2 | 3 | 4
@@ -92,7 +93,8 @@
     }
   }
 
-  $effect(() => {
+  // Once, when the page shows.
+  onMount(() => {
     void loadGrids()
   })
 
@@ -123,10 +125,9 @@
 
   // ---- "Compte" and its dialog (spec 046, spec 033) ----
 
-  // Whether the window is wide, as the catalogue frame works it out: the
-  // dialog is a bottom sheet on a narrow window.
-  let isWide = $state(false)
-  let dialogLayout: 'sheet' | 'column' = $derived(isWide ? 'column' : 'sheet')
+  // The dialog is a bottom sheet on a narrow window, as the catalogue frame
+  // works it out.
+  let dialogLayout: 'sheet' | 'column' = $derived(isWindowWide() ? 'column' : 'sheet')
 
   let accountDialog: AccountDialog | null = $state(null)
   let accountOpenButton: HTMLButtonElement | null = $state(null)
@@ -157,7 +158,7 @@
 {/snippet}
 
 <div class="nock-plain-page catalogue-page" data-testid="catalogue-page" data-state={pageState}>
-  <CatalogueFrame topBarEnd={accountStatus === null ? undefined : accountOpen} bind:isWide>
+  <CatalogueFrame topBarEnd={accountStatus === null ? undefined : accountOpen}>
     <h1 class="nock-page-heading">{t('catalogue.heading')}</h1>
     {#if myRoomKeys.length > 0}
       <MyRooms keys={myRoomKeys} onloaded={recordSolvedRooms} />

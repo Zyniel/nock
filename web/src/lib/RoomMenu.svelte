@@ -3,6 +3,7 @@
   // switches, « Inviter », the host's settings and the account when they
   // apply, then the timer and the way back to the grids. A detail is hidden
   // from screen readers: a switch's state is its `aria-pressed`.
+  import FocusableLink from './FocusableLink.svelte'
   import { t } from './i18n'
 
   let {
@@ -107,13 +108,13 @@
 <button type="button" class="nock-menu-item" data-testid="timer-toggle" onclick={onToggleTimer}
   ><span>{isTimerShown ? t('timer.hide') : t('timer.toggle_label')}</span></button
 >
-<!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-<a class="nock-menu-item back-to-grids" data-testid="back-to-grids" href="/" tabindex="0"
-  ><span>{t('menu.back')}</span></a
+<FocusableLink class="nock-menu-item back-to-grids" data-testid="back-to-grids" href="/"
+  ><span>{t('menu.back')}</span></FocusableLink
 >
 
 <style>
-  .back-to-grids {
+  /* The link is FocusableLink's element: the rule reaches it as a global. */
+  :global(a.back-to-grids) {
     text-decoration: none;
   }
 </style>

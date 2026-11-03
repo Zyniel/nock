@@ -294,8 +294,9 @@ conformance is checked »).
 ## Code
 
 - `web/src/app.css`: focus ring, `visually-hidden`. `web/src/lib/RoomPage.svelte`,
-  `GridViewport.svelte`: grid roles, announcement, grid release, interactive
-  mark. `InAppKeyboard.svelte`, `remoteSelections.ts`, `scrollingLists.ts`,
+  `GridViewport.svelte`, `LetterCell.svelte`, `ClueCell.svelte`,
+  `gridKeys.ts`: grid roles, announcement, grid release, interactive mark.
+  `InAppKeyboard.svelte`, `remoteSelections.ts`, `scrollingLists.ts`,
   `i18n.ts`, `web/src/i18n/fr.json`.
 - `src/nock/hub.py`: the bounds, `STALLED_CLOSE_CODE`, `FLOOD_CLOSE_CODE`;
   `src/nock/room.py`: `RoomConfig`; `src/nock/server.py`: routes,

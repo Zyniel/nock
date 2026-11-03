@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import EntryFrame from './EntryFrame.svelte'
+  import FocusableLink from './FocusableLink.svelte'
   import { t } from './i18n'
   import { displayNickname } from './nickname'
   import { fetchPublicRecap, type PublicRecap } from './recap'
@@ -35,9 +36,8 @@
 </script>
 
 {#snippet homeLink()}
-  <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-  <a class="nock-button nock-button-primary" data-testid="share-home" href="/" tabindex="0"
-    >{t('share.home')}</a
+  <FocusableLink class="nock-button nock-button-primary" data-testid="share-home" href="/"
+    >{t('share.home')}</FocusableLink
   >
 {/snippet}
 

@@ -340,9 +340,13 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 
 ## Code
 
-- `web/src/lib/RoomPage.svelte` (layout, overlays, play area, the status
-  region) and its parts: `RoomTopBar`, `RoomPopover`, `AideMenu`, `RoomMenu`,
-  `ClueBar`, `RoomGoneDialog`, `RoomSheet` (the room sheets' shared dialog and
-  its region) (`.svelte`); `windowForm.ts`.
+- `web/src/lib/RoomPage.svelte` (layout, overlays, play area), `roomOverlays.ts`
+  (the one-overlay rule), `playFit.ts` (layout, the grid's box, the clue bar's
+  width, the legend's place), `StatusRegion.svelte` and `announce.ts` (the
+  status region, announced by `RoomPage.svelte`), `GridStatus.svelte` (the
+  grid's completion line) and its parts: `RoomTopBar.svelte`, `RoomPopover.svelte`, `AideMenu.svelte`,
+  `RoomMenu.svelte`, `ClueBar.svelte`, `RoomGoneDialog.svelte`,
+  `RoomSheet.svelte` (the room sheets' shared dialog and its region);
+  `windowForm.ts`.
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
   `tests/test_hud_*`, `tests/hud_harness.py`.

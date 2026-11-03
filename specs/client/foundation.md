@@ -181,8 +181,9 @@ smooth on a phone.
 ## Code
 
 - `web/src/app.css` (tokens, page base, focus ring, components, the note's
-  fade), `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay,
-  what a frame redraws), `web/src/main.ts` (fonts, subsets, preload),
+  fade), `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay),
+  `web/src/lib/LetterCell.svelte`, `web/src/lib/ClueCell.svelte` (what a frame
+  redraws), `web/src/main.ts` (fonts, subsets, preload),
   `web/src/lib/icons.ts`.
 - Tests: `tests/test_foundation_*`, `tests/test_spec_041_*` and the
   `tests/test_spec_040_*` and `test_spec_048_*` files of the cited criteria.

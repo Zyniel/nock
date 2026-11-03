@@ -167,19 +167,42 @@ BUILD_STEP: tuple[str, list[str]] = (
 # component that SHARED_COMPONENT_MIN_DOMAINS domains or more name, with exactly
 # those domains.
 SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
+    "web/src/lib/ClueCell.svelte": (
+        "chat",
+        "foundation",
+        "product",
+        "viewport",
+    ),
     "web/src/lib/GridViewport.svelte": (
         "board",
+        "foundation",
+        "presence",
+        "product",
+        "server",
+        "viewport",
+    ),
+    "web/src/lib/LetterCell.svelte": (
         "catch-up",
         "co-op",
         "foundation",
         "hints",
         "presence",
         "product",
-        "rules",
-        "server",
         "viewport",
     ),
-    "web/src/lib/PlayersPanel.svelte": ("chat", "host", "presence", "room", "rooms"),
+    "web/src/lib/PlayersPanel.svelte": (
+        "chat",
+        "host",
+        "presence",
+        "room",
+        "rooms",
+    ),
+    "web/src/lib/RoomMenu.svelte": (
+        "account",
+        "hud",
+        "presence",
+        "rules",
+    ),
     "web/src/lib/RoomPage.svelte": (
         "board",
         "catch-up",
@@ -201,8 +224,12 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "viewport",
         "votes",
     ),
-    "web/src/lib/RoomMenu.svelte": ("account", "hud", "presence", "rules"),
-    "web/src/lib/RoomTopBar.svelte": ("co-op", "hud", "rules", "server"),
+    "web/src/lib/RoomTopBar.svelte": (
+        "co-op",
+        "hud",
+        "rules",
+        "server",
+    ),
 }
 SHARED_COMPONENT_MIN_DOMAINS = 4
 # A word that may name a client component in a spec's Code section: the specs

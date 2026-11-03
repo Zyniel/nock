@@ -164,7 +164,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
 
 - `src/nock/room.py`: the stale rule among the edit checks, the time-outs in
   `tick` and in the join; `RoomConfig.resume_window_seconds`.
-- `web/src/lib/roomSession.ts`, `RoomPage.svelte`: heartbeat, losses, retries,
+- `web/src/lib/roomConnection.ts`, `roomSession.ts`, `RoomPage.svelte`:
+  heartbeat, losses, retries,
   the selection sent again, resent edits, kept requests.
 - Tests: `tests/test_spec_017_ac01_*`, `tests/test_spec_017_ac02_*`,
   `tests/test_spec_017_ac03_*`, `tests/test_spec_017_ac05_*`;

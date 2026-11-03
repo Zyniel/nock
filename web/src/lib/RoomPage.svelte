@@ -3,29 +3,47 @@
   import AccountDialog from './AccountDialog.svelte'
   import AideMenu from './AideMenu.svelte'
   import ClueBar from './ClueBar.svelte'
-  import EntryFrame from './EntryFrame.svelte'
+  import EntryPage from './EntryPage.svelte'
+  import GridStatus from './GridStatus.svelte'
   import GridViewport from './GridViewport.svelte'
   import HostSettings from './HostSettings.svelte'
   import InAppKeyboard from './InAppKeyboard.svelte'
+  import NoteSlot from './NoteSlot.svelte'
   import ReactionPicker from './ReactionPicker.svelte'
   import RecapDialog from './RecapDialog.svelte'
   import { isValidCount } from './revealCount'
   import RoomGoneDialog from './RoomGoneDialog.svelte'
   import RoomMenu from './RoomMenu.svelte'
-  import RoomNote from './RoomNote.svelte'
-  import type { ShownNote } from './RoomNote.svelte'
   import RoomPopover from './RoomPopover.svelte'
-  import RoomTopBar from './RoomTopBar.svelte'
-  import Salon from './Salon.svelte'
+  import RoomTopBar, {
+    type TopBarActions,
+    type TopBarEditing,
+    type TopBarOverlays,
+    type TopBarSalonBadge,
+    type TopBarTimer,
+  } from './RoomTopBar.svelte'
+  import Salon, {
+    type SalonActions,
+    type SalonChat,
+    type SalonProgress,
+    type SalonRoster,
+  } from './Salon.svelte'
   import StatusRegion from './StatusRegion.svelte'
+  import VoteBanner from './VoteBanner.svelte'
   import { announce, takeAnnouncing } from './announce'
   import { t } from './i18n'
+  import {
+    isSalonOpen as isSalonOpenIn,
+    isScrimShown as isScrimShownIn,
+    overlaysAfter,
+    type OverlayAction,
+    type OverlayState,
+  } from './roomOverlays'
   import { fetchAccountStatus, linkRoom, type AccountStatus } from './account'
   import { preloadGridFonts } from './fontPreload'
-  import { nameOf, streamEntries } from './activityFeed'
+  import { streamEntries } from './activityFeed'
   import {
     AUTHORS_VIEW_KEY,
-    MIN_GRID_VIEWPORT_PX,
     colourByPlayer,
     legendNames,
     legendRoom,
@@ -77,42 +95,50 @@
   } from './roomRecord'
   import { readItem, removeItem, writeItem } from './storage'
   import { readTimerHidden, writeTimerHidden } from './timer'
-  import { VOTE_TICK_MS, voteCountdown } from './voteCountdown'
-  import { LOW_WINDOW_PX, isWideWindow } from './windowForm'
+  import { LOW_WINDOW_PX } from './windowForm'
   import type {
     LetterCellView,
-    PendingEdit,
     ReactionValue,
     RoomStatus,
     Snapshot,
-    VoteClock,
-    VoteView,
   } from './roomSession'
   import {
-    CONNECT_LIMIT_MS,
-    EDIT_SEND_INTERVAL_MS,
     FLASH_MS,
-    PING_INTERVAL_MS,
     REACTION_MS,
-    SILENCE_LIMIT_MS,
-    addPendingEdit,
     endFlash,
     endReaction,
     gridLabel,
     isEndedStatus,
-    isFinalClose,
     latestPendingEdits,
     letterCellIndex,
     newSession,
-    receiveFrame,
-    reconnectDelay,
     shownCell,
     shownCellWith,
     shownGrid,
-    statusAfterFinalClose,
-    statusAfterLoss,
   } from './roomSession'
-  import { fittedGridBox } from './gridLayout'
+  import {
+    clueBarWidthOf,
+    columnGridBoxFor,
+    layoutOf,
+    legendPlacement,
+    type Box,
+  } from './playFit'
+  import { trackExpiries } from './expiry'
+  import {
+    createRoomConnection,
+    type ConnectionHooks,
+    type RoomConnection,
+  } from './roomConnection'
+  import {
+    checkMessage,
+    clueTarget,
+    flagMessage,
+    reactMessage,
+    revealMessage,
+    selectCellMessage,
+    voteMessage,
+    type EditKind,
+  } from './roomCommands'
   import {
     computeWords,
     positionKey,
@@ -135,10 +161,6 @@
   // (spec 044).
   const KEYBOARD_HIDDEN_KEY = 'nock.keyboard_hidden'
   const KEYBOARD_HIDDEN_VALUE = 'true'
-  // The column layout's play area: its padding, and the smallest width of the
-  // clue bar when the play area has that much room (spec 043, Decision 12).
-  const PLAY_AREA_PADDING_PX = 12
-  const CLUE_BAR_MIN_PX = 320
 
   let { code }: { code: string } = $props()
 
@@ -154,7 +176,10 @@
   let nicknameText = $state(readNickname() ?? '')
   let formError: 'length' | 'characters' | null = $state(null)
   let formJoinNickname: string | null = $state(null)
-  let socket: WebSocket | null = null
+  // The socket, the heartbeat, the retries and what waits to be sent live in
+  // roomConnection.ts. The page makes its connection when it opens (the effect
+  // at the end of this script).
+  let connection: RoomConnection | null = null
   let gridViewport: GridViewport | undefined = $state()
   // The in-app keyboard is for touch screens: the main pointer is coarse.
   const isTouchScreen = window.matchMedia('(pointer: coarse)').matches
@@ -198,7 +223,8 @@
   let windowWidth = $state(window.innerWidth)
   let windowHeight = $state(window.innerHeight)
 
-  // A low window: at most 500 px high, a phone on its side.
+  // A low window: at most 500 px high, a phone on its side. The layout is
+  // "column" or "sheet" (playFit.ts).
   let isLowWindow = $derived(windowHeight <= LOW_WINDOW_PX)
   let layout = $derived(layoutOf(windowWidth, windowHeight, isKeyboardShown))
   // The phone top bar is the sheet layout's, and the column layout's on a low
@@ -207,25 +233,8 @@
     layout === 'sheet' || isLowWindow ? 'phone' : 'computer',
   )
 
-  // The two layouts of the room (spec 043, spec 044, "Which layout"): "column"
-  // for a wide window, or for a landscape window at most LOW_WINDOW_PX high on
-  // which the in-app keyboard does not show; "sheet" otherwise.
-  function layoutOf(width: number, height: number, isKeyboardOn: boolean): 'sheet' | 'column' {
-    const isLandscape = width > height
-    if (!isLandscape) {
-      return 'sheet'
-    }
-    const isLowWithoutKeyboard = height <= LOW_WINDOW_PX && !isKeyboardOn
-    if (isWideWindow(width, height) || isLowWithoutKeyboard) {
-      return 'column'
-    }
-    return 'sheet'
-  }
-
   // ---- The popovers, the Salon and the scrim (spec 043) ----
 
-  // The open popover: the Aide menu, the Menu, or none.
-  let openPopover: 'aide' | 'menu' | null = $state(null)
   let aideButton: HTMLButtonElement | null = $state(null)
   let menuButton: HTMLButtonElement | null = $state(null)
   let chatToggle: HTMLButtonElement | null = $state(null)
@@ -234,17 +243,31 @@
   let salon: Salon | undefined = $state()
   let salonElement: HTMLElement | null = $state(null)
 
-  // The Salon is closed at load in the sheet layout; in the column layout it
-  // is open unless the player closed it in this browser.
-  let isSheetSalonOpen = $state(false)
-  let isColumnSalonOpen = $state(readItem(SALON_CLOSED_KEY) !== SALON_CLOSED_VALUE)
-  let isSalonOpen = $derived(layout === 'sheet' ? isSheetSalonOpen : isColumnSalonOpen)
+  // What is open over the room: the Aide menu or the Menu, the Salon, the
+  // reaction picker (roomOverlays.ts holds the one-overlay rule). The Salon is
+  // closed at load in the sheet layout; in the column layout it is open unless
+  // the player closed it in this browser.
+  let overlays: OverlayState = $state.raw({
+    popover: null,
+    isSheetSalonOpen: false,
+    isColumnSalonOpen: readItem(SALON_CLOSED_KEY) !== SALON_CLOSED_VALUE,
+    isPickerOpen: false,
+  })
+  let openPopover = $derived(overlays.popover)
+  let isPickerOpen = $derived(overlays.isPickerOpen)
+  let isSalonOpen = $derived(isSalonOpenIn(overlays, layout))
   let salonTab: 'discussion' | 'players' = $state('discussion')
   // The stream is read while it shows: the Salon open on its Discussion tab.
   let isStreamShown = $derived(isSalonOpen && salonTab === 'discussion')
   // The scrim covers the page under the top bar while a popover or the Salon
   // sheet is open (sheet layout only).
-  let isScrimShown = $derived(layout === 'sheet' && (openPopover !== null || isSalonOpen))
+  let isScrimShown = $derived(isScrimShownIn(overlays, layout))
+
+  // Apply an action to what is open. The page's state is not a dependency of
+  // the effect or the handler that dispatches.
+  function dispatchOverlay(action: OverlayAction): void {
+    overlays = overlaysAfter(untrack(() => overlays), action, untrack(() => layout))
+  }
 
   // A change of layout closes the popovers and the reaction picker; the Salon
   // takes the state it has in the new layout (the sheet starts closed).
@@ -255,29 +278,19 @@
       return
     }
     lastLayout = current
-    openPopover = null
-    isPickerOpen = false
-    isSheetSalonOpen = false
+    dispatchOverlay({ kind: 'layoutChanged' })
   })
 
   // Open or close a popover. In the sheet layout one overlay shows at a time;
   // in the column layout the Salon column stays as it is.
   function togglePopover(popover: 'aide' | 'menu'): void {
-    if (openPopover === popover) {
-      openPopover = null
-      return
-    }
-    openPopover = popover
-    isPickerOpen = false
-    if (layout === 'sheet') {
-      isSheetSalonOpen = false
-    }
+    dispatchOverlay({ kind: 'togglePopover', popover })
   }
 
   // Close the open popover and put the focus on its button.
   function closePopoverToButton(): void {
     const button = openPopover === 'aide' ? aideButton : menuButton
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     button?.focus()
   }
 
@@ -297,7 +310,7 @@
       if (popover?.contains(target) || button?.contains(target)) {
         return
       }
-      openPopover = null
+      dispatchOverlay({ kind: 'closePopover' })
     }
     window.addEventListener('pointerdown', onPointerDown, true)
     return () => window.removeEventListener('pointerdown', onPointerDown, true)
@@ -306,8 +319,7 @@
   // A tap or a click on the scrim closes what it lies under; the focus does
   // not move.
   function closeOverlays(): void {
-    openPopover = null
-    isSheetSalonOpen = false
+    dispatchOverlay({ kind: 'scrim' })
   }
 
   // True while a Tab is moving the focus: from its key press to its first focus
@@ -343,12 +355,11 @@
     // This focus is the one the Tab moved: a later one is the page's.
     isTabMovingFocus = false
     const menu = openPopover === 'aide' ? aideMenu : roomMenu
-    if (openPopover !== null && menu !== null && !menu.contains(target)) {
-      openPopover = null
-    }
-    if (isSheetSalonOpen && salonElement !== null && !salonElement.contains(target)) {
-      isSheetSalonOpen = false
-    }
+    dispatchOverlay({
+      kind: 'tabLeft',
+      leftMenu: menu !== null && !menu.contains(target),
+      leftSalon: salonElement !== null && !salonElement.contains(target),
+    })
   }
 
   $effect(() => {
@@ -375,20 +386,14 @@
   // Open or close the Salon of the current layout. The column remembers a
   // close in this browser; in the sheet layout one overlay shows at a time.
   function setSalonOpen(isOpen: boolean): void {
+    dispatchOverlay({ kind: 'setSalon', isOpen })
     if (layout === 'column') {
-      isColumnSalonOpen = isOpen
       if (isOpen) {
         removeItem(SALON_CLOSED_KEY)
       } else {
         writeItem(SALON_CLOSED_KEY, SALON_CLOSED_VALUE)
       }
       refitNow()
-      return
-    }
-    isSheetSalonOpen = isOpen
-    if (isOpen) {
-      openPopover = null
-      isPickerOpen = false
     }
   }
 
@@ -396,7 +401,7 @@
   // column stays open.
   function onSalonEscape(): void {
     if (layout === 'sheet') {
-      isSheetSalonOpen = false
+      dispatchOverlay({ kind: 'setSalon', isOpen: false })
     }
     chatToggle?.focus()
   }
@@ -469,7 +474,9 @@
       (session.status === 'connecting' && isFormKept),
   )
   // A nickname refused by the server is shown as a characters error.
-  let shownError = $derived(formError ?? (session.nicknameRefused ? 'characters' : null))
+  let shownError: 'length' | 'characters' | null = $derived(
+    formError ?? (session.nicknameRefused ? 'characters' : null),
+  )
 
   // ---- The status region (client/hud.md rules 17 and 18) ----
 
@@ -525,66 +532,30 @@
 
   // Each flash ends FLASH_MS after it started. A flash that a newer one replaced
   // is no longer in the list, so its timer finds nothing to end.
-  const scheduledFlashes = new Set<number>()
-  const flashTimers = new Set<ReturnType<typeof setTimeout>>()
+  const flashExpiries = trackExpiries(FLASH_MS, (id) => endFlash(session, id))
   $effect(() => {
-    for (const flash of session.flashes) {
-      if (scheduledFlashes.has(flash.id)) {
-        continue
-      }
-      scheduledFlashes.add(flash.id)
-      const timer = setTimeout(() => {
-        flashTimers.delete(timer)
-        scheduledFlashes.delete(flash.id)
-        endFlash(session, flash.id)
-      }, FLASH_MS)
-      flashTimers.add(timer)
-    }
+    flashExpiries.schedule(session.flashes)
   })
 
   // Leaving the page must not leave the flash timers to fire on a destroyed page.
   // This is a separate effect: the one above re-runs with each new flash, and its
   // cleanup would cancel the timers of the flashes still showing.
   $effect(() => {
-    return () => {
-      for (const timer of flashTimers) {
-        clearTimeout(timer)
-      }
-      flashTimers.clear()
-      scheduledFlashes.clear()
-    }
+    return () => flashExpiries.dispose()
   })
 
   // Each cell highlighted by a catch-up goes back to normal CATCH_UP_HIGHLIGHT_MS
   // after its highlight started (spec 034). A cell highlighted again has a new
   // id, so the timer of its old highlight finds nothing to end.
-  const scheduledCaughtUp = new Set<number>()
-  const caughtUpTimers = new Set<ReturnType<typeof setTimeout>>()
+  const caughtUpExpiries = trackExpiries(CATCH_UP_HIGHLIGHT_MS, (id) => endCaughtUp(session, id))
   $effect(() => {
-    for (const cell of session.caughtUpCells) {
-      if (scheduledCaughtUp.has(cell.id)) {
-        continue
-      }
-      scheduledCaughtUp.add(cell.id)
-      const timer = setTimeout(() => {
-        caughtUpTimers.delete(timer)
-        scheduledCaughtUp.delete(cell.id)
-        endCaughtUp(session, cell.id)
-      }, CATCH_UP_HIGHLIGHT_MS)
-      caughtUpTimers.add(timer)
-    }
+    caughtUpExpiries.schedule(session.caughtUpCells)
   })
 
   // Leaving the page must not leave the highlight timers to fire on a destroyed
   // page (a separate effect, as for the flashes).
   $effect(() => {
-    return () => {
-      for (const timer of caughtUpTimers) {
-        clearTimeout(timer)
-      }
-      caughtUpTimers.clear()
-      scheduledCaughtUp.clear()
-    }
+    return () => caughtUpExpiries.dispose()
   })
 
   // ---- Catching up after an absence (spec 034) ----
@@ -648,11 +619,17 @@
   // Returns whether it went out: a socket that is no longer open, even before
   // the page has seen its close, drops what it is given.
   function send(message: object): boolean {
-    if (socket === null || socket.readyState !== WebSocket.OPEN) {
+    if (connection === null) {
       return false
     }
-    socket.send(JSON.stringify(message))
-    return true
+    return connection.send(message)
+  }
+
+  // Send an undo, a check or a reveal after the edits pending when it is made:
+  // kept while the page is not joined, queued behind a running resend, else sent
+  // at once.
+  function sendRequest(message: object): void {
+    connection?.request(message)
   }
 
   // True while the page is joined: a socket with its snapshot (« Réagir », « Je
@@ -684,7 +661,9 @@
     session.snapshot !== null &&
       session.snapshot.grid.cells.every((cell) => cell.type !== 'letter' || cell.letter !== null),
   )
-  let gridStatus = $derived(session.solved ? 'solved' : isGridFull ? 'full_wrong' : null)
+  let gridStatus: 'solved' | 'full_wrong' | null = $derived(
+    session.solved ? 'solved' : isGridFull ? 'full_wrong' : null,
+  )
   let gridStatusText = $derived(
     gridStatus === 'solved'
       ? t('completion.solved')
@@ -790,8 +769,7 @@
     formError = null
     session.nicknameRefused = false
     formJoinNickname = check.nickname
-    session.status = 'joining'
-    send({ type: 'join', nickname: check.nickname, resume_token: null })
+    connection?.join(check.nickname)
   }
 
   // The identity of the last snapshot, held in memory: the next join uses it
@@ -830,17 +808,6 @@
     writeRoomSelection(code, next)
     if (cellChanged) {
       send(selectCellMessage(next))
-    }
-  }
-
-  // The select_cell of a selection: the server only knows the cell and the
-  // direction, not the chosen word.
-  function selectCellMessage(selected: Selection): object {
-    return {
-      type: 'select_cell',
-      row: selected.row,
-      column: selected.column,
-      direction: selected.direction,
     }
   }
 
@@ -926,36 +893,15 @@
     isPencilMode = !isPencilMode
   }
 
-  // The message of an edit by its kind: edit_letter or erase for 'edit',
-  // pencil_edit for 'pencil', confirm_pencil for 'confirm'.
-  function editMessage(
-    edit: Pick<PendingEdit, 'row' | 'column' | 'letter' | 'kind'>,
-    baseSeq: number | null,
-  ): object {
-    const { row, column, letter } = edit
-    if (edit.kind === 'confirm') {
-      return { type: 'confirm_pencil', row, column, base_seq: baseSeq }
-    }
-    if (edit.kind === 'pencil') {
-      return { type: 'pencil_edit', row, column, letter, base_seq: baseSeq }
-    }
-    if (letter === null) {
-      return { type: 'erase', row, column, base_seq: baseSeq }
-    }
-    return { type: 'edit_letter', row, column, letter, base_seq: baseSeq }
-  }
-
   // Show an edit of a cell at once, keep it pending until the server answers,
   // and send it with `baseSeq`.
   function startEdit(
     cell: LetterCellView,
     letter: string | null,
-    kind: PendingEdit['kind'],
+    kind: EditKind,
     baseSeq: number | null,
   ): void {
-    addPendingEdit(session, cell.row, cell.column, letter, kind)
-    editsMade += 1
-    sendEdit(editMessage({ row: cell.row, column: cell.column, letter, kind }, baseSeq))
+    connection?.edit(cell, letter, kind, baseSeq)
   }
 
   // The confirm control shows while the selected cell shows a pencil letter
@@ -1055,7 +1001,7 @@
     if (isCheckDisabled) {
       return
     }
-    sendRequest({ type: 'check', target })
+    sendRequest(checkMessage(target))
   }
 
   function onCheckLetter(): void {
@@ -1066,12 +1012,7 @@
 
   function onCheckWord(): void {
     if (activeWord !== null) {
-      onCheck({
-        scope: 'word',
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      })
+      onCheck({ scope: 'word', ...clueTarget(activeWord) })
     }
   }
 
@@ -1115,10 +1056,9 @@
     if (isRevealLetterDisabled || selection === null) {
       return
     }
-    sendRequest({
-      type: 'reveal',
-      target: { scope: 'letter', row: selection.row, column: selection.column },
-    })
+    sendRequest(
+      revealMessage({ scope: 'letter', row: selection.row, column: selection.column }),
+    )
   }
 
   // Ask the server to reveal the selected word.
@@ -1126,15 +1066,7 @@
     if (isRevealWordDisabled || activeWord === null) {
       return
     }
-    sendRequest({
-      type: 'reveal',
-      target: {
-        scope: 'word',
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      },
-    })
+    sendRequest(revealMessage({ scope: 'word', ...clueTarget(activeWord) }))
   }
 
   // ---- The clue flag (spec 021) ----
@@ -1169,17 +1101,10 @@
       return
     }
     if (isFlagPressed) {
-      send({ type: 'flag', clue: null })
+      send(flagMessage(null))
       return
     }
-    send({
-      type: 'flag',
-      clue: {
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      },
-    })
+    send(flagMessage(clueTarget(activeWord)))
   }
 
   // ---- Chat and reactions (spec 022) ----
@@ -1246,13 +1171,18 @@
     isRoomLinked = true
     void linkRoom({ code, resume_token: session.snapshot.resume_token })
   })
-  let recapOpenButton: HTMLButtonElement | null = $state(null)
+  // The completion status on the page, in the clue bar's row or as the band.
+  let gridStatusView: GridStatus | undefined = $state()
+
+  function openRecap(): void {
+    isRecapOpen = true
+  }
 
   // Escape or the close button closed the dialog: the focus goes back to the
   // button that opens it.
   function closeRecap(): void {
     isRecapOpen = false
-    recapOpenButton?.focus()
+    gridStatusView?.focusRecapButton()
   }
 
   // ---- The stream and its unread messages (specs 013, 022, 043) ----
@@ -1322,7 +1252,6 @@
 
   // ---- The reaction button and picker ----
 
-  let isPickerOpen = $state(false)
   let reactButton: HTMLButtonElement | null = $state(null)
 
   // In the sheet layout one overlay shows at a time; in the column layout the
@@ -1332,21 +1261,17 @@
       closeReactionPicker()
       return
     }
-    isPickerOpen = true
-    openPopover = null
-    if (layout === 'sheet') {
-      isSheetSalonOpen = false
-    }
+    dispatchOverlay({ kind: 'togglePicker' })
   }
 
   function closeReactionPicker(): void {
-    isPickerOpen = false
+    dispatchOverlay({ kind: 'closePicker' })
     reactButton?.focus()
   }
 
   // Close the picker and leave the focus where it is.
   function dismissReactionPicker(): void {
-    isPickerOpen = false
+    dispatchOverlay({ kind: 'closePicker' })
   }
 
   // React on the selected word's clue. Only a reaction that went out counts for
@@ -1355,15 +1280,7 @@
     if (activeWord === null || isReactDisabled || isReactionPaced) {
       return
     }
-    const wentOut = send({
-      type: 'react',
-      clue: {
-        row: activeWord.clueRow,
-        column: activeWord.clueColumn,
-        clue_index: activeWord.clueIndex,
-      },
-      reaction,
-    })
+    const wentOut = send(reactMessage(activeWord, reaction))
     if (!wentOut) {
       return
     }
@@ -1375,33 +1292,15 @@
   // it arrived; one that a newer reaction replaced is no longer in the list, so
   // its timer finds nothing to end.
   let clueReactions = $derived(clueReactionMarkers(session.reactions, session.names))
-  const scheduledReactions = new Set<number>()
-  const reactionTimers = new Set<ReturnType<typeof setTimeout>>()
+  const reactionExpiries = trackExpiries(REACTION_MS, (id) => endReaction(session, id))
   $effect(() => {
-    for (const shown of session.reactions) {
-      if (scheduledReactions.has(shown.id)) {
-        continue
-      }
-      scheduledReactions.add(shown.id)
-      const timer = setTimeout(() => {
-        reactionTimers.delete(timer)
-        scheduledReactions.delete(shown.id)
-        endReaction(session, shown.id)
-      }, REACTION_MS)
-      reactionTimers.add(timer)
-    }
+    reactionExpiries.schedule(session.reactions)
   })
 
   // A separate effect, as for the flashes: the one above re-runs with each new
   // reaction, and its cleanup would cancel the timers of those still showing.
   $effect(() => {
-    return () => {
-      for (const timer of reactionTimers) {
-        clearTimeout(timer)
-      }
-      reactionTimers.clear()
-      scheduledReactions.clear()
-    }
+    return () => reactionExpiries.dispose()
   })
 
   // ---- Votes (spec 025) ----
@@ -1416,211 +1315,23 @@
   let isReactDisabled = $derived(
     !isJoined || activeWord === null || isMuted || isVoteBannerShown,
   )
-  let isMyRequest = $derived(
-    openVote !== null && session.snapshot !== null && openVote.player_id === session.snapshot.you,
-  )
-  let hasVoted = $derived(openVote !== null && session.votedIds.includes(openVote.vote_id))
-  let voteQuestionText = $derived(openVote === null ? '' : voteQuestion(openVote))
-  let voteResultText = $derived(
-    session.lastVoteOutcome === null ? '' : t(`vote.result.${session.lastVoteOutcome}`),
-  )
-  // What a screen reader hears: the question when a vote opens, the result
-  // when it closes.
-  let voteAnnouncement = $derived(openVote !== null ? voteQuestionText : voteResultText)
 
-  // ---- The countdown of the open vote (spec 047) ----
-
-  // The countdown of the open vote when this page saw it open, else null: a
-  // vote known only from a snapshot shows no seconds and no bar.
-  let voteClock = $derived(openVote === null ? null : clockOfVote(openVote))
-  // The page's clock (performance.now()), read again every VOTE_TICK_MS while
-  // the banner counts.
-  let voteNowMs = $state(0)
-  let countdown = $derived(voteClock === null ? null : voteCountdown(voteClock, voteNowMs))
-
-  $effect(() => {
-    if (voteClock === null || !isVoteBannerShown) {
-      return
-    }
-    voteNowMs = performance.now()
-    const ticker = setInterval(() => {
-      voteNowMs = performance.now()
-    }, VOTE_TICK_MS)
-    return () => clearInterval(ticker)
-  })
-
-  // The countdown the session keeps for `vote`, or null when it keeps none for
-  // that vote.
-  function clockOfVote(vote: VoteView): VoteClock | null {
-    const clock = session.voteClock
-    if (clock === null || clock.vote_id !== vote.vote_id) {
-      return null
-    }
-    return clock
-  }
-
-  // The question of a vote, with the requester's nickname (spec 013's known
-  // names). The page inserts it as text.
-  function voteQuestion(vote: VoteView): string {
-    return t(`vote.question.${vote.kind}`, { name: nameOf(session.names, vote.player_id) })
-  }
-
-  // The ballot buttons are disabled while the page is not joined: a ballot sent
-  // then would be dropped while the page showed it as cast (decision 18).
-  let isVotingOffline = $derived(!isJoined)
-
-  // Send my ballot on the open vote, once, then give the focus to the status
-  // that replaces the buttons, so it never falls back to the page (decision 19).
-  function castVote(yes: boolean): void {
-    if (openVote === null || isVotingOffline || session.votedIds.includes(openVote.vote_id)) {
-      return
-    }
-    send({ type: 'vote', vote_id: openVote.vote_id, yes })
-    session.votedIds.push(openVote.vote_id)
-    void focusVoteStatus()
-  }
-
-  // `tick` resolves once the DOM shows `vote-status` instead of the buttons.
-  async function focusVoteStatus(): Promise<void> {
-    await tick()
-    voteStatus?.focus()
-  }
-
-  // ---- Focus when the banner changes (decision 19) ----
-
-  let voteBanner: HTMLElement | null = $state(null)
-  // The banner's height, with its border: a note that shows while the banner
-  // is on the page sits under it (spec 043, Decision 25).
+  // The vote banner's height, with its border: a note that shows while the
+  // banner is on the page sits under it (spec 043, Decision 25).
   let voteBannerHeight = $state(0)
-  let voteStatus: HTMLElement | null = $state(null)
 
-  // What the banner holds: nothing, or the question of one vote.
-  let bannerContent = $derived(
-    !isVoteBannerShown || openVote === null ? 'none' : `vote-${openVote.vote_id}`,
-  )
-  let lastBannerContent = 'none'
-
-  // Runs before the page changes the banner: when the focus is inside it, the
-  // vote closed or the banner leaves, and the focus goes to the grid instead of
-  // falling back to the page.
-  $effect.pre(() => {
-    const content = bannerContent
-    if (content === lastBannerContent) {
-      return
-    }
-    lastBannerContent = content
-    const focused = document.activeElement
-    if (voteBanner !== null && focused !== null && voteBanner.contains(focused)) {
-      void focusGridAfterUpdate()
-    }
-  })
-
-  // Runs before the ballot buttons are disabled by a lost connection: a focus on
-  // one goes to the grid instead of falling back to the page, as the chat does
-  // for a mute (gameplay/votes.md rule 6).
-  $effect.pre(() => {
-    if (!isVotingOffline) {
-      return
-    }
-    const focused = document.activeElement
-    // The banner's only buttons are « Oui » and « Non »: the status line that
-    // replaces them after a ballot is not a button and keeps the focus.
-    const isOnBallotButton =
-      focused instanceof HTMLButtonElement && voteBanner !== null && voteBanner.contains(focused)
-    if (isOnBallotButton) {
-      gridViewport?.focusGrid()
-    }
-  })
-
-  async function focusGridAfterUpdate(): Promise<void> {
-    await tick()
-    gridViewport?.focusGrid()
+  // Send my ballot on the open vote and remember it was cast: the banner then
+  // shows the line that replaces the buttons.
+  function castVote(voteId: number, yes: boolean): void {
+    send(voteMessage(voteId, yes))
+    session.votedIds.push(voteId)
   }
 
   // ---- The 3-second notes (spec 043) ----
 
-  // The note over the grid, one at a time, and the newest note of the room
-  // that waits for the vote banner to go.
-  let shownNote: ShownNote | null = $state(null)
-  let waitingNote: ShownNote | null = $state(null)
-  // Each shown note gets its own id, so a newer one replaces the older at once.
-  let nextShownNoteId = 1
-  let handledRoomNoteId = 0
-  let shownUndoRefusals = 0
-
-  function newShownNote(isUndo: boolean, kind: string | null, text: string): ShownNote {
-    const note = { id: nextShownNoteId, isUndo, kind, text }
-    nextShownNoteId += 1
-    return note
-  }
-
-  // The notes of the room, in one place so that the newest always wins. A new
-  // note: none while the stream shows; while the vote banner is on the page it
-  // waits, replacing any older waiting note; otherwise it shows, and a note
-  // that waited is dropped (the result of a vote, made once the banner has
-  // left, replaces the notes that waited during it, spec 047). With no new
-  // note, once the banner has gone, the note that waited shows, unless the
-  // stream shows by then: the player reads the same line there.
-  $effect(() => {
-    const latest = session.latestNote
-    const isBannerShown = isVoteBannerShown
-    if (latest !== null && latest.id !== handledRoomNoteId) {
-      handledRoomNoteId = latest.id
-      receiveRoomNote(latest.kind, latest.text, isBannerShown)
-      return
-    }
-    if (!isBannerShown) {
-      showWaitingNote()
-    }
-  })
-
-  function receiveRoomNote(kind: string | null, text: string, isBannerShown: boolean): void {
-    if (untrack(() => isStreamShown)) {
-      waitingNote = null
-      return
-    }
-    const note = newShownNote(false, kind, text)
-    if (isBannerShown) {
-      waitingNote = note
-      return
-    }
-    waitingNote = null
-    shownNote = note
-  }
-
-  function showWaitingNote(): void {
-    const note = untrack(() => waitingNote)
-    if (note === null) {
-      return
-    }
-    waitingNote = null
-    if (!untrack(() => isStreamShown)) {
-      shownNote = note
-    }
-  }
-
-  // "Nothing to undo" (spec 018) has the note's look and place: it replaces
-  // any shown note, and shows whatever else shows.
-  $effect(() => {
-    if (session.undoRefusals === shownUndoRefusals) {
-      return
-    }
-    shownUndoRefusals = session.undoRefusals
-    shownNote = newShownNote(true, null, t('undo.nothing'))
-    announce(t('undo.nothing'))
-  })
-
-  // A note leaves once it has faded, unless a newer one replaced it.
-  function onNoteGone(noteId: number): void {
-    if (shownNote !== null && shownNote.id === noteId) {
-      shownNote = null
-    }
-  }
-
   // A tap or a click on a note opens the Salon on its Discussion tab, as
-  // « Salon » does, and removes the note.
+  // « Salon » does (the note slot removes the note first).
   function openSalonFromNote(): void {
-    shownNote = null
     salonTab = 'discussion'
     setSalonOpen(true)
     void salon?.focusInside()
@@ -1652,7 +1363,7 @@
   // sends its message.
   function aideAction(action: () => void): () => void {
     return () => {
-      openPopover = null
+      dispatchOverlay({ kind: 'closePopover' })
       aideButton?.focus()
       action()
     }
@@ -1662,26 +1373,26 @@
 
   // « Inviter »: the Salon on its Joueurs tab, the focus on « Copier le lien ».
   function invite(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     salonTab = 'players'
     setSalonOpen(true)
     void salon?.focusCopyLink()
   }
 
   function openHostSettings(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     copyRoomSettingsToForm()
     hostSettings?.open()
   }
 
   function openAccount(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     accountDialog?.open()
   }
 
   // « Masquer le chrono » or « Afficher le chrono »: sends nothing.
   function toggleTimerFromMenu(): void {
-    openPopover = null
+    dispatchOverlay({ kind: 'closePopover' })
     setTimerShown(!isTimerShown)
     menuButton?.focus()
   }
@@ -1744,10 +1455,64 @@
     return clues
   }
 
-  // ---- The play area (spec 043, "Play area and fit") ----
+  // ---- What the top bar and the Salon are given ----
 
-  // The clue bar's height (specs/_design/room.md « Clue bar »).
-  const CLUE_BAR_HEIGHT_PX = 34
+  // Each group is a derived object: it is made again only when one of its
+  // values changes, so the top bar and the Salon do not work out again what
+  // depends on it at every change of the page. The actions never change.
+  let topBarTimer: TopBarTimer = $derived({
+    isShown: isTimerShown,
+    baseMs: session.timerBaseMs,
+    isRunning: session.timerRunning,
+    anchor: session.timerAnchor,
+  })
+  let topBarEditing: TopBarEditing = $derived({
+    isSolved: session.solved,
+    isReadOnly,
+    isPencilMode,
+    isTouchScreen,
+    isKeyboardShown,
+  })
+  let topBarOverlays: TopBarOverlays = $derived({
+    isAideOpen: openPopover === 'aide',
+    isMenuOpen: openPopover === 'menu',
+    isSalonOpen,
+  })
+  let salonBadge: TopBarSalonBadge = $derived({ unreadLines, hasNewEvents, label: salonLabel })
+  const topBarActions: TopBarActions = {
+    onShowTimer: () => setTimerShown(true),
+    onUndo,
+    onTogglePencil: togglePencilMode,
+    onToggleKeyboard: toggleKeyboard,
+    onToggleAide: () => togglePopover('aide'),
+    onToggleSalon: toggleSalon,
+    onToggleMenu: () => togglePopover('menu'),
+  }
+
+  let salonProgress: SalonProgress = $derived({ filledWords, totalWords: words.length })
+  let salonChat: SalonChat = $derived({
+    entries: stream,
+    names: session.names,
+    colours: playerColours,
+    isMuted,
+    isPaced: isChatPaced,
+    isJoined,
+  })
+  let salonRoster: SalonRoster = $derived({
+    players: session.snapshot === null ? [] : session.snapshot.players,
+    isHost,
+    clues: rosterClues,
+    shareLink,
+  })
+  const salonActions: SalonActions = {
+    onSend: sendChat,
+    onMute: toggleMute,
+    onRemove: removePlayer,
+    onEscape: onSalonEscape,
+    onMuted: () => chatToggle?.focus(),
+  }
+
+  // ---- The play area (spec 043, "Play area and fit") ----
 
   // The block of the grid, the clue bar and the status, as large as the play
   // area leaves; and the height of the status band under the bar.
@@ -1793,23 +1558,28 @@
   // The room the legend needs under the grid: 38 px, or its height and its gap
   // when it wraps.
   let wantedLegendRoom = $derived(legendRoom(authorsLegendHeight))
-  // True while the mode is on and that room would leave the viewport less than
-  // 100 px high: the legend then lies over the viewport's bottom and the grid
+  // While the mode is on, the legend lies over the viewport's bottom when its
+  // room would leave the viewport less than 100 px high, and the grid then
   // gives it no room (decision 8). The legend's height does not depend on the
   // grid's size, so the two places do not alternate.
-  let isLegendOverGrid = $derived(
-    isAuthorsViewOn && viewportHeightWithLegendRoom() < MIN_GRID_VIEWPORT_PX,
+  let legend = $derived(
+    legendPlacement({
+      isAuthorsViewOn,
+      wantedLegendRoom,
+      viewportHeightWithRoom: viewportHeightWithLegendRoom(),
+    }),
   )
+  let isLegendOverGrid = $derived(legend.isOverGrid)
   // The room the grid gives the legend: none while the mode is off or while
   // the legend lies over the grid.
-  let authorsLegendRoom = $derived(isAuthorsViewOn && !isLegendOverGrid ? wantedLegendRoom : 0)
+  let authorsLegendRoom = $derived(legend.legendRoom)
 
   // The viewport's height if the grid gave the legend its room: in the sheet
   // layout its height with the mode off less the room; in the column layout
   // the height of the grid's box fitted to the height left less the room.
   function viewportHeightWithLegendRoom(): number {
     if (layout === 'column') {
-      const box = columnGridBoxFor(wantedLegendRoom)
+      const box = columnGridBoxWith(wantedLegendRoom)
       return box === null ? 0 : box.height
     }
     const heightWithModeOff = gridAreaContent === undefined ? 0 : gridAreaContent.height
@@ -1820,37 +1590,27 @@
   // as the room left after the clue bar, the status and, while the Auteurs mode
   // is on, the legend's room (spec 045); null in the sheet layout, where the
   // viewport fills its area.
-  let columnGridBox = $derived(columnGridBoxFor(authorsLegendRoom))
+  let columnGridBox = $derived(columnGridBoxWith(authorsLegendRoom))
   // The grid's box with no legend under it: the clue bar keeps its width when
   // the Auteurs mode turns on (spec 045, "The grid's room").
-  let columnGridBoxWithoutLegend = $derived(columnGridBoxFor(0))
+  let columnGridBoxWithoutLegend = $derived(columnGridBoxWith(0))
   // The clue bar is as wide as the grid with no legend, but never narrower than
-  // the smaller of CLUE_BAR_MIN_PX and the play area (Decision 12); the full
-  // width in the sheet layout.
-  let clueBarWidth = $derived(
-    columnGridBoxWithoutLegend === null
-      ? null
-      : Math.max(columnGridBoxWithoutLegend.width, Math.min(CLUE_BAR_MIN_PX, playBlockWidth)),
-  )
+  // the smaller of 320 px and the play area (Decision 12); the full width in
+  // the sheet layout.
+  let clueBarWidth = $derived(clueBarWidthOf(columnGridBoxWithoutLegend, playBlockWidth))
 
   // The grid's box in the column layout when `legendRoomPx` is taken from the
   // height left for it; null in the sheet layout.
-  function columnGridBoxFor(legendRoomPx: number): { width: number; height: number } | null {
-    if (layout !== 'column' || session.snapshot === null) {
-      return null
-    }
-    const heightLeft =
-      playBlockHeight -
-      PLAY_AREA_PADDING_PX -
-      CLUE_BAR_HEIGHT_PX -
-      (isStatusUnderClueBar ? statusBandHeight : 0) -
-      legendRoomPx
-    return fittedGridBox(
+  function columnGridBoxWith(legendRoomPx: number): Box | null {
+    return columnGridBoxFor({
+      layout,
+      grid: session.snapshot === null ? null : session.snapshot.grid,
       playBlockWidth,
-      Math.max(0, heightLeft),
-      session.snapshot.grid.width,
-      session.snapshot.grid.height,
-    )
+      playBlockHeight,
+      statusBandHeight,
+      isStatusUnderClueBar,
+      legendRoomPx,
+    })
   }
 
   function roomSocketUrl(roomCode: string): string {
@@ -1858,185 +1618,7 @@
     return `${scheme}://${location.host}/api/rooms/${roomCode}/ws`
   }
 
-  // ---- The connection: heartbeat, loss detection and reconnection (spec 017) ----
-
-  // The next delay of the reconnection is `reconnectDelay(reconnectAttempt)`.
-  let reconnectAttempt = 0
-  let pingTimer: ReturnType<typeof setInterval> | undefined
-  let silenceTimer: ReturnType<typeof setTimeout> | undefined
-  let reconnectTimer: ReturnType<typeof setTimeout> | undefined
-  // Watches the socket being opened for its connect limit.
-  let connectTimer: ReturnType<typeof setTimeout> | undefined
-  // The page clock (performance.now()) when the silence of the open socket
-  // started: its last frame, or the page's return into view.
-  let silenceStartedAt = 0
-
-  function stopHeartbeat(): void {
-    clearInterval(pingTimer)
-    clearTimeout(silenceTimer)
-    pingTimer = undefined
-    silenceTimer = undefined
-  }
-
-  function stopReconnectTimer(): void {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = undefined
-  }
-
-  function stopConnectTimer(): void {
-    clearTimeout(connectTimer)
-    connectTimer = undefined
-  }
-
-  // ---- What the page sends after a snapshot (platform/reconnection.md rules 5 and 7) ----
-
-  // An undo, a check or a reveal made while the page is not joined, kept until
-  // the next snapshot. `editsBefore` counts the edits made before it: it goes out
-  // after them and before any later edit.
-  interface KeptRequest {
-    message: object
-    editsBefore: number
-  }
-
-  // A message waiting its turn in the send queue. `request` is set for an undo,
-  // a check or a reveal, so that a loss can keep it again; an edit stays pending
-  // and is resent anyway, and a select_cell is sent again after the next snapshot.
-  interface QueuedMessage {
-    message: object
-    request: KeptRequest | null
-  }
-
-  // Until the socket has its snapshot nothing is sent: edits stay pending, and
-  // undos, checks and reveals are kept. They are then sent one every
-  // EDIT_SEND_INTERVAL_MS, oldest first, through the send queue.
-  let isSynced = false
-  let sendQueue: QueuedMessage[] = []
-  let sendTimer: ReturnType<typeof setInterval> | undefined
-  // How many edits the page has made since it opened.
-  let editsMade = 0
-  let keptRequests: KeptRequest[] = []
-
-  // Stop the send queue. The requests it still holds are kept again, before any
-  // kept since, for the next snapshot.
-  function stopSendQueue(): void {
-    clearInterval(sendTimer)
-    sendTimer = undefined
-    const stillQueued: KeptRequest[] = []
-    for (const queued of sendQueue) {
-      if (queued.request !== null) {
-        stillQueued.push(queued.request)
-      }
-    }
-    keptRequests = [...stillQueued, ...keptRequests]
-    sendQueue = []
-    isSynced = false
-  }
-
-  function sendNextQueued(): void {
-    const next = sendQueue.shift()
-    if (next === undefined) {
-      clearInterval(sendTimer)
-      sendTimer = undefined
-      return
-    }
-    send(next.message)
-  }
-
-  // Send an edit now, or behind the messages still queued. Before the snapshot of
-  // the socket nothing is sent: the edit is pending and is resent with the others.
-  function sendEdit(message: object): void {
-    if (!isSynced) {
-      return
-    }
-    if (sendTimer === undefined) {
-      send(message)
-      return
-    }
-    sendQueue.push({ message, request: null })
-  }
-
-  // Send an undo, a check or a reveal after the edits pending when it is made:
-  // kept while the page is not joined, queued behind a running resend, else sent
-  // at once.
-  function sendRequest(message: object): void {
-    const request: KeptRequest = { message, editsBefore: editsMade }
-    if (!isSynced) {
-      keptRequests.push(request)
-      return
-    }
-    if (sendTimer === undefined) {
-      send(message)
-      return
-    }
-    sendQueue.push({ message, request })
-  }
-
-  // Stop listening to a socket and close it.
-  function dropSocket(dropped: WebSocket): void {
-    if (socket === dropped) {
-      stopSendQueue()
-      stopConnectTimer()
-    }
-    dropped.onopen = null
-    dropped.onmessage = null
-    dropped.onclose = null
-    dropped.onerror = null
-    dropped.close()
-    if (socket === dropped) {
-      socket = null
-    }
-  }
-
-  // Any frame from the server shows the connection is alive: the silence starts
-  // again from now.
-  function restartSilenceTimer(opened: WebSocket): void {
-    silenceStartedAt = performance.now()
-    clearTimeout(silenceTimer)
-    silenceTimer = setTimeout(() => checkSilence(opened), SILENCE_LIMIT_MS)
-  }
-
-  // The silence is read from the clock, as the page's timers may run late:
-  // at SILENCE_LIMIT_MS of it the connection is lost at once, its socket
-  // dropped so that its late frames and close change nothing. A hidden page
-  // loses no socket to the silence: its return counts it again
-  // (platform/reconnection.md rule 3).
-  function checkSilence(opened: WebSocket): void {
-    silenceTimer = undefined
-    if (document.hidden) {
-      return
-    }
-    const silentMs = performance.now() - silenceStartedAt
-    if (silentMs >= SILENCE_LIMIT_MS) {
-      connectionLost(opened)
-      return
-    }
-    silenceTimer = setTimeout(() => checkSilence(opened), SILENCE_LIMIT_MS - silentMs)
-  }
-
-  function startHeartbeat(opened: WebSocket): void {
-    stopHeartbeat()
-    pingTimer = setInterval(() => send({ type: 'ping' }), PING_INTERVAL_MS)
-    restartSilenceTimer(opened)
-  }
-
-  // A socket still connecting CONNECT_LIMIT_MS after it was created is dropped:
-  // a loss. The time is read from the clock, so a hidden page whose timers ran
-  // late drops it at its first timer after them (platform/reconnection.md
-  // rule 6).
-  function watchConnectLimit(opened: WebSocket, createdAt: number): void {
-    const leftMs = CONNECT_LIMIT_MS - (performance.now() - createdAt)
-    connectTimer = setTimeout(() => {
-      connectTimer = undefined
-      if (opened !== socket || opened.readyState !== WebSocket.CONNECTING) {
-        return
-      }
-      if (performance.now() - createdAt >= CONNECT_LIMIT_MS) {
-        connectionLost(opened)
-        return
-      }
-      watchConnectLimit(opened, createdAt)
-    }, leftMs)
-  }
+  // ---- The connection (spec 017): the page's side ----
 
   // A loss before the first snapshot keeps the nickname form on screen when it was
   // shown, or when a join sent from it is lost (the new socket shows it again).
@@ -2048,42 +1630,34 @@
     formJoinNickname = null
   }
 
-  // The socket is lost: show it, then try again after the next delay.
-  function connectionLost(lost: WebSocket): void {
-    if (lost !== socket) {
-      return
+  // A new snapshot, before anything waiting is sent: catch up after an
+  // absence, remember who I am, and on the page's first snapshot select again
+  // what this device saved.
+  function onSnapshot(snapshot: Snapshot, isFirst: boolean): void {
+    snapshotCount += 1
+    // A return: a snapshot past the seen seq the page had when it arrived. A
+    // first visit on this device has no seen seq, so no return.
+    if (seenSeq !== null && snapshot.seq > seenSeq) {
+      void catchUpOnReturn(snapshot, seenSeq)
     }
-    stopHeartbeat()
-    dropSocket(lost)
-    keepFormAfterLoss()
-    session.status = statusAfterLoss(session)
-    const delay = reconnectDelay(reconnectAttempt)
-    reconnectAttempt += 1
-    stopReconnectTimer()
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = undefined
-      openSocket()
-    }, delay)
-  }
-
-  // The socket closed for good: no more tries, and nothing will be sent again,
-  // so what waited to be sent is dropped (client/hud.md rule 19).
-  function connectionEnded(ended: WebSocket, closeCode: number): void {
-    stopHeartbeat()
-    stopReconnectTimer()
-    dropSocket(ended)
-    session.status = statusAfterFinalClose(closeCode, session.status)
-    dropWaitingSends()
-    if (isRoomGone) {
-      leaveDeletedRoom()
+    rememberJoin(snapshot)
+    // Only the first snapshot of the page: a reconnection keeps the old
+    // snapshot until the new one arrives, so it sets no second mark.
+    if (isFirst) {
+      restoreSavedSelection(snapshot)
+      void markInteractive()
+      // The history of the first snapshot is not unread (spec 022).
+      lastSeenChatSeq = snapshot.seq
     }
   }
 
-  // Drop the letters waiting to be sent and the kept undos, checks and reveals.
-  function dropWaitingSends(): void {
-    stopSendQueue()
-    session.pendingEdits = []
-    keptRequests = []
+  // Any frame: a nickname the server refused ends the join sent from the form,
+  // and the page remembers its seq.
+  function onFrame(): void {
+    if (session.status === 'nickname') {
+      formJoinNickname = null
+    }
+    rememberSeenSeq()
   }
 
   // ---- The room gone (client/hud.md rule 16) ----
@@ -2095,165 +1669,38 @@
   // Close what is open over the room before the room-gone dialog shows. The
   // Salon column stays as it is.
   function leaveDeletedRoom(): void {
-    openPopover = null
-    isSheetSalonOpen = false
-    isPickerOpen = false
+    dispatchOverlay({ kind: 'roomGone' })
     isRecapOpen = false
     hostSettings?.close()
     accountDialog?.close()
   }
 
-  // The browser has a network again: do not wait for the next delay.
-  function onBrowserOnline(): void {
-    if (reconnectTimer !== undefined) {
-      stopReconnectTimer()
-      openSocket()
-      return
-    }
-    // A socket still connecting may never open on a dead network: replace it.
-    if (socket !== null && socket.readyState === WebSocket.CONNECTING) {
-      stopHeartbeat()
-      dropSocket(socket)
-      openSocket()
-    }
-  }
-
-  // The page came back into view (platform/reconnection.md rules 3 and 6): a
-  // try waiting on its delay goes at once; an open socket sends `ping` at once
-  // and counts its silence from now.
-  function onVisibilityChange(): void {
-    if (document.hidden) {
-      return
-    }
-    if (reconnectTimer !== undefined) {
-      stopReconnectTimer()
-      openSocket()
-      return
-    }
-    if (socket !== null && socket.readyState === WebSocket.OPEN) {
-      send({ type: 'ping' })
-      startHeartbeat(socket)
-    }
-  }
-
-  // My pending edits, each as the message of its kind and with the base_seq it
-  // had, and the kept requests, in the order they were made. The pending edits
-  // are the newest edits made: counting from 0, the first of them is edit
-  // number editsMade minus their count.
-  function pendingInOrder(): QueuedMessage[] {
-    const ordered: QueuedMessage[] = []
-    const firstEditNumber = editsMade - session.pendingEdits.length
-    let requestIndex = 0
-    session.pendingEdits.forEach((edit, index) => {
-      const editNumber = firstEditNumber + index
-      // The requests made before this edit go before it.
-      while (
-        requestIndex < keptRequests.length &&
-        keptRequests[requestIndex].editsBefore <= editNumber
-      ) {
-        const request = keptRequests[requestIndex]
-        ordered.push({ message: request.message, request })
-        requestIndex += 1
+  const connectionHooks: ConnectionHooks = {
+    joinPlan: () => planAutomaticJoin(code, t('room.default_nickname'), heldIdentity),
+    onOpen: () => {
+      isFormKept = false
+    },
+    onSnapshot,
+    onFrame,
+    onLoss: keepFormAfterLoss,
+    onEnded: () => {
+      if (isRoomGone) {
+        leaveDeletedRoom()
       }
-      ordered.push({ message: editMessage(edit, edit.baseSeq), request: null })
-    })
-    for (const request of keptRequests.slice(requestIndex)) {
-      ordered.push({ message: request.message, request })
-    }
-    return ordered
-  }
-
-  // Once the socket has its snapshot, send what waited: after a loss the
-  // selection first (the server cleared it), then the pending edits and the
-  // kept requests in order. They are paced, the first one at once, then one
-  // every EDIT_SEND_INTERVAL_MS.
-  function sendAfterSnapshot(isAfterLoss: boolean): void {
-    stopSendQueue()
-    isSynced = true
-    if (isAfterLoss && selection !== null) {
-      sendQueue.push({ message: selectCellMessage(selection), request: null })
-    }
-    sendQueue.push(...pendingInOrder())
-    keptRequests = []
-    sendTimer = setInterval(sendNextQueued, EDIT_SEND_INTERVAL_MS)
-    sendNextQueued()
-  }
-
-  // The first message of a socket: the join of the stored identity, or the form.
-  function joinOnOpen(opened: WebSocket): void {
-    const plan = planAutomaticJoin(code, t('room.default_nickname'), heldIdentity)
-    isFormKept = false
-    if (plan === null) {
-      session.status = 'nickname'
-      return
-    }
-    if (session.snapshot === null) {
-      session.status = 'joining'
-    }
-    opened.send(JSON.stringify({ type: 'join', ...plan }))
-  }
-
-  function onSocketMessage(opened: WebSocket, event: MessageEvent): void {
-    restartSilenceTimer(opened)
-    if (typeof event.data !== 'string') {
-      return
-    }
-    const snapshotBefore = session.snapshot
-    const seenSeqBefore = seenSeq
-    receiveFrame(session, event.data)
-    if (session.snapshot !== null && session.snapshot !== snapshotBefore) {
-      snapshotCount += 1
-      // A return: a snapshot past the seen seq the page had when it arrived. A
-      // first visit on this device has no seen seq, so no return.
-      if (seenSeqBefore !== null && session.snapshot.seq > seenSeqBefore) {
-        void catchUpOnReturn(session.snapshot, seenSeqBefore)
-      }
-      rememberJoin(session.snapshot)
-      // Only the first snapshot of the page: a reconnection keeps the old
-      // snapshot until the new one arrives, so it sets no second mark.
-      if (snapshotBefore === null) {
-        restoreSavedSelection(session.snapshot)
-        void markInteractive()
-        // The history of the first snapshot is not unread (spec 022).
-        lastSeenChatSeq = session.snapshot.seq
-      }
-      reconnectAttempt = 0
-      // After a loss: the first snapshot of this socket (isSynced is still
-      // false), when the page had a snapshot on an earlier socket. A second
-      // snapshot on the same socket is not one.
-      const isAfterLoss = snapshotBefore !== null && !isSynced
-      sendAfterSnapshot(isAfterLoss)
-    }
-    if (session.status === 'nickname') {
-      formJoinNickname = null
-    }
-    rememberSeenSeq()
-  }
-
-  function openSocket(): void {
-    const opened = new WebSocket(roomSocketUrl(code))
-    socket = opened
-    stopConnectTimer()
-    watchConnectLimit(opened, performance.now())
-
-    opened.onopen = () => {
-      stopConnectTimer()
-      startHeartbeat(opened)
-      joinOnOpen(opened)
-    }
-    opened.onmessage = (event: MessageEvent) => onSocketMessage(opened, event)
-    opened.onclose = (event: CloseEvent) => {
-      if (isFinalClose(session, event.code)) {
-        connectionEnded(opened, event.code)
-      } else {
-        connectionLost(opened)
-      }
-    }
+    },
+    // After a loss the server forgot the selection: it is sent first.
+    selectionMessage: () => (selection === null ? null : selectCellMessage(selection)),
   }
 
   $effect(() => {
     seenSeq = readRoomSeenSeq(code)
-    openSocket()
+    const opened = createRoomConnection(roomSocketUrl(code), session, connectionHooks)
+    connection = opened
+    opened.start()
+    // The network back, and the page back into view, do not wait for the next
+    // delay (platform/reconnection.md rules 3 and 6).
+    const onBrowserOnline = (): void => opened.onOnline()
+    const onVisibilityChange = (): void => opened.onVisible()
     window.addEventListener('online', onBrowserOnline)
     document.addEventListener('visibilitychange', onVisibilityChange)
 
@@ -2261,111 +1708,25 @@
     return () => {
       window.removeEventListener('online', onBrowserOnline)
       document.removeEventListener('visibilitychange', onVisibilityChange)
-      stopHeartbeat()
-      stopReconnectTimer()
-      stopConnectTimer()
-      if (socket !== null) {
-        dropSocket(socket)
-      }
+      opened.dispose()
     }
   })
 </script>
 
 <svelte:window bind:innerWidth={windowWidth} bind:innerHeight={windowHeight} />
 
-<!-- The completion status (spec 026, spec 043, spec 044): its text, after the
-     ✓ pictogram once solved, and « Voir le bilan » in the band of a solved grid.
-     The page shows it in one of two places, never both: see isStatusInClueBar
-     and isStatusUnderClueBar. Only the full-but-wrong status sits in the clue
-     bar's row, since a solved page has no keyboard. -->
-{#snippet gridStatusContent()}
-  <span class="grid-status-text" data-testid="grid-status-text"
-    >{#if gridStatus === 'solved'}<span class="status-check" aria-hidden="true"></span
-      >{/if}{gridStatusText}</span
-  >
-  {#if gridStatus === 'solved'}
-    <button
-      type="button"
-      class="nock-button nock-button-primary recap-open"
-      data-testid="recap-open"
-      bind:this={recapOpenButton}
-      onclick={() => (isRecapOpen = true)}>{t('recap.open')}</button
-    >
-  {/if}
-{/snippet}
-
+<!-- The completion status in the clue bar's row, which ClueBar renders. The
+     page shows it in one of two places, never both: see isStatusInClueBar and
+     isStatusUnderClueBar. -->
 {#snippet statusInRow()}
-  <p class="grid-status in-row" data-testid="grid-status" data-state={gridStatus}>
-    {@render gridStatusContent()}
-  </p>
-{/snippet}
-
-<!-- The entry pages (spec 046, "Entry pages"): the room code line, then the
-     nickname card or the card of a status that refuses entry. -->
-{#snippet entryPage()}
-  <EntryFrame>
-    <h1 class="room-code-line">{t('room.heading', { code })}</h1>
-    {#if isEntryCardShown}
-      <div class="nock-card" data-testid="entry-card">
-        <p class="nock-card-title" data-testid="room-status">
-          {t(`room.status.${session.status}`)}
-        </p>
-        {#if session.status === 'not_found'}
-          <!-- An expired room is deleted (spec 032), so it reads as one that
-               never existed: the line says why a room may be gone (P3). -->
-          <p class="nock-card-detail" data-testid="entry-detail">
-            {t('room.status.not_found_detail')}
-          </p>
-        {/if}
-        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1).
-             "Voir les grilles" is primary where it is the only way on. -->
-        <a
-          class="nock-button"
-          class:nock-button-primary={session.status === 'not_found'}
-          class:nock-button-secondary={session.status !== 'not_found'}
-          data-testid="entry-home"
-          href="/"
-          tabindex="0">{t('share.home')}</a
-        >
-      </div>
-    {:else}
-      <form class="nock-card" data-testid="nickname-form" onsubmit={submitNickname}>
-        <h2 class="nock-card-title">{t('join.heading')}</h2>
-        <div class="nock-field">
-          <label for="nickname-input">{t('join.nickname_label')}</label>
-          <input
-            id="nickname-input"
-            class="nock-text-input nickname-input"
-            data-testid="nickname-input"
-            type="text"
-            autocomplete="nickname"
-            placeholder={t('room.default_nickname')}
-            aria-invalid={shownError !== null ? 'true' : undefined}
-            aria-describedby={shownError !== null ? 'nickname-error' : undefined}
-            bind:value={nicknameText}
-          />
-        </div>
-        {#if shownError !== null}
-          <p
-            class="nock-error-line nickname-error"
-            id="nickname-error"
-            data-testid="nickname-error"
-            role="alert"
-          >
-            {shownError === 'length' ? t('join.error.length') : t('join.error.characters')}
-          </p>
-        {/if}
-        <button
-          type="submit"
-          class="nock-button nock-button-primary"
-          data-testid="nickname-submit"
-          disabled={session.status !== 'nickname'}>{t('join.submit')}</button
-        >
-        <!-- The status of the nickname card: read but not seen. -->
-        <p class="visually-hidden" data-testid="room-status">{t(`room.status.${session.status}`)}</p>
-      </form>
-    {/if}
-  </EntryFrame>
+  <GridStatus
+    bind:this={gridStatusView}
+    status={gridStatus}
+    text={gridStatusText}
+    placement="row"
+    width={null}
+    onOpenRecap={openRecap}
+  />
 {/snippet}
 
 <!-- The room is the page's `main`. An entry page is not: its frame owns the
@@ -2389,7 +1750,14 @@
   <!-- The page's status region, there from the first paint in every state. -->
   <StatusRegion bind:this={statusRegion} testId="status-region" />
   {#if isEntryPage}
-    {@render entryPage()}
+    <EntryPage
+      {code}
+      status={session.status}
+      isCardShown={isEntryCardShown}
+      bind:nicknameText
+      {shownError}
+      onSubmit={submitNickname}
+    />
   {:else}
     <!-- The room's heading: read but not seen while the room opens and once it
          shows (spec 043, spec 046). -->
@@ -2397,31 +1765,14 @@
     <RoomTopBar
       form={topBarForm}
       {isOpening}
-      {isTimerShown}
-      timerBaseMs={session.timerBaseMs}
-      isTimerRunning={session.timerRunning}
-      timerAnchor={session.timerAnchor}
-      isSolved={session.solved}
-      {isReadOnly}
-      {isPencilMode}
-      {isTouchScreen}
-      {isKeyboardShown}
-      isAideOpen={openPopover === 'aide'}
-      isMenuOpen={openPopover === 'menu'}
-      {isSalonOpen}
-      {unreadLines}
-      {hasNewEvents}
-      {salonLabel}
+      timer={topBarTimer}
+      editing={topBarEditing}
+      overlays={topBarOverlays}
+      {salonBadge}
       bind:aideButton
       bind:menuButton
       bind:chatToggle
-      onShowTimer={() => setTimerShown(true)}
-      {onUndo}
-      onTogglePencil={togglePencilMode}
-      onToggleKeyboard={toggleKeyboard}
-      onToggleAide={() => togglePopover('aide')}
-      onToggleSalon={toggleSalon}
-      onToggleMenu={() => togglePopover('menu')}
+      actions={topBarActions}
     />
   {/if}
   {#if session.snapshot !== null}
@@ -2523,82 +1874,29 @@
               : `${columnGridBox.height + authorsLegendRoom}px`}
             bind:contentRect={gridAreaContent}
           >
-            <div
-              class="visually-hidden"
-              data-testid="vote-announcement"
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-            >{voteAnnouncement}</div>
-            {#if isVoteBannerShown}
-              <!-- The question, the row of the ballot (or the line that takes
-                   its place) with the seconds left on its right, then the bar
-                   of the time left (spec 047). -->
-              <div
-                class="vote-banner {layout}"
-                data-testid="vote-banner"
-                role="group"
-                aria-labelledby="vote-question"
-                bind:this={voteBanner}
-                bind:offsetHeight={voteBannerHeight}
-              >
-                <p id="vote-question" class="vote-question" data-testid="vote-question">
-                  {voteQuestionText}
-                </p>
-                <div class="vote-row" data-testid="vote-row">
-                  {#if isMyRequest || hasVoted}
-                    <!-- Not a Tab stop, but it takes the focus after a ballot. -->
-                    <span
-                      class="vote-status"
-                      data-testid="vote-status"
-                      tabindex="-1"
-                      bind:this={voteStatus}
-                      >{isMyRequest ? t('vote.waiting') : t('vote.cast')}</span
-                    >
-                  {:else}
-                    <button
-                      type="button"
-                      class="nock-button nock-button-primary vote-button"
-                      data-testid="vote-yes"
-                      disabled={isVotingOffline}
-                      onclick={() => castVote(true)}>{t('vote.yes')}</button
-                    >
-                    <button
-                      type="button"
-                      class="nock-button nock-button-secondary vote-button"
-                      data-testid="vote-no"
-                      disabled={isVotingOffline}
-                      onclick={() => castVote(false)}>{t('vote.no')}</button
-                    >
-                  {/if}
-                  {#if countdown !== null}
-                    <span class="vote-seconds" data-testid="vote-seconds"
-                      >{t('vote.seconds_left', { count: countdown.seconds })}</span
-                    >
-                  {/if}
-                </div>
-                {#if countdown !== null}
-                  <div class="vote-timebar" data-testid="vote-timebar" aria-hidden="true">
-                    <div
-                      class="vote-timebar-fill"
-                      data-testid="vote-timebar-fill"
-                      style:width="{countdown.share * 100}%"
-                    ></div>
-                  </div>
-                {/if}
-              </div>
-            {/if}
-            {#if shownNote !== null}
-              {#key shownNote.id}
-                <RoomNote
-                  note={shownNote}
-                  {layout}
-                  bannerHeight={isVoteBannerShown ? voteBannerHeight : 0}
-                  onOpen={openSalonFromNote}
-                  onGone={onNoteGone}
-                />
-              {/key}
-            {/if}
+            <VoteBanner
+              {openVote}
+              isShown={isVoteBannerShown}
+              {isJoined}
+              votedIds={session.votedIds}
+              voteClock={session.voteClock}
+              names={session.names}
+              {you}
+              lastVoteOutcome={session.lastVoteOutcome}
+              {layout}
+              bind:height={voteBannerHeight}
+              onVote={castVote}
+              onFocusGrid={() => gridViewport?.focusGrid()}
+            />
+            <NoteSlot
+              latestNote={session.latestNote}
+              undoRefusals={session.undoRefusals}
+              isBannerShown={isVoteBannerShown}
+              {isStreamShown}
+              {layout}
+              bannerHeight={voteBannerHeight}
+              onOpenSalon={openSalonFromNote}
+            />
             <GridViewport
               bind:this={gridViewport}
               grid={session.snapshot.grid}
@@ -2655,15 +1953,15 @@
             />
           {/if}
           {#if isStatusUnderClueBar}
-            <p
-              class="grid-status band"
-              data-testid="grid-status"
-              data-state={gridStatus}
-              style:width={clueBarWidth === null ? null : `${clueBarWidth}px`}
-              bind:offsetHeight={statusBandHeight}
-            >
-              {@render gridStatusContent()}
-            </p>
+            <GridStatus
+              bind:this={gridStatusView}
+              status={gridStatus}
+              text={gridStatusText}
+              placement="band"
+              width={clueBarWidth}
+              bind:height={statusBandHeight}
+              onOpenRecap={openRecap}
+            />
           {/if}
         </div>
         {#if isKeyboardShown}
@@ -2682,26 +1980,13 @@
         {layout}
         isOpen={isSalonOpen}
         bind:tab={salonTab}
-        {filledWords}
-        totalWords={words.length}
-        entries={stream}
-        names={session.names}
-        colours={playerColours}
-        players={session.snapshot.players}
+        progress={salonProgress}
+        chat={salonChat}
+        roster={salonRoster}
         {you}
-        {isHost}
-        {isMuted}
-        isPaced={isChatPaced}
-        isJoined={session.status === 'joined'}
         {isAccessibilityOn}
-        clues={rosterClues}
-        {shareLink}
         bind:chatText
-        onSend={sendChat}
-        onMute={toggleMute}
-        onRemove={removePlayer}
-        onEscape={onSalonEscape}
-        onMuted={() => chatToggle?.focus()}
+        actions={salonActions}
         bind:element={salonElement}
       />
     </div>
@@ -2760,9 +2045,6 @@
   .room-page {
     position: relative;
     box-sizing: border-box;
-    max-width: none;
-    margin: 0;
-    padding: 0;
     height: 100vh;
     height: 100dvh;
     display: flex;
@@ -2781,18 +2063,6 @@
 
   .room-status {
     margin: 0;
-  }
-
-  /* The nickname shows in capitals, the placeholder too, while the value keeps
-     the text as typed, so input methods and the caret work as usual (spec 012,
-     room page flow step 3). */
-  .nickname-input {
-    text-transform: uppercase;
-  }
-
-  /* The refused nickname's reason, right under the field. */
-  .nickname-error {
-    margin-top: -6px;
   }
 
   /* While the room opens (spec 046): all the height under the top bar, its
@@ -2910,156 +2180,7 @@
     margin: 10px -12px -12px;
   }
 
-  /* ---- The vote banner (spec 025, spec 047; specs/_design/overlays.md « Vote ») ----
-
-     Over the grid (spec 025 decision 9): absolutely placed, so it takes no
-     height from the grid. The vote wins over the Salon sheet and the scrim
-     (spec 022 decision 16), which come later in the page on layer 8: it is
-     drawn one layer above them. Its top, left and right edges are 8 px inside
-     the grid area: `grid-area` in the sheet layout (its 8 px padding, so the
-     banner lies on the viewport's edges), the viewport in the column layout
-     (under the grid area's 12 px top padding). */
-  .vote-banner {
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    z-index: 9;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px 12px;
-    border: 2px solid var(--nock-navy);
-    border-radius: 10px;
-    background: var(--nock-white);
-    box-shadow: 0 10px 24px -12px var(--nock-shadow);
-  }
-
-  .vote-banner.sheet {
-    top: 8px;
-  }
-
-  .vote-banner.column {
-    top: 20px;
-  }
-
-  .vote-question {
-    margin: 0;
-    font: 600 0.95rem/1.3 var(--nock-font-ui);
-    color: var(--nock-ink);
-  }
-
-  /* The ballot, or the line that takes its place, then the seconds on the
-     right. */
-  .vote-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 31px;
-  }
-
-  .vote-button {
-    flex: none;
-    padding: 7px 16px;
-  }
-
-  .vote-status {
-    min-width: 0;
-    font: 500 0.85rem/1.3 var(--nock-font-ui);
-    color: var(--nock-muted);
-  }
-
-  .vote-seconds {
-    flex: none;
-    margin-left: auto;
-    font: 500 0.85rem/1 var(--nock-font-ui);
-    color: var(--nock-muted);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  /* The time left: a word-blue track and its navy fill, which moves in steps
-     with no transition (spec 047, Decision 3). */
-  .vote-timebar {
-    height: 4px;
-    border-radius: 2px;
-    background: var(--nock-word);
-    overflow: hidden;
-  }
-
-  .vote-timebar-fill {
-    height: 100%;
-    background: var(--nock-navy);
-    transition: none;
-  }
-
-  /* ---- The completion status (spec 026; specs/_design/overlays.md « End of grid ») ---- */
-
-  .grid-status {
-    margin: 0;
-    font: 600 0.95rem/1.2 var(--nock-font-ui);
-  }
-
-  /* The end band under the clue bar, as wide as the bar. */
-  .grid-status.band {
-    flex: none;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 100%;
-    padding: 8px 12px;
-  }
-
-  .grid-status.band[data-state='solved'] {
-    color: var(--nock-green);
-    background: var(--nock-green-bg);
-  }
-
-  .grid-status.band[data-state='full_wrong'] {
-    color: var(--nock-navy);
-    background: var(--nock-clue-bg);
-  }
-
-  /* In the clue bar's row: white text on one line, after the clue. */
-  .grid-status.in-row {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 0 8px;
-    white-space: nowrap;
-    color: var(--nock-white);
-  }
-
-  /* The text of the band, after its pictogram: it wraps when the band is too
-     narrow for it and "Voir le bilan" on one line (spec 047). */
-  .grid-status.band .grid-status-text {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-
-  /* The check mark of a solved grid: a pictogram drawn by CSS, never read, a space
-     before the text. */
-  .status-check::before {
-    content: '✓';
-  }
-
-  .status-check {
-    margin-right: 0.25em;
-  }
-
-  /* "Voir le bilan" keeps its whole label on one line, on the band's
-     right. */
-  .recap-open {
-    flex: none;
-    margin-left: auto;
-    padding: 7px 12px;
-    font-size: 0.85rem;
-    white-space: nowrap;
-  }
-
-  /* ---- The scrim of the sheet layout (layer 7) ---- */
+  /* ---- The scrim of the sheet layout (layer 7, from under the 54 px top bar) ---- */
 
   .room-scrim {
     position: fixed;

@@ -7,6 +7,7 @@
   // any link does. Its look is « Brand link » (_design/foundation.md,
   // « Components »): plain text at rest, a word-blue background on hover for
   // the link only. Both forms have the same box, so the bar does not move.
+  import FocusableLink from './FocusableLink.svelte'
   import { t } from './i18n'
   import { NOCK_MARK_POINTS } from './icons'
 
@@ -21,20 +22,20 @@
 {#if isHome}
   <span class="topbar-brand" data-testid="topbar-brand">{@render content()}</span>
 {:else}
-  <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-  <a
+  <FocusableLink
     class="topbar-brand"
     data-testid="topbar-brand"
     href="/"
-    tabindex="0"
-    aria-label={t('topbar.home')}>{@render content()}</a
+    aria-label={t('topbar.home')}>{@render content()}</FocusableLink
   >
 {/if}
 
 <style>
   /* The padding sits inside a negative margin of the same size, so the box is
-     larger than its content and nothing moves. */
-  .topbar-brand {
+     larger than its content and nothing moves. The link is FocusableLink's
+     element: the rules reach it as a global. */
+  .topbar-brand,
+  :global(a.topbar-brand) {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -48,11 +49,12 @@
   }
 
   /* Only the link has a hover look; the plain brand of `/` has none. */
-  a.topbar-brand:hover {
+  :global(a.topbar-brand:hover) {
     background: var(--nock-word);
   }
 
-  .topbar-brand svg {
+  .topbar-brand svg,
+  :global(a.topbar-brand) svg {
     width: 12px;
     height: 18px;
     fill: var(--nock-navy);

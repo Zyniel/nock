@@ -10,9 +10,18 @@ export type ArrowSide = 'right' | 'bottom'
 export const ZOOM_MIN = 1
 export const ZOOM_MAX = 5
 
+// The clue bar's height (specs/_design/room.md « Clue bar »): ClueBar draws it and the
+// room page subtracts it when it fits the grid.
+export const CLUE_BAR_HEIGHT_PX = 34
+
 // The grid's own left and top line: each cell draws its right and bottom lines
 // inside its side, so the grid is one line wider and higher than its cells.
 export const GRID_LINE_PX = 1
+
+// The DOM id of a cell, used by the grid's aria-activedescendant.
+export function cellId(row: number, column: number): string {
+  return `cell-${row}-${column}`
+}
 
 // The side of the clue cell where the word's first letter is.
 export function arrowSide(arrow: Arrow): ArrowSide {
@@ -376,6 +385,19 @@ export interface ScrollAxis {
   cellSide: number
   gridStart: number
   gridEnd: number
+}
+
+// The scroll on one axis after a change of cell size that keeps the grid point
+// under `offset` (px from the viewport's edge) where it was: the point's place
+// in cells stays the same.
+export function scrollAfterZoom(
+  scroll: number,
+  offset: number,
+  oldCellSize: number,
+  newCellSize: number,
+): number {
+  const cellsBeforeOffset = (scroll + offset) / oldCellSize
+  return cellsBeforeOffset * newCellSize - offset
 }
 
 // The scroll on one axis that shows the selected cell with one cell of margin

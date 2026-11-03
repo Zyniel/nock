@@ -298,5 +298,5 @@ not-found pages ».
   erasure. `src/nock/store.py`: the creator column. `src/nock/server.py`: the
   cookie of `POST /api/rooms` and of the room socket.
 - `web/src/lib/PlayersPanel.svelte`, `HostSettings.svelte`: host controls;
-  `RoomPage.svelte`, `roomSession.ts`: final statuses.
+  `roomConnection.ts`, `RoomPage.svelte`, `roomSession.ts`: final statuses.
 - Tests: `tests/test_spec_014_*`, `tests/test_host_*`.

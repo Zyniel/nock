@@ -4,6 +4,7 @@
   // what each button does and when it is enabled.
   import type { Snippet } from 'svelte'
   import Icon from './Icon.svelte'
+  import { CLUE_BAR_HEIGHT_PX } from './gridLayout'
   import { t } from './i18n'
   import type { Word } from './wordSelection'
   import { wordKey } from './wordSelection'
@@ -52,6 +53,7 @@
   role="region"
   aria-label={t('clue_bar.label')}
   style:width={width === null ? null : `${width}px`}
+  style:height="{CLUE_BAR_HEIGHT_PX}px"
 >
   <button
     type="button"
@@ -108,7 +110,6 @@
     box-sizing: border-box;
     display: flex;
     align-items: center;
-    height: 34px;
     max-width: 100%;
   }
 

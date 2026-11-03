@@ -251,7 +251,8 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
   `timer_value_ms`, `snapshot_for`, `replay`, `after_restart`.
 - `src/nock/protocol.py`: `GridSolved`, `GridFullWrong`, the snapshot's timer.
 - `web/src/lib/roomSession.ts`: the page's solved flag and timer;
-  `RoomPage.svelte`: the status and the input lock; `GridViewport.svelte`: the
-  `Control+z` and `Meta+z` shortcut; `RoomTimer.svelte`, `timer.ts`,
-  `RoomTopBar.svelte`, `RoomMenu.svelte`: the timer and its hiding.
+  `RoomPage.svelte`: the input lock; `GridStatus.svelte`: the status;
+  `gridKeys.ts`: the `Control+z` and `Meta+z` shortcut; `RoomTimer.svelte`,
+  `timer.ts`, `RoomTopBar.svelte`, `RoomMenu.svelte`: the timer and its
+  hiding.
 - Tests: `tests/test_spec_026_*`, `tests/test_spec_027_*`.

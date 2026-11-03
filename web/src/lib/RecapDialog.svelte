@@ -3,6 +3,7 @@
   import { announce } from './announce'
   import { newLinkCopier } from './copyLink'
   import { t } from './i18n'
+  import FocusableLink from './FocusableLink.svelte'
   import { displayNickname } from './nickname'
   import PlayerIcon from './PlayerIcon.svelte'
   import RoomSheet from './RoomSheet.svelte'
@@ -178,13 +179,11 @@
         {t('recap.share_label')}
       </h3>
       <div class="recap-share-row" data-testid="recap-share-row">
-        <!-- WebKit only Tab-focuses links that have a tabindex (spec 035 AC-1). -->
-        <a
+        <FocusableLink
           class="recap-share-link"
           data-testid="recap-share-link"
           href={shareUrl}
-          tabindex="0"
-          aria-describedby="recap-share-label">{shareUrl}</a
+          aria-describedby="recap-share-label">{shareUrl}</FocusableLink
         >
         <button
           type="button"
@@ -330,8 +329,9 @@
     flex-wrap: wrap;
   }
 
-  /* The URL box (specs/_design/foundation.md « Components »): one line with an ellipsis. */
-  .recap-share-link {
+  /* The URL box (specs/_design/foundation.md « Components »): one line with an ellipsis.
+     The link is FocusableLink's element, reached from its row. */
+  .recap-share-row :global(.recap-share-link) {
     flex: 1 1 0;
     display: block;
     box-sizing: border-box;
@@ -346,7 +346,7 @@
     text-overflow: ellipsis;
   }
 
-  :global(.bottom) .recap-share-link {
+  :global(.bottom) .recap-share-row :global(.recap-share-link) {
     flex-basis: 100%;
   }
 

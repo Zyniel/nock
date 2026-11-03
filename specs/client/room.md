@@ -145,8 +145,10 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
 
 ## Code
 
-- `web/src/lib/RoomPage.svelte` (the Salon's state, the dot, the notes) and
-  its parts `Salon`, `PlayersPanel`, `RoomNote` (`.svelte`); `chat.ts` (badge,
-  dot); `roomSession.ts` (what makes a note).
+- `web/src/lib/RoomPage.svelte` (the Salon's state, the dot),
+  `roomOverlays.ts` (what each action leaves open) and its parts
+  `Salon.svelte`, `PlayersPanel.svelte`, `RoomNote.svelte`, `NoteSlot.svelte`
+  (the note slot); `chat.ts` (badge, dot); `roomSession.ts` (what makes a
+  note).
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`;
   `tests/test_room_*` for AC-8.
