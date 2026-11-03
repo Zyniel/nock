@@ -4,7 +4,7 @@ title: A status region empties after it spoke
 status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T16:07:00Z'
+updated_date: '2026-11-03T16:18:00Z'
 labels:
   - domain:hud
 milestone: m-4
@@ -50,4 +50,6 @@ From DRAFT-054 (B-046). The room page's role=status region and each open sheet's
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead: 5 s after the last write (MESSAGE_HOLD_MS), counted from the write after the existing 50 ms clear; a new message replaces at once and restarts the 5 s; a repeated text is still announced.
+
+Lead: « 5 s after » counts from when the region reads the message (rule 17), not from the press; « at once » means within 500 ms of page time. AC-26's wording aligned with rule 17 by the spec-writer.
 <!-- SECTION:NOTES:END -->

@@ -299,8 +299,8 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   paint holds a region with `role="status"`, empty and read but not seen;
   once joined, and again after a socket loss, it is still that element.
   Joined, « Annuler » with nothing to undo makes it read « Rien à annuler. »;
-  pressed again 4 s later, it still reads « Rien à annuler. » 4 s after that
-  second press, and is empty 5 s after it.
+  pressed again 4 s later, it reads « Rien à annuler. » anew, still 4 s
+  after that, and is empty 5 s after it read the text anew.
 - **AC-27** At 1280 by 720, Ana, host, opens « Réglages de l'hôte », whose
   status region is empty; the socket closes: within 5 s that region reads
   « Connexion perdue. Vous pouvez continuer : vos lettres seront envoyées au
