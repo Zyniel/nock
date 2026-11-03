@@ -269,3 +269,41 @@ def test_ac20_a_target_that_is_a_file_is_refused_without_a_traceback(
     assert "error:" in result.stderr
     assert "target.txt" in result.stderr
     assert target_file.read_text(encoding="utf-8") == "not a directory"
+
+
+# ---- AC-22: one number once -------------------------------------------------------
+
+
+def write_two_former_files_with_one_number(source: Path, fx01_text: str) -> None:
+    """Write `g1.json` and `g2.json`, both valid and both of number 1."""
+    write_former(source, "g1.json", former_payload(fx01_text, number=1))
+    write_former(source, "g2.json", former_payload(fx01_text, number=1))
+
+
+def test_ac22_a_number_held_by_an_earlier_file_refuses_the_later_file(
+    source: Path, target: Path, fx01_text: str
+) -> None:
+    write_two_former_files_with_one_number(source, fx01_text)
+
+    with pytest.raises(ValueError, match=r"g2\.json"):
+        convert(source, target)
+
+    assert file_names(target) == []
+
+
+def test_ac22_main_exits_with_a_non_zero_code_naming_the_later_file(
+    source: Path,
+    target: Path,
+    fx01_text: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_two_former_files_with_one_number(source, fx01_text)
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([str(source), str(target)])
+
+    captured = capsys.readouterr()
+    reported = f"{exit_info.value.code} {captured.out} {captured.err}"
+    assert exit_info.value.code not in (0, None)
+    assert "g2.json" in reported
+    assert file_names(target) == []
