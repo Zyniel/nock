@@ -1,11 +1,15 @@
-"""Tests of `content/library.md` AC-25: a summary whose `published_on` is not a
-calendar date is a failed answer (rule 2).
+"""Tests of `content/library.md` AC-25: a summary that is not a summary is a failed
+answer (rule 2).
 
 Browser with the live server serving `CAT`. The test lets the page's request reach
 the server (`route.fetch`), puts `2026-02-30` (no such day) or `hier` in grid 2's
 `published_on`, and gives the page that answer: `/` shows « Impossible de charger
 les grilles. » in its `error` state, with no filter and no card; `/g/2`, given that
 summary by `GET /api/grids/2`, shows the same line in its `error` state, no card.
+
+The same holds when grid 2's item lacks `word_count`, in the list for `/` and as
+`GET /api/grids/2`'s answer for `/g/2` (`/g/2` does not ask the list), and when
+`GET /api/grids/2` answers `[]` for `/g/2`.
 """
 
 from __future__ import annotations
@@ -95,6 +99,71 @@ def test_ac25_a_grid_page_given_that_summary_shows_the_error(
     page: Page, live_server: str, published_on: str
 ) -> None:
     page.route(GRID_2_ROUTE, answer_grid_2_with(published_on))
+
+    page.goto(f"{live_server}/g/2")
+
+    grid_page = page.get_by_test_id("grid-page")
+    expect(grid_page).to_have_attribute("data-state", "error")
+    expect(grid_page).to_contain_text(load_fr()["catalogue.error"])
+    expect(grid_page.get_by_test_id("catalogue-item")).to_have_count(0)
+
+
+def answer_list_without_word_count(route: Route) -> None:
+    """A route handler: the server's list, grid 2's item without `word_count`."""
+    summaries = route.fetch().json()
+    assert isinstance(summaries, list), summaries
+    for summary in summaries:
+        if summary["number"] == 2:
+            del summary["word_count"]
+    route.fulfill(
+        status=200, content_type="application/json", body=json.dumps(summaries)
+    )
+
+
+def answer_grid_2_without_word_count(route: Route) -> None:
+    """A route handler: the server's summary of grid 2, without `word_count`."""
+    summary = route.fetch().json()
+    assert isinstance(summary, dict), summary
+    del summary["word_count"]
+    route.fulfill(status=200, content_type="application/json", body=json.dumps(summary))
+
+
+def test_ac25_a_list_with_an_item_without_word_count_is_an_error(
+    page: Page, live_server: str
+) -> None:
+    page.route(LIST_ROUTE, answer_list_without_word_count)
+
+    page.goto(f"{live_server}/")
+
+    catalogue_page = page.get_by_test_id("catalogue-page")
+    expect(catalogue_page).to_have_attribute("data-state", "error")
+    expect(catalogue_page).to_contain_text(load_fr()["catalogue.error"])
+    expect(page.get_by_test_id("catalogue-filters")).to_have_count(0)
+    expect(page.get_by_test_id("catalogue-item")).to_have_count(0)
+
+
+def test_ac25_a_grid_page_given_a_summary_without_word_count_shows_the_error(
+    page: Page, live_server: str
+) -> None:
+    page.route(GRID_2_ROUTE, answer_grid_2_without_word_count)
+
+    page.goto(f"{live_server}/g/2")
+
+    grid_page = page.get_by_test_id("grid-page")
+    expect(grid_page).to_have_attribute("data-state", "error")
+    expect(grid_page).to_contain_text(load_fr()["catalogue.error"])
+    expect(grid_page.get_by_test_id("catalogue-item")).to_have_count(0)
+
+
+def test_ac25_a_grid_page_given_an_empty_list_shows_the_error(
+    page: Page, live_server: str
+) -> None:
+    page.route(
+        GRID_2_ROUTE,
+        lambda route: route.fulfill(
+            status=200, content_type="application/json", body="[]"
+        ),
+    )
 
     page.goto(f"{live_server}/g/2")
 
