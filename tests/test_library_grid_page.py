@@ -15,7 +15,7 @@ from playwright.sync_api import Page, expect
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec004_harness import grid_from_text, load_fr, make_reference_catalogue
-from spec046_harness import HeldRoute, muted_line_problems
+from spec046_harness import POLL_MS, WAIT_TIMEOUT_MS, HeldRoute, muted_line_problems
 
 GRID_2_ROUTE = "**/api/grids/2"
 
@@ -44,4 +44,8 @@ def test_ac18_while_the_grid_has_not_answered_the_page_shows_a_muted_loading_lin
     expect(status).to_have_text(load_fr()["catalogue.loading"])
     assert muted_line_problems(status) == []
     expect(grid_page.get_by_test_id("catalogue-item")).to_have_count(0)
+    waited_ms = 0
+    while len(held.routes) < 1 and waited_ms < WAIT_TIMEOUT_MS:
+        page.wait_for_timeout(POLL_MS)
+        waited_ms += POLL_MS
     assert len(held.routes) == 1

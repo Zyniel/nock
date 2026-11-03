@@ -4,7 +4,7 @@ title: Library rules proven
 status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T20:44:00Z'
+updated_date: '2026-11-03T20:55:00Z'
 labels:
   - domain:library
 milestone: m-5
@@ -46,3 +46,9 @@ From DRAFT-016. library rules 8, 10, 16 and AC-6 are kept by the code but untest
 2. Tests: tests/test_library_*.py.
 3. Quick gate: uv run python scripts/gate.py --specs library --browsers chromium
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Review round 1: APPROVE (eleven mutations of the built client each failed a new test). Suggestion 2 taken (the AC-18 test waits for the held request). Not taken: 1 (split the AC-6 test: one page load proves both sentences of the widened criterion); 3 (two handler helpers: not weaker); 4 (progress request: outside the widened criteria).
+<!-- SECTION:NOTES:END -->
