@@ -41,10 +41,17 @@ bar, as at 1280 by 720 (its layout checks and, at 568 by 320, its scans still ru
 Spec 013 AC-6's keyboard check runs on the pages where the keyboard shows: the
 touch context with `FX02_FULL_WRONG`.
 
-Refined by `gameplay/rules.md` AC-10 (B-046): `grid-status` has no live role, the
-page's status region reads its text (`client/hud.md` rule 17), and a resize that
-moves the status to its other place does not write the region again: the region's
-`MutationObserver` records nothing during the resizes.
+Refined by `gameplay/rules.md` AC-10 (B-046): `grid-status` has no live role, and
+a resize that moves the status to its other place does not write the page's status
+region again (`client/hud.md` rule 17): the region's `MutationObserver` records no
+text during the resizes.
+
+Refined by B-070 (`client/hud.md` rule 17): the region empties 5 s after its last
+message. These pages wait for spec 043's 3-second note to leave before they are
+read, so the region may already be empty: that the region reads the status is
+proven by `gameplay/rules.md` AC-3 and AC-7 (`test_spec_026_ac01_ac03_grid_solved.py`,
+`test_spec_026_ac06_ac07_grid_full_wrong.py`), and here an emptying recorded during
+the resizes is not a write.
 """
 
 from __future__ import annotations
@@ -58,7 +65,6 @@ from playwright.sync_api import Browser, Locator, Page, expect
 
 from fonts_ready import wait_for_fonts
 from hud_harness import (
-    expect_page_region_reads,
     live_role_problems,
     record_region_texts,
     recorded_region_texts,
@@ -407,14 +413,22 @@ def open_status_page(
 
 def expect_status_shows(page: Page, state: str) -> None:
     """One `grid-status`, shown, with no live role, the `data-state` and the text of
-    `state`, which the page's status region reads."""
+    `state`."""
     status = page.get_by_test_id("grid-status")
     expect(status).to_have_count(1)
     expect(status).to_be_visible()
     assert live_role_problems(status) == []
     expect(status).to_have_attribute("data-state", state)
     expect_status_text(status, load_fr()[STATUS_TEXT_KEYS[state]])
-    expect_page_region_reads(page, load_fr()[STATUS_TEXT_KEYS[state]])
+
+
+def texts_written(recorded: list[str]) -> list[str]:
+    """The texts written in the region, from what `record_region_texts` recorded.
+
+    The region empties 5 s after its last message (`client/hud.md` rule 17): an
+    empty text is that emptying, not a write.
+    """
+    return [text for text in recorded if text != ""]
 
 
 # ---- Measures ----
@@ -887,7 +901,8 @@ def test_ac10_a_resize_across_500_px_moves_the_status(
             problems[f"{size[0]}x{size[1]}"] = found
 
     assert problems == {}, f"{state}: {problems}"
-    assert recorded_region_texts(page) == [], "the status region was written again"
+    written = texts_written(recorded_region_texts(page))
+    assert written == [], "the status region was written again"
 
 
 def test_ac10_a_rotation_moves_the_status_and_the_region_is_not_written_again(
@@ -906,4 +921,5 @@ def test_ac10_a_rotation_moves_the_status_and_the_region_is_not_written_again(
 
     expect_status_shows(page, state)
     assert status_place_problems(page, upright) == []
-    assert recorded_region_texts(page) == [], "the status region was written again"
+    written = texts_written(recorded_region_texts(page))
+    assert written == [], "the status region was written again"
