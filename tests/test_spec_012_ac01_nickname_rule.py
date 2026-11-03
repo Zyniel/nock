@@ -599,7 +599,7 @@ def test_ac1_fr_json_has_the_join_texts() -> None:
 def test_ac1_fr_json_has_a_status_text_for_every_status() -> None:
     fr = load_fr()
     statuses = ["connecting", "nickname", "joining", "joined", "full", "replaced"]
-    statuses += ["not_found", "throttled", "closed"]
+    statuses += ["not_found", "throttled"]
 
     for status in statuses:
         assert fr[f"room.status.{status}"] != "", status

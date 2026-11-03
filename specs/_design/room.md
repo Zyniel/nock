@@ -296,8 +296,8 @@ grid. `room-status` (« Reconnexion… ») is then visually hidden (class
 `visually-hidden`), read by screen readers only.
 
 The status band: a final status that comes once the room has shown (removed by the
-host, replaced by another tab, the connection closed for good (« Connexion
-perdue. »), and the room's other final statuses but its deletion) is the connection
+host, replaced by another tab, and the room's other final statuses but its
+deletion) is the connection
 band's look without the red dot: under the top bar, full width, `--nock-clue-bg`,
 1 px line-grey bottom border, padding 8 px 12 px, the status text in ink 500
 0.85rem/1.3, for example « Vous avez été retiré de ce salon. ». The room stays

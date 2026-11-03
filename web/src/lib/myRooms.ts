@@ -1,6 +1,7 @@
 // "My rooms" of the catalogue page (spec 032): the rooms this device keeps an
 // identity for, and what the server sums up of each. Plain functions: no DOM.
 
+import { isDateTime } from './dateTime'
 import { t } from './i18n'
 import { readIdentity } from './joinRules'
 import { storedKeys } from './storage'
@@ -81,8 +82,9 @@ function isNumberOrNull(value: unknown): boolean {
   return value === null || typeof value === 'number'
 }
 
+// Tell whether a value is an ISO 8601 date-time with a time zone.
 export function isTime(value: unknown): value is string {
-  return typeof value === 'string' && !Number.isNaN(Date.parse(value))
+  return isDateTime(value)
 }
 
 // A field the server may leave out: absent, null, or of the type `isType` checks.
