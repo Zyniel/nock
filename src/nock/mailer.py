@@ -89,14 +89,13 @@ class SmtpMailer:
             connection = smtplib.SMTP(
                 settings.host, settings.port, timeout=SMTP_TIMEOUT_SECONDS
             )
-        # The block closes the connection, also when a step fails.
+        # The block ends the session with one QUIT, also when a step fails.
         with connection:
             if settings.security == "starttls":
                 connection.starttls(context=ssl.create_default_context())
             if settings.user is not None and settings.password is not None:
                 connection.login(settings.user, settings.password.get_secret_value())
             connection.send_message(message)
-            connection.quit()
 
 
 def sign_in_message(settings: AccountSettings, to: str, token: str) -> EmailMessage:

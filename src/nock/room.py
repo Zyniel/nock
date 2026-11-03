@@ -16,6 +16,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
 
 from nock.grid import Grid, LetterCell
 from nock.protocol import (
+    MAX_PLAYERS,
     CellLocked,
     CellRef,
     CellTarget,
@@ -97,7 +98,6 @@ MIN_ROOM_LIFE_HOURS: int = 24
 MAX_ROOM_LIFE_HOURS: int = 8760
 DEFAULT_ROOM_LIFE_HOURS: int = 720
 SECONDS_PER_HOUR: float = 3_600.0
-MAX_PLAYERS: int = 8  # spec 012 AC-4
 MAX_PAST_PLAYERS: int = 100  # spec 032 AC-4: past players a room keeps
 # `lobby/host.md` rule 2: banned tokens a room keeps, the newest in removal order.
 MAX_REMOVED_TOKENS: int = 100
@@ -287,7 +287,7 @@ class RoomState(RoomModel):
     created_at: float
     seq: int = Field(default=0, ge=0, strict=True)  # seq of the last event
     cells: tuple[CellState, ...]  # one per letter cell, in the order of grid.cells
-    players: tuple[PlayerRecord, ...] = Field(default=(), max_length=8)
+    players: tuple[PlayerRecord, ...] = Field(default=(), max_length=MAX_PLAYERS)
     settings: RoomSettings = DEFAULT_SETTINGS
     reveal_budget: RevealBudget = DEFAULT_REVEAL_BUDGET  # what is left
     # spec 024: the reveals accepted so far, as two counts. A snapshot stored
