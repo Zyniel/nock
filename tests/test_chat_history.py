@@ -252,6 +252,40 @@ def test_ac21_a_stored_history_over_200_keeps_the_newest_200_after_a_message(
     assert loaded.chat == live.chat
 
 
+@pytest.mark.parametrize(
+    "from_snapshot",
+    [
+        pytest.param(False, id="the log alone"),
+        pytest.param(True, id="a stored snapshot"),
+    ],
+)
+def test_ac21_a_stored_message_holding_u202e_loads_unchanged(
+    store_path: Path, fx01_grid: Grid, from_snapshot: bool
+) -> None:
+    state, entries = joined_room(fx01_grid)
+    message = ChatMessage(seq=3, player_id="p1", text="a\u202eb")
+    entries.append(LogEntry(at=NOW, event=message))
+    writer = RoomStore(store_path)
+    try:
+        writer.create_room(new_room(ROOM_CODE, fx01_grid, NOW))
+        writer.append(ROOM_CODE, entries)
+    finally:
+        writer.close()
+    if from_snapshot:
+        stored = state.model_copy(update={"chat": (message,), "seq": 3})
+        insert_stored_snapshot(store_path, stored)
+    store = RoomStore(store_path)
+    try:
+        loaded = store.load_room(ROOM_CODE)
+    finally:
+        store.close()
+
+    assert loaded is not None
+    assert loaded.seq == 3
+    assert loaded.chat == (message,)
+    assert loaded.chat[0].text == "a\u202eb"
+
+
 # ---- The stream on the page ----------------------------------------------------------
 
 
