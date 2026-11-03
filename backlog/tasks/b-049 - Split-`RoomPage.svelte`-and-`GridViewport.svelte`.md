@@ -59,7 +59,7 @@ ordinal: 10000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -82,6 +82,8 @@ Lead: tests 239 in tests/web/ (one per module plus roomConnectionHarness.ts), ch
 Lead: steps 1 to 4 done by the implementer (Sonnet) in one run and committed in two (the room page's L25 leftovers ride with steps 2 to 4, being in the same file); its chromium gate passed 8361 + 162, all Node tests of the built modules pass; the tests of roomConnection, roomOverlays and playFit wait for steps 5, 6 and 13.
 
 Lead: review round 1 CHANGES REQUESTED (L24's play state machine, WebKit link workaround and window-width tracking still copied; L25's layer comment still wrong; hud's Code section named GridStatus for the status region; suggestions), fixed in ee47d3a, 27be639, f381525, ba772d2 (implementer, Opus), f8cabf4 (spec-writer), bc9ca01 (test-writer: scrollAfterZoom); round 2 APPROVE, its suggestions in DRAFT-059 (board PR #112). Commit 4ff2ad5 (step 1) does not build alone (ClueBar imports a constant step 2 adds); the branch was pushed, so it stays: only bisecting is affected. Gates: Chromium full gate green (8704 parallel, 162 serial); the three-engine gate was cut twice by container restarts, so the engines ran one by one: Firefox 4054 passed, 1 failed (test_server_offline_undo.py ac29 [firefox-50 ms], the load flake of DRAFT-053, passed 3/3 alone); WebKit GATE PASSED (4055 + 72).
+
+Pull request: https://github.com/Zyniel/nock/pull/113
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
