@@ -202,7 +202,9 @@ folder:
    failing review after two rounds) is assigned to you instead:
    `backlog task list -a @zyniel --plain` is your inbox.
 3. **Accept it.** Once the milestone's tasks are merged, the lead opens a
-   `backlog: close <name>` pull request with the verdict. Merge it to accept.
+   `backlog: close <name>` pull request with the verdict. It merges on its own
+   once CI is green; close it or add `needs-human` to send it back. A verdict
+   `not accepted` waits for your merge.
 
 `specs/_archive/v1.1.0/` holds the numbered specs (`002-...` to `048-...`), the
 build record of v1.1.0; they are never edited again, and the domain specs point

@@ -162,7 +162,8 @@ with the verdict:
 
 The PR auto-merges once CI is green: letting it merge is your acceptance. To
 send it back, **close** it or add the `needs-human` label, and **comment** what is
-wrong. A verdict `not accepted` does not auto-merge: it waits for you. If you
+wrong. A verdict `not accepted` does not auto-merge: it arrives labelled
+`needs-human` and waits for you. If you
 send it back, the lead adds fix tasks inside the same milestone. A fix task
 counts toward the budget, so a big send-back may also mean raising the size.
 
