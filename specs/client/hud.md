@@ -258,8 +258,8 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   « Réagir », « Je bloque », ›; with nothing selected the middle two are
   disabled. With TAMIS full, › selects NAVAL then MIME, ‹ NAVAL; a click on ›
   while typing leaves the focus on the grid. The picker floats over the grid's
-  bottom; Bob's reaction is a pill drawn on top of IDES's clue.
-  (← 043 AC-23, 043 AC-24, 043 AC-25)
+  bottom; Bob's reaction is a pill drawn on top of IDES's clue, and a tap on
+  the pill selects IDES. (← 043 AC-23, 043 AC-24, 043 AC-25)
 - **AC-19** With 8 players, at every window of `product.md` on a computer and a
   touch screen, all closed, the Salon open or a menu open: the grid keeps
   100 px, nothing scrolls, the top bar, clue bar and what is open lie in the
@@ -278,8 +278,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   après un certain temps sans modification. », holds the focus on « Voir les
   grilles », a link to `/`. At 1280 by 720 while reconnecting, with `T` typed
   at (1, 0) and not yet answered, the connection band goes, (1, 0) is empty
-  and the dialog shows alike. Both follow « Room gone » and pass the scans of
-  `product.md`.
+  and the dialog shows alike. These two dialogs follow « Room gone » and pass
+  the scans of `product.md`. At 1280 by 720 with « Réglages de l'hôte » open,
+  the settings sheet closes and the dialog shows alike.
 - **AC-22** Under the room-gone dialog, with (1, 0) selected, Escape, a press on
   the scrim, Tab and Shift+Tab leave the focus on « Voir les grilles » and the
   dialog open; a typed `A` leaves (1, 0) empty; a press on the link loads `/`.
@@ -290,7 +291,9 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   disables it leaves the menu open.
 - **AC-24** At 360 by 740 with MIME selected and the Salon sheet open,
   Shift+Tab on « Discussion » focuses › of the clue bar, the sheet and the
-  scrim gone and « Salon » not expanded.
+  scrim gone and « Salon » not expanded. Bob at 360 by 740, the Salon sheet
+  open and the focus in its message box, is muted by Ana: the sheet stays open
+  with the focus on « Salon », and his next Tab closes it.
 - **AC-25** At 1280 by 720 in the host's settings, a press in « Lettres à
   révéler » released on the backdrop, or a press on the backdrop released in
   the sheet, leaves it open with its values; a press and its release both on

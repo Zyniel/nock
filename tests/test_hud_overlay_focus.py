@@ -8,8 +8,11 @@ Menu; a vote that disables the focused « La grille » leaves the menu open.
 
 AC-24: at 360 by 740 with the Salon sheet open, Shift+Tab on « Discussion » focuses
 the clue bar's next-word button and closes the sheet, its scrim and « Salon »'s
-expansion. From "Edge cases": Tab on the Salon sheet's last control leaves the page
-for the browser and closes nothing; the next Tab into the page closes it.
+expansion. Bob, not the host, with the focus in the sheet's message box, is muted
+by Ana (`player_muted` for him): the box is disabled, the sheet stays open with the
+focus on « Salon », and his next Tab closes it. From "Edge cases": Tab on the Salon
+sheet's last control leaves the page for the browser and closes nothing; the next
+Tab into the page closes it.
 
 AC-25: at 1280 by 720 in the host's settings, a press in « Lettres à révéler »
 released on the backdrop, or a press on the backdrop released in the sheet, leaves
@@ -50,7 +53,7 @@ from hud_harness import (
     press_and_release,
 )
 from nock.grid import Grid
-from nock.protocol import HelpMode
+from nock.protocol import HelpMode, PlayerMuted
 from room_panels import is_closed, open_aide, open_menu, show_tab
 from spec019_harness import OpenWindow, window_opener
 from spec042_harness import wait_until
@@ -64,6 +67,7 @@ from spec043_harness import (
     fr_value,
     fx01_view,
     open_room,
+    player,
     players_up_to,
     select_mime,
     send_and_wait,
@@ -253,6 +257,43 @@ def test_ac24_tab_out_of_the_page_closes_nothing_until_the_focus_is_in_the_page(
                 page, lambda: not salon_is_open(page), "the Salon closed by the Tab"
             )
         focus_was_on_an_element = not state["onNothing"]
+
+
+def open_bob_room(page: Page, base_url: str, grid: Grid) -> RoomMock:
+    """Open FX-01 as Bob (`p1`, not the host) among Ana (`p2`, the host) and Cy."""
+    bob = player("p1", nickname="BOB")
+    ana = player("p2", nickname="ANA", host=True)
+    cy = player("p3")
+    frame = snapshot_frame(fx01_view(grid), [bob, ana, cy])
+    return open_room(page, base_url, frame)
+
+
+def test_ac24_muted_with_the_focus_in_the_message_box_the_sheet_stays_open(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(PHONE[0], PHONE[1], False)
+    mock = open_bob_room(page, live_server, fx01_grid)
+    show_tab(page, "discussion")
+    message_box = page.get_by_test_id("chat-input")
+    message_box.focus()
+    expect(message_box).to_be_focused()
+
+    send_and_wait(
+        page, mock, PlayerMuted(seq=6, player_id="p1", muted=True).model_dump_json()
+    )
+
+    expect(message_box).to_be_disabled()
+    expect(page.get_by_test_id("chat-toggle")).to_be_focused()
+    page.wait_for_timeout(QUIET_MS)
+    assert salon_is_open(page)
+    expect(page.get_by_test_id("chat-toggle")).to_be_focused()
+
+    page.keyboard.press("Tab")
+
+    expect_closed(page.get_by_test_id("salon"))
+    expect(page.get_by_test_id("chat-toggle")).to_have_attribute(
+        "aria-expanded", "false"
+    )
 
 
 # ---- AC-25: the host's settings and the backdrop ----------------------------------
