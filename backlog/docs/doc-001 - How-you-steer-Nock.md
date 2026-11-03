@@ -161,11 +161,11 @@ with the verdict:
   `accepted with open items` or `not accepted`, with the evidence.
 
 The PR auto-merges once CI is green: letting it merge is your acceptance. To
-send it back, **close** it or add the `needs-human` label, and **comment** what is
-wrong. A verdict `not accepted` does not auto-merge: it arrives labelled
-`needs-human` and waits for you. If you
-send it back, the lead adds fix tasks inside the same milestone. A fix task
-counts toward the budget, so a big send-back may also mean raising the size.
+send it back, **close** it or add the `needs-human` label, and **comment** what
+is wrong. A verdict `not accepted` does not auto-merge: it arrives labelled
+`needs-human` and waits for you. If you send it back, the lead adds fix tasks
+inside the same milestone. A fix task counts toward the budget, so a big
+send-back may also mean raising the size.
 
 **Circuit breaker:** if the budget is spent before the milestone is done, the
 lead stops and assigns the milestone to you, saying what works, what is
@@ -204,7 +204,7 @@ archive.
 | --- | --- | --- |
 | Monday | 15 min | Open the inbox and answer what is assigned to you. Bet, reshape or drop the pitches waiting. Say `continue`. |
 | During the week | 0 | Nothing, unless GitHub sends a `needs-human` notification. |
-| A milestone closes | 10 min | Read the verdict and look at the changed screens, then merge or send it back. |
+| A milestone closes | 10 min | Read the verdict and look at the changed screens, then let it merge, or close it or add `needs-human` to send it back. |
 | When you want to ship | 15 min | Cut a release and ask for the next pitches. |
 
 ## What you no longer do
@@ -213,7 +213,8 @@ archive.
 - Approve each spec change.
 - Answer the agents' technical questions.
 - Ask for each push or pull request.
-- Merge every PR (you merge only the held ones and the milestone PRs).
+- Merge every PR (you merge only the held ones, the `backlog: milestone` PRs
+  and a `not accepted` close).
 - Pick between technical options that are equivalent for players.
 
 ## Cheat sheet

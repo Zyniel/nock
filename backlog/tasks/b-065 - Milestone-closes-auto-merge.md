@@ -1,10 +1,10 @@
 ---
 id: B-065
 title: Milestone closes auto-merge
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-03T09:25:00Z'
-updated_date: '2026-11-03T09:26:00Z'
+updated_date: '2026-11-03T09:29:00Z'
 labels:
   - tooling
 milestone: m-2
@@ -24,12 +24,12 @@ ordinal: 53000
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -44,4 +44,12 @@ ordinal: 53000
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead: the edits as the human approved them in chat (2026-11-03).
+
+Review round 2 asked two doc-001 lines (weekly table, « What you no longer do ») and a reflow; the lead applied them without a third round: wording only, same policy.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A backlog: close PR now auto-merges once CI is green; the human stops it by closing it or adding needs-human. A not-accepted close carries needs-human and waits for the human; pitches and escalations never auto-merge. Changed: CLAUDE.md, the milestone skill (close step 4), doc-001, README. Review: round 2's remaining wording findings applied by the lead. Gate: --stage tests green (no code changed).
+<!-- SECTION:FINAL_SUMMARY:END -->
