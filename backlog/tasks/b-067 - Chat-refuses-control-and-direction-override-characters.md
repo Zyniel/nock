@@ -1,9 +1,10 @@
 ---
 id: B-067
 title: Chat refuses control and direction-override characters
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T16:08:00Z'
 labels:
   - domain:chat
 milestone: m-4
@@ -23,6 +24,8 @@ From DRAFT-029 (B-028's review). A chat text accepts control and bidirectional o
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A chat text holding a control or bidirectional override character is refused as nicknames are
+- [ ] #2 chat AC-9 (changed)
+- [ ] #3 chat AC-21 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -34,3 +37,19 @@ From DRAFT-029 (B-028's review). A chat text accepts control and bidirectional o
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: social/chat.md, widen the existing criterion on a chat text's checks (chat is past the budget).
+2. Tests: tests/test_chat_*.py.
+3. Quick gate: uv run python scripts/gate.py --specs chat --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: nicknames use an allow-list, so chat refuses Unicode Cc, Cf, Zl, Zp except U+000A, U+200C, U+200D (serving.md rule 9's set); only U+000A among line breaks stays allowed; invalid_message reused; a stored message with a refused character still loads (AC-21 widened).
+
+Lead: tag characters U+E0020-U+E007F allowed too, so subdivision flag emoji (England, Scotland, Wales) are not refused (spec-checker's side-effect note).
+<!-- SECTION:NOTES:END -->
