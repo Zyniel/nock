@@ -13,6 +13,8 @@ dependencies: []
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
 The row of `gameplay/modes.md` (race, teams) and the line under the table say "B-002 writes" the file, but the human dropped B-002 on 2026-10-29 (it was never imported as a task). Say instead that race and teams have no task, or drop the row until a milestone takes them.
+
+Also (« Spec splits » close): the `_map.md` note on criteria cited by more than one domain misses 004 AC-7, cited by both content/ipuz.md and content/library.md (already true between grid-files and library before the splits). One line for the spec-writer.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
