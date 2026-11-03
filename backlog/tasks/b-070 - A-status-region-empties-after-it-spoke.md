@@ -1,9 +1,10 @@
 ---
 id: B-070
 title: A status region empties after it spoke
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T16:07:00Z'
 labels:
   - domain:hud
 milestone: m-4
@@ -23,6 +24,8 @@ From DRAFT-054 (B-046). The room page's role=status region and each open sheet's
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A status region is empty a few seconds after its last message, and still announces each new one
+- [ ] #2 hud AC-26 (changed)
+- [ ] #3 hud AC-27 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -34,3 +37,17 @@ From DRAFT-054 (B-046). The room page's role=status region and each open sheet's
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: client/hud.md rule 17, widen AC-26 or AC-27 (hud is past the budget).
+2. Tests: tests/test_hud_status_region.py.
+3. Quick gate: uv run python scripts/gate.py --specs hud --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: 5 s after the last write (MESSAGE_HOLD_MS), counted from the write after the existing 50 ms clear; a new message replaces at once and restarts the 5 s; a repeated text is still announced.
+<!-- SECTION:NOTES:END -->
