@@ -59,7 +59,12 @@ help is wanted. The host can mute a player's chat and reactions.
 ### Chat
 
 7. `chat` is input. Its text, stripped as Python's `str.strip()` does, holds 1
-   to 280 code points, else `invalid_message` (`platform/realtime.md`). Then: a
+   to 280 code points and no character of Unicode general category Cc, Cf, Zl
+   or Zp but U+000A, U+200C, U+200D and the tags U+E0020 to U+E007F (the
+   controls and the bidirectional overrides and isolates, such as U+202E,
+   that nicknames refuse), else
+   `invalid_message` (`platform/realtime.md`). The check is the `chat`
+   message's: a message already in the history keeps its text. Then: a
    muted sender gets `muted`; a sender with 5 messages accepted in the last 10
    seconds (sliding: those after now − 10) is dropped, with no event and no
    answer; else one `chat_message` (seq, player, text unchanged) reaches every
@@ -212,9 +217,12 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   her box is empty. Two players sending 20 messages each at once get one order,
   the same on both and in a later snapshot, each sender's in sending order.
   (← 022 AC-1)
-- **AC-9** 280 `a` are sent; 281 `a`, `""` or three spaces get
-  `invalid_message`, unseen by others, the seq unchanged; `" salut "` arrives as
-  `salut`. The box keeps 280 of 300 typed characters, « Envoyer » is disabled
+- **AC-9** 280 `a` are sent; 281 `a`, `""`, three spaces, `"a\u202eb"`,
+  `"a\u0007b"` or `"a\u2028b"` get `invalid_message`, unseen by others, the
+  seq unchanged; `" salut "` arrives as `salut`, `"a\nb"`,
+  `"\U0001F469\u200d\U0001F4BB"` and
+  `"\U0001F3F4\U000E0067\U000E0062\U000E0073\U000E0063\U000E0074\U000E007F"`
+  as sent. The box keeps 280 of 300 typed characters, « Envoyer » is disabled
   when it is empty or blank, and `  salut  ` sends `salut`. (← 022 AC-2)
 - **AC-10** Bob's 👏 on IDES gives no event and reaches Bob and Ana once, with
   no seq and nothing logged; within 1 s both pages show 👏 on IDES. A 😮 shows,
@@ -287,7 +295,7 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
   `product.md`. (← 022 AC-19, 047 AC-12, 047 AC-14)
 - **AC-21** After 205 messages in a room, a joiner's snapshot carries the
   newest 200 in seq order, and so does the room loaded from the store; the
-  stream shows those 200.
+  stream shows those 200. A stored message holding U+202E loads with it.
 - **AC-22** With MIME selected and the picker open, the socket closes: within
   5 s « Réagir » and « Je bloque » are disabled and the picker is closed,
   nothing sent; the next snapshot enables both again. After a close 4001 both
@@ -301,7 +309,10 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 ## Edge cases
 
 - A text made only of whitespace that `str.strip()` removes but `trim()` keeps
-  (U+001C to U+001F, U+0085) gets `invalid_message` and is lost (AC-9).
+  (U+001C to U+001F, U+0085), or one holding a pasted U+202E, gets
+  `invalid_message` and is lost (AC-9).
+- A stored message holding a character rule 7 refuses loads and shows as it
+  is (AC-21).
 - The 201st message drops the oldest from the history (AC-21).
 - A room loaded with more than 200 messages in its history comes down to the
   newest 200 at its next message (AC-21).

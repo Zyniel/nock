@@ -418,6 +418,83 @@ def test_ac2_websocket_a_text_that_only_str_strip_empties_gets_invalid_message(
     assert seq_after == seq_before == 2
 
 
+# Texts that rule 7 refuses for a character of category Cc, Cf, Zl or Zp that is
+# neither U+000A, U+200C, U+200D nor a tag: the bidirectional override U+202E, the
+# bell U+0007 and the line separator U+2028 (`social/chat.md` AC-9).
+TEXTS_WITH_REFUSED_CHARACTERS = [
+    "a\u202eb",
+    "a\u0007b",
+    "a\u2028b",
+    "a\u2029b",
+    "a\u200bb",
+    "a\U000e0001b",
+]
+
+# Texts that rule 7 accepts as sent: a line feed, an emoji joined by U+200D (woman
+# technologist), and the flag of Scotland, a base flag followed by tags U+E0067 to
+# U+E007F.
+TEXTS_WITH_ALLOWED_CHARACTERS = [
+    "a\nb",
+    "a\u200cb",
+    "a\U000e0020b",
+    "\U0001f469\u200d\U0001f4bb",
+    "\U0001f3f4\U000e0067\U000e0062\U000e0073\U000e0063\U000e0074\U000e007f",
+]
+
+
+@pytest.mark.parametrize("text", TEXTS_WITH_REFUSED_CHARACTERS)
+def test_ac2_websocket_a_text_with_a_control_or_override_character_is_refused(
+    fx01_grid: Grid, dist_dir: Path, text: str
+) -> None:
+    with (
+        chat_room(fx01_grid, dist_dir, WS_CONFIG) as (client, registry, code),
+        contextlib.ExitStack() as stack,
+    ):
+        ana, bob = join_peers(stack, client, code, ["Ana", "Bob"])
+        bob_count = len(bob.messages())
+        ana_count = len(ana.messages())
+        seq_before = room_seq(registry, code)
+
+        ana.send_text(chat_json(text))
+        ana.wait_until(
+            lambda: len(errors_of(ana.messages()[ana_count:])) >= 1,
+            "an error",
+        )
+        ping_and_wait(ana)
+        ping_and_wait(bob)
+        refusals = errors_of(ana.messages()[ana_count:])
+        ana_chat = chat_messages_of(ana)
+        bob_meanwhile = without_pongs(bob.messages()[bob_count:])
+        seq_after = room_seq(registry, code)
+
+    assert refusals == [ErrorCode.INVALID_MESSAGE]
+    assert ana_chat == []
+    assert bob_meanwhile == []
+    assert seq_after == seq_before == 2
+
+
+@pytest.mark.parametrize("text", TEXTS_WITH_ALLOWED_CHARACTERS)
+def test_ac2_websocket_a_line_feed_a_joiner_and_tags_are_sent_as_they_are(
+    fx01_grid: Grid, dist_dir: Path, text: str
+) -> None:
+    with (
+        chat_room(fx01_grid, dist_dir, WS_CONFIG) as (client, _, code),
+        contextlib.ExitStack() as stack,
+    ):
+        ana, bob = join_peers(stack, client, code, ["Ana", "Bob"])
+
+        ana.send_text(chat_json(text))
+        wait_for_chat_count(ana, 1)
+        wait_for_chat_count(bob, 1)
+        ana_id = ana.you()
+        ana_messages = chat_messages_of(ana)
+        bob_messages = chat_messages_of(bob)
+
+    expected = ChatMessage(seq=3, player_id=ana_id, text=text)
+    assert ana_messages == [expected]
+    assert bob_messages == [expected]
+
+
 # ---- AC-2: the page's chat form ----
 
 
