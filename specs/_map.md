@@ -37,7 +37,7 @@ table, the naming rules and the glossary follow in the same change.
 | gameplay | `gameplay/hints.md` | check, reveal, the reveal budget, the hint limit, the Aide items | cells, room | 023, 024; 025 AC-1, AC-4 |
 | gameplay | `gameplay/votes.md` | the group vote on a grid check or a reveal, its banner | room, overlays | 025 AC-2, AC-3, AC-5 to AC-9; 047 AC-1 to AC-5, AC-13, AC-14 |
 | gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029; 046 AC-13; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
-| gameplay | `gameplay/modes.md` | race, teams (B-002, not written yet) | | 030, 031 (untested stubs) |
+| gameplay | `gameplay/modes.md` | race, teams (not written yet; no task) | | 030, 031 (untested stubs) |
 | social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
 | social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 013 AC-7, AC-8; 047 AC-12, AC-14 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
@@ -54,17 +54,18 @@ table, the naming rules and the glossary follow in the same change.
 | platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, entry and not-found pages, the opening, the brand | pages, foundation | 040 AC-14 to AC-25; 046 AC-1, AC-18 to AC-23; 048 AC-14 |
 | client | `client/foundation.md` | state lines, motion, colour tokens, fonts, icons, shared components, the focus ring, what a frame redraws | foundation, cells | 041; 040 AC-26; 048 AC-13 |
-| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
+| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, the status region, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
 criteria goes whole to its row; a criterion may be cited by more than one domain
 (043 AC-5 is cited by `hud` and `room`, 047 AC-13 by `votes` and `results`,
 047 AC-14 by `votes`, `results` and `chat`, 033 AC-5 by `account` and
-`erasure`), and each of them states the part its own screens hold.
+`erasure`, 004 AC-7 by `ipuz` and `library`), and each of them states the part
+its own screens hold.
 
-Every file of the table exists but `gameplay/modes.md`, which B-002 writes; until
-then nothing of race or teams is built.
+Every file of the table exists but `gameplay/modes.md` (race and teams: no task
+writes it); nothing of race or teams is built.
 
 ## Shared files
 
@@ -192,6 +193,7 @@ then nothing of race or teams is built.
 | effective value | the value each row of « Durées de vie des salons » shows (the override, else the environment value, else the default; every rule reads it) | `RoomRegistry.config` |
 | dry run | « Cela effacera N salons maintenant. » (how many rooms a proposed value would delete now; nothing saved) | `POST /api/ops/settings/dry-run` |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
+| status region | (not shown: the visually hidden `role="status"` region of the room page and of each open sheet, where announced messages are written; `client/hud.md` rules 17 and 18) | `StatusRegion.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
 | viewport | « Grille » (the grid's scroll area: the part of the grid the page shows at its zoom and scroll) | `GridViewport.svelte`, `gridLayout.ts` |
 | foundation, state line | (not shown: the tokens, fonts, icons, components and focus ring every screen is built from; the one line a page shows while waiting, empty, failed or done) | `app.css`, `icons.ts`, `--nock-*` |
