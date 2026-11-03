@@ -6,6 +6,7 @@ and booleans are strict. The grid sent to the browser never holds answers.
 
 from __future__ import annotations
 
+import unicodedata
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -17,6 +18,7 @@ from pydantic import (
     StrictBool,
     StringConstraints,
     TypeAdapter,
+    field_validator,
 )
 
 from nock.grid import Arrow, ClueCell, EmptyCell, Grid, LetterCell, Position
@@ -66,6 +68,47 @@ def _strip_text(value: object) -> object:
 ChatText = Annotated[
     str, Field(min_length=1, max_length=280), BeforeValidator(_strip_text)
 ]
+
+
+# Chat rule 7: an incoming chat text refuses the characters of these Unicode
+# general categories (controls, format characters, line and paragraph
+# separators), such as U+202E, which reverses the text that follows.
+REFUSED_CHAT_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
+# These stay allowed: the line feed, the two joiners that emoji sequences and
+# some scripts need, and the tags U+E0020 to U+E007F that flags are made of.
+ALLOWED_CHAT_CHARACTERS: frozenset[str] = frozenset(
+    {"\N{LINE FEED}", "\N{ZERO WIDTH NON-JOINER}", "\N{ZERO WIDTH JOINER}"}
+)
+FIRST_ALLOWED_TAG = 0xE0020
+LAST_ALLOWED_TAG = 0xE007F
+
+
+def _is_refused_in_chat(character: str) -> bool:
+    """Tell whether a chat text may not hold `character`."""
+    if character in ALLOWED_CHAT_CHARACTERS:
+        return False
+    if FIRST_ALLOWED_TAG <= ord(character) <= LAST_ALLOWED_TAG:
+        return False
+    return unicodedata.category(character) in REFUSED_CHAT_CATEGORIES
+
+
+def _refuse_control_characters(text: str) -> str:
+    """Return `text` when it holds no refused character.
+
+    Args:
+        text: A chat text, already stripped.
+
+    Returns:
+        `text`, unchanged.
+
+    Raises:
+        ValueError: `text` holds a character of REFUSED_CHAT_CATEGORIES that
+            is not allowed in a chat.
+    """
+    for character in text:
+        if _is_refused_in_chat(character):
+            raise ValueError(f"Character not allowed in a chat: {character!r}")
+    return text
 
 
 class Direction(StrEnum):
@@ -303,6 +346,13 @@ class Chat(ProtocolModel):
 
     type: Literal["chat"] = "chat"
     text: ChatText
+
+    # Only here, not on ChatText: a stored ChatMessage loads as it is (chat AC-21).
+    @field_validator("text")
+    @classmethod
+    def _text_holds_no_control_character(cls, text: str) -> str:
+        """Refuse a text holding a control or direction-override character."""
+        return _refuse_control_characters(text)
 
 
 class React(ProtocolModel):
