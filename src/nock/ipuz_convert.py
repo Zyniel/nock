@@ -16,6 +16,7 @@ from typing import NamedTuple
 from pydantic import BaseModel, ConfigDict, StrictBool, field_validator
 
 from nock.catalogue import (
+    FORMER_SUFFIX,
     GRID_FILE_SUFFIX,
     INDEX_FILE_NAME,
     CreditText,
@@ -27,7 +28,6 @@ from nock.grid import Grid
 from nock.grid_import import import_grid
 from nock.ipuz import GridFile, write_ipuz
 
-FORMER_SUFFIX = ".json"
 PUBLISHED_ON_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
@@ -119,11 +119,20 @@ def _convert_file(path: Path) -> _Conversion:
 def _convert_all(source: Path) -> list[_Conversion]:
     """Convert every former file of `source`, refusing at the first bad one."""
     conversions: list[_Conversion] = []
+    numbers_seen: set[int] = set()
     for name in _former_file_names(source):
         try:
-            conversions.append(_convert_file(source / name))
+            conversion = _convert_file(source / name)
         except (OSError, ValueError) as error:
             raise ValueError(f"{name}: invalid former grid file: {error}") from error
+        number = conversion.index_entry.number
+        if number in numbers_seen:
+            raise ValueError(
+                f"{name}: invalid former grid file: number {number} is already "
+                "held by an earlier file"
+            )
+        numbers_seen.add(number)
+        conversions.append(conversion)
     return conversions
 
 
