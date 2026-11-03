@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: done
+status: approved
 ---
 
 # lobby/rooms - Solo start, room creation and invitation
@@ -57,6 +57,8 @@ codes are limited per address.
    rule 11).
 7. A new room has seq 0, no player, empty cells, help mode `free`, a budget of 5
    letters and 1 word, no lock, its catalogue number and its creator, if any.
+   A room's state and its snapshot hold at most `MAX_PLAYERS` (8) players,
+   one constant for both.
 8. A code is 6 characters drawn with `secrets` from the 32 of
    `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`, drawn again while a room has it.
 
@@ -196,6 +198,8 @@ status band of « Connection lost »; before, the entry card of
 - **AC-18** On `/` with grids 3, 2 and 1, card 2's button is named « Jouer »
   and described « Grille n° 2 », card 3's described « Grille n° 3 »; on `/g/1`
   it is described « Grille n° 1 ».
+- **AC-19** A `RoomState` and a `Snapshot` with `MAX_PLAYERS` players are
+  valid; with `MAX_PLAYERS + 1`, each raises `ValidationError`.
 
 ## Edge cases
 
@@ -227,12 +231,13 @@ status band of « Connection lost »; before, the entry card of
 
 ## Code
 
-- `src/nock/room.py`: `new_room`. `src/nock/hub.py`: `RoomRegistry`, codes,
-  room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle, the
-  creation limit. `src/nock/settings.py`, `src/nock/__main__.py`: the
+- `src/nock/room.py`: `new_room`, `RoomState`, `MAX_PLAYERS`;
+  `src/nock/protocol.py`: `Snapshot`. `src/nock/hub.py`: `RoomRegistry`,
+  codes, room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle,
+  the creation limit. `src/nock/settings.py`, `src/nock/__main__.py`: the
   variable.
 - `web/src/lib/playGrid.ts`, `CatalogueItem.svelte`: « Jouer »; `roomRecord.ts`:
   the record; `PlayersPanel.svelte`: the link; `roomConnection.ts`,
   `RoomPage.svelte`, `roomSession.ts`: the throttled status.
 - Tests: `tests/test_spec_010_*`, `test_spec_011_*`, AC-7 of
-  `tests/test_spec_040_*`, and `tests/test_rooms_*` for AC-13 to AC-18.
+  `tests/test_spec_040_*`, and `tests/test_rooms_*` for AC-13 to AC-19.

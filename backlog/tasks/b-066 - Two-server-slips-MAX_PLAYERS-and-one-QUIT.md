@@ -1,9 +1,10 @@
 ---
 id: B-066
 title: 'Two server slips: MAX_PLAYERS and one QUIT'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T16:07:00Z'
 labels:
   - domain:rooms
   - domain:account
@@ -26,6 +27,8 @@ From DRAFT-027 and DRAFT-028 (B-028's review). RoomState.players and Snapshot.pl
 <!-- AC:BEGIN -->
 - [ ] #1 The player limit of a room's state and of a snapshot is MAX_PLAYERS, one constant
 - [ ] #2 A mail send sends QUIT once
+- [ ] #3 rooms AC-19 (new)
+- [ ] #4 account AC-9 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -37,3 +40,17 @@ From DRAFT-027 and DRAFT-028 (B-028's review). RoomState.players and Snapshot.pl
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: lobby/rooms.md (player limit) and account/account.md (mailer) only if a rule or criterion needs it; else code-only with tests.
+2. Tests: tests/test_rooms_*.py, tests/test_account_*.py (new criteria if any).
+3. Quick gate: uv run python scripts/gate.py --specs rooms,account --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: limit stays 8; QUIT criterion tested with a stub of smtplib.SMTP (a fake server sees one QUIT either way); a failed send also ends with one QUIT through the with-block, no extra criterion; joining.md's statement of the limit left as is.
+<!-- SECTION:NOTES:END -->
