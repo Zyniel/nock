@@ -1,9 +1,10 @@
 ---
 id: B-068
 title: 'Grid files: one number once, safe file names, a former grids folder named'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T17:29:00Z'
 labels:
   - domain:grid-files
 milestone: m-4
@@ -25,6 +26,9 @@ From DRAFT-004, 005, 006. The converter does not refuse two former files with on
 - [ ] #1 The converter refuses two former files with one number, names the second and writes nothing
 - [ ] #2 The index refuses a file name with ':' and two names equal but for case
 - [ ] #3 A grids/ with former files and no index logs the command that converts it
+- [ ] #4 grid-files AC-22 (new)
+- [ ] #5 grid-files AC-23 (new)
+- [ ] #6 grid-files AC-24 (new)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -36,3 +40,17 @@ From DRAFT-004, 005, 006. The converter does not refuse two former files with on
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: content/grid-files.md (the converter's refusal, the index's file names, a former grids folder's log line).
+2. Tests: tests/test_grid_files_*.py.
+3. Quick gate: uv run python scripts/gate.py --specs grid-files --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: the warning fires for a file the converter would read (a .json name not starting with '.'); case-folded equal names reuse the existing same-file refusal; the converter's own lower-case and ':' checks on source names left out (a draft at the milestone's close).
+<!-- SECTION:NOTES:END -->
