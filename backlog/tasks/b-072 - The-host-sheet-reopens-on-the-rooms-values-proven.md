@@ -1,9 +1,10 @@
 ---
 id: B-072
 title: The host sheet reopens on the room's values, proven
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
+updated_date: '2026-11-03T19:18:00Z'
 labels:
   - domain:host
 milestone: m-5
@@ -23,6 +24,7 @@ From DRAFT-062. B-050's first review round blocked on the host settings sheet re
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Typed values closed without saving are gone when the sheet reopens: the room's values show
+- [ ] #2 host AC-21 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -34,3 +36,17 @@ From DRAFT-062. B-050's first review round blocked on the host settings sheet re
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: lobby/host.md, widen AC-21 (host is past the budget).
+2. Tests: tests/test_host_settings_sheet.py.
+3. Quick gate: uv run python scripts/gate.py --specs host --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: option A, « closed without Enregistrer » (the test-writer picks the close); the reopen covers the help mode and the count, as rule 8 names both.
+<!-- SECTION:NOTES:END -->
