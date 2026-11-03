@@ -4,7 +4,7 @@ title: « Mes salons » reads ISO dates only; the unreachable closed status goes
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T20:11:00Z'
+updated_date: '2026-11-03T20:12:00Z'
 labels:
   - domain:summaries
   - domain:shell
@@ -38,7 +38,7 @@ From DRAFT-057 and DRAFT-020. isTime in web/src/lib/myRooms.ts uses Date.parse a
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -57,6 +57,8 @@ Lead: « Connexion perdue. » (room.status.closed) is unreachable (no closed sta
 Lead: the test-writer's two finished_at cases kept (rule 2 covers both fields).
 
 Review round 1: APPROVE. Not taken: 1 (negative offset or bare-date test cases: the spec's examples are tested); 2 and 4 (calendar check and history's stricter reading: in the follow-up draft for gameplay/results.md); 3 (the caption's wording: accurate).
+
+PR #126.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
