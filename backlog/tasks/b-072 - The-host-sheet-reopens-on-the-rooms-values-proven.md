@@ -4,7 +4,7 @@ title: The host sheet reopens on the room's values, proven
 status: Done
 assignee: []
 created_date: '2026-11-03T16:02:00Z'
-updated_date: '2026-11-03T20:40:00Z'
+updated_date: '2026-11-03T20:41:00Z'
 labels:
   - domain:host
 milestone: m-5
@@ -34,7 +34,7 @@ From DRAFT-062. B-050's first review round blocked on the host settings sheet re
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -51,6 +51,8 @@ From DRAFT-062. B-050's first review round blocked on the host settings sheet re
 Lead: option A, « closed without Enregistrer » (the test-writer picks the close); the reopen covers the help mode and the count, as rule 8 names both.
 
 Review round 1: APPROVE. Not taken: 1 (a separate test for the reopen: it saves a browser run, the name covers the lock scenario it continues); 2 (other closes than Escape: they share RoomSheet's onClosed path, as 019's AC-19 test already relies on).
+
+PR #127.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
