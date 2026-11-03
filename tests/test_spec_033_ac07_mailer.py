@@ -12,12 +12,18 @@ Three ways, as the criterion's brackets say:
   recorders that keep their arguments and calls: `starttls` and `tls` open a
   connection with a timeout of 10 s and a context that checks the certificate and
   the host name, log in when a user is set, send the message and quit.
+  The recorders also keep the QUIT that the end of a `with` block asks for, as the
+  real `smtplib` does, so that a second QUIT, or any command once the connection
+  is closed, shows in the calls.
 - HTTP, with the app of the "Test harness".
 
 The arguments of each replaced call are bound to the signature of the real
 `smtplib` method, so that a value passed by position or by keyword is read alike.
 Calls that ask nothing of the server (`ehlo`, `helo`, `ehlo_or_helo_if_needed`,
 `set_debuglevel`, `has_extn`, `noop`, `close`) are left out of the order checked.
+
+AC-9 of `account/account.md` widens this: one QUIT per message, the last command,
+after a send as after a failure.
 
 Edge cases checked as well: `security="none"` with smtplib replaced opens no TLS;
 a refusal raised by `send_message`, and a port where no server listens, also make
@@ -476,9 +482,9 @@ class SmtpRecorder:
             return self
 
         def exit_block(self: object, *args: object) -> None:
-            # A real `with` block ends with QUIT when nothing sent it before.
-            if "quit" not in recorder.names():
-                recorder.calls.append(SmtpCall("quit", {}))
+            # The real `__exit__` asks for QUIT every time, also when `quit()`
+            # closed the connection before (the server is not answering then).
+            recorder.calls.append(SmtpCall("quit", {}))
 
         namespace: dict[str, object] = {
             "__init__": init,
@@ -629,3 +635,52 @@ def test_ac7_a_failed_login_raises_mail_error_without_the_password(
     error = caught.value
     assert PASSWORD not in str(error)
     assert PASSWORD not in "".join(traceback.format_exception(error))
+
+
+def assert_one_quit_and_nothing_after(recorder: SmtpRecorder) -> None:
+    """The talk to the server holds one QUIT, and it is the last command."""
+    names = recorder.names()
+    assert names.count("quit") == 1, names
+    assert names[-1] == "quit", names
+
+
+@pytest.mark.parametrize(
+    ("security", "port", "user"),
+    [
+        ("none", 25, None),
+        ("starttls", 587, "nock"),
+        ("tls", 465, "nock"),
+    ],
+)
+def test_ac7_a_send_issues_one_quit_and_no_command_after_it(
+    recorder: SmtpRecorder, security: str, port: int, user: str | None
+) -> None:
+    password = PASSWORD if user is not None else None
+
+    send(smtp_settings("smtp.example", port, security, user, password), the_message())
+
+    assert_one_quit_and_nothing_after(recorder)
+
+
+@pytest.mark.parametrize(
+    ("failing_call", "failure"),
+    [
+        (
+            "send_message",
+            smtplib.SMTPRecipientsRefused({ANA_EMAIL: (550, b"No such user")}),
+        ),
+        ("login", smtplib.SMTPAuthenticationError(535, b"Authentication failed")),
+    ],
+)
+def test_ac7_a_failed_send_ends_with_one_quit(
+    monkeypatch: pytest.MonkeyPatch, failing_call: str, failure: Exception
+) -> None:
+    replaced = SmtpRecorder(fail_on=failing_call, failure=failure)
+    monkeypatch.setattr(smtplib, "SMTP", replaced.SMTP)
+    monkeypatch.setattr(smtplib, "SMTP_SSL", replaced.SMTP_SSL)
+    settings = smtp_settings("smtp.example", 587, "starttls", "nock", PASSWORD)
+
+    with pytest.raises(mail_error()):
+        send(settings, the_message())
+
+    assert_one_quit_and_nothing_after(replaced)
