@@ -39,9 +39,11 @@ load it.
 ## Decisions and escalations
 
 The human decides with pull requests and chat: a bet is the merge of a
-`backlog: milestone <name>` pull request, an acceptance the merge of a
-`backlog: close <name>` one, a release the push of a tag. Everything else
-merges on its own once CI is green.
+`backlog: milestone <name>` pull request, a release the push of a tag. A
+`backlog: close <name>` pull request merges on its own once CI is green, as
+everything else does: the human accepts by letting it merge, and stops it by
+closing it or adding `needs-human`. A close whose verdict is « not accepted »
+gets the `needs-human` label and waits for the human's merge.
 
 Escalate only these, with the task assigned to `@zyniel` and a comment giving
 the question, the options and your recommendation (`backlog task edit B-NNN -a
@@ -139,7 +141,8 @@ holds the stack and the modeling rules.
    implementer, then reviewer (two rounds at most), with one commit per phase;
    then the pull request, with auto-merge.
 3. `/milestone close <name>`: the verdict, checked by an independent review, in
-   a `backlog: close <name>` pull request; the human accepts by merging it.
+   a `backlog: close <name>` pull request; the human accepts by letting it
+   merge.
 
 `/task <milestone> <change>` adds one task inside a milestone's budget, or to
 Upkeep. A tooling task has the label `tooling` and no spec: the lead builds it
@@ -240,9 +243,10 @@ model price.
   On a clash, stop and report instead of renumbering.
 - One branch and one pull request per task. The lead pushes it, opens the pull
   request and turns on auto-merge (`gh pr merge --auto --merge`), except for a
-  held task and for the `backlog: milestone` and `backlog: close` pull requests,
-  which the human merges. Never merge one yourself. After the merge, delete the
-  remote branch and the worktree.
+  held task, a `backlog: milestone` pull request and a `backlog: close` one
+  whose verdict is « not accepted » (labelled `needs-human`), which the human
+  merges. Never merge one yourself. After the merge, delete the remote branch
+  and the worktree.
 
 ## Code standards
 
