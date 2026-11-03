@@ -33,7 +33,6 @@ REQUIRED_KEYS = [
     "room.status.connecting",
     "room.status.joined",
     "room.status.not_found",
-    "room.status.closed",
     "not_found.heading",
 ]
 
@@ -99,6 +98,7 @@ def test_ac22_fr_json_is_a_flat_catalogue_with_the_required_keys() -> None:
         assert value != "", key
     for required_key in REQUIRED_KEYS:
         assert required_key in messages
+    assert "room.status.closed" not in messages
 
 
 @pytest.mark.parametrize(
