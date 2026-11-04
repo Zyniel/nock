@@ -1,0 +1,37 @@
+---
+id: B-077
+title: A pen pans a zoomed grid
+status: To Do
+assignee: []
+created_date: '2026-11-04T01:17:00Z'
+labels:
+  - domain:viewport
+milestone: m-6
+dependencies: []
+documentation:
+  - specs/gameplay/viewport.md
+priority: medium
+ordinal: 65000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+From DRAFT-063, the human's option B (2026-11-04). Since B-050 (L15), web/src/lib/pinchPan.ts ignores every pointer but touch, so a pen no longer pans a zoomed grid. A pen drags like a finger: one pen on a zoomed grid pans it; a pen tap still selects the cell (a drag starts only past the threshold the finger uses). A mouse still never pans. Out of scope: pinch with a pen (one pointer), mouse panning.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 On a zoomed grid, a pen drag pans the grid as a finger drag does
+- [ ] #2 A pen tap still selects the cell it touched, and a mouse drag still pans nothing
+<!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [ ] #3 Tests committed before the code, or a tooling task
+- [ ] #4 Reviewer APPROVE within two rounds
+- [ ] #5 Full gate green
+- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+<!-- DOD:END -->
