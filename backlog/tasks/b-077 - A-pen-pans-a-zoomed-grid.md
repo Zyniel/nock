@@ -4,7 +4,7 @@ title: A pen pans a zoomed grid
 status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T10:04:00Z'
+updated_date: '2026-11-04T10:07:00Z'
 labels:
   - domain:viewport
 milestone: m-6
@@ -25,6 +25,8 @@ From DRAFT-063, the human's option B (2026-11-04). Since B-050 (L15), web/src/li
 <!-- AC:BEGIN -->
 - [ ] #1 On a zoomed grid, a pen drag pans the grid as a finger drag does
 - [ ] #2 A pen tap still selects the cell it touched, and a mouse drag still pans nothing
+- [ ] #3 viewport AC-2 (changed)
+- [ ] #4 viewport AC-20 (new)
 <!-- AC:END -->
 
 ## Definition of Done
