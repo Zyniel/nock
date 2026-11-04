@@ -31,7 +31,7 @@ From DRAFT-061 (L27 of the B-039 review), delegated by the human 2026-11-04. Upd
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -50,6 +50,8 @@ The two low advisories are deepmerge (GHSA-gcqx-w48m-w2h4) via @sveltejs/vite-pl
 Review round 1: CHANGES REQUESTED. Fixed: the lockfile is now written by npm 11 (CI's lts/*), so it keeps its ten libc fields; npm 10 had dropped them. The criterion is reworded by the lead: 'the two advisories gone' could never be met, since deepmerge 4.3.1 is the latest release and @sveltejs/vite-plugin-svelte 7.3.1 still needs it; the two low advisories stay, with no fix published. Gate: the full gate in three engines ran 16,903 passed and 2 failed under load (webkit test_server_offline_undo ac29, firefox test_spec_033_ac09 at 320x568); both pass when rerun alone, and neither depends on these packages. The lead accepts that run with the reruns; CI's gate runs on the pull request and after the merge.
 
 Review round 2: APPROVE.
+
+Pull request #135, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
