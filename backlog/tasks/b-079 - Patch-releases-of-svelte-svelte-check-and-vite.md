@@ -1,9 +1,10 @@
 ---
 id: B-079
 title: Patch releases of svelte, svelte-check and vite
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
+updated_date: '2026-11-04T01:19:00Z'
 labels:
   - tooling
 milestone: m-6
@@ -32,3 +33,11 @@ From DRAFT-061 (L27 of the B-039 review), delegated by the human 2026-11-04. Upd
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. No spec (tooling): npm update svelte svelte-check vite in web/ (lockfile only, ranges unchanged).
+2. npm audit: the two low advisories gone.
+3. Gate: the full gate, one engine at a time (chromium, firefox, webkit).
+<!-- SECTION:PLAN:END -->
