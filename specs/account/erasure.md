@@ -1,7 +1,7 @@
 ---
 area: account
 file: erasure
-status: approved
+status: done
 ---
 
 # account/erasure - Erasure, what is kept, history records, grid progress
