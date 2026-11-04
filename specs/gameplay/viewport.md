@@ -215,4 +215,5 @@ dashed edge.
   `web/src/lib/RoomPage.svelte` (its measure).
 - Tests: `tests/test_viewport_*`, `tests/test_spec_006_*` and the
   `tests/test_spec_042_*` files of the cited criteria; the pinch gestures of
-  AC-2 and AC-16 are checked in Chromium only (`product.md` rule 10).
+  AC-2 and AC-16 and the pen and mouse gestures of AC-20 are checked in
+  Chromium only (`product.md` rule 10).
