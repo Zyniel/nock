@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: viewport
-status: approved
+status: done
 ---
 
 # gameplay/viewport - The grid's drawing, cursors, fit, zoom and hyphen edges
