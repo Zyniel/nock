@@ -41,3 +41,9 @@ From DRAFT-061 (L27 of the B-039 review), delegated by the human 2026-11-04. Upd
 2. npm audit: the two low advisories gone.
 3. Gate: the full gate, one engine at a time (chromium, firefox, webkit).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+The two low advisories are deepmerge (GHSA-gcqx-w48m-w2h4) via @sveltejs/vite-plugin-svelte: no fix available upstream, so they stay; the patch bumps of the three packages are done.
+<!-- SECTION:NOTES:END -->
