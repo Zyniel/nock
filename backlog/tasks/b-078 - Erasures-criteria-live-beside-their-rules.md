@@ -4,7 +4,7 @@ title: Erasure's criteria live beside their rules
 status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T10:04:00Z'
+updated_date: '2026-11-04T10:08:00Z'
 labels:
   - domain:account
   - domain:erasure
@@ -26,6 +26,9 @@ From DRAFT-055, option B (the lead's pick, delegated by the human 2026-11-04). a
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 The three criteria are in erasure.md beside rules 3 and 4, their tests renamed and passing, and account.md no longer holds them
+- [ ] #2 erasure AC-15 (new, was account AC-2)
+- [ ] #3 erasure AC-16 (new, was account AC-10)
+- [ ] #4 erasure AC-17 (new, was account AC-13)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -50,4 +53,6 @@ From DRAFT-055, option B (the lead's pick, delegated by the human 2026-11-04). a
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead decisions: the moved criteria are erasure AC-15 (was account AC-2), AC-16 (AC-10), AC-17 (AC-13), right after AC-13 beside rule 3, not in number order. erasure.md at 16.4 KB and 17 criteria is accepted (account drops to 17.6 KB). No domain test existed: the three were proven by their pointers to tests/test_spec_033_* and test_spec_038_*, so no test moves.
+
+No test phase and no implementer: the moved criteria are proven by their unchanged pointers to tests/test_spec_033_* and test_spec_038_*.
 <!-- SECTION:NOTES:END -->
