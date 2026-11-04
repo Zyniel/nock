@@ -4,7 +4,7 @@ title: Erasure's criteria live beside their rules
 status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T01:19:00Z'
+updated_date: '2026-11-04T10:04:00Z'
 labels:
   - domain:account
   - domain:erasure
@@ -45,3 +45,9 @@ From DRAFT-055, option B (the lead's pick, delegated by the human 2026-11-04). a
 2. Tests: the domain tests renamed and moved; pointers move as they are.
 3. Quick gate: uv run python scripts/gate.py --specs account,erasure --browsers chromium
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead decisions: the moved criteria are erasure AC-15 (was account AC-2), AC-16 (AC-10), AC-17 (AC-13), right after AC-13 beside rule 3, not in number order. erasure.md at 16.4 KB and 17 criteria is accepted (account drops to 17.6 KB). No domain test existed: the three were proven by their pointers to tests/test_spec_033_* and test_spec_038_*, so no test moves.
+<!-- SECTION:NOTES:END -->
