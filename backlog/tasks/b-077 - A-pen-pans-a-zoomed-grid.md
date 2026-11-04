@@ -1,9 +1,10 @@
 ---
 id: B-077
 title: A pen pans a zoomed grid
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
+updated_date: '2026-11-04T01:19:00Z'
 labels:
   - domain:viewport
 milestone: m-6
@@ -35,3 +36,11 @@ From DRAFT-063, the human's option B (2026-11-04). Since B-050 (L15), web/src/li
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: gameplay/viewport.md rule 3 (which pointers pan) and its criterion.
+2. Tests: tests/test_viewport_*.py (a pen drag pans, a pen tap selects, a mouse drag pans nothing).
+3. Quick gate: uv run python scripts/gate.py --specs viewport --browsers chromium
+<!-- SECTION:PLAN:END -->
