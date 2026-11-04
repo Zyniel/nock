@@ -4,7 +4,7 @@ title: Patch releases of svelte, svelte-check and vite
 status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T01:19:00Z'
+updated_date: '2026-11-04T12:06:00Z'
 labels:
   - tooling
 milestone: m-6
@@ -21,7 +21,7 @@ From DRAFT-061 (L27 of the B-039 review), delegated by the human 2026-11-04. Upd
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The lockfile holds the latest patches of the three packages in range, npm audit shows the two advisories gone, and the gate passes in the three engines
+- [ ] #1 The lockfile holds the latest patches of the three packages in range, npm audit shows no advisory that a release fixes, and the gate passes in the three engines
 <!-- AC:END -->
 
 ## Definition of Done
@@ -46,4 +46,6 @@ From DRAFT-061 (L27 of the B-039 review), delegated by the human 2026-11-04. Upd
 
 <!-- SECTION:NOTES:BEGIN -->
 The two low advisories are deepmerge (GHSA-gcqx-w48m-w2h4) via @sveltejs/vite-plugin-svelte: no fix available upstream, so they stay; the patch bumps of the three packages are done.
+
+Review round 1: CHANGES REQUESTED. Fixed: the lockfile is now written by npm 11 (CI's lts/*), so it keeps its ten libc fields; npm 10 had dropped them. The criterion is reworded by the lead: 'the two advisories gone' could never be met, since deepmerge 4.3.1 is the latest release and @sveltejs/vite-plugin-svelte 7.3.1 still needs it; the two low advisories stay, with no fix published. Gate: the full gate in three engines ran 16,903 passed and 2 failed under load (webkit test_server_offline_undo ac29, firefox test_spec_033_ac09 at 320x568); both pass when rerun alone, and neither depends on these packages. The lead accepts that run with the reruns; CI's gate runs on the pull request and after the merge.
 <!-- SECTION:NOTES:END -->
