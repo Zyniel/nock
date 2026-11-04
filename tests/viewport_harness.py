@@ -602,11 +602,15 @@ def tap_shown_part(page: Page, target: Locator) -> None:
     page.touchscreen.tap(x, y)
 
 
-def _send_touch(session: CDPSession, kind: str, point: Point | None) -> None:
-    """One `Input.dispatchTouchEvent` with one finger at `point`, or none."""
+def _send_touch(session: CDPSession, kind: str, fingers: list[Point]) -> None:
+    """One `Input.dispatchTouchEvent` with the fingers now on the screen.
+
+    Finger `n` of the list has the touch id `n`. An id that is new in a `touchMove`
+    presses a finger; a `touchEnd` with no finger lifts them all.
+    """
     touch_points: list[dict[str, float]] = []
-    if point is not None:
-        touch_points.append({"x": point[0], "y": point[1], "id": 0})
+    for identifier, finger in enumerate(fingers):
+        touch_points.append({"x": finger[0], "y": finger[1], "id": identifier})
     event = {"type": kind, "touchPoints": touch_points}
     session.send("Input.dispatchTouchEvent", event)
 
@@ -614,15 +618,22 @@ def _send_touch(session: CDPSession, kind: str, point: Point | None) -> None:
 def _send_mouse(
     session: CDPSession, pointer: Pointer, kind: str, point: Point, pressed: bool
 ) -> None:
-    """One `Input.dispatchMouseEvent` of a pen or a mouse, its tip down or not."""
+    """One `Input.dispatchMouseEvent` of a pen or a mouse, its tip down or not.
+
+    A move with the tip up is a hover and names no button; a press, a release and
+    a move with the tip down name the left one.
+    """
     pressed_buttons = 1 if pressed else 0
+    button = "left"
+    if kind == "mouseMoved" and not pressed:
+        button = "none"
     session.send(
         "Input.dispatchMouseEvent",
         {
             "type": kind,
             "x": point[0],
             "y": point[1],
-            "button": "left",
+            "button": button,
             "buttons": pressed_buttons,
             "clickCount": 1,
             "pointerType": pointer.value,
@@ -647,8 +658,8 @@ def tap_with(page: Page, pointer: Pointer, point: Point) -> None:
     session = page.context.new_cdp_session(page)
     try:
         if pointer == Pointer.TOUCH:
-            _send_touch(session, "touchStart", point)
-            _send_touch(session, "touchEnd", None)
+            _send_touch(session, "touchStart", [point])
+            _send_touch(session, "touchEnd", [])
         else:
             _send_mouse(session, pointer, "mouseMoved", point, pressed=False)
             _send_mouse(session, pointer, "mousePressed", point, pressed=True)
@@ -670,10 +681,10 @@ def drag_with(page: Page, pointer: Pointer, start: Point, offset: Point) -> None
     session = page.context.new_cdp_session(page)
     try:
         if pointer == Pointer.TOUCH:
-            _send_touch(session, "touchStart", start)
+            _send_touch(session, "touchStart", [start])
             for point in path:
-                _send_touch(session, "touchMove", point)
-            _send_touch(session, "touchEnd", None)
+                _send_touch(session, "touchMove", [point])
+            _send_touch(session, "touchEnd", [])
         else:
             _send_mouse(session, pointer, "mouseMoved", start, pressed=False)
             _send_mouse(session, pointer, "mousePressed", start, pressed=True)
@@ -684,27 +695,39 @@ def drag_with(page: Page, pointer: Pointer, start: Point, offset: Point) -> None
         session.detach()
 
 
-def drag_pen_beside_a_finger(
-    page: Page, finger: Point, start: Point, offset: Point
+def pinch_beside_a_pen(
+    page: Page,
+    held_finger: Point,
+    pen: tuple[Point, Point],
+    moving_finger: tuple[Point, Point],
 ) -> None:
-    """Hold a finger still while a pen is dragged, then lift the pen, then the finger.
+    """Pinch with two fingers while a pen, dragged first, stays pressed beside them.
+
+    A first finger goes down and stays still; the pen goes down and is dragged by
+    its offset; a second finger goes down and is dragged by its offset; the
+    fingers lift, then the pen.
 
     Args:
-        page: The page to drag on.
-        finger: Where the finger stays down.
-        start: Where the pen goes down.
-        offset: How far the pen moves before it lifts.
+        page: The page to pinch on.
+        held_finger: Where the first finger stays down.
+        pen: Where the pen goes down, and how far it moves before it stays still.
+        moving_finger: Where the second finger goes down, and how far it moves.
     """
-    path = _drag_path(start, offset)
+    pen_start, pen_offset = pen
+    pen_path = _drag_path(pen_start, pen_offset)
+    finger_start, finger_offset = moving_finger
+    finger_path = _drag_path(finger_start, finger_offset)
     session = page.context.new_cdp_session(page)
     try:
-        _send_touch(session, "touchStart", finger)
-        _send_mouse(session, Pointer.PEN, "mouseMoved", start, pressed=False)
-        _send_mouse(session, Pointer.PEN, "mousePressed", start, pressed=True)
-        for point in path:
+        _send_touch(session, "touchStart", [held_finger])
+        _send_mouse(session, Pointer.PEN, "mouseMoved", pen_start, pressed=False)
+        _send_mouse(session, Pointer.PEN, "mousePressed", pen_start, pressed=True)
+        for point in pen_path:
             _send_mouse(session, Pointer.PEN, "mouseMoved", point, pressed=True)
-            _send_touch(session, "touchMove", finger)
-        _send_mouse(session, Pointer.PEN, "mouseReleased", path[-1], pressed=False)
-        _send_touch(session, "touchEnd", None)
+        _send_touch(session, "touchMove", [held_finger, finger_start])
+        for point in finger_path:
+            _send_touch(session, "touchMove", [held_finger, point])
+        _send_touch(session, "touchEnd", [])
+        _send_mouse(session, Pointer.PEN, "mouseReleased", pen_path[-1], pressed=False)
     finally:
         session.detach()
