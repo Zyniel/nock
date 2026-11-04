@@ -1,9 +1,10 @@
 ---
 id: B-078
 title: Erasure's criteria live beside their rules
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
+updated_date: '2026-11-04T01:19:00Z'
 labels:
   - domain:account
   - domain:erasure
@@ -36,3 +37,11 @@ From DRAFT-055, option B (the lead's pick, delegated by the human 2026-11-04). a
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Spec: account/account.md AC-2, AC-10, AC-13 move to account/erasure.md beside rules 3 and 4.
+2. Tests: the domain tests renamed and moved; pointers move as they are.
+3. Quick gate: uv run python scripts/gate.py --specs account,erasure --browsers chromium
+<!-- SECTION:PLAN:END -->
