@@ -22,8 +22,7 @@ interface Finger {
 // The pen pressed on the viewport, where it went down and where it is now.
 interface Pen {
   pointerId: number
-  startX: number
-  startY: number
+  start: Finger
   clientX: number
   clientY: number
 }
@@ -60,8 +59,7 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
   function onPenDown(event: PointerEvent): void {
     pen = {
       pointerId: event.pointerId,
-      startX: event.clientX,
-      startY: event.clientY,
+      start: { clientX: event.clientX, clientY: event.clientY },
       clientX: event.clientX,
       clientY: event.clientY,
     }
@@ -101,6 +99,13 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
   }
 
   function onPenMove(event: PointerEvent, pressedPen: Pen): void {
+    // A pen that moves with its tip up was lifted where the viewport did not
+    // hear it: it is forgotten and only hovers.
+    const isTipDown = (event.buttons & 1) === 1
+    if (!isTipDown) {
+      pen = null
+      return
+    }
     viewport.scrollLeft -= event.clientX - pressedPen.clientX
     viewport.scrollTop -= event.clientY - pressedPen.clientY
     pressedPen.clientX = event.clientX
@@ -108,10 +113,7 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
     if (isPenDragged) {
       return
     }
-    const distance = distanceBetween(
-      { clientX: pressedPen.startX, clientY: pressedPen.startY },
-      pressedPen,
-    )
+    const distance = distanceBetween(pressedPen.start, pressedPen)
     if (distance > PEN_TAP_LIMIT_PX) {
       isPenDragged = true
       // From now on the viewport keeps the pen until it lifts, even if it
@@ -142,8 +144,7 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
   }
 
   function onPointerEnd(event: PointerEvent): void {
-    if (pen !== null && event.pointerId === pen.pointerId) {
-      pen = null
+    if (event.pointerType === 'pen') {
       return
     }
     fingers.delete(event.pointerId)
@@ -151,6 +152,15 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
       startDistance = 0
     }
     startPinchIfTwoFingers()
+  }
+
+  // Listens on the whole window, not only on the viewport: a pen pressed on
+  // the viewport and lifted beside it, before it moved far enough to be
+  // captured, is forgotten too.
+  function onPenLifted(event: PointerEvent): void {
+    if (pen !== null && event.pointerId === pen.pointerId) {
+      pen = null
+    }
   }
 
   // A pressed pen dragged over the clue texts would select them, and the
@@ -195,6 +205,8 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
   viewport.addEventListener('pointermove', onPointerMove)
   viewport.addEventListener('pointerup', onPointerEnd)
   viewport.addEventListener('pointercancel', onPointerEnd)
+  window.addEventListener('pointerup', onPenLifted)
+  window.addEventListener('pointercancel', onPenLifted)
   viewport.addEventListener('selectstart', onSelectStart)
   viewport.addEventListener('click', onClick, true)
   return {
@@ -203,6 +215,8 @@ export function pinchPan(viewport: HTMLElement, grid: PinchPanZoom): { destroy: 
       viewport.removeEventListener('pointermove', onPointerMove)
       viewport.removeEventListener('pointerup', onPointerEnd)
       viewport.removeEventListener('pointercancel', onPointerEnd)
+      window.removeEventListener('pointerup', onPenLifted)
+      window.removeEventListener('pointercancel', onPenLifted)
       viewport.removeEventListener('selectstart', onSelectStart)
       viewport.removeEventListener('click', onClick, true)
     },
