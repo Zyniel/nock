@@ -4,7 +4,7 @@ title: A pen pans a zoomed grid
 status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T01:19:00Z'
+updated_date: '2026-11-04T10:04:00Z'
 labels:
   - domain:viewport
 milestone: m-6
@@ -44,3 +44,9 @@ From DRAFT-063, the human's option B (2026-11-04). Since B-050 (L15), web/src/li
 2. Tests: tests/test_viewport_*.py (a pen drag pans, a pen tap selects, a mouse drag pans nothing).
 3. Quick gate: uv run python scripts/gate.py --specs viewport --browsers chromium
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead decisions: no drag-threshold number in the spec (no spec or code has one; AC-20 sets a still tap against a 100 px drag). The code drops a click that an engine fires after a pen drag, with a small movement limit for the pen only; the finger keeps the browser's behaviour. Pinch counts touch pointers only. Whether AC-20 needs a Chromium-only note is the test-writer's call.
+<!-- SECTION:NOTES:END -->
