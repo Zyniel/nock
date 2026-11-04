@@ -253,8 +253,9 @@ erasure must never undo.
 
 - Sign-in, the session, the account's rooms, the sheet and the page, including
   « Supprimer mon compte » and what the device forgets on a 204:
-  `account/account.md`. AC-15 to AC-17 check part of that behaviour with
-  rules 3 and 4; its rules stay there.
+  `account/account.md`. AC-15 to AC-17 check part of that behaviour together
+  with rules 3 and 4; the rules of that behaviour stay in
+  `account/account.md`.
 - An export of the account, a confirmation link or a grace period before
   deleting, keeping creator rooms alive; erasing chat lines or backups.
 - Pushing a device's progress up to the account; a guest's progress across

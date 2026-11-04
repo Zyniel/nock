@@ -4,7 +4,7 @@ title: Erasure's criteria live beside their rules
 status: In Progress
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T10:08:00Z'
+updated_date: '2026-11-04T10:45:00Z'
 labels:
   - domain:account
   - domain:erasure
@@ -55,4 +55,6 @@ From DRAFT-055, option B (the lead's pick, delegated by the human 2026-11-04). a
 Lead decisions: the moved criteria are erasure AC-15 (was account AC-2), AC-16 (AC-10), AC-17 (AC-13), right after AC-13 beside rule 3, not in number order. erasure.md at 16.4 KB and 17 criteria is accepted (account drops to 17.6 KB). No domain test existed: the three were proven by their pointers to tests/test_spec_033_* and test_spec_038_*, so no test moves.
 
 No test phase and no implementer: the moved criteria are proven by their unchanged pointers to tests/test_spec_033_* and test_spec_038_*.
+
+Review round 1: APPROVE. Taken: the Out of scope sentence reworded. Not taken: cutting AC-15 down to its purge sentence (the task moves the criteria whole, and every clause stays proven by its pointer); the sizes were already accepted.
 <!-- SECTION:NOTES:END -->
