@@ -8,7 +8,9 @@ upright, the in-app keyboard showing unless the test hides it). "AC-11's start"
 is FX-02 zoomed to 2 by a pinch from 100 to 200 px apart (`spec006_harness`'s
 `pinch`, AC-2's), then the viewport scrolled back to the grid's top-left corner,
 with nothing selected. At that zoom a FX-02 cell is about 52.75 px and the
-viewport about 344 by 478 px.
+viewport about 344 by 478 px. Its opening, the readers of the scroll and the
+selection, and the taps on the shown part of a cell are in `viewport_harness`,
+which the pen tests of AC-20 share.
 
 Choices where the spec leaves room:
 
@@ -50,24 +52,23 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.grid import Grid
-from nock.protocol import GridView, grid_view
+from nock.protocol import grid_view
 from spec006_harness import pan, pinch
 from spec019_harness import OpenWindow, window_opener, with_letter_cells
-from spec042_harness import (
-    Box,
-    box_of,
-    cell_at,
-    me,
-    open_room,
-    seed_value,
+from spec042_harness import Box, box_of, cell_at
+from spec044_harness import expect_no_keyboard, key_of
+from viewport_harness import (
+    expect_selected,
+    open_ac11_start,
+    open_phone_room,
+    open_zoomed,
+    read_scroll,
+    tap_shown_part,
+    viewport_of,
+    wait_two_frames,
 )
-from spec044_harness import KEYBOARD_HIDDEN_KEY, expect_no_keyboard, key_of
 
-PHONE_WIDTH = 360
-PHONE_HEIGHT = 740
-# Fingers from 100 to 200 px apart double the zoom (rule 3), 100 to 150 px
-# multiply it by 1.5.
-PINCH_TO_TWO = (100.0, 200.0)
+# Fingers from 100 to 150 px apart multiply the zoom by 1.5 (rule 3).
 PINCH_TWO_TO_THREE = (100.0, 150.0)
 SCROLL_TOLERANCE_PX = 1.0
 MAX_PANS = 6
@@ -92,13 +93,6 @@ JAMBE_UP_STEPS = [5, 4, 3, 2]
 # ECHEC, « Contraire d'une réussite » in (16, 5): (16, 6) to (16, 10).
 ECHEC_FIRST = (16, 6)
 
-# Two animation frames: a scroll made at once has happened, an animated one not.
-TWO_FRAMES_SCRIPT = (
-    "() => new Promise(resolve =>"
-    " requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))))"
-)
-SCROLL_SCRIPT = "element => [element.scrollLeft, element.scrollTop]"
-SCROLL_TO_CORNER_SCRIPT = "element => element.scrollTo(0, 0)"
 AT_BOTTOM_RIGHT_SCRIPT = (
     "element => element.scrollLeft >= element.scrollWidth - element.clientWidth - 1"
     " && element.scrollTop >= element.scrollHeight - element.clientHeight - 1"
@@ -145,28 +139,11 @@ def fx02_grid(fx02_text: str) -> Grid:
 # ---- Reading the viewport ---------------------------------------------------------
 
 
-def viewport_of(page: Page) -> Locator:
-    """The grid's viewport, the element that scrolls (`grid-viewport`)."""
-    return page.get_by_test_id("grid-viewport")
-
-
-def read_scroll(viewport: Locator) -> tuple[float, float]:
-    """The viewport's scroll, as (left, top)."""
-    values = viewport.evaluate(SCROLL_SCRIPT)
-    assert isinstance(values, list), values
-    return float(values[0]), float(values[1])
-
-
 def scrolled_ancestors(viewport: Locator) -> list[str]:
     """The window and the viewport's ancestors that are scrolled (empty: none)."""
     scrolled = viewport.evaluate(SCROLLED_ANCESTORS_SCRIPT)
     assert isinstance(scrolled, list), scrolled
     return [str(item) for item in scrolled]
-
-
-def wait_two_frames(page: Page) -> None:
-    """Wait two animation frames: a scroll made at once is done by then."""
-    page.evaluate(TWO_FRAMES_SCRIPT)
 
 
 def overlap(first_low: float, first_high: float, low: float, high: float) -> float:
@@ -218,34 +195,6 @@ def clue_at(page: Page, row: int, column: int, clue_index: int) -> Locator:
     return cell_at(page, row, column).locator(selector)
 
 
-def tap_shown_part(page: Page, target: Locator) -> None:
-    """Touch the centre of the part of a cell or clue that the viewport shows."""
-    shown = box_of(target)
-    view = box_of(viewport_of(page))
-    left = max(shown.left, view.left)
-    right = min(shown.right, view.right)
-    top = max(shown.top, view.top)
-    bottom = min(shown.bottom, view.bottom)
-    assert left < right, f"{shown} is not in the viewport {view} across"
-    assert top < bottom, f"{shown} is not in the viewport {view} down"
-    page.touchscreen.tap((left + right) / 2, (top + bottom) / 2)
-
-
-def expect_selected(page: Page, row: int, column: int, direction: str) -> None:
-    """Wait until the grid's selection is (row, column) in `direction`.
-
-    Args:
-        page: The room page.
-        row: The selected cell's row.
-        column: The selected cell's column.
-        direction: `"across"` or `"down"`.
-    """
-    grid = page.get_by_test_id("grid")
-    expect(grid).to_have_attribute("data-selected-row", str(row))
-    expect(grid).to_have_attribute("data-selected-column", str(column))
-    expect(grid).to_have_attribute("data-direction", direction)
-
-
 def type_letter(page: Page, letter: str, typing: str) -> None:
     """Type a capital letter with the in-app key or on the focused grid."""
     if typing == IN_APP_KEYS:
@@ -254,46 +203,7 @@ def type_letter(page: Page, letter: str, typing: str) -> None:
         page.keyboard.press(letter.lower())
 
 
-# ---- Opening the room -------------------------------------------------------------
-
-
-def open_phone_room(
-    window: OpenWindow, base_url: str, view: GridView, *, keyboard_hidden: bool
-) -> Page:
-    """Open the mocked room on a touch phone held upright, at zoom 1."""
-    page = window(PHONE_WIDTH, PHONE_HEIGHT, True)
-    if keyboard_hidden:
-        seed_value(page, KEYBOARD_HIDDEN_KEY, "true")
-    open_room(page, base_url, view, [me()])
-    if keyboard_hidden:
-        expect_no_keyboard(page)
-    expect(viewport_of(page)).to_have_attribute("data-zoom", "1")
-    return page
-
-
-def open_zoomed(
-    window: OpenWindow, base_url: str, view: GridView, *, keyboard_hidden: bool
-) -> Page:
-    """Open the room on a phone, zoom to 2 and scroll back to the top-left corner.
-
-    Returns:
-        The page, nothing selected, the viewport's scroll at (0, 0).
-    """
-    page = open_phone_room(window, base_url, view, keyboard_hidden=keyboard_hidden)
-    viewport = viewport_of(page)
-    start, end = PINCH_TO_TWO
-    pinch(page, viewport, start, end)
-    expect(viewport).to_have_attribute("data-zoom", "2")
-    viewport.evaluate(SCROLL_TO_CORNER_SCRIPT)
-    wait_two_frames(page)
-    assert read_scroll(viewport) == (0.0, 0.0)
-    expect(page.get_by_test_id("grid")).to_have_attribute("data-selected-row", "")
-    return page
-
-
-def open_ac11_start(window: OpenWindow, base_url: str, grid: Grid) -> Page:
-    """AC-11's start: FX-02 zoomed to 2, at the grid's top-left corner."""
-    return open_zoomed(window, base_url, grid_view(grid), keyboard_hidden=False)
+# ---- Panning ----------------------------------------------------------------------
 
 
 def pan_to_bottom_right(page: Page, viewport: Locator) -> None:

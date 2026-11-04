@@ -4,6 +4,12 @@ AC-1 starts with the shape of FX-02 (the fixture grid), then opens a room on it:
 at-load checks run in all three engines, the pinch and pan checks in Chromium only
 (touch input through the Chrome DevTools Protocol). The shared setup is in
 `spec006_harness`.
+
+viewport AC-2 widened the pan to a pen (`specs/gameplay/viewport.md` rule 3): a pen
+pans as one finger does and never zooms, alone or beside a finger. A pen is a real
+`pen` pointer sent by the protocol's `Input.dispatchMouseEvent`
+(`viewport_harness`'s `drag_with`), dragged like `pan`'s finger: from the viewport
+centre by -200 px in x and y.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from spec006_harness import (
     pan,
     pinch,
 )
+from viewport_harness import Pointer, drag_pen_beside_a_finger, drag_with
 
 ZOOM_PATTERN = re.compile(r"^\d+(\.\d{1,2})?$")
 MAX_PINCHES = 5
@@ -34,6 +41,13 @@ SMALL_PINCH_START = 40.0
 BIG_PINCH_END = 300.0
 EPSILON = 1e-6
 FX02_WORD_COUNT = 47
+# `pan`'s drag: from the viewport centre by -200 px in x and y.
+PAN_OFFSET = (-200.0, -200.0)
+# A finger held 50 px left of the viewport centre while a pen goes from 50 px to
+# 150 px right of it: two fingers that did so would double the zoom.
+FINGER_FROM_CENTRE = -50.0
+PEN_FROM_CENTRE = 50.0
+PEN_SPREAD = (100.0, 0.0)
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
@@ -90,6 +104,20 @@ def client_size(viewport: Locator) -> tuple[float, float]:
 
 # ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
 # `pinch` and `pan` are in `spec006_harness`.
+
+
+def viewport_centre(viewport: Locator) -> tuple[float, float]:
+    """The centre of the viewport's box, as (x, y) in CSS px of the page."""
+    box = box_of(viewport)
+    return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+
+
+def pan_with(page: Page, viewport: Locator, pointer: Pointer) -> None:
+    """Pan with one finger (`pan`) or drag a pen the same way."""
+    if pointer == Pointer.TOUCH:
+        pan(page, viewport)
+    else:
+        drag_with(page, pointer, viewport_centre(viewport), PAN_OFFSET)
 
 
 def pinch_out(page: Page, viewport: Locator) -> None:
@@ -334,17 +362,19 @@ def test_ac1_pinch_out_raises_the_zoom_up_to_the_maximum(
 
 
 @pytest.mark.only_browser("chromium")
+@pytest.mark.parametrize("pointer", [Pointer.TOUCH, Pointer.PEN])
 def test_ac1_pan_scrolls_the_zoomed_grid_in_both_directions(
     phone_page: Page,
     live_server: str,
     room_registry: RoomRegistry,
     fx02_grid: Grid,
+    pointer: Pointer,
 ) -> None:
     viewport = open_room(phone_page, live_server, room_registry, fx02_grid)
     pinch_out_to_max(phone_page, viewport)
     scroll_before = viewport.evaluate("e => [e.scrollLeft, e.scrollTop]")
 
-    pan(phone_page, viewport)
+    pan_with(phone_page, viewport, pointer)
 
     handle = viewport.element_handle()
     assert handle is not None
@@ -468,3 +498,39 @@ def test_ac1_a_one_finger_drag_never_changes_the_zoom(
     phone_page.wait_for_timeout(SETTLE_MS)
 
     assert read_zoom(viewport) == zoom_before
+
+
+@pytest.mark.only_browser("chromium")
+def test_ac1_a_pen_drag_never_changes_the_zoom(
+    phone_page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx02_grid: Grid,
+) -> None:
+    viewport = open_room(phone_page, live_server, room_registry, fx02_grid)
+    pinch_out(phone_page, viewport)
+    wait_for_zoom(phone_page, viewport, f"> 1 + {EPSILON}", 1.0)
+    zoom_before = read_zoom(viewport)
+
+    pan_with(phone_page, viewport, Pointer.PEN)
+
+    phone_page.wait_for_timeout(SETTLE_MS)
+    assert read_zoom(viewport) == zoom_before
+
+
+@pytest.mark.only_browser("chromium")
+def test_ac1_a_pen_moving_away_from_a_finger_never_changes_the_zoom(
+    phone_page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx02_grid: Grid,
+) -> None:
+    viewport = open_room(phone_page, live_server, room_registry, fx02_grid)
+    centre_x, centre_y = viewport_centre(viewport)
+    finger = (centre_x + FINGER_FROM_CENTRE, centre_y)
+    pen_start = (centre_x + PEN_FROM_CENTRE, centre_y)
+
+    drag_pen_beside_a_finger(phone_page, finger, pen_start, PEN_SPREAD)
+
+    phone_page.wait_for_timeout(SETTLE_MS)
+    assert read_zoom(viewport) == 1.0
