@@ -11,22 +11,10 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec004_harness import grid_from_text, make_reference_catalogue
-
 PLAY_NAME = "Jouer"  # `catalogue.play`
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT (also served by `live_server`)."""
-    return make_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.mark.parametrize(

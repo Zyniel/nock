@@ -23,8 +23,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
-
 from host_harness import schema_version
 from lifetime_harness import select_rows, set_schema_version, table_rows
 from nock.grid import Grid
@@ -32,7 +30,6 @@ from nock.room import RoomState, new_room
 from nock.store import RoomStore
 from server_harness import snapshot_seqs
 from spec018_harness import letter_cells
-from spec032_harness import grid_from_text
 from spec034_harness import ANA, CODE, TA, Play, T
 
 OTHER_ROOM = "SSSSSS"
@@ -44,11 +41,6 @@ LAST_SEQ = 350
 MIDDLE_SEQ = 150
 SECOND_SNAPSHOT_SEQ = 80
 LETTERS = "QXZ"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def play_room_r(grid: Grid, store: RoomStore) -> Play:

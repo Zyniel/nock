@@ -41,7 +41,6 @@ from spec025_harness import (
     eight_players,
     fr_text,
     grid_check_line_frame,
-    grid_from_text,
     make_page,
     open_room,
     opened,
@@ -89,11 +88,6 @@ ELEMENT_AT_CENTRE_SCRIPT = (
     " return document.elementFromPoint(r.left + r.width / 2,"
     " r.top + r.height / 2) === el; }"
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def open_spec_013_room(page: Page, base_url: str, grid: Grid) -> MockRoomSocket:

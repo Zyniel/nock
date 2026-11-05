@@ -34,7 +34,6 @@ from spec034_harness import (
     expect_catch_up_applied,
     expect_seq,
     feed_item_locator,
-    grid_from_text,
     grid_line_frame,
     open_mocked_room,
     record_with,
@@ -159,11 +158,6 @@ class FeedScroll(NamedTuple):
     @property
     def scrolls(self) -> bool:
         return self.scroll_height > self.client_height
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def absence_lines_json() -> str:

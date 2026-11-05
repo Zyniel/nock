@@ -34,7 +34,7 @@ from nock.protocol import (
     parse_client_message,
 )
 from nock.server import RoomRegistry
-from spec040_harness import EXPECTED_SETTINGS, grid_from_text, load_fr
+from spec040_harness import EXPECTED_SETTINGS, load_fr
 
 SNAPSHOT_RESUME_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 WAIT_TIMEOUT_MS = 5000
@@ -44,11 +44,6 @@ class EnterRoom(Protocol):
     """The `enter_room` fixture of conftest."""
 
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Mocked room socket (browser tests) --------------------------------------

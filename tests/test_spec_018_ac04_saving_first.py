@@ -33,26 +33,14 @@ from spec018_harness import (
     WAIT_SECONDS,
     assert_same_room,
     corrupt_log_entry,
-    grid_from_text,
     join_peers,
     letter_cells,
     load_from_file,
-    make_dist_dir,
     open_peer,
     server_grid,
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 # ---- AC-4: saving first, and a failed save changes nothing ----

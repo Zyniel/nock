@@ -36,12 +36,10 @@ from spec018_harness import (
     Process,
     corrupt_log_entry,
     drive_room,
-    grid_from_text,
     grid_of_peer,
     grid_values,
     letter_cells,
     load_from_file,
-    make_dist_dir,
     open_peer,
     players_all_disconnected,
     resume_tokens,
@@ -54,16 +52,6 @@ SNAPSHOT_CONFIG = RoomConfig(
 
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 # ---- Helpers on the SQLite file ----

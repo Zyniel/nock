@@ -12,11 +12,8 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec035_harness import (
-    build_fx01_grid,
-    build_reference_catalogue,
     open_room,
     player_view,
 )
@@ -44,15 +41,7 @@ from spec041_harness import (
 # ---- Fixtures: thin wrappers around the harnesses ---------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (served by live_server for `/`)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 # ---- AC-1: each colour token resolves to its value --------------------------------

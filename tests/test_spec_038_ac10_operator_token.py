@@ -106,7 +106,6 @@ OTHER_TOKEN = "Ops-" + "y" * 40  # a valid token other than OPS_TOKEN
 
 # ---- Values of the test harness ------------------------------------------------------
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 PROCESS_EXIT_LIMIT_SECONDS = 20.0
 GIVEN_ROOM = "GIVEN1"  # a room of the registry, for the replay path
 
@@ -184,12 +183,6 @@ def settings_error_of(value: str) -> ValueError:
     with pytest.raises(SettingsError) as caught:
         token_of({OPERATOR_TOKEN_VARIABLE: value})
     return caught.value
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    (tmp_path / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return tmp_path
 
 
 @pytest.fixture

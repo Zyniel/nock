@@ -57,7 +57,6 @@ from spec032_harness import (
     TA,
     TB,
     TC,
-    grid_from_text,
     registry_on_file,
     utc,
 )
@@ -70,11 +69,6 @@ ANA_PLAYER = Player("Ana", ANA, TA)
 BOB_PLAYER = Player("Bob", BOB, TB)
 CY_PLAYER = Player("Cy", CY, TC)
 HOOK_ERROR = "the test's delete hook fails on purpose"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class RecordingHook:

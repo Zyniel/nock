@@ -9,7 +9,6 @@ return Bob must hear where she is before he hears her offline letter.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Browser, Page
 
 from nock.grid import Grid
@@ -30,15 +29,10 @@ from realtime_harness import (
     rejoin,
 )
 from spec017_harness import cell_at, expect_cell
-from spec024_harness import EnterRoom, expect_selection, grid_from_text
+from spec024_harness import EnterRoom, expect_selection
 from spec042_harness import wait_until
 
 TAMIS_KEY = "0,0,0"  # the word TAMIS, row 1 across, by its clue (`data-word`)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def selection_moved(player_id: str, row: int, column: int) -> SelectionMoved:

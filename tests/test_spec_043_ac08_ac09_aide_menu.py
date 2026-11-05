@@ -99,11 +99,6 @@ ORDER_SCRIPT = r"""
 # ---- Fixtures --------------------------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
 def ac8_frame(grid: Grid, *, help_mode: HelpMode = HelpMode.FREE) -> str:
     """AC-8's snapshot: help mode `free`, 5 letters and 1 word, a pencil `T` by
     `p2` in (1, 0)."""

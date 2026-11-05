@@ -53,7 +53,6 @@ from playwright.sync_api import Page, ViewportSize, expect
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from grids_harness import FX01_HYPHENS, grid_with_answers
-from nock.catalogue import Catalogue
 from nock.grid import Grid, LetterCell
 from nock.protocol import (
     CellRef,
@@ -83,7 +82,6 @@ from spec042_harness import (
     cell_at,
     flash_composite,
     fx01_view,
-    make_catalogue,
     me,
     open_room,
     player,
@@ -114,11 +112,6 @@ from viewport_harness import (
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def hyphen_grid(fx01_text: str) -> Grid:
     """FX-01 with `VI-DE` and `NA-VAL`."""
     return grid_with_answers(fx01_text, FX01_HYPHENS)
@@ -144,10 +137,7 @@ def case_grids(
     return {"fx01": hyphen_grid, "fx02": fx02_hyphen_grid, "both": both_marks_grid}
 
 
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published_force_1"
 
 
 # ---- Windows and cell sizes -------------------------------------------------------

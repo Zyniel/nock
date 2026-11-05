@@ -33,17 +33,11 @@ from spec034_harness import (
     absence_rooms,
     catch_up_path,
     cell_refs,
-    grid_from_text,
     known_catch_up,
     registry_catch_up,
 )
 
 ABSENCE_CELLS = [(0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (2, 4), (3, 1), (4, 1)]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

@@ -24,7 +24,6 @@ from spec009_harness import (
     dispatch_key,
     down,
     expect_selection,
-    grid_from_text,
     open_fx01,
     open_view,
     sent_selections,
@@ -38,11 +37,6 @@ ACROSS_VIDE = "2,0,0"
 
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

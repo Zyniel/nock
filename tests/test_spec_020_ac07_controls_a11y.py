@@ -46,7 +46,6 @@ from collections.abc import Callable, Iterator
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import (
     CheckResult,
@@ -84,10 +83,8 @@ from spec024_harness import (
     contrast_problems,
     expect_selection,
     expect_seq,
-    grid_from_text,
     language_data,
     load_fr,
-    make_catalogue,
     make_walker,
     open_context_page,
     open_room,
@@ -147,15 +144,7 @@ def pencil_letter(letter: str, author: str) -> dict[str, object]:
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

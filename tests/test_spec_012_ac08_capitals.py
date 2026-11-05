@@ -71,11 +71,9 @@ from spec012_harness import (
     MOCK_TOKEN,
     MockRoomSocket,
     active_view,
-    grid_from_text,
     join_text,
     load_fr,
     make_app,
-    make_dist_dir,
     make_registry,
     make_state,
     only_error_code,
@@ -89,16 +87,6 @@ from spec012_harness import (
 )
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

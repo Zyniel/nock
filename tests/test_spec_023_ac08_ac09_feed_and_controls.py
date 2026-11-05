@@ -19,7 +19,6 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -42,8 +41,6 @@ from spec023_harness import (
     EnterRoom,
     MockRoomSocket,
     cell_at,
-    grid_from_text,
-    make_catalogue,
     open_fx01,
     play_ana_checks_the_word,
     sent_letters,
@@ -57,15 +54,7 @@ SETTLE_MS = 400
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Helpers for the page tests ----

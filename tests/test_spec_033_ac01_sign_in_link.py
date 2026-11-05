@@ -24,12 +24,9 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-import pytest
-
 from nock.grid import Grid
 from nock.protocol import EditLetter, LetterChanged, Ping, Pong, RemovePlayer
 from spec017_harness import FakeClock, Peer, open_peer
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PATH,
     ANA_EMAIL,
@@ -65,11 +62,6 @@ from spec033_harness import (
 TYPED_ADDRESS = "  Ana.Probe@Example.org "
 OTHER_SPELLING = "ANA.PROBE@example.ORG"
 NO_STORE = "no-store"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class AnasRoom(NamedTuple):

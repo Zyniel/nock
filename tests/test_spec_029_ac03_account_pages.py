@@ -52,7 +52,7 @@ from spec029_harness import (
     stored_history,
     wait_quietly,
 )
-from spec032_harness import ANA, BOB, TA, TB, grid_from_text
+from spec032_harness import ANA, BOB, TA, TB
 from spec033_harness import (
     ACCOUNT_PAGE_PATH,
     ANA_EMAIL,
@@ -68,11 +68,6 @@ from spec033_harness import (
 
 R_CODE = "RRRRRR"
 ACCOUNT_ONLY_CODE = "AAA111"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

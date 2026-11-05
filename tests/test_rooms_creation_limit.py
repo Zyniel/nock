@@ -23,7 +23,6 @@ import pytest
 from host_harness import LEA_EMAIL, create_room_as, host_app, sign_in_as
 from lifetime_harness import variables_of
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from rooms_harness import (
     DEFAULT_LIMIT,
     GRID_NUMBER,
@@ -38,8 +37,6 @@ from rooms_harness import (
 )
 from spec011_harness import BURST_SIZE, at_once
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import with_session
 
 REFUSED_EACH = 20
@@ -47,14 +44,7 @@ LATER_SECONDS = 10.0
 JUST_BEFORE_THE_HOUR = HOUR - 0.1
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- AC-13: thirty an hour from an address -----------------------------------------

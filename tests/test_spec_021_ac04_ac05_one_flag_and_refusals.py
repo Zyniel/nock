@@ -17,7 +17,6 @@ import json
 import pytest
 from playwright.sync_api import Page
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import (
     ClueRef,
@@ -57,9 +56,7 @@ from spec024_harness import (
     events_of,
     expect_seq,
     full17,
-    grid_from_text,
     load_fr,
-    make_catalogue,
     player_record,
     player_view,
     refusal_code,
@@ -82,15 +79,7 @@ NO_WORD_CLUES = [
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Rooms ----

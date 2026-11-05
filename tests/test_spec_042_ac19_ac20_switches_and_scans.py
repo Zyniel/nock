@@ -32,7 +32,6 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Direction, FlagView, GridView, PlayerView, grid_view
 from room_panels import open_menu
@@ -66,7 +65,6 @@ from spec042_harness import (
     click_switch,
     fx01_view,
     load_fr,
-    make_catalogue,
     me,
     open_room,
     open_toolbar_setup_room,
@@ -84,15 +82,7 @@ SCAN_SIZES = [(1280, 720), (360, 740)]
 # ---- Fixtures: thin wrappers around the harnesses -------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published_force_1"
 
 
 @pytest.fixture

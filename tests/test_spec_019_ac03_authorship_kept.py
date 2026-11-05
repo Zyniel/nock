@@ -75,7 +75,6 @@ from spec019_harness import (
     ana_types_t_and_bob_types_a,
     authors_switch,
     cell_at,
-    grid_from_text,
     room_page,
     turn_switch_on,
 )
@@ -87,7 +86,6 @@ NOW = 2_000_000.0
 FIRST_TOKEN = "first-token-number-0001"
 SECOND_TOKEN = "second-token-number-002"
 THIRD_TOKEN = "third-token-number-0003"
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 WAIT_SECONDS = 10.0
 POLL_SECONDS = 0.02
 RESUME_WINDOW_SECONDS = 300.0  # spec 017, RoomConfig's default
@@ -126,19 +124,6 @@ AUTHORS_AFTER_PLAY: Authors = {
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 # ---- Helpers on room states -------------------------------------------------

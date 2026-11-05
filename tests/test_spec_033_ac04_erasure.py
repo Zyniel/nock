@@ -70,7 +70,6 @@ from spec032_harness import (
     TIMED_OUT_AT,
     Run,
     events_of,
-    grid_from_text,
 )
 from spec033_harness import (
     ACCOUNT_PATH,
@@ -105,11 +104,6 @@ LINKED_AT = 1.0
 LINKED_AFTER_ERASURE_AT = 2.0
 DELETED_AT = 1.5
 RESUME_WINDOW = 300.0  # spec 017's resume window, RoomConfig's default
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class SnapshotRecorder(RoomStore):

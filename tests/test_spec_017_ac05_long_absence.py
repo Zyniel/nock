@@ -11,7 +11,6 @@ Refined by `platform/reconnection.md` rule 6 (B-047): the first retry comes 0.8 
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -29,19 +28,12 @@ from spec017_harness import (
     expect_offline,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     room_page,
     settle,
     snapshot_frame,
     wait_until,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-5: offline edits survive a long absence (browser) --------------------
 

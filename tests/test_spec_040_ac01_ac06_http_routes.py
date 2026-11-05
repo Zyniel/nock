@@ -21,12 +21,7 @@ from fastapi.testclient import TestClient
 
 from nock.grid import Grid
 from nock.server import WEB_DIST_DIR, RoomRegistry, create_app
-from spec040_harness import INDEX_HTML, PROJECT_ROOT, grid_from_text, make_dist_dir
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
+from spec040_harness import INDEX_HTML, PROJECT_ROOT, make_dist_dir
 
 
 @pytest.fixture

@@ -57,10 +57,7 @@ from spec024_harness import (
     Received,
     TrafficLog,
     connect,
-    grid_from_text,
     join_peers,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     player_view,
 )
@@ -74,20 +71,7 @@ Cell = tuple[int, int]
 Step = tuple[int, int, str | None]  # row, column, letter (None: erase)
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

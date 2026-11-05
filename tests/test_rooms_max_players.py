@@ -24,14 +24,8 @@ from spec012_harness import (
     ROOM_CODE,
     START_TIME,
     active_view,
-    grid_from_text,
     make_player,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def room_with_players(grid: Grid, count: int) -> RoomState:

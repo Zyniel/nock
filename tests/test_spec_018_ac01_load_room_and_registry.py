@@ -40,9 +40,7 @@ from spec018_harness import (
     assert_same_room,
     corrupt_log_entry,
     drive_room,
-    grid_from_text,
     grid_values,
-    make_dist_dir,
     published_catalogue,
     resume_tokens,
     token_of,
@@ -60,16 +58,6 @@ class FakeClock(Protocol):
     def __call__(self) -> float: ...
 
     def advance(self, seconds: float) -> None: ...
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

@@ -22,11 +22,8 @@ import json
 import pytest
 from playwright.sync_api import Page, Request, Route, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from spec010_harness import (
     ROOM_URL_PATTERN,
-    catalogue_from_grid,
     code_from_url,
     expect_joined,
     read_json_object,
@@ -43,7 +40,7 @@ from spec029_harness import (
     open_catalogue,
     wait_quietly,
 )
-from spec032_harness import FORM_WATCHER, grid_from_text, load_fr
+from spec032_harness import FORM_WATCHER, load_fr
 
 RECORD_CODE = "QQQQQQ"
 PROGRESS_KEY = "nock.progress"
@@ -51,15 +48,7 @@ FINISHED_PROGRESS = json.dumps({"1": "finished"})
 CREATE_ROUTE = "**/api/rooms"
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (spec 010's harness), served by `live_server`."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def grid_1_record() -> dict[str, object]:

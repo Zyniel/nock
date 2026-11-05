@@ -10,9 +10,8 @@ behaviour (Tab, Alt+Tab, modifier arrows) are also checked through dispatched
 (`dispatch_key`).
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixture `fx01_grid` is defined in each
-file as a thin wrapper around `grid_from_text`: a fixture imported from here
-would be an unused import for ruff.
+stays in that file, next to its tests. The fixture `fx01_grid` is not defined in the
+test files: it is the shared one of `tests/conftest.py`.
 """
 
 from __future__ import annotations
@@ -53,11 +52,6 @@ ACROSS_AMEN = "3,0,0"
 ACROSS_LEST = "4,0,0"
 
 ChangeList = list[tuple[int, int, dict[str, object]]]
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixtures)."""
-    return Grid.model_validate_json(text)
 
 
 def cell_at(page: Page, row: int, column: int) -> Locator:

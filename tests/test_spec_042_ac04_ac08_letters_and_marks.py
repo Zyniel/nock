@@ -26,7 +26,6 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import CellTarget, LetterChanged, PlayerView, RevealBudget
 from spec019_harness import MockRoomSocket
@@ -55,7 +54,6 @@ from spec042_harness import (
     fx01_view,
     inner_box,
     line_height_px,
-    make_catalogue,
     me,
     notch_size,
     open_caught_up_room,
@@ -71,15 +69,7 @@ from spec042_harness import (
 # ---- Fixtures: thin wrappers around the harness ---------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published_force_1"
 
 
 # ---- AC-4: grid letters ----------------------------------------------------------

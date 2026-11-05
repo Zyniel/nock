@@ -121,11 +121,6 @@ def ops_server(tmp_path: Path, catalogue: Catalogue) -> Iterator[OpsServer]:
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
     return Grid.model_validate_json(fx02_text)
 

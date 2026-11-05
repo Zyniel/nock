@@ -55,7 +55,7 @@ from spec029_harness import (
     sign_in_from,
     solved_at_of,
 )
-from spec032_harness import ANA, BOB, CY, LIFE, T0, TA, TB, TC, grid_from_text, utc
+from spec032_harness import ANA, BOB, CY, LIFE, T0, TA, TB, TC, utc
 from spec033_harness import (
     ACCOUNT_PATH,
     ANA_EMAIL,
@@ -74,11 +74,6 @@ PLAYERS = [
     Player("Zélie-Probe", BOB, TB),
     Player("Bob", CY, TC),
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

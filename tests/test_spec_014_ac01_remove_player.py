@@ -76,8 +76,6 @@ from spec014_harness import (
     token_of,
     wait_until,
 )
-from spec014_harness import dist_dir as dist_dir
-from spec014_harness import fx01_grid as fx01_grid
 
 FORM_WATCHER = (
     "window.__formSeen = false;"

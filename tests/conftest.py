@@ -19,6 +19,7 @@ from fonts_ready import wait_for_fonts
 
 if TYPE_CHECKING:
     from nock.catalogue import Catalogue
+    from nock.grid import Grid
     from nock.server import RoomRegistry
 
 # The harness modules (`specNNN_harness.py` and the domains' `<name>_harness.py`)
@@ -130,6 +131,7 @@ def fx02_text() -> str:
     return (FIXTURES_DIR / "fx02.json").read_text(encoding="utf-8")
 
 
+INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 MISSING_BUILD_MESSAGE = "web/dist is missing: run npm --prefix web run build"
 SERVER_START_TIMEOUT_SECONDS = 10.0
 
@@ -145,14 +147,50 @@ def room_registry() -> Iterator[RoomRegistry]:
 
 
 @pytest.fixture
-def catalogue() -> Catalogue:
-    """Return the catalogue that the live server serves (empty by default).
+def fx01_grid(fx01_text: str) -> Grid:
+    """Return the FX-01 reference grid, parsed."""
+    from nock.grid import Grid
 
-    A test module that needs grids overrides this fixture with its own.
+    return Grid.model_validate_json(fx01_text)
+
+
+@pytest.fixture
+def dist_dir(tmp_path: Path) -> Path:
+    """Return a `dist` folder holding a minimal `index.html`."""
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
+    return dist
+
+
+@pytest.fixture
+def catalogue(request: pytest.FixtureRequest, fx01_grid: Grid) -> Catalogue:
+    """Return the catalogue that the live server serves.
+
+    The default is an empty `Catalogue()`. A test module that needs grids sets the
+    module constant `CATALOGUE_KIND` instead of defining its own fixture; the
+    catalogue is then built on the `fx01_grid` of the module. The valid values are
+    the names of `catalogue_builders.CATALOGUE_BUILDERS`:
+
+    - `"published"`: FX-01 as published entry 1, force 2.
+    - `"published_force_1"`: the same with force 1.
+    - `"reference"`: the reference catalogue CAT of spec 004 (four entries, the
+      fourth unpublished).
+
+    Any other value raises a `ValueError`. A module that needs a different
+    catalogue overrides this fixture with its own.
     """
+    from catalogue_builders import CATALOGUE_BUILDERS
     from nock.catalogue import Catalogue
 
-    return Catalogue()
+    kind = getattr(request.module, "CATALOGUE_KIND", None)
+    if kind is None:
+        return Catalogue()
+    if kind not in CATALOGUE_BUILDERS:
+        known_kinds = ", ".join(sorted(CATALOGUE_BUILDERS))
+        message = f"unknown CATALOGUE_KIND {kind!r}: expected one of {known_kinds}"
+        raise ValueError(message)
+    return CATALOGUE_BUILDERS[kind](fx01_grid)
 
 
 def _bind_free_port() -> socket.socket:

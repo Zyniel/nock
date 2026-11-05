@@ -11,10 +11,8 @@ spec 024's mocked socket. The shared setup is in `spec020_harness`.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import ConfirmPencil, ErrorCode, PencilEdit
 from spec017_harness import (
@@ -40,8 +38,6 @@ from spec024_harness import (
     ChangeList,
     expect_selection,
     expect_seq,
-    grid_from_text,
-    make_catalogue,
     open_room,
 )
 
@@ -50,15 +46,7 @@ WORD_W1 = "0,0,0"
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- The first steps of AC-6 ----

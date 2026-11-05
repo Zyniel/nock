@@ -12,15 +12,16 @@ tests are in `tests/test_serving_*.py`:
   browser.
 
 This module holds what more than one of those files uses: the values of the
-spec, the fixtures `fx01_grid`, `catalogue` (FX-01 as entry 1), `registry`
-(a `RecordingRegistry`) and `account_store`, the app of the HTTP edge tests (a
-built client, the operator pages on, a catalogue holding FX-01) and a bare HTTP
-exchange over a socket, for the requests that no test client can make (a chunked
-body with no `Content-Length`, a declared length with no body).
+spec, the fixtures `registry` (a `RecordingRegistry`) and `account_store`, the app
+of the HTTP edge tests (a built client, the operator pages on, a catalogue holding
+FX-01) and a bare HTTP exchange over a socket, for the requests that no test
+client can make (a chunked body with no `Content-Length`, a declared length with
+no body).
 
 Pytest finds a fixture by name in the module of the test, so each test file that
 asks for one imports it under the same name (`from serving_harness import
-catalogue as catalogue`, the form that tells ruff the import is meant to stay).
+registry as registry`, the form that tells ruff the import is meant to stay). The
+files serve the `published` catalogue of `conftest.py` (`CATALOGUE_KIND`).
 
 The app is `create_app(rooms=registry, dist_dir=..., catalogue=...,
 operator_token=OPS_TOKEN)`, the way spec 038's tests build it, with the accounts
@@ -44,7 +45,6 @@ from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.server import create_app
-from spec010_harness import catalogue_from_grid
 from spec033_harness import account_settings
 from spec038_harness import OPS_TOKEN
 
@@ -96,18 +96,6 @@ class RecordingRegistry(RoomRegistry):
         )
         self.created_codes.append(code)
         return code
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    """The FX-01 reference grid."""
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1."""
-    return catalogue_from_grid(fx01_grid)
 
 
 @pytest.fixture

@@ -50,11 +50,6 @@ ABSENCE_START_SEQ = 4  # `V3`'s seq: the page saw it before the absence
 ABSENCE_END_SEQ = 10
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
 def absence_with_two_closed_votes(grid: Grid) -> tuple[RoomState, Play, int]:
     """Play the absence on `V3`.
 

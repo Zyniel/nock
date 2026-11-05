@@ -26,7 +26,7 @@ from nock.grid import Grid
 from operations_harness import LOGGER_PREFIX, holding_a_read, warnings_logged
 from spec017_harness import FakeClock
 from spec029_harness import Player, play_fx01, sign_in_from
-from spec032_harness import BOB, TB, grid_from_text
+from spec032_harness import BOB, TB
 from spec033_harness import (
     ACCOUNT_PATH,
     SIGNED_OUT,
@@ -42,11 +42,6 @@ ZOE_PLAYER = "p-zoe"
 ZOE_TOKEN = "token-of-zoe-0001"
 ZOE_STORED = "ZOÉ"  # as the server stores her nickname (spec 012 decision 12)
 ANSWER_BOUND_SECONDS = 2.0
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def test_ac7_the_erasure_answers_at_once_and_the_next_sweep_empties_the_files(

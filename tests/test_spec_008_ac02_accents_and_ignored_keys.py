@@ -7,7 +7,6 @@ in `spec008_harness`.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -20,7 +19,6 @@ from spec008_harness import (
     expect_letter,
     expect_letters,
     expect_selection,
-    grid_from_text,
     open_fx01,
     press_all,
     put,
@@ -29,12 +27,6 @@ from spec008_harness import (
     settle,
     tap,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-2: accents fold, other keys are ignored ------------------------------
 

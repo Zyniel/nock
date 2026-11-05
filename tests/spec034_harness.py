@@ -124,11 +124,6 @@ SENT = ClueRef(row=0, column=4, clue_index=0)
 # ---- Fixture bodies ----------------------------------------------------------------
 
 
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixtures)."""
-    return Grid.model_validate_json(text)
-
-
 def load_fr() -> dict[str, str]:
     """The French messages of the web client."""
     return json.loads(FR_JSON_PATH.read_text(encoding="utf-8"))

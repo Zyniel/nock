@@ -42,9 +42,6 @@ from spec037_harness import (
     SETTLE_MS,
     WAIT_TIMEOUT_MS,
     connect,
-    grid_from_text,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     state_of,
     wait_until_page,
@@ -55,20 +52,7 @@ SNAPSHOT_RESUME_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 # ---- Fixtures -----------------------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

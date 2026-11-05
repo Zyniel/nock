@@ -20,7 +20,6 @@ from spec007_harness import (
     cell_at,
     clue_named,
     expect_selection,
-    grid_from_text,
     note_view,
     open_fx01,
     open_mock_room,
@@ -36,11 +35,6 @@ from spec007_harness import (
 FX01_LETTER_CELL_COUNT = 18
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

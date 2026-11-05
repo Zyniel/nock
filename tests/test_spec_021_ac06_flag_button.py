@@ -20,10 +20,8 @@ after `react-button` and before `clue-next`, with no text and the `aria-label`
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import (
     ErrorCode,
@@ -49,8 +47,6 @@ from spec024_harness import (
     ChangeList,
     MockRoomSocket,
     expect_seq,
-    grid_from_text,
-    make_catalogue,
     open_context_page,
     wait_until_page,
     with_letter_cells,
@@ -105,15 +101,7 @@ ATTRIBUTES_SCRIPT = """
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Helpers ----

@@ -12,13 +12,7 @@ from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from nock.server import RoomRegistry
-from spec006_harness import WINDOW_SIZES, box_of, grid_from_text, open_room
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
+from spec006_harness import WINDOW_SIZES, box_of, open_room
 
 # ---- AC-7: the room page fits the window -------------------------------------
 

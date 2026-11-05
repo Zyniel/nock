@@ -41,7 +41,6 @@ from spec024_harness import (
     LANGUAGE_SCAN_SCRIPT,
     cell_at,
     expect_seq,
-    grid_from_text,
     language_data,
     load_fr,
     open_context_page,
@@ -102,11 +101,6 @@ FR_KEYS = {
 def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
     """Readable ids of window sizes for `parametrize`."""
     return [f"{width}x{height}" for width, height in sizes]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def open_solved_eight_player_room(

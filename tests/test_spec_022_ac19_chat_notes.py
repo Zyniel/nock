@@ -46,7 +46,7 @@ from spec022_harness import (
     three_players,
     wait_for_frame_count,
 )
-from spec024_harness import grid_from_text, load_fr, open_context_page
+from spec024_harness import load_fr, open_context_page
 from spec025_harness import MockRoomSocket
 
 WINDOW_SIZES = [
@@ -109,11 +109,6 @@ testId => {
 
 def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
     return [f"{width}x{height}" for width, height in sizes]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def snapshot_chat() -> list[ChatMessage]:

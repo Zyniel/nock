@@ -9,26 +9,15 @@ no card. The 404 and 500 answers of the same criterion are proven by the tests o
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec004_harness import grid_from_text, load_fr, make_reference_catalogue
+from spec004_harness import load_fr
 from spec046_harness import POLL_MS, WAIT_TIMEOUT_MS, HeldRoute, muted_line_problems
 
 GRID_2_ROUTE = "**/api/grids/2"
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 def test_ac18_while_the_grid_has_not_answered_the_page_shows_a_muted_loading_line(

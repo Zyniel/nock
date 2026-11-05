@@ -1,10 +1,10 @@
 """Tests of spec 038 (privacy and operations), AC-6: the ops API is the operator's.
 
-The ops API runs on `TestClient(create_app(rooms=registry, dist_dir=tmp_path,
+The ops API runs on `TestClient(create_app(rooms=registry, dist_dir=dist_dir,
 operator_token=OPS_TOKEN))`, with a registry on conftest's fake clock whose store
 holds rooms with chosen creation times (`new_room(code, grid, <creation time>)`,
 then `add_room`, then `store.append` of hand-made entries), as the spec's "Test
-harness" says. "Off" is `create_app(rooms=registry, dist_dir=tmp_path)` with
+harness" says. "Off" is `create_app(rooms=registry, dist_dir=dist_dir)` with
 NOCK_OPERATOR_TOKEN deleted. The shared setup is in `spec038_harness`; spec 011's
 `at_once` sends a burst of requests at once.
 
@@ -93,7 +93,6 @@ EMPTY_DASHBOARD_BODY = re.compile(
 
 # ---- Values of the test harness ------------------------------------------------------
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 UNKNOWN_ROOM = "ZZZZZZ"
 THROTTLED_CLOSE_CODE = 4429  # spec 011
 ROOM_NOT_FOUND_CLOSE_CODE = 4404
@@ -127,18 +126,6 @@ class SlowTokenCheck:
 
 
 # ---- Fixtures ------------------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    """`tmp_path` with an `index.html`, the `dist_dir` of the "Test harness"."""
-    (tmp_path / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return tmp_path
 
 
 @pytest.fixture

@@ -23,7 +23,6 @@ from __future__ import annotations
 import contextlib
 from pathlib import Path
 
-import pytest
 from pydantic import BaseModel
 
 from nock.grid import Grid
@@ -54,7 +53,7 @@ from nock.protocol import (
     Undo,
     Vote,
 )
-from spec017_harness import Peer, error_events, grid_from_text, join_two, make_dist_dir
+from spec017_harness import Peer, error_events, join_two
 from spec022_harness import WS_CONFIG, chat_room
 from spec043_harness import FX01_SOLUTION
 
@@ -67,16 +66,6 @@ EDIT_ERROR_CODES = {
 }
 SOLVING_CELL = (1, 4)  # Ana's `S`, her last letter
 MIME = ClueRef(row=0, column=2, clue_index=0)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def send(peer: Peer, message: BaseModel) -> None:

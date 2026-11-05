@@ -57,10 +57,8 @@ from spec013_harness import (
     FakeClock,
     Peer,
     events_of,
-    grid_from_text,
     join_two,
     load_fr,
-    make_dist_dir,
     open_room,
     ping_and_wait,
     player_of,
@@ -77,16 +75,6 @@ from spec013_harness import (
 )
 
 IDLE_AFTER_SECONDS = 120.0
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 # ---- Helpers of the idle state tests ----------------------------------------

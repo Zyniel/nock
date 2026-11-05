@@ -65,8 +65,6 @@ from spec032_harness import (
     UNKNOWN_CODE,
     Run,
     abc_summary,
-    grid_from_text,
-    make_dist_dir,
     player_ids,
     post_summaries,
     summaries_request,
@@ -77,16 +75,6 @@ from spec032_harness import (
 
 ANSWERS = ("TAMIS", "NAVAL", "MIME", "IDES", "SENT", "VIDE", "AMEN", "LEST")
 WRONG_CODE_LIMIT = 10  # spec 011 AC-3
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def ana_and_bob(grid: Grid) -> Run:

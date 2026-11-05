@@ -30,10 +30,7 @@ from lifetime_harness import (
     wait_until_deleted,
 )
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ANA_EMAIL,
     ZELIE_EMAIL,
@@ -48,14 +45,7 @@ SHORT_SWEEP_SECONDS = 0.05
 ANONYMOUS_LIFE_HOURS = 24
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def sweep_one_cycle(app: HostApp, email: str) -> None:

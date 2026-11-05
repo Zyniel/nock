@@ -32,10 +32,7 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from shell_harness import FetchedScripts, built_files, open_locked_ops
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec046_harness import (
     OpenWindow,
     open_catalogue,
@@ -48,14 +45,7 @@ OPS_MARKERS = ["ops-token-input", "ops-replay-code", "ops-period"]
 CATALOGUE_MARKERS = ["catalogue-filter", "my-room-title", "history-title"]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

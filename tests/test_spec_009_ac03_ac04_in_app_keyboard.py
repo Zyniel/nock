@@ -23,7 +23,6 @@ from spec009_harness import (
     MockRoomSocket,
     cell_at,
     expect_selection,
-    grid_from_text,
     open_fx01,
     open_mock_room,
     sent_messages,
@@ -63,11 +62,6 @@ COARSE_POINTER_SCRIPT = """
 
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def make_touch_page(

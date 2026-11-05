@@ -156,11 +156,6 @@ def sweeping_config() -> RoomConfig:
 # ---- Fixture bodies ------------------------------------------------------------
 
 
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixtures)."""
-    return Grid.model_validate_json(text)
-
-
 def make_dist_dir(root: Path) -> Path:
     """A `dist` directory with a minimal `index.html` (the `dist_dir` fixtures)."""
     dist = root / "dist"

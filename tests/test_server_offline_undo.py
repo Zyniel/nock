@@ -34,7 +34,7 @@ from realtime_harness import (
     wait_for_requests,
 )
 from spec017_harness import cell_at, expect_cell
-from spec024_harness import EnterRoom, expect_selection, grid_from_text
+from spec024_harness import EnterRoom, expect_selection
 from spec042_harness import wait_until
 
 TAMIS_KEY = "0,0,0"  # the word TAMIS, row 1 across, by its clue (`data-word`)
@@ -73,11 +73,6 @@ CASES = {
         "tam", "", True, ["T", "A", "M", "undo"], ("T", "A", "")
     ),
 }
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def expected_requests(order: list[str], base_seq: int) -> list[ClientMessage]:

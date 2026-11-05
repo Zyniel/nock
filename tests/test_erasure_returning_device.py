@@ -24,7 +24,6 @@ from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec011_harness import EnterRoom
 from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PATH,
     FORMER_PLAYER_TEXT,
@@ -45,11 +44,6 @@ from spec033_harness import (
     wait_for_messages,
     you_of,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

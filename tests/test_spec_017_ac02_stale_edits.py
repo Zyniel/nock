@@ -43,11 +43,9 @@ from spec017_harness import (
     events_of,
     expect_cell,
     first_join,
-    grid_from_text,
     has_state_change,
     join_two,
     joined_room,
-    make_dist_dir,
     open_peer,
     room_page,
     running_room,
@@ -58,16 +56,6 @@ from spec017_harness import (
     wait_until,
     with_cell,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def stale_room(grid: Grid) -> RoomState:

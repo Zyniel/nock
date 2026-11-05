@@ -30,7 +30,6 @@ from playwright.sync_api import Browser, Page, expect
 from fonts_ready import wait_for_fonts
 from joining_harness import expect_field_neither_invalid_nor_described
 from nock.grid import Grid
-from spec035_harness import build_fx01_grid
 from spec042_harness import box_of
 from spec043_harness import INK, NAVY, RED, RULE, WHITE, fr_value, px
 from spec046_harness import (
@@ -70,11 +69,6 @@ from sure_click import click_until_pressed
 
 REFUSAL_CASES = [(size, refusal) for size in SIZES for refusal in REFUSALS]
 REFUSAL_IDS = [f"{w}x{h}-{refusal}" for (w, h), refusal in REFUSAL_CASES]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
 
 
 @pytest.fixture

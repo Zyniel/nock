@@ -18,28 +18,17 @@ from __future__ import annotations
 
 from urllib.parse import urlsplit
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from library_harness import QUIET_MS
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec004_harness import fr_text, grid_from_text, load_fr, make_reference_catalogue
+from spec004_harness import fr_text, load_fr
 
 GRIDS_PATH = "/api/grids"
 CHIPS = ["all", "1", "2", "3", "4"]
 PRESSES = ["1", "4", "2", "all", "3", "3", "1"]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 def chip_label(chip: str) -> str:

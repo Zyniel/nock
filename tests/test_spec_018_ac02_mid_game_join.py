@@ -28,12 +28,10 @@ from spec018_harness import (
     WAIT_SECONDS,
     Peer,
     Process,
-    grid_from_text,
     grid_of_peer,
     join_peers,
     letter_cells,
     make_app,
-    make_dist_dir,
     make_registry,
     open_peer,
     players_all_disconnected,
@@ -48,16 +46,6 @@ Edit = EditLetter | Erase
 
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

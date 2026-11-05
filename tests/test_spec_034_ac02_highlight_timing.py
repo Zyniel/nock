@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -24,7 +23,6 @@ from spec034_harness import (
     cell_at,
     expect_catch_up_applied,
     expected_caught_up,
-    grid_from_text,
     marks_by_cell,
     open_mocked_room,
     reconnect_with_snapshot,
@@ -35,11 +33,6 @@ from spec034_harness import (
 STILL_ON_MS = 4_500
 GONE_BY_MS = 6_000
 SECOND_CATCH_UP_DELAY_MS = 2_000
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def wait_until_ms_after(page: Page, start: float, milliseconds: int) -> None:

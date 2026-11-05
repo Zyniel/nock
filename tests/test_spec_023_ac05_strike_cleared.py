@@ -6,10 +6,8 @@ The page is driven with spec 040's mocked socket. The shared setup is in
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import (
     CellLocked,
@@ -22,8 +20,6 @@ from spec023_harness import (
     MIME,
     ChangeList,
     cell_at,
-    grid_from_text,
-    make_catalogue,
     open_fx01,
     refs,
     sent_letters,
@@ -34,15 +30,7 @@ from spec023_harness import (
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Helpers for the page tests ----
