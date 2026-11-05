@@ -1,14 +1,9 @@
-"""Tests of `social/chat.md` AC-22 and AC-23: « Réagir », « Je bloque » and the
-pacing while the page is not joined.
+"""Tests of `social/chat.md` AC-23: the pacing of « Réagir » and the chat while the
+page is not joined.
 
-Rules 5, 10 and 13. Ana's page on spec 017's mocked room (`joined_room`, FX-01,
-seq 5, 1280 by 720).
-
-AC-22: with MIME selected and the picker open, the socket closes with 1011: within
-5 s « Réagir » and « Je bloque » are disabled and the picker is gone, no `react`
-or `flag` sent; they stay disabled on the new socket until its snapshot, which
-enables both. After a close 4001 both stay disabled, also once the selection
-moves to another word.
+Rule 13. Ana's page on spec 017's mocked room (`joined_room`, FX-01, seq 5,
+1280 by 720). The helpers of the page's buttons are in
+`spec022_harness.py`, shared with `test_reactions_connection.py`.
 
 AC-23: the page clock is frozen, so the 12 seconds of the pacing never run out and
 no ping nor silence check runs. Every socket is a controlled stand-in
@@ -23,15 +18,12 @@ showing for the chat.
 
 from __future__ import annotations
 
-import json
-
 import pytest
-from playwright.sync_api import Locator, Page, expect
+from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from reconnection_harness import CONTROL_ALL_SCRIPT, cut_quietly, deliver_close
 from spec017_harness import (
-    LOSS_BUDGET_MS,
     STORED_JOIN,
     MockConnection,
     MockRoom,
@@ -45,48 +37,22 @@ from spec017_harness import (
     snapshot_frame,
     wait_until,
 )
-from spec022_harness import REACTION_VALUES, open_panel
-from spec043_harness import fr_value, press_cell, select_mime
+from spec022_harness import (
+    REACTION_VALUES,
+    frames_of_kind,
+    open_panel,
+    picker,
+    react_button,
+)
+from spec043_harness import fr_value, select_mime
 
-LOST_CLOSE = 1011
-REPLACED_CLOSE = 4001
 FIRST_DELAY_LATEST_MS = 1200
 SENT_BEFORE_THE_CUT = 4
-STAYS_DISABLED_MS = 1500  # longer than the first retry delay at its highest
 
 
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
-
-
-def react_button(page: Page) -> Locator:
-    return page.get_by_test_id("react-button")
-
-
-def flag_button(page: Page) -> Locator:
-    return page.get_by_test_id("flag-button")
-
-
-def picker(page: Page) -> Locator:
-    return page.get_by_test_id("reaction-picker")
-
-
-def frames_of_kind(connection: MockConnection, kind: str) -> list[str]:
-    """The frames of one `type` the page sent on one socket, in order."""
-    found: list[str] = []
-    for frame in connection.frames:
-        if json.loads(frame)["type"] == kind:
-            found.append(frame)
-    return found
-
-
-def sent_on_any_socket(room: MockRoom, kind: str) -> int:
-    """How many frames of one `type` the page sent, on every socket."""
-    count = 0
-    for connection in room.connections:
-        count += len(frames_of_kind(connection, kind))
-    return count
 
 
 def expect_options_enabled(page: Page, enabled: bool) -> None:
@@ -128,58 +94,6 @@ def rejoin_on_the_next_socket(page: Page, room: MockRoom, grid: Grid) -> MockCon
     second.send(snapshot_frame(grid, 5))
     expect_status(page, "joined")
     return second
-
-
-# ---- AC-22: disabled while the page is not joined ----------------------------------
-
-
-def test_ac22_a_loss_disables_both_buttons_and_closes_the_picker_until_a_snapshot(
-    page: Page, live_server: str, fx01_grid: Grid
-) -> None:
-    room = joined_room(page, live_server, fx01_grid)
-    select_mime(page)
-    expect(flag_button(page)).to_be_enabled()
-    react_button(page).click()
-    expect(picker(page)).to_be_visible()
-
-    room.connections[0].close(LOST_CLOSE)
-
-    expect(react_button(page)).to_be_disabled(timeout=LOSS_BUDGET_MS)
-    expect(flag_button(page)).to_be_disabled(timeout=LOSS_BUDGET_MS)
-    expect(picker(page)).to_have_count(0)
-    room.wait_for_connections(2)
-    second = room.connections[1]
-    assert first_join(page, second) == STORED_JOIN
-    settle(page)
-    expect(react_button(page)).to_be_disabled()
-    expect(flag_button(page)).to_be_disabled()
-    assert sent_on_any_socket(room, "react") == 0
-    assert sent_on_any_socket(room, "flag") == 0
-
-    second.send(snapshot_frame(fx01_grid, 5))
-
-    expect_status(page, "joined")
-    expect(react_button(page)).to_be_enabled()
-    expect(flag_button(page)).to_be_enabled()
-
-
-def test_ac22_after_a_close_4001_both_buttons_stay_disabled(
-    page: Page, live_server: str, fx01_grid: Grid
-) -> None:
-    room = joined_room(page, live_server, fx01_grid)
-    select_mime(page)
-    expect(react_button(page)).to_be_enabled()
-
-    room.connections[0].close(REPLACED_CLOSE)
-
-    expect_status(page, "replaced")
-    expect(react_button(page)).to_be_disabled()
-    expect(flag_button(page)).to_be_disabled()
-    press_cell(page, 1, 0)
-    page.wait_for_timeout(STAYS_DISABLED_MS)
-    expect(react_button(page)).to_be_disabled()
-    expect(flag_button(page)).to_be_disabled()
-    assert len(room.connections) == 1
 
 
 # ---- AC-23: only what went out on an open socket counts ------------------------------
