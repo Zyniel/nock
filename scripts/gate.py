@@ -174,6 +174,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "viewport",
     ),
     "web/src/lib/GridViewport.svelte": (
+        "authorship",
         "board",
         "foundation",
         "presence",
@@ -182,6 +183,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "viewport",
     ),
     "web/src/lib/LetterCell.svelte": (
+        "authorship",
         "catch-up",
         "co-op",
         "foundation",
@@ -199,11 +201,12 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
     ),
     "web/src/lib/RoomMenu.svelte": (
         "account",
+        "authorship",
         "menus",
-        "presence",
         "rules",
     ),
     "web/src/lib/RoomPage.svelte": (
+        "authorship",
         "board",
         "catch-up",
         "chat",
