@@ -168,8 +168,8 @@ BURST_TIMEOUT_SECONDS = 10.0
 class SlowLookupRegistry(RoomRegistry):
     """A registry whose room lookups answer `LOOKUP_DELAY_SECONDS` later.
 
-    The room socket looks its room up with `connect` (`platform/server.md`
-    rule 22) and the recap route with `peek_room`; `room_state` is slowed too. A
+    The room socket looks its room up with `connect` (`platform/live-rooms.md`
+    rule 3) and the recap route with `peek_room`; `room_state` is slowed too. A
     lookup that loads a room from the disk can take that long. In a burst the
     delay keeps the requests in flight at the same time, whatever the order in
     which their threads run, so a burst that is not counted one request after

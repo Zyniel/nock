@@ -1,20 +1,20 @@
-"""Shared setup of the tests of platform/server about the rooms in memory (AC-23,
-AC-24) and of the tests that read which rooms are live.
+"""Shared setup of the tests of platform/live-rooms about the rooms in memory (AC-4,
+AC-5) and of the tests that read which rooms are live.
 
 Pytest does not collect this module (its name does not start with `test_`). The
-tests are in `tests/test_server_*.py`:
+tests are in `tests/test_live_rooms_*.py` and `tests/test_server_*.py`:
 
-- `test_server_rooms_in_memory.py`: AC-23 and AC-24, over the room socket, with the
+- `test_live_rooms_in_memory.py`: AC-4 and AC-5, over the room socket, with the
   app of `host_harness` (a fake clock, the rooms' store on a file).
-- `test_server_engine_time.py`: rule 20, which has its own setup.
-- `test_server_socket_responsiveness.py`: AC-25, a socket whose lookup is slow
+- `test_live_rooms_engine_time.py`: rule 1, which has its own setup.
+- `test_live_rooms_socket_responsiveness.py`: AC-6, a socket whose lookup is slow
   (`SlowConnectRegistry`) delays nobody. It measures durations, so it runs on its
   own (`SERIAL_TEST_FILES`).
-- `test_server_socket_loads.py`: AC-26, the store reads of a socket's lookup
+- `test_live_rooms_socket_loads.py`: AC-7, the store reads of a socket's lookup
   (`CountingStore`).
-- `test_server_snapshots.py`: AC-27 and AC-28, the two snapshots a room keeps and
-  the catch-up that does not depend on the snapshots saved since. Ana types
-  through `type_letters`; the snapshots are read with `snapshot_seqs`.
+- `test_server_snapshots.py` (platform/server): AC-27 and AC-28, the two snapshots
+  a room keeps and the catch-up that does not depend on the snapshots saved since.
+  Ana types through `type_letters`; the snapshots are read with `snapshot_seqs`.
 
 A room is live when `RoomRegistry.live_codes()` holds its code. `state_of` (and
 every `room_state` lookup) loads a room and so makes it live: a test that reads
