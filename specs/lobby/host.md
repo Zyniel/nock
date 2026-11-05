@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: host
-status: approved
+status: done
 ---
 
 # lobby/host - The host role and the creator

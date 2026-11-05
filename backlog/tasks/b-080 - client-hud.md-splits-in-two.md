@@ -4,7 +4,7 @@ title: client/hud.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T10:57:00Z'
+updated_date: '2026-11-05T11:14:00Z'
 labels:
   - domain:hud
 milestone: m-7
@@ -54,4 +54,6 @@ Lead decision (Plan agent on Fable, three cuts): Cut 1, client/menus.md takes hu
 Spec-checker round 1: CHANGES REQUESTED (room.md and hud.md Depends on still gave hud the scrim). Fixed. Lead decision: client/room.md keeps four Depends on files (hud, menus, chat, presence) against the template's three: its agents need menus for the sheet's closing rules and each of the others for a tab or the layout; no other spec is over.
 
 Spec-checker round 2: APPROVED. hud 14.5 KB and 13 criteria, menus 9.5 KB and 9.
+
+Review round 1: APPROVE. Not taken: the harness docstrings' stale claim that votes AC-9 uses the sheet helpers (there before this task) and claude_docs/frontend-review.md's citations (a dated review record that no role edits).
 <!-- SECTION:NOTES:END -->
