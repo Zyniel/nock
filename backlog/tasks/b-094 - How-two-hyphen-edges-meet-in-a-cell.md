@@ -36,7 +36,7 @@ From DRAFT-008: _design/cells.md says how two hyphen edges meet (the corner pixe
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -51,6 +51,8 @@ Tests: test_ac21 passes on both grids, as the spec writes down what the code pai
 Reviewer round 1: APPROVE. It checked that the test fails on a white corner pixel and on solid strips, and that the cell sheet's new drawings show AC-21's pixels. Not taken: a docstring wording and a second cell size near 72 px (the geometry holds over the whole range). For m-8's close: add viewport.md (21 criteria), hud.md (15.4 KB) and _design/cells.md (18.1 KB) to DRAFT-079.
 
 Full gate here (Chromium): static checks pass, as do 8,775 of 8,776 parallel tests and all 162 serial ones. The one failure, test_spec_035_ac08 contrast on a flashing cell at phone-7, missed the cell's flash (data-flash empty). That is a timing race under load. B-094 changes no code, and the test passed 16/16 three times on rerun. For m-8's close: add it to B-100's notes. Firefox and WebKit are left to CI after the merge.
+
+Pull request #153, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
