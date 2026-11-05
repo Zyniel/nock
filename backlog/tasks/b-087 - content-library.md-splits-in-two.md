@@ -4,7 +4,7 @@ title: content/library.md splits in two
 status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T21:15:00Z'
+updated_date: '2026-11-05T21:29:00Z'
 labels:
   - domain:library
 milestone: m-7
@@ -35,7 +35,7 @@ From DRAFT-058. library is 17.0 KB with 25 criteria. Out of scope: any behaviour
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -54,6 +54,8 @@ Spec-checker APPROVED in one round. Not taken (optional): writing '(004 AC-3)' i
 Reviewer round 1: APPROVE, with findings 1-3 taken in round 1. Library rules 8 and 16 now point to the cards criteria that prove them. Cards' Code names its pointers' specs. Lines are wrapped. Round 2: APPROVE. Its last wrapping and the bare bracket ids in library's Code were fixed with the specs-done commit. Left for later: renaming library_harness.py (m-9's test tidy) and the wrong '(spec 004 rule 7)' citations in CataloguePage.svelte:44 and catalogue.ts:67 (the follow-up draft).
 
 Full gate here (Chromium): static checks and 8,774 parallel tests green. Of the 162 serial tests, only foundation remote pace AC-13 failed, a timing test this container is often too slow for (see the investigation session's item B); CI passed it on every other branch. Main then brought B-084's sibling splits B-085 and B-086, and the merge was clean. Traceability and shared components passed again. No code changed, so Firefox and WebKit are left to CI after the merge.
+
+Pull request #149, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
