@@ -8,10 +8,12 @@ room, the waiting times, the simulated client (`Peer`) with its traffic log, the
 helpers that join players and read the room, and the builders of the fixtures.
 What only one file uses stays in that file, next to its tests.
 
-The fixtures `fx01_grid`, `dist_dir`, `catalogue`, `registry` and the like are
-defined in each file that needs them, as thin wrappers around `grid_from_text`,
-`make_dist_dir`, `make_catalogue` and `make_registry`: a fixture imported from here
-would be an unused import for ruff.
+The fixtures `fx01_grid`, `dist_dir` and `catalogue` are not defined in the test
+files: they are the shared ones of `tests/conftest.py`, and a test module that
+serves grids sets `CATALOGUE_KIND` (the names are in `tests/catalogue_builders.py`)
+instead of defining `catalogue`. The fixture `registry` and the like are defined in
+each file that needs them, as thin wrappers around `make_registry`: a fixture
+imported from here would be an unused import for ruff.
 """
 
 from __future__ import annotations

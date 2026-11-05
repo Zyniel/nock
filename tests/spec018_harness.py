@@ -22,11 +22,13 @@ Not tested here, by the spec's own decision: a real process kill and a power cut
 undo (spec 026), the refusal of a removed player's join (spec 014), the README.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid`, `dist_dir`,
-`registry`, `client` and `catalogue` are defined in each file that needs them as
-thin wrappers around `grid_from_text`, `make_dist_dir`, `make_registry`,
-`make_app` and `published_catalogue`: a fixture imported from here would be an
-unused import for ruff.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`. The
+fixtures `registry` and `client` are defined in each file that needs them as thin
+wrappers around `make_registry` and `make_app`: a fixture imported from here would
+be an unused import for ruff. A test module that serves spec 018's catalogue
+(published entry 2) defines its own `catalogue` fixture around
+`published_catalogue`.
 """
 
 from __future__ import annotations

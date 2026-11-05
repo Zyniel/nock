@@ -22,10 +22,11 @@ of pencil letters (spec 020 is not built). The completion by an undo is tested
 because spec 018 is built.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid`, `dist_dir`,
-`registry`, `room_code` and `client` are defined in each file that needs them, as
-thin wrappers around `grid_from_text`, `make_dist_dir`, `make_registry` and
-`make_client`: a fixture imported from here would be an unused import for ruff.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`. The
+fixtures `registry`, `room_code` and `client` are defined in each file that needs
+them, as thin wrappers around `make_registry` and `make_client`: a fixture imported
+from here would be an unused import for ruff.
 """
 
 from __future__ import annotations

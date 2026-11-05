@@ -17,11 +17,11 @@ and 037, the `last_edit` and `recent_edits` fields of an accepted edit (specs 01
 and 037), and the `wrong` flag on the page (spec 023 owns its attribute).
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid`, `dist_dir`,
-`registry`, `room_code` and `client` are defined in each file that needs them, as
-thin wrappers around `grid_from_text`, `make_dist_dir`, `make_registry` and
-`make_app` (`room_code` is one line): a fixture imported from here would be an
-unused import for ruff.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`. The
+fixtures `registry`, `room_code` and `client` are defined in each file that needs
+them, as thin wrappers around `make_registry` and `make_app` (`room_code` is one
+line): a fixture imported from here would be an unused import for ruff.
 """
 
 from __future__ import annotations

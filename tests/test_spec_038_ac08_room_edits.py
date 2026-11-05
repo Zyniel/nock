@@ -6,7 +6,7 @@ check and a reveal lock cells, with joins, chat and presence entries in between.
 The nicknames come from the `player_joined` entries, which hold them in capitals
 (`ANA`, `BOB`), as the server stores them.
 
-HTTP: the replay route on `TestClient(create_app(rooms=registry, dist_dir=tmp_path,
+HTTP: the replay route on `TestClient(create_app(rooms=registry, dist_dir=dist_dir,
 operator_token=OPS_TOKEN))`, with the room registered by `add_room` and its log
 appended to the store.
 

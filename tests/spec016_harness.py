@@ -13,10 +13,11 @@ Not tested here: `pencil_edit` and `confirm_pencil` on a locked cell (spec 020),
 (spec 019).
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid`, `dist_dir`,
-`registry` and `client` are defined in each file that needs them as thin wrappers
-around `grid_from_text`, `make_dist_dir`, `make_registry` and `make_app`: a fixture
-imported from here would be an unused import for ruff.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`. The
+fixtures `registry` and `client` are defined in each file that needs them as thin
+wrappers around `make_registry` and `make_app`: a fixture imported from here would
+be an unused import for ruff.
 """
 
 from __future__ import annotations

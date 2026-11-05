@@ -4,9 +4,11 @@ This module is not a test file: pytest does not collect it. The tests of spec 00
 are in `tests/test_spec_004_*.py`, one file per criterion group.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid`, `catalogue`,
-`dist_dir` and `client` are defined in each file that needs them, as thin wrappers
-around `grid_from_text`, `make_reference_catalogue`, `make_dist_dir` and
+stays in that file, next to its tests. The fixtures `fx01_grid`, `dist_dir` and
+`catalogue` are not defined in the test files: they are the shared ones of
+`tests/conftest.py`, and a test module that serves grids sets `CATALOGUE_KIND` (the
+names are in `tests/catalogue_builders.py`) instead of defining `catalogue`. The
+`client` fixture is defined in each file that needs it, as a thin wrapper around
 `make_client`: a fixture imported from here would be an unused import for ruff.
 """
 

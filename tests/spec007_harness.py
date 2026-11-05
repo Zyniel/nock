@@ -7,9 +7,8 @@ The page is tested with spec 040's mocked socket on `/r/ABC123`: the test sends
 an FX-01 snapshot (or a hand-built view) and reads every frame the page sent.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixture `fx01_grid` is defined in each
-file as a thin wrapper around `grid_from_text`: a fixture imported from here would
-be an unused import for ruff.
+stays in that file, next to its tests. The fixture `fx01_grid` is not defined in the
+test files: it is the shared one of `tests/conftest.py`.
 """
 
 from __future__ import annotations

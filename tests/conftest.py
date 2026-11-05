@@ -165,12 +165,20 @@ def dist_dir(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def catalogue(request: pytest.FixtureRequest, fx01_grid: Grid) -> Catalogue:
-    """Return the catalogue that the live server serves (empty by default).
+    """Return the catalogue that the live server serves.
 
-    A test module that needs grids sets `CATALOGUE_KIND` to the name of a builder
-    in `catalogue_builders.CATALOGUE_BUILDERS`, which builds the catalogue on the
-    `fx01_grid` of the module. A module that needs another catalogue overrides
-    this fixture with its own.
+    The default is an empty `Catalogue()`. A test module that needs grids sets the
+    module constant `CATALOGUE_KIND` instead of defining its own fixture; the
+    catalogue is then built on the `fx01_grid` of the module. The valid values are
+    the names of `catalogue_builders.CATALOGUE_BUILDERS`:
+
+    - `"published"`: FX-01 as published entry 1, force 2.
+    - `"published_force_1"`: the same with force 1.
+    - `"reference"`: the reference catalogue CAT of spec 004 (four entries, the
+      fourth unpublished).
+
+    Any other value raises a `ValueError`. A module that needs a different
+    catalogue overrides this fixture with its own.
     """
     from catalogue_builders import CATALOGUE_BUILDERS
     from nock.catalogue import Catalogue

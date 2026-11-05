@@ -26,10 +26,13 @@ the helpers below when a test runs. So while they are missing, each test that ne
 them fails with an AttributeError, and the collection of the other tests goes on.
 
 This module holds what more than one test file uses. What only one file uses stays
-in that file. The fixtures (`fx01_grid`, `dist_dir`, `catalogue`, `registry`,
-`client`) are defined in each file that asks for them, as thin wrappers around
-`grid_from_text`, `make_dist_dir`, `make_catalogue` and `make_registry`: a fixture
-imported from here would be an unused import for ruff.
+in that file. The fixtures `fx01_grid`, `dist_dir` and `catalogue` are not defined
+in the test files: they are the shared ones of `tests/conftest.py`, and a test
+module that serves grids sets `CATALOGUE_KIND` (the names are in
+`tests/catalogue_builders.py`) instead of defining `catalogue`. The fixtures
+`registry` and `client` are defined in each file that asks for them, as thin
+wrappers around `make_registry`: a fixture imported from here would be an unused
+import for ruff.
 """
 
 from __future__ import annotations

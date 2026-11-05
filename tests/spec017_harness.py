@@ -26,8 +26,7 @@ decision 7) and the pending edits lost by a reload (not observable).
 
 This module holds what more than one of those files uses. What only one file uses
 stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
-defined in each file as thin wrappers around `grid_from_text` and `make_dist_dir`:
-a fixture imported from here would be an unused import for ruff.
+not defined in the test files: they are the shared ones of `tests/conftest.py`.
 """
 
 from __future__ import annotations

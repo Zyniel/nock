@@ -1,10 +1,10 @@
 """Tests of spec 038 (privacy and operations), AC-6: the ops API is the operator's.
 
-The ops API runs on `TestClient(create_app(rooms=registry, dist_dir=tmp_path,
+The ops API runs on `TestClient(create_app(rooms=registry, dist_dir=dist_dir,
 operator_token=OPS_TOKEN))`, with a registry on conftest's fake clock whose store
 holds rooms with chosen creation times (`new_room(code, grid, <creation time>)`,
 then `add_room`, then `store.append` of hand-made entries), as the spec's "Test
-harness" says. "Off" is `create_app(rooms=registry, dist_dir=tmp_path)` with
+harness" says. "Off" is `create_app(rooms=registry, dist_dir=dist_dir)` with
 NOCK_OPERATOR_TOKEN deleted. The shared setup is in `spec038_harness`; spec 011's
 `at_once` sends a burst of requests at once.
 
