@@ -1,9 +1,10 @@
 ---
 id: B-084
 title: account/account.md gives its sheet and page
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T20:06:00Z'
 labels:
   - domain:account
 milestone: m-7
