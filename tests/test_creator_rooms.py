@@ -1,4 +1,4 @@
-"""Tests of lobby/host, AC-9: which rooms have a creator, and what is stored.
+"""Tests of lobby/creator, AC-1: which rooms have a creator, and what is stored.
 
 Over HTTP, with the app of `host_harness` (accounts on or off, the fake clock, both
 stores on one database file). The creator is read from the live room
@@ -45,7 +45,7 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
     return make_catalogue(fx01_grid)
 
 
-def test_ac9_a_signed_in_post_stores_the_account_as_the_creator(
+def test_ac1_a_signed_in_post_stores_the_account_as_the_creator(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -67,7 +67,7 @@ def assert_anonymous_room(app: HostApp, code: str) -> None:
 
 
 @pytest.mark.parametrize("cookie", ["none", "unknown", "expired"])
-def test_ac9_a_post_without_a_valid_session_makes_an_anonymous_room(
+def test_ac1_a_post_without_a_valid_session_makes_an_anonymous_room(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -87,7 +87,7 @@ def test_ac9_a_post_without_a_valid_session_makes_an_anonymous_room(
         assert_anonymous_room(app, code)
 
 
-def test_ac9_a_post_with_accounts_off_ignores_the_cookie(
+def test_ac1_a_post_with_accounts_off_ignores_the_cookie(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -104,7 +104,7 @@ def test_ac9_a_post_with_accounts_off_ignores_the_cookie(
         assert_anonymous_room(accounts_off, code)
 
 
-def test_ac9_a_host_who_signs_in_later_does_not_become_the_creator(
+def test_ac1_a_host_who_signs_in_later_does_not_become_the_creator(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -182,7 +182,7 @@ def write_old_store(path: Path, grid: Grid) -> None:
         connection.close()
 
 
-def test_ac9_a_database_written_before_the_column_opens_with_it_added(
+def test_ac1_a_database_written_before_the_column_opens_with_it_added(
     tmp_path: Path, fx01_grid: Grid
 ) -> None:
     path = tmp_path / "old.sqlite3"

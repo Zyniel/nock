@@ -1,4 +1,4 @@
-"""Tests of lobby/host, AC-15: erasing an account deletes the rooms it created.
+"""Tests of lobby/creator, AC-7: erasing an account deletes the rooms it created.
 
 Over the room socket, with the app of `host_harness`. Lea's account is erased with
 `DELETE /api/account` (the identities she recorded with `PUT /api/account/rooms`
@@ -68,7 +68,7 @@ def catalogue(fx01_grid: Grid) -> Catalogue:
 
 
 class Erased(NamedTuple):
-    """The play of AC-15 once Lea's account is deleted; the app is still running."""
+    """The play of AC-7 once Lea's account is deleted; the app is still running."""
 
     app: HostApp
     bob_session: str
@@ -121,7 +121,7 @@ def erased_scene(
     grid: Grid,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[Erased]:
-    """Play AC-15 up to the answer of `DELETE /api/account` with Lea's session."""
+    """Play AC-7 up to the answer of `DELETE /api/account` with Lea's session."""
     with (
         host_app(directory, clock, catalogue, monkeypatch) as app,
         contextlib.ExitStack() as stack,
@@ -204,7 +204,7 @@ def close_code_before_any_message(client: TestClient, code: str) -> int:
         return close_code_of_next_read(websocket)
 
 
-def test_ac15_the_erasure_closes_the_other_players_socket_with_4404_and_nothing_else(
+def test_ac7_the_erasure_closes_the_other_players_socket_with_4404_and_nothing_else(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -222,7 +222,7 @@ def test_ac15_the_erasure_closes_the_other_players_socket_with_4404_and_nothing_
     assert after == scene.bob_r_before
 
 
-def test_ac15_the_creator_room_is_gone_live_and_stored_and_its_code_is_wrong(
+def test_ac7_the_creator_room_is_gone_live_and_stored_and_its_code_is_wrong(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -251,7 +251,7 @@ def test_ac15_the_creator_room_is_gone_live_and_stored_and_its_code_is_wrong(
     assert next_attempt == THROTTLED
 
 
-def test_ac15_bobs_history_keeps_the_solved_record_naming_her_dashes(
+def test_ac7_bobs_history_keeps_the_solved_record_naming_her_dashes(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -265,7 +265,7 @@ def test_ac15_bobs_history_keeps_the_solved_record_naming_her_dashes(
     assert records[0]["teammates"] == [FORMER]
 
 
-def test_ac15_in_a_room_she_did_not_create_her_player_is_erased_and_nothing_else(
+def test_ac7_in_a_room_she_did_not_create_her_player_is_erased_and_nothing_else(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -288,7 +288,7 @@ def test_ac15_in_a_room_she_did_not_create_her_player_is_erased_and_nothing_else
     assert bob_s_after == scene.bob_s_before
 
 
-def test_ac15_an_anonymous_room_where_she_was_host_keeps_its_players_and_host(
+def test_ac7_an_anonymous_room_where_she_was_host_keeps_its_players_and_host(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,

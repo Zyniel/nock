@@ -1,9 +1,9 @@
-"""Tests of lobby/host, AC-16: a creator room loaded while accounts are off.
+"""Tests of lobby/creator, AC-8: a creator room loaded while accounts are off.
 
 Over the room socket, with the app of `host_harness`: Lea creates a room signed in,
-Bob joins, Lea goes away and Bob becomes the stand-in host. AC-16 opens the same
+Bob joins, Lea goes away and Bob becomes the stand-in host. AC-8 opens the same
 database file in an app with accounts off, then on again. The erasure of the
-creator account (AC-15) is in `test_host_creator_deletion.py`.
+creator account (AC-7) is in `test_creator_deletion.py`.
 """
 
 from __future__ import annotations
@@ -98,10 +98,10 @@ def hand_over_to_bob(app: HostApp, scene: Scene) -> None:
     wait_for_host(app.registry, scene.room.code, scene.bob_id)
 
 
-# ---- AC-16: accounts off, then on again --------------------------------------------
+# ---- AC-8: accounts off, then on again --------------------------------------------
 
 
-def test_ac16_a_room_loaded_with_accounts_off_plays_as_an_anonymous_room(
+def test_ac8_a_room_loaded_with_accounts_off_plays_as_an_anonymous_room(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
