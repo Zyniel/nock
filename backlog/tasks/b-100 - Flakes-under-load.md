@@ -4,6 +4,7 @@ title: Flakes under load
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T05:01:00Z'
 labels:
   - tooling
 milestone: m-9
@@ -32,3 +33,9 @@ From DRAFT-024, 032, 053 and 018, and B-079's gate (webkit test_server_offline_u
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From the close of « Owner's calls »: WebKit test_server_offline_undo AC-29 fails with 'Clock.pause_at: Cannot fast-forward to the past' (CI after 06c360b, and B-079's local gate); its cause is in scope here.
+<!-- SECTION:NOTES:END -->
