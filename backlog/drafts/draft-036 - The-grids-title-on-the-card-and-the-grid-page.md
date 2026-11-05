@@ -6,7 +6,7 @@ assignee: []
 created_date: '2026-11-01T16:44:00Z'
 labels:
   - idea
-  - domain:library
+  - domain:cards
 dependencies: []
 ---
 

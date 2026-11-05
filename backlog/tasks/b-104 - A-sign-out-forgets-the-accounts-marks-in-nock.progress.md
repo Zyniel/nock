@@ -4,12 +4,15 @@ title: A sign-out forgets the account's marks in nock.progress
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T22:33:00Z'
 labels:
-  - domain:account
+  - domain:my-account
+  - domain:cards
 milestone: m-10
 dependencies: []
 documentation:
-  - specs/account/account.md
+  - specs/account/my-account.md
+  - specs/content/cards.md
 priority: medium
 ordinal: 92000
 ---
@@ -34,3 +37,9 @@ From DRAFT-042. B-040 makes a sign-out or deletion forget the identities, room r
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+After B-084 and B-087: what a sign-out forgets is account/my-account.md rule 5, and nock.progress is content/cards.md rule 1.
+<!-- SECTION:NOTES:END -->
