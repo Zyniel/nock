@@ -1,4 +1,4 @@
-"""Tests of content/library, AC-22 to AC-24: the account's progress on `/` and
+"""Tests of content/cards, AC-7 to AC-9: the account's progress on `/` and
 `/g/<n>`, merged with the device's.
 
 Browser with the live server serving `CAT` (accounts off, so the account routes
@@ -14,7 +14,7 @@ Choices where the spec leaves room:
 - "`nock.progress` is unchanged": its parsed value is the seeded one, after the
   merged pills show.
 - "Ready" on `/g/<n>` is the `data-state` `ready` of `grid-page`.
-- AC-24 reads « `/g/1` show « Commencée » on card 1, « Terminée » on card 3 »: a
+- AC-9 reads « `/g/1` show « Commencée » on card 1, « Terminée » on card 3 »: a
   grid page shows one card, so `/g/1` shows card 1 « Commencée » and `/g/3` card 3
   « Terminée ».
 - A failed answer is waited for (the request ended) and the page given a pause
@@ -22,7 +22,7 @@ Choices where the spec leaves room:
   failure is caught.
 - "Signed out, `/` never asks the route": `GET /api/account` answers signed out,
   the « Compte » button shows (the status is handled), and the route is not asked
-  within a pause. The route would answer AC-22's progress if it were.
+  within a pause. The route would answer AC-7's progress if it were.
 """
 
 from __future__ import annotations
@@ -67,10 +67,10 @@ def open_grid(page: Page, base_url: str, number: int) -> None:
     expect(page.get_by_test_id("grid-page")).to_have_attribute("data-state", "ready")
 
 
-# ---- AC-22: the catalogue merges the two sources ---------------------------------
+# ---- AC-7: the catalogue merges the two sources ---------------------------------
 
 
-def test_ac22_the_catalogue_shows_the_merged_progress_and_keeps_the_device_storage(
+def test_ac7_the_catalogue_shows_the_merged_progress_and_keeps_the_device_storage(
     page: Page, live_server: str
 ) -> None:
     seed_device_progress(page)
@@ -88,7 +88,7 @@ def test_ac22_the_catalogue_shows_the_merged_progress_and_keeps_the_device_stora
     assert log.count(STATUS_PATH) == 1
 
 
-def test_ac22_while_the_answer_is_pending_the_page_is_ready_with_the_devices_pills(
+def test_ac7_while_the_answer_is_pending_the_page_is_ready_with_the_devices_pills(
     page: Page, live_server: str
 ) -> None:
     seed_device_progress(page)
@@ -107,13 +107,13 @@ def test_ac22_while_the_answer_is_pending_the_page_is_ready_with_the_devices_pil
     assert stored_progress(page) == DEVICE_PROGRESS
 
 
-# ---- AC-23: the grid page --------------------------------------------------------
+# ---- AC-8: the grid page --------------------------------------------------------
 
 
 @pytest.mark.parametrize(
     ("number", "progress"), [(1, "finished"), (2, "started"), (3, "finished")]
 )
-def test_ac23_the_grid_page_asks_the_progress_and_not_the_status(
+def test_ac8_the_grid_page_asks_the_progress_and_not_the_status(
     page: Page, live_server: str, number: int, progress: str
 ) -> None:
     seed_device_progress(page)
@@ -130,11 +130,11 @@ def test_ac23_the_grid_page_asks_the_progress_and_not_the_status(
     expect(page.get_by_test_id("account-open")).to_have_count(0)
 
 
-# ---- AC-24: no progress from the account -----------------------------------------
+# ---- AC-9: no progress from the account -----------------------------------------
 
 
 @pytest.mark.parametrize("answer", FAILING_ANSWERS)
-def test_ac24_the_catalogue_keeps_the_devices_progress_when_the_account_gives_none(
+def test_ac9_the_catalogue_keeps_the_devices_progress_when_the_account_gives_none(
     page: Page, live_server: str, answer: str
 ) -> None:
     seed_device_progress(page)
@@ -153,7 +153,7 @@ def test_ac24_the_catalogue_keeps_the_devices_progress_when_the_account_gives_no
 
 
 @pytest.mark.parametrize("answer", FAILING_ANSWERS)
-def test_ac24_the_grid_pages_keep_the_devices_progress_when_the_account_gives_none(
+def test_ac9_the_grid_pages_keep_the_devices_progress_when_the_account_gives_none(
     page: Page, live_server: str, answer: str
 ) -> None:
     seed_device_progress(page)
@@ -172,7 +172,7 @@ def test_ac24_the_grid_pages_keep_the_devices_progress_when_the_account_gives_no
         expect_progress(page, number, DEVICE_ONLY[number])
 
 
-def test_ac24_signed_out_the_catalogue_never_asks_the_progress(
+def test_ac9_signed_out_the_catalogue_never_asks_the_progress(
     page: Page, live_server: str
 ) -> None:
     seed_device_progress(page)

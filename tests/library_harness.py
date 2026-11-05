@@ -1,14 +1,15 @@
-"""Shared setup of the tests of content/library, AC-22 to AC-24: the account's
+"""Shared setup of the tests of content/cards, AC-7 to AC-9: the account's
 progress on the catalogue and the grid page.
 
-Pytest does not collect this module (its name does not start with `test_`). The
-tests are in `tests/test_library_*.py`:
+Pytest does not collect this module (its name does not start with `test_`). It
+keeps its name because `test_library_filter.py` imports `QUIET_MS` from it, so it
+is shared with library's filter test. The progress tests are in:
 
-- `test_library_progress.py`: AC-22 to AC-24, browser with the live server serving
+- `test_cards_progress.py`: AC-7 to AC-9, browser with the live server serving
   `CAT`, the account routes answered by `page.route` and `nock.progress` seeded.
 
 The device's progress is `DEVICE_PROGRESS` and the account's `ACCOUNT_PROGRESS`
-(AC-22's storage and answer). Merged, grids 1, 2 and 3 read `finished`, `started`
+(AC-7's storage and answer). Merged, grids 1, 2 and 3 read `finished`, `started`
 and `finished`; from the device alone, `started`, none and `finished`.
 """
 
@@ -35,7 +36,7 @@ ACCOUNT_PROGRESS = {"1": "finished", "2": "started", "3": "started"}
 MERGED = {1: "finished", 2: "started", 3: "finished"}
 DEVICE_ONLY = {1: "started", 2: "none", 3: "finished"}
 
-# What AC-24's answers have in common with a failure: no progress from the account.
+# What AC-9's answers have in common with a failure: no progress from the account.
 FAILING_ANSWERS = ["401", "404", "500", "array", "bad value", "request fails"]
 
 
@@ -69,7 +70,7 @@ class RequestLog:
 
 
 def seed_device_progress(page: Page) -> None:
-    """Put AC-22's `nock.progress` in the page's storage before its scripts run."""
+    """Put AC-7's `nock.progress` in the page's storage before its scripts run."""
     seed_storage(page, {PROGRESS_KEY: json.dumps(DEVICE_PROGRESS)})
 
 
