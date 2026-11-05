@@ -1,7 +1,7 @@
 ---
 area: platform
 file: serving
-status: done
+status: approved
 ---
 
 # platform/serving - Serving the client, the HTTP edge, environment settings
@@ -58,8 +58,10 @@ it before it serves, with one line naming the variable.
    `NOCK_EXPIRY_SWEEP_MINUTES`, `lobby/lifetime.md` rule 7), then
    `NOCK_ROOMS_PER_ADDRESS_PER_HOUR` (`lobby/rooms.md` rule 14), then
    `NOCK_SOCKETS_PER_ADDRESS` (`platform/realtime.md` rule 26), then the
-   account variables by their own rules (`account/account.md` rule 2). What
-   it runs: `product.md` rule 27.
+   account variables by their own rules (`account/account.md` rule 2). Only
+   once they all pass does it build the app, by one call of
+   `nock.server.production_app()` (`platform/server.md` rule 23), and run it
+   (`product.md` rule 27).
 7. `NOCK_HOST`, unset or empty `127.0.0.1`: only ASCII letters, ASCII digits,
    `.`, `-` and `:`. With `:` it is an IPv6 address that
    `ipaddress.IPv6Address` accepts, without brackets; else a name whose dots
@@ -113,6 +115,14 @@ it before it serves, with one line naming the variable.
     hashes. A 404 or 503 of these routes has no `Cache-Control`. The 413 of any
     path: rule 11. The API's: `admin/operations.md` rule 10,
     `account/account.md` rule 1.
+14. Every HTTP route under `/api/` that answers a body declares its type
+    (`response_model`), and FastAPI checks each answer against it: a model, a
+    list of models, or for `GET /api/account/progress` a map of grid numbers
+    to `"started"` or `"finished"`; never `dict[str, object]`. Its JSON is the
+    model's: the keys its domain file lists, in the order that file gives
+    where it gives one (`admin/overrides.md` rule 3, `admin/operations.md`
+    rule 12), an integer written as one (`720`, never `720.0`). A route that
+    answers 204, and `GET /api/rooms` (rule 4), declare none.
 
 ## Acceptance criteria
 
@@ -130,7 +140,8 @@ it before it serves, with one line naming the variable.
 - **AC-3** With no build, the app starts; `/` and `/r/ABC123` answer 503
   `text/plain` naming `npm --prefix web run build` while `/api/nope` answers
   404; once `index.html` is written, `/` serves it. (← 040 AC-6)
-- **AC-4** `main()` runs `nock.server.app` with `ws_max_size` 8192 on
+- **AC-4** `main()` runs the app of one `nock.server.production_app()` call
+  with `ws_max_size` 8192 on
   127.0.0.1:8000 with both variables unset or `""`, on `0.0.0.0`:9123 when set
   so, on port 8000 for `"0" * 5000 + "8000"`, and on the host given for
   `example.org.`, 63 `a` then `.example`, `::1` and `::ffff:192.0.2.1`.
@@ -138,8 +149,9 @@ it before it serves, with one line naming the variable.
 - **AC-5** `NOCK_PORT` `"0"`, `"65536"` or `" 8000"`, `NOCK_HOST` `"[::1]"`,
   `"my_host"`, `"a..b"` or `"bücher.example"`, and `NOCK_DATABASE`
   `"data/nock.sqlite3\n"` or `"nock\u200b.sqlite3"` each stop `main()` with a
-  one-line message holding the name and `repr()` of the value, and no server
-  runs; `python -m nock` exits with 1. (← 036 AC-11)
+  one-line message holding the name and `repr()` of the value, with no
+  `production_app()` call and no server run; `python -m nock` exits with 1.
+  (← 036 AC-11)
 - **AC-6** `NOCK_DATABASE` `"/srv/jeu de mots/données/nock.sqlite3"`,
   `C:\Users\François\nock.sqlite3`, `"/srv/nock\u200ddata/nock.sqlite3"` or
   `"/srv/donn\udce9es/nock.sqlite3"` never stops `main()`, which leaves the
@@ -172,6 +184,11 @@ it before it serves, with one line naming the variable.
   `POST /api/account` with accounts on and off, each with a `Content-Length` of
   65,537, get 413 `{"detail": "Content Too Large"}` with `Cache-Control:
   no-store`, never 404 or 405.
+- **AC-15** In an app with operator pages and accounts on, each HTTP route
+  under `/api/` that answers a body declares a `response_model` of rule 14,
+  none `dict[str, object]`: `GET /api/ops/settings` a model, `GET /api/grids`
+  a list of a model; `GET /api/rooms` and the 204 of `DELETE /api/account`
+  declare none.
 
 ## Edge cases
 
@@ -192,9 +209,10 @@ it before it serves, with one line naming the variable.
 ## Code
 
 - `src/nock/server.py`: client routes, `WEB_DIST_DIR`, the body limit, headers
-  and `Cache-Control` of rules 11 to 13. `Caddyfile` (repository root): the
-  proxy's body limit. `src/nock/__main__.py`, `src/nock/settings.py`: the
-  variables.
+  and `Cache-Control` of rules 11 to 13, each route's `response_model`.
+  `Caddyfile` (repository root): the proxy's body limit.
+  `src/nock/__main__.py` (`main()`, which runs `production_app()`),
+  `src/nock/settings.py`: the variables.
 - Tests: `tests/test_spec_040_ac01_ac06_*`, `tests/test_spec_040_ac27_ac29_*`,
-  `tests/test_spec_036_ac10_ac12_*`; `tests/test_serving_*` for AC-7 to AC-14,
+  `tests/test_spec_036_ac10_ac12_*`; `tests/test_serving_*` for AC-7 to AC-15,
   AC-11 in the browsers.

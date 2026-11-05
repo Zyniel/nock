@@ -1,10 +1,10 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
-# platform/server - Durable rooms, undo, engine time, rooms in memory
+# platform/server - Durable rooms, undo, engine time, rooms in memory, building the app
 
 ## Purpose
 
@@ -143,11 +143,24 @@ played.
     socket. A handler cancelled while the call runs leaves the connection it
     gets back, so the room's count of open sockets stays right.
 
+### Building the app
+
+23. Importing `nock.server` builds no app and reads no file under `grids/`;
+    the module has no `app` name. Each call of
+    `create_app` builds one; `production_app()` builds the one `python -m
+    nock` runs (`platform/serving.md` rule 6): `create_app` with the catalogue
+    read from `grids/` of the repository, the other arguments left to their
+    defaults.
+
 ### Look
 
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
 `client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two
 top bars (« Phone top bar », « Computer top bar »).
+
+## New interface
+
+- `nock.server.production_app() -> FastAPI` (rule 23).
 
 ## Acceptance criteria
 
@@ -239,6 +252,10 @@ top bars (« Phone top bar », « Computer top bar »).
   at (1, 1) and (1, 2) empty. Pressed offline between `A` and `M`, it reaches
   the server between them: every page ends with (1, 1) empty and `M` at
   (1, 2).
+- **AC-30** With every read of a file under `grids/` failing, `import
+  nock.server` succeeds, reads no file under `grids/` and leaves the module
+  with no `app`;
+  `production_app()` then fails with that read's error.
 
 ## Edge cases
 
@@ -285,11 +302,11 @@ top bars (« Phone top bar », « Computer top bar »).
 - `src/nock/room.py` (`handle_message`), `src/nock/catch_up.py`
   (`build_catch_up`), `src/nock/recap.py`: the rules of rule 20, reading
   `Grid.words` and `Grid.solution_letter`.
-- `src/nock/server.py`: `create_app`, the store's path, the socket route's one
-  call to `connect` in a worker thread.
+- `src/nock/server.py`: `create_app`, `production_app`, the store's path, the
+  socket route's one call to `connect` in a worker thread.
 - `web/src/lib/RoomTopBar.svelte`, `gridKeys.ts`, `GridViewport.svelte`,
   `RoomPage.svelte`, `roomSession.ts`, `RoomNote.svelte`: the undo button,
   shortcut and message.
 - Tests: `tests/test_spec_018_*`; `tests/test_server_engine_time.py` for rule
   20, which measures durations and so runs on its own (`SERIAL_TEST_FILES`), as
-  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-29.
+  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-30.

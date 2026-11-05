@@ -4,7 +4,7 @@ title: 'Server structure: typed answers and an app factory'
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-05T02:10:00Z'
+updated_date: '2026-11-05T02:11:00Z'
 labels:
   - domain:server
   - domain:serving
@@ -49,6 +49,17 @@ ordinal: 12000
      (lead's default) no, the image keeps the layout (B-009); B yes.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 server AC-30 (new)
+- [ ] #2 serving AC-15 (new)
+- [ ] #3 serving AC-4 (changed)
+- [ ] #4 serving AC-5 (changed)
+- [ ] #5 overrides AC-2 (changed)
+- [ ] #6 overrides AC-6 (changed)
+- [ ] #7 operations AC-4 (changed)
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -77,4 +88,6 @@ Lead's pick among the Plan agent's options (Fable, high): B. nock.server loses i
 Lead decisions on the spec: the answer-model rule lives in serving.md (rule 14, AC-15), which owns the HTTP edge; the progress route declares dict[str, Literal['started', 'finished']]; LinkRequested stays unnamed in the specs (account AC-1 already checks 202 {}); server.md at about 18 KB and 24 criteria is accepted until B-086 splits it.
 
 Spec-checker round 1: CHANGES REQUESTED (key order claimed only where a file gives one; overrides' integers named; grids/ files; the no-app name; _map.md rows). For the implementer: README.md's uvicorn nock.server:app line changes with the code.
+
+Spec-checker round 2: APPROVED.
 <!-- SECTION:NOTES:END -->
