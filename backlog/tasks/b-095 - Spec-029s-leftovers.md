@@ -4,10 +4,11 @@ title: Spec 029's leftovers
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T01:54:00Z'
 labels:
   - domain:erasure
   - domain:results
-milestone: m-8
+milestone: m-10
 dependencies: []
 documentation:
   - specs/account/erasure.md

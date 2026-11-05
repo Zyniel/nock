@@ -4,9 +4,10 @@ title: SMTP sends out of the sync routes' pool
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T01:54:00Z'
 labels:
   - domain:account
-milestone: m-9
+milestone: m-10
 dependencies: []
 documentation:
   - specs/account/account.md

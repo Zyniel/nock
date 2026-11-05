@@ -4,9 +4,10 @@ title: B-040's small cleanups
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T01:54:00Z'
 labels:
   - domain:account
-milestone: m-8
+milestone: m-10
 dependencies: []
 documentation:
   - specs/account/account.md

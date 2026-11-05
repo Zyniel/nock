@@ -4,11 +4,12 @@ title: One helper for refused characters, MAX_PLAYERS named where it lives
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T01:54:00Z'
 labels:
   - domain:chat
   - domain:serving
   - domain:rooms
-milestone: m-8
+milestone: m-10
 dependencies: []
 documentation:
   - specs/social/chat.md
