@@ -4,6 +4,7 @@ title: Compact the tests
 status: To Do
 assignee: []
 created_date: '2026-11-01T16:43:00Z'
+updated_date: '2026-11-05T01:54:00Z'
 labels: []
 milestone: m-2
 dependencies: []
@@ -35,3 +36,9 @@ ordinal: 13000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Released by the human in chat, 2026-11-05 (« /milestone m-2 »: run Upkeep). The lead cuts it to fit one task: the most copied helpers (dist_dir, catalogue and the like) move into shared fixtures, and near-copies become parametrised tests where a file holds them; every criterion keeps its test names and checks, none weaker. What is left goes back to a draft.
+<!-- SECTION:NOTES:END -->

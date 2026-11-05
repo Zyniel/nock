@@ -23,8 +23,8 @@ table, the naming rules and the glossary follow in the same change.
 
 | Area | File | What it covers | Look | From the v1.1.0 specs |
 | --- | --- | --- | --- | --- |
-| account | `account/account.md` | sign-in, the session, the account's rooms, the account sheet and page | pages | 033 (but AC-4); 038 AC-1, AC-2; 046 AC-3; 048 AC-3 to AC-5 |
-| account | `account/erasure.md` | the account's deletion: the erasure and its attempts, what is kept, « Ancien joueur », history records, grid progress | | 033 AC-4, AC-5; 029 AC-3, AC-6, AC-7 (server side) |
+| account | `account/account.md` | sign-in, the session, the account's rooms, the account sheet and page | pages | 033 (but AC-3, AC-4, AC-10); 046 AC-3; 048 AC-3 to AC-5 |
+| account | `account/erasure.md` | the account's deletion: the erasure and its attempts, what is kept, « Ancien joueur », history records, grid progress | | 033 AC-1, AC-3 to AC-5, AC-10; 038 AC-1, AC-2; 029 AC-3, AC-6, AC-7 (server side) |
 | lobby | `lobby/rooms.md` | solo start, room creation and its limit per address, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
 | lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do; the creator | room | 014 |
 | lobby | `lobby/joining.md` | join by link, the account's one seat, room resume | pages | 012; 032 AC-3, AC-7; 046 AC-15 to AC-17 |
@@ -60,9 +60,9 @@ table, the naming rules and the glossary follow in the same change.
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
 criteria goes whole to its row; a criterion may be cited by more than one domain
 (043 AC-5 is cited by `hud` and `room`, 047 AC-13 by `votes` and `results`,
-047 AC-14 by `votes`, `results` and `chat`, 033 AC-5 by `account` and
-`erasure`, 004 AC-7 by `ipuz` and `library`), and each of them states the part
-its own screens hold.
+047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 and 033 AC-5 by
+`account` and `erasure`, 004 AC-7 by `ipuz` and `library`), and each of them
+states the part its own screens hold.
 
 Every file of the table exists but `gameplay/modes.md` (race and teams: no task
 writes it); nothing of race or teams is built.
