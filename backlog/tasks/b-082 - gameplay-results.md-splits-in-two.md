@@ -34,7 +34,7 @@ From DRAFT-058. results is 19.4 KB with 23 criteria. Out of scope: any behaviour
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -51,6 +51,8 @@ Lead decision: Cut 1 (history) over Cut 2 (recap). It splits by topic, not by la
 Reviewer round 1: APPROVE. Taken: specs back to done. Not taken here: B-091 and B-095 gaining domain:history and specs/gameplay/history.md, which goes on a board branch since those are other tasks. Not taken: adding rules.md, account.md and rooms.md to history's Depends on, because the template's limit is three files and they are cited inline, as they were in results.
 
 Full gate here (Chromium): static checks and 8,774 parallel tests green. Only foundation remote pace AC-13 failed (main-thread time per selection), as on B-080 and B-081: this container is too slow for it, and CI passed it for both. No test or code changed, so Firefox and WebKit are left to CI after the merge. After merging main (B-081), the shared-components check and the traceability gate passed again.
+
+Pull request #143, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
