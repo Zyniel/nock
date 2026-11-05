@@ -67,7 +67,7 @@ ordinal: 12000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -92,6 +92,8 @@ Spec-checker round 1: CHANGES REQUESTED (key order claimed only where a file giv
 Spec-checker round 2: APPROVED.
 
 Review round 1: APPROVE. Taken: production_app's docstring names CatalogueError, main()'s docstring gives the full order of the checks, the dashboard answer reads through a named answer_fields. Not taken: AC-30's wording 'that read's error' (the test accepts the read's error in the cause chain, which is what the code raises).
+
+Pull request #140, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
