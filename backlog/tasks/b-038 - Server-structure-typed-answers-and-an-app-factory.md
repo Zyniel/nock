@@ -1,10 +1,10 @@
 ---
 id: B-038
 title: 'Server structure: typed answers and an app factory'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-05T03:25:00Z'
+updated_date: '2026-11-05T10:18:00Z'
 labels:
   - domain:server
   - domain:serving
@@ -51,22 +51,22 @@ ordinal: 12000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 server AC-30 (new)
-- [ ] #2 serving AC-15 (new)
-- [ ] #3 serving AC-4 (changed)
-- [ ] #4 serving AC-5 (changed)
-- [ ] #5 overrides AC-2 (changed)
-- [ ] #6 overrides AC-6 (changed)
-- [ ] #7 operations AC-4 (changed)
+- [x] #1 server AC-30 (new)
+- [x] #2 serving AC-15 (new)
+- [x] #3 serving AC-4 (changed)
+- [x] #4 serving AC-5 (changed)
+- [x] #5 overrides AC-2 (changed)
+- [x] #6 overrides AC-6 (changed)
+- [x] #7 operations AC-4 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -93,3 +93,9 @@ Spec-checker round 2: APPROVED.
 
 Review round 1: APPROVE. Taken: production_app's docstring names CatalogueError, main()'s docstring gives the full order of the checks, the dashboard answer reads through a named answer_fields. Not taken: AC-30's wording 'that read's error' (the test accepts the read's error in the cause chain, which is what the code raises).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Importing nock.server no longer builds an app or reads grids/: nock.server.production_app() builds it, and __main__ and the README's uvicorn line call it (--factory). Every /api body route declares a response_model (LinkRequested, SettingsAnswer, DryRunAnswer, DashboardAnswer and others), so the answers are typed in the OpenAPI schema; the JSON bytes are unchanged, as the overrides and operations criteria now pin them. Specs: server rule 23 and AC-30, serving rule 14 and AC-15 (AC-4, AC-5 changed), overrides AC-2 and AC-6, operations AC-4, product rule 27, _architecture.md's layout. Full gate green in Chromium, Firefox and WebKit (WebKit rerun alone after a worker restart).
+<!-- SECTION:FINAL_SUMMARY:END -->
