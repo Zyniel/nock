@@ -4,7 +4,7 @@ title: The final status's wording and ISO dates in results
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T22:49:00Z'
+updated_date: '2026-11-05T23:26:00Z'
 labels:
   - domain:hud
   - domain:shell
@@ -54,4 +54,6 @@ Lead decisions on the spec-writer's choices:
 - Follow-ups: a calendar example for summaries.md AC-4, and DRAFT-056's pressed « Je bloque » under the disabled look (reactions); both are drafted at m-8's close.
 
 Spec-checker APPROVED in round 2. Round 1 asked to test :60 and +24:00 in history AC-5, to complete rule 2's list, to name ⇄, a clue and the reaction pill in hud rule 19, to add the reveal to AC-31, and to name the grid in shell AC-35. Final hud.md is 15,419 bytes with 15 criteria.
+
+Reviewer: CHANGES REQUESTED in round 1 (the date test missed century leap years and month lengths; AC-31 now shows that the kept requests go after a snapshot), APPROVE in round 2. It checked that broken copies of dateTime.ts all fail the unit test. Not taken: rewrapping one 93-character comment line in dateTime.ts.
 <!-- SECTION:NOTES:END -->
