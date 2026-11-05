@@ -121,7 +121,7 @@ erasure must never undo.
 ### Grid progress
 
 10. `GET /api/account/progress` answers the account's progress as
-    `nock.progress` holds the device's (`content/library.md` rule 7): an object
+    `nock.progress` holds the device's (`content/cards.md` rule 1): an object
     from grid numbers in decimal to `"finished"`, for each history record and
     each solved room of an identity `account/account.md` rule 12 lists, or
     `"started"`, for each unsolved one and each creator room (`lobby/creator.md`
@@ -260,7 +260,7 @@ erasure must never undo.
   deleting, keeping creator rooms alive; erasing chat lines or backups.
 - Pushing a device's progress up to the account; a guest's progress across
   devices. How the pages merge the account's progress with the device's:
-  `content/library.md`. The history on screen: `gameplay/history.md`.
+  `content/cards.md`. The history on screen: `gameplay/history.md`.
 - Logs and retention: `admin/operations.md`.
 
 ## Code

@@ -17,7 +17,9 @@ codes are limited per address.
 - `lobby/joining.md`: joins, identities, the roster, past players.
 - `platform/realtime.md`: messages, codes, delivery; resume and time-out are
   `platform/reconnection.md`.
-- `content/library.md`: the catalogue, published grids, `nock.progress`.
+- `content/library.md`: the catalogue, published grids; « Jouer » and
+  `catalogue.play_failed` on a card, and the reading of `nock.progress`, are
+  `content/cards.md`.
 
 ## Rules
 
@@ -33,7 +35,7 @@ codes are limited per address.
    without a code, it stays, shows `catalogue.play_failed` in that item and
    enables the button again. The button is disabled while the request runs.
    Each tap makes a new room. The button is named « Jouer » and described by
-   its card's title (`catalogue.item.number`, `content/library.md` rule 12).
+   its card's title (`catalogue.item.number`, `content/cards.md` rule 2).
 3. The room record `nock.room.<CODE>` is a JSON object with `grid` (the
    catalogue number or null) and `selection`; anything else reads as no
    record, and a rewrite keeps unknown fields. The room page writes the

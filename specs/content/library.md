@@ -9,15 +9,14 @@ status: done
 ## Purpose
 
 A player browses the published grids on « Grilles », filters them by force,
-sees which ones this device or their account started or finished, and opens
-one grid by its own link `/g/<number>`. The grid APIs feed both pages and
-never send a clue or an answer.
+and opens one grid by its own link `/g/<number>`; each grid shows as a card
+(`content/cards.md`). The grid APIs feed both pages and never send a clue or
+an answer.
 
 ## Depends on
 
 - `content/grid-files.md`: the index, the number, published and withdrawn.
-- `lobby/rooms.md`: « Jouer » on each card, its failure's cause, and the writing
-  of `nock.progress`.
+- `content/cards.md`: the grid card, its progress and « Jouer ».
 - `account/account.md`: the sign-in status; the account's progress is
   `account/erasure.md`.
 
@@ -47,20 +46,6 @@ never send a clue or an answer.
    `{"detail": "Not Found"}`, never `index.html`, built or not. A trailing slash
    (`/api/grids/`, `/g/2/`) is 404 with no redirect.
 
-### Progress on this device or account
-
-7. A card's progress is `finished` if either source says so, else `started` if
-   either does, else none. The sources, read the same way: `localStorage`
-   `nock.progress` (`lobby/rooms.md` writes it) and the body of `GET
-   /api/account/progress` (`account/erasure.md` rule 10), never stored on the
-   device; each a JSON object from grid numbers in decimal to `"started"` or
-   `"finished"`. Each value is read on its own: any other value, a missing key,
-   text that is not JSON or JSON that is not an object means no progress from
-   that source. A request that fails or answers another status than 2xx (401
-   signed out, 404 accounts off) means none from the account. The pills show
-   the device's progress at once and the merged one when the answer comes;
-   neither page's state waits for it.
-
 ### The catalogue page `/`
 
 8. The page asks `GET /api/grids` once. It is loading until the answer, then
@@ -68,10 +53,12 @@ never send a clue or an answer.
    or answers anything but a list of summaries. The heading « Grilles »
    (`catalogue.heading`) shows in every state. Once `GET /api/account` has
    answered signed in (`account/account.md` rule 13), it asks `GET
-   /api/account/progress` once; signed out, never.
+   /api/account/progress` once; signed out, never (proven by
+   `content/cards.md` AC-9).
 9. Its column holds, in order: the heading, « Mes salons » when it shows
-   (`lobby/summaries.md`), the force filter, then one state line or the cards,
-   then « Grilles terminées » when it shows (`gameplay/history.md`). By state:
+   (`lobby/summaries.md`), the force filter, then one state line or the cards
+   (`content/cards.md`), then « Grilles terminées » when it shows
+   (`gameplay/history.md`). By state:
 
    | State | After the heading |
    | --- | --- |
@@ -91,39 +78,17 @@ never send a clue or an answer.
 11. The top bar holds the brand only (`client/shell.md` rule 17), plain text
     here, plus « Compte » while accounts are on (`account/account.md`).
 
-### Grid cards
-
-12. One card per shown grid, in the server's order. A card shows « Grille n° N »
-    (`catalogue.item.number`), the progress pill « Commencée » or « Terminée »
-    (`catalogue.progress.*`) when the grid has progress and none otherwise,
-    « Publiée le <date> » (`catalogue.item.published`, the date in French as
-    `1 octobre 2026`, read in UTC so every time zone shows the same day), four
-    force marks, « Force F », « W × H » and « N mots »
-    (`catalogue.item.force`, `.size`, `.words`), and « Jouer »
-    (`lobby/rooms.md`).
-13. The force marks show the force drawn, marks 1 to F filled; they are hidden
-    from assistive technology, and the force is always written beside them.
-14. A card holds the generic drawing of its grid, built from its width and
-    height only and hidden from assistive technology, whenever the list is
-    wide enough for two columns of cards, even when one card is shown. It
-    follows the list's width, not the window's form: a landscape window that is
-    not a computer's gets drawings when its list holds two columns, and a card
-    alone on its row because the list is narrow never has one. A resize adds
-    or removes the drawings within 300 ms.
-15. After a failed « Jouer » (`lobby/rooms.md`), `catalogue.play_failed` shows
-    as an alert error line inside that card, under its force line; no other
-    card shows one.
-
 ### The grid page `/g/<n>`
 
 16. The page asks `GET /api/grids/<n>` and, once, `GET /api/account/progress`
-    (rule 7), nothing else of the grids or of the account. It shows,
-    under a top bar holding the brand only (no « Compte », accounts on or off)
-    and with no heading, filter, « Mes salons » or « Grilles terminées »: the
-    muted line `catalogue.loading` while loading, then the grid's one card as
-    on the catalogue (progress, drawing and « Jouer » included); the error line
-    `catalogue.error` when the request fails, answers another status than 2xx
-    or 404, or answers anything but a summary; the muted line
+    (`content/cards.md` rule 1), nothing else of the grids or of the account
+    (proven by `content/cards.md` AC-8). It shows, under a top bar holding the
+    brand only (no « Compte », accounts on or off) and with no heading, filter,
+    « Mes salons » or « Grilles terminées »: the muted line `catalogue.loading`
+    while loading, then the grid's one card as on the catalogue
+    (`content/cards.md`; progress, drawing and « Jouer » included); the error
+    line `catalogue.error` when the request fails, answers another status than
+    2xx or 404, or answers anything but a summary; the muted line
     `not_found.heading` (« Page introuvable ») and no card on a 404.
 
 ### Baselines
@@ -133,10 +98,9 @@ never send a clue or an answer.
 
 ### Look
 
-- The brand bar and column of both pages, the filter chips, the cards, their
-  progress pills, force marks and drawing, and « Jouer »: `_design/pages.md`,
-  « Catalogue », with `_design/foundation.md`, « Components » (card, list row,
-  error line, brand link, plain on the catalogue).
+- The brand bar and column of both pages and the filter chips:
+  `_design/pages.md`, « Catalogue », with `_design/foundation.md`,
+  « Components » (brand link, plain on the catalogue).
 - The state lines: `_design/pages.md`, « States: opening, loading, empty,
   error ».
 
@@ -178,13 +142,6 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   and none other to it (`?force=` included). The label and
   the chips, pressed or not, follow the catalogue design ("Look").
   (← 004 AC-2, 046 AC-4)
-- **AC-7** With `nock.progress` `{"1": "started", "2": "finished", "99":
-  "started"}`, card 1 shows « Commencée », card 2 « Terminée » and card 3 no
-  pill, as on `/g/1`; each pill sits after its card's number in the catalogue
-  design, its text at least 4.5:1 on its background. (← 004 AC-3, 046 AC-6)
-- **AC-8** With `nock.progress` `not json`, `[1]` or `{"1": "done"}`, no card
-  shows progress and the page is ready; with `{"1": "started", "2": "done",
-  "3": 1}` only card 1 does. (← 004 AC-3)
 - **AC-9** While `GET /api/grids` has not answered, the page is loading and
   shows « Grilles » and « Chargement… » as a muted line under it, with no
   filter and no card. (← 004 AC-1, 046 AC-9)
@@ -199,24 +156,6 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-12** On a computer and on a phone, with accounts off, `/` holds the
   brand bar with the brand alone in it, then the column: « Grilles », the
   filter, the cards, laid out by the catalogue design. (← 046 AC-2)
-- **AC-13** CAT's cards on a computer and on a phone, with their number,
-  publication line and « Jouer », follow the catalogue design's card grid.
-  (← 046 AC-5)
-- **AC-14** A card of force 3, 13 × 17 and 54 words shows three filled marks
-  out of four, hidden from assistive technology, then « Force 3 », « 13 × 17 »
-  and « 54 mots », with their separators as the catalogue design draws them; a
-  card of force 2 has two filled marks. (← 046 AC-7)
-- **AC-15** On a computer, a 13 × 17 and a 5 × 5 card each begin with their
-  generic drawing, hidden from assistive technology, as the catalogue design
-  draws it, and a lone card keeps its drawing. A landscape window that is not
-  a computer's but whose list is wide enough for two columns shows drawings,
-  while a slightly narrower one, whose list holds one column, shows none, as
-  do a phone and an upright tablet. Resizing from a computer to a phone
-  removes them within 300 ms, and back restores them. (← 046 AC-8)
-- **AC-16** With `POST /api/rooms` answering 500, « Jouer » on card 2 shows
-  « Impossible de lancer la partie. Réessayez. » with `role="alert"`, as an
-  error line inside card 2 under its force line; card 2 stays in the list with
-  « Jouer » enabled, and cards 1 and 3 show no error. (← 046 AC-10)
 - **AC-17** `/g/2` asks `GET /api/grids/2` first and shows one card of grid 2,
   with the texts of AC-5, in the card design, under a brand bar with no
   « Compte » while accounts are on, and no heading; it has its drawing on a
@@ -235,20 +174,6 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - **AC-21** On `/g/2` the brand is the link « Accueil » to `/` with no
   `aria-current`; following it loads the catalogue, which asks
   `GET /api/grids`.
-- **AC-22** Ana signed in, `nock.progress` `{"1": "started", "3": "finished"}`
-  and `GET /api/account/progress` answering `{"1": "finished", "2": "started",
-  "3": "started"}`: `/` shows card 1 « Terminée », card 2 « Commencée » and
-  card 3 « Terminée »; while the answer is pending the page is already ready
-  with « Commencée », no pill and « Terminée »; `nock.progress` is unchanged
-  afterwards.
-- **AC-23** With AC-22's storage and answer, `/g/2` asks
-  `GET /api/account/progress` and not `GET /api/account`, shows « Commencée »
-  on its card and no « Compte »; `/g/1` shows « Terminée ».
-- **AC-24** With AC-22's storage, when `GET /api/account/progress` answers
-  401, 404, 500, `[1]` or `{"1": "done", "3": "started"}`, or the request
-  fails, `/` (signed in) shows « Commencée » on card 1 and « Terminée » on card
-  3, `/g/1` shows « Commencée » and `/g/3` « Terminée », each page ready;
-  signed out, `/` never asks the route.
 - **AC-25** When `GET /api/grids` answers CAT's list with grid 2's
   `published_on` `2026-02-30` or `hier`, `/` shows « Impossible de charger les
   grilles. » with no filter and no card; when `GET /api/grids/2` answers that
@@ -261,19 +186,11 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - Two grids of the same date: the higher number comes first (AC-2).
 - A published grid dated in the future is listed (AC-2).
 - A grid number of nine digits is valid; ten digits is 404 (AC-4).
-- A progress key for a grid not listed (`99`) is ignored, from either source
-  (AC-7).
-- The account's `finished` beats the device's `started`, and the reverse
-  (AC-22).
-- A catalogue of one grid on a computer still has two columns, so its card
-  has its drawing (AC-15).
-- « Jouer » failing on one card leaves the others untouched (AC-16).
 
 ## Out of scope
 
 - Other orders than newest first, searching, paging, filtering by size.
-- Showing grid credits (`content/grid-files.md` rule 11); a real thumbnail of the
-  grid's layout.
+- Showing grid credits (`content/grid-files.md` rule 11).
 - Reloading the grid list while the server runs: `content/grid-files.md`.
 - « Jouer », the room it creates and the writing of `nock.progress`:
   `lobby/rooms.md`. « Mes salons »: `lobby/summaries.md`. « Grilles terminées »:
@@ -289,12 +206,10 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - `src/nock/server.py`: the grid routes, `GRID_NUMBER_PATTERN`,
   `FORCE_PATTERN`.
 - `web/src/App.svelte`: the `/g/<n>` route. `web/src/lib/CataloguePage.svelte`,
-  `GridPage.svelte`, `CatalogueFrame.svelte`, `CatalogueList.svelte`,
-  `CatalogueItem.svelte`; `catalogue.ts` (progress, its merge with the
-  account's, date); `gridThumb.ts`.
-- Tests: `tests/test_library_*` (the account's progress, the date check);
-  `tests/test_spec_004_ac01_ac03_*`, `test_spec_004_ac04_*`,
+  `GridPage.svelte`, `CatalogueFrame.svelte`, `CatalogueList.svelte`;
+  `catalogue.ts` (the summary's check).
+- Tests: `tests/test_library_*`, with `tests/library_harness.py`;
+  `tests/test_spec_004_ac01_ac03_*` (004 AC-1, AC-2), `test_spec_004_ac04_*`,
   `test_spec_004_ac06_*`, the force tests of `test_spec_004_ac07_*`;
-  `tests/test_spec_046_ac01_ac02_*` (AC-2), `test_spec_046_ac04_ac06_*`,
-  `test_spec_046_ac07_ac08_*`, `test_spec_046_ac09_ac10_*`,
-  `test_spec_046_ac14_*`.
+  `tests/test_spec_046_ac01_ac02_*` (046 AC-2), `test_spec_046_ac04_ac06_*`
+  (046 AC-4), `test_spec_046_ac09_ac10_*` (046 AC-9), `test_spec_046_ac14_*`.
