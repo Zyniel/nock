@@ -127,14 +127,14 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - A real thumbnail of the grid's layout.
 - « Jouer », the room it creates and the writing of `nock.progress`:
   `lobby/rooms.md`. How the account's progress is derived:
-  `account/erasure.md`. When the pages ask for the progress, their states and
-  the filter: `content/library.md`.
+  `account/erasure.md`. The pages' states and the filter:
+  `content/library.md`.
 
 ## Code
 
 - `web/src/lib/CatalogueItem.svelte`; `catalogue.ts` (progress, its merge with
   the account's, the date); `gridThumb.ts`.
 - Tests: `tests/test_cards_progress.py`, with `tests/library_harness.py` as its
-  harness; `tests/test_spec_004_ac01_ac03_*` (AC-3),
-  `test_spec_046_ac04_ac06_*` (AC-5, AC-6), `test_spec_046_ac07_ac08_*`,
-  `test_spec_046_ac09_ac10_*` (AC-10).
+  harness; `tests/test_spec_004_ac01_ac03_*` (004 AC-3),
+  `test_spec_046_ac04_ac06_*` (046 AC-5, AC-6), `test_spec_046_ac07_ac08_*`,
+  `test_spec_046_ac09_ac10_*` (046 AC-10).
