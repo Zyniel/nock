@@ -1,7 +1,7 @@
 ---
 area: account
 file: my-account
-status: approved
+status: done
 ---
 
 # account/my-account - The account sheet and page

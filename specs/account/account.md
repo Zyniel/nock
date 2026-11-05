@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: approved
+status: done
 ---
 
 # account/account - Optional account
