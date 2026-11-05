@@ -31,18 +31,12 @@ from spec018_harness import (
     ROOM_CODE,
     START_TIME,
     assert_same_room,
-    grid_from_text,
     letter_changed,
     token_of,
     two_player_room,
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

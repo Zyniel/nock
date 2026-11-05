@@ -98,7 +98,7 @@ erases and keeps is `account/erasure.md`.
     It records an identity for the account and links no member to it: a member
     is linked by a signed-in join, and an account is at most one player of a
     room, whose seat its signed-in joins reach (`lobby/joining.md` rule 4,
-    `lobby/host.md` rule 10).
+    `lobby/creator.md` rule 1).
 12. `GET /api/account/rooms` lists the latest identity per room, newest first,
     leaving out any whose token is no member's of the room under that code.
     The account keeps an identity until it is deleted.

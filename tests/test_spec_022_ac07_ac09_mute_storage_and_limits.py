@@ -90,10 +90,8 @@ from spec024_harness import (
     EnterRoom,
     cell_at,
     events_of,
-    grid_from_text,
     join_peers,
     load_fr,
-    make_dist_dir,
     ping_and_wait,
     player_record,
     refusal_code,
@@ -106,16 +104,6 @@ from spec025_harness import fr_text
 QUIET_RULES = RoomConfig(silence_timeout_seconds=3600)
 CHAT_LIMIT = 5  # the defaults of RoomConfig.chat_limit and reaction_limit
 WINDOW_SECONDS = 10.0  # the defaults of the two windows
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def without_pongs(messages: Sequence[ServerMessage]) -> list[ServerMessage]:

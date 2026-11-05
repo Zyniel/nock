@@ -18,7 +18,6 @@ from spec007_harness import (
     active_clue_texts,
     clue_named,
     expect_selection,
-    grid_from_text,
     load_fr,
     note_view,
     open_fx01,
@@ -34,11 +33,6 @@ from spec007_harness import (
 MIN_BAR_FONT_SIZE_PX = 14.0
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

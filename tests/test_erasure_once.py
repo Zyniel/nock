@@ -21,8 +21,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from account_harness import (
     BOB_PLAYER,
     FAST_SWEEP_CONFIG,
@@ -37,7 +35,7 @@ from nock.hub import RoomRegistry
 from nock.store import RoomStore
 from spec017_harness import FakeClock
 from spec029_harness import play_fx01
-from spec032_harness import NO_TICK_CONFIG, grid_from_text
+from spec032_harness import NO_TICK_CONFIG
 from spec033_harness import (
     ACCOUNT_PATH,
     ANA_EMAIL,
@@ -51,11 +49,6 @@ FIRST_DONE_AT = 10.0
 FIRST_NOTIFIED_AT = 5.0
 SECOND_DONE_AT = 20.0
 SECOND_NOTIFIED_AT = 15.0
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class StaleListOnce:

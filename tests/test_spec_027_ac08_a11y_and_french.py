@@ -27,7 +27,6 @@ from playwright.sync_api import Browser, expect
 from nock.grid import Grid
 from spec024_harness import (
     contrast_problems,
-    grid_from_text,
     language_data,
     language_problems,
     load_fr,
@@ -51,11 +50,6 @@ SCAN_SIZES = [(1280, 720), (360, 740)]
 LOOSE_LIVE_REGIONS = ["polite", "assertive"]
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- The text in fr.json ----

@@ -54,11 +54,11 @@ from serving_harness import (
     raw_exchange,
 )
 from serving_harness import account_store as account_store
-from serving_harness import catalogue as catalogue
-from serving_harness import fx01_grid as fx01_grid
 from serving_harness import registry as registry
 from spec033_harness import ACCOUNT_PATH
 from spec038_harness import DASHBOARD_PATH, serving
+
+CATALOGUE_KIND = "published"
 
 CADDYFILE_PATH = Path(__file__).resolve().parents[1] / "Caddyfile"
 ROOMS_PATH = "/api/rooms"

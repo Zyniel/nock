@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -39,11 +38,6 @@ X_AND_Y: list[tuple[int, int, dict[str, object]]] = [
     (1, 0, {"letter": "X", "author": "p2"}),
     (1, 1, {"letter": "Y", "author": "p2"}),
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
 
 
 def malformed_check_frame() -> str:

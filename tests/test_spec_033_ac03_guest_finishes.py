@@ -28,7 +28,6 @@ from nock.protocol import parse_client_message
 from room_panels import open_aide
 from spec011_harness import EnterRoom
 from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import (
     WAIT_TIMEOUT_MS,
     AccountServer,
@@ -75,11 +74,6 @@ DIALOG_WATCHER = (
     " childList: true, subtree: true, attributes: true,"
     " attributeFilter: ['open'] });"
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

@@ -24,9 +24,6 @@ from itertools import pairwise
 import pytest
 from playwright.sync_api import Browser, Locator, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec041_harness import text_contrast
 from spec042_harness import box_of
 from spec043_harness import (
@@ -69,14 +66,7 @@ PUBLISHED = {1: "1 septembre 2026", 2: "1 octobre 2026", 3: "1 octobre 2026"}
 MIN_TEXT_CONTRAST = 4.5
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

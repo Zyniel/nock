@@ -59,7 +59,6 @@ from spec025_harness import (
     Play,
     closed,
     events_of,
-    grid_from_text,
     open_vote_of,
     opened,
     refusal_code,
@@ -77,11 +76,6 @@ LETTER_2_1 = CellTarget(row=2, column=1)
 CLUE_CELL = CellTarget(row=0, column=0)
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Helpers of the tests of this file ----

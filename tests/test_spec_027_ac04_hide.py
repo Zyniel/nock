@@ -23,7 +23,7 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from room_panels import open_menu
-from spec024_harness import grid_from_text, load_fr
+from spec024_harness import load_fr
 from spec027_harness import (
     QUIET_MS,
     clock_seconds,
@@ -42,11 +42,6 @@ OTHER_ROOM_CODE = "DEF456"
 RUNNING_AT_65_S = 65_000
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Helpers ----

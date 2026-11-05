@@ -36,7 +36,7 @@ from nock.protocol import (
     grid_view,
     parse_client_message,
 )
-from spec018_harness import grid_from_text, letter_changed, published_catalogue
+from spec018_harness import letter_changed, published_catalogue
 
 SNAPSHOT_RESUME_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 
@@ -48,11 +48,6 @@ ChangeList = list[tuple[int, int, dict[str, object]]]
 
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

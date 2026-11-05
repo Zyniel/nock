@@ -40,8 +40,6 @@ from nock.room import RoomConfig
 from nock.server import create_app
 from realtime_harness import SILENT_CLOSE_CODE, open_socket
 from spec011_harness import make_dist_dir
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 
 JOIN_TIMEOUT_SECONDS = 0.5
 CLOSE_LIMIT_SECONDS = 1.5
@@ -58,14 +56,7 @@ FRAMES = {
 }
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def serve_room(

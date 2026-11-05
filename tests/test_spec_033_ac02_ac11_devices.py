@@ -50,7 +50,6 @@ from spec024_harness import make_catalogue
 from spec032_harness import (
     FORM_WATCHER,
     expect_my_rooms_ready,
-    grid_from_text,
     my_room_items,
     seed_storage,
 )
@@ -80,11 +79,6 @@ from spec033_harness import (
 )
 
 QUIET_MS = 1000  # "sends one": no second request within this pause
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

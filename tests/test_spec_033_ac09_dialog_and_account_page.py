@@ -48,7 +48,6 @@ from spec024_harness import (
     open_context_page,
     open_room,
 )
-from spec032_harness import grid_from_text
 from spec033_harness import (
     A_TOKEN,
     ACCOUNT_PAGE_PATH,
@@ -110,11 +109,6 @@ NEW_KEYS = {
         " demandé, ignorez ce message."
     ),
 }
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

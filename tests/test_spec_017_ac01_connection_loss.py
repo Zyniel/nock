@@ -43,7 +43,6 @@ from spec017_harness import (
     expect_offline,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     open_room,
     room_page,
@@ -57,11 +56,6 @@ SELECTION_MOVED_FRAME = (
     '{"type": "selection_moved", "player_id": "p2", "selection": '
     '{"row": 1, "column": 0, "direction": "across"}}'
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def load_fr() -> dict[str, str]:

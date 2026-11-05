@@ -55,7 +55,7 @@ from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec017_harness import FakeClock
 from spec029_harness import history_body, link_room, play_fx01
-from spec032_harness import LIFE, T0, TA, grid_from_text
+from spec032_harness import LIFE, T0, TA
 from spec033_harness import (
     NOT_AUTHORIZED,
     NOT_FOUND,
@@ -65,11 +65,6 @@ from spec033_harness import (
 )
 
 CONTROL_ONLY = {str(CONTROL_GRID): "started"}
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-4: what the route answers ------------------------------------------------

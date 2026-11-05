@@ -46,7 +46,6 @@ from spec024_harness import (
     EnterRoom,
     joined_room,
 )
-from spec032_harness import grid_from_text
 
 HISTORY_CAP = 200
 JOINED_AT_SEQ = 2
@@ -68,11 +67,6 @@ class SentRoom(NamedTuple):
     def live(self) -> RoomState:
         """The state after the last message."""
         return self.states[max(self.states)]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def room_after_messages(grid: Grid, count: int) -> SentRoom:

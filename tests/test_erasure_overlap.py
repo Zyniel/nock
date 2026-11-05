@@ -23,8 +23,6 @@ from __future__ import annotations
 import contextlib
 from pathlib import Path
 
-import pytest
-
 from account_harness import (
     FAST_SWEEP_CONFIG,
     U_CODE,
@@ -40,7 +38,6 @@ from account_harness import (
 from nock.grid import Grid
 from spec017_harness import FakeClock
 from spec029_harness import account_id_of, sign_in_from
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PATH,
     FORMER_NICKNAME,
@@ -51,11 +48,6 @@ from spec033_harness import (
 )
 
 HOLD_SECONDS = 1.0  # ten sweeps of FAST_SWEEP_CONFIG, inside the 5 s of the wait
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def test_ac14_a_sweep_during_the_routes_attempt_leaves_the_erasure_to_it(

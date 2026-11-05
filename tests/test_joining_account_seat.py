@@ -33,19 +33,10 @@ from nock.grid import Grid
 from nock.protocol import EditLetter, PlayerState
 from spec014_harness import Peer, ping_and_wait
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text, snapshot_cell
+from spec032_harness import snapshot_cell
 from spec033_harness import NOBODYS_TOKEN, state_of
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 class Room(NamedTuple):

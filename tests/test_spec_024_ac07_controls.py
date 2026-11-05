@@ -17,7 +17,6 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import (
     CellTarget,
@@ -37,9 +36,7 @@ from spec024_harness import (
     cell_at,
     expect_selection,
     expect_seq,
-    grid_from_text,
     load_fr,
-    make_catalogue,
     open_room,
     settings_changed_frame,
     wait_until_page,
@@ -48,15 +45,7 @@ from spec024_harness import (
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Helpers ----

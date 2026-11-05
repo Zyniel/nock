@@ -22,7 +22,6 @@ from __future__ import annotations
 import pytest
 
 from room_panels import open_host_settings
-from spec014_harness import fx01_grid as fx01_grid
 from spec014_windows_harness import (
     NARROW_LOW_IDS,
     NARROW_LOW_WINDOWS,

@@ -127,11 +127,6 @@ NewPage = Callable[[int, int], Page]
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def server(tmp_path: Path, fx01_grid: Grid) -> Iterator[OpsServer]:
     with ops_live_server(tmp_path, catalogue_from_grid(fx01_grid)) as running:
         yield running

@@ -38,11 +38,9 @@ from spec026_harness import (
     EnterRoom,
     events_of,
     full17,
-    grid_from_text,
     join_peers,
     load_fr,
     make_client,
-    make_dist_dir,
     make_registry,
     play_live_game,
     solved_room,
@@ -55,16 +53,6 @@ SOLVED_BUDGET_SECONDS = 1.0
 SOLVED_BUDGET_MS = 1000
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

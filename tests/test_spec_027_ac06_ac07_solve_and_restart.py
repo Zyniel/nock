@@ -39,7 +39,6 @@ from spec024_harness import (
     ROOM_CODE,
     ROW_MAJOR,
     SECOND_TOKEN,
-    grid_from_text,
     host_changes,
     two_player_room,
 )
@@ -66,11 +65,6 @@ def every_cell_revealed() -> RoomConfig:
 
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

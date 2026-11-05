@@ -18,7 +18,6 @@ showing for the chat.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -31,7 +30,6 @@ from spec017_harness import (
     expect_offline,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     settle,
     snapshot_frame,
@@ -48,11 +46,6 @@ from spec043_harness import fr_value, select_mime
 
 FIRST_DELAY_LATEST_MS = 1200
 SENT_BEFORE_THE_CUT = 4
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def expect_options_enabled(page: Page, enabled: bool) -> None:

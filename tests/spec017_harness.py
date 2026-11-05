@@ -26,8 +26,7 @@ decision 7) and the pending edits lost by a reload (not observable).
 
 This module holds what more than one of those files uses. What only one file uses
 stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
-defined in each file as thin wrappers around `grid_from_text` and `make_dist_dir`:
-a fixture imported from here would be an unused import for ruff.
+not defined in the test files: they are the shared ones of `tests/conftest.py`.
 """
 
 from __future__ import annotations
@@ -85,7 +84,6 @@ from nock.room import (
 )
 from nock.server import create_app
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 NOW = 2_000_000.0
 NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eva", "Fay", "Gus", "Hal"]
@@ -120,19 +118,6 @@ class FakeClock(Protocol):
     def __call__(self) -> float: ...
 
     def advance(self, seconds: float) -> None: ...
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """A `dist` directory with a minimal `index.html` (the `dist_dir` fixture)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 # ---- Helpers for the rules ---------------------------------------------------

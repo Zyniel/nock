@@ -1,10 +1,10 @@
-"""Tests of lobby/host, AC-11 to AC-14: the creator's player is host whenever
+"""Tests of lobby/creator, AC-3 to AC-6: the creator's player is host whenever
 connected, and no stand-in keeps them out.
 
-AC-11 runs over the room socket, with the app of `host_harness` (the creator comes
-from a signed-in `POST /api/rooms`, the session from the socket's cookie). AC-12 to
-AC-14 run on the rules with exact clock values: `join_room` with `account_id`,
-`tick`, `handle_message`. The page of AC-11 is in `test_host_creator_pages.py`.
+AC-3 runs over the room socket, with the app of `host_harness` (the creator comes
+from a signed-in `POST /api/rooms`, the session from the socket's cookie). AC-4 to
+AC-6 run on the rules with exact clock values: `join_room` with `account_id`,
+`tick`, `handle_message`. The page of AC-3 is in `test_creator_pages.py`.
 """
 
 from __future__ import annotations
@@ -69,24 +69,14 @@ from spec014_harness import (
     with_player,
 )
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
+
+CATALOGUE_KIND = "published"
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
+# ---- AC-3: the creator's join over the sockets ------------------------------------
 
 
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
-
-
-# ---- AC-11: the creator's join over the sockets ------------------------------------
-
-
-def test_ac11_the_creators_join_tells_the_host_player_joined_then_host_changed(
+def test_ac3_the_creators_join_tells_the_host_player_joined_then_host_changed(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -120,7 +110,7 @@ def test_ac11_the_creators_join_tells_the_host_player_joined_then_host_changed(
     assert room.account_id not in heard
 
 
-def test_ac11_a_creator_who_joins_her_own_room_first_gets_no_host_changed(
+def test_ac3_a_creator_who_joins_her_own_room_first_gets_no_host_changed(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -137,10 +127,10 @@ def test_ac11_a_creator_who_joins_her_own_room_first_gets_no_host_changed(
     assert lea_events == []
 
 
-# ---- AC-12: the role comes and goes with the creator's player ----------------------
+# ---- AC-4: the role comes and goes with the creator's player ----------------------
 
 
-def test_ac12_her_resume_after_the_hand_over_gives_one_host_changed(
+def test_ac4_her_resume_after_the_hand_over_gives_one_host_changed(
     fx01_grid: Grid,
 ) -> None:
     state = away(room_with_creator(fx01_grid), "p1", AWAY_AT)
@@ -155,7 +145,7 @@ def test_ac12_her_resume_after_the_hand_over_gives_one_host_changed(
     assert host_flags(snapshot.players) == {"p1": True, "p2": False, "p3": False}
 
 
-def test_ac12_her_seat_back_gives_player_joined_then_host_changed(
+def test_ac4_her_seat_back_gives_player_joined_then_host_changed(
     fx01_grid: Grid,
 ) -> None:
     state = away(room_with_creator(fx01_grid), "p1", AWAY_AT)
@@ -172,7 +162,7 @@ def test_ac12_her_seat_back_gives_player_joined_then_host_changed(
 
 
 @pytest.mark.parametrize("presence", [PlayerState.ACTIVE, PlayerState.IDLE])
-def test_ac12_a_tick_gives_a_connected_creator_the_role_back(
+def test_ac4_a_tick_gives_a_connected_creator_the_role_back(
     fx01_grid: Grid, presence: PlayerState
 ) -> None:
     state = room_with_creator(fx01_grid)
@@ -186,7 +176,7 @@ def test_ac12_a_tick_gives_a_connected_creator_the_role_back(
 
 
 @pytest.mark.parametrize("seconds_away", [1, 61, 200])
-def test_ac12_no_tick_gives_a_disconnected_creator_the_role(
+def test_ac4_no_tick_gives_a_disconnected_creator_the_role(
     fx01_grid: Grid, seconds_away: int
 ) -> None:
     state = room_with_creator(fx01_grid)
@@ -200,7 +190,7 @@ def test_ac12_no_tick_gives_a_disconnected_creator_the_role(
     assert host_ids(state) == ["p2"]
 
 
-def test_ac12_her_token_alone_gives_the_role_back(
+def test_ac4_her_token_alone_gives_the_role_back(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -235,7 +225,7 @@ def test_ac12_her_token_alone_gives_the_role_back(
     assert host_flags(back.snapshot().players) == {lea_id: True, bob_id: False}
 
 
-# ---- AC-13: a stand-in host cannot touch the creator's player ----------------------
+# ---- AC-5: a stand-in host cannot touch the creator's player ----------------------
 
 
 @pytest.mark.parametrize(
@@ -243,7 +233,7 @@ def test_ac12_her_token_alone_gives_the_role_back(
     [RemovePlayer(player_id="p1"), MutePlayer(player_id="p1", muted=True)],
     ids=["remove", "mute"],
 )
-def test_ac13_a_stand_in_host_gets_invalid_target_on_the_creators_player(
+def test_ac5_a_stand_in_host_gets_invalid_target_on_the_creators_player(
     fx01_grid: Grid, message: RemovePlayer | MutePlayer
 ) -> None:
     before = stand_in_room(fx01_grid)
@@ -256,7 +246,7 @@ def test_ac13_a_stand_in_host_gets_invalid_target_on_the_creators_player(
     assert player_of(outcome.state, "p1").muted is False
 
 
-def test_ac13_the_stand_in_host_still_removes_others_and_the_creator_removes_him(
+def test_ac5_the_stand_in_host_still_removes_others_and_the_creator_removes_him(
     fx01_grid: Grid,
 ) -> None:
     state = stand_in_room(fx01_grid)
@@ -279,7 +269,7 @@ def test_ac13_the_stand_in_host_still_removes_others_and_the_creator_removes_him
     assert player_ids(lea_removes.state) == ["p1"]
 
 
-# ---- AC-14: a lock does not keep the creator's session out -------------------------
+# ---- AC-6: a lock does not keep the creator's session out -------------------------
 
 
 def locked_by(state: RoomState, player_id: str, now: float) -> RoomState:
@@ -301,7 +291,7 @@ def join_from_the_session(state: RoomState, nickname: str, now: float) -> Outcom
     )
 
 
-def test_ac14_a_locked_room_refuses_cy_back_but_seats_the_creator_back(
+def test_ac6_a_locked_room_refuses_cy_back_but_seats_the_creator_back(
     fx01_grid: Grid,
 ) -> None:
     state = away(room_with_creator(fx01_grid), "p1", AWAY_AT)
@@ -322,7 +312,7 @@ def test_ac14_a_locked_room_refuses_cy_back_but_seats_the_creator_back(
     assert host_ids(back) == ["p1"]
 
 
-def test_ac14_a_new_device_of_the_creator_joins_a_locked_room_as_host(
+def test_ac6_a_new_device_of_the_creator_joins_a_locked_room_as_host(
     fx01_grid: Grid,
 ) -> None:
     state = locked_by(room_without_lea(fx01_grid, 2), "p2", NOW + 1)
@@ -337,7 +327,7 @@ def test_ac14_a_new_device_of_the_creator_joins_a_locked_room_as_host(
     assert host_ids(lea.state) == [NEW_PLAYER_ID]
 
 
-def test_ac14_a_full_room_refuses_the_creator_as_anyone(fx01_grid: Grid) -> None:
+def test_ac6_a_full_room_refuses_the_creator_as_anyone(fx01_grid: Grid) -> None:
     state = locked_by(room_without_lea(fx01_grid, 8), "p2", NOW + 1)
 
     lea = join_from_the_session(state, "Lea", NOW + 2)

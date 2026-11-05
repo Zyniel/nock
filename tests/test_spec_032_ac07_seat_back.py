@@ -19,8 +19,6 @@ its page run in `test_spec_032_ac07_page_after_the_seat_back.py`.
 
 from __future__ import annotations
 
-import pytest
-
 import nock.room
 from nock.grid import Grid
 from nock.protocol import (
@@ -77,7 +75,6 @@ from spec032_harness import (
     cell_of,
     error_code_of,
     events_of,
-    grid_from_text,
     past,
     player_ids,
     player_of,
@@ -88,11 +85,6 @@ from spec032_harness import (
 
 IDES = ClueRef(row=0, column=3, clue_index=0)
 MORE_PLAYERS = ["Dan", "Eve", "Fay", "Gus", "Hal", "Ivy"]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def players_summary(state: RoomState) -> list[tuple[str, str, int, bool]]:

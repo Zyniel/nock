@@ -31,7 +31,6 @@ from host_harness import (
     wait_for_message,
 )
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.protocol import GridSolved
 from results_harness import (
     recap_route,
@@ -42,8 +41,6 @@ from results_harness import (
 from server_harness import wait_until_not_live
 from spec011_harness import INDEX_HTML
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import ACCOUNT_PATH, HOUR, ROOMS_PATH, room_key, with_session
 
 ZOE_EMAIL = "zoe.probe@example.org"
@@ -52,14 +49,7 @@ NOT_FOUND = {"detail": "Not Found"}
 PAST_THE_SOLVED_LIFE_HOURS = 721
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.mark.parametrize("sockets_open", [True, False], ids=["live", "stored"])

@@ -1,11 +1,11 @@
-"""Tests of lobby/host, AC-10: the account of a member.
+"""Tests of lobby/creator, AC-2: the account of a member.
 
 Over the room socket, with the app of `host_harness`: a signed-in join links the
 member it makes, resumes or seats back only when that member has none; a member's
 account never changes otherwise; `PUT /api/account/rooms` links no member. The
 member's account is read from the live room (`PlayerRecord.account_id`); the page
 that follows (the nickname form of a signed-in device) is in
-`test_host_creator_pages.py`.
+`test_creator_pages.py`.
 """
 
 from __future__ import annotations
@@ -33,19 +33,9 @@ from nock.protocol import PlayerState, RemovePlayer
 from nock.store import RoomStore
 from spec014_harness import ping_and_wait, player_of
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import ROOMS_PATH, room_key, state_of, wait_for, with_session
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def room_of(app: HostApp, grid: Grid) -> str:
@@ -53,7 +43,7 @@ def room_of(app: HostApp, grid: Grid) -> str:
     return app.registry.register_room(grid, grid_number=1)
 
 
-def test_ac10_a_signed_in_resume_links_the_member_it_resumes(
+def test_ac2_a_signed_in_resume_links_the_member_it_resumes(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -85,7 +75,7 @@ def test_ac10_a_signed_in_resume_links_the_member_it_resumes(
     assert lea_account not in heard
 
 
-def test_ac10_the_linked_member_is_reached_by_the_account_without_a_token(
+def test_ac2_the_linked_member_is_reached_by_the_account_without_a_token(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -114,7 +104,7 @@ def test_ac10_the_linked_member_is_reached_by_the_account_without_a_token(
     assert len(players) == 1
 
 
-def test_ac10_a_members_account_does_not_change_when_another_account_resumes_it(
+def test_ac2_a_members_account_does_not_change_when_another_account_resumes_it(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -150,7 +140,7 @@ def test_ac10_a_members_account_does_not_change_when_another_account_resumes_it(
     assert len(players) == 2
 
 
-def test_ac10_putting_a_room_links_no_member(
+def test_ac2_putting_a_room_links_no_member(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -180,7 +170,7 @@ def test_ac10_putting_a_room_links_no_member(
     assert player_of(room_state, lea_id).account_id is None
 
 
-def test_ac10_a_removed_account_player_returns_from_another_device_as_a_new_player(
+def test_ac2_a_removed_account_player_returns_from_another_device_as_a_new_player(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -217,7 +207,7 @@ def stored_link(database_path: Path, code: str, player_id: str) -> str | None:
     return player_of(stored, player_id).account_id
 
 
-def test_ac10_the_link_is_stored_and_survives_a_restart(
+def test_ac2_the_link_is_stored_and_survives_a_restart(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,

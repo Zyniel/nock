@@ -33,9 +33,8 @@ from nock.protocol import (
 from nock.room import RoomConfig
 from nock.server import create_app
 from nock.store import RoomStore
-from spec005_harness import grid_from_text, make_entry
+from spec005_harness import make_entry
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 NOT_FOUND_BODY = {"detail": "Not Found"}
 RECEIVE_TIMEOUT_SECONDS = 5.0
 SERVER_CONFIG = RoomConfig(max_edits_per_second=1000, silence_timeout_seconds=600)
@@ -51,19 +50,6 @@ assert len(SOLUTION) == 18
 
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 @pytest.fixture

@@ -37,18 +37,12 @@ from nock.server import (
 )
 from spec040_harness import (
     EXPECTED_SETTINGS,
-    grid_from_text,
     make_dist_dir,
     socket_url,
 )
 
 JOIN_TEXT = '{"type": "join", "nickname": "Ana", "resume_token": null}'
 ROOM_CODE_REGEX = re.compile(r"^[A-Z0-9]{6}$")
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

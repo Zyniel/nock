@@ -25,12 +25,10 @@ from spec015_harness import (
     Triple,
     answer_of,
     errors_received,
-    grid_from_text,
     grid_of_peer,
     join_peers,
     letter_cells,
     make_app,
-    make_dist_dir,
     make_registry,
     send_edits_together,
     server_grid,
@@ -44,16 +42,6 @@ ERASE_SHARE = 0.1
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

@@ -6,24 +6,16 @@ The page is tested with spec 040's mocked socket. The shared setup is in
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from nock.protocol import grid_view
 from spec006_harness import (
     cell_at,
-    grid_from_text,
     open_mock_room,
     show_snapshot,
     with_letter_cells,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-6: the grid shows the letters and locks of the snapshot --------------
 

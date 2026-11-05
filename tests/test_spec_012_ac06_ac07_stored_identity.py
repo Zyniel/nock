@@ -25,7 +25,6 @@ from spec012_harness import (
     WAIT_TIMEOUT_MS,
     active_view,
     error_frame,
-    grid_from_text,
     load_fr,
     open_mock_room,
     settle,
@@ -35,11 +34,6 @@ from spec012_harness import (
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # A stored identity holds the nickname as the server sent it, in capitals.

@@ -33,9 +33,6 @@ import pytest
 from playwright.sync_api import Page, Request
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec041_harness import (
     PACKAGE_JSON_PATH,
     README_PATH,
@@ -48,15 +45,7 @@ from spec041_harness import (
 # ---- Fixtures: thin wrappers around the harnesses ---------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (served by live_server for `/`)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 # ---- AC-5: Nock serves its fonts itself -------------------------------------------

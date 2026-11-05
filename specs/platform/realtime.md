@@ -275,8 +275,9 @@ contract. No browser receives an answer letter before the room earns it.
 ## Out of scope
 
 - What each event does to the room: the gameplay and social domains. The join's
-  steps, takeover with 4001 and past players: `lobby/joining.md`. Host hand-over
-  and the creator: `lobby/host.md`. The wrong-code throttle: `lobby/rooms.md`.
+  steps, takeover with 4001 and past players: `lobby/joining.md`. Host hand-over:
+  `lobby/host.md`; the creator: `lobby/creator.md`. The wrong-code throttle:
+  `lobby/rooms.md`.
 - Stale edits, the resume window, the page's heartbeat, losses, retries and
   resends: `platform/reconnection.md`. The page's seq buffer and its other
   connection states: `client/shell.md`. Presence states in the roster:

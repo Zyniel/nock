@@ -22,7 +22,6 @@ reads `Auteurs`, flips on each click and sends nothing).
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
@@ -41,7 +40,6 @@ from spec019_harness import (
     cell_at,
     cell_locked_frame,
     expect_seq,
-    grid_from_text,
     letter_changed_frame,
     load_fr,
     open_ac1,
@@ -151,11 +149,6 @@ playerId => {
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Helpers of these tests -------------------------------------------------

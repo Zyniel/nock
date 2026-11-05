@@ -1,9 +1,9 @@
-"""Tests of lobby/host, AC-16: a creator room loaded while accounts are off.
+"""Tests of lobby/creator, AC-8: a creator room loaded while accounts are off.
 
 Over the room socket, with the app of `host_harness`: Lea creates a room signed in,
-Bob joins, Lea goes away and Bob becomes the stand-in host. AC-16 opens the same
+Bob joins, Lea goes away and Bob becomes the stand-in host. AC-8 opens the same
 database file in an app with accounts off, then on again. The erasure of the
-creator account (AC-15) is in `test_host_creator_deletion.py`.
+creator account (AC-7) is in `test_creator_deletion.py`.
 """
 
 from __future__ import annotations
@@ -31,25 +31,15 @@ from host_harness import (
     wait_for_state,
 )
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.protocol import ErrorCode, PlayerState, RemovePlayer
 from spec014_harness import Peer, ping_and_wait
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import ROOMS_PATH, room_key, state_of, with_session
 
 TICKS_PAUSE_SECONDS = 0.4  # several ticks of 50 ms
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 class Scene(NamedTuple):
@@ -98,10 +88,10 @@ def hand_over_to_bob(app: HostApp, scene: Scene) -> None:
     wait_for_host(app.registry, scene.room.code, scene.bob_id)
 
 
-# ---- AC-16: accounts off, then on again --------------------------------------------
+# ---- AC-8: accounts off, then on again --------------------------------------------
 
 
-def test_ac16_a_room_loaded_with_accounts_off_plays_as_an_anonymous_room(
+def test_ac8_a_room_loaded_with_accounts_off_plays_as_an_anonymous_room(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,

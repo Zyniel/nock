@@ -22,7 +22,7 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import GridSolved, LetterChanged
-from spec024_harness import expect_seq, grid_from_text
+from spec024_harness import expect_seq
 from spec027_harness import (
     ABSENT,
     advance_clock,
@@ -46,11 +46,6 @@ WATCH_MS = 1500
 MAX_WAIT_MS = 250 + REFRESH_STEP_MS
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def letter_frame(seq: int, letter: str | None, player_id: str = "p2") -> str:

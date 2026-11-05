@@ -36,11 +36,6 @@ from spec028_harness import (
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def db_path(tmp_path: Path) -> Path:
     return tmp_path / "rooms.db"
 

@@ -34,7 +34,6 @@ from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from room_panels import open_host_settings, show_tab
-from spec014_harness import fx01_grid as fx01_grid
 from spec014_harness import joined_mock_room
 from spec014_windows_harness import (
     MIN_TARGET_PX,

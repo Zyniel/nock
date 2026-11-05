@@ -36,7 +36,7 @@ from spec011_harness import (
     at_once,
     receive_text_or_fail,
 )
-from spec024_harness import INDEX_HTML, make_dist_dir
+from spec024_harness import INDEX_HTML
 from spec028_harness import (
     FAKE_CLOCK_CONFIG,
     SHARE_TOKEN,
@@ -52,16 +52,6 @@ from spec028_harness import (
 NOT_FOUND = {"detail": "Not Found"}
 TOO_MANY = {"detail": "Too Many Requests"}
 UNKNOWN_CODE = "ZZZZZZ"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

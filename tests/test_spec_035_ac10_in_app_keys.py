@@ -18,7 +18,6 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec035_harness import (
     FOCUS_OUTLINE_SCRIPT,
@@ -27,8 +26,6 @@ from spec035_harness import (
     MIN_OUTLINE_PX,
     SENTINEL_TEST_ID,
     add_sentinel,
-    build_fx01_grid,
-    build_reference_catalogue,
     cell_at,
     expect_focus_on_grid,
     expect_focus_on_sentinel,
@@ -39,15 +36,7 @@ from spec035_harness import (
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (also served by live_server)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 # ---- AC-10: the in-app keyboard keys stay out of the Tab order --------------------

@@ -30,7 +30,6 @@ from spec013_harness import (
     cell_at,
     check_frame,
     feed_locator,
-    grid_from_text,
     make_page,
     open_room,
     player_view,
@@ -59,11 +58,6 @@ FEED_LIST_SELECTOR = '[data-testid="activity-feed"] ul'
 
 # A bounding box as (x, y, width, height).
 Box = tuple[float, float, float, float]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-6: the roster and the feed keep the grid's room ----

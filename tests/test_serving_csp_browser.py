@@ -31,8 +31,6 @@ from playwright.sync_api import ConsoleMessage, Page, Response
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from serving_harness import EDGE_HEADERS
-from serving_harness import catalogue as catalogue
-from serving_harness import fx01_grid as fx01_grid
 from spec038_harness import (
     OpsServer,
     open_dashboard,
@@ -41,6 +39,8 @@ from spec038_harness import (
     wait_for_room_letters,
 )
 from spec046_harness import open_catalogue
+
+CATALOGUE_KIND = "published"
 
 VIOLATION_RECORDER = """
 window.__violations = [];

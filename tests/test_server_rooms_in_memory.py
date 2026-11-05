@@ -39,7 +39,6 @@ from host_harness import (
     wait_for_message,
 )
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
     EditLetter,
@@ -61,8 +60,6 @@ from server_harness import (
 )
 from spec014_harness import has_state_change, socket_url
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import DATABASE_FILE_NAME, wait_for
 
 TYPED_ROW = 1
@@ -71,14 +68,7 @@ TYPED_LETTER = "T"
 NO_ROOMS: frozenset[str] = frozenset()
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def letter_in(snapshot: Snapshot, row: int, column: int) -> str | None:

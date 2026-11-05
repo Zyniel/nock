@@ -38,11 +38,8 @@ from spec024_harness import (
     accepted_reveal,
     check_cell,
     full17,
-    grid_from_text,
     host_changes,
     join_peers,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     ping_and_wait,
     r1_room,
@@ -57,20 +54,7 @@ LATER = NOW + 10.0
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

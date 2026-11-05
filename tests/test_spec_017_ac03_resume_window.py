@@ -14,7 +14,6 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
@@ -48,12 +47,10 @@ from spec017_harness import (
     cell_state,
     events_of,
     expect_cell,
-    grid_from_text,
     has_player_joined,
     has_state_change,
     join_two,
     keep_seen,
-    make_dist_dir,
     open_peer,
     player_of,
     player_view,
@@ -81,16 +78,6 @@ class EnterRoom(Protocol):
     """The `enter_room` fixture of conftest."""
 
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def player_ids(state: RoomState) -> list[str]:

@@ -125,12 +125,6 @@ def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    """The FX-01 grid (5 by 5)."""
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
     """The FX-02 grid (13 by 17)."""
     return Grid.model_validate_json(fx02_text)

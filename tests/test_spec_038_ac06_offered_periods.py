@@ -24,7 +24,6 @@ from nock.hub import RoomRegistry
 from nock.room import RoomConfig, new_room
 from nock.server import create_app
 from spec017_harness import FakeClock
-from spec032_harness import make_dist_dir
 from spec038_harness import (
     DASHBOARD_PATH,
     DAY,
@@ -35,16 +34,6 @@ from spec038_harness import (
 )
 
 HOURS_PER_DAY = 24
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def seed_three_rooms(registry: RoomRegistry, grid: Grid) -> None:

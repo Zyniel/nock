@@ -27,7 +27,6 @@ from spec015_harness import (
     MockRoomSocket,
     cell_at,
     expect_cell,
-    grid_from_text,
     letter_changed_frame,
     open_fx01,
     snapshot_frame,
@@ -37,11 +36,6 @@ from spec015_harness import (
 )
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-2: my letter appears at once (browser, mocked socket) ----------------

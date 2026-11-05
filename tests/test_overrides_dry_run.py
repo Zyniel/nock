@@ -35,14 +35,9 @@ from overrides_harness import (
 )
 from spec014_harness import Peer
 from spec017_harness import FakeClock
-from spec032_harness import CODE_A, CODE_B, T0, grid_from_text
+from spec032_harness import CODE_A, CODE_B, T0
 
 ANONYMOUS = "anonymous_room_hours"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @contextlib.contextmanager

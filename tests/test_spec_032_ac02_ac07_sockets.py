@@ -28,7 +28,6 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-import pytest
 from fastapi.testclient import TestClient
 
 import nock.room
@@ -63,8 +62,6 @@ from spec032_harness import (
     NO_TICK_CONFIG,
     SEAT_BACK_SOCKET_CONFIG,
     T0,
-    grid_from_text,
-    make_dist_dir,
     post_summaries,
     refused_by_spec_012,
     snapshot_cell,
@@ -76,16 +73,6 @@ THROTTLED = 4429
 WRONG_CODE_LIMIT = 10  # spec 011 AC-3: ten wrong codes in a minute
 # Made only of punctuation: spec 012 refuses it, the protocol's length does not.
 REFUSED_NICKNAME = "--"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def has_letter_changed(peer: Peer) -> bool:

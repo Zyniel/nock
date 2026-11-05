@@ -31,7 +31,6 @@ from typing import Any
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import CellTarget, LetterChanged, PlayerView, RevealBudget
 from room_panels import open_aide
@@ -49,11 +48,9 @@ from spec024_harness import (
     contrast_problems,
     expect_selection,
     expect_seq,
-    grid_from_text,
     language_data,
     language_problems,
     load_fr,
-    make_catalogue,
     make_walker,
     mark_contrast,
     mark_problems,
@@ -74,15 +71,7 @@ for _row in range(2, 5):
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

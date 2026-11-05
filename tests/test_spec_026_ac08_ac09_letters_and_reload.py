@@ -6,8 +6,6 @@ is in `spec026_harness`.
 
 from __future__ import annotations
 
-import pytest
-
 from nock.grid import Grid
 from nock.protocol import (
     EditLetter,
@@ -30,18 +28,12 @@ from spec026_harness import (
     Cell,
     events_of,
     full17,
-    grid_from_text,
     refusal_code,
     two_player_room,
     write,
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-8: the 18 letters of FX-01 ----

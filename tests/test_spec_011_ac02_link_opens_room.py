@@ -17,17 +17,11 @@ from nock.hub import RoomRegistry
 from spec011_harness import (
     EnterRoom,
     build_catalogue,
-    grid_from_text,
     open_fx01_room,
 )
 
 PHONE_VIEWPORT = {"width": 360, "height": 740}
 DESKTOP_VIEWPORT = {"width": 1280, "height": 800}
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

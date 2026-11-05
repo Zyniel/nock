@@ -11,15 +11,12 @@ from collections.abc import Callable, Iterator
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Direction, PlayerState, PlayerView, Selection
 from spec035_harness import (
     EPSILON,
     WINDOW_SIZES,
     MockRoomSocket,
-    build_fx01_grid,
-    build_reference_catalogue,
     cell_at,
     computed,
     open_k2,
@@ -40,15 +37,7 @@ from spec042_harness import (
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (also served by live_server)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

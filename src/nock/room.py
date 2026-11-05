@@ -246,7 +246,7 @@ class PlayerRecord(RoomModel):
     # `gameplay/hints.md` rule 2: times of the checks and reveals counted in the
     # window (not logged)
     recent_hints: tuple[float, ...] = ()
-    # `lobby/host.md` rule 10: the account this member is linked to, None for an
+    # `lobby/creator.md` rule 1: the account this member is linked to, None for an
     # anonymous player. Never sent to a browser. A snapshot stored before the link
     # has no such key and loads with None.
     account_id: str | None = None
@@ -320,7 +320,7 @@ class RoomState(RoomModel):
     # stored before this spec has no such keys and loads with None, solved or not.
     solved_at: float | None = None
     solved_elapsed_ms: int | None = Field(default=None, ge=0, strict=True)
-    # `lobby/host.md` rule 11: the account that created the room, None for an
+    # `lobby/creator.md` rule 2: the account that created the room, None for an
     # anonymous room. The store keeps it in `room_times`, not in the snapshots.
     creator_account_id: str | None = None
 
@@ -402,7 +402,7 @@ def new_room(
         share_token: The token of the room's public recap (spec 028), 16 to 64
             characters of A-Z, a-z, 0-9, "_" and "-"; None for no share link.
         creator_account_id: The account that creates the room, None for an
-            anonymous room (`lobby/host.md` rule 11).
+            anonymous room (`lobby/creator.md` rule 2).
 
     Returns:
         The new state. `cells` holds one empty cell per letter cell of `grid`,
@@ -895,8 +895,8 @@ def join_room(
     refusal after such a time-out keeps the time-out.
 
     A signed-in join links its member to the account when that member has none.
-    The creator's player is host at the end of their join (`lobby/host.md`
-    rule 13).
+    The creator's player is host at the end of their join (`lobby/creator.md`
+    rule 4).
 
     Args:
         state: The room.
@@ -1058,7 +1058,7 @@ def _with_account_linked(
 ) -> RoomState:
     """Link the player to the account when they have no account yet.
 
-    A member's account never changes otherwise (`lobby/host.md` rule 10).
+    A member's account never changes otherwise (`lobby/creator.md` rule 1).
     """
     player = _find_player(state, player_id)
     if account_id is None or player is None or player.account_id is not None:
@@ -2548,7 +2548,7 @@ def tick(state: RoomState, now: float, config: RoomConfig = DEFAULT_CONFIG) -> O
     more than the resume window leaves the room. Then each active player
     without input for the idle delay becomes idle. Then the creator's player,
     when not disconnected and without the host role, takes it back
-    (`lobby/host.md` rule 13). Then a host disconnected for
+    (`lobby/creator.md` rule 4). Then a host disconnected for
     more than the hand-over delay hands the host role to the longest-present
     connected player. Last, an open vote whose time is over closes `timed_out`
     (spec 025).

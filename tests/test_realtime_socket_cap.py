@@ -68,8 +68,6 @@ from realtime_harness import (
 from spec011_harness import make_dist_dir
 from spec014_harness import Peer
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 
 TYPED_ROW = 1
 TYPED_COLUMN = 0
@@ -100,14 +98,7 @@ class SmallCapAddress(NamedTuple):
     stack: ExitStack
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

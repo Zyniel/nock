@@ -14,8 +14,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import NamedTuple
 
-import pytest
-
 from nock.grid import Grid
 from nock.protocol import ErrorCode, GridFullWrong, GridSolved, LetterChanged, Undo
 from nock.room import (
@@ -44,7 +42,6 @@ from spec024_harness import (
     SOLUTION,
     events_of,
     full17,
-    grid_from_text,
     joined_room,
     player_record,
     refusal_code,
@@ -54,11 +51,6 @@ from spec024_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-3: completion evaluates pencil and normal letters the same way ----

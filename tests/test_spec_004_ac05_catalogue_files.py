@@ -33,23 +33,13 @@ from nock.catalogue import (
 from nock.grid import Grid
 from spec004_harness import (
     PROJECT_ROOT,
-    grid_from_text,
     make_entry,
-    make_reference_catalogue,
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 def loaded_numbers(directory: Path) -> list[int]:

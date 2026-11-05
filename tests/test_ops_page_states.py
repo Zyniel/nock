@@ -113,11 +113,6 @@ TOKEN_OF_256 = (ALLOWED_MIX * 52)[:256]
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     yield from window_opener(browser, browser_name)
 

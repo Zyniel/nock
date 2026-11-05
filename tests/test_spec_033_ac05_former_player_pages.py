@@ -33,7 +33,7 @@ from nock.grid import Grid
 from room_panels import open_aide
 from spec011_harness import EnterRoom
 from spec024_harness import make_catalogue
-from spec032_harness import expect_my_rooms_ready, grid_from_text, my_room_items
+from spec032_harness import expect_my_rooms_ready, my_room_items
 from spec033_harness import (
     ACCOUNT_PATH,
     FORMER_NICKNAME,
@@ -79,11 +79,6 @@ OTHER_LETTERS: list[tuple[int, int, str]] = [
     (3, 4, "n"),
     (4, 4, "t"),
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

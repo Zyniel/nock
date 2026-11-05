@@ -33,8 +33,6 @@ from __future__ import annotations
 import contextlib
 from pathlib import Path
 
-import pytest
-
 from account_harness import (
     BOB_EMAIL,
     FAST_SWEEP_CONFIG,
@@ -56,7 +54,7 @@ from spec029_harness import (
     play_fx01,
     sign_in_from,
 )
-from spec032_harness import BOB, CY, LIFE, TB, TC, grid_from_text
+from spec032_harness import BOB, CY, LIFE, TB, TC
 from spec033_harness import (
     ACCOUNT_PATH,
     FORMER_NICKNAME,
@@ -71,11 +69,6 @@ T_CODE = "TTTTTT"
 CY_EMAIL = "cy.probe@example.org"
 HOLD_SECONDS = 5.6  # more than the 5 s that the erasure waits for an engine
 ATTEMPTS_AFTER_THE_SECOND = 3
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def teammates_of(accounts: AccountStore, account_id: str) -> list[tuple[str, ...]]:

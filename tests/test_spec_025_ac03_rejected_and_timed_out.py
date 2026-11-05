@@ -61,10 +61,7 @@ from spec025_harness import (
     config_with_vote_timeout,
     events_of,
     fr_text,
-    grid_from_text,
     join_peers,
-    make_catalogue,
-    make_dist_dir,
     open_room,
     open_vote_of,
     opened,
@@ -83,20 +80,7 @@ BANNER_GONE_SECONDS = 0.3  # spec 047: "within 300 ms" of the `vote_closed`
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Helpers ----

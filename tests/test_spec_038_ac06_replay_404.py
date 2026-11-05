@@ -2,7 +2,7 @@
 
 "Operator access" says that a 404 of `GET /api/ops/rooms/<code>/edits` is not a
 refused request of rule 2. The ops API runs on `TestClient(create_app(rooms=registry,
-dist_dir=tmp_path, operator_token=OPS_TOKEN))`, with a registry on conftest's fake
+dist_dir=dist_dir, operator_token=OPS_TOKEN))`, with a registry on conftest's fake
 clock, as in `test_spec_038_ac06_ops_api.py`. Every request here carries the right
 token and the clock never moves by more than a few seconds, so the 60 seconds of
 the throttle's window never pass.
@@ -41,7 +41,6 @@ from spec038_harness import (
 
 # ---- Values of the test harness ------------------------------------------------------
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 BREAKING_CODE = "abc"  # breaks ROOM_CODE_PATTERN
 UNKNOWN_ROOM = "ZZZZZZ"
 EXPIRED_ROOM = "EXPIRD"
@@ -50,18 +49,6 @@ SECONDS_BETWEEN_REQUESTS = 2  # 10 requests span 18 s, well within 60 s
 
 
 # ---- Fixtures ------------------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    """`tmp_path` with an `index.html`, the `dist_dir` of the "Test harness"."""
-    (tmp_path / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return tmp_path
 
 
 @pytest.fixture

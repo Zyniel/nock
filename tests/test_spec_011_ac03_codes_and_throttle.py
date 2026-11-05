@@ -42,9 +42,7 @@ from spec011_harness import (
     at_once,
     build_catalogue,
     fresh_state,
-    grid_from_text,
     load_fr,
-    make_dist_dir,
     receive_text_or_fail,
     socket_url,
 )
@@ -57,16 +55,6 @@ STORED_IDENTITY_SCRIPT = (
 
 
 # ---- Fixtures and helpers ----------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

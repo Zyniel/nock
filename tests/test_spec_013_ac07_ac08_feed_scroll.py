@@ -54,17 +54,10 @@ from spec013_harness import (
     feed_items,
     feed_locator,
     feed_snapshot_players,
-    grid_from_text,
     make_page,
     open_room,
     wait_until,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-7 and AC-8: the feed's scroll position ----
 #

@@ -12,7 +12,6 @@ that the others' cursors are dashed becomes a check that they are triangles.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Locator, Page, expect
 
 from nock.grid import Grid
@@ -26,7 +25,6 @@ from spec013_harness import (
     cell_at,
     clear_frame,
     expected_tints,
-    grid_from_text,
     open_room,
     player_view,
     remote_players_on,
@@ -36,12 +34,6 @@ from spec013_harness import (
     tinted_by_map,
     triangle_fill,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-3: two outlines on one cell ------------------------------------------------
 

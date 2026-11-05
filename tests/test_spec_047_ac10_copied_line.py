@@ -48,11 +48,6 @@ GONE_AFTER_MS = 2500  # "gone 2,500 ms later"
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def clipboard_page(browser: Browser) -> Iterator[Page]:
     """A 1280 by 720 page whose context may read and write the clipboard."""
     viewport = {"width": COMPUTER[0], "height": COMPUTER[1]}

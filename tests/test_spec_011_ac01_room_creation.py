@@ -62,9 +62,7 @@ from spec011_harness import (
     FakeClock,
     build_catalogue,
     fresh_state,
-    grid_from_text,
     load_fr,
-    make_dist_dir,
     open_fx01_room,
 )
 
@@ -74,16 +72,6 @@ UNKNOWN_NUMBER = 99
 
 
 # ---- Fixtures and helpers ----------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

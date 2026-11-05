@@ -29,7 +29,7 @@ from nock.grid import Grid
 from nock.hub import RoomConnection, RoomRegistry
 from nock.store import RoomStore
 from spec017_harness import FakeClock
-from spec032_harness import T0, grid_from_text
+from spec032_harness import T0
 
 EXPIRED_COUNT = 50
 LIVE_EXPIRED_CODE = "E00020"  # one of the 50; a socket opens it before the sweep
@@ -38,11 +38,6 @@ OPEN_CODES = ["OPENAA", "OPENBB"]
 OPEN_LAST_EDIT_AT = T0 + 100 * HOUR
 LIFE_HOURS = 720  # the default life of each kind of room
 NOW = EXPIRED_LAST_EDIT_AT + LIFE_HOURS * HOUR + 1  # the expired ones, not the 2
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def expired_codes(count: int) -> list[str]:

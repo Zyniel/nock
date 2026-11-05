@@ -9,7 +9,6 @@ The shared setup is in `spec007_harness`.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Arrow, Grid
@@ -26,7 +25,6 @@ from spec007_harness import (
     active_clue_texts,
     clue_named,
     expect_selection,
-    grid_from_text,
     load_fr,
     open_fx01,
     open_mock_room,
@@ -40,11 +38,6 @@ from spec007_harness import (
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-5: one select_cell per selection change ------------------------------

@@ -20,7 +20,6 @@ from playwright.sync_api import Browser, expect
 
 from nock.grid import Grid
 from room_panels import show_tab
-from spec014_harness import fx01_grid as fx01_grid
 from spec014_harness import joined_mock_room
 from spec014_windows_harness import (
     HIT_TEST_BODY,

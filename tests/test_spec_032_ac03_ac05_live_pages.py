@@ -19,12 +19,10 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from spec010_harness import (
     EnterRoom,
-    catalogue_from_grid,
     cell_at,
     expect_joined,
     start_from_catalogue,
@@ -35,21 +33,11 @@ from spec032_harness import (
     PARIS,
     WAIT_TIMEOUT_MS,
     expect_my_rooms_ready,
-    grid_from_text,
     my_room_items,
     seed_storage,
 )
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The catalogue the live server serves: FX-01 as published entry 1."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

@@ -28,7 +28,7 @@ from playwright.sync_api import Browser, Page, Request, Response, WebSocket, exp
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
-from spec010_harness import catalogue_from_grid, expect_joined, start_from_catalogue
+from spec010_harness import expect_joined, start_from_catalogue
 from spec038_harness import (
     KEY_PAUSE_MS,
     OPS_TIMEOUT_MS,
@@ -118,15 +118,7 @@ class Probe(NamedTuple):
     traffic: Traffic
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (spec 010's catalogue)."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

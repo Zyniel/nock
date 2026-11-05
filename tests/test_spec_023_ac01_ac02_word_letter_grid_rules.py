@@ -37,7 +37,6 @@ from spec023_harness import (
     cell_state,
     cell_view,
     check,
-    grid_from_text,
     refs,
     s1_room,
     two_player_room,
@@ -45,11 +44,6 @@ from spec023_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Helper of the tests of this file ----

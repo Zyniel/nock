@@ -45,7 +45,6 @@ from nock.room import (
 from nock.store import RoomStore
 from server_harness import insert_stored_snapshot
 from spec014_harness import NEW_PLAYER_ID, NEW_TOKEN, NOW, QUIET_RULES, token_of
-from spec018_harness import grid_from_text
 
 CODE = "ABCDEF"
 HOST = "p1"
@@ -85,11 +84,6 @@ class RemovedRoom:
 
 def _join(nickname: str, resume_token: str | None = None) -> Join:
     return Join(nickname=nickname, resume_token=resume_token)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

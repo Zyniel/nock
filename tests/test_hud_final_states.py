@@ -75,11 +75,6 @@ AC29_CHANGES: list[tuple[int, int, dict[str, object]]] = [
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     yield from window_opener(browser, browser_name)
 

@@ -43,7 +43,7 @@ import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
-from spec035_harness import Walker, build_fx01_grid, open_room
+from spec035_harness import Walker, open_room
 from spec041_harness import NAVY, WAIT_TIMEOUT_MS, Rgb, cell_at
 from spec042_harness import Box, box_of
 from viewport_harness import Picture, take_picture
@@ -95,11 +95,6 @@ SAMPLES = RIGHT_EDGE_SAMPLES + BOTTOM_EDGE_SAMPLES
 
 
 # ---- Fixtures -----------------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
 
 
 # ---- Helpers ------------------------------------------------------------------------

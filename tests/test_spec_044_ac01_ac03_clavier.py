@@ -81,11 +81,6 @@ SALON_WIDTH = 340.0
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     """Return `window(width, height, touch)`: a page in a context of that size."""
     yield from window_opener(browser, browser_name)

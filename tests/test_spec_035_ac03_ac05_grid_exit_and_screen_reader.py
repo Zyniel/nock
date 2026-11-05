@@ -24,7 +24,6 @@ from typing import Any
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Direction
 from spec035_harness import (
@@ -33,8 +32,6 @@ from spec035_harness import (
     SETTLE_MS,
     MockRoomSocket,
     Walker,
-    build_fx01_grid,
-    build_reference_catalogue,
     cell_at,
     computed,
     expect_focus_on_grid,
@@ -50,15 +47,7 @@ from spec035_harness import (
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (also served by live_server)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 # The `Tab` listener of the spec's "Test harness": on `window`, bubble phase, it
