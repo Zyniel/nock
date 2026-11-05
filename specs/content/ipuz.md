@@ -1,7 +1,7 @@
 ---
 area: content
 file: ipuz
-status: done
+status: approved
 ---
 
 # content/ipuz - The ipuz file: format, reader, writer
@@ -25,8 +25,11 @@ text.
 
 ### The ipuz file
 
-1. A `.ipuz` file is a JSON object (UTF-8) of the ipuz v2 ArrowWord kind. It
-   holds `version` exactly `http://ipuz.org/v2`, `kind` exactly
+1. A `.ipuz` file is a JSON object (UTF-8; one byte order mark, U+FEFF, at its
+   start is skipped) of the ipuz v2 ArrowWord kind. A key written twice in one
+   object, wherever it stands (a key holding `:` included), is refused naming
+   the key. The file holds `version`
+   exactly `http://ipuz.org/v2`, `kind` exactly
    `["http://ipuz.org/crossword/arrowword#1"]`, `clueplacement` exactly
    `"blocks"`, `dimensions` (`width`, `height`), `puzzle`, `clues` holding
    exactly the key `Clues`, `author`, `date` and `difficulty`; optionally `block`,
@@ -39,13 +42,13 @@ text.
    | Model | ipuz |
    | --- | --- |
    | width, height | `dimensions` |
-   | letter cell | the `empty` value in `puzzle` (default `0`; `0` and `"0"` are the same value), or the object `{"cell": <empty>, "style": {"dashed": "<letters>"}}` with no other key (rule 5) |
+   | letter cell | the `empty` value in `puzzle` (default `0`; `0` and `"0"` are the same value), or the object `{"cell": <empty>, "style": <style>}` with no other key (rule 5) |
    | clue cell | the `block` value (default `"#"`, a text, different from `empty`) with one or two clues whose `location` is that cell, in the order of `Clues`; a third is refused |
    | empty cell | a block with no clue; `null` (ipuz's "no cell") is refused |
    | clue text | `clue`: a raw `<` or `>` (a tag) is refused, then HTML entities are decoded (`&amp;` is `&`) |
    | arrow | derived from `location` and `cells` (rule 4) |
    | answer, breaks | `answer` and `enumeration` (rule 5) |
-   | (derived) | `solution`: the letters at the letter cells, the block value elsewhere |
+   | (derived) | `solution`: at a letter cell one letter, in either case, with or without accent (rule 4 of `content/grids.md`): `E`, `e`, `É`, `ê` for `E`; the block value elsewhere |
 
    `puzzle` and, when present, `solution` hold `height` rows of `width` values;
    any other value (a clue number, another text, another object) is refused. A
@@ -58,7 +61,8 @@ text.
    `styles`, `zones`, `Across`, a clue's `number`, another `clueplacement`, a
    clue written as a text or a pair, ...). The ipuz keys `notes`, `intro`,
    `explanation`, `annotation`, `charset` and `showenumerations` are accepted
-   at the top level and ignored. A key holding `:` (another tool's namespace)
+   at the top level and ignored, as are `explanation`, `tags` and `type` on a
+   clue, whatever their value. A key holding `:` (another tool's namespace)
    is ignored wherever it stands.
 4. The arrow comes from the clue cell (r, c) and the first cell of `cells`:
    (r, c + 1) starts right, (r + 1, c) starts below; any other first cell is
@@ -69,9 +73,10 @@ text.
    `right_then_down`; a one-cell word takes the straight arrow of its first
    cell. `cells` must then be the word rule 3 of `content/grids.md` resolves.
 5. A word's breaks use ipuz's own means, all agreeing:
-   - `enumeration`, when present, is counts of letters, each one or more, joined
-     by single separators of rule 4 of `content/grids.md` (`-`, `.`, ` `, `'`):
-     `5`, `3-2-5`, `1.1`, `1 1`, `7'3`, `1.1-3`. Their total is the answer's
+   - `enumeration`, when present, is counts of letters, each one or more (a
+     leading zero is allowed: `05` is 5), joined by single separators of rule 4
+     of `content/grids.md` (`-`, `.`, ` `, `'`, `’` the same as `'`): `5`,
+     `3-2-5`, `1.1`, `1 1`, `7'3`, `7’3`, `1.1-3`. Their total is the answer's
      letters and each separator is a break. Any other text is refused: `5-`,
      `.5`, `1.1.`, `2  3`, `2,3`, `0`.
    - `answer` is written with its separators (`ARC-EN-CIEL`, `A.I`) or as
@@ -80,16 +85,17 @@ text.
      the same kinds (`VI-DE` under `"4"`, `A I` or `A-I` under `"1.1"` are
      refused); an answer of letters only takes them: the model's answer (rule 4
      of `content/grids.md`) is then its letters written with the enumeration's
-     separators (`AI` under `"1.1"` is `A.I`); otherwise it is the answer as
-     written. Without enumeration, the answer's own separators give the breaks.
-   - `dashed`, the drawing of a break: a letter cell may be the object
-     `{"cell": <empty>, "style": {"dashed": "<letters>"}}`, the letters among
-     `T`, `R`, `B`, `L`, each naming the edge of that cell with its top, right,
-     bottom or left neighbour (a line may be set from either of its cells). Each
-     edge must lie between two letter cells. When any cell carries `dashed`, the
-     edges named must be exactly the edges of the grid's breaks
-     (`Grid.hyphen_edges`), whatever their separators; with none, nothing is
-     checked.
+     separators, `’` written `'` (`AI` under `"1.1"` is `A.I`); otherwise it
+     is the answer as written. Without enumeration, the answer's own
+     separators give the breaks.
+   - `dashed`, the drawing of a break: a letter cell's `<style>` (rule 2)
+     holds `dashed`, `dotted` or both and no other key, each a text of letters
+     among `T`, `R`, `B`, `L`, each naming the edge of that cell with its top,
+     right, bottom or left neighbour (a line may be set from either of its
+     cells); `dotted` is read as `dashed`. Each edge must lie between two
+     letter cells. When any cell carries a style, the edges named must be
+     exactly the edges of the grid's breaks (`Grid.hyphen_edges`), whatever
+     their separators; with none, nothing is checked.
 6. `difficulty` is the force: a whole number 1 to 4, or the same digit as a text
    (`3` or `"3"`). `date` is the publication date (`published_on`), exactly
    `MM/DD/YYYY` and a real date. `author` is 1 to 200 characters once stripped,
@@ -102,9 +108,9 @@ text.
    model's answer is built from it); after its step 2, every clue's `cells` is
    its resolved word; after its step 8, `solution` agrees with the answers, then
    `answer` and `enumeration` agree on their separators, then the `dashed`
-   edges are the edges of the breaks. The first problem stops the import,
-   naming the clue (clue cell and text), the position, or the edge as two
-   `(row, column)` cells, the first one first.
+   and `dotted` edges are the edges of the breaks. The first problem stops the
+   import, naming the clue (clue cell and text), the position, or the edge as
+   two `(row, column)` cells, the first one first.
 
 ### The writer
 
@@ -159,9 +165,10 @@ text.
 - **AC-10** A `solution` that disagrees with the answers is refused after every
   check of `content/grids.md` rule 6: FX-01's solution with `X` at (1, 4) names
   `(1, 4)`; a letter at (0, 0) names `(0, 0)`. An `enumeration` follows rule 5:
-  `"5"` on `TAMIS` loads; `"2 3"` loads with the answer `TA MIS` and a break
-  after 2, `"2'3"` with `TA'MIS`; `"4"`, `"5-"`, `"5."`, `"2  3"` and `"2,3"`
-  are refused naming `(0, 0)` and `Passoire fine`.
+  `"5"` and `"05"` on `TAMIS` load; `"2 3"` loads with the answer `TA MIS` and
+  a break after 2, `"02-3"` with `TA-MIS`, `"2'3"` and `"2’3"` with `TA'MIS`;
+  `"4"`, `"5-"`, `"5."`, `"2  3"` and `"2,3"` are refused naming `(0, 0)` and
+  `Passoire fine`.
 - **AC-11** `difficulty` `3` and `"3"` load as force 3; `"Force 3"`, `5`, `"03"`
   and `3.0` are refused. `date` `10/01/2026` loads as `published_on`
   `2026-10-01`, kept `YYYY-MM-DD` in the summary; `2026-10-01`, `1/1/2026` and
@@ -170,8 +177,9 @@ text.
   key is ignored: FX-01 with `"saved": []`, `"styles": {}` or `"rating": 3` at
   the top level, `clues` holding `"Across": []`, or W5 holding `"number": 5` is
   refused; with `"notes": "x"`, `"showenumerations": true` or
-  `"com.example:rating": 3` at the top level, or `"com.example:x": 1` on W5,
-  it loads equal to AC-1.
+  `"com.example:rating": 3` at the top level, or `"com.example:x": 1`,
+  `"explanation": "x"`, `"tags": ["x"]` or `"type": 1` on W5, it loads equal
+  to AC-1.
 - **AC-13** A clue text is plain: `Fatales &amp; César` loads as
   `Fatales & César`; `<b>Flaire</b>` is refused naming `(0, 4)`.
 - **AC-14** A word's breaks follow rule 5, on FX-01 with `VI-DE` across from
@@ -184,6 +192,20 @@ text.
   `"VI-DE"` with `"4"`, or `"VI DE"` with `"2.2"`, is refused naming `(2, 0)`
   and `Sans contenu`; with `NA-VAL` down from (0, 1) as well and only `R` at
   `[2, 2]`, the file is refused naming `(1, 1)`, `(2, 1)`.
+- **AC-15** `dotted` is read as `dashed`, on AC-14's grid with `VI-DE`: the
+  style `{"dotted": "R"}` or `{"dashed": "R", "dotted": "R"}` at `[2, 2]` loads
+  with the break after 2; `{"dotted": "R"}` at `[3, 2]` is refused naming
+  `(2, 3)`, `(2, 4)`, and the style `{}` at `[2, 2]` naming `(2, 2)`.
+- **AC-16** A `solution` letter is compared case and accents aside: FX-01's
+  solution with `e`, `É` or `ê` at (4, 2) loads equal to AC-1; `EE` or `E-`
+  there is refused naming `(4, 2)`.
+- **AC-17** A key written twice in one object is refused naming it, even with
+  the same value twice: FX-01's text with `"author"` written twice at the top
+  level is refused naming `author`, with `"answer"` twice in W5 naming
+  `answer`, and with `"com.example:x"` twice on W5 naming `com.example:x`.
+- **AC-18** A byte order mark at the start of a file is skipped: FX-01's file
+  with the bytes `EF BB BF` (U+FEFF) before its first `{` loads equal to AC-1;
+  with two, it is refused as not valid JSON.
 
 ## Edge cases
 
@@ -194,9 +216,9 @@ text.
   whole run (rule 3 of `content/grids.md`).
 - `Clues:Définitions` is a key holding `:`, so it is ignored and `Clues` is
   missing (AC-12).
-- A `dashed` letter naming an edge outside the grid or beside a block is
-  refused naming that edge; `""` or a letter other than T, R, B, L is refused as
-  a value (AC-4, AC-14).
+- A `dashed` or `dotted` letter naming an edge outside the grid or beside a
+  block is refused naming that edge; `""` or a letter other than T, R, B, L is
+  refused as a value (AC-4, AC-14).
 - An enumeration without separator leaves the answer as written (`ÊTRE` with
   `"4"` stays `ÊTRE`) (AC-14).
 
@@ -206,8 +228,8 @@ text.
   unchanged by the file format; the summary keeps `force` and `published_on`
   (`content/library.md`).
 - The index, credits, withdrawal and the converter: `content/grid-files.md`.
-- Reading another ipuz kind, a clue number, a cell style other than `dashed`,
-  or a saved state.
+- Reading another ipuz kind, a clue number, a cell style other than `dashed`
+  and `dotted`, or a saved state.
 - ipuz's other enumeration marks (`,`, `;`, a trailing `.`, `0` for an unknown
   length): refused by rule 5. Showing an enumeration to players.
 
