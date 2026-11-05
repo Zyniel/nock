@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: rules
-status: done
+status: approved
 ---
 
 # gameplay/rules - Completion and the shared timer
@@ -242,7 +242,7 @@ figures and the chrono icon, `_design/foundation.md`, « Typography » and
 - A timer event, pausing by hand, a countdown, per-player times, penalties for
   help, announcing the time to screen readers, leaderboards.
 - Check and reveal: `gameplay/hints.md`. The recap and « Voir le bilan »:
-  `gameplay/results.md`. The top bar and the Menu: `client/hud.md`. The in-app
+  `gameplay/results.md`. The top bar: `client/hud.md`; the Menu: `client/menus.md`. The in-app
   keyboard: `gameplay/board.md`.
 
 ## Code

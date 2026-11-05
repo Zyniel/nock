@@ -4,7 +4,7 @@ title: client/hud.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T10:56:00Z'
+updated_date: '2026-11-05T10:57:00Z'
 labels:
   - domain:hud
 milestone: m-7
@@ -24,6 +24,7 @@ From DRAFT-058. hud is 22.4 KB with 22 criteria. Move one part, its criteria as 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 hud.md is under about 15 KB and 20 criteria, the part moved with its criteria and pointers, _map.md updated, the gate's traceability green
+- [ ] #2 menus AC-1 to AC-9 (moved from hud AC-6 to AC-10, AC-15, AC-23 to AC-25)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -51,4 +52,6 @@ From DRAFT-058. hud is 22.4 KB with 22 criteria. Move one part, its criteria as 
 Lead decision (Plan agent on Fable, three cuts): Cut 1, client/menus.md takes hud rules 8-13 (Aide menu, Menu, switches and items, the popover rule, the room sheets) as rules 1-6 and AC-6 to AC-10, AC-15, AC-23 to AC-25 as AC-1 to AC-9. hud goes to about 14.1 KB and 13 criteria, menus about 9.6 KB and 9. Not taken: status (23 test functions move, hud stays at the edge) and layout (the top bar is what hud means). Cost: tests/test_hud_overlay_focus.py becomes tests/test_menus_overlay_focus.py (8 functions renumbered), the sheet helpers of hud_harness.py go to menus_harness.py, and scripts/gate.py SHARED_COMPONENT_DOMAINS follows (the lead, as a coherence fix of the tooling).
 
 Spec-checker round 1: CHANGES REQUESTED (room.md and hud.md Depends on still gave hud the scrim). Fixed. Lead decision: client/room.md keeps four Depends on files (hud, menus, chat, presence) against the template's three: its agents need menus for the sheet's closing rules and each of the others for a tab or the layout; no other spec is over.
+
+Spec-checker round 2: APPROVED. hud 14.5 KB and 13 criteria, menus 9.5 KB and 9.
 <!-- SECTION:NOTES:END -->

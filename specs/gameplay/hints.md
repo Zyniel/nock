@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: hints
-status: done
+status: approved
 ---
 
 # gameplay/hints - Check and reveal
@@ -90,7 +90,7 @@ Each player may ask only a few times in a short while.
 
 ### The Aide items
 
-10. While the help mode is not `none`, the Aide menu (`client/hud.md`) holds the
+10. While the help mode is not `none`, the Aide menu (`client/menus.md`) holds the
     group « Vérifier » (`check.letter`, `check.word`, `check.grid`), then
     « Révéler » (`reveal.letter`, `reveal.word`). A reveal item's detail says
     what is left: `reveal.letters_left` (`_one` at 1), `reveal.letter_none` at
@@ -205,7 +205,7 @@ The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
 - Generated hints, revealing the whole grid, undoing a reveal, keyboard
   shortcuts, a message telling a player their request was dropped.
 - The vote and its banner: `gameplay/votes.md`. The host settings:
-  `lobby/host.md`. The Aide menu's place: `client/hud.md`; the notes:
+  `lobby/host.md`. The Aide menu's place: `client/menus.md`; the notes:
   `client/room.md`. Cell marks: `gameplay/viewport.md`; pending edits:
   `gameplay/board.md`.
   Completion: `gameplay/rules.md`. The stream and its lines' look:

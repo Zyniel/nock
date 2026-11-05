@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: done
+status: approved
 ---
 
 # account/account - Optional account
@@ -114,7 +114,7 @@ erases and keeps is `account/erasure.md`.
 
 ### The account sheet and page
 
-14. « Compte » opens the sheet: in a room from the Menu (`client/hud.md`); on
+14. « Compte » opens the sheet: in a room from the Menu (`client/menus.md`); on
     the catalogue from the top bar, whose button's `aria-expanded` follows the
     sheet. A modal dialog named by its heading: focus goes to the address
     field, else its first control, and stays inside; Escape, « Fermer » or the

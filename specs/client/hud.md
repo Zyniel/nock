@@ -1,24 +1,25 @@
 ---
 area: client
 file: hud
-status: done
+status: approved
 ---
 
-# client/hud - The room's frame: top bar, menus, sheets, clue bar
+# client/hud - The room's frame: top bar, clue bar, play area
 
 ## Purpose
 
-Every room page frames the grid with the top bar, two menus, the room sheets
-and the clue bar, on a phone or a computer, never taking the grid's room, and
-gives the Salon (`client/room.md`) its column or its sheet.
+Every room page frames the grid with the top bar and the clue bar, on a phone
+or a computer, never taking the grid's room, and gives the menus and sheets
+(`client/menus.md`) their place and the Salon (`client/room.md`) its column or
+its sheet.
 
 ## Depends on
 
 - `product.md`: the supported windows and the accessibility baselines.
 - `gameplay/viewport.md`: the grid and its fit; the selection and the in-app
   keyboard are `gameplay/board.md`.
-- `client/room.md`: the Salon's open and closed states, which the layout, the
-  scrim and the play area follow.
+- `client/room.md`: the Salon's open and closed states, which the layout and
+  the play area follow.
 
 ## Rules
 
@@ -63,69 +64,8 @@ gives the Salon (`client/room.md`) its column or its sheet.
    room-gone dialog (rule 16); any other status is a band under the top bar,
    without the connection band's dot.
 
-### Menus
+### Clue bar
 
-8. The Aide menu, a group named `topbar.aide`, holds the pencil confirm and a
-   separator while it applies (`gameplay/co-op.md`); then, unless the help mode
-   is `none`, « Vérifier » and « Révéler » (`gameplay/hints.md`), each a group
-   named by its heading, a separator between; else, when empty, the line
-   `aide.empty` (« L'aide est désactivée dans ce salon. »). « Aide » never
-   leaves the bar. An item that appears while the menu is open moves no focus.
-9. An enabled Aide item closes the menu, focuses « Aide », then sends its
-   request once. A disabled item sends nothing and leaves the menu open, as
-   does an item disabled while it is open.
-10. The Menu, a group named `topbar.menu`, holds in order: the switches
-    « Auteurs », « Mots des autres », « Accessibilité » (`social/presence.md`,
-    `gameplay/board.md`), each with the detail of its state; « Inviter »
-    (`menu.invite`, detail `menu.invite_detail`); « Réglages de l'hôte », for
-    the host only (`lobby/host.md`); « Compte » (`account.open`), while
-    accounts are on (`account/account.md`); a separator; `timer.hide` or
-    `timer.toggle_label`; « Retour aux grilles » (`menu.back`), a link to `/`.
-    Details are hidden from screen readers. Following « Retour aux grilles »
-    or the brand asks nothing: the page loads `/`, and the player,
-    disconnected, keeps the seat, to resume from « Mes salons »
-    (`lobby/summaries.md`).
-11. A switch flips in place, the Menu open and focused on it. Every other item
-    closes the Menu: « Inviter » opens the Salon on « Joueurs » focused on
-    « Copier le lien »; « Réglages de l'hôte » and « Compte » open their sheet;
-    the timer item hides or shows the timer and focuses « Menu ».
-
-### Popovers
-
-12. A menu's button opens and closes it; opening focuses its first enabled item,
-    else the menu; Escape inside closes it and focuses the button. Column
-    layout: a pointer press outside closes it. Sheet layout: while a menu or
-    the Salon is open a scrim covers the page under the top bar; a tap on it
-    closes them, moving no focus and selecting nothing. A Tab or Shift+Tab
-    pressed inside the page that puts the focus on an element outside an open
-    menu or the Salon sheet closes it, the focus staying on that element,
-    wherever the focus was before: inside it, lost to no element (an item
-    disabled under it), or on an element outside it where the page had moved
-    it. Losing the focus to no element closes nothing, nor does a focus the
-    page moves: after a mute (`social/chat.md` rule 15) the Salon sheet stays
-    open with the focus on « Salon », and the next Tab closes it. A focus that
-    enters the page from another window or the browser's own controls closes
-    nothing by itself. A press follows the rules above, not the focus: a press
-    on its own button (« Aide », « Menu », « Salon ») closes it, once. At most
-    one of the menus, the Salon sheet and the reaction picker is open; the
-    Salon column is apart. A closed menu stays in the page, hidden, with its
-    items' states. A menu's place follows the top bar's form; its content
-    scrolls inside it, so it stays in the window.
-
-### Sheets, clue bar
-
-13. The room sheets (the host's settings, the account, the recap of
-    `gameplay/results.md` rule 9, the room-gone dialog of rule 16) are modal
-    dialogs named by their title, the focus inside from their opening; in the
-    sheet layout the top bar stays seen and inert above. Tab and Shift+Tab go
-    round a sheet's controls and never leave it: Tab on its last control
-    focuses its first, Shift+Tab on its first its last. The host's settings and
-    the account close on Escape, or on a press and its release both on the
-    backdrop: a press that starts in the sheet and ends on the backdrop, or the
-    reverse, closes nothing. Each close of either focuses « Menu » (Escape, the
-    backdrop, « Fermer », « Enregistrer » once it has sent the settings, the
-    loss of the host role, `lobby/host.md` rule 8), except when the room-gone
-    dialog closes it (rule 16).
 14. The clue bar holds ‹ `clue_bar.previous`, the clue on one line with its
     direction, « Réagir », « Je bloque », › `clue_bar.next`. › does what Tab
     does in the grid, ‹ what Shift+Tab does (`gameplay/board.md`), grid focused
@@ -146,9 +86,10 @@ gives the Salon (`client/room.md`) its column or its sheet.
 
 16. Once the room has shown, `not_found` (the 4404 of a deleted room,
     `lobby/lifetime.md` rule 6), joined or reconnecting, closes the menus, the
-    Salon sheet, the reaction picker and any other room sheet (rule 13), takes
-    the connection band away and drops the letters waiting to be sent. A modal
-    alert dialog then covers the page, named by its title `room.gone.title`
+    Salon sheet, the reaction picker and any other room sheet
+    (`client/menus.md` rule 6), takes the connection band away and drops the
+    letters waiting to be sent. A modal alert dialog then covers the page,
+    named by its title `room.gone.title`
     (« Ce salon n'existe plus. ») and described by
     `room.status.not_found_detail`, with one control, the link `share.home`
     (« Voir les grilles ») to `/`, which takes the focus. The room stays drawn
@@ -163,8 +104,8 @@ gives the Salon (`client/room.md`) its column or its sheet.
     the letters waiting to be sent and the kept undos, checks and reveals, and
     makes the grid read-only: a typed letter or an erase, from the keys or the
     in-app keyboard, changes no cell and sends nothing; « Annuler » and every
-    Aide item, the confirm item included, are disabled (rule 9). The selection
-    still moves.
+    Aide item, the confirm item included, are disabled (`client/menus.md`
+    rule 2). The selection still moves.
 
 ### Status region
 
@@ -181,9 +122,10 @@ gives the Salon (`client/room.md`) its column or its sheet.
     its last message was written; each new message starts the 5 s again. The
     vote's region (`gameplay/votes.md` rule 8), the grid's (`product.md`
     rule 17) and the alerts stay as they are.
-18. While a room sheet is open (rule 13) the page behind it is inert, so the
-    sheet holds a region of the same kind, empty at its opening and emptied as
-    rule 17 says, and every message goes to it instead, the recap's own
+18. While a room sheet is open (`client/menus.md` rule 6) the page behind it
+    is inert, so the sheet holds a region of the same kind, empty at its
+    opening and emptied as rule 17 says, and every message goes to it
+    instead, the recap's own
     (`gameplay/results.md` rules 9, 12) included; the page's region gets none,
     and gets the messages again once the sheet closes.
 
@@ -192,11 +134,10 @@ gives the Salon (`client/room.md`) its column or its sheet.
 `_design/room.md`: « Which layout »; « Phone and upright tablet (sheet
 layout) » and « Computer and landscape tablet (column layout) » for the play
 areas, with « Phone top bar », « Clue bar », « Computer top bar » and « Low
-column layout »; « Aide menu »; « Menu »; « Reactions »; « Connection lost »;
-« Room sheets: host settings and account »; « Layers ». The end band:
+column layout »; « Reactions »; « Connection lost »; « Layers ». The end band:
 `_design/overlays.md`, « End of grid »; the room-gone dialog, « Room gone ».
-Menus, buttons, switches, the brand link: `_design/foundation.md`,
-« Components »; the focus in menus and sheets, « Focus ».
+Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
+« Focus ».
 
 ## Acceptance criteria
 
@@ -220,40 +161,6 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   bar and the grid area moves down; rejoined, both are back. After `removed`,
   « Vous avez été retiré de ce salon. » is a band under the top bar with no
   dot. Both follow « Connection lost ». (← 043 AC-7)
-- **AC-6** With 5 letters and 1 word left, the Aide menu holds « Vérifier »
-  (« La lettre », « Le mot », « La grille »), a separator, « Révéler » (« La
-  lettre » « 5 restantes », « Le mot » « 1 restant »); with Bob's pencil `T`
-  at (1, 0) selected, « Confirmer la lettre au crayon » and a separator come
-  first; in mode `none` on an empty cell, only « L'aide est désactivée dans ce
-  salon. ». (← 043 AC-8)
-- **AC-7** MIME selected, « Le mot » sends one check of MIME, closes the menu,
-  focuses « Aide » and keeps the selection; so does each item with its request.
-  A disabled « La lettre », or items a vote disables while it is open, send
-  nothing and leave it open. (← 043 AC-9)
-- **AC-8** The host's Menu reads « Auteurs » « désactivé », « Mots des autres »
-  « teintés », « Accessibilité » « désactivée », « Inviter » « lien »,
-  « Réglages de l'hôte », a separator, « Masquer le chrono », « Retour aux
-  grilles » to `/`; a player who is not host has no « Réglages de l'hôte »;
-  with accounts on « Compte » follows it, or « Inviter » for a player who is
-  not host. It hangs where its top bar
-  form's design puts it. (← 043 AC-10)
-- **AC-9** « Accessibilité » turns to « activée », the Menu open and focused on
-  it; by keyboard, Enter on « Menu » focuses « Auteurs » and Enter flips each
-  switch. « Inviter » opens « Joueurs » focused on « Copier le lien ».
-  « Masquer le chrono » puts « Chrono » at the timer's place and focuses
-  « Menu ». (← 043 AC-6, 043 AC-11)
-- **AC-10** « Aide » or « Menu » opens expanded, with the pressed look, focused
-  on its first enabled item; Escape focuses the button; a second press closes.
-  At 1280 by 720 a click on (2, 2) closes the Menu and selects (2, 2), the
-  Salon column staying open. At 360 by 740 a tap on the scrim closes « Aide »,
-  sending and selecting nothing; opening the Menu closes « Aide », opening the
-  Salon the Menu or the picker. A closed « Aide » still holds « La grille ».
-  (← 043 AC-5, 043 AC-12)
-- **AC-15** « Réglages de l'hôte » is a modal sheet named by its title, centred
-  at 1280 by 720, a bottom sheet at 360 by 740 that a tap above closes;
-  « Enregistrer » sends, closes it and focuses « Menu ». « Compte » opens the
-  account sheet alike; Escape focuses « Menu ». Both follow « Room sheets ».
-  (← 043 AC-21, 043 AC-22)
 - **AC-16** MIME selected, the clue bar reads ‹, « Artiste muet » ↓,
   « Réagir », « Je bloque », ›; with nothing selected the middle two are
   disabled. With TAMIS full, › selects NAVAL then MIME, ‹ NAVAL; a click on ›
@@ -284,20 +191,6 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 - **AC-22** Under the room-gone dialog, with (1, 0) selected, Escape, a press on
   the scrim, Tab and Shift+Tab leave the focus on « Voir les grilles » and the
   dialog open; a typed `A` leaves (1, 0) empty; a press on the link loads `/`.
-- **AC-23** At 360 by 740 with MIME selected, Tab on « Le mot », the last item
-  of the open Aide menu, focuses the grid, the menu and the scrim gone; at 1280
-  by 720 Shift+Tab on « Auteurs » in the open Menu focuses « Menu », the Menu
-  closed. With « La grille » focused in the open Aide menu, a vote that
-  disables it leaves the menu open.
-- **AC-24** At 360 by 740 with MIME selected and the Salon sheet open,
-  Shift+Tab on « Discussion » focuses › of the clue bar, the sheet and the
-  scrim gone and « Salon » not expanded. Bob at 360 by 740, the Salon sheet
-  open and the focus in its message box, is muted by Ana: the sheet stays open
-  with the focus on « Salon », and his next Tab closes it.
-- **AC-25** At 1280 by 720 in the host's settings, a press in « Lettres à
-  révéler » released on the backdrop, or a press on the backdrop released in
-  the sheet, leaves it open with its values; a press and its release both on
-  the backdrop close it and focus « Menu ».
 - **AC-26** With the socket opened but not answered, the room page's first
   paint holds a region with `role="status"`, empty and read but not seen;
   once joined, and again after a socket loss, it is still that element.
@@ -325,15 +218,11 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
 
 ## Edge cases
 
-- A square window is a sheet (AC-1); help mode `none` keeps « Aide » (AC-6).
+- A square window is a sheet (AC-1).
 - Removed by the host after the room showed: the status band, never the
   room-gone dialog (AC-5).
 - A 4404 before the first snapshot: the entry card (`client/shell.md` rule 7),
   not the dialog (AC-21).
-- Tab on the Salon sheet's last control leaves the page for the browser and
-  closes nothing; the Tab that brings the focus back to the page's first
-  control closes nothing either, and the next Tab pressed inside the page
-  closes it (rule 12).
 
 ## Out of scope
 
@@ -345,18 +234,20 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   (`account/account.md` rule 17).
 - The Salon, what « Salon » carries while it is closed, the 3-second notes:
   `client/room.md`. « Réagir », « Je bloque », the reactions: `social/chat.md`.
-- What items, sheets, lines and rows do: the domains each rule names. The page
-  before the room shows: `client/shell.md`.
+- The menus, the popover rules, the scrim and the room sheets:
+  `client/menus.md`.
+- What lines and rows do: the domains each rule names. The page before the
+  room shows: `client/shell.md`.
 
 ## Code
 
-- `web/src/lib/RoomPage.svelte` (layout, overlays, play area), `roomOverlays.ts`
-  (the one-overlay rule), `playFit.ts` (layout, the grid's box, the clue bar's
-  width, the legend's place), `StatusRegion.svelte` and `announce.ts` (the
-  status region, announced by `RoomPage.svelte`), `GridStatus.svelte` (the
-  grid's completion line) and its parts: `RoomTopBar.svelte`, `RoomPopover.svelte`, `AideMenu.svelte`,
-  `RoomMenu.svelte`, `ClueBar.svelte`, `RoomGoneDialog.svelte`,
-  `RoomSheet.svelte` (the room sheets' shared dialog and its region);
-  `windowForm.ts`.
+- `web/src/lib/RoomPage.svelte` (layout, play area, room gone),
+  `roomOverlays.ts` (what a layout change and the room's deletion close),
+  `playFit.ts` (layout, the grid's box, the clue bar's width, the legend's
+  place), `StatusRegion.svelte` and `announce.ts` (the status region,
+  announced by `RoomPage.svelte`), `GridStatus.svelte` (the grid's completion
+  line) and its parts: `RoomTopBar.svelte`, `ClueBar.svelte`,
+  `RoomGoneDialog.svelte`, `RoomSheet.svelte` (the room-gone dialog's frame,
+  a sheet's region); `windowForm.ts`.
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
   `tests/test_hud_*`, `tests/hud_harness.py`.

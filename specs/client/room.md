@@ -1,7 +1,7 @@
 ---
 area: client
 file: room
-status: done
+status: approved
 ---
 
 # client/room - The room panel (« Salon ») and the notes
@@ -16,7 +16,9 @@ just did.
 ## Depends on
 
 - `client/hud.md`: the layouts, the top bar and its « Salon » button, the
-  scrim, the play area the Salon column shares.
+  play area the Salon column shares.
+- `client/menus.md`: the scrim and the popover rules the Salon sheet follows
+  (one open overlay at a time, Tab out).
 - `social/chat.md`: the stream's lines, messages, the unread count, the
   message box.
 - `social/presence.md`: the Joueurs rows, their states and clues.
@@ -137,7 +139,8 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
 
 - Dragging the Salon sheet, scrolling to a tapped note's line, announcing
   other players' actions to screen readers.
-- The layouts, the top bar, the scrim and the play area: `client/hud.md`. What
+- The layouts, the top bar and the play area: `client/hud.md`; the scrim:
+  `client/menus.md`. What
   the stream, its lines and the message box do: `social/chat.md`. The Joueurs
   rows' content: `social/presence.md`; the invitation link: `lobby/rooms.md`;
   the host's buttons: `lobby/host.md`. The catch-up lines: `social/catch-up.md`. The
