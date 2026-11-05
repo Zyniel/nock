@@ -4,7 +4,7 @@ title: Erasure's criteria live beside their rules
 status: Done
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-05T03:23:00Z'
+updated_date: '2026-11-05T03:24:00Z'
 labels:
   - domain:account
   - domain:erasure
@@ -38,7 +38,7 @@ From DRAFT-055, option B (the lead's pick, delegated by the human 2026-11-04). a
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -59,6 +59,8 @@ No test phase and no implementer: the moved criteria are proven by their unchang
 Review round 1: APPROVE. Taken: the Out of scope sentence reworded. Not taken: cutting AC-15 down to its purge sentence (the task moves the criteria whole, and every clause stays proven by its pointer); the sizes were already accepted.
 
 Criterion #1: no domain test existed, so none was renamed; the three are proven by their unchanged pointers. Full gate, one engine at a time: chromium 8,757 + 162 passed, firefox 4,074, webkit 4,074 (plus the serial files), all green.
+
+Pull request #137, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
