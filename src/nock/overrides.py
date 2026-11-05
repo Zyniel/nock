@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Mapping
-from typing import NamedTuple
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, StrictInt, model_validator
 
@@ -39,14 +39,16 @@ logger = logging.getLogger(__name__)
 SWEEP_MINUTES_NAME: str = "expiry_sweep_minutes"
 
 
-class Setting(NamedTuple):
+class Setting(BaseModel):
     """One setting: its name, its unit, its bounds and its environment variable.
 
     See `admin/overrides.md` rule 1 and `lobby/lifetime.md` rule 7.
     """
 
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     name: str
-    unit: str  # "hours" or "minutes"
+    unit: Literal["hours", "minutes"]
     minimum: int
     maximum: int
     default: int
@@ -56,12 +58,12 @@ class Setting(NamedTuple):
 def _room_life(name: str, variable: str) -> Setting:
     """Return the room life setting called `name`, read from `variable`."""
     return Setting(
-        name,
-        "hours",
-        MIN_ROOM_LIFE_HOURS,
-        MAX_ROOM_LIFE_HOURS,
-        DEFAULT_ROOM_LIFE_HOURS,
-        variable,
+        name=name,
+        unit="hours",
+        minimum=MIN_ROOM_LIFE_HOURS,
+        maximum=MAX_ROOM_LIFE_HOURS,
+        default=DEFAULT_ROOM_LIFE_HOURS,
+        variable=variable,
     )
 
 
@@ -72,12 +74,12 @@ SETTINGS: tuple[Setting, ...] = (
     _room_life("anonymous_solved_room_hours", ANONYMOUS_SOLVED_ROOM_HOURS_VARIABLE),
     _room_life("anonymous_room_hours", ANONYMOUS_ROOM_HOURS_VARIABLE),
     Setting(
-        SWEEP_MINUTES_NAME,
-        "minutes",
-        MIN_SWEEP_MINUTES,
-        MAX_SWEEP_MINUTES,
-        DEFAULT_SWEEP_MINUTES,
-        EXPIRY_SWEEP_MINUTES_VARIABLE,
+        name=SWEEP_MINUTES_NAME,
+        unit="minutes",
+        minimum=MIN_SWEEP_MINUTES,
+        maximum=MAX_SWEEP_MINUTES,
+        default=DEFAULT_SWEEP_MINUTES,
+        variable=EXPIRY_SWEEP_MINUTES_VARIABLE,
     ),
 )
 SETTING_BY_NAME: dict[str, Setting] = {setting.name: setting for setting in SETTINGS}
@@ -112,6 +114,43 @@ class SettingChange(BaseModel):
     def is_room_life(self) -> bool:
         """Tell whether the setting is a room life (the interval is not)."""
         return self.name != SWEEP_MINUTES_NAME
+
+
+class SettingRow(BaseModel):
+    """One setting as `GET /api/ops/settings` lists it (`admin/overrides.md` rule 3).
+
+    The fields are in the order of the JSON. `environment` and `value` are whole
+    numbers, except the interval when it is a fraction of a minute (0.5).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str
+    unit: Literal["hours", "minutes"]
+    min: int
+    max: int
+    default: int
+    environment: int | float | None  # None when the variable is unset
+    override: int | None  # None when there is none
+    value: int | float  # the effective value
+    source: Literal["override", "environment", "default"]
+
+
+class SettingsAnswer(BaseModel):
+    """The answer of `GET` and `PUT /api/ops/settings`."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    durable: bool  # true when the store is a database file
+    settings: tuple[SettingRow, ...]
+
+
+class DryRunAnswer(BaseModel):
+    """The answer of the dry run: how many rooms a room life would delete."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    rooms: int
 
 
 def settings_set_in(environ: Mapping[str, str]) -> frozenset[str]:
@@ -235,13 +274,13 @@ class RoomLifeOverrides:
         with self._lock:
             self._registry.replace_config(self._environment)
 
-    def answer(self) -> dict[str, object]:
+    def answer(self) -> SettingsAnswer:
         """Return the answer of `GET /api/ops/settings` (rule 3)."""
         with self._lock:
-            rows: list[dict[str, object]] = []
+            rows: list[SettingRow] = []
             for setting in SETTINGS:
                 rows.append(self._row(setting))
-        return {"durable": self._store.is_durable, "settings": rows}
+        return SettingsAnswer(durable=self._store.is_durable, settings=tuple(rows))
 
     def save(self, name: str, value: int | None) -> None:
         """Save the override of a setting, or remove it with None, and apply it.
@@ -294,7 +333,7 @@ class RoomLifeOverrides:
             return value != setting.default
         return setting.name in self._settings_set
 
-    def _row(self, setting: Setting) -> dict[str, object]:
+    def _row(self, setting: Setting) -> SettingRow:
         """Return the nine fields of a setting's row. Caller locks."""
         name = setting.name
         environment_value = _values_of(self._environment)[name]
@@ -302,6 +341,7 @@ class RoomLifeOverrides:
         if self._is_set_in_environment(setting, environment_value):
             environment = environment_value
         override = self._overrides.get(name)
+        source: Literal["override", "environment", "default"]
         if override is not None:
             value: float = override
             source = "override"
@@ -311,14 +351,14 @@ class RoomLifeOverrides:
         else:
             value = setting.default
             source = "default"
-        return {
-            "name": name,
-            "unit": setting.unit,
-            "min": setting.minimum,
-            "max": setting.maximum,
-            "default": setting.default,
-            "environment": environment,
-            "override": override,
-            "value": value,
-            "source": source,
-        }
+        return SettingRow(
+            name=name,
+            unit=setting.unit,
+            min=setting.minimum,
+            max=setting.maximum,
+            default=setting.default,
+            environment=environment,
+            override=override,
+            value=value,
+            source=source,
+        )

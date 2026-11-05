@@ -16,6 +16,9 @@ With account settings, it also serves the optional accounts (spec 033): the page
 link sent by e-mail and keep the rooms of their account. Before a room is
 deleted, each account of the room keeps the record of its finished grid
 (spec 029).
+
+Importing this module builds no app. `create_app` builds one, and `production_app`
+builds the one that `python -m nock` runs (`platform/server.md` rule 23).
 """
 
 from __future__ import annotations
@@ -63,6 +66,8 @@ from nock.accounts import (
     Account,
     AccountStatus,
     AccountStore,
+    GridProgress,
+    HistoryRecord,
     PendingErasure,
     RoomIdentity,
     SignInLinkRequest,
@@ -74,10 +79,11 @@ from nock.catalogue import (
     GRIDS_DIR,
     Catalogue,
     CatalogueEntry,
+    GridSummary,
     load_catalogue,
     summarize,
 )
-from nock.catch_up import CatchUpRequest
+from nock.catch_up import CatchUp, CatchUpRequest
 from nock.hub import (
     MAX_FRAME_BYTES,
     ROOM_NOT_FOUND_CLOSE_CODE,
@@ -95,6 +101,7 @@ from nock.mailer import (
 )
 from nock.operations import (
     DAY_SECONDS,
+    DashboardAnswer,
     RoomLog,
     RoomReplay,
     dashboard_figures,
@@ -102,8 +109,15 @@ from nock.operations import (
     offered_periods,
     room_edits,
 )
-from nock.overrides import RoomLifeOverrides, SettingChange, settings_set_in
+from nock.overrides import (
+    DryRunAnswer,
+    RoomLifeOverrides,
+    SettingChange,
+    SettingsAnswer,
+    settings_set_in,
+)
 from nock.protocol import grid_view, parse_client_message
+from nock.recap import PublicRecap, Recap
 from nock.room import RoomKey, RoomState, RoomSummary
 from nock.room import member_id as room_member_id
 from nock.settings import (
@@ -126,6 +140,7 @@ __all__ = [
     "WS_MAX_SIZE_BYTES",
     "RoomRegistry",
     "create_app",
+    "production_app",
     "server_config",
 ]
 
@@ -169,6 +184,12 @@ LINK_LIMIT_WINDOW_SECONDS: float = 3_600.0  # spec 033: the limits count an hour
 DashboardDays = Literal["1", "7", "30"]
 
 _MISSING_BUILD_TEXT = "The web client is not built: run npm --prefix web run build"
+
+
+class LinkRequested(BaseModel):
+    """The answer of POST /api/account/link: 202 and `{}`, with no field."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class CreateRoomRequest(BaseModel):
@@ -1644,18 +1665,14 @@ def create_app(
     @web_app.get("/api/grids")
     def list_grids(
         force: Annotated[str | None, Query(pattern=FORCE_PATTERN)] = None,
-    ) -> list[dict[str, object]]:
+    ) -> list[GridSummary]:
         force_number = int(force) if force is not None else None
-        summaries = grid_catalogue.published_summaries(force_number)
-        bodies: list[dict[str, object]] = []
-        for summary in summaries:
-            bodies.append(summary.model_dump(mode="json"))
-        return bodies
+        return grid_catalogue.published_summaries(force_number)
 
     @web_app.get("/api/grids/{number}")
-    def get_grid(number: str) -> dict[str, object]:
+    def get_grid(number: str) -> GridSummary:
         entry = _published_entry(grid_catalogue, grid_number_regex, number)
-        return summarize(entry).model_dump(mode="json")
+        return summarize(entry)
 
     @web_app.get("/api/rooms", include_in_schema=False)
     def refuse_room_list() -> None:
@@ -1688,7 +1705,7 @@ def create_app(
     # Spec 028. A wrong code counts against the throttle of the room socket, so
     # this route cannot be used to test room codes at full speed.
     @web_app.get("/api/rooms/{code}/recap")
-    def get_room_recap(code: str, request: Request) -> dict[str, object]:
+    def get_room_recap(code: str, request: Request) -> Recap:
         room_registry = holder.get()
         address = _client_address(request)
         now = room_registry.clock()
@@ -1702,36 +1719,32 @@ def create_app(
         recap = room_registry.room_recap(code)
         if recap is None:
             raise _not_found()
-        return recap.model_dump(mode="json")
+        return recap
 
     @web_app.get("/api/recaps/{token}")
-    def get_shared_recap(token: str) -> dict[str, object]:
+    def get_shared_recap(token: str) -> PublicRecap:
         shared = holder.get().shared_recap(token)
         if shared is None:
             raise _not_found()
-        return shared.model_dump(mode="json")
+        return shared
 
     # Spec 032: the rooms a device keeps a member's token of. A room left out is
     # never said why, so this route tests no room code and is not throttled.
     @web_app.post("/api/rooms/summaries")
-    def list_room_summaries(body: RoomSummariesRequest) -> list[dict[str, object]]:
-        summaries: list[RoomSummary] = holder.get().room_summaries(body.rooms)
-        bodies: list[dict[str, object]] = []
-        for summary in summaries:
-            bodies.append(summary.model_dump(mode="json"))
-        return bodies
+    def list_room_summaries(body: RoomSummariesRequest) -> list[RoomSummary]:
+        return holder.get().room_summaries(body.rooms)
 
     # Spec 034: what changed in a room while a member's page was away. A 404
     # never says why, so this route is no oracle for room codes and is not
     # throttled.
     @web_app.post("/api/rooms/{code}/catch-up")
-    def get_catch_up(code: str, body: CatchUpRequest) -> dict[str, object]:
+    def get_catch_up(code: str, body: CatchUpRequest) -> CatchUp:
         if room_code_regex.fullmatch(code) is None:
             raise _not_found()
         catch_up = holder.get().catch_up(code, body)
         if catch_up is None:
             raise _not_found()
-        return catch_up.model_dump(mode="json")
+        return catch_up
 
     # Spec 038: the figures of the rooms created in the last `days` days, read
     # from the store without making any room live.
@@ -1739,7 +1752,7 @@ def create_app(
     @web_app.get("/api/ops/dashboard", dependencies=[Depends(check_operator)])
     def get_dashboard(
         days: Annotated[DashboardDays | None, Query()] = None,
-    ) -> dict[str, object]:
+    ) -> DashboardAnswer:
         room_registry = holder.get()
         now = room_registry.clock()
         offered_days = offered_periods(room_registry.config)
@@ -1752,14 +1765,14 @@ def create_app(
         since = now - period_days * DAY_SECONDS
         room_logs = _room_logs_since(room_registry.store, since)
         figures = dashboard_figures(room_logs, period_days, now)
-        answer = figures.model_dump(mode="json")
-        answer["offered_days"] = offered_days
-        return answer
+        return DashboardAnswer.model_validate(
+            {**figures.model_dump(), "offered_days": offered_days}
+        )
 
     # Spec 038: the empty grid and the ordered edits of one room, from its log.
     # A 404 here is no refusal: only wrong tokens count against the address.
     @web_app.get("/api/ops/rooms/{code}/edits", dependencies=[Depends(check_operator)])
-    def get_room_edits(code: str) -> dict[str, object]:
+    def get_room_edits(code: str) -> RoomReplay:
         if room_code_regex.fullmatch(code) is None:
             raise _not_found()
         room_registry = holder.get()
@@ -1770,16 +1783,16 @@ def create_app(
         replay = RoomReplay(
             code=code, grid=grid_view(state.grid), edits=room_edits(entries)
         )
-        return replay.model_dump(mode="json")
+        return replay
 
     # `admin/overrides.md` rule 3: the five settings with their sources.
     @web_app.get("/api/ops/settings", dependencies=[Depends(check_operator)])
-    def get_settings() -> dict[str, object]:
+    def get_settings() -> SettingsAnswer:
         return running_overrides.get().answer()
 
     # Rule 4: save an override of one setting, or remove it with a null value.
     @web_app.put("/api/ops/settings", dependencies=[Depends(check_operator)])
-    def save_setting(change: SettingChange) -> dict[str, object]:
+    def save_setting(change: SettingChange) -> SettingsAnswer:
         overrides = running_overrides.get()
         overrides.save(change.name, change.value)
         return overrides.answer()
@@ -1787,30 +1800,28 @@ def create_app(
     # Rule 5: how many rooms a proposed room life would delete now. Nothing is
     # saved or deleted.
     @web_app.post("/api/ops/settings/dry-run", dependencies=[Depends(check_operator)])
-    def dry_run_setting(change: SettingChange) -> dict[str, object]:
+    def dry_run_setting(change: SettingChange) -> DryRunAnswer:
         if not change.is_room_life():
             raise HTTPException(
                 status_code=422, detail="The dry run is for a room life only"
             )
         rooms = running_overrides.get().dry_run(change.name, change.value)
-        return {"rooms": rooms}
+        return DryRunAnswer(rooms=rooms)
 
     @web_app.get(ACCOUNT_API_ROOT)
-    def get_account_status(request: Request) -> dict[str, object]:
+    def get_account_status(request: Request) -> AccountStatus:
         account = signed_in_account(request)
         if account is None:
             status = AccountStatus(signed_in=False, email=None)
         else:
             status = AccountStatus(signed_in=True, email=account.email)
-        return status.model_dump(mode="json")
+        return status
 
     # Spec 033: checked in this order: the body, the address, the room, the
     # limits; then the mail is sent. Only a request that reaches the mailer
     # counts toward the limits.
     @web_app.post(f"{ACCOUNT_API_ROOT}/link", status_code=202)
-    def ask_sign_in_link(
-        body: SignInLinkRequest, request: Request
-    ) -> dict[str, object]:
+    def ask_sign_in_link(body: SignInLinkRequest, request: Request) -> LinkRequested:
         store = account_store_in_use()
         settings = account_service.settings
         sender = account_service.mailer
@@ -1840,10 +1851,10 @@ def create_app(
             # A MailError names the kind of failure only: no address, no secret.
             logger.warning("A sign-in link was not sent: %s", error)
             raise HTTPException(status_code=503, detail="Mail not sent") from None
-        return {}
+        return LinkRequested()
 
     @web_app.post(f"{ACCOUNT_API_ROOT}/sign-in")
-    def sign_in_with_link(body: SignInRequest, response: Response) -> dict[str, object]:
+    def sign_in_with_link(body: SignInRequest, response: Response) -> SignInResult:
         store = account_store_in_use()
         settings = account_service.settings
         if settings is None:
@@ -1870,8 +1881,7 @@ def create_app(
             httponly=True,
             samesite="lax",
         )
-        result = SignInResult(email=link.email, room_code=room_code, rooms=tuple(rooms))
-        return result.model_dump(mode="json")
+        return SignInResult(email=link.email, room_code=room_code, rooms=tuple(rooms))
 
     @web_app.post(f"{ACCOUNT_API_ROOT}/sign-out", status_code=204)
     def sign_out(request: Request) -> Response:
@@ -1884,30 +1894,23 @@ def create_app(
         return response
 
     @web_app.get(f"{ACCOUNT_API_ROOT}/rooms")
-    def list_account_rooms(request: Request) -> list[dict[str, object]]:
+    def list_account_rooms(request: Request) -> list[RoomIdentity]:
         account = require_account(request)
         store = account_store_in_use()
-        identities = _served_identities(holder.get(), store, account.account_id)
-        bodies: list[dict[str, object]] = []
-        for identity in identities:
-            bodies.append(identity.model_dump(mode="json"))
-        return bodies
+        return _served_identities(holder.get(), store, account.account_id)
 
     # Spec 029: the account's finished grids, after saving the missing records.
     @web_app.get(f"{ACCOUNT_API_ROOT}/history")
-    def list_account_history(request: Request) -> list[dict[str, object]]:
+    def list_account_history(request: Request) -> list[HistoryRecord]:
         account = require_account(request)
         store = account_store_in_use()
         _save_missing_history(holder.get(), store, account.account_id)
-        bodies: list[dict[str, object]] = []
-        for record in store.history(account.account_id):
-            bodies.append(record.model_dump(mode="json"))
-        return bodies
+        return store.history(account.account_id)
 
     # Rule 24: derived at each request from the history, the rooms and the
     # creator rooms; nothing is saved.
     @web_app.get(f"{ACCOUNT_API_ROOT}/progress")
-    def get_account_progress(request: Request) -> dict[str, str]:
+    def get_account_progress(request: Request) -> dict[str, GridProgress]:
         account = require_account(request)
         store = account_store_in_use()
         room_registry = holder.get()
@@ -2015,6 +2018,21 @@ def create_app(
     return web_app
 
 
+def production_app() -> FastAPI:
+    """Build the app that `python -m nock` runs (`platform/server.md` rule 23).
+
+    It is `create_app` with the catalogue read from `grids/` of the repository
+    and every other argument left to its default.
+
+    Returns:
+        The app, with the grids of `grids/` published.
+
+    Raises:
+        OSError: A file under `grids/` cannot be read.
+    """
+    return create_app(catalogue=load_catalogue(GRIDS_DIR))
+
+
 def server_config(
     app: FastAPI, host: str = "127.0.0.1", port: int = 8000, log_level: str = "warning"
 ) -> uvicorn.Config:
@@ -2043,6 +2061,3 @@ def server_config(
         access_log=False,
         ws_max_size=WS_MAX_SIZE_BYTES,
     )
-
-
-app: FastAPI = create_app(catalogue=load_catalogue(GRIDS_DIR))
