@@ -4,6 +4,7 @@ title: The fonts' preload through a ?url import
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T22:21:00Z'
 labels:
   - tooling
 milestone: m-10
@@ -32,3 +33,9 @@ From DRAFT-050 (B-050, #95). The fonts' preload names a node_modules path; a Vit
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), item F: on a phone, the account sheet's first error line jumps from two lines to one, because Source Sans 3 weight 500 loads only when that line appears. Preloading weight 500 with the other faces removes the jump, with no change of look.
+<!-- SECTION:NOTES:END -->
