@@ -1,7 +1,7 @@
 ---
 area: account
 file: erasure
-status: done
+status: approved
 ---
 
 # account/erasure - Erasure, what is kept, history records, grid progress
@@ -107,8 +107,8 @@ erasure must never undo.
    an erasure (rule 5) deletes it; a failing hook is logged and the deletion
    goes on. Only identities whose token is a member's of that room count, so a
    room that drew an old code saves nothing. A record: `code`, `grid_number`,
-   `width`, `height`, `finished_at`, `elapsed_ms` (`gameplay/results.md` rule
-   14) and `teammates`, the other members in `team_nicknames` order, each
+   `width`, `height`, `finished_at`, `elapsed_ms` (`gameplay/history.md` rule
+   1) and `teammates`, the other members in `team_nicknames` order, each
    once. In the save's transaction, a team-mate whose code and player id a
    pending erasure holds, marked erased or not (rule 5), is written `--`.
 9. `GET /api/account/history` lists the records, newest `finished_at` first,
@@ -260,7 +260,7 @@ erasure must never undo.
   deleting, keeping creator rooms alive; erasing chat lines or backups.
 - Pushing a device's progress up to the account; a guest's progress across
   devices. How the pages merge the account's progress with the device's:
-  `content/library.md`. The history on screen: `gameplay/results.md`.
+  `content/library.md`. The history on screen: `gameplay/history.md`.
 - Logs and retention: `admin/operations.md`.
 
 ## Code

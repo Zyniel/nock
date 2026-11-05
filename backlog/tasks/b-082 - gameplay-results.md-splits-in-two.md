@@ -4,7 +4,7 @@ title: gameplay/results.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T16:21:00Z'
+updated_date: '2026-11-05T16:27:00Z'
 labels:
   - domain:results
 milestone: m-7
@@ -24,6 +24,7 @@ From DRAFT-058. results is 19.4 KB with 23 criteria. Out of scope: any behaviour
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 results.md is under about 15 KB and 20 criteria, the part moved with its criteria and pointers, _map.md updated, the gate's traceability green
+- [ ] #2 results AC-17 to AC-20 move to gameplay/history.md as history AC-1 to AC-4
 <!-- AC:END -->
 
 ## Definition of Done
