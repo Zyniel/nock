@@ -83,7 +83,7 @@ out; the room goes with the creator's account.
    typed or chosen. The switch sends the opposite of the room's lock and shows
    the room's, not the click's. A `host_changed` gives or takes
    these controls at once; taking them closes an open host sheet
-   (`client/hud.md` rule 13).
+   (`client/menus.md` rule 6).
 9. `removed` or `room_locked`, on a join, during the game or a reconnection, ends
    the page on `removed` or `locked` with `room.status.removed` or
    `room.status.locked`, with no form, no reconnection band and no reconnection;
@@ -288,8 +288,9 @@ not-found pages ».
 - Codes, creation, the throttle and the engine: `lobby/rooms.md`. The join's
   steps, members and takeover: `lobby/joining.md`. Accounts and the session:
   `account/account.md`; the erasure: `account/erasure.md`. Feed lines of host, lock and settings changes,
-  « Couper » and muting's effect: `social/chat.md`. The Menu, sheets and top
-  bar: `client/hud.md`; the Joueurs tab: `client/room.md`.
+  « Couper » and muting's effect: `social/chat.md`. The Menu and sheets:
+  `client/menus.md`; the top bar: `client/hud.md`; the Joueurs tab:
+  `client/room.md`.
 
 ## Code
 

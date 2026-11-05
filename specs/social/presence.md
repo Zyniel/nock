@@ -103,7 +103,7 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 ### Auteurs mode
 
 14. « Auteurs » (`authors.switch`) is the first item of the Menu
-    (`client/hud.md`), with the detail `authors.on` (« activé ») or
+    (`client/menus.md`), with the detail `authors.on` (« activé ») or
     `authors.off` (« désactivé »). It is a toggle, never disabled, a solved
     grid included; activating it sends nothing and leaves the Menu open. It
     starts on only when `localStorage["nock.authors"]` is `"true"`; each
@@ -276,7 +276,7 @@ player works on the grid, and, when they ask for it, who wrote each letter.
 - The stream's order, caps and scroll, and its host, lock and settings
   lines: `social/chat.md`. Its lines of checks and reveals:
   `gameplay/hints.md`; of votes: `gameplay/votes.md`. The Joueurs tab's layout: `client/room.md`; the Menu:
-  `client/hud.md`. Changes while away: `social/catch-up.md`. The recap's
+  `client/menus.md`. Changes while away: `social/catch-up.md`. The recap's
   player marks: `gameplay/results.md`.
 - Cursor trails, typing indicators, avatars; a disconnected player's
   selection; a letter's author in words or for a screen reader; a filter on

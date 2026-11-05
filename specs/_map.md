@@ -55,12 +55,13 @@ table, the naming rules and the glossary follow in the same change.
 | platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching, the answers' types), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, entry and not-found pages, the opening, the brand | pages, foundation | 040 AC-14 to AC-25; 046 AC-1, AC-18 to AC-23; 048 AC-14 |
 | client | `client/foundation.md` | state lines, motion, colour tokens, fonts, icons, shared components, the focus ring, what a frame redraws | foundation, cells | 041; 040 AC-26; 048 AC-13 |
-| client | `client/hud.md` | the room's layouts, top bar, menus, popover rules, sheets, the status region, clue bar, play area, the room-gone dialog | room, overlays | 043 AC-1 to AC-12, AC-21 to AC-25, AC-27 to AC-29, AC-31 |
+| client | `client/hud.md` | the room's layouts, top bar, the status region, clue bar, play area, the room-gone dialog, the other final states | room, overlays | 043 AC-1 to AC-4, AC-7, AC-23 to AC-25, AC-27 to AC-29, AC-31 |
+| client | `client/menus.md` | the Aide menu and the Menu, their items, the popover rules (scrim, Tab out), the room sheets | room | 043 AC-5, AC-6, AC-8 to AC-12, AC-21, AC-22 |
 | client | `client/room.md` | the room panel « Salon » (progress, chat and players tabs), what « Salon » carries while closed, the 3-second notes | room | 043 AC-5, AC-13 to AC-20, AC-26, AC-30 |
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
 criteria goes whole to its row; a criterion may be cited by more than one domain
-(043 AC-5 is cited by `hud` and `room`, 047 AC-13 by `votes` and `results`,
+(043 AC-5 is cited by `menus` and `room`, 047 AC-13 by `votes` and `results`,
 047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 and 033 AC-5 by
 `account` and `erasure`, 004 AC-7 by `ipuz` and `library`), and each of them
 states the part its own screens hold.
@@ -194,6 +195,7 @@ writes it); nothing of race or teams is built.
 | effective value | the value each row of « Durées de vie des salons » shows (the override, else the environment value, else the default; every rule reads it) | `RoomRegistry.config` |
 | dry run | « Cela effacera N salons maintenant. » (how many rooms a proposed value would delete now; nothing saved) | `POST /api/ops/settings/dry-run` |
 | hud | the top bar: « Aide », « Salon », « Menu » | `RoomTopBar.svelte` |
+| menus, room sheets | « Aide », « Menu » (the two menus the top bar opens); « Réglages de l'hôte », « Compte » (the modal dialogs the Menu opens) | `AideMenu.svelte`, `RoomMenu.svelte`, `RoomSheet.svelte` |
 | status region | (not shown: the visually hidden `role="status"` region of the room page and of each open sheet, where announced messages are written; `client/hud.md` rules 17 and 18) | `StatusRegion.svelte` |
 | room panel, notes | « Salon » (the panel beside or over the grid), the 3-second notes | `Salon.svelte`, `RoomNote.svelte` |
 | viewport | « Grille » (the grid's scroll area: the part of the grid the page shows at its zoom and scroll) | `GridViewport.svelte`, `gridLayout.ts` |

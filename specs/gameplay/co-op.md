@@ -255,8 +255,8 @@ keyboard ».
 - Several candidates in a cell, confirming a word or every pencil letter,
   shortcuts for pencil mode or confirming, remembering pencil mode across
   reloads.
-- Typing, selection and the in-app keyboard: `gameplay/board.md`. The top bar and
-  the Aide menu: `client/hud.md`. Messages and the edit rate:
+- Typing, selection and the in-app keyboard: `gameplay/board.md`. The top bar:
+  `client/hud.md`; the Aide menu: `client/menus.md`. Messages and the edit rate:
   `platform/realtime.md`; the stale rule, reconnection: `platform/reconnection.md`. Undo, the log and the store:
   `platform/server.md`. Locks by checks and reveals: `gameplay/hints.md`.
   Completion: `gameplay/rules.md`. Authors and their colours:
