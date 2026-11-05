@@ -34,7 +34,7 @@ From DRAFT-058. chat is 21.5 KB with 23 criteria; the spec-writer proposed socia
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -56,6 +56,8 @@ Spec-checker: CHANGES REQUESTED in round 1 (escapes of chat AC-9 turned into rea
 Review round 1: APPROVE. Taken: the helpers both test files share move to spec022_harness.py (no test imports a test module). Not taken: re-wrapping a few lines after the inserted links (cosmetic).
 
 Full gate here: Chromium static checks and 8,774 parallel tests green. The same two timing tests failed as on B-080 (foundation remote pace AC-13, spec 036 AC-1): this container is too slow for them, and B-080's CI passed them. The moved tests pass in Firefox and WebKit (8 passed). After main took B-080, the merge conflicted only in hud.md's Related list: the resolution keeps both the reactions pointer and the menus line. The traceability gate and the moved tests passed again after the merge.
+
+Pull request #142, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
