@@ -1,4 +1,4 @@
-"""Tests of `client/hud.md` AC-28 and AC-29: a final status after the room showed
+"""Tests of `client/hud.md` AC-28 to AC-31: a final status after the room showed
 makes the grid read-only (rule 19).
 
 Ana's page at 1280 by 720 on spec 043's mocked room (`hud_harness.open_fx01_room`,
@@ -20,6 +20,18 @@ and « Révéler » are disabled with the disabled look (their label in
 sends nothing and leaves the Aide menu open (rule 9); with (1, 0) selected, the
 confirm item is disabled alike.
 
+AC-30: Ana's page on AC-29's snapshot with MIME selected on Bob's `I` at (2, 2),
+after a close 4001. Backspace leaves `I` and the selection on (2, 2); ArrowDown
+selects the empty (3, 2), where `t` then Backspace leave it empty and selected; a
+press on (1, 0) selects it. At 360 by 740 on a touch screen, a tap on the in-app
+keyboard's `T` and on ⌫ leaves `I` and the selection on (2, 2) alike.
+
+AC-31: reconnecting (the socket lost, the band showing), « Annuler » pressed and
+« Vérifier » « La lettre » and « Révéler » « La lettre » chosen on MIME, a rejoin
+answered by `room_locked` and a close 1000 never sends the undo, the check or the
+reveal: the frames the mock got since the loss are the join only (no undo, no check,
+no reveal).
+
 "A typed letter changes nothing" is read 300 ms after the key (`QUIET_MS`).
 """
 
@@ -30,15 +42,21 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
-from hud_harness import open_fx01_room, reconnect_with_t_pending
+from hud_harness import (
+    CONNECTION_LOSS_MS,
+    LOST_CLOSE_CODE,
+    open_fx01_room,
+    reconnect_with_t_pending,
+)
 from nock.grid import Grid
-from nock.protocol import ErrorCode
+from nock.protocol import Check, ErrorCode, Join, Reveal, Undo
 from room_panels import open_aide
 from spec019_harness import OpenWindow, window_opener
-from spec042_harness import box_of
+from spec042_harness import box_of, wait_until
 from spec043_harness import (
     COMPUTER,
     MUTED,
+    PHONE,
     QUIET_MS,
     RoomMock,
     cell_at,
@@ -221,3 +239,91 @@ def test_ac29_after_a_close_4001_the_pencil_confirm_item_is_disabled(
     confirm = page.get_by_test_id("confirm-pencil")
     expect_disabled_look(confirm)
     expect_press_sends_nothing(page, mock, confirm)
+
+
+# ---- AC-30: the selection still moves, no key changes a cell -------------------------
+
+
+def expect_cell_keeps(page: Page, row: int, column: int, letter: str) -> None:
+    """Wait QUIET_MS, then expect the cell to hold `letter` and to be selected."""
+    page.wait_for_timeout(QUIET_MS)
+    expect(cell_at(page, row, column)).to_have_attribute("data-letter", letter)
+    expect_selected(page, row, column)
+
+
+def test_ac30_after_a_close_4001_the_keys_change_no_cell_and_the_selection_moves(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = computer_page(window)
+    mock = open_ac29(page, live_server, fx01_grid)
+    select_mime(page)
+    close_with_4001(page, mock)
+    expect(page.get_by_test_id("grid")).to_be_focused()
+
+    page.keyboard.press("Backspace")
+
+    expect_cell_keeps(page, 2, 2, "I")
+    page.keyboard.press("ArrowDown")
+    expect_selected(page, 3, 2)
+    page.keyboard.press("t")
+    expect_cell_keeps(page, 3, 2, "")
+    page.keyboard.press("Backspace")
+    expect_cell_keeps(page, 3, 2, "")
+    press_cell(page, 1, 0)
+
+
+def test_ac30_after_a_close_4001_the_in_app_keyboard_changes_no_cell(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = window(PHONE[0], PHONE[1], True)
+    mock = open_ac29(page, live_server, fx01_grid)
+    select_mime(page, touch=True)
+    close_with_4001(page, mock)
+    keyboard = page.get_by_test_id("keyboard")
+    expect(keyboard).to_be_visible()
+
+    keyboard.locator('[data-testid="key"][data-key="T"]').tap()
+
+    expect_cell_keeps(page, 2, 2, "I")
+    keyboard.get_by_test_id("key-delete").tap()
+    expect_cell_keeps(page, 2, 2, "I")
+
+
+# ---- AC-31: kept requests are never sent ---------------------------------------------
+
+
+def pick_aide_item(page: Page, test_id: str) -> None:
+    """Open the Aide menu and choose one item, which closes the menu."""
+    open_aide(page)
+    page.get_by_test_id(test_id).click()
+    expect(page.get_by_test_id("aide-menu")).to_be_hidden()
+
+
+def test_ac31_a_rejoin_refused_with_room_locked_never_sends_the_kept_requests(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    page = computer_page(window)
+    mock = open_ac29(page, live_server, fx01_grid)
+    select_mime(page)
+    sent_before = len(mock.frames_without_pings())
+    received_before = len(mock.received)
+    mock.close(LOST_CLOSE_CODE)
+    expect(page.get_by_test_id("connection-banner")).to_be_visible(
+        timeout=CONNECTION_LOSS_MS
+    )
+    page.get_by_test_id("undo-button").click()
+    pick_aide_item(page, "check-letter")
+    pick_aide_item(page, "reveal-letter")
+    wait_until(page, lambda: mock.has_join_after(received_before), "the new join")
+
+    mock.send(error_frame(ErrorCode.ROOM_LOCKED))
+    mock.close(SERVER_CLOSE)
+
+    expect_room_status(page, "locked")
+    page.wait_for_timeout(QUIET_MS)
+    sent = mock.parsed_frames_after(sent_before)
+    kept_kinds = (Undo, Check, Reveal)
+    kept_sent = [frame for frame in sent if isinstance(frame, kept_kinds)]
+    joins = [frame for frame in sent if isinstance(frame, Join)]
+    assert kept_sent == []
+    assert len(joins) == 1, sent
