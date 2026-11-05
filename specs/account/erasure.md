@@ -203,6 +203,26 @@ erasure must never undo.
 - **AC-13** A done erasure of time 0 is deleted by the purge at 157,680,001 s
   and kept at 157,679,999 s, no other row touched. A purge at 157,680,001 s
   that raises is logged, and the next sweep's purge deletes that erasure.
+- **AC-15** A sign-in link used again, or 1,801 s after it was asked, gets
+  404; used at 1,799 s, 200. A session signs in a second short of 90 days,
+  not a second past. A second sign-in leaves the first working; behind
+  `https://` the cookie has `Secure`. Two spellings of an address are one
+  account; a player removed before the link is used gets `room_code` null.
+  Purges at 1,801 s and 7,776,001 s delete a link and a session of time 0, no
+  byte of the link's address left; at 1,799 s and 7,775,999 s they stay.
+  (← 033 AC-1)
+- **AC-16** Across a link, a sign-in, a status, a `PUT`, a sign-out, a failed
+  mail and a deletion, no log holds the link token, the session, a resume
+  token, the address or the SMTP password; the files hold the address, and
+  the link and session only as SHA-256 hex. A sign-out answers 204 and ends
+  the session, also when there is none. (← 033 AC-10)
+- **AC-17** With accounts on, a browser with no cookie or storage solves
+  FX-01 with a word check: no 401 or 403, no cookie, the account sheet never
+  opens, every frame parses as a client message; solving from the catalogue,
+  nothing sets a cookie and every request stays on the origin. An anonymous
+  player who plays leaves only `ANA` and her id in the files, nothing of her
+  browser's agent, headers, language or address. (← 033 AC-3, 038 AC-1,
+  038 AC-2)
 - **AC-14** Zoé, in live room R and creator of U, deletes her account while
   R's engine is held for 1 s, and a sweep starts during the route's attempt:
   once both are over, R's player is `--`, U is gone, her address received
@@ -233,6 +253,8 @@ erasure must never undo.
 
 - Sign-in, the session, the account's rooms, the sheet and the page, including
   « Supprimer mon compte » and what the device forgets on a 204:
+  `account/account.md`. AC-15 to AC-17 check part of that behaviour together
+  with rules 3 and 4; the rules of that behaviour stay in
   `account/account.md`.
 - An export of the account, a confirmation link or a grace period before
   deleting, keeping creator rooms alive; erasing chat lines or backups.
