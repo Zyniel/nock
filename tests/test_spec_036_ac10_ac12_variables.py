@@ -51,6 +51,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import nock.server
@@ -471,6 +472,7 @@ def store_paths(monkeypatch: pytest.MonkeyPatch) -> list[str]:
 def test_ac10_main_runs_server_config_of_nock_server_app_on_the_address_given(
     monkeypatch: pytest.MonkeyPatch,
     server_runs: list[uvicorn.Config],
+    production_app_calls: list[FastAPI],
     nock_host: str | None,
     nock_port: str | None,
     expected_address: tuple[str, int],
@@ -481,8 +483,9 @@ def test_ac10_main_runs_server_config_of_nock_server_app_on_the_address_given(
     main()
 
     assert len(server_runs) == 1, "main() must run exactly one server"
+    assert len(production_app_calls) == 1, "main() must call production_app() once"
     config = server_runs[0]
-    assert config.app is nock.server.app
+    assert config.app is production_app_calls[0]
     assert config.ws_max_size == MAX_WS_FRAME_BYTES
     assert (config.host, config.port) == expected_address
 
@@ -533,7 +536,9 @@ def test_ac10_a_port_with_leading_zeros_or_at_the_bounds_is_accepted(
 
 
 def test_ac10_a_port_of_5000_zeros_then_8000_is_8000_beyond_the_int_digit_limit(
-    monkeypatch: pytest.MonkeyPatch, server_runs: list[uvicorn.Config]
+    monkeypatch: pytest.MonkeyPatch,
+    server_runs: list[uvicorn.Config],
+    production_app_calls: list[FastAPI],
 ) -> None:
     set_variables(monkeypatch, host=None, port=ZEROS_THEN_8000, database=None)
     main = entry_point()
@@ -541,8 +546,9 @@ def test_ac10_a_port_of_5000_zeros_then_8000_is_8000_beyond_the_int_digit_limit(
     main()
 
     assert len(server_runs) == 1, "main() must run exactly one server"
+    assert len(production_app_calls) == 1, "main() must call production_app() once"
     config = server_runs[0]
-    assert config.app is nock.server.app
+    assert config.app is production_app_calls[0]
     assert config.ws_max_size == MAX_WS_FRAME_BYTES
     assert (config.host, config.port) == (DEFAULT_HOST, DEFAULT_PORT)
 
@@ -611,6 +617,7 @@ def test_ac10_importing_nock_main_runs_no_server(
 def test_ac11_an_invalid_value_stops_main_before_any_server_runs(
     monkeypatch: pytest.MonkeyPatch,
     server_runs: list[uvicorn.Config],
+    production_app_calls: list[FastAPI],
     variable: str,
     value: str,
 ) -> None:
@@ -620,6 +627,7 @@ def test_ac11_an_invalid_value_stops_main_before_any_server_runs(
     refusal_message(main)
 
     assert server_runs == []
+    assert production_app_calls == [], "a refused variable builds no app"
 
 
 @pytest.mark.usefixtures("server_runs")

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import uvicorn
+from fastapi import FastAPI
 from playwright.sync_api import Page, expect
 
 from fonts_ready import wait_for_fonts
@@ -46,6 +47,27 @@ def no_operator_token(monkeypatch: pytest.MonkeyPatch) -> None:
     startup and every `main()`. A test that needs the variable sets it itself.
     """
     monkeypatch.delenv(OPERATOR_TOKEN_VARIABLE, raising=False)
+
+
+@pytest.fixture
+def production_app_calls(monkeypatch: pytest.MonkeyPatch) -> list[FastAPI]:
+    """Record the app of each `nock.server.production_app()` call.
+
+    The real function still runs. Returns the list the apps are appended to, in
+    the order of the calls (`platform/serving.md` rule 6).
+    """
+    import nock.server
+
+    real_production_app = nock.server.production_app
+    built_apps: list[FastAPI] = []
+
+    def recording_production_app() -> FastAPI:
+        built_app = real_production_app()
+        built_apps.append(built_app)
+        return built_app
+
+    monkeypatch.setattr(nock.server, "production_app", recording_production_app)
+    return built_apps
 
 
 class FakeClock:

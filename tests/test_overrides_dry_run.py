@@ -93,6 +93,7 @@ def test_ac6_the_dry_run_counts_the_rooms_the_proposed_life_would_delete(
 
     assert response.status_code == 200, response.text
     assert response.json() == {"rooms": rooms}
+    assert response.content == f'{{"rooms":{rooms}}}'.encode("ascii")
 
 
 def test_ac6_a_dry_run_saves_nothing_deletes_nothing_and_closes_nothing(

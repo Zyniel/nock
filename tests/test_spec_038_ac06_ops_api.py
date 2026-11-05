@@ -27,10 +27,12 @@ the one it needs (see `spec038_harness`).
 
 from __future__ import annotations
 
+import re
 import secrets
 import threading
 import time
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -80,6 +82,14 @@ METHOD_NOT_ALLOWED = {"detail": "Method Not Allowed"}  # FastAPI's 405
 OLD_CODE = "OLD8DY"
 EDGE_CODE = "EDGE7D"
 NEW_CODE = "NEW1DY"
+
+# AC-4 (operations): the body on an empty store, with the start of the period free.
+EMPTY_DASHBOARD_BODY = re.compile(
+    rb'\{"days":7,"since":"(?P<since>[^"]*)","rooms_created":0,'
+    rb'"players_per_room":null,"completion_rate":null,"median_solving_ms":null,'
+    rb'"latency_median_ms":null,"latency_p95_ms":null,"disconnection_rate":null,'
+    rb'"offered_days":\[1,7,30\]\}'
+)
 
 # ---- Values of the test harness ------------------------------------------------------
 
@@ -266,6 +276,19 @@ def test_ac6_the_dashboard_with_the_token_answers_200_with_the_7_day_figures(
     result = figures_of(response)
     assert result.days == 7
     assert result == figures_from_the_store(seeded, 7)
+
+
+def test_ac6_on_an_empty_store_the_body_is_exactly_the_bytes_of_the_spec(
+    registry: RoomRegistry, ops_client: TestClient
+) -> None:
+    response = ops_client.get(DASHBOARD_PATH, headers=bearer(OPS_TOKEN))
+
+    assert response.status_code == 200, response.text
+    # S, the period's start, is a JSON string; the rest is fixed byte for byte.
+    matched = EMPTY_DASHBOARD_BODY.fullmatch(response.content)
+    assert matched is not None, response.content
+    since = datetime.fromisoformat(matched.group("since").decode("ascii"))
+    assert since == datetime.fromtimestamp(registry.clock() - 7 * DAY, tz=UTC)
 
 
 def test_ac6_the_7_day_figures_hold_the_rooms_of_7_days_and_1_day_ago(
