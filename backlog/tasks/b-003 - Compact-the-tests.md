@@ -4,7 +4,7 @@ title: Compact the tests
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:43:00Z'
-updated_date: '2026-11-05T11:46:00Z'
+updated_date: '2026-11-05T12:44:00Z'
 labels: []
 milestone: m-2
 dependencies: []
@@ -56,4 +56,6 @@ ordinal: 13000
 Released by the human in chat, 2026-11-05 (« /milestone m-2 »: run Upkeep). The lead cuts it to fit one task: the most copied helpers (dist_dir, catalogue and the like) move into shared fixtures, and near-copies become parametrised tests where a file holds them; every criterion keeps its test names and checks, none weaker. What is left goes back to a draft.
 
 Test-writer: 381 files, +212 -3381; dist_dir in conftest.py (3 spec 040 copies kept, they write assets); catalogue built from CATALOGUE_KIND by tests/catalogue_builders.py (5 spec 011 and 018 copies kept, they build their own entries); fx01_grid also shared. Collected ids identical (8,936). Lead decision: no parametrisation, since every near-copy is a test_acN_ function and the criterion keeps every test name; 27 groups of near-copies stay as they are.
+
+Review round 1: CHANGES REQUESTED (19 harness docstrings named the removed copies; spec 038 docstrings). Fixed; the lead also named fx01_grid and CATALOGUE_KIND in .claude/agents/test-writer.md (a tooling coherence fix). Not taken: failing on a misspelled CATALOGUE_KIND name (its tests fail on the missing grids anyway). Review round 2: APPROVE. The full gate waits for B-080 and B-081 to merge, since they move test files this task edits.
 <!-- SECTION:NOTES:END -->
