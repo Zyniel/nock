@@ -4,7 +4,7 @@ title: gameplay/results.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T16:27:00Z'
+updated_date: '2026-11-05T16:30:00Z'
 labels:
   - domain:results
 milestone: m-7
@@ -47,4 +47,6 @@ The new gameplay/history.md (domain history) takes « Finished grids »: results
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead decision: Cut 1 (history) over Cut 2 (recap). It splits by topic, not by layer, matches the glossary's terms results and history, moves no test and changes no code. results ends near 14.6 KB with 19 criteria, at the line: the next results criterion should come from elsewhere. B-091 and B-095 now concern history as well as results.
+
+Reviewer round 1: APPROVE. Taken: specs back to done. Not taken here: B-091 and B-095 gaining domain:history and specs/gameplay/history.md, which goes on a board branch since those are other tasks. Not taken: adding rules.md, account.md and rooms.md to history's Depends on, because the template's limit is three files and they are cited inline, as they were in results.
 <!-- SECTION:NOTES:END -->
