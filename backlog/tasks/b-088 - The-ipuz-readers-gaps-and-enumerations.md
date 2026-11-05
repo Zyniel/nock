@@ -4,7 +4,7 @@ title: The ipuz reader's gaps and enumerations
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T22:47:00Z'
+updated_date: '2026-11-05T22:50:00Z'
 labels:
   - domain:ipuz
 milestone: m-8
@@ -51,4 +51,6 @@ Lead decisions on the spec-writer's choices:
 - ipuz.md is 14.4 KB with 18 criteria.
 
 Spec-checker APPROVED in round 2. Round 1 asked for namespaced keys and 'one' byte order mark to be written in the text, the solution row to point to grids.md rule 4, and two lines to be reflowed. For the implementer: confirm that grids/*.ipuz still load under the duplicate-key check.
+
+Tests: 20 fail for the missing feature, 154 pass. Lead decision: read_ipuz takes text, so a byte order mark reaches it as U+FEFF at the start; no bytes input.
 <!-- SECTION:NOTES:END -->
