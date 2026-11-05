@@ -2,9 +2,10 @@
 id: B-088
 title: The ipuz reader's gaps and enumerations
 status: In Progress
-assignee: []
+assignee:
+  - '@zyniel'
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T22:50:00Z'
+updated_date: '2026-11-05T23:44:00Z'
 labels:
   - domain:ipuz
 milestone: m-8
@@ -53,4 +54,6 @@ Lead decisions on the spec-writer's choices:
 Spec-checker APPROVED in round 2. Round 1 asked for namespaced keys and 'one' byte order mark to be written in the text, the solution row to point to grids.md rule 4, and two lines to be reflowed. For the implementer: confirm that grids/*.ipuz still load under the duplicate-key check.
 
 Tests: 20 fail for the missing feature, 154 pass. Lead decision: read_ipuz takes text, so a byte order mark reaches it as U+FEFF at the start; no bytes input.
+
+Reviewer round 2: CHANGES REQUESTED. Five of six round-1 findings are fixed. Left open: test_ac4_a_dashed_value_that_is_not_made_of_t_r_b_l_is_refused (tests/test_ipuz_structure.py) passes even if the dotted letters are not checked, because each bad case is refused later for another reason; the reviewer proved it with a mutation. Its fix is one assertion on the message (re.search for 'T,? R,? B,? L'), checked against the mutation. The code is correct. Escalated: CHANGES REQUESTED after two review rounds (CLAUDE.md). Recommendation: let the test-writer add that assertion, have the reviewer confirm it in a short third round, then close.
 <!-- SECTION:NOTES:END -->
