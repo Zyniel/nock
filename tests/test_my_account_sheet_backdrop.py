@@ -1,7 +1,7 @@
-"""Tests of `account/account.md` AC-34: the account sheet closes on a press and its
-release both on the backdrop (rule 14), in a room and on the catalogue.
+"""Tests of `account/my-account.md` AC-8: the account sheet closes on a press and its
+release both on the backdrop (rule 2), in a room and on the catalogue.
 
-AC-34: in a room at 1280 by 720 and on the catalogue at 360 by 740, with `lea@exa`
+AC-8: in a room at 1280 by 720 and on the catalogue at 360 by 740, with `lea@exa`
 typed in the account sheet, a press in the field released on the backdrop leaves the
 sheet open with `lea@exa` still typed; a press and its release both on the backdrop
 close it.
@@ -14,10 +14,10 @@ Readings where the spec leaves room:
 - A press and release at two places is `mouse.down` at one, `mouse.move`, `mouse.up`
   at the other. The backdrop of the room's sheet (centred) is left of it; the
   catalogue's bottom sheet has the backdrop above it, under the top bar.
-- A press on the backdrop released in the sheet is also tried: rule 14 says a press
+- A press on the backdrop released in the sheet is also tried: rule 2 says a press
   that starts on one and ends on the other closes nothing, the reverse as well.
 - "Closes nothing" is read 300 ms after the release; "close it" focuses « Menu » in
-  the room and « Compte » on the catalogue (rule 14).
+  the room and « Compte » on the catalogue (rule 2).
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ def open_sheet_with_address(
 
 @pytest.mark.parametrize("start", ["field", "backdrop"])
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
-def test_ac34_a_press_and_release_in_two_places_keep_the_sheet_and_the_address(
+def test_ac8_a_press_and_release_in_two_places_keep_the_sheet_and_the_address(
     window: OpenWindow, live_server: str, fx01_grid: Grid, case: SheetCase, start: str
 ) -> None:
     page, dialog = open_sheet_with_address(window, live_server, fx01_grid, case)
@@ -134,7 +134,7 @@ def test_ac34_a_press_and_release_in_two_places_keep_the_sheet_and_the_address(
 
 
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
-def test_ac34_a_press_and_release_both_on_the_backdrop_close_the_sheet(
+def test_ac8_a_press_and_release_both_on_the_backdrop_close_the_sheet(
     window: OpenWindow, live_server: str, fx01_grid: Grid, case: SheetCase
 ) -> None:
     page, dialog = open_sheet_with_address(window, live_server, fx01_grid, case)
