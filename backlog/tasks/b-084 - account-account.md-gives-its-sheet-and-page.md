@@ -35,7 +35,7 @@ From DRAFT-058. account is 18.9 KB with 20 criteria (17.6 KB once B-078 is merge
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -54,6 +54,8 @@ Spec-checker APPROVED in one round. Not taken, all optional: adding room to the 
 Reviewer round 1: APPROVE. Its quick gate passed (account, my-account in Chromium). Not taken, all optional: claude_docs/frontend-review.md is a dated report; the Look column of my-account's _map.md row; window sizes named in AC-2, 4 and 8, copied as they were and recorded for the m-7 close's follow-up drafts.
 
 Full gate here (Chromium): static checks, 8,774 parallel and 162 serial tests, all green. Main then brought B-085, and two files conflicted. In gate.py, RoomMenu.svelte is now authorship, menus, my-account and rules. In _map.md, the shared-criteria list keeps both sides' entries. Traceability, shared components, ruff and black passed again. Firefox and WebKit are left to CI after the merge, since only tests were renamed.
+
+Pull request #150, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
