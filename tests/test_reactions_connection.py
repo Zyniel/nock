@@ -14,7 +14,7 @@ moves to another word.
 from __future__ import annotations
 
 import pytest
-from playwright.sync_api import Locator, Page, expect
+from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from spec017_harness import (
@@ -28,8 +28,8 @@ from spec017_harness import (
     settle,
     snapshot_frame,
 )
+from spec022_harness import flag_button, frames_of_kind, picker, react_button
 from spec043_harness import press_cell, select_mime
-from test_chat_connection import frames_of_kind, picker, react_button
 
 LOST_CLOSE = 1011
 REPLACED_CLOSE = 4001
@@ -39,10 +39,6 @@ STAYS_DISABLED_MS = 1500  # longer than the first retry delay at its highest
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
-
-
-def flag_button(page: Page) -> Locator:
-    return page.get_by_test_id("flag-button")
 
 
 def sent_on_any_socket(room: MockRoom, kind: str) -> int:

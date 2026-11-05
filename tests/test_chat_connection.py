@@ -2,8 +2,8 @@
 page is not joined.
 
 Rule 13. Ana's page on spec 017's mocked room (`joined_room`, FX-01, seq 5,
-1280 by 720). The helpers of the page's buttons are shared with
-`test_reactions_connection.py` (`social/reactions.md` AC-10).
+1280 by 720). The helpers of the page's buttons are in
+`spec022_harness.py`, shared with `test_reactions_connection.py`.
 
 AC-23: the page clock is frozen, so the 12 seconds of the pacing never run out and
 no ping nor silence check runs. Every socket is a controlled stand-in
@@ -18,10 +18,8 @@ showing for the chat.
 
 from __future__ import annotations
 
-import json
-
 import pytest
-from playwright.sync_api import Locator, Page, expect
+from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from reconnection_harness import CONTROL_ALL_SCRIPT, cut_quietly, deliver_close
@@ -39,7 +37,13 @@ from spec017_harness import (
     snapshot_frame,
     wait_until,
 )
-from spec022_harness import REACTION_VALUES, open_panel
+from spec022_harness import (
+    REACTION_VALUES,
+    frames_of_kind,
+    open_panel,
+    picker,
+    react_button,
+)
 from spec043_harness import fr_value, select_mime
 
 FIRST_DELAY_LATEST_MS = 1200
@@ -49,23 +53,6 @@ SENT_BEFORE_THE_CUT = 4
 @pytest.fixture
 def fx01_grid(fx01_text: str) -> Grid:
     return grid_from_text(fx01_text)
-
-
-def react_button(page: Page) -> Locator:
-    return page.get_by_test_id("react-button")
-
-
-def picker(page: Page) -> Locator:
-    return page.get_by_test_id("reaction-picker")
-
-
-def frames_of_kind(connection: MockConnection, kind: str) -> list[str]:
-    """The frames of one `type` the page sent on one socket, in order."""
-    found: list[str] = []
-    for frame in connection.frames:
-        if json.loads(frame)["type"] == kind:
-            found.append(frame)
-    return found
 
 
 def expect_options_enabled(page: Page, enabled: bool) -> None:
