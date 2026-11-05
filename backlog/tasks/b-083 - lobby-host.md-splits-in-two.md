@@ -34,7 +34,7 @@ From DRAFT-058 (and DRAFT-051, folded into it). host is 18.5 KB with 22 criteria
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -53,6 +53,8 @@ Spec-checker APPROVED in one round. When B-082 merges first, the merge from main
 Reviewer round 1: APPROVE. Not taken, all optional and none a regression: moving the glossary's lobby/creator.md mention to the Code column, adding lobby/rooms.md to creator's Depends on (the template's limit is three files, and rooms.md is cited inline), and re-wrapping one line in rooms.md.
 
 Full gate here (Chromium): static checks, 8,774 parallel and 162 serial tests, all green. Main then brought in B-003 (shared test fixtures) and merged cleanly. The renamed creator tests keep no local fixture copies. Lint, traceability, shared components and the 80 creator and host tests passed again. Firefox and WebKit are left to CI after the merge, since only tests were renamed and comments repointed.
+
+Pull request #146, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
