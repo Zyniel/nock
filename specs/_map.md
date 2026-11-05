@@ -40,7 +40,8 @@ table, the naming rules and the glossary follow in the same change.
 | gameplay | `gameplay/history.md` | finished grids: the device's and the account's records, « Grilles terminées », « Rejouer » | pages | 029 AC-1 to AC-6; 046 AC-13 |
 | gameplay | `gameplay/modes.md` | race, teams (not written yet; no task) | | 030, 031 (untested stubs) |
 | social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
-| social | `social/chat.md` | chat, reactions, clue flag, mute | room | 021, 022; 013 AC-7, AC-8; 047 AC-12, AC-14 |
+| social | `social/chat.md` | chat, the Salon's stream, mute | room | 022 (but AC-3 to AC-5); 013 AC-7, AC-8; 047 AC-12, AC-14 |
+| social | `social/reactions.md` | the clue flag « Je bloque », reactions and their picker | cells, room | 021; 022 AC-3 to AC-5 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
 | content | `content/grids.md` | grid model, import checks, no third-party content | | 002, 003; 005 AC-4, AC-5 |
 | content | `content/grid-files.md` | the index `grids/catalogue.json`, credits, withdrawal, the converter | | 004 AC-5; 005 AC-1 to AC-3, AC-6, AC-7 |

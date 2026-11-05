@@ -1311,7 +1311,7 @@
   let isVoteBannerShown = $derived(!session.solved && openVote !== null)
   // « Réagir » is disabled while the vote banner shows, so the picker never
   // covers the vote's buttons (spec 043, Decision 10), and while the page is not
-  // joined (social/chat.md rule 13). Disabling it closes the picker.
+  // joined (social/reactions.md rule 8). Disabling it closes the picker.
   let isReactDisabled = $derived(
     !isJoined || activeWord === null || isMuted || isVoteBannerShown,
   )

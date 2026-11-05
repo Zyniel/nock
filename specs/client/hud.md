@@ -233,7 +233,7 @@ Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
   only a sign-out or deletion forgets, for a seat the account brought
   (`account/account.md` rule 17).
 - The Salon, what « Salon » carries while it is closed, the 3-second notes:
-  `client/room.md`. « Réagir », « Je bloque », the reactions: `social/chat.md`.
+  `client/room.md`. « Réagir », « Je bloque », the reactions: `social/reactions.md`.
 - The menus, the popover rules, the scrim and the room sheets:
   `client/menus.md`.
 - What lines and rows do: the domains each rule names. The page before the
