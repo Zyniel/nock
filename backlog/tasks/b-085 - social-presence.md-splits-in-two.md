@@ -4,7 +4,7 @@ title: social/presence.md splits in two
 status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T20:05:00Z'
+updated_date: '2026-11-05T20:06:00Z'
 labels:
   - domain:presence
 milestone: m-7
@@ -34,7 +34,7 @@ From DRAFT-058. presence is 18.1 KB with 20 criteria. Out of scope: any behaviou
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -53,6 +53,8 @@ Spec-checker APPROVED in round 2. Round 1 asked for the list of shared criteria 
 Reviewer round 1: APPROVE. Not taken, both optional: adding platform/realtime.md to authorship's Depends on (the template's limit is three files, and it is cited inline), and more code names in the glossary row.
 
 Full gate here (Chromium): static checks, 8,774 parallel and 162 serial tests, all green. Main then brought B-003 and B-083 and merged cleanly. Lint, traceability and shared components passed again. No test or code changed, so Firefox and WebKit are left to CI after the merge.
+
+Pull request #147, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
