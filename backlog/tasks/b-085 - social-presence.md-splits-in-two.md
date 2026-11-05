@@ -1,9 +1,10 @@
 ---
 id: B-085
 title: social/presence.md splits in two
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T18:01:00Z'
 labels:
   - domain:presence
 milestone: m-7
