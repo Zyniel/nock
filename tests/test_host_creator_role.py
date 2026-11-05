@@ -69,18 +69,8 @@ from spec014_harness import (
     with_player,
 )
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- AC-11: the creator's join over the sockets ------------------------------------

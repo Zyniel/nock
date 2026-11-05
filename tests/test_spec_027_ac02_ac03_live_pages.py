@@ -21,13 +21,12 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from spec022_harness import new_player_page
-from spec024_harness import EnterRoom, cell_at, grid_from_text
+from spec024_harness import EnterRoom, cell_at
 from spec025_harness import MockRoomSocket
 from spec027_harness import (
     advance_clock,
@@ -56,11 +55,6 @@ RECONNECT_LIMIT_MS = 3000
 SNAPSHOT_WINDOW_MS = 300
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def type_t_at_1_0(page: Page) -> float:

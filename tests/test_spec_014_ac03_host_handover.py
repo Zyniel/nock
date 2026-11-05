@@ -59,8 +59,6 @@ from spec014_harness import (
     token_of,
     with_player,
 )
-from spec014_harness import dist_dir as dist_dir
-from spec014_harness import fx01_grid as fx01_grid
 
 
 def host_events(peer: Peer) -> list[HostChanged]:

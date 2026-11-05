@@ -70,7 +70,6 @@ BOB = "BOB"
 
 # ---- Values of the test harness ------------------------------------------------------
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 UNKNOWN_ROOM = "ZZZZZZ"
 EMPTY_ROOM = "EMPTY1"
 
@@ -325,17 +324,6 @@ def test_ac8_a_log_without_edits_gives_no_edit() -> None:
 
 
 # ---- AC-8: the replay route ----------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    (tmp_path / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return tmp_path
 
 
 @pytest.fixture

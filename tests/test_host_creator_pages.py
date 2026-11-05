@@ -30,7 +30,6 @@ from room_panels import open_menu
 from spec011_harness import EnterRoom
 from spec014_harness import load_fr, token_of
 from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PAGE_PATH,
     ROOMS_PATH,
@@ -47,11 +46,6 @@ from spec033_harness import (
 )
 
 ROOMS_URL = "/api/rooms"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

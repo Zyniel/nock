@@ -70,11 +70,6 @@ class EnterRoom(Protocol):
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
 
 
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
 def catalogue_from_grid(grid: Grid) -> Catalogue:
     """A catalogue holding `grid` as published entry 1, force 2.
 

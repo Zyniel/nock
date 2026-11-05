@@ -44,16 +44,11 @@ from overrides_harness import (
     stored_overrides,
 )
 from spec017_harness import FakeClock
-from spec032_harness import CODE_A, T0, grid_from_text
+from spec032_harness import CODE_A, T0
 from spec033_harness import DATABASE_FILE_NAME
 
 CREATOR = "creator_room_hours"
 INTERVAL = "expiry_sweep_minutes"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-9: a file keeps the overrides, memory does not ----

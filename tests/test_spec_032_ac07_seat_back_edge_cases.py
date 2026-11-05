@@ -45,7 +45,6 @@ from spec032_harness import (
     anas_past_record,
     error_code_of,
     events_of,
-    grid_from_text,
     past,
     player_ids,
     player_of,
@@ -60,11 +59,6 @@ from spec032_harness import (
 REFUSED_NICKNAMES = pytest.mark.parametrize(
     "nickname", ["--", "Ana!"], ids=["only_punctuation", "a_refused_character"]
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Edge cases ----------------------------------------------------------------

@@ -93,7 +93,6 @@ EMPTY_DASHBOARD_BODY = re.compile(
 
 # ---- Values of the test harness ------------------------------------------------------
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 UNKNOWN_ROOM = "ZZZZZZ"
 THROTTLED_CLOSE_CODE = 4429  # spec 011
 ROOM_NOT_FOUND_CLOSE_CODE = 4404
@@ -127,18 +126,6 @@ class SlowTokenCheck:
 
 
 # ---- Fixtures ------------------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    """`tmp_path` with an `index.html`, the `dist_dir` of the "Test harness"."""
-    (tmp_path / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return tmp_path
 
 
 @pytest.fixture

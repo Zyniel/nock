@@ -23,7 +23,6 @@ from playwright.sync_api import Browser, Page, expect
 
 from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import ChangeSettings, HelpMode
 from nock.server import create_app
@@ -35,11 +34,8 @@ from spec025_harness import (
     EnterRoom,
     feed_lines,
     fr_text,
-    grid_from_text,
     host_sets_help_mode,
     join_peer,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     seed_nickname,
 )
@@ -49,20 +45,7 @@ JOIN_TIMEOUT_MS = 10_000
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

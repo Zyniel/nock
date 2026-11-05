@@ -30,10 +30,10 @@ from serving_harness import (
     edge_app,
     padded_room_request,
 )
-from serving_harness import catalogue as catalogue
-from serving_harness import fx01_grid as fx01_grid
 from serving_harness import registry as registry
 from spec040_harness import make_dist_dir
+
+CATALOGUE_KIND = "published"
 
 RAISING_PATH = "/raises-an-error"
 

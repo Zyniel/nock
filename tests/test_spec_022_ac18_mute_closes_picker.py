@@ -48,7 +48,7 @@ from spec022_harness import (
     three_players,
     wait_for_reading,
 )
-from spec024_harness import grid_from_text, open_context_page
+from spec024_harness import open_context_page
 from spec025_harness import MockRoomSocket
 
 SIZES = [(1280, 720), (360, 740)]
@@ -80,11 +80,6 @@ PANEL_BOX_SCRIPT = r"""
 
 def size_ids() -> list[str]:
     return [f"{width}x{height}" for width, height in SIZES]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def open_room_where_you_are_not_host(

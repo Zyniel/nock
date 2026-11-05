@@ -14,7 +14,6 @@ The readings of "hidden" and "timers run late" are `reconnection_harness`'s. The
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -28,7 +27,6 @@ from spec017_harness import (
     expect_offline,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     settle,
     wait_until,
@@ -43,11 +41,6 @@ LOST_CLOSE = 1011
 FIRST_THREE_DELAYS_LATEST_MS = [1200, 2400, 4800]
 EIGHT_SECOND_DELAY_LATEST_MS = 9600
 WAIT_WHILE_HIDDEN_MS = 1000  # well short of the 8-second delay's 6.4 s
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def hide_while_timers_run_late(page: Page) -> None:

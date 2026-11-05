@@ -55,8 +55,6 @@ from spec014_harness import (
     three_players,
     wait_until,
 )
-from spec014_harness import dist_dir as dist_dir
-from spec014_harness import fx01_grid as fx01_grid
 
 # ---- AC-4: change settings (rules) ------------------------------------------
 

@@ -47,7 +47,6 @@ from spec017_harness import (
     expect_offline,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     snapshot_frame,
     wait_until,
@@ -66,11 +65,6 @@ DRAWS = [
     pytest.param(RANDOM_AT_LOWEST_SCRIPT, LOWEST_DELAYS_MS, id="lowest"),
     pytest.param(RANDOM_AT_HIGHEST_SCRIPT, HIGHEST_DELAYS_MS, id="highest"),
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def lose_the_first_socket(page: Page, room: MockRoom) -> None:

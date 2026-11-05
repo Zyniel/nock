@@ -44,8 +44,8 @@ from nock.room import (
     tick,
     timer_value_ms,
 )
-from spec017_harness import FakeClock, make_dist_dir, open_peer, running_room
-from spec024_harness import FIRST_TOKEN, NOW, SECOND_TOKEN, grid_from_text
+from spec017_harness import FakeClock, open_peer, running_room
+from spec024_harness import FIRST_TOKEN, NOW, SECOND_TOKEN
 from spec027_harness import (
     THIRD_TOKEN,
     TIMER_CONFIG,
@@ -61,16 +61,6 @@ from spec027_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def room_running_since_10(grid: Grid) -> RoomState:

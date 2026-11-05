@@ -41,7 +41,7 @@ from nock.accounts import AccountStore, ErasedPlayer, RoomIdentity
 from nock.grid import Grid
 from nock.room import RoomKey
 from spec029_harness import Player, play_fx01
-from spec032_harness import ANA, BOB, T0, TA, TB, grid_from_text
+from spec032_harness import ANA, BOB, T0, TA, TB
 from spec033_harness import ANA_EMAIL, ZELIE_EMAIL
 
 CODE = "RRRRRR"
@@ -59,11 +59,6 @@ INDEXED_TABLES = [
     "account_links",
     "account_sessions",
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def fill_accounts(accounts: AccountStore, grid: Grid) -> str:

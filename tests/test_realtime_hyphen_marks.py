@@ -71,11 +71,6 @@ def hyphen_grid(fx01_text: str) -> Grid:
     return grid_with_answers(fx01_text, FX01_HYPHENS)
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
 @pytest.mark.parametrize(
     "separator", ["-", ".", " ", "'"], ids=["hyphen", "dot", "space", "apostrophe"]
 )

@@ -58,7 +58,6 @@ from spec032_harness import (
     NO_TICK_CONFIG,
     T0,
     TA,
-    grid_from_text,
     registry_on_file,
 )
 
@@ -70,11 +69,6 @@ LIFE_FIELDS = [
     "anonymous_solved_room_hours",
     "anonymous_room_hours",
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

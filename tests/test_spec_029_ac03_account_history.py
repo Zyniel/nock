@@ -64,7 +64,6 @@ from spec032_harness import (
     TA,
     TB,
     TC,
-    grid_from_text,
     make_dist_dir,
     utc,
 )
@@ -76,11 +75,6 @@ C_CODE = "CCCCCC"
 ANA_PLAYER = Player("Ana", ANA, TA)
 BOB_PLAYER = Player("Bob", BOB, TB)
 CY_PLAYER = Player("Cy", CY, TC)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def expected_record(

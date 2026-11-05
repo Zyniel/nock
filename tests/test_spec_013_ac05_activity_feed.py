@@ -11,7 +11,6 @@ feed's own heading (`feed.heading`) is gone. The other checks are unchanged.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -41,7 +40,6 @@ from spec013_harness import (
     feed_items,
     feed_locator,
     feed_snapshot_players,
-    grid_from_text,
     load_fr,
     open_room,
     player_view,
@@ -52,11 +50,6 @@ from spec013_harness import (
 
 CLUE_FATALES = ClueRef(row=0, column=3, clue_index=0)
 CLUE_MARINE = ClueRef(row=0, column=0, clue_index=1)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-5: the activity feed ----

@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from playwright.sync_api import Locator, Page, expect
 
 from nock.grid import Grid
@@ -39,7 +38,6 @@ from spec017_harness import (
     expect_offline,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     settle,
     snapshot_frame,
@@ -53,11 +51,6 @@ REPLACED_CLOSE = 4001
 FIRST_DELAY_LATEST_MS = 1200
 SENT_BEFORE_THE_CUT = 4
 STAYS_DISABLED_MS = 1500  # longer than the first retry delay at its highest
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def react_button(page: Page) -> Locator:

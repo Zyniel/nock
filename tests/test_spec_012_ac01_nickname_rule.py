@@ -50,12 +50,10 @@ from spec012_harness import (
     ROOM_CODE,
     active_view,
     error_frame,
-    grid_from_text,
     join_as,
     join_text,
     load_fr,
     make_app,
-    make_dist_dir,
     make_player,
     make_registry,
     make_state,
@@ -73,16 +71,6 @@ from spec012_harness import (
 from sure_click import click_until_pressed
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

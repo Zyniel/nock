@@ -29,11 +29,9 @@ from spec015_harness import (
     Peer,
     answer_of,
     cell_selector,
-    grid_from_text,
     join_peers,
     letter_cells,
     make_app,
-    make_dist_dir,
     make_registry,
 )
 
@@ -50,16 +48,6 @@ class EnterRoom(Protocol):
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

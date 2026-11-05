@@ -50,11 +50,6 @@ SETTLE_MS = 300
 FORM_TIMEOUT_MS = 5000
 
 
-def grid_from_text(text: str) -> Grid:
-    """Parse the JSON text of the FX-01 grid (the `fx01_text` fixture)."""
-    return Grid.model_validate_json(text)
-
-
 def load_fr() -> dict[str, str]:
     return json.loads(FR_JSON_PATH.read_text(encoding="utf-8"))
 

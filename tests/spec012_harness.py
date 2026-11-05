@@ -66,7 +66,6 @@ from nock.server import create_app
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FR_JSON_PATH = PROJECT_ROOT / "web" / "src" / "i18n" / "fr.json"
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 NOW = 2_000_000.0
 OLD_TIME = 1_500_000.0
@@ -81,19 +80,6 @@ OTHER_TOKEN = "q3Wm8xYo2vB4tY1zW9nR"
 
 
 # ---- Helpers for the fixtures --------------------------------------------------
-
-
-def grid_from_text(text: str) -> Grid:
-    """Return the grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """Return a `dist` directory with a minimal `index.html` (`dist_dir`)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 def make_registry() -> RoomRegistry:

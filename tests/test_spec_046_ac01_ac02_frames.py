@@ -38,9 +38,7 @@ import pytest
 from playwright.sync_api import Browser, expect
 
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from spec033_harness import AccountServer, account_live_server
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec042_harness import box_of
 from spec043_harness import NAVY, WHITE, expect_brand_link, fr_value, label_of, px
 from spec046_harness import (
@@ -80,15 +78,7 @@ from spec048_harness import AccountMock, open_account, open_share
 ENTRY_SIZES = [*WIDE_SIZES, *NARROW_SIZES]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004, served by the live server."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

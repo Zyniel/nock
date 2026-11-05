@@ -22,7 +22,6 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import PlayerJoined
 from room_panels import show_tab
@@ -36,8 +35,6 @@ from spec035_harness import (
     WINDOW_SIZES,
     Cell,
     ChangeList,
-    build_fx01_grid,
-    build_reference_catalogue,
     cell_at,
     contrast_measurements,
     contrast_offenders,
@@ -54,15 +51,7 @@ from spec035_harness import (
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (also served by live_server)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

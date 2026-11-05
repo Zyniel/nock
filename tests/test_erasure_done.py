@@ -58,7 +58,6 @@ from nock.grid import Grid
 from operations_harness import LOGGER_PREFIX
 from spec017_harness import FakeClock
 from spec029_harness import Player, account_id_of, link_room, play_fx01, sign_in_from
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PATH,
     FORMER_NICKNAME,
@@ -78,11 +77,6 @@ from spec033_harness import (
 
 SECRETS = [ZOE_EMAIL, ZOE_STORED]
 LATER_SWEEPS_SECONDS = 1.0  # ten sweeps of FAST_SWEEP_CONFIG
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class Outcome(NamedTuple):

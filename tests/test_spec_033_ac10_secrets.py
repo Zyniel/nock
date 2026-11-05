@@ -32,7 +32,6 @@ import pytest
 
 from nock.grid import Grid
 from spec017_harness import FakeClock, open_peer
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PATH,
     ANA_EMAIL,
@@ -53,11 +52,6 @@ from spec033_harness import (
 )
 
 PASSWORD = "pw-SECRET-9"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class Secrets(NamedTuple):

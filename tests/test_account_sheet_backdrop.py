@@ -29,12 +29,10 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
 from hud_harness import centre_of, press_and_release
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from room_panels import open_menu
 from spec019_harness import OpenWindow, window_opener
 from spec033_harness import AccountRoutes
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec043_harness import (
     COMPUTER,
     PHONE,
@@ -75,16 +73,7 @@ CASE_IDS = ["room-1280x720", "catalogue-360x740"]
 # ---- Fixtures --------------------------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    """Return the fixture grid FX-01, parsed."""
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """Return the catalogue the live server serves: the reference one."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

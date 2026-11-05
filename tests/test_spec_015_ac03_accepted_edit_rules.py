@@ -19,7 +19,6 @@ from nock.room import (
     join_room,
     new_room,
 )
-from spec015_harness import grid_from_text
 
 ROOM_CODE = "ABCDEF"
 START_TIME = 1_000_000.0
@@ -29,11 +28,6 @@ SECOND_TOKEN = "second-token-number-002"
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-3: the accepted edit, directly on handle_message ---------------------

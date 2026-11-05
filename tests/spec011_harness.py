@@ -76,11 +76,6 @@ class EnterRoom(Protocol):
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
 
 
-def grid_from_text(fx01_text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(fx01_text)
-
-
 def make_dist_dir(tmp_path: Path) -> Path:
     """A `dist` directory with a minimal `index.html` (the `dist_dir` fixture)."""
     dist = tmp_path / "dist"

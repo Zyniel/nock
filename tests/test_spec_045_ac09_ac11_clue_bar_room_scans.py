@@ -155,11 +155,6 @@ LONG_NAME_IDS = ["568x320-desktop", "740x360-desktop"]
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
     return Grid.model_validate_json(fx02_text)
 

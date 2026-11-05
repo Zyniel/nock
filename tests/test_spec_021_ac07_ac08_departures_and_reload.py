@@ -76,10 +76,7 @@ from spec024_harness import (
     Peer,
     events_of,
     expect_seq,
-    grid_from_text,
     join_one,
-    make_catalogue,
-    make_dist_dir,
     player_record,
     two_player_room,
 )
@@ -100,20 +97,7 @@ FLAG_STEPS: list[tuple[str, ClueRef | None]] = [
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

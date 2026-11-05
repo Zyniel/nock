@@ -16,19 +16,12 @@ from spec008_harness import (
     MockRoomSocket,
     dispatch_key,
     expect_selection,
-    grid_from_text,
     open_fx01,
     sent_edits,
     settle,
     snapshot_frame,
     tap,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-5: Backspace never leaves the page -----------------------------------
 

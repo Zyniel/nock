@@ -17,7 +17,6 @@ from spec016_harness import (
     cell_selector,
     default_players,
     expect_letter,
-    grid_from_text,
     letter_changed_frame,
     open_fx01,
 )
@@ -28,11 +27,6 @@ FLASH_MAX_MS = 2000
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Helpers of the flash tests -----------------------------------------------

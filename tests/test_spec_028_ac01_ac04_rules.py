@@ -63,11 +63,6 @@ BACK_AT = NOW + RESUME_WINDOW_SECONDS + 1.0
 AFTER_THE_SOLVE = NOW + 800.0
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
 def recap_of(game: Game) -> Recap:
     return build_recap(game.state, game.log)
 

@@ -81,7 +81,6 @@ from nock.room import (
 from nock.server import create_app
 from nock.store import RoomStore
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 OTHER_CODE = "GHJKLM"
 START_TIME = 1_000_000.0
@@ -122,19 +121,6 @@ class FakeClock(Protocol):
     def __call__(self) -> float: ...
 
     def advance(self, seconds: float) -> None: ...
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """A `dist` directory with a minimal `index.html` (the `dist_dir` fixture)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 def make_registry() -> RoomRegistry:

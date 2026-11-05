@@ -51,9 +51,6 @@ from urllib.parse import urlsplit
 import pytest
 from playwright.sync_api import Browser, Locator, Page, Request, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec042_harness import Box, box_of, colour_of, to_box, wait_until
 from spec043_harness import (
     WORD,
@@ -113,15 +110,7 @@ lastPlay => {
 """
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004, served by the live server."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

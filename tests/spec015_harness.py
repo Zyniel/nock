@@ -67,7 +67,6 @@ from nock.protocol import (
 from nock.room import RoomConfig, grid_state
 from nock.server import create_app
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 SNAPSHOT_RESUME_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 
 WAIT_SECONDS = 10.0
@@ -85,19 +84,6 @@ ChangeList = list[tuple[int, int, dict[str, object]]]
 
 
 # ---- Fixture bodies ---------------------------------------------------------
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """A `dist` directory with a minimal `index.html` (the `dist_dir` fixture)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 def make_registry() -> RoomRegistry:

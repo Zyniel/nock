@@ -81,7 +81,6 @@ from nock.room import (
 )
 from nock.server import create_app
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 ROOM_CODE = "ABC123"
 NOW = 2_000_000.0
@@ -140,17 +139,6 @@ class EnterRoom(Protocol):
 
 
 # ---- Fixture helpers: the fixtures themselves are in the test files ----
-
-
-def grid_from_text(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-def make_dist_dir(tmp_path: Path) -> Path:
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 def make_registry() -> RoomRegistry:

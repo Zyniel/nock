@@ -31,11 +31,9 @@ from nock.room import (
 )
 from spec012_harness import (
     active_view,
-    grid_from_text,
     join_as,
     load_fr,
     make_app,
-    make_dist_dir,
     make_player,
     make_registry,
     make_state,
@@ -48,16 +46,6 @@ from spec012_harness import (
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

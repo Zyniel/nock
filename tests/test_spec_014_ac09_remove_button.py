@@ -33,7 +33,6 @@ import pytest
 from playwright.sync_api import Page
 
 from spec014_harness import NICKNAMES, load_fr, roster_item
-from spec014_harness import fx01_grid as fx01_grid
 from spec014_windows_harness import (
     DEFAULT_ROOT_FONT_PX,
     EPSILON,

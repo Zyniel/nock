@@ -58,16 +58,11 @@ from overrides_harness import (
     registry_app,
 )
 from spec017_harness import FakeClock
-from spec032_harness import CODE_A, T0, grid_from_text
+from spec032_harness import CODE_A, T0
 from spec038_harness import OPS_TOKEN
 
 ROOM_NOT_FOUND_CLOSE_CODE = 4404
 SHORT_SWEEP_SECONDS = 0.05
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-11: the next lookup ----

@@ -37,7 +37,7 @@ from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.store import RoomStore
-from spec024_harness import LANGUAGE_SCAN_SCRIPT, ROOM_CODE, grid_from_text, load_fr
+from spec024_harness import LANGUAGE_SCAN_SCRIPT, ROOM_CODE, load_fr
 from spec026_harness import EnterRoom, play_live_game
 from spec028_harness import (
     QUIET_MS,
@@ -51,11 +51,6 @@ from spec028_harness import (
 from spec035_harness import contrast_offenders, unknown_texts
 
 SOLVE_TIMEOUT_MS = 15_000
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

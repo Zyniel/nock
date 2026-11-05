@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -40,7 +39,6 @@ from spec034_harness import (
     expect_seq,
     feed_item_locator,
     feed_items,
-    grid_from_text,
     grid_line_frame,
     load_fr,
     open_mocked_room,
@@ -52,11 +50,6 @@ from spec034_harness import (
 )
 
 FEED_LIMIT = 100
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def absence_lines_json() -> str:

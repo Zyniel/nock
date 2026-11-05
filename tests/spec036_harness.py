@@ -6,7 +6,7 @@ not collect them; each test file imports the names it uses. A fixture defined in
 one of them is imported by name in every test file that uses it, because pytest
 looks for the fixtures of a test among the names of the test module.
 
-- `spec036_harness` (this module): the `fx01_grid` fixture, the waiting times,
+- `spec036_harness` (this module): the waiting times,
   `triples` and the names of the variables of `python -m nock`, which test files
   of different themes use.
 - `spec036_browser_harness`: the room page in a browser (the phone profile, the
@@ -26,9 +26,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-import pytest
-
-from nock.grid import Grid
 from nock.protocol import EditLetter, LetterChanged
 
 # ---- Values of the spec --------------------------------------------------------------
@@ -48,14 +45,6 @@ OPERATOR_TOKEN_VARIABLE = "NOCK_OPERATOR_TOKEN"
 
 WAIT_SECONDS = 10.0
 POLL_SECONDS = 0.01
-
-
-# ---- Fixtures ------------------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
 
 
 # ---- Messages ------------------------------------------------------------------------

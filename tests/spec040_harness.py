@@ -25,7 +25,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from nock.grid import Grid
 from nock.protocol import HelpMode, RevealBudget, RoomSettings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -39,11 +38,6 @@ EXPECTED_SETTINGS = RoomSettings(
     reveal_budget=RevealBudget(letters=5, words=1),
     locked=False,
 )
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
 
 
 def make_dist_dir(root: Path) -> Path:

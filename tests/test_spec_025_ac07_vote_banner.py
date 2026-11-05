@@ -34,7 +34,6 @@ from spec025_harness import (
     MockRoomSocket,
     closed,
     fr_text,
-    grid_from_text,
     load_fr,
     open_room,
     opened,
@@ -59,11 +58,6 @@ NEW_KEYS = {
     "vote.result.rejected": "Vote refusé.",
     "vote.result.timed_out": "Temps écoulé, vote annulé.",
 }
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def open_with_bobs_word_vote(page: Page, base_url: str, grid: Grid) -> MockRoomSocket:

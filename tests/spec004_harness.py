@@ -56,22 +56,6 @@ def make_entry(
     )
 
 
-def grid_from_text(text: str) -> Grid:
-    """Return the grid that the JSON `text` holds (the body of `fx01_grid`)."""
-    return Grid.model_validate_json(text)
-
-
-def make_reference_catalogue(grid: Grid) -> Catalogue:
-    """Return the reference catalogue CAT of the spec, built on `grid`."""
-    entries = (
-        make_entry(grid, 1, date(2026, 9, 1), 1, True),
-        make_entry(grid, 2, date(2026, 10, 1), 2, True),
-        make_entry(grid, 3, date(2026, 10, 1), 1, True),
-        make_entry(grid, 4, date(2026, 10, 5), 3, False),
-    )
-    return Catalogue(entries=entries)
-
-
 def make_dist_dir(tmp_path: Path) -> Path:
     """Create a `dist` directory with a minimal `index.html` and return it."""
     dist = tmp_path / "dist"

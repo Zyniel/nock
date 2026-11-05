@@ -29,11 +29,6 @@ def credits() -> dict[str, str]:
     return json.loads(credits_path.read_text(encoding="utf-8"))
 
 
-def grid_from_text(fx01_text: str) -> Grid:
-    """Return the FX-01 grid parsed from its JSON text."""
-    return Grid.model_validate_json(fx01_text)
-
-
 def make_entry(
     grid: Grid, number: int, published: bool = True, withdrawn: bool = False
 ) -> CatalogueEntry:

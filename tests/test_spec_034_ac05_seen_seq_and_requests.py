@@ -29,7 +29,6 @@ from spec034_harness import (
     expect_seq,
     expected_caught_up,
     feed_item_locator,
-    grid_from_text,
     letter_frame,
     open_mocked_room,
     reconnect_with_snapshot,
@@ -42,11 +41,6 @@ from spec034_harness import (
 NO_REQUEST_MS = 1_000
 NO_RETRY_MS = 2_000
 DROPPED_ANSWER_MS = 500
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def stored_record(page: Page) -> object:

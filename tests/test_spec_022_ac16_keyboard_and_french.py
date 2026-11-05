@@ -46,7 +46,6 @@ from spec022_harness import (
 )
 from spec024_harness import (
     contrast_problems,
-    grid_from_text,
     language_data,
     language_problems,
     load_fr,
@@ -104,11 +103,6 @@ FOCUS_IN_PANEL_SCRIPT = r"""
   };
 }
 """
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- `fr.json` ----

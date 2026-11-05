@@ -62,8 +62,6 @@ from spec014_harness import (
     sole_error,
     stored_room,
 )
-from spec014_harness import dist_dir as dist_dir
-from spec014_harness import fx01_grid as fx01_grid
 
 # ---- AC-5: a player who is not in the room can do nothing (rules) -----------
 

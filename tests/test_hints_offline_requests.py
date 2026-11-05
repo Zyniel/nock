@@ -10,7 +10,6 @@ TAMIS, then the reveal of (1, 2).
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -25,15 +24,10 @@ from realtime_harness import (
 )
 from room_panels import open_aide
 from spec017_harness import cell_at, expect_cell
-from spec024_harness import TAMIS, EnterRoom, expect_selection, grid_from_text
+from spec024_harness import TAMIS, EnterRoom, expect_selection
 
 TAMIS_KEY = "0,0,0"  # the word TAMIS, row 1 across, by its clue (`data-word`)
 WAIT_TIMEOUT_MS = 5000
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def pick_aide_item(page: Page, test_id: str) -> None:

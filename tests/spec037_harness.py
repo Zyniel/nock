@@ -17,11 +17,8 @@ would be an unused import for ruff.
 from __future__ import annotations
 
 import contextlib
-import json
 import threading
 from collections.abc import Callable
-from datetime import date
-from pathlib import Path
 from typing import NamedTuple
 
 import pytest
@@ -29,7 +26,6 @@ from fastapi.testclient import TestClient
 from playwright.sync_api import Page
 from starlette.testclient import WebSocketTestSession
 
-from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -44,7 +40,6 @@ from nock.protocol import (
 )
 from nock.room import PlayerRecord, RoomConfig, RoomState, join_room, new_room
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 START_TIME = 1_000_000.0
 NOW = 2_000_000.0
@@ -56,38 +51,6 @@ WAIT_TIMEOUT_MS = 5000
 SETTLE_MS = 400
 
 # ---- Builders of the fixtures -------------------------------------------------
-
-
-def credits() -> dict[str, str]:
-    """Return the credit fields of a catalogue entry (tests/fixtures/credits.json)."""
-    credits_path = Path(__file__).parent / "fixtures" / "credits.json"
-    return json.loads(credits_path.read_text(encoding="utf-8"))
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """A `dist` directory with a minimal `index.html` (the `dist_dir` fixture)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
-
-
-def make_catalogue(grid: Grid) -> Catalogue:
-    """A catalogue holding `grid` as published entry 1 (the `catalogue` fixture)."""
-    entry = CatalogueEntry(
-        number=1,
-        published_on=date(2026, 10, 1),
-        force=2,
-        published=True,
-        **credits(),
-        grid=grid,
-    )
-    return Catalogue(entries=(entry,))
 
 
 def make_registry() -> RoomRegistry:

@@ -16,9 +16,8 @@ from collections.abc import Callable
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
-from spec035_harness import build_fx01_grid, build_reference_catalogue, open_room
+from spec035_harness import open_room
 from spec041_harness import (
     UI_FONT_STACK,
     add_probe,
@@ -31,15 +30,7 @@ from spec041_harness import (
 # ---- Fixtures: thin wrappers around the harnesses ---------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (served by live_server for `/`)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 # ---- The pages and the probe ------------------------------------------------------

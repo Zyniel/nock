@@ -73,11 +73,9 @@ from spec024_harness import (
     EnterRoom,
     events_of,
     full17,
-    grid_from_text,
     join_one,
     join_peers,
     load_fr,
-    make_dist_dir,
     ping_and_wait,
     two_player_room,
     write,
@@ -89,16 +87,6 @@ MESSAGES_PER_CLIENT = 20
 ALL_MESSAGES = 2 * MESSAGES_PER_CLIENT
 SHOWN_LINES = 200  # the page shows the last 200 lines (decision 12)
 THREAD_START_SECONDS = 10.0
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 # ---- AC-1: the rule ----

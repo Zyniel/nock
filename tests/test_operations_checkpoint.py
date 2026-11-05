@@ -44,7 +44,7 @@ from nock.room import FORMER_PLAYER_NICKNAME, new_room
 from nock.store import RoomStore
 from operations_harness import LOGGER_PREFIX, write_room
 from spec029_harness import Player, play_fx01
-from spec032_harness import ANA, BOB, NO_TICK_CONFIG, T0, TA, TB, Run, grid_from_text
+from spec032_harness import ANA, BOB, NO_TICK_CONFIG, T0, TA, TB, Run
 from spec033_harness import ANA_EMAIL, database_bytes, strings_in
 
 if TYPE_CHECKING:
@@ -54,11 +54,6 @@ CODE = "QJ7WXK"
 BUSY_TIMEOUT_SECONDS = 5.0
 BUSY_TIMEOUT_MS = 5000
 LINK_LIFE_SECONDS = 1_800.0
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-22 and AC-25: checkpoint_wal on a connection that fakes its answers --------

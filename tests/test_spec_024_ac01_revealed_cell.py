@@ -57,12 +57,9 @@ from spec024_harness import (
     check_cell,
     computed,
     events_of,
-    grid_from_text,
     join_one,
     join_peers,
     load_fr,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     mark_problems,
     open_room,
@@ -79,20 +76,7 @@ BOLD_WEIGHT = 700
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

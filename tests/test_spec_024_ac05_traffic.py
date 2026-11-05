@@ -50,11 +50,8 @@ from spec024_harness import (
     TrafficLog,
     cell_at,
     expect_selection,
-    grid_from_text,
     join_one,
     join_peers,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     snapshot_cell,
     wait_until_page,
@@ -70,20 +67,7 @@ Shown = tuple[int, int, str]  # a letter shown at a cell: row, column, letter
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

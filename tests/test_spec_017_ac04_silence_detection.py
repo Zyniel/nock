@@ -47,12 +47,10 @@ from spec017_harness import (
     Peer,
     error_events,
     events_of,
-    grid_from_text,
     has_state_change,
     join_two,
     joined_room,
     keep_seen,
-    make_dist_dir,
     open_peer,
     player_of,
     running_room,
@@ -63,16 +61,6 @@ from spec017_harness import (
 
 SILENCE_CLOSE = 4408
 ROSTER_BUDGET_MS = 300
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def pong_count(peer: Peer) -> int:

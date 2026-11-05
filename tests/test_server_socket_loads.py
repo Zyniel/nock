@@ -21,17 +21,12 @@ from __future__ import annotations
 from contextlib import ExitStack
 from pathlib import Path
 
-import pytest
-
 from host_harness import SOCKET_CONFIG, open_member
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.protocol import Join
 from server_harness import CountingStore, serving
 from spec014_harness import Peer, socket_url
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import DATABASE_FILE_NAME
 
 GRID_NUMBER = 1  # the number of the grid of `spec024_harness.make_catalogue`
@@ -39,14 +34,7 @@ UNKNOWN_CODE = "ZZZZZZ"
 ROOM_NOT_FOUND_CLOSE_CODE = 4404
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def test_ac26_a_socket_to_a_room_not_in_memory_loads_it_once_and_a_second_loads_nothing(

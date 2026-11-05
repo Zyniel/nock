@@ -30,12 +30,9 @@ unused import for ruff.
 from __future__ import annotations
 
 import contextlib
-import json
 import re
 import threading
 from collections.abc import Callable
-from datetime import date
-from pathlib import Path
 from typing import NamedTuple, Protocol
 
 import pytest
@@ -44,7 +41,6 @@ from playwright.sync_api import Locator, Page, WebSocketRoute, expect
 from starlette.testclient import WebSocketTestSession
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -85,7 +81,6 @@ from nock.room import (
 )
 from room_panels import open_aide
 
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 START_TIME = 1_000_000.0
 NOW = 2_000_000.0
@@ -107,42 +102,10 @@ MIME = WordTarget(row=0, column=2, clue_index=0)
 # ---- What the fixtures of the test files are built from ----
 
 
-def credits() -> dict[str, str]:
-    """Return the credit fields of a catalogue entry (tests/fixtures/credits.json)."""
-    credits_path = Path(__file__).parent / "fixtures" / "credits.json"
-    return json.loads(credits_path.read_text(encoding="utf-8"))
-
-
 class EnterRoom(Protocol):
     """The `enter_room` fixture of conftest."""
 
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixtures)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """A `dist` directory with a minimal `index.html` (the `dist_dir` fixtures)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
-
-
-def make_catalogue(grid: Grid) -> Catalogue:
-    """A catalogue holding `grid` as published entry 1 (the `catalogue` fixtures)."""
-    entry = CatalogueEntry(
-        number=1,
-        published_on=date(2026, 10, 1),
-        force=2,
-        published=True,
-        **credits(),
-        grid=grid,
-    )
-    return Catalogue(entries=(entry,))
 
 
 def make_registry() -> RoomRegistry:

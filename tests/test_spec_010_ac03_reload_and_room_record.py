@@ -12,7 +12,6 @@ import json
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import SelectCell, parse_client_message
@@ -23,11 +22,9 @@ from spec010_harness import (
     EnterRoom,
     FrameRecorder,
     MockRoomSocket,
-    catalogue_from_grid,
     cell_at,
     code_from_url,
     expect_joined,
-    grid_from_text,
     load_fr,
     open_mock_room,
     read_json_object,
@@ -40,16 +37,7 @@ from spec010_harness import (
     wait_until,
 )
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1, force 2."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def letters_on_server(

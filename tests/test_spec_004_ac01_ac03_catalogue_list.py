@@ -29,14 +29,11 @@ from spec004_harness import (
     expect_entry_2_texts,
     expect_item_numbers,
     fr_text,
-    grid_from_text,
     item_by_number,
     json_numbers,
     load_fr,
     make_client,
-    make_dist_dir,
     make_entry,
-    make_reference_catalogue,
     summary_numbers,
 )
 
@@ -59,20 +56,7 @@ PROGRESS_KEY = "nock.progress"
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

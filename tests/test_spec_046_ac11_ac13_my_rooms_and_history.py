@@ -30,11 +30,9 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from spec029_harness import OLD_CODE
 from spec032_harness import ABC, XYZ
-from spec035_harness import build_fx01_grid, build_reference_catalogue, load_fr
+from spec035_harness import load_fr
 from spec042_harness import box_of
 from spec043_harness import (
     GREEN,
@@ -87,14 +85,7 @@ SEP = "\N{MIDDLE DOT}"
 OLD_LOADING_TEXT = "Chargement de vos salons\N{HORIZONTAL ELLIPSIS}"
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

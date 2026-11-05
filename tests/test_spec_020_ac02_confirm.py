@@ -18,12 +18,8 @@ not locked and the grid is not solved (it was disabled otherwise), with the text
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -66,9 +62,6 @@ from spec024_harness import (
     events_of,
     expect_selection,
     expect_seq,
-    grid_from_text,
-    make_catalogue,
-    make_dist_dir,
     open_room,
     refusal_code,
     reveal_result_frame,
@@ -100,20 +93,7 @@ def selection_sent(frames: list[str], row: int, column: int) -> bool:
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Rooms of the rule tests ----

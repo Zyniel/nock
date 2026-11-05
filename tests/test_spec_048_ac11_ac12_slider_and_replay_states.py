@@ -87,11 +87,6 @@ def server(tmp_path: Path, catalogue: Catalogue) -> Iterator[OpsServer]:
         yield running
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
 def slider_page(window: OpenWindow, server: OpsServer, grid: Grid) -> Page:
     """`REPLAY` at 1280 by 720, at its maximum position 7."""
     page = window(1280, 720)

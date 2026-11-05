@@ -42,7 +42,6 @@ from spec019_harness import SWATCH_COLOURS_JS, Rgba, rgba_from
 from spec024_harness import (
     cell_at,
     expect_seq,
-    grid_from_text,
     load_fr,
 )
 from spec027_harness import open_timer_room
@@ -67,11 +66,6 @@ PART_IDS = [
     "recap-copy",
     "recap-close",
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def open_recap(page: Page) -> None:

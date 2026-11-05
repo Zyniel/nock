@@ -21,9 +21,7 @@ from collections.abc import Callable
 import pytest
 from playwright.sync_api import Page, Route, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec004_harness import grid_from_text, load_fr, make_reference_catalogue
+from spec004_harness import load_fr
 
 LIST_ROUTE = re.compile(r".*/api/grids(\?.*)?$")
 GRID_2_ROUTE = re.compile(r".*/api/grids/2$")
@@ -33,15 +31,7 @@ NOT_A_DATE = [
 ]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 def with_grid_2_published_on(summary: dict[str, object], published_on: str) -> None:

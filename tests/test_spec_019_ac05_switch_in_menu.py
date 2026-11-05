@@ -57,7 +57,6 @@ from spec019_harness import (
     authors_switch,
     cell_at,
     expect_seq,
-    grid_from_text,
     layout_problems,
     open_room,
     player_view,
@@ -182,11 +181,6 @@ testId => {
 
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

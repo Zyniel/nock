@@ -8,7 +8,6 @@ prevented. The shared setup is in `spec009_harness`.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid, LetterCell
@@ -21,7 +20,6 @@ from spec009_harness import (
     dispatch_key,
     down,
     expect_selection,
-    grid_from_text,
     open_fx01,
     sent_selections,
     settle,
@@ -32,11 +30,6 @@ DOWN_IDES = "0,3,0"
 
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def all_filled(

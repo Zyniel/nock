@@ -23,7 +23,6 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import NamedTuple
 
-import pytest
 from fastapi.testclient import TestClient
 
 from nock.grid import Grid
@@ -61,11 +60,6 @@ YANN_TOKEN = "yann-resume-token-00003"
 SWEPT_CHAT = "chat-swept-6390"  # the chat of the WebSocket part
 SWEEP_DEADLINE_SECONDS = 2.0  # "within 2 seconds of real time"
 POLL_SECONDS = 0.05
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
 
 
 # ---- Python: rooms A and B on a store file -------------------------------------------

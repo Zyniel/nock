@@ -75,7 +75,6 @@ from overrides_harness import (
     solved_stored_room,
     type_and_save,
 )
-from spec032_harness import grid_from_text
 from spec033_harness import DATABASE_FILE_NAME
 from spec042_harness import box_of
 from spec046_harness import OpenWindow, button_colour_problems, window_opener
@@ -89,11 +88,6 @@ OVERRIDE_HOURS = 96
 @pytest.fixture
 def window(browser: Browser, browser_name: str) -> Iterator[OpenWindow]:
     yield from window_opener(browser, browser_name)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

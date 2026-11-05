@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -23,7 +22,6 @@ from spec008_harness import (
     expect_letter,
     expect_letters,
     expect_selection,
-    grid_from_text,
     open_fx01,
     press,
     press_all,
@@ -34,11 +32,6 @@ from spec008_harness import (
     tap,
     wait_until,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def down(row: int, column: int) -> SelectCell:

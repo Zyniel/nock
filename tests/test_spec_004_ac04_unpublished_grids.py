@@ -22,33 +22,17 @@ from spec004_harness import (
     INDEX_HTML,
     NOT_FOUND_BODY,
     expect_item_numbers,
-    grid_from_text,
     item_by_number,
     json_numbers,
     make_client,
-    make_dist_dir,
     make_entry,
-    make_reference_catalogue,
     summary_numbers,
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

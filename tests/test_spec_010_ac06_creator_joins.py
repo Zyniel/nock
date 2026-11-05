@@ -12,8 +12,6 @@ import json
 import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.protocol import ErrorCode, ErrorMessage, Join
 from spec010_harness import (
     CATALOGUE_RECORD,
@@ -21,9 +19,7 @@ from spec010_harness import (
     MOCK_TOKEN,
     ROOM_RECORD_KEY,
     FrameRecorder,
-    catalogue_from_grid,
     expect_joined,
-    grid_from_text,
     load_fr,
     open_mock_room,
     read_json_object,
@@ -42,15 +38,7 @@ STORED_IDENTITY = json.dumps(
 )
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1, force 2."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- AC-6: the creator joins at once -------------------------------------------

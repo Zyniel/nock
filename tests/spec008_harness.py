@@ -55,11 +55,6 @@ ChangeList = list[tuple[int, int, dict[str, object]]]
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
 def cell_at(page: Page, row: int, column: int) -> Locator:
     selector = f'[data-testid="cell"][data-row="{row}"][data-column="{column}"]'
     return page.locator(selector)
