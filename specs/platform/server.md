@@ -1,18 +1,16 @@
 ---
 area: platform
 file: server
-status: done
+status: approved
 ---
 
-# platform/server - Durable rooms, undo, engine time, rooms in memory, building the app
+# platform/server - Durable rooms, undo, building the app
 
 ## Purpose
 
 The server holds the only true room state and keeps it on disk, so a restart
 loses nothing a player saw and every player gets their seat back. A player can
-take back their last edit. Every room's rules run on one thread, so each step
-stays short whatever the grid, and a room is held in memory only while it is
-played.
+take back their last edit.
 
 ## Depends on
 
@@ -72,15 +70,15 @@ played.
    that seq: the same cells and players whatever snapshots a save deleted
    since.
 6. A code held only in the store is taken. A socket to the room, and nothing
-   else, loads such a room and makes it live (rule 21), after one restart
-   step run before anything else and logged like any step: each
-   player not disconnected becomes disconnected at that time, with one
-   `player_state_changed` each in roster order, selection and recent edits
-   cleared. Their resume window runs from then (`platform/reconnection.md`
-   rule 2). What the restart step does to chat windows, reaction windows,
-   the vote and the timer: `social/chat.md` rule 7, `social/reactions.md`
-   rule 7, `gameplay/votes.md`, `gameplay/rules.md`. Every
-   other read (summaries, catch-up, the recaps, the account's rooms and
+   else, loads such a room and makes it live (`platform/live-rooms.md`
+   rule 2), after one restart step run before anything else and logged like
+   any step: each player not disconnected becomes disconnected at that time,
+   with one `player_state_changed` each in roster order, selection and recent
+   edits cleared. Their resume window runs from then
+   (`platform/reconnection.md` rule 2). What the restart step does to chat
+   windows, reaction windows, the vote and the timer: `social/chat.md` rule 7,
+   `social/reactions.md` rule 7, `gameplay/votes.md`, `gameplay/rules.md`.
+   Every other read (summaries, catch-up, the recaps, the account's rooms and
    history, the operator's edits) replays the room from the store without
    making it live, with no restart step and no log entry. A lookup that meets
    an expired room deletes it instead (`lobby/lifetime.md`).
@@ -112,37 +110,6 @@ played.
    and 7). An error `nothing_to_undo` shows `undo.nothing` (« Rien à annuler. »)
    for 3 seconds; no other error does. The undo's `letter_changed` only
    updates the confirmed grid (`gameplay/co-op.md` rule 12).
-
-### Engine time
-
-20. Every live room's step runs on the one engine thread (`lobby/rooms.md` rule
-    12), so a step is bounded in time whatever the grid: the rules read the
-    grid's lookups (`content/grids.md` rule 12) and never resolve a clue again.
-    Measured on the rules alone, with no socket and no store, on FX-02, as the
-    median of 5 runs after one warm-up: the edit that solves the grid takes
-    under 5 ms; a check of the whole grid, every letter wrong, under 10 ms; the
-    catch-up of an absence of 100 letters (`social/catch-up.md`) under 50 ms.
-    No player sees a difference: the events, replies and answers are as before.
-
-### Rooms in memory
-
-21. A room is live, held in memory with its task, only while it is played:
-    from when a socket opens to it until its task ends with no socket open to
-    it, joined or not. Creating a room writes it to the store (rule 2) and
-    holds nothing. When its task ends with no socket open, its snapshot is
-    saved (rule 4) and it leaves memory; a room whose snapshot fails stays
-    live until its task next ends or the server stops. The next socket loads
-    it back by rule 6; its players are all disconnected already, so the
-    restart step logs nothing. The number of live rooms has no cap.
-22. A socket's lookup of its room is one registry call, `RoomRegistry.connect`,
-    run in a worker thread, never on the server's event loop. In one step under
-    the registry lock it deletes an expired room (`lobby/lifetime.md` rule 6),
-    loads and replays a room not in memory (rule 6) and counts the socket (rule
-    21), then gives back the connection, or nothing for an unknown or expired
-    code, which the wrong-code throttle then records (`lobby/rooms.md` rule 9).
-    No other lookup is made for the socket, so a room is loaded once per
-    socket. A handler cancelled while the call runs leaves the connection it
-    gets back, so the room's count of open sockets stays right.
 
 ### Building the app
 
@@ -214,30 +181,6 @@ top bars (« Phone top bar », « Computer top bar »).
   (← 018 AC-3)
 - **AC-13** An error `nothing_to_undo` shows « Rien à annuler. » for about 3
   seconds; an error `not_host` does not. (← 018 AC-3)
-- **AC-20** In a FX-02 room with every letter cell right but one, the edit that
-  fills the last cell is applied, `grid_solved` among its events, in under 5 ms
-  by rule 20's measure.
-- **AC-21** In a FX-02 room with a wrong letter in every letter cell, a check of
-  the whole grid is applied, its `check_result` naming every cell wrong and no
-  cell correct, in under 10 ms by rule 20's measure.
-- **AC-22** The catch-up of an absence of 100 letters typed into an empty FX-02
-  room is built, with its changed cells and completed words, in under 50 ms by
-  rule 20's measure.
-- **AC-23** A room created through `POST /api/rooms` is not live; a socket
-  opened to it makes it live, and once that socket closes without joining the
-  room is not live again.
-- **AC-24** Ana and Bob are in a room; Ana types `T` at (1, 0) and closes her
-  socket: the room stays live. Once Bob's closes, it is not live and the
-  store's latest snapshot is at the room's seq. Ana's next socket finds `T`
-  and her seat, and the log holds no entry between that seq and her join's.
-- **AC-25** With a registry whose `connect` takes 1 second, a socket opening to
-  Ana's room delays nobody: `GET /api/grids` and a second socket to another
-  room, sent meanwhile, are answered within 200 ms; the first socket's join
-  then gets its snapshot.
-- **AC-26** A socket to a room not in memory makes the store load it once (one
-  `load_room` read for that socket), with its restart step; a socket to
-  `ZZZZZZ` loads nothing and closes with 4404; a second socket to the room
-  while the first is open loads nothing.
 - **AC-27** As Ana types 250 letters in a FX-01 room, after the saves at seq
   100 and 200 the store holds two snapshots of the room, at seq 0 and 200;
   once her socket closes, at 0 and the room's seq only, the log whole, and the
@@ -269,12 +212,6 @@ top bars (« Phone top bar », « Computer top bar »).
 - An undo restores the pencil flag of what it puts back (AC-10).
 - An undo works after a restart: replay rebuilds each player's undo (AC-1).
 - Loading an unknown code gives nothing and a lookup stays unknown (AC-7).
-- A room's grid built from the store's JSON (rule 5) and one taken from the
-  catalogue keep the same budgets: each builds its lookups once, when it is
-  built (AC-20).
-- A room whose snapshot fails as its last socket closes stays live, and is
-  saved at the server's shutdown (AC-24).
-- The shutdown saves no snapshot of a room that already left memory (AC-24).
 - A room whose first and newest snapshots are one row keeps that one; a save at
   the newest's seq replaces it (AC-27).
 - A deleted snapshot's pages leave the WAL at the next checkpoint
@@ -289,25 +226,17 @@ top bars (« Phone top bar », « Computer top bar »).
   `social/catch-up.md`. Client routing and its pages: `client/shell.md`.
 - Serving the client, the HTTP edge and the environment variables, `main()`
   included: `platform/serving.md`. The run configuration, frame size and
-  connection bounds: `product.md`; the budgets measured in a browser or across
-  sockets: `product.md` rules 21 to 25.
-- What the grid's lookups hold: `content/grids.md`. How many checks a room
-  may run: `gameplay/hints.md`.
+  connection bounds: `product.md`.
+- Engine time, the rooms held in memory and the socket's lookup:
+  `platform/live-rooms.md`.
 
 ## Code
 
 - `src/nock/store.py`: `RoomStore`. `src/nock/room.py`: `replay`,
   `after_restart`, undo in `handle_message`; `RoomConfig.snapshot_every`.
-- `src/nock/hub.py`: commit before delivery, snapshots, loading, rooms
-  leaving memory, `close()`.
-- `src/nock/room.py` (`handle_message`), `src/nock/catch_up.py`
-  (`build_catch_up`), `src/nock/recap.py`: the rules of rule 20, reading
-  `Grid.words` and `Grid.solution_letter`.
-- `src/nock/server.py`: `create_app`, `production_app`, the store's path, the
-  socket route's one call to `connect` in a worker thread.
+- `src/nock/hub.py`: commit before delivery, snapshots, loading, `close()`.
+- `src/nock/server.py`: `create_app`, `production_app`, the store's path.
 - `web/src/lib/RoomTopBar.svelte`, `gridKeys.ts`, `GridViewport.svelte`,
   `RoomPage.svelte`, `roomSession.ts`, `RoomNote.svelte`: the undo button,
   shortcut and message.
-- Tests: `tests/test_spec_018_*`; `tests/test_server_engine_time.py` for rule
-  20, which measures durations and so runs on its own (`SERIAL_TEST_FILES`), as
-  does the file of AC-25; `tests/test_server_*` for AC-23 to AC-30.
+- Tests: `tests/test_spec_018_*`; `tests/test_server_*` for AC-27 to AC-30.

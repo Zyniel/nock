@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: done
+status: approved
 ---
 
 # platform/realtime - Room events and fair play
@@ -34,7 +34,7 @@ contract. No browser receives an answer letter before the room earns it.
    address held by the wrong-code throttle is closed with 4429
    (`lobby/rooms.md`). An unknown, malformed or expired code is closed with 4404
    and no message, and counts as a wrong code; the lookup that decides it is
-   `platform/server.md` rule 22.
+   `platform/live-rooms.md` rule 3.
 3. A frame of 4,097 to 8,192 bytes (UTF-8 for text) is answered
    `invalid_message` unparsed; a larger one is closed with 1009 (`product.md`).
    A frame that does not parse is answered `invalid_message`. After an
