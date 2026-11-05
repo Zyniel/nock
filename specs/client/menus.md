@@ -1,7 +1,7 @@
 ---
 area: client
 file: menus
-status: done
+status: approved
 ---
 
 # client/menus - The room's menus, popovers and sheets
@@ -38,7 +38,8 @@ same way by pointer, touch or keyboard, on a phone or a computer.
    `gameplay/board.md`), each with the detail of its state; « Inviter »
    (`menu.invite`, detail `menu.invite_detail`); « Réglages de l'hôte », for
    the host only (`lobby/host.md`); « Compte » (`account.open`), while
-   accounts are on (`account/account.md`); a separator; `timer.hide` or
+   accounts are on (`account/account.md`; the sheet: `account/my-account.md`);
+   a separator; `timer.hide` or
    `timer.toggle_label`; « Retour aux grilles » (`menu.back`), a link to `/`.
    Details are hidden from screen readers. Following « Retour aux grilles »
    or the brand asks nothing: the page loads `/`, and the player,

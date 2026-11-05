@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
@@ -40,7 +40,8 @@ None. Every domain spec depends on this file.
    salons », with what changed while away: `lobby/joining.md`,
    `lobby/summaries.md`, `social/catch-up.md`.
 8. The optional account: sign in by email, keep rooms and history across devices:
-   `account/account.md`; erase one's data: `account/erasure.md`.
+   `account/account.md`, `account/my-account.md`; erase one's data:
+   `account/erasure.md`.
 9. The operator's page: figures, a room's replay: `admin/ops-page.md`;
    retention: `admin/operations.md`.
 
@@ -56,7 +57,7 @@ the path. Everything else under `/` is a file of the built client or 404
 | `GET /g/<number>` | a published grid's page, else 404 | `content/library.md` |
 | `GET /r/<code>` | the room page; 404 unless 6 capitals or digits | `lobby/joining.md` |
 | `GET /recap/<token>` | the shared recap page; unknown token 404 | `gameplay/results.md` |
-| `GET /account` | the account page | `account/account.md` |
+| `GET /account` | the account page | `account/my-account.md` |
 | `GET /ops` | the operator's page | `admin/ops-page.md` |
 | `GET /api/grids?force=`, `GET /api/grids/<number>` | the published grids, one grid | `content/library.md` |
 | `POST /api/rooms` | a room on a published grid: code, share link, 201; `GET` is 404 | `lobby/rooms.md` |

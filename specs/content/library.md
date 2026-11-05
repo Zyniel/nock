@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -67,7 +67,7 @@ never send a clue or an answer.
    ready, or in error when the request fails, answers another status than 2xx,
    or answers anything but a list of summaries. The heading « Grilles »
    (`catalogue.heading`) shows in every state. Once `GET /api/account` has
-   answered signed in (`account/account.md` rule 13), it asks `GET
+   answered signed in (`account/my-account.md` rule 1), it asks `GET
    /api/account/progress` once; signed out, never.
 9. Its column holds, in order: the heading, « Mes salons » when it shows
    (`lobby/summaries.md`), the force filter, then one state line or the cards,
@@ -89,7 +89,7 @@ never send a clue or an answer.
     « Toutes » on load. Pressing « Force N » shows the loaded grids of force N
     in the same order, with no new request; « Toutes » shows them all again.
 11. The top bar holds the brand only (`client/shell.md` rule 17), plain text
-    here, plus « Compte » while accounts are on (`account/account.md`).
+    here, plus « Compte » while accounts are on (`account/my-account.md`).
 
 ### Grid cards
 
@@ -277,7 +277,7 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - Reloading the grid list while the server runs: `content/grid-files.md`.
 - « Jouer », the room it creates and the writing of `nock.progress`:
   `lobby/rooms.md`. « Mes salons »: `lobby/summaries.md`. « Grilles terminées »:
-  `gameplay/history.md`. « Compte » and its dialog: `account/account.md`; how
+  `gameplay/history.md`. « Compte » and its dialog: `account/my-account.md`; how
   the account's progress is derived: `account/erasure.md`.
 - The frame of entry pages, the page not found, the scans of every page and
   their fit at every window: `client/shell.md`.

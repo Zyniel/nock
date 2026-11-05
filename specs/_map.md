@@ -23,7 +23,8 @@ table, the naming rules and the glossary follow in the same change.
 
 | Area | File | What it covers | Look | From the v1.1.0 specs |
 | --- | --- | --- | --- | --- |
-| account | `account/account.md` | sign-in, the session, the account's rooms, the account sheet and page | pages | 033 (but AC-3, AC-4, AC-10); 046 AC-3; 048 AC-3 to AC-5 |
+| account | `account/account.md` | sign-in, the session, the account's rooms | | 033 AC-1, AC-6 to AC-8, AC-11 |
+| account | `account/my-account.md` | « Compte » in a room and on the catalogue, the sign-in sheet, the e-mail form, the `/account` page and its states, what the device stores and forgets for the account | pages | 033 AC-2, AC-5, AC-9, AC-11; 046 AC-3; 048 AC-3 to AC-5 |
 | account | `account/erasure.md` | the account's deletion: the erasure and its attempts, what is kept, « Ancien joueur », history records, grid progress | | 033 AC-1, AC-3 to AC-5, AC-10; 038 AC-1, AC-2; 029 AC-3, AC-6, AC-7 (server side) |
 | lobby | `lobby/rooms.md` | solo start, room creation and its limit per address, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
 | lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do | room | 014 |
@@ -64,8 +65,9 @@ table, the naming rules and the glossary follow in the same change.
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
 criteria goes whole to its row; a criterion may be cited by more than one domain
 (043 AC-5 is cited by `menus` and `room`, 047 AC-13 by `votes` and `results`,
-047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 and 033 AC-5 by
-`account` and `erasure`, 029 AC-3 and 029 AC-6 by `history` and `erasure`,
+047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 by `account` and
+`erasure`, 033 AC-5 by `my-account` and `erasure`, 033 AC-11 by `account` and
+`my-account`, 029 AC-3 and 029 AC-6 by `history` and `erasure`,
 004 AC-7 by `ipuz` and `library`), and each of them
 states the part its own screens hold.
 
@@ -178,6 +180,7 @@ writes it); nothing of race or teams is built.
 | connection | (one socket of a player; "session" is the sign-in cookie) | `RoomConnection`, `nock_session` |
 | loss, final close, resume window | « Connexion perdue… » (a close the page retries after; one it stops at; how long a disconnected player keeps their seat) | `reconnecting`, `RoomConfig.resume_window_seconds` |
 | invited player | the nickname form under « Salon <code> » | `join` without token |
+| account sheet, account page | « Compte » (the dialog), « Mon compte » (`/account`); `account/my-account.md` | `AccountDialog.svelte`, `AccountEmailForm.svelte`, `AccountPage.svelte`, `account.ts` |
 | account player, anonymous player | (a member linked to an account, to none) | `PlayerRecord.account_id` |
 | erasure, former player | « Ancien joueur » (the deletion of an account's data, run in attempts until done; the player it leaves, stored `--`) | `PendingErasure`, `FORMER_PLAYER_NICKNAME` |
 | host, stand-in host | « hôte » (a host who is not the creator's player) | `is_host`, `host_changed` |

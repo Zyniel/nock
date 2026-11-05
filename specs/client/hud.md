@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: done
+status: approved
 ---
 
 # client/hud - The room's frame: top bar, clue bar, play area
@@ -231,7 +231,7 @@ Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
 - Room gone: leaving by itself after a delay; a dialog for a removed player or
   another final status; forgetting the deleted room's stored identity, which
   only a sign-out or deletion forgets, for a seat the account brought
-  (`account/account.md` rule 17).
+  (`account/my-account.md` rule 5).
 - The Salon, what « Salon » carries while it is closed, the 3-second notes:
   `client/room.md`. « Réagir », « Je bloque », the reactions: `social/reactions.md`.
 - The menus, the popover rules, the scrim and the room sheets:
