@@ -1,10 +1,10 @@
 ---
 id: B-077
 title: A pen pans a zoomed grid
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T01:17:00Z'
-updated_date: '2026-11-04T11:28:00Z'
+updated_date: '2026-11-05T04:35:00Z'
 labels:
   - domain:viewport
 milestone: m-6
@@ -23,19 +23,19 @@ From DRAFT-063, the human's option B (2026-11-04). Since B-050 (L15), web/src/li
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On a zoomed grid, a pen drag pans the grid as a finger drag does
-- [ ] #2 A pen tap still selects the cell it touched, and a mouse drag still pans nothing
-- [ ] #3 viewport AC-2 (changed)
-- [ ] #4 viewport AC-20 (new)
+- [x] #1 On a zoomed grid, a pen drag pans the grid as a finger drag does
+- [x] #2 A pen tap still selects the cell it touched, and a mouse drag still pans nothing
+- [x] #3 viewport AC-2 (changed)
+- [x] #4 viewport AC-20 (new)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -56,3 +56,9 @@ Review round 1: CHANGES REQUESTED. Fixed: a pen lifted beside the viewport, or h
 
 Review round 2: APPROVE. Not taken: listening for the pen's lift in the capture phase (the tip-up check already forgets a pen whose lift never arrives).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A pen on a zoomed grid now pans it as a finger does; a pen tap still selects its cell, and a mouse drag pans nothing. pinchPan.ts tracks a pen apart from the fingers (pinch counts touch only), drops the click an engine fires after a pen drag, and forgets a pen lifted outside the viewport or hovering tip-up. Spec: viewport AC-2 widened, AC-20 added. Full gate green in Chromium, Firefox and WebKit.
+<!-- SECTION:FINAL_SUMMARY:END -->
