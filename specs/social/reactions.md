@@ -1,7 +1,7 @@
 ---
 area: social
 file: reactions
-status: approved
+status: done
 ---
 
 # social/reactions - The clue flag and reactions
