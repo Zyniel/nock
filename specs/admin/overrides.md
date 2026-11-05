@@ -1,7 +1,7 @@
 ---
 area: admin
 file: overrides
-status: approved
+status: done
 ---
 
 # admin/overrides - The `/ops` overrides of the room lives
