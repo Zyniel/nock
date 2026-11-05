@@ -1,7 +1,7 @@
 ---
 area: product
 file: product
-status: done
+status: approved
 ---
 
 # product - What Nock is and what every domain keeps
@@ -138,7 +138,7 @@ every `/api/ops` path 404 whatever the method (a body over the limit: 413 first,
 19. Contrast. Every visible text reaches 4.5:1 against its background in every
     state, opacity folded in (the pairs of `_design/foundation.md`); flashes
     are included, except the Auteurs inks during a flash, whose contrast is not
-    guaranteed (`social/presence.md` rule 15).
+    guaranteed (`social/authorship.md` rule 4).
 20. Language. `<html lang="fr">`; every interface string comes from
     `web/src/i18n/fr.json` through `t()`; the only texts outside it are data:
     nicknames as displayed, clues, letters, codes, URLs and numbers. Text meant

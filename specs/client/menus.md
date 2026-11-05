@@ -1,7 +1,7 @@
 ---
 area: client
 file: menus
-status: done
+status: approved
 ---
 
 # client/menus - The room's menus, popovers and sheets
@@ -34,7 +34,7 @@ same way by pointer, touch or keyboard, on a phone or a computer.
    request once. A disabled item sends nothing and leaves the menu open, as
    does an item disabled while it is open.
 3. The Menu, a group named `topbar.menu`, holds in order: the switches
-   « Auteurs », « Mots des autres », « Accessibilité » (`social/presence.md`,
+   « Auteurs », « Mots des autres », « Accessibilité » (`social/authorship.md`,
    `gameplay/board.md`), each with the detail of its state; « Inviter »
    (`menu.invite`, detail `menu.invite_detail`); « Réglages de l'hôte », for
    the host only (`lobby/host.md`); « Compte » (`account.open`), while
