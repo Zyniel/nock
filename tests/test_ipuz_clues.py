@@ -269,6 +269,7 @@ def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
         pytest.param("e", id="lower-case"),
         pytest.param("\N{LATIN CAPITAL LETTER E WITH ACUTE}", id="upper-acute"),
         pytest.param("\N{LATIN SMALL LETTER E WITH CIRCUMFLEX}", id="lower-circumflex"),
+        pytest.param("E\N{COMBINING ACUTE ACCENT}", id="decomposed-acute"),
     ],
 )
 def test_ac16_a_solution_letter_in_another_case_or_accent_loads_equal(
@@ -280,7 +281,7 @@ def test_ac16_a_solution_letter_in_another_case_or_accent_loads_equal(
     assert read_data(data) == read_data(fx01_ipuz_data())
 
 
-@pytest.mark.parametrize("value", ["EE", "E-"])
+@pytest.mark.parametrize("value", ["EE", "E-", "\N{COMBINING ACUTE ACCENT}"])
 def test_ac16_a_solution_of_two_characters_is_refused_naming_the_cell(
     value: str,
 ) -> None:

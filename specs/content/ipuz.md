@@ -28,15 +28,14 @@ text.
 1. A `.ipuz` file is a JSON object (UTF-8; one byte order mark, U+FEFF, at its
    start is skipped) of the ipuz v2 ArrowWord kind. A key written twice in one
    object, wherever it stands (a key holding `:` included), is refused naming
-   the key. The file holds `version`
-   exactly `http://ipuz.org/v2`, `kind` exactly
-   `["http://ipuz.org/crossword/arrowword#1"]`, `clueplacement` exactly
+   the key. The file holds `version` exactly `http://ipuz.org/v2`, `kind`
+   exactly `["http://ipuz.org/crossword/arrowword#1"]`, `clueplacement` exactly
    `"blocks"`, `dimensions` (`width`, `height`), `puzzle`, `clues` holding
-   exactly the key `Clues`, `author`, `date` and `difficulty`; optionally `block`,
-   `empty`, `solution` and the fields of `content/grid-files.md` rule 11. Every
-   coordinate in the file is `[column, row]`, counted from zero; Nock turns it
-   into `(row, column)` before any message, which may also quote the value as
-   written (`location [4, 0], that is (0, 4)`).
+   exactly the key `Clues`, `author`, `date` and `difficulty`; optionally
+   `block`, `empty`, `solution` and the fields of `content/grid-files.md`
+   rule 11. Every coordinate in the file is `[column, row]`, counted from zero;
+   Nock turns it into `(row, column)` before any message, which may also quote
+   the value as written (`location [4, 0], that is (0, 4)`).
 2. The mapping to the model:
 
    | Model | ipuz |
@@ -221,6 +220,9 @@ text.
   refused as a value (AC-4, AC-14).
 - An enumeration without separator leaves the answer as written (`ÊTRE` with
   `"4"` stays `ÊTRE`) (AC-14).
+- A `solution` letter written as a base letter and a combining accent (`E`
+  then U+0301) is one letter, like `É`; a combining mark alone is refused
+  (AC-16).
 
 ## Out of scope
 

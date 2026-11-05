@@ -243,11 +243,12 @@ def test_ac14_every_break_edge_dashed_loads() -> None:
         pytest.param(1, 4, "B", ["(4, 1)"], id="outside-at-the-bottom"),
     ],
 )
+@pytest.mark.parametrize("style_key", ["dashed", "dotted"])
 def test_ac14_a_dashed_edge_outside_the_grid_or_beside_a_block_is_refused(
-    column: int, row: int, letters: str, named: list[str]
+    column: int, row: int, letters: str, named: list[str], style_key: str
 ) -> None:
     data = fx01_ipuz_data()
-    set_dashed(data, column, row, letters)
+    set_style(data, column, row, {style_key: letters})
 
     message = read_error(data)
 

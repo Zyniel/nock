@@ -24,7 +24,6 @@ from grid_files_harness import (
     JsonData,
     cell_with_clues,
     clue_named,
-    dashed_cell,
     fx01_ipuz_data,
     fx01_model_grid,
     read_data,
@@ -155,12 +154,21 @@ def test_ac4_a_text_zero_is_the_same_value_as_a_number_zero() -> None:
     assert read_data(data) == read_data(fx01_ipuz_data())
 
 
-@pytest.mark.parametrize("letters", ["", "X"])
+@pytest.mark.parametrize(
+    "style",
+    [
+        pytest.param({"dashed": ""}, id="dashed-empty"),
+        pytest.param({"dashed": "X"}, id="dashed-x"),
+        pytest.param({"dotted": ""}, id="dotted-empty"),
+        pytest.param({"dotted": "X"}, id="dotted-x"),
+        pytest.param({"dashed": "R", "dotted": "X"}, id="dashed-r-dotted-x"),
+    ],
+)
 def test_ac4_a_dashed_value_that_is_not_made_of_t_r_b_l_is_refused(
-    letters: str,
+    style: JsonData,
 ) -> None:
     data = fx01_ipuz_data()
-    data["puzzle"][1][0] = dashed_cell(letters)
+    data["puzzle"][1][0] = {"cell": 0, "style": style}
 
     read_error(data)
 
