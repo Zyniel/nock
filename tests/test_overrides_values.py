@@ -47,6 +47,13 @@ from overrides_harness import (
     rows_of,
 )
 
+# AC-2: the last row of the list in memory with no variable, byte for byte.
+INTERVAL_ROW_BYTES = (
+    b'{"name":"expiry_sweep_minutes","unit":"minutes","min":1,"max":1440,'
+    b'"default":60,"environment":null,"override":null,"value":60,'
+    b'"source":"default"}'
+)
+
 CREATOR_NAME = CREATOR.field
 ANONYMOUS_NAME = ANONYMOUS.field
 
@@ -139,6 +146,17 @@ def test_ac2_the_five_settings_come_in_order_with_their_bounds_in_memory(
     assert response.status_code == 200, response.text
     assert response.json() == {"durable": False, "settings": default_rows()}
     assert list(rows_of(response)) == SETTING_NAMES
+
+
+def test_ac2_the_body_is_written_in_the_keys_order_with_whole_numbers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with env_app(tmp_path, monkeypatch) as ops:
+        response = ops.settings()
+
+    assert response.status_code == 200, response.text
+    assert response.content.startswith(b'{"durable":false,"settings":[')
+    assert response.content.endswith(INTERVAL_ROW_BYTES + b"]}")
 
 
 def test_ac2_durable_is_true_on_a_database_file(

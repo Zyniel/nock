@@ -29,7 +29,7 @@ import string
 import threading
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StrictBool
 
@@ -50,8 +50,10 @@ SESSION_LIFE_SECONDS: float = 7_776_000.0  # 90 days (decision 11)
 LINKS_PER_EMAIL_PER_HOUR: int = 3  # decision 11
 LINKS_PER_ADDRESS_PER_HOUR: int = 10  # decision 11
 EMAIL_MAX_LENGTH: int = 254
-FINISHED: str = "finished"  # a grid's progress, as the client's nock.progress
-STARTED: str = "started"
+# A grid's progress, as the client's nock.progress.
+GridProgress = Literal["started", "finished"]
+FINISHED: GridProgress = "finished"
+STARTED: GridProgress = "started"
 ERASURE_RECORD_LIFE_SECONDS: float = 157_680_000.0  # 5 years of 365 days
 
 LOCAL_PART_MAX_LENGTH: int = 64
@@ -612,7 +614,7 @@ class AccountStore:
         account_id: str,
         peek_room: Callable[[str], RoomState | None],
         created_codes: list[str],
-    ) -> dict[str, str]:
+    ) -> dict[str, GridProgress]:
         """Return the account's progress, grid numbers in decimal to a state.
 
         A grid is `"finished"` for each history record and each solved room of the
@@ -631,7 +633,7 @@ class AccountStore:
         Returns:
             The progress; `{}` when no room or record gives a grid number.
         """
-        progress: dict[str, str] = {}
+        progress: dict[str, GridProgress] = {}
         for identity in self.identities(account_id):
             state = peek_room(identity.code)
             if state is None or member_id(state, identity.resume_token) is None:
@@ -1095,7 +1097,7 @@ def _erased_players_of(
 
 
 def _mark_grid(
-    progress: dict[str, str], state: RoomState, *, is_finished: bool
+    progress: dict[str, GridProgress], state: RoomState, *, is_finished: bool
 ) -> None:
     """Mark the room's grid in `progress`; `finished` is never lowered.
 

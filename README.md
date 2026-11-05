@@ -257,8 +257,9 @@ characters, and only the last label may be empty: a name may end with a dot
 refused. `NOCK_PORT` must be a whole number from 1 to 65535, written with the
 digits 0 to 9. A refused value (in these two variables or in `NOCK_DATABASE`,
 below) stops the start with a message that names the variable and shows the
-value. Use this command rather than `uvicorn nock.server:app`: it also sets the
-WebSocket frame limit of spec 036 (8,192 bytes), where uvicorn alone accepts
+value. Use this command rather than `uvicorn --factory
+nock.server:production_app` (`nock.server` has no `app` any more): it also sets
+the WebSocket frame limit of spec 036 (8,192 bytes), where uvicorn alone accepts
 frames of 16 MiB, and it logs warnings and errors only, with no access log, so
 that the logs hold no client address (spec 038).
 

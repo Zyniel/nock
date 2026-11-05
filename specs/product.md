@@ -170,7 +170,8 @@ every `/api/ops` path 404 whatever the method (a body over the limit: 413 first,
     (`WS_MAX_SIZE_BYTES`): a larger one closes the socket with 1009 before it is
     buffered; one of 4,097 to 8,192 bytes reaches the app and gets
     `invalid_message`, the socket open. Binary frames follow the same limits.
-27. Serving. `uv run python -m nock` runs `nock.server.app` with
+27. Serving. `uv run python -m nock` runs the app of
+    `nock.server.production_app()` with
     `server_config`: `ws_max_size` 8192, no access log, log level `warning`,
     uvicorn's defaults otherwise; the address is `NOCK_HOST`:`NOCK_PORT`
     (default `127.0.0.1`:8000); the rooms live in the SQLite file
