@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: viewport
-status: done
+status: approved
 ---
 
 # gameplay/viewport - The grid's drawing, cursors, fit, zoom and hyphen edges
@@ -183,6 +183,12 @@ dashed edge.
   dragged 100 px left from (1, 3) scrolls the viewport 100 px across, as a
   finger's drag does, and leaves (1, 2) selected. A mouse dragged 100 px left
   from (1, 3) leaves the viewport's scroll unchanged.
+- **AC-21** On FX-01 at cells of 72 px or more, no one selecting: with
+  `TA-MIS` and `NA-VAL`, of the 3 by 3 pixels centred where the right and
+  bottom edges of (1, 1) meet, the centre and the pixels right of it and below
+  it are rule grey, the other six white; with `VI-DE` and `ID-ES`, where the
+  right edge of (2, 2) ends and the bottom edge of (2, 3) starts, the centre
+  and the pixels left of it and below it are rule grey, the other six white.
 
 ## Edge cases
 

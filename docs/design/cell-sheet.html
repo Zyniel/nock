@@ -86,6 +86,8 @@ h2 small { font: 600 .72rem/1 var(--f-ui); letter-spacing: .08em; text-transform
 .c.hy-b { border-bottom-color: transparent; }
 .hy { position: absolute; pointer-events: none; }
 .hy.band { z-index: 7; }
+/* the crossing pixel at the bottom-right corner of the cell before a hyphen stays rule grey */
+.hy.corner { width: 1px; height: 1px; background: var(--rule); }
 .c.word { background: var(--word); }
 .c.locked { background: var(--locked); }
 .c.sel { background: var(--sel); }
@@ -467,6 +469,7 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     <p class="lead">A word's break takes no cell, as in printed grids: the edge between the two letters it joins is dashed instead of the plain grid line (across, the right edge of the letter before it; down, its bottom edge). Every break is drawn so, whatever its separator: a compound word's hyphen, an abbreviation's dot, a space or an apostrophe (A.I, A I and A-I look the same). Dashes in hyphen grey <code>#5E6573</code>, darker than the grid lines: a whole number per edge, at least 3, about 5 px of period per pixel of thickness, 60 % dash, half a gap at each end so the corners stay open; 1 px thick under 36 px cells, 2 px from 36, 3 px from 72; every dash end on a whole pixel. The same in every state. Beside my selected cell, my navy border turns dashed on that side, so the hyphen never hides under it.</p>
     <div class="board static" id="hyphen"></div>
     <p class="note"><strong>Layers.</strong> The dashes sit where the grid line sat, under every mark: the ring, the triangles and the arrows keep their places, and the notch of a revealed letter above a down hyphen sits over its dashes. No arrow ever lies on a hyphen edge. The drawing is EX-AMI (« Ancien copain »), hyphen between X and A, crossed by AS (« Champion »).</p>
+    <p class="note"><strong>Where two edges meet.</strong> In one cell with both marks, or where an across edge ends and a down edge starts, each edge keeps its own dashes and stops one pixel short of the crossing line. The crossing pixel stays rule grey: the plain line runs to it, and a cell with both marks draws it itself. Around it, every pixel is a plain line or a cell's background: an edge's first and last pixels are in its half gaps (last row).</p>
   </section>
 
   <section>
@@ -750,8 +753,14 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
   /* hy: [{r, c, dir: "right" | "down"}], the cell before the hyphen. Positions are in the grid's
      padding box: cell (r, c) starts at (c s, r s), its right line at (c + 1) s - 1, its bottom at (r + 1) s - 1. */
   function hyEdges(rows, s, hy) {
-    var t = s < 36 ? 1 : s < 72 ? 2 : 3, L = s - 1, runs = hyRuns(L, t), h = "";
+    var t = s < 36 ? 1 : s < 72 ? 2 : 3, L = s - 1, runs = hyRuns(L, t), h = "", cornered = {};
     hy.forEach(function (e) {
+      /* the crossing pixel at the end of the edge, the bottom-right corner of the cell before: rule grey,
+         whether the cell's other line is plain or a hyphen edge too (where two edges meet) */
+      if (!cornered[e.r + "," + e.c]) {
+        cornered[e.r + "," + e.c] = true;
+        h += '<span class="hy corner" style="left:' + ((e.c + 1) * s - 1) + "px;top:" + ((e.r + 1) * s - 1) + 'px"></span>';
+      }
       var across = e.dir === "right";
       var line = (across ? (e.c + 1) * s : (e.r + 1) * s) - 1 - Math.floor((t - 1) / 2);
       var along = across ? "to bottom" : "to right";
@@ -940,6 +949,13 @@ button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
     h += spec(bare(18, true), "18 px (FX-02 on a 320 by 568 phone)", "1 px thick, 3 dashes of 3 to 4 px; still a dashed border on my cell");
     h += spec(bare(36, false), "36 px", "2 px thick from 36 px: 4 dashes");
     h += spec(bare(90, true), "90 px (a phone at zoom 5)", "3 px thick, 8 dashes of about 7 px, one pixel into each cell");
+    h += '<div style="flex-basis:100%;height:0"></div>';
+    /* two edges meet at one crossing, at 90 px (3 px thick): FX-01's letters around it */
+    function meet(letters, hy) {
+      return grid(letters.map(function (row) { return row.map(function (l) { return { letter: l }; }); }), 90, hy);
+    }
+    h += spec(meet([["A", "M"], ["V", "I"]], [{ r: 0, c: 0, dir: "right" }, { r: 0, c: 0, dir: "down" }]), "Two edges of one cell, 90 px", "TA-MIS across, NA-VAL down: both of A's edges stop short of its corner pixel, rule grey; the lines of M and V run into it");
+    h += spec(meet([["I", "D"], ["M", "E"]], [{ r: 0, c: 0, dir: "right" }, { r: 0, c: 1, dir: "down" }]), "An edge ending where another starts, 90 px", "VI-DE across, ID-ES down: the crossing pixel stays rule grey; the across edge's outer pixel on that line is in the down edge's gap, white");
     set("hyphen", h);
 
     h = "";
