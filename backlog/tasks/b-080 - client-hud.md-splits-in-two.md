@@ -34,7 +34,7 @@ From DRAFT-058. hud is 22.4 KB with 22 criteria. Move one part, its criteria as 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -58,6 +58,8 @@ Spec-checker round 2: APPROVED. hud 14.5 KB and 13 criteria, menus 9.5 KB and 9.
 Review round 1: APPROVE. Not taken: the harness docstrings' stale claim that votes AC-9 uses the sheet helpers (there before this task) and claude_docs/frontend-review.md's citations (a dated review record that no role edits).
 
 Full gate here: Chromium static checks and 8,774 parallel tests green. Two timing tests failed: foundation remote pace AC-13 (2.03 ms against a 2 ms limit) and spec 036 AC-1 (2,623 ms against 2,500 ms). The pace test fails the same way in B-081, which changes no client code, so this container is too slow for them; CI's Ubuntu run decides. Firefox ran past its 45-minute limit on this four-core container, and WebKit hit the known Clock.pause_at flake (B-100). The moved menus tests pass in Firefox and WebKit (20 passed). The Firefox and WebKit runs on main after the merge cover the rest.
+
+Pull request #141, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
