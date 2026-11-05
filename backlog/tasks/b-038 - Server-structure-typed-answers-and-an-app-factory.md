@@ -4,9 +4,10 @@ title: 'Server structure: typed answers and an app factory'
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-05T02:01:00Z'
+updated_date: '2026-11-05T02:06:00Z'
 labels:
   - domain:server
+  - domain:serving
   - domain:overrides
   - domain:operations
 milestone: m-2
@@ -72,4 +73,6 @@ ordinal: 12000
 Released by the human in chat, 2026-11-05 (« /milestone m-2 »: run Upkeep). Open question 1 settled by the lead: option A, the data folders keep the repository layout (the image keeps it, B-009); no variables.
 
 Lead's pick among the Plan agent's options (Fable, high): B. nock.server loses its module-level app; production_app() builds it (create_app with the catalogue of grids/) and main() calls it after the variable checks; routes keep their closures. Answers become pydantic models (frozen, extra forbid) in today's key order, int | float where a value can be either, so the JSON bytes stay the same: overrides' Setting becomes a model (SETTINGS and SETTING_BY_NAME keep their names), SettingRow, SettingsAnswer, DryRunAnswer; operations' DashboardAnswer adds offered_days last; LinkRequested for the link route's {}; every /api route declares its answer. Rejected: A (a lazy module app keeps a hidden singleton), C (routers and app.state: two or three tasks, out of this cut). product.md rule 27 and serving.md AC-4 name production_app() in place of nock.server.app: the entry's name only, inside the human's release of B-038.
+
+Lead decisions on the spec: the answer-model rule lives in serving.md (rule 14, AC-15), which owns the HTTP edge; the progress route declares dict[str, Literal['started', 'finished']]; LinkRequested stays unnamed in the specs (account AC-1 already checks 202 {}); server.md at about 18 KB and 24 criteria is accepted until B-086 splits it.
 <!-- SECTION:NOTES:END -->
