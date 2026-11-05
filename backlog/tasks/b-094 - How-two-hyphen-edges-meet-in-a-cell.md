@@ -4,7 +4,7 @@ title: How two hyphen edges meet in a cell
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T22:49:00Z'
+updated_date: '2026-11-05T22:53:00Z'
 labels:
   - design
   - domain:viewport
@@ -45,4 +45,6 @@ From DRAFT-008: _design/cells.md says how two hyphen edges meet (the corner pixe
 Lead decision: the criterion goes in gameplay/viewport.md as AC-21 (option a), because design files hold no criteria. viewport.md goes to 21 criteria, one over the budget, recorded with DRAFT-079. A split would be an escalation, and folding the criterion into AC-9 would rewrite its tests. The cell sheet's corner pixel in the 4b drawings is also corrected to match the code. No change of look in the app.
 
 Spec-checker APPROVED in one round. Not taken, all optional: three wording refinements in cells.md (the t = 2 outer pixel, the mirror case, line 34's « stays plain »). For m-8's close: add viewport.md (21 criteria) and hud.md (15.4 KB) to DRAFT-079. For the test-writer: the two cases are two separate grids, read at fractional cell sizes.
+
+Tests: test_ac21 passes on both grids, as the spec writes down what the code paints; no code change. tests/test_viewport_hyphen_edges.py is now 831 lines, a little over 800; a split by criterion group can come with DRAFT-078's test tidy.
 <!-- SECTION:NOTES:END -->
