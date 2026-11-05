@@ -1,7 +1,7 @@
 ---
 area: social
 file: presence
-status: approved
+status: done
 ---
 
 # social/presence - Who is here and where

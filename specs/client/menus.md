@@ -1,7 +1,7 @@
 ---
 area: client
 file: menus
-status: approved
+status: done
 ---
 
 # client/menus - The room's menus, popovers and sheets

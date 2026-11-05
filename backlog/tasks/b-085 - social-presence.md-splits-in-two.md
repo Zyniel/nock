@@ -4,7 +4,7 @@ title: social/presence.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T18:16:00Z'
+updated_date: '2026-11-05T18:21:00Z'
 labels:
   - domain:presence
 milestone: m-7
@@ -49,4 +49,6 @@ The new social/authorship.md (domain authorship) takes authorship and « Auteurs
 Lead decision: Cut A (authorship) over Cut B (selections). It is the coherent topic (019 and 045 whole), leaves both files near 10 KB (9 and 11 criteria), and needs no test move and no code-comment change. Cut B would leave presence at 14.5 KB with 15 criteria.
 
 Spec-checker APPROVED in round 2. Round 1 asked for the list of shared criteria in _map.md to be completed (043 AC-16, AC-17 and AC-19, 013 AC-5, 036 AC-12), for the chat row to list what chat shares, and for one line to be rewrapped.
+
+Reviewer round 1: APPROVE. Not taken, both optional: adding platform/realtime.md to authorship's Depends on (the template's limit is three files, and it is cited inline), and more code names in the glossary row.
 <!-- SECTION:NOTES:END -->

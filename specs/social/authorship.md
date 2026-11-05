@@ -1,7 +1,7 @@
 ---
 area: social
 file: authorship
-status: approved
+status: done
 ---
 
 # social/authorship - A letter's author and the « Auteurs » mode
