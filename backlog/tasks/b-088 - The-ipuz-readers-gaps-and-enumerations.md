@@ -1,9 +1,10 @@
 ---
 id: B-088
 title: The ipuz reader's gaps and enumerations
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T22:38:00Z'
 labels:
   - domain:grid-files
   - domain:grids
