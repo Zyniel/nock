@@ -95,7 +95,7 @@ codes are limited per address.
     and detached on its own; a player disconnects with their last socket (a resume
     takes over the older one, `lobby/joining.md` rule 6). Once the registry is
     closed, its thread stops and no input runs a rule. A room leaves memory
-    when its task ends with no socket open (`platform/server.md` rule 21).
+    when its task ends with no socket open (`platform/live-rooms.md` rule 2).
 
 ### Creation limit
 

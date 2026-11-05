@@ -201,10 +201,10 @@ it before it serves, with one line naming the variable.
 - The run configuration, frame size and connection bounds: `product.md`.
 - CORS (no cross-origin use). The `Cache-Control` of API answers other than
   the 413: the files rule 13 names.
-- The store `NOCK_DATABASE` opens, the rooms in memory, undo, engine time:
-  `platform/server.md`. The bounds of the room lives, the creation limit, the
-  socket cap and the account variables: the files rule 6 names. Client routing
-  and its pages: `client/shell.md`.
+- The store `NOCK_DATABASE` opens and undo: `platform/server.md`. The rooms
+  in memory and engine time: `platform/live-rooms.md`. The bounds of the room
+  lives, the creation limit, the socket cap and the account variables: the
+  files rule 6 names. Client routing and its pages: `client/shell.md`.
 
 ## Code
 

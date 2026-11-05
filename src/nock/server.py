@@ -1218,7 +1218,7 @@ async def _connect_in_worker(
 
     When the handler is cancelled while the thread runs, the thread goes on, and
     the connection it returns is left as soon as it comes, so that the room's
-    count of open sockets stays right (`platform/server.md` rule 22).
+    count of open sockets stays right (`platform/live-rooms.md` rule 3).
 
     Args:
         connect: Opens the connection; it runs in the worker thread.
@@ -1987,7 +1987,7 @@ def create_app(
             account_id = None if account is None else account.account_id
             return room_registry.connect(code, account_id, owner_loop=owner_loop)
 
-        # One call in a worker thread (`platform/server.md` rule 22): it may
+        # One call in a worker thread (`platform/live-rooms.md` rule 3): it may
         # read the room from the store or delete it once expired (spec 032),
         # and the event loop must not wait.
         connection = await _connect_in_worker(connect)

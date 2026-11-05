@@ -1,6 +1,6 @@
-"""Tests of server AC-20, AC-21 and AC-22: the engine time budgets (rule 20).
+"""Tests of platform/live-rooms AC-1, AC-2 and AC-3: the engine time budgets (rule 1).
 
-Rule 20's measure: the room's rules alone, with no socket and no store, on FX-02,
+Rule 1's measure: the room's rules alone, with no socket and no store, on FX-02,
 as the median of 5 runs after one warm-up, timed with `time.perf_counter`.
 `nock.room.handle_message` runs the edit and the check, and
 `nock.catch_up.build_catch_up` the catch-up. Each room state is built outside the
@@ -13,16 +13,16 @@ answer cannot pass.
 
 Choices where the spec leaves room:
 
-- AC-20: the one empty cell is the last letter cell in row-major order. The room
+- AC-1: the one empty cell is the last letter cell in row-major order. The room
   is built by one player, whose edits come 0.1 s apart, under the default limit
   of 20 a second (`RoomConfig()`).
-- AC-20, edge case: the budget holds for a grid taken from the model's JSON, for
+- AC-1, edge case: the budget holds for a grid taken from the model's JSON, for
   the grid of a room loaded from the store's JSON (`RoomState` read from its own
   JSON) and for a grid returned by `import_grid`, the way the catalogue builds
   its grids.
-- AC-21: the whole grid is full of wrong letters (each is a letter other than the
+- AC-2: the whole grid is full of wrong letters (each is a letter other than the
   solution letter), so the room holds a `grid_full_wrong` before the check.
-- AC-22: the 100 letters are the first 100 cells of the words of FX-02 in clue
+- AC-3: the 100 letters are the first 100 cells of the words of FX-02 in clue
   order (word after word, a cell once), typed by one player in that order. The
   words completed are worked out in this file from `Grid.word_cells`.
 """
@@ -218,11 +218,11 @@ def fx02_grid(fx02_text: str) -> Grid:
     return Grid.model_validate_json(fx02_text)
 
 
-# ---- AC-20: the edit that solves the grid --------------------------------------------
+# ---- AC-1: the edit that solves the grid --------------------------------------------
 
 
 @pytest.mark.parametrize("source", GRID_SOURCES)
-def test_ac20_the_edit_that_solves_the_grid_takes_under_5_ms(
+def test_ac1_the_edit_that_solves_the_grid_takes_under_5_ms(
     source: str, fx02_text: str
 ) -> None:
     grid = grid_from_source(source, fx02_text)
@@ -257,10 +257,10 @@ def test_ac20_the_edit_that_solves_the_grid_takes_under_5_ms(
     assert median_ms < EDIT_BUDGET_MS
 
 
-# ---- AC-21: the check of the whole grid ----------------------------------------------
+# ---- AC-2: the check of the whole grid ----------------------------------------------
 
 
-def test_ac21_a_check_of_a_grid_all_wrong_takes_under_10_ms(
+def test_ac2_a_check_of_a_grid_all_wrong_takes_under_10_ms(
     fx02_grid: Grid,
 ) -> None:
     solution = solution_of(fx02_grid)
@@ -291,7 +291,7 @@ def test_ac21_a_check_of_a_grid_all_wrong_takes_under_10_ms(
     assert median_ms < CHECK_BUDGET_MS
 
 
-# ---- AC-22: the catch-up of 100 letters ----------------------------------------------
+# ---- AC-3: the catch-up of 100 letters ----------------------------------------------
 
 
 def absence_letters(grid: Grid) -> list[tuple[Position, str]]:
@@ -339,7 +339,7 @@ def completed_words(
     return tuple(completed)
 
 
-def test_ac22_the_catch_up_of_100_letters_takes_under_50_ms(
+def test_ac3_the_catch_up_of_100_letters_takes_under_50_ms(
     fx02_grid: Grid,
 ) -> None:
     letters = absence_letters(fx02_grid)
