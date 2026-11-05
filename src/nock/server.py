@@ -1765,9 +1765,9 @@ def create_app(
         since = now - period_days * DAY_SECONDS
         room_logs = _room_logs_since(room_registry.store, since)
         figures = dashboard_figures(room_logs, period_days, now)
-        return DashboardAnswer.model_validate(
-            {**figures.model_dump(), "offered_days": offered_days}
-        )
+        answer_fields = figures.model_dump()
+        answer_fields["offered_days"] = offered_days
+        return DashboardAnswer.model_validate(answer_fields)
 
     # Spec 038: the empty grid and the ordered edits of one room, from its log.
     # A 404 here is no refusal: only wrong tokens count against the address.
@@ -2028,7 +2028,8 @@ def production_app() -> FastAPI:
         The app, with the grids of `grids/` published.
 
     Raises:
-        OSError: A file under `grids/` cannot be read.
+        CatalogueError: A file under `grids/` cannot be read (the read error
+            is its `__cause__`), or the index or a grid file is bad.
     """
     return create_app(catalogue=load_catalogue(GRIDS_DIR))
 

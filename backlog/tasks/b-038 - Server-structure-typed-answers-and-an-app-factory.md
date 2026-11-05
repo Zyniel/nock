@@ -4,7 +4,7 @@ title: 'Server structure: typed answers and an app factory'
 status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-05T02:11:00Z'
+updated_date: '2026-11-05T03:25:00Z'
 labels:
   - domain:server
   - domain:serving
@@ -90,4 +90,6 @@ Lead decisions on the spec: the answer-model rule lives in serving.md (rule 14, 
 Spec-checker round 1: CHANGES REQUESTED (key order claimed only where a file gives one; overrides' integers named; grids/ files; the no-app name; _map.md rows). For the implementer: README.md's uvicorn nock.server:app line changes with the code.
 
 Spec-checker round 2: APPROVED.
+
+Review round 1: APPROVE. Taken: production_app's docstring names CatalogueError, main()'s docstring gives the full order of the checks, the dashboard answer reads through a named answer_fields. Not taken: AC-30's wording 'that read's error' (the test accepts the read's error in the cause chain, which is what the code raises).
 <!-- SECTION:NOTES:END -->
