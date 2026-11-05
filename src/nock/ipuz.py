@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import unicodedata
 from collections.abc import Collection
 from datetime import date
 from typing import NamedTuple
@@ -231,6 +232,8 @@ def _parse_object(text: str) -> JsonObject:
             text.removeprefix(_BYTE_ORDER_MARK),
             object_pairs_hook=_object_without_repeated_keys,
         )
+    except IpuzError:
+        raise
     except ValueError as error:
         raise IpuzError(f"the file is not valid JSON: {error}") from error
     return _as_object(data, "the file")
@@ -352,7 +355,7 @@ def _read_dash_letters(value: object, key: str, where: str) -> str:
 
 
 def _read_dashed_cell(value: JsonObject, empty: object, where: str) -> str:
-    """Read a letter cell drawn with dashed edges and return its `dashed` letters."""
+    """Read a letter cell with dashed edges; return its dashed and dotted letters."""
     _check_keys(value, ("cell", "style"), where)
     _check_required(value, ("cell", "style"), where)
     if not _same_value(value["cell"], empty):
@@ -498,7 +501,8 @@ def _read_counts(enumeration: str, name: str) -> list[int]:
     if _ENUMERATION_PATTERN.fullmatch(enumeration) is None:
         raise IpuzError(
             f"{name} has the enumeration {enumeration!r}, expected counts of "
-            "letters joined by single separators (- . space '), like 3-2-5"
+            "letters joined by single separators "
+            "(- . space ' \N{RIGHT SINGLE QUOTATION MARK}), like 3-2-5"
         )
     counts: list[int] = []
     for part in _COUNT_PATTERN.findall(enumeration):
@@ -653,10 +657,13 @@ def _is_solution_letter(found: object, expected: str) -> bool:
 
     Case and accents do not matter (rule 4 of `content/grids.md`).
     """
-    if not isinstance(found, str) or len(found) != 1:
+    if not isinstance(found, str):
+        return False
+    composed = unicodedata.normalize("NFC", found)
+    if len(composed) != 1:
         return False
     try:
-        return normalize_answer(found) == expected
+        return normalize_answer(composed) == expected
     except ValueError:
         return False
 
