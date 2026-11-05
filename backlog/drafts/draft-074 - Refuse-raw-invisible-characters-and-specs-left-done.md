@@ -1,0 +1,29 @@
+---
+id: DRAFT-074
+title: Refuse raw invisible characters and specs left done
+status: Draft
+assignee: []
+created_date: '2026-11-05T22:21:00Z'
+labels:
+  - follow-up
+  - tooling
+dependencies: []
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), items I-1 and I-2. New tooling behaviour, the human's call.
+(1) guard_paths.py refuses an Edit or Write holding raw Cf, Cc or Zs characters other than the plain space, with an allowlist for the zero-width joiner inside emoji. The same scan becomes a static step of gate.py. Today it would flag the raw U+3000 at tests/test_spec_037_ac02_edit_validation.py:427.
+(2) A SubagentStop check for the spec-writer in role_gate.py: every spec changed since origin/main reads status: draft. Size S each.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [ ] #3 Tests committed before the code, or a tooling task
+- [ ] #4 Reviewer APPROVE within two rounds
+- [ ] #5 Full gate green
+- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+<!-- DOD:END -->
