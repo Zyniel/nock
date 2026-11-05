@@ -1,9 +1,10 @@
 ---
 id: B-083
 title: lobby/host.md splits in two
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T17:06:00Z'
 labels:
   - domain:host
 milestone: m-7
