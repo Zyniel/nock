@@ -1,9 +1,10 @@
 ---
 id: B-086
 title: platform/server.md splits in two
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T18:35:00Z'
 labels:
   - domain:server
 milestone: m-7
