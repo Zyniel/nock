@@ -19,7 +19,7 @@ Kept in `localStorage`, for every room of the browser; they send nothing.
 
 The other keys hold data, not settings: `nock.nickname` and
 `nock.identity.<CODE>` (`lobby/joining.md`), `nock.room.<CODE>`
-(`lobby/rooms.md`), `nock.progress` (`content/library.md`), `nock.history`
+(`lobby/rooms.md`), `nock.progress` (`content/cards.md`), `nock.history`
 (`gameplay/history.md`), `nock.account_rooms` (`account/account.md`). The operator token sits in the tab's
 `sessionStorage` (`admin/ops-page.md`).
 
