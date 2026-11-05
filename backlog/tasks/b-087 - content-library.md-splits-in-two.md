@@ -4,7 +4,7 @@ title: content/library.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T20:21:00Z'
+updated_date: '2026-11-05T20:29:00Z'
 labels:
   - domain:library
 milestone: m-7
@@ -50,4 +50,6 @@ The new content/cards.md (domain cards) takes the grid card. Library rules 7 and
 Lead decision: Cut A (cards) over Cut B (grid-data). The four grid-card rules and the progress rule are one topic. No criterion becomes shared, one test file moves, and no gate list changes. library.md ends near 11.9 KB with 16 criteria. B-084 repoints account citations in library.md at the same time; whichever merges second resolves them.
 
 Spec-checker APPROVED in one round. Not taken (optional): writing '(004 AC-3)' instead of '(AC-3)' in cards' Code brackets. Follow-up for m-7's close, to become a draft: web/src/lib/CataloguePage.svelte:44 says '(spec 004 rule 7)' about the progress, but spec 004 rule 7 is the force query; the comment should cite content/cards.md rule 1. This was already wrong before this change.
+
+Reviewer round 1: APPROVE, with findings 1-3 taken in round 1. Library rules 8 and 16 now point to the cards criteria that prove them. Cards' Code names its pointers' specs. Lines are wrapped. Round 2: APPROVE. Its last wrapping and the bare bracket ids in library's Code were fixed with the specs-done commit. Left for later: renaming library_harness.py (m-9's test tidy) and the wrong '(spec 004 rule 7)' citations in CataloguePage.svelte:44 and catalogue.ts:67 (the follow-up draft).
 <!-- SECTION:NOTES:END -->

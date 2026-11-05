@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: approved
+status: done
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -82,13 +82,13 @@ an answer.
 
 16. The page asks `GET /api/grids/<n>` and, once, `GET /api/account/progress`
     (`content/cards.md` rule 1), nothing else of the grids or of the account
-    (proven by `content/cards.md` AC-8). It shows, under a top bar holding the brand only (no « Compte », accounts
-    on or off) and with no heading, filter, « Mes salons » or « Grilles
-    terminées »: the muted line `catalogue.loading` while loading, then the
-    grid's one card as on the catalogue (`content/cards.md`; progress, drawing
-    and « Jouer » included); the error line
-    `catalogue.error` when the request fails, answers another status than 2xx
-    or 404, or answers anything but a summary; the muted line
+    (proven by `content/cards.md` AC-8). It shows, under a top bar holding the
+    brand only (no « Compte », accounts on or off) and with no heading, filter,
+    « Mes salons » or « Grilles terminées »: the muted line `catalogue.loading`
+    while loading, then the grid's one card as on the catalogue
+    (`content/cards.md`; progress, drawing and « Jouer » included); the error
+    line `catalogue.error` when the request fails, answers another status than
+    2xx or 404, or answers anything but a summary; the muted line
     `not_found.heading` (« Page introuvable ») and no card on a 404.
 
 ### Baselines
@@ -209,7 +209,7 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   `GridPage.svelte`, `CatalogueFrame.svelte`, `CatalogueList.svelte`;
   `catalogue.ts` (the summary's check).
 - Tests: `tests/test_library_*`, with `tests/library_harness.py`;
-  `tests/test_spec_004_ac01_ac03_*` (AC-1, AC-2), `test_spec_004_ac04_*`, `test_spec_004_ac06_*`, the force tests of
-  `test_spec_004_ac07_*`; `tests/test_spec_046_ac01_ac02_*` (AC-2),
-  `test_spec_046_ac04_ac06_*` (AC-4), `test_spec_046_ac09_ac10_*` (AC-9),
-  `test_spec_046_ac14_*`.
+  `tests/test_spec_004_ac01_ac03_*` (004 AC-1, AC-2), `test_spec_004_ac04_*`,
+  `test_spec_004_ac06_*`, the force tests of `test_spec_004_ac07_*`;
+  `tests/test_spec_046_ac01_ac02_*` (046 AC-2), `test_spec_046_ac04_ac06_*`
+  (046 AC-4), `test_spec_046_ac09_ac10_*` (046 AC-9), `test_spec_046_ac14_*`.
