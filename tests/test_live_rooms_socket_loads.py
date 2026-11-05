@@ -1,4 +1,4 @@
-"""Tests of platform/server, AC-26: a socket's lookup loads its room once.
+"""Tests of platform/live-rooms, AC-7: a socket's lookup loads its room once.
 
 Over the room socket of an app on a store of `server_harness.CountingStore`, which
 records each `load_room` read that found a room. Rooms are created over HTTP, so
@@ -12,7 +12,7 @@ Readings of the spec's wording:
   an implementation that asks the store about `ZZZZZZ` and gets nothing loads
   nothing either.
 - "With its restart step" has no outside sign when the room has no connected
-  player (rule 21: the restart step logs nothing then); the test checks that the
+  player (rule 2: the restart step logs nothing then); the test checks that the
   room is live and serves the join.
 """
 
@@ -37,7 +37,7 @@ ROOM_NOT_FOUND_CLOSE_CODE = 4404
 CATALOGUE_KIND = "published"
 
 
-def test_ac26_a_socket_to_a_room_not_in_memory_loads_it_once_and_a_second_loads_nothing(
+def test_ac7_a_socket_to_a_room_not_in_memory_loads_it_once_and_a_second_loads_nothing(
     tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
 ) -> None:
     store = CountingStore(tmp_path / DATABASE_FILE_NAME)
@@ -67,7 +67,7 @@ def test_ac26_a_socket_to_a_room_not_in_memory_loads_it_once_and_a_second_loads_
     assert loaded_after_the_second == [code]
 
 
-def test_ac26_a_socket_to_an_unknown_room_loads_nothing_and_closes_with_4404(
+def test_ac7_a_socket_to_an_unknown_room_loads_nothing_and_closes_with_4404(
     tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
 ) -> None:
     store = CountingStore(tmp_path / DATABASE_FILE_NAME)

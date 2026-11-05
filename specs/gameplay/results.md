@@ -32,7 +32,7 @@ time and the team to anyone.
    with a `player_joined`, at its first one, with its last nickname, `removed`
    when the host removed it, then each other credited id, nickname null. A
    player's `letters` are the cells it authors in the solved grid
-   (`social/presence.md` rule 12), so they and `revealed_letters` add up to
+   (`social/authorship.md` rule 1), so they and `revealed_letters` add up to
    `letter_cells`.
 2. A player's `words`: walking the log from an empty grid, an entry that makes a
    word full (a letter, pencil or not, or a reveal's lock) makes its player the

@@ -1,4 +1,4 @@
-"""Tests of platform/server, AC-23 and AC-24: a room is in memory only while played.
+"""Tests of platform/live-rooms, AC-4 and AC-5: a room is in memory only while played.
 
 Over the room socket of the app of `host_harness` (a fake clock, accounts off, the
 rooms' store on a file), reading `RoomRegistry.live_codes()` and the store. The
@@ -9,14 +9,14 @@ Readings of the spec's wording:
 - "Not live" is `code not in registry.live_codes()`; a test waits (bounded, real
   time) for the room to leave memory after a socket closes, as the task ends
   asynchronously, and waits for the room to be live after a socket opens.
-- AC-24's "the room's seq" is the seq of the last entry of the room's log; "the
+- AC-5's "the room's seq" is the seq of the last entry of the room's log; "the
   store's latest snapshot" is the highest seq of its `snapshots` rows. The check
   comes right after the room left memory: a room leaves memory once its snapshot
-  is saved (rule 21).
+  is saved (rule 2).
 - "The log holds no entry between that seq and her join's": the first entry after
   the snapshot is Ana's `player_state_changed` to `active`, at the snapshot's seq
   plus one.
-- The edge cases of AC-24 use a store whose snapshot saving fails, and one that
+- The edge cases of AC-5 use a store whose snapshot saving fails, and one that
   counts the snapshots it saves.
 """
 
@@ -97,10 +97,10 @@ def serving(
         yield client, registry
 
 
-# ---- AC-23: created is not live; a socket makes it live ----------------------------
+# ---- AC-4: created is not live; a socket makes it live ----------------------------
 
 
-def test_ac23_a_created_room_is_not_live_a_socket_makes_it_live_until_it_closes(
+def test_ac4_a_created_room_is_not_live_a_socket_makes_it_live_until_it_closes(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -127,10 +127,10 @@ def test_ac23_a_created_room_is_not_live_a_socket_makes_it_live_until_it_closes(
     assert stored_after_close is True
 
 
-# ---- AC-24: live until the last socket is gone -------------------------------------
+# ---- AC-5: live until the last socket is gone -------------------------------------
 
 
-def test_ac24_the_room_stays_live_for_the_second_socket_then_is_saved_and_leaves(
+def test_ac5_the_room_stays_live_for_the_second_socket_then_is_saved_and_leaves(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -169,7 +169,7 @@ def test_ac24_the_room_stays_live_for_the_second_socket_then_is_saved_and_leaves
     assert snapshot_seq == room_seq
 
 
-def test_ac24_ana_finds_her_letter_and_seat_with_nothing_logged_before_her_join(
+def test_ac5_ana_finds_her_letter_and_seat_with_nothing_logged_before_her_join(
     tmp_path: Path,
     fake_clock: FakeClock,
     catalogue: Catalogue,
@@ -206,7 +206,7 @@ def test_ac24_ana_finds_her_letter_and_seat_with_nothing_logged_before_her_join(
     assert (first_after.player_id, first_after.state) == (ana_id, PlayerState.ACTIVE)
 
 
-def test_ac24_a_room_whose_snapshot_fails_stays_live_and_is_saved_at_shutdown(
+def test_ac5_a_room_whose_snapshot_fails_stays_live_and_is_saved_at_shutdown(
     tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
 ) -> None:
     store = SnapshotStore(tmp_path / DATABASE_FILE_NAME)
@@ -240,7 +240,7 @@ def test_ac24_a_room_whose_snapshot_fails_stays_live_and_is_saved_at_shutdown(
     assert store.saved_seqs == [room_seq]
 
 
-def test_ac24_a_room_whose_snapshot_failed_is_saved_when_its_task_next_ends(
+def test_ac5_a_room_whose_snapshot_failed_is_saved_when_its_task_next_ends(
     tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
 ) -> None:
     store = SnapshotStore(tmp_path / DATABASE_FILE_NAME)
@@ -275,7 +275,7 @@ def test_ac24_a_room_whose_snapshot_failed_is_saved_when_its_task_next_ends(
     assert store.saved_seqs == [room_seq]
 
 
-def test_ac24_a_socket_arriving_while_the_room_is_leaving_gets_a_working_room(
+def test_ac5_a_socket_arriving_while_the_room_is_leaving_gets_a_working_room(
     tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
 ) -> None:
     store = SnapshotStore(tmp_path / DATABASE_FILE_NAME)
@@ -320,7 +320,7 @@ def test_ac24_a_socket_arriving_while_the_room_is_leaving_gets_a_working_room(
     assert snapshot_seq == room_seq
 
 
-def test_ac24_the_shutdown_saves_no_snapshot_of_a_room_that_left_memory(
+def test_ac5_the_shutdown_saves_no_snapshot_of_a_room_that_left_memory(
     tmp_path: Path, fake_clock: FakeClock, catalogue: Catalogue
 ) -> None:
     store = SnapshotStore(tmp_path / DATABASE_FILE_NAME)

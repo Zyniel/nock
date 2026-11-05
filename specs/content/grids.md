@@ -210,7 +210,8 @@ party.
 - The grid files, the index, credits and withdrawal: `content/grid-files.md`.
 - Listing, filtering and the grid page: `content/library.md`.
 - Where real grids come from (commission, licence, generation): an owner decision.
-- How long the room's rules take reading the lookups: `platform/server.md`.
+- How long the room's rules take reading the lookups:
+  `platform/live-rooms.md`.
 
 ## Code
 

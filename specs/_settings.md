@@ -10,7 +10,7 @@ Kept in `localStorage`, for every room of the browser; they send nothing.
 
 | Setting (UI) | Values, default first | Key | Owner |
 | --- | --- | --- | --- |
-| « Auteurs » (Menu) | off, on | `nock.authors`: `"true"` or `"false"` | `social/presence.md` 14 |
+| « Auteurs » (Menu) | off, on | `nock.authors`: `"true"` or `"false"` | `social/authorship.md` 3 |
 | « Mots des autres » (Menu) | on, off | `nock.others_tint`: `"false"` is off | `gameplay/board.md` 18 |
 | « Accessibilité » (Menu) | off, on | `nock.accessibility`: `"true"` is on | `gameplay/board.md` 18 |
 | « Masquer le chrono » (Menu) | shown, hidden | `nock.timer_hidden` = `true` while hidden, else absent | `gameplay/rules.md` 13 |

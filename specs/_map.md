@@ -40,8 +40,9 @@ table, the naming rules and the glossary follow in the same change.
 | gameplay | `gameplay/results.md` | end of game, recap, shared recap page | overlays, pages | 028; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
 | gameplay | `gameplay/history.md` | finished grids: the device's and the account's records, « Grilles terminées », « Rejouer » | pages | 029 AC-1 to AC-6; 046 AC-13 |
 | gameplay | `gameplay/modes.md` | race, teams (not written yet; no task) | | 030, 031 (untested stubs) |
-| social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
-| social | `social/chat.md` | chat, the Salon's stream, mute | room | 022 (but AC-3 to AC-5); 013 AC-7, AC-8; 047 AC-12, AC-14 |
+| social | `social/presence.md` | who is here and where: states, the others' selections, the grid's room | cells, room | 013 (but AC-7, AC-8); 043 AC-19 |
+| social | `social/authorship.md` | a letter's author and finder, « Auteurs » mode: inks, the legend and its room | cells, room | 019, 045 |
+| social | `social/chat.md` | chat, the Salon's stream, mute | room | 022 (but AC-3 to AC-5); 013 AC-5, AC-7, AC-8; 043 AC-16, AC-17; 047 AC-12, AC-14 |
 | social | `social/reactions.md` | the clue flag « Je bloque », reactions and their picker | cells, room | 021; 022 AC-3 to AC-5 |
 | social | `social/catch-up.md` | what changed while a player was away | cells, room | 034 |
 | content | `content/grids.md` | grid model, import checks, no third-party content | | 002, 003; 005 AC-4, AC-5 |
@@ -54,7 +55,8 @@ table, the naming rules and the glossary follow in the same change.
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
 | platform | `platform/realtime.md` | room events protocol, fair play | | 039, 037; 017 AC-4; 040 AC-8 to AC-13 |
 | platform | `platform/reconnection.md` | stale edits, the resume window, the page's connection: heartbeat, losses, retries, resends | room | 017 AC-1 to AC-3, AC-5 |
-| platform | `platform/server.md` | durable state, undo, engine time, the rooms held in memory, building the app | | 018; 036 AC-12 |
+| platform | `platform/server.md` | durable state, undo, building the app | | 018; 036 AC-12 |
+| platform | `platform/live-rooms.md` | the rooms held in memory: live from the first socket to the last, the socket's one lookup, the step's time budgets | | |
 | platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching, the answers' types), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, entry and not-found pages, the opening, the brand | pages, foundation | 040 AC-14 to AC-25; 046 AC-1, AC-18 to AC-23; 048 AC-14 |
 | client | `client/foundation.md` | state lines, motion, colour tokens, fonts, icons, shared components, the focus ring, what a frame redraws | foundation, cells | 041; 040 AC-26; 048 AC-13 |
@@ -64,10 +66,13 @@ table, the naming rules and the glossary follow in the same change.
 
 `product.md` takes 035 and 036 AC-1 to AC-9. A numbered spec named without
 criteria goes whole to its row; a criterion may be cited by more than one domain
-(043 AC-5 is cited by `menus` and `room`, 047 AC-13 by `votes` and `results`,
+(043 AC-5 is cited by `menus` and `room`, 043 AC-19 by `room` and
+`presence`, 043 AC-16 and 043 AC-17 by `room` and `chat`, 013 AC-5 by
+`presence` and `chat`, 047 AC-13 by `votes` and `results`,
 047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 and 033 AC-5 by
 `account` and `erasure`, 029 AC-3 and 029 AC-6 by `history` and `erasure`,
-004 AC-7 by `ipuz` and `library`), and each of them
+036 AC-12 by `server` and `serving`, 004 AC-7 by `ipuz` and `library`), and
+each of them
 states the part its own screens hold.
 
 Every file of the table exists but `gameplay/modes.md` (race and teams: no task
@@ -175,7 +180,7 @@ writes it); nothing of race or teams is built.
 | ipuz | (not shown: the standard crossword file format, v2 ArrowWord kind, a grid file is written in) | `ipuz.py`, `read_ipuz`, `write_ipuz` |
 | index | (not shown) | `grids/catalogue.json`, `IndexEntry`, `CatalogueEntry` |
 | room | « salon » | `room.py`, `/r/<code>` |
-| live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open) | `RoomRegistry.live_codes` |
+| live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open; `platform/live-rooms.md`) | `RoomRegistry.live_codes` |
 | member | (a player or a past player of a room) | `PlayerRecord`, `PastPlayer` |
 | connection | (one socket of a player; "session" is the sign-in cookie) | `RoomConnection`, `nock_session` |
 | loss, final close, resume window | « Connexion perdue… » (a close the page retries after; one it stops at; how long a disconnected player keeps their seat) | `reconnecting`, `RoomConfig.resume_window_seconds` |
@@ -207,7 +212,7 @@ writes it); nothing of race or teams is built.
 | foundation, state line | (not shown: the tokens, fonts, icons, components and focus ring every screen is built from; the one line a page shows while waiting, empty, failed or done) | `app.css`, `icons.ts`, `--nock-*` |
 | hints | « Aide »: « Vérifier », « Révéler » | `check`, `reveal` |
 | vote, ballot | « … propose de vérifier la grille », « Oui » / « Non » (the group's decision on a grid check or a reveal; one player's yes or no) | `vote_opened`, `vote_closed`; `vote` |
-| authorship | « Auteurs » | `authors` |
+| authorship | « Auteurs » (`social/authorship.md`) | `authors` |
 | results | « Bilan de la partie », « Voir le bilan » | `recap.py`, `recap` |
 | history | « Grilles terminées » | `history`, `nock.history`, `history.ts`, `HistoryList.svelte`, `HistoryItem.svelte` |
 | operations | « Exploitation » | `operations.py`, `/ops` |

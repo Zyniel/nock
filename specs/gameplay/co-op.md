@@ -260,7 +260,7 @@ keyboard ».
   `platform/realtime.md`; the stale rule, reconnection: `platform/reconnection.md`. Undo, the log and the store:
   `platform/server.md`. Locks by checks and reveals: `gameplay/hints.md`.
   Completion: `gameplay/rules.md`. Authors and their colours:
-  `social/presence.md`. The relay under a 4G profile: `product.md`.
+  `social/authorship.md`. The relay under a 4G profile: `product.md`.
 
 ## Code
 
