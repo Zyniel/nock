@@ -19,7 +19,7 @@ room they are no member of.
   the resume by token.
 - `lobby/lifetime.md`: the last edit time, expiry and the deletion a lookup
   runs first.
-- `gameplay/results.md`: the result fields of a summary; the record « Mes
+- `gameplay/history.md`: the result fields of a summary; the record « Mes
   salons » writes for a solved room.
 
 ## Rules
@@ -32,7 +32,7 @@ room they are no member of.
    the code, the grid number (null outside the catalogue), width, height, the
    members' nicknames (past players in leaving order, then players, each once),
    the last activity (the last edit time, UTC), `solved` and the result fields
-   of `gameplay/results.md`; no letter. The answer never says why a room is left
+   of `gameplay/history.md`; no letter. The answer never says why a room is left
    out; it is not counted by the wrong-code throttle, makes no room live and
    writes nothing. An invalid body answers 422.
 
@@ -96,7 +96,7 @@ room they are no member of.
   the summaries no longer return.
 - Who is a member, the identities and the resume: `lobby/joining.md`. Room
   lives, expiry and the sweep: `lobby/lifetime.md`. The result fields and
-  « Grilles terminées »: `gameplay/results.md`. The identities an account
+  « Grilles terminées »: `gameplay/history.md`. The identities an account
   stores on the device before « Mes salons » asks: `account/account.md`. The
   wrong-code throttle: `lobby/rooms.md`. The catalogue column « Mes salons »
   sits in: `content/library.md`.

@@ -4,15 +4,15 @@ title: Spec 029's leftovers
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T16:30:00Z'
 labels:
   - domain:erasure
-  - domain:results
+  - domain:history
 milestone: m-10
 dependencies: []
 documentation:
   - specs/account/erasure.md
-  - specs/gameplay/results.md
+  - specs/gameplay/history.md
 priority: low
 ordinal: 83000
 ---
