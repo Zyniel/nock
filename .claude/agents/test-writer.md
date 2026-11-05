@@ -61,7 +61,10 @@ The rules are in `specs/_map.md`, "Criteria and their tests". In short:
   A rule of the server, the model or a pure function is tested without a browser.
 - Reuse the fixtures of `tests/conftest.py` and the existing harness modules; do
   not write another copy of a helper that already exists (`dist_dir`,
-  `catalogue`, grid builders, room openers).
+  `fx01_grid`, `catalogue`, grid builders, room openers). A module picks the
+  catalogue the `catalogue` fixture builds with one line, `CATALOGUE_KIND =
+  "published"` (the kinds are in `tests/catalogue_builders.py`); without it the
+  catalogue is empty.
 - Test through the public behaviour: the names of the spec's "New interface" and
   of the existing modules. Do not test private helpers and do not mock the thing
   under test.
