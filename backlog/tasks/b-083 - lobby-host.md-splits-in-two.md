@@ -4,7 +4,7 @@ title: lobby/host.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T17:06:00Z'
+updated_date: '2026-11-05T17:14:00Z'
 labels:
   - domain:host
 milestone: m-7
@@ -35,3 +35,15 @@ From DRAFT-058 (and DRAFT-051, folded into it). host is 18.5 KB with 22 criteria
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+The new lobby/creator.md (domain creator) takes members' accounts and the creator: host rules 10-15 as creator rules 1-6, and host AC-9..16 as creator AC-1..8. The creator Edge cases move. Repoint _map.md (new row, glossary), rooms.md, lifetime.md, joining.md, realtime.md, account.md and erasure.md. Rename six test files to tests/test_creator_*.py with renumbered test names. Repoint the code comments in hub.py, store.py and room.py. No gate.py change.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead decision: Cut A (creator) over Cut B (client/controls). It is the coherent topic, leaves host.md near 11.4 KB with 14 criteria, and needs no gate.py change. tests/host_harness.py keeps its name: it is the shared socket app of eight domains, and renaming it would touch 28 files, many of them also changed by B-003. Its docstring is updated instead.
+<!-- SECTION:NOTES:END -->
