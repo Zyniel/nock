@@ -249,7 +249,7 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 - Presence states in the roster: `social/presence.md`. Host controls and the
   creator: `lobby/host.md`. Codes and creation: `lobby/rooms.md`. The rooms of
   an account: `account/account.md`. Finished grids
-  after deletion: `gameplay/results.md`. What changed while away:
+  after deletion: `gameplay/history.md`. What changed while away:
   `social/catch-up.md`. What deletion erases for privacy:
   `admin/operations.md`.
 
