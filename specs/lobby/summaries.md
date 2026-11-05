@@ -97,7 +97,7 @@ room they are no member of.
 - Who is a member, the identities and the resume: `lobby/joining.md`. Room
   lives, expiry and the sweep: `lobby/lifetime.md`. The result fields and
   « Grilles terminées »: `gameplay/history.md`. The identities an account
-  stores on the device before « Mes salons » asks: `account/account.md`. The
+  stores on the device before « Mes salons » asks: `account/my-account.md`. The
   wrong-code throttle: `lobby/rooms.md`. The catalogue column « Mes salons »
   sits in: `content/library.md`.
 

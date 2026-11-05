@@ -708,7 +708,7 @@ def expect_asking(page: Page, button: Locator, count: int) -> None:
 
     `aria-expanded` is "true" and `aria-controls` names the question's block, which
     holds the question's line, « Confirmer » and « Annuler », as on the account page
-    (`account/account.md` rule 17).
+    (`account/my-account.md` rule 5).
     """
     expect(button).to_have_attribute("aria-expanded", "true")
     block = question_block(page, button)

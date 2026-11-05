@@ -2,8 +2,8 @@
 
 Pytest does not collect this module (its name does not start with `test_`). It
 holds what the tests of AC-9 (`test_menus_overlay_focus.py`) share with the tests
-of `lobby/host.md` AC-18 to AC-20, `gameplay/votes.md` AC-9 and `account/account.md`
-AC-34: the `host_changed` frame, and a press at one point released at another
+of `lobby/host.md` AC-18 to AC-20, `gameplay/votes.md` AC-9 and `account/my-account.md`
+AC-8: the `host_changed` frame, and a press at one point released at another
 (`press_and_release`), the way a drag between a sheet and its backdrop reads.
 The host's sheet on a mocked room (`open_host_sheet`) stays in `hud_harness.py`,
 where the room-gone tests also use it.

@@ -22,7 +22,7 @@ Readings taken where the spec leaves room:
   `hr` or `role="separator"` right before it (`has_divider` of
   `overrides_harness`), and the question stands under the rows.
 - "The account page's disclosure" (rule 13) is read as that page marks it
-  (`account/account.md` rule 17, `AccountPage.svelte`): the button that asked
+  (`account/my-account.md` rule 5, `AccountPage.svelte`): the button that asked
   has `aria-expanded` "true" while the question is open, "false" otherwise, and
   `aria-controls` naming the question's block (`expect_asking`). "The button
   pressed" is also checked as the account page's own tests check it: the quiet

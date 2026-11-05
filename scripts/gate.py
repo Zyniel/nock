@@ -200,9 +200,9 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "rooms",
     ),
     "web/src/lib/RoomMenu.svelte": (
-        "account",
         "authorship",
         "menus",
+        "my-account",
         "rules",
     ),
     "web/src/lib/RoomPage.svelte": (
@@ -217,6 +217,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "hud",
         "joining",
         "menus",
+        "my-account",
         "presence",
         "product",
         "reconnection",

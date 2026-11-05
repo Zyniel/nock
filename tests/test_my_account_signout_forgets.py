@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-31 to AC-33: a sign-out forgets the account's seats.
+"""Tests of account/my-account, AC-5 to AC-7: a sign-out forgets the account's seats.
 
 A browser, on the live server of spec 033's "Test harness" (accounts on, a
 recording mailer, the real client). Ana's account lists the rooms R and T; her
@@ -7,13 +7,13 @@ signs in from `/account` (which stores R), her account links S from another devi
 and `/` loads (which stores S): the device holds the identities of R and S, T's
 unchanged, and `nock.account_rooms` names R and S.
 
-- AC-31: « Se déconnecter », answered 204 by the server, shows `signed_out`; the
+- AC-5: « Se déconnecter », answered 204 by the server, shows `signed_out`; the
   device then holds no identity, room record or history record of R or S and no
   `nock.account_rooms`; T's identity, room record and history record stay, and
   « Mes salons » on `/` lists T alone.
-- AC-32: « Supprimer définitivement », answered 204, shows `deleted` and leaves the
+- AC-6: « Supprimer définitivement », answered 204, shows `deleted` and leaves the
   device the same way.
-- AC-33: a sign-out answered 500 or a deletion answered 500 shows
+- AC-7: a sign-out answered 500 or a deletion answered 500 shows
   `account.error.generic` and every `localStorage` item stays as it was.
 """
 
@@ -205,7 +205,7 @@ def account_rooms_of(page: Page) -> list[str]:
 
 
 def device_with_seats(server: AccountServer, devices: Devices, grid: Grid) -> Seats:
-    """AC-31's device, signed in, holding the seats of R and S and its own of T.
+    """AC-5's device, signed in, holding the seats of R and S and its own of T.
 
     Another device signs in from R and links T; this device holds its own seat in
     T, `nock.room.R`, `nock.room.T` and history records of R and T, signs in from
@@ -288,10 +288,10 @@ def assert_device_forgot_the_account_seats(seats: Seats) -> None:
     assert history_by_code(page) == {T_CODE: seats.t_history}
 
 
-# ---- AC-31 to AC-33 ---------------------------------------------------------------
+# ---- AC-5 to AC-7 ---------------------------------------------------------------
 
 
-def test_ac31_a_sign_out_forgets_r_and_s_and_keeps_t(
+def test_ac5_a_sign_out_forgets_r_and_s_and_keeps_t(
     account_server: AccountServer, devices: Devices, fx01_grid: Grid
 ) -> None:
     seats = device_with_seats(account_server, devices, fx01_grid)
@@ -303,7 +303,7 @@ def test_ac31_a_sign_out_forgets_r_and_s_and_keeps_t(
     assert_device_forgot_the_account_seats(seats)
 
 
-def test_ac31_mes_salons_lists_t_alone_after_the_sign_out(
+def test_ac5_mes_salons_lists_t_alone_after_the_sign_out(
     account_server: AccountServer, devices: Devices, fx01_grid: Grid
 ) -> None:
     seats = device_with_seats(account_server, devices, fx01_grid)
@@ -317,7 +317,7 @@ def test_ac31_mes_salons_lists_t_alone_after_the_sign_out(
     expect(my_room_items(seats.page).first).to_have_attribute("data-code", T_CODE)
 
 
-def test_ac32_a_deletion_leaves_the_device_as_a_sign_out_does(
+def test_ac6_a_deletion_leaves_the_device_as_a_sign_out_does(
     account_server: AccountServer, devices: Devices, fx01_grid: Grid
 ) -> None:
     seats = device_with_seats(account_server, devices, fx01_grid)
@@ -339,7 +339,7 @@ def fail_with_500(route: Route) -> None:
 
 
 @pytest.mark.parametrize("action", ["sign-out", "deletion"])
-def test_ac33_a_failed_sign_out_or_deletion_removes_nothing(
+def test_ac7_a_failed_sign_out_or_deletion_removes_nothing(
     account_server: AccountServer, devices: Devices, fx01_grid: Grid, action: str
 ) -> None:
     seats = device_with_seats(account_server, devices, fx01_grid)

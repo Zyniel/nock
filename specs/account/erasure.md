@@ -18,7 +18,8 @@ erasure must never undo.
 ## Depends on
 
 - `account/account.md`: accounts on or off, the session, identities and their
-  tokens, the mailer, the page's « Supprimer mon compte ».
+  tokens, the mailer; the page's « Supprimer mon compte » is
+  `account/my-account.md`.
 - `lobby/joining.md`: members, past players, the seat back, the device's
   identities; the creator rooms are `lobby/creator.md`.
 - `lobby/lifetime.md`: the sweep that runs the attempts and the purge; its
@@ -251,11 +252,11 @@ erasure must never undo.
 
 ## Out of scope
 
-- Sign-in, the session, the account's rooms, the sheet and the page, including
-  « Supprimer mon compte » and what the device forgets on a 204:
-  `account/account.md`. AC-15 to AC-17 check part of that behaviour together
-  with rules 3 and 4; the rules of that behaviour stay in
-  `account/account.md`.
+- Sign-in, the session, the account's rooms: `account/account.md`. The sheet
+  and the page, including « Supprimer mon compte » and what the device forgets
+  on a 204: `account/my-account.md`. AC-15 to AC-17 check part of that
+  behaviour together with rules 3 and 4; the rules of that behaviour stay in
+  those two files.
 - An export of the account, a confirmation link or a grace period before
   deleting, keeping creator rooms alive; erasing chat lines or backups.
 - Pushing a device's progress up to the account; a guest's progress across

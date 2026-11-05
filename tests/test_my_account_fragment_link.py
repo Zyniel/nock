@@ -1,4 +1,4 @@
-"""Tests of account/account, AC-12: a link opened on an `/account` already shown.
+"""Tests of account/my-account, AC-1: a link opened on an `/account` already shown.
 
 A browser, on the live server of spec 033's "Test harness" (accounts on, a
 recording mailer, the real client). A link is asked over HTTP from a device with no
@@ -61,7 +61,7 @@ def asked_token(server: AccountServer, devices: Devices) -> str:
     return token_of(server.mailer.messages[0])
 
 
-def test_ac12_a_token_set_as_the_fragment_of_a_signed_out_page_signs_in(
+def test_ac1_a_token_set_as_the_fragment_of_a_signed_out_page_signs_in(
     account_server: AccountServer, devices: Devices
 ) -> None:
     token = asked_token(account_server, devices)
