@@ -1,7 +1,7 @@
 ---
 area: client
 file: hud
-status: done
+status: approved
 ---
 
 # client/hud - The room's frame: top bar, menus, sheets, clue bar
@@ -344,7 +344,7 @@ Menus, buttons, switches, the brand link: `_design/foundation.md`,
   only a sign-out or deletion forgets, for a seat the account brought
   (`account/account.md` rule 17).
 - The Salon, what « Salon » carries while it is closed, the 3-second notes:
-  `client/room.md`. « Réagir », « Je bloque », the reactions: `social/chat.md`.
+  `client/room.md`. « Réagir », « Je bloque », the reactions: `social/reactions.md`.
 - What items, sheets, lines and rows do: the domains each rule names. The page
   before the room shows: `client/shell.md`.
 

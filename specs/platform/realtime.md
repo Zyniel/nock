@@ -1,7 +1,7 @@
 ---
 area: platform
 file: realtime
-status: done
+status: approved
 ---
 
 # platform/realtime - Room events and fair play
@@ -71,8 +71,10 @@ contract. No browser receives an answer letter before the room earns it.
    - `social/presence.md`: `select_cell`, answered by `selection_moved` (where a
      player is), and `player_joined`, `player_left`, `player_state_changed`
      (who is here, and how);
-   - `social/chat.md`: `chat`, `react`, `flag`, `mute_player`, answered by
-     `chat_message`, `reaction`, `flag_changed`, `player_muted`;
+   - `social/chat.md`: `chat`, `mute_player`, answered by `chat_message`,
+     `player_muted`;
+   - `social/reactions.md`: `react`, `flag`, answered by `reaction`,
+     `flag_changed`;
    - `lobby/host.md`: `remove_player`, `lock_room`, `change_settings` (host
      controls; the help settings are `gameplay/hints.md`), answered by
      `settings_changed` and `host_changed` (the host role passed on);
@@ -105,13 +107,14 @@ contract. No browser receives an answer letter before the room earns it.
     is logged before it is sent, then reaches every joined socket of the room,
     the sender's included; a reply goes to the sender only. `selection_moved`
     goes to the other players only; a `reaction` goes to every player, the
-    sender included (`social/chat.md`). A joiner gets its snapshot before any
+    sender included (`social/reactions.md`). A joiner gets its snapshot before any
     later event and misses none. The page applies events by seq
     (`client/shell.md`).
 12. A refusal is one `error` to the sender only and changes neither the room nor
     its seq, except that it wakes an idle sender first (`social/presence.md`).
     Chat and reactions over their limit, a muted player's reaction and an
-    invalid reaction are dropped with no answer (`social/chat.md`), and so are
+    invalid reaction are dropped with no answer (`social/chat.md`,
+    `social/reactions.md`), and so are
     checks and reveals over their limit (`gameplay/hints.md`). The
     `room_full` or `room_locked` of a join, and the `removed` of a removed
     token's join or of the host's removal (sent to the removed player), are
@@ -281,7 +284,8 @@ contract. No browser receives an answer letter before the room earns it.
 - Durable state across a restart, the log and undo: `platform/server.md`.
   Stalled, flooding and oversized sockets: `product.md`. What changed while
   away: `social/catch-up.md`.
-- Throttling other messages: chat and reactions, `social/chat.md`; checks and
+- Throttling other messages: chat, `social/chat.md`; reactions,
+  `social/reactions.md`; checks and
   reveals, `gameplay/hints.md`; wrong codes, `lobby/rooms.md`; `undo`,
   `select_cell`, ballots and the rest are not limited.
 - Peer-to-peer sync, a leave message, message acknowledgements, a Content
