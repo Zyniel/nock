@@ -4,7 +4,7 @@ title: social/chat.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T10:46:00Z'
+updated_date: '2026-11-05T10:49:00Z'
 labels:
   - domain:chat
 milestone: m-7
@@ -44,3 +44,9 @@ From DRAFT-058. chat is 21.5 KB with 23 criteria; the spec-writer proposed socia
 3. Tests: rename or move the domain tests of moved criteria (after B-003 merges, which edits many test files).
 4. No code change; reviewer; full gate; pull request.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead decision (Plan agent on Fable, three cuts): Cut C, social/reactions.md takes the clue flag (rules 1-6, AC-1 to AC-7, 021 whole) and the reactions (rules 12-14, AC-10, AC-11, AC-22; 022 AC-3 to AC-5), renumbered rules 1-9 and AC-1 to AC-10. chat goes to about 13.8 KB and 13 criteria, reactions about 9.4 KB and 10. Not taken: social/stream (rules 18-20) leaves chat 2.3 KB over and at 20 criteria; the flag alone leaves it 1.7 KB over. Cost: test_chat_connection.py's two test_ac22_* move to tests/test_reactions_connection.py as test_ac10_*.
+<!-- SECTION:NOTES:END -->
