@@ -440,7 +440,7 @@ def test_ac2_the_activity_feed_focus_outline_is_fully_visible(
     show_tab(page, "discussion")
     fill_feed_and_check_it_scrolls(page, mock)
     # Start the walk inside the open Salon: a Tab onto an element outside the
-    # Salon sheet closes it (`client/hud.md` rule 12), and the feed with it.
+    # Salon sheet closes it (`client/menus.md` rule 5), and the feed with it.
     page.get_by_test_id("salon-tab-discussion").focus()
     reached = False
     for _ in range(MAX_TABS):

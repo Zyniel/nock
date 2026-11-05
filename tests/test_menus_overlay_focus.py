@@ -1,12 +1,12 @@
-"""Tests of `client/hud.md` AC-23, AC-24 and AC-25: the focus stays where a player
-can see it in the room's menus, its Salon sheet and its host sheet (rules 12, 13).
+"""Tests of `client/menus.md` AC-7, AC-8 and AC-9: the focus stays where a player
+can see it in the room's menus, its Salon sheet and its host sheet (rules 5, 6).
 
-AC-23: at 360 by 740 with MIME selected, Tab on « Le mot », the last item of the
+AC-7: at 360 by 740 with MIME selected, Tab on « Le mot », the last item of the
 open Aide menu, focuses the grid and closes the menu and its scrim; at 1280 by
 720 Shift+Tab on « Auteurs » in the open Menu focuses « Menu » and closes the
 Menu; a vote that disables the focused « La grille » leaves the menu open.
 
-AC-24: at 360 by 740 with the Salon sheet open, Shift+Tab on « Discussion » focuses
+AC-8: at 360 by 740 with the Salon sheet open, Shift+Tab on « Discussion » focuses
 the clue bar's next-word button and closes the sheet, its scrim and « Salon »'s
 expansion. Bob, not the host, with the focus in the sheet's message box, is muted
 by Ana (`player_muted` for him): the box is disabled, the sheet stays open with the
@@ -14,7 +14,7 @@ focus on « Salon », and his next Tab closes it. From "Edge cases": Tab on the 
 sheet's last control leaves the page for the browser and closes nothing; the next
 Tab into the page closes it.
 
-AC-25: at 1280 by 720 in the host's settings, a press in « Lettres à révéler »
+AC-9: at 1280 by 720 in the host's settings, a press in « Lettres à révéler »
 released on the backdrop, or a press on the backdrop released in the sheet, leaves
 it open with its values; a press and its release both on the backdrop close it and
 focus « Menu ».
@@ -45,13 +45,8 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from hud_harness import (
-    COMPUTER_BACKDROP_POINT,
-    centre_of,
-    open_fx01_room,
-    open_host_sheet,
-    press_and_release,
-)
+from hud_harness import open_fx01_room, open_host_sheet
+from menus_harness import COMPUTER_BACKDROP_POINT, centre_of, press_and_release
 from nock.grid import Grid
 from nock.protocol import HelpMode, PlayerMuted
 from room_panels import is_closed, open_aide, open_menu, show_tab
@@ -144,10 +139,10 @@ def salon_is_open(page: Page) -> bool:
     return bool(salon_focus(page)["isOpen"])
 
 
-# ---- AC-23: the Aide menu and the Menu --------------------------------------------
+# ---- AC-7: the Aide menu and the Menu --------------------------------------------
 
 
-def test_ac23_tab_on_the_last_item_of_the_aide_menu_focuses_the_grid_and_closes_it(
+def test_ac7_tab_on_the_last_item_of_the_aide_menu_focuses_the_grid_and_closes_it(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = window(PHONE[0], PHONE[1], False)
@@ -170,7 +165,7 @@ def test_ac23_tab_on_the_last_item_of_the_aide_menu_focuses_the_grid_and_closes_
     expect_word(page, "0,2,0")
 
 
-def test_ac23_shift_tab_on_the_first_item_of_the_menu_focuses_menu_and_closes_it(
+def test_ac7_shift_tab_on_the_first_item_of_the_menu_focuses_menu_and_closes_it(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = window(COMPUTER[0], COMPUTER[1], False)
@@ -189,7 +184,7 @@ def test_ac23_shift_tab_on_the_first_item_of_the_menu_focuses_menu_and_closes_it
 
 
 @pytest.mark.parametrize("size", SIZES, ids=SIZE_IDS)
-def test_ac23_a_vote_that_disables_the_focused_item_leaves_the_menu_open(
+def test_ac7_a_vote_that_disables_the_focused_item_leaves_the_menu_open(
     window: OpenWindow, live_server: str, fx01_grid: Grid, size: tuple[int, int]
 ) -> None:
     page = window(size[0], size[1], False)
@@ -211,10 +206,10 @@ def test_ac23_a_vote_that_disables_the_focused_item_leaves_the_menu_open(
     )
 
 
-# ---- AC-24: the Salon sheet -------------------------------------------------------
+# ---- AC-8: the Salon sheet -------------------------------------------------------
 
 
-def test_ac24_shift_tab_on_discussion_focuses_the_clue_bar_and_closes_the_sheet(
+def test_ac8_shift_tab_on_discussion_focuses_the_clue_bar_and_closes_the_sheet(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = window(PHONE[0], PHONE[1], False)
@@ -235,7 +230,7 @@ def test_ac24_shift_tab_on_discussion_focuses_the_clue_bar_and_closes_the_sheet(
     )
 
 
-def test_ac24_tab_out_of_the_page_closes_nothing_until_the_focus_is_in_the_page(
+def test_ac8_tab_out_of_the_page_closes_nothing_until_the_focus_is_in_the_page(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = window(PHONE[0], PHONE[1], False)
@@ -268,7 +263,7 @@ def open_bob_room(page: Page, base_url: str, grid: Grid) -> RoomMock:
     return open_room(page, base_url, frame)
 
 
-def test_ac24_muted_with_the_focus_in_the_message_box_the_sheet_stays_open(
+def test_ac8_muted_with_the_focus_in_the_message_box_the_sheet_stays_open(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = window(PHONE[0], PHONE[1], False)
@@ -296,11 +291,11 @@ def test_ac24_muted_with_the_focus_in_the_message_box_the_sheet_stays_open(
     )
 
 
-# ---- AC-25: the host's settings and the backdrop ----------------------------------
+# ---- AC-9: the host's settings and the backdrop ----------------------------------
 
 
 @pytest.mark.parametrize("start", ["field", "backdrop"])
-def test_ac25_a_press_and_release_in_two_places_close_nothing(
+def test_ac9_a_press_and_release_in_two_places_close_nothing(
     window: OpenWindow, live_server: str, fx01_grid: Grid, start: str
 ) -> None:
     page = window(COMPUTER[0], COMPUTER[1], False)
@@ -324,7 +319,7 @@ def test_ac25_a_press_and_release_in_two_places_close_nothing(
     expect(letters).to_have_value("7")
 
 
-def test_ac25_a_press_and_release_both_on_the_backdrop_close_it_and_focus_menu(
+def test_ac9_a_press_and_release_both_on_the_backdrop_close_it_and_focus_menu(
     window: OpenWindow, live_server: str, fx01_grid: Grid
 ) -> None:
     page = window(COMPUTER[0], COMPUTER[1], False)

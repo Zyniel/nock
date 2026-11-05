@@ -218,8 +218,8 @@ The grid itself (cells, arrows, cursors, zoom, the viewport):
 - The grid's cells, arrows, cursors, fit, zoom, the viewport following the
   selection, hyphen edges: `gameplay/viewport.md`. The selection after a
   reload: `lobby/rooms.md`. Others' selections: `social/presence.md`. Edits,
-  pencil letters: `gameplay/co-op.md`. Top bar, Menu, clue bar buttons:
-  `client/hud.md`. Grid roles: `product.md`.
+  pencil letters: `gameplay/co-op.md`. Top bar, clue bar buttons:
+  `client/hud.md`; the Menu: `client/menus.md`. Grid roles: `product.md`.
 
 ## Code
 

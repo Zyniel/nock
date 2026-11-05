@@ -52,7 +52,8 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
-from hud_harness import host_changed_frame, open_host_sheet
+from hud_harness import open_host_sheet
+from menus_harness import host_changed_frame
 from nock.grid import Grid
 from nock.protocol import ChangeSettings, HelpMode, RevealBudget, parse_client_message
 from room_panels import open_host_settings
