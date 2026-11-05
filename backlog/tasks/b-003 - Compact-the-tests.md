@@ -4,7 +4,7 @@ title: Compact the tests
 status: Done
 assignee: []
 created_date: '2026-11-01T16:43:00Z'
-updated_date: '2026-11-05T18:00:00Z'
+updated_date: '2026-11-05T18:01:00Z'
 labels: []
 milestone: m-2
 dependencies: []
@@ -39,7 +39,7 @@ ordinal: 13000
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -60,6 +60,8 @@ Test-writer: 381 files, +212 -3381; dist_dir in conftest.py (3 spec 040 copies k
 Review round 1: CHANGES REQUESTED (19 harness docstrings named the removed copies; spec 038 docstrings). Fixed; the lead also named fx01_grid and CATALOGUE_KIND in .claude/agents/test-writer.md (a tooling coherence fix). Not taken: failing on a misspelled CATALOGUE_KIND name (its tests fail on the missing grids anyway). Review round 2: APPROVE. The full gate waits for B-080 and B-081 to merge, since they move test files this task edits.
 
 After B-080 and B-081 merged, main came in. The conflicts in test_account_sheet_backdrop.py and test_chat_connection.py were resolved: the moved helpers are imported from menus_harness and spec022_harness, with no local copies. The new test_reactions_connection.py lost its local fx01_grid copy. Full gate here (Chromium): static checks, 8,774 parallel and 162 serial tests, all green. Firefox and WebKit are left to CI after the merge: the change is to test setup only. Then main took B-082 and the board change (specs and backlog only), and the traceability gate passed again.
+
+Pull request #145, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
