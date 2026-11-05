@@ -65,7 +65,7 @@ whom no stand-in can keep out; the room goes with the creator's account.
    (`client/hud.md` rule 16), one that had not the entry card
    (`client/shell.md` rule 7), and a later socket to its code counts as a wrong
    code. The other players' finished grids stay in their history
-   (`gameplay/results.md` rule 15, `account/erasure.md` rule 8). Being host of
+   (`gameplay/history.md` rule 2, `account/erasure.md` rule 8). Being host of
    an anonymous room deletes nothing: the erased account's player there is `--`
    (`account/erasure.md` rules 1, 5), the room otherwise unchanged.
 6. While accounts are off a stored creator stays and the room plays as an

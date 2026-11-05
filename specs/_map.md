@@ -37,7 +37,8 @@ table, the naming rules and the glossary follow in the same change.
 | gameplay | `gameplay/rules.md` | completion, shared timer | room, overlays | 026, 027 |
 | gameplay | `gameplay/hints.md` | check, reveal, the reveal budget, the hint limit, the Aide items | cells, room | 023, 024; 025 AC-1, AC-4 |
 | gameplay | `gameplay/votes.md` | the group vote on a grid check or a reveal, its banner | room, overlays | 025 AC-2, AC-3, AC-5 to AC-9; 047 AC-1 to AC-5, AC-13, AC-14 |
-| gameplay | `gameplay/results.md` | end of game, recap, history, shared recap page | overlays, pages | 028, 029; 046 AC-13; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
+| gameplay | `gameplay/results.md` | end of game, recap, shared recap page | overlays, pages | 028; 047 AC-6 to AC-11, AC-13, AC-14; 048 AC-1, AC-2 |
+| gameplay | `gameplay/history.md` | finished grids: the device's and the account's records, « Grilles terminées », « Rejouer » | pages | 029 AC-1 to AC-6; 046 AC-13 |
 | gameplay | `gameplay/modes.md` | race, teams (not written yet; no task) | | 030, 031 (untested stubs) |
 | social | `social/presence.md` | who is here and where, authorship, Auteurs mode | cells, room | 013 (but AC-7, AC-8), 019, 045 |
 | social | `social/chat.md` | chat, the Salon's stream, mute | room | 022 (but AC-3 to AC-5); 013 AC-7, AC-8; 047 AC-12, AC-14 |
@@ -64,7 +65,8 @@ table, the naming rules and the glossary follow in the same change.
 criteria goes whole to its row; a criterion may be cited by more than one domain
 (043 AC-5 is cited by `menus` and `room`, 047 AC-13 by `votes` and `results`,
 047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 and 033 AC-5 by
-`account` and `erasure`, 004 AC-7 by `ipuz` and `library`), and each of them
+`account` and `erasure`, 029 AC-3 and 029 AC-6 by `history` and `erasure`,
+004 AC-7 by `ipuz` and `library`), and each of them
 states the part its own screens hold.
 
 Every file of the table exists but `gameplay/modes.md` (race and teams: no task
@@ -205,7 +207,7 @@ writes it); nothing of race or teams is built.
 | vote, ballot | « … propose de vérifier la grille », « Oui » / « Non » (the group's decision on a grid check or a reveal; one player's yes or no) | `vote_opened`, `vote_closed`; `vote` |
 | authorship | « Auteurs » | `authors` |
 | results | « Bilan de la partie », « Voir le bilan » | `recap.py`, `recap` |
-| history | « Grilles terminées » | `history` |
+| history | « Grilles terminées » | `history`, `nock.history`, `history.ts`, `HistoryList.svelte`, `HistoryItem.svelte` |
 | operations | « Exploitation » | `operations.py`, `/ops` |
 | ops page, replay | « Exploitation » (the operator's page: the token form, the dashboard card and its periods, a room's edits played step by step on its grid) | `OpsPage.svelte`, `OpsReplay.svelte`, `room_edits` |
 | force | « Force » (difficulty 1 to 4) | `force` |

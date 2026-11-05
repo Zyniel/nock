@@ -4,16 +4,17 @@ title: The final status's wording and ISO dates in results
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T16:30:00Z'
 labels:
   - domain:hud
   - domain:shell
-  - domain:results
+  - domain:history
 milestone: m-8
 dependencies: []
 documentation:
   - specs/client/hud.md
   - specs/client/shell.md
-  - specs/gameplay/results.md
+  - specs/gameplay/history.md
 priority: low
 ordinal: 79000
 ---
