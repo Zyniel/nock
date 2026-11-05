@@ -4,6 +4,12 @@ AC-1 starts with the shape of FX-02 (the fixture grid), then opens a room on it:
 at-load checks run in all three engines, the pinch and pan checks in Chromium only
 (touch input through the Chrome DevTools Protocol). The shared setup is in
 `spec006_harness`.
+
+viewport AC-2 widened the pan to a pen (`specs/gameplay/viewport.md` rule 3): a pen
+pans as one finger does and never zooms, so it is never one of the fingers of a
+pinch. A pen is a real `pen` pointer sent by the protocol's
+`Input.dispatchMouseEvent` (`viewport_harness`'s `drag_with`), dragged like `pan`'s
+finger: from the viewport centre by -200 px in x and y.
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from spec006_harness import (
     pan,
     pinch,
 )
+from viewport_harness import Pointer, drag_with, pinch_beside_a_pen
 
 ZOOM_PATTERN = re.compile(r"^\d+(\.\d{1,2})?$")
 MAX_PINCHES = 5
@@ -34,6 +41,20 @@ SMALL_PINCH_START = 40.0
 BIG_PINCH_END = 300.0
 EPSILON = 1e-6
 FX02_WORD_COUNT = 47
+# `pan`'s drag: from the viewport centre by -200 px in x and y.
+PAN_OFFSET = (-200.0, -200.0)
+# A pinch beside a pen, around the viewport centre: finger A is held 50 px left of
+# it; the pen goes down 50 px above it and moves 100 px up; finger B comes down
+# 50 px right of it and moves 50 px right. A and B go from 100 to 150 px apart, a
+# zoom of 1.5. A pen taken for a finger would pinch with A (71 to 158 px apart,
+# 2.24) or, A forgotten, with B (158 to 180 px apart, 1.14).
+HELD_FINGER_FROM_CENTRE = (-50.0, 0.0)
+PEN_FROM_CENTRE = (0.0, -50.0)
+PEN_MOVE = (0.0, -100.0)
+MOVING_FINGER_FROM_CENTRE = (50.0, 0.0)
+MOVING_FINGER_MOVE = (50.0, 0.0)
+FINGERS_ALONE_ZOOM = 1.5
+ZOOM_TOLERANCE = 0.06
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
@@ -90,6 +111,26 @@ def client_size(viewport: Locator) -> tuple[float, float]:
 
 # ---- Pinch and pan through the Chrome DevTools Protocol (Chromium only) -------
 # `pinch` and `pan` are in `spec006_harness`.
+
+
+def viewport_centre(viewport: Locator) -> tuple[float, float]:
+    """The centre of the viewport's box, as (x, y) in CSS px of the page."""
+    box = box_of(viewport)
+    return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+
+
+def from_centre(viewport: Locator, offset: tuple[float, float]) -> tuple[float, float]:
+    """The point at an offset from the viewport centre, in CSS px of the page."""
+    centre_x, centre_y = viewport_centre(viewport)
+    return centre_x + offset[0], centre_y + offset[1]
+
+
+def pan_with(page: Page, viewport: Locator, pointer: Pointer) -> None:
+    """Pan with one finger (`pan`) or drag a pen the same way."""
+    if pointer == Pointer.TOUCH:
+        pan(page, viewport)
+    else:
+        drag_with(page, pointer, viewport_centre(viewport), PAN_OFFSET)
 
 
 def pinch_out(page: Page, viewport: Locator) -> None:
@@ -334,17 +375,19 @@ def test_ac1_pinch_out_raises_the_zoom_up_to_the_maximum(
 
 
 @pytest.mark.only_browser("chromium")
+@pytest.mark.parametrize("pointer", [Pointer.TOUCH, Pointer.PEN])
 def test_ac1_pan_scrolls_the_zoomed_grid_in_both_directions(
     phone_page: Page,
     live_server: str,
     room_registry: RoomRegistry,
     fx02_grid: Grid,
+    pointer: Pointer,
 ) -> None:
     viewport = open_room(phone_page, live_server, room_registry, fx02_grid)
     pinch_out_to_max(phone_page, viewport)
     scroll_before = viewport.evaluate("e => [e.scrollLeft, e.scrollTop]")
 
-    pan(phone_page, viewport)
+    pan_with(phone_page, viewport, pointer)
 
     handle = viewport.element_handle()
     assert handle is not None
@@ -468,3 +511,24 @@ def test_ac1_a_one_finger_drag_never_changes_the_zoom(
     phone_page.wait_for_timeout(SETTLE_MS)
 
     assert read_zoom(viewport) == zoom_before
+
+
+@pytest.mark.only_browser("chromium")
+def test_ac1_a_pen_pressed_beside_a_pinch_never_changes_its_zoom(
+    phone_page: Page,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx02_grid: Grid,
+) -> None:
+    viewport = open_room(phone_page, live_server, room_registry, fx02_grid)
+    held_finger = from_centre(viewport, HELD_FINGER_FROM_CENTRE)
+    pen = (from_centre(viewport, PEN_FROM_CENTRE), PEN_MOVE)
+    moving_finger = (
+        from_centre(viewport, MOVING_FINGER_FROM_CENTRE),
+        MOVING_FINGER_MOVE,
+    )
+
+    pinch_beside_a_pen(phone_page, held_finger, pen, moving_finger)
+
+    phone_page.wait_for_timeout(SETTLE_MS)
+    assert read_zoom(viewport) == pytest.approx(FINGERS_ALONE_ZOOM, abs=ZOOM_TOLERANCE)

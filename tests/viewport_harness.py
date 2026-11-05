@@ -1,10 +1,20 @@
 """Shared setup of the tests of the domain viewport (`specs/gameplay/viewport.md`).
 
 Pytest does not collect this module (its name does not start with `test_`). It
-holds the readers of painted pixels that the hyphen edge tests (viewport AC-9 and
-AC-10) use: a screenshot clip decoded into its pixels, and the reading of one
-cell edge across its thickness and along its length, with the geometry of
-`specs/_design/cells.md` « Hyphen edges ».
+holds:
+
+- The readers of painted pixels that the hyphen edge tests (viewport AC-9 and
+  AC-10) use: a screenshot clip decoded into its pixels, and the reading of one
+  cell edge across its thickness and along its length, with the geometry of
+  `specs/_design/cells.md` « Hyphen edges ».
+- "AC-11's start" (FX-02 on a touch phone held upright, zoomed to 2 by a pinch,
+  the viewport at the grid's top-left corner) and its readers of the scroll and
+  the selection, which the zoomed tests of AC-11 to AC-20 share.
+- Taps and drags by a finger, a pen or a mouse. Each is a real pointer of that
+  type: a finger goes through the Chrome DevTools Protocol's
+  `Input.dispatchTouchEvent`, a pen and a mouse through its
+  `Input.dispatchMouseEvent` with `pointerType` `pen` or `mouse` (Playwright has
+  no pen). They work in Chromium only.
 
 Pixels: the page is in a context with a device scale factor of 1, so one pixel
 of a screenshot is one CSS pixel. A clip is taken at whole CSS pixels and decoded
@@ -27,9 +37,14 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import pytest
-from playwright.sync_api import Page
+from playwright.sync_api import CDPSession, Locator, Page, expect
 
-from spec042_harness import RULE, Box, Rgb, box_of, cell_at
+from nock.grid import Grid
+from nock.protocol import GridView, grid_view
+from spec006_harness import pinch
+from spec019_harness import OpenWindow
+from spec042_harness import RULE, Box, Rgb, box_of, cell_at, me, open_room, seed_value
+from spec044_harness import KEYBOARD_HIDDEN_KEY, expect_no_keyboard
 
 # `--nock-hyphen` (`specs/_design/foundation.md`, « Colour tokens »).
 HYPHEN: Rgb = (0x5E, 0x65, 0x73)
@@ -459,3 +474,260 @@ def plain_edge_problems(reading: EdgeReading) -> list[str]:
         if colour != RULE:
             problems.append(f"pixel {index} along the line is {colour}")
     return problems
+
+
+# ---- AC-11's start: FX-02 zoomed to 2 on a phone held upright ---------------------
+
+PHONE_WIDTH = 360
+PHONE_HEIGHT = 740
+# Fingers from 100 to 200 px apart double the zoom (rule 3).
+PINCH_TO_TWO = (100.0, 200.0)
+
+# Two animation frames: a scroll made at once has happened, an animated one not.
+TWO_FRAMES_SCRIPT = (
+    "() => new Promise(resolve =>"
+    " requestAnimationFrame(() => requestAnimationFrame(() => resolve(null))))"
+)
+SCROLL_SCRIPT = "element => [element.scrollLeft, element.scrollTop]"
+SCROLL_TO_CORNER_SCRIPT = "element => element.scrollTo(0, 0)"
+
+
+def viewport_of(page: Page) -> Locator:
+    """The grid's viewport, the element that scrolls (`grid-viewport`)."""
+    return page.get_by_test_id("grid-viewport")
+
+
+def read_scroll(viewport: Locator) -> tuple[float, float]:
+    """The viewport's scroll, as (left, top)."""
+    values = viewport.evaluate(SCROLL_SCRIPT)
+    assert isinstance(values, list), values
+    return float(values[0]), float(values[1])
+
+
+def wait_two_frames(page: Page) -> None:
+    """Wait two animation frames: a scroll made at once is done by then."""
+    page.evaluate(TWO_FRAMES_SCRIPT)
+
+
+def expect_selected(page: Page, row: int, column: int, direction: str) -> None:
+    """Wait until the grid's selection is (row, column) in `direction`.
+
+    Args:
+        page: The room page.
+        row: The selected cell's row.
+        column: The selected cell's column.
+        direction: `"across"` or `"down"`.
+    """
+    grid = page.get_by_test_id("grid")
+    expect(grid).to_have_attribute("data-selected-row", str(row))
+    expect(grid).to_have_attribute("data-selected-column", str(column))
+    expect(grid).to_have_attribute("data-direction", direction)
+
+
+def open_phone_room(
+    window: OpenWindow, base_url: str, view: GridView, *, keyboard_hidden: bool
+) -> Page:
+    """Open spec 042's mocked room on a touch phone held upright, at zoom 1."""
+    page = window(PHONE_WIDTH, PHONE_HEIGHT, True)
+    if keyboard_hidden:
+        seed_value(page, KEYBOARD_HIDDEN_KEY, "true")
+    open_room(page, base_url, view, [me()])
+    if keyboard_hidden:
+        expect_no_keyboard(page)
+    expect(viewport_of(page)).to_have_attribute("data-zoom", "1")
+    return page
+
+
+def open_zoomed(
+    window: OpenWindow, base_url: str, view: GridView, *, keyboard_hidden: bool
+) -> Page:
+    """Open the room on a phone, zoom to 2 and scroll back to the top-left corner.
+
+    Returns:
+        The page, nothing selected, the viewport's scroll at (0, 0).
+    """
+    page = open_phone_room(window, base_url, view, keyboard_hidden=keyboard_hidden)
+    viewport = viewport_of(page)
+    start, end = PINCH_TO_TWO
+    pinch(page, viewport, start, end)
+    expect(viewport).to_have_attribute("data-zoom", "2")
+    viewport.evaluate(SCROLL_TO_CORNER_SCRIPT)
+    wait_two_frames(page)
+    assert read_scroll(viewport) == (0.0, 0.0)
+    expect(page.get_by_test_id("grid")).to_have_attribute("data-selected-row", "")
+    return page
+
+
+def open_ac11_start(window: OpenWindow, base_url: str, grid: Grid) -> Page:
+    """AC-11's start: FX-02 zoomed to 2, at the grid's top-left corner."""
+    return open_zoomed(window, base_url, grid_view(grid), keyboard_hidden=False)
+
+
+# ---- Taps and drags by a finger, a pen or a mouse (Chromium only) ------------------
+
+Point = tuple[float, float]  # (x, y) in CSS px of the page
+
+# A drag moves in this many equal steps, as a hand moves in several events.
+DRAG_STEPS = 10
+
+
+class Pointer(StrEnum):
+    """The kind of pointer, as the page's `PointerEvent.pointerType` reads it."""
+
+    TOUCH = "touch"
+    PEN = "pen"
+    MOUSE = "mouse"
+
+
+def shown_centre(page: Page, target: Locator) -> Point:
+    """The centre of the part of a cell or clue that the viewport shows.
+
+    A locator's own tap first scrolls its element into view, which would scroll
+    the viewport under test: the zoomed tests tap this point instead.
+    """
+    shown = box_of(target)
+    view = box_of(viewport_of(page))
+    left = max(shown.left, view.left)
+    right = min(shown.right, view.right)
+    top = max(shown.top, view.top)
+    bottom = min(shown.bottom, view.bottom)
+    assert left < right, f"{shown} is not in the viewport {view} across"
+    assert top < bottom, f"{shown} is not in the viewport {view} down"
+    return (left + right) / 2, (top + bottom) / 2
+
+
+def tap_shown_part(page: Page, target: Locator) -> None:
+    """Touch the centre of the part of a cell or clue that the viewport shows."""
+    x, y = shown_centre(page, target)
+    page.touchscreen.tap(x, y)
+
+
+def _send_touch(session: CDPSession, kind: str, fingers: list[Point]) -> None:
+    """One `Input.dispatchTouchEvent` with the fingers now on the screen.
+
+    Finger `n` of the list has the touch id `n`. An id that is new in a `touchMove`
+    presses a finger; a `touchEnd` with no finger lifts them all.
+    """
+    touch_points: list[dict[str, float]] = []
+    for identifier, finger in enumerate(fingers):
+        touch_points.append({"x": finger[0], "y": finger[1], "id": identifier})
+    event = {"type": kind, "touchPoints": touch_points}
+    session.send("Input.dispatchTouchEvent", event)
+
+
+def _send_mouse(
+    session: CDPSession, pointer: Pointer, kind: str, point: Point, pressed: bool
+) -> None:
+    """One `Input.dispatchMouseEvent` of a pen or a mouse, its tip down or not.
+
+    A move with the tip up is a hover and names no button; a press, a release and
+    a move with the tip down name the left one.
+    """
+    pressed_buttons = 1 if pressed else 0
+    button = "left"
+    if kind == "mouseMoved" and not pressed:
+        button = "none"
+    session.send(
+        "Input.dispatchMouseEvent",
+        {
+            "type": kind,
+            "x": point[0],
+            "y": point[1],
+            "button": button,
+            "buttons": pressed_buttons,
+            "clickCount": 1,
+            "pointerType": pointer.value,
+        },
+    )
+
+
+def _drag_path(start: Point, offset: Point) -> list[Point]:
+    """The points a drag goes through after its start, its end last."""
+    path: list[Point] = []
+    for step in range(1, DRAG_STEPS + 1):
+        share = step / DRAG_STEPS
+        path.append((start[0] + offset[0] * share, start[1] + offset[1] * share))
+    return path
+
+
+def tap_with(page: Page, pointer: Pointer, point: Point) -> None:
+    """Put a finger, a pen or a mouse down at a point and lift it there.
+
+    A pen first hovers at the point, as a real pen comes down from above it.
+    """
+    session = page.context.new_cdp_session(page)
+    try:
+        if pointer == Pointer.TOUCH:
+            _send_touch(session, "touchStart", [point])
+            _send_touch(session, "touchEnd", [])
+        else:
+            _send_mouse(session, pointer, "mouseMoved", point, pressed=False)
+            _send_mouse(session, pointer, "mousePressed", point, pressed=True)
+            _send_mouse(session, pointer, "mouseReleased", point, pressed=False)
+    finally:
+        session.detach()
+
+
+def drag_with(page: Page, pointer: Pointer, start: Point, offset: Point) -> None:
+    """Drag a finger, a pen or a mouse from a point by an offset, then lift it.
+
+    Args:
+        page: The page to drag on.
+        pointer: The kind of pointer.
+        start: Where the pointer goes down, in CSS px of the page.
+        offset: How far it moves before it lifts, as (x, y) in CSS px.
+    """
+    path = _drag_path(start, offset)
+    session = page.context.new_cdp_session(page)
+    try:
+        if pointer == Pointer.TOUCH:
+            _send_touch(session, "touchStart", [start])
+            for point in path:
+                _send_touch(session, "touchMove", [point])
+            _send_touch(session, "touchEnd", [])
+        else:
+            _send_mouse(session, pointer, "mouseMoved", start, pressed=False)
+            _send_mouse(session, pointer, "mousePressed", start, pressed=True)
+            for point in path:
+                _send_mouse(session, pointer, "mouseMoved", point, pressed=True)
+            _send_mouse(session, pointer, "mouseReleased", path[-1], pressed=False)
+    finally:
+        session.detach()
+
+
+def pinch_beside_a_pen(
+    page: Page,
+    held_finger: Point,
+    pen: tuple[Point, Point],
+    moving_finger: tuple[Point, Point],
+) -> None:
+    """Pinch with two fingers while a pen, dragged first, stays pressed beside them.
+
+    A first finger goes down and stays still; the pen goes down and is dragged by
+    its offset; a second finger goes down and is dragged by its offset; the
+    fingers lift, then the pen.
+
+    Args:
+        page: The page to pinch on.
+        held_finger: Where the first finger stays down.
+        pen: Where the pen goes down, and how far it moves before it stays still.
+        moving_finger: Where the second finger goes down, and how far it moves.
+    """
+    pen_start, pen_offset = pen
+    pen_path = _drag_path(pen_start, pen_offset)
+    finger_start, finger_offset = moving_finger
+    finger_path = _drag_path(finger_start, finger_offset)
+    session = page.context.new_cdp_session(page)
+    try:
+        _send_touch(session, "touchStart", [held_finger])
+        _send_mouse(session, Pointer.PEN, "mouseMoved", pen_start, pressed=False)
+        _send_mouse(session, Pointer.PEN, "mousePressed", pen_start, pressed=True)
+        for point in pen_path:
+            _send_mouse(session, Pointer.PEN, "mouseMoved", point, pressed=True)
+        _send_touch(session, "touchMove", [held_finger, finger_start])
+        for point in finger_path:
+            _send_touch(session, "touchMove", [held_finger, point])
+        _send_touch(session, "touchEnd", [])
+        _send_mouse(session, Pointer.PEN, "mouseReleased", pen_path[-1], pressed=False)
+    finally:
+        session.detach()
