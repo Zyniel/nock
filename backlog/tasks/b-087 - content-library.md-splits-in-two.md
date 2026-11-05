@@ -1,10 +1,10 @@
 ---
 id: B-087
 title: content/library.md splits in two
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T20:29:00Z'
+updated_date: '2026-11-05T21:15:00Z'
 labels:
   - domain:library
 milestone: m-7
@@ -24,17 +24,17 @@ From DRAFT-058. library is 17.0 KB with 25 criteria. Out of scope: any behaviour
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 library.md is under about 15 KB and 20 criteria, the part moved with its criteria and pointers, _map.md updated, the gate's traceability green
-- [ ] #2 library AC-7, 8, 13-16 and 22-24 move to content/cards.md as cards AC-1 to AC-9; tests/test_library_progress.py becomes tests/test_cards_progress.py
+- [x] #1 library.md is under about 15 KB and 20 criteria, the part moved with its criteria and pointers, _map.md updated, the gate's traceability green
+- [x] #2 library AC-7, 8, 13-16 and 22-24 move to content/cards.md as cards AC-1 to AC-9; tests/test_library_progress.py becomes tests/test_cards_progress.py
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -52,4 +52,12 @@ Lead decision: Cut A (cards) over Cut B (grid-data). The four grid-card rules an
 Spec-checker APPROVED in one round. Not taken (optional): writing '(004 AC-3)' instead of '(AC-3)' in cards' Code brackets. Follow-up for m-7's close, to become a draft: web/src/lib/CataloguePage.svelte:44 says '(spec 004 rule 7)' about the progress, but spec 004 rule 7 is the force query; the comment should cite content/cards.md rule 1. This was already wrong before this change.
 
 Reviewer round 1: APPROVE, with findings 1-3 taken in round 1. Library rules 8 and 16 now point to the cards criteria that prove them. Cards' Code names its pointers' specs. Lines are wrapped. Round 2: APPROVE. Its last wrapping and the bare bracket ids in library's Code were fixed with the specs-done commit. Left for later: renaming library_harness.py (m-9's test tidy) and the wrong '(spec 004 rule 7)' citations in CataloguePage.svelte:44 and catalogue.ts:67 (the follow-up draft).
+
+Full gate here (Chromium): static checks and 8,774 parallel tests green. Of the 162 serial tests, only foundation remote pace AC-13 failed, a timing test this container is often too slow for (see the investigation session's item B); CI passed it on every other branch. Main then brought B-084's sibling splits B-085 and B-086, and the merge was clean. Traceability and shared components passed again. No code changed, so Firefox and WebKit are left to CI after the merge.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+content/library.md splits in two. The new content/cards.md (domain cards) takes the grid card: its lines, the progress pill and its sources, the force marks, the drawing and the failed « Jouer ». Library rules 7 and 12-15 become cards rules 1-5, and library AC-7, 8, 13-16 and 22-24 become cards AC-1..9. library.md is 11.4 KB with 16 criteria, cards.md 7.1 KB with 9. tests/test_library_progress.py becomes tests/test_cards_progress.py, with renumbered names and unchanged bodies; library_harness.py keeps its name. Library rules 8 and 16 point to the cards criteria that prove them. _map.md and the citations in rooms.md, erasure.md and _settings.md follow.
+<!-- SECTION:FINAL_SUMMARY:END -->
