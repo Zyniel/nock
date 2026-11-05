@@ -4,6 +4,7 @@ title: 'Server structure: typed answers and an app factory'
 status: To Do
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
+updated_date: '2026-11-05T01:54:00Z'
 labels:
   - domain:server
   - domain:overrides
@@ -56,3 +57,9 @@ ordinal: 12000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Released by the human in chat, 2026-11-05 (« /milestone m-2 »: run Upkeep). Open question 1 settled by the lead: option A, the data folders keep the repository layout (the image keeps it, B-009); no variables.
+<!-- SECTION:NOTES:END -->
