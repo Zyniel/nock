@@ -20,7 +20,7 @@ Just before each deletion, the registry's delete hook gets the room's latest
 state (spec 029).
 
 A socket whose session signs an account in joins as that account
-(`lobby/host.md`): its connection carries the account, which the room's join
+(`lobby/creator.md`): its connection carries the account, which the room's join
 rules read. A room has a creator, an account, while accounts are on.
 
 Each step made by a client message logs its relay time (spec 038): how long the
@@ -995,7 +995,7 @@ class RoomRegistry:
 
         While it is False, a room loaded from the store plays as an anonymous
         room; the store keeps its creator for when accounts are on again
-        (`lobby/host.md` rule 15). It is True for a new registry.
+        (`lobby/creator.md` rule 6). It is True for a new registry.
 
         Args:
             active: False while accounts are off.
@@ -1014,7 +1014,7 @@ class RoomRegistry:
             grid: The grid to solve.
             grid_number: Catalogue number of the grid, None for a bare grid.
             creator_account_id: The account that creates the room, None for an
-                anonymous room (`lobby/host.md` rule 11).
+                anonymous room (`lobby/creator.md` rule 2).
 
         Returns:
             A code of ROOM_CODE_LENGTH characters of ROOM_CODE_ALPHABET, drawn
@@ -1268,7 +1268,7 @@ class RoomRegistry:
 
         Each deletion is that of an expired room (spec 032): the delete hook
         first, then the room's sockets closed with ROOM_NOT_FOUND_CLOSE_CODE and
-        its rows removed, live or stored (`lobby/host.md` rule 14). Returns once
+        its rows removed, live or stored (`lobby/creator.md` rule 5). Returns once
         they are all deleted. A deletion that raises stops the others; the rooms
         deleted before it stay deleted, and each was reported.
 
@@ -1572,7 +1572,7 @@ class RoomRegistry:
         """Return a room loaded from the store as it plays.
 
         While accounts are off a stored creator stays in the store, but the room
-        plays as an anonymous room (`lobby/host.md` rule 15).
+        plays as an anonymous room (`lobby/creator.md` rule 6).
         """
         if self._creators_active:
             return state
