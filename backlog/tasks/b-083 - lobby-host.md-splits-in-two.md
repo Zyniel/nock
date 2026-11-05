@@ -4,7 +4,7 @@ title: lobby/host.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T17:20:00Z'
+updated_date: '2026-11-05T18:04:00Z'
 labels:
   - domain:host
 milestone: m-7
@@ -49,4 +49,6 @@ The new lobby/creator.md (domain creator) takes members' accounts and the creato
 Lead decision: Cut A (creator) over Cut B (client/controls). It is the coherent topic, leaves host.md near 11.4 KB with 14 criteria, and needs no gate.py change. tests/host_harness.py keeps its name: it is the shared socket app of eight domains, and renaming it would touch 28 files, many of them also changed by B-003. Its docstring is updated instead.
 
 Spec-checker APPROVED in one round. When B-082 merges first, the merge from main must make creator.md rule 5 cite gameplay/history.md rule 2, take this branch's deletion in host.md, and keep both edits in joining.md's Out of scope.
+
+Reviewer round 1: APPROVE. Not taken, all optional and none a regression: moving the glossary's lobby/creator.md mention to the Code column, adding lobby/rooms.md to creator's Depends on (the template's limit is three files, and rooms.md is cited inline), and re-wrapping one line in rooms.md.
 <!-- SECTION:NOTES:END -->
