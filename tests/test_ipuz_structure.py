@@ -237,6 +237,12 @@ def test_ac12_a_key_the_reader_does_not_support_is_refused_naming_it(
         ("top", "com.example:rating", 3),
         ("clues", "com.example:x", 1),
         ("clue", "com.example:x", 1),
+        ("clue", "explanation", "x"),
+        ("clue", "explanation", None),
+        ("clue", "tags", ["x"]),
+        ("clue", "tags", {"a": [1]}),
+        ("clue", "type", 1),
+        ("clue", "type", ["x"]),
     ],
 )
 def test_ac12_a_descriptive_or_namespace_key_is_ignored(

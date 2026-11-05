@@ -171,6 +171,8 @@ def test_ac9_the_check_comes_before_the_length_of_the_answer() -> None:
     assert re.search(r"\bSE\b", message) is None, message
 
 
+RIGHT_QUOTE = "\N{RIGHT SINGLE QUOTATION MARK}"
+
 # ---- AC-10: solution and enumeration -------------------------------------------
 
 
@@ -205,7 +207,7 @@ def test_ac10_the_solution_is_checked_after_every_check_of_the_import() -> None:
     assert "(1, 4)" not in message
 
 
-@pytest.mark.parametrize("enumeration", ["5", None])
+@pytest.mark.parametrize("enumeration", ["5", "05", None])
 def test_ac10_an_enumeration_that_counts_the_letters_loads(
     enumeration: str | None,
 ) -> None:
@@ -221,7 +223,13 @@ def test_ac10_an_enumeration_that_counts_the_letters_loads(
 
 @pytest.mark.parametrize(
     ("enumeration", "answer", "breaks"),
-    [("2 3", "TA MIS", (2,)), ("2'3", "TA'MIS", (2,)), ("2.3", "TA.MIS", (2,))],
+    [
+        pytest.param("2 3", "TA MIS", (2,), id="space"),
+        pytest.param("2'3", "TA'MIS", (2,), id="apostrophe"),
+        pytest.param("2.3", "TA.MIS", (2,), id="dot"),
+        pytest.param("02-3", "TA-MIS", (2,), id="leading-zero-and-hyphen"),
+        pytest.param(f"2{RIGHT_QUOTE}3", "TA'MIS", (2,), id="typographic-apostrophe"),
+    ],
 )
 def test_ac10_an_enumeration_with_a_separator_gives_the_answer_its_break(
     enumeration: str, answer: str, breaks: tuple[int, ...]
@@ -250,3 +258,35 @@ def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
 
     assert "(0, 0)" in message
     assert "Passoire fine" in message
+
+
+# ---- AC-16: a solution letter in any case and accent --------------------------
+
+
+@pytest.mark.parametrize(
+    "letter",
+    [
+        pytest.param("e", id="lower-case"),
+        pytest.param("\N{LATIN CAPITAL LETTER E WITH ACUTE}", id="upper-acute"),
+        pytest.param("\N{LATIN SMALL LETTER E WITH CIRCUMFLEX}", id="lower-circumflex"),
+    ],
+)
+def test_ac16_a_solution_letter_in_another_case_or_accent_loads_equal(
+    letter: str,
+) -> None:
+    data = fx01_ipuz_data()
+    data["solution"][4][2] = letter
+
+    assert read_data(data) == read_data(fx01_ipuz_data())
+
+
+@pytest.mark.parametrize("value", ["EE", "E-"])
+def test_ac16_a_solution_of_two_characters_is_refused_naming_the_cell(
+    value: str,
+) -> None:
+    data = fx01_ipuz_data()
+    data["solution"][4][2] = value
+
+    message = read_error(data)
+
+    assert "(4, 2)" in message

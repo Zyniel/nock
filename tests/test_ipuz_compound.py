@@ -1,4 +1,4 @@
-"""Tests of content/ipuz AC-14: the breaks of a word in a grid file.
+"""Tests of content/ipuz AC-14 and AC-15: the breaks of a word in a grid file.
 
 `enumeration`, an answer written with separators and the `dashed` edges of the
 puzzle all say where a word breaks, and must agree (rule 5). Positions are
@@ -253,3 +253,50 @@ def test_ac14_a_dashed_edge_outside_the_grid_or_beside_a_block_is_refused(
 
     for cell_name in named:
         assert cell_name in message
+
+
+# ---- AC-15: dotted is read as dashed --------------------------------------------
+
+
+def set_style(data: JsonData, column: int, row: int, style: JsonData) -> None:
+    """Give the letter cell at [column, row] of the puzzle exactly this style."""
+    data["puzzle"][row][column] = {"cell": 0, "style": style}
+
+
+@pytest.mark.parametrize(
+    "style",
+    [
+        pytest.param({"dotted": "R"}, id="dotted"),
+        pytest.param({"dashed": "R", "dotted": "R"}, id="dashed-and-dotted"),
+    ],
+)
+def test_ac15_a_dotted_edge_is_read_as_a_dashed_edge(style: JsonData) -> None:
+    data = vide_data()
+    set_style(data, 2, 2, style)
+
+    grid_file = read_data(data)
+
+    assert grid_file == read_data(vide_data())
+    assert cell_with_clues(grid_file.grid, 2, 0).clues[0].breaks == (2,)
+
+
+def test_ac15_a_dotted_edge_next_to_the_break_edge_is_refused_naming_it() -> None:
+    data = vide_data()
+    set_style(data, 3, 2, {"dotted": "R"})
+
+    message = read_error(data)
+
+    assert "(2, 3)" in message
+    assert "(2, 4)" in message
+    assert message.index("(2, 3)") < message.index("(2, 4)")
+
+
+def test_ac15_a_style_with_neither_dashed_nor_dotted_is_refused_naming_the_cell() -> (
+    None
+):
+    data = vide_data()
+    set_style(data, 2, 2, {})
+
+    message = read_error(data)
+
+    assert "(2, 2)" in message
