@@ -1,10 +1,10 @@
 ---
 id: B-003
 title: Compact the tests
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:43:00Z'
-updated_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T03:25:00Z'
 labels: []
 milestone: m-2
 dependencies: []
@@ -27,6 +27,11 @@ ordinal: 13000
 - Screens: none.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 The local copies of dist_dir (74 files) and catalogue (114 files) give way to shared fixtures in tests/conftest.py where they are the same; near-copies in one file become parametrised tests; every criterion keeps its test names and checks, and the full gate passes
+<!-- AC:END -->
+
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
@@ -36,6 +41,14 @@ ordinal: 13000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Wait for B-038 and B-077 to merge (both edit tests/conftest.py or viewport test files), then merge main here.
+2. test-writer (tests only, no spec): move identical dist_dir and catalogue copies to conftest fixtures; parametrise near-copies inside one file; never rename a test_acN_ function nor weaken a check.
+3. reviewer checks no check got weaker (collected test count per criterion, the gate's traceability), then the full gate in three engines and the pull request.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
