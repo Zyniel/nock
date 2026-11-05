@@ -1,7 +1,7 @@
-"""Tests of platform/server, AC-25: a slow socket lookup delays no other request.
+"""Tests of platform/live-rooms, AC-6: a slow socket lookup delays no other request.
 
 The registry of `server_harness.SlowConnectRegistry` takes a second to run
-`connect` for one room, the lookup of a socket (rule 22). While that lookup waits,
+`connect` for one room, the lookup of a socket (rule 3). While that lookup waits,
 `GET /api/grids` and a socket to another room, sent meanwhile, are answered within
 200 ms; the first socket's join then gets its snapshot.
 
@@ -47,7 +47,7 @@ def has_snapshot(peer: Peer) -> bool:
     return any(isinstance(message, Snapshot) for message in peer.messages())
 
 
-def test_ac25_a_socket_whose_lookup_takes_a_second_delays_no_other_request(
+def test_ac6_a_socket_whose_lookup_takes_a_second_delays_no_other_request(
     tmp_path: Path, fx01_grid: Grid, catalogue: Catalogue
 ) -> None:
     registry = SlowConnectRegistry()

@@ -57,8 +57,9 @@ WARM_UP_TIMEOUT_MS = 60_000
 # spec 034's highlight window (on at 4.5 s, gone at 6 s) and feed scroll
 # measure durations too, as does spec 043's note lifetime (fading from 2.7 s,
 # gone by 3.7 s; 2026-10-22) and spec 047's « Lien copié » line (gone 2 s after
-# the copy; 2026-10-23). The server's engine time (`platform/server.md` rule
-# 20) times the room's rules in milliseconds, with no browser (B-030).
+# the copy; 2026-10-23). The live rooms' engine time
+# (`platform/live-rooms.md` rule 1) times the room's rules in milliseconds,
+# with no browser (B-030).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
         "test_erasure_busy.py",
@@ -66,9 +67,9 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_erasure_overlap.py",
         "test_erasure_retry.py",
         "test_operations_checkpoint_busy.py",
+        "test_live_rooms_engine_time.py",
+        "test_live_rooms_socket_responsiveness.py",
         "test_realtime_join_deadline.py",
-        "test_server_engine_time.py",
-        "test_server_socket_responsiveness.py",
         "test_foundation_remote_pace.py",
         "test_spec_013_ac02_selections.py",
         "test_spec_013_ac07_ac08_feed_scroll.py",

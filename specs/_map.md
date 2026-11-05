@@ -54,7 +54,8 @@ table, the naming rules and the glossary follow in the same change.
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
 | platform | `platform/realtime.md` | room events protocol, fair play | | 039, 037; 017 AC-4; 040 AC-8 to AC-13 |
 | platform | `platform/reconnection.md` | stale edits, the resume window, the page's connection: heartbeat, losses, retries, resends | room | 017 AC-1 to AC-3, AC-5 |
-| platform | `platform/server.md` | durable state, undo, engine time, the rooms held in memory, building the app | | 018; 036 AC-12 |
+| platform | `platform/server.md` | durable state, undo, building the app | | 018; 036 AC-12 |
+| platform | `platform/live-rooms.md` | the rooms held in memory: live from the first socket to the last, the socket's one lookup, the step's time budgets | | |
 | platform | `platform/serving.md` | serving the built client, the HTTP edge (body limit, security headers, caching, the answers' types), `main()` and the environment settings | | 040 AC-1 to AC-6, AC-27 to AC-29; 036 AC-10 to AC-12 |
 | client | `client/shell.md` | client routing, connection states, text and translations, entry and not-found pages, the opening, the brand | pages, foundation | 040 AC-14 to AC-25; 046 AC-1, AC-18 to AC-23; 048 AC-14 |
 | client | `client/foundation.md` | state lines, motion, colour tokens, fonts, icons, shared components, the focus ring, what a frame redraws | foundation, cells | 041; 040 AC-26; 048 AC-13 |
@@ -175,7 +176,7 @@ writes it); nothing of race or teams is built.
 | ipuz | (not shown: the standard crossword file format, v2 ArrowWord kind, a grid file is written in) | `ipuz.py`, `read_ipuz`, `write_ipuz` |
 | index | (not shown) | `grids/catalogue.json`, `IndexEntry`, `CatalogueEntry` |
 | room | « salon » | `room.py`, `/r/<code>` |
-| live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open) | `RoomRegistry.live_codes` |
+| live room | (not shown: a room held in memory with its task, from a socket's opening until its task ends with no socket open; `platform/live-rooms.md`) | `RoomRegistry.live_codes` |
 | member | (a player or a past player of a room) | `PlayerRecord`, `PastPlayer` |
 | connection | (one socket of a player; "session" is the sign-in cookie) | `RoomConnection`, `nock_session` |
 | loss, final close, resume window | « Connexion perdue… » (a close the page retries after; one it stops at; how long a disconnected player keeps their seat) | `reconnecting`, `RoomConfig.resume_window_seconds` |

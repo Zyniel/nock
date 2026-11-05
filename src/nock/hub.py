@@ -9,9 +9,9 @@ that never reads its socket is closed as stalled, and a client that sends faster
 than its room applies is closed as flooding.
 
 A room is held in memory, with its task, only while it is played: from the moment
-a socket opens to it until its task ends with no socket open (`platform/server.md`
-rule 21). Then its snapshot is saved and it leaves memory; the next socket loads it
-again.
+a socket opens to it until its task ends with no socket open
+(`platform/live-rooms.md` rule 2). Then its snapshot is saved and it leaves memory;
+the next socket loads it again.
 
 A room lives its room life from its starting point (`lobby/lifetime.md`). An
 expired room is deleted by `expire_rooms`, which the app runs at its start and
@@ -1061,7 +1061,7 @@ class RoomRegistry:
             self._store.create_room(state, last_edit_at=self._clock())
 
     def live_codes(self) -> frozenset[str]:
-        """Return the codes of the live rooms (`platform/server.md` rule 21).
+        """Return the codes of the live rooms (`platform/live-rooms.md` rule 2).
 
         A room is live from when a socket opens to it until its task ends with
         no socket open. Read under the registry's lock.
@@ -1349,7 +1349,7 @@ class RoomRegistry:
         deadline of the connection starts now (`RoomConfig.join_timeout_seconds`).
 
         May be called from any thread, so that the socket's handler runs it in
-        a worker thread: it reads the store (`platform/server.md` rule 22).
+        a worker thread: it reads the store (`platform/live-rooms.md` rule 3).
 
         Args:
             code: The room.
