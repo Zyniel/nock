@@ -72,6 +72,15 @@ class DashboardFigures(BaseModel):
     disconnection_rate: float | None
 
 
+class DashboardAnswer(DashboardFigures):
+    """The answer of `GET /api/ops/dashboard`: the figures, then the periods.
+
+    `offered_days` comes last, as `admin/operations.md` rule 12 gives the order.
+    """
+
+    offered_days: list[int]  # the offered periods, rising
+
+
 class RoomEdit(BaseModel):
     """One edit of a room, as the replay shows it."""
 

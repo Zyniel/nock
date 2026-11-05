@@ -57,15 +57,16 @@ ALLOWED_JOINERS: frozenset[str] = frozenset(
 
 
 def main() -> None:
-    """Run `nock.server.app` with `server_config` until the server stops.
+    """Run the app of `production_app()` with `server_config` until it stops.
 
-    The host comes from NOCK_HOST (default 127.0.0.1) and the port from
-    NOCK_PORT (default 8000), once NOCK_OPERATOR_TOKEN (checked first),
-    NOCK_HOST, NOCK_PORT and NOCK_DATABASE have passed the checks below. The
-    variables are read at each call. An unset or empty NOCK_HOST or
-    NOCK_PORT takes its default. An unset or empty NOCK_DATABASE is not checked,
-    and the app then keeps its rooms in memory. An unset or empty
-    NOCK_OPERATOR_TOKEN is not checked either, and the operator pages are off.
+    The app is built by one call of `nock.server.production_app()`, once every
+    variable below has passed its check. The host comes from NOCK_HOST (default
+    127.0.0.1) and the port from NOCK_PORT (default 8000). The variables are read
+    at each call. NOCK_OPERATOR_TOKEN is checked first, then NOCK_HOST,
+    NOCK_PORT and NOCK_DATABASE. An unset or empty NOCK_HOST or NOCK_PORT takes
+    its default. An unset or empty NOCK_DATABASE is not checked, and the app
+    then keeps its rooms in memory. An unset or empty NOCK_OPERATOR_TOKEN is
+    not checked either, and the operator pages are off.
 
     The values each variable takes:
 
@@ -121,7 +122,8 @@ def main() -> None:
     _check_rooms_per_address_per_hour()
     _check_sockets_per_address()
     _check_account_settings()
-    config = nock.server.server_config(nock.server.app, host=host, port=port)
+    app = nock.server.production_app()
+    config = nock.server.server_config(app, host=host, port=port)
     uvicorn.Server(config).run()
 
 

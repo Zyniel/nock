@@ -43,7 +43,10 @@ shorter life would delete before saving it.
 3. `GET /api/ops/settings`: 200 `{"durable": b, "settings": [...]}`, the five
    settings in rule 1's order, each `name`, `unit` (`hours` or `minutes`),
    `min`, `max`, `default`, `environment` (null when the variable is unset),
-   `override` (null when none), `value` (the effective value) and `source`.
+   `override` (null when none), `value` (the effective value) and `source`,
+   in this order (`platform/serving.md` rule 14). `environment` and `value`
+   are JSON integers, except a registry's interval that is a fraction of a
+   minute (rule 1), written as that number (`0.5`).
    `durable` is true when the store is a database file.
 4. `PUT /api/ops/settings`, body `{"name": s, "value": v}`: `v` a whole number
    within the bounds saves it as the override of `s`; `v` null removes the
@@ -133,7 +136,10 @@ shorter life would delete before saving it.
 - **AC-2** With the token, `GET /api/ops/settings` lists the five settings in
   rule 1's order with their nine fields, the lives `unit` `hours`, `min` 24,
   `max` 8760, `default` 720, the interval `unit` `minutes`, 1, 1440, 60;
-  `durable` is true on a database file and false in memory.
+  `durable` is true on a database file and false in memory. In memory with no
+  variable, the body starts with the bytes `{"durable":false,"settings":[`
+  and its last row is exactly
+  `{"name":"expiry_sweep_minutes","unit":"minutes","min":1,"max":1440,"default":60,"environment":null,"override":null,"value":60,"source":"default"}`.
 - **AC-3** `PUT {"name": "anonymous_room_hours", "value": 48}` answers 200 with
   the list, that row 48 and `override`, the four others as before; the next
   `GET` reads the same.
@@ -145,9 +151,9 @@ shorter life would delete before saving it.
   `expiry_sweep_minutes` 0 and 1441, the name `room_hours`, and a body with no
   `value` each answer 422, and the next `GET` is unchanged.
 - **AC-6** Anonymous rooms A (last edited 50 h ago, a socket open), B (30 h) and
-  C (solved 30 h ago) under `anonymous_room_hours` 48: the dry run of 24 answers
-  `{"rooms": 2}`, of 96 `{"rooms": 0}`; A's socket stays open, no room is gone,
-  and the `GET` after shows no override.
+  C (solved 30 h ago) under `anonymous_room_hours` 48: the dry run of 24
+  answers the bytes `{"rooms":2}`, of 96 `{"rooms":0}`; A's socket stays open,
+  no room is gone, and the `GET` after shows no override.
 - **AC-7** With `NOCK_ANONYMOUS_ROOM_HOURS` 24 overridden to 720 and B of AC-6
   present, the dry run of `{"value": null}` answers `{"rooms": 1}`; the dry run
   of `expiry_sweep_minutes` 30 answers 422.
@@ -228,7 +234,9 @@ shorter life would delete before saving it.
 
 ## Code
 
-- `src/nock/overrides.py`; `src/nock/server.py`: the three routes, the start;
+- `src/nock/overrides.py`: `Setting`, `SETTINGS`, the answers `SettingsAnswer`
+  (rows `SettingRow`) and `DryRunAnswer`; `src/nock/server.py`: the three
+  routes, the start;
   `src/nock/store.py`: the table; `src/nock/hub.py`: the config swap.
 - `web/src/lib/OpsSettings.svelte`, `OpsPage.svelte`, `ops.ts`.
 - Tests: `tests/test_overrides_*`.

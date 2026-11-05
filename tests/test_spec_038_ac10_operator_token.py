@@ -39,7 +39,6 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import nock.server
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.room import new_room
@@ -293,7 +292,9 @@ def test_ac10_main_with_an_invalid_token_raises_system_exit_naming_the_variable(
 
 
 def test_ac10_main_with_the_ops_token_runs_the_server_once(
-    monkeypatch: pytest.MonkeyPatch, server_runs: list[uvicorn.Config]
+    monkeypatch: pytest.MonkeyPatch,
+    server_runs: list[uvicorn.Config],
+    production_app_calls: list[FastAPI],
 ) -> None:
     set_token_only(monkeypatch, OPS_TOKEN)
     main = entry_point()
@@ -301,7 +302,8 @@ def test_ac10_main_with_the_ops_token_runs_the_server_once(
     main()
 
     assert len(server_runs) == 1, "main() must run exactly one server"
-    assert server_runs[0].app is nock.server.app
+    assert len(production_app_calls) == 1, "main() must call production_app() once"
+    assert server_runs[0].app is production_app_calls[0]
 
 
 @pytest.mark.parametrize("value", [None, ""], ids=["unset", "empty"])

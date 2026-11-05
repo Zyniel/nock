@@ -60,7 +60,8 @@ interface" follows this note. Decided with the human on 2026-10-10.
 | `nock/room.py` | Room state and the rules applied to each event |
 | `nock/protocol.py` | Message models exchanged with the client |
 | `nock/store.py` | SQLite log and snapshots |
-| `nock/server.py` | FastAPI app and WebSocket endpoint |
+| `nock/server.py` | FastAPI app factories (`create_app`, `production_app`) and WebSocket endpoint; builds no app at import |
+| `nock/__main__.py` | `main()`: checks the variables, then runs `production_app()` |
 | `web/` | Svelte client |
 
 ## Toolchain (in place since 2026-10-10)

@@ -130,8 +130,9 @@ them is `admin/ops-page.md`.
     is; the default period is 7 when offered, else 1. The rooms of a period are
     those created at or after `now − days × 86 400 s`, read with their whole
     logs from the store; within an offered period none has expired. The answer
-    holds `days`, `offered_days` (the offered periods, rising), `since` (that
-    start, in UTC) and the figures. A figure with nothing to count is None, but
+    holds, in this order (`platform/serving.md` rule 14), `days`, `since`
+    (that start, in UTC), the figures as listed below, then `offered_days`
+    (the offered periods, rising). A figure with nothing to count is None, but
     `rooms_created` is 0:
     - `rooms_created`: how many rooms;
     - `players_per_room`: `player_joined` entries per room;
@@ -174,7 +175,10 @@ them is `admin/ops-page.md`.
   (← 038 AC-5)
 - **AC-4** With the token and the default lives, the dashboard answers 200 with
   the 7-day figures of the rooms created 7 days and 1 day ago, not 8, none made
-  live, `days` 7 and `offered_days` `[1, 7, 30]`; `?days=30` gives `days` 30
+  live, `days` 7 and `offered_days` `[1, 7, 30]`; on an empty store the body
+  is exactly
+  `{"days":7,"since":S,"rooms_created":0,"players_per_room":null,"completion_rate":null,"median_solving_ms":null,"latency_median_ms":null,"latency_p95_ms":null,"disconnection_rate":null,"offered_days":[1,7,30]}`,
+  S the period's start as a JSON string; `?days=30` gives `days` 30
   and `?days=2` 422. With `NOCK_CREATOR_SOLVED_ROOM_HOURS` 168, no `days` gives
   the 7-day figures with `[1, 7]` and `?days=30` 422; at 24, the 1-day figures
   with `[1]`. (← 038 AC-6)
@@ -248,7 +252,8 @@ them is `admin/ops-page.md`.
 
 ## Code
 
-- `src/nock/operations.py`: figures, periods. `src/nock/server.py`: ops routes,
+- `src/nock/operations.py`: figures, periods, the dashboard's answer
+  `DashboardAnswer`, the replay's `RoomReplay`. `src/nock/server.py`: ops routes,
   guard, throttles, `/ops`. `src/nock/settings.py`: `operator_token_from_env`.
   `src/nock/store.py`: deletion, `checkpoint_wal`, `codes_created_since`.
   `src/nock/accounts.py`: its checkpoints. `src/nock/hub.py`: `relay_ms`.

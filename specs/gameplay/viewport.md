@@ -10,8 +10,9 @@ status: done
 
 A player sees the grid drawn from the latest snapshot, fitted to their screen,
 with the other players' cursors on it. On a touch screen two fingers zoom and
-one pans, and the viewport follows the selection as the player types or moves
-along the grid. A hyphenated answer shows its hyphen as a dashed edge.
+one finger or a pen pans, and the viewport follows the selection as the player
+types or moves along the grid. A hyphenated answer shows its hyphen as a
+dashed edge.
 
 ## Depends on
 
@@ -39,10 +40,12 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
 3. At zoom 1 the grid fits its viewport and the room page the window, with no
    scrolling; the grid refits when its room changes. Two fingers multiply the
    zoom by the ratio of their distances, between 1 and a maximum at which no
-   FX-02 clue text is cut off on a 360 px wide phone; one finger pans. There is
-   no other zoom control. While the zoom is above 1, each change of selected
-   cell (`gameplay/board.md`), except one made by a tap on a letter cell,
-   scrolls the grid's viewport at once the least that shows the whole cell
+   FX-02 clue text is cut off on a 360 px wide phone; a pen never zooms. One
+   finger or a pen dragged on the grid pans it and selects no cell; a pen tap
+   selects as a finger's does (`gameplay/board.md`); a mouse drag never pans.
+   There is no other zoom control. While the zoom is above 1, each change of
+   selected cell (`gameplay/board.md`), except one made by a tap on a letter
+   cell, scrolls the grid's viewport at once the least that shows the whole cell
    with one cell of margin on each side the grid's edge allows; on an axis
    where the viewport holds less than three cells, the cell is centred on it
    instead. A tap on a letter cell, a change of direction alone, a pan, a
@@ -83,9 +86,9 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
   stays. (← 006 AC-4, 006 AC-6, 006 AC-8)
 - **AC-2** On a 360 by 740 touch phone FX-02 opens at zoom 1 inside its
   viewport; fingers going from 100 to 150 px apart give 1.5; pinching on stops
-  at the maximum, where a pan scrolls both ways and no clue text is cut off;
-  pinching in never goes below 1; one finger never zooms. At 1280 by 800 FX-02
-  needs no pan. (← 006 AC-1)
+  at the maximum, where a pan by one finger or by a pen scrolls both ways and
+  no clue text is cut off; pinching in never goes below 1; one finger or a pen
+  never zooms. At 1280 by 800 FX-02 needs no pan. (← 006 AC-1)
 - **AC-3** At the supported windows (`product.md` rule 11), for example 320 by
   568 and 568 by 320, the catalogue and the room page never scroll sideways;
   the room page does not scroll down, its grid viewport is inside the window
@@ -176,6 +179,10 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
   viewport's top edge ending at the top edge of the cell above the selected
   one; the first one also scrolls back across, the viewport's left edge ending
   at the grid's.
+- **AC-20** In AC-11's start, a pen tap on (1, 2) selects it; a pen then
+  dragged 100 px left from (1, 3) scrolls the viewport 100 px across, as a
+  finger's drag does, and leaves (1, 2) selected. A mouse dragged 100 px left
+  from (1, 3) leaves the viewport's scroll unchanged.
 
 ## Edge cases
 
@@ -208,4 +215,5 @@ along the grid. A hyphenated answer shows its hyphen as a dashed edge.
   `web/src/lib/RoomPage.svelte` (its measure).
 - Tests: `tests/test_viewport_*`, `tests/test_spec_006_*` and the
   `tests/test_spec_042_*` files of the cited criteria; the pinch gestures of
-  AC-2 and AC-16 are checked in Chromium only (`product.md` rule 10).
+  AC-2 and AC-16 and the pen and mouse gestures of AC-20 are checked in
+  Chromium only (`product.md` rule 10).

@@ -174,13 +174,6 @@ erases and keeps is `account/erasure.md`.
   sets rule 9's cookie; `GET /api/account` says signed in; the room's
   players, cells and log are unchanged and no socket hears of it.
   (← 033 AC-1)
-- **AC-2** A link used again, or 1,801 s after it was asked, gets 404; used
-  at 1,799 s, 200. A session signs in a second short of 90 days, not a second
-  past. A second sign-in leaves the first working; behind `https://` the
-  cookie has `Secure`. Two spellings of an address are one account; a player
-  removed before the link is used gets `room_code` null. Purges at 1,801 s
-  and 7,776,001 s delete a link and a session of time 0, no byte of the
-  link's address left; at 1,799 s and 7,775,999 s they stay. (← 033 AC-1)
 - **AC-4** An address with no `@`, nothing on one side, a one-label domain, a
   space, `ç`, `,`, `<` or `"` before the `@`, or 255 characters, gets 422
   `{"detail": "Invalid e-mail address"}`; a room key of no member or no room,
@@ -215,11 +208,6 @@ erases and keeps is `account/erasure.md`.
   command after it; `tls` uses that context from the start. A refused
   recipient raises `MailError` without the address, traceback included, and
   the request gets 503. (← 033 AC-7)
-- **AC-10** Across a link, a sign-in, a status, a `PUT`, a sign-out, a failed
-  mail and a deletion, no log holds the link token, the session, a resume
-  token, the address or the SMTP password; the files hold the address, and
-  the link and session only as SHA-256 hex. A sign-out answers 204 and ends
-  the session, also when there is none. (← 033 AC-10)
 - **AC-11** Signed in from R, Ana's rooms are R, with her id, token and
   `ANA`; after she puts S (204), S then R. A `PUT` of no member gets 404, one
   without cookie 401 even with a malformed key. Once R expires the list is S,
@@ -233,12 +221,6 @@ erases and keeps is `account/erasure.md`.
   there keeps it. On an `/account` already showing signed out, a link token
   set as the fragment, with no reload, leaves the URL and signs in.
   (← 033 AC-2, 033 AC-11)
-- **AC-13** With accounts on, a browser with no cookie or storage solves
-  FX-01 with a word check: no 401 or 403, no cookie, the sheet never opens,
-  every frame parses as a client message; solving from the catalogue, nothing
-  sets a cookie and every request stays on the origin. An anonymous player who
-  plays leaves only `ANA` and her id in the files, nothing of her browser's agent,
-  headers, language or address. (← 033 AC-3, 038 AC-1, 038 AC-2)
 - **AC-16** « Compte », in the room Menu inside every supported window or a
   catalogue top-bar button, shows the focus ring from the keyboard
   (`product.md` rule 14); Enter opens the sheet on the field, and
@@ -295,7 +277,8 @@ erases and keeps is `account/erasure.md`.
 - Passwords, social sign-in, changing or adding an address, merging
   accounts, other e-mails; an IPv6 public URL.
 - `DELETE /api/account` and the erasure it starts, what is kept, « Ancien
-  joueur », the history records, the account's grid progress:
+  joueur », the history records, the account's grid progress; how links and
+  sessions are stored and purged, and what no log holds:
   `account/erasure.md`.
 - Catch-up, kept per device: `social/catch-up.md`.
 - Forgetting on the device a seat whose room the summaries no longer return;

@@ -432,7 +432,8 @@
     }
   })
 
-  // Touch gestures (pinchPan.ts): one finger pans, two fingers pinch.
+  // Touch and pen gestures (pinchPan.ts): one finger or a pen pans, two
+  // fingers pinch.
   const pinchZoom: PinchPanZoom = {
     zoom: () => zoom,
     cellSize: () => cellSize,
