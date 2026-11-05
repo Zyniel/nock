@@ -1,9 +1,10 @@
 ---
 id: B-082
 title: gameplay/results.md splits in two
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T16:13:00Z'
 labels:
   - domain:results
 milestone: m-7
