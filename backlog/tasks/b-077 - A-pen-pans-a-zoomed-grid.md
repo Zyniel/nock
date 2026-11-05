@@ -36,7 +36,7 @@ From DRAFT-063, the human's option B (2026-11-04). Since B-050 (L15), web/src/li
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -55,6 +55,8 @@ Lead decisions: no drag-threshold number in the spec (no spec or code has one; A
 Review round 1: CHANGES REQUESTED. Fixed: a pen lifted beside the viewport, or hovering with its tip up, is forgotten and never pans; the pen-beside-a-pinch test now fails if a pen joins or clears the fingers (checked on two mutations); the hover sends no button; the pen-alone zoom test that could not fail is gone; the pen keeps its start as a Finger.
 
 Review round 2: APPROVE. Not taken: listening for the pen's lift in the capture phase (the tip-up check already forgets a pen whose lift never arrives).
+
+Pull request #138.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
