@@ -345,7 +345,7 @@
 
   // A Tab or Shift+Tab that puts the focus on an element outside the open menu
   // or the Salon sheet closes it, the focus staying on that element
-  // (client/hud.md rule 12). A focus that no Tab moved closes nothing, nor does
+  // (client/menus.md rule 5). A focus that no Tab moved closes nothing, nor does
   // a focus lost to no element, which raises no focus event.
   function closeOverlayLeftByTab(event: FocusEvent): void {
     const target = event.target

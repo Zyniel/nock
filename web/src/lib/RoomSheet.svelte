@@ -3,7 +3,7 @@
   import { takeAnnouncing } from './announce'
   import StatusRegion from './StatusRegion.svelte'
 
-  // The frame the room sheets share (client/hud.md rule 13): the host's
+  // The frame the room sheets share (client/menus.md rule 6): the host's
   // settings, the account, the recap and the room-gone dialog. A modal dialog
   // named by its title, centred in the column layout and a bottom sheet in the
   // sheet layout (app.css, `.room-sheet`). It holds what they do alike: the
