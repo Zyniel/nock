@@ -4,7 +4,7 @@ title: platform/server.md splits in two
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T18:48:00Z'
+updated_date: '2026-11-05T18:55:00Z'
 labels:
   - domain:server
 milestone: m-7
@@ -49,4 +49,6 @@ The new platform/live-rooms.md (domain live-rooms) takes the rooms held in memor
 Lead decision: Cut A (live-rooms) over Cut B (gameplay/undo). It is the coherent runtime topic, leaves server.md near 13.5 KB with 17 criteria, and needs no shared-components change. Cut B would leave server at 14.5 KB with 19 criteria and touch three shared-component entries.
 
 Spec-checker APPROVED in one round. Two wrapping slips it noted were fixed before the commit.
+
+Reviewer round 1: APPROVE, no findings.
 <!-- SECTION:NOTES:END -->

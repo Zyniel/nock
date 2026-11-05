@@ -1,7 +1,7 @@
 ---
 area: platform
 file: live-rooms
-status: approved
+status: done
 ---
 
 # platform/live-rooms - The rooms held in memory, the socket's lookup, engine time
