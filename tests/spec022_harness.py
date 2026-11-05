@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from fastapi.testclient import TestClient
-from playwright.sync_api import Browser, Page, expect
+from playwright.sync_api import Browser, Locator, Page, expect
 
 from fonts_ready import wait_for_fonts
 from nock.grid import Grid
@@ -71,6 +71,7 @@ from nock.room import Outcome, RoomConfig, RoomState, handle_message
 from nock.server import create_app
 from nock.store import RoomStore
 from room_panels import show_tab
+from spec017_harness import MockConnection
 from spec021_harness import clue_at
 from spec024_harness import (
     NOW,
@@ -379,6 +380,27 @@ def open_panel(page: Page, touch: bool = False) -> None:
     if field.is_enabled():
         field.focus()
     expect(page.get_by_test_id("chat-panel")).to_be_visible()
+
+
+def react_button(page: Page) -> Locator:
+    return page.get_by_test_id("react-button")
+
+
+def flag_button(page: Page) -> Locator:
+    return page.get_by_test_id("flag-button")
+
+
+def picker(page: Page) -> Locator:
+    return page.get_by_test_id("reaction-picker")
+
+
+def frames_of_kind(connection: MockConnection, kind: str) -> list[str]:
+    """The frames of one `type` the page sent on one socket, in order."""
+    found: list[str] = []
+    for frame in connection.frames:
+        if json.loads(frame)["type"] == kind:
+            found.append(frame)
+    return found
 
 
 class ChatLine(NamedTuple):

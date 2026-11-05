@@ -21,7 +21,7 @@ text `fr.json["reaction.button"]`"); the picker comes after `clue-bar` and befor
 `salon`, over the bottom of `grid-viewport` (spec 043 AC-25: centred, 8 px above
 its bottom), and the last step runs with the Salon open on Discussion.
 
-Refined by `social/chat.md` AC-11 (B-046): `react-button` has no `aria-controls`
+Refined by `social/reactions.md` AC-9 (B-046): `react-button` has no `aria-controls`
 while the picker is closed (before the first opening and after each of the three
 ways to close it), and while the picker is open its `aria-controls` is the picker's
 `id`.

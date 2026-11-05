@@ -28,7 +28,7 @@ from typing import NamedTuple
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
-from hud_harness import centre_of, press_and_release
+from menus_harness import centre_of, press_and_release
 from nock.grid import Grid
 from room_panels import open_menu
 from spec019_harness import OpenWindow, window_opener

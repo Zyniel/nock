@@ -168,9 +168,9 @@ BUILD_STEP: tuple[str, list[str]] = (
 # those domains.
 SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
     "web/src/lib/ClueCell.svelte": (
-        "chat",
         "foundation",
         "product",
+        "reactions",
         "viewport",
     ),
     "web/src/lib/GridViewport.svelte": (
@@ -199,7 +199,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
     ),
     "web/src/lib/RoomMenu.svelte": (
         "account",
-        "hud",
+        "menus",
         "presence",
         "rules",
     ),
@@ -212,6 +212,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "host",
         "hud",
         "joining",
+        "menus",
         "presence",
         "product",
         "reconnection",

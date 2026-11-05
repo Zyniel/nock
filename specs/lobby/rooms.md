@@ -227,7 +227,8 @@ status band of « Connection lost »; before, the entry card of
   Web Share, QR codes, offline play.
 - Fair play: `platform/realtime.md`; reconnection: `platform/reconnection.md`. Durable state:
   `platform/server.md`. Feed lines of joins and departures:
-  `social/presence.md`. The Menu, sheets and top bar: `client/hud.md`.
+  `social/presence.md`. The Menu and sheets: `client/menus.md`; the top bar:
+  `client/hud.md`.
 
 ## Code
 
