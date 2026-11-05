@@ -1,10 +1,10 @@
 ---
 id: B-038
 title: 'Server structure: typed answers and an app factory'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-01T16:44:00Z'
-updated_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T01:56:00Z'
 labels:
   - domain:server
   - domain:overrides
@@ -57,6 +57,14 @@ ordinal: 12000
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Plan agent (Fable, high) proposes the options; the lead picks.
+2. Spec change: platform/server.md (and _architecture.md if the modeling rules move), spec-writer then spec-checker.
+3. Tests, implementer, reviewer, full gate, pull request.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
