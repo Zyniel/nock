@@ -15,7 +15,8 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 
 ## Depends on
 
-- `lobby/host.md`: removing and locking, the creator, the account of a member.
+- `lobby/host.md`: removing and locking; the creator and a member's account:
+  `lobby/creator.md`.
 - `platform/realtime.md`: the join message, error codes; the resume window and
   the time-out of a disconnected player are `platform/reconnection.md`.
 - `platform/server.md`: the store that keeps a room across restarts.
@@ -65,7 +66,7 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
    `removed`, `room_locked` and `room_full` close the socket; `invalid_nickname`
    leaves it open for another join. A token that matches nobody is ignored. The
    creator's player is host at the end of their join whatever step seated them
-   (`lobby/host.md` rule 13).
+   (`lobby/creator.md` rule 4).
 5. The joiner gets a snapshot that already counts the join and holds the room's
    letters, hint budget and timer; the others get `player_joined`, the joiner
    never does. A second join on a joined socket is ignored.
@@ -128,7 +129,7 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
     rule 2 (an erased player's `--` keeps no suffix); colour kept unless a player
     has it, else the lowest free one. The join's nickname is ignored. They are
     host only when no player is, or when they are the creator's player
-    (`lobby/host.md` rule 13). Their flag, undo history and rate windows start
+    (`lobby/creator.md` rule 4). Their flag, undo history and rate windows start
     afresh, and a vote opened while they were away does not count them.
 14. A seat back refused (locked, full) leaves them a past player and a member. A
     refusal after a time-out inside the join keeps that time-out.
@@ -246,10 +247,10 @@ account. A room outlives its players for its room life (`lobby/lifetime.md`).
 - The summaries route and « Mes salons »: `lobby/summaries.md`.
 - Room lives, expiry, the sweep and what a deletion removes:
   `lobby/lifetime.md`.
-- Presence states in the roster: `social/presence.md`. Host controls and the
-  creator: `lobby/host.md`. Codes and creation: `lobby/rooms.md`. The rooms of
-  an account: `account/account.md`. Finished grids
-  after deletion: `gameplay/history.md`. What changed while away:
+- Presence states in the roster: `social/presence.md`. Host controls:
+  `lobby/host.md`; the creator: `lobby/creator.md`. Codes and creation:
+  `lobby/rooms.md`. The rooms of an account: `account/account.md`. Finished
+  grids after deletion: `gameplay/history.md`. What changed while away:
   `social/catch-up.md`. What deletion erases for privacy:
   `admin/operations.md`.
 

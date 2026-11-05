@@ -1,13 +1,13 @@
-"""Tests of lobby/host, AC-10 and AC-11 in the browser: what the pages show.
+"""Tests of lobby/creator, AC-2 and AC-3 in the browser: what the pages show.
 
 On the live server of spec 033's harness (accounts on, the recording mailer, the
 built client). Each device is a browser context with its own cookies and storage.
 
-AC-11: Lea creates a room signed in, Bob enters first and holds the host controls
+AC-3: Lea creates a room signed in, Bob enters first and holds the host controls
 (« Réglages de l'hôte » in the Menu); once Lea enters, Bob's Menu has lost the
 entry and hers has it.
 
-AC-10: a device signed in as Lea, with no identity stored for a room where her
+AC-2: a device signed in as Lea, with no identity stored for a room where her
 member is not linked to her account (her `PUT /api/account/rooms` links none), shows
 the nickname form.
 """
@@ -74,7 +74,7 @@ def signed_in_page(server: AccountServer, devices: Devices) -> Page:
     return page
 
 
-def test_ac11_the_creators_arrival_moves_the_host_controls_to_her_menu(
+def test_ac3_the_creators_arrival_moves_the_host_controls_to_her_menu(
     account_server: AccountServer, devices: Devices, enter_room: EnterRoom
 ) -> None:
     lea_page = signed_in_page(account_server, devices)
@@ -100,7 +100,7 @@ def test_ac11_the_creators_arrival_moves_the_host_controls_to_her_menu(
     expect(bob_page.get_by_text(load_fr()["settings.heading"])).to_have_count(0)
 
 
-def test_ac10_a_signed_in_device_without_an_identity_shows_the_nickname_form(
+def test_ac2_a_signed_in_device_without_an_identity_shows_the_nickname_form(
     account_server: AccountServer, devices: Devices, fx01_grid: Grid
 ) -> None:
     code = "ABCDEF"

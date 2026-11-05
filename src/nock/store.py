@@ -3,7 +3,7 @@
 Each room also has its creation time, its last edit time and its solve time
 (`lobby/lifetime.md`), which its room life runs from, so that the expired rooms
 are found without loading them, and its creator, the account that created it
-(`lobby/host.md` rule 11), kept in `room_times` only: the snapshots hold no
+(`lobby/creator.md` rule 2), kept in `room_times` only: the snapshots hold no
 creator.
 
 The table `overrides` holds the settings saved from `/ops`

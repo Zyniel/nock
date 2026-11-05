@@ -1,16 +1,18 @@
-"""Shared setup of the tests of lobby/host about members and the creator (AC-9 to
-AC-16), and of the account seat of lobby/joining (AC-21).
+"""Harness of the tests of lobby/creator (AC-1 to AC-8), shared with the tests of
+other domains that import it, such as the account seat of lobby/joining (AC-21).
 
 Pytest does not collect this module (its name does not start with `test_`). The
-tests are in `tests/test_host_*.py` and `tests/test_joining_account_seat.py`:
+creator tests are in `tests/test_creator_*.py`; the others that use it include
+`tests/test_joining_account_seat.py`:
 
-- `test_host_creator_rooms.py`: AC-9, the creator of a room and its stored row.
-- `test_host_members.py`: AC-10, the account of a member.
-- `test_host_creator_role.py`: AC-11 (over the sockets), AC-12, AC-13 and AC-14 (the
+- `test_creator_rooms.py`: AC-1, the creator of a room and its stored row.
+- `test_creator_members.py`: AC-2, the account of a member.
+- `test_creator_role.py`: AC-3 (over the sockets), AC-4, AC-5 and AC-6 (the
   rules).
-- `test_host_creator_erasure.py`: AC-15 and AC-16, over the sockets, with the
-  deletion of an account and with accounts switched off.
-- `test_host_creator_pages.py`: what the pages of AC-10 and AC-11 show.
+- `test_creator_deletion.py`: AC-7, over the sockets, with the deletion of an
+  account.
+- `test_creator_accounts_off.py`: AC-8, with accounts switched off.
+- `test_creator_pages.py`: what the pages of AC-2 and AC-3 show.
 - `test_joining_account_seat.py`: AC-21.
 
 Two kinds of tests:

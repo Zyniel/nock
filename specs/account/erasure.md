@@ -20,7 +20,7 @@ erasure must never undo.
 - `account/account.md`: accounts on or off, the session, identities and their
   tokens, the mailer, the page's « Supprimer mon compte ».
 - `lobby/joining.md`: members, past players, the seat back, the device's
-  identities; the creator rooms are `lobby/host.md`.
+  identities; the creator rooms are `lobby/creator.md`.
 - `lobby/lifetime.md`: the sweep that runs the attempts and the purge; its
   checkpoint is `admin/operations.md` rule 20.
 
@@ -71,8 +71,8 @@ erasure must never undo.
       nothing else of the room changes; a live room's engine is waited for
       at most 5 s. The player is then marked erased, as is one whose room is
       gone; the erasure holds every player, marked or not, until it is done;
-   2. its creator rooms are deleted, live and stored (`lobby/host.md` rule
-      14); a room counts as deleted only when its deletion removed it;
+   2. its creator rooms are deleted, live and stored (`lobby/creator.md`
+      rule 5); a room counts as deleted only when its deletion removed it;
    3. last, every player the erasure holds, marked or not, becomes `--`
       among the team-mates of every history record (rule 9).
 
@@ -124,8 +124,8 @@ erasure must never undo.
     `nock.progress` holds the device's (`content/library.md` rule 7): an object
     from grid numbers in decimal to `"finished"`, for each history record and
     each solved room of an identity `account/account.md` rule 12 lists, or
-    `"started"`, for each unsolved one and each creator room (`lobby/host.md`
-    rule 11) that still exists; `finished` wins. A room or record with no grid
+    `"started"`, for each unsolved one and each creator room (`lobby/creator.md`
+    rule 2) that still exists; `finished` wins. A room or record with no grid
     number gives nothing; `{}` when nothing does. Derived at each request,
     nothing stored: it saves no record, and « Grilles terminées » lists every
     grid it marks `finished`, since rule 8 saves each solved room that counts
@@ -234,8 +234,8 @@ erasure must never undo.
 - An erased player's open pages keep the old name until their next snapshot
   (AC-3).
 - A creator room is deleted whoever is host in it then; an anonymous room where
-  the account's player is host stays, that player `--` (`lobby/host.md`
-  AC-15).
+  the account's player is host stays, that player `--` (`lobby/creator.md`
+  AC-7).
 - A solved creator room the account never joined is `started`, as its history
   never lists it (AC-4).
 - A held player's room that expired meanwhile is deleted by step 1, its hook

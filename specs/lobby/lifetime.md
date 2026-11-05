@@ -14,7 +14,7 @@ deletes it with all its data.
 
 ## Depends on
 
-- `lobby/host.md`: creator and anonymous rooms, a creator room played as
+- `lobby/creator.md`: creator and anonymous rooms, a creator room played as
   anonymous while accounts are off, the deletion at the creator's erasure.
 - `gameplay/rules.md`: `grid_solved`, and that no edit is accepted once solved.
 - `platform/serving.md`: `main()`, the order and the wording of its variable
@@ -35,9 +35,9 @@ deletes it with all its data.
 
 ### Kinds and lives
 
-3. A room is a creator room or an anonymous room (`lobby/host.md` rule 11), and
-   solved or not. While accounts are off every room is anonymous, a stored
-   creator included (`lobby/host.md` rule 15).
+3. A room is a creator room or an anonymous room (`lobby/creator.md` rule 2),
+   and solved or not. While accounts are off every room is anonymous, a stored
+   creator included (`lobby/creator.md` rule 6).
 4. A room life is how long a room lasts after its starting point: a whole number
    of hours, 24 to 8760, one per kind, default 720. Each has a server variable,
    which gives its environment value, and a `RoomConfig` field
@@ -102,10 +102,10 @@ deletes it with all its data.
 ### Stored times and migrations
 
 8. The schema's `user_version` is 4: 1 brought the creator column
-   (`lobby/host.md` rule 11); 2 the solve time, a nullable column of
+   (`lobby/creator.md` rule 2); 2 the solve time, a nullable column of
    `room_times`; 3 the indexes of `room_times` by creation time and by
    creator, which the dashboard's rooms (`admin/operations.md` rule 12) and an
-   erased account's creator rooms (`lobby/host.md` rule 14) read; 4 the two
+   erased account's creator rooms (`lobby/creator.md` rule 5) read; 4 the two
    snapshots per room (`platform/server.md` rule 4). A store below 4 is
    migrated once at open, in one transaction: the missing columns are added;
    below 2, each solved room gets its solve time from its stored state or log,
@@ -208,7 +208,7 @@ deletes it with all its data.
 - A refused value is shown in the message, since none of the five variables is
   a secret (AC-8).
 - The creator's erasure deletes its rooms whether expired or not, with no
-  second read (`lobby/host.md` rule 14) (`lobby/host.md` AC-15).
+  second read (`lobby/creator.md` rule 5) (`lobby/creator.md` AC-7).
 - A room with one or two snapshots loses none at migration 4 (AC-18).
 
 ## Out of scope
@@ -218,8 +218,8 @@ deletes it with all its data.
   sign-in links), each a constant of its domain.
 - Overriding the lives and the sweep interval from `/ops`, the override's
   storage and the dry run: `admin/overrides.md`.
-- The deletion of a creator room at its creator's erasure: `lobby/host.md` rule
-  14. What a deletion erases for privacy: `admin/operations.md`. Summaries and
+- The deletion of a creator room at its creator's erasure: `lobby/creator.md`
+  rule 5. What a deletion erases for privacy: `admin/operations.md`. Summaries and
   « Mes salons »: `lobby/summaries.md`. The `/ops` periods a life allows:
   `admin/operations.md`.
 
