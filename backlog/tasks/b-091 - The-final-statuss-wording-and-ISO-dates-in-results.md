@@ -4,7 +4,7 @@ title: The final status's wording and ISO dates in results
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T16:30:00Z'
+updated_date: '2026-11-05T22:33:00Z'
 labels:
   - domain:hud
   - domain:shell
@@ -39,3 +39,9 @@ From DRAFT-056 and DRAFT-066: what « the selection still moves » covers in a f
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+After B-082: the rule that a « Grilles terminées » record needs an ISO date is now in gameplay/history.md.
+<!-- SECTION:NOTES:END -->

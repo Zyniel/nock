@@ -4,12 +4,15 @@ title: Lower-level tests of three B-050 fixes
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-05T22:33:00Z'
 labels:
   - domain:hud
+  - domain:menus
 milestone: m-9
 dependencies: []
 documentation:
   - specs/client/hud.md
+  - specs/client/menus.md
 priority: low
 ordinal: 87000
 ---
@@ -34,3 +37,9 @@ From DRAFT-071: L12 (RoomPopover placed again after tick()), L14 (one watcher pe
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+After B-080: L12 (RoomPopover.svelte) is now client/menus.md.
+<!-- SECTION:NOTES:END -->

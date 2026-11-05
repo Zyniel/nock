@@ -4,13 +4,13 @@ title: B-040's small cleanups
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-05T22:33:00Z'
 labels:
-  - domain:account
+  - domain:my-account
 milestone: m-10
 dependencies: []
 documentation:
-  - specs/account/account.md
+  - specs/account/my-account.md
 priority: low
 ordinal: 80000
 ---
@@ -35,3 +35,9 @@ From DRAFT-043: one reading of a mixed nock.account_rooms array, malformed histo
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+After B-084: the test test_ac33 is now my-account AC-7 (test_ac7 in tests/test_my_account_signout_forgets.py).
+<!-- SECTION:NOTES:END -->

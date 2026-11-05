@@ -12,7 +12,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-From B-084's reviewer: account/my-account.md AC-2, AC-4 and AC-8 name window sizes (1280 by 720, 360 by 740, 320 by 568), the test mechanics _map.md « What a spec holds » keeps out of specs. They were copied as they were in the split. For m-8.
+From B-084's reviewer: account/my-account.md AC-2, AC-4 and AC-8 name window sizes (1280 by 720, 360 by 740, 320 by 568), the test mechanics _map.md « What a spec holds » keeps out of specs. They were copied as they were in the split. m-7's close review found the same in client/hud.md (15 times), client/menus.md (7), and board, viewport, rules and others: if the rule applies everywhere, this draft covers all of them. For m-8.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
