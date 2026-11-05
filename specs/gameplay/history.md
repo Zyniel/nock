@@ -33,8 +33,8 @@ terminées », where a grid can be played again.
    date-time as `lobby/summaries.md` rule 2 reads one, or not a real one,
    refused in every engine: a month outside 01 to 12, a day its month lacks
    (`2026-02-30`, `2026-02-29`), an hour past 23 or minutes past 59 in the
-   time or its offset, seconds past 59. A room's deletion removes no record; only the cap and a newer
-   record of the same code do.
+   time or its offset, seconds past 59. A room's deletion removes no record;
+   only the cap and a newer record of the same code do.
 3. A solved summary writes its room's record, replacing that code's; the
    team-mates are its players but names exactly equal to this device's
    identity nickname for the room. The catalogue page writes one per summary
@@ -123,4 +123,5 @@ terminées », where a grid can be played again.
   `playGrid.ts`, `CataloguePage.svelte` (the merge and the account history),
   `RoomPage.svelte` (it writes the record once solved).
 - Tests: `tests/test_spec_029_*` (AC-1 to AC-6), AC-13 of
-  `tests/test_spec_046_ac11_ac13_*`.
+  `tests/test_spec_046_ac11_ac13_*`, `tests/test_history_*` (AC-5),
+  `tests/web/dateTime.test.ts`.

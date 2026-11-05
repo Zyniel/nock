@@ -13,11 +13,14 @@ const REAL_DATE_TIMES = [
   '2026-12-31T23:59:59Z',
   '2026-01-01T00:00:00-23:59',
   '2026-04-30T08:30:00+23:59',
+  '2000-02-29T00:00:00Z',
 ]
 
 const IMPOSSIBLE_DATE_TIMES = [
   '2026-02-30T08:30:00Z',
   '2026-02-29T08:30:00Z',
+  '1900-02-29T00:00:00Z',
+  '2100-02-29T00:00:00Z',
   '2026-04-31T08:30:00Z',
   '2026-13-01T08:30:00Z',
   '2026-00-10T08:30:00Z',
@@ -28,6 +31,26 @@ const IMPOSSIBLE_DATE_TIMES = [
   '2026-10-14T08:30:00+24:00',
   '2026-10-14T08:30:00+01:60',
 ]
+
+// The length of each month of 2026: its last day is real, the day after is not.
+const MONTH_ENDS: [string, number][] = [
+  ['01', 31],
+  ['02', 28],
+  ['03', 31],
+  ['04', 30],
+  ['05', 31],
+  ['06', 30],
+  ['07', 31],
+  ['08', 31],
+  ['09', 30],
+  ['10', 31],
+  ['11', 30],
+  ['12', 31],
+]
+
+function dateTimeOn(month: string, day: number): string {
+  return `2026-${month}-${String(day).padStart(2, '0')}T12:00:00Z`
+}
 
 const NOT_ISO_VALUES: unknown[] = [
   '2026-10-14 08:30:00Z',
@@ -48,6 +71,14 @@ test('a real ISO date-time is one, leap day and offsets included', () => {
 test('a date-time the calendar does not have is not one', () => {
   for (const value of IMPOSSIBLE_DATE_TIMES) {
     assert.equal(isDateTime(value), false, value)
+  }
+})
+
+test('the last day of each month is real and the day after it is not', () => {
+  for (const [month, lastDay] of MONTH_ENDS) {
+    assert.equal(isDateTime(dateTimeOn(month, lastDay)), true, `${month}-${lastDay}`)
+    const next = lastDay + 1
+    assert.equal(isDateTime(dateTimeOn(month, next)), false, `${month}-${next}`)
   }
 })
 

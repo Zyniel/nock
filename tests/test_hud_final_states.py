@@ -29,8 +29,9 @@ keyboard's `T` and on ⌫ leaves `I` and the selection on (2, 2) alike.
 AC-31: reconnecting (the socket lost, the band showing), « Annuler » pressed and
 « Vérifier » « La lettre » and « Révéler » « La lettre » chosen on MIME, a rejoin
 answered by `room_locked` and a close 1000 never sends the undo, the check or the
-reveal: the frames the mock got since the loss are the join only (no undo, no check,
-no reveal).
+reveal (the mock got none since the loss, 300 ms after the close). Answered by a
+snapshot instead, the same page sends them after it, in the order they were made:
+the undo, the check of the letter (2, 2), the reveal of the letter (2, 2).
 
 "A typed letter changes nothing" is read 300 ms after the key (`QUIET_MS`).
 """
@@ -49,7 +50,7 @@ from hud_harness import (
     reconnect_with_t_pending,
 )
 from nock.grid import Grid
-from nock.protocol import Check, ErrorCode, Join, Reveal, Undo
+from nock.protocol import CellTarget, Check, ErrorCode, Reveal, Undo
 from room_panels import open_aide
 from spec019_harness import OpenWindow, window_opener
 from spec042_harness import box_of, wait_until
@@ -122,10 +123,14 @@ def expect_disabled_look(item: Locator) -> None:
     assert colour_matches(label["colour"], MUTED), label["colour"]
 
 
+def ac29_frame(grid: Grid) -> str:
+    """AC-29's snapshot: Bob's pencil `T` at (1, 0) and his `I` at (2, 2)."""
+    return snapshot_frame(fx01_view(grid, AC29_CHANGES), players_up_to(3))
+
+
 def open_ac29(page: Page, base_url: str, grid: Grid) -> RoomMock:
     """AC-29's room: Bob's pencil `T` at (1, 0) and his `I` at (2, 2)."""
-    frame = snapshot_frame(fx01_view(grid, AC29_CHANGES), players_up_to(3))
-    return open_room(page, base_url, frame)
+    return open_room(page, base_url, ac29_frame(grid))
 
 
 def close_with_4001(page: Page, mock: RoomMock) -> None:
@@ -292,6 +297,24 @@ def test_ac30_after_a_close_4001_the_in_app_keyboard_changes_no_cell(
 # ---- AC-31: kept requests are never sent ---------------------------------------------
 
 
+MIME_LETTER = CellTarget(row=2, column=2)
+KEPT_REQUESTS: list[object] = [
+    Undo(),
+    Check(target=MIME_LETTER),
+    Reveal(target=MIME_LETTER),
+]
+
+
+def kept_requests_sent(mock: RoomMock, sent_before: int) -> list[object]:
+    """The undos, checks and reveals the mock got after its first `sent_before`
+    frames, in order."""
+    kept: list[object] = []
+    for frame in mock.parsed_frames_after(sent_before):
+        if isinstance(frame, (Undo, Check, Reveal)):
+            kept.append(frame)
+    return kept
+
+
 def pick_aide_item(page: Page, test_id: str) -> None:
     """Open the Aide menu and choose one item, which closes the menu."""
     open_aide(page)
@@ -299,8 +322,9 @@ def pick_aide_item(page: Page, test_id: str) -> None:
     expect(page.get_by_test_id("aide-menu")).to_be_hidden()
 
 
-def test_ac31_a_rejoin_refused_with_room_locked_never_sends_the_kept_requests(
-    window: OpenWindow, live_server: str, fx01_grid: Grid
+@pytest.mark.parametrize("rejoin_refused", [False, True], ids=["snapshot", "locked"])
+def test_ac31_kept_requests_go_after_a_snapshot_and_never_after_room_locked(
+    window: OpenWindow, live_server: str, fx01_grid: Grid, rejoin_refused: bool
 ) -> None:
     page = computer_page(window)
     mock = open_ac29(page, live_server, fx01_grid)
@@ -316,14 +340,17 @@ def test_ac31_a_rejoin_refused_with_room_locked_never_sends_the_kept_requests(
     pick_aide_item(page, "reveal-letter")
     wait_until(page, lambda: mock.has_join_after(received_before), "the new join")
 
-    mock.send(error_frame(ErrorCode.ROOM_LOCKED))
-    mock.close(SERVER_CLOSE)
-
-    expect_room_status(page, "locked")
-    page.wait_for_timeout(QUIET_MS)
-    sent = mock.parsed_frames_after(sent_before)
-    kept_kinds = (Undo, Check, Reveal)
-    kept_sent = [frame for frame in sent if isinstance(frame, kept_kinds)]
-    joins = [frame for frame in sent if isinstance(frame, Join)]
-    assert kept_sent == []
-    assert len(joins) == 1, sent
+    if rejoin_refused:
+        mock.send(error_frame(ErrorCode.ROOM_LOCKED))
+        mock.close(SERVER_CLOSE)
+        expect_room_status(page, "locked")
+        page.wait_for_timeout(QUIET_MS)
+        assert kept_requests_sent(mock, sent_before) == []
+    else:
+        mock.send(ac29_frame(fx01_grid))
+        wait_until(
+            page,
+            lambda: len(kept_requests_sent(mock, sent_before)) == len(KEPT_REQUESTS),
+            "the kept requests",
+        )
+        assert kept_requests_sent(mock, sent_before) == KEPT_REQUESTS
