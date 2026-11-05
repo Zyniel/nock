@@ -4,7 +4,7 @@ title: platform/server.md splits in two
 status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T20:05:00Z'
+updated_date: '2026-11-05T20:06:00Z'
 labels:
   - domain:server
 milestone: m-7
@@ -34,7 +34,7 @@ From DRAFT-058. server is 17.3 KB with 23 criteria. Out of scope: any behaviour 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -53,6 +53,8 @@ Spec-checker APPROVED in one round. Two wrapping slips it noted were fixed befor
 Reviewer round 1: APPROVE, no findings.
 
 Full gate here (Chromium): static checks, 8,774 parallel and 162 serial tests (the renamed live-rooms timing files among them), all green. Main then brought B-083 and merged cleanly. Lint, traceability and shared components passed again. Firefox and WebKit are left to CI after the merge: only tests were renamed and comments repointed.
+
+Pull request #148, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
