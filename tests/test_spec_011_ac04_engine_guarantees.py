@@ -36,22 +36,9 @@ from nock.server import create_app
 from spec011_harness import (
     JOIN_TEXT,
     START_TIME,
-    grid_from_text,
-    make_dist_dir,
     receive_text_or_fail,
     socket_url,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
 
 # ---- AC-4: the runtime guarantees of the room engine ------------------------
 

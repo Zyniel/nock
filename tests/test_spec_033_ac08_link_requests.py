@@ -32,7 +32,7 @@ from nock.hub import RoomRegistry
 from nock.server import create_app
 from nock.store import RoomStore
 from spec017_harness import FakeClock, open_peer
-from spec032_harness import grid_from_text, make_dist_dir
+from spec032_harness import make_dist_dir
 from spec033_harness import (
     ACCOUNT_PAGE_PATH,
     ACCOUNT_PATH,
@@ -84,11 +84,6 @@ SPLITTABLE_ADDRESSES = [
     "a<b@example.org",
     'a"b@example.org',
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def addresses(count: int) -> list[str]:

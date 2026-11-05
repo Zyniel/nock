@@ -24,7 +24,6 @@ from nock.room import (
 from spec018_harness import (
     NOW,
     cell_state,
-    grid_from_text,
     letter_changed,
     other_cells,
     player_record,
@@ -33,11 +32,6 @@ from spec018_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-3: undo on handle_message ----

@@ -36,7 +36,6 @@ from spec024_harness import (
     accepted_reveal,
     allowance_cut,
     cell_state,
-    grid_from_text,
     host_change_outcome,
     r1_room,
     r1_with_entries,
@@ -47,11 +46,6 @@ from spec024_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- Helpers ----

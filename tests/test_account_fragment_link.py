@@ -19,7 +19,6 @@ from playwright.sync_api import Browser, Page
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PAGE_PATH,
     ANA_EMAIL,
@@ -36,11 +35,6 @@ STATUS_PATH = "/api/account"
 FRAGMENT_TOKEN_SCRIPT = "token => { location.hash = token; }"
 LOAD_MARK_SCRIPT = "() => { window.__loadMark = 'same document'; }"
 READ_MARK_SCRIPT = "() => window.__loadMark"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

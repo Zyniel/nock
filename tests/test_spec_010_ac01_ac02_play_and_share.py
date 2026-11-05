@@ -12,18 +12,14 @@ from collections.abc import Callable
 import pytest
 from playwright.sync_api import Browser, Page, Request, Route, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from nock.hub import RoomRegistry
 from spec010_harness import (
     PROGRESS_KEY,
     ROOM_URL_PATTERN,
     URL_TIMEOUT_MS,
     EnterRoom,
-    catalogue_from_grid,
     cell_at,
     expect_joined,
-    grid_from_text,
     item_play_button,
     load_fr,
     read_json_object,
@@ -39,15 +35,7 @@ BREAK_STORAGE_SCRIPT = (
 )
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1, force 2."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 class RequestCounter:

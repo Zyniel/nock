@@ -28,7 +28,6 @@ from typing import Any, NamedTuple
 import pytest
 from playwright.sync_api import Browser, Page, WebSocket, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from room_panels import show_tab
 from spec035_harness import (
@@ -42,8 +41,6 @@ from spec035_harness import (
     ROOM_TIMEOUT_MS,
     SETTLE_MS,
     Walker,
-    build_fx01_grid,
-    build_reference_catalogue,
     cell_at,
     expect_selected,
     expect_word,
@@ -57,15 +54,7 @@ from spec035_harness import (
 # ---- Fixtures: thin wrappers around spec035_harness -------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (also served by live_server)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 ACTIVE_ELEMENT_SCRIPT = r"""

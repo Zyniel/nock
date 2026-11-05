@@ -31,7 +31,7 @@ from nock.catalogue import (
     summarize,
 )
 from nock.grid import Grid
-from spec005_harness import credits, grid_from_text, make_entry
+from spec005_harness import credits, make_entry
 
 AUTHOR = "Équipe Nock"
 SOURCE = "Commande Nock 2026"
@@ -44,11 +44,6 @@ ALL_CREDITS = ["author", "source", "licence"]
 
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def write_credit(directory: Path, field: str, value: object) -> str:

@@ -39,7 +39,7 @@ from operations_harness import (
     write_room,
 )
 from spec017_harness import FakeClock
-from spec032_harness import LIFE, NO_TICK_CONFIG, T0, Run, grid_from_text
+from spec032_harness import LIFE, NO_TICK_CONFIG, T0, Run
 from spec033_harness import database_bytes, strings_in
 
 CODE_A = "QJ7WXK"  # occurs nowhere else in the file
@@ -47,11 +47,6 @@ CHAT = "chat-busy-6610"
 LOOKUP_BOUND_SECONDS = 1.0
 BUSY_TIMEOUT_SECONDS = 5.0
 BUSY_TIMEOUT_MS = 5000
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def test_ac25_a_checkpoint_blocked_by_a_reader_gives_up_at_once_and_keeps_the_timeout(

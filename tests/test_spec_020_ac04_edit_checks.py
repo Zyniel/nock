@@ -54,10 +54,7 @@ from spec020_harness import (
 from spec024_harness import (
     NOW,
     events_of,
-    grid_from_text,
     join_peers,
-    make_catalogue,
-    make_dist_dir,
     make_registry,
     ping_and_wait,
     player_record,
@@ -80,19 +77,7 @@ CLUE_CELL_PENCIL_JSON = (
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

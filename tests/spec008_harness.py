@@ -3,8 +3,8 @@
 This module is not a test file: pytest does not collect it. The tests of spec 008
 are in `tests/test_spec_008_*.py`, one file per criterion group. It holds what more
 than one of those files uses. What only one file uses stays in that file, next to
-its tests. The fixture `fx01_grid` is defined in each file as a thin wrapper around
-`grid_from_text`: a fixture imported from here would be an unused import for ruff.
+its tests. The fixture `fx01_grid` is not defined in the test files: it is the
+shared one of `tests/conftest.py`.
 
 Keys: ASCII keys go through `page.keyboard.press`. Playwright cannot press a key
 such as "é" (`keyboard.press` raises "Unknown key" and `keyboard.type` sends no
@@ -53,11 +53,6 @@ ACROSS_W8 = "4,0,0"
 ChangeList = list[tuple[int, int, dict[str, object]]]
 
 # ---- Fixtures and helpers ---------------------------------------------------
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
 
 
 def cell_at(page: Page, row: int, column: int) -> Locator:

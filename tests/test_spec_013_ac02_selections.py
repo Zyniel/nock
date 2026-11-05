@@ -50,10 +50,8 @@ from spec013_harness import (
     clear_frame,
     events_of,
     expected_tints,
-    grid_from_text,
     join_two,
     letter_cells_of_fx01,
-    make_dist_dir,
     open_peer,
     open_room,
     ping_and_wait,
@@ -76,16 +74,6 @@ from spec013_harness import (
 RELAY_P95_SECONDS = 0.1
 RELAY_SAMPLES = 100
 DRAW_BUDGET_MS = 300
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 # ---- AC-2: selections, rules -----------------------------------------------------

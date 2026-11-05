@@ -34,7 +34,7 @@ from nock.protocol import Join
 from nock.room import join_room, new_room
 from spec024_harness import make_catalogue
 from spec029_harness import device_record, history_value, read_key, stored_history
-from spec032_harness import expect_my_rooms_ready, grid_from_text, my_room_items
+from spec032_harness import expect_my_rooms_ready, my_room_items
 from spec033_harness import (
     ACCOUNT_PAGE_PATH,
     ANA_EMAIL,
@@ -68,11 +68,6 @@ SIGN_OUT_ROUTE = "**/api/account/sign-out"
 ACCOUNT_ROUTE = "**/api/account"
 
 Identity = dict[str, str]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

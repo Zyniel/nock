@@ -33,19 +33,9 @@ from nock.protocol import PlayerState, RemovePlayer
 from nock.store import RoomStore
 from spec014_harness import ping_and_wait, player_of
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import ROOMS_PATH, room_key, state_of, wait_for, with_session
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def room_of(app: HostApp, grid: Grid) -> str:

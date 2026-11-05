@@ -51,7 +51,6 @@ from nock.accounts import ErasedPlayer
 from nock.grid import Grid
 from operations_harness import LOGGER_PREFIX
 from spec017_harness import FakeClock
-from spec032_harness import grid_from_text
 from spec033_harness import (
     ACCOUNT_PATH,
     FORMER_NICKNAME,
@@ -68,11 +67,6 @@ HOLD_SECONDS = 5.6  # more than the 5 s that the erasure waits for an engine
 ANSWER_BOUND_SECONDS = 7.0
 LATER_SWEEPS_SECONDS = 1.0  # ten sweeps of FAST_SWEEP_CONFIG
 ONE_DAY = 86_400.0
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def test_ac9_a_held_engine_leaves_the_erasure_pending_and_the_next_attempt_ends_it(

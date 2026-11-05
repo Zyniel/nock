@@ -48,9 +48,6 @@ from library_harness import (
     stored_progress,
     wait_for_progress_answers,
 )
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec004_harness import grid_from_text, make_reference_catalogue
 from spec042_harness import wait_until
 from spec046_harness import (
     SIGNED_IN,
@@ -61,16 +58,7 @@ from spec046_harness import (
     open_catalogue,
 )
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 def open_grid(page: Page, base_url: str, number: int) -> None:

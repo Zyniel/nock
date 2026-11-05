@@ -39,10 +39,8 @@ from spec016_harness import (
     cell_state,
     default_players,
     expect_letter,
-    grid_from_text,
     join_peers,
     make_app,
-    make_dist_dir,
     make_registry,
     open_fx01,
     two_player_room,
@@ -50,16 +48,6 @@ from spec016_harness import (
 )
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

@@ -28,7 +28,6 @@ from spec034_harness import (
     cell_at,
     expected_caught_up,
     feed_item_locator,
-    grid_from_text,
     open_mocked_room,
     record_with,
     request_body,
@@ -38,11 +37,6 @@ from spec034_harness import (
 
 NO_RETRY_MS = 2_000
 MALFORMED_CLUES: list[object] = [None, {"row": "2", "column": 0, "clue_index": 0}]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def answer_with_malformed_clue(clue: object) -> str:

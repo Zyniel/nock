@@ -29,10 +29,10 @@ from nock.accounts import AccountStore
 from nock.catalogue import Catalogue
 from nock.hub import RoomRegistry
 from serving_harness import account_store as account_store
-from serving_harness import catalogue as catalogue
 from serving_harness import edge_app
-from serving_harness import fx01_grid as fx01_grid
 from serving_harness import registry as registry
+
+CATALOGUE_KIND = "published"
 
 API_PREFIX = "/api/"
 NO_MODEL_ROUTE = ("GET", "/api/rooms")

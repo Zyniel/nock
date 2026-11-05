@@ -10,16 +10,12 @@ wait for the fonts. The shared setup is in `tests/spec041_harness.py`.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Direction, Selection
 from spec035_harness import (
     ChangeList,
-    build_fx01_grid,
-    build_reference_catalogue,
     open_room,
     player_view,
 )
@@ -47,15 +43,7 @@ from spec041_harness import (
 # ---- Fixtures: thin wrappers around the harnesses ---------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of spec 004 (served by live_server for `/`)."""
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 # ---- The room of AC-15 ------------------------------------------------------------

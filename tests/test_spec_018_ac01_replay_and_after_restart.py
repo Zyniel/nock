@@ -50,7 +50,6 @@ from spec018_harness import (
     SECOND_TOKEN,
     START_TIME,
     cell_state,
-    grid_from_text,
     letter_changed,
     other_cells,
     player_record,
@@ -61,11 +60,6 @@ from spec018_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- AC-1: replay ----

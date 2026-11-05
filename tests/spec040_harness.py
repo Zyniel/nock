@@ -13,11 +13,12 @@ are in `tests/test_spec_040_*.py`, one file per criterion group:
   and the API documentation.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures that several files need are
-defined in each of them: `fx01_grid` and `dist_dir` as thin wrappers around
-`grid_from_text` and `make_dist_dir`, and `empty_client`, `registry`, `room_code`
-and `room_client` as the same few lines. A fixture imported from here would be an
-unused import for ruff.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`. The
+040 files whose built client needs `assets/app.js` and `favicon.svg` define their
+own `dist_dir` around `make_dist_dir`. The fixtures `empty_client`, `registry`,
+`room_code` and `room_client` are the same few lines in each file that needs them: a
+fixture imported from here would be an unused import for ruff.
 """
 
 from __future__ import annotations
@@ -25,7 +26,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from nock.grid import Grid
 from nock.protocol import HelpMode, RevealBudget, RoomSettings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -39,11 +39,6 @@ EXPECTED_SETTINGS = RoomSettings(
     reveal_budget=RevealBudget(letters=5, words=1),
     locked=False,
 )
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
 
 
 def make_dist_dir(root: Path) -> Path:

@@ -40,7 +40,7 @@ from spec022_harness import (
     read_chat_lines,
     three_players,
 )
-from spec024_harness import grid_from_text, load_fr, open_context_page
+from spec024_harness import load_fr, open_context_page
 from spec025_harness import fr_text
 
 SNAPSHOT_CHAT = [
@@ -55,11 +55,6 @@ SALON_CLOSED_SCRIPT = (
 )
 HEIGHT_SIZES = [(1280, 720), (568, 320)]
 HEIGHT_TOLERANCE_PX = 1.0  # "the same height (1 px tolerance)"
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def seed_salon_closed(page: Page) -> None:

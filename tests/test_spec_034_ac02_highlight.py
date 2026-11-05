@@ -30,7 +30,6 @@ from spec034_harness import (
     cell_at,
     expect_catch_up_applied,
     expected_caught_up,
-    grid_from_text,
     marks_by_cell,
     open_mocked_room,
     record_with,
@@ -137,11 +136,6 @@ cell => {
   }
 }
 """
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

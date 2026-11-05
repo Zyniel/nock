@@ -45,7 +45,6 @@ from spec025_harness import (
     cell_at,
     closed,
     events_of,
-    grid_from_text,
     last_vote_id_of,
     open_room,
     open_vote_of,
@@ -65,11 +64,6 @@ HELP_BUTTONS = (
     "reveal-letter",
     "reveal-word",
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def expect_no_help_controls(page: Page) -> None:

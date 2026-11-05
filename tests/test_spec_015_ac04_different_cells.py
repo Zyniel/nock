@@ -26,13 +26,11 @@ from spec015_harness import (
     cell_at,
     errors_received,
     expect_cell,
-    grid_from_text,
     grid_of_peer,
     join_peers,
     letter_cells,
     letter_changed_frame,
     make_app,
-    make_dist_dir,
     make_registry,
     open_fx01,
     send_edits_together,
@@ -43,16 +41,6 @@ from spec015_harness import (
 )
 
 # ---- Fixtures ---------------------------------------------------------------
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

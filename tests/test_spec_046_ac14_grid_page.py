@@ -23,9 +23,6 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, expect
 
-from nock.catalogue import Catalogue
-from nock.grid import Grid
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec043_harness import LINE, RED, WHITE, fr_value
 from spec046_harness import (
     SIGNED_OUT,
@@ -48,15 +45,7 @@ from spec046_harness import (
     window_opener,
 )
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

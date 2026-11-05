@@ -137,11 +137,6 @@ async (run) => {
 """
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
 # ---- The production server in a subprocess -------------------------------------------
 
 

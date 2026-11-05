@@ -11,7 +11,6 @@ import json
 import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import GridSolved
 from spec010_harness import (
@@ -20,10 +19,8 @@ from spec010_harness import (
     ROOM_RECORD_KEY,
     ROOM_URL_PATTERN,
     MockRoomSocket,
-    catalogue_from_grid,
     code_from_url,
     expect_joined,
-    grid_from_text,
     item_play_button,
     open_mock_room,
     read_json_object,
@@ -40,15 +37,7 @@ from spec010_harness import (
 STARTED_PROGRESS = json.dumps({"1": "started"})
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1, force 2."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def wait_for_progress(page: Page, expected: dict[str, str]) -> None:

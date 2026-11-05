@@ -34,7 +34,6 @@ from typing import Any
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import ClueCell, Grid
 from nock.protocol import ClueRef, Flag, FlagView, grid_view, parse_client_message
 from spec021_harness import (
@@ -57,7 +56,6 @@ from spec024_harness import (
     language_data,
     language_problems,
     load_fr,
-    make_catalogue,
     make_walker,
     open_context_page,
     outline_problems,
@@ -105,19 +103,11 @@ clue => {
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
     return grid_from_text(fx02_text)
 
 
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- Helpers ----

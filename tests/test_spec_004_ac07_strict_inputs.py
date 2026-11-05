@@ -16,32 +16,15 @@ from fastapi.testclient import TestClient
 
 from grid_files_harness import fx01_ipuz_data, write_one_grid
 from nock.catalogue import Catalogue, CatalogueError, load_catalogue
-from nock.grid import Grid
 from spec004_harness import (
-    grid_from_text,
     json_numbers,
     make_client,
-    make_dist_dir,
-    make_reference_catalogue,
 )
 
 # ---- Fixtures and helpers ---------------------------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """The reference catalogue CAT of the spec (also served by live_server)."""
-    return make_reference_catalogue(fx01_grid)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

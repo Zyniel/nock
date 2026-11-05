@@ -20,12 +20,7 @@ from httpx2 import Response
 
 from nock.grid import Grid
 from nock.server import RoomRegistry, create_app
-from spec040_harness import INDEX_HTML, grid_from_text, make_dist_dir, socket_url
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
+from spec040_harness import INDEX_HTML, make_dist_dir, socket_url
 
 
 @pytest.fixture

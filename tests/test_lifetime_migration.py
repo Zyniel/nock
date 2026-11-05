@@ -45,7 +45,6 @@ from nock.room import LogEntry, RoomState
 from nock.store import RoomStore
 from spec017_harness import FakeClock
 from spec026_harness import LAST_CELL, NOW, full17, solved_room, write
-from spec032_harness import grid_from_text
 
 SOLVED_ROOM = "SOLVED"
 LOGGED_ROOM = "LOGGED"
@@ -104,11 +103,6 @@ class OldRoom(NamedTuple):
     log: tuple[LogEntry, ...]
     last_edit_at: float
     creator: str | None
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def named(state: RoomState, code: str) -> RoomState:

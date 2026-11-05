@@ -49,7 +49,6 @@ from spec022_harness import (
 )
 from spec024_harness import (
     cell_at,
-    grid_from_text,
     load_fr,
     open_context_page,
     player_view,
@@ -194,11 +193,6 @@ INPUT_INSIDE_SCRIPT = r"""
 
 def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
     return [f"{width}x{height}" for width, height in sizes]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- The setup ----

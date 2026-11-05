@@ -7,10 +7,10 @@ The page is tested against the real app (a live server, the catalogue of FX-01 a
 entry 1) and against spec 040's mocked room socket (`MockRoomSocket`).
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid` and `catalogue`
-are defined in each file as thin wrappers around `grid_from_text` and
-`catalogue_from_grid`: a fixture imported from here would be an unused import for
-ruff, and `live_server` needs the `catalogue` of its own file.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `catalogue` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`, and
+a test module that serves grids sets `CATALOGUE_KIND` (the names are in
+`tests/catalogue_builders.py`) instead of defining `catalogue`.
 """
 
 from __future__ import annotations
@@ -70,15 +70,10 @@ class EnterRoom(Protocol):
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
 
 
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(text)
-
-
 def catalogue_from_grid(grid: Grid) -> Catalogue:
     """A catalogue holding `grid` as published entry 1, force 2.
 
-    This is the body of the `catalogue` fixture of each test file.
+    Some test files build their own `catalogue` fixture around it.
     """
     entry = CatalogueEntry(
         number=1,

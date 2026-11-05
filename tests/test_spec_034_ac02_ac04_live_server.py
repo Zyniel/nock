@@ -25,7 +25,6 @@ from spec034_harness import (
     cell_at,
     feed_item_locator,
     feed_items,
-    grid_from_text,
     room_page,
 )
 
@@ -51,11 +50,6 @@ class EnterRoom(Protocol):
     """The `enter_room` fixture of conftest."""
 
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

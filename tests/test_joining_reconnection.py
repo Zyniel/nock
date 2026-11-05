@@ -28,7 +28,6 @@ from spec017_harness import (
     advance_page,
     expect_new_connection_after,
     expect_status,
-    grid_from_text,
     open_room,
     player_view,
     snapshot_frame,
@@ -47,11 +46,6 @@ OTHER_IDENTITY = json.dumps(
     {"player_id": "p7", "resume_token": "other-tab-token-0000007", "nickname": "ZOE"}
 )
 ANAS_REJOIN = Join(nickname="ANA", resume_token=SNAPSHOT_TOKEN)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def first_frame(page: Page, connection: MockConnection) -> ClientMessage:

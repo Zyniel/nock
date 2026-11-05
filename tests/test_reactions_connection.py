@@ -13,7 +13,6 @@ moves to another word.
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
@@ -23,7 +22,6 @@ from spec017_harness import (
     MockRoom,
     expect_status,
     first_join,
-    grid_from_text,
     joined_room,
     settle,
     snapshot_frame,
@@ -34,11 +32,6 @@ from spec043_harness import press_cell, select_mime
 LOST_CLOSE = 1011
 REPLACED_CLOSE = 4001
 STAYS_DISABLED_MS = 1500  # longer than the first retry delay at its highest
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def sent_on_any_socket(room: MockRoom, kind: str) -> int:

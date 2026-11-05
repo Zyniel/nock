@@ -48,7 +48,7 @@ from spec022_harness import (
     open_chat_room,
     open_panel,
 )
-from spec024_harness import cell_at, grid_from_text, open_context_page, player_view
+from spec024_harness import cell_at, open_context_page, player_view
 from spec025_harness import GRID_CHECK, MockRoomSocket, closed, opened
 
 WINDOW_SIZES = [
@@ -140,11 +140,6 @@ LIST_SCROLLS_SCRIPT = r"""
 
 def size_ids() -> list[str]:
     return [f"{width}x{height}" for width, height in WINDOW_SIZES]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def eight_players_with_p2_host() -> list[PlayerView]:

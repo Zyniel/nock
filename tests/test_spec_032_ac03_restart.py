@@ -41,23 +41,11 @@ from spec032_harness import (
     DAY,
     SEAT_BACK_CONFIG,
     T0,
-    grid_from_text,
-    make_dist_dir,
     snapshot_cell,
 )
 
 TIMER_MS = 90_000  # from the first letter (t0 + 10) to the last leave (t0 + 100)
 TIMER_TOLERANCE_MS = 1_000
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 class NextDay(NamedTuple):

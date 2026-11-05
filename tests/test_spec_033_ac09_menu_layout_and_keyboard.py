@@ -54,7 +54,6 @@ from spec024_harness import (
     outline_problems,
     player_view,
 )
-from spec032_harness import grid_from_text
 from spec033_harness import (
     WAIT_TIMEOUT_MS,
     WINDOW_SIZES,
@@ -70,11 +69,6 @@ FEED_ITEMS = 100
 MIN_GRID_VIEWPORT_PX = 100.0
 EPSILON = 1.0
 TRAP_PRESSES = 10
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

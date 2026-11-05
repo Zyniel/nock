@@ -8,9 +8,8 @@ are in `tests/test_spec_005_*.py`, one file per criterion group:
 - AC-6 and AC-7: no new room on a withdrawn grid, open rooms can finish.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixture `fx01_grid` is defined in each
-file that needs it as a thin wrapper around `grid_from_text`: a fixture imported
-from here would be an unused import for ruff.
+stays in that file, next to its tests. The fixture `fx01_grid` is not defined in the
+test files: it is the shared one of `tests/conftest.py`.
 """
 
 from __future__ import annotations
@@ -27,11 +26,6 @@ def credits() -> dict[str, str]:
     """Return the credit fields of a catalogue entry (tests/fixtures/credits.json)."""
     credits_path = Path(__file__).parent / "fixtures" / "credits.json"
     return json.loads(credits_path.read_text(encoding="utf-8"))
-
-
-def grid_from_text(fx01_text: str) -> Grid:
-    """Return the FX-01 grid parsed from its JSON text."""
-    return Grid.model_validate_json(fx01_text)
 
 
 def make_entry(

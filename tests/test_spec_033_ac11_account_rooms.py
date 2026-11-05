@@ -25,12 +25,10 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-import pytest
-
 from nock.grid import Grid
 from nock.room import new_room
 from spec017_harness import FakeClock, open_peer
-from spec032_harness import LIFE, grid_from_text
+from spec032_harness import LIFE
 from spec033_harness import (
     ANA_EMAIL,
     NOBODYS_TOKEN,
@@ -42,11 +40,6 @@ from spec033_harness import (
     link_and_sign_in,
     room_key,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class TwoRooms(NamedTuple):

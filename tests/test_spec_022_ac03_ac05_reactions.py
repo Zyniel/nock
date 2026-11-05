@@ -88,10 +88,8 @@ from spec024_harness import (
     cell_at,
     events_of,
     full17,
-    grid_from_text,
     join_peers,
     load_fr,
-    make_dist_dir,
     ping_and_wait,
     player_record,
     seen_at,
@@ -112,16 +110,6 @@ GONE_BY_MS = 3500  # "no clue-reaction is left 3,500 ms after it appeared"
 APPEAR_WITHIN_MS = 300
 SECOND_REACTION_AFTER_MS = 1000
 GONE_TIMEOUT_MS = 6000
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 # ---- AC-3: the rule ----

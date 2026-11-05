@@ -45,10 +45,8 @@ from nock.store import RoomStore
 from spec012_harness import close_code_of_next_read
 from spec014_harness import Peer, ping_and_wait, player_of, socket_url
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
 from spec028_harness import ROW_MAJOR, SOLUTION
 from spec029_harness import history_body
-from spec032_harness import grid_from_text
 from spec033_harness import ACCOUNT_PATH, ROOMS_PATH, room_key, state_of, with_session
 
 ROOM_NOT_FOUND = 4404
@@ -57,14 +55,7 @@ WRONG_CODE_LIMIT = 10  # `lobby/rooms.md`: ten wrong codes in a minute
 FORMER = "--"
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 class Erased(NamedTuple):

@@ -26,10 +26,13 @@ the helpers below when a test runs. So while they are missing, each test that ne
 them fails with an AttributeError, and the collection of the other tests goes on.
 
 This module holds what more than one test file uses. What only one file uses stays
-in that file. The fixtures (`fx01_grid`, `dist_dir`, `catalogue`, `registry`,
-`client`) are defined in each file that asks for them, as thin wrappers around
-`grid_from_text`, `make_dist_dir`, `make_catalogue` and `make_registry`: a fixture
-imported from here would be an unused import for ruff.
+in that file. The fixtures `fx01_grid`, `dist_dir` and `catalogue` are not defined
+in the test files: they are the shared ones of `tests/conftest.py`, and a test
+module that serves grids sets `CATALOGUE_KIND` (the names are in
+`tests/catalogue_builders.py`) instead of defining `catalogue`. The fixtures
+`registry` and `client` are defined in each file that asks for them, as thin
+wrappers around `make_registry`: a fixture imported from here would be an unused
+import for ruff.
 """
 
 from __future__ import annotations
@@ -39,7 +42,6 @@ import json
 import re
 import threading
 from collections.abc import Callable
-from datetime import date
 from pathlib import Path
 from typing import Protocol
 
@@ -57,7 +59,6 @@ from starlette.testclient import WebSocketTestSession
 
 import nock.room
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import (
@@ -107,7 +108,6 @@ from room_panels import open_host_settings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FR_JSON_PATH = PROJECT_ROOT / "web" / "src" / "i18n" / "fr.json"
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 
 # ---- Rules: the rooms of the spec's "Test harness" ---------------------------
 
@@ -358,38 +358,6 @@ class EnterRoom(Protocol):
     """The `enter_room` fixture of conftest."""
 
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
-
-
-def credits() -> dict[str, str]:
-    """The credit fields of a catalogue entry (tests/fixtures/credits.json)."""
-    credits_path = Path(__file__).parent / "fixtures" / "credits.json"
-    return json.loads(credits_path.read_text(encoding="utf-8"))
-
-
-def grid_from_text(text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixtures)."""
-    return Grid.model_validate_json(text)
-
-
-def make_dist_dir(root: Path) -> Path:
-    """A `dist` directory with a minimal `index.html` (the `dist_dir` fixtures)."""
-    dist = root / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
-
-
-def make_catalogue(grid: Grid) -> Catalogue:
-    """A catalogue holding `grid` as published entry 1 (the `catalogue` fixtures)."""
-    entry = CatalogueEntry(
-        number=1,
-        published_on=date(2026, 10, 1),
-        force=2,
-        published=True,
-        **credits(),
-        grid=grid,
-    )
-    return Catalogue(entries=(entry,))
 
 
 def make_registry() -> RoomRegistry:

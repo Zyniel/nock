@@ -28,7 +28,6 @@ from collections.abc import Callable
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import CheckResult, FlagView, GridTarget, PlayerView, grid_view
 from spec019_harness import layout_problems
@@ -38,8 +37,6 @@ from spec024_harness import (
     WAIT_TIMEOUT_MS,
     cell_at,
     expect_seq,
-    grid_from_text,
-    make_catalogue,
     make_walker,
     open_context_page,
     outline_problems,
@@ -129,15 +126,7 @@ FOCUS_SCRIPT = "() => {\n" + COLOUR_CONTRAST_JS + r"""
 # ---- Fixtures ----
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """A catalogue holding FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 # ---- The setup ----

@@ -38,7 +38,6 @@ from playwright.sync_api import Browser, Page, Request, expect
 from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.protocol import ErrorCode
-from spec035_harness import build_fx01_grid
 from spec042_harness import box_of
 from spec043_harness import (
     COMPUTER_BUTTONS,
@@ -94,11 +93,6 @@ ABSENT_IDS = [
     "grid-status",
     "connection-banner",
 ]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
 
 
 @pytest.fixture

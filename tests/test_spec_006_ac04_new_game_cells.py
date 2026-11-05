@@ -29,11 +29,6 @@ FX02_EMPTY_CELL_COUNT = 56
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
     return grid_from_text(fx02_text)
 

@@ -22,7 +22,6 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Direction, GridView, LetterChanged, PlayerView, grid_view
 from spec007_harness import note_view
@@ -45,7 +44,6 @@ from spec042_harness import (
     colour_of,
     colour_problems,
     fx01_view,
-    make_catalogue,
     make_storage_throw,
     me,
     mixed_colour_problems,
@@ -64,19 +62,11 @@ from spec042_harness import (
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def fx02_grid(fx02_text: str) -> Grid:
     return Grid.model_validate_json(fx02_text)
 
 
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published_force_1"
 
 
 # ---- AC-1: grid lines and empty cells -------------------------------------------

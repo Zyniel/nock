@@ -4,10 +4,11 @@ This module is not a test file: pytest does not collect it. The tests of spec 01
 are in `tests/test_spec_011_*.py`, one file per criterion.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixtures `fx01_grid`, `dist_dir` and
-`catalogue` are defined in each file that needs them as thin wrappers around
-`grid_from_text`, `make_dist_dir` and `build_catalogue`: a fixture imported from
-here would be an unused import for ruff.
+stays in that file, next to its tests. The fixtures `fx01_grid` and `dist_dir` are
+not defined in the test files: they are the shared ones of `tests/conftest.py`. A
+test module that needs another catalogue (spec 011's has a published and an
+unpublished entry) defines its own `catalogue` fixture around `build_catalogue`;
+`live_server` serves the `catalogue` of the test module.
 """
 
 from __future__ import annotations
@@ -74,11 +75,6 @@ class EnterRoom(Protocol):
     """The `enter_room` fixture of conftest."""
 
     def __call__(self, page: Page, url: str, nickname: str = "Ana") -> None: ...
-
-
-def grid_from_text(fx01_text: str) -> Grid:
-    """The grid of a JSON text (the body of the `fx01_grid` fixture)."""
-    return Grid.model_validate_json(fx01_text)
 
 
 def make_dist_dir(tmp_path: Path) -> Path:

@@ -7,9 +7,8 @@ The page is tested with spec 040's mocked socket on `/r/ABC123`: the test sends
 an FX-01 snapshot (or a hand-built view) and reads every frame the page sent.
 
 This module holds what more than one of those files uses. What only one file uses
-stays in that file, next to its tests. The fixture `fx01_grid` is defined in each
-file as a thin wrapper around `grid_from_text`: a fixture imported from here would
-be an unused import for ruff.
+stays in that file, next to its tests. The fixture `fx01_grid` is not defined in the
+test files: it is the shared one of `tests/conftest.py`.
 """
 
 from __future__ import annotations
@@ -48,11 +47,6 @@ SNAPSHOT_RESUME_TOKEN = "r7Kq2mXo9vB4tY1zW8nP"
 WAIT_TIMEOUT_MS = 5000
 SETTLE_MS = 300
 FORM_TIMEOUT_MS = 5000
-
-
-def grid_from_text(text: str) -> Grid:
-    """Parse the JSON text of the FX-01 grid (the `fx01_text` fixture)."""
-    return Grid.model_validate_json(text)
 
 
 def load_fr() -> dict[str, str]:

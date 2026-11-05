@@ -40,17 +40,12 @@ from lifetime_harness import (
 from nock.grid import Grid
 from nock.room import new_room
 from nock.store import RoomStore
-from spec032_harness import T0, grid_from_text
+from spec032_harness import T0
 
 CREATED_ROOMS = ["AAAAAA", "BBBBBB", "CCCCCC"]
 LEAS_ROOM = "BBBBBB"
 SOLVED_ROOM = "SOLVED"
 HAND_SET_SOLVE_TIME = 12345.0  # not the room's last edit time (T0)
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def add_rooms(store: RoomStore, grid: Grid) -> None:

@@ -71,7 +71,6 @@ from room_panels import open_host_settings, show_tab
 from spec017_harness import (
     expect_offline,
     expect_status,
-    grid_from_text,
     open_room,
     snapshot_frame,
 )
@@ -111,11 +110,6 @@ WRITE_LIMIT_MS = 500  # the most page clock a message may take to be written
 WRITE_STEP_MS = 10
 REAL_PAUSE_MS = 10  # the real pause after each step, for the pongs
 COPIED_TEXT = fr_value("room.share.copied")  # « Lien copié »
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

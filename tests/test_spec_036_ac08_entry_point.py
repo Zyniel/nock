@@ -55,7 +55,6 @@ from spec036_harness import (
 # The fixtures of the harness. pytest looks for a test's fixtures among the names of
 # its module, so they are imported by name. `x as x` is the explicit re-export
 # form: it keeps ruff from reporting the import as unused or as redefined.
-from spec036_harness import fx01_grid as fx01_grid
 
 # ---- Values of the spec --------------------------------------------------------------
 

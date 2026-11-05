@@ -23,12 +23,10 @@ from collections.abc import Iterator
 import pytest
 from playwright.sync_api import Browser, Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.hub import RoomRegistry
 from nock.protocol import GridSolved, LetterChanged
 from spec010_harness import (
-    catalogue_from_grid,
     expect_joined,
     seed_local_storage,
     start_from_catalogue,
@@ -57,7 +55,7 @@ from spec029_harness import (
     solved_summary,
     wait_for_stored_history,
 )
-from spec032_harness import PARIS, SummariesRoute, grid_from_text, sent_keys
+from spec032_harness import PARIS, SummariesRoute, sent_keys
 
 PARIS_DATE_SCRIPT = (
     "milliseconds => new Intl.DateTimeFormat('fr-FR', {day: 'numeric',"
@@ -66,15 +64,7 @@ PARIS_DATE_SCRIPT = (
 )
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (spec 010's harness), served by `live_server`."""
-    return catalogue_from_grid(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

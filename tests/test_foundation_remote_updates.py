@@ -256,12 +256,6 @@ def places_of(cells: list[tuple[int, int]]) -> set[str]:
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    """Return the FX-01 reference grid (5 by 5)."""
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def phone_page(browser: Browser, browser_name: str) -> Iterator[Page]:
     """A page of a 360 by 740 touch phone (spec 024's touch context)."""
     context = new_context(browser, browser_name, PHONE_WIDTH, PHONE_HEIGHT, True)

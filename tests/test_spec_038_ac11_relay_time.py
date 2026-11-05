@@ -75,11 +75,6 @@ TICK_SECONDS = 0.05
 
 
 @pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
 def blocking_store() -> Iterator[BlockingStore]:
     store = BlockingStore()
     yield store

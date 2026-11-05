@@ -39,14 +39,8 @@ from spec034_harness import (
     Play,
     absence_rooms,
     catch_up_path,
-    grid_from_text,
     known_catch_up,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 @pytest.fixture

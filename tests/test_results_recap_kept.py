@@ -40,12 +40,6 @@ from spec011_harness import INDEX_HTML
 from spec014_harness import open_peer
 from spec024_harness import ROOM_CODE
 from spec028_harness import SHARE_TOKEN
-from spec032_harness import grid_from_text
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 class CountingBuild:

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
 from playwright.sync_api import Locator, Page, expect
 
 from nock.grid import Grid
@@ -32,17 +31,12 @@ from spec022_harness import (
     remaining_ms,
     wait_for_frame_count,
 )
-from spec024_harness import grid_from_text, load_fr
+from spec024_harness import load_fr
 
 PACE_COUNT = 5
 PACE_SECONDS = 12.0
 STILL_PACED_AT_SECONDS = 11.5
 PACING_SLACK_SECONDS = 0.75
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def wait_until_elapsed(page: Page, started: float, seconds: float) -> None:

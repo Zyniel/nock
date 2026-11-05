@@ -50,7 +50,6 @@ from spec022_harness import (
     wait_for_frame_count,
 )
 from spec024_harness import (
-    grid_from_text,
     load_fr,
     open_context_page,
     player_view,
@@ -86,11 +85,6 @@ NO_CUT = {"top": 0, "right": 0, "bottom": 0, "left": 0}
 
 def size_ids(sizes: list[tuple[int, int]]) -> list[str]:
     return [f"{width}x{height}" for width, height in sizes]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 # ---- The chat list's measures ----

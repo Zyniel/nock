@@ -25,7 +25,6 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page, expect
 
-from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import ClueRef, FlagView, PlayerView
 from spec021_harness import flag_changed_frame
@@ -54,7 +53,6 @@ from spec042_harness import (
     hit_chain,
     hit_owner,
     is_transparent,
-    make_catalogue,
     me,
     open_room,
     player,
@@ -67,15 +65,7 @@ from spec042_harness import (
 # ---- Fixtures: thin wrappers around the harness ---------------------------------
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    """FX-01 as published entry 1 (the live server serves it)."""
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published_force_1"
 
 
 # ---- Reading a clue cell -----------------------------------------------------------

@@ -16,18 +16,11 @@ from nock.protocol import GridView, grid_view
 from spec006_harness import (
     SETTLE_MS,
     cell_at,
-    grid_from_text,
     open_mock_room,
     show_snapshot,
     snapshot_frame,
     with_letter_cells,
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
 
 # ---- AC-8: a malformed grid in a snapshot is ignored --------------------------
 

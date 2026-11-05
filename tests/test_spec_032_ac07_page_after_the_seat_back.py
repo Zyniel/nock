@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import re
 
-import pytest
 from playwright.sync_api import Page, expect
 
 from fonts_ready import wait_for_fonts
@@ -36,7 +35,6 @@ from spec019_harness import (
     WAIT_TIMEOUT_MS,
     MockRoomSocket,
     expect_seq,
-    grid_from_text,
     player_joined_frame,
     player_view,
     turn_switch_on,
@@ -56,11 +54,6 @@ from spec045_harness import (
 
 SNAPSHOT_SEQ = 7
 SEAT_BACK_SEQ = 8
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def bobs_snapshot(grid: Grid) -> str:

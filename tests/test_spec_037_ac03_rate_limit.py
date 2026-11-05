@@ -33,9 +33,7 @@ from nock.room import CellState, PlayerRecord, RoomConfig, RoomState, handle_mes
 from nock.server import create_app
 from spec037_harness import (
     NOW,
-    grid_from_text,
     join_peers,
-    make_dist_dir,
     player_record,
     refusal_code,
     state_of,
@@ -55,16 +53,6 @@ class FakeClock(Protocol):
     def __call__(self) -> float: ...
 
     def advance(self, seconds: float) -> None: ...
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

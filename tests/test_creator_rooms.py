@@ -30,19 +30,9 @@ from nock.grid import Grid
 from nock.room import new_room
 from nock.store import RoomStore
 from spec017_harness import FakeClock
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 from spec033_harness import ROOMS_PATH, SESSION_LIFE, room_key, state_of, with_session
 
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def test_ac1_a_signed_in_post_stores_the_account_as_the_creator(

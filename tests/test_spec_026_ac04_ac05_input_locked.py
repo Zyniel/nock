@@ -47,12 +47,10 @@ from spec026_harness import (
     cell_at,
     expect_seq,
     full17,
-    grid_from_text,
     join_peers,
     letters_except,
     load_fr,
     make_client,
-    make_dist_dir,
     make_registry,
     open_fx01,
     refusal_code,
@@ -88,16 +86,6 @@ COARSE_POINTER_SCRIPT = """
 """
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

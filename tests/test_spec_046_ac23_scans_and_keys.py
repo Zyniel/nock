@@ -31,13 +31,9 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from spec024_harness import contrast_problems, language_problems
 from spec032_harness import ABC, XYZ
 from spec035_harness import (
-    build_fx01_grid,
-    build_reference_catalogue,
     load_fr,
     unknown_texts,
 )
@@ -137,14 +133,7 @@ ACCEPTED_SAMPLES = [
 ]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

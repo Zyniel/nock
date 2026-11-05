@@ -20,7 +20,6 @@ import contextlib
 from collections.abc import Iterator
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 import nock.room
@@ -42,7 +41,6 @@ from spec029_harness import (
 )
 from spec032_harness import (
     NO_TICK_CONFIG,
-    grid_from_text,
     make_dist_dir,
     post_summaries,
     utc,
@@ -50,11 +48,6 @@ from spec032_harness import (
 
 UNSOLVED_CODE = "OPEN01"
 PLAYERS = [Player("Ana", "p1", FIRST_TOKEN), Player("Bob", "p2", SECOND_TOKEN)]
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
 
 
 def spec_026_play(grid: Grid) -> Play:

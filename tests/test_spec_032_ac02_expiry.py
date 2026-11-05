@@ -56,8 +56,6 @@ from spec032_harness import (
     T0,
     TA,
     events_of,
-    grid_from_text,
-    make_dist_dir,
     snapshot_of,
     sweeping_config,
 )
@@ -68,16 +66,6 @@ PLAY_R_T0 = NOW  # the t0 of the HTTP part: spec 028's NOW
 NOT_FOUND = {"detail": "Not Found"}
 WAIT_SECONDS = 5.0
 POLL_SECONDS = 0.02
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 def write_room_a(path: Path, grid: Grid) -> None:

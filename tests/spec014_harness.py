@@ -17,11 +17,7 @@ How the tests are built:
   browser contexts (the flows of the criteria), and with spec 040's mocked socket
   (the exact messages the page sends, the snapshot updates, the final states and
   the layout of the host's view).
-- Pytest finds a fixture by name in the module of the test. The fixtures
-  `fx01_grid` and `dist_dir` are defined here once, and each test file that asks
-  for them imports them under the same name
-  (`from spec014_harness import fx01_grid as fx01_grid`, the form that tells ruff
-  the import is meant to stay).
+- The fixtures `fx01_grid` and `dist_dir` are the shared ones of `conftest.py`.
 """
 
 from __future__ import annotations
@@ -85,7 +81,6 @@ from nock.server import create_app
 from nock.store import RoomStore
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
-INDEX_HTML = '<!doctype html><title></title><div id="app"></div>'
 ROOM_CODE = "ABCDEF"
 NOW = 2_000_000.0
 NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eva", "Fay", "Gus", "Hal"]
@@ -144,19 +139,6 @@ Sendable = (
     | MutePlayer
     | SelectCell
 )
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return Grid.model_validate_json(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    dist = tmp_path / "dist"
-    dist.mkdir()
-    (dist / "index.html").write_text(INDEX_HTML, encoding="utf-8")
-    return dist
 
 
 def load_fr() -> dict[str, str]:

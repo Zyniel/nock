@@ -37,14 +37,12 @@ import math
 import re
 import zlib
 from collections.abc import Callable, Sequence
-from datetime import date
 from typing import Any, NamedTuple
 
 import pytest
 from playwright.sync_api import Locator, Page, expect
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue, CatalogueEntry
 from nock.grid import Arrow, ClueCell, Grid, LetterCell
 from nock.protocol import (
     CheckResult,
@@ -66,7 +64,7 @@ from nock.protocol import (
 from room_panels import open_menu
 from spec019_harness import MockRoomSocket, with_letter_cells
 from spec034_harness import CATCH_UP_ROUTE, CatchUpRoute, seed_storage
-from spec035_harness import COLOUR_CONTRAST_JS, credits, load_fr
+from spec035_harness import COLOUR_CONTRAST_JS, load_fr
 
 # ---- Constants --------------------------------------------------------------
 
@@ -724,19 +722,6 @@ def selection_frame(player_id: str, row: int, column: int, direction: Direction)
     """A `selection_moved` that puts `player_id` on (row, column)."""
     selection = Selection(row=row, column=column, direction=direction)
     return SelectionMoved(player_id=player_id, selection=selection).model_dump_json()
-
-
-def make_catalogue(grid: Grid) -> Catalogue:
-    """A catalogue holding `grid` as published entry 1 (for the live server's `/`)."""
-    entry = CatalogueEntry(
-        number=1,
-        published_on=date(2026, 10, 1),
-        force=1,
-        published=True,
-        **credits(),
-        grid=grid,
-    )
-    return Catalogue(entries=(entry,))
 
 
 # ---- Pages --------------------------------------------------------------------

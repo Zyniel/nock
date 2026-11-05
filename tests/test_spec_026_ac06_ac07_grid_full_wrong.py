@@ -36,12 +36,10 @@ from spec026_harness import (
     events_of,
     expect_seq,
     full17,
-    grid_from_text,
     join_peers,
     letters_except,
     load_fr,
     make_client,
-    make_dist_dir,
     make_registry,
     open_fx01,
     play_live_game,
@@ -51,16 +49,6 @@ from spec026_harness import (
 )
 
 # ---- Fixtures ----
-
-
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def dist_dir(tmp_path: Path) -> Path:
-    return make_dist_dir(tmp_path)
 
 
 @pytest.fixture

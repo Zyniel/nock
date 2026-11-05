@@ -25,10 +25,7 @@ import pytest
 from playwright.sync_api import Browser, Page, expect
 
 from fonts_ready import wait_for_fonts
-from nock.catalogue import Catalogue
-from nock.grid import Grid
 from spec006_harness import WINDOW_SIZES
-from spec035_harness import build_fx01_grid, build_reference_catalogue
 from spec046_harness import (
     SIGNED_OUT,
     WAIT_TIMEOUT_MS,
@@ -125,14 +122,7 @@ CASES = [(size, state) for size in WINDOW_SIZES for state in STATES]
 CASE_IDS = [f"{w}x{h}-{state}" for (w, h), state in CASES]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return build_fx01_grid(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return build_reference_catalogue(fx01_grid)
+CATALOGUE_KIND = "reference"
 
 
 @pytest.fixture

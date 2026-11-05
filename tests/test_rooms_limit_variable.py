@@ -33,7 +33,6 @@ import nock.server
 import nock.settings
 from lifetime_harness import CREATOR, SWEEP_VARIABLE, variables_of
 from nock.catalogue import Catalogue
-from nock.grid import Grid
 from rooms_harness import (
     DEFAULT_LIMIT,
     LIMIT_VARIABLE,
@@ -45,8 +44,6 @@ from rooms_harness import (
     run_python_m_nock,
 )
 from spec011_harness import make_dist_dir
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 
 BELOW_THE_LIVES = "23"
 ARABIC_INDIC_THREE = "\N{ARABIC-INDIC DIGIT THREE}"
@@ -60,14 +57,7 @@ REFUSED_LIMITS = [
 ]
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 @pytest.fixture

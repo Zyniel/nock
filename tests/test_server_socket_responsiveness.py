@@ -23,7 +23,6 @@ import time
 from contextlib import ExitStack
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from host_harness import open_member
@@ -34,22 +33,13 @@ from nock.server import create_app
 from server_harness import CONNECT_DELAY_SECONDS, SlowConnectRegistry
 from spec011_harness import make_dist_dir
 from spec014_harness import Peer, socket_url
-from spec024_harness import make_catalogue
-from spec032_harness import grid_from_text
 
 ANSWER_LIMIT_SECONDS = 0.2
 SLOW_START_LIMIT_SECONDS = 5.0
 SNAPSHOT_LIMIT_SECONDS = CONNECT_DELAY_SECONDS + 5.0
 
 
-@pytest.fixture
-def fx01_grid(fx01_text: str) -> Grid:
-    return grid_from_text(fx01_text)
-
-
-@pytest.fixture
-def catalogue(fx01_grid: Grid) -> Catalogue:
-    return make_catalogue(fx01_grid)
+CATALOGUE_KIND = "published"
 
 
 def has_snapshot(peer: Peer) -> bool:
