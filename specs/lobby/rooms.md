@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: rooms
-status: done
+status: approved
 ---
 
 # lobby/rooms - Solo start, room creation and invitation
@@ -53,8 +53,8 @@ codes are limited per address.
    422 for any other body (one over the limit: 413 first, `platform/serving.md`
    rule 11). `GET` is 404 JSON, `PUT`, `PATCH` and `DELETE` are 405,
    `POST /api/rooms/` is 404 with no redirect. Only a 201 creates a room. A valid
-   session on the request makes its account the room's creator (`lobby/host.md`
-   rule 11).
+   session on the request makes its account the room's creator
+   (`lobby/creator.md` rule 2).
 7. A new room has seq 0, no player, empty cells, help mode `free`, a budget of 5
    letters and 1 word, no lock, its catalogue number and its creator, if any.
    A room's state and its snapshot hold at most `MAX_PLAYERS` (8) players,
@@ -219,7 +219,8 @@ status band of « Connection lost »; before, the entry card of
 
 ## Out of scope
 
-- The host role, its controls and the creator: `lobby/host.md`. Limits on any
+- The host role and its controls: `lobby/host.md`; the creator:
+  `lobby/creator.md`. Limits on any
   other HTTP route than creation, the recap route, the ops API and the
   sign-in link; the cap on the open sockets of an address:
   `platform/realtime.md` rules 2 and 26; the app
