@@ -209,6 +209,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
         "chat",
         "co-op",
         "hints",
+        "history",
         "host",
         "hud",
         "joining",
