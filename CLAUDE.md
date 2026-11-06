@@ -219,6 +219,17 @@ model price.
   `--workers` or `NOCK_WORKERS`, which `.claude/settings.json` sets.
 - One gate at a time runs its tests: another waits up to 10 minutes for the
   lock in `.git/`, then fails naming the gate that holds it.
+- A watchdog stops a test pass still running after 75 minutes (parallel) or
+  20 (serial; `--pass-timeout`), with every process it started, and names the
+  tests it was running. Each run keeps its results in
+  `.git/nock-gate-results/<branch>/<run>/`: `summary.txt`, the JUnit XML and
+  a JSON line per test phase. The serial pass first waits up to 2 minutes for
+  a low load, and re-runs once the tests it failed, reported « passed on
+  re-run » with both loads.
+- `--resume` leaves out the tests that passed in an earlier run on the same
+  checkout (commit and uncommitted changes), and prints how many; `--shard
+  I/N` runs the I-th of N shards of the test files, for a long run of several
+  engines.
 - When a role finishes, `scripts/hooks/role_gate.py` runs the gate: `--stage
   tests` for the test-writer, and for the implementer the quick gate of the
   domains and numbered specs the branch changed since `main`. A role held by a

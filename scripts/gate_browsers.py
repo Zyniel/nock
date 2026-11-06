@@ -23,14 +23,32 @@ It warms each browser up once, before the first test that uses it (see
 leaves out the browser tests of every other spec (2026-10-16). A selector that
 is not a number is a domain's test prefix: `--nock-specs grids,co_op` keeps
 `test_grids_*.py` and `test_co_op_*.py` (2026-10-24, specs/_map.md).
+
+For the gate's watchdog, results folder, `--resume` and `--shard` (B-107), it
+takes four more options:
+
+- `--nock-progress-dir DIR`: each process that runs tests (a pytest-xdist
+  worker, or pytest itself without workers) keeps in `DIR/<worker>.txt` the
+  test it is running and since when, so that the gate can say which tests
+  were running when its watchdog stopped a pass;
+- `--nock-results FILE`: the process that reports (the pytest-xdist
+  controller, or pytest itself) appends one JSON line per phase of each test,
+  flushed at once, so the file survives a stopped run;
+- `--nock-skip-passed FILE`: leaves out the node ids listed in FILE, one per
+  line (the gate's `--resume`);
+- `--nock-shard I/N`: keeps only the I-th of N shards of the test files, the
+  files sorted by path and dealt round robin (the gate's `--shard`).
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from collections.abc import Generator
+from datetime import datetime
 from pathlib import Path
+from typing import TextIO
 
 import pytest
 from playwright.sync_api import Browser, sync_playwright
@@ -90,6 +108,14 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
 missing_engines: set[str] = set()
 deselected_count = 0
 
+# The worker name of a process run without pytest-xdist, in the progress and
+# results files.
+MAIN_PROCESS_NAME = "main"
+# The progress file of this process, while it runs tests (--nock-progress-dir).
+progress_path: Path | None = None
+# The open results file of the reporting process (--nock-results).
+results_file: TextIO | None = None
+
 
 def find_missing_engines() -> set[str]:
     """Return the engines whose browser executable is not installed."""
@@ -103,21 +129,127 @@ def find_missing_engines() -> set[str]:
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Add --nock-specs, the gate's --specs."""
+    """Add the gate's options: --nock-specs and those of its results folder."""
     parser.addoption(
         "--nock-specs",
         default="",
         help="Comma-separated spec numbers and domain test prefixes: run only "
         "their browser tests.",
     )
+    parser.addoption(
+        "--nock-progress-dir",
+        default="",
+        help="Folder where each process that runs tests names the test it runs.",
+    )
+    parser.addoption(
+        "--nock-results",
+        default="",
+        help="File to append one JSON line to per phase of each test.",
+    )
+    parser.addoption(
+        "--nock-skip-passed",
+        default="",
+        help="File of node ids, one per line, to leave out.",
+    )
+    parser.addoption(
+        "--nock-shard",
+        default="",
+        help="I/N: run only the I-th of N shards of the test files.",
+    )
+
+
+def is_xdist_worker(config: pytest.Config) -> bool:
+    """Tell whether this process is a pytest-xdist worker."""
+    return hasattr(config, "workerinput")
+
+
+def is_xdist_controller(config: pytest.Config) -> bool:
+    """Tell whether this process hands the tests out to pytest-xdist workers."""
+    if is_xdist_worker(config):
+        return False
+    return config.pluginmanager.hasplugin("dsession")
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Register the marks."""
+    """Register the marks, and open the results file."""
+    global results_file
     config.addinivalue_line("markers", "browser: the test runs in a browser engine")
     config.addinivalue_line(
         "markers", "serial: timing-sensitive, runs after the parallel pass"
     )
+
+    results_text = str(config.getoption("--nock-results"))
+    if results_text and not is_xdist_worker(config):
+        results_path = Path(results_text)
+        results_path.parent.mkdir(parents=True, exist_ok=True)
+        results_file = results_path.open("a", encoding="utf-8")
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Choose this process's progress file, when it runs tests.
+
+    Decided here rather than in pytest_configure: pytest-xdist registers its
+    controller ("dsession") in a pytest_configure of its own, which may run
+    after this plugin's.
+    """
+    global progress_path
+    config = session.config
+    progress_folder_text = str(config.getoption("--nock-progress-dir"))
+    if not progress_folder_text or is_xdist_controller(config):
+        return
+    progress_folder = Path(progress_folder_text)
+    progress_folder.mkdir(parents=True, exist_ok=True)
+    worker_name = os.environ.get("PYTEST_XDIST_WORKER", MAIN_PROCESS_NAME)
+    progress_path = progress_folder / f"{worker_name}.txt"
+
+
+def pytest_unconfigure() -> None:
+    """Close the results file."""
+    global results_file
+    if results_file is not None:
+        results_file.close()
+        results_file = None
+
+
+def pytest_runtest_logstart(nodeid: str) -> None:
+    """Name the test this process starts in its progress file."""
+    if progress_path is None:
+        return
+    started = datetime.now().astimezone().isoformat(timespec="seconds")
+    progress_path.write_text(f"{nodeid}\nstarted {started}\n", encoding="utf-8")
+
+
+def pytest_runtest_logfinish() -> None:
+    """Empty the progress file: this process runs no test any more."""
+    if progress_path is None:
+        return
+    progress_path.unlink(missing_ok=True)
+
+
+def worker_of(report: pytest.TestReport) -> str:
+    """Return the pytest-xdist worker that ran a test, such as gw0, or "main"."""
+    # The controller adds the worker's node to the reports it receives.
+    worker_node = getattr(report, "node", None)
+    gateway = getattr(worker_node, "gateway", None)
+    worker_name = getattr(gateway, "id", None)
+    if isinstance(worker_name, str):
+        return worker_name
+    return MAIN_PROCESS_NAME
+
+
+def pytest_runtest_logreport(report: pytest.TestReport) -> None:
+    """Append one phase of a test to the results file, at once."""
+    if results_file is None:
+        return
+    line = {
+        "nodeid": report.nodeid,
+        "when": report.when,
+        "outcome": report.outcome,
+        "duration": round(report.duration, 3),
+        "worker": worker_of(report),
+    }
+    results_file.write(json.dumps(line) + "\n")
+    results_file.flush()
 
 
 def engine_of(item: pytest.Item) -> str | None:
@@ -172,6 +304,11 @@ def pytest_collection_modifyitems(
     mark_items(items)
     yield
     deselect_other_specs(config, items)
+    # The shards before the tests that passed: a file keeps its shard when
+    # --resume leaves out tests, so the shards of a resumed run still cover
+    # every file.
+    deselect_other_shards(config, items)
+    deselect_passed(config, items)
     deselect_missing_engines(config, items)
 
 
@@ -222,6 +359,72 @@ def deselect_other_specs(config: pytest.Config, items: list[pytest.Item]) -> Non
     deselected: list[pytest.Item] = []
     for item in items:
         if engine_of(item) is not None and not is_selected(item, wanted_specs):
+            deselected.append(item)
+        else:
+            kept.append(item)
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept
+
+
+def read_shard(shard_text: str) -> tuple[int, int]:
+    """Return the shard number (1-based) and the shard count of "I/N".
+
+    Raises:
+        pytest.UsageError: When the text is not I/N with 1 <= I <= N.
+    """
+    number_text, _, count_text = shard_text.partition("/")
+    if not number_text.isdigit() or not count_text.isdigit():
+        raise pytest.UsageError(f"--nock-shard {shard_text}: expected I/N")
+    shard_number = int(number_text)
+    shard_count = int(count_text)
+    if shard_count < 1 or not 1 <= shard_number <= shard_count:
+        raise pytest.UsageError(
+            f"--nock-shard {shard_text}: expected I/N with 1 <= I <= N"
+        )
+    return shard_number, shard_count
+
+
+def deselect_other_shards(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Keep only the tests of the files of the shard --nock-shard names.
+
+    The test files are sorted by path and dealt round robin: the file at
+    position k (from 0) belongs to shard k % N + 1.
+    """
+    shard_text = str(config.getoption("--nock-shard"))
+    if not shard_text:
+        return
+    shard_number, shard_count = read_shard(shard_text)
+    paths = sorted({item.path for item in items})
+    kept_paths: set[Path] = set()
+    for position, path in enumerate(paths):
+        if position % shard_count == shard_number - 1:
+            kept_paths.add(path)
+    kept: list[pytest.Item] = []
+    deselected: list[pytest.Item] = []
+    for item in items:
+        if item.path in kept_paths:
+            kept.append(item)
+        else:
+            deselected.append(item)
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = kept
+
+
+def deselect_passed(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Leave out the tests whose node ids the --nock-skip-passed file lists."""
+    skip_text = str(config.getoption("--nock-skip-passed"))
+    if not skip_text:
+        return
+    passed_ids: set[str] = set()
+    for line in Path(skip_text).read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            passed_ids.add(line.strip())
+    kept: list[pytest.Item] = []
+    deselected: list[pytest.Item] = []
+    for item in items:
+        if item.nodeid in passed_ids:
             deselected.append(item)
         else:
             kept.append(item)
