@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -180,6 +180,11 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   summary, `/g/2` shows the same error line. So do `/` and `/g/2` when grid 2's
   item, in CAT's list or as `GET /api/grids/2`'s answer, lacks `word_count`,
   and `/g/2` when `GET /api/grids/2` answers `[]`.
+- **AC-26** When `GET /api/grids` answers CAT's list with one field of grid
+  2's item of the wrong type, in turn each of `number`, `force`, `width`,
+  `height` and `word_count` as a string (`"2"` for `number`) and
+  `published_on` as a number, `/` shows « Impossible de charger les
+  grilles. » with no filter and no card.
 
 ## Edge cases
 
