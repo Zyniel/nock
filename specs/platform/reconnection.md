@@ -1,7 +1,7 @@
 ---
 area: platform
 file: reconnection
-status: done
+status: approved
 ---
 
 # platform/reconnection - Stale edits, the resume window, the page's connection
@@ -95,7 +95,13 @@ a loss, retries and sends what it held.
    they were made, each request after the edits that were pending when it
    was made and before any later one: the first at once and one every 100 ms.
    An edit, undo, check or reveal made while these go out queues behind them;
-   otherwise it is sent at once. No edit, undo, check or reveal is sent
+   otherwise it is sent at once. A loss before they have all gone out keeps
+   the undos, checks and reveals not sent yet, those queued behind them
+   included, for the next snapshot, in their places. An undo, check or
+   reveal the page cannot hand to its socket, already closing while the
+   page has not heard its close yet, is kept the same way; one handed to a
+   socket whose network is gone is lost with it, while the edits around it,
+   still pending, go out again. No edit, undo, check or reveal is sent
    between the socket opening and its snapshot. Pending edits and kept
    requests live in memory only: a reload loses them.
 
@@ -143,6 +149,18 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - **AC-9** Ana's joined page is hidden and its own timers stop firing for 10
   seconds: it still sends `ping` every 2 seconds, and the server never closes
   it with 4408 (`platform/realtime.md` rule 16) during the 10 seconds.
+- **AC-10** Offline, Ana types `T` at (1, 0) then checks that cell; her
+  socket is lost again after her reconnection snapshot, once the `T` has gone
+  out and before the check has: after the next snapshot her page sends the
+  `T` then the check, never sent on the lost socket.
+- **AC-11** Ana's joined socket closes with 1011 and, before her page has
+  heard the close, she types `T` at (1, 0), checks that cell and types `A`
+  at (1, 1): after her reconnection snapshot her page sends the `T`, the
+  check, then the `A`.
+- **AC-12** Joined, Ana types `T` at (1, 0) and checks that cell once her
+  network has gone silent, before her page drops the socket for that
+  silence: after her reconnection snapshot her page sends the `T` again and
+  no check.
 
 ## Edge cases
 
@@ -184,4 +202,4 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - `web/src/lib/pingWorker.ts`: the worker's 2-second ticks.
 - Tests: `tests/test_spec_017_ac01_*`, `tests/test_spec_017_ac02_*`,
   `tests/test_spec_017_ac03_*`, `tests/test_spec_017_ac05_*`;
-  `tests/test_reconnection_*` for AC-5 to AC-9.
+  `tests/test_reconnection_*` for AC-5 to AC-12.
