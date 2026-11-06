@@ -1,10 +1,10 @@
 ---
 id: B-106
 title: 'CI: merges into main stop cancelling each other'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-06T09:19:00Z'
+updated_date: '2026-11-06T09:20:00Z'
 labels:
   - follow-up
   - tooling
@@ -33,6 +33,14 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Tooling, no spec: .github/workflows/ci.yml concurrency and all-gates
+Tests: none (CI behaviour), checked on the PR runs
+Gate: uv run python scripts/gate.py --skip-static? no: full static stage
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

@@ -10,9 +10,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels its older run. A run on main, or
+# started by hand, has a group of its own, so a merge never cancels the run of
+# the merge before it, nor replaces it while it waits.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Which gate jobs a pull request needs, from the files it changes. A file
@@ -172,14 +175,41 @@ jobs:
   # One check that passes only when every gate job passed, so the branch rule
   # of main needs to require this name only, whatever the matrix holds. The
   # static and browser jobs may be skipped only when the changed files allow
-  # it, and the other engines only on a pull request.
+  # it, and the other engines only on a pull request. A pull request's run
+  # that a newer push cancelled passes, naming the newer head, which has a run
+  # of its own; a run cancelled on the pull request's current head fails.
   all-gates:
     name: Quality gate
     if: always()
     needs: [changes, static, browsers, other-engines]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
+      - name: Pass a pull request's run superseded by a newer push
+        id: superseded
+        if: >-
+          github.event_name == 'pull_request' && (
+          needs.changes.result == 'cancelled' ||
+          needs.static.result == 'cancelled' ||
+          needs.browsers.result == 'cancelled' ||
+          needs.other-engines.result == 'cancelled')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          RUN_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          current_head="$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" --jq .head.sha)"
+          if [ -n "$current_head" ] && [ "$current_head" != "$RUN_HEAD" ]; then
+            echo "superseded by $current_head"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cancelled on the pull request's current head $RUN_HEAD"
+          fi
       - name: Check that every gate job passed
+        if: steps.superseded.outputs.superseded != 'true'
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           STATIC_RESULT: ${{ needs.static.result }}
