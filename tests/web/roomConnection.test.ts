@@ -27,6 +27,9 @@ import {
   snapshotFrame,
 } from './roomConnectionHarness'
 
+const SOCKET_CLOSING = 2
+const REVEAL_GRID = { type: 'reveal', target: { scope: 'grid' } }
+
 beforeEach(() => {
   mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 })
@@ -288,6 +291,40 @@ test('a loss during a resend keeps the requests not sent yet for the next snapsh
   const letterA = { type: 'edit_letter', row: 0, column: 1, letter: 'A', base_seq: 5 }
   const letterB = { type: 'edit_letter', row: 0, column: 1, letter: 'B', base_seq: 5 }
   assert.deepEqual(secondSocket.sent, [JOIN_WITH_IDENTITY, letterA, UNDO, letterB, CHECK_GRID])
+})
+
+test('requests refused by a closing socket keep their order for the next snapshot', () => {
+  const harness = joinedHarness(5)
+  const closing = lastSocket(harness)
+  closing.readyState = SOCKET_CLOSING
+  harness.connection.request(CHECK_GRID)
+  harness.connection.request(REVEAL_GRID)
+  closing.closeWith(ABNORMAL_CLOSE)
+  const next = reopen(harness, 1200)
+  next.receive(snapshotFrame(6))
+  advance(harness, 300)
+  assert.deepEqual(next.sent, [JOIN_WITH_IDENTITY, CHECK_GRID, REVEAL_GRID])
+})
+
+test('a request refused during a resend keeps its place among the ones still queued', () => {
+  const harness = joinedHarness(5)
+  lastSocket(harness).closeWith(ABNORMAL_CLOSE)
+  harness.connection.edit(letterCell(0, 1), 'T', 'edit', null)
+  harness.connection.request(CHECK_GRID)
+  harness.connection.edit(letterCell(0, 1), 'A', 'edit', null)
+  harness.connection.request(UNDO)
+  const resending = reopen(harness, 1200)
+  resending.receive(snapshotFrame(9))
+  // The socket starts closing before the check goes out, which it refuses.
+  resending.readyState = SOCKET_CLOSING
+  advance(harness, 100)
+  resending.closeWith(ABNORMAL_CLOSE)
+  const next = reopen(harness, 1200)
+  next.receive(snapshotFrame(10))
+  advance(harness, 400)
+  const letterT = { type: 'edit_letter', row: 0, column: 1, letter: 'T', base_seq: 5 }
+  const letterA = { type: 'edit_letter', row: 0, column: 1, letter: 'A', base_seq: 5 }
+  assert.deepEqual(next.sent, [JOIN_WITH_IDENTITY, letterT, CHECK_GRID, letterA, UNDO])
 })
 
 // ---- send() ----

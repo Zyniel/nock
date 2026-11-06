@@ -1,4 +1,4 @@
-"""Shared setup of the tests of `platform/reconnection.md` AC-6 to AC-9 and of the
+"""Shared setup of the tests of `platform/reconnection.md` AC-6 to AC-12 and of the
 other domains' tests of the page's connection (`social/chat.md` AC-23).
 
 Pytest does not collect this module (its name does not start with `test_`). The
@@ -9,6 +9,8 @@ tests are in:
   jitter of the retry delays).
 - `test_reconnection_worker_pings.py`: AC-9, a hidden page whose own timers stop,
   on the live server and in real time (it runs on its own, `SERIAL_TEST_FILES`).
+- `test_reconnection_kept_requests.py`: AC-10 to AC-12, the requests a loss keeps
+  or takes away (AC-11 on `CONTROL_ALL_SCRIPT`).
 - `test_spec_017_ac05_long_absence.py` uses the socket stand-ins too.
 
 AC-6 to AC-8 run on spec 017's mocked room (`spec017_harness.joined_room`) and its
