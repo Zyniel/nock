@@ -4,7 +4,7 @@ title: Refuse raw invisible characters and specs left done
 status: Done
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-06T11:50:00Z'
+updated_date: '2026-11-06T11:51:00Z'
 labels:
   - follow-up
   - tooling
@@ -27,7 +27,7 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -44,6 +44,8 @@ Gate: the full gate in Chromium
 The human queued this as a tooling pull request on 2026-11-06 ("Queue B-072 and B-074 as technical PR"): the escalation for new tooling behaviour is answered. Filed under Upkeep, label tooling, no spec; the lead builds it on its branch.
 
 Lead's decisions: the scan applies to every caller and allows the space, the line feed and the tab (Caddyfile's tabs); the ZWJ between two emoji parts; the spec-writer check counts only specs with an uncommitted change, since the lead commits approved and done statuses itself. Reviewer round 1: CHANGES REQUESTED, blocking: .claude/settings.json's SubagentStop matcher never ran role_gate.py for the spec-writer. Fixed by the lead: the matcher names spec-writer (and the PreToolUse matcher MultiEdit); the status is read from the front matter as gate.py reads it; Zl and Zp join the refused categories; control characters get their \N names; the hook gives the total past five; main's two modes documented; CLAUDE.md's Quality gate names both checks.
+
+PR: #165.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
