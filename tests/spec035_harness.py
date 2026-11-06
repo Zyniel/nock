@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from datetime import date
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -814,25 +814,35 @@ NUMBER_PLACEHOLDERS = (
 PLACEHOLDER = re.compile(r"\{([A-Za-z_]+)\}")
 
 
-def template_pattern(template: str) -> re.Pattern[str]:
+def template_pattern(
+    template: str, bound_values: Mapping[str, Sequence[str]] | None = None
+) -> re.Pattern[str]:
     """Read a `fr.json` value as a pattern (spec 035, "Language scan").
 
     Args:
         template: A value of `fr.json`, such as `Grille n° {number}`.
+        bound_values: The values some open placeholders can take, by placeholder
+            name (`{"reaction": ["Bravo", "Rire"]}`). None binds nothing.
 
     Returns:
         A pattern for `fullmatch`. The text around the placeholders matches
         itself. A number placeholder (`NUMBER_PLACEHOLDERS`) matches one or more
-        ASCII digits `0` to `9` and nothing else. Any other placeholder matches
+        ASCII digits `0` to `9` and nothing else. A placeholder of `bound_values`
+        matches one of its values and nothing else. Any other placeholder matches
         one or more characters.
     """
+    bound_values = bound_values or {}
     pattern = ""
     literal_start = 0
     for placeholder in PLACEHOLDER.finditer(template):
         literal = template[literal_start : placeholder.start()]
         pattern += re.escape(literal)
-        if placeholder.group(1) in NUMBER_PLACEHOLDERS:
+        name = placeholder.group(1)
+        if name in NUMBER_PLACEHOLDERS:
             pattern += "[0-9]+"
+        elif name in bound_values:
+            alternatives = [re.escape(value) for value in bound_values[name]]
+            pattern += "(?:" + "|".join(alternatives) + ")"
         else:
             pattern += ".+"
         literal_start = placeholder.end()
@@ -889,13 +899,24 @@ def accepted_data(data: set[str]) -> set[str]:
     return accepted
 
 
-def unknown_texts(texts: list[str], data: set[str]) -> list[str]:
+def unknown_texts(
+    texts: list[str],
+    data: set[str],
+    bound_values: Mapping[str, Sequence[str]] | None = None,
+) -> list[str]:
     """The texts that are neither a `fr.json` value, nor test data, nor trivial.
 
     Test data is accepted as written and in its `displayNickname` form
-    (`accepted_data`).
+    (`accepted_data`). With `bound_values` (`template_pattern`), a placeholder
+    named there matches only its values, as written and in their
+    `displayNickname` form, instead of any text.
     """
-    patterns = [template_pattern(normalised(value)) for value in load_fr().values()]
+    bound: dict[str, list[str]] = {}
+    for name, values in (bound_values or {}).items():
+        bound[name] = sorted(accepted_data(set(values)))
+    patterns = [
+        template_pattern(normalised(value), bound) for value in load_fr().values()
+    ]
     normalised_data = accepted_data(data)
     unknown: list[str] = []
     for text in texts:

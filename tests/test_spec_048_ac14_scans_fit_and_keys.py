@@ -30,7 +30,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from playwright.sync_api import Browser, Page, Route, expect
+from playwright.sync_api import Browser, Page, expect
 
 from nock.catalogue import Catalogue
 from nock.grid import Grid
@@ -42,41 +42,30 @@ from spec033_harness import (
     account_live_server,
 )
 from spec035_harness import Walker
-from spec038_harness import DASHBOARD_ROUTE, WRONG_TOKEN, OpsServer, ops_live_server
-from spec046_harness import HeldRoute, OpenWindow, fulfil_json, window_opener
+from spec038_harness import OpsServer, ops_live_server
+from spec046_harness import OpenWindow, window_opener
 from spec048_harness import (
-    NOT_FOUND,
     ROOM_CODE,
     SHARE_PATH,
-    SIGNED_OUT,
     SIZE_IDS,
     SIZES,
-    AccountMock,
     ask_deletion,
-    expect_account_state,
     no_horizontal_scroll,
-    open_account,
+    open_account_state,
     open_share,
     open_share_loading,
     open_share_unavailable,
     open_signed_in,
     ring_problems,
-    submit_address,
 )
 from spec048_ops_harness import (
-    ReplayRoute,
-    expect_ops_state,
-    open_ops,
+    open_ops_state,
     open_ready_ops,
     open_replay,
     replay,
     replay_answer,
-    replay_empty,
     replay_fx02,
-    seed_ops_token,
-    set_position,
 )
-from sure_click import click_until_pressed
 
 SHARE_STATES = ["loading", "loaded", "unavailable"]
 ACCOUNT_STATES = [
@@ -150,73 +139,6 @@ def open_share_state(page: Page, base_url: str, state: str) -> None:
         open_share(page, base_url)
     else:
         open_share_unavailable(page, base_url)
-
-
-def open_account_state(page: Page, base_url: str, state: str) -> None:
-    """Open the account page in one of `ACCOUNT_STATES`."""
-    if state in ("signed_in", "deletion_asked", "deleted"):
-        open_signed_in(page, base_url)
-        if state == "deletion_asked":
-            ask_deletion(page)
-        elif state == "deleted":
-            ask_deletion(page)
-            page.get_by_test_id("account-delete-confirm").click()
-            expect_account_state(page, "deleted")
-        return
-    if state == "loading":
-        open_account(page, base_url, AccountMock(status=None), "loading")
-    elif state == "signing_in":
-        mock = AccountMock(sign_in=None)
-        open_account(page, base_url, mock, "signing_in", link=True)
-    elif state == "link_invalid":
-        mock = AccountMock(sign_in=404)
-        open_account(page, base_url, mock, "link_invalid", link=True)
-    elif state == "error":
-        mock = AccountMock(status=(500, {"detail": "Internal Server Error"}))
-        open_account(page, base_url, mock, "error")
-    else:
-        link_status = 422 if state == "signed_out_error" else 202
-        mock = AccountMock(status=(200, SIGNED_OUT), link_statuses=(link_status,))
-        open_account(page, base_url, mock, "signed_out")
-        submit_address(page, "ana@")
-        shown = "account-error" if state == "signed_out_error" else "account-sent"
-        expect(page.get_by_test_id(shown)).to_be_visible()
-
-
-def open_ops_state(page: Page, base_url: str, state: str, grid: Grid) -> None:
-    """Open the ops page in one of `OPS_STATES`."""
-    if state == "locked_refused":
-
-        def refuse(route: Route) -> None:
-            fulfil_json(route, 401, {"detail": "Not authorized"})
-
-        page.route(DASHBOARD_ROUTE, refuse)
-        open_ops(page, base_url)
-        field = page.get_by_test_id("ops-token-input")
-        field.fill(WRONG_TOKEN)
-        expect(field).to_have_value(WRONG_TOKEN)
-        # 2026-10-23: Firefox under load lost the press; main's run after #43.
-        click_until_pressed(page.get_by_test_id("ops-token-submit"))
-        expect(page.get_by_test_id("ops-token-error")).to_be_visible()
-    elif state in ("loading", "error"):
-
-        def fail(route: Route) -> None:
-            fulfil_json(route, 500, {"detail": "Internal Server Error"})
-
-        if state == "loading":
-            HeldRoute(page, DASHBOARD_ROUTE)
-        else:
-            page.route(DASHBOARD_ROUTE, fail)
-        seed_ops_token(page)
-        open_ops(page, base_url)
-        expect_ops_state(page, state)
-    elif state == "ready_position_4":
-        open_replay(page, base_url, replay_answer(replay(grid)), "ready")
-        set_position(page, 4)
-    elif state == "ready_empty":
-        open_replay(page, base_url, replay_answer(replay_empty(grid)), "ready")
-    else:
-        open_replay(page, base_url, ReplayRoute(404, NOT_FOUND), "not_found")
 
 
 # ---- Scans -------------------------------------------------------------------------

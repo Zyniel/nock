@@ -53,11 +53,10 @@ WARM_UP_TIMEOUT_MS = 60_000
 # most); with four workers that once took 341 ms in WebKit on CI (2026-10-16).
 # The relay of spec 015 (95 % within 100 ms) once failed in the parallel pass
 # while another agent's browsers loaded the machine (2026-10-16); spec 013's
-# relay, spec 025's banner window (2.5 to 4.5 s), spec 026's solve budget and
-# spec 034's highlight window (on at 4.5 s, gone at 6 s) and feed scroll
-# measure durations too, as does spec 043's note lifetime (fading from 2.7 s,
-# gone by 3.7 s; 2026-10-22) and spec 047's « Lien copié » line (gone 2 s after
-# the copy; 2026-10-23). The live rooms' engine time
+# relay, spec 026's solve budget and spec 034's highlight window (on at 4.5 s,
+# gone at 6 s) and feed scroll measure durations too, as does spec 043's note
+# lifetime (fading from 2.7 s, gone by 3.7 s; 2026-10-22) and spec 047's « Lien
+# copié » line (gone 2 s after the copy; 2026-10-23). The live rooms' engine time
 # (`platform/live-rooms.md` rule 1) times the room's rules in milliseconds,
 # with no browser (B-030).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
@@ -76,7 +75,6 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_spec_015_ac01_relay_to_the_others.py",
         "test_spec_022_ac10_pacing.py",
         "test_spec_022_ac11_ac12_chat_list_scroll.py",
-        "test_spec_025_ac07_vote_banner.py",
         "test_spec_026_ac01_ac03_grid_solved.py",
         "test_spec_027_ac02_ac03_live_pages.py",
         "test_spec_034_ac02_highlight_timing.py",

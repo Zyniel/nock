@@ -25,15 +25,30 @@ Readings of the spec's wording:
 - "The text `<progress`": `<progress` not followed by a letter, a digit, `-` or
   `_`, so `<progression` is not flagged; `role="progressbar"` with single or
   double quotes, spaces allowed around `=`.
+
+The text scan cannot see an animation started at run time (DRAFT-013), so three
+browser tests also ask the page of each state of spec 048 AC-14 (the states of
+`open_account_state` and `open_ops_state`) for `document.getAnimations()` (as spec
+046 AC-9 does): the shared recap, the account page and the ops page. A
+CSS transition is left out, since the criterion accepts `transition` (its samples
+`a{transition:opacity .25s}`); anything else running, such as an `element.animate`
+call or a CSS animation, fails. The elements with `role="progressbar"` are counted
+too.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from playwright.sync_api import Page
 
+from nock.catalogue import Catalogue
+from nock.grid import Grid
+from spec033_harness import AccountServer, account_live_server
+from spec038_harness import OpsServer, ops_live_server
 from spec041_harness import (
     WEB_DIST_ASSETS_DIR,
     remove_css_comments,
@@ -42,6 +57,13 @@ from spec041_harness import (
     source_files,
     split_svelte,
 )
+from spec048_harness import (
+    open_account_state,
+    open_share,
+    open_share_loading,
+    open_share_unavailable,
+)
+from spec048_ops_harness import open_ops_state
 
 KEYFRAMES = re.compile(r"@(?:-[A-Za-z]+-)?keyframes\b", re.IGNORECASE)
 ANIMATION_DECLARATION = re.compile(
@@ -50,6 +72,34 @@ ANIMATION_DECLARATION = re.compile(
 )
 PROGRESS_ELEMENT = re.compile(r"<progress(?![A-Za-z0-9_\-])", re.IGNORECASE)
 PROGRESSBAR_ROLE = re.compile(r"""role\s*=\s*(?:"progressbar"|'progressbar')""")
+
+ACCOUNT_STATES = [
+    "loading",
+    "signing_in",
+    "signed_in",
+    "deletion_asked",
+    "link_invalid",
+    "signed_out_error",
+    "signed_out_sent",
+    "deleted",
+    "error",
+]
+OPS_STATES = [
+    "locked_refused",
+    "loading",
+    "error",
+    "ready_position_4",
+    "ready_empty",
+    "replay_not_found",
+]
+
+# Counts the progress bars and the running animations other than CSS transitions.
+RUN_TIME_SCRIPT = """() => [
+    document.querySelectorAll('[role="progressbar"]').length,
+    document.getAnimations().filter(
+        animation => !(animation instanceof CSSTransition)
+    ).length,
+]"""
 
 FLAGGED_SAMPLES = [
     "@keyframes spin{}",
@@ -164,3 +214,71 @@ def test_ac13_no_built_css_holds_keyframes_or_an_animation() -> None:
 
     assert len(sheets) > 0
     assert found == {}
+
+
+# ---- The client at run time ------------------------------------------------------
+
+
+def run_time_problems(page: Page) -> list[str]:
+    """How the page now breaks "no spinner, no animation" at run time.
+
+    Args:
+        page: A page in the state to check.
+
+    Returns:
+        One entry for the elements with `role="progressbar"` and one for the
+        running animations other than CSS transitions. Empty when there are none.
+    """
+    found = page.evaluate(RUN_TIME_SCRIPT)
+    assert isinstance(found, list), found
+    progress_bars, animations = found
+    problems: list[str] = []
+    if progress_bars != 0:
+        problems.append(f"{progress_bars} elements with role=progressbar")
+    if animations != 0:
+        problems.append(f"{animations} running animations")
+    return problems
+
+
+@pytest.mark.parametrize("state", ["loading", "unavailable", "loaded"])
+def test_ac13_the_shared_recap_runs_no_animation_in_any_state(
+    page: Page, live_server: str, state: str
+) -> None:
+    if state == "loading":
+        open_share_loading(page, live_server)
+    elif state == "unavailable":
+        open_share_unavailable(page, live_server)
+    else:
+        open_share(page, live_server)
+
+    assert run_time_problems(page) == []
+
+
+@pytest.fixture
+def account_server(tmp_path: Path, catalogue: Catalogue) -> Iterator[AccountServer]:
+    with account_live_server(tmp_path, catalogue) as server:
+        yield server
+
+
+@pytest.mark.parametrize("state", ACCOUNT_STATES)
+def test_ac13_the_account_page_runs_no_animation_in_any_state(
+    page: Page, account_server: AccountServer, state: str
+) -> None:
+    open_account_state(page, account_server.base_url, state)
+
+    assert run_time_problems(page) == []
+
+
+@pytest.fixture
+def ops_server(tmp_path: Path, catalogue: Catalogue) -> Iterator[OpsServer]:
+    with ops_live_server(tmp_path, catalogue) as server:
+        yield server
+
+
+@pytest.mark.parametrize("state", OPS_STATES)
+def test_ac13_the_ops_page_runs_no_animation_in_any_state(
+    page: Page, ops_server: OpsServer, fx01_grid: Grid, state: str
+) -> None:
+    open_ops_state(page, ops_server.base_url, state, fx01_grid)
+
+    assert run_time_problems(page) == []

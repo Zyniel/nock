@@ -32,13 +32,14 @@ from spec038_harness import (
     DASHBOARD_ROUTE,
     OPS_TOKEN,
     OPS_TOKEN_KEY,
+    WRONG_TOKEN,
     DashboardRoute,
     dashboard_answer,
     seven_day_figures,
 )
 from spec042_harness import READERS_JS, Box, Colour, to_box, to_colour
-from spec046_harness import fulfil_json, same_size
-from spec048_harness import ROOM_CODE, WAIT_TIMEOUT_MS
+from spec046_harness import HeldRoute, fulfil_json, same_size
+from spec048_harness import NOT_FOUND, ROOM_CODE, WAIT_TIMEOUT_MS
 from sure_click import click_until_pressed
 
 NOW = 1_800_000_000.0  # the dashboard's clock (spec 038's tests)
@@ -352,3 +353,39 @@ def grid_position(box: Box, origin: Box, side: float) -> tuple[int, int]:
     row = round((box.top - origin.top) / side)
     column = round((box.left - origin.left) / side)
     return (row, column)
+
+
+def open_ops_state(page: Page, base_url: str, state: str, grid: Grid) -> None:
+    """Open the ops page in one of `OPS_STATES`."""
+    if state == "locked_refused":
+
+        def refuse(route: Route) -> None:
+            fulfil_json(route, 401, {"detail": "Not authorized"})
+
+        page.route(DASHBOARD_ROUTE, refuse)
+        open_ops(page, base_url)
+        field = page.get_by_test_id("ops-token-input")
+        field.fill(WRONG_TOKEN)
+        expect(field).to_have_value(WRONG_TOKEN)
+        # 2026-10-23: Firefox under load lost the press; main's run after #43.
+        click_until_pressed(page.get_by_test_id("ops-token-submit"))
+        expect(page.get_by_test_id("ops-token-error")).to_be_visible()
+    elif state in ("loading", "error"):
+
+        def fail(route: Route) -> None:
+            fulfil_json(route, 500, {"detail": "Internal Server Error"})
+
+        if state == "loading":
+            HeldRoute(page, DASHBOARD_ROUTE)
+        else:
+            page.route(DASHBOARD_ROUTE, fail)
+        seed_ops_token(page)
+        open_ops(page, base_url)
+        expect_ops_state(page, state)
+    elif state == "ready_position_4":
+        open_replay(page, base_url, replay_answer(replay(grid)), "ready")
+        set_position(page, 4)
+    elif state == "ready_empty":
+        open_replay(page, base_url, replay_answer(replay_empty(grid)), "ready")
+    else:
+        open_replay(page, base_url, ReplayRoute(404, NOT_FOUND), "not_found")
