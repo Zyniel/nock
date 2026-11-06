@@ -5,8 +5,9 @@
 
   // The history, the finished grids of the catalogue page (spec 029,
   // spec 046), already merged and in their order. The catalogue page shows it
-  // only when there is a record.
-  let { records }: { records: HistoryRecord[] } = $props()
+  // only when there is a record. `isSignedIn` tells « Rejouer » which progress
+  // key to write.
+  let { records, isSignedIn }: { records: HistoryRecord[]; isSignedIn: boolean } = $props()
 </script>
 
 <section class="history" data-testid="history" aria-labelledby="history-heading">
@@ -14,7 +15,7 @@
   <!-- The explicit role: WebKit does not expose a list without bullets as a list. -->
   <ul class="history-list" role="list">
     {#each records as record (record.code)}
-      <HistoryItem {record} />
+      <HistoryItem {record} {isSignedIn} />
     {/each}
   </ul>
 </section>

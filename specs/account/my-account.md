@@ -71,8 +71,9 @@ the account brings and forgets them when the account leaves it.
    focuses the disclosure. A 204 ends on `deleted`: `account.deleted` and
    « Voir les grilles » to `/`. Before it shows `signed_out` or `deleted`, a
    204 removes, for each code of `nock.account_rooms`, its identity,
-   `nock.room.<CODE>` and its records in `nock.history`, then the list; a
-   seat the device took itself stays. A failed sign-out or deletion removes
+   `nock.room.<CODE>` and its records in `nock.history`, then the list and
+   `nock.account_progress` (`content/cards.md` rule 2); a seat the device took
+   itself, and `nock.progress`, stay. A failed sign-out or deletion removes
    nothing.
 
 ### Look
@@ -136,11 +137,21 @@ the account brings and forgets them when the account leaves it.
   `lea@exa` typed in the account sheet, a press in the field released on the
   backdrop leaves the sheet open with `lea@exa` still typed; a press and its
   release both on the backdrop close it.
+- **AC-9** Ana signed in, `GET /api/account/progress` answering `{}`, the
+  device holding `nock.progress` `{"1": "finished"}` and
+  `nock.account_progress` `{"1": "started", "2": "finished"}`: `/` shows
+  cards 1 and 2 « Terminée ». After « Se déconnecter »
+  answered 204, or « Supprimer définitivement » answered 204, the device holds
+  no `nock.account_progress`, `nock.progress` is unchanged, and `/` shows
+  card 1 « Terminée » and card 2 no pill. After either answered 500, both
+  keys are as they were.
 
 ## Edge cases
 
 - A seat the device took itself in a room the account also lists stays
   through a sign-out (AC-5).
+- A mark set signed out stays through a sign-out, even on a grid the account
+  also marked (AC-9).
 
 ## Out of scope
 
@@ -161,4 +172,4 @@ the account brings and forgets them when the account leaves it.
   links), `wideWindow.ts` (the catalogue page's wide-window test).
 - Tests: those of the pointers (033 AC-2, AC-5, AC-9, AC-11; 046 AC-3; 048
   AC-3 to AC-5), in `tests/test_spec_NNN_*`; `tests/test_my_account_*` (AC-1
-  for its open page, AC-5 to AC-8).
+  for its open page, AC-5 to AC-9).

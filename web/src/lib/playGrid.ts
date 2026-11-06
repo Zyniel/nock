@@ -3,10 +3,11 @@
 import { markStarted } from './catalogue'
 import { writeRoomCreated } from './roomRecord'
 
-// Create a room on a catalogue grid, remember it, and load its page.
-// Returns false when the room could not be created.
-export async function playGrid(number: number): Promise<boolean> {
-  markStarted(number)
+// Create a room on a catalogue grid, remember it, and load its page. The grid
+// is marked started in the account's key when the page is signed in, else in
+// the device's. Returns false when the room could not be created.
+export async function playGrid(number: number, isSignedIn: boolean): Promise<boolean> {
+  markStarted(number, isSignedIn)
   let code: unknown
   try {
     const response = await fetch('/api/rooms', {
