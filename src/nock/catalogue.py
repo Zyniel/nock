@@ -229,8 +229,16 @@ def _read_index(directory: Path) -> list[IndexEntry]:
     return index_entries
 
 
-def _is_former_file(path: Path) -> bool:
-    """Tell whether the converter would read `path` (shared with the converter)."""
+def is_former_file(path: Path) -> bool:
+    """Tell whether the converter would read `path`.
+
+    Args:
+        path: A path inside a directory of former grid files.
+
+    Returns:
+        True when the name does not start with `.`, ends with the former suffix
+        and the path is a file.
+    """
     if path.name.startswith("."):
         return False
     return path.name.endswith(FORMER_SUFFIX) and path.is_file()
@@ -240,7 +248,7 @@ def _holds_former_file(directory: Path) -> bool:
     """Tell whether `directory` holds a file the converter would read."""
     if not directory.is_dir():
         return False
-    return any(_is_former_file(path) for path in directory.iterdir())
+    return any(is_former_file(path) for path in directory.iterdir())
 
 
 def _read_grid_file(directory: Path, index_entry: IndexEntry) -> CatalogueEntry:
