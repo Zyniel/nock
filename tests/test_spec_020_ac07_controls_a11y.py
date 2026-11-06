@@ -80,6 +80,7 @@ from spec024_harness import (
     WAIT_TIMEOUT_MS,
     ChangeList,
     cell_at,
+    close_checking_no_rejoin,
     contrast_problems,
     expect_selection,
     expect_seq,
@@ -118,6 +119,7 @@ SPEC024_BUTTONS = [
 ]
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_ITEMS = 100
+FEED_SETUP = f"the {FEED_ITEMS} feed items"
 MIN_GRID_VIEWPORT_PX = 100.0
 EPSILON = 1.0
 MAX_TABS = 60
@@ -214,11 +216,11 @@ def open_top_bar_room(
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", WORD_W7)
         control = page.get_by_test_id(pencil_control(width, height, touch))
         expect(control).to_be_visible()
-        mock.expect_no_rejoin(f"the {FEED_ITEMS} feed items")
+        mock.expect_no_rejoin(FEED_SETUP)
     except BaseException:
         close()
         raise
-    return page, close
+    return page, close_checking_no_rejoin(mock, close, FEED_SETUP)
 
 
 def spec013_layout_problems(page: Page, touch: bool) -> list[str]:

@@ -72,7 +72,7 @@ import contextlib
 import string
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import NamedTuple
 
 import pytest
@@ -445,7 +445,6 @@ def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
     live_server: str,
     room_registry: RoomRegistry,
     fx02_grid: Grid,
-    record_property: Callable[[str, object], None],
 ) -> None:
     code = room_registry.register_room(fx02_grid)
     keystrokes = local_echo_keystrokes(fx02_grid)
@@ -482,10 +481,6 @@ def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
 
     burst_ms = after_ms - before_ms
     idle_share_ms = idle.task_ms * burst_window_ms / idle.wall_ms
-    record_property("idle_task_ms", round(idle.task_ms, 2))
-    record_property("idle_window_ms", round(idle.wall_ms, 1))
-    record_property("burst_task_ms", round(burst_ms, 2))
-    record_property("burst_window_ms", round(burst_window_ms, 1))
     windows = (
         f"{burst_ms:.1f} ms over the burst's {burst_window_ms:.0f} ms; "
         f"{idle.task_ms:.1f} ms over {idle.wall_ms:.0f} ms idle before it, "

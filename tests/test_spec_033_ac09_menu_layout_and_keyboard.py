@@ -46,6 +46,7 @@ from room_panels import open_menu
 from spec024_harness import (
     SETTLE_MS,
     cell_at,
+    close_checking_no_rejoin,
     expect_seq,
     make_catalogue,
     make_walker,
@@ -66,6 +67,7 @@ from spec033_harness import (
 CONTEXTS = ["desktop", "touch"]
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_ITEMS = 100
+FEED_SETUP = f"the {FEED_ITEMS} feed items"
 MIN_GRID_VIEWPORT_PX = 100.0
 EPSILON = 1.0
 TRAP_PRESSES = 10
@@ -121,11 +123,11 @@ def open_layout_room(
             cell.click(timeout=WAIT_TIMEOUT_MS)
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", "3,0,0")
         expect(page.get_by_test_id("account-open")).to_have_count(1)
-        mock.expect_no_rejoin(f"the {FEED_ITEMS} feed items")
+        mock.expect_no_rejoin(FEED_SETUP)
     except BaseException:
         close()
         raise
-    return page, close
+    return page, close_checking_no_rejoin(mock, close, FEED_SETUP)
 
 
 # ---- Layout ---------------------------------------------------------------------

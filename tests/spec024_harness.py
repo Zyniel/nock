@@ -942,6 +942,33 @@ class MockRoomSocket:
         return count
 
 
+def close_checking_no_rejoin(
+    mock: MockRoomSocket, close: Callable[[], None], setup: str
+) -> Callable[[], None]:
+    """Return a closer that fails on a rejoin during the test's reads, then closes.
+
+    The check at the end of a setup does not see a reconnection that happens
+    later, while the test reads the layout: the rejoin would heal the page
+    silently with the feed lines gone. The page is closed whatever the check says.
+
+    Args:
+        mock: The mocked room whose rejoins are counted.
+        close: The closer of the page's context.
+        setup: What the test sent that no snapshot holds, for the message.
+
+    Returns:
+        A closer to call when the test is done with the page.
+    """
+
+    def close_after_check() -> None:
+        try:
+            mock.expect_no_rejoin(setup)
+        finally:
+            close()
+
+    return close_after_check
+
+
 def wait_until_page(
     page: Page, condition: Callable[[], bool], what: str = "the page"
 ) -> None:
