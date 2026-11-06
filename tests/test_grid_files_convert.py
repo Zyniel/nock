@@ -312,7 +312,15 @@ def test_ac22_main_exits_with_a_non_zero_code_naming_the_later_file(
 # ---- AC-25: source names the converter refuses -------------------------------------
 
 
-@pytest.mark.parametrize("refused_name", ["A.json", "G1.json", "a:b.json"])
+@pytest.mark.parametrize(
+    "refused_name",
+    [
+        pytest.param("A.json", id="upper"),
+        pytest.param("G1.json", id="upper-g"),
+        pytest.param("a:b.json", id="colon"),
+        pytest.param("\N{LATIN SMALL LETTER SHARP S}.json", id="sharp-s"),
+    ],
+)
 def test_ac25_a_source_name_that_is_not_safe_is_refused_and_nothing_is_written(
     source: Path,
     target: Path,
@@ -320,6 +328,7 @@ def test_ac25_a_source_name_that_is_not_safe_is_refused_and_nothing_is_written(
     capsys: pytest.CaptureFixture[str],
     refused_name: str,
 ) -> None:
+    """Refuse unsafe names; sharp s folds to "ss", so casefold refuses it (rule 15)."""
     write_former(source, refused_name, former_payload(fx01_text, number=1))
     write_former(source, "g2.json", former_payload(fx01_text, number=2))
 

@@ -113,7 +113,9 @@ def _convert_file(path: Path) -> _Conversion:
 
 
 def _check_name_is_safe(name: str) -> None:
-    """Refuse a source file name the index would refuse.
+    """Refuse a source file name rule 15 refuses.
+
+    That is a name that changes when case-folded or holds a backslash or a colon.
 
     Raises:
         ValueError: The name changes when case-folded, or holds a backslash or a colon.
