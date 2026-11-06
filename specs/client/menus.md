@@ -1,7 +1,7 @@
 ---
 area: client
 file: menus
-status: done
+status: approved
 ---
 
 # client/menus - The room's menus, popovers and sheets
@@ -69,7 +69,8 @@ same way by pointer, touch or keyboard, on a phone or a computer.
    on its own button (« Aide », « Menu », « Salon ») closes it, once. At most
    one of the menus, the Salon sheet and the reaction picker is open; the
    Salon column is apart. A closed menu stays in the page, hidden, with its
-   items' states. A menu's place follows the top bar's form; its content
+   items' states. A menu's place follows the top bar's form, also when the
+   form changes while the menu is open and the layout stays; its content
    scrolls inside it, so it stays in the window.
 
 ### Sheets
@@ -143,6 +144,9 @@ host settings and account »; « Layers ». Menus, switches: `_design/foundation
   révéler » released on the backdrop, or a press on the backdrop released in
   the sheet, leaves it open with its values; a press and its release both on
   the backdrop close it and focus « Menu ».
+- **AC-10** At 1280 by 720 with the Menu open, the window turned to 1280 by
+  480 (the column layout kept, the phone top bar) leaves the Menu open at the
+  place of a Menu opened at 1280 by 480.
 
 ## Edge cases
 
@@ -167,4 +171,4 @@ host settings and account »; « Layers ». Menus, switches: `_design/foundation
   trap, Escape, the backdrop), `HostSettings.svelte` and `AccountDialog.svelte`
   (the two sheets the Menu opens).
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`;
-  `tests/test_menus_*` for AC-7 to AC-9, `tests/menus_harness.py`.
+  `tests/test_menus_*` for AC-7 to AC-10, `tests/menus_harness.py`.

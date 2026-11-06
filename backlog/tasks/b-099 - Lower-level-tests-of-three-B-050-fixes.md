@@ -1,10 +1,10 @@
 ---
 id: B-099
 title: Lower-level tests of three B-050 fixes
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T22:33:00Z'
+updated_date: '2026-11-06T10:45:00Z'
 labels:
   - domain:hud
   - domain:menus
@@ -26,6 +26,7 @@ From DRAFT-071: L12 (RoomPopover placed again after tick()), L14 (one watcher pe
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Each of L12, L14 and L15 has a test that fails without its fix
+- [ ] #2 menus AC-10 (new)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -38,8 +39,18 @@ From DRAFT-071: L12 (RoomPopover placed again after tick()), L14 (one watcher pe
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Spec: specs/client/menus.md and/or hud.md, criteria for L12 (and L14, L15 if a pure unit test cannot reach them)
+Tests: tests/test_menus_*.py / tests/test_hud_*.py, tests/web/*.test.ts
+Quick gate: uv run python scripts/gate.py --specs hud,menus --browsers chromium
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 After B-080: L12 (RoomPopover.svelte) is now client/menus.md.
+
+Lead's decisions: L12 becomes menus AC-10 (browser criterion; menus.md owns RoomPopover.svelte, hud.md is over 15 KB); L14 and L15 get tests/web/ unit tests (scrollingLists.test.ts, pinchPan.test.ts), which prove no criterion, so no criterion for them. Rule 5 sharpened to name an open menu following a change of the bar's form; the spec-checker found it states current behaviour (hud rules 1 and 2), not a product change. Spec-checker: APPROVED; its wording note (« turned to » means resized, not rotated) is passed to the test-writer instead of a spec round.
 <!-- SECTION:NOTES:END -->
