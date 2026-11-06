@@ -14,7 +14,11 @@ Time-based client behaviour has two kinds of tests. The bounds the spec states i
 real seconds (the banner within 5,000 ms) are measured with Playwright's waiting
 assertions. The constants (ping every 2,000 ms, 4,000 ms of silence, the reconnect
 delays) are tested without long waits on Playwright's page clock, which is frozen
-before the page loads and moved by hand with `advance_page`. Since B-047
+before the page loads and moved by hand with `advance_page`. Playwright's clock
+does not reach a dedicated worker, whose timer keeps the 2 s of the pings
+(`platform/reconnection.md` rule 3): a page with a frozen clock is loaded without
+`Worker` (`keep_pings_on_the_page_clock`), so it keeps the 2 s with its own timer:
+the ping tests of AC-1 prove that fallback of the rule. Since B-047
 (`platform/reconnection.md` rule 6) a reconnect delay is drawn within 20 % of its
 value either way: `expect_new_connection_after` takes that range.
 
@@ -104,6 +108,8 @@ WAIT_TIMEOUT_MS = 5000
 STEP_SETTLE_MS = 120
 SETTLE_MS = 400
 NO_RECONNECTION_MS = 1500
+# Takes `Worker` away before the app loads, so that no worker can be created.
+NO_WORKER_SCRIPT = "delete window.Worker;"
 
 ChangeList = list[tuple[int, int, dict[str, object]]]
 Edit = EditLetter | Erase
@@ -460,6 +466,17 @@ def advance_page(page: Page, milliseconds: int) -> None:
     page.wait_for_timeout(STEP_SETTLE_MS)
 
 
+def keep_pings_on_the_page_clock(page: Page) -> None:
+    """Load the page without `Worker`, so that its pings follow the page clock.
+
+    `platform/reconnection.md` rule 3: a page whose worker cannot be created keeps
+    the 2 seconds of its pings with its own timer. Playwright's page clock does not
+    reach a dedicated worker, so a test that freezes the page clock and moves it by
+    hand calls this before the page loads.
+    """
+    page.add_init_script(NO_WORKER_SCRIPT)
+
+
 def seed_local_storage(page: Page, items: dict[str, str]) -> None:
     script = (
         f"const items = {json.dumps(items)};"
@@ -548,8 +565,9 @@ def open_room(
 
     With `identity` the stored identity of spec 012 is seeded and the page joins
     at once; without it the nickname form is shown. With `frozen` the page clock
-    stands still until a test moves it with `advance_page`. An `init_script` is
-    added after the mock, so it wraps the mocked `WebSocket`.
+    stands still until a test moves it with `advance_page`, and the page has no
+    `Worker` (`keep_pings_on_the_page_clock`). An `init_script` is added after the
+    mock, so it wraps the mocked `WebSocket`.
     """
     room = MockRoom(page)
     room.answer_pings = answer_pings
@@ -559,6 +577,7 @@ def open_room(
     if identity:
         seed_local_storage(page, {"nock.identity.ABC123": STORED_IDENTITY})
     if frozen:
+        keep_pings_on_the_page_clock(page)
         page.clock.install(time=0)
         page.clock.pause_at(1)
     page.goto(f"{base_url}/r/ABC123")

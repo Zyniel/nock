@@ -12,7 +12,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-From B-100: 14 harness mocks still send only on their first route (spec006-016, 023, 026, 035 harnesses; test_spec_018_ac03, 037_ac04, 040_ac14 tests), so a page that reconnects under load is lost the way 033 AC-9's was. Follow spec024_harness.MockRoomSocket: newest route, rejoin answered, rejoins counted.
+From B-100: 14 harness mocks still send only on their first route (spec006-016, 023, 026, 035 harnesses; test_spec_018_ac03, 037_ac04, 040_ac14 tests), so a page that reconnects under load is lost the way 033 AC-9's was. Follow spec024_harness.MockRoomSocket: newest route, rejoin answered, rejoins counted. Also (m-9 close): spec024_harness.MockRoomSocket now answers rejoins silently in every test that does not call expect_no_rejoin, so a test checking only that something is absent could pass on a page that reconnected and lost events.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
