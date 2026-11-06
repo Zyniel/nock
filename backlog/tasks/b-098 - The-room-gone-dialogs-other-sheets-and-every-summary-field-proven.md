@@ -37,7 +37,7 @@ From DRAFT-070 and DRAFT-072: hud AC-21 widens to the recap and the account shee
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -56,6 +56,8 @@ Lead's decision: the description's « unit test » became browser-observable cri
 Test-writer: every guarded line (two sheet closes in leaveDeletedRoom, six field checks in isGridSummary) fails its test when removed. No implementer phase: the behaviour exists and the tests pass on the current code.
 
 Reviewer round 1: APPROVE (it re-ran the removal check itself). Taken: one route handler for AC-25/AC-26's list edits, the hud_harness and test_hud_room_gone docstrings (test-writer). Not taken, to a follow-up draft: hud.md is 15.7 KB, so its next criterion should come with a split.
+
+PR: #162.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
