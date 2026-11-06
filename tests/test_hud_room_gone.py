@@ -1,4 +1,4 @@
-"""Tests of `client/hud.md` AC-21 and AC-22: the room-gone dialog (rule 16).
+"""Tests of `client/hud.md` AC-21, AC-22 and AC-32: the room-gone dialog (rule 16).
 
 AC-21: once the room has shown, the 4404 of a deleted room closes the Salon sheet
 (or the host's settings), takes every band away, drops the letter waiting to be
@@ -17,6 +17,12 @@ measured on it. From "Edge cases": a 4404 before the first snapshot shows no dia
 AC-22: under the dialog, with (1, 0) selected, Escape, a press on the scrim, Tab
 and Shift+Tab leave the focus on the link and the dialog open; a typed `A`
 leaves (1, 0) empty; a press on the link loads `/`.
+
+AC-32: at 1280 by 720, the recap opened by « Voir le bilan » on a solved room, and
+the account sheet opened by « Compte » from the Menu (accounts on, signed out), are
+closed by the deletion (neither is visible, and the account sheet loses its `open`
+attribute) and the dialog shows as
+AC-21 says, the focus on the link.
 
 Readings where the spec leaves room are in `hud_harness`. Also:
 
@@ -43,8 +49,10 @@ from hud_harness import (
     GonePage,
     content_problems,
     delete_room,
+    delete_while_account_sheet_open,
     delete_while_host_settings_open,
     delete_while_joined_with_the_salon_open,
+    delete_while_recap_open,
     delete_while_reconnecting_with_t_pending,
     expect_dialog_as_rule_16_says,
     expect_no_band,
@@ -186,6 +194,36 @@ def test_ac21_with_the_host_settings_open_the_deletion_closes_them_and_shows_it(
     expect_layout(page, "column")
     expect(page.get_by_test_id("host-settings")).not_to_have_attribute("open", "")
     expect(page.get_by_test_id("host-settings")).not_to_be_visible()
+    expect_no_band(gone)
+
+
+# ---- AC-32: the recap and the account sheet ---------------------------------------
+
+
+def test_ac32_with_the_recap_open_the_deletion_closes_it_and_shows_the_dialog(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    gone = open_gone(window, live_server, fx01_grid, delete_while_recap_open, COMPUTER)
+    page = gone.page
+
+    expect_dialog_as_rule_16_says(page)
+    expect_layout(page, "column")
+    expect(page.get_by_test_id("recap")).not_to_be_visible()
+    expect_no_band(gone)
+
+
+def test_ac32_with_the_account_sheet_open_the_deletion_closes_it_and_shows_it(
+    window: OpenWindow, live_server: str, fx01_grid: Grid
+) -> None:
+    gone = open_gone(
+        window, live_server, fx01_grid, delete_while_account_sheet_open, COMPUTER
+    )
+    page = gone.page
+
+    expect_dialog_as_rule_16_says(page)
+    expect_layout(page, "column")
+    expect(page.get_by_test_id("account-dialog")).not_to_have_attribute("open", "")
+    expect(page.get_by_test_id("account-dialog")).not_to_be_visible()
     expect_no_band(gone)
 
 

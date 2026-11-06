@@ -4,7 +4,7 @@ title: The room-gone dialog's other sheets and every summary field, proven
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T09:23:00Z'
+updated_date: '2026-11-06T09:31:00Z'
 labels:
   - domain:hud
   - domain:library
@@ -52,4 +52,6 @@ Quick gate: uv run python scripts/gate.py --specs hud,library --browsers chromiu
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead's decision: the description's « unit test » became browser-observable criteria (hud AC-32, library AC-26), since only pytest tests prove a criterion. Spec-checker: APPROVED; noted hud.md is now 15.7 KB, so a further hud criterion should come with a split.
+
+Test-writer: every guarded line (two sheet closes in leaveDeletedRoom, six field checks in isGridSummary) fails its test when removed. No implementer phase: the behaviour exists and the tests pass on the current code.
 <!-- SECTION:NOTES:END -->

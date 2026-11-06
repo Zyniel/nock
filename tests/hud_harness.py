@@ -61,7 +61,13 @@ from playwright.sync_api import Locator, Page, expect
 
 from nock.grid import Grid
 from nock.protocol import ErrorCode, Undo
-from room_panels import open_host_settings, open_host_settings_with_keyboard, show_tab
+from room_panels import (
+    open_host_settings,
+    open_host_settings_with_keyboard,
+    open_menu,
+    show_tab,
+)
+from spec033_harness import AccountRoutes
 from spec042_harness import Box, box_of, pixel_at, wait_until
 from spec043_harness import (
     FX01_SOLUTION,
@@ -80,10 +86,13 @@ from spec043_harness import (
     same_position,
     snapshot_frame,
 )
+from spec044_harness import solved_frame
 from spec046_harness import button_colour_problems, content_box
 from spec047_harness import (
     SCRIM_DIALOG_ALPHA,
+    click_recap_open,
     column_frame_problems,
+    open_solved,
     sheet_frame_problems,
     type_problems,
 )
@@ -199,6 +208,51 @@ def delete_while_host_settings_open(page: Page, base_url: str, grid: Grid) -> Go
     mock = open_host_sheet(page, base_url, grid)
     noted_top = grid_area_top(page)
     noted_pixel = pixel_at(page, TOP_BAR_POINT[0], TOP_BAR_POINT[1])
+    delete_room(mock)
+    return GonePage(page, mock, noted_pixel, noted_top)
+
+
+def delete_while_recap_open(page: Page, base_url: str, grid: Grid) -> GonePage:
+    """Solved on FX-01 with the recap opened by « Voir le bilan », the room is
+    deleted.
+
+    Args:
+        page: A fresh page, in the window the test wants (1280 by 720 for AC-32).
+        base_url: The live server.
+        grid: FX-01.
+
+    Returns:
+        The page once the 4404 is sent, and what it showed before.
+    """
+    mock, _ = open_solved(page, base_url, solved_frame(grid))
+    noted_top = grid_area_top(page)
+    noted_pixel = pixel_at(page, TOP_BAR_POINT[0], TOP_BAR_POINT[1])
+    click_recap_open(page)
+    delete_room(mock)
+    return GonePage(page, mock, noted_pixel, noted_top)
+
+
+def delete_while_account_sheet_open(page: Page, base_url: str, grid: Grid) -> GonePage:
+    """Joined on FX-01 with accounts on and « Compte » opened from the Menu, the
+    room is deleted.
+
+    Args:
+        page: A fresh page, in the window the test wants (1280 by 720 for AC-32).
+        base_url: The live server.
+        grid: FX-01.
+
+    Returns:
+        The page once the 4404 is sent, and what it showed before.
+    """
+    AccountRoutes().install(page)
+    mock = open_fx01_room(page, base_url, grid)
+    noted_top = grid_area_top(page)
+    noted_pixel = pixel_at(page, TOP_BAR_POINT[0], TOP_BAR_POINT[1])
+    expect(page.get_by_test_id("account-open")).to_have_count(1)
+    open_menu(page)
+    page.get_by_test_id("account-open").click()
+    dialog = page.get_by_test_id("account-dialog")
+    expect(dialog).to_have_attribute("open", "", timeout=WAIT_TIMEOUT_MS)
     delete_room(mock)
     return GonePage(page, mock, noted_pixel, noted_top)
 

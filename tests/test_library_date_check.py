@@ -1,11 +1,15 @@
-"""Tests of `content/library.md` AC-25: a summary that is not a summary is a failed
-answer (rule 2).
+"""Tests of `content/library.md` AC-25 and AC-26: a summary that is not a summary is
+a failed answer (rule 2).
 
 Browser with the live server serving `CAT`. The test lets the page's request reach
 the server (`route.fetch`), puts `2026-02-30` (no such day) or `hier` in grid 2's
 `published_on`, and gives the page that answer: `/` shows « Impossible de charger
 les grilles. » in its `error` state, with no filter and no card; `/g/2`, given that
 summary by `GET /api/grids/2`, shows the same line in its `error` state, no card.
+
+AC-26: the page gets the server's list with one field of grid 2's item of the wrong
+type (`number`, `force`, `width`, `height` or `word_count` as a string, `"2"` for
+`number`; `published_on` as a number): `/` shows the same error, no filter, no card.
 
 The same holds when grid 2's item lacks `word_count`, in the list for `/` and as
 `GET /api/grids/2`'s answer for `/g/2` (`/g/2` does not ask the list), and when
@@ -161,3 +165,50 @@ def test_ac25_a_grid_page_given_an_empty_list_shows_the_error(
     expect(grid_page).to_have_attribute("data-state", "error")
     expect(grid_page).to_contain_text(load_fr()["catalogue.error"])
     expect(grid_page.get_by_test_id("catalogue-item")).to_have_count(0)
+
+
+# AC-26: one field of grid 2's item of the wrong type, in turn.
+WRONG_TYPE_FIELDS: list[tuple[str, object]] = [
+    ("number", "2"),
+    ("force", "2"),
+    ("width", "5"),
+    ("height", "5"),
+    ("word_count", "8"),
+    ("published_on", 20261001),
+]
+
+
+def answer_list_with_wrong_type(field: str, value: object) -> Callable[[Route], None]:
+    """A route handler: the server's list, grid 2's `field` set to `value`."""
+
+    def answer(route: Route) -> None:
+        summaries = route.fetch().json()
+        assert isinstance(summaries, list), summaries
+        changed = 0
+        for summary in summaries:
+            if summary["number"] == 2:
+                summary[field] = value
+                changed += 1
+        assert changed == 1, summaries
+        route.fulfill(
+            status=200, content_type="application/json", body=json.dumps(summaries)
+        )
+
+    return answer
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), WRONG_TYPE_FIELDS, ids=[name for name, _ in WRONG_TYPE_FIELDS]
+)
+def test_ac26_a_list_with_a_field_of_the_wrong_type_is_an_error(
+    page: Page, live_server: str, field: str, value: object
+) -> None:
+    page.route(LIST_ROUTE, answer_list_with_wrong_type(field, value))
+
+    page.goto(f"{live_server}/")
+
+    catalogue_page = page.get_by_test_id("catalogue-page")
+    expect(catalogue_page).to_have_attribute("data-state", "error")
+    expect(catalogue_page).to_contain_text(load_fr()["catalogue.error"])
+    expect(page.get_by_test_id("catalogue-filters")).to_have_count(0)
+    expect(page.get_by_test_id("catalogue-item")).to_have_count(0)
