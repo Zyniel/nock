@@ -1,4 +1,4 @@
-"""Tests of viewport AC-9 and AC-10: the dashed edge of a compound word's hyphen.
+"""Viewport AC-9, AC-10 and AC-21: the dashed edge of a compound word's hyphen.
 
 On the mocked room of `tests/spec042_harness.py`, desktop context, FX-01 with
 `VI-DE` and `NA-VAL` (the right edge of (2, 2) and the bottom edge of (1, 1) are
@@ -18,9 +18,12 @@ Choices where the spec leaves room:
   side while the pixels count whole lines. "On a whole pixel": every pixel the
   dashes cover is `--nock-hyphen` or the background, none blended.
 - The crossing grid lines stay plain: their pixels at the ends of the edge are
-  rule grey across the dashes' thickness. Rule 5's "whatever the state of the
-  two cells" includes a cell with both marks: FX-01 with `TA-MIS` and `NA-VAL`,
-  where both edges of (1, 1) end at its bottom right corner pixel.
+  rule grey across the dashes' thickness where the crossing line is plain. At
+  about 57 px the thickness (the line's pixel and the next one) reaches only
+  plain crossing lines, even at the bottom right corner pixel of (1, 1) in FX-01
+  with `TA-MIS` and `NA-VAL`, where both its edges end; rule 5's "whatever the
+  state of the two cells" includes that cell with both marks. Where the crossing
+  line is itself a hyphen edge, its pixels are those of AC-21.
 - "The same in every state": the same look by the formula for the cell's
   current size. Before and after the state, the dashes match the formula at the
   side read then (Auteurs mode shows its legend under the grid, which refits it
@@ -41,6 +44,10 @@ Choices where the spec leaves room:
   pixel is in the cell before, and on the down hyphen with (1, 1) selected.
 - AC-10, the tap and the letters: the same tap and keys on FX-01 as published
   give the same cells and letters.
+- AC-21, "cells of 72 px or more": FX-01 at 1024 by 768, about 130.6 px, where
+  the dashes are 3 px. The crossing pixel is where each of the two edges, read
+  as AC-9 reads it, meets its crossing line: the row of one, the column of the
+  other. Each of the 3 by 3 pixels is exactly rule grey or white.
 """
 
 from __future__ import annotations
@@ -94,6 +101,7 @@ from viewport_harness import (
     HYPHEN,
     INTERIOR_OFFSET,
     EdgeReading,
+    Picture,
     Run,
     Side,
     dash_count,
@@ -712,3 +720,112 @@ def test_ac10_a_tap_selects_vides_four_cells_and_letters_fill_them_as_published(
         expect(cell_at(page, *cell)).to_have_attribute("data-letter", letter)
     grid_element = page.get_by_test_id("grid")
     expect(grid_element).to_have_attribute("data-selected-column", "4")
+
+
+# ---- AC-21: the pixels around where two hyphen edges meet -------------------------
+
+# The 3 by 3 pixels centred on a crossing pixel, top row first, left to right.
+PixelSquare = tuple[tuple[Rgb, Rgb, Rgb], ...]
+
+
+class MeetingCase(NamedTuple):
+    """Two hyphen edges of FX-01 that meet at a crossing of grid lines.
+
+    Attributes:
+        answers: FX-01's answers written with their hyphens.
+        right_edge: The cell whose right edge is the across hyphen edge, and the
+            cell whose plain right line finds that line's pixel.
+        right_edge_ends: True when the right edge ends at the crossing, False
+            when it starts there.
+        bottom_edge: The cell whose bottom edge is the down hyphen edge, and the
+            cell whose plain bottom line finds that line's pixel.
+        bottom_edge_ends: True when the bottom edge ends at the crossing, False
+            when it starts there.
+        expected: The 3 by 3 pixels around the crossing pixel.
+    """
+
+    answers: dict[str, str]
+    right_edge: tuple[Cell, Cell]
+    right_edge_ends: bool
+    bottom_edge: tuple[Cell, Cell]
+    bottom_edge_ends: bool
+    expected: PixelSquare
+
+
+MEETING_CASES = {
+    # Both edges of (1, 1) end at its bottom right corner: the centre and the
+    # pixels right of it and below it are rule grey.
+    "ta-mis-and-na-val-at-the-corner-of-1-1": MeetingCase(
+        {"TAMIS": "TA-MIS", "NAVAL": "NA-VAL"},
+        ((1, 1), (2, 1)),
+        True,
+        ((1, 1), (1, 2)),
+        True,
+        (
+            (WHITE, WHITE, WHITE),
+            (WHITE, RULE, RULE),
+            (WHITE, RULE, WHITE),
+        ),
+    ),
+    # The right edge of (2, 2) ends where the bottom edge of (2, 3) starts: the
+    # centre and the pixels left of it and below it are rule grey.
+    "vi-de-ends-where-id-es-starts": MeetingCase(
+        {"VIDE": "VI-DE", "IDES": "ID-ES"},
+        ((2, 2), (3, 2)),
+        True,
+        ((2, 3), (2, 4)),
+        False,
+        (
+            (WHITE, WHITE, WHITE),
+            (RULE, RULE, WHITE),
+            (WHITE, RULE, WHITE),
+        ),
+    ),
+}
+
+
+def crossing_along(reading: EdgeReading, at_end: bool) -> int:
+    """The page coordinate along an edge of the crossing line at one of its ends.
+
+    Args:
+        reading: The edge, read by `read_edge`.
+        at_end: True for the crossing line after the edge's last pixel, False
+            for the one before its first pixel.
+
+    Returns:
+        A y for a right edge, an x for a bottom edge.
+    """
+    if at_end:
+        return reading.first_inner + reading.length
+    return reading.first_inner - 1
+
+
+def pixels_around(picture: Picture, x: int, y: int) -> PixelSquare:
+    """The 3 by 3 pixels centred on (x, y), top row first, left to right."""
+    rows: list[tuple[Rgb, Rgb, Rgb]] = []
+    for row_y in (y - 1, y, y + 1):
+        row = (picture.at(x - 1, row_y), picture.at(x, row_y), picture.at(x + 1, row_y))
+        rows.append(row)
+    return tuple(rows)
+
+
+@pytest.mark.parametrize("case_name", list(MEETING_CASES))
+def test_ac21_the_pixels_around_where_two_hyphen_edges_meet(
+    page: Page, live_server: str, fx01_text: str, case_name: str
+) -> None:
+    case = MEETING_CASES[case_name]
+    grid = grid_with_answers(fx01_text, case.answers)
+    open_fx01(page, live_server, grid_view(grid), LARGE_WINDOW)
+    right_cell, right_reference = case.right_edge
+    bottom_cell, bottom_reference = case.bottom_edge
+    side = require_side(page, right_cell, LARGE_SIDES)
+    assert dash_thickness(side) == 3
+    picture = grid_picture(page)
+
+    right_edge = read_edge(page, picture, right_cell, Side.RIGHT, right_reference)
+    bottom_edge = read_edge(page, picture, bottom_cell, Side.BOTTOM, bottom_reference)
+    # The right edge meets the crossing's row, the bottom edge its column.
+    crossing_y = crossing_along(right_edge, case.right_edge_ends)
+    crossing_x = crossing_along(bottom_edge, case.bottom_edge_ends)
+
+    assert pixels_around(picture, crossing_x, crossing_y) == case.expected
