@@ -1,10 +1,10 @@
 ---
 id: B-088
 title: The ipuz reader's gaps and enumerations
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T02:36:00Z'
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - domain:ipuz
 milestone: m-8
@@ -23,17 +23,17 @@ From DRAFT-009 and DRAFT-010: dotted (drawn as dashed), solution letters, a key 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each of the reader's gaps and the ’ separator is decided in the specs with a criterion, tested and built
-- [ ] #2 content/ipuz.md AC-10, AC-12 and AC-15 to AC-18: dotted, solution letters, keys written twice, the byte order mark, clue keys, ’ and a leading zero
+- [x] #1 Each of the reader's gaps and the ’ separator is decided in the specs with a criterion, tested and built
+- [x] #2 content/ipuz.md AC-10, AC-12 and AC-15 to AC-18: dotted, solution letters, keys written twice, the byte order mark, clue keys, ’ and a leading zero
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -69,4 +69,20 @@ The task is unassigned; the spec changes for 2, 4 and 7 go through the spec-writ
 Reviewer round 3 (first on the human's revised spec): CHANGES REQUESTED. Its mutations show the code is correct and every answer of the human is pinned. One blocking gap: the AC-15 empty-style test passes when that check is removed, because the break-edge check also names (2, 2). Lead decision: the human's answers rewrote the spec, so this counts as the revised task's first review and a confirming round follows. Taken: the blocking assertion; a count of 10 or more tested; the leading-zero refusal message and dead code; test names that match the upper-case rule.
 
 Confirming review: APPROVE. M7 (empty-style check removed) and M2 (one-digit counts) now fail the tests. Note: 5bac515 changed tests and code together; the reviewer checked that the new tests pass on the previous code, so no test was fitted to the code.
+
+Full gate here (Chromium): static checks, 8,829 parallel and 162 serial tests, all green. Firefox and WebKit are left to CI after the merge; the change is server-side only. Not verified: no sample grids are in grids/ (only .gitkeep), so real grids were not loaded under the stricter rules.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+content/ipuz.md now says what the ipuz reader does in seven cases, as the human decided on 2026-11-06:
+- a dotted edge draws a break, as dashed does, whatever the separator (AC-15);
+- a solution letter is upper-case, its accent dropped: É, Ê and E with a combining acute count as E; a lower-case one is refused (AC-16);
+- a key written twice in any object is refused, naming it (AC-17);
+- a file starting with a byte order mark is refused as not valid JSON (AC-18);
+- a clue's explanation, tags and type are ignored (AC-12);
+- ’ is an enumeration separator, the same as ' (AC-10);
+- an enumeration's counts have no leading zero (AC-10).
+src/nock/ipuz.py implements them. Review went three rounds on the first spec, then the human's answers rewrote it and one confirming round followed; the reviewer's mutations show that every rule is pinned by a test. ipuz.md is 14.9 KB with 18 criteria.
+<!-- SECTION:FINAL_SUMMARY:END -->
