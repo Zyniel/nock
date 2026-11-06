@@ -1,9 +1,10 @@
 ---
 id: B-089
 title: The converter checks its source names
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-06T01:04:00Z'
 labels:
   - domain:grid-files
 milestone: m-8
