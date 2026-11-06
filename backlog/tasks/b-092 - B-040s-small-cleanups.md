@@ -4,7 +4,7 @@ title: B-040's small cleanups
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T19:18:00Z'
+updated_date: '2026-11-06T19:20:00Z'
 labels:
   - domain:my-account
 milestone: m-10
@@ -30,7 +30,7 @@ From DRAFT-043: one reading of a mixed nock.account_rooms array, malformed histo
 <!-- DOD:BEGIN -->
 - [x] #1 Spec change APPROVED by the spec-checker, or no spec change
 - [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
+- [x] #3 Tests committed before the code, or a tooling task
 - [ ] #4 Reviewer APPROVE within two rounds
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
