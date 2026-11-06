@@ -261,10 +261,12 @@ Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
   grid), `roomConnection.ts` (what a final state drops),
   `roomOverlays.ts` (what a layout change and the room's deletion close),
   `playFit.ts` (layout, the grid's box, the clue bar's width, the legend's
-  place), `StatusRegion.svelte` and `announce.ts` (the status region,
-  announced by `RoomPage.svelte`), `GridStatus.svelte` (the grid's completion
-  line) and its parts: `RoomTopBar.svelte`, `ClueBar.svelte`,
-  `RoomGoneDialog.svelte`, `RoomSheet.svelte` (the room-gone dialog's frame,
-  a sheet's region); `windowForm.ts`.
+  place), `StatusRegion.svelte` and `announce.ts` (the status region;
+  written to by `RoomPage.svelte`, `NoteSlot.svelte`, `RecapDialog.svelte`,
+  `PlayersPanel.svelte`; `RoomSheet.svelte` holds a sheet's),
+  `GridStatus.svelte` (the grid's completion line); the room page's parts:
+  `RoomTopBar.svelte`, `ClueBar.svelte`, `RoomGoneDialog.svelte`
+  and its frame `RoomSheet.svelte`; `FocusableLink.svelte` (the link of the
+  room-gone dialog; `client/foundation.md`); `windowForm.ts`.
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`,
   `tests/test_hud_*`, `tests/hud_harness.py`.

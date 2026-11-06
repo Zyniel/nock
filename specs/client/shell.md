@@ -246,6 +246,7 @@ file, and the brand on the top bars.
   `roomConnection.ts` (the socket), `RoomPage.svelte` (opening),
   `EntryPage.svelte` (the entry page, its cards), `EntryFrame.svelte`,
   `CatalogueFrame.svelte` (the frames and their `main`), `NotFoundPage.svelte`,
-  `PageTopBar.svelte`, `TopBarBrand.svelte`.
+  `PageTopBar.svelte`, `TopBarBrand.svelte`; `FocusableLink.svelte` (the
+  links of these pages), `wideWindow.ts` (the frames' wide-window test).
 - Tests: `tests/test_shell_*` and the `tests/test_spec_040_*`,
   `test_spec_046_*` and `test_spec_048_*` files of the cited criteria.

@@ -212,7 +212,8 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   `FORCE_PATTERN`.
 - `web/src/App.svelte`: the `/g/<n>` route. `web/src/lib/CataloguePage.svelte`,
   `GridPage.svelte`, `CatalogueFrame.svelte`, `CatalogueList.svelte`;
-  `catalogue.ts` (the summary's check).
+  `catalogue.ts` (the summary's check); `wideWindow.ts` (the wide-window
+  test).
 - Tests: `tests/test_library_*`, with `tests/library_harness.py`;
   `tests/test_spec_004_ac01_ac03_*` (004 AC-1, AC-2), `test_spec_004_ac04_*`,
   `test_spec_004_ac06_*`, the force tests of `test_spec_004_ac07_*`;

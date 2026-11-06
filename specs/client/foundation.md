@@ -185,6 +185,8 @@ smooth on a phone.
   fade), `web/src/lib/GridViewport.svelte` (the grid's ring and its overlay),
   `web/src/lib/LetterCell.svelte`, `web/src/lib/ClueCell.svelte` (what a frame
   redraws), `web/src/main.ts` (fonts, subsets, preload),
-  `web/src/lib/icons.ts`.
+  `web/src/lib/icons.ts`, `FocusableLink.svelte` (the WebKit link
+  workaround every link uses), `PlayButton.svelte` (the button that starts
+  a grid), `wideWindow.ts` (the wide-window test).
 - Tests: `tests/test_foundation_*`, `tests/test_spec_041_*` and the
   `tests/test_spec_040_*` and `test_spec_048_*` files of the cited criteria.
