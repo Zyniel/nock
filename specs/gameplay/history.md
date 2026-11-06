@@ -29,8 +29,12 @@ terminées », where a grid can be played again.
 2. `nock.history` holds the device's records, a JSON array of `{"code",
    "grid", "width", "height", "finished_at", "elapsed_ms", "teammates"}`,
    newest first then by code, at most 100. Not an array reads as none; an item
-   of other field types is ignored. A room's deletion removes no record; only
-   the cap and a newer record of the same code do.
+   of other field types is ignored, and so is one whose `finished_at` is not a
+   date-time as `lobby/summaries.md` rule 2 reads one, or not a real one,
+   refused in every engine: a month outside 01 to 12, a day its month lacks
+   (`2026-02-30`, `2026-02-29`), an hour past 23 or minutes past 59 in the
+   time or its offset, seconds past 59. A room's deletion removes no record;
+   only the cap and a newer record of the same code do.
 3. A solved summary writes its room's record, replacing that code's; the
    team-mates are its players but names exactly equal to this device's
    identity nickname for the room. The catalogue page writes one per summary
@@ -38,8 +42,8 @@ terminées », where a grid can be played again.
    asks its own summary and writes it. A failed request writes nothing.
 4. Signed in (`account/account.md`), the catalogue page adds the records of
    `GET /api/account/history`, one per code, the account's winning, in rule
-   2's order, never stored on the device; a failed or malformed answer adds
-   none.
+   2's order, never stored on the device; a failed or malformed answer, one
+   holding an item rule 2 ignores included, adds none.
 
 ### « Grilles terminées »
 
@@ -88,6 +92,13 @@ terminées », where a grid can be played again.
   row, the button enabled. The section passes the scans, Tab reaches « Rejouer »
   with the ring, Enter sends, and 7 team-mates of 20 characters scroll no window
   sideways. (← 029 AC-4, 029 AC-5)
+- **AC-5** With `nock.history` holding records finished
+  `2026-10-14T08:30:00Z`, `2028-02-29T09:30:00.5+01:00`,
+  `2026-10-14 08:30:00Z`, `2026-02-30T08:30:00Z`, `2026-10-14T24:00:00Z`,
+  `2026-10-14T08:30:60Z` and `2026-10-14T08:30:00+24:00`, « Grilles
+  terminées » lists the first two only, in every engine. Signed in,
+  an account answer of two records, one finished `2026-02-30T08:30:00Z`, adds
+  neither.
 
 ## Edge cases
 
@@ -107,8 +118,10 @@ terminées », where a grid can be played again.
 ## Code
 
 - `src/nock/room.py`: `solved_at`, `room_summary`.
-- `web/src/lib/`: `history.ts`, `HistoryList.svelte`, `HistoryItem.svelte`,
+- `web/src/lib/`: `history.ts`, `dateTime.ts` (the date-time it reads),
+  `HistoryList.svelte`, `HistoryItem.svelte`,
   `playGrid.ts`, `CataloguePage.svelte` (the merge and the account history),
   `RoomPage.svelte` (it writes the record once solved).
 - Tests: `tests/test_spec_029_*` (AC-1 to AC-6), AC-13 of
-  `tests/test_spec_046_ac11_ac13_*`.
+  `tests/test_spec_046_ac11_ac13_*`, `tests/test_history_*` (AC-5),
+  `tests/web/dateTime.test.ts`.

@@ -67,13 +67,15 @@ decides about a grid stays in the index. Both are read once at server start.
 ### Converter
 
 15. `uv run python -m nock.ipuz_convert SOURCE TARGET` converts a directory of
-    the former grid files: each file of SOURCE named `<name>.json` (lower-case,
-    not starting with `.`), in code-point order of the names, an object of
+    the former grid files: each file of SOURCE whose name ends in `.json` and
+    does not start with `.`, in code-point order of the names, an object of
     `number`, `published_on` (`YYYY-MM-DD`), `force`, `published`, `author`,
     `source`, `licence`, the optional `withdrawn` and `grid` in the model's
-    JSON. It writes `TARGET/<name>.ipuz` for each and `TARGET/catalogue.json`
-    with the entries in that order. A source file holding the number of an
-    earlier one in that order is refused. When a source file is refused, or
+    JSON. It writes `TARGET/<name>.ipuz` for each `<name>.json` and
+    `TARGET/catalogue.json` with the entries in that order. A source file is
+    refused when its name is not lower-case (it changes when case-folded, as
+    `G1.json` does) or holds `\` or `:`, or when it holds the number of an
+    earlier one in that order. When a source file is refused, or
     `TARGET/catalogue.json` or a `.ipuz` it would write exists (the index is
     checked first), it writes nothing, names that file and exits with a non-zero
     code. Nothing else reads the former format.
@@ -124,6 +126,10 @@ decides about a grid stays in the index. Both are read once at server start.
   `catalogue.json` loads as an empty catalogue and logs one warning holding
   `uv run python -m nock.ipuz_convert`; a `grids/` holding only `notes.txt`,
   or `g1.json` next to a valid `catalogue.json`, logs no warning.
+- **AC-25** The converter run on a source holding `g2.json` (number 2) and one
+  of `A.json`, `G1.json` or `a:b.json` (number 1), both valid former FX-01
+  files, writes nothing into the target, names that file (`A.json`, `G1.json`
+  or `a:b.json`) and exits with a non-zero code.
 
 ## Edge cases
 
@@ -134,6 +140,8 @@ decides about a grid stays in the index. Both are read once at server start.
   link (AC-5).
 - Former `.json` files next to a `catalogue.json` are ignored, with no warning
   (AC-24).
+- `G1.json` alone in a `grids/` with no index logs rule 1's warning; the
+  converter then refuses it (AC-24, AC-25).
 
 ## Out of scope
 
@@ -148,7 +156,7 @@ decides about a grid stays in the index. Both are read once at server start.
 ## Code
 
 - `src/nock/catalogue.py`: the index, the catalogue, `load_catalogue`,
-  `find_published`.
+  `find_published`, `is_former_file` (the files rules 1 and 15 take).
 - `src/nock/ipuz_convert.py`: the converter.
 - Tests: `tests/test_grid_files_*`, the catalogue tests of `test_spec_004_*`,
   and the credit and withdrawal tests of `test_spec_005_*`.

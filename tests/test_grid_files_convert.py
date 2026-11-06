@@ -1,4 +1,4 @@
-"""Tests of grid-files AC-20: the converter of the former grid files.
+"""Tests of grid-files AC-20, AC-22 and AC-25: the converter of the former files.
 
 `convert(source, target)` turns a directory of `<name>.json` files (the former
 format: listing data, credits and a grid in the model's JSON) into `.ipuz` files
@@ -306,4 +306,37 @@ def test_ac22_main_exits_with_a_non_zero_code_naming_the_later_file(
     reported = f"{exit_info.value.code} {captured.out} {captured.err}"
     assert exit_info.value.code not in (0, None)
     assert "g2.json" in reported
+    assert file_names(target) == []
+
+
+# ---- AC-25: source names the converter refuses -------------------------------------
+
+
+@pytest.mark.parametrize(
+    "refused_name",
+    [
+        pytest.param("A.json", id="upper"),
+        pytest.param("G1.json", id="upper-g"),
+        pytest.param("a:b.json", id="colon"),
+        pytest.param("\N{LATIN SMALL LETTER SHARP S}.json", id="sharp-s"),
+    ],
+)
+def test_ac25_a_source_name_that_is_not_safe_is_refused_and_nothing_is_written(
+    source: Path,
+    target: Path,
+    fx01_text: str,
+    capsys: pytest.CaptureFixture[str],
+    refused_name: str,
+) -> None:
+    """Refuse unsafe names; sharp s folds to "ss", so casefold refuses it (rule 15)."""
+    write_former(source, refused_name, former_payload(fx01_text, number=1))
+    write_former(source, "g2.json", former_payload(fx01_text, number=2))
+
+    with pytest.raises(SystemExit) as exit_info:
+        main([str(source), str(target)])
+
+    captured = capsys.readouterr()
+    reported = f"{exit_info.value.code} {captured.out} {captured.err}"
+    assert exit_info.value.code not in (0, None)
+    assert refused_name in reported
     assert file_names(target) == []

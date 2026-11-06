@@ -53,6 +53,20 @@ crossing grid line, which stays plain), with s the cell side at the current zoom
 | 56 px (a computer) | 2 px | 7 | 5 px |
 | 90 px (a phone at zoom 5) | 3 px | 8 | 7 px |
 
+Where two edges meet at a crossing of grid lines (the right and bottom edges of
+one cell with both marks, or an across edge ending where a down edge starts, as
+the right edge of (r, c) and the bottom edge of (r, c + 1)), each keeps the
+geometry above, its t pixels across ending one pixel short of the crossing line:
+
+- the crossing pixel, where the two lines cross, is `--nock-rule`: the plain line
+  of a cell with one mark runs to its corner; a cell with both marks draws that
+  corner pixel in `--nock-rule` itself, in the dashes' layer;
+- at t = 2 and 3, each of the eight pixels around the crossing pixel is
+  `--nock-rule` where a plain line runs through it, else the background of its
+  cell: an edge's first and last pixels lie in its half gaps, so no dash reaches
+  them. A 3 px edge's outer pixel on the crossing line, where that line is the
+  other edge, is so the cell's background, not rule grey.
+
 Contrast (`foundation.md`, « Colour tokens »): 5.86:1 on white, 4.26:1 on my
 selected cell, at least 4.4:1 on every word, tint and locked background; 2.93:1 on
 the darkest flash, accepted for the flash's 1 s.
@@ -71,8 +85,8 @@ base on the edge. No arrow ever lies on a hyphen edge: an arrow's edge faces its
 clue cell. The dashed side of my selection border is on top, like the rest of the
 border.
 
-Drawn in the cell sheet, « 4b · Compound words », and in the screens sheet, part 3,
-« Compound words ».
+Drawn in the cell sheet, « 4b · Compound words » (the two ways edges meet in its
+last row), and in the screens sheet, part 3, « Compound words ».
 
 ## Letter cell backgrounds
 
@@ -249,7 +263,8 @@ Top first, inside one cell (the sheet's z-index in brackets):
 4. Player triangles (2), and in clue cells the flag (2).
 5. Catch-up ring (1).
 6. The letter, or the clue text.
-7. The dashes of a hyphen edge (« Hyphen edges »), in place of the grid line.
+7. The dashes of a hyphen edge (« Hyphen edges »), in place of the grid line, and
+   the rule-grey corner pixel of a cell with both marks.
 8. The flash overlay, then the background.
 
 A shown reaction (8) sits over its clue cell and the cells around it (`room.md`,
