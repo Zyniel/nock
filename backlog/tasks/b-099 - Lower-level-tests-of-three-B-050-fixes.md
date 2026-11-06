@@ -4,7 +4,7 @@ title: Lower-level tests of three B-050 fixes
 status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T11:55:00Z'
+updated_date: '2026-11-06T11:56:00Z'
 labels:
   - domain:hud
   - domain:menus
@@ -36,7 +36,7 @@ From DRAFT-071: L12 (RoomPopover placed again after tick()), L14 (one watcher pe
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -57,6 +57,8 @@ Lead's decisions: L12 becomes menus AC-10 (browser criterion; menus.md owns Room
 Test-writer: a plain viewport resize does not show L12's bug (Svelte redraws the bar in the microtasks between RoomPage's and the popover's resize listeners), so the AC-10 test delivers each resize as one script event whose listeners run back to back (an init script), the case the fix exists for; without placeAgain() it fails in three engines. Lead's decision: accepted, since the size, layout, bar and expected place are the criterion's and only the event's timing is forced. L14: tests/web/scrollingLists.test.ts (3 of 4 fail on the pre-fix code); L15: tests/web/pinchPan.test.ts (ghost finger fails without the isPrimary guard, capture without setPointerCapture). No implementer phase: the fixes exist.
 
 Reviewer round 1: APPROVE (it re-ran each removal itself in three engines). Taken (test-writer): tests of stopping a shared watcher, the IN_ONE_GO_SCRIPT comment for all engines. Not taken, to a follow-up draft: the dom lib reference in two tests/web files types every unit test with the DOM (a separate DOM-typed group would be tooling). Noted: a real resize does not produce L12's event timing, so L12 is defensive; AC-10 guards it.
+
+PR: #166.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
