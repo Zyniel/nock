@@ -12,7 +12,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-From m-7's close review and B-087: tests/library_harness.py now holds the helpers of content/cards' tests; library's filter test only takes QUIET_MS from it. Move QUIET_MS to a shared harness and rename the file cards_harness.py (the conftest registration and role_gate.py's harness-to-domain map follow). For m-9.
+From m-7's close review and B-087: tests/library_harness.py now holds the helpers of content/cards' tests; library's filter test only takes QUIET_MS from it. Move QUIET_MS to a shared harness and rename the file cards_harness.py (the conftest registration and role_gate.py's harness-to-domain map follow). Also split tests/test_viewport_hyphen_edges.py (831 lines after B-094) by criterion group (AC-9, AC-10, AC-21). For m-9.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
