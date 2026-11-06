@@ -25,8 +25,10 @@ arrives, so that `performance.now()` is the same when the page anchors the timer
 when the test reads it: no real delay can shift a value. `advance_clock` then moves
 the clock by hand, in small steps with a real pause between them, so that the pong
 the mocked socket sends back to each of the page's `ping` frames (spec 017) reaches
-the page before its next 4 s check. Nothing in those tests depends on how fast the
-machine is. Units: Playwright for Python reads a number given to `install`,
+the page before its next 4 s check. Playwright's clock does not reach a dedicated
+worker, so the page is loaded without `Worker` and keeps its pings on its own timer
+(spec 017's `keep_pings_on_the_page_clock`). Nothing in those tests depends on how
+fast the machine is. Units: Playwright for Python reads a number given to `install`,
 `pause_at`, `set_fixed_time` and `set_system_time` as SECONDS (it multiplies it by
 1000), and a number given to `run_for` and `fast_forward` as milliseconds.
 
@@ -78,7 +80,7 @@ from nock.room import (
     join_room,
     new_room,
 )
-from spec017_harness import Peer
+from spec017_harness import Peer, keep_pings_on_the_page_clock
 from spec024_harness import (
     FIRST_TOKEN,
     NOW,
@@ -445,8 +447,9 @@ def join_room_page(
     Args:
         page: A fresh page.
         base_url: The live server, which serves the built client.
-        frozen: Whether the page's clock is frozen when the snapshot arrives (see
-            the module docstring); `advance_clock` then moves it.
+        frozen: Whether the page's clock is frozen when the snapshot arrives,
+            on a page without `Worker` (see the module docstring); `advance_clock`
+            then moves it.
         room_code: The room's code, for the page's URL and the socket route. A
             code the browser has not opened before shows the nickname form (spec
             012's stored identity is per room).
@@ -456,6 +459,7 @@ def join_room_page(
         each ping with a pong.
     """
     if frozen:
+        keep_pings_on_the_page_clock(page)
         page.clock.install(time=0)
     mock = MockRoomSocket(page)
     route = re.compile(rf".*/api/rooms/{room_code}/ws$")
@@ -509,8 +513,9 @@ def open_timer_room(
         solved: The snapshot's `solved`.
         seq: The snapshot's seq.
         players: The roster.
-        frozen: Whether the page's clock is frozen when the snapshot arrives (see
-            the module docstring); `advance_clock` then moves it.
+        frozen: Whether the page's clock is frozen when the snapshot arrives,
+            on a page without `Worker` (see the module docstring); `advance_clock`
+            then moves it.
         room_code: The room's code, for the page's URL and the socket route. A
             code the browser has not opened before shows the nickname form (spec
             012's stored identity is per room).

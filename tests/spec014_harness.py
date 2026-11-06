@@ -80,6 +80,7 @@ from nock.room import (
 from nock.server import create_app
 from nock.store import RoomStore
 from page_ready import wait_for_room_page
+from spec017_harness import keep_pings_on_the_page_clock
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 ROOM_CODE = "ABCDEF"
@@ -663,13 +664,16 @@ def open_mock_room(
     """Open /r/ABC123 on a mocked socket and wait for the first socket.
 
     With `identity` the stored identity of spec 012 is seeded and the page joins at
-    once. With `frozen` the page clock stands still until `advance_page`.
+    once. With `frozen` the page clock stands still until `advance_page`, and the
+    page has no `Worker`, so its pings follow that clock (spec 017's
+    `keep_pings_on_the_page_clock`).
     """
     room = MockRoom(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), room.handle)
     if identity:
         seed_identity(page)
     if frozen:
+        keep_pings_on_the_page_clock(page)
         page.clock.install(time=0)
         page.clock.pause_at(1)
     page.goto(f"{base_url}/r/ABC123")
