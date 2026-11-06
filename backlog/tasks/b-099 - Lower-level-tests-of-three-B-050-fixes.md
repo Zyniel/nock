@@ -4,7 +4,7 @@ title: Lower-level tests of three B-050 fixes
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T10:45:00Z'
+updated_date: '2026-11-06T10:57:00Z'
 labels:
   - domain:hud
   - domain:menus
@@ -53,4 +53,6 @@ Quick gate: uv run python scripts/gate.py --specs hud,menus --browsers chromium
 After B-080: L12 (RoomPopover.svelte) is now client/menus.md.
 
 Lead's decisions: L12 becomes menus AC-10 (browser criterion; menus.md owns RoomPopover.svelte, hud.md is over 15 KB); L14 and L15 get tests/web/ unit tests (scrollingLists.test.ts, pinchPan.test.ts), which prove no criterion, so no criterion for them. Rule 5 sharpened to name an open menu following a change of the bar's form; the spec-checker found it states current behaviour (hud rules 1 and 2), not a product change. Spec-checker: APPROVED; its wording note (« turned to » means resized, not rotated) is passed to the test-writer instead of a spec round.
+
+Test-writer: a plain viewport resize does not show L12's bug (Svelte redraws the bar in the microtasks between RoomPage's and the popover's resize listeners), so the AC-10 test delivers each resize as one script event whose listeners run back to back (an init script), the case the fix exists for; without placeAgain() it fails in three engines. Lead's decision: accepted, since the size, layout, bar and expected place are the criterion's and only the event's timing is forced. L14: tests/web/scrollingLists.test.ts (3 of 4 fail on the pre-fix code); L15: tests/web/pinchPan.test.ts (ghost finger fails without the isPrimary guard, capture without setPointerCapture). No implementer phase: the fixes exist.
 <!-- SECTION:NOTES:END -->
