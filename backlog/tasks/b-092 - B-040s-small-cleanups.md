@@ -1,10 +1,10 @@
 ---
 id: B-092
 title: B-040's small cleanups
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T19:20:00Z'
+updated_date: '2026-11-06T20:25:00Z'
 labels:
   - domain:my-account
 milestone: m-10
@@ -23,17 +23,17 @@ From DRAFT-043: one reading of a mixed nock.account_rooms array, malformed histo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each cleanup of DRAFT-043 is done or decided, with its test
+- [x] #1 Each cleanup of DRAFT-043 is done or decided, with its test
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
 - [x] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -54,4 +54,14 @@ Lead's decisions on DRAFT-043: (1) a mixed nock.account_rooms array: the strict 
 Lead's answers to the spec-writer: AC-10 and AC-11 never used in this file (only 033 pointers); a malformed nock.history item whose code is listed goes with the room's records (rule 5: each item whose code is listed); any string of nock.account_rooms counts as a code (strict only about non-string items); a sign-in after a mixed array rewrites it with the new codes only, not stated (Nock never writes one); history.ts's merge dropping malformed items is gameplay/history.md's, a follow-up draft.
 
 Spec-checker round 1: APPROVED. Its notes 1 (rule 1: « a JSON array of strings, each read as a code », « any item ») and 2 (AC-10 also checks nock.account_rooms is gone) taken by the spec-writer after the verdict, the checker's own wording, so no second check; note 3 (a nock.history that is not an array) left, outside DRAFT-043.
+
+Reviewer round 1: APPROVE (each test fails without the change; AC-7 still proven). Accepted: an unparseable or non-array nock.history stays as stored (it has no items, rule 5 leaves it, the old code wrote nothing either). Not taken: AC-11's stored order with the kept items already in code order (a re-sorting filter would pass): a sharper order is a later spec pass, filed with the follow-ups. The reviewer's gate was held by B-093's full gate; the implementer's quick gate passed.
+
+Full gate green (chromium): 8909 parallel + 145 serial passed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DRAFT-043's three cleanups: a nock.account_rooms array with any item that is not a string reads as empty, so a sign-out removes nothing it names (my-account AC-10); a sign-out or deletion answered 204 removes each nock.history item of the account's rooms, malformed ones included, and keeps every other item as stored and in order (AC-11, forgetHistoryOfCodes in account.ts); AC-7's test parametrized over the action and reading through the harnesses. An unparseable nock.history is left as stored. Firefox and WebKit left to CI. Follow-ups: history.ts's merge also drops malformed items; AC-11's order check could be sharper.
+<!-- SECTION:FINAL_SUMMARY:END -->
