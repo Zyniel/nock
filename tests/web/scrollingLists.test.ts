@@ -22,6 +22,7 @@ class FakeResizeObserver {
   static built: FakeResizeObserver[] = []
   readonly callback: () => void
   readonly calls: ObserverCall[] = []
+  disconnected = false
 
   constructor(callback: () => void) {
     this.callback = callback
@@ -36,12 +37,15 @@ class FakeResizeObserver {
     this.calls.push({ method: 'unobserve', target })
   }
 
-  disconnect(): void {}
+  disconnect(): void {
+    this.disconnected = true
+  }
 }
 
 class FakeMutationObserver {
   static built: FakeMutationObserver[] = []
   readonly callback: () => void
+  disconnected = false
 
   constructor(callback: () => void) {
     this.callback = callback
@@ -50,7 +54,9 @@ class FakeMutationObserver {
 
   observe(): void {}
 
-  disconnect(): void {}
+  disconnect(): void {
+    this.disconnected = true
+  }
 }
 
 // A list of the page: its items are its children.
@@ -162,4 +168,46 @@ test('a line that left is no longer observed, and nothing else changes', () => {
   changeContent()
 
   assert.deepEqual(sizeObserver.calls, [{ method: 'unobserve', target: leftLine }])
+})
+
+test('a caller that stops leaves the other caller notified', () => {
+  const list = listOf('first line')
+  const heard: string[] = []
+  const stopFeed = watchListChanges(asElement(list), () => heard.push('feed'))
+  watchListChanges(asElement(list), () => heard.push('tab stop'))
+
+  stopFeed()
+  onlyResizeObserver().callback()
+
+  assert.deepEqual(heard, ['tab stop'])
+  assert.equal(onlyResizeObserver().disconnected, false)
+  assert.equal(FakeMutationObserver.built[0].disconnected, false)
+})
+
+test('the last caller that stops disconnects both observers', () => {
+  const list = listOf('first line')
+  const stopFeed = watchListChanges(asElement(list), () => {})
+  const stopTabStop = watchListChanges(asElement(list), () => {})
+
+  stopFeed()
+  stopTabStop()
+
+  assert.equal(onlyResizeObserver().disconnected, true)
+  assert.equal(FakeMutationObserver.built.length, 1)
+  assert.equal(FakeMutationObserver.built[0].disconnected, true)
+})
+
+test('a watch after the last stop builds a fresh watcher', () => {
+  const list = listOf('first line')
+  const stop = watchListChanges(asElement(list), () => {})
+  stop()
+  const heard: string[] = []
+
+  watchListChanges(asElement(list), () => heard.push('again'))
+
+  assert.equal(FakeResizeObserver.built.length, 2)
+  assert.equal(FakeMutationObserver.built.length, 2)
+  assert.equal(FakeResizeObserver.built[1].disconnected, false)
+  FakeResizeObserver.built[1].callback()
+  assert.deepEqual(heard, ['again'])
 })

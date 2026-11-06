@@ -47,9 +47,10 @@ COMPUTER_BAR_CLASS = re.compile(r"\bcomputer\b")
 
 # Stop each `resize` event of the browser before any listener of the page, and
 # dispatch a `resize` event of the page's own in its place, so that the page's
-# listeners run in one go (see the module's docstring). It runs before the
-# page's scripts: Chromium calls a window's listeners in the order they were
-# added, a capturing one included.
+# listeners run in one go (see the module's docstring). It holds in all three
+# engines: the init script registers before the page's scripts, and listeners at
+# the target run in registration order (the capturing ones first at the target,
+# per the DOM spec), so this one runs before any listener of the page.
 IN_ONE_GO_SCRIPT = r"""
 window.addEventListener('resize', event => {
   if (!event.isTrusted) {
