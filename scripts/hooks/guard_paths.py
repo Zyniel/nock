@@ -17,8 +17,9 @@ working directory came back as the main tree and every edit in its worktree
 was refused).
 
 Every caller, the lead included, is also refused text that holds a raw
-invisible character: a format, control or space character other than the plain
-space, the line feed and the tab (Unicode categories Cf, Cc and Zs). The code
+invisible character: a format, control, space or separator character other
+than the plain space, the line feed and the tab (Unicode categories Cf, Cc, Zs,
+Zl and Zp). The code
 standards write such a character as a `\N{NAME}` escape (CLAUDE.md); a raw one
 cannot be seen in a review. The one exception is the zero-width joiner between
 two emoji, which joins them into one (B-108). With `--check-repository`, the
@@ -67,7 +68,20 @@ ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
 
 # The Unicode categories of the characters a file may not hold raw, and the
 # characters of those categories it may.
-RAW_CHARACTER_CATEGORIES: frozenset[str] = frozenset({"Cf", "Cc", "Zs"})
+RAW_CHARACTER_CATEGORIES: frozenset[str] = frozenset({"Cf", "Cc", "Zs", "Zl", "Zp"})
+# The names \N{...} accepts for the control characters, which have no Unicode
+# name of their own.
+CONTROL_CHARACTER_NAMES: dict[str, str] = {
+    "\0": "NULL",
+    "\b": "BACKSPACE",
+    "\v": "LINE TABULATION",
+    "\f": "FORM FEED",
+    "\r": "CARRIAGE RETURN",
+    "\x1b": "ESCAPE",
+    "\x7f": "DELETE",
+}
+# How many problems the hook lists before it gives their total.
+LISTED_PROBLEMS = 5
 ALLOWED_RAW_CHARACTERS: frozenset[str] = frozenset({" ", "\n", "\t"})
 ZERO_WIDTH_JOINER = "\N{ZERO WIDTH JOINER}"
 VARIATION_SELECTOR_16 = "\N{VARIATION SELECTOR-16}"
@@ -103,7 +117,7 @@ def raw_character_problems(text: str) -> list[str]:
 
     Returns:
         "line L, column C: U+XXXX NAME" for each character of the categories
-        Cf, Cc and Zs other than the plain space, the line feed, the tab and a
+        Cf, Cc, Zs, Zl and Zp other than the plain space, the line feed, the tab and a
         zero-width joiner between two emoji parts; empty when there is none.
     """
     problems: list[str] = []
@@ -127,7 +141,9 @@ def raw_character_problems(text: str) -> list[str]:
         )
         if joins_emoji:
             continue
-        name = unicodedata.name(character, "UNNAMED")
+        name = CONTROL_CHARACTER_NAMES.get(character)
+        if name is None:
+            name = unicodedata.name(character, "UNNAMED")
         problems.append(
             f"line {line_number}, column {column_number}: "
             f"U+{ord(character):04X} {name}"
@@ -282,9 +298,25 @@ def is_allowed(relative_path: str, allowed_paths: list[str]) -> bool:
 
 
 def main() -> int:
-    """Read the hook input from stdin and allow or block the edit."""
-    if sys.argv[1:] == ["--check-repository"]:
+    """Scan the repository, or judge one edit from the hook input on stdin.
+
+    With `--check-repository` (the gate's static step), scan every tracked
+    file; with no argument (the PreToolUse hook), read the hook input and allow
+    or block the edit.
+
+    Returns:
+        The exit code: 0 to allow, 2 to block, 1 on a problem of the hook.
+    """
+    arguments = sys.argv[1:]
+    if arguments == ["--check-repository"]:
         return check_repository(Path(__file__).resolve().parents[2])
+    if arguments:
+        print(
+            f"guard_paths: unknown arguments {arguments}; "
+            "use --check-repository or none.",
+            file=sys.stderr,
+        )
+        return 1
     try:
         hook_input = json.load(sys.stdin)
     except json.JSONDecodeError:
@@ -315,7 +347,9 @@ def main() -> int:
     for text in written_texts(tool_input):
         problems.extend(raw_character_problems(text))
     if problems:
-        listed = "; ".join(problems[:5])
+        listed = "; ".join(problems[:LISTED_PROBLEMS])
+        if len(problems) > LISTED_PROBLEMS:
+            listed += f"; and {len(problems) - LISTED_PROBLEMS} more"
         print(
             f"Blocked: the text written to '{relative_path}' holds a raw "
             f"invisible character ({listed}). Write each one as a \\N{{NAME}} "

@@ -225,6 +225,11 @@ model price.
   failure outside its files (a stale test, for the implementer) says so in its
   report and finishes again without changing anything; the hook then lets it
   stop.
+- The same hook holds the spec-writer while a spec it changed, not yet
+  committed, reads another status than `draft`. `scripts/hooks/guard_paths.py`
+  refuses any edit, the lead's included, whose new text holds a raw invisible
+  character (a `\N{NAME}` escape instead); the gate's static step « raw
+  characters » scans every tracked file the same way.
 - A client component that four domains or more name in their Code section is
   listed with them in `SHARED_COMPONENT_DOMAINS` (`scripts/gate.py`, kept
   equal to the specs by a static check): when the branch changed it, the quick

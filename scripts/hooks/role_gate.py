@@ -69,11 +69,11 @@ ROLE_STAGES: dict[str, str] = {
 
 # The role whose changed specs must read `status: draft` when it stops.
 SPEC_WRITER_ROLE = "spec-writer"
-# The status line of a spec's front matter, and the status a change leaves.
-STATUS_LINE_PATTERN = re.compile(r"^status:\s*(\S+)\s*$", re.MULTILINE)
+# A spec's front matter and its status field, read as scripts/gate.py reads
+# them, and the status a change leaves.
+FRONT_MATTER_PATTERN = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+STATUS_FIELD_PATTERN = re.compile(r"^status:[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 DRAFT_STATUS = "draft"
-# The spec outside specs/<area>/ that carries a status line.
-PRODUCT_SPEC_PATH = "specs/product.md"
 
 MAX_OUTPUT_LINES = 80
 # Below the hook's 1,200 s in .claude/settings.json, which leaves time for uv and
@@ -168,8 +168,13 @@ def resolve_stage(role_name: str) -> str | None:
 def is_spec_writer(role_name: str) -> bool:
     """Tell whether a role name is the spec-writer's.
 
+    "spec-writer-2" is treated like "spec-writer".
+
     Args:
         role_name: Agent type or teammate name taken from the hook input.
+
+    Returns:
+        True for the spec-writer.
     """
     return role_name == SPEC_WRITER_ROLE or role_name.startswith(f"{SPEC_WRITER_ROLE}-")
 
@@ -193,6 +198,25 @@ def uncommitted_paths(project_root: Path) -> list[str]:
     return paths
 
 
+def front_matter_status(spec_text: str) -> str:
+    """Return the status field of a spec's front matter.
+
+    Args:
+        spec_text: The spec's text.
+
+    Returns:
+        The field's value, or "missing" when the spec has no front matter or
+        no non-empty status field in it.
+    """
+    front_matter = FRONT_MATTER_PATTERN.match(spec_text)
+    if front_matter is None:
+        return "missing"
+    field = STATUS_FIELD_PATTERN.search(front_matter.group(1))
+    if field is None or not field.group(1):
+        return "missing"
+    return field.group(1)
+
+
 def specs_not_draft(project_root: Path) -> list[str]:
     """Return the changed specs whose status is not `draft`.
 
@@ -200,11 +224,11 @@ def specs_not_draft(project_root: Path) -> list[str]:
         project_root: The checkout the spec-writer worked in.
 
     Returns:
-        "path (status: X)" for each domain spec or specs/product.md with an
-        uncommitted change whose status line is not draft; empty when none.
+        "path (status: X)" for each domain spec (specs/product.md among them)
+        with an uncommitted change whose front matter's status is not draft;
+        empty when none.
     """
     spec_paths = set(domain_spec_paths(project_root).values())
-    spec_paths.add(PRODUCT_SPEC_PATH)
     problems: list[str] = []
     for path in sorted(set(uncommitted_paths(project_root))):
         if path not in spec_paths:
@@ -212,8 +236,7 @@ def specs_not_draft(project_root: Path) -> list[str]:
         spec_file = project_root / path
         if not spec_file.is_file():
             continue
-        match = STATUS_LINE_PATTERN.search(spec_file.read_text(encoding="utf-8"))
-        status = match.group(1) if match is not None else "missing"
+        status = front_matter_status(spec_file.read_text(encoding="utf-8"))
         if status != DRAFT_STATUS:
             problems.append(f"{path} (status: {status})")
     return problems
