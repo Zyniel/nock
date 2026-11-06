@@ -4,6 +4,7 @@ title: « Mes salons » after a sign-out keeps rooms created signed in
 status: Draft
 assignee: []
 created_date: '2026-11-06T16:20:00Z'
+updated_date: '2026-11-06T18:37:00Z'
 labels:
   - follow-up
   - domain:my-account
@@ -25,3 +26,9 @@ From B-104's spec check: a room created on the device with « Jouer » while sig
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From B-104's review: reopening such a room still marks its grid in nock.progress (the room's own marks), and a room page that read signed_in before a sign-out in another tab writes nock.account_progress after it.
+<!-- SECTION:NOTES:END -->

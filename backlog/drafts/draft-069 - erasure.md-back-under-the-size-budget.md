@@ -13,7 +13,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-From the close of « Owner's calls »: B-078 moved three criteria into specs/account/erasure.md, now 16.5 KB, over the 15 KB budget; « Spec splits 2 » (B-084) cuts account only. Cut or tighten erasure.md.
+From the close of « Owner's calls »: B-078 moved three criteria into specs/account/erasure.md, 16.5 KB then, 17.5 KB with 18 criteria after B-095 (spec 029's leftovers), over the 15 KB budget; « Spec splits 2 » (B-084) cuts account only. Cut or tighten erasure.md.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
