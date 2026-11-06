@@ -4,7 +4,7 @@ title: The ipuz reader's gaps and enumerations
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T02:23:00Z'
+updated_date: '2026-11-06T02:32:00Z'
 labels:
   - domain:ipuz
 milestone: m-8
@@ -65,4 +65,6 @@ The human's answers (chat, 2026-11-06):
 6. ’ is a separator; no change.
 7. No leading zero in an enumeration: each count is a whole number of at least 1 written without a leading zero (05, 02-3 and 0 refused).
 The task is unassigned; the spec changes for 2, 4 and 7 go through the spec-writer and spec-checker, then tests, code and one review round.
+
+Reviewer round 3 (first on the human's revised spec): CHANGES REQUESTED. Its mutations show the code is correct and every answer of the human is pinned. One blocking gap: the AC-15 empty-style test passes when that check is removed, because the break-edge check also names (2, 2). Lead decision: the human's answers rewrote the spec, so this counts as the revised task's first review and a confirming round follows. Taken: the blocking assertion; a count of 10 or more tested; the leading-zero refusal message and dead code; test names that match the upper-case rule.
 <!-- SECTION:NOTES:END -->
