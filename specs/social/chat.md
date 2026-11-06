@@ -1,7 +1,7 @@
 ---
 area: social
 file: chat
-status: approved
+status: done
 ---
 
 # social/chat - Chat, the stream and mute
