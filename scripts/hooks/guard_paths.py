@@ -1,4 +1,4 @@
-"""Claude Code hook: keep each role inside the files it owns.
+r"""Claude Code hook: keep each role inside the files it owns.
 
 Wired in .claude/settings.json to PreToolUse for the Edit, Write and
 NotebookEdit tools. When the call comes from one of the roles below and the
@@ -16,6 +16,15 @@ working directory (2026-10-16: after a container restart, an implementer's
 working directory came back as the main tree and every edit in its worktree
 was refused).
 
+Every caller, the lead included, is also refused text that holds a raw
+invisible character: a format, control, space or separator character other
+than the plain space, the line feed and the tab (Unicode categories Cf, Cc, Zs,
+Zl and Zp). The code standards write such a character as a `\N{NAME}` escape
+(CLAUDE.md); a raw one cannot be seen in a review. The one exception is the
+zero-width joiner between two emoji, which joins them into one (B-108). With
+`--check-repository`, the script scans every file git tracks instead, as a
+static step of scripts/gate.py.
+
 This is a guardrail, not a sandbox: it covers the file-editing tools, not
 shell commands. The reviewer and the per-phase git commits are the backstop.
 """
@@ -24,7 +33,9 @@ from __future__ import annotations
 
 import fnmatch
 import json
+import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 # Folders (ending with "/") and single files each role may write, relative to
@@ -53,6 +64,158 @@ ROLE_DENIED_PATTERNS: dict[str, list[str]] = {
         "web/.*",
     ],
 }
+
+
+# The Unicode categories of the characters a file may not hold raw, and the
+# characters of those categories it may.
+RAW_CHARACTER_CATEGORIES: frozenset[str] = frozenset({"Cf", "Cc", "Zs", "Zl", "Zp"})
+# The names \N{...} accepts for the control characters, which have no Unicode
+# name of their own.
+CONTROL_CHARACTER_NAMES: dict[str, str] = {
+    "\0": "NULL",
+    "\b": "BACKSPACE",
+    "\v": "LINE TABULATION",
+    "\f": "FORM FEED",
+    "\r": "CARRIAGE RETURN",
+    "\x1b": "ESCAPE",
+    "\x7f": "DELETE",
+}
+# How many problems the hook lists before it gives their total.
+LISTED_PROBLEMS = 5
+ALLOWED_RAW_CHARACTERS: frozenset[str] = frozenset({" ", "\n", "\t"})
+ZERO_WIDTH_JOINER = "\N{ZERO WIDTH JOINER}"
+VARIATION_SELECTOR_16 = "\N{VARIATION SELECTOR-16}"
+# The first code point of the emoji planes (U+1F000 to U+1FAFF).
+FIRST_EMOJI_CODE_POINT = 0x1F000
+LAST_EMOJI_CODE_POINT = 0x1FAFF
+GIT_TIMEOUT_SECONDS = 30
+
+
+def is_emoji_part(character: str) -> bool:
+    """Tell whether a character can stand next to a joiner inside an emoji.
+
+    Args:
+        character: One character.
+
+    Returns:
+        True for a symbol (category So), an emoji code point or the emoji
+        variation selector.
+    """
+    if character == VARIATION_SELECTOR_16:
+        return True
+    code_point = ord(character)
+    if FIRST_EMOJI_CODE_POINT <= code_point <= LAST_EMOJI_CODE_POINT:
+        return True
+    return unicodedata.category(character) == "So"
+
+
+def raw_character_problems(text: str) -> list[str]:
+    """Return one message per raw invisible character a text holds.
+
+    Args:
+        text: The text written, or a file's content.
+
+    Returns:
+        "line L, column C: U+XXXX NAME" for each character of the categories
+        Cf, Cc, Zs, Zl and Zp other than the plain space, the line feed, the tab and a
+        zero-width joiner between two emoji parts; empty when there is none.
+    """
+    problems: list[str] = []
+    line_number = 1
+    column_number = 0
+    for index, character in enumerate(text):
+        column_number += 1
+        if character == "\n":
+            line_number += 1
+            column_number = 0
+            continue
+        if character in ALLOWED_RAW_CHARACTERS:
+            continue
+        if unicodedata.category(character) not in RAW_CHARACTER_CATEGORIES:
+            continue
+        joins_emoji = (
+            character == ZERO_WIDTH_JOINER
+            and 0 < index < len(text) - 1
+            and is_emoji_part(text[index - 1])
+            and is_emoji_part(text[index + 1])
+        )
+        if joins_emoji:
+            continue
+        name = CONTROL_CHARACTER_NAMES.get(character)
+        if name is None:
+            name = unicodedata.name(character, "UNNAMED")
+        problems.append(
+            f"line {line_number}, column {column_number}: "
+            f"U+{ord(character):04X} {name}"
+        )
+    return problems
+
+
+def written_texts(tool_input: dict[str, object]) -> list[str]:
+    """Return the texts an Edit, MultiEdit, Write or NotebookEdit call writes.
+
+    Args:
+        tool_input: The tool's input from the hook input.
+
+    Returns:
+        The new strings, content or cell source the call writes.
+    """
+    texts: list[str] = []
+    for key in ("new_string", "content", "new_source"):
+        value = tool_input.get(key)
+        if isinstance(value, str):
+            texts.append(value)
+    edits = tool_input.get("edits")
+    if isinstance(edits, list):
+        for edit in edits:
+            if isinstance(edit, dict):
+                new_string = edit.get("new_string")
+                if isinstance(new_string, str):
+                    texts.append(new_string)
+    return texts
+
+
+def check_repository(project_root: Path) -> int:
+    """Scan every file git tracks for raw invisible characters.
+
+    Args:
+        project_root: The checkout to scan.
+
+    Returns:
+        0 when no tracked text file holds one, else 1.
+    """
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=GIT_TIMEOUT_SECONDS,
+        check=True,
+    )
+    file_count = 0
+    problem_count = 0
+    for relative_path in result.stdout.split("\0"):
+        file_path = project_root / relative_path
+        if not relative_path or not file_path.is_file():
+            continue
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            # A binary file (an image, a font): not text to read.
+            continue
+        file_count += 1
+        for problem in raw_character_problems(text):
+            print(f"FAIL: {relative_path}, {problem}")
+            problem_count += 1
+    if problem_count:
+        print(
+            f"{problem_count} raw invisible character(s): write each as a "
+            "\\N{NAME} escape (CLAUDE.md, Code standards)."
+        )
+        return 1
+    print(f"OK: no raw invisible character in {file_count} tracked text files")
+    return 0
 
 
 def find_checkout_root(path: Path) -> Path | None:
@@ -135,7 +298,25 @@ def is_allowed(relative_path: str, allowed_paths: list[str]) -> bool:
 
 
 def main() -> int:
-    """Read the hook input from stdin and allow or block the edit."""
+    """Scan the repository, or judge one edit from the hook input on stdin.
+
+    With `--check-repository` (the gate's static step), scan every tracked
+    file; with no argument (the PreToolUse hook), read the hook input and allow
+    or block the edit.
+
+    Returns:
+        The exit code: 0 to allow, 2 to block, 1 on a problem of the hook.
+    """
+    arguments = sys.argv[1:]
+    if arguments == ["--check-repository"]:
+        return check_repository(Path(__file__).resolve().parents[2])
+    if arguments:
+        print(
+            f"guard_paths: unknown arguments {arguments}; "
+            "use --check-repository or none.",
+            file=sys.stderr,
+        )
+        return 1
     try:
         hook_input = json.load(sys.stdin)
     except json.JSONDecodeError:
@@ -143,11 +324,9 @@ def main() -> int:
         return 1
 
     role_name = str(hook_input.get("agent_type") or "")
-    allowed_paths = resolve_allowed_paths(role_name)
-    if allowed_paths is None:
-        return 0
-
     tool_input = hook_input.get("tool_input") or {}
+    if not isinstance(tool_input, dict):
+        return 0
     raw_path = tool_input.get("file_path") or tool_input.get("notebook_path")
     if not raw_path:
         return 0
@@ -163,6 +342,26 @@ def main() -> int:
         # Outside any checkout (scratch files, temp folders): not this hook's job.
         return 0
     relative_path = target_path.relative_to(project_root).as_posix()
+
+    problems: list[str] = []
+    for text in written_texts(tool_input):
+        problems.extend(raw_character_problems(text))
+    if problems:
+        listed = "; ".join(problems[:LISTED_PROBLEMS])
+        if len(problems) > LISTED_PROBLEMS:
+            listed += f"; and {len(problems) - LISTED_PROBLEMS} more"
+        print(
+            f"Blocked: the text written to '{relative_path}' holds a raw "
+            f"invisible character ({listed}). Write each one as a \\N{{NAME}} "
+            'escape, for example "\\N{NO-BREAK SPACE}" (CLAUDE.md, Code '
+            "standards), or as an escape of the file's own language.",
+            file=sys.stderr,
+        )
+        return 2
+
+    allowed_paths = resolve_allowed_paths(role_name)
+    if allowed_paths is None:
+        return 0
 
     denied_pattern = find_denied_pattern(
         relative_path, resolve_denied_patterns(role_name)

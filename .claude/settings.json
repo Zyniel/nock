@@ -45,7 +45,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|NotebookEdit",
+        "matcher": "Edit|MultiEdit|Write|NotebookEdit",
         "hooks": [
           {
             "type": "command",
@@ -63,7 +63,7 @@
     ],
     "SubagentStop": [
       {
-        "matcher": "test-writer|implementer",
+        "matcher": "test-writer|implementer|spec-writer",
         "hooks": [
           {
             "type": "command",
@@ -75,7 +75,7 @@
               "${CLAUDE_PROJECT_DIR}/scripts/hooks/role_gate.py"
             ],
             "timeout": 1200,
-            "statusMessage": "Running the quality gate"
+            "statusMessage": "Checking the role's work (quality gate, spec status)"
           }
         ]
       }
@@ -93,7 +93,7 @@
               "${CLAUDE_PROJECT_DIR}/scripts/hooks/role_gate.py"
             ],
             "timeout": 1200,
-            "statusMessage": "Running the quality gate"
+            "statusMessage": "Checking the role's work (quality gate, spec status)"
           }
         ]
       }
