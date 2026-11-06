@@ -1,7 +1,7 @@
 ---
 area: account
 file: erasure
-status: done
+status: approved
 ---
 
 # account/erasure - Erasure, what is kept, history records, grid progress
@@ -21,7 +21,8 @@ erasure must never undo.
   tokens, the mailer; the page's « Supprimer mon compte » is
   `account/my-account.md`.
 - `lobby/joining.md`: members, past players, the seat back, the device's
-  identities; the creator rooms are `lobby/creator.md`.
+  identities; the creator rooms are `lobby/creator.md`; how a summary lists
+  the members' nicknames is `lobby/summaries.md`.
 - `lobby/lifetime.md`: the sweep that runs the attempts and the purge; its
   checkpoint is `admin/operations.md` rule 20.
 
@@ -109,15 +110,17 @@ erasure must never undo.
    goes on. Only identities whose token is a member's of that room count, so a
    room that drew an old code saves nothing. A record: `code`, `grid_number`,
    `width`, `height`, `finished_at`, `elapsed_ms` (`gameplay/history.md` rule
-   1) and `teammates`, the other members in `team_nicknames` order, each
-   once. In the save's transaction, a team-mate whose code and player id a
-   pending erasure holds, marked erased or not (rule 5), is written `--`.
+   1) and `teammates`, the other members' nicknames as a summary lists them
+   (`lobby/summaries.md` rule 1). In the save's transaction, a team-mate
+   whose code and player id a pending erasure holds, marked erased or not
+   (rule 5), is written `--`.
 9. `GET /api/account/history` lists the records, newest `finished_at` first,
    then by code. An erasure makes its players `--` among the others'
    team-mates: in the deletion's transaction (rule 1), at the last step of
    every attempt (rule 5) and in any record saved while it is pending (rule
-   8), so a save that read the room before the erasure, or by the delete
-   hook of a room an attempt deletes, never brings the nickname back.
+   8), so neither a save that read the room before the erasure and writes
+   while it is pending nor the delete hook of a room an attempt deletes
+   brings the nickname back.
 
 ### Grid progress
 
@@ -229,6 +232,9 @@ erasure must never undo.
   once both are over, R's player is `--`, U is gone, her address received
   one e-mail, and the erasure is done with `attempts` 1 and `rooms_deleted`
   1.
+- **AC-18** Ana, Bob, Zoé and Lou, joined in that order, solve R; Zoé and
+  Lou delete their accounts: Ana's record of R reads `["BOB", "--", "--"]`,
+  saved before the deletions or after.
 
 ## Edge cases
 
@@ -241,6 +247,14 @@ erasure must never undo.
   never lists it (AC-4).
 - A held player's room that expired meanwhile is deleted by step 1, its hook
   saving the nickname, which step 3 erases (AC-11).
+- A record that `GET /api/account/history` saves from a room it read before
+  step 1 reached that room, and writes once that erasure is done, keeps the
+  nickname: the whole erasure must end between that read and that write.
+- The delete hook reads and saves under the rooms' lock, which step 1 takes
+  too, so no erasure reaches its room in between. A socket opening to any
+  room meanwhile waits for it; a database busy past SQLite's 5-second
+  timeout fails the hook, logged, and that room's records not yet saved are
+  lost (AC-1).
 - An app stopped between the e-mail and the write that marks the erasure done
   sends it again at its next attempt (AC-9).
 - A sweep that starts during the route's attempt leaves that erasure to it
@@ -274,4 +288,5 @@ erasure must never undo.
   `store.py` (`erase_player`), `hub.py` (`erase_player`, the creator rooms'
   deletion, the delete hook).
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`;
-  `tests/test_erasure_*` (AC-4 to AC-14), which share `tests/account_harness.py`.
+  `tests/test_erasure_*` (AC-4 to AC-14, AC-18), which share
+  `tests/account_harness.py`.
