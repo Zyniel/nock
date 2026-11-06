@@ -1,10 +1,10 @@
 ---
 id: B-101
 title: Hidden tabs measured in three engines
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T15:06:00Z'
+updated_date: '2026-11-06T15:33:00Z'
 labels:
   - domain:reconnection
 milestone: m-9
@@ -23,18 +23,18 @@ From DRAFT-060: measure whether a real hidden tab's throttled pings let the serv
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The measure is recorded in the task, and a hidden tab stays connected in the three engines, or the spec says what happens
-- [ ] #2 reconnection AC-6 (changed)
-- [ ] #3 reconnection AC-9 (new)
+- [x] #1 The measure is recorded in the task, and a hidden tab stays connected in the three engines, or the spec says what happens
+- [x] #2 reconnection AC-6 (changed)
+- [x] #3 reconnection AC-9 (new)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -60,3 +60,19 @@ Spec-checker: APPROVED; its three wording notes applied (AC-9 names the 4408 clo
 
 Reviewer round 1: APPROVE (its probes: AC-9 fails without a worker; a 404 on the worker asset falls back to the page's timer with no close; a throwing constructor falls back; five hide/show cycles leave one worker). Taken: two spec lines rewrapped, a docstring. Not taken, to a follow-up draft: a test of the worker's error fallback (a stale asset hash after a deploy), which has no criterion of its own.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Milestone m-9 « Tidy tests and tooling ».
+
+- **The measure** (task notes; scripts rerunnable): Playwright never truly hides a page, so the real app ran outside it: Chromium 153 over raw CDP, Firefox 155 without Playwright's forcing, WebKitGTK default and Safari-like, each hidden 421 s with a second player watching. Chromium stops a hidden page's timers after ~60 s: the server closed the socket with 4408 at ~66 s, then every ~21 s, and the room saw « déconnecté » 17 times. Safari-like WebKit: from ~20 s, every ~20 s. Firefox and default WebKitGTK stayed connected. A dedicated worker's 2 s timer kept its pace in all three engines.
+- **reconnection rule 3** (changed): the ping ticks come from a dedicated worker served from the app's origin; a page whose worker cannot be created or reports an error keeps the 2 s with its own timer; a page the browser suspends whole loses its socket and reconnects as before.
+- **reconnection AC-9 (new)**: `tests/test_reconnection_worker_pings.py::test_ac9_a_hidden_page_whose_own_timers_stop_pings_every_2_s_and_stays_open` (three engines; serial): a hidden page whose clock is paused pings every 2 s for 10 s, one socket, never disconnected. It fails without the worker.
+- **reconnection AC-6 (changed)**: wording (a page held back whole); its tests run without Worker.
+- **Task #1**: the measure is recorded, and a hidden tab now stays connected in the three engines.
+- **Code**: `web/src/lib/pingWorker.ts`, `roomConnection.ts` (`createPingWorker`, `startPingTicks`). The frozen-clock harnesses load the page without Worker, so the 017 AC-1 pace tests prove the fallback.
+- **Spec-checker**: APPROVED. **Reviewer**: APPROVE, round 1 (its probes: a 404 on the worker asset and a throwing constructor both fall back; one worker after five hide/show cycles). Follow-up: a test of the worker's error fallback.
+- **Decisions**: option 1 (a worker) over server pings or a longer silence (protocol changes, the human's) or a flicker written into the spec (a product call).
+- **Gate**: the full gate in Chromium passed (8886 parallel; serial at load 2.8 of 4 CPUs).
+<!-- SECTION:FINAL_SUMMARY:END -->

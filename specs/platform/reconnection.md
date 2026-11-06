@@ -1,7 +1,7 @@
 ---
 area: platform
 file: reconnection
-status: approved
+status: done
 ---
 
 # platform/reconnection - Stale edits, the resume window, the page's connection
@@ -52,11 +52,12 @@ a loss, retries and sends what it held.
    worker posts makes the page send `ping` on its socket. The worker's script
    is a file of the app's own origin, so the security headers stay as
    `platform/serving.md` says. A page whose worker cannot be created or
-   reports an error keeps the 2 seconds with its own timer. The silence is the time since the socket's
-   last frame of any kind, read from the clock, not counted in timer ticks; at
-   4 seconds of silence the connection is lost at once: the socket is dropped,
-   and its late frames and close event change nothing. A hidden page loses no
-   socket to its own silence check, as that check's timer may run late: when
+   reports an error keeps the 2 seconds with its own timer. The silence is the
+   time since the socket's last frame of any kind, read from the clock, not
+   counted in timer ticks; at 4 seconds of silence the connection is lost at
+   once: the socket is dropped, and its late frames and close event change
+   nothing. A hidden page loses no socket to its own silence check, as that
+   check's timer may run late: when
    it becomes visible again it sends `ping` at once and counts the silence
    from that moment. A page the browser suspends, its worker with it, may be
    closed by the server's silence (`platform/realtime.md` rule 16): a loss
@@ -127,10 +128,10 @@ The connection band follows `_design/room.md`, « Connection lost ».
   Ana on (1, 1) across, then the `letter_changed` of her `T`.
 - **AC-6** Ana's joined page is hidden and the browser holds back its timers,
   its worker's too, so for 5 seconds it sends no ping and gets no frame while
-  the server keeps the socket open: made visible again, it sends `ping` at once and keeps the same socket,
-  with no band. Made visible on a socket that then gets no frame, it shows the
-  band within 5 seconds of the return. Made visible while a try waits on an
-  8-second delay, it opens a socket at once.
+  the server keeps the socket open: made visible again, it sends `ping` at once
+  and keeps the same socket, with no band. Made visible on a socket that then
+  gets no frame, it shows the band within 5 seconds of the return. Made visible
+  while a try waits on an 8-second delay, it opens a socket at once.
 - **AC-7** After a loss, a socket whose opening the network never answers is
   dropped 6 seconds after it was created, and the next socket opens after the
   second delay, 1.6 to 2.4 seconds later; a socket that opens 5 seconds
