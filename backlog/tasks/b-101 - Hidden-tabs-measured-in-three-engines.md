@@ -4,7 +4,7 @@ title: Hidden tabs measured in three engines
 status: Done
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T15:33:00Z'
+updated_date: '2026-11-06T15:34:00Z'
 labels:
   - domain:reconnection
 milestone: m-9
@@ -35,7 +35,7 @@ From DRAFT-060: measure whether a real hidden tab's throttled pings let the serv
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -59,6 +59,8 @@ Lead's decision: option 1, the page's ping timer runs in a Web Worker (client on
 Spec-checker: APPROVED; its three wording notes applied (AC-9 names the 4408 close, the fallback covers a worker that cannot be created or reports an error, AC-6 rewrapped). Lead's decisions: the fallback to the page's own timer has no criterion of its own; the harnesses that freeze the page clock remove Worker so the page's timer (and the page clock) drives their pings, which proves the fallback through the 017 AC-1 tests.
 
 Reviewer round 1: APPROVE (its probes: AC-9 fails without a worker; a 404 on the worker asset falls back to the page's timer with no close; a throwing constructor falls back; five hide/show cycles leave one worker). Taken: two spec lines rewrapped, a docstring. Not taken, to a follow-up draft: a test of the worker's error fallback (a stale asset hash after a deploy), which has no criterion of its own.
+
+PR: #170.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
