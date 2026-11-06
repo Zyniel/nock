@@ -34,7 +34,7 @@ From DRAFT-009 and DRAFT-010: dotted (drawn as dashed), solution letters, a key 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -71,6 +71,8 @@ Reviewer round 3 (first on the human's revised spec): CHANGES REQUESTED. Its mut
 Confirming review: APPROVE. M7 (empty-style check removed) and M2 (one-digit counts) now fail the tests. Note: 5bac515 changed tests and code together; the reviewer checked that the new tests pass on the previous code, so no test was fitted to the code.
 
 Full gate here (Chromium): static checks, 8,829 parallel and 162 serial tests, all green. Firefox and WebKit are left to CI after the merge; the change is server-side only. Not verified: no sample grids are in grids/ (only .gitkeep), so real grids were not loaded under the stricter rules.
+
+Pull request #156, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
