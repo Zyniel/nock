@@ -4,7 +4,7 @@ title: Flakes under load
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-05T22:21:00Z'
+updated_date: '2026-11-06T03:26:00Z'
 labels:
   - tooling
 milestone: m-9
@@ -44,4 +44,6 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 - E (Firefox 033 AC-9, seq 5 instead of 105). Most likely the mocked socket fell silent for 4 s under load and the page reconnected. MockRoomSocket.send always writes to routes[0] (spec024_harness.py:841), the dead socket. Fix: the mock follows the newest route and answers its join with the latest snapshot. Size S. Not reproduced (216/216).
 - B (timing tests foundation remote pace AC-13 and 036 AC-1). Other agents' browser runs load the CPUs while the gate's serial pass runs. Fixes: AC-13 subtracts an idle window's TaskDuration; the gate-side options are the human's call (see the gate draft). Size S. The budgets stay as they are, since they are product.md baselines.
 - F (048 AC-5 'account-error ends under the submit button's top', CI on #147). Weight 500 loads only when the error line appears, and the three boxes are read across the font swap. Fix: wait_for_fonts once the error shows, and read the boxes in one evaluate. Size XS.
+
+From m-8's close review: B-094's full gate failed test_spec_035_ac08_ac09_contrast_and_french.py::test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour[chromium-phone-7] once. The cell's data-flash was already empty when read, a timing race under load; it passed 48/48 on rerun.
 <!-- SECTION:NOTES:END -->

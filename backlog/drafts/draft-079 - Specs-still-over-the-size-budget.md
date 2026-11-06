@@ -12,7 +12,7 @@ dependencies: []
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-From m-7's close review: DRAFT-058's successor. Still over about 15 KB or 20 criteria on main: account/erasure.md 16.6 KB, platform/realtime.md 17.7 KB, gameplay/co-op.md 16.4 KB with 21 criteria, social/catch-up.md 21 criteria, gameplay/rules.md 15.6 KB with 20, lobby/joining.md 15.5 KB. gameplay/results.md sits at 19 criteria. A future 'Spec splits 3' bet.
+From m-7's close review: DRAFT-058's successor. Still over about 15 KB or 20 criteria on main: account/erasure.md 16.6 KB, platform/realtime.md 17.7 KB, gameplay/co-op.md 16.4 KB with 21 criteria, social/catch-up.md 21 criteria, gameplay/rules.md 15.6 KB with 20, lobby/joining.md 15.5 KB. gameplay/results.md sits at 19 criteria. After m-8: client/hud.md is 15.4 KB with 15 criteria (B-091), gameplay/viewport.md has 21 criteria (B-094), and specs/_design/cells.md is 18.1 KB (B-094). A future 'Spec splits 3' bet.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Definition of Done
