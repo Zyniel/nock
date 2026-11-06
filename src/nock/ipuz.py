@@ -79,10 +79,9 @@ _CLUE_KEYS = (*_REQUIRED_CLUE_KEYS, "enumeration", *_IGNORED_CLUE_KEYS)
 _MAX_AUTHOR_LENGTH = 200
 _DATE_PATTERN = re.compile(r"([0-9]{2})/([0-9]{2})/([0-9]{4})")
 _ENUMERATION_PATTERN = re.compile(
-    "[0-9]+(?:[-. '\N{RIGHT SINGLE QUOTATION MARK}][0-9]+)*"
+    "[1-9][0-9]*(?:[-. '\N{RIGHT SINGLE QUOTATION MARK}][1-9][0-9]*)*"
 )
 _COUNT_PATTERN = re.compile(r"[0-9]+")
-_BYTE_ORDER_MARK = "\N{ZERO WIDTH NO-BREAK SPACE}"
 _DASHED_LETTERS = "TRBL"
 _DASH_STYLE_KEYS = ("dashed", "dotted")
 _FORCE_OF_TEXT = {"1": 1, "2": 2, "3": 3, "4": 4}
@@ -225,11 +224,11 @@ def _object_without_repeated_keys(pairs: list[tuple[str, object]]) -> JsonObject
 def _parse_object(text: str) -> JsonObject:
     """Parse the text of a file into a JSON object.
 
-    One byte order mark at the start is skipped; a second one is not JSON.
+    A byte order mark at the start is not JSON and is refused.
     """
     try:
         data = json.loads(
-            text.removeprefix(_BYTE_ORDER_MARK),
+            text,
             object_pairs_hook=_object_without_repeated_keys,
         )
     except IpuzError:
@@ -655,12 +654,13 @@ def _read_solution_values(solution: object) -> dict[Position, object]:
 def _is_solution_letter(found: object, expected: str) -> bool:
     """Tell whether a `solution` value is the expected letter, one character.
 
-    Case and accents do not matter (rule 4 of `content/grids.md`).
+    The letter must be upper-case; accents do not matter (rule 4 of
+    `content/grids.md`).
     """
     if not isinstance(found, str):
         return False
     composed = unicodedata.normalize("NFC", found)
-    if len(composed) != 1:
+    if len(composed) != 1 or composed.islower():
         return False
     try:
         return normalize_answer(composed) == expected
