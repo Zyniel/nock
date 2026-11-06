@@ -21,8 +21,9 @@ invisible character: a format, control, space or separator character other
 than the plain space, the line feed and the tab (Unicode categories Cf, Cc, Zs,
 Zl and Zp). The code standards write such a character as a `\N{NAME}` escape
 (CLAUDE.md); a raw one cannot be seen in a review. The one exception is the
-zero-width joiner between two emoji, which joins them into one (B-108). With `--check-repository`, the
-script scans every file git tracks instead, as a static step of scripts/gate.py.
+zero-width joiner between two emoji, which joins them into one (B-108). With
+`--check-repository`, the script scans every file git tracks instead, as a
+static step of scripts/gate.py.
 
 This is a guardrail, not a sandbox: it covers the file-editing tools, not
 shell commands. The reviewer and the per-phase git commits are the backstop.
