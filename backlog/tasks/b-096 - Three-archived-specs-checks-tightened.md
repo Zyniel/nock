@@ -31,7 +31,7 @@ From DRAFT-011, 013 and 014: spec 025's vote banner test leaves SERIAL_TEST_FILE
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -48,6 +48,8 @@ Gate: the full gate in Chromium
 Test-writer: 025 AC-7 measures no duration (BANNER_GONE_MS is a bounded wait), 5/5 green with 4 workers, so it leaves SERIAL_TEST_FILES (lead). 048 AC-13 gains a document.getAnimations() check (CSSTransition allowed, as AC-13 allows transition) on the recap, account and ops replay states; an injected element.animate fails the 11 new tests while the 17 text-scan tests pass. 035 AC-9's scan binds {name} to the nicknames and {reaction} to fr.json's reactions (spec035_harness.unknown_texts gains an optional bound_values, default unchanged for its other users); an injected « Error : connection lost » fails the 16 page cases. {text} of note.message stays open, being free chat text.
 
 Reviewer round 1: APPROVE (it injected both regressions itself; 025 3/3 with 4 workers in three engines). Taken (test-writer): the missing 048 account and ops states in the run-time check, reaction_values requiring _label, the assert pinning the open scan's hole dropped, readability. Not taken, to a follow-up draft: 16 other users of unknown_texts still accept any « X : Y » text (chat's 022 AC-16 matters most).
+
+PR: #163.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
