@@ -574,8 +574,8 @@ class AccountStore:
 
         Returns:
             The records. The team-mates of each are in the order they were
-            saved, a nickname equal to an earlier one left out, as
-            `team_nicknames` does.
+            saved, a nickname equal to an earlier one left out except
+            FORMER_PLAYER_NICKNAME, as `team_nicknames` does.
         """
         with self._lock:
             record_rows = self._connection.execute(
@@ -593,7 +593,8 @@ class AccountStore:
         for code, nickname in teammate_rows:
             if code not in teammates_by_code:
                 teammates_by_code[code] = []
-            if nickname not in teammates_by_code[code]:
+            is_erased = nickname == FORMER_PLAYER_NICKNAME
+            if is_erased or nickname not in teammates_by_code[code]:
                 teammates_by_code[code].append(nickname)
         records: list[HistoryRecord] = []
         for code, grid_number, width, height, finished_at, elapsed_ms in record_rows:

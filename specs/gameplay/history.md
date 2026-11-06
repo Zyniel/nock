@@ -25,7 +25,7 @@ terminées », where a grid can be played again.
 1. A room keeps its `grid_solved`'s time and `elapsed_ms`, by `replay` too. A
    summary (`lobby/summaries.md` rule 1) adds `finished_at` (that time, UTC) and
    `elapsed_ms`, null unless solved; a room stored without them takes them from
-   its log.
+   its log at each read, storing nothing.
 2. `nock.history` holds the device's records, a JSON array of `{"code",
    "grid", "width", "height", "finished_at", "elapsed_ms", "teammates"}`,
    newest first then by code, at most 100. Not an array reads as none; an item
@@ -38,8 +38,9 @@ terminées », where a grid can be played again.
 3. A solved summary writes its room's record, replacing that code's; the
    team-mates are its players but names exactly equal to this device's
    identity nickname for the room. The catalogue page writes one per summary
-   of « Mes salons »; the room page, once solved (once per load, untested),
-   asks its own summary and writes it. A failed request writes nothing.
+   of « Mes salons »; the room page, once solved, asks its own summary once
+   per load (untested) and writes it. A failed request writes nothing and is
+   not sent again.
 4. Signed in (`account/account.md`), the catalogue page adds the records of
    `GET /api/account/history`, one per code, the account's winning, in rule
    2's order, never stored on the device; a failed or malformed answer, one
@@ -105,8 +106,10 @@ terminées », where a grid can be played again.
 - A removed player gets no summary, so no record (`lobby/summaries.md` AC-1).
 - A team-mate with this device's nickname is left out too (AC-2).
 - One grid finished in two rooms gives two records (AC-2).
-- A room finished while away is recorded when the device next sees it solved,
-  while it exists (AC-3).
+- A room finished while away, or whose room page's request failed, is
+  recorded when the device next sees it solved, while it exists (AC-3).
+- Two erased team-mates read « Ancien joueur » twice (`lobby/summaries.md`
+  AC-5, `account/erasure.md` AC-18).
 
 ## Out of scope
 

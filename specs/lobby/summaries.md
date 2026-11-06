@@ -30,7 +30,8 @@ room they are no member of.
    at most 100 keys, and answers one summary per room that some key holds a
    member's token for, newest last activity first, then code order. A summary is
    the code, the grid number (null outside the catalogue), width, height, the
-   members' nicknames (past players in leaving order, then players, each once),
+   members' nicknames (past players in leaving order, then players, each once
+   but `--`, once per erased member),
    the last activity (the last edit time, UTC), `solved` and the result fields
    of `gameplay/history.md`; no letter. The answer never says why a room is left
    out; it is not counted by the wrong-code throttle, makes no room live and
@@ -81,6 +82,9 @@ room they are no member of.
   `2026-10-14 08:30:00Z` (a space for the `T`), or `2026-10-14T08:30:00` (no
   time zone), shows « Impossible de charger vos salons. » and no row, while
   `2026-10-14T08:30:00.5Z` lists the row.
+- **AC-5** In room A, where Bob joined before Zoé and Lou, who then deleted
+  their accounts, Bob's token gets one summary whose players are `BOB`, `--`,
+  `--`.
 
 ## Edge cases
 
@@ -103,7 +107,8 @@ room they are no member of.
 
 ## Code
 
-- `src/nock/room.py`: `room_summary`; `src/nock/hub.py`: `room_summaries`;
+- `src/nock/room.py`: `room_summary`, `team_nicknames`; `src/nock/hub.py`:
+  `room_summaries`;
   `src/nock/server.py`: the summaries route.
 - `web/src/lib/myRooms.ts`, `web/src/lib/MyRooms.svelte`: « Mes salons »;
   `FocusableLink.svelte`: its links.

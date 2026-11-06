@@ -205,6 +205,10 @@ ZOE_NICKNAME = "Zoé"
 ZOE_STORED = "ZOÉ"  # as the server stores her nickname (spec 012 decision 12)
 ZOE = "p-zoe"
 TZ = "token-of-zoe-0001"
+LOU_EMAIL = "lou.probe@example.org"
+LOU_NICKNAME = "Lou"
+LOU = "p-lou"
+TL = "token-of-lou-0001"
 # A sweep every 0.1 s of real time, on which no tick changes anything.
 FAST_SWEEP_CONFIG = NO_TICK_CONFIG.model_copy(update={"expiry_sweep_seconds": 0.1})
 
