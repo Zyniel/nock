@@ -213,9 +213,12 @@ def nock_process(database: Path, log_path: Path) -> Generator[NockServer]:
 
 
 # Opens a socket and sends a join as soon as it is open; reports the first
-# message it received, or the close that came instead. Gives up after 5 seconds.
+# message it received, or the close that came instead. Gives up after `waitMs`:
+# AC-8 sets no time for the join, so the wait is the server's start wait. It was
+# 5 s, the likely cause of the join's failures under load (DRAFT-024, B-100): the
+# subprocess shares the machine with the other browser runs.
 FIRST_MESSAGE_SCRIPT = """
-async ({ url, join }) => {
+async ({ url, join, waitMs }) => {
   const socket = new WebSocket(url);
   let firstMessage = null;
   let closeCode = null;
@@ -227,7 +230,7 @@ async ({ url, join }) => {
   socket.addEventListener("close", (event) => {
     closeCode = event.code;
   });
-  const deadline = performance.now() + 5000;
+  const deadline = performance.now() + waitMs;
   const waitFor = async (condition) => {
     while (!condition() && closeCode === null && performance.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -272,7 +275,11 @@ def test_ac8_a_join_on_the_room_of_nock_database_gets_a_snapshot_first(
 
     with nock_process(database, tmp_path / LOG_FILE_NAME) as server:
         page.goto(f"{server.base_url}/")
-        arguments = {"url": socket_url(server.base_url, code), "join": join}
+        arguments = {
+            "url": socket_url(server.base_url, code),
+            "join": join,
+            "waitMs": SERVER_START_SECONDS * 1000,
+        }
         result = page.evaluate(FIRST_MESSAGE_SCRIPT, arguments)
 
     assert result["opened"] is True

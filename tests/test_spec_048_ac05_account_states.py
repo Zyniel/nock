@@ -29,6 +29,10 @@ Readings of the spec's wording:
   page and none is the `id` `account-error` had.
 - Each field is filled, then its value is checked, then the form is submitted
   with `account-email-submit`.
+- An answer line under or between the form's controls is placed once the fonts
+  its text shows are loaded (`wait_for_fonts`: the error line's weight 500 loads
+  only when the line shows), and the boxes compared are read in one evaluate, so
+  no font swap falls between two of them (B-100).
 """
 
 from __future__ import annotations
@@ -39,10 +43,12 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
+from fonts_ready import wait_for_fonts
 from nock.catalogue import Catalogue
 from spec033_harness import AccountServer, account_live_server
-from spec042_harness import box_of
+from spec042_harness import Box, box_of
 from spec043_harness import INK, RED, RULE, fr_format, fr_value
+from spec045_harness import boxes_of, required_box
 from spec046_harness import (
     OpenWindow,
     button_colour_problems,
@@ -125,11 +131,22 @@ def signed_out_page(
     return page, mock
 
 
+def placed_boxes(page: Page, test_ids: list[str]) -> dict[str, Box]:
+    """The boxes of `test_ids`, read in one evaluate once the fonts are loaded."""
+    wait_for_fonts(page)
+    boxes = boxes_of(page, test_ids)
+    placed: dict[str, Box] = {}
+    for test_id in test_ids:
+        placed[test_id] = required_box(boxes, test_id)
+    return placed
+
+
 def between_problems(page: Page, test_id: str) -> list[str]:
     """`test_id` lies between `account-email-input` and `account-email-submit`."""
-    line = box_of(page.get_by_test_id(test_id))
-    field = box_of(page.get_by_test_id("account-email-input"))
-    submit = box_of(page.get_by_test_id("account-email-submit"))
+    boxes = placed_boxes(page, [test_id, "account-email-input", "account-email-submit"])
+    line = boxes[test_id]
+    field = boxes["account-email-input"]
+    submit = boxes["account-email-submit"]
     problems: list[str] = []
     if line.top < field.bottom - 1.0:
         problems.append(f"{test_id} starts above the input's bottom")
@@ -285,8 +302,8 @@ def test_ac5_a_new_submit_answered_202_clears_the_error_and_confirms_under_the_b
     expect(field).not_to_have_attribute("aria-invalid", "true")
     problems = border_colour_problems(field, "input", RULE)
     problems.extend(done_line_problems(sent, "account-sent"))
-    submit = box_of(page.get_by_test_id("account-email-submit"))
-    if box_of(sent).top < submit.bottom - 1.0:
+    boxes = placed_boxes(page, ["account-sent", "account-email-submit"])
+    if boxes["account-sent"].top < boxes["account-email-submit"].bottom - 1.0:
         problems.append("account-sent is not under account-email-submit")
 
     assert expected == SENT_TEXT

@@ -91,6 +91,7 @@ from nock.room import (
     join_room,
     new_room,
 )
+from page_ready import wait_for_room_page
 from spec013_harness import make_page
 from spec035_harness import (
     FX01_CLUES,
@@ -814,11 +815,23 @@ class MockRoomSocket:
     that sent it: without the answer, the page takes 4 s without a frame from the
     server for a lost connection (spec 017, AC-4), so a step that takes longer on a
     slow engine would find the page `reconnecting`.
+
+    A page can still lose its socket under load (a pong late by 4 s) and open a
+    new one (B-100: 033 AC-9 read seq 5 instead of 105). The mock then behaves
+    like the real server: `send` writes to the page's newest socket, and the join
+    of a socket after the first is answered with the latest snapshot: the last
+    snapshot the test sent, at the highest seq the test sent since, as the
+    server's snapshot includes every event before it. The events the test sent
+    after that snapshot are taken as included: a test whose events change what a
+    snapshot holds (letters, the roster) sends its own snapshot after a
+    reconnection. The join of the first socket is the test's to answer.
     """
 
     def __init__(self) -> None:
         self.received: list[str] = []
         self.routes: list[WebSocketRoute] = []
+        self._latest_snapshot: dict[str, object] | None = None
+        self._latest_seq = 0
 
     def handle(self, route: WebSocketRoute) -> None:
         """Take one socket the page opened (the handler of `route_web_socket`).
@@ -836,16 +849,42 @@ class MockRoomSocket:
     def _record_and_answer(self, route: WebSocketRoute, message: str | bytes) -> None:
         text = message if isinstance(message, str) else message.decode("utf-8")
         self.received.append(text)
-        if parse_client_message(text) == Ping():
+        request = parse_client_message(text)
+        if request == Ping():
             route.send(Pong().model_dump_json())
+        elif isinstance(request, Join) and route is not self.routes[0]:
+            self._answer_rejoin(route)
+
+    def _answer_rejoin(self, route: WebSocketRoute) -> None:
+        if self._latest_snapshot is None:
+            return  # no snapshot yet: the test answers this join itself
+        snapshot = dict(self._latest_snapshot)
+        snapshot["seq"] = self._latest_seq
+        route.send(json.dumps(snapshot))
+
+    def _remember(self, frame: str) -> None:
+        """Keep the last snapshot sent and the highest seq sent."""
+        try:
+            parsed = json.loads(frame)
+        except json.JSONDecodeError:
+            return  # a frame that is not JSON changes no state of the room
+        if not isinstance(parsed, dict):
+            return
+        seq = parsed.get("seq")
+        if parsed.get("type") == "snapshot":
+            self._latest_snapshot = parsed
+            self._latest_seq = 0
+        if isinstance(seq, int) and seq > self._latest_seq:
+            self._latest_seq = seq
 
     def send(self, frame: str) -> None:
-        """Send one server frame to the page on its first socket.
+        """Send one server frame to the page on its newest socket.
 
         Args:
             frame: The frame's JSON text.
         """
-        self.routes[0].send(frame)
+        self._remember(frame)
+        self.routes[-1].send(frame)
 
     def frames_without_pings(self) -> list[str]:
         """The frames the page sent, without its keep-alive `ping` frames.
@@ -1029,6 +1068,7 @@ def open_room(
     mock = MockRoomSocket()
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/{ROOM_CODE}")
+    wait_for_room_page(page)
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana", timeout=WAIT_TIMEOUT_MS)
     nickname_input.press("Enter", timeout=WAIT_TIMEOUT_MS)

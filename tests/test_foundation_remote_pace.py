@@ -36,8 +36,13 @@ Choices where the spec leaves room:
 - AC-13, "main-thread time": the renderer main thread's time in tasks, the
   `TaskDuration` of CDP `Performance.getMetrics` (under the CPU throttling),
   read once before Bob's first `select_cell` and once after the page has received
-  the 100 `selection_moved`. The page's cost per `selection_moved` is the
-  difference divided by 100.
+  the 100 `selection_moved`: the burst window. `TaskDuration` is wall time, so it
+  also holds what the page does anyway (its timers, its pings) and, on a machine
+  that other browser runs load, that work stretched by the load (B-100). So the
+  same reads are made over an idle window of the burst window's length, once the
+  page has settled after the burst, with nothing sent to the page; the page's
+  cost per `selection_moved` is the burst window's time less the idle window's,
+  divided by 100. The budget is unchanged.
 - AC-13, "100 `select_cell` in a row": `product.md` rule 25 lets a connection have
   at most 100 inputs posted and not yet applied, so Bob sends them in 10 batches
   of 10, each followed by a ping whose pong he waits for.
@@ -46,8 +51,9 @@ Choices where the spec leaves room:
   burst has been relayed) and the counter itself, an init script's `message`
   listener on each socket that counts the frames holding `selection_moved` (a
   substring test). Both are counted as the page's: they make the measure
-  stricter by microseconds. The page's own pings and their pongs during the
-  burst are frames that change no cell, so they count too.
+  stricter by microseconds (the idle window has no counter reads). The page's
+  own pings and their pongs fall in both windows alike (one every 2 s), so they
+  mostly cancel out.
 - The simulated players send no keep-alive ping, so this module's registry
   lifts the silence timeout of `platform/realtime.md` (6 s): a player quiet
   during the setup would otherwise be disconnected and lose their cursor. Every
@@ -335,6 +341,22 @@ def wait_for_selection_frames(page: Page, count: int) -> None:
         waited_ms += RELAY_WAIT_MS
 
 
+def idle_main_thread_ms(page: Page, session: CDPSession, window_ms: float) -> float:
+    """The page's main-thread time over `window_ms` of wall time with nothing sent.
+
+    Args:
+        page: The room page, settled.
+        session: The page's CDP session, with `Performance.enable` sent.
+        window_ms: The length of the idle window, in ms.
+
+    Returns:
+        The `TaskDuration` the page spent in tasks over the window, in ms.
+    """
+    before_ms = main_thread_ms(session)
+    page.wait_for_timeout(window_ms)
+    return main_thread_ms(session) - before_ms
+
+
 def send_selection_burst(bob: Peer, cell: Cell) -> None:
     """Bob's 100 `select_cell` for the cell he holds, across, in batches of 10."""
     for _ in range(SELECTION_BURST // BATCH_SIZE):
@@ -419,19 +441,25 @@ def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
         phone.page.wait_for_timeout(SETTLE_MS)
         frames_before = selection_frames_received(phone.page)
 
+        burst_started_at = time.monotonic()
         before_ms = main_thread_ms(phone.session)
         send_selection_burst(bob, bobs_cell)
         phone.page.wait_for_timeout(RELAY_WAIT_MS)
         wait_for_selection_frames(phone.page, frames_before + SELECTION_BURST)
         after_ms = main_thread_ms(phone.session)
+        burst_window_ms = (time.monotonic() - burst_started_at) * 1000
 
         assert selection_frames_received(phone.page) == frames_before + SELECTION_BURST
         assert bob.errors() == []
         expect_cursors_shown(phone.page, len(peers))
+        phone.page.wait_for_timeout(SETTLE_MS)
+        idle_ms = idle_main_thread_ms(phone.page, phone.session, burst_window_ms)
 
-    per_selection_ms = (after_ms - before_ms) / SELECTION_BURST
+    burst_ms = after_ms - before_ms
+    per_selection_ms = (burst_ms - idle_ms) / SELECTION_BURST
     assert per_selection_ms <= MAIN_THREAD_BUDGET_MS, (
         f"main-thread time per selection_moved that changes no cell: "
         f"{per_selection_ms:.2f} ms on average over {SELECTION_BURST}, limit "
-        f"{MAIN_THREAD_BUDGET_MS:.0f} ms ({after_ms - before_ms:.0f} ms in all)"
+        f"{MAIN_THREAD_BUDGET_MS:.0f} ms ({burst_ms:.0f} ms over the burst's "
+        f"{burst_window_ms:.0f} ms, less {idle_ms:.0f} ms idle over as long)"
     )
