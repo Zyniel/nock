@@ -4,7 +4,7 @@ title: The ipuz reader's gaps and enumerations
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T02:32:00Z'
+updated_date: '2026-11-06T02:36:00Z'
 labels:
   - domain:ipuz
 milestone: m-8
@@ -67,4 +67,6 @@ The human's answers (chat, 2026-11-06):
 The task is unassigned; the spec changes for 2, 4 and 7 go through the spec-writer and spec-checker, then tests, code and one review round.
 
 Reviewer round 3 (first on the human's revised spec): CHANGES REQUESTED. Its mutations show the code is correct and every answer of the human is pinned. One blocking gap: the AC-15 empty-style test passes when that check is removed, because the break-edge check also names (2, 2). Lead decision: the human's answers rewrote the spec, so this counts as the revised task's first review and a confirming round follows. Taken: the blocking assertion; a count of 10 or more tested; the leading-zero refusal message and dead code; test names that match the upper-case rule.
+
+Confirming review: APPROVE. M7 (empty-style check removed) and M2 (one-digit counts) now fail the tests. Note: 5bac515 changed tests and code together; the reviewer checked that the new tests pass on the previous code, so no test was fitted to the code.
 <!-- SECTION:NOTES:END -->
