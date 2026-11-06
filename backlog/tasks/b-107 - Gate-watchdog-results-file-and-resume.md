@@ -1,10 +1,10 @@
 ---
 id: B-107
 title: Gate watchdog, results file and resume
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-06T13:14:00Z'
+updated_date: '2026-11-06T13:46:00Z'
 labels:
   - follow-up
   - tooling
@@ -27,11 +27,11 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -54,3 +54,18 @@ Built by the lead's builder (Opus) from the design. Deviations accepted: the wor
 
 Reviewer round 1: APPROVE, no blocking findings (it checked the watchdog at 0.1 min, resume, shards 1-4 = 8885 with an identical union, the lock on SIGINT). Taken: stop the tree before reporting; --resume's OK rests on what the selection really left out; shard wording per pass; non-finite --pass-timeout refused; the double load wait counted in the comment. Not taken, to a follow-up draft: the POSIX stop without ps (read /proc) and the race with a browser started during the listing (SIGSTOP the tree first); a fingerprint taken again at the end; pruning old branch folders by age.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Upkeep, tooling, no spec. New tooling behaviour approved by the human on 2026-11-06 (DRAFT-072 queued as a tooling PR); no new dependency (pytest-timeout not approved). Files: scripts/gate.py, scripts/gate_browsers.py, CLAUDE.md.
+
+- **Watchdog**: each pytest pass has a limit (75 min parallel, 20 min serial; `--pass-timeout`). Past it, the gate stops the whole process tree (taskkill /T on Windows, the descendants on POSIX; no new session, so role_gate's own kill still reaches it), then names each worker's running test from progress files the plugin writes. Exit 124.
+- **Results folder**: `<git common dir>/nock-gate-results/<branch>/<run>/` holds run.json, summary.txt, junit XML and JSON lines per pass; the newest 20 runs per branch are kept.
+- **Orphans**: a warning lists Playwright browser processes running when the gate takes its lock; it never kills them.
+- **Serial pass**: it waits up to 120 s for the load to fall under 0.75 × CPUs, and prints the load beside its result. Its failures (20 at most) are re-run once in a fresh process, printed as « N test(s) passed on re-run under load L (failed first under load L0) » with their node ids, or « failed again ». Never re-run: a watchdog stop, pytest's usage errors, the parallel pass. Budgets untouched.
+- **`--resume`** leaves out the tests already passed on the same checkout (commit plus uncommitted changes, by fingerprint). **`--shard I/N`** runs one of N shards of each pass's test files, sorted and dealt round robin.
+- **Design**: by the Plan agent (watchdog in gate.py, results written by the plugin, shards by file); the builder's deviations are listed in the notes.
+- **Reviewer**: APPROVE in round 1 (the watchdog at 0.1 min, resume, shards 1-4 = 8885 with an identical union, the lock released on SIGINT). Taken: stop the tree before reporting; --resume's OK rests on what the selection really left out; non-finite limits refused; wording. Follow-up: the POSIX stop without `ps` and the race with a newly started browser; a fingerprint taken again at the end; pruning old branch folders.
+- **Gate**: the full gate in Chromium passed with the new code (8886 parallel; serial at load 2.9 of 4 CPUs; results folder written). Windows paths (taskkill, the PowerShell query, GetSystemTimes) are untried; each falls back to a warning or « load unknown » rather than failing.
+<!-- SECTION:FINAL_SUMMARY:END -->
