@@ -1,10 +1,10 @@
 ---
 id: B-090
 title: One helper for refused characters, MAX_PLAYERS named where it lives
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T01:54:00Z'
+updated_date: '2026-11-06T15:36:00Z'
 labels:
   - domain:chat
   - domain:serving
@@ -39,3 +39,17 @@ From DRAFT-067 and DRAFT-069. No behaviour change: one helper holds the refused 
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Spec: lobby/rooms.md Code section (MAX_PLAYERS in protocol.py); chat.md and serving.md Code sections if the helper moves
+Tests: unchanged (chat and NOCK_DATABASE tests pass as they are)
+Quick gate: uv run python scripts/gate.py --specs chat,serving,rooms --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Spec-checker: APPROVED (Code sections only). Lead's decision: no new test (the criterion asks that the existing chat and NOCK_DATABASE tests pass unchanged), so no test-writer phase; the helper is is_refused_character(character, allowed) in src/nock/protocol.py.
+<!-- SECTION:NOTES:END -->
