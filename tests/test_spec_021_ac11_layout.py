@@ -36,6 +36,7 @@ from spec024_harness import (
     COLOUR_CONTRAST_JS,
     WAIT_TIMEOUT_MS,
     cell_at,
+    close_checking_no_rejoin,
     expect_seq,
     make_walker,
     open_context_page,
@@ -57,6 +58,7 @@ CONTEXTS = ["desktop", "touch"]
 FLAG_BUTTON = "flag-button"
 EIGHT_NICKNAMES = ["Ana", "Bob", "Cleo", "Dan", "Eve", "Fay", "Gus", "Hal"]
 FEED_ITEMS = 100
+FEED_SETUP = f"the {FEED_ITEMS} feed items"
 MIN_TARGET_PX = 24.0
 SIZE_TOLERANCE_PX = 0.5
 EPSILON = 1.0
@@ -181,10 +183,11 @@ def open_layout_room(
         if salon.get_attribute("hidden", timeout=WAIT_TIMEOUT_MS) is None:
             page.get_by_test_id("chat-toggle").click(timeout=WAIT_TIMEOUT_MS)
         expect(salon).to_be_hidden()
+        mock.expect_no_rejoin(FEED_SETUP)
     except BaseException:
         close()
         raise
-    return page, close
+    return page, close_checking_no_rejoin(mock, close, FEED_SETUP)
 
 
 # ---- The checks ----

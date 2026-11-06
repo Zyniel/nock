@@ -59,6 +59,7 @@ from nock.protocol import (
 )
 from nock.room import LogEntry, PlayerRecord, RoomConfig, RoomState, join_room, new_room
 from nock.server import create_app
+from page_ready import wait_for_room_page
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 ROOM_CODE = "ABCDEF"
@@ -440,6 +441,7 @@ def open_room(
     mock = MockRoomSocket(page)
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/ABC123")
+    wait_for_room_page(page)
     nickname_input = page.get_by_test_id("nickname-input")
     nickname_input.fill("Ana", timeout=FORM_TIMEOUT_MS)
     nickname_input.press("Enter", timeout=FORM_TIMEOUT_MS)

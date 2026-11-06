@@ -75,6 +75,7 @@ from nock.protocol import (
     grid_view,
     parse_client_message,
 )
+from page_ready import wait_for_room_page
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
 ROOM_CODE = "ABC123"
@@ -430,6 +431,7 @@ def open_nickname_form(page: Page, base_url: str) -> MockRoomSocket:
     mock = MockRoomSocket()
     page.route_web_socket(re.compile(r".*/api/rooms/ABC123/ws$"), mock.handle)
     page.goto(f"{base_url}/r/{ROOM_CODE}")
+    wait_for_room_page(page)
     expect(page.get_by_test_id("nickname-input")).to_be_visible(timeout=WAIT_TIMEOUT_MS)
     wait_for_fonts(page)
     return mock

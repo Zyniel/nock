@@ -157,7 +157,8 @@ the account brings and forgets them when the account leaves it.
 
 - `web/src/lib/account.ts`, `AccountDialog.svelte`, `AccountEmailForm.svelte`,
   `AccountPage.svelte`, `RoomMenu.svelte`, `CataloguePage.svelte`,
-  `RoomPage.svelte` (its status and its `PUT`).
+  `RoomPage.svelte` (its status and its `PUT`), `FocusableLink.svelte` (their
+  links), `wideWindow.ts` (the catalogue page's wide-window test).
 - Tests: those of the pointers (033 AC-2, AC-5, AC-9, AC-11; 046 AC-3; 048
   AC-3 to AC-5), in `tests/test_spec_NNN_*`; `tests/test_my_account_*` (AC-1
   for its open page, AC-5 to AC-8).
