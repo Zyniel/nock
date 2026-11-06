@@ -1,10 +1,10 @@
 ---
 id: B-096
 title: Three archived specs' checks tightened
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T10:56:00Z'
+updated_date: '2026-11-06T11:30:00Z'
 labels:
   - tooling
 milestone: m-9
@@ -21,16 +21,16 @@ From DRAFT-011, 013 and 014: spec 025's vote banner test leaves SERIAL_TEST_FILE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The three checks are tightened and fail on the regression each draft names
+- [x] #1 The three checks are tightened and fail on the regression each draft names
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -49,3 +49,16 @@ Test-writer: 025 AC-7 measures no duration (BANNER_GONE_MS is a bounded wait), 5
 
 Reviewer round 1: APPROVE (it injected both regressions itself; 025 3/3 with 4 workers in three engines). Taken (test-writer): the missing 048 account and ops states in the run-time check, reaction_values requiring _label, the assert pinning the open scan's hole dropped, readability. Not taken, to a follow-up draft: 16 other users of unknown_texts still accept any « X : Y » text (chat's 022 AC-16 matters most).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Milestone m-9 « Tidy tests and tooling ». Tooling task, no spec change; tests of v1.1.0 specs tightened (specs/_archive untouched).
+
+- **AC #1** (the three checks tightened, failing on each draft's regression):
+  - DRAFT-011: `tests/test_spec_025_ac07_vote_banner.py` measures no duration since spec 047, so it leaves SERIAL_TEST_FILES (`scripts/gate_browsers.py`). 5/5 and 3/3 runs with 4 workers, three engines.
+  - DRAFT-013: `tests/test_spec_048_ac13_no_spinner.py` adds a `document.getAnimations()` run-time check (CSS transitions allowed, as AC-13 allows them) on every state of the shared recap, the account page (9) and the ops page (6). An injected `element.animate` fails the new tests while the text scans pass.
+  - DRAFT-014: spec 035 AC-9's language scan binds `{name}` to the nicknames and `{reaction}` to fr.json's reactions (`tests/spec035_harness.py`, optional `bound_values`). An injected « Error : connection lost » fails all 16 page cases.
+- **Reviewer**: APPROVE, round 1 (it injected both regressions itself). Taken: the missing 048 states, `reaction_values` requiring `_label`, the assertion pinning the open scan's hole dropped. Follow-up: 16 other `unknown_texts` users still accept any « X : Y » text.
+- **Gate**: full gate in Chromium passed (8877 parallel).
+<!-- SECTION:FINAL_SUMMARY:END -->
