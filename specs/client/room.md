@@ -1,7 +1,7 @@
 ---
 area: client
 file: room
-status: done
+status: approved
 ---
 
 # client/room - The room panel (« Salon ») and the notes
@@ -151,7 +151,7 @@ and the scrim. The badge: `_design/foundation.md`, « Components ».
 - `web/src/lib/RoomPage.svelte` (the Salon's state, the dot),
   `roomOverlays.ts` (what each action leaves open) and its parts
   `Salon.svelte`, `PlayersPanel.svelte`, `RoomNote.svelte`, `NoteSlot.svelte`
-  (the note slot); `chat.ts` (badge, dot); `roomSession.ts` (what makes a
-  note).
+  (the note slot); `FocusableLink.svelte` (the players' link); `chat.ts`
+  (badge, dot); `roomSession.ts` (what makes a note).
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`;
   `tests/test_room_*` for AC-8.

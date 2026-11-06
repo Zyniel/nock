@@ -1,7 +1,7 @@
 ---
 area: client
 file: menus
-status: done
+status: approved
 ---
 
 # client/menus - The room's menus, popovers and sheets
@@ -165,6 +165,6 @@ host settings and account »; « Layers ». Menus, switches: `_design/foundation
   Tab out), and its parts: `RoomPopover.svelte`, `AideMenu.svelte`,
   `RoomMenu.svelte`, `RoomSheet.svelte` (the sheets' shared dialog: the Tab
   trap, Escape, the backdrop), `HostSettings.svelte` and `AccountDialog.svelte`
-  (the two sheets the Menu opens).
+  (the two sheets the Menu opens); `FocusableLink.svelte` (their links).
 - Tests: `tests/test_spec_043_*`, `tests/spec043_harness.py`;
   `tests/test_menus_*` for AC-7 to AC-9, `tests/menus_harness.py`.

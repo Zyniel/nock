@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: summaries
-status: done
+status: approved
 ---
 
 # lobby/summaries - Room summaries and « Mes salons »
@@ -105,7 +105,8 @@ room they are no member of.
 
 - `src/nock/room.py`: `room_summary`; `src/nock/hub.py`: `room_summaries`;
   `src/nock/server.py`: the summaries route.
-- `web/src/lib/myRooms.ts`, `web/src/lib/MyRooms.svelte`: « Mes salons ».
+- `web/src/lib/myRooms.ts`, `web/src/lib/MyRooms.svelte`: « Mes salons »;
+  `FocusableLink.svelte`: its links.
 - Tests: those of the pointers, in `tests/test_spec_032_ac04_*`,
   `tests/test_spec_032_ac05_*`, `tests/test_spec_032_ac03_ac05_*` (AC-5),
   `tests/test_spec_032_ac06_*`, `tests/test_spec_046_ac11_ac13_*` (AC-11,

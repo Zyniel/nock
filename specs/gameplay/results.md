@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: results
-status: done
+status: approved
 ---
 
 # gameplay/results - End of game, recap and shared recap
@@ -244,7 +244,7 @@ error ».
   `code_for_share_token`; `server.py`: the recap routes.
 - `web/src/App.svelte`: the `/recap/<token>` route. `web/src/lib/`:
   `RoomPage.svelte` (the button), `RecapDialog.svelte`, `recap.ts`,
-  `copyLink.ts`, `SharePage.svelte`.
+  `copyLink.ts`, `SharePage.svelte`, `FocusableLink.svelte` (their links).
 - Tests: `tests/test_spec_028_*`, `test_spec_047_ac06_*` to `..._ac11_*`,
   `..._ac13_*`, `..._ac14_*`, `test_spec_048_ac01_ac02_*`;
   `tests/test_results_*` for AC-21 to AC-23.

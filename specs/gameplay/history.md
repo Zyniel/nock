@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: history
-status: done
+status: approved
 ---
 
 # gameplay/history - Finished grids, « Grilles terminées », « Rejouer »
@@ -120,8 +120,9 @@ terminées », where a grid can be played again.
 - `src/nock/room.py`: `solved_at`, `room_summary`.
 - `web/src/lib/`: `history.ts`, `dateTime.ts` (the date-time it reads),
   `HistoryList.svelte`, `HistoryItem.svelte`,
-  `playGrid.ts`, `CataloguePage.svelte` (the merge and the account history),
-  `RoomPage.svelte` (it writes the record once solved).
+  `PlayButton.svelte` (« Rejouer »), `playGrid.ts`, `CataloguePage.svelte`
+  (the merge and the account history), `RoomPage.svelte` (it writes the
+  record once solved).
 - Tests: `tests/test_spec_029_*` (AC-1 to AC-6), AC-13 of
   `tests/test_spec_046_ac11_ac13_*`, `tests/test_history_*` (AC-5),
   `tests/web/dateTime.test.ts`.
