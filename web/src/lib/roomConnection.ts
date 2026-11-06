@@ -3,7 +3,8 @@
 // limit, the retries with their jitter, the resend of what waited after a
 // loss, and the final closes. Besides the frame parser (roomSession.ts) it is
 // the only writer of `session.status`. No DOM and no runes: the browser comes
-// in through ConnectionDeps, and the page's side runs through ConnectionHooks.
+// in through ConnectionDeps and the ping worker (pingWorker.ts), and the
+// page's side runs through ConnectionHooks.
 
 import type { JoinPlan } from './joinRules'
 import { editMessage } from './roomCommands'
@@ -60,6 +61,72 @@ export const BROWSER_DEPS: ConnectionDeps = {
   now: () => performance.now(),
   random: () => Math.random(),
   isHidden: () => document.hidden,
+}
+
+// What the connection needs of the browser's Worker: the ping worker of
+// pingWorker.ts. Declared here because the Node tests type-check this module
+// without the DOM library; Node has no Worker, so there the page's own timer
+// keeps the ping ticks.
+interface PingWorker {
+  onmessage: (() => void) | null
+  onerror: (() => void) | null
+  postMessage(intervalMs: number): void
+  terminate(): void
+}
+
+declare const Worker: new (url: URL, options: { type: 'module' }) => PingWorker
+
+// The ping worker, or null when the browser has no Worker or cannot create one.
+// Vite builds pingWorker.ts into the app's assets: a file of its own origin.
+function createPingWorker(): PingWorker | null {
+  if (typeof Worker === 'undefined') {
+    return null
+  }
+  try {
+    return new Worker(new URL('./pingWorker.ts', import.meta.url), { type: 'module' })
+  } catch {
+    return null
+  }
+}
+
+// The heartbeat's ticks, running until stopped.
+interface PingTicks {
+  stop(): void
+}
+
+// Call `onTick` every PING_INTERVAL_MS (platform/reconnection.md rule 3). The
+// ticks come from the ping worker, whose timer the browser does not slow on a
+// hidden page. A page whose worker cannot be created, or reports an error,
+// keeps the pace with its own timer.
+function startPingTicks(onTick: () => void): PingTicks {
+  let pageTimer: ReturnType<typeof setInterval> | undefined
+  const worker = createPingWorker()
+
+  function stopWorker(): void {
+    if (worker !== null) {
+      worker.onmessage = null
+      worker.onerror = null
+      worker.terminate()
+    }
+  }
+
+  if (worker === null) {
+    pageTimer = setInterval(onTick, PING_INTERVAL_MS)
+  } else {
+    worker.onmessage = onTick
+    worker.onerror = () => {
+      stopWorker()
+      pageTimer = setInterval(onTick, PING_INTERVAL_MS)
+    }
+    worker.postMessage(PING_INTERVAL_MS)
+  }
+
+  return {
+    stop() {
+      stopWorker()
+      clearInterval(pageTimer)
+    },
+  }
 }
 
 // The page's side of the connection. Each hook runs synchronously.
@@ -146,7 +213,7 @@ export function createRoomConnection(
 
   // The next delay of the reconnection is `reconnectDelay(reconnectAttempt)`.
   let reconnectAttempt = 0
-  let pingTimer: ReturnType<typeof setInterval> | undefined
+  let pingTicks: PingTicks | null = null
   let silenceTimer: ReturnType<typeof setTimeout> | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
   // Watches the socket being opened for its connect limit.
@@ -156,9 +223,9 @@ export function createRoomConnection(
   let silenceStartedAt = 0
 
   function stopHeartbeat(): void {
-    clearInterval(pingTimer)
+    pingTicks?.stop()
     clearTimeout(silenceTimer)
-    pingTimer = undefined
+    pingTicks = null
     silenceTimer = undefined
   }
 
@@ -351,7 +418,7 @@ export function createRoomConnection(
 
   function startHeartbeat(opened: ConnectionSocket): void {
     stopHeartbeat()
-    pingTimer = setInterval(() => send({ type: 'ping' }), PING_INTERVAL_MS)
+    pingTicks = startPingTicks(() => send({ type: 'ping' }))
     restartSilenceTimer(opened)
   }
 
