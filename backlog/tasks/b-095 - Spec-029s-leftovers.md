@@ -4,7 +4,7 @@ title: Spec 029's leftovers
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T18:01:00Z'
+updated_date: '2026-11-06T18:03:00Z'
 labels:
   - domain:erasure
   - domain:history
@@ -33,7 +33,7 @@ From DRAFT-015: a history save across an erasure, the delete hook's SQLite write
 <!-- DOD:BEGIN -->
 - [x] #1 Spec change APPROVED by the spec-checker, or no spec change
 - [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
+- [x] #3 Tests committed before the code, or a tooling task
 - [ ] #4 Reviewer APPROVE within two rounds
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
