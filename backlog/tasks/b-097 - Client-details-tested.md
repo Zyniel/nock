@@ -1,10 +1,10 @@
 ---
 id: B-097
 title: Client details tested
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T09:32:00Z'
+updated_date: '2026-11-06T10:03:00Z'
 labels:
   - domain:shell
 milestone: m-9
@@ -23,18 +23,18 @@ From DRAFT-021: binary frames ignored, t() placeholders, a typeless frame told f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each of the three details has a test that fails without it
-- [ ] #2 shell AC-36 (new)
-- [ ] #3 shell AC-37 (new)
+- [x] #1 Each of the three details has a test that fails without it
+- [x] #2 shell AC-36 (new)
+- [x] #3 shell AC-37 (new)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -57,3 +57,16 @@ Test-writer: AC-36's binary case does not fail when onSocketMessage's non-string
 
 Reviewer round 1: APPROVE, three suggestions. Taken: move send_binary out of shell_harness.py into its only user (test-writer). Not taken, to a follow-up draft: AC-36 repeats part of AC-7's {"seq": 6} (tidy one criterion, or strengthen 040 AC-19's test to check seq 5 first); the binary case's only discriminating check is timed (SETTLE_MS 300 ms), acceptable as decoding is synchronous.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Milestone m-9 « Tidy tests and tooling ». No product code changes: the behaviour existed and was not proven.
+
+- **shell AC-36 (new)**: `tests/test_shell_malformed_events.py::test_ac36_a_binary_or_typeless_frame_is_dropped_and_event_6_then_applies` (binary frame, text frame without type). Removing parseFrame's string-type check fails the typeless case; a client decoding binary frames fails the binary case.
+- **shell AC-37 (new)**: `tests/test_shell_placeholders.py::test_ac37_a_placeholder_with_no_value_is_left_as_written`. Fails when t() blanks the missing placeholder or writes « undefined ».
+- **Task #1** (each of the three details has a test that fails without it): the two above.
+- **Reviewer**: APPROVE, round 1. Taken: send_binary moved to its only user. Follow-ups: AC-36 overlaps AC-7's `{"seq": 6}`; the binary case's discriminating check is timed (SETTLE_MS).
+- **Decisions**: shell.md at 21 criteria accepted as « about 20 »; AC-36's binary half does not catch the removal of onSocketMessage's redundant non-string check (a Blob fails JSON.parse anyway), accepted since it proves the rule; no implementer phase.
+- **Gate**: full gate in Chromium passed (8832 parallel, 162 serial).
+<!-- SECTION:FINAL_SUMMARY:END -->
