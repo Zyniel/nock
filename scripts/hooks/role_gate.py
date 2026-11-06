@@ -28,6 +28,13 @@ it wrote with Edit or Write name that checkout, and so do the directories its
 Bash commands name with `git -C`, `cd` and `--directory` (2026-10-21: an
 implementer that edited only through Bash was gated in the session's directory).
 
+The spec-writer runs no gate, but may not stop while a spec it changed (a
+domain spec or specs/product.md with a change not yet committed) reads another
+status than `draft`: a change makes a spec draft until the spec-checker
+approves it (CLAUDE.md, "Specs and criteria"; B-108). Only uncommitted changes
+count, since the lead commits a spec change only after the spec-checker's
+APPROVED and sets its status then.
+
 A failure the agent cannot fix, such as a stale test that only the test-writer
 may change, must not hold it for ever (2026-10-16: an implementer was blocked at
 every stop by a spec 018 test that spec 028 had made stale). When the hook
@@ -53,11 +60,20 @@ import tempfile
 from pathlib import Path
 
 # Which gate stage each role must pass before it is allowed to stop.
-# Roles that are not listed (spec-writer, reviewer, ...) are never blocked.
+# Roles that are not listed (spec-writer, reviewer, ...) run no gate; the
+# spec-writer has its own check (check_spec_writer).
 ROLE_STAGES: dict[str, str] = {
     "test-writer": "tests",
     "implementer": "full",
 }
+
+# The role whose changed specs must read `status: draft` when it stops.
+SPEC_WRITER_ROLE = "spec-writer"
+# The status line of a spec's front matter, and the status a change leaves.
+STATUS_LINE_PATTERN = re.compile(r"^status:\s*(\S+)\s*$", re.MULTILINE)
+DRAFT_STATUS = "draft"
+# The spec outside specs/<area>/ that carries a status line.
+PRODUCT_SPEC_PATH = "specs/product.md"
 
 MAX_OUTPUT_LINES = 80
 # Below the hook's 1,200 s in .claude/settings.json, which leaves time for uv and
@@ -147,6 +163,94 @@ def resolve_stage(role_name: str) -> str | None:
         if role_name == known_role or role_name.startswith(f"{known_role}-"):
             return stage
     return None
+
+
+def is_spec_writer(role_name: str) -> bool:
+    """Tell whether a role name is the spec-writer's.
+
+    Args:
+        role_name: Agent type or teammate name taken from the hook input.
+    """
+    return role_name == SPEC_WRITER_ROLE or role_name.startswith(f"{SPEC_WRITER_ROLE}-")
+
+
+def uncommitted_paths(project_root: Path) -> list[str]:
+    """Return the paths changed in the checkout and not yet committed.
+
+    Args:
+        project_root: The checkout whose changes are wanted.
+
+    Returns:
+        Repository-relative paths, staged, unstaged or untracked; empty when
+        git cannot tell.
+    """
+    paths: list[str] = []
+    changed = run_git(project_root, ["diff", "--name-only", "HEAD"])
+    untracked = run_git(project_root, ["ls-files", "--others", "--exclude-standard"])
+    for output in (changed, untracked):
+        if output is not None:
+            paths.extend(line for line in output.splitlines() if line)
+    return paths
+
+
+def specs_not_draft(project_root: Path) -> list[str]:
+    """Return the changed specs whose status is not `draft`.
+
+    Args:
+        project_root: The checkout the spec-writer worked in.
+
+    Returns:
+        "path (status: X)" for each domain spec or specs/product.md with an
+        uncommitted change whose status line is not draft; empty when none.
+    """
+    spec_paths = set(domain_spec_paths(project_root).values())
+    spec_paths.add(PRODUCT_SPEC_PATH)
+    problems: list[str] = []
+    for path in sorted(set(uncommitted_paths(project_root))):
+        if path not in spec_paths:
+            continue
+        spec_file = project_root / path
+        if not spec_file.is_file():
+            continue
+        match = STATUS_LINE_PATTERN.search(spec_file.read_text(encoding="utf-8"))
+        status = match.group(1) if match is not None else "missing"
+        if status != DRAFT_STATUS:
+            problems.append(f"{path} (status: {status})")
+    return problems
+
+
+def check_spec_writer(hook_input: dict[str, object], role_name: str) -> int:
+    """Hold the spec-writer while a spec it changed is not draft.
+
+    Args:
+        hook_input: The hook input.
+        role_name: The spec-writer's agent type or teammate name.
+
+    Returns:
+        0 when it may stop, 2 when it must set the status lines first.
+    """
+    project_root = checkout_to_check(hook_input)
+    state_path = block_state_path(hook_input, role_name)
+    if hook_input.get("stop_hook_active") is True:
+        fingerprint = checkout_fingerprint(project_root)
+        if fingerprint is not None and fingerprint == read_block_state(state_path):
+            clear_block_state(state_path)
+            return 0
+    problems = specs_not_draft(project_root)
+    if not problems:
+        clear_block_state(state_path)
+        return 0
+    write_block_state(state_path, checkout_fingerprint(project_root))
+    print(
+        f"{role_name} is not done yet: a spec it changed must read "
+        "`status: draft` until the spec-checker approves the change "
+        '(CLAUDE.md, "Specs and criteria"). Set the status line of:\n'
+        + "\n".join(f"- {problem}" for problem in problems)
+        + "\nIf one of them is not yours to change, say so in your report and "
+        "finish again without changing anything: the hook then lets you stop.",
+        file=sys.stderr,
+    )
+    return 2
 
 
 def run_git(project_root: Path, arguments: list[str]) -> str | None:
@@ -619,6 +723,8 @@ def main() -> int:
     agent_type = hook_input.get("agent_type")
     teammate_name = hook_input.get("teammate_name")
     role_name = str(agent_type or teammate_name or "")
+    if is_spec_writer(role_name):
+        return check_spec_writer(hook_input, role_name)
     stage = resolve_stage(role_name)
     if stage is None:
         return 0

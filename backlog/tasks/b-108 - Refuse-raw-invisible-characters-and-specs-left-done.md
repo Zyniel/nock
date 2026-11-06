@@ -1,10 +1,10 @@
 ---
 id: B-108
 title: Refuse raw invisible characters and specs left done
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-06T09:22:00Z'
+updated_date: '2026-11-06T11:41:00Z'
 labels:
   - follow-up
   - tooling
@@ -29,6 +29,14 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Tooling, no spec: scripts/hooks/guard_paths.py refuses raw Cf/Cc/Zs (ZWJ in emoji allowed); the same scan as a static step of scripts/gate.py; role_gate.py checks the spec-writer leaves changed specs at status: draft
+Tests: tests of the hooks if any exist (test-writer), the raw U+3000 in tests/test_spec_037_ac02_edit_validation.py (test-writer)
+Gate: the full gate in Chromium
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 

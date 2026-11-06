@@ -121,6 +121,12 @@ STATIC_STEPS: list[tuple[str, list[str]]] = [
         "screens sheet (up to date)",
         ["python", "docs/design/screens_sheet/build.py", "--check"],
     ),
+    # A raw invisible character cannot be seen in a review: the code standards
+    # write it as a \N{NAME} escape (B-108).
+    (
+        "raw characters (escaped)",
+        ["python", "scripts/hooks/guard_paths.py", "--check-repository"],
+    ),
 ]
 WEB_DIR = PROJECT_ROOT / "web"
 
