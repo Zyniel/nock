@@ -235,8 +235,9 @@ status band of « Connection lost »; before, the entry card of
 
 ## Code
 
-- `src/nock/room.py`: `new_room`, `RoomState`, `MAX_PLAYERS`;
-  `src/nock/protocol.py`: `Snapshot`. `src/nock/hub.py`: `RoomRegistry`,
+- `src/nock/room.py`: `new_room`, `RoomState`;
+  `src/nock/protocol.py`: `MAX_PLAYERS` (its comment points at rule 7),
+  `Snapshot`. `src/nock/hub.py`: `RoomRegistry`,
   codes, room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle,
   the creation limit. `src/nock/settings.py`, `src/nock/__main__.py`: the
   variable.

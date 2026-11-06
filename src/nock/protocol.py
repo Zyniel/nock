@@ -32,7 +32,7 @@ class ProtocolModel(BaseModel):
 
 # ---- Shared value types -------------------------------------------------
 
-MAX_PLAYERS: int = 8  # spec 012 AC-4: players in a room and in its snapshot
+MAX_PLAYERS: int = 8  # players in a room and in its snapshot (`lobby/rooms.md` rule 7)
 
 Coordinate = Annotated[int, Field(ge=0, strict=True)]  # row or column
 Count = Annotated[int, Field(ge=0, strict=True)]
@@ -72,26 +72,37 @@ ChatText = Annotated[
 ]
 
 
-# Chat rule 7: an incoming chat text refuses the characters of these Unicode
-# general categories (controls, format characters, line and paragraph
-# separators), such as U+202E, which reverses the text that follows.
-REFUSED_CHAT_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
-# These stay allowed: the line feed, the two joiners that emoji sequences and
+# The characters of these Unicode general categories are refused in a chat text
+# (chat rule 7) and in NOCK_DATABASE (serving rule 9): controls, format
+# characters, line and paragraph separators, such as U+202E, which reverses the
+# text that follows.
+REFUSED_CATEGORIES: frozenset[str] = frozenset({"Cc", "Cf", "Zl", "Zp"})
+# A chat keeps allowed: the line feed, the two joiners that emoji sequences and
 # some scripts need, and the tags U+E0020 to U+E007F that flags are made of.
-ALLOWED_CHAT_CHARACTERS: frozenset[str] = frozenset(
-    {"\N{LINE FEED}", "\N{ZERO WIDTH NON-JOINER}", "\N{ZERO WIDTH JOINER}"}
+JOINERS: frozenset[str] = frozenset(
+    {"\N{ZERO WIDTH NON-JOINER}", "\N{ZERO WIDTH JOINER}"}
 )
-FIRST_ALLOWED_TAG = 0xE0020
-LAST_ALLOWED_TAG = 0xE007F
+CHAT_ALLOWED_CHARACTERS: frozenset[str] = (
+    frozenset({"\N{LINE FEED}"})
+    | JOINERS
+    | frozenset(chr(code_point) for code_point in range(0xE0020, 0xE007F + 1))
+)
 
 
-def _is_refused_in_chat(character: str) -> bool:
-    """Tell whether a chat text may not hold `character`."""
-    if character in ALLOWED_CHAT_CHARACTERS:
+def is_refused_character(character: str, allowed: frozenset[str] = frozenset()) -> bool:
+    """Tell whether `character` is refused.
+
+    Args:
+        character: One character.
+        allowed: Characters that stay allowed although their category is refused.
+
+    Returns:
+        False when `character` is in `allowed`, else True when its Unicode
+        category is in REFUSED_CATEGORIES.
+    """
+    if character in allowed:
         return False
-    if FIRST_ALLOWED_TAG <= ord(character) <= LAST_ALLOWED_TAG:
-        return False
-    return unicodedata.category(character) in REFUSED_CHAT_CATEGORIES
+    return unicodedata.category(character) in REFUSED_CATEGORIES
 
 
 def _refuse_control_characters(text: str) -> str:
@@ -104,11 +115,11 @@ def _refuse_control_characters(text: str) -> str:
         `text`, unchanged.
 
     Raises:
-        ValueError: `text` holds a character of REFUSED_CHAT_CATEGORIES that
-            is not allowed in a chat.
+        ValueError: `text` holds a character of REFUSED_CATEGORIES that
+            a chat does not allow.
     """
     for character in text:
-        if _is_refused_in_chat(character):
+        if is_refused_character(character, CHAT_ALLOWED_CHARACTERS):
             raise ValueError(f"Character not allowed in a chat: {character!r}")
     return text
 
