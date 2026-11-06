@@ -358,6 +358,61 @@ def test_ac9_the_checker_accepts_the_data_of_the_test() -> None:
     assert unknown_texts(["Bobby"], data) == ["Bobby"]
 
 
+# DRAFT-014: `{name}` and `{reaction}` were open placeholders, so `{name} : {reaction}`
+# accepted any "X : Y" text, in English too. In AC-9's scan they are bound to the
+# values they take: the nicknames of the test and the reactions of `fr.json`. (`Ana :
+# Great` still passes, as `note.message`, `{name} : {text}`: a note's text is free.)
+def reaction_values() -> list[str]:
+    """What `{reaction}` takes: each emoji and each name of a reaction of `fr.json`.
+
+    The client fills it with a name (`Bravo`, in `reaction.shown_label`) or with an
+    emoji (in `note.own_reaction`).
+    """
+    fr_json = load_fr()
+    values: list[str] = []
+    for key, name in fr_json.items():
+        if not (key.startswith("reaction.") and key.endswith("_label")):
+            continue
+        emoji_key = key.removesuffix("_label")
+        if emoji_key in fr_json:
+            values.append(name)
+            values.append(fr_json[emoji_key])
+    return values
+
+
+def bound_unknown_texts(texts: list[str], data: set[str]) -> list[str]:
+    """AC-9's scan of `texts`, with `{name}` and `{reaction}` bound to their values."""
+    bound_values = {"name": NICKNAMES, "reaction": reaction_values()}
+    return unknown_texts(texts, data, bound_values)
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [
+        "Ana : Bravo",
+        "Bob : Je réfléchis",
+        "Ana : \N{CLAPPING HANDS SIGN}",
+        "Vous avez réagi : \N{THINKING FACE}",
+        "Vous avez réagi : Rire",
+    ],
+)
+def test_ac9_a_bound_checker_accepts_a_nickname_and_a_reaction(sample: str) -> None:
+    assert bound_unknown_texts([sample], set()) == []
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [
+        "Error : connection lost",
+        "Score : 3",
+        "Zoe : Bravo",
+        "Vous avez réagi : Great",
+    ],
+)
+def test_ac9_a_bound_checker_flags_any_other_x_colon_y_text(sample: str) -> None:
+    assert bound_unknown_texts([sample], set()) == [sample]
+
+
 # Two of spec 040's examples: O'NEIL written with U+2019 as its apostrophe, and a
 # Greek name, U+039D U+038A U+039A U+039F U+03A3, which shows as U+039D U+03AF
 # U+03BA U+03BF U+03C2, ending with the final sigma.
@@ -450,5 +505,5 @@ def test_ac9_the_page_is_in_french_with_every_string_from_fr_json(
         UNKNOWN_CODE,
         f"{live_server}/r/{ROOM_CODE}",
     }
-    unknown = unknown_texts(texts, data)
+    unknown = bound_unknown_texts(texts, data)
     assert unknown == [], f"{state} at {width}x{height}: {unknown}"
