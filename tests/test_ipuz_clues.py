@@ -11,8 +11,10 @@ Choices where the spec leaves room:
   compete with the `cells` check. That the message is not the length check's is
   read from the answer `SE` not being quoted in it.
 - AC-10: ".5", "0", "0-5", "2--3" and "1.1." are refused like the criterion's
-  samples, since rule 5 asks for counts of one or more joined by single
-  separators.
+  samples, since rule 5 asks for counts of one or more, without a leading zero,
+  joined by single separators.
+- AC-16: a lower-case letter is refused whatever its accent, written as one
+  character or as a base letter and a combining mark.
 """
 
 from __future__ import annotations
@@ -171,6 +173,8 @@ def test_ac9_the_check_comes_before_the_length_of_the_answer() -> None:
     assert re.search(r"\bSE\b", message) is None, message
 
 
+RIGHT_QUOTE = "\N{RIGHT SINGLE QUOTATION MARK}"
+
 # ---- AC-10: solution and enumeration -------------------------------------------
 
 
@@ -221,7 +225,12 @@ def test_ac10_an_enumeration_that_counts_the_letters_loads(
 
 @pytest.mark.parametrize(
     ("enumeration", "answer", "breaks"),
-    [("2 3", "TA MIS", (2,)), ("2'3", "TA'MIS", (2,)), ("2.3", "TA.MIS", (2,))],
+    [
+        pytest.param("2 3", "TA MIS", (2,), id="space"),
+        pytest.param("2'3", "TA'MIS", (2,), id="apostrophe"),
+        pytest.param("2.3", "TA.MIS", (2,), id="dot"),
+        pytest.param(f"2{RIGHT_QUOTE}3", "TA'MIS", (2,), id="typographic-apostrophe"),
+    ],
 )
 def test_ac10_an_enumeration_with_a_separator_gives_the_answer_its_break(
     enumeration: str, answer: str, breaks: tuple[int, ...]
@@ -237,8 +246,30 @@ def test_ac10_an_enumeration_with_a_separator_gives_the_answer_its_break(
 
 
 @pytest.mark.parametrize(
+    ("answer", "enumeration", "breaks"),
+    [
+        pytest.param("ABCDEFGHIJ", "10", (), id="ten"),
+        pytest.param("ABCDEFGHIJKL", None, (), id="twelve-without-enumeration"),
+        pytest.param("ABCDEFGHIJKL", "12", (), id="twelve"),
+        pytest.param("ABCDEFGHIJ-KLMNOPQRSTUV", "10-12", (10,), id="ten-and-twelve"),
+    ],
+)
+def test_ac10_an_enumeration_with_a_count_of_ten_or_more_loads(
+    answer: str, enumeration: str | None, breaks: tuple[int, ...]
+) -> None:
+    letters = answer.replace("-", "")
+
+    clue = cell_with_clues(
+        read_data(mini_data(answer, letters, enumeration)).grid, 0, 0
+    ).clues[0]
+
+    assert clue.letters == letters
+    assert clue.breaks == breaks
+
+
+@pytest.mark.parametrize(
     "enumeration",
-    ["4", "5-", "5.", ".5", "0", "0-5", "2--3", "2  3", "2,3", "1.1."],
+    ["4", "05", "02-3", "5-", "5.", ".5", "0", "0-5", "2--3", "2  3", "2,3", "1.1."],
 )
 def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
     enumeration: str,
@@ -250,3 +281,47 @@ def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
 
     assert "(0, 0)" in message
     assert "Passoire fine" in message
+
+
+# ---- AC-16: an upper-case solution letter, with or without an accent ----------
+
+
+@pytest.mark.parametrize(
+    "letter",
+    [
+        pytest.param("\N{LATIN CAPITAL LETTER E WITH ACUTE}", id="upper-acute"),
+        pytest.param(
+            "\N{LATIN CAPITAL LETTER E WITH CIRCUMFLEX}", id="upper-circumflex"
+        ),
+        pytest.param("E\N{COMBINING ACUTE ACCENT}", id="decomposed-acute"),
+    ],
+)
+def test_ac16_an_upper_case_accented_solution_letter_loads_equal(
+    letter: str,
+) -> None:
+    data = fx01_ipuz_data()
+    data["solution"][4][2] = letter
+
+    assert read_data(data) == read_data(fx01_ipuz_data())
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param("e", id="lower-case"),
+        pytest.param("\N{LATIN SMALL LETTER E WITH CIRCUMFLEX}", id="lower-circumflex"),
+        pytest.param("e\N{COMBINING ACUTE ACCENT}", id="lower-decomposed-acute"),
+        pytest.param("EE", id="two-letters"),
+        pytest.param("E-", id="letter-and-hyphen"),
+        pytest.param("\N{COMBINING ACUTE ACCENT}", id="combining-mark-alone"),
+    ],
+)
+def test_ac16_a_lower_case_or_two_character_solution_is_refused_naming_the_cell(
+    value: str,
+) -> None:
+    data = fx01_ipuz_data()
+    data["solution"][4][2] = value
+
+    message = read_error(data)
+
+    assert "(4, 2)" in message

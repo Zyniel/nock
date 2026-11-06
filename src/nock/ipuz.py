@@ -1,6 +1,6 @@
 """Grid files in the ipuz ArrowWord format: the reader and the writer.
 
-The rules are in `specs/content/grid-files.md`. A file is a JSON object of the
+The rules are in `specs/content/ipuz.md`. A file is a JSON object of the
 ipuz v2 ArrowWord kind. Every coordinate in a file is `[column, row]`; messages
 write positions `(row, column)`.
 """
@@ -10,6 +10,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import unicodedata
 from collections.abc import Collection
 from datetime import date
 from typing import NamedTuple
@@ -26,6 +27,7 @@ from nock.grid import (
     Grid,
     LetterCell,
     Position,
+    normalize_answer,
     separators_of,
 )
 from nock.grid_import import GridImportError, check_arrows, check_words
@@ -71,14 +73,17 @@ _IGNORED_KEYS = (
 )
 _TOP_LEVEL_KEYS = (*_REQUIRED_KEYS, *_OPTIONAL_KEYS, *_IGNORED_KEYS)
 _REQUIRED_CLUE_KEYS = ("clue", "location", "cells", "answer")
-_CLUE_KEYS = (*_REQUIRED_CLUE_KEYS, "enumeration")
+_IGNORED_CLUE_KEYS = ("explanation", "tags", "type")
+_CLUE_KEYS = (*_REQUIRED_CLUE_KEYS, "enumeration", *_IGNORED_CLUE_KEYS)
 
 _MAX_AUTHOR_LENGTH = 200
 _DATE_PATTERN = re.compile(r"([0-9]{2})/([0-9]{2})/([0-9]{4})")
-_ENUMERATION_PATTERN = re.compile(r"[0-9]+(?:[-. '][0-9]+)*")
+_ENUMERATION_PATTERN = re.compile(
+    "[1-9][0-9]*(?:[-. '\N{RIGHT SINGLE QUOTATION MARK}][1-9][0-9]*)*"
+)
 _COUNT_PATTERN = re.compile(r"[0-9]+")
-_SEPARATOR_PATTERN = re.compile(r"[^0-9]")
 _DASHED_LETTERS = "TRBL"
+_DASH_STYLE_KEYS = ("dashed", "dotted")
 _FORCE_OF_TEXT = {"1": 1, "2": 2, "3": 3, "4": 4}
 
 
@@ -206,10 +211,28 @@ def _read_position(value: object, where: str) -> Position:
     return (row, column)
 
 
+def _object_without_repeated_keys(pairs: list[tuple[str, object]]) -> JsonObject:
+    """Build a JSON object from its pairs, refusing a key written twice."""
+    data: JsonObject = {}
+    for key, value in pairs:
+        if key in data:
+            raise IpuzError(f"the key {key!r} is written twice in one object")
+        data[key] = value
+    return data
+
+
 def _parse_object(text: str) -> JsonObject:
-    """Parse the text of a file into a JSON object."""
+    """Parse the text of a file into a JSON object.
+
+    A byte order mark at the start is not JSON and is refused.
+    """
     try:
-        data = json.loads(text)
+        data = json.loads(
+            text,
+            object_pairs_hook=_object_without_repeated_keys,
+        )
+    except IpuzError:
+        raise
     except ValueError as error:
         raise IpuzError(f"the file is not valid JSON: {error}") from error
     return _as_object(data, "the file")
@@ -320,22 +343,31 @@ def _read_block_and_empty(data: JsonObject) -> tuple[str, object]:
     return block, empty
 
 
+def _read_dash_letters(value: object, key: str, where: str) -> str:
+    """Read the letters of a `dashed` or `dotted` style: a text of T, R, B, L."""
+    if not isinstance(value, str) or value == "":
+        raise IpuzError(f"{where}: {key} must be a text of T, R, B, L")
+    for letter in value:
+        if letter not in _DASHED_LETTERS:
+            raise IpuzError(f"{where}: {key} {value!r} holds {letter!r}, not T R B L")
+    return value
+
+
 def _read_dashed_cell(value: JsonObject, empty: object, where: str) -> str:
-    """Read a letter cell drawn with dashed edges and return its `dashed` letters."""
+    """Read a letter cell with dashed edges; return its dashed and dotted letters."""
     _check_keys(value, ("cell", "style"), where)
     _check_required(value, ("cell", "style"), where)
     if not _same_value(value["cell"], empty):
         raise IpuzError(f"{where}: cell must be {empty!r}, got {value['cell']!r}")
     style = _as_object(value["style"], f"{where}: style")
-    _check_keys(style, ("dashed",), f"{where}: style")
-    _check_required(style, ("dashed",), f"{where}: style")
-    dashed = style["dashed"]
-    if not isinstance(dashed, str) or dashed == "":
-        raise IpuzError(f"{where}: dashed must be a text of T, R, B, L")
-    for letter in dashed:
-        if letter not in _DASHED_LETTERS:
-            raise IpuzError(f"{where}: dashed {dashed!r} holds {letter!r}, not T R B L")
-    return dashed
+    _check_keys(style, _DASH_STYLE_KEYS, f"{where}: style")
+    letters = ""
+    for key in _DASH_STYLE_KEYS:
+        if key in style:
+            letters += _read_dash_letters(style[key], key, where)
+    if letters == "":
+        raise IpuzError(f"{where}: style must hold dashed or dotted")
+    return letters
 
 
 def _read_layout(puzzle: object, block: str, empty: object) -> _Layout:
@@ -468,17 +500,13 @@ def _read_counts(enumeration: str, name: str) -> list[int]:
     if _ENUMERATION_PATTERN.fullmatch(enumeration) is None:
         raise IpuzError(
             f"{name} has the enumeration {enumeration!r}, expected counts of "
-            "letters joined by single separators (- . space '), like 3-2-5"
+            "letters of 1 or more, written without a leading zero, joined by "
+            "single separators (- . space ' \N{RIGHT SINGLE QUOTATION MARK}), "
+            "like 3-2-5"
         )
     counts: list[int] = []
     for part in _COUNT_PATTERN.findall(enumeration):
-        count = int(part)
-        if count < 1:
-            raise IpuzError(
-                f"{name} has the enumeration {enumeration!r}, "
-                "expected each count to be one or more"
-            )
-        counts.append(count)
+        counts.append(int(part))
     return counts
 
 
@@ -491,12 +519,9 @@ def _join_counts(pieces: list[str], separators: tuple[str, ...]) -> str:
 
 
 def _normalized_enumeration(enumeration: str) -> str:
-    """Write an enumeration by its counts and separators, without leading zeros."""
-    counts: list[str] = []
-    for part in _COUNT_PATTERN.findall(enumeration):
-        counts.append(str(int(part)))
-    separators = tuple(_SEPARATOR_PATTERN.findall(enumeration))
-    return _join_counts(counts, separators)
+    """Write an enumeration by its counts and separators."""
+    counts = _COUNT_PATTERN.findall(enumeration)
+    return _join_counts(counts, separators_of(enumeration))
 
 
 def _separate(letters: str, counts: list[int], separators: tuple[str, ...]) -> str:
@@ -619,6 +644,30 @@ def _read_solution_values(solution: object) -> dict[Position, object]:
     return values
 
 
+def _is_solution_letter(found: object, expected: str) -> bool:
+    """Tell whether a `solution` value is the expected letter, one character.
+
+    The letter must be upper-case; accents do not matter (rule 4 of
+    `content/grids.md`).
+    """
+    if not isinstance(found, str):
+        return False
+    composed = unicodedata.normalize("NFC", found)
+    if len(composed) != 1 or composed.islower():
+        return False
+    try:
+        return normalize_answer(composed) == expected
+    except ValueError:
+        return False
+
+
+def _is_solution_value(found: object, expected: str, is_letter: bool) -> bool:
+    """Tell whether a `solution` value agrees with a cell."""
+    if is_letter:
+        return _is_solution_letter(found, expected)
+    return found == expected
+
+
 def _check_solution(data: JsonObject, grid: Grid, block: str) -> None:
     """Check that `solution` holds the answers' letters and the block value."""
     if "solution" not in data:
@@ -626,13 +675,15 @@ def _check_solution(data: JsonObject, grid: Grid, block: str) -> None:
     found_values = _read_solution_values(data["solution"])
     for cell in grid.cells:
         position = (cell.row, cell.column)
-        expected = grid.solution_letter(cell.row, cell.column) or block
+        letter = grid.solution_letter(cell.row, cell.column)
+        expected = letter or block
         if position not in found_values:
             raise IpuzError(
                 f"solution has no value at {_format_position(position)}, "
                 f"expected {expected!r}"
             )
-        if found_values[position] != expected:
+        is_letter = letter is not None
+        if not _is_solution_value(found_values[position], expected, is_letter):
             raise IpuzError(
                 f"solution holds {found_values[position]!r} at "
                 f"{_format_position(position)}, expected {expected!r}"

@@ -10,11 +10,13 @@ Choices where the spec leaves room:
   derives it with the block value.
 - AC-5: the `solution` is left out, so that only the shape of `puzzle` can be
   the problem.
-- AC-4, a `dashed` value of "" or "X" is only expected to be refused.
+- AC-4, a `dashed` or `dotted` value of "" or "X" is refused for its reason: the
+  message says the value is made of T, R, B and L.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 import pytest
@@ -24,7 +26,6 @@ from grid_files_harness import (
     JsonData,
     cell_with_clues,
     clue_named,
-    dashed_cell,
     fx01_ipuz_data,
     fx01_model_grid,
     read_data,
@@ -155,14 +156,25 @@ def test_ac4_a_text_zero_is_the_same_value_as_a_number_zero() -> None:
     assert read_data(data) == read_data(fx01_ipuz_data())
 
 
-@pytest.mark.parametrize("letters", ["", "X"])
+@pytest.mark.parametrize(
+    "style",
+    [
+        pytest.param({"dashed": ""}, id="dashed-empty"),
+        pytest.param({"dashed": "X"}, id="dashed-x"),
+        pytest.param({"dotted": ""}, id="dotted-empty"),
+        pytest.param({"dotted": "X"}, id="dotted-x"),
+        pytest.param({"dashed": "R", "dotted": "X"}, id="dashed-r-dotted-x"),
+    ],
+)
 def test_ac4_a_dashed_value_that_is_not_made_of_t_r_b_l_is_refused(
-    letters: str,
+    style: JsonData,
 ) -> None:
     data = fx01_ipuz_data()
-    data["puzzle"][1][0] = dashed_cell(letters)
+    data["puzzle"][1][0] = {"cell": 0, "style": style}
 
-    read_error(data)
+    message = read_error(data)
+
+    assert re.search(r"T,? R,? B,? L", message), message
 
 
 # ---- AC-5: the shape of the puzzle ------------------------------------------
@@ -237,6 +249,12 @@ def test_ac12_a_key_the_reader_does_not_support_is_refused_naming_it(
         ("top", "com.example:rating", 3),
         ("clues", "com.example:x", 1),
         ("clue", "com.example:x", 1),
+        ("clue", "explanation", "x"),
+        ("clue", "explanation", None),
+        ("clue", "tags", ["x"]),
+        ("clue", "tags", {"a": [1]}),
+        ("clue", "type", 1),
+        ("clue", "type", ["x"]),
     ],
 )
 def test_ac12_a_descriptive_or_namespace_key_is_ignored(
