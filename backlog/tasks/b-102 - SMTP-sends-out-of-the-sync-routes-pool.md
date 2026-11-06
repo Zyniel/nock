@@ -4,7 +4,7 @@ title: SMTP sends out of the sync routes' pool
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T15:47:00Z'
+updated_date: '2026-11-06T16:01:00Z'
 labels:
   - domain:account
 milestone: m-10
@@ -56,4 +56,6 @@ Spec-checker round 1: CHANGES REQUESTED: moving the sends to asyncio's default e
 Spec-checker round 2: APPROVED (the socket case split into AC-25, accepted).
 
 Test-writer: AC-24 fails now (GET /api/grids answered after 19 sends had ended); AC-25 passes now (the join's room lookup runs on asyncio's default executor, not the sync pool) but fails for the default-executor fix the spec-checker raised (tried in a scratch copy), and both pass with each send on its own thread. Lead's decisions: AC-25 kept as a guard that cannot fail before the fix; no assertion that all 50 sends start at once (no cap was decided either way); the file joins SERIAL_TEST_FILES (it races a 5 s hold).
+
+Reviewer round 1: CHANGES REQUESTED. Blocking: a mailer error other than MailError never resolved the send's future, so the request hung (and a graceful shutdown with it); the thread now passes any exception on. Also taken: rule 7 cited, annotations, prepare_sign_in_link's docstring. Noted: the sweep has no criterion of its own (covered through AC-25's executor).
 <!-- SECTION:NOTES:END -->
