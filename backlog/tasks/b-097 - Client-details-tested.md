@@ -1,9 +1,10 @@
 ---
 id: B-097
 title: Client details tested
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
+updated_date: '2026-11-06T09:23:00Z'
 labels:
   - domain:shell
 milestone: m-9
@@ -23,6 +24,8 @@ From DRAFT-021: binary frames ignored, t() placeholders, a typeless frame told f
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Each of the three details has a test that fails without it
+- [ ] #2 shell AC-36 (new)
+- [ ] #3 shell AC-37 (new)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -34,3 +37,19 @@ From DRAFT-021: binary frames ignored, t() placeholders, a typeless frame told f
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Spec: specs/client/shell.md (criteria for rules 2, 3, 5)
+Tests: tests/test_shell_*.py and/or tests/web/
+Quick gate: uv run python scripts/gate.py --specs shell --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead's decisions: shell.md reaching 21 criteria is accepted as « about 20 » (a split of the connection rules would be an architecture change, out of scope); the binary frame and the typeless frame share AC-36, proven by a parametrised test that fails for each alone; AC-36 keeps « a letter event 6 as UTF-8 JSON », so a binary frame read as text would apply.
+
+Spec-checker: APPROVED. Its note on AC-37 (no fr.json template has two placeholders, so the test calls t() with its own template, as AC-3 checks code-level properties of t()) is accepted as written.
+<!-- SECTION:NOTES:END -->
