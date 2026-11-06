@@ -226,6 +226,11 @@ Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
 - **AC-31** Reconnecting, with « Annuler » pressed, « Vérifier » « La
   lettre » and « Révéler » « La lettre » chosen, a rejoin refused with
   `room_locked`, then closed, never sends the undo, the check or the reveal.
+- **AC-32** At 1280 by 720, solved, with the recap opened by « Voir le
+  bilan », the room is deleted: the recap closes and the dialog shows as
+  AC-21 says, the focus on « Voir les grilles ». With accounts on and
+  « Compte » opened from the Menu, the account sheet closes and the dialog
+  shows alike.
 
 ## Edge cases
 
