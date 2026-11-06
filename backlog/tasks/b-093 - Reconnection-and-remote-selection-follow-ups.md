@@ -4,7 +4,7 @@ title: Reconnection and remote selection follow-ups
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T17:20:00Z'
+updated_date: '2026-11-06T17:27:00Z'
 labels:
   - domain:reconnection
   - domain:presence
@@ -57,4 +57,6 @@ Lead's decisions on the spec-writer's report: (3) the dying socket: a request ne
 Measurement (scratchpad b093/, 2 rounds of 10 alternating runs, under load 9-13 on 4 CPUs): per selection_moved, with the reuse median ~5.9 ms, without ~7.5 ms, ranges overlapping heavily: no browser budget can tell them apart. Lead's decision: no pace criterion for the reuse; it is guarded by a deterministic node unit test in tests/web (the same object comes back for a cell whose remotes did not change), which proves no criterion. The task's criterion is therefore met in part for the reuse (a test, no criterion); presence.md is left unchanged.
 
 Spec-checker round 1: CHANGES REQUESTED (rule 7's queued requests, no criterion for the lost half, wording); round 2: APPROVED.
+
+Test-writer: AC-11 fails now (the check dropped when send() refuses); AC-10 and AC-12 pass now and each fails on its removal (stopSendQueue not keeping queued requests; a request resent after a dead-network send). remotesByCell: tests/web/remoteSelections.test.ts (identity of unchanged cells), fails with the reuse deleted. Note for the implementer: rule 7 also covers a queued request whose send fails in sendNextQueued; AC-11 exercises request() only.
 <!-- SECTION:NOTES:END -->
