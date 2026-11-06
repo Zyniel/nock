@@ -31,7 +31,7 @@ From DRAFT-024, 032, 053 and 018, and B-079's gate (webkit test_server_offline_u
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -71,6 +71,8 @@ Test-writer's findings and fixes (2026-11-06):
 Reviewer round 1: CHANGES REQUESTED. Blocking: AC-13's idle window measured after the burst can subtract the burst's own cost (GC, a leaked timer); to be measured before the burst, failing when idle exceeds the burst. Also taken: the spec024 mock counts its rejoin answers and setups whose state no snapshot carries check it; 036 AC-8's join gets what is left of the 10 s (lead's decision: the 10 s of AC-8 covers both the GET and the snapshot); the 035 AC-8 guard's comment.
 
 Reviewer round 2: APPROVE (AC-13 alone: idle 42.8 ms over 4012 ms, burst 76.7 ms over 599 ms, 0.70 ms per selection_moved). Taken (test-writer): expect_no_rejoin also after the tests' reads; the record_property calls dropped (xunit2 drops them, the failure message carries the numbers).
+
+PR: #167.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
