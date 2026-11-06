@@ -72,7 +72,11 @@ erases and keeps `account/erasure.md`.
    timeout, `tls` and `starttls` over TLS that checks the certificate and host
    name, a login when a user is set, one `QUIT` per message and no command
    once the connection is closed. A failure is `MailError`, whose text and
-   traceback hold no address, password or token.
+   traceback hold no address, password or token. The sign-in link's sends
+   run on threads of their own: however slow the SMTP server and however
+   many of those sends wait, the other routes, the room sockets and the
+   sweep go on as they would without them; a link request still answers
+   once its send ends (rule 6).
 8. `POST /api/account/sign-in`, `{"token"}` (43 URL-safe characters, else
    422), deletes its link: unknown, or asked more than 1,800 s before, 404.
    Else the account is found or created, a session starts, and a link's room
@@ -152,6 +156,11 @@ erases and keeps `account/erasure.md`.
   command after it; `tls` uses that context from the start. A refused
   recipient raises `MailError` without the address, traceback included, and
   the request gets 503. (← 033 AC-7)
+- **AC-24** While 50 link requests, each within the limits, wait on an SMTP
+  server that holds every message 5 s, `GET /api/grids` answers 200 before
+  any of those sends ends.
+- **AC-25** While those 50 link requests wait, a socket that joins an
+  existing room gets its `snapshot` before any of those sends ends.
 - **AC-11** Signed in from R, Ana's rooms are R, with her id, token and
   `ANA`; after she puts S (204), S then R. A `PUT` of no member gets 404, one
   without cookie 401 even with a malformed key. Once R expires the list is S,
@@ -185,4 +194,4 @@ erases and keeps `account/erasure.md`.
   `settings.py` (`account_settings_from_env`), `mailer.py` (the sign-in
   message), `i18n.py`, `server.py` (routes, limits).
 - Tests: those of the pointers, in `tests/test_spec_NNN_*`;
-  `tests/test_account_*` (AC-6 for its wrong methods, AC-23).
+  `tests/test_account_*` (AC-6 for its wrong methods, AC-23 to AC-25).

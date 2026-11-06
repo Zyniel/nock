@@ -85,9 +85,11 @@ WARM_UP_TIMEOUT_MS = 60_000
 # copié » line (gone 2 s after the copy; 2026-10-23). The live rooms' engine time
 # (`platform/live-rooms.md` rule 1) times the room's rules in milliseconds,
 # with no browser (B-030). Reconnection AC-9 times a hidden page's 2 s pings
-# over 10 s of real time (B-101).
+# over 10 s of real time (B-101). The account's slow mail tests race 50 sends
+# held 5 s against a route's and a join's answers (B-102).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
+        "test_account_slow_mail.py",
         "test_erasure_busy.py",
         "test_erasure_history.py",
         "test_erasure_overlap.py",

@@ -37,6 +37,7 @@ from collections.abc import (
     Callable,
     Mapping,
 )
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -54,6 +55,7 @@ from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import MutableHeaders
 from starlette.requests import ClientDisconnect
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -1243,6 +1245,49 @@ def _leave_connection_of(connecting: asyncio.Future[RoomConnection | None]) -> N
         connection.leave()
 
 
+async def _send_on_own_thread(sender: Mailer, message: EmailMessage) -> None:
+    """Send `message` on a thread of its own and wait for the send to end.
+
+    The thread belongs to this send alone, not to a pool that the other routes,
+    the sockets and the sweep share, so that sends held by a slow SMTP server
+    never take a thread from them (`account/account.md` rule 7).
+
+    Args:
+        sender: The mailer that sends the message.
+        message: The message to send.
+
+    Raises:
+        MailError: When the mailer could not send the message.
+        Exception: Whatever else the mailer raised, as it would from a plain call.
+    """
+    loop = asyncio.get_running_loop()
+    ended: asyncio.Future[None] = loop.create_future()
+
+    def finish(error: Exception | None) -> None:
+        if ended.done():  # the request was cancelled while the send went on
+            return
+        if error is None:
+            ended.set_result(None)
+        else:
+            ended.set_exception(error)
+
+    def send_and_report() -> None:
+        error: Exception | None = None
+        try:
+            sender.send(message)
+        except Exception as send_error:
+            # Any failure must reach the waiting request: a thread that ended
+            # without it would leave the request waiting for ever.
+            error = send_error
+        # The loop is closed when the app stopped while the send went on: then
+        # nobody waits for the result.
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(finish, error)
+
+    threading.Thread(target=send_and_report, daemon=True).start()
+    await ended
+
+
 async def _serve_socket(websocket: WebSocket, connection: RoomConnection) -> None:
     """Serve the socket of a connection until it closes.
 
@@ -1820,8 +1865,22 @@ def create_app(
     # Spec 033: checked in this order: the body, the address, the room, the
     # limits; then the mail is sent. Only a request that reaches the mailer
     # counts toward the limits.
-    @web_app.post(f"{ACCOUNT_API_ROOT}/link", status_code=202)
-    def ask_sign_in_link(body: SignInLinkRequest, request: Request) -> LinkRequested:
+    def prepare_sign_in_link(
+        body: SignInLinkRequest, request: Request
+    ) -> tuple[Mailer, EmailMessage]:
+        """Check the request, store its link; return the mailer and the message.
+
+        Args:
+            body: The e-mail address, and the room the link is for, if any.
+            request: The request, whose client address counts toward the limits.
+
+        Returns:
+            The mailer and the sign-in message to send with it.
+
+        Raises:
+            HTTPException: 404 when accounts are off or the room is not the
+                caller's, 422 for an invalid address, 429 when a limit is reached.
+        """
         store = account_store_in_use()
         settings = account_service.settings
         sender = account_service.mailer
@@ -1845,8 +1904,17 @@ def create_app(
         if not account_service.limits.count_unless_reached(email, address, now):
             raise _too_many_requests()
         token = store.add_link(email, body.room, now)
+        return sender, sign_in_message(settings, email, token)
+
+    # The checks and the store are sync work: they run in the pool of sync
+    # routes. The send runs on a thread of its own (rule 7).
+    @web_app.post(f"{ACCOUNT_API_ROOT}/link", status_code=202)
+    async def ask_sign_in_link(
+        body: SignInLinkRequest, request: Request
+    ) -> LinkRequested:
+        sender, message = await run_in_threadpool(prepare_sign_in_link, body, request)
         try:
-            sender.send(sign_in_message(settings, email, token))
+            await _send_on_own_thread(sender, message)
         except MailError as error:
             # A MailError names the kind of failure only: no address, no secret.
             logger.warning("A sign-in link was not sent: %s", error)
