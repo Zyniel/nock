@@ -35,7 +35,7 @@ From DRAFT-021: binary frames ignored, t() placeholders, a typeless frame told f
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -56,6 +56,8 @@ Spec-checker: APPROVED. Its note on AC-37 (no fr.json template has two placehold
 Test-writer: AC-36's binary case does not fail when onSocketMessage's non-string check is removed, since a Blob fails JSON.parse and is dropped anyway; it does fail against a client that decodes binary frames (binaryType arraybuffer + TextDecoder), which is the behaviour rule 3 forbids. Lead's decision: accepted, the test proves the rule rather than one redundant line. No implementer phase: the behaviour exists and every test passes on the current code.
 
 Reviewer round 1: APPROVE, three suggestions. Taken: move send_binary out of shell_harness.py into its only user (test-writer). Not taken, to a follow-up draft: AC-36 repeats part of AC-7's {"seq": 6} (tidy one criterion, or strengthen 040 AC-19's test to check seq 5 first); the binary case's only discriminating check is timed (SETTLE_MS 300 ms), acceptable as decoding is synchronous.
+
+PR: #161.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
