@@ -4,7 +4,7 @@ title: Client details tested
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T09:27:00Z'
+updated_date: '2026-11-06T09:32:00Z'
 labels:
   - domain:shell
 milestone: m-9
@@ -54,4 +54,6 @@ Lead's decisions: shell.md reaching 21 criteria is accepted as « about 20 » (a
 Spec-checker: APPROVED. Its note on AC-37 (no fr.json template has two placeholders, so the test calls t() with its own template, as AC-3 checks code-level properties of t()) is accepted as written.
 
 Test-writer: AC-36's binary case does not fail when onSocketMessage's non-string check is removed, since a Blob fails JSON.parse and is dropped anyway; it does fail against a client that decodes binary frames (binaryType arraybuffer + TextDecoder), which is the behaviour rule 3 forbids. Lead's decision: accepted, the test proves the rule rather than one redundant line. No implementer phase: the behaviour exists and every test passes on the current code.
+
+Reviewer round 1: APPROVE, three suggestions. Taken: move send_binary out of shell_harness.py into its only user (test-writer). Not taken, to a follow-up draft: AC-36 repeats part of AC-7's {"seq": 6} (tidy one criterion, or strengthen 040 AC-19's test to check seq 5 first); the binary case's only discriminating check is timed (SETTLE_MS 300 ms), acceptable as decoding is synchronous.
 <!-- SECTION:NOTES:END -->

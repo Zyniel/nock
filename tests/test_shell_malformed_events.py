@@ -32,7 +32,6 @@ from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from nock.protocol import CheckResult, GridTarget, WordTarget
-from shell_harness import send_binary
 from spec019_harness import SETTLE_MS
 from spec043_harness import (
     GREEN,
@@ -142,9 +141,19 @@ LETTER_COLUMN = 1
 LETTER = "V"
 
 
+def _send_binary(mock: RoomMock, text: str) -> None:
+    """Send a text as a binary frame on the newest mocked socket.
+
+    Args:
+        mock: The mocked room whose newest socket sends the frame.
+        text: Text to send, encoded as UTF-8.
+    """
+    mock.routes[-1].send(text.encode("utf-8"))
+
+
 def binary_letter_frame(mock: RoomMock) -> None:
     """Send letter event 6 as a binary frame holding its UTF-8 JSON."""
-    send_binary(mock, letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
+    _send_binary(mock, letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
 
 
 def typeless_frame(mock: RoomMock) -> None:
