@@ -4,7 +4,7 @@ title: The converter checks its source names
 status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T01:38:00Z'
+updated_date: '2026-11-06T01:39:00Z'
 labels:
   - domain:grid-files
 milestone: m-8
@@ -34,7 +34,7 @@ From DRAFT-068: rule 15 widens so the converter refuses names that are not lower
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -51,6 +51,8 @@ Spec-checker APPROVED in round 2; round 1 asked AC-25 to name the refused file r
 Reviewer round 1: APPROVE. Taken: ß.json in AC-25's test (guards the case-folding decision) and the docstring fix. Not taken: a backslash test (the name cannot be created on Windows; refused today by rule 2's check too) and a G1.json case for rule 1's warning.
 
 Full gate here (Chromium): static checks, 8,788 parallel and 162 serial tests, all green. Firefox and WebKit are left to CI after the merge; the change is server-side only.
+
+Pull request #155, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
