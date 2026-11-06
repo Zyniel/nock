@@ -6,8 +6,9 @@
 
   // One finished grid of the history list (spec 029), a list row (spec 046):
   // its title and its one line of date, time and team-mates, then "Rejouer"
-  // on the right when the grid has a number.
-  let { record }: { record: HistoryRecord } = $props()
+  // on the right when the grid has a number. `isSignedIn` tells « Rejouer »
+  // which progress key to write.
+  let { record, isSignedIn }: { record: HistoryRecord; isSignedIn: boolean } = $props()
 
   // True when « Rejouer », the play steps of spec 010 for the grid number,
   // could not create the room: the row shows its error line.
@@ -49,6 +50,7 @@
     {@const number = record.grid}
     <PlayButton
       {number}
+      {isSignedIn}
       class="nock-button nock-button-secondary"
       data-testid="history-replay"
       aria-label={t('history.replay_label', { number })}

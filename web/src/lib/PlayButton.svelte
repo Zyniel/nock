@@ -4,18 +4,21 @@
   // grid and loads its page; the button stays disabled while the request runs.
   // When the room could not be created, `hasFailed` turns true: the card or the
   // row shows its error line. The caller gives the button's class, test id,
-  // name or description, and its text.
+  // name or description, its text, and whether the page is signed in (the
+  // grid's mark goes to the account's key then, content/cards rule 2).
   import type { Snippet } from 'svelte'
   import type { HTMLButtonAttributes } from 'svelte/elements'
   import { playGrid } from './playGrid'
 
   let {
     number,
+    isSignedIn,
     hasFailed = $bindable(false),
     children,
     ...attributes
   }: {
     number: number
+    isSignedIn: boolean
     hasFailed?: boolean
     children: Snippet
   } & Omit<HTMLButtonAttributes, 'type' | 'disabled' | 'onclick' | 'children'> = $props()
@@ -35,7 +38,7 @@
     }
     isStarting = true
     hasFailed = false
-    const started = await playGrid(number)
+    const started = await playGrid(number, isSignedIn)
     if (!started) {
       isStarting = false
       hasFailed = true
