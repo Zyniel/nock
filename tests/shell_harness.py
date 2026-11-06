@@ -1,7 +1,7 @@
-"""Shared setup of the tests of `client/shell.md` AC-29 to AC-31: texts that come from
-`fr.json`, the landmarks of the pages and the code fetched per route. The fonts
-tests of `client/foundation.md` (`tests/test_foundation_fonts.py`) read the built
-files through `built_files` and `ASSETS_DIR` too.
+"""Shared setup of the tests of `client/shell.md` AC-29 to AC-31 and AC-37: texts
+that come from `fr.json`, the landmarks of the pages and the code fetched per route.
+The fonts tests of `client/foundation.md` (`tests/test_foundation_fonts.py`) read the
+built files through `built_files` and `ASSETS_DIR` too.
 
 Pytest does not collect this module (its name does not start with `test_`). The tests
 are in `tests/test_shell_*.py`:
@@ -9,6 +9,7 @@ are in `tests/test_shell_*.py`:
 - `test_shell_text_keys.py`: AC-29, the list separator and the units.
 - `test_shell_landmarks.py`: AC-30, one banner then one `main` on every page.
 - `test_shell_page_code.py`: AC-31, the code fetched on each page's route.
+- `test_shell_placeholders.py`: AC-37, a placeholder with no value.
 
 This module holds what more than one of those files uses: the built client's files
 (`web/dist`), the way a test reads the scripts a page fetched, a rewrite of one
