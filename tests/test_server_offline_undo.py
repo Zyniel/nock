@@ -10,7 +10,11 @@ made and before any later one, which decides what every page ends with.
 The "50 ms" is page time: Ana's page clock is installed before the room opens.
 The proxy holds the snapshot of her return; the clock is paused, the snapshot
 passed on, the clock moved by 50 ms and Control+z pressed, so the resend (one
-edit every 100 ms) cannot move on meanwhile; the clock then runs again.
+edit every 100 ms) cannot move on meanwhile; the clock then runs again. The
+pause is spec 027's `freeze_clock`: the clock runs on while the test reads
+`Date.now()` and asks for the pause, so the pause lands at least 50 ms ahead and
+the jump doubles when that was still too short (B-100: a pause 1 ms ahead failed
+in WebKit and Firefox under load, "Cannot fast-forward to the past").
 """
 
 from __future__ import annotations
@@ -35,11 +39,10 @@ from realtime_harness import (
 )
 from spec017_harness import cell_at, expect_cell
 from spec024_harness import EnterRoom, expect_selection
+from spec027_harness import freeze_clock
 from spec042_harness import wait_until
 
 TAMIS_KEY = "0,0,0"  # the word TAMIS, row 1 across, by its clue (`data-word`)
-PAUSE_AHEAD_MS = 1  # how far ahead of its time the page clock is paused
-MS_PER_SECOND = 1000
 UNDO_DELAY_MS = 50  # "50 ms after her reconnection snapshot"
 
 
@@ -104,16 +107,6 @@ def type_keys(page: Page, keys: str) -> None:
         page.keyboard.press(key)
 
 
-def pause_page_clock(page: Page) -> None:
-    """Stop the page's installed clock, just ahead of where it is.
-
-    `pause_at` reads a number as seconds since the epoch, `Date.now()` gives ms.
-    """
-    now_ms = page.evaluate("() => Date.now()")
-    assert isinstance(now_ms, int | float), now_ms
-    page.clock.pause_at((now_ms + PAUSE_AHEAD_MS) / MS_PER_SECOND)
-
-
 def go_offline_at_1_0(page: Page, ana: Player) -> int:
     """Ana selects (1, 0) and loses her socket; return the seq her page holds."""
     cell_at(page, 1, 0).click()
@@ -130,7 +123,7 @@ def come_back_and_undo(page: Page, ana: Player, case: UndoCase) -> ProxiedSocket
         return rejoin(ana)
     socket = ana.proxy.come_back(is_holding=True)
     wait_until(page, socket.has_snapshot, "the snapshot of Ana's return")
-    pause_page_clock(page)
+    freeze_clock(page)
     socket.release()
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-status", "joined")
     page.clock.run_for(UNDO_DELAY_MS)

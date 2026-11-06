@@ -79,6 +79,7 @@ from nock.room import (
 )
 from nock.server import create_app
 from nock.store import RoomStore
+from page_ready import wait_for_room_page
 from spec017_harness import keep_pings_on_the_page_clock
 
 FR_JSON_PATH = Path(__file__).resolve().parents[1] / "web" / "src" / "i18n" / "fr.json"
@@ -676,6 +677,7 @@ def open_mock_room(
         page.clock.install(time=0)
         page.clock.pause_at(1)
     page.goto(f"{base_url}/r/ABC123")
+    wait_for_room_page(page)
     room.wait_for_connections(1)
     if identity:
         wait_until(page, lambda: len(room.connections[0].frames) > 0)

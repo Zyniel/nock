@@ -9,6 +9,12 @@ after a change that shows a face not shown before (an italic pencil letter, a cl
 cell's condensed face, a bold text). A test that only reads colours, computed
 styles or texts needs no wait.
 
+A face is only asked for when the browser lays out a text that uses it, and the
+layout may not have run yet since the change that showed the text: then
+`document.fonts.ready` is already resolved and the face swaps in after the read
+(B-100, 048 AC-5: the error line's weight 500). So the wait forces a layout
+first, then waits for `document.fonts.ready`.
+
 Pytest does not collect this module (its name does not start with `test_`).
 """
 
@@ -16,11 +22,17 @@ from __future__ import annotations
 
 from playwright.sync_api import Page
 
-FONTS_READY_SCRIPT = "() => document.fonts.ready.then(() => true)"
+FONTS_READY_SCRIPT = """
+async () => {
+  document.documentElement.getBoundingClientRect();
+  await document.fonts.ready;
+  return true;
+}
+"""
 
 
 def wait_for_fonts(page: Page) -> None:
-    """Wait for `document.fonts.ready` on `page`.
+    """Wait until the fonts `page`'s text uses are loaded.
 
     Args:
         page: A page that shows the text a test is about to measure.
