@@ -614,7 +614,7 @@ def entry_with_player_erased(entry: LogEntry, player_id: str) -> LogEntry | None
 
 
 def team_nicknames(state: RoomState) -> tuple[str, ...]:
-    """Return the nicknames of the room's members, each once.
+    """Return the nicknames of the room's members, each once but FORMER_PLAYER_NICKNAME.
 
     Args:
         state: The room.
@@ -622,7 +622,7 @@ def team_nicknames(state: RoomState) -> tuple[str, ...]:
     Returns:
         First the nicknames of `past_players` in the order they left, then those
         of `players` in `players` order. A nickname equal to an earlier one is
-        left out.
+        left out, except FORMER_PLAYER_NICKNAME: each erased member keeps one.
     """
     member_nicknames: list[str] = []
     for past_player in state.past_players:
@@ -632,7 +632,7 @@ def team_nicknames(state: RoomState) -> tuple[str, ...]:
 
     nicknames: list[str] = []
     for nickname in member_nicknames:
-        if nickname not in nicknames:
+        if nickname == FORMER_PLAYER_NICKNAME or nickname not in nicknames:
             nicknames.append(nickname)
     return tuple(nicknames)
 
