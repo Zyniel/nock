@@ -5,6 +5,12 @@ checker on its samples and the new `fr.json` keys). AC-8 and AC-9 scan the
 rendered pages of the states K1 to K7 of the spec. The setup the test files of
 spec 035 share is in `tests/spec035_harness.py`.
 
+A flash lasts 1 s of page time (spec 016). The states that scan a flashing cell
+install the page clock before the page opens and pause it before the letter
+that starts the flash (spec 027's `freeze_clock`), so the flash is still on when
+the scan reads the colours, however slow the machine (B-100: under load the scan
+once ran past the flash's end). The clock stays paused until the page closes.
+
 Not tested here, and why:
 
 - State K7 `/g/99`: the live server answers `GET /g/99` with the 404 JSON body of
@@ -25,6 +31,7 @@ from fonts_ready import wait_for_fonts
 from nock.grid import Grid
 from nock.protocol import PlayerJoined
 from room_panels import show_tab
+from spec027_harness import freeze_clock
 from spec035_harness import (
     FX01_CLUES,
     LANGUAGE_SCAN_SCRIPT,
@@ -95,7 +102,9 @@ def open_k1(page: Page, live_server: str, grid: Grid) -> None:
 
 
 def open_k3(page: Page, live_server: str, grid: Grid) -> None:
+    page.clock.install()
     mock = open_k2(page, live_server, grid)
+    freeze_clock(page)
     mock.send(letter_changed_frame(14, 1, 3, "O", "p2"))
     expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", "1")
 
@@ -177,7 +186,9 @@ def test_ac8_text_contrast_is_at_least_4_5_to_1(
 
     assert offenders == [], f"{state} at {width}x{height}: {offenders}"
     if state == "k3_flash":
-        # The flash must not have ended during the scan.
+        # Guards the frozen clock: with the clock paused (`open_k3`) the flash
+        # cannot end, so this fails only if the freeze stopped holding, and the
+        # scan above could then have read the cell after its flash.
         expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", "1")
 
 
@@ -207,6 +218,7 @@ def test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour(
     height: int,
 ) -> None:
     page = new_page(width, height)
+    page.clock.install()
     mock = open_k2(page, live_server, fx01_grid)
     seq = 14
     for index, joining in enumerate(["p6", "p7", "p8"]):
@@ -218,6 +230,7 @@ def test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour(
     expect(page.get_by_test_id("room-page")).to_have_attribute("data-seq", str(seq - 1))
 
     # Make (1, 3) mine again, then let the player of this colour replace it.
+    freeze_clock(page)
     mock.send(letter_changed_frame(seq, 1, 3, "I", "p1"))
     mock.send(letter_changed_frame(seq + 1, 1, 3, "O", FLASH_PLAYERS[colour]))
     expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", str(colour))
@@ -225,7 +238,9 @@ def test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour(
     offenders = contrast_offenders(page)
 
     assert offenders == [], f"flash colour {colour} at {width}x{height}: {offenders}"
-    # The flash must not have ended during the scan.
+    # Guards the frozen clock: with the clock paused (`freeze_clock` above) the
+    # flash cannot end, so this fails only if the freeze stopped holding, and the
+    # scan above could then have read the cell after its flash.
     expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", str(colour))
 
 
