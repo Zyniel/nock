@@ -25,8 +25,9 @@ text.
 
 ### The ipuz file
 
-1. A `.ipuz` file is a JSON object (UTF-8; one byte order mark, U+FEFF, at its
-   start is skipped) of the ipuz v2 ArrowWord kind. A key written twice in one
+1. A `.ipuz` file is a JSON object of the ipuz v2 ArrowWord kind, in UTF-8
+   without a byte order mark: a file starting with one (U+FEFF, the bytes
+   `EF BB BF`) is refused as not valid JSON. A key written twice in one
    object, wherever it stands (a key holding `:` included), is refused naming
    the key. The file holds `version` exactly `http://ipuz.org/v2`, `kind`
    exactly `["http://ipuz.org/crossword/arrowword#1"]`, `clueplacement` exactly
@@ -47,7 +48,7 @@ text.
    | clue text | `clue`: a raw `<` or `>` (a tag) is refused, then HTML entities are decoded (`&amp;` is `&`) |
    | arrow | derived from `location` and `cells` (rule 4) |
    | answer, breaks | `answer` and `enumeration` (rule 5) |
-   | (derived) | `solution`: at a letter cell one letter, in either case, with or without accent (rule 4 of `content/grids.md`): `E`, `e`, `É`, `ê` for `E`; the block value elsewhere |
+   | (derived) | `solution`: at a letter cell one upper-case letter, its accent dropped (rule 4 of `content/grids.md`): `E`, `É`, `Ê`, `E` then U+0301 for `E`; a lower-case letter, accented or not, is refused; the block value elsewhere |
 
    `puzzle` and, when present, `solution` hold `height` rows of `width` values;
    any other value (a clue number, another text, another object) is refused. A
@@ -72,12 +73,12 @@ text.
    `right_then_down`; a one-cell word takes the straight arrow of its first
    cell. `cells` must then be the word rule 3 of `content/grids.md` resolves.
 5. A word's breaks use ipuz's own means, all agreeing:
-   - `enumeration`, when present, is counts of letters, each one or more (a
-     leading zero is allowed: `05` is 5), joined by single separators of rule 4
-     of `content/grids.md` (`-`, `.`, ` `, `'`, `’` the same as `'`): `5`,
-     `3-2-5`, `1.1`, `1 1`, `7'3`, `7’3`, `1.1-3`. Their total is the answer's
-     letters and each separator is a break. Any other text is refused: `5-`,
-     `.5`, `1.1.`, `2  3`, `2,3`, `0`.
+   - `enumeration`, when present, is counts of letters, each a whole number of
+     at least 1 written without a leading zero, joined by single separators of
+     rule 4 of `content/grids.md` (`-`, `.`, ` `, `'`, `’` the same as `'`):
+     `5`, `3-2-5`, `1.1`, `1 1`, `7'3`, `7’3`, `1.1-3`. Their total is the
+     answer's letters and each separator is a break. Any other text is refused:
+     `5-`, `.5`, `1.1.`, `2  3`, `2,3`, `0`, `05`.
    - `answer` is written with its separators (`ARC-EN-CIEL`, `A.I`) or as
      letters (`ARCENCIEL`, `AI`). Under an enumeration, an answer holding a
      separator must hold exactly the enumeration's, at the same places and of
@@ -164,9 +165,9 @@ text.
 - **AC-10** A `solution` that disagrees with the answers is refused after every
   check of `content/grids.md` rule 6: FX-01's solution with `X` at (1, 4) names
   `(1, 4)`; a letter at (0, 0) names `(0, 0)`. An `enumeration` follows rule 5:
-  `"5"` and `"05"` on `TAMIS` load; `"2 3"` loads with the answer `TA MIS` and
-  a break after 2, `"02-3"` with `TA-MIS`, `"2'3"` and `"2’3"` with `TA'MIS`;
-  `"4"`, `"5-"`, `"5."`, `"2  3"` and `"2,3"` are refused naming `(0, 0)` and
+  `"5"` on `TAMIS` loads; `"2 3"` loads with the answer `TA MIS` and a break
+  after 2, `"2'3"` and `"2’3"` with `TA'MIS`; `"4"`, `"05"`, `"02-3"`, `"5-"`,
+  `"5."`, `"2  3"` and `"2,3"` are refused naming `(0, 0)` and
   `Passoire fine`.
 - **AC-11** `difficulty` `3` and `"3"` load as force 3; `"Force 3"`, `5`, `"03"`
   and `3.0` are refused. `date` `10/01/2026` loads as `published_on`
@@ -195,16 +196,16 @@ text.
   style `{"dotted": "R"}` or `{"dashed": "R", "dotted": "R"}` at `[2, 2]` loads
   with the break after 2; `{"dotted": "R"}` at `[3, 2]` is refused naming
   `(2, 3)`, `(2, 4)`, and the style `{}` at `[2, 2]` naming `(2, 2)`.
-- **AC-16** A `solution` letter is compared case and accents aside: FX-01's
-  solution with `e`, `É` or `ê` at (4, 2) loads equal to AC-1; `EE` or `E-`
-  there is refused naming `(4, 2)`.
+- **AC-16** A `solution` letter is upper-case, its accent dropped: FX-01's
+  solution with `É`, `Ê` or `E` followed by U+0301 at (4, 2) loads equal to
+  AC-1; `e`, `ê`, `EE` or `E-` there is refused naming `(4, 2)`.
 - **AC-17** A key written twice in one object is refused naming it, even with
   the same value twice: FX-01's text with `"author"` written twice at the top
   level is refused naming `author`, with `"answer"` twice in W5 naming
   `answer`, and with `"com.example:x"` twice on W5 naming `com.example:x`.
-- **AC-18** A byte order mark at the start of a file is skipped: FX-01's file
-  with the bytes `EF BB BF` (U+FEFF) before its first `{` loads equal to AC-1;
-  with two, it is refused as not valid JSON.
+- **AC-18** A file starting with a byte order mark is refused: FX-01's file
+  with the bytes `EF BB BF` (U+FEFF) before its first `{` is refused as not
+  valid JSON.
 
 ## Edge cases
 
@@ -220,9 +221,9 @@ text.
   refused as a value (AC-4, AC-14).
 - An enumeration without separator leaves the answer as written (`ÊTRE` with
   `"4"` stays `ÊTRE`) (AC-14).
-- A `solution` letter written as a base letter and a combining accent (`E`
-  then U+0301) is one letter, like `É`; a combining mark alone is refused
-  (AC-16).
+- A `solution` letter written as an upper-case letter and a combining accent
+  (`E` then U+0301) is one letter, like `É`; a lower-case letter with one
+  (`e` then U+0301), or a combining mark alone, is refused (AC-16).
 
 ## Out of scope
 
