@@ -181,6 +181,7 @@ def open_layout_room(
         if salon.get_attribute("hidden", timeout=WAIT_TIMEOUT_MS) is None:
             page.get_by_test_id("chat-toggle").click(timeout=WAIT_TIMEOUT_MS)
         expect(salon).to_be_hidden()
+        mock.expect_no_rejoin(f"the {FEED_ITEMS} feed items")
     except BaseException:
         close()
         raise

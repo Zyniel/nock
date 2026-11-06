@@ -821,15 +821,19 @@ class MockRoomSocket:
     like the real server: `send` writes to the page's newest socket, and the join
     of a socket after the first is answered with the latest snapshot: the last
     snapshot the test sent, at the highest seq the test sent since, as the
-    server's snapshot includes every event before it. The events the test sent
-    after that snapshot are taken as included: a test whose events change what a
-    snapshot holds (letters, the roster) sends its own snapshot after a
-    reconnection. The join of the first socket is the test's to answer.
+    server's snapshot includes every event before it. What the events the test
+    sent after that snapshot changed is not in the answer, so the page shows the
+    right seq with that state lost. The mock counts the rejoins it answered
+    (`rejoins_answered`): a setup that sends such events (the feed's 100 lines)
+    calls `expect_no_rejoin` once it is done, and a reconnection during it fails
+    the test instead of passing on the wrong page. The join of the first socket is
+    the test's to answer.
     """
 
     def __init__(self) -> None:
         self.received: list[str] = []
         self.routes: list[WebSocketRoute] = []
+        self.rejoins_answered = 0
         self._latest_snapshot: dict[str, object] | None = None
         self._latest_seq = 0
 
@@ -860,6 +864,7 @@ class MockRoomSocket:
             return  # no snapshot yet: the test answers this join itself
         snapshot = dict(self._latest_snapshot)
         snapshot["seq"] = self._latest_seq
+        self.rejoins_answered += 1
         route.send(json.dumps(snapshot))
 
     def _remember(self, frame: str) -> None:
@@ -885,6 +890,18 @@ class MockRoomSocket:
         """
         self._remember(frame)
         self.routes[-1].send(frame)
+
+    def expect_no_rejoin(self, setup: str) -> None:
+        """Fail when the mock answered a rejoin: the page lost what `setup` sent.
+
+        Args:
+            setup: What the test sent that no snapshot holds, for the message.
+        """
+        if self.rejoins_answered > 0:
+            pytest.fail(
+                f"the page reconnected {self.rejoins_answered} time(s) during "
+                f"{setup}: the rejoin's snapshot does not hold it"
+            )
 
     def frames_without_pings(self) -> list[str]:
         """The frames the page sent, without its keep-alive `ping` frames.

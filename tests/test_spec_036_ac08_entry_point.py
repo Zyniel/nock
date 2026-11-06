@@ -139,13 +139,20 @@ def process_output(log_path: Path) -> str:
 
 
 def wait_for_first_answer(
-    process: subprocess.Popen[bytes], url: str, log_path: Path
+    process: subprocess.Popen[bytes], url: str, log_path: Path, deadline: float
 ) -> HttpAnswer:
-    """Poll GET `url` until the server answers, for up to 10 seconds.
+    """Poll GET `url` until the server answers, up to `deadline`.
 
-    Fails the test when the process ends first, or when nothing answers in time.
+    Args:
+        process: The running `python -m nock`.
+        url: The URL to poll.
+        log_path: The process's output, shown when the test fails.
+        deadline: The `time.monotonic()` value by which the server must answer.
+
+    Returns:
+        The first answer. The test fails when the process ends first, or when
+        nothing answers in time.
     """
-    deadline = time.monotonic() + SERVER_START_SECONDS
     while True:
         exit_status = process.poll()
         if exit_status is not None:
@@ -178,10 +185,15 @@ def stop_process(process: subprocess.Popen[bytes]) -> None:
 
 
 class NockServer(NamedTuple):
-    """A running `python -m nock`: its base URL and its first answer to GET /."""
+    """A running `python -m nock`: its base URL and its first answer to GET /.
+
+    `deadline` is the `time.monotonic()` value 10 seconds after the process was
+    started: the end of AC-8's window.
+    """
 
     base_url: str
     first_answer: HttpAnswer
+    deadline: float
 
 
 @contextlib.contextmanager
@@ -190,14 +202,16 @@ def nock_process(database: Path, log_path: Path) -> Generator[NockServer]:
 
     Runs `[sys.executable, "-m", "nock"]` with the environment of
     `nock_environment`, its output going to `log_path`, and yields once GET /
-    got an answer. Fails (not skips) when the client is not built. The process
-    is terminated at the end, then killed if it does not stop.
+    got an answer, which has to come within 10 seconds of the start. Fails (not
+    skips) when the client is not built. The process is terminated at the end,
+    then killed if it does not stop.
     """
     if not (WEB_DIST_DIR / "index.html").is_file():
         pytest.fail(MISSING_BUILD_MESSAGE)
     port = free_local_port()
     base_url = f"http://127.0.0.1:{port}"
     with log_path.open("wb") as log_file:
+        deadline = time.monotonic() + SERVER_START_SECONDS
         process = subprocess.Popen(
             [sys.executable, "-m", "nock"],
             env=nock_environment(database, port),
@@ -206,17 +220,22 @@ def nock_process(database: Path, log_path: Path) -> Generator[NockServer]:
             stderr=subprocess.STDOUT,
         )
         try:
-            first_answer = wait_for_first_answer(process, f"{base_url}/", log_path)
-            yield NockServer(base_url=base_url, first_answer=first_answer)
+            first_answer = wait_for_first_answer(
+                process, f"{base_url}/", log_path, deadline
+            )
+            yield NockServer(base_url, first_answer, deadline)
         finally:
             stop_process(process)
 
 
 # Opens a socket and sends a join as soon as it is open; reports the first
-# message it received, or the close that came instead. Gives up after `waitMs`:
-# AC-8 sets no time for the join, so the wait is the server's start wait. It was
-# 5 s, the likely cause of the join's failures under load (DRAFT-024, B-100): the
-# subprocess shares the machine with the other browser runs.
+# message it received, or the close that came instead. Gives up after `waitMs`.
+# AC-8's "within 10 seconds" covers both clauses, the GET and the join (the
+# stricter reading, the lead's decision in B-100), so the join gets what is left
+# of the 10 s counted from the process's start once GET / answered and the page
+# is open, not a fresh 10 s. The wait used to be a fixed 5 s, the likely cause of
+# the join's failures under load (DRAFT-024, B-100): the subprocess shares the
+# machine with the other browser runs.
 FIRST_MESSAGE_SCRIPT = """
 async ({ url, join, waitMs }) => {
   const socket = new WebSocket(url);
@@ -275,10 +294,15 @@ def test_ac8_a_join_on_the_room_of_nock_database_gets_a_snapshot_first(
 
     with nock_process(database, tmp_path / LOG_FILE_NAME) as server:
         page.goto(f"{server.base_url}/")
+        join_wait_ms = (server.deadline - time.monotonic()) * 1000
+        if join_wait_ms <= 0:
+            pytest.fail(
+                "no time left of AC-8's 10 s for the join once the page is open"
+            )
         arguments = {
             "url": socket_url(server.base_url, code),
             "join": join,
-            "waitMs": SERVER_START_SECONDS * 1000,
+            "waitMs": join_wait_ms,
         }
         result = page.evaluate(FIRST_MESSAGE_SCRIPT, arguments)
 

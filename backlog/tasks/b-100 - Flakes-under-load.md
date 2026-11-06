@@ -4,7 +4,7 @@ title: Flakes under load
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T10:39:00Z'
+updated_date: '2026-11-06T10:50:00Z'
 labels:
   - tooling
 milestone: m-9
@@ -67,4 +67,6 @@ Test-writer's findings and fixes (2026-11-06):
 - DRAFT-024: 036 AC-8's in-page join wait goes from a hard 5 s to SERVER_START_SECONDS (10 s), likely cause. Stay, cause not visible in the test code: 046 AC-22 nickname error (already hardened), 046 AC-22 fit, 024 AC-3 disabled reveal contrast, 019 AC-4 legend (Windows only); 046 AC-14 « client not built » is another gate rebuilding web/dist (environment).
 - DRAFT-032 stays: goto waits for load, which waits for index.css where .nock-card is defined; no late stylesheet is possible. If it fails again, SERIAL_TEST_FILES.
 - No SERIAL_TEST_FILES change needed. Follow-up: 14 other mocks still send only on routes[0] (spec006-016, 023, 026, 035 harnesses, 018 AC-3, 037 AC-4, 040 AC-14 tests).
+
+Reviewer round 1: CHANGES REQUESTED. Blocking: AC-13's idle window measured after the burst can subtract the burst's own cost (GC, a leaked timer); to be measured before the burst, failing when idle exceeds the burst. Also taken: the spec024 mock counts its rejoin answers and setups whose state no snapshot carries check it; 036 AC-8's join gets what is left of the 10 s (lead's decision: the 10 s of AC-8 covers both the GET and the snapshot); the 035 AC-8 guard's comment.
 <!-- SECTION:NOTES:END -->

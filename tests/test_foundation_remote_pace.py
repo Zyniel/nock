@@ -39,10 +39,16 @@ Choices where the spec leaves room:
   the 100 `selection_moved`: the burst window. `TaskDuration` is wall time, so it
   also holds what the page does anyway (its timers, its pings) and, on a machine
   that other browser runs load, that work stretched by the load (B-100). So the
-  same reads are made over an idle window of the burst window's length, once the
-  page has settled after the burst, with nothing sent to the page; the page's
-  cost per `selection_moved` is the burst window's time less the idle window's,
-  divided by 100. The budget is unchanged.
+  same reads are made over an idle window of 4 s (two of the page's pings) just
+  before the burst, once the page has settled, with nothing sent to the page;
+  its time, scaled to the burst window's length, is the page's work anyway. The
+  page's cost per `selection_moved` is the burst window's time less that share,
+  divided by 100. The idle window comes before the burst so that it holds none of
+  the burst's own work: what the burst leaves running (its garbage collected in
+  idle time, a timer or a frame loop started by each `selection_moved`) counts
+  in the burst window while it lasts and is never subtracted from it. An idle
+  share above the burst's time fails the test: the measure is then void, not a
+  pass. The budget is unchanged.
 - AC-13, "100 `select_cell` in a row": `product.md` rule 25 lets a connection have
   at most 100 inputs posted and not yet applied, so Bob sends them in 10 batches
   of 10, each followed by a ping whose pong he waits for.
@@ -66,7 +72,8 @@ import contextlib
 import string
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from typing import NamedTuple
 
 import pytest
 from fastapi.testclient import TestClient
@@ -115,6 +122,7 @@ SENDER_LEAD_SECONDS = 0.2
 SENDER_LIMIT_SECONDS = 30.0
 LOAD_WARM_UP_MS = 1_000
 SETTLE_MS = 1_000
+IDLE_WINDOW_MS = 4_000  # two of the page's pings, one every 2 s
 BATCH_SIZE = 10
 RELAY_WAIT_MS = 300
 COUNTER_WAIT_MS = 10_000
@@ -341,20 +349,34 @@ def wait_for_selection_frames(page: Page, count: int) -> None:
         waited_ms += RELAY_WAIT_MS
 
 
-def idle_main_thread_ms(page: Page, session: CDPSession, window_ms: float) -> float:
-    """The page's main-thread time over `window_ms` of wall time with nothing sent.
+class MainThreadWindow(NamedTuple):
+    """The page's main-thread time over a window of wall time, both in ms."""
+
+    task_ms: float
+    wall_ms: float
+
+
+def idle_main_thread(
+    page: Page, session: CDPSession, window_ms: float
+) -> MainThreadWindow:
+    """The page's main-thread time over about `window_ms` with nothing sent.
 
     Args:
         page: The room page, settled.
         session: The page's CDP session, with `Performance.enable` sent.
-        window_ms: The length of the idle window, in ms.
+        window_ms: How long to wait between the two reads, in ms.
 
     Returns:
-        The `TaskDuration` the page spent in tasks over the window, in ms.
+        The `TaskDuration` the page spent in tasks between the two reads, and
+        the wall time from just before the first read to just after the second,
+        measured as the burst window is.
     """
+    started_at = time.monotonic()
     before_ms = main_thread_ms(session)
     page.wait_for_timeout(window_ms)
-    return main_thread_ms(session) - before_ms
+    after_ms = main_thread_ms(session)
+    wall_ms = (time.monotonic() - started_at) * 1000
+    return MainThreadWindow(task_ms=after_ms - before_ms, wall_ms=wall_ms)
 
 
 def send_selection_burst(bob: Peer, cell: Cell) -> None:
@@ -419,7 +441,11 @@ def test_ac12_the_local_echo_holds_while_seven_other_players_type(
 
 @pytest.mark.only_browser("chromium")
 def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
-    browser: Browser, live_server: str, room_registry: RoomRegistry, fx02_grid: Grid
+    browser: Browser,
+    live_server: str,
+    room_registry: RoomRegistry,
+    fx02_grid: Grid,
+    record_property: Callable[[str, object], None],
 ) -> None:
     code = room_registry.register_room(fx02_grid)
     keystrokes = local_echo_keystrokes(fx02_grid)
@@ -439,6 +465,7 @@ def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
         bobs_cell = words[0].cells[0]
         phone.session.send("Performance.enable")
         phone.page.wait_for_timeout(SETTLE_MS)
+        idle = idle_main_thread(phone.page, phone.session, IDLE_WINDOW_MS)
         frames_before = selection_frames_received(phone.page)
 
         burst_started_at = time.monotonic()
@@ -452,14 +479,25 @@ def test_ac13_a_selection_bob_already_holds_costs_at_most_2_ms_of_main_thread(
         assert selection_frames_received(phone.page) == frames_before + SELECTION_BURST
         assert bob.errors() == []
         expect_cursors_shown(phone.page, len(peers))
-        phone.page.wait_for_timeout(SETTLE_MS)
-        idle_ms = idle_main_thread_ms(phone.page, phone.session, burst_window_ms)
 
     burst_ms = after_ms - before_ms
-    per_selection_ms = (burst_ms - idle_ms) / SELECTION_BURST
+    idle_share_ms = idle.task_ms * burst_window_ms / idle.wall_ms
+    record_property("idle_task_ms", round(idle.task_ms, 2))
+    record_property("idle_window_ms", round(idle.wall_ms, 1))
+    record_property("burst_task_ms", round(burst_ms, 2))
+    record_property("burst_window_ms", round(burst_window_ms, 1))
+    windows = (
+        f"{burst_ms:.1f} ms over the burst's {burst_window_ms:.0f} ms; "
+        f"{idle.task_ms:.1f} ms over {idle.wall_ms:.0f} ms idle before it, "
+        f"{idle_share_ms:.1f} ms scaled to the burst window"
+    )
+    assert idle_share_ms <= burst_ms, (
+        f"the page spent more main-thread time idle than during the burst, so "
+        f"the burst's cost would be negative and the measure is void: {windows}"
+    )
+    per_selection_ms = (burst_ms - idle_share_ms) / SELECTION_BURST
     assert per_selection_ms <= MAIN_THREAD_BUDGET_MS, (
         f"main-thread time per selection_moved that changes no cell: "
         f"{per_selection_ms:.2f} ms on average over {SELECTION_BURST}, limit "
-        f"{MAIN_THREAD_BUDGET_MS:.0f} ms ({burst_ms:.0f} ms over the burst's "
-        f"{burst_window_ms:.0f} ms, less {idle_ms:.0f} ms idle over as long)"
+        f"{MAIN_THREAD_BUDGET_MS:.0f} ms ({windows})"
     )

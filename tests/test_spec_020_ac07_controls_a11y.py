@@ -214,6 +214,7 @@ def open_top_bar_room(
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", WORD_W7)
         control = page.get_by_test_id(pencil_control(width, height, touch))
         expect(control).to_be_visible()
+        mock.expect_no_rejoin(f"the {FEED_ITEMS} feed items")
     except BaseException:
         close()
         raise

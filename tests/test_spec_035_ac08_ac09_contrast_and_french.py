@@ -186,7 +186,9 @@ def test_ac8_text_contrast_is_at_least_4_5_to_1(
 
     assert offenders == [], f"{state} at {width}x{height}: {offenders}"
     if state == "k3_flash":
-        # The flash must not have ended during the scan.
+        # Guards the frozen clock: with the clock paused (`open_k3`) the flash
+        # cannot end, so this fails only if the freeze stopped holding, and the
+        # scan above could then have read the cell after its flash.
         expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", "1")
 
 
@@ -236,7 +238,9 @@ def test_ac8_text_contrast_holds_on_a_cell_flashing_in_every_colour(
     offenders = contrast_offenders(page)
 
     assert offenders == [], f"flash colour {colour} at {width}x{height}: {offenders}"
-    # The flash must not have ended during the scan.
+    # Guards the frozen clock: with the clock paused (`freeze_clock` above) the
+    # flash cannot end, so this fails only if the freeze stopped holding, and the
+    # scan above could then have read the cell after its flash.
     expect(cell_at(page, 1, 3)).to_have_attribute("data-flash", str(colour))
 
 

@@ -121,6 +121,7 @@ def open_layout_room(
             cell.click(timeout=WAIT_TIMEOUT_MS)
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", "3,0,0")
         expect(page.get_by_test_id("account-open")).to_have_count(1)
+        mock.expect_no_rejoin(f"the {FEED_ITEMS} feed items")
     except BaseException:
         close()
         raise

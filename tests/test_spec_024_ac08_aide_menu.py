@@ -209,6 +209,7 @@ def open_setup_room(
         else:
             cell.click(timeout=WAIT_TIMEOUT_MS)
         expect(page.get_by_test_id("clue-bar")).to_have_attribute("data-word", "3,0,0")
+        mock.expect_no_rejoin(f"the {FEED_ITEMS} feed items")
     except BaseException:
         close()
         raise
