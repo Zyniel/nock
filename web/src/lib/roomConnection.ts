@@ -263,30 +263,29 @@ export function createRoomConnection(
   }
 
   // Keep a request the socket did not take, in its place among the others:
-  // after the requests made before it, before those made after it.
+  // after the requests made before it (those made between the same two edits
+  // included), before those made after it.
   function keepRequest(kept: KeptRequest): void {
     let position = 0
     while (
       position < keptRequests.length &&
-      keptRequests[position].editsBefore < kept.editsBefore
+      keptRequests[position].editsBefore <= kept.editsBefore
     ) {
       position += 1
     }
     keptRequests.splice(position, 0, kept)
   }
 
-  // Stop the send queue. The requests it still holds are kept again, before any
-  // kept since, for the next snapshot.
+  // Stop the send queue. The requests it still holds are kept again, each in
+  // its place among the ones kept since, for the next snapshot.
   function stopSendQueue(): void {
     clearInterval(sendTimer)
     sendTimer = undefined
-    const stillQueued: KeptRequest[] = []
     for (const queued of sendQueue) {
       if (queued.request !== null) {
-        stillQueued.push(queued.request)
+        keepRequest(queued.request)
       }
     }
-    keptRequests = [...stillQueued, ...keptRequests]
     sendQueue = []
     isSynced = false
   }
