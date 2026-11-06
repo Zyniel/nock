@@ -1,10 +1,10 @@
 ---
 id: B-104
 title: A sign-out forgets the account's marks in nock.progress
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T15:49:00Z'
+updated_date: '2026-11-06T18:20:00Z'
 labels:
   - domain:my-account
   - domain:cards
@@ -25,23 +25,23 @@ From DRAFT-042. B-040 makes a sign-out or deletion forget the identities, room r
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After a sign-out or a deletion, the catalogue shows none of the account's grids as started or finished, and the marks set while signed out stay
-- [ ] #2 cards AC-10 (new)
-- [ ] #3 cards AC-11 (new)
-- [ ] #4 cards AC-12 (new)
-- [ ] #5 cards AC-13 (new)
-- [ ] #6 my-account AC-9 (new)
-- [ ] #7 rooms AC-5 (changed)
+- [x] #1 After a sign-out or a deletion, the catalogue shows none of the account's grids as started or finished, and the marks set while signed out stay
+- [x] #2 cards AC-10 (new)
+- [x] #3 cards AC-11 (new)
+- [x] #4 cards AC-12 (new)
+- [x] #5 cards AC-13 (new)
+- [x] #6 my-account AC-9 (new)
+- [x] #7 rooms AC-5 (changed)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -66,4 +66,14 @@ Spec-checker round 1: CHANGES REQUESTED (AC-12's 401/500 case contradicted its s
 Lead's decision: library.md's Out of scope pointer (which key « Jouer » writes: cards rule 2) accepted as a one-line fourth file; the account/account.md Depends-on bullet dropped (my-account rule 1 is where the pages ask the status).
 
 Spec-checker round 2: APPROVED.
+
+Reviewer round 1: APPROVE (no other writer of nock.progress; the room page joins while its status is held). Taken: cards' Tests line names the new files. Not taken: a duplicated read helper in a test, $derived.by (svelte-check needed it). Noted for DRAFT-094: « Grilles terminées » still lists a solved grid of a room created signed in, reopening that room marks it in nock.progress; and a room page that read signed_in before a sign-out in another tab writes nock.account_progress after it.
+
+Full gate green (chromium): 8906 parallel + 145 serial passed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A sign-out or a deletion now forgets the account's marks: marks set while signed in go to a second key, nock.account_progress (same format as nock.progress), removed when the sign-out or deletion answers 204; the pills merge both keys and the account's route. Marks set signed out stay. Cards AC-10 to AC-13, my-account AC-9, rooms AC-5 changed; Firefox and WebKit left to CI. Open: « Grilles terminées » and reopening a room created signed in still mark the grid, and a sign-out in another tab (DRAFT-094).
+<!-- SECTION:FINAL_SUMMARY:END -->
