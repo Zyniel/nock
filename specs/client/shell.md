@@ -61,7 +61,9 @@ file, and the brand on the top bars.
    asks for nothing. What an event changes belongs to its domain. An event
    applies whole: a part of it of the wrong shape is skipped as if absent (a
    struck cell of a `check_result` that is not two integers strikes nothing),
-   and the event still takes its seq.
+   and the event still takes its seq. A `check_result` found no wrong letter
+   only when its `wrong` is an empty list: one whose entries are all skipped
+   found some.
 5. `selection_moved` and `reaction` are dropped before the first snapshot and
    apply at once after it; `error` applies at once at any time. None of them
    touches the seq or the buffer; any other message without an integer `seq`
@@ -207,6 +209,11 @@ file, and the brand on the top bars.
   seq 5, a `check_result` 6 whose `wrong` is `[null, {"row": 1, "column": 0},
   {"row": "1", "column": 1}]` gives seq 6, strikes (1, 0) and not (1, 1), and
   adds its stream line; event 7 then gives seq 7.
+- **AC-35** On FX-01, after a snapshot at seq 5, a `check_result` 6 of the
+  word MIME whose `wrong` is `[null, {"row": "1", "column": 1}]` strikes no
+  cell, and its stream line has the look of a check that found a wrong
+  letter (`_design/room.md`, « Salon »); with `wrong` `[]` it has the other
+  look.
 
 ## Edge cases
 
@@ -229,6 +236,7 @@ file, and the brand on the top bars.
 - `web/src/App.svelte` (routing, title, code per page), `web/index.html`,
   `web/src/lib/i18n.ts`, `web/src/i18n/fr.json`.
 - `web/src/lib/roomSession.ts` (frames, seq, final closes, cursors),
+  `activityFeed.ts` (a check that found no wrong letter),
   `roomConnection.ts` (the socket), `RoomPage.svelte` (opening),
   `EntryPage.svelte` (the entry page, its cards), `EntryFrame.svelte`,
   `CatalogueFrame.svelte` (the frames and their `main`), `NotFoundPage.svelte`,

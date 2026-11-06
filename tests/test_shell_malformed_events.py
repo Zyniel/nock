@@ -1,5 +1,5 @@
-"""Tests of `client/shell.md` AC-34: an event applies whole, a part of the wrong
-shape skipped (rule 4).
+"""Tests of `client/shell.md` AC-34 and AC-35: an event applies whole, a part of
+the wrong shape skipped, and only an empty `wrong` list is a clean check (rule 4).
 
 Ana's page at 1280 by 720 on spec 043's mocked room, joined on FX-01 with Bob's `X`
 at (1, 0) and `Y` at (1, 1), snapshot at seq 5. The mock sends Bob's grid check as
@@ -8,18 +8,29 @@ at (1, 0) and `Y` at (1, 1), snapshot at seq 5. The mock sends Bob's grid check 
 takes seq 6, strikes (1, 0) (`data-wrong` true) and not (1, 1), and adds the
 stream line « Bob a vérifié la grille ». Event 7, Bob's `V` at (2, 1), then gives
 seq 7 and shows.
+
+AC-35: on the same room, the mock sends Bob's check of the word MIME as `check_result`
+6 whose `wrong` is `[null, {"row": "1", "column": 1}]`: no cell is struck, and its
+stream line (« Bob a vérifié un mot ») is in `--nock-muted`, the look of a check that
+found a wrong letter. With `wrong` `[]` the line is in green, the
+look of a clean check (`specs/_design/room.md`, « Salon »).
 """
 
 from __future__ import annotations
 
 import json
 
+import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
-from nock.protocol import CheckResult, GridTarget
+from nock.protocol import CheckResult, GridTarget, WordTarget
 from spec043_harness import (
+    GREEN,
+    MUTED,
+    Rgb,
     cell_at,
+    expect_colour,
     expect_seq,
     fr_format,
     fx01_view,
@@ -70,3 +81,45 @@ def test_ac34_a_check_result_with_malformed_cells_strikes_only_the_valid_one(
 
     expect_seq(page, 7)
     expect(cell_at(page, 2, 1)).to_have_attribute("data-letter", "V")
+
+
+# ---- AC-35: only an empty wrong list is a clean check ------------------------------
+
+MIME_TARGET = WordTarget(row=0, column=2, clue_index=0)
+
+
+def word_check_frame(wrong: list[object]) -> str:
+    """Bob's check of MIME at seq 6, its `wrong` list put in as given."""
+    result = CheckResult(
+        seq=6, player_id="p2", target=MIME_TARGET, correct=(), wrong=()
+    )
+    event = result.model_dump(mode="json")
+    event["wrong"] = wrong
+    return json.dumps(event)
+
+
+@pytest.mark.parametrize(
+    ("wrong", "line_colour"),
+    [
+        ([None, {"row": "1", "column": 1}], MUTED),
+        ([], GREEN),
+    ],
+    ids=["entries all skipped", "empty list"],
+)
+def test_ac35_only_an_empty_wrong_list_gives_the_clean_check_look(
+    page: Page,
+    live_server: str,
+    fx01_grid: Grid,
+    wrong: list[object],
+    line_colour: Rgb,
+) -> None:
+    frame = snapshot_frame(fx01_view(fx01_grid, X_AND_Y), players_up_to(3))
+    mock = open_room(page, live_server, frame)
+
+    mock.send(word_check_frame(wrong))
+
+    expect_seq(page, 6)
+    expect(page.locator('[data-testid="cell"][data-wrong="true"]')).to_have_count(0)
+    line = page.locator('[data-testid="feed-item"][data-seq="6"]')
+    expect(line).to_have_text(fr_format("feed.check.word", name="Bob"))
+    expect_colour(line, "color", line_colour)

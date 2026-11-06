@@ -97,16 +97,6 @@ its sheet.
     nothing, and Tab and Shift+Tab stay on the link. The page stays until the
     player follows it.
 
-### Other final states
-
-19. Once the room has shown, any other final state (`replaced`, `removed`,
-    `locked`, `full`, `throttled`: `platform/reconnection.md` rule 4) drops
-    the letters waiting to be sent and the kept undos, checks and reveals, and
-    makes the grid read-only: a typed letter or an erase, from the keys or the
-    in-app keyboard, changes no cell and sends nothing; « Annuler » and every
-    Aide item, the confirm item included, are disabled (`client/menus.md`
-    rule 2). The selection still moves.
-
 ### Status region
 
 17. From its first paint, in every state, the room page holds one region with
@@ -128,6 +118,19 @@ its sheet.
     instead, the recap's own
     (`gameplay/results.md` rules 9, 12) included; the page's region gets none,
     and gets the messages again once the sheet closes.
+
+### Other final states
+
+19. Once the room has shown, any other final state (`replaced`, `removed`,
+    `locked`, `full`, `throttled`: `platform/reconnection.md` rule 4) drops
+    the letters waiting to be sent and the kept undos, checks and reveals,
+    which are never sent, and makes the grid read-only: a typed letter or an
+    erase, from the keys or the in-app keyboard, changes no cell, moves no
+    selection and sends nothing; « Annuler » and every Aide item, the confirm
+    item included, are disabled (`client/menus.md` rule 2). Every other way
+    still moves the selection (`gameplay/board.md` rules 6, 12, 13, 15; rule
+    14 here): a press on a cell or a clue, the arrows, Tab and Shift+Tab, ⇄,
+    ‹ and ›, a reaction pill.
 
 ### Look
 
@@ -215,6 +218,14 @@ Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
   lettre », « Le mot » of « Révéler » take the disabled look, and a press on
   any sends nothing; with Bob's pencil `T` at (1, 0) selected, the confirm
   item is disabled alike.
+- **AC-30** At 1280 by 720 with Bob's `I` at (2, 2) and MIME selected on it,
+  after a close 4001: Backspace leaves `I` and the selection on (2, 2);
+  ArrowDown selects the empty (3, 2), where `t` then Backspace leave it empty
+  and selected; a press on (1, 0) selects it. On a touch screen at 360 by 740
+  the in-app keyboard's `T` and ⌫ change no cell alike.
+- **AC-31** Reconnecting, with « Annuler » pressed, « Vérifier » « La
+  lettre » and « Révéler » « La lettre » chosen, a rejoin refused with
+  `room_locked`, then closed, never sends the undo, the check or the reveal.
 
 ## Edge cases
 
@@ -241,7 +252,8 @@ Buttons, the brand link: `_design/foundation.md`, « Components »; the focus,
 
 ## Code
 
-- `web/src/lib/RoomPage.svelte` (layout, play area, room gone),
+- `web/src/lib/RoomPage.svelte` (layout, play area, room gone, read-only
+  grid), `roomConnection.ts` (what a final state drops),
   `roomOverlays.ts` (what a layout change and the room's deletion close),
   `playFit.ts` (layout, the grid's box, the clue bar's width, the legend's
   place), `StatusRegion.svelte` and `announce.ts` (the status region,
