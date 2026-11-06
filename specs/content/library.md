@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -197,8 +197,9 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - Other orders than newest first, searching, paging, filtering by size.
 - Showing grid credits (`content/grid-files.md` rule 11).
 - Reloading the grid list while the server runs: `content/grid-files.md`.
-- « Jouer », the room it creates and the writing of `nock.progress`:
-  `lobby/rooms.md`. « Mes salons »: `lobby/summaries.md`. « Grilles terminées »:
+- « Jouer » and the room it creates: `lobby/rooms.md`; which progress key it
+  writes: `content/cards.md` rule 2. « Mes salons »: `lobby/summaries.md`.
+  « Grilles terminées »:
   `gameplay/history.md`. « Compte » and its dialog: `account/my-account.md`; how
   the account's progress is derived: `account/erasure.md`.
 - The frame of entry pages, the page not found, the scans of every page and

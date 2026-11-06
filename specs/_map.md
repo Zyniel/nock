@@ -50,7 +50,7 @@ table, the naming rules and the glossary follow in the same change.
 | content | `content/grid-files.md` | the index `grids/catalogue.json`, credits, withdrawal, the converter | | 004 AC-5; 005 AC-1 to AC-3, AC-6, AC-7 |
 | content | `content/ipuz.md` | the `.ipuz` grid file: its format, the reader and its checks, the writer | | 004 AC-7 |
 | content | `content/library.md` | what players browse: the grid APIs, the catalogue page, its filter and states, the grid page | pages | 004 AC-1, AC-2, AC-4, AC-6, AC-7; 046 AC-2, AC-4, AC-9, AC-14 |
-| content | `content/cards.md` | the grid card: its lines, the progress pill and its two sources, the force marks, the drawing, the failed « Jouer » | pages | 004 AC-3; 046 AC-5 to AC-8, AC-10 |
+| content | `content/cards.md` | the grid card: its lines, the progress pill and its three sources, the force marks, the drawing, the failed « Jouer » | pages | 004 AC-3; 046 AC-5 to AC-8, AC-10 |
 | admin | `admin/operations.md` | logs, metrics, retention, the operator token, the ops API | | 038 AC-3 to AC-6, AC-10, AC-11 |
 | admin | `admin/ops-page.md` | the `/ops` page: the token form and its states, the dashboard card and its period chips, the replay of a room's edits | pages | 038 AC-7 to AC-9; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
