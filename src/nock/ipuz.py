@@ -500,18 +500,13 @@ def _read_counts(enumeration: str, name: str) -> list[int]:
     if _ENUMERATION_PATTERN.fullmatch(enumeration) is None:
         raise IpuzError(
             f"{name} has the enumeration {enumeration!r}, expected counts of "
-            "letters joined by single separators "
-            "(- . space ' \N{RIGHT SINGLE QUOTATION MARK}), like 3-2-5"
+            "letters of 1 or more, written without a leading zero, joined by "
+            "single separators (- . space ' \N{RIGHT SINGLE QUOTATION MARK}), "
+            "like 3-2-5"
         )
     counts: list[int] = []
     for part in _COUNT_PATTERN.findall(enumeration):
-        count = int(part)
-        if count < 1:
-            raise IpuzError(
-                f"{name} has the enumeration {enumeration!r}, "
-                "expected each count to be one or more"
-            )
-        counts.append(count)
+        counts.append(int(part))
     return counts
 
 
@@ -524,10 +519,8 @@ def _join_counts(pieces: list[str], separators: tuple[str, ...]) -> str:
 
 
 def _normalized_enumeration(enumeration: str) -> str:
-    """Write an enumeration by its counts and separators, without leading zeros."""
-    counts: list[str] = []
-    for part in _COUNT_PATTERN.findall(enumeration):
-        counts.append(str(int(part)))
+    """Write an enumeration by its counts and separators."""
+    counts = _COUNT_PATTERN.findall(enumeration)
     return _join_counts(counts, separators_of(enumeration))
 
 

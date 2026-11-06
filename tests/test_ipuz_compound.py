@@ -301,3 +301,15 @@ def test_ac15_a_style_with_neither_dashed_nor_dotted_is_refused_naming_the_cell(
     message = read_error(data)
 
     assert "(2, 2)" in message
+    assert "(2, 3)" not in message, message
+
+
+def test_ac15_an_empty_style_in_a_grid_without_breaks_is_refused_naming_the_cell() -> (
+    None
+):
+    data = fx01_ipuz_data()
+    set_style(data, 1, 1, {})
+
+    message = read_error(data)
+
+    assert "(1, 1)" in message

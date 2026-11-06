@@ -246,6 +246,28 @@ def test_ac10_an_enumeration_with_a_separator_gives_the_answer_its_break(
 
 
 @pytest.mark.parametrize(
+    ("answer", "enumeration", "breaks"),
+    [
+        pytest.param("ABCDEFGHIJ", "10", (), id="ten"),
+        pytest.param("ABCDEFGHIJKL", None, (), id="twelve-without-enumeration"),
+        pytest.param("ABCDEFGHIJKL", "12", (), id="twelve"),
+        pytest.param("ABCDEFGHIJ-KLMNOPQRSTUV", "10-12", (10,), id="ten-and-twelve"),
+    ],
+)
+def test_ac10_an_enumeration_with_a_count_of_ten_or_more_loads(
+    answer: str, enumeration: str | None, breaks: tuple[int, ...]
+) -> None:
+    letters = answer.replace("-", "")
+
+    clue = cell_with_clues(
+        read_data(mini_data(answer, letters, enumeration)).grid, 0, 0
+    ).clues[0]
+
+    assert clue.letters == letters
+    assert clue.breaks == breaks
+
+
+@pytest.mark.parametrize(
     "enumeration",
     ["4", "05", "02-3", "5-", "5.", ".5", "0", "0-5", "2--3", "2  3", "2,3", "1.1."],
 )
@@ -261,7 +283,7 @@ def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
     assert "Passoire fine" in message
 
 
-# ---- AC-16: a solution letter in any case and accent --------------------------
+# ---- AC-16: an upper-case solution letter, with or without an accent ----------
 
 
 @pytest.mark.parametrize(
@@ -274,7 +296,7 @@ def test_ac10_an_enumeration_that_is_not_the_letters_counted_is_refused(
         pytest.param("E\N{COMBINING ACUTE ACCENT}", id="decomposed-acute"),
     ],
 )
-def test_ac16_a_solution_letter_in_another_case_or_accent_loads_equal(
+def test_ac16_an_upper_case_accented_solution_letter_loads_equal(
     letter: str,
 ) -> None:
     data = fx01_ipuz_data()
@@ -294,7 +316,7 @@ def test_ac16_a_solution_letter_in_another_case_or_accent_loads_equal(
         pytest.param("\N{COMBINING ACUTE ACCENT}", id="combining-mark-alone"),
     ],
 )
-def test_ac16_a_solution_of_two_characters_is_refused_naming_the_cell(
+def test_ac16_a_lower_case_or_two_character_solution_is_refused_naming_the_cell(
     value: str,
 ) -> None:
     data = fx01_ipuz_data()
