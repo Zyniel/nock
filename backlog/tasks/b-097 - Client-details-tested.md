@@ -4,7 +4,7 @@ title: Client details tested
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T09:23:00Z'
+updated_date: '2026-11-06T09:27:00Z'
 labels:
   - domain:shell
 milestone: m-9
@@ -52,4 +52,6 @@ Quick gate: uv run python scripts/gate.py --specs shell --browsers chromium
 Lead's decisions: shell.md reaching 21 criteria is accepted as « about 20 » (a split of the connection rules would be an architecture change, out of scope); the binary frame and the typeless frame share AC-36, proven by a parametrised test that fails for each alone; AC-36 keeps « a letter event 6 as UTF-8 JSON », so a binary frame read as text would apply.
 
 Spec-checker: APPROVED. Its note on AC-37 (no fr.json template has two placeholders, so the test calls t() with its own template, as AC-3 checks code-level properties of t()) is accepted as written.
+
+Test-writer: AC-36's binary case does not fail when onSocketMessage's non-string check is removed, since a Blob fails JSON.parse and is dropped anyway; it does fail against a client that decodes binary frames (binaryType arraybuffer + TextDecoder), which is the behaviour rule 3 forbids. Lead's decision: accepted, the test proves the rule rather than one redundant line. No implementer phase: the behaviour exists and every test passes on the current code.
 <!-- SECTION:NOTES:END -->

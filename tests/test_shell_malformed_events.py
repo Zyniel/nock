@@ -1,5 +1,6 @@
-"""Tests of `client/shell.md` AC-34 and AC-35: an event applies whole, a part of
-the wrong shape skipped, and only an empty `wrong` list is a clean check (rule 4).
+"""Tests of `client/shell.md` AC-34 to AC-36: an event applies whole, a part of
+the wrong shape skipped, and only an empty `wrong` list is a clean check (rule 4); a
+frame that is not a text message with a `type` is dropped (rule 3).
 
 Ana's page at 1280 by 720 on spec 043's mocked room, joined on FX-01 with Bob's `X`
 at (1, 0) and `Y` at (1, 1), snapshot at seq 5. The mock sends Bob's grid check as
@@ -14,21 +15,30 @@ AC-35: on the same room, the mock sends Bob's check of the word MIME as `check_r
 stream line (« Bob a vérifié un mot ») is in `--nock-muted`, the look of a check that
 found a wrong letter. With `wrong` `[]` the line is in green, the
 look of a clean check (`specs/_design/room.md`, « Salon »).
+
+AC-36: on the same room, the mock sends letter event 6 as a binary frame (UTF-8 JSON),
+or the text frame `{"seq": 6}` with no `type`: the page stays joined at seq 5 with
+nothing buffered (`data-pending` 0) after a pause long enough for the frame to have
+been read. Letter event 6 sent as text then gives seq 6 and its letter shows.
 """
 
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 
 import pytest
 from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from nock.protocol import CheckResult, GridTarget, WordTarget
+from shell_harness import send_binary
+from spec019_harness import SETTLE_MS
 from spec043_harness import (
     GREEN,
     MUTED,
     Rgb,
+    RoomMock,
     cell_at,
     expect_colour,
     expect_seq,
@@ -123,3 +133,51 @@ def test_ac35_only_an_empty_wrong_list_gives_the_clean_check_look(
     line = page.locator('[data-testid="feed-item"][data-seq="6"]')
     expect(line).to_have_text(fr_format("feed.check.word", name="Bob"))
     expect_colour(line, "color", line_colour)
+
+
+# ---- AC-36: a frame that is not a text message with a type is dropped ---------------
+
+LETTER_ROW = 2
+LETTER_COLUMN = 1
+LETTER = "V"
+
+
+def binary_letter_frame(mock: RoomMock) -> None:
+    """Send letter event 6 as a binary frame holding its UTF-8 JSON."""
+    send_binary(mock, letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
+
+
+def typeless_frame(mock: RoomMock) -> None:
+    """Send the text frame `{"seq": 6}`, which has no `type`."""
+    mock.send(json.dumps({"seq": 6}))
+
+
+@pytest.mark.parametrize(
+    "send_dropped_frame",
+    [binary_letter_frame, typeless_frame],
+    ids=["binary frame", "text frame without type"],
+)
+def test_ac36_a_binary_or_typeless_frame_is_dropped_and_event_6_then_applies(
+    page: Page,
+    live_server: str,
+    fx01_grid: Grid,
+    send_dropped_frame: Callable[[RoomMock], None],
+) -> None:
+    frame = snapshot_frame(fx01_view(fx01_grid, X_AND_Y), players_up_to(3))
+    mock = open_room(page, live_server, frame)
+    room = page.get_by_test_id("room-page")
+
+    send_dropped_frame(mock)
+    page.wait_for_timeout(SETTLE_MS)
+
+    expect(room).to_have_attribute("data-status", "joined")
+    expect(room).to_have_attribute("data-seq", "5")
+    expect(room).to_have_attribute("data-pending", "0")
+
+    mock.send(letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
+
+    expect_seq(page, 6)
+    expect(room).to_have_attribute("data-pending", "0")
+    expect(cell_at(page, LETTER_ROW, LETTER_COLUMN)).to_have_attribute(
+        "data-letter", LETTER
+    )

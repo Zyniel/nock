@@ -9,6 +9,8 @@ are in `tests/test_shell_*.py`:
 - `test_shell_text_keys.py`: AC-29, the list separator and the units.
 - `test_shell_landmarks.py`: AC-30, one banner then one `main` on every page.
 - `test_shell_page_code.py`: AC-31, the code fetched on each page's route.
+- `test_shell_malformed_events.py`: AC-34 to AC-36, events and frames of wrong shape.
+- `test_shell_placeholders.py`: AC-37, a placeholder with no value.
 
 This module holds what more than one of those files uses: the built client's files
 (`web/dist`), the way a test reads the scripts a page fetched, a rewrite of one
@@ -30,6 +32,7 @@ from playwright.sync_api import Page, Request, Route, expect
 
 from fonts_ready import wait_for_fonts
 from nock.server import WEB_DIST_DIR
+from spec043_harness import RoomMock
 from spec046_harness import WAIT_TIMEOUT_MS
 
 ASSETS_DIR = WEB_DIST_DIR / "assets"
@@ -66,6 +69,11 @@ def open_locked_ops(page: Page, base_url: str) -> None:
         "data-state", "locked", timeout=WAIT_TIMEOUT_MS
     )
     wait_for_fonts(page)
+
+
+def send_binary(mock: RoomMock, text: str) -> None:
+    """Send `text`, UTF-8 encoded, as a binary frame on the newest mocked socket."""
+    mock.routes[-1].send(text.encode("utf-8"))
 
 
 def built_file_of(url: str) -> Path:
