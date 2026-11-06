@@ -23,7 +23,7 @@ from nock.catalogue import (
     Force,
     GridNumber,
     IndexEntry,
-    _is_former_file,
+    is_former_file,
 )
 from nock.grid import Grid
 from nock.grid_import import import_grid
@@ -68,7 +68,7 @@ def _former_file_names(source: Path) -> list[str]:
     """List the names of the former files of `source`, in code-point order."""
     names: list[str] = []
     for path in source.iterdir():
-        if _is_former_file(path):
+        if is_former_file(path):
             names.append(path.name)
     names.sort()
     return names
@@ -112,11 +112,25 @@ def _convert_file(path: Path) -> _Conversion:
     return _Conversion(file_name, write_ipuz(grid_file), index_entry)
 
 
+def _check_name_is_safe(name: str) -> None:
+    """Refuse a source file name the index would refuse.
+
+    Raises:
+        ValueError: The name changes when case-folded, or holds a backslash or a colon.
+    """
+    if name.casefold() != name or "\\" in name or ":" in name:
+        raise ValueError(
+            f"{name}: invalid former grid file: the name must be lower-case "
+            "and hold no '\\' or ':'"
+        )
+
+
 def _convert_all(source: Path) -> list[_Conversion]:
     """Convert every former file of `source`, refusing at the first bad one."""
     conversions: list[_Conversion] = []
     numbers_seen: set[int] = set()
     for name in _former_file_names(source):
+        _check_name_is_safe(name)
         try:
             conversion = _convert_file(source / name)
         except (OSError, ValueError) as error:
