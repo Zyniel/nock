@@ -19,7 +19,6 @@ from grid_files_harness import (
     clue_named,
     dump,
     fx01_ipuz_data,
-    read_data,
 )
 from nock.ipuz import IpuzError, read_ipuz
 
@@ -87,14 +86,8 @@ def test_ac17_a_namespaced_key_twice_in_one_object_is_refused(where: str) -> Non
 # ---- AC-18: a byte order mark ------------------------------------------------------
 
 
-def test_ac18_one_byte_order_mark_at_the_start_is_skipped() -> None:
+def test_ac18_a_byte_order_mark_at_the_start_is_refused_as_not_valid_json() -> None:
     text = BYTE_ORDER_MARK + dump(fx01_ipuz_data())
-
-    assert read_ipuz(text) == read_data(fx01_ipuz_data())
-
-
-def test_ac18_two_byte_order_marks_are_refused_as_not_valid_json() -> None:
-    text = BYTE_ORDER_MARK * 2 + dump(fx01_ipuz_data())
 
     with pytest.raises(IpuzError, match="not valid JSON"):
         read_ipuz(text)

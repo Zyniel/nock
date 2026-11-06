@@ -10,11 +10,13 @@ Choices where the spec leaves room:
   derives it with the block value.
 - AC-5: the `solution` is left out, so that only the shape of `puzzle` can be
   the problem.
-- AC-4, a `dashed` value of "" or "X" is only expected to be refused.
+- AC-4, a `dashed` or `dotted` value of "" or "X" is refused for its reason: the
+  message says the value is made of T, R, B and L.
 """
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 import pytest
@@ -170,7 +172,9 @@ def test_ac4_a_dashed_value_that_is_not_made_of_t_r_b_l_is_refused(
     data = fx01_ipuz_data()
     data["puzzle"][1][0] = {"cell": 0, "style": style}
 
-    read_error(data)
+    message = read_error(data)
+
+    assert re.search(r"T,? R,? B,? L", message), message
 
 
 # ---- AC-5: the shape of the puzzle ------------------------------------------
