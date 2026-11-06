@@ -37,7 +37,7 @@ From DRAFT-067 and DRAFT-069. No behaviour change: one helper holds the refused 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -54,6 +54,8 @@ Quick gate: uv run python scripts/gate.py --specs chat,serving,rooms --browsers 
 Spec-checker: APPROVED (Code sections only). Lead's decision: no new test (the criterion asks that the existing chat and NOCK_DATABASE tests pass unchanged), so no test-writer phase; the helper is is_refused_character(character, allowed) in src/nock/protocol.py.
 
 Reviewer round 1: APPROVE (behaviour identical for chat and NOCK_DATABASE; no test changed). Not taken (style, no follow-up): the unused default of allowed, the wording of the comment above JOINERS.
+
+PR: #172.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
