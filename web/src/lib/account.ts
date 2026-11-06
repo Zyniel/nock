@@ -3,7 +3,7 @@
 // functions: no DOM.
 
 import { ACCOUNT_PROGRESS_STORAGE_KEY } from './catalogue'
-import { HISTORY_KEY, readHistory, type HistoryRecord } from './history'
+import { HISTORY_KEY } from './history'
 import { identityKey, readIdentity, writeIdentity } from './joinRules'
 import type { RoomKey } from './myRooms'
 import { readItem, removeItem, roomRecordKey, writeItem } from './storage'
@@ -195,8 +195,8 @@ export async function linkRoom(key: RoomKey): Promise<void> {
 }
 
 // The codes of the rooms whose identity this device took from the account. A
-// stored value that is not a JSON array reads as none, and an item that is not a
-// string is left out.
+// stored value that is not a JSON array reads as none, and so does an array with
+// an item that is not a string.
 function readAccountRoomCodes(): string[] {
   const raw = readItem(ACCOUNT_ROOMS_KEY)
   if (raw === null) {
@@ -213,11 +213,50 @@ function readAccountRoomCodes(): string[] {
   }
   const codes: string[] = []
   for (const item of stored) {
-    if (isString(item)) {
-      codes.push(item)
+    if (!isString(item)) {
+      return []
     }
+    codes.push(item)
   }
   return codes
+}
+
+// Whether a stored history item has a `code` that is one of the given codes. An
+// item of any other shape does not.
+function isHistoryItemOfCodes(item: unknown, codes: string[]): boolean {
+  if (typeof item !== 'object' || item === null) {
+    return false
+  }
+  const code = (item as Record<string, unknown>).code
+  return isString(code) && codes.includes(code)
+}
+
+// Remove the items of `nock.history` whose `code` is one of the given codes,
+// malformed items included. Every other item stays as stored, in its order. A
+// stored value that is not a JSON array is left as stored.
+function forgetHistoryOfCodes(codes: string[]): void {
+  const raw = readItem(HISTORY_KEY)
+  if (raw === null) {
+    return
+  }
+  let stored: unknown
+  try {
+    stored = JSON.parse(raw)
+  } catch {
+    return
+  }
+  if (!Array.isArray(stored)) {
+    return
+  }
+  const keptItems: unknown[] = []
+  for (const item of stored) {
+    if (!isHistoryItemOfCodes(item, codes)) {
+      keptItems.push(item)
+    }
+  }
+  if (keptItems.length < stored.length) {
+    writeItem(HISTORY_KEY, JSON.stringify(keptItems))
+  }
 }
 
 // Store each identity of the account whose room has no valid identity on this
@@ -256,16 +295,7 @@ export function forgetAccountSeats(): void {
     removeItem(identityKey(code))
     removeItem(roomRecordKey(code))
   }
-  const storedRecords = readHistory()
-  const keptRecords: HistoryRecord[] = []
-  for (const record of storedRecords) {
-    if (!accountCodes.includes(record.code)) {
-      keptRecords.push(record)
-    }
-  }
-  if (keptRecords.length < storedRecords.length) {
-    writeItem(HISTORY_KEY, JSON.stringify(keptRecords))
-  }
+  forgetHistoryOfCodes(accountCodes)
   removeItem(ACCOUNT_ROOMS_KEY)
   removeItem(ACCOUNT_PROGRESS_STORAGE_KEY)
 }

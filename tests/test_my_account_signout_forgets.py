@@ -1,4 +1,4 @@
-"""Tests of account/my-account, AC-5 to AC-7: a sign-out forgets the account's seats.
+"""Tests of account/my-account, AC-5 to AC-7, AC-10, AC-11: a sign-out forgets seats.
 
 A browser, on the live server of spec 033's "Test harness" (accounts on, a
 recording mailer, the real client). Ana's account lists the rooms R and T; her
@@ -15,6 +15,17 @@ unchanged, and `nock.account_rooms` names R and S.
   device the same way.
 - AC-7: a sign-out answered 500 or a deletion answered 500 shows
   `account.error.generic` and every `localStorage` item stays as it was.
+
+AC-10 and AC-11 run on a device signed in as Ana with the room R alone, and write
+`nock.account_rooms`, the seats and `nock.history` once the `/account` page shows
+`signed_in`:
+
+- AC-10: `nock.account_rooms` is `["RRRRRR", 1]`; a sign-out answered 204 shows
+  `signed_out`, R's identity, room record and history record stay and the device
+  holds no `nock.account_rooms`.
+- AC-11: `nock.history` holds R's record, `{"code": "RRRRRR", "grid": "two"}`,
+  T's record, `{"code": "UUUUUU", "grid": "two"}` and `null`; after a sign-out or
+  a deletion answered 204 it holds T's record, the U item and `null`, in order.
 """
 
 from __future__ import annotations
@@ -28,6 +39,7 @@ from typing import NamedTuple
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, Route, expect
 
+from cards_harness import stored_object
 from nock.catalogue import Catalogue
 from nock.grid import Grid
 from nock.protocol import Join
@@ -53,6 +65,7 @@ from spec033_harness import (
     load_fr,
     room_key,
     sign_in_with_link,
+    stored_identity,
     wait_for_messages,
 )
 from spec033_harness import token_of as link_token_of
@@ -60,6 +73,7 @@ from spec033_harness import token_of as link_token_of
 R_CODE = "RRRRRR"  # the account brings it, at the sign-in
 S_CODE = "SSSSSS"  # the account brings it, at the catalogue load
 T_CODE = "TTTTTT"  # the device's own seat, which the account lists as well
+U_CODE = "UUUUUU"  # a room of the device's history that the account never lists
 ACCOUNT_ROOMS_KEY = "nock.account_rooms"
 HISTORY_KEY = "nock.history"
 FINISHED_AT = "2026-10-14T08:30:00Z"
@@ -165,14 +179,6 @@ def local_storage_of(page: Page) -> dict[str, str]:
     return items
 
 
-def stored_json(page: Page, key: str) -> object:
-    """The item `key` parsed, or None when it is absent."""
-    raw = read_key(page, key)
-    if raw is None:
-        return None
-    return json.loads(raw)
-
-
 def history_by_code(page: Page) -> dict[str, object]:
     """The records of `nock.history`, by room code; empty when it is absent."""
     stored = stored_history(page)
@@ -190,7 +196,7 @@ def history_by_code(page: Page) -> dict[str, object]:
 
 def account_rooms_of(page: Page) -> list[str]:
     """The codes of `nock.account_rooms`, sorted; empty when it is absent."""
-    stored = stored_json(page, ACCOUNT_ROOMS_KEY)
+    stored = stored_object(page, ACCOUNT_ROOMS_KEY)
     if stored is None:
         return []
     assert isinstance(stored, list), stored
@@ -252,7 +258,7 @@ def device_with_seats(server: AccountServer, devices: Devices, grid: Grid) -> Se
 
 def assert_seat_stored(page: Page, code: str, identity: Identity) -> None:
     """The device holds `identity` under `nock.identity.<code>`."""
-    assert stored_json(page, f"nock.identity.{code}") == identity
+    assert stored_identity(page, code) == identity
 
 
 def assert_device_holds_all(seats: Seats) -> None:
@@ -338,27 +344,117 @@ def fail_with_500(route: Route) -> None:
         route.fallback()
 
 
-@pytest.mark.parametrize("action", ["sign-out", "deletion"])
+class Leaving(NamedTuple):
+    """One way to leave the account: the request it sends and the buttons it presses."""
+
+    route: str  # the `page.route` pattern of its request
+    buttons: tuple[str, ...]  # test ids clicked in order
+    state: str  # the account state a 204 shows
+
+
+SIGN_OUT = Leaving(SIGN_OUT_ROUTE, ("account-sign-out",), "signed_out")
+DELETION = Leaving(
+    ACCOUNT_ROUTE, ("account-delete", "account-delete-confirm"), "deleted"
+)
+LEAVINGS = [
+    pytest.param(SIGN_OUT, id="sign-out"),
+    pytest.param(DELETION, id="deletion"),
+]
+
+
+def press_buttons(page: Page, leaving: Leaving) -> None:
+    """Click the buttons of `leaving` in order."""
+    for test_id in leaving.buttons:
+        page.get_by_test_id(test_id).click()
+
+
+@pytest.mark.parametrize("leaving", LEAVINGS)
 def test_ac7_a_failed_sign_out_or_deletion_removes_nothing(
-    account_server: AccountServer, devices: Devices, fx01_grid: Grid, action: str
+    account_server: AccountServer,
+    devices: Devices,
+    fx01_grid: Grid,
+    leaving: Leaving,
 ) -> None:
     seats = device_with_seats(account_server, devices, fx01_grid)
     open_account_page(seats)
     page = seats.page
     before = local_storage_of(page)
-    if action == "sign-out":
-        page.route(SIGN_OUT_ROUTE, fail_with_500)
-    else:
-        page.route(ACCOUNT_ROUTE, fail_with_500)
+    page.route(leaving.route, fail_with_500)
 
-    if action == "sign-out":
-        page.get_by_test_id("account-sign-out").click()
-    else:
-        page.get_by_test_id("account-delete").click()
-        page.get_by_test_id("account-delete-confirm").click()
+    press_buttons(page, leaving)
 
     expect_account_state(page, "error")
     expect(account_page(page).get_by_test_id("account-state-line")).to_have_text(
         load_fr()["account.error.generic"], timeout=WAIT_TIMEOUT_MS
     )
     assert local_storage_of(page) == before
+
+
+# ---- AC-10 and AC-11 ------------------------------------------------------------
+
+
+def device_signed_in_with_r(
+    server: AccountServer, devices: Devices, grid: Grid
+) -> tuple[Page, Identity]:
+    """Ana's device, signed in on `/account`, with R as the account's only room."""
+    identity = add_room_with_ana(server, grid, R_CODE)
+    context = devices.new()
+    sign_in_by_http(context, server, identity)
+    page = context.new_page()
+    page.goto(f"{server.base_url}{ACCOUNT_PAGE_PATH}")
+    expect_account_state(page, "signed_in")
+    return page, identity
+
+
+def test_ac10_an_account_rooms_with_a_non_string_item_names_no_room(
+    account_server: AccountServer, devices: Devices, fx01_grid: Grid
+) -> None:
+    page, identity = device_signed_in_with_r(account_server, devices, fx01_grid)
+    identity_text = json.dumps(identity)
+    room_text = json.dumps({"grid": 1, "selection": None})
+    r_history = device_record(R_CODE, 1, FINISHED_AT, ELAPSED_MS, [])
+    store_items(
+        page,
+        {
+            ACCOUNT_ROOMS_KEY: json.dumps([R_CODE, 1]),
+            f"nock.identity.{R_CODE}": identity_text,
+            f"nock.room.{R_CODE}": room_text,
+            HISTORY_KEY: history_value([r_history]),
+        },
+    )
+
+    page.get_by_test_id("account-sign-out").click()
+
+    expect_account_state(page, "signed_out")
+    assert read_key(page, f"nock.identity.{R_CODE}") == identity_text
+    assert read_key(page, f"nock.room.{R_CODE}") == room_text
+    assert stored_history(page) == [r_history]
+    assert read_key(page, ACCOUNT_ROOMS_KEY) is None
+
+
+@pytest.mark.parametrize("leaving", LEAVINGS)
+def test_ac11_a_sign_out_or_deletion_keeps_the_other_rooms_history_items_as_stored(
+    account_server: AccountServer,
+    devices: Devices,
+    fx01_grid: Grid,
+    leaving: Leaving,
+) -> None:
+    page, _ = device_signed_in_with_r(account_server, devices, fx01_grid)
+    r_record = device_record(R_CODE, 1, FINISHED_AT, ELAPSED_MS, [])
+    t_record = device_record(T_CODE, 1, FINISHED_AT, ELAPSED_MS, ["Bob"])
+    r_malformed = {"code": R_CODE, "grid": "two"}
+    u_malformed = {"code": U_CODE, "grid": "two"}
+    store_items(
+        page,
+        {
+            ACCOUNT_ROOMS_KEY: json.dumps([R_CODE]),
+            HISTORY_KEY: history_value(
+                [r_record, r_malformed, t_record, u_malformed, None]
+            ),
+        },
+    )
+
+    press_buttons(page, leaving)
+
+    expect_account_state(page, leaving.state)
+    assert stored_history(page) == [t_record, u_malformed, None]
