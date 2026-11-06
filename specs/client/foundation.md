@@ -1,7 +1,7 @@
 ---
 area: client
 file: foundation
-status: approved
+status: done
 ---
 
 # client/foundation - State lines, motion, tokens, fonts, icons, components, redraws

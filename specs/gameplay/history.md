@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: history
-status: approved
+status: done
 ---
 
 # gameplay/history - Finished grids, « Grilles terminées », « Rejouer »

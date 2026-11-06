@@ -1,7 +1,7 @@
 ---
 area: content
 file: cards
-status: approved
+status: done
 ---
 
 # content/cards - The grid card
