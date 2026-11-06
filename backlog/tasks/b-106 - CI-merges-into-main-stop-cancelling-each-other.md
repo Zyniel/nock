@@ -31,7 +31,7 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 - [x] #3 Tests committed before the code, or a tooling task
 - [ ] #4 Reviewer APPROVE within two rounds
 - [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -48,6 +48,8 @@ Gate: uv run python scripts/gate.py --skip-static? no: full static stage
 The human took this into m-9, in chat, 2026-11-06 (« Take DRAFT-073 into m-9 »). It changes the CI run policy on main, which the human decided on 2026-10-21; this is their decision. Tooling task: no spec, built by the lead on its branch. m-9 now holds 8 tasks, the top of its L budget.
 
 Lead's decisions: the group of a non-pull-request run is its run id, so main's runs neither cancel nor replace each other (a shared group without cancel-in-progress would still drop a waiting run when a third merge queues). The superseded check asks the GitHub API for the pull request's head (job permission pull-requests: read) only when a gate job was cancelled. No reviewer round: a tooling task the lead builds; the PR runs prove the behaviour (the « records its PR » push supersedes the first run).
+
+PR: #159.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
