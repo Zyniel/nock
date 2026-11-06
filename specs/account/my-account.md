@@ -1,7 +1,7 @@
 ---
 area: account
 file: my-account
-status: done
+status: approved
 ---
 
 # account/my-account - The account sheet and page
@@ -32,8 +32,9 @@ the account brings and forgets them when the account leaves it.
    and the account page after a sign-in store each identity the account lists
    (`account/account.md` rule 12) whose code has none on the device
    (`lobby/joining.md` rule 8), never replacing one, and add its code to
-   `nock.account_rooms`, a JSON array of codes only the account code reads
-   (anything else reads as empty).
+   `nock.account_rooms`, a JSON array of strings, each read as a code, that
+   only the account code reads; anything else, an array with any item that is
+   not a string included, reads as empty.
 
 ### The account sheet and page
 
@@ -71,10 +72,12 @@ the account brings and forgets them when the account leaves it.
    focuses the disclosure. A 204 ends on `deleted`: `account.deleted` and
    « Voir les grilles » to `/`. Before it shows `signed_out` or `deleted`, a
    204 removes, for each code of `nock.account_rooms`, its identity,
-   `nock.room.<CODE>` and its records in `nock.history`, then the list and
+   `nock.room.<CODE>` and each item of `nock.history` whose `code` is one of
+   those codes, then the list and
    `nock.account_progress` (`content/cards.md` rule 2); a seat the device took
-   itself, and `nock.progress`, stay. A failed sign-out or deletion removes
-   nothing.
+   itself, and `nock.progress`, stay. Every other item of `nock.history` stays
+   as stored and in its order, one `gameplay/history.md` rule 2 ignores
+   included. A failed sign-out or deletion removes nothing.
 
 ### Look
 
@@ -145,6 +148,18 @@ the account brings and forgets them when the account leaves it.
   no `nock.account_progress`, `nock.progress` is unchanged, and `/` shows
   card 1 « Terminée » and card 2 no pill. After either answered 500, both
   keys are as they were.
+- **AC-10** The device holds `nock.account_rooms` `["RRRRRR", 1]`, an
+  identity, a room record and a history record of `RRRRRR`. « Se
+  déconnecter », answered 204, shows `signed_out`; the identity, room record
+  and history record of `RRRRRR` stay, and the device holds no
+  `nock.account_rooms`.
+- **AC-11** The device holds `nock.account_rooms` `["RRRRRR"]` and
+  `nock.history` holding, in order, a record of `RRRRRR`, `{"code":
+  "RRRRRR", "grid": "two"}`, a record of `TTTTTT`, `{"code": "UUUUUU",
+  "grid": "two"}` and `null`. After « Se
+  déconnecter » answered 204, or « Supprimer définitivement » answered 204,
+  `nock.history` holds the record of `TTTTTT`, `{"code": "UUUUUU", "grid":
+  "two"}` and `null`, in that order.
 
 ## Edge cases
 
@@ -152,6 +167,10 @@ the account brings and forgets them when the account leaves it.
   through a sign-out (AC-5).
 - A mark set signed out stays through a sign-out, even on a grid the account
   also marked (AC-9).
+- A `nock.account_rooms` with any item that is not a string names no room
+  (AC-10).
+- History items of other rooms that the history ignores stay through a
+  sign-out (AC-11).
 
 ## Out of scope
 
@@ -172,4 +191,4 @@ the account brings and forgets them when the account leaves it.
   links), `wideWindow.ts` (the catalogue page's wide-window test).
 - Tests: those of the pointers (033 AC-2, AC-5, AC-9, AC-11; 046 AC-3; 048
   AC-3 to AC-5), in `tests/test_spec_NNN_*`; `tests/test_my_account_*` (AC-1
-  for its open page, AC-5 to AC-9).
+  for its open page, AC-5 to AC-11).
