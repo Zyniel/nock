@@ -1,12 +1,14 @@
 ---
-id: DRAFT-074
+id: B-108
 title: Refuse raw invisible characters and specs left done
-status: Draft
+status: To Do
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
+updated_date: '2026-11-06T09:22:00Z'
 labels:
   - follow-up
   - tooling
+milestone: m-2
 dependencies: []
 ---
 
@@ -27,3 +29,9 @@ From the Investigation report of 2026-11-05 (artifact Cheu7PqfqNyy8VT9UZ1LWQ), i
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+The human queued this as a tooling pull request on 2026-11-06 ("Queue B-072 and B-074 as technical PR"): the escalation for new tooling behaviour is answered. Filed under Upkeep, label tooling, no spec; the lead builds it on its branch.
+<!-- SECTION:NOTES:END -->
