@@ -10,7 +10,12 @@
   let {
     grids,
     accountProgress,
-  }: { grids: GridSummary[]; accountProgress: Record<string, unknown> | null } = $props()
+    isSignedIn,
+  }: {
+    grids: GridSummary[]
+    accountProgress: Record<string, unknown> | null
+    isSignedIn: boolean
+  } = $props()
 
   let listWidth = $state(0)
   const isThumbShown = $derived(listWidth >= THUMB_MIN_LIST_WIDTH_PX)
@@ -31,7 +36,7 @@
 
 <div class="catalogue-list" data-testid="catalogue-list" use:watchWidth>
   {#each grids as grid (grid.number)}
-    <CatalogueItem summary={grid} {isThumbShown} {accountProgress} />
+    <CatalogueItem summary={grid} {isThumbShown} {accountProgress} {isSignedIn} />
   {/each}
 </div>
 

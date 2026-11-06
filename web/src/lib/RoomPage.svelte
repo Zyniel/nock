@@ -594,13 +594,17 @@
   }
 
   // A solved grid is finished on this device, when the room knows its number.
+  // The mark waits for GET /api/account to answer or fail, so that it goes to
+  // the account's key when signed in, else to the device's (content/cards
+  // rule 2). Only the mark waits: the page joins and shows meanwhile.
   $effect(() => {
-    if (!session.solved) {
+    if (!session.solved || !isAccountStatusSettled) {
       return
     }
     const grid = readRoomGrid(code)
     if (grid !== null) {
-      markFinished(grid)
+      const isSignedIn = accountStatus !== null && accountStatus.signed_in
+      markFinished(grid, isSignedIn)
     }
   })
 
@@ -1149,6 +1153,8 @@
   // Null while it has not answered 200 (accounts off, or a failed request): the
   // page then shows no account control.
   let accountStatus: AccountStatus | null = $state(null)
+  // True once GET /api/account has answered or failed.
+  let isAccountStatusSettled = $state(false)
   let accountDialog: AccountDialog | null = $state(null)
   // Whether this page load sent its one PUT /api/account/rooms.
   let isRoomLinked = false
@@ -1156,6 +1162,7 @@
   onMount(() => {
     void fetchAccountStatus().then((status) => {
       accountStatus = status
+      isAccountStatusSettled = true
     })
   })
 

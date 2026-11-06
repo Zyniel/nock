@@ -1,17 +1,19 @@
-"""Shared setup of the tests of `platform/reconnection.md` AC-6 to AC-8 and of the
+"""Shared setup of the tests of `platform/reconnection.md` AC-6 to AC-9 and of the
 other domains' tests of the page's connection (`social/chat.md` AC-23).
 
 Pytest does not collect this module (its name does not start with `test_`). The
 tests are in:
 
-- `test_reconnection_hidden_page.py`: AC-6, a hidden page whose timers ran late.
+- `test_reconnection_hidden_page.py`: AC-6, a hidden page the browser held back.
 - `test_reconnection_retries.py`: AC-7 (the 6-second connect limit) and AC-8 (the
   jitter of the retry delays).
+- `test_reconnection_worker_pings.py`: AC-9, a hidden page whose own timers stop,
+  on the live server and in real time (it runs on its own, `SERIAL_TEST_FILES`).
 - `test_spec_017_ac05_long_absence.py` uses the socket stand-ins too.
 
-They run on spec 017's mocked room (`spec017_harness.joined_room`) and its frozen
-page clock, moved by hand with `advance_page`. What a mocked socket cannot do is
-done in the page by the stand-ins of `SOCKET_STAND_INS_SCRIPT`, which wraps the
+AC-6 to AC-8 run on spec 017's mocked room (`spec017_harness.joined_room`) and its
+frozen page clock, moved by hand with `advance_page`. What a mocked socket cannot
+do is done in the page by the stand-ins of `SOCKET_STAND_INS_SCRIPT`, which wraps the
 page's `WebSocket` (it is added after the mock, so it wraps the mocked one):
 
 - `window.__socketTimes`: the page clock (`performance.now()`) at the creation of
@@ -40,9 +42,14 @@ Readings where the specs leave room:
 - "The page is hidden": `document.hidden` and `document.visibilityState` read as
   `VISIBILITY_SCRIPT` sets them, and a `visibilitychange` event on `document`
   follows each change (`set_page_hidden`).
-- "Its timers run late": `page.clock.fast_forward`, which moves the page clock
-  (`Date` and `performance.now()`) at once and then fires each timer that came due
-  meanwhile once, late (Playwright's model of a laptop lid closed and opened).
+- "Its timers run late" (AC-6, "the browser holds back its timers, its worker's
+  too"): `page.clock.fast_forward`, which moves the page clock (`Date` and
+  `performance.now()`) at once and then fires each timer that came due meanwhile
+  once, late (Playwright's model of a laptop lid closed and opened), on a page
+  loaded without `Worker` (`spec017_harness.keep_pings_on_the_page_clock`).
+- "Its own timers stop firing" (AC-9): Playwright's page clock, installed before
+  the page loads and paused once the page is hidden. It does not reach a
+  dedicated worker, whose timers keep running in real time.
 - "Every random draw at its lowest" or "highest": `Math.random` returns 0, or the
   largest number below 1, the page drawing each delay as the base delay times
   0.8 plus 0.4 times `Math.random()` (`RANDOM_AT_LOWEST_SCRIPT`,

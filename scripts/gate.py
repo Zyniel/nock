@@ -270,6 +270,7 @@ SHARED_COMPONENT_DOMAINS: dict[str, tuple[str, ...]] = {
     "web/src/lib/RoomPage.svelte": (
         "authorship",
         "board",
+        "cards",
         "catch-up",
         "chat",
         "co-op",

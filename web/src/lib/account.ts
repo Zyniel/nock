@@ -2,6 +2,7 @@
 // the server and the room identities an account brings to this device. Plain
 // functions: no DOM.
 
+import { ACCOUNT_PROGRESS_STORAGE_KEY } from './catalogue'
 import { HISTORY_KEY, readHistory, type HistoryRecord } from './history'
 import { identityKey, readIdentity, writeIdentity } from './joinRules'
 import type { RoomKey } from './myRooms'
@@ -246,7 +247,9 @@ export function storeMissingIdentities(identities: AccountIdentity[]): void {
 
 // Remove from this device what the account brought: for each code of
 // `nock.account_rooms`, its identity, its room record and its history records,
-// then the list itself. A seat the device took itself is not in the list.
+// then the list itself and the progress marked while signed in
+// (`nock.account_progress`). A seat the device took itself is not in the list,
+// and `nock.progress` stays.
 export function forgetAccountSeats(): void {
   const accountCodes = readAccountRoomCodes()
   for (const code of accountCodes) {
@@ -264,4 +267,5 @@ export function forgetAccountSeats(): void {
     writeItem(HISTORY_KEY, JSON.stringify(keptRecords))
   }
   removeItem(ACCOUNT_ROOMS_KEY)
+  removeItem(ACCOUNT_PROGRESS_STORAGE_KEY)
 }

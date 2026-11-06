@@ -212,7 +212,9 @@ it before it serves, with one line naming the variable.
   and `Cache-Control` of rules 11 to 13, each route's `response_model`.
   `Caddyfile` (repository root): the proxy's body limit.
   `src/nock/__main__.py` (`main()`, which runs `production_app()`),
-  `src/nock/settings.py`: the variables.
+  `src/nock/settings.py`: the variables. The `NOCK_DATABASE` character check
+  calls `is_refused_character` of `src/nock/protocol.py`, which it shares with
+  the chat text check (`social/chat.md`), and passes the joiners it allows.
 - Tests: `tests/test_spec_040_ac01_ac06_*`, `tests/test_spec_040_ac27_ac29_*`,
   `tests/test_spec_036_ac10_ac12_*`; `tests/test_serving_*` for AC-7 to AC-15,
   AC-11 in the browsers.

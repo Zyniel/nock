@@ -18,7 +18,7 @@ codes are limited per address.
 - `platform/realtime.md`: messages, codes, delivery; resume and time-out are
   `platform/reconnection.md`.
 - `content/library.md`: the catalogue, published grids; « Jouer » and
-  `catalogue.play_failed` on a card, and the reading of `nock.progress`, are
+  `catalogue.play_failed` on a card, and the device's progress keys, are
   `content/cards.md`.
 
 ## Rules
@@ -28,14 +28,15 @@ codes are limited per address.
 1. A solo game is a room created from the catalogue with one player; inviting is
    sending its link, and nothing converts when others come.
 2. Each catalogue item, on the catalogue page and on `/g/<number>`, has
-   « Jouer » (`catalogue.play`). A tap marks the grid `started` in
-   `nock.progress` unless it is `finished`, then asks for a room (rule 6). On
+   « Jouer » (`catalogue.play`). A tap marks the grid `started` in the
+   device's progress, the key `content/cards.md` rule 2 names, unless it is
+   `finished`, then asks for a room (rule 6). On
    success it writes the room record `{"grid": <number>, "selection": null}`
    and loads `/r/<code>`. On a network error, any other status or an answer
    without a code, it stays, shows `catalogue.play_failed` in that item and
    enables the button again. The button is disabled while the request runs.
    Each tap makes a new room. The button is named « Jouer » and described by
-   its card's title (`catalogue.item.number`, `content/cards.md` rule 2).
+   its card's title (`catalogue.item.number`, `content/cards.md` rule 3).
 3. The room record `nock.room.<CODE>` is a JSON object with `grid` (the
    catalogue number or null) and `selection`; anything else reads as no
    record, and a rewrite keeps unknown fields. The room page writes the
@@ -45,7 +46,8 @@ codes are limited per address.
    word in its direction is restored as a tap (it sends `select_cell`); else
    nothing is selected or sent.
 5. A `grid_solved`, or a snapshot with `solved: true`, in a room whose record's
-   `grid` is a number marks that grid `finished`.
+   `grid` is a number marks that grid `finished` in the device's progress, the
+   key `content/cards.md` rule 2 names.
 
 ### Creation and codes
 
@@ -141,10 +143,11 @@ status band of « Connection lost »; before, the entry card of
 - **AC-4** After Ana types `T`, `A` and taps (2, 2) twice, a reload first sends
   a join with her stored token and is the same player, alone in the roster,
   with `T`, `A` and (2, 2) selected down. (← 010 AC-3)
-- **AC-5** After « Jouer » on grid 1, `nock.progress` holds `{"1": "started"}`
-  (other grids and a `finished` kept), the record has `grid` 1 and the catalogue
-  shows item 1 started; a `grid_solved` or solved snapshot then gives
-  `{"1": "finished"}`, and with `grid` null nothing. (← 010 AC-4, 010 AC-5)
+- **AC-5** Signed out, after « Jouer » on grid 1, `nock.progress` holds
+  `{"1": "started"}` (other grids and a `finished` kept), the record has
+  `grid` 1 and the catalogue shows item 1 started; a `grid_solved` or solved
+  snapshot then gives `{"1": "finished"}`, and with `grid` null nothing.
+  (← 010 AC-4, 010 AC-5)
 - **AC-6** With `Zoé` remembered, the first frame after « Jouer » is a join as
   `Zoé` without token, the own row reads `Zoé` and the stored identity holds that
   player's id and `ZOÉ`; with nothing remembered the join is as « Invité » and
@@ -235,8 +238,9 @@ status band of « Connection lost »; before, the entry card of
 
 ## Code
 
-- `src/nock/room.py`: `new_room`, `RoomState`, `MAX_PLAYERS`;
-  `src/nock/protocol.py`: `Snapshot`. `src/nock/hub.py`: `RoomRegistry`,
+- `src/nock/room.py`: `new_room`, `RoomState`;
+  `src/nock/protocol.py`: `MAX_PLAYERS` (its comment points at rule 7),
+  `Snapshot`. `src/nock/hub.py`: `RoomRegistry`,
   codes, room tasks. `src/nock/server.py`: `POST /api/rooms`, the throttle,
   the creation limit. `src/nock/settings.py`, `src/nock/__main__.py`: the
   variable.

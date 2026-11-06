@@ -222,6 +222,9 @@ The examples use FX-01 (`specs/_reference.md`) with Ana (`p1`, host), Bob
 ## Code
 
 - `src/nock/room.py`: `_chat`, `after_restart`; `RoomConfig` holds the limits.
+  `src/nock/protocol.py`: `is_refused_character`, the one helper that holds
+  the refused categories (shared with `NOCK_DATABASE`, `platform/serving.md`);
+  the chat check passes the characters rule 7 allows.
 - `web/src/lib/chat.ts`, `activityFeed.ts` (`streamEntries`, `trimFeed`,
   `FEED_LIMIT`), `scrollingLists.ts`, `ChatPanel.svelte`,
   `ReactionPicker.svelte` (its pacing), `PlayersPanel.svelte` (« Couper »),

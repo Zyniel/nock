@@ -1,9 +1,11 @@
-"""Tests of `platform/reconnection.md` AC-6: a hidden page whose timers ran late.
+"""Tests of `platform/reconnection.md` AC-6: a hidden page the browser held back.
 
 Rules 3 and 6. Ana's joined page (spec 017's mocked room, `joined_room`) is hidden,
 then its page clock jumps 5 seconds with the timers that came due meanwhile fired
 once, late (`page.clock.fast_forward`), while the mocked server keeps the socket
-open and sends nothing. Made visible again, the page sends `ping` at once (the
+open and sends nothing. The browser holds back the worker's timers too: the frozen
+page is loaded without `Worker` (`joined_room`), so no timer runs outside the page
+clock. Made visible again, the page sends `ping` at once (the
 page clock still frozen) and keeps its socket with no band; on a socket that then
 gets no frame, the band shows within 5 seconds of the return. A page made visible
 while a retry waits on the 8-second delay opens a socket at once.

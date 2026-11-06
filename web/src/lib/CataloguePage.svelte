@@ -40,6 +40,10 @@
   // What GET /api/account answered, or null while accounts are off or the
   // request failed (spec 033): then there is no "Compte".
   let accountStatus: AccountStatus | null = $state(null)
+  // The page is signed in once GET /api/account answered 200 with `signed_in`
+  // true: « Jouer » and « Rejouer » mark the grid in the account's key then
+  // (content/cards rule 2).
+  const isSignedIn = $derived.by(() => accountStatus !== null && accountStatus.signed_in)
   // The account's progress while signed in, null until the answer (spec 004
   // rule 7): the cards show the device's progress meanwhile.
   let accountProgress: Record<string, unknown> | null = $state(null)
@@ -99,7 +103,8 @@
   })
 
   async function loadAccountProgress(): Promise<void> {
-    accountProgress = await fetchAccountProgress()
+    const answer = await fetchAccountProgress()
+    accountProgress = answer.progress
   }
 
   // Spec 033: before "My rooms" asks for its summaries, a signed-in page stores
@@ -200,10 +205,10 @@
         {t('catalogue.empty_filtered')}
       </p>
     {:else}
-      <CatalogueList grids={shownGrids} {accountProgress} />
+      <CatalogueList grids={shownGrids} {accountProgress} {isSignedIn} />
     {/if}
     {#if shownHistory.length > 0}
-      <HistoryList records={shownHistory} />
+      <HistoryList records={shownHistory} {isSignedIn} />
     {/if}
   </CatalogueFrame>
   {#if accountStatus !== null}

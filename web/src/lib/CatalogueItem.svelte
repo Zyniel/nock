@@ -14,10 +14,12 @@
     summary,
     isThumbShown,
     accountProgress,
+    isSignedIn,
   }: {
     summary: GridSummary
     isThumbShown: boolean
     accountProgress: Record<string, unknown> | null
+    isSignedIn: boolean
   } = $props()
 
   // The force line draws one Nock mark per force level, navy up to the grid's.
@@ -130,6 +132,7 @@
   </div>
   <PlayButton
     number={summary.number}
+    {isSignedIn}
     class="nock-button nock-button-primary play"
     data-testid="catalogue-play"
     aria-describedby={titleId}

@@ -84,8 +84,9 @@ WARM_UP_TIMEOUT_MS = 60_000
 # lifetime (fading from 2.7 s, gone by 3.7 s; 2026-10-22) and spec 047's « Lien
 # copié » line (gone 2 s after the copy; 2026-10-23). The live rooms' engine time
 # (`platform/live-rooms.md` rule 1) times the room's rules in milliseconds,
-# with no browser (B-030). The account's slow mail tests race 50 sends held 5 s
-# against a route's and a join's answers (B-102).
+# with no browser (B-030). Reconnection AC-9 times a hidden page's 2 s pings
+# over 10 s of real time (B-101). The account's slow mail tests race 50 sends
+# held 5 s against a route's and a join's answers (B-102).
 SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
         "test_account_slow_mail.py",
@@ -97,6 +98,7 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
         "test_live_rooms_engine_time.py",
         "test_live_rooms_socket_responsiveness.py",
         "test_realtime_join_deadline.py",
+        "test_reconnection_worker_pings.py",
         "test_foundation_remote_pace.py",
         "test_spec_013_ac02_selections.py",
         "test_spec_013_ac07_ac08_feed_scroll.py",

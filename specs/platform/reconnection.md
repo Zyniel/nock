@@ -46,13 +46,22 @@ a loss, retries and sends what it held.
 
 ### The page's connection
 
-3. While its socket is open the page sends `ping` every 2 seconds. The silence
-   is the time since the socket's last frame of any kind, read from the clock,
-   not counted in timer ticks; at 4 seconds of silence the connection is lost
-   at once: the socket is dropped, and its late frames and close event change
-   nothing. A hidden page loses no socket to the silence, as its timers may run
-   late: when it becomes visible again it sends `ping` at once and counts the
-   silence from that moment.
+3. While its socket is open the page sends `ping` every 2 seconds. The 2
+   seconds are kept by a timer in a dedicated worker, which the browser does
+   not slow as it slows or stops a hidden page's own timers: each tick the
+   worker posts makes the page send `ping` on its socket. The worker's script
+   is a file of the app's own origin, so the security headers stay as
+   `platform/serving.md` says. A page whose worker cannot be created or
+   reports an error keeps the 2 seconds with its own timer. The silence is the
+   time since the socket's last frame of any kind, read from the clock, not
+   counted in timer ticks; at 4 seconds of silence the connection is lost at
+   once: the socket is dropped, and its late frames and close event change
+   nothing. A hidden page loses no socket to its own silence check, as that
+   check's timer may run late: when
+   it becomes visible again it sends `ping` at once and counts the silence
+   from that moment. A page the browser suspends, its worker with it, may be
+   closed by the server's silence (`platform/realtime.md` rule 16): a loss
+   like any other.
 4. Any close or socket error is a loss, 4408 and 4503 included
    (`platform/realtime.md` rule 13), except a final one: 4404, 4429, 4001, or a
    close after an `error` `room_full`, `room_locked` or `removed`. A final
@@ -117,12 +126,12 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - **AC-5** Offline, Ana types `T` at (1, 0), her selection moving to (1, 1)
   across: after her reconnection snapshot, Bob receives `selection_moved` for
   Ana on (1, 1) across, then the `letter_changed` of her `T`.
-- **AC-6** Ana's joined page is hidden and its timers run late, so for 5
-  seconds it sends no ping and gets no frame while the server keeps the socket
-  open: made visible again, it sends `ping` at once and keeps the same socket,
-  with no band. Made visible on a socket that then gets no frame, it shows the
-  band within 5 seconds of the return. Made visible while a try waits on an
-  8-second delay, it opens a socket at once.
+- **AC-6** Ana's joined page is hidden and the browser holds back its timers,
+  its worker's too, so for 5 seconds it sends no ping and gets no frame while
+  the server keeps the socket open: made visible again, it sends `ping` at once
+  and keeps the same socket, with no band. Made visible on a socket that then
+  gets no frame, it shows the band within 5 seconds of the return. Made visible
+  while a try waits on an 8-second delay, it opens a socket at once.
 - **AC-7** After a loss, a socket whose opening the network never answers is
   dropped 6 seconds after it was created, and the next socket opens after the
   second delay, 1.6 to 2.4 seconds later; a socket that opens 5 seconds
@@ -131,6 +140,9 @@ The connection band follows `_design/room.md`, « Connection lost ».
   losses come 0.8, 1.6, 3.2, 6.4 and 6.4 seconds after each loss; at its
   highest, 1.2, 2.4, 4.8, 9.6 and 9.6 seconds; after a snapshot, the next loss
   is followed by a try 0.8 to 1.2 seconds later.
+- **AC-9** Ana's joined page is hidden and its own timers stop firing for 10
+  seconds: it still sends `ping` every 2 seconds, and the server never closes
+  it with 4408 (`platform/realtime.md` rule 16) during the 10 seconds.
 
 ## Edge cases
 
@@ -145,6 +157,8 @@ The connection band follows `_design/room.md`, « Connection lost ».
   unless a close event comes first (AC-6).
 - An `online` event replaces a socket stuck connecting before its 6 seconds
   (rule 6).
+- A page whose worker cannot be created or reports an error keeps the 2
+  seconds with its own timer (rule 3).
 
 ## Out of scope
 
@@ -167,6 +181,7 @@ The connection band follows `_design/room.md`, « Connection lost ».
 - `web/src/lib/roomConnection.ts`, `roomSession.ts`, `RoomPage.svelte`:
   heartbeat, losses, retries,
   the selection sent again, resent edits, kept requests.
+- `web/src/lib/pingWorker.ts`: the worker's 2-second ticks.
 - Tests: `tests/test_spec_017_ac01_*`, `tests/test_spec_017_ac02_*`,
   `tests/test_spec_017_ac03_*`, `tests/test_spec_017_ac05_*`;
-  `tests/test_reconnection_*` for AC-5 to AC-8.
+  `tests/test_reconnection_*` for AC-5 to AC-9.

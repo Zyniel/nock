@@ -15,11 +15,11 @@ the server is built, and a refused value stops the start (specs 036, 038 and 033
 from __future__ import annotations
 
 import os
-import unicodedata
 
 import uvicorn
 
 import nock.server
+from nock.protocol import JOINERS, is_refused_character
 from nock.settings import (
     MAX_LABEL_LENGTH,
     MAX_PORT,
@@ -39,21 +39,6 @@ PORT_VARIABLE: str = "NOCK_PORT"
 DATABASE_VARIABLE: str = nock.server.DATABASE_VARIABLE  # the app reads it (spec 018)
 DEFAULT_HOST: str = "127.0.0.1"
 DEFAULT_PORT: int = 8000
-# NOCK_DATABASE refuses the characters of these Unicode general categories (as
-# unicodedata.category gives them): most are invisible, or they end a line, so
-# the path could name another file than the one the operator reads.
-REFUSED_DATABASE_CATEGORIES: frozenset[str] = frozenset(
-    {
-        "Cc",  # control characters: newline, tab, escape, DEL, U+0080 to U+009F
-        "Cf",  # format characters: zero width space, byte order mark, soft hyphen
-        "Zl",  # the line separator, U+2028
-        "Zp",  # the paragraph separator, U+2029
-    }
-)
-# These two format characters stay allowed: some scripts need them inside words.
-ALLOWED_JOINERS: frozenset[str] = frozenset(
-    {"\N{ZERO WIDTH NON-JOINER}", "\N{ZERO WIDTH JOINER}"}
-)
 
 
 def main() -> None:
@@ -272,18 +257,7 @@ def _check_database() -> None:
 
 def _holds_refused_character(text: str) -> bool:
     """Tell whether `text` holds a character that NOCK_DATABASE refuses."""
-    return any(_is_refused_in_database(character) for character in text)
-
-
-def _is_refused_in_database(character: str) -> bool:
-    """Tell whether NOCK_DATABASE refuses `character`.
-
-    It does when the category of `character` is in REFUSED_DATABASE_CATEGORIES,
-    unless `character` is one of ALLOWED_JOINERS.
-    """
-    if character in ALLOWED_JOINERS:
-        return False
-    return unicodedata.category(character) in REFUSED_DATABASE_CATEGORIES
+    return any(is_refused_character(character, JOINERS) for character in text)
 
 
 def _refusal(variable: str, expected: str, value: str) -> SystemExit:

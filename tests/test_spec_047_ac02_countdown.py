@@ -8,8 +8,9 @@ snapshot shows (spec 027's `freeze_clock`), so that the moment the page applies
 clock then moves with `page.clock.run_for` in steps of 100 ms with a real pause of
 10 ms between them (spec 027's `advance_clock`), so that the mocked socket's pong
 to each of the page's `ping` frames (spec 017) reaches the page before its next
-silence check. Nothing here depends on how fast the machine is, so the file runs
-in the parallel pass.
+silence check. The page is loaded without `Worker`, so its pings follow that clock
+(spec 017's `keep_pings_on_the_page_clock`). Nothing here depends on how fast the
+machine is, so the file runs in the parallel pass.
 
 Readings where the spec leaves room:
 
@@ -33,6 +34,7 @@ import pytest
 from playwright.sync_api import Browser, Locator, Page, expect
 
 from nock.grid import Grid
+from spec017_harness import keep_pings_on_the_page_clock
 from spec019_harness import OpenWindow, window_opener
 from spec027_harness import advance_clock, freeze_clock
 from spec042_harness import box_of
@@ -93,6 +95,7 @@ def open_counting(
     page = window(COMPUTER[0], COMPUTER[1], False)
     if reduced_motion:
         page.emulate_media(reduced_motion="reduce")
+    keep_pings_on_the_page_clock(page)
     page.clock.install()
     mock = open_vote_room(page, base_url, grid)
     freeze_clock(page)
