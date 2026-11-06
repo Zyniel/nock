@@ -424,7 +424,7 @@ def test_ac2_websocket_a_join_frame_over_4096_bytes_but_few_characters_is_refuse
 ) -> None:
     # Ana followed by ideographic spaces: valid once stripped, 1457 characters
     # but 4257 bytes, so only a size measured in bytes refuses it.
-    nickname = "Ana" + "　" * 1400
+    nickname = "Ana" + "\N{IDEOGRAPHIC SPACE}" * 1400
     frame = json.dumps(
         {"type": "join", "nickname": nickname, "resume_token": None},
         ensure_ascii=False,
