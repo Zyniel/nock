@@ -21,8 +21,8 @@ leaves (1, 0) empty; a press on the link loads `/`.
 AC-32: at 1280 by 720, the recap opened by « Voir le bilan » on a solved room, and
 the account sheet opened by « Compte » from the Menu (accounts on, signed out), are
 closed by the deletion (neither is visible, and the account sheet loses its `open`
-attribute) and the dialog shows as
-AC-21 says, the focus on the link.
+attribute) and the dialog shows as AC-21
+says, the focus on the link.
 
 Readings where the spec leaves room are in `hud_harness`. Also:
 

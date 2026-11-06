@@ -44,14 +44,27 @@ def with_grid_2_published_on(summary: dict[str, object], published_on: str) -> N
         summary["published_on"] = published_on
 
 
-def answer_list_with(published_on: str) -> Callable[[Route], None]:
-    """A route handler: the server's list, grid 2 published on `published_on`."""
+DELETE = object()  # marks a field to remove rather than set
+
+
+def answer_list_changing(field: str, value: object) -> Callable[[Route], None]:
+    """A route handler: the server's list, grid 2's `field` set to `value`.
+
+    With `DELETE` as `value`, the field is removed from grid 2's item instead.
+    """
 
     def answer(route: Route) -> None:
         summaries = route.fetch().json()
         assert isinstance(summaries, list), summaries
+        changed = 0
         for summary in summaries:
-            with_grid_2_published_on(summary, published_on)
+            if summary["number"] == 2:
+                if value is DELETE:
+                    del summary[field]
+                else:
+                    summary[field] = value
+                changed += 1
+        assert changed == 1, summaries
         route.fulfill(
             status=200, content_type="application/json", body=json.dumps(summaries)
         )
@@ -77,7 +90,7 @@ def answer_grid_2_with(published_on: str) -> Callable[[Route], None]:
 def test_ac25_a_list_with_a_date_that_is_not_a_calendar_date_is_an_error(
     page: Page, live_server: str, published_on: str
 ) -> None:
-    page.route(LIST_ROUTE, answer_list_with(published_on))
+    page.route(LIST_ROUTE, answer_list_changing("published_on", published_on))
 
     page.goto(f"{live_server}/")
 
@@ -102,18 +115,6 @@ def test_ac25_a_grid_page_given_that_summary_shows_the_error(
     expect(grid_page.get_by_test_id("catalogue-item")).to_have_count(0)
 
 
-def answer_list_without_word_count(route: Route) -> None:
-    """A route handler: the server's list, grid 2's item without `word_count`."""
-    summaries = route.fetch().json()
-    assert isinstance(summaries, list), summaries
-    for summary in summaries:
-        if summary["number"] == 2:
-            del summary["word_count"]
-    route.fulfill(
-        status=200, content_type="application/json", body=json.dumps(summaries)
-    )
-
-
 def answer_grid_2_without_word_count(route: Route) -> None:
     """A route handler: the server's summary of grid 2, without `word_count`."""
     summary = route.fetch().json()
@@ -125,7 +126,7 @@ def answer_grid_2_without_word_count(route: Route) -> None:
 def test_ac25_a_list_with_an_item_without_word_count_is_an_error(
     page: Page, live_server: str
 ) -> None:
-    page.route(LIST_ROUTE, answer_list_without_word_count)
+    page.route(LIST_ROUTE, answer_list_changing("word_count", DELETE))
 
     page.goto(f"{live_server}/")
 
@@ -178,32 +179,13 @@ WRONG_TYPE_FIELDS: list[tuple[str, object]] = [
 ]
 
 
-def answer_list_with_wrong_type(field: str, value: object) -> Callable[[Route], None]:
-    """A route handler: the server's list, grid 2's `field` set to `value`."""
-
-    def answer(route: Route) -> None:
-        summaries = route.fetch().json()
-        assert isinstance(summaries, list), summaries
-        changed = 0
-        for summary in summaries:
-            if summary["number"] == 2:
-                summary[field] = value
-                changed += 1
-        assert changed == 1, summaries
-        route.fulfill(
-            status=200, content_type="application/json", body=json.dumps(summaries)
-        )
-
-    return answer
-
-
 @pytest.mark.parametrize(
     ("field", "value"), WRONG_TYPE_FIELDS, ids=[name for name, _ in WRONG_TYPE_FIELDS]
 )
 def test_ac26_a_list_with_a_field_of_the_wrong_type_is_an_error(
     page: Page, live_server: str, field: str, value: object
 ) -> None:
-    page.route(LIST_ROUTE, answer_list_with_wrong_type(field, value))
+    page.route(LIST_ROUTE, answer_list_changing(field, value))
 
     page.goto(f"{live_server}/")
 

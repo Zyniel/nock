@@ -2,7 +2,7 @@
 the host's settings sheet it covers (`client/menus.md` rule 6).
 
 Pytest does not collect this module (its name does not start with `test_`). It
-holds what the tests of AC-21 and AC-22 (`test_hud_room_gone.py`) share: the
+holds what the tests of AC-21, AC-22 and AC-32 (`test_hud_room_gone.py`) share: the
 dialog's texts, the two ways a page meets the deletion of its room (joined, and
 reconnecting with a letter not yet answered), and the checks of the dialog's look
 (`specs/_design/overlays.md`, « Room gone »).
