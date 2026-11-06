@@ -4,7 +4,7 @@ title: Hidden tabs measured in three engines
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T14:23:00Z'
+updated_date: '2026-11-06T15:06:00Z'
 labels:
   - domain:reconnection
 milestone: m-9
@@ -57,4 +57,6 @@ Measure (2026-11-06; scripts and results in the lead's scratchpad b101/, rerunna
 Lead's decision: option 1, the page's ping timer runs in a Web Worker (client only: platform/reconnection.md rule 3 and the client; no protocol change, no dependency). Server pings or a longer silence would be protocol or realtime changes (the human's); writing the flicker into the spec would accept a visible « déconnecté » flicker (a product call). A tab the browser suspends or discards still reconnects as today.
 
 Spec-checker: APPROVED; its three wording notes applied (AC-9 names the 4408 close, the fallback covers a worker that cannot be created or reports an error, AC-6 rewrapped). Lead's decisions: the fallback to the page's own timer has no criterion of its own; the harnesses that freeze the page clock remove Worker so the page's timer (and the page clock) drives their pings, which proves the fallback through the 017 AC-1 tests.
+
+Reviewer round 1: APPROVE (its probes: AC-9 fails without a worker; a 404 on the worker asset falls back to the page's timer with no close; a throwing constructor falls back; five hide/show cycles leave one worker). Taken: two spec lines rewrapped, a docstring. Not taken, to a follow-up draft: a test of the worker's error fallback (a stale asset hash after a deploy), which has no criterion of its own.
 <!-- SECTION:NOTES:END -->

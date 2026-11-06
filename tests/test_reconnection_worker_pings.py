@@ -92,7 +92,19 @@ class Watch(NamedTuple):
 
 
 def is_disconnected(registry: RoomRegistry, code: str, player_id: str) -> bool:
-    """Whether the server reads the player as disconnected now."""
+    """Tell whether the server reads the player as disconnected now.
+
+    Args:
+        registry: The live server's rooms.
+        code: The room's code. The room must still exist.
+        player_id: The player whose state is read. The player must be in the room.
+
+    Returns:
+        True when the player's state is disconnected, False otherwise.
+
+    Raises:
+        AssertionError: If the room is gone or the player is not in it.
+    """
     state = registry.peek_room(code)
     assert state is not None, f"room {code} is gone"
     for player in state.players:
