@@ -53,7 +53,10 @@ Options of the full stage (2026-10-15, so CI can run one job per engine):
         checkout (same commit, same uncommitted changes), read from this
         branch's run folders; the count left out is printed.
     --shard I/N: run only the I-th of N shards of the test files, sorted by
-        name and dealt round robin; both passes take the same shard.
+        name and dealt round robin. Each pass deals its own files, those its
+        `-m` selection keeps, so a file with serial and parallel tests may
+        fall in different shards in the two passes; the N shards of a pass
+        still cover all its tests.
 
 Each run of the tests keeps its results in .git/nock-gate-results/<branch>/
 <run>/ (the newest KEEP_RUNS_PER_BRANCH runs of a branch are kept): run.json
@@ -93,6 +96,7 @@ import contextlib
 import ctypes
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -341,7 +345,8 @@ RESULT_LABELS: tuple[str, ...] = ("tests", "parallel", "serial", "serial-rerun")
 # that failed once, if they are few (B-107).
 SERIAL_LOAD_FRACTION = 0.75
 # Short enough that the 1,140 s scripts/hooks/role_gate.py gives the gate
-# still holds the wait, the quick gate and the lock wait.
+# still holds the quick gate, the lock wait and, at worst, two of these waits:
+# one before the serial pass and one before its re-run (2 x 120 s).
 SERIAL_LOAD_WAIT_SECONDS = 120
 LOAD_POLL_SECONDS = 5
 MAX_RERUN_FAILURES = 20
@@ -495,10 +500,17 @@ def run_tool(
     try:
         return process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
+        # Stopped before the report, so that nothing in the report can leave
+        # pytest running once the gate lets the lock go. The progress files
+        # outlive the stop, so the report still names the tests.
+        try:
+            stop_process_tree(process.pid)
+            wait_for_end(process)
+        except KeyboardInterrupt:
+            stop_process_tree(process.pid)
+            raise
         if watchdog is not None:
             report_watchdog_stop(step_name, watchdog)
-        stop_process_tree(process.pid)
-        wait_for_end(process)
         return TIMED_OUT_EXIT_CODE
     except KeyboardInterrupt:
         stop_process_tree(process.pid)
@@ -729,6 +741,42 @@ def results_path_of(run: GateRun, label: str) -> Path:
     return run.folder / f"{label}.jsonl"
 
 
+def read_left_out_count(left_out_path: Path) -> int:
+    """Return the count gate_browsers' --nock-left-out wrote, or 0.
+
+    Args:
+        left_out_path: The file of the count of tests a pass left out as
+            passed already (--resume).
+
+    Returns:
+        The count; 0 when the file is missing or holds no number.
+    """
+    try:
+        text = left_out_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return 0
+    if not text.isdigit():
+        return 0
+    return int(text)
+
+
+def resume_options(skip_path: Path | None, run: GateRun, label: str) -> list[str]:
+    """Return the pytest options of --resume for one pass.
+
+    Args:
+        skip_path: The file of node ids to leave out, or None without --resume.
+        run: The run's results folder.
+        label: The pass's label.
+
+    Returns:
+        --nock-skip-passed and --nock-left-out, or nothing without --resume.
+    """
+    if skip_path is None:
+        return []
+    left_out_path = run.folder / f"{label}-left-out.txt"
+    return [f"--nock-skip-passed={skip_path}", f"--nock-left-out={left_out_path}"]
+
+
 def run_pytest_pass(
     pytest_pass: PytestPass, run: GateRun, extra_options: list[str]
 ) -> int | None:
@@ -758,29 +806,30 @@ def run_pytest_passes(
     passes: list[PytestPass],
     run: GateRun,
     base_command: list[str],
-    extra_options: list[str],
-    tests_left_out: int,
+    skip_path: Path | None,
 ) -> bool:
     """Run the pytest passes and report whether they all succeeded.
 
     A pass that selects no test (pytest's exit code 5) is fine, such as the
     serial pass of a selection without serial tests, as long as one pass ran
-    a test, or --resume left tests out. The serial pass waits for a low load
-    first (wait_for_low_load), and the tests it fails run once more
-    (rerun_serial_failures).
+    a test, or --resume left out tests of its selection. The serial pass
+    waits for a low load first (wait_for_low_load), and the tests it fails
+    run once more (rerun_serial_failures).
 
     Args:
         passes: The passes, in order.
         run: The run's results folder; every result line goes to its summary.
         base_command: The pytest command without a selection, for a re-run.
-        extra_options: More pytest options for every pass but a re-run.
-        tests_left_out: The tests --resume leaves out, as passed already.
+        skip_path: The file of node ids --resume leaves out, for every pass
+            but a re-run; None without --resume.
 
     Returns:
         True when every pass passed or selected nothing, and one ran a test.
     """
     all_passed = True
     tests_ran = False
+    # What the passes' own selections left out as passed, from gate_browsers.
+    tests_left_out = 0
     for pytest_pass in passes:
         step_name = pytest_pass.step_name
         load_label = ""
@@ -788,7 +837,11 @@ def run_pytest_passes(
         if pytest_pass.serial:
             load = wait_for_low_load(run)
             load_label = f" ({describe_load(load, run.cpu_count)})"
+        extra_options = resume_options(skip_path, run, pytest_pass.label)
         exit_code = run_pytest_pass(pytest_pass, run, extra_options)
+        if skip_path is not None:
+            left_out_path = run.folder / f"{pytest_pass.label}-left-out.txt"
+            tests_left_out += read_left_out_count(left_out_path)
         if exit_code == 0:
             tests_ran = True
             note(run, f"OK: {step_name}{load_label}")
@@ -810,7 +863,11 @@ def run_pytest_passes(
             note(run, f"FAIL: {step_name} exited with code {exit_code}{load_label}")
     if all_passed and not tests_ran:
         if tests_left_out > 0:
-            note(run, "OK: every selected test passed in an earlier run (--resume)")
+            note(
+                run,
+                f"OK: the {tests_left_out} selected test(s) passed in an earlier "
+                "run (--resume)",
+            )
             return True
         note(run, "FAIL: no pytest pass selected a test")
         return False
@@ -1411,7 +1468,7 @@ def read_outcomes(results_path: Path, passed_by_id: dict[str, bool]) -> None:
         passed_by_id[node_id] = passed
 
 
-def prepare_resume(run: GateRun) -> tuple[Path, int] | None:
+def prepare_resume(run: GateRun) -> Path | None:
     """List the tests that passed already on this checkout, for --resume.
 
     They are read from the earlier runs of this branch whose checkout had the
@@ -1421,8 +1478,8 @@ def prepare_resume(run: GateRun) -> tuple[Path, int] | None:
         run: This run; skip-passed.txt goes in its folder.
 
     Returns:
-        The file of node ids to leave out and their count, or None when git
-        cannot describe the checkout.
+        The file of node ids to leave out, or None when git cannot describe
+        the checkout.
     """
     if run.fingerprint is None:
         note(
@@ -1457,7 +1514,7 @@ def prepare_resume(run: GateRun) -> tuple[Path, int] | None:
         )
     else:
         note(run, "--resume: nothing passed on this checkout yet")
-    return skip_path, len(passed_ids)
+    return skip_path
 
 
 def run_tests(
@@ -1478,15 +1535,12 @@ def run_tests(
         True when the passes succeeded.
     """
     warn_about_orphan_browsers(run)
-    extra_options: list[str] = []
-    tests_left_out = 0
+    skip_path: Path | None = None
     if resume:
-        prepared = prepare_resume(run)
-        if prepared is None:
+        skip_path = prepare_resume(run)
+        if skip_path is None:
             return False
-        skip_path, tests_left_out = prepared
-        extra_options = [f"--nock-skip-passed={skip_path}"]
-    return run_pytest_passes(passes, run, base_command, extra_options, tests_left_out)
+    return run_pytest_passes(passes, run, base_command, skip_path)
 
 
 def find_spec_files(directory: Path = SPECS_DIR) -> list[Path]:
@@ -2192,8 +2246,11 @@ def parse_pass_timeout(timeout_text: str) -> tuple[float, float]:
             raise argparse.ArgumentTypeError(
                 f"'{part.strip()}' is not a number of minutes"
             ) from None
-        if not minutes > 0:
-            raise argparse.ArgumentTypeError("a limit must be above 0 minutes")
+        # An infinite limit overflows Popen.wait on Windows.
+        if not math.isfinite(minutes) or not minutes > 0:
+            raise argparse.ArgumentTypeError(
+                "a limit must be a finite number of minutes above 0"
+            )
         limits.append(minutes * 60)
     if len(limits) == 1:
         return limits[0], limits[0]
@@ -2417,8 +2474,11 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         metavar="I/N",
         help="Run only the I-th of N shards of the test files (1-based): the "
-        "files sorted by name, dealt round robin. Both passes take the same "
-        "shard, so a long run of several engines fits in shorter runs.",
+        "files sorted by name, dealt round robin, so a long run of several "
+        "engines fits in shorter runs. Each pass deals its own files (after "
+        "-m): a file with serial and parallel tests may fall in different "
+        "shards in the two passes, and the N shards of each pass cover all its "
+        "tests.",
     )
     return parser.parse_args()
 

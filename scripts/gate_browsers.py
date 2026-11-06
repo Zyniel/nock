@@ -25,7 +25,7 @@ is not a number is a domain's test prefix: `--nock-specs grids,co_op` keeps
 `test_grids_*.py` and `test_co_op_*.py` (2026-10-24, specs/_map.md).
 
 For the gate's watchdog, results folder, `--resume` and `--shard` (B-107), it
-takes four more options:
+takes five more options:
 
 - `--nock-progress-dir DIR`: each process that runs tests (a pytest-xdist
   worker, or pytest itself without workers) keeps in `DIR/<worker>.txt` the
@@ -36,8 +36,16 @@ takes four more options:
   flushed at once, so the file survives a stopped run;
 - `--nock-skip-passed FILE`: leaves out the node ids listed in FILE, one per
   line (the gate's `--resume`);
+- `--nock-left-out FILE`: with `--nock-skip-passed`, the process that
+  collects writes in FILE how many tests of its selection it left out, so
+  the gate knows whether a pass that ran nothing had passed tests to leave
+  out;
 - `--nock-shard I/N`: keeps only the I-th of N shards of the test files, the
-  files sorted by path and dealt round robin (the gate's `--shard`).
+  files sorted by path and dealt round robin (the gate's `--shard`). The
+  files are those the run's `-m` selection keeps, so each of the gate's
+  passes deals its own: a file with serial and parallel tests may fall in
+  different shards in the two passes, and the N shards of a pass cover all
+  its tests.
 """
 
 from __future__ import annotations
@@ -150,6 +158,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--nock-skip-passed",
         default="",
         help="File of node ids, one per line, to leave out.",
+    )
+    parser.addoption(
+        "--nock-left-out",
+        default="",
+        help="File to write the count of tests --nock-skip-passed left out to.",
     )
     parser.addoption(
         "--nock-shard",
@@ -431,6 +444,10 @@ def deselect_passed(config: pytest.Config, items: list[pytest.Item]) -> None:
     if deselected:
         config.hook.pytest_deselected(items=deselected)
         items[:] = kept
+    left_out_text = str(config.getoption("--nock-left-out"))
+    if left_out_text:
+        # Every pytest-xdist worker collects the same tests: the same count.
+        Path(left_out_text).write_text(f"{len(deselected)}\n", encoding="utf-8")
 
 
 def deselect_missing_engines(config: pytest.Config, items: list[pytest.Item]) -> None:
