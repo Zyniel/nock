@@ -1,10 +1,10 @@
 ---
 id: B-089
 title: The converter checks its source names
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T01:13:00Z'
+updated_date: '2026-11-06T01:38:00Z'
 labels:
   - domain:grid-files
 milestone: m-8
@@ -23,17 +23,17 @@ From DRAFT-068: rule 15 widens so the converter refuses names that are not lower
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The converter refuses A.json, G1.json and a:b.json as rule 15 says, with a criterion and its test
-- [ ] #2 grid-files AC-25: the converter refuses A.json, G1.json and a:b.json by name, writing nothing
+- [x] #1 The converter refuses A.json, G1.json and a:b.json as rule 15 says, with a criterion and its test
+- [x] #2 grid-files AC-25: the converter refuses A.json, G1.json and a:b.json by name, writing nothing
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -49,4 +49,12 @@ Only the case check is new behaviour: a:b.json is refused today through rule 2's
 Spec-checker APPROVED in round 2; round 1 asked AC-25 to name the refused file rather than « the second file ».
 
 Reviewer round 1: APPROVE. Taken: ß.json in AC-25's test (guards the case-folding decision) and the docstring fix. Not taken: a backslash test (the name cannot be created on Windows; refused today by rule 2's check too) and a G1.json case for rule 1's warning.
+
+Full gate here (Chromium): static checks, 8,788 parallel and 162 serial tests, all green. Firefox and WebKit are left to CI after the merge; the change is server-side only.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+grid-files rule 15: the converter (python -m nock.ipuz_convert) refuses a source file whose name is not lower-case, meaning unchanged when case-folded, or holds a backslash or a colon. It names the file, writes nothing and exits non-zero (AC-25: A.json, G1.json, a:b.json; the test also covers ß.json). is_former_file is now public in catalogue.py, and the converter uses it. Only the case check is new behaviour: a colon or a backslash was already refused through rule 2's index check.
+<!-- SECTION:FINAL_SUMMARY:END -->
