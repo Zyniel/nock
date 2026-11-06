@@ -30,8 +30,8 @@ From DRAFT-059: FocusableLink.svelte, PlayButton.svelte and wideWindow.ts are na
 - [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #5 Full gate green
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -48,6 +48,8 @@ Gate: the full gate in Chromium
 Lead's decisions: a change to a done file's Code section makes it draft (specs/_map.md), so the 12 touched specs go draft → approved → done. PlayButton.svelte and wideWindow.ts are named in every domain whose Code section names one of their importers, so each reaches 4 domains. The gate's map (SHARED_COMPONENT_DOMAINS) gains FocusableLink.svelte (8 domains) and PlayButton.svelte (4), and hud for PlayersPanel.svelte (hud's Code line now names it). wideWindow.ts is named in 5 Code sections but the map covers .svelte components only: extending the static check to .ts modules was tried and would add 8 modules at once (roomSession.ts in 17 domains, roomConnection.ts, activityFeed.ts, …), widening the quick gate a lot — new tooling behaviour, so it becomes a draft for the human rather than part of this task.
 
 Spec-checker round 1: CHANGES REQUESTED (FocusableLink missing from lobby/rooms, hud's frame gloss on the wrong file, PlayButton's gloss, one placement rule). Lead's decision on placement: a shared file is named in the domains it serves, so wideWindow.ts left gameplay/history and stays in account/my-account (it lays out the account dialog). Round 2: APPROVED. Final: FocusableLink.svelte in 9 domains, PlayButton.svelte in 4, both in SHARED_COMPONENT_DOMAINS (with hud for PlayersPanel); wideWindow.ts in 4 Code sections, outside the map (.svelte only), for the human.
+
+PR: #164.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
