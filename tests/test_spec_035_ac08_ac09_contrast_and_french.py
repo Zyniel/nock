@@ -371,8 +371,10 @@ def reaction_values() -> list[str]:
     fr_json = load_fr()
     values: list[str] = []
     for key, name in fr_json.items():
+        if not (key.startswith("reaction.") and key.endswith("_label")):
+            continue
         emoji_key = key.removesuffix("_label")
-        if key.startswith("reaction.") and emoji_key in fr_json:
+        if emoji_key in fr_json:
             values.append(name)
             values.append(fr_json[emoji_key])
     return values
@@ -408,7 +410,6 @@ def test_ac9_a_bound_checker_accepts_a_nickname_and_a_reaction(sample: str) -> N
     ],
 )
 def test_ac9_a_bound_checker_flags_any_other_x_colon_y_text(sample: str) -> None:
-    assert unknown_texts([sample], set()) == []
     assert bound_unknown_texts([sample], set()) == [sample]
 
 

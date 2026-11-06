@@ -27,8 +27,9 @@ Readings of the spec's wording:
   double quotes, spaces allowed around `=`.
 
 The text scan cannot see an animation started at run time (DRAFT-013), so three
-browser tests also ask the page of each spec 048 state for `document.getAnimations()`
-(as spec 046 AC-9 does): the shared recap, the account page and the ops replay. A
+browser tests also ask the page of each state of spec 048 AC-14 (the states of
+`open_account_state` and `open_ops_state`) for `document.getAnimations()` (as spec
+046 AC-9 does): the shared recap, the account page and the ops page. A
 CSS transition is left out, since the criterion accepts `transition` (its samples
 `a{transition:opacity .25s}`); anything else running, such as an `element.animate`
 call or a CSS animation, fails. The elements with `role="progressbar"` are counted
@@ -57,15 +58,12 @@ from spec041_harness import (
     split_svelte,
 )
 from spec048_harness import (
-    NOT_FOUND,
-    ROOM_CODE,
-    AccountMock,
-    open_account,
+    open_account_state,
     open_share,
     open_share_loading,
     open_share_unavailable,
 )
-from spec048_ops_harness import ReplayRoute, open_replay, replay, replay_answer
+from spec048_ops_harness import open_ops_state
 
 KEYFRAMES = re.compile(r"@(?:-[A-Za-z]+-)?keyframes\b", re.IGNORECASE)
 ANIMATION_DECLARATION = re.compile(
@@ -75,7 +73,25 @@ ANIMATION_DECLARATION = re.compile(
 PROGRESS_ELEMENT = re.compile(r"<progress(?![A-Za-z0-9_\-])", re.IGNORECASE)
 PROGRESSBAR_ROLE = re.compile(r"""role\s*=\s*(?:"progressbar"|'progressbar')""")
 
-SERVER_ERROR = {"detail": "Internal Server Error"}
+ACCOUNT_STATES = [
+    "loading",
+    "signing_in",
+    "signed_in",
+    "deletion_asked",
+    "link_invalid",
+    "signed_out_error",
+    "signed_out_sent",
+    "deleted",
+    "error",
+]
+OPS_STATES = [
+    "locked_refused",
+    "loading",
+    "error",
+    "ready_position_4",
+    "ready_empty",
+    "replay_not_found",
+]
 
 # Counts the progress bars and the running animations other than CSS transitions.
 RUN_TIME_SCRIPT = """() => [
@@ -204,14 +220,23 @@ def test_ac13_no_built_css_holds_keyframes_or_an_animation() -> None:
 
 
 def run_time_problems(page: Page) -> list[str]:
-    """How the page now breaks "no spinner, no animation" at run time."""
+    """How the page now breaks "no spinner, no animation" at run time.
+
+    Args:
+        page: A page in the state to check.
+
+    Returns:
+        One entry for the elements with `role="progressbar"` and one for the
+        running animations other than CSS transitions. Empty when there are none.
+    """
     found = page.evaluate(RUN_TIME_SCRIPT)
     assert isinstance(found, list), found
+    progress_bars, animations = found
     problems: list[str] = []
-    if found[0] != 0:
-        problems.append(f"{found[0]} elements with role=progressbar")
-    if found[1] != 0:
-        problems.append(f"{found[1]} running animations")
+    if progress_bars != 0:
+        problems.append(f"{progress_bars} elements with role=progressbar")
+    if animations != 0:
+        problems.append(f"{animations} running animations")
     return problems
 
 
@@ -235,19 +260,11 @@ def account_server(tmp_path: Path, catalogue: Catalogue) -> Iterator[AccountServ
         yield server
 
 
-@pytest.mark.parametrize("state", ["loading", "signing_in", "signed_out", "error"])
+@pytest.mark.parametrize("state", ACCOUNT_STATES)
 def test_ac13_the_account_page_runs_no_animation_in_any_state(
     page: Page, account_server: AccountServer, state: str
 ) -> None:
-    mock = AccountMock()
-    if state == "loading":
-        mock = AccountMock(status=None)
-    elif state == "signing_in":
-        mock = AccountMock(sign_in=None)
-    elif state == "error":
-        mock = AccountMock(status=(500, SERVER_ERROR))
-
-    open_account(page, account_server.base_url, mock, state, link=state == "signing_in")
+    open_account_state(page, account_server.base_url, state)
 
     assert run_time_problems(page) == []
 
@@ -258,18 +275,10 @@ def ops_server(tmp_path: Path, catalogue: Catalogue) -> Iterator[OpsServer]:
         yield server
 
 
-@pytest.mark.parametrize(
-    ("status", "state"),
-    [(None, "loading"), (404, "not_found"), (500, "error"), (200, "ready")],
-)
-def test_ac13_the_ops_replay_runs_no_animation_in_any_state(
-    page: Page, ops_server: OpsServer, fx01_grid: Grid, status: int | None, state: str
+@pytest.mark.parametrize("state", OPS_STATES)
+def test_ac13_the_ops_page_runs_no_animation_in_any_state(
+    page: Page, ops_server: OpsServer, fx01_grid: Grid, state: str
 ) -> None:
-    if status == 200:
-        route = replay_answer(replay(fx01_grid))
-    else:
-        route = ReplayRoute(status, None if status is None else NOT_FOUND)
-
-    open_replay(page, ops_server.base_url, route, state, ROOM_CODE)
+    open_ops_state(page, ops_server.base_url, state, fx01_grid)
 
     assert run_time_problems(page) == []
