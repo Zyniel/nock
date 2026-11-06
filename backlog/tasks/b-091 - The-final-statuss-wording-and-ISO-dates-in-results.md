@@ -1,10 +1,10 @@
 ---
 id: B-091
 title: The final status's wording and ISO dates in results
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-05T23:26:00Z'
+updated_date: '2026-11-06T00:38:00Z'
 labels:
   - domain:hud
   - domain:shell
@@ -27,17 +27,17 @@ From DRAFT-056 and DRAFT-066: what « the selection still moves » covers in a f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The rules say what the code does in each case of the two drafts, each with a criterion and its test
-- [ ] #2 hud AC-30 and AC-31, shell AC-35 and history AC-5: what a final status still lets move, the all-malformed check, and real ISO dates for « Grilles terminées »
+- [x] #1 The rules say what the code does in each case of the two drafts, each with a criterion and its test
+- [x] #2 hud AC-30 and AC-31, shell AC-35 and history AC-5: what a final status still lets move, the all-malformed check, and real ISO dates for « Grilles terminées »
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -56,4 +56,16 @@ Lead decisions on the spec-writer's choices:
 Spec-checker APPROVED in round 2. Round 1 asked to test :60 and +24:00 in history AC-5, to complete rule 2's list, to name ⇄, a clue and the reaction pill in hud rule 19, to add the reveal to AC-31, and to name the grid in shell AC-35. Final hud.md is 15,419 bytes with 15 criteria.
 
 Reviewer: CHANGES REQUESTED in round 1 (the date test missed century leap years and month lengths; AC-31 now shows that the kept requests go after a snapshot), APPROVE in round 2. It checked that broken copies of dateTime.ts all fail the unit test. Not taken: rewrapping one 93-character comment line in dateTime.ts.
+
+Full gate here (Chromium): static checks, 8,782 parallel and 162 serial tests, all green. Main then brought B-094 and merged cleanly. Traceability and shared components passed again. Firefox and WebKit are left to CI after the merge; the calendar check is now the same in every engine by construction (integer checks, no Date.parse).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The specs now say what the code does in a final status and for « Grilles terminées » dates.
+- hud rule 19: a typed letter or an erase changes nothing and moves nothing, every other way still moves the selection, and kept undos, checks and reveals are never sent (AC-30, AC-31).
+- shell rule 4: only an empty wrong list counts as a clean check (AC-35).
+- history rules 2 and 4: a record needs a real ISO date-time; month, day, hour, minutes, seconds and offset out of range are refused in every engine (AC-5).
+The one code change is the calendar check in the shared isDateTime (web/src/lib/dateTime.ts), which also serves « Mes salons » and /ops. A unit test pins leap years and every month's length. hud.md is 15.4 KB with 15 criteria, recorded for DRAFT-079.
+<!-- SECTION:FINAL_SUMMARY:END -->
