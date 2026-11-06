@@ -4,7 +4,7 @@ title: Reconnection and remote selection follow-ups
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T17:27:00Z'
+updated_date: '2026-11-06T18:17:00Z'
 labels:
   - domain:reconnection
   - domain:presence
@@ -59,4 +59,6 @@ Measurement (scratchpad b093/, 2 rounds of 10 alternating runs, under load 9-13 
 Spec-checker round 1: CHANGES REQUESTED (rule 7's queued requests, no criterion for the lost half, wording); round 2: APPROVED.
 
 Test-writer: AC-11 fails now (the check dropped when send() refuses); AC-10 and AC-12 pass now and each fails on its removal (stopSendQueue not keeping queued requests; a request resent after a dead-network send). remotesByCell: tests/web/remoteSelections.test.ts (identity of unchanged cells), fails with the reuse deleted. Note for the implementer: rule 7 also covers a queued request whose send fails in sendNextQueued; AC-11 exercises request() only.
+
+Review round 1: CHANGES REQUESTED. (1) keepRequest puts a later request with the same editsBefore in front (< must be <=), and stopSendQueue puts the still-queued requests in front of one kept by a sendNextQueued refusal: both break rule 7's « in their places »; (2) no test catches either. Lead's calls: the test-writer adds two node tests in tests/web/ (failing on 399fad5), then the implementer fixes the order; the reviewer's suggestion of a criterion for the queued case is not taken: rule 7 already states it and the unit tests guard it, as for the remotesByCell reuse. The reviewer's gate was held by B-104's full gate; its reconnection browser tests passed outside the gate (14).
 <!-- SECTION:NOTES:END -->
