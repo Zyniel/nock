@@ -38,7 +38,7 @@ From DRAFT-056 and DRAFT-066: what « the selection still moves » covers in a f
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Notes
@@ -58,6 +58,8 @@ Spec-checker APPROVED in round 2. Round 1 asked to test :60 and +24:00 in histor
 Reviewer: CHANGES REQUESTED in round 1 (the date test missed century leap years and month lengths; AC-31 now shows that the kept requests go after a snapshot), APPROVE in round 2. It checked that broken copies of dateTime.ts all fail the unit test. Not taken: rewrapping one 93-character comment line in dateTime.ts.
 
 Full gate here (Chromium): static checks, 8,782 parallel and 162 serial tests, all green. Main then brought B-094 and merged cleanly. Traceability and shared components passed again. Firefox and WebKit are left to CI after the merge; the calendar check is now the same in every engine by construction (integer checks, no Date.parse).
+
+Pull request #154, auto-merge on.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
