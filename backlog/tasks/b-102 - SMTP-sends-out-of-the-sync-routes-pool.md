@@ -4,7 +4,7 @@ title: SMTP sends out of the sync routes' pool
 status: Done
 assignee: []
 created_date: '2026-11-05T01:54:00Z'
-updated_date: '2026-11-06T17:50:00Z'
+updated_date: '2026-11-06T17:51:00Z'
 labels:
   - domain:account
 milestone: m-10
@@ -35,7 +35,7 @@ From DRAFT-030: a slow mail server and many addresses could fill the 40 threads 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -60,6 +60,8 @@ Test-writer: AC-24 fails now (GET /api/grids answered after 19 sends had ended);
 Reviewer round 1: CHANGES REQUESTED. Blocking: a mailer error other than MailError never resolved the send's future, so the request hung (and a graceful shutdown with it); the thread now passes any exception on. Also taken: rule 7 cited, annotations, prepare_sign_in_link's docstring. Noted: the sweep has no criterion of its own (covered through AC-25's executor).
 
 Reviewer round 2: APPROVE.
+
+PR: #173.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
