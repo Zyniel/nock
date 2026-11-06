@@ -214,6 +214,12 @@ file, and the brand on the top bars.
   cell, and its stream line has the look of a check that found a wrong
   letter (`_design/room.md`, « Salon »); with `wrong` `[]` it has the other
   look.
+- **AC-36** On FX-01, after a snapshot at seq 5, a binary frame holding a
+  letter event 6 as UTF-8 JSON, or the text frame `{"seq": 6}` with no `type`,
+  leaves the page joined at seq 5 with nothing buffered; that letter event 6
+  sent as text then gives seq 6 and its letter shows.
+- **AC-37** A shown text whose `fr.json` template is « {name} et {other} »,
+  filled with `name` « Ana » and no `other`, reads « Ana et {other} ».
 
 ## Edge cases
 
