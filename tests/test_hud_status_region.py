@@ -24,7 +24,9 @@ Readings where the spec leaves room:
 - The 5 s of `MESSAGE_HOLD_MS` are read on Playwright's page clock, installed
   before the page loads and frozen once the room shows (for AC-27, once the sheet
   is open); the test then moves it by hand, with a real pause after each step so
-  that the mocked socket's pongs reach the page. Each reading is exact: nothing
+  that the mocked socket's pongs reach the page. The page is loaded without
+  `Worker`, so its pings follow that clock (spec 017's
+  `keep_pings_on_the_page_clock`). Each reading is exact: nothing
   moves the page's timers between two steps.
 - "Makes it read" and "replaces the one there at once": the region reads the
   message once the page clock has moved at most `WRITE_LIMIT_MS` after the answer
@@ -71,6 +73,7 @@ from room_panels import open_host_settings, show_tab
 from spec017_harness import (
     expect_offline,
     expect_status,
+    keep_pings_on_the_page_clock,
     open_room,
     snapshot_frame,
 )
@@ -216,6 +219,7 @@ def test_ac26_the_region_is_there_at_the_first_paint_and_stays_the_same_element(
 def test_ac26_a_second_message_is_announced_again_and_starts_the_5_s_again(
     page: Page, live_server: str, fx01_grid: Grid
 ) -> None:
+    keep_pings_on_the_page_clock(page)
     page.clock.install()
     mock = open_fx01_room(page, live_server, fx01_grid)
     freeze_clock(page)
@@ -255,6 +259,7 @@ def test_ac27_a_sheet_takes_the_messages_and_the_page_gets_them_once_it_closes(
 ) -> None:
     page = window(COMPUTER[0], COMPUTER[1], False)
     page.add_init_script(ACCEPTING_CLIPBOARD_SCRIPT)
+    keep_pings_on_the_page_clock(page)
     page.clock.install()
     mock = open_fx01_room(page, live_server, fx01_grid)
     show_tab(page, "players")
