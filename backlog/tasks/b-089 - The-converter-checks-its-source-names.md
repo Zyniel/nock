@@ -4,7 +4,7 @@ title: The converter checks its source names
 status: In Progress
 assignee: []
 created_date: '2026-11-05T01:53:00Z'
-updated_date: '2026-11-06T01:08:00Z'
+updated_date: '2026-11-06T01:13:00Z'
 labels:
   - domain:grid-files
 milestone: m-8
@@ -47,4 +47,6 @@ Lead decisions on the spec-writer's questions:
 Only the case check is new behaviour: a:b.json is refused today through rule 2's name check. The original draft is backlog/archive/drafts/draft-068 - The-converter-checks-its-source-names.md.
 
 Spec-checker APPROVED in round 2; round 1 asked AC-25 to name the refused file rather than « the second file ».
+
+Reviewer round 1: APPROVE. Taken: ß.json in AC-25's test (guards the case-folding decision) and the docstring fix. Not taken: a backslash test (the name cannot be created on Windows; refused today by rule 2's check too) and a G1.json case for rule 1's warning.
 <!-- SECTION:NOTES:END -->
