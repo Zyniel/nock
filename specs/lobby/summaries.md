@@ -46,7 +46,8 @@ room they are no member of.
    nothing; a failed request, or an answer that is not a list of summaries,
    shows `my_rooms.error`. A summary's `last_activity_at`, and its
    `finished_at` when set, is a date only as a date-time in ISO 8601 with a
-   time zone, its seconds' fraction read when present
+   time zone, on a day and at a time the calendar has, its seconds' fraction
+   read when present
    (`2026-10-14T08:30:00.123456+00:00`, `2026-10-14T08:30:00Z`), in every
    engine; any other string makes the answer no list of summaries. The rest
    of the page never waits for it. A row
@@ -79,8 +80,9 @@ room they are no member of.
   no horizontal scroll with 8 players of 20 characters. Its rows follow the
   catalogue design ("Look"). (← 032 AC-6, 046 AC-11)
 - **AC-4** An answer whose one summary has `last_activity_at`
-  `2026-10-14 08:30:00Z` (a space for the `T`), or `2026-10-14T08:30:00` (no
-  time zone), shows « Impossible de charger vos salons. » and no row, while
+  `2026-10-14 08:30:00Z` (a space for the `T`), `2026-10-14T08:30:00` (no
+  time zone), or `2026-02-30T08:30:00Z` (a day February lacks), shows
+  « Impossible de charger vos salons. » and no row, while
   `2026-10-14T08:30:00.5Z` lists the row.
 - **AC-5** In room A, where Bob joined before Zoé and Lou, who then deleted
   their accounts, Bob's token gets one summary whose players are `BOB`, `--`,
