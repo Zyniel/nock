@@ -4,7 +4,7 @@ title: platform/realtime.md under the size guide
 status: Done
 assignee: []
 created_date: '2026-11-05T22:33:00Z'
-updated_date: '2026-11-09T20:17:00Z'
+updated_date: '2026-11-09T20:18:00Z'
 labels:
   - domain:realtime
   - domain:fair-play
@@ -36,7 +36,7 @@ From DRAFT-079. platform/realtime.md is 17.7 KB with 19 criteria. Move one part,
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -57,6 +57,8 @@ Spec-checker APPROVED. realtime.md 15,213 bytes, 15 criteria; fair-play.md 3,894
 Review round 1: CHANGES REQUESTED (hints.md and votes.md Depends on still sent « what a browser may receive » to realtime). Fixed with two suggestions (hints.md rewrap, _map.md's realtime row names the join deadline and the sockets per address); spec-checker APPROVED.
 
 Close: platform/server.md still held B-086's « New interface » section (production_app, now in its Code); removed, as the close step does for each domain file of the task.
+
+Pull request: https://github.com/Zyniel/nock/pull/186
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
