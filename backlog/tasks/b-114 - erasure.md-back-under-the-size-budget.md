@@ -4,7 +4,7 @@ title: account/erasure.md back under the size guide
 status: Done
 assignee: []
 created_date: '2026-11-05T05:01:00Z'
-updated_date: '2026-11-09T21:53:00Z'
+updated_date: '2026-11-09T21:54:00Z'
 labels:
   - domain:erasure
 milestone: m-11
@@ -36,7 +36,7 @@ From DRAFT-069. account/erasure.md is 17.5 KB with 18 criteria, over the ~15 KB 
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -57,6 +57,8 @@ Spec-checker APPROVED. erasure.md 12,483 bytes, 12 criteria; records.md 6,234 by
 Lead (tooling incoherence): scripts/gate_browsers.py SERIAL_TEST_FILES names test_records_history.py, the renamed file.
 
 Reviewer: APPROVE in one round. Two wording suggestions (erasure.md's records link inside the joining.md bullet; records.md's third edge case « that step 1 ») left for a follow-up draft.
+
+Pull request: https://github.com/Zyniel/nock/pull/190
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
