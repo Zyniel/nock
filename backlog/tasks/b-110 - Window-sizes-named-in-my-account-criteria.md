@@ -4,7 +4,7 @@ title: Window sizes in layout criteria, one rule
 status: In Progress
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-09T20:00:00Z'
+updated_date: '2026-11-09T20:03:00Z'
 labels:
   - follow-up
 milestone: m-11
@@ -47,4 +47,6 @@ Gate: uv run python scripts/gate.py --stage tests (traceability)
 Lead: the specs (archive left out) name 78 sizes in 13 files; every window size is on the new list, so no criterion changes. The sentence defining « The supported windows » as the eight sizes the tests share is dropped: that set is product.md rule 11, a baseline (escalation class, out of the milestone); follow-up draft. 283 by 640 stays listed (hud AC-3's test runs at it).
 
 Spec-checker: CHANGES REQUESTED in round 1 (1920 by 1080 both listed and excluded as a bound of product.md rule 11; 283 by 640 named like a phone class), APPROVED in round 2. No test and no code change: no criterion changed.
+
+Reviewer: APPROVE in one round; its wording suggestion taken (a window on a threshold or a pixel on either side), spec-checker APPROVED. Left: _map.md is 20 KB (not a domain file; already over before).
 <!-- SECTION:NOTES:END -->

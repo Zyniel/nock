@@ -168,7 +168,8 @@ writes it); nothing of race or teams is built.
   1024 by 768; the desktop 1280 by 720; the laptop 1280 by 800; the large
   desktop 1920 by 1080; the low desktop 1280 by 480. A criterion about a
   threshold that `_design/` sets (900 px wide, 500 px high, landscape) may also
-  name a window on it and one a pixel past it: 900 and 899 by 600, 800 by 800.
+  name a window on it or a pixel on either side of it: 900 and 899 by 600, 800
+  by 800.
   A size that is not a window (the grid's viewport, a cell, an image, the floor
   of `product.md` rule 11, 300 by 480) is not on the list.
 - "New interface" only while a change is being built.
