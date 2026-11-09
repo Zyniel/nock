@@ -4,7 +4,7 @@ title: The cards harness, and the hyphen-edge tests split
 status: Done
 assignee: []
 created_date: '2026-11-05T22:33:00Z'
-updated_date: '2026-11-09T19:04:00Z'
+updated_date: '2026-11-09T19:05:00Z'
 labels:
   - tooling
 milestone: m-11
@@ -31,7 +31,7 @@ From DRAFT-078. tests/cards_harness.py exists but tests/library_harness.py is st
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -46,6 +46,8 @@ Gate: uv run python scripts/gate.py --specs cards,library,viewport --browsers ch
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead: library_harness.py's content moved into cards_harness.py (the cards domain's harness), and test_library_filter.py imports QUIET_MS from it. role_gate.py's harness-to-domain map is the prefix rule of names_domain (test_<domain>_*, <domain>_harness*): with library_harness.py gone it names only files that exist (cards_harness.py -> cards), so it needs no edit. Its one gap, that a change to cards_harness.py does not add library to the quick gate though test_library_filter.py imports it, is not new and CI runs every test: a follow-up draft, since closing it is new tooling behaviour. The hyphen-edge file split in four (AC-9 is two files, at about 430 lines alone). The Tests lines of content/cards.md and content/library.md that named library_harness.py go through the spec-writer and the spec-checker.
+
+Pull request: https://github.com/Zyniel/nock/pull/183
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
