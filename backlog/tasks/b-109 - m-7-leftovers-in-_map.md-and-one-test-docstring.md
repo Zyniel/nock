@@ -1,10 +1,10 @@
 ---
 id: B-109
 title: Pointers and citations fixed
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T22:33:00Z'
-updated_date: '2026-11-09T18:03:00Z'
+updated_date: '2026-11-09T19:29:00Z'
 labels:
   - domain:summaries
   - domain:history
@@ -21,16 +21,16 @@ From DRAFT-077, DRAFT-075 and DRAFT-097. (1) _map.md's glossary gets a row for s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The five slips are fixed and the gate's traceability is green
+- [x] #1 The five slips are fixed and the gate's traceability is green
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -49,3 +49,13 @@ Lead: the spec-writer also fixed the same slip on summaries.md's Tests line (046
 
 Spec-checker APPROVED, two minor notes: history.md's Depends on does not list lobby/joining.md (now cited by the edge case), and the two cited criteria show one erased player each, so « twice » rests on rule 3. Both left for a follow-up draft.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+No behaviour change; no criterion added, changed or deleted.
+- #1 The five slips are fixed, traceability green: (1) _map.md glossary row for social/reactions.md (« Je bloque », « Réagir », the picker) and the my-account row's Look « pages, room »; (2) summaries.md's Tests line « (032 AC-5) », and the same slip « (046 AC-11, AC-12) » on that line; (3) history.md's edge case of two erased team-mates points at joining.md rule 3 (displayNickname's rule) and the page tests of history AC-3 and erasure AC-3, and its Depends on lists joining.md; (4) tests/test_hud_final_states.py cites client/menus.md rule 2 (menus.md has no rule 9); (5) catalogue.ts cites content/cards rule 1, dateTime.ts's top comment is under 88 characters.
+- Spec-checker APPROVED twice (the change, then the review's two history.md fixes). Reviewer: APPROVE in one round.
+- Full gate: GATE PASSED (full), 8915 parallel and 147 serial tests.
+- Assumed: no unit test of displayNickname exists; the two-player case rests on joining.md rule 3.
+<!-- SECTION:FINAL_SUMMARY:END -->
