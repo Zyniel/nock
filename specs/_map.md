@@ -25,7 +25,8 @@ table, the naming rules and the glossary follow in the same change.
 | --- | --- | --- | --- | --- |
 | account | `account/account.md` | sign-in, the session, the account's rooms | | 033 AC-1, AC-6 to AC-8, AC-11 |
 | account | `account/my-account.md` | « Compte » in a room and on the catalogue, the sign-in sheet, the e-mail form, the `/account` page and its states, what the device stores and forgets for the account | pages, room | 033 AC-2, AC-5, AC-9, AC-11; 046 AC-3; 048 AC-3 to AC-5 |
-| account | `account/erasure.md` | the account's deletion: the erasure and its attempts, what is kept, « Ancien joueur », history records, grid progress | | 033 AC-1, AC-3 to AC-5, AC-10; 038 AC-1, AC-2; 029 AC-3, AC-6, AC-7 (server side) |
+| account | `account/erasure.md` | the account's deletion: the erasure and its attempts, what is kept, « Ancien joueur » | | 033 AC-1, AC-3 to AC-5, AC-10; 038 AC-1, AC-2 |
+| account | `account/records.md` | what the account keeps of a player's play: the history records and their route, the grid progress route | | 029 AC-3, AC-6, AC-7 (server side) |
 | lobby | `lobby/rooms.md` | solo start, room creation and its limit per address, invitation, the room engine, the wrong-code throttle | room | 010, 011; 040 AC-7 |
 | lobby | `lobby/host.md` | the host role: who holds it, how it passes, what it may do | room | 014 |
 | lobby | `lobby/creator.md` | a member's account, the creator and the creator's player: host whenever connected, past the lock, the room deleted at the creator's erasure, accounts off | | |
@@ -72,7 +73,7 @@ criteria goes whole to its row; a criterion may be cited by more than one domain
 `presence` and `chat`, 047 AC-13 by `votes` and `results`,
 047 AC-14 by `votes`, `results` and `chat`, 033 AC-1 by `account` and
 `erasure`, 033 AC-5 by `my-account` and `erasure`, 033 AC-11 by `account` and
-`my-account`, 029 AC-3 and 029 AC-6 by `history` and `erasure`,
+`my-account`, 029 AC-3 and 029 AC-6 by `history` and `records`,
 036 AC-12 by `server` and `serving`, 004 AC-7 by `ipuz` and `library`), and
 each of them
 states the part its own screens hold.
@@ -177,7 +178,7 @@ writes it); nothing of race or teams is built.
 | Spec term | UI (French) | Code |
 | --- | --- | --- |
 | library | « Grilles » (the catalogue page) | `catalogue.py`, `catalogue-page` |
-| grid card, progress pill | « Grille n° N » … (a grid on « Grilles » and on `/g/<n>`; `content/cards.md`); « Commencée », « Terminée » | `CatalogueItem.svelte`, `nock.progress`, `GET /api/account/progress` |
+| grid card, progress pill | « Grille n° N » … (a grid on « Grilles » and on `/g/<n>`; `content/cards.md`); « Commencée », « Terminée » (the account's progress route is `account/records.md`) | `CatalogueItem.svelte`, `nock.progress`, `GET /api/account/progress` |
 | grid file | (not shown) | `grids/*.ipuz`, `GridFile` |
 | ipuz | (not shown: the standard crossword file format, v2 ArrowWord kind, a grid file is written in) | `ipuz.py`, `read_ipuz`, `write_ipuz` |
 | index | (not shown) | `grids/catalogue.json`, `IndexEntry`, `CatalogueEntry` |
@@ -218,7 +219,8 @@ writes it); nothing of race or teams is built.
 | authorship | « Auteurs » (`social/authorship.md`) | `authors` |
 | clue flag, reaction, picker | « Je bloque » (a player's flag on a clue where help is wanted), « Réagir » and its picker (an emoji on a word, shown on its clue for 3 s); `social/reactions.md` | `flag`, `flag_changed`, `react`, `reaction`, `clueFlags.ts`, `ReactionPicker.svelte` |
 | results | « Bilan de la partie », « Voir le bilan » | `recap.py`, `recap` |
-| history | « Grilles terminées » | `history`, `nock.history`, `history.ts`, `HistoryList.svelte`, `HistoryItem.svelte` |
+| history | « Grilles terminées » (on screen: `gameplay/history.md`) | `history`, `nock.history`, `history.ts`, `HistoryList.svelte`, `HistoryItem.svelte` |
+| history record, grid progress | (not shown: what an account keeps of a solved room, and the « Commencée » or « Terminée » it derives for each grid; `account/records.md`) | `account_history`, `GET /api/account/history`, `GET /api/account/progress` |
 | operations | « Exploitation » | `operations.py`, `/ops` |
 | ops page, replay | « Exploitation » (the operator's page: the token form, the dashboard card and its periods, a room's edits played step by step on its grid) | `OpsPage.svelte`, `OpsReplay.svelte`, `room_edits` |
 | force | « Force » (difficulty 1 to 4) | `force` |

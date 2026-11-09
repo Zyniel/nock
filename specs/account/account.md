@@ -1,7 +1,7 @@
 ---
 area: account
 file: account
-status: done
+status: approved
 ---
 
 # account/account - Optional account
@@ -12,7 +12,8 @@ A player who wants their rooms, and the progress of their grids, on every
 device signs in with a link sent by e-mail; nothing else needs an account.
 This file holds the settings, the sign-in, the session and the account's
 rooms; the sheet and the page are `account/my-account.md`, what the deletion
-erases and keeps `account/erasure.md`.
+erases and keeps `account/erasure.md`, the account's history records and grid
+progress `account/records.md`.
 
 ## Depends on
 
@@ -180,9 +181,9 @@ erases and keeps `account/erasure.md`.
 - Passwords, social sign-in, changing or adding an address, merging
   accounts, other e-mails; an IPv6 public URL.
 - `DELETE /api/account` and the erasure it starts, what is kept, « Ancien
-  joueur », the history records, the account's grid progress; how links and
-  sessions are stored and purged, and what no log holds:
-  `account/erasure.md`.
+  joueur »; how links and sessions are stored and purged, and what no log
+  holds: `account/erasure.md`. The history records and the account's grid
+  progress: `account/records.md`.
 - The sheet, the page, what the device stores and forgets for the account:
   `account/my-account.md`.
 - Catch-up, kept per device: `social/catch-up.md`.

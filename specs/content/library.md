@@ -1,7 +1,7 @@
 ---
 area: content
 file: library
-status: done
+status: approved
 ---
 
 # content/library - The catalogue « Grilles » and the grid page
@@ -18,7 +18,7 @@ an answer.
 - `content/grid-files.md`: the index, the number, published and withdrawn.
 - `content/cards.md`: the grid card, its progress and « Jouer ».
 - `account/account.md`: the sign-in status; the account's progress is
-  `account/erasure.md`.
+  `account/records.md`.
 
 ## Rules
 
@@ -201,7 +201,7 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   writes: `content/cards.md` rule 2. « Mes salons »: `lobby/summaries.md`.
   « Grilles terminées »:
   `gameplay/history.md`. « Compte » and its dialog: `account/my-account.md`; how
-  the account's progress is derived: `account/erasure.md`.
+  the account's progress is derived: `account/records.md`.
 - The frame of entry pages, the page not found, the scans of every page and
   their fit at every window: `client/shell.md`.
 

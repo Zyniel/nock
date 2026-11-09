@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: done
+status: approved
 ---
 
 # admin/operations - Logs, retention, the operator token and the ops API
@@ -47,7 +47,7 @@ them is `admin/ops-page.md`.
    an account keeps its identity in the room (code, player id, resume token,
    nickname) and its record of a solved room until the account goes, and a
    pending sign-in link its room key until used or expired
-   (`account/account.md` rule 12, `account/erasure.md` rule 8). A deleted
+   (`account/account.md` rule 12, `account/records.md` rule 1). A deleted
    account's erasure keeps its address and its players' codes and ids until it
    is done, then its times and counts alone for 5 years (`account/erasure.md`
    rules 5, 6).

@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: history
-status: done
+status: approved
 ---
 
 # gameplay/history - Finished grids, « Grilles terminées », « Rejouer »
@@ -14,8 +14,8 @@ terminées », where a grid can be played again.
 ## Depends on
 
 - `lobby/summaries.md`: summaries, which carry a room's result.
-- `account/erasure.md`: the account's records, its history route, « Ancien
-  joueur ».
+- `account/records.md`: the account's records, its history route; the
+  erasure that writes `--` is `account/erasure.md`.
 - `content/library.md`: the catalogue page and its column.
 - `lobby/joining.md`: how a nickname is shown, « Ancien joueur » for `--`
   (rule 3).
@@ -117,8 +117,8 @@ terminées », where a grid can be played again.
 
 - Deleting, sorting or filtering records; moving them to an account; a link
   from a record to its recap.
-- How an account saves and erases records, its history route:
-  `account/erasure.md`.
+- How an account saves records, its history route: `account/records.md`; how
+  an erasure writes `--` in them: `account/erasure.md`.
 
 ## Code
 

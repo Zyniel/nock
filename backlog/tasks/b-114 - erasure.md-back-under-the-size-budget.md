@@ -1,10 +1,10 @@
 ---
 id: B-114
 title: account/erasure.md back under the size guide
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T05:01:00Z'
-updated_date: '2026-11-09T04:50:00Z'
+updated_date: '2026-11-09T20:27:00Z'
 labels:
   - domain:erasure
 milestone: m-11
@@ -21,6 +21,12 @@ From DRAFT-069. account/erasure.md is 17.5 KB with 18 criteria, over the ~15 KB 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 erasure.md is under about 15 KB and 20 criteria, any moved part has its criteria and pointers, _map.md updated, the gate's traceability green
+- [ ] #2 records AC-1 (moved from erasure AC-1)
+- [ ] #3 records AC-2 (moved from erasure AC-4)
+- [ ] #4 records AC-3 (moved from erasure AC-5)
+- [ ] #5 records AC-4 (moved from erasure AC-6)
+- [ ] #6 records AC-5 (moved from erasure AC-11)
+- [ ] #7 records AC-6 (moved from erasure AC-18)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -32,3 +38,19 @@ From DRAFT-069. account/erasure.md is 17.5 KB with 18 criteria, over the ~15 KB 
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/account/erasure.md, new specs/account/records.md, specs/_map.md, the specs citing the moved rules and criteria
+Tests: tests/test_erasure_progress.py, _history.py, _teammates.py renamed to test_records_* with their test_acN_ renumbered
+Gate: uv run python scripts/gate.py --specs erasure,records --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead's pick among the Plan agent's options (Fable, high): option 3, a new domain account/records.md for what the account keeps of a player's play (erasure rules 8-10; AC-1, AC-4, AC-5, AC-6, AC-11, AC-18 renumbered AC-1 to AC-6, text unchanged, as B-085 did), three test files renamed to test_records_*. Rejected: tightening prose only (about 1-1.5 KB, short of the 2.5 KB needed, with a risk of changing meaning); moving AC-15 to AC-17 to account.md (erasure would land at about 15.0 KB, marginal, and leave two topics). Adding the domain is covered by the bet: the pitch names each split adding one. product.md is out of the milestone: not edited.
+
+Spec-checker APPROVED. erasure.md 12,483 bytes, 12 criteria; records.md 6,234 bytes, 6 criteria. Its note on records.md's Purpose taken (the original « which a team-mate's erasure must never undo » restored). Code names  and  checked in src/nock/accounts.py. product.md's routes table (lines 70-71) still names erasure.md as owner of the history and progress routes: product.md is out of the milestone, follow-up draft. The lead updates scripts/gate_browsers.py SERIAL_TEST_FILES with the test rename (an incoherence of the tooling otherwise).
+<!-- SECTION:NOTES:END -->
