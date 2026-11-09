@@ -1,7 +1,7 @@
 ---
 area: admin
 file: operations
-status: approved
+status: done
 ---
 
 # admin/operations - Logs, retention, the operator token and the ops API

@@ -1,7 +1,7 @@
 ---
 area: lobby
 file: creator
-status: approved
+status: done
 ---
 
 # lobby/creator - Member accounts and the creator

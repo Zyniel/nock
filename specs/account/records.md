@@ -1,7 +1,7 @@
 ---
 area: account
 file: records
-status: approved
+status: done
 ---
 
 # account/records - History records and grid progress
