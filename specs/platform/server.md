@@ -1,7 +1,7 @@
 ---
 area: platform
 file: server
-status: approved
+status: done
 ---
 
 # platform/server - Durable rooms, undo, building the app
@@ -125,10 +125,6 @@ take back their last edit.
 « Annuler » and « Rien à annuler. »: `client/hud.md` rule 4 and
 `client/room.md` rule 8, `_design/room.md`, « 3-second notes » and the two
 top bars (« Phone top bar », « Computer top bar »).
-
-## New interface
-
-- `nock.server.production_app() -> FastAPI` (rule 23).
 
 ## Acceptance criteria
 

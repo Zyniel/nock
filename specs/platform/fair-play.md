@@ -1,7 +1,7 @@
 ---
 area: platform
 file: fair-play
-status: approved
+status: done
 ---
 
 # platform/fair-play - Fair play
