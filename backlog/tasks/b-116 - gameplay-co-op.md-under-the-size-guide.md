@@ -4,7 +4,7 @@ title: gameplay/co-op.md under the size guide
 status: Done
 assignee: []
 created_date: '2026-11-09T18:05:00Z'
-updated_date: '2026-11-09T21:30:00Z'
+updated_date: '2026-11-09T21:31:00Z'
 labels:
   - domain:co-op
   - domain:pencil
@@ -44,7 +44,7 @@ Split from B-115 (the lead's call: both cuts do not fit one agent context; the m
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -65,6 +65,8 @@ Lead (tooling coherence, the gate's static check demands it): scripts/gate.py SH
 Spec-checker APPROVED. co-op.md 9,968 bytes, 10 criteria; pencil.md 7,987 bytes, 11 criteria. Its three wording notes taken (pencil Out of scope names the co-op rules its AC-1, AC-3, AC-4, AC-6 to AC-9 give pencil cases of; co-op Purpose and Code). No test renamed: every moved criterion points at 020.
 
 Reviewer: APPROVE in one round. Sizes on disk at HEAD: co-op.md 9,938 bytes, pencil.md 8,032 bytes (the earlier figures were before the wording notes). Cosmetic reflows (hud.md:48, board.md:223, viewport.md:209, _map.md:136) and an « erase » word in board.md's Depends on left for a follow-up draft.
+
+Pull request: https://github.com/Zyniel/nock/pull/189
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
