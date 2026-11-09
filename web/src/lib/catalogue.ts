@@ -92,7 +92,7 @@ export function progressOf(
   return 'none'
 }
 
-// Ask the server for the signed-in account's progress (spec 004 rule 7): grid
+// Ask the server for the signed-in account's progress (content/cards rule 1): grid
 // number -> "started" or "finished". A request that fails or a status other
 // than 2xx is signed out with no progress; a 2xx is signed in, with no progress
 // when its body is not a JSON object. The answer is never stored on the device.
