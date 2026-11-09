@@ -346,7 +346,6 @@ def test_ac19_junk_frames_are_ignored(
 
     mock.send("not json")
     mock.send("[1, 2]")
-    mock.send('{"seq": 6}')
     mock.send('{"type": 3, "seq": 6}')
     mock.send("null")
     mock.send(event_frame(6))

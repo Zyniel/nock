@@ -20,7 +20,7 @@ from urllib.parse import urlsplit
 
 from playwright.sync_api import Page, expect
 
-from library_harness import QUIET_MS
+from cards_harness import QUIET_MS
 from spec004_harness import fr_text, load_fr
 
 GRIDS_PATH = "/api/grids"
