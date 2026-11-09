@@ -4,7 +4,7 @@ title: A calendar example for « Mes salons » and /ops dates
 status: Done
 assignee: []
 created_date: '2026-11-06T03:26:00Z'
-updated_date: '2026-11-09T21:06:00Z'
+updated_date: '2026-11-09T21:07:00Z'
 labels:
   - domain:summaries
   - domain:operations
@@ -34,7 +34,7 @@ From DRAFT-080. isDateTime (web/src/lib/dateTime.ts) refuses a date-time the cal
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -55,6 +55,8 @@ Criterion #2: admin/operations.md has no criterion that reads a date (the server
 No implementation phase: isDateTime already refuses a date the calendar lacks; the new cases pass on the current code and fail with its day-in-month check dropped.
 
 Reviewer: APPROVE in one round. Suggestions left for follow-up drafts: an impossible time (T25:00:00Z) and an accepted leap day (2028-02-29) are not shown by any criterion.
+
+Pull request: https://github.com/Zyniel/nock/pull/188
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
