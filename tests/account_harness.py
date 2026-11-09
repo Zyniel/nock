@@ -1,18 +1,20 @@
-"""Shared setup of the tests of account/erasure, AC-4 to AC-6 and AC-8 to AC-14.
+"""Shared setup of the tests of account/records, AC-2 to AC-6, and of
+account/erasure, AC-8 to AC-14.
 
 Pytest does not collect this module (its name does not start with `test_`). The
-tests are in `tests/test_erasure_*.py`:
+tests are in `tests/test_records_*.py` and `tests/test_erasure_*.py`:
 
-- `test_erasure_progress.py`: AC-4 to AC-6, `GET /api/account/progress` over
-  HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one
-  file, a fake clock).
-- `test_erasure_done.py`, `test_erasure_history.py`, `test_erasure_record.py`,
+- `test_records_progress.py`: records AC-2 to AC-4, `GET /api/account/progress`
+  over HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on
+  one file, a fake clock).
+- `test_erasure_done.py`, `test_records_history.py` (records AC-5),
+  `test_records_teammates.py` (records AC-6), `test_erasure_record.py`,
   `test_erasure_retry.py`, `test_erasure_overlap.py` and `test_erasure_once.py`:
-  AC-8 to AC-11, AC-13 and AC-14, the erasure that always finishes, on the same
-  app. Zoé's play (`zoe_in_rooms`, `zoe_in_new_live_room`), the room store that
-  holds a room's engine (`HoldingStore`) and the reading of the erasure's two
-  tables are here.
-- `test_erasure_returning_device.py`: AC-12, a browser.
+  erasure AC-8 to AC-10, AC-13 and AC-14 and records AC-5 and AC-6, the erasure
+  that always finishes, on the same app. Zoé's play (`zoe_in_rooms`,
+  `zoe_in_new_live_room`), the room store that holds a room's engine
+  (`HoldingStore`) and the reading of the erasure's two tables are here.
+- `test_erasure_returning_device.py`: erasure AC-12, a browser.
 
 Ana's rooms are FX-01 rooms played with the rules (spec 029's `play_fx01`) and
 registered with `add_room`, so that the grid number of each one is chosen. A room

@@ -1,4 +1,4 @@
-"""Tests of account/erasure, AC-11: a history record never brings an erased name back.
+"""Tests of account/records, AC-5: a history record never brings an erased name back.
 
 HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one file,
 a fake clock). Two plays:
@@ -84,7 +84,7 @@ def is_second_attempt_over(accounts: AccountStore) -> bool:
     return pending[0].attempts >= ATTEMPTS_AFTER_THE_SECOND
 
 
-def test_ac11_records_saved_from_a_state_read_before_her_deletion_name_her_dashes(
+def test_ac5_records_saved_from_a_state_read_before_her_deletion_name_her_dashes(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     store = HoldingStore(tmp_path / "nock.sqlite3")
@@ -134,7 +134,7 @@ def test_ac11_records_saved_from_a_state_read_before_her_deletion_name_her_dashe
     assert cy_teammates == [("BOB", FORMER_NICKNAME)]
 
 
-def test_ac11_the_record_saved_by_the_delete_hook_of_her_deleted_room_names_her_dashes(
+def test_ac5_the_record_saved_by_the_delete_hook_of_her_deleted_room_names_her_dashes(
     tmp_path: Path, fake_clock: FakeClock, fx01_grid: Grid
 ) -> None:
     with account_app(tmp_path, fake_clock) as app:
