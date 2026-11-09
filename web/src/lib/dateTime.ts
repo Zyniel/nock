@@ -1,8 +1,8 @@
 // The one reading of the dates the server sends. Plain function: no DOM.
 
 // An ISO 8601 date-time such as "2026-05-01T10:20:30.5Z": a fraction of a second
-// is optional, the offset is "Z", "+hh:mm" or "-hh:mm". The groups are the year, month, day,
-// hour, minute, second and, for a numeric offset, its hour and minute.
+// is optional, the offset is "Z", "+hh:mm" or "-hh:mm". The groups are the year,
+// month, day, hour, minute, second and, for a numeric offset, its hour and minute.
 // `Date.parse` alone is lenient and differs between engines, so the calendar is
 // checked on these fields instead.
 const DATE_TIME_PATTERN =
