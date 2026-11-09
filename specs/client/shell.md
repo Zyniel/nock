@@ -150,7 +150,7 @@ file, and the brand on the top bars.
 - **AC-6** After a snapshot at seq 5, events 4, 5 and 7 leave seq 5 with one
   buffered; event 6 then gives seq 7 with none. (← 040 AC-19)
 - **AC-7** After a snapshot at seq 5, a `selection_moved`, a `reaction`, an
-  `error` and the frames `not json`, `[1, 2]`, `{"seq": 6}` and `null` change
+  `error` and the frames `not json`, `[1, 2]` and `null` change
   neither seq, buffer nor state; an event 6 then gives seq 6. (← 040 AC-19,
   040 AC-20)
 - **AC-8** A close 1011 after a snapshot makes the page reconnecting, its status
@@ -214,10 +214,12 @@ file, and the brand on the top bars.
   cell, and its stream line has the look of a check that found a wrong
   letter (`_design/room.md`, « Salon »); with `wrong` `[]` it has the other
   look.
-- **AC-36** On FX-01, after a snapshot at seq 5, a binary frame holding a
-  letter event 6 as UTF-8 JSON, or the text frame `{"seq": 6}` with no `type`,
-  leaves the page joined at seq 5 with nothing buffered; that letter event 6
-  sent as text then gives seq 6 and its letter shows.
+- **AC-36** On FX-01, after a snapshot at seq 5, a binary frame holding the
+  letter event 6 `W` at (2, 1) as UTF-8 JSON, or the text frame `{"seq": 6}`
+  with no `type`, is ignored: the text letter event 7 `T` at (1, 0) that
+  follows is buffered, one pending; the text letter event 6 `V` at (2, 1)
+  then gives seq 7 with nothing buffered, the page still joined, (2, 1)
+  showing `V` and (1, 0) `T`.
 - **AC-37** A shown text whose `fr.json` template is « {name} et {other} »,
   filled with `name` « Ana » and no `other`, reads « Ana et {other} ».
 

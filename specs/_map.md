@@ -54,7 +54,8 @@ table, the naming rules and the glossary follow in the same change.
 | admin | `admin/operations.md` | logs, metrics, retention, the operator token, the ops API | | 038 AC-3 to AC-6, AC-10, AC-11 |
 | admin | `admin/ops-page.md` | the `/ops` page: the token form and its states, the dashboard card and its period chips, the replay of a room's edits | pages | 038 AC-7 to AC-9; 048 AC-6 to AC-12 |
 | admin | `admin/overrides.md` | the `/ops` overrides of the room lives and the sweep interval: effective value, settings routes, dry run, storage, the settings card | pages | |
-| platform | `platform/realtime.md` | room events protocol, fair play | | 039, 037; 017 AC-4; 040 AC-8 to AC-13 |
+| platform | `platform/realtime.md` | room events protocol: the socket, the messages, order and delivery, the silence check, the join deadline, the sockets per address and their cap, the grid view's hyphen marks | | 039 (but AC-14 to AC-17); 037 AC-2; 017 AC-4; 040 AC-8, AC-10 to AC-13 |
+| platform | `platform/fair-play.md` | answer-free payloads, the edit rate, text never inserted as HTML | | 037 AC-1, AC-3, AC-4; 039 AC-14 to AC-17; 040 AC-9 |
 | platform | `platform/reconnection.md` | stale edits, the resume window, the page's connection: heartbeat, losses, retries, resends | room | 017 AC-1 to AC-3, AC-5 |
 | platform | `platform/server.md` | durable state, undo, building the app | | 018; 036 AC-12 |
 | platform | `platform/live-rooms.md` | the rooms held in memory: live from the first socket to the last, the socket's one lookup, the step's time budgets | | |
@@ -157,10 +158,21 @@ writes it); nothing of race or teams is built.
 - About 15 KB and 20 criteria per file. Over that, split the domain and update
   the table above.
 - Never the look (cite the design file and section), never test mechanics
-  (window sizes, test ids, sample lists, fixtures: the tests hold them), never
-  copies of code (name the module), never history (the commit message holds the
-  reason; a `<file>.notes.md` next to the spec keeps one only when a later change
-  will need it).
+  (test ids, sample lists, fixtures: the tests hold them), never copies of code
+  (name the module), never history (the commit message holds the reason; a
+  `<file>.notes.md` next to the spec keeps one only when a later change will
+  need it).
+- A window is not a test mechanic: a layout criterion names the window it is
+  about, by its size, from this list: the phone 360 by 740 and sideways 740 by
+  360; the small phone 320 by 568 and sideways 568 by 320; 283 by 640, a window
+  under the floor of `product.md` rule 11; the tablet 768 by 1024 and sideways
+  1024 by 768; the desktop 1280 by 720; the laptop 1280 by 800; the large
+  desktop 1920 by 1080; the low desktop 1280 by 480. A criterion about a
+  threshold that `_design/` sets (900 px wide, 500 px high, landscape) may also
+  name a window on it or a pixel on either side of it: 900 and 899 by 600, 800
+  by 800.
+  A size that is not a window (the grid's viewport, a cell, an image, the floor
+  of `product.md` rule 11, 300 by 480) is not on the list.
 - "New interface" only while a change is being built.
 
 ## Naming rules
