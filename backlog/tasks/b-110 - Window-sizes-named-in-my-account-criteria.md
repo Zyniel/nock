@@ -1,10 +1,10 @@
 ---
 id: B-110
 title: Window sizes in layout criteria, one rule
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-09T20:03:00Z'
+updated_date: '2026-11-09T20:42:00Z'
 labels:
   - follow-up
 milestone: m-11
@@ -20,16 +20,16 @@ From DRAFT-076. Criteria name window sizes (360 by 740, 320 by 568, 1280 by 720)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 _map.md « What a spec holds » lists the window sizes layout criteria may name, every size named in a domain spec is on the list, and the gate's traceability is green
+- [x] #1 _map.md « What a spec holds » lists the window sizes layout criteria may name, every size named in a domain spec is on the list, and the gate's traceability is green
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Spec change APPROVED by the spec-checker, or no spec change
-- [ ] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
-- [ ] #3 Tests committed before the code, or a tooling task
-- [ ] #4 Reviewer APPROVE within two rounds
-- [ ] #5 Full gate green
+- [x] #1 Spec change APPROVED by the spec-checker, or no spec change
+- [x] #2 Change of look drawn in docs/design/ and the screens sheet rebuilt, or no change of look
+- [x] #3 Tests committed before the code, or a tooling task
+- [x] #4 Reviewer APPROVE within two rounds
+- [x] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
@@ -50,3 +50,13 @@ Spec-checker: CHANGES REQUESTED in round 1 (1920 by 1080 both listed and exclude
 
 Reviewer: APPROVE in one round; its wording suggestion taken (a window on a threshold or a pixel on either side), spec-checker APPROVED. Left: _map.md is 20 KB (not a domain file; already over before).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Only specs/_map.md changed; no criterion, test or code.
+- #1 « What a spec holds »: a window is not a test mechanic; a layout criterion names the window it is about, from a list: phone 360 by 740 / 740 by 360, small phone 320 by 568 / 568 by 320, 283 by 640 (under product.md rule 11's floor), tablet 768 by 1024 / 1024 by 768, desktop 1280 by 720, laptop 1280 by 800, large desktop 1920 by 1080, low desktop 1280 by 480; a criterion on a _design/ threshold may name a window on it or a pixel on either side (900 and 899 by 600, 800 by 800); sizes that are not windows (grid viewport, a cell, an image, rule 11's floor 300 by 480) are not on the list. Every size named in a domain spec is covered (spec-checker's scan across line wraps); traceability green.
+- Decisions: no sentence defines « the supported windows » (product.md rule 11's set is a baseline, an escalation class, out of the milestone): follow-up draft. 283 by 640 listed (hud AC-3's test runs at it).
+- Spec-checker: CHANGES REQUESTED once (1920 by 1080 both listed and excluded), then APPROVED. Reviewer: APPROVE in one round; its threshold-wording suggestion taken.
+- Full gate: GATE PASSED (full), 8915 parallel and 147 serial tests.
+<!-- SECTION:FINAL_SUMMARY:END -->
