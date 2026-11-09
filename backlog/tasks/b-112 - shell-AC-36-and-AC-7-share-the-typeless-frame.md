@@ -33,7 +33,7 @@ From DRAFT-083 (B-097's review). client/shell.md AC-7 lists {"seq": 6} among the
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -54,6 +54,8 @@ No implementation phase: the change is in a criterion's wording and its tests, w
 Review round 1: CHANGES REQUESTED. The binary frame reaches the page as a Blob, whose read waits, so W-then-V sent back to back missed a decoder that waits. Lead's call: AC-36 puts a visible step between the ignored frame and event 6 (a text event 7 buffered, one pending), then event 6 V applies both; spec-writer, spec-checker, then test-writer (Opus, after a send-back).
 
 Review round 2: APPROVE. Left as is: the docstring's « T then applies at once » holds for a synchronous decoder only (the conclusion holds either way), and a decoder slower than two round trips would pass, which no fixed delay closes either.
+
+Pull request: https://github.com/Zyniel/nock/pull/185
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
