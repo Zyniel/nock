@@ -4,7 +4,7 @@ title: platform/realtime.md under the size guide
 status: In Progress
 assignee: []
 created_date: '2026-11-05T22:33:00Z'
-updated_date: '2026-11-09T19:14:00Z'
+updated_date: '2026-11-09T19:20:00Z'
 labels:
   - domain:realtime
   - domain:fair-play
@@ -53,4 +53,6 @@ Gate: uv run python scripts/gate.py --specs realtime,fair-play --browsers chromi
 Lead's pick among the Plan agent's options (Fable, high): R1, move realtime's « Fair play » section (rules 23-25, AC-6, AC-12, AC-13, AC-14, all pointers to 037/039/040) to a new domain platform/fair-play.md, criteria text unchanged and renumbered from AC-1 (precedent B-085); the hyphen-mark part of rule 23 and AC-20 stay in realtime. Rejected: R2 (a sockets domain, three test files renamed and ten pointers rewritten), R3 (too little margin). Adding a domain is covered by the bet: the pitch names each split adding one. co-op's cut went to B-116 (both did not fit one context).
 
 Spec-checker APPROVED. realtime.md 15,213 bytes, 15 criteria; fair-play.md 3,894 bytes, 4 criteria. 037 stays partly in realtime (AC-9, AC-11 point at 037 AC-2). No test renamed, no code: every moved criterion is a pointer. Left for a follow-up: _map.md's realtime row could name the join deadline and the sockets per address.
+
+Review round 1: CHANGES REQUESTED (hints.md and votes.md Depends on still sent « what a browser may receive » to realtime). Fixed with two suggestions (hints.md rewrap, _map.md's realtime row names the join deadline and the sockets per address); spec-checker APPROVED.
 <!-- SECTION:NOTES:END -->

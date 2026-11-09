@@ -17,8 +17,8 @@ Each player may ask only a few times in a short while.
 
 - `gameplay/board.md`: letter cells, the selection and its word, pending edits.
 - `lobby/host.md`: the host settings, which set the help mode and the allowance.
-- `platform/realtime.md`: the messages, their error codes, what a browser may
-  receive.
+- `platform/realtime.md`: the messages, their error codes.
+- `platform/fair-play.md`: what a browser may receive.
 
 ## Rules
 
@@ -35,16 +35,16 @@ Each player may ask only a few times in a short while.
 
 2. A check, a reveal or a ballot is input (it wakes an idle player,
    `social/presence.md`); the edit rate limit (`platform/fair-play.md`) counts
-   none of them. A check or a
-   reveal, whatever its target, meets the hint limit first: when its sender
-   already has `RoomConfig.hint_limit` (5) counted requests in the last
-   `hint_window_seconds` (10) seconds (sliding: those after now − 10), it is
-   dropped. A dropped request gets no reply, adds no entry, closes no expired
-   vote and changes nothing but the sender's presence. A request counts when it
-   is applied at once or opens a vote; a dropped or refused one does not, nor a
-   ballot, which no limit holds back, nor the request of a vote that passes.
-   Each player has their own window, never logged; a restart empties them all.
-   Then the first step that applies refuses a check or a reveal:
+   none of them. A check or a reveal, whatever its target, meets the hint limit
+   first: when its sender already has `RoomConfig.hint_limit` (5) counted
+   requests in the last `hint_window_seconds` (10) seconds (sliding: those
+   after now − 10), it is dropped. A dropped request gets no reply, adds no
+   entry, closes no expired vote and changes nothing but the sender's presence.
+   A request counts when it is applied at once or opens a vote; a dropped or
+   refused one does not, nor a ballot, which no limit holds back, nor the
+   request of a vote that passes. Each player has their own window, never
+   logged; a restart empties them all. Then the first step that applies refuses
+   a check or a reveal:
    1. the grid is solved: `grid_solved`;
    2. help mode `none`: `help_disabled`;
    3. a letter target that is not a letter cell: `not_a_letter_cell`; a word
@@ -208,11 +208,9 @@ The Aide groups, `_design/room.md`, « Aide menu »; the strike and the notch,
 - The vote and its banner: `gameplay/votes.md`. The host settings:
   `lobby/host.md`. The Aide menu's place: `client/menus.md`; the notes:
   `client/room.md`. Cell marks: `gameplay/viewport.md`; pending edits:
-  `gameplay/board.md`.
-  Completion: `gameplay/rules.md`. The stream and its lines' look:
-  `social/chat.md`. Protocol: `platform/realtime.md`; fair play:
-  `platform/fair-play.md`. The recap's
-  counts: `gameplay/results.md`.
+  `gameplay/board.md`. Completion: `gameplay/rules.md`. The stream and its
+  lines' look: `social/chat.md`. Protocol: `platform/realtime.md`; fair play:
+  `platform/fair-play.md`. The recap's counts: `gameplay/results.md`.
 
 ## Code
 

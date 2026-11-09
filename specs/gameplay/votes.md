@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: votes
-status: done
+status: approved
 ---
 
 # gameplay/votes - The group vote on help and its banner
@@ -17,8 +17,8 @@ result.
 
 - `gameplay/hints.md`: the help modes, the requests and their refusal steps, the
   Aide items disabled while a vote is open.
-- `platform/realtime.md`: the messages, their error codes, what a browser may
-  receive.
+- `platform/realtime.md`: the messages, their error codes.
+- `platform/fair-play.md`: what a browser may receive.
 - `social/chat.md`: the stream the `vote` line goes to.
 
 ## Rules
