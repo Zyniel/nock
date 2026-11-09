@@ -4,7 +4,7 @@ title: A calendar example for « Mes salons » and /ops dates
 status: In Progress
 assignee: []
 created_date: '2026-11-06T03:26:00Z'
-updated_date: '2026-11-09T19:55:00Z'
+updated_date: '2026-11-09T19:58:00Z'
 labels:
   - domain:summaries
   - domain:operations
@@ -51,4 +51,6 @@ Gate: uv run python scripts/gate.py --specs summaries,ops-page --browsers chromi
 Lead: the /ops replay page is specified in admin/ops-page.md, not operations.md; its date criterion is AC-16 (rule 6), so criterion #2 applies to ops-page AC-16.
 
 Criterion #2: admin/operations.md has no criterion that reads a date (the server writes its dates and parses none sent to it); the /ops date criterion is ops-page AC-16. Spec-checker APPROVED; its optional note (ops-page rule 6 could mirror summaries rule 2 word for word) is not taken: one function decides both and AC-16 checks refusals only.
+
+No implementation phase: isDateTime already refuses a date the calendar lacks; the new cases pass on the current code and fail with its day-in-month check dropped.
 <!-- SECTION:NOTES:END -->
