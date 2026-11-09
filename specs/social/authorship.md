@@ -18,7 +18,8 @@ players under the grid.
   others' cursors and tints it leaves alone.
 - `lobby/joining.md`: players, colours, nicknames and their display, join
   order, resume and seat back.
-- `gameplay/co-op.md`: edits, pencil letters and their confirmation, flashes.
+- `gameplay/co-op.md`: edits, pencil letters, flashes; confirming a pencil
+  letter is `gameplay/pencil.md`.
 
 ## Rules
 
@@ -26,7 +27,7 @@ players under the grid.
 
 1. A letter cell's author is the player of its last `letter_changed` that put
    a letter there: the last writer, the undoer of a letter an undo puts back,
-   the confirmer of a pencil letter (`gameplay/co-op.md`). An erase and a
+   the confirmer of a pencil letter (`gameplay/pencil.md`). An erase and a
    reveal leave no author; a lock by a check keeps it. The server keeps
    authors by player id through a resume, a time-out and a restart, from the
    log or from a stored snapshot.

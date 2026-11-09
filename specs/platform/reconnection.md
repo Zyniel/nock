@@ -28,7 +28,7 @@ a loss, retries and sends what it held.
 1. A cell edit sent again after a reconnection carries `base_seq`, the last seq
    the page had applied when the edit was made; an edit without one is never
    stale. A live `confirm_pencil` also carries the page's seq
-   (`gameplay/co-op.md`). With `base_seq` b, the edit is `stale_edit` when the
+   (`gameplay/pencil.md`). With `base_seq` b, the edit is `stale_edit` when the
    cell last changed after b by another player; else it applies as a live
    edit. The rate limit (`platform/fair-play.md` rule 2) comes before the
    letter-cell check, which comes before `cell_locked`, then staleness (the

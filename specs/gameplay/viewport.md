@@ -205,7 +205,8 @@ dashed edge.
 - The selection, taps, typing, navigation, the clue bar, the in-app keyboard,
   « Mots des autres » and « Accessibilité »: `gameplay/board.md`. Others'
   selections and their tint: `social/presence.md`. Edits, pencil letters:
-  `gameplay/co-op.md`. Grid roles: `product.md`. What a frame may redraw:
+  `gameplay/co-op.md`; pencil mode: `gameplay/pencil.md`. Grid roles:
+  `product.md`. What a frame may redraw:
   `client/foundation.md`.
 
 ## Code

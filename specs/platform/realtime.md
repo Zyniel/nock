@@ -58,10 +58,12 @@ contract.
    - this file: `join` (enter the room, with an optional resume token),
      `snapshot` (the whole room for the joiner), `ping` and `pong` (heartbeat),
      `error` (a refusal, rule 10);
-   - `gameplay/co-op.md`: `edit_letter`, `erase`, `pencil_edit`,
-     `confirm_pencil` (change a cell), answered by `letter_changed` (a cell's
-     letter set or erased) and `cell_locked` (a cell fixed, checked right or
-     revealed);
+   - `gameplay/co-op.md`: `edit_letter`, `erase` (change a cell), answered by
+     `letter_changed` (a cell's letter set or erased) and `cell_locked` (a cell
+     fixed, checked right or revealed);
+   - `gameplay/pencil.md`: `pencil_edit`, `confirm_pencil` (a pencil letter,
+     its confirmation), checked and answered as the edits of
+     `gameplay/co-op.md`;
    - `gameplay/hints.md`: `check`, `reveal`, answered by `check_result`,
      `reveal_result`;
    - `gameplay/votes.md`: `vote` (a ballot), answered by `vote_opened`,

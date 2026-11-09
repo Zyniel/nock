@@ -61,7 +61,7 @@ for every player, measures the room's playing time from the first letter typed.
 6. Once solved, a letter key, `Backspace`, `Control+z`, `Meta+z` and the undo
    button send nothing and change no cell. Disabled: the undo button, the three
    checks and the reveal items of « Aide » (`gameplay/hints.md`), « Crayon » and
-   the pencil confirmation (`gameplay/co-op.md`), « Clavier »; the in-app
+   the pencil confirmation (`gameplay/pencil.md`), « Clavier »; the in-app
    keyboard goes away (`gameplay/board.md`). Selecting cells and the arrow keys
    still work.
 7. The status is the end band under the clue bar, where « Voir le bilan »

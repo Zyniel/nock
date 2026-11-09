@@ -25,7 +25,7 @@ same way by pointer, touch or keyboard, on a phone or a computer.
 ### Menus
 
 1. The Aide menu, a group named `topbar.aide`, holds the pencil confirm and a
-   separator while it applies (`gameplay/co-op.md`); then, unless the help mode
+   separator while it applies (`gameplay/pencil.md`); then, unless the help mode
    is `none`, « Vérifier » and « Révéler » (`gameplay/hints.md`), each a group
    named by its heading, a separator between; else, when empty, the line
    `aide.empty` (« L'aide est désactivée dans ce salon. »). « Aide » never
