@@ -16,10 +16,11 @@ stream line (« Bob a vérifié un mot ») is in `--nock-muted`, the look of a c
 found a wrong letter. With `wrong` `[]` the line is in green, the
 look of a clean check (`specs/_design/room.md`, « Salon »).
 
-AC-36: on the same room, the mock sends letter event 6 as a binary frame (UTF-8 JSON),
-or the text frame `{"seq": 6}` with no `type`: the page stays joined at seq 5 with
-nothing buffered (`data-pending` 0) after a pause long enough for the frame to have
-been read. Letter event 6 sent as text then gives seq 6 and its letter shows.
+AC-36: on the same room, the mock sends letter event 6 `W` at (2, 1) as a binary
+frame (UTF-8 JSON), or the text frame `{"seq": 6}` with no `type`. Letter event 6 `V`
+at (2, 1), sent next as text, gives seq 6 with nothing buffered, the page still
+joined, and (2, 1) showing `V`: a decoded binary frame would have shown `W` or
+buffered the text event, so no fixed delay is waited.
 """
 
 from __future__ import annotations
@@ -32,7 +33,6 @@ from playwright.sync_api import Page, expect
 
 from nock.grid import Grid
 from nock.protocol import CheckResult, GridTarget, WordTarget
-from spec019_harness import SETTLE_MS
 from spec043_harness import (
     GREEN,
     MUTED,
@@ -139,6 +139,7 @@ def test_ac35_only_an_empty_wrong_list_gives_the_clean_check_look(
 LETTER_ROW = 2
 LETTER_COLUMN = 1
 LETTER = "V"
+BINARY_LETTER = "W"
 
 
 def _send_binary(mock: RoomMock, text: str) -> None:
@@ -153,7 +154,7 @@ def _send_binary(mock: RoomMock, text: str) -> None:
 
 def binary_letter_frame(mock: RoomMock) -> None:
     """Send letter event 6 as a binary frame holding its UTF-8 JSON."""
-    _send_binary(mock, letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
+    _send_binary(mock, letter_frame(6, LETTER_ROW, LETTER_COLUMN, BINARY_LETTER, "p2"))
 
 
 def typeless_frame(mock: RoomMock) -> None:
@@ -177,16 +178,11 @@ def test_ac36_a_binary_or_typeless_frame_is_dropped_and_event_6_then_applies(
     room = page.get_by_test_id("room-page")
 
     send_dropped_frame(mock)
-    page.wait_for_timeout(SETTLE_MS)
-
-    expect(room).to_have_attribute("data-status", "joined")
-    expect(room).to_have_attribute("data-seq", "5")
-    expect(room).to_have_attribute("data-pending", "0")
-
     mock.send(letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
 
     expect_seq(page, 6)
     expect(room).to_have_attribute("data-pending", "0")
+    expect(room).to_have_attribute("data-status", "joined")
     expect(cell_at(page, LETTER_ROW, LETTER_COLUMN)).to_have_attribute(
         "data-letter", LETTER
     )
