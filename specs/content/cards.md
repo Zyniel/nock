@@ -1,7 +1,7 @@
 ---
 area: content
 file: cards
-status: done
+status: approved
 ---
 
 # content/cards - The grid card
@@ -174,9 +174,8 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
   `catalogue.ts` (progress, the key it writes, its merge with the account's,
   the date); `playGrid.ts` (« Jouer »'s mark), `RoomPage.svelte` (the solve's
   mark); `gridThumb.ts`.
-- Tests: `tests/test_cards_progress.py`, with `tests/library_harness.py` as its
-  harness; `tests/test_cards_progress_keys.py`,
-  `test_cards_progress_marks.py`, `test_cards_progress_solve.py` (AC-10 to
+- Tests: `tests/test_cards_progress.py`, `test_cards_progress_keys.py`,
+  `test_cards_progress_marks.py`, `test_cards_progress_solve.py` (AC-7 to
   AC-13), with `tests/cards_harness.py` as their harness;
   `tests/test_spec_004_ac01_ac03_*` (004 AC-3),
   `test_spec_046_ac04_ac06_*` (046 AC-5, AC-6), `test_spec_046_ac07_ac08_*`,
