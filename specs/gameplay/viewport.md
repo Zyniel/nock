@@ -60,7 +60,7 @@ dashed edge.
 ### Hyphen edges
 
 5. A letter cell's `hyphen_right` or `hyphen_down` mark (`platform/realtime.md`
-   rule 23; absent reads false) draws that edge, its right or its bottom, as
+   rule 27; absent reads false) draws that edge, its right or its bottom, as
    the dashed hyphen edge of `_design/cells.md` « Hyphen edges » in place of
    the grid line, whatever the state of the two cells and at every zoom; no
    other edge is dashed. Words, selection, typing, navigation, check and
