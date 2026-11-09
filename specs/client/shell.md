@@ -216,9 +216,10 @@ file, and the brand on the top bars.
   look.
 - **AC-36** On FX-01, after a snapshot at seq 5, a binary frame holding the
   letter event 6 `W` at (2, 1) as UTF-8 JSON, or the text frame `{"seq": 6}`
-  with no `type`, is ignored: the letter event 6 `V` at (2, 1) sent next as
-  text gives seq 6 with nothing buffered, the page still joined, and (2, 1)
-  shows `V`.
+  with no `type`, is ignored: the text letter event 7 `T` at (1, 0) that
+  follows is buffered, one pending; the text letter event 6 `V` at (2, 1)
+  then gives seq 7 with nothing buffered, the page still joined, (2, 1)
+  showing `V` and (1, 0) `T`.
 - **AC-37** A shown text whose `fr.json` template is « {name} et {other} »,
   filled with `name` « Ana » and no `other`, reads « Ana et {other} ».
 
