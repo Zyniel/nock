@@ -31,7 +31,7 @@ From DRAFT-077, DRAFT-075 and DRAFT-097. (1) _map.md's glossary gets a row for s
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -48,6 +48,8 @@ Gate: uv run python scripts/gate.py --specs summaries,history --browsers chromiu
 Lead: the spec-writer also fixed the same slip on summaries.md's Tests line (046 AC-11, AC-12): kept. (3): no unit test of displayNickname exists; the edge case points at joining.md rule 3 and the page tests of history AC-3 and erasure AC-3; no new test in this tidy task.
 
 Spec-checker APPROVED, two minor notes: history.md's Depends on does not list lobby/joining.md (now cited by the edge case), and the two cited criteria show one erased player each, so « twice » rests on rule 3. Both left for a follow-up draft.
+
+Pull request: https://github.com/Zyniel/nock/pull/184
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
