@@ -4,6 +4,7 @@ title: Specs still over the size guide after m-11
 status: Draft
 assignee: []
 created_date: '2026-11-09T22:22:00Z'
+updated_date: '2026-11-09T22:25:00Z'
 labels:
   - follow-up
 dependencies: []
@@ -24,3 +25,9 @@ From DRAFT-079 (m-11 took realtime, co-op and erasure). Over the ~15 KB / 20-cri
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+m-11's review: platform/realtime.md is 15,338 bytes at its close (B-116 added the pencil.md line to rule 7), at the edge of the guide: its next addition takes it over.
+<!-- SECTION:NOTES:END -->
