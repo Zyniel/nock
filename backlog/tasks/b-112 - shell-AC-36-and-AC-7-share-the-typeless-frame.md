@@ -4,7 +4,7 @@ title: shell's typeless frame in one criterion
 status: In Progress
 assignee: []
 created_date: '2026-11-06T13:46:00Z'
-updated_date: '2026-11-09T18:03:00Z'
+updated_date: '2026-11-09T18:15:00Z'
 labels:
   - domain:shell
 milestone: m-11
@@ -48,4 +48,6 @@ Gate: uv run python scripts/gate.py --specs shell --browsers chromium
 
 <!-- SECTION:NOTES:BEGIN -->
 Lead: AC-36 keeps the typeless frame, AC-7 drops it. The 040 test's {"type": 3, "seq": 6} frame stays as it is (outside B-112); proving rule 3's string type properly goes to a follow-up draft.
+
+No implementation phase: the change is in a criterion's wording and its tests, with no behaviour change; both tests pass on the current code.
 <!-- SECTION:NOTES:END -->
