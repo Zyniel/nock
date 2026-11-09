@@ -20,7 +20,7 @@ account has on it, a drawing of its proportions on wide lists, and « Jouer ».
   moments that mark a grid.
 - `account/my-account.md`: the sign-in status the pages ask (rule 1) and the
   sign-out or deletion that removes `nock.account_progress` (rule 5); the
-  account's progress route is `account/erasure.md`.
+  account's progress route is `account/records.md`.
 
 ## Rules
 
@@ -29,7 +29,7 @@ account has on it, a drawing of its proportions on wide lists, and « Jouer ».
 1. A card's progress is `finished` if any source says so, else `started` if
    any does, else none. The sources, read the same way: `localStorage`
    `nock.progress` and `nock.account_progress` (rule 2 writes them) and the
-   body of `GET /api/account/progress` (`account/erasure.md` rule 10), never
+   body of `GET /api/account/progress` (`account/records.md` rule 3), never
    stored on the device; each a JSON object from grid numbers in decimal to
    `"started"` or `"finished"`. Each value is read on its own: any other
    value, a missing key, text that is not JSON or JSON that is not an object
@@ -163,7 +163,7 @@ The examples use CAT, four grids on FX-01: 1 (`2026-09-01`, force 1), 2
 - A real thumbnail of the grid's layout.
 - « Jouer », the room it creates and the moments that mark a grid:
   `lobby/rooms.md`. How the account's progress is derived:
-  `account/erasure.md`. The pages' states and the filter:
+  `account/records.md`. The pages' states and the filter:
   `content/library.md`.
 - Telling, in `nock.progress`, which marks an account set: none carries an
   origin, and they stay through a sign-out.

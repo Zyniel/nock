@@ -91,7 +91,7 @@ SERIAL_TEST_FILES: frozenset[str] = frozenset(
     {
         "test_account_slow_mail.py",
         "test_erasure_busy.py",
-        "test_erasure_history.py",
+        "test_records_history.py",
         "test_erasure_overlap.py",
         "test_erasure_retry.py",
         "test_operations_checkpoint_busy.py",

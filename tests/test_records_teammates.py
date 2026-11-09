@@ -1,4 +1,4 @@
-"""Tests of account/erasure, AC-18: two erased team-mates read `--` twice.
+"""Tests of account/records, AC-6: two erased team-mates read `--` twice.
 
 HTTP, on the app of spec 033's "Test harness" (accounts on, both stores on one file,
 a fake clock). Ana, Bob, Zoé and Lou, joined in that order, solved R, a stored FX-01
@@ -47,7 +47,7 @@ ERASED_TWICE = ["BOB", FORMER_NICKNAME, FORMER_NICKNAME]
     [True, False],
     ids=["saved before the deletions", "saved after the deletions"],
 )
-def test_ac18_two_erased_teammates_read_dashes_twice_in_the_record(
+def test_ac6_two_erased_teammates_read_dashes_twice_in_the_record(
     tmp_path: Path,
     fake_clock: FakeClock,
     fx01_grid: Grid,
