@@ -42,6 +42,8 @@ ACCOUNT_PROGRESS_PATH = "/api/account/progress"
 ACCOUNT_PROGRESS_ROUTE = "**/api/account/progress"
 STATUS_PATH = "/api/account"
 QUIET_MS = 500  # "never asks": nothing within this pause
+ACCOUNT_PROGRESS_KEY = "nock.account_progress"
+ROOM_SOCKET_PATTERN = re.compile(r".*/api/rooms/[A-Z0-9]{6}/ws$")
 
 DEVICE_PROGRESS = {"1": "started", "3": "finished"}
 ACCOUNT_PROGRESS = {"1": "finished", "2": "started", "3": "started"}
@@ -86,14 +88,6 @@ def seed_device_progress(page: Page) -> None:
     seed_storage(page, {PROGRESS_KEY: json.dumps(DEVICE_PROGRESS)})
 
 
-def stored_progress(page: Page) -> object:
-    """`nock.progress` parsed, or None when it is absent."""
-    raw = read_storage(page, PROGRESS_KEY)
-    if raw is None:
-        return None
-    return json.loads(raw)
-
-
 def answer_failing(page: Page, kind: str) -> None:
     """Answer the account's progress route as `kind` (one of `FAILING_ANSWERS`)."""
 
@@ -134,10 +128,6 @@ def expect_progresses(page: Page, progresses: dict[int, str]) -> None:
     """Expect each card of `progresses` to show its progress."""
     for number, progress in progresses.items():
         expect_progress(page, number, progress)
-
-
-ACCOUNT_PROGRESS_KEY = "nock.account_progress"
-ROOM_SOCKET_PATTERN = re.compile(r".*/api/rooms/[A-Z0-9]{6}/ws$")
 
 
 def stored_object(page: Page, key: str) -> object:
