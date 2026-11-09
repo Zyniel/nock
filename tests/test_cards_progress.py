@@ -30,7 +30,7 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page, expect
 
-from library_harness import (
+from cards_harness import (
     ACCOUNT_PROGRESS,
     ACCOUNT_PROGRESS_PATH,
     ACCOUNT_PROGRESS_ROUTE,

@@ -29,9 +29,13 @@ from pathlib import Path
 import pytest
 from playwright.sync_api import Browser, Page, Route
 
-from cards_harness import ACCOUNT_PROGRESS_KEY
+from cards_harness import (
+    ACCOUNT_PROGRESS_KEY,
+    ACCOUNT_PROGRESS_ROUTE,
+    PROGRESS_KEY,
+    expect_progresses,
+)
 from catalogue_builders import reference_catalogue
-from library_harness import ACCOUNT_PROGRESS_ROUTE, PROGRESS_KEY, expect_progresses
 from nock.grid import Grid
 from spec033_harness import (
     ACCOUNT_PAGE_PATH,

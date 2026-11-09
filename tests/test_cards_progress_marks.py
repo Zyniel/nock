@@ -26,19 +26,17 @@ from playwright.sync_api import Page, expect
 
 from cards_harness import (
     ACCOUNT_PROGRESS_KEY,
+    ACCOUNT_PROGRESS_PATH,
+    ACCOUNT_PROGRESS_ROUTE,
+    PROGRESS_KEY,
+    RequestLog,
     device_keys,
     open_grid,
     stored_object,
     tap_play,
     tap_replay,
-    wait_for_stored,
-)
-from library_harness import (
-    ACCOUNT_PROGRESS_PATH,
-    ACCOUNT_PROGRESS_ROUTE,
-    PROGRESS_KEY,
-    RequestLog,
     wait_for_progress_answers,
+    wait_for_stored,
 )
 from spec029_harness import HISTORY_KEY, device_record, history_value
 from spec032_harness import seed_storage
