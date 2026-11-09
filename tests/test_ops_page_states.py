@@ -327,6 +327,7 @@ def replay_with_second_edit(grid: Grid, field: str, value: object) -> object:
     ("field", "value"),
     [
         pytest.param("at", "hier", id="time-hier"),
+        pytest.param("at", "2026-02-30T10:00:00Z", id="time-feb-30"),
         pytest.param("seq", 1.5, id="seq-1.5"),
     ],
 )
