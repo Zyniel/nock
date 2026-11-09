@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: pencil
-status: approved
+status: done
 ---
 
 # gameplay/pencil - Pencil mode and confirming

@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: co-op
-status: approved
+status: done
 ---
 
 # gameplay/co-op - Shared letters and same-cell conflicts

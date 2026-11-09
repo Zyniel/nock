@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: board
-status: approved
+status: done
 ---
 
 # gameplay/board - Selection, typing and the in-app keyboard
