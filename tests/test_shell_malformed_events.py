@@ -17,10 +17,16 @@ found a wrong letter. With `wrong` `[]` the line is in green, the
 look of a clean check (`specs/_design/room.md`, « Salon »).
 
 AC-36: on the same room, the mock sends letter event 6 `W` at (2, 1) as a binary
-frame (UTF-8 JSON), or the text frame `{"seq": 6}` with no `type`. Letter event 6 `V`
-at (2, 1), sent next as text, gives seq 6 with nothing buffered, the page still
-joined, and (2, 1) showing `V`: a decoded binary frame would have shown `W` or
-buffered the text event, so no fixed delay is waited.
+frame (UTF-8 JSON), or the text frame `{"seq": 6}` with no `type`, then the text
+letter event 7 `T` at (1, 0). The page buffers `T`: one pending, still at seq 5. The
+text letter event 6 `V` at (2, 1) then gives seq 7 with nothing buffered, the page
+still joined, (2, 1) showing `V` and (1, 0) `T`.
+
+No fixed delay is waited. The page is read after a round trip (an `expect` on
+`data-pending`) before `V` is sent, so a decoder of binary frames, synchronous or
+reading a `Blob` (which always waits), has had the time to apply `W` at seq 6 first:
+`T` then applies at once and nothing is pending, and the text `V` comes as a
+duplicate, dropped, leaving `W` at (2, 1).
 """
 
 from __future__ import annotations
@@ -140,6 +146,9 @@ LETTER_ROW = 2
 LETTER_COLUMN = 1
 LETTER = "V"
 BINARY_LETTER = "W"
+LATER_ROW = 1
+LATER_COLUMN = 0
+LATER_LETTER = "T"
 
 
 def _send_binary(mock: RoomMock, text: str) -> None:
@@ -178,11 +187,19 @@ def test_ac36_a_binary_or_typeless_frame_is_dropped_and_event_6_then_applies(
     room = page.get_by_test_id("room-page")
 
     send_dropped_frame(mock)
+    mock.send(letter_frame(7, LATER_ROW, LATER_COLUMN, LATER_LETTER, "p2"))
+
+    expect(room).to_have_attribute("data-pending", "1")
+    expect_seq(page, 5)
+
     mock.send(letter_frame(6, LETTER_ROW, LETTER_COLUMN, LETTER, "p2"))
 
-    expect_seq(page, 6)
+    expect_seq(page, 7)
     expect(room).to_have_attribute("data-pending", "0")
     expect(room).to_have_attribute("data-status", "joined")
     expect(cell_at(page, LETTER_ROW, LETTER_COLUMN)).to_have_attribute(
         "data-letter", LETTER
+    )
+    expect(cell_at(page, LATER_ROW, LATER_COLUMN)).to_have_attribute(
+        "data-letter", LATER_LETTER
     )
