@@ -4,7 +4,7 @@ title: Window sizes in layout criteria, one rule
 status: Done
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-09T20:42:00Z'
+updated_date: '2026-11-09T20:43:00Z'
 labels:
   - follow-up
 milestone: m-11
@@ -30,7 +30,7 @@ From DRAFT-076. Criteria name window sizes (360 by 740, 320 by 568, 1280 by 720)
 - [x] #3 Tests committed before the code, or a tooling task
 - [x] #4 Reviewer APPROVE within two rounds
 - [x] #5 Full gate green
-- [ ] #6 Pull request open with auto-merge on, or left to the human to merge
+- [x] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -49,6 +49,8 @@ Lead: the specs (archive left out) name 78 sizes in 13 files; every window size 
 Spec-checker: CHANGES REQUESTED in round 1 (1920 by 1080 both listed and excluded as a bound of product.md rule 11; 283 by 640 named like a phone class), APPROVED in round 2. No test and no code change: no criterion changed.
 
 Reviewer: APPROVE in one round; its wording suggestion taken (a window on a threshold or a pixel on either side), spec-checker APPROVED. Left: _map.md is 20 KB (not a domain file; already over before).
+
+Pull request: https://github.com/Zyniel/nock/pull/187
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
