@@ -157,10 +157,20 @@ writes it); nothing of race or teams is built.
 - About 15 KB and 20 criteria per file. Over that, split the domain and update
   the table above.
 - Never the look (cite the design file and section), never test mechanics
-  (window sizes, test ids, sample lists, fixtures: the tests hold them), never
-  copies of code (name the module), never history (the commit message holds the
-  reason; a `<file>.notes.md` next to the spec keeps one only when a later change
-  will need it).
+  (test ids, sample lists, fixtures: the tests hold them), never copies of code
+  (name the module), never history (the commit message holds the reason; a
+  `<file>.notes.md` next to the spec keeps one only when a later change will
+  need it).
+- A window is not a test mechanic: a layout criterion names the window it is
+  about, by its size, from this list: the phone 360 by 740 and sideways 740 by
+  360; the small phone 320 by 568 and sideways 568 by 320; 283 by 640, a window
+  under the floor of `product.md` rule 11; the tablet 768 by 1024 and sideways
+  1024 by 768; the desktop 1280 by 720; the laptop 1280 by 800; the large
+  desktop 1920 by 1080; the low desktop 1280 by 480. A criterion about a
+  threshold that `_design/` sets (900 px wide, 500 px high, landscape) may also
+  name a window on it and one a pixel past it: 900 and 899 by 600, 800 by 800.
+  A size that is not a window (the grid's viewport, a cell, an image, the floor
+  of `product.md` rule 11, 300 by 480) is not on the list.
 - "New interface" only while a change is being built.
 
 ## Naming rules

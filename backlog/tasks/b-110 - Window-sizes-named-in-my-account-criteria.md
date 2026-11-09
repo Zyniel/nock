@@ -1,10 +1,10 @@
 ---
 id: B-110
 title: Window sizes in layout criteria, one rule
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T22:21:00Z'
-updated_date: '2026-11-09T04:50:00Z'
+updated_date: '2026-11-09T20:00:00Z'
 labels:
   - follow-up
 milestone: m-11
@@ -32,3 +32,19 @@ From DRAFT-076. Criteria name window sizes (360 by 740, 320 by 568, 1280 by 720)
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/_map.md « What a spec holds » (the window sizes), plus any domain spec naming a size not on the list
+Tests: none expected (no criterion reworded)
+Gate: uv run python scripts/gate.py --stage tests (traceability)
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: the specs (archive left out) name 78 sizes in 13 files; every window size is on the new list, so no criterion changes. The sentence defining « The supported windows » as the eight sizes the tests share is dropped: that set is product.md rule 11, a baseline (escalation class, out of the milestone); follow-up draft. 283 by 640 stays listed (hud AC-3's test runs at it).
+
+Spec-checker: CHANGES REQUESTED in round 1 (1920 by 1080 both listed and excluded as a bound of product.md rule 11; 283 by 640 named like a phone class), APPROVED in round 2. No test and no code change: no criterion changed.
+<!-- SECTION:NOTES:END -->
