@@ -1,10 +1,10 @@
 ---
 id: B-109
 title: Pointers and citations fixed
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T22:33:00Z'
-updated_date: '2026-11-09T04:50:00Z'
+updated_date: '2026-11-09T18:03:00Z'
 labels:
   - domain:summaries
   - domain:history
@@ -33,3 +33,19 @@ From DRAFT-077, DRAFT-075 and DRAFT-097. (1) _map.md's glossary gets a row for s
 - [ ] #5 Full gate green
 - [ ] #6 Pull request open with auto-merge on, or left to the human to merge
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Specs: specs/_map.md, specs/lobby/summaries.md, specs/gameplay/history.md
+Tests: tests/test_hud_final_states.py (docstring citation only)
+Gate: uv run python scripts/gate.py --specs summaries,history --browsers chromium
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Lead: the spec-writer also fixed the same slip on summaries.md's Tests line (046 AC-11, AC-12): kept. (3): no unit test of displayNickname exists; the edge case points at joining.md rule 3 and the page tests of history AC-3 and erasure AC-3; no new test in this tidy task.
+
+Spec-checker APPROVED, two minor notes: history.md's Depends on does not list lobby/joining.md (now cited by the edge case), and the two cited criteria show one erased player each, so « twice » rests on rule 3. Both left for a follow-up draft.
+<!-- SECTION:NOTES:END -->

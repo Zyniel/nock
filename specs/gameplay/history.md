@@ -1,7 +1,7 @@
 ---
 area: gameplay
 file: history
-status: done
+status: approved
 ---
 
 # gameplay/history - Finished grids, « Grilles terminées », « Rejouer »
@@ -108,8 +108,9 @@ terminées », where a grid can be played again.
 - One grid finished in two rooms gives two records (AC-2).
 - A room finished while away, or whose room page's request failed, is
   recorded when the device next sees it solved, while it exists (AC-3).
-- Two erased team-mates read « Ancien joueur » twice (`lobby/summaries.md`
-  AC-5, `account/erasure.md` AC-18).
+- Two erased team-mates, `--` twice, read « Ancien joueur » twice: the display
+  of `lobby/joining.md` rule 3 names each one (AC-3, `account/erasure.md`
+  AC-3).
 
 ## Out of scope
 
