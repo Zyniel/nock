@@ -30,7 +30,7 @@ from __future__ import annotations
 import pytest
 from playwright.sync_api import Page, expect
 
-from library_harness import (
+from cards_harness import (
     ACCOUNT_PROGRESS,
     ACCOUNT_PROGRESS_PATH,
     ACCOUNT_PROGRESS_ROUTE,
@@ -38,6 +38,7 @@ from library_harness import (
     DEVICE_PROGRESS,
     FAILING_ANSWERS,
     MERGED,
+    PROGRESS_KEY,
     QUIET_MS,
     STATUS_PATH,
     RequestLog,
@@ -45,7 +46,7 @@ from library_harness import (
     expect_progress,
     expect_progresses,
     seed_device_progress,
-    stored_progress,
+    stored_object,
     wait_for_progress_answers,
 )
 from spec042_harness import wait_until
@@ -83,7 +84,7 @@ def test_ac7_the_catalogue_shows_the_merged_progress_and_keeps_the_device_storag
     expect_progresses(page, MERGED)
     wait_for_progress_answers(page, log, 1)
     page.wait_for_timeout(QUIET_MS)
-    assert stored_progress(page) == DEVICE_PROGRESS
+    assert stored_object(page, PROGRESS_KEY) == DEVICE_PROGRESS
     assert log.count(ACCOUNT_PROGRESS_PATH) == 1
     assert log.count(STATUS_PATH) == 1
 
@@ -104,7 +105,7 @@ def test_ac7_while_the_answer_is_pending_the_page_is_ready_with_the_devices_pill
     expect_progresses(page, DEVICE_ONLY)
     held.release(200, ACCOUNT_PROGRESS)
     expect_progresses(page, MERGED)
-    assert stored_progress(page) == DEVICE_PROGRESS
+    assert stored_object(page, PROGRESS_KEY) == DEVICE_PROGRESS
 
 
 # ---- AC-8: the grid page --------------------------------------------------------

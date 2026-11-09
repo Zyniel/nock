@@ -7,6 +7,8 @@ holds:
   AC-10) use: a screenshot clip decoded into its pixels, and the reading of one
   cell edge across its thickness and along its length, with the geometry of
   `specs/_design/cells.md` « Hyphen edges ».
+- The windows, cell sizes and cells that the hyphen edge tests share
+  (`test_viewport_hyphen_edges_*.py`), and the `hyphen_grid` fixture.
 - "AC-11's start" (FX-02 on a touch phone held upright, zoomed to 2 by a pinch,
   the viewport at the grid's top-left corner) and its readers of the scroll and
   the selection, which the zoomed tests of AC-11 to AC-20 share.
@@ -37,13 +39,26 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 import pytest
-from playwright.sync_api import CDPSession, Locator, Page, expect
+from playwright.sync_api import CDPSession, Locator, Page, ViewportSize, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from grids_harness import FX01_HYPHENS, grid_with_answers
 from nock.grid import Grid
 from nock.protocol import GridView, grid_view
 from spec006_harness import pinch
 from spec019_harness import OpenWindow
-from spec042_harness import RULE, Box, Rgb, box_of, cell_at, me, open_room, seed_value
+from spec042_harness import (
+    CELL_SELECTOR,
+    RULE,
+    WAIT_TIMEOUT_MS,
+    Box,
+    Rgb,
+    box_of,
+    cell_at,
+    me,
+    open_room,
+    seed_value,
+)
 from spec044_harness import KEYBOARD_HIDDEN_KEY, expect_no_keyboard
 
 # `--nock-hyphen` (`specs/_design/foundation.md`, « Colour tokens »).
@@ -731,3 +746,65 @@ def pinch_beside_a_pen(
         _send_mouse(session, Pointer.PEN, "mouseReleased", pen_path[-1], pressed=False)
     finally:
         session.detach()
+
+
+# ---- The hyphen edge tests: windows, cell sizes and cells ---------------------------
+
+MEDIUM_WINDOW = ViewportSize(width=700, height=400)  # FX-01 cells of about 57.4 px
+SMALL_WINDOW = ViewportSize(width=568, height=320)  # FX-02 cells of about 12.1 px
+LARGE_WINDOW = ViewportSize(width=1024, height=768)  # FX-01 cells of about 130.6 px
+
+Cell = tuple[int, int]
+SideRange = tuple[float, float]
+MEDIUM_SIDES: SideRange = (50.0, 64.0)
+SMALL_SIDES: SideRange = (10.0, 20.0)
+LARGE_SIDES: SideRange = (72.0, 200.0)
+
+VIDE_EDGE: Cell = (2, 2)  # its right edge
+NAVAL_EDGE: Cell = (1, 1)  # its bottom edge
+TAMIS_EDGE: Cell = (1, 1)  # its right edge
+FX02_EDGE: Cell = (1, 4)  # its right edge
+
+
+# True once the cell's side is fractional and in [low, high).
+SIDE_SCRIPT = """
+([selector, low, high]) => {
+  const cell = document.querySelector(selector);
+  if (cell === null) {
+    return false;
+  }
+  const side = cell.getBoundingClientRect().width;
+  return low <= side && side < high && side !== Math.trunc(side);
+}
+"""
+
+
+def require_side(page: Page, cell: Cell, sides: SideRange) -> float:
+    """The cell's side, once it is fractional and in `sides`.
+
+    The grid fits its area after the snapshot shows, so the side is polled; the
+    test fails, naming the side, when it is not such a side in time.
+    """
+    row, column = cell
+    low, high = sides
+    selector = CELL_SELECTOR.format(row=row, column=column)
+    try:
+        page.wait_for_function(
+            SIDE_SCRIPT, arg=[selector, low, high], timeout=WAIT_TIMEOUT_MS
+        )
+    except PlaywrightTimeoutError:
+        side = box_of(cell_at(page, *cell)).width
+        pytest.fail(f"cells of {side} px, expected a fractional side in {sides}")
+    return box_of(cell_at(page, *cell)).width
+
+
+def open_fx01(page: Page, base_url: str, view: GridView, window: ViewportSize) -> None:
+    """Open FX-01's room at `window`, `p1` alone, on a view."""
+    page.set_viewport_size(window)
+    open_room(page, base_url, view, [me()])
+
+
+@pytest.fixture
+def hyphen_grid(fx01_text: str) -> Grid:
+    """FX-01 with `VI-DE` and `NA-VAL`."""
+    return grid_with_answers(fx01_text, FX01_HYPHENS)
